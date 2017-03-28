@@ -1,205 +1,26 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 28 Mar 2017 13:13:30 -0600
-Subject: [Update][PATCH v9.1 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
-References: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <6fb7a454-7829-0147-9b53-2d85e9200ad3@redhat.com>
+From: vincent.legoll@gmail.com (Vincent Legoll)
+Date: Tue, 28 Mar 2017 21:14:50 +0200
+Subject: [linux-sunxi] About the thermal sensor driver on H3/A64/H5
+In-Reply-To: <20170329004009.2aa6b7a9@x220i>
+References: <20170329004009.2aa6b7a9@x220i>
+Message-ID: <CAEwRq=pWjuaEyn=_wzPDD-FY9jt=wB8fZKoTe6tJibchBjrmcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2017 06:21 AM, Hanjun Guo wrote:
-> With the preparation of platform msi support and interrupt producer
-> in commit d44fa3d46079 ("ACPI: Add support for ResourceSource/IRQ
-> domain mapping"), we can add mbigen ACPI support now.
-> 
-> Now that the major framework changes are ready, we just need to add
-> the ACPI probe code which creates the irqdomain for devices connecting
-> to it.
-> 
-> In order to create the irqdomain, we need to know the number of hw
-> irqs as input which is provided by mbigen. In DT case, we are using
-> "num-pins" property to describe it, and we will take advantage of
-> that too using _DSD in ACPI as there is no standard way of describe
-> it in ACPI way, also according to the _DSD rule described in
-> Documentation/acpi/DSD-properties-rules.txt, it doesn't break
-> the rules.
-> 
-> The DSDT is represented as below:
-> 
-> For mbigen,
->   Device(MBI0) {
->           Name(_HID, "HISI0152")
->           Name(_UID, Zero)
->           Name(_CRS, ResourceTemplate() {
->                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->           })
-> 
->          Name(_DSD, Package () {
->                  ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->                  Package () {
->                          Package () {"num-pins", 378}
->                  }
->         })
->  }
-> 
-> For devices,
->  Device(SAS0) {
->          Name(_HID, "HISIxxxx")
->          Name(_UID, Zero)
->          Name(_CRS, ResourceTemplate() {
->                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12, ...}
->          })
->  }
-> 
-> So for the devices connected to the mbigen, as we clearly say that
-> it refers to a specific interrupt controller (mbigen), we can get
-> the virq from mbigen's irqdomain once it's created successfully.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: MaJun <majun258@huawei.com>
-> Cc: Al Stone <ahs3@redhat.com>
-> Cc: Darren Hart <dvhart@infradead.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-mbigen.c | 75 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 72 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index 3756408..061cdb8 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -16,6 +16,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqchip.h>
->  #include <linux/module.h>
-> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
->  				    unsigned long *hwirq,
->  				    unsigned int *type)
->  {
-> -	if (is_of_node(fwspec->fwnode)) {
-> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
->  		if (fwspec->param_count != 2)
->  			return -EINVAL;
->  
-> @@ -271,6 +272,58 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +				     struct mbigen_device *mgn_chip)
-> +{
-> +	struct irq_domain *domain;
-> +	u32 num_pins = 0;
-> +	int ret;
-> +
-> +	/*
-> +	 * "num-pins" is the total number of interrupt pins implemented in
-> +	 * this mbigen instance, and mbigen is an interrupt controller
-> +	 * connected to ITS  converting wired interrupts into MSI, so we
-> +	 * use "num-pins" to alloc MSI vectors which are needed by client
-> +	 * devices connected to it.
-> +	 *
-> +	 * Here is the DSDT device node used for mbigen in firmware:
-> +	 *	Device(MBI0) {
-> +	 *		Name(_HID, "HISI0152")
-> +	 *		Name(_UID, Zero)
-> +	 *		Name(_CRS, ResourceTemplate() {
-> +	 *			Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-> +	 *		})
-> +	 *
-> +	 *		Name(_DSD, Package () {
-> +	 *			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-> +	 *			Package () {
-> +	 *				Package () {"num-pins", 378}
-> +	 *			}
-> +	 *		})
-> +	 *	}
-> +	 */
+Hello,
 
-Excellent.  These comments I really like.  Thanks for doing this!
+On Tue, Mar 28, 2017 at 6:40 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> I'm trying to do a mainlinable thermal driver for H3/A64/H5 SoCs;
 
-> +	ret = device_property_read_u32(&pdev->dev, "num-pins", &num_pins);
-> +	if (ret || num_pins == 0)
-> +		return -EINVAL;
-> +
-> +	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
-> +						   mbigen_write_msg,
-> +						   &mbigen_domain_ops,
-> +						   mgn_chip);
-> +	if (!domain)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +					    struct mbigen_device *mgn_chip)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
->  static int mbigen_device_probe(struct platform_device *pdev)
->  {
->  	struct mbigen_device *mgn_chip;
-> @@ -289,9 +342,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  	if (IS_ERR(mgn_chip->base))
->  		return PTR_ERR(mgn_chip->base);
->  
-> -	err = mbigen_of_create_domain(pdev, mgn_chip);
-> -	if (err)
-> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-> +		err = mbigen_of_create_domain(pdev, mgn_chip);
-> +	else if (ACPI_COMPANION(&pdev->dev))
-> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-> +	else
-> +		err = -EINVAL;
-> +
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain",
-> +			mgn_chip->base);
->  		return err;
-> +	}
->  
->  	platform_set_drvdata(pdev, mgn_chip);
->  	return 0;
-> @@ -303,10 +365,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  };
->  MODULE_DEVICE_TABLE(of, mbigen_of_match);
->  
-> +static const struct acpi_device_id mbigen_acpi_match[] = {
-> +	{ "HISI0152", 0 },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-> +
->  static struct platform_driver mbigen_platform_driver = {
->  	.driver = {
->  		.name		= "Hisilicon MBIGEN-V2",
->  		.of_match_table	= mbigen_of_match,
-> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
->  	},
->  	.probe			= mbigen_device_probe,
->  };
-> 
+What's the relationship with:
+- DVFS - from Ond?ej Jirman
+- THS - from Josef Gajdusek
 
-All LGTM.
+See : http://linux-sunxi.org/Linux_mainlining_effort#Minor_drivers
 
-Reviewed-by: Al Stone <ahs3@redhat.com>
+Are those not suitable ? unrelated ?
+
+Thanks
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Vincent Legoll
