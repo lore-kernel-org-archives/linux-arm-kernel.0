@@ -1,186 +1,94 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 28 Mar 2017 20:21:05 +0800
-Subject: [Update][PATCH v9.1 15/15] irqchip: mbigen: Add ACPI support
-Message-ID: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Mar 2017 14:22:29 +0200
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <20170328115413.GJ23682@e104320-lin>
+References: <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+ <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com>
+ <58CFF058.8020205@arm.com>
+ <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+ <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
+ <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
+ <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
+Message-ID: <20170328122229.GA31789@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the preparation of platform msi support and interrupt producer
-in commit d44fa3d46079 ("ACPI: Add support for ResourceSource/IRQ
-domain mapping"), we can add mbigen ACPI support now.
+On Tue, Mar 28, 2017 at 12:54:13PM +0100, Achin Gupta wrote:
+> On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
+> > On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
+> > > Hi Christoffer,
+> > >
+> > > (CC: Leif and Achin who know more about how UEFI fits into this picture)
+> > >
+> > > On 21/03/17 19:39, Christoffer Dall wrote:
+> > > > On Tue, Mar 21, 2017 at 07:11:44PM +0000, James Morse wrote:
+> > > >> On 21/03/17 11:34, Christoffer Dall wrote:
+> > > >>> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
+> > > >>>> On 2017/3/20 23:08, James Morse wrote:
+> > > >>>>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
+> > > >>>>>>>>> In the RAS implementation, hardware pass the virtual SEI
+> > > >>>>>>>>> syndrome information through the VSESR_EL2, so set the virtual
+> > > >>>>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
+> > > >>>>>>>>> the guest OS
+> > > >>>>>
+> > > >>>>> How does this work with firmware first?
+> > > >>>>
+> > > >>>> I explained it in previous mail about the work flow.
+> > > >>>
+> > > >>> When delivering and reporting SEIs to the VM, should this happen
+> > > >>> directly to the OS running in the VM, or to the guest firmware (e.g.
+> > > >>> UEFI) running in the VM as well?
+> > > >>
+> > > >> 'firmware first' is the ACPI specs name for x86's BIOS or management-mode
+> > > >> handling the error. On arm64 we have multiple things called firmware, so the
+> > > >> name might be more confusing than helpful.
+> > > >>
+> > > >> As far as I understand it, firmware here refers to the secure-world and EL3.
+> > > >> Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
+> > > >> routing them to EL3 where secure platform specific firmware generates CPER records.
+> > > >> For a guest, Qemu takes the role of this EL3-firmware.
+> 
+> +1
+> 
+> > > >>
+> > > > Thanks for the clarification.  So UEFI in the VM would not be involved
+> > > > in this at all?
+> > >
+> > > On the host, part of UEFI is involved to generate the CPER records.
+> > > In a guest?, I don't know.
+> > > Qemu could generate the records, or drive some other component to do it.
+> >
+> > I think I am beginning to understand this a bit.  Since the guet UEFI
+> > instance is specifically built for the machine it runs on, QEMU's virt
+> > machine in this case, they could simply agree (by some contract) to
+> > place the records at some specific location in memory, and if the guest
+> > kernel asks its guest UEFI for that location, things should just work by
+> > having logic in QEMU to process error reports and populate guest memory.
+> >
+> > Is this how others see the world too?
+> 
+> I think so!
+> 
+> AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
+> the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
+> HEST for the guest Kernel?
+> 
+> If so, then the question is how the guest UEFI finds out where QEMU (acting as
+> EL3 firmware) will populate the CPERs. This could either be a contract between
+> the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
+> where the memory is.
+> 
+> This is the way I expect it to work at the EL3/EL2 boundary. So I am
+> extrapolating it to the guest/hypervisor boundary. Do shout if I am missing
+> anything.
 
-Now that the major framework changes are ready, we just need to add
-the ACPI probe code which creates the irqdomain for devices connecting
-to it.
+No that sounds like a resonable comparison.
 
-In order to create the irqdomain, we need to know the number of hw
-irqs as input which is provided by mbigen. In DT case, we are using
-"num-pins" property to describe it, and we will take advantage of
-that too using _DSD in ACPI as there is no standard way of describe
-it in ACPI way, also according to the _DSD rule described in
-Documentation/acpi/DSD-properties-rules.txt, it doesn't break
-the rules.
+I'm not entirely sure what a HEST or GHES is, but I think the only place
+where I'm still not clear is if when the guest kernel is notified of
+errors does it (a) just traverse memory by following some pointers
+(which it may have pre-loaded at boot from UEFI), or (b) run UEFI code
+which can call into QEMU and generate error records on demand?
 
-The DSDT is represented as below:
-
-For mbigen,
-  Device(MBI0) {
-          Name(_HID, "HISI0152")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-          })
-
-         Name(_DSD, Package () {
-                 ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-                 Package () {
-                         Package () {"num-pins", 378}
-                 }
-        })
- }
-
-For devices,
- Device(SAS0) {
-         Name(_HID, "HISIxxxx")
-         Name(_UID, Zero)
-         Name(_CRS, ResourceTemplate() {
-                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12, ...}
-         })
- }
-
-So for the devices connected to the mbigen, as we clearly say that
-it refers to a specific interrupt controller (mbigen), we can get
-the virq from mbigen's irqdomain once it's created successfully.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: MaJun <majun258@huawei.com>
-Cc: Al Stone <ahs3@redhat.com>
-Cc: Darren Hart <dvhart@infradead.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-mbigen.c | 75 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 72 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 3756408..061cdb8 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,6 +16,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/module.h>
-@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 				    unsigned long *hwirq,
- 				    unsigned int *type)
- {
--	if (is_of_node(fwspec->fwnode)) {
-+	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
-@@ -271,6 +272,58 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	struct irq_domain *domain;
-+	u32 num_pins = 0;
-+	int ret;
-+
-+	/*
-+	 * "num-pins" is the total number of interrupt pins implemented in
-+	 * this mbigen instance, and mbigen is an interrupt controller
-+	 * connected to ITS  converting wired interrupts into MSI, so we
-+	 * use "num-pins" to alloc MSI vectors which are needed by client
-+	 * devices connected to it.
-+	 *
-+	 * Here is the DSDT device node used for mbigen in firmware:
-+	 *	Device(MBI0) {
-+	 *		Name(_HID, "HISI0152")
-+	 *		Name(_UID, Zero)
-+	 *		Name(_CRS, ResourceTemplate() {
-+	 *			Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-+	 *		})
-+	 *
-+	 *		Name(_DSD, Package () {
-+	 *			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-+	 *			Package () {
-+	 *				Package () {"num-pins", 378}
-+	 *			}
-+	 *		})
-+	 *	}
-+	 */
-+	ret = device_property_read_u32(&pdev->dev, "num-pins", &num_pins);
-+	if (ret || num_pins == 0)
-+		return -EINVAL;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
-+						   mbigen_write_msg,
-+						   &mbigen_domain_ops,
-+						   mgn_chip);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+#else
-+static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
-+					    struct mbigen_device *mgn_chip)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int mbigen_device_probe(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip;
-@@ -289,9 +342,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
--	err = mbigen_of_create_domain(pdev, mgn_chip);
--	if (err)
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-+		err = mbigen_of_create_domain(pdev, mgn_chip);
-+	else if (ACPI_COMPANION(&pdev->dev))
-+		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-+	else
-+		err = -EINVAL;
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain",
-+			mgn_chip->base);
- 		return err;
-+	}
- 
- 	platform_set_drvdata(pdev, mgn_chip);
- 	return 0;
-@@ -303,10 +365,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- };
- MODULE_DEVICE_TABLE(of, mbigen_of_match);
- 
-+static const struct acpi_device_id mbigen_acpi_match[] = {
-+	{ "HISI0152", 0 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-+
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
- 		.of_match_table	= mbigen_of_match,
-+		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
- 	},
- 	.probe			= mbigen_device_probe,
- };
--- 
-1.9.1
+Thanks,
+-Christoffer
