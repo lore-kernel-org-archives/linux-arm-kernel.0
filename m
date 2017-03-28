@@ -1,106 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 15:04:39 +0200
-Subject: [PATCH v2 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <87vaqtadry.fsf@free-electrons.com>
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
- <0e60fccd7913b83ee53d2921ce8f297927e8b6f3.1490120798.git-series.gregory.clement@free-electrons.com>
- <CACRpkdYv6WDWM60dRMaYfEt50M8N-yLYk2TRguNi78aQtt6X9A@mail.gmail.com>
- <87vaqtadry.fsf@free-electrons.com>
-Message-ID: <CACRpkdY0DzMGiRTWeS23iCY3Vja9dnXJVaMqOnhJRpBLowfYTA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Mar 2017 14:05:52 +0100
+Subject: [PATCH v22 00/11] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <CADyBb7ujZKDF0aUJZRUN81jor04mZ-V5ESWScAjaxoHQUeVFSA@mail.gmail.com>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <1cc5a994-0af6-79ea-930d-44b3fc789427@jonmasters.org>
+ <CADyBb7ujZKDF0aUJZRUN81jor04mZ-V5ESWScAjaxoHQUeVFSA@mail.gmail.com>
+Message-ID: <20170328130552.GA8643@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 12:36 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On lun., mars 27 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Tue, Mar 28, 2017 at 08:34:12PM +0800, Fu Wei wrote:
+> Hi Jon,
+> 
+> Thanks for your email
+>  An hour ago, I just got some feedback from Lorenzo, will update my
+> patchset ASAP according to his suggestion.
+> 
+> But I still need some feedback form Mark, I can see some progress here:
+> https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arch-timer/gtdt
+> 
+> I guess I should rebase my patchset to his gtdt branch for v23.
+> 
+> So now, I am waiting for Mark's feedback to move on.
 
->>> +                       u32 virq = irq_linear_revmap(d, hwirq +
->>> +                                                    i * GPIO_PER_REG);
->>
->> Use irq_find_mapping() instead please.
->
-> As we are in the interrupt handler I chose to use this function because
-> according to its documentation: "This is a fast path alternative to
-> irq_find_mapping() that can be called directly by irq controller code to
-> save a handful of instructions".
->
-> The only restriction is "It is always safe to call, but won't find irqs
-> mapped using the radix tree.". So I think that for this driver it is
-> okay.
+Sorry for the delay; I have not had the time to focus on this as I would
+like to. I'm happy with patches 1-4, but from patch 5 onwards, there's
+one change I'd like to see.
 
-So you are relying on the core code in gpiolib to select a linear
-map. That is implicit semantics, and either all drivers using
-GPIOLIB_IRQCHIP should be changed to irq_linear_revmap()
-or all stay with irq_find_mapping().
+I'd prefer that mmio timer frame rame N was always stored at
+arch_timer_mem::frame[N], rather than arch_timer_mem::frame[] being in
+an arbitrary order. That will make arch_timer_mem_frame::frame_nr
+redundant.
 
-In this case, I doubt it that you are actually so timing critical that
-it matters. Please use irq_find_mapping().
+To allow arch_timer_mem::frame[] this to be sparse, I'm happy to have a
+bool arch_timer_mem_frame::valid field that we set when probing each
+frame. Then we don't need arch_timer_mem::num_frames.
 
->>> +       nr_irq_parent = of_irq_count(np);
->>> +       spin_lock_init(&info->irq_lock);
->>> +
->>> +       if (!nr_irq_parent) {
->>> +               dev_err(&pdev->dev, "Invalid or no IRQ\n");
->>> +               return 0;
->>> +       }
->>
->> What if it is > 1? That doesn't seem to work but will pass this
->> check silently.
->
-> If we have nr_irq_parent > 1, it will work and it is actually expected.
+This will make iterating over the frames far less confusing, and makes
+it simple to detect when a frame number is erroneously reused.
 
-Ah, I get it. Nice.
+Otherwise, I'm largely happy to pick the rest and apply any fixups
+myself.
 
->>> +       ret = gpiochip_irqchip_add(gc, irqchip, 0,
->>> +                                  handle_level_irq, IRQ_TYPE_NONE);
->>
->> If you also set up the handler in .set_type() you can assign
->> handle_bad_irq() here and let .set_type set the right handler
->> as e.g. drivers/gpio/gpio-pl061.c.
->
-> Well the hardware can only manage the edge trigger, so there is no
-> benefit to modify it each time we want to change the kind of edge we
-> want (raising or falling). But your comment make me realized that I used
-> the wrong one, I will move to handle_edge_irq in the v4.
-
-Ooops, yeah handle_edge_irq() is what calls the ACK callback.
-
->>> +       for (i = 0; i < nrirqs; i++) {
->>> +               struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
->>> +
->>> +               d->mask = 1 << (i % GPIO_PER_REG);
->>> +       }
->>
->> What is this? It looks like a big hack. At least put in a fat
->> comment about what is going on and why.
->
-> I can reuse a part of the commit log here: "The only unusual "feature"
-> is that many interrupts are connected to the parent interrupt
-> controller. But we do not take advantage of this and use the chained irq
-> with all of them."
-
-What you're doing is mocking around with core irqchip semantics.
-Is ->mask really supposed to be played around with from the outsid
-like this?
-
-Anyways: BIT(i % GPIO_PER_REG) is nicer.
-
->>> +       for (i = 0; i < nr_irq_parent; i++) {
->>> +               int irq = irq_of_parse_and_map(np, i);
->>
->> I think gpiochip_irqchip_add() will do this for you already,
->> as it calls irq_create_mapping() for all offsets which will call
->> irq_of_parse_and_map() am I right?
->
-> After reading the code, it doesn't seem it is the case. At least there
-> is no irq_of_parse_and_map() call from gpiochip_irqchip_add(). And waht
-> we need here is to associate each IRQ to the same GPIO handler.
->
-> I can still try without this line to confirm it.
-
-It has irq_create_mapping(gpiochip->irqdomain, offset); that get
-called for every IRQ, and that will eventually call irq_of_parse_and_map()
-if the IRQs are defined in the device tree. (IIRC)
-
-Yours,
-Linus Walleij
+Thanks,
+Mark.
