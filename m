@@ -1,119 +1,108 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 28 Mar 2017 10:30:31 +0200
-Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
-In-Reply-To: <1490578500.22814.31.camel@mhfsdcap03>
-References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
- <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
- <13a83728-0031-5683-c371-4b517df32299@intel.com>
- <1490344369.22814.10.camel@mhfsdcap03>
- <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
- <1490348427.22814.19.camel@mhfsdcap03>
- <CAPDyKFoo5sJ2XtjyiW1DLjhFdJySbDK7+N05vrKpeiZsp25qrA@mail.gmail.com>
- <1490578500.22814.31.camel@mhfsdcap03>
-Message-ID: <CAPDyKFoWyVrdk7bG1n=rTSOddvqaj-uTO70QoGmcKQK1Fhio2w@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 28 Mar 2017 11:38:27 +0300
+Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
+In-Reply-To: <58DA1E38.50907@samsung.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
+ <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
+ <93e79e92-a102-e931-8d63-843031848888@samsung.com>
+ <58DA1E38.50907@samsung.com>
+Message-ID: <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Tue, Mar 28, 2017 at 11:26 AM, Inki Dae <inki.dae@samsung.com> wrote:
+> Merged.
 
->>
->> If there is a problem in __mmc_switch(), let's try to fix it there first.
->>
-> Anyway, it is a bug of retry 3 times at max but without check current
-> card status and ensure it's in transfer state before next retry.
+Hi,
 
-Correct. Do you want to send a patch that fixes this? Otherwise I can do it...
+I do not see the tag (with DT patches) merged by you which I provided
+to you before. These are essential for bisectability. Without them,
+kernel bisectability is broken. Did you merged the tag somewhere?
 
->> >> > I think the purpose of "re-tune" is trying to cover particular case(eg.
->> >> > voltage fluctuate or EMI or some glitch of host/device which caused CRC
->> >> > error)
->> >>
->> >> No, re-tuning is to compensate for drift caused primarily by temperature change.
->> >>
->> > Yes, by JEDEC spec, temperature change cause timing drift of EMMC
->> > device, but, as you mentioned, maybe I have a hardware problem of host,
->> > but needs Software to cover it. so that we are doing our best to do
->> > re-tune if got CRC error. if could recover it, then  it's better than
->> > system hung.
->>
->> Exactly in what cases do you get CRC errors for CMD6. We need a full
->> cmd log to understand and to help.
->>
->> >> > error) , but in such cases, too many cases are disable re-tune function
->> >> > by mmc_retune_hold(), for example, in this case, if a response CRC error
->> >> > got then we never have chance to recover it. then cause system cannot
->> >> > access emmc or suspend/resume fail.
->> >>
->> >> Maybe you have a hardware problem.
->>
->> There is no way I am going to accept patches touching this part of the
->> mmc core, without providing real evidence for how it solves a problem.
->> To me, it seems like you are applying a workaround for another issue.
->>
->> Again, try to provide us with some more data and logs, then perhaps we
->> can help narrow down the issues.
->>
->> Kind regards
->> Uffe
+Best regards,
+Krzysztof
+
+> Thanks,
+> Inki Dae
 >
-> Below is the fail log of suspend fail.
-> the normal command tune result should be 0xffffff9ff, but some time, we
-> get the tune result of 0xffffffff, then we choose the 10 as the best
-> tune parameter, which is not stable.
-> I know that we should focus on why we get the result of 0xffffffff, this
-> may be result of device/host timing shifting while tuning. but what I
-> want to do is that when get a response CRC error, we can do re-tune to
-> recovery it, but not only return the -84 and cause suspend fail
-> eventually. if all hardware are perfect, then we don't need the re-tune
-> mechanism.
-
-Thanks for elaborating!
-
-Can you please also tell exactly which of the CMD6 commands in the
-suspend sequence that is triggering this problem? Cache flush? Power
-off notification?
-
->
-> as Adrian's comment, if temperature change at here caused CMD6 response
-> CRC error, then how to recovery it ?
-
-So in your case, allowing re-tuning a little longer in __mmc_switch()
-solves your problem. Clearly there are cases when we need to prevent
-re-tuning when sending CMD6, however maybe not in all cases as we do
-today.
-
-For example it seems reasonable to not hold retuning before sending
-CMD6 for cache flush, but instead it should be sufficient to hold it
-before polling for busy in __mmc_switch().
-
-Adrian, what's your thoughts on this?
-
->
-> [  129.106622]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
-> [map:fffff9ff] [maxlen:21] [final:21] -->current result is OK and 21 is
-> stable
-> [  129.109404]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
-> [map:ffffe03f] [maxlen:19] [final:22]
-> --------------------> below is next resume and re-init card:
-> [  129.778454]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: Regulator set
-> error -22: 3300000 - 3300000
-> [  130.016987]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
-> [map:ffffffff] [maxlen:32] [final:10] --> this result if not OK and 10
-> is not stable.
-
-As you suspect the tuning didn't work out correctly, then why don't
-you retry one more time?
-
-> [  130.019556]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
-> [map:ffffc03f] [maxlen:18] [final:23]
-> [  130.124279]  (1)[1248:system_server]mmc0: cache flush error -84
-> [  130.125058]  (1)[1248:system_server]dpm_run_callback():
-> mmc_bus_suspend+0x0/0x4c returns -84
-> [  130.126104]  (1)[1248:system_server]PM: Device mmc0:0001 failed to
-> suspend: error -84
->
->
->
-
-Kind regards
-Uffe
+> 2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
+>> Hi inki,
+>>
+>> Could you check the this patch?
+>> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
+>>
+>> Best regards,
+>> Hoegeun
+>>
+>>
+>> On 03/08/2017 01:54 PM, Hoegeun Kwon wrote:
+>>> The dsi + panel is a parental relationship, so OF grpah is not needed.
+>>> Therefore, the current dsi_parse_dt function will throw an error,
+>>> because there is no linked OF graph for the case fimd + dsi + panel.
+>>>
+>>> Parse the Pll burst and esc clock frequency properties in dsi_parse_dt()
+>>> and create a bridge_node only if there is an OF graph associated with dsi.
+>>>
+>>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>>> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+>>> ---
+>>>   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 32 ++++++++------------------------
+>>>   1 file changed, 8 insertions(+), 24 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>>> index f5c04d0..2d4e118 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>>> @@ -1652,39 +1652,23 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+>>>       if (ret < 0)
+>>>           return ret;
+>>>   -    ep = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
+>>> -    if (!ep) {
+>>> -        dev_err(dev, "no output port with endpoint specified\n");
+>>> -        return -EINVAL;
+>>> -    }
+>>> -
+>>> -    ret = exynos_dsi_of_read_u32(ep, "samsung,burst-clock-frequency",
+>>> +    ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
+>>>                        &dsi->burst_clk_rate);
+>>>       if (ret < 0)
+>>> -        goto end;
+>>> +        return ret;
+>>>   -    ret = exynos_dsi_of_read_u32(ep, "samsung,esc-clock-frequency",
+>>> +    ret = exynos_dsi_of_read_u32(node, "samsung,esc-clock-frequency",
+>>>                        &dsi->esc_clk_rate);
+>>>       if (ret < 0)
+>>> -        goto end;
+>>> -
+>>> -    of_node_put(ep);
+>>> +        return ret;
+>>>         ep = of_graph_get_next_endpoint(node, NULL);
+>>> -    if (!ep) {
+>>> -        ret = -EINVAL;
+>>> -        goto end;
+>>> -    }
+>>> -
+>>> -    dsi->bridge_node = of_graph_get_remote_port_parent(ep);
+>>> -    if (!dsi->bridge_node) {
+>>> -        ret = -EINVAL;
+>>> -        goto end;
+>>> +    if (ep) {
+>>> +        dsi->bridge_node = of_graph_get_remote_port_parent(ep);
+>>> +        of_node_put(ep);
+>>>       }
+>>> -end:
+>>> -    of_node_put(ep);
+>>>   -    return ret;
+>>> +    return 0;
+>>>   }
+>>>     static int exynos_dsi_bind(struct device *dev, struct device *master,
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>>
