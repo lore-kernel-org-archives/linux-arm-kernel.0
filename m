@@ -1,55 +1,87 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 14:46:14 +0200
-Subject: [PATCH v2 9/9] arm: KVM: Treat CP15 accessors returning false as
- successful
-In-Reply-To: <20170327160345.12402-10-marc.zyngier@arm.com>
+Date: Tue, 28 Mar 2017 14:46:23 +0200
+Subject: [PATCH v2 1/9] arm64: KVM: PMU: Refactor pmu_*_el0_disabled
+In-Reply-To: <20170327160345.12402-2-marc.zyngier@arm.com>
 References: <20170327160345.12402-1-marc.zyngier@arm.com>
- <20170327160345.12402-10-marc.zyngier@arm.com>
-Message-ID: <20170328124614.GI31156@cbox>
+ <20170327160345.12402-2-marc.zyngier@arm.com>
+Message-ID: <20170328124623.GJ31156@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:03:45PM +0100, Marc Zyngier wrote:
-> Instead of considering that a CP15 accessor has failed when
-> returning false, let's consider that it is *always* successful
-> (after all, we won't stand for an incomplete emulation).
+On Mon, Mar 27, 2017 at 05:03:37PM +0100, Marc Zyngier wrote:
+> There is a lot of duplication in the pmu_*_el0_disabled helpers,
+> and as we're going to modify them shortly, let's move all the
+> common stuff in a single function.
 > 
-> The return value now simply indicates whether we should skip
-> the instruction (because it has now been emulated), or if we
-> should leave the PC alone if the emulation has injected an
-> exception.
+> No functionnal change.
 > 
-
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/kvm/coproc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  arch/arm64/kvm/sys_regs.c | 25 +++++++++++--------------
+>  1 file changed, 11 insertions(+), 14 deletions(-)
 > 
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 519aac12b365..2c14b69511e9 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -520,15 +520,15 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
->  		if (likely(r->access(vcpu, params, r))) {
->  			/* Skip instruction, since it was emulated */
->  			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> -			return 1;
->  		}
-> -		/* If access function fails, it should complain. */
->  	} else {
-> +		/* If access function fails, it should complain. */
->  		kvm_err("Unsupported guest CP15 access at: %08lx\n",
->  			*vcpu_pc(vcpu));
->  		print_cp_instr(params);
-> +		kvm_inject_undefined(vcpu);
->  	}
-> -	kvm_inject_undefined(vcpu);
-> +
->  	return 1;
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 0e26f8c2b56f..7e1d673304d5 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -460,35 +460,32 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
 >  }
 >  
+> -static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
+> +static bool check_disabled(struct kvm_vcpu *vcpu, u64 flags)
+>  {
+>  	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> +	bool cond = (reg & flags) || vcpu_mode_priv(vcpu);
+
+nit: I would call this variable 'enabled' and then return !enabled to
+make it clear what's going on.
+
+(If you agree, I can fix this up when applying along with the typo and
+rename pointed out by Suzuki).
+
+>  
+> -	return !((reg & ARMV8_PMU_USERENR_EN) || vcpu_mode_priv(vcpu));
+> +	return !cond;
+>  }
+>  
+> -static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
+> +static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
+>  {
+> -	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_EN);
+> +}
+>  
+> -	return !((reg & (ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN))
+> -		 || vcpu_mode_priv(vcpu));
+> +static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
+> +{
+> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN);
+>  }
+>  
+>  static bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
+>  {
+> -	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> -
+> -	return !((reg & (ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN))
+> -		 || vcpu_mode_priv(vcpu));
+> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN);
+>  }
+>  
+>  static bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
+>  {
+> -	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+> -
+> -	return !((reg & (ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN))
+> -		 || vcpu_mode_priv(vcpu));
+> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN);
+>  }
+>  
+>  static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 > -- 
 > 2.11.0
 > 
+
+Otherwise:
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
