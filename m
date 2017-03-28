@@ -1,97 +1,45 @@
-From: achin.gupta@arm.com (Achin Gupta)
-Date: Tue, 28 Mar 2017 12:54:13 +0100
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <20170328112328.GA31156@cbox>
-References: <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com>
- <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
- <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
- <20170328112328.GA31156@cbox>
-Message-ID: <20170328115413.GJ23682@e104320-lin>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 28 Mar 2017 15:08:11 +0300
+Subject: [PATCH 0/4] ARM: dts: r8a7794: Correct clock of DU1
+In-Reply-To: <1490697933-5849-1-git-send-email-geert+renesas@glider.be>
+References: <1490697933-5849-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <7112167.AJcfquYAnB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
-> On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
-> > Hi Christoffer,
-> >
-> > (CC: Leif and Achin who know more about how UEFI fits into this picture)
-> >
-> > On 21/03/17 19:39, Christoffer Dall wrote:
-> > > On Tue, Mar 21, 2017 at 07:11:44PM +0000, James Morse wrote:
-> > >> On 21/03/17 11:34, Christoffer Dall wrote:
-> > >>> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
-> > >>>> On 2017/3/20 23:08, James Morse wrote:
-> > >>>>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
-> > >>>>>>>>> In the RAS implementation, hardware pass the virtual SEI
-> > >>>>>>>>> syndrome information through the VSESR_EL2, so set the virtual
-> > >>>>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
-> > >>>>>>>>> the guest OS
-> > >>>>>
-> > >>>>> How does this work with firmware first?
-> > >>>>
-> > >>>> I explained it in previous mail about the work flow.
-> > >>>
-> > >>> When delivering and reporting SEIs to the VM, should this happen
-> > >>> directly to the OS running in the VM, or to the guest firmware (e.g.
-> > >>> UEFI) running in the VM as well?
-> > >>
-> > >> 'firmware first' is the ACPI specs name for x86's BIOS or management-mode
-> > >> handling the error. On arm64 we have multiple things called firmware, so the
-> > >> name might be more confusing than helpful.
-> > >>
-> > >> As far as I understand it, firmware here refers to the secure-world and EL3.
-> > >> Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
-> > >> routing them to EL3 where secure platform specific firmware generates CPER records.
-> > >> For a guest, Qemu takes the role of this EL3-firmware.
+Hi Geert,
 
-+1
+Thank you for the patches.
 
-> > >>
-> > > Thanks for the clarification.  So UEFI in the VM would not be involved
-> > > in this at all?
-> >
-> > On the host, part of UEFI is involved to generate the CPER records.
-> > In a guest?, I don't know.
-> > Qemu could generate the records, or drive some other component to do it.
->
-> I think I am beginning to understand this a bit.  Since the guet UEFI
-> instance is specifically built for the machine it runs on, QEMU's virt
-> machine in this case, they could simply agree (by some contract) to
-> place the records at some specific location in memory, and if the guest
-> kernel asks its guest UEFI for that location, things should just work by
-> having logic in QEMU to process error reports and populate guest memory.
->
-> Is this how others see the world too?
+On Tuesday 28 Mar 2017 12:45:29 Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> In the DTS files for the R-Car E2 SoC and for development boards based
+> on this SoC, the second channel of the display unit incorrectly points
+> to the module clock for the first channel.
+> 
+> This patch series adds the missing module clock for the second channel,
+> and refers to it from the DU device node in the various DTS files.
+> 
+> Untested due to lack of hardware.
 
-I think so!
+The patches look good to me.
 
-AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
-the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
-HEST for the guest Kernel?
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-If so, then the question is how the guest UEFI finds out where QEMU (acting as
-EL3 firmware) will populate the CPERs. This could either be a contract between
-the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
-where the memory is.
+> Geert Uytterhoeven (4):
+>   ARM: dts: r8a7794: Add DU1 clock to device tree
+>   ARM: dts: r8a7794: Correct clock of DU1
+>   ARM: dts: alt: Correct clock of DU1
+>   ARM: dts: silk: Correct clock of DU1
+> 
+>  arch/arm/boot/dts/r8a7794-alt.dts         |  2 +-
+>  arch/arm/boot/dts/r8a7794-silk.dts        |  2 +-
+>  arch/arm/boot/dts/r8a7794.dtsi            | 10 ++++++----
+>  include/dt-bindings/clock/r8a7794-clock.h |  1 +
+>  4 files changed, 9 insertions(+), 6 deletions(-)
 
-This is the way I expect it to work at the EL3/EL2 boundary. So I am
-extrapolating it to the guest/hypervisor boundary. Do shout if I am missing
-anything.
+-- 
+Regards,
 
-hth,
-Achin
-
->
-> >
-> > Leif and Achin are the people with the UEFI/bigger picture.
-> >
-> >
->
-> Thanks!
-> -Christoffer
-
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0060a/DEN0060A_ARM_MM_Interface_Specification.pdf
+Laurent Pinchart
