@@ -1,115 +1,205 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 28 Mar 2017 14:10:56 -0500
-Subject: [PATCH] selftests: watchdog: accept multiple params on command line
-Message-ID: <1490728256-24143-1-git-send-email-timur@codeaurora.org>
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 28 Mar 2017 13:13:30 -0600
+Subject: [Update][PATCH v9.1 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
+References: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <6fb7a454-7829-0147-9b53-2d85e9200ad3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Watchdog drivers are not required to retain programming information,
-such as timeouts, after the watchdog device is closed.  Therefore,
-the watchdog test should be able to perform multiple actions after
-opening the watchdog device.
+On 03/28/2017 06:21 AM, Hanjun Guo wrote:
+> With the preparation of platform msi support and interrupt producer
+> in commit d44fa3d46079 ("ACPI: Add support for ResourceSource/IRQ
+> domain mapping"), we can add mbigen ACPI support now.
+> 
+> Now that the major framework changes are ready, we just need to add
+> the ACPI probe code which creates the irqdomain for devices connecting
+> to it.
+> 
+> In order to create the irqdomain, we need to know the number of hw
+> irqs as input which is provided by mbigen. In DT case, we are using
+> "num-pins" property to describe it, and we will take advantage of
+> that too using _DSD in ACPI as there is no standard way of describe
+> it in ACPI way, also according to the _DSD rule described in
+> Documentation/acpi/DSD-properties-rules.txt, it doesn't break
+> the rules.
+> 
+> The DSDT is represented as below:
+> 
+> For mbigen,
+>   Device(MBI0) {
+>           Name(_HID, "HISI0152")
+>           Name(_UID, Zero)
+>           Name(_CRS, ResourceTemplate() {
+>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>           })
+> 
+>          Name(_DSD, Package () {
+>                  ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>                  Package () {
+>                          Package () {"num-pins", 378}
+>                  }
+>         })
+>  }
+> 
+> For devices,
+>  Device(SAS0) {
+>          Name(_HID, "HISIxxxx")
+>          Name(_UID, Zero)
+>          Name(_CRS, ResourceTemplate() {
+>                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12, ...}
+>          })
+>  }
+> 
+> So for the devices connected to the mbigen, as we clearly say that
+> it refers to a specific interrupt controller (mbigen), we can get
+> the virq from mbigen's irqdomain once it's created successfully.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: MaJun <majun258@huawei.com>
+> Cc: Al Stone <ahs3@redhat.com>
+> Cc: Darren Hart <dvhart@infradead.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-mbigen.c | 75 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 72 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index 3756408..061cdb8 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -16,6 +16,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irqchip.h>
+>  #include <linux/module.h>
+> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+>  				    unsigned long *hwirq,
+>  				    unsigned int *type)
+>  {
+> -	if (is_of_node(fwspec->fwnode)) {
+> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+>  		if (fwspec->param_count != 2)
+>  			return -EINVAL;
+>  
+> @@ -271,6 +272,58 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
+> +				     struct mbigen_device *mgn_chip)
+> +{
+> +	struct irq_domain *domain;
+> +	u32 num_pins = 0;
+> +	int ret;
+> +
+> +	/*
+> +	 * "num-pins" is the total number of interrupt pins implemented in
+> +	 * this mbigen instance, and mbigen is an interrupt controller
+> +	 * connected to ITS  converting wired interrupts into MSI, so we
+> +	 * use "num-pins" to alloc MSI vectors which are needed by client
+> +	 * devices connected to it.
+> +	 *
+> +	 * Here is the DSDT device node used for mbigen in firmware:
+> +	 *	Device(MBI0) {
+> +	 *		Name(_HID, "HISI0152")
+> +	 *		Name(_UID, Zero)
+> +	 *		Name(_CRS, ResourceTemplate() {
+> +	 *			Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+> +	 *		})
+> +	 *
+> +	 *		Name(_DSD, Package () {
+> +	 *			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+> +	 *			Package () {
+> +	 *				Package () {"num-pins", 378}
+> +	 *			}
+> +	 *		})
+> +	 *	}
+> +	 */
 
-For example, to set the timeout to 10s and ping every 5s:
+Excellent.  These comments I really like.  Thanks for doing this!
 
-	watchdog-test -t 10 -p 5 -e
+> +	ret = device_property_read_u32(&pdev->dev, "num-pins", &num_pins);
+> +	if (ret || num_pins == 0)
+> +		return -EINVAL;
+> +
+> +	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
+> +						   mbigen_write_msg,
+> +						   &mbigen_domain_ops,
+> +						   mgn_chip);
+> +	if (!domain)
+> +		return -ENOMEM;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
+> +					    struct mbigen_device *mgn_chip)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+>  static int mbigen_device_probe(struct platform_device *pdev)
+>  {
+>  	struct mbigen_device *mgn_chip;
+> @@ -289,9 +342,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>  	if (IS_ERR(mgn_chip->base))
+>  		return PTR_ERR(mgn_chip->base);
+>  
+> -	err = mbigen_of_create_domain(pdev, mgn_chip);
+> -	if (err)
+> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
+> +		err = mbigen_of_create_domain(pdev, mgn_chip);
+> +	else if (ACPI_COMPANION(&pdev->dev))
+> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
+> +	else
+> +		err = -EINVAL;
+> +
+> +	if (err) {
+> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain",
+> +			mgn_chip->base);
+>  		return err;
+> +	}
+>  
+>  	platform_set_drvdata(pdev, mgn_chip);
+>  	return 0;
+> @@ -303,10 +365,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>  };
+>  MODULE_DEVICE_TABLE(of, mbigen_of_match);
+>  
+> +static const struct acpi_device_id mbigen_acpi_match[] = {
+> +	{ "HISI0152", 0 },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
+> +
+>  static struct platform_driver mbigen_platform_driver = {
+>  	.driver = {
+>  		.name		= "Hisilicon MBIGEN-V2",
+>  		.of_match_table	= mbigen_of_match,
+> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+>  	},
+>  	.probe			= mbigen_device_probe,
+>  };
+> 
 
-Also, display the periodic decimal point only if the keep-alive call
-succeeds.
+All LGTM.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- tools/testing/selftests/watchdog/watchdog-test.c | 61 +++++++++++++-----------
- 1 file changed, 34 insertions(+), 27 deletions(-)
+Reviewed-by: Al Stone <ahs3@redhat.com>
 
-diff --git a/tools/testing/selftests/watchdog/watchdog-test.c b/tools/testing/selftests/watchdog/watchdog-test.c
-index 6983d05..a74c9d7 100644
---- a/tools/testing/selftests/watchdog/watchdog-test.c
-+++ b/tools/testing/selftests/watchdog/watchdog-test.c
-@@ -24,9 +24,11 @@
- static void keep_alive(void)
- {
-     int dummy;
-+    int ret;
- 
--    printf(".");
--    ioctl(fd, WDIOC_KEEPALIVE, &dummy);
-+    ret = ioctl(fd, WDIOC_KEEPALIVE, &dummy);
-+    if (!ret)
-+        printf(".");
- }
- 
- /*
-@@ -51,6 +53,7 @@ int main(int argc, char *argv[])
-     int flags;
-     unsigned int ping_rate = 1;
-     int ret;
-+    int i;
- 
-     setbuf(stdout, NULL);
- 
-@@ -61,31 +64,35 @@ int main(int argc, char *argv[])
- 	exit(-1);
-     }
- 
--    if (argc > 1) {
--	if (!strncasecmp(argv[1], "-d", 2)) {
--	    flags = WDIOS_DISABLECARD;
--	    ioctl(fd, WDIOC_SETOPTIONS, &flags);
--	    printf("Watchdog card disabled.\n");
--	    goto end;
--	} else if (!strncasecmp(argv[1], "-e", 2)) {
--	    flags = WDIOS_ENABLECARD;
--	    ioctl(fd, WDIOC_SETOPTIONS, &flags);
--	    printf("Watchdog card enabled.\n");
--	    goto end;
--	} else if (!strncasecmp(argv[1], "-t", 2) && argv[2]) {
--	    flags = atoi(argv[2]);
--	    ioctl(fd, WDIOC_SETTIMEOUT, &flags);
--	    printf("Watchdog timeout set to %u seconds.\n", flags);
--	    goto end;
--	} else if (!strncasecmp(argv[1], "-p", 2) && argv[2]) {
--	    ping_rate = strtoul(argv[2], NULL, 0);
--	    printf("Watchdog ping rate set to %u seconds.\n", ping_rate);
--	} else {
--	    printf("-d to disable, -e to enable, -t <n> to set " \
--		"the timeout,\n-p <n> to set the ping rate, and \n");
--	    printf("run by itself to tick the card.\n");
--	    goto end;
--	}
-+    for (i = 1; i < argc; i++) {
-+        if (!strncasecmp(argv[i], "-d", 2)) {
-+            flags = WDIOS_DISABLECARD;
-+            ret = ioctl(fd, WDIOC_SETOPTIONS, &flags);
-+            if (!ret)
-+                printf("Watchdog card disabled.\n");
-+        } else if (!strncasecmp(argv[i], "-e", 2)) {
-+            flags = WDIOS_ENABLECARD;
-+            ret = ioctl(fd, WDIOC_SETOPTIONS, &flags);
-+            if (!ret)
-+                printf("Watchdog card enabled.\n");
-+        } else if (!strncasecmp(argv[i], "-t", 2) && argv[2]) {
-+            flags = atoi(argv[i + 1]);
-+            ret = ioctl(fd, WDIOC_SETTIMEOUT, &flags);
-+            if (!ret)
-+                printf("Watchdog timeout set to %u seconds.\n", flags);
-+            i++;
-+        } else if (!strncasecmp(argv[i], "-p", 2) && argv[2]) {
-+            ping_rate = strtoul(argv[i + 1], NULL, 0);
-+            printf("Watchdog ping rate set to %u seconds.\n", ping_rate);
-+            i++;
-+        } else {
-+            printf("-d to disable, -e to enable, -t <n> to set "
-+                "the timeout,\n-p <n> to set the ping rate, and ");
-+            printf("run by itself to tick the card.\n");
-+            printf("Parameters are parsed left-to-right in real-time.\n");
-+            printf("Example: %s -d -t 10 -p 5 -e\n", argv[0]);
-+            goto end;
-+        }
-     }
- 
-     printf("Watchdog Ticking Away!\n");
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
