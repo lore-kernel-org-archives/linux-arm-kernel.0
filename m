@@ -1,10 +1,10 @@
 From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Tue, 28 Mar 2017 11:56:39 +0300
-Subject: [PATCH 12/16] drivers, net,
- ppp: convert asyncppp.refcnt from atomic_t to refcount_t
+Date: Tue, 28 Mar 2017 11:56:38 +0300
+Subject: [PATCH 11/16] drivers,
+ net: convert masces_tx_sa.refcnt from atomic_t to refcount_t
 In-Reply-To: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
 References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1490691403-4016-13-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1490691403-4016-12-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,56 +19,48 @@ Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
 Signed-off-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: David Windsor <dwindsor@gmail.com>
 ---
- drivers/net/ppp/ppp_async.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/net/macsec.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ppp/ppp_async.c b/drivers/net/ppp/ppp_async.c
-index feb9569..2d08f7e 100644
---- a/drivers/net/ppp/ppp_async.c
-+++ b/drivers/net/ppp/ppp_async.c
-@@ -69,7 +69,7 @@ struct asyncppp {
+diff --git a/drivers/net/macsec.c b/drivers/net/macsec.c
+index 1869223..2851dda 100644
+--- a/drivers/net/macsec.c
++++ b/drivers/net/macsec.c
+@@ -188,7 +188,7 @@ struct macsec_tx_sa {
+ 	struct macsec_key key;
+ 	spinlock_t lock;
+ 	u32 next_pn;
+-	atomic_t refcnt;
++	refcount_t refcnt;
+ 	bool active;
+ 	struct macsec_tx_sa_stats __percpu *stats;
+ 	struct rcu_head rcu;
+@@ -362,7 +362,7 @@ static struct macsec_tx_sa *macsec_txsa_get(struct macsec_tx_sa __rcu *ptr)
+ 	if (!sa || !sa->active)
+ 		return NULL;
  
- 	struct tasklet_struct tsk;
+-	if (!atomic_inc_not_zero(&sa->refcnt))
++	if (!refcount_inc_not_zero(&sa->refcnt))
+ 		return NULL;
  
--	atomic_t	refcnt;
-+	refcount_t	refcnt;
- 	struct semaphore dead_sem;
- 	struct ppp_channel chan;	/* interface to generic ppp layer */
- 	unsigned char	obuf[OBUFSIZE];
-@@ -140,14 +140,14 @@ static struct asyncppp *ap_get(struct tty_struct *tty)
- 	read_lock(&disc_data_lock);
- 	ap = tty->disc_data;
- 	if (ap != NULL)
--		atomic_inc(&ap->refcnt);
-+		refcount_inc(&ap->refcnt);
- 	read_unlock(&disc_data_lock);
- 	return ap;
- }
+ 	return sa;
+@@ -379,7 +379,7 @@ static void free_txsa(struct rcu_head *head)
  
- static void ap_put(struct asyncppp *ap)
+ static void macsec_txsa_put(struct macsec_tx_sa *sa)
  {
--	if (atomic_dec_and_test(&ap->refcnt))
-+	if (refcount_dec_and_test(&ap->refcnt))
- 		up(&ap->dead_sem);
+-	if (atomic_dec_and_test(&sa->refcnt))
++	if (refcount_dec_and_test(&sa->refcnt))
+ 		call_rcu(&sa->rcu, free_txsa);
  }
  
-@@ -185,7 +185,7 @@ ppp_asynctty_open(struct tty_struct *tty)
- 	skb_queue_head_init(&ap->rqueue);
- 	tasklet_init(&ap->tsk, ppp_async_process, (unsigned long) ap);
+@@ -1422,7 +1422,7 @@ static int init_tx_sa(struct macsec_tx_sa *tx_sa, char *sak, int key_len,
+ 	}
  
--	atomic_set(&ap->refcnt, 1);
-+	refcount_set(&ap->refcnt, 1);
- 	sema_init(&ap->dead_sem, 0);
+ 	tx_sa->active = false;
+-	atomic_set(&tx_sa->refcnt, 1);
++	refcount_set(&tx_sa->refcnt, 1);
+ 	spin_lock_init(&tx_sa->lock);
  
- 	ap->chan.private = ap;
-@@ -234,7 +234,7 @@ ppp_asynctty_close(struct tty_struct *tty)
- 	 * our channel ops (i.e. ppp_async_send/ioctl) are in progress
- 	 * by the time it returns.
- 	 */
--	if (!atomic_dec_and_test(&ap->refcnt))
-+	if (!refcount_dec_and_test(&ap->refcnt))
- 		down(&ap->dead_sem);
- 	tasklet_kill(&ap->tsk);
- 
+ 	return 0;
 -- 
 2.7.4
