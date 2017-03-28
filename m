@@ -1,47 +1,40 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 28 Mar 2017 13:25:59 -0400
-Subject: [PATCH] video: ARM CLCD: fix dma allocation size
-In-Reply-To: <20170308145805.1325-1-slemieux.tyco@gmail.com>
-References: <20170308145805.1325-1-slemieux.tyco@gmail.com>
-Message-ID: <1490721959.24147.3.camel@gmail.com>
+Date: Tue, 28 Mar 2017 13:28:23 -0400
+Subject: [PATCH 0/2] [kernel] ARM: lpc32xx: migrate CLCD config to
+ device tree
+In-Reply-To: <20170308174638.25578-1-slemieux.tyco@gmail.com>
+References: <20170308174638.25578-1-slemieux.tyco@gmail.com>
+Message-ID: <1490722103.24147.5.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+Hi Vladimir,
 
-On Wed, 2017-03-08 at 09:58 -0500, Sylvain Lemieux wrote:
-> From: Liam Beguin <lbeguin@tycoint.com>
+On Wed, 2017-03-08 at 12:46 -0500, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
 > 
-> This patch forces the frambuffer size to be aligned on kernel pages.
+> Migrate the CLCD configurations to the device tree and
+> remove custom functions from board files.
 > 
-> During the board startup, the splash screed did appear;
-> the "ts_test" program or our application were not able to start.
+> This change depends on the following change:
+> "video: ARM CLCD: fix dma allocation size"
+> https://www.spinics.net/lists/arm-kernel/msg567178.html
 > 
-> The following error message was reported:
-> error: failed to map framebuffer device to memory.
-> LinuxFB: driver cannot connect
+> Note:
+> * We tested a similar change on a custom LPC32xx board with a 480x272 LCD.
+> * We did not test this change on hardware;
+>   we do not have access to a PHY3250 board with the 240x320 LCD.
 > 
-> The issue was discovered, on the LPC32xx platform, during the migration
-> of the LCD definition from the board file to the device tree.
+> Liam Beguin (2):
+>   ARM: dts: lpc32xx: phy3250: add clcd configuration
+>   ARM: lpc32xx: drop CLCD configuration
 > 
-> Signed-off-by: Liam Beguin <lbeguin@tycoint.com>
-> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-> ---
->  drivers/video/fbdev/amba-clcd.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/lpc3250-phy3250.dts | 35 ++++++++++++++++++
+>  arch/arm/mach-lpc32xx/phy3250.c       | 70 -----------------------------------
+>  2 files changed, 35 insertions(+), 70 deletions(-)
 > 
-> diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-> index 0fab92c62828..ffc2c33c6cef 100644
-> --- a/drivers/video/fbdev/amba-clcd.c
-> +++ b/drivers/video/fbdev/amba-clcd.c
-> @@ -881,8 +881,8 @@ static int clcdfb_of_dma_setup(struct clcd_fb *fb)
->  	if (err)
->  		return err;
->  
-> -	framesize = fb->panel->mode.xres * fb->panel->mode.yres *
-> -			fb->panel->bpp / 8;
-> +	framesize = PAGE_ALIGN(fb->panel->mode.xres * fb->panel->mode.yres *
-> +			fb->panel->bpp / 8);
->  	fb->fb.screen_base = dma_alloc_coherent(&fb->dev->dev, framesize,
->  			&dma, GFP_KERNEL);
->  	if (!fb->fb.screen_base)
+do you think you can look at this patchset?
+
+
+Regards,
+Sylvain
