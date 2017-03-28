@@ -1,36 +1,106 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 28 Mar 2017 09:04:29 -0400
-Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
-References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
- <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
- <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
-Message-ID: <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Mar 2017 15:04:39 +0200
+Subject: [PATCH v2 5/7] pinctrl: aramda-37xx: Add irqchip support
+In-Reply-To: <87vaqtadry.fsf@free-electrons.com>
+References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
+ <0e60fccd7913b83ee53d2921ce8f297927e8b6f3.1490120798.git-series.gregory.clement@free-electrons.com>
+ <CACRpkdYv6WDWM60dRMaYfEt50M8N-yLYk2TRguNi78aQtt6X9A@mail.gmail.com>
+ <87vaqtadry.fsf@free-electrons.com>
+Message-ID: <CACRpkdY0DzMGiRTWeS23iCY3Vja9dnXJVaMqOnhJRpBLowfYTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/28/2017 8:52 AM, Sinan Kaya wrote:
-> On 3/28/2017 2:02 AM, Patel, Mayurkumar wrote:
->> Thanks for your patches. I am seeing kernel panic after applying
->> these patches (on top of latest kernel) each time during early boot in pci_aspm_init() (any hints already?) function.
->> Need to check if it's something related to my local setup or it's because of these changes.
->> For now I don't have more details why it crashes but I will dig in further and I will provide
->> you more data as soon as I have it.
+On Tue, Mar 28, 2017 at 12:36 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+>  On lun., mars 27 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+
+>>> +                       u32 virq = irq_linear_revmap(d, hwirq +
+>>> +                                                    i * GPIO_PER_REG);
 >>
-> 
-> Interesting, I retested Qemu and I don't see an issue. 
-> Can you share your bootlog when you see the crash?
-> 
-Thinking more...
+>> Use irq_find_mapping() instead please.
+>
+> As we are in the interrupt handler I chose to use this function because
+> according to its documentation: "This is a fast path alternative to
+> irq_find_mapping() that can be called directly by irq controller code to
+> save a handful of instructions".
+>
+> The only restriction is "It is always safe to call, but won't find irqs
+> mapped using the radix tree.". So I think that for this driver it is
+> okay.
 
-Can you add this to the top of pci_aspm_init() and try again?
+So you are relying on the core code in gpiolib to select a linear
+map. That is implicit semantics, and either all drivers using
+GPIOLIB_IRQCHIP should be changed to irq_linear_revmap()
+or all stay with irq_find_mapping().
 
-if (!pci_is_pcie(pdev))
-          return -EINVAL;
+In this case, I doubt it that you are actually so timing critical that
+it matters. Please use irq_find_mapping().
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>> +       nr_irq_parent = of_irq_count(np);
+>>> +       spin_lock_init(&info->irq_lock);
+>>> +
+>>> +       if (!nr_irq_parent) {
+>>> +               dev_err(&pdev->dev, "Invalid or no IRQ\n");
+>>> +               return 0;
+>>> +       }
+>>
+>> What if it is > 1? That doesn't seem to work but will pass this
+>> check silently.
+>
+> If we have nr_irq_parent > 1, it will work and it is actually expected.
+
+Ah, I get it. Nice.
+
+>>> +       ret = gpiochip_irqchip_add(gc, irqchip, 0,
+>>> +                                  handle_level_irq, IRQ_TYPE_NONE);
+>>
+>> If you also set up the handler in .set_type() you can assign
+>> handle_bad_irq() here and let .set_type set the right handler
+>> as e.g. drivers/gpio/gpio-pl061.c.
+>
+> Well the hardware can only manage the edge trigger, so there is no
+> benefit to modify it each time we want to change the kind of edge we
+> want (raising or falling). But your comment make me realized that I used
+> the wrong one, I will move to handle_edge_irq in the v4.
+
+Ooops, yeah handle_edge_irq() is what calls the ACK callback.
+
+>>> +       for (i = 0; i < nrirqs; i++) {
+>>> +               struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
+>>> +
+>>> +               d->mask = 1 << (i % GPIO_PER_REG);
+>>> +       }
+>>
+>> What is this? It looks like a big hack. At least put in a fat
+>> comment about what is going on and why.
+>
+> I can reuse a part of the commit log here: "The only unusual "feature"
+> is that many interrupts are connected to the parent interrupt
+> controller. But we do not take advantage of this and use the chained irq
+> with all of them."
+
+What you're doing is mocking around with core irqchip semantics.
+Is ->mask really supposed to be played around with from the outsid
+like this?
+
+Anyways: BIT(i % GPIO_PER_REG) is nicer.
+
+>>> +       for (i = 0; i < nr_irq_parent; i++) {
+>>> +               int irq = irq_of_parse_and_map(np, i);
+>>
+>> I think gpiochip_irqchip_add() will do this for you already,
+>> as it calls irq_create_mapping() for all offsets which will call
+>> irq_of_parse_and_map() am I right?
+>
+> After reading the code, it doesn't seem it is the case. At least there
+> is no irq_of_parse_and_map() call from gpiochip_irqchip_add(). And waht
+> we need here is to associate each IRQ to the same GPIO handler.
+>
+> I can still try without this line to confirm it.
+
+It has irq_create_mapping(gpiochip->irqdomain, offset); that get
+called for every IRQ, and that will eventually call irq_of_parse_and_map()
+if the IRQs are defined in the device tree. (IIRC)
+
+Yours,
+Linus Walleij
