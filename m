@@ -1,61 +1,50 @@
-From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Tue, 28 Mar 2017 20:20:43 +0200
-Subject: [PATCH v2, 2/3] tty/serial: meson_uart: add documentation for the
- dt-bindings
-In-Reply-To: <20170328100551.GA24221@leverpostej>
-References: <20170328092545.4644-1-hgkr.klein@gmail.com>
- <20170328092545.4644-3-hgkr.klein@gmail.com>
- <20170328100551.GA24221@leverpostej>
-Message-ID: <c233fb1c-7ae5-cfdf-938d-6e9dfa7bbcca@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Mar 2017 19:48:28 +0100
+Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
+In-Reply-To: <20170322183512.GB27921@leverpostej>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+ <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+ <20170310183555.GB6271@arm.com>
+ <20170322183512.GB27921@leverpostej>
+Message-ID: <20170328184828.GF8643@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Mark,
+On Wed, Mar 22, 2017 at 06:35:13PM +0000, Mark Rutland wrote:
+> On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
+> > On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
+> 
+> > > The next question is how do we merge this. Obviously, we can't split it
+> > > between trees, and this is very likely to clash with anything that we
+> > > will merge on the KVM side (the sysreg table is a popular place).
+> > > 
+> > > Will, Catalin: Would it make sense to create a stable branch with these
+> > > patches, and merge it into both the arm64 and KVM trees? That'd make
+> > > things easier...
+> > 
+> > I think the scope for conflict on our side is pretty high too, so a shared
+> > branch might be the best way to go. I don't want to branch just yet though,
+> > so I'll probably wait a week or so before setting something in stone.
+> 
+> Any further thoughts on this?
+> 
+> Christoffer has Acked the KVM bits, so if you're happy to do so for the
+> arm64 bits I can make a stable branch.
 
-i will add your text to the patch.
+Looking around, it doesn't look like there's anything outside of arm64
+that'll conflict on the <asm/sysreg.h> changes, and git's happy to merge
+my changes with Suzuki's changes currently queued in arm64's
+for-next/core branch.
 
-Helmut
+I think it would make sense for those to be in a common branch taken by
+both the arm64 and KVM trees, with the KVM-specific parts being taken by
+KVM alone atop of that.
 
-On 28.03.2017 12:05, Mark Rutland wrote:
-> On Tue, Mar 28, 2017 at 11:25:44AM +0200, Helmut Klein wrote:
->> Add the documentation for the device tree binding of meson_uart
->>
->> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
->> ---
->>  .../bindings/serial/amlogic,meson_uart.txt         | 25 ++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
->>
->> diff --git a/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
->> new file mode 100644
->> index 000000000000..6f94ba25760d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
->> @@ -0,0 +1,25 @@
->> +* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
->> +
->> +Required properties:
->> +- compatible	: "amlogic,meson-uart"
->> +- reg		: offset and length of the register set for the device.
->> +- interrupts	: device interrupt
->> +- clocks	: the baud rate clock for the UART and optionally the core clock for the none AO uarts
->> +e.g.
->> +uart_A: serial at 84c0 {
->> +	compatible = "amlogic,meson-uart";
->> +	reg = <0x0 0x84c0 0x0 0x14>;
->> +	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
->> +	interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
->> +	clocks = <&xtal>, <&clkc CLKID_UART0>;
->> +	clock-names = "xtal", "core";
->
-> Please define these explicitly above, e.g.
->
-> - clocks: a list of phandle + clock-specifier pairs, one for each entry
->           in clock names.
-> - clock-names: contains:
->   * "xtal" for the baud rate clock
->   * "core" for the non-AO UARTs (optional)
->
-> Thanks,
-> Mark.
->
+Would everyone be happy with that?
+
+For reference, I've updated my branches so that arm64/common-sysreg only
+contains the common parts, with the KVM parts atop of that in
+kvm/common-sysreg.
+
+Thanks,
+Mark.
