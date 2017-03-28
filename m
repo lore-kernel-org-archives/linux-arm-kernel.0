@@ -1,56 +1,46 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 14:44:55 +0200
-Subject: [PATCH v2 2/9] arm64: KVM: PMU: Inject UNDEF exception on
- illegal register access
-In-Reply-To: <20170327160345.12402-3-marc.zyngier@arm.com>
-References: <20170327160345.12402-1-marc.zyngier@arm.com>
- <20170327160345.12402-3-marc.zyngier@arm.com>
-Message-ID: <20170328124455.GB31156@cbox>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 28 Mar 2017 15:49:58 +0200
+Subject: [PATCH v5 1/5] usb: dwc2: Add support for STM32F429/439/469 USB
+ OTG HS/FS in FS mode (internal PHY)
+In-Reply-To: <8760ith6a6.fsf@linux.intel.com>
+References: <20170201012547.76158-1-bruherrera@gmail.com>
+ <20170201012547.76158-2-bruherrera@gmail.com>
+ <2B3535C5ECE8B5419E3ECBE300772909021B411720@US01WEMBX2.internal.synopsys.com>
+ <58187797-2c11-c75b-571c-27fe64578099@st.com>
+ <8760ith6a6.fsf@linux.intel.com>
+Message-ID: <d3711b3b-401d-87c7-20bd-a88364ef15a1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:03:38PM +0100, Marc Zyngier wrote:
-> Both pmu_*_el0_disabled() and pmu_counter_idx_valid() perform checks
-> on the validity of an access, but only return a boolean indicating
-> if the access is valid or not.
-> 
-> Let's allow these functions to also inject an UNDEF exception if
-> the access was illegal.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
-> ---
->  arch/arm64/kvm/sys_regs.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 7e1d673304d5..d98ce9a52291 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -465,6 +465,9 @@ static bool check_disabled(struct kvm_vcpu *vcpu, u64 flags)
->  	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
->  	bool cond = (reg & flags) || vcpu_mode_priv(vcpu);
->  
-> +	if (!cond)
-> +		kvm_inject_undefined(vcpu);
-> +
->  	return !cond;
->  }
->  
-> @@ -564,8 +567,10 @@ static bool pmu_counter_idx_valid(struct kvm_vcpu *vcpu, u64 idx)
->  
->  	pmcr = vcpu_sys_reg(vcpu, PMCR_EL0);
->  	val = (pmcr >> ARMV8_PMU_PMCR_N_SHIFT) & ARMV8_PMU_PMCR_N_MASK;
-> -	if (idx >= val && idx != ARMV8_PMU_CYCLE_IDX)
-> +	if (idx >= val && idx != ARMV8_PMU_CYCLE_IDX) {
-> +		kvm_inject_undefined(vcpu);
->  		return false;
-> +	}
->  
->  	return true;
->  }
-> -- 
-> 2.11.0
-> 
+On 03/28/2017 03:36 PM, Felipe Balbi wrote:
+>
+> Hi,
+>
+> Alexandre Torgue <alexandre.torgue@st.com> writes:
+>> Hi John,
+>>
+>> On 02/01/2017 04:37 AM, John Youn wrote:
+>>> On 1/31/2017 5:26 PM, Bruno Herrera wrote:
+>>>> This patch introduces a new parameter to activate USB OTG HS/FS core
+>>>> embedded phy transceiver. The STM32F4x9 SoC uses the GGPIO register
+>>>> to enable the transceiver.
+>>>> Also add the dwc2_set_params function for stm32f4 otg fs.
+>>>>
+>>>> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+>>>
+>>> Acked-by: John Youn <johnyoun@synopsys.com>
+>>>
+>> Do you plan to take those patches on your pull-request for 4.12?
+>> I was wondering if I take machine parts (DT) in my pull request for 4.12
+>> or if I wait an official version with driver part merged.
+>
+> patches already in my queue for v4.12
+
+Thanks for info.
+
+Regards
+Alex
+
+>
