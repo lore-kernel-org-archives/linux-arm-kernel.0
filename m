@@ -1,47 +1,71 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 28 Mar 2017 17:53:38 +0800
-Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
- <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <5c7f6092-9358-08ac-5341-2364637c2008@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Mar 2017 10:54:21 +0100
+Subject: [PATCH v34 05/14] arm64: mm: add set_memory_valid()
+In-Reply-To: <20170328065130.16019-3-takahiro.akashi@linaro.org>
+References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
+ <20170328065130.16019-3-takahiro.akashi@linaro.org>
+Message-ID: <CAKv+Gu_QjVyLCaXDsi_14AVnk0kMN9O6xiF6B7TLbp+weOkPTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 28 March 2017 at 07:51, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> This function validates and invalidates PTE entries, and will be utilized
+> in kdump to protect loaded crash dump kernel image.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-On 2017/3/22 6:47, Tyler Baicar wrote:
-> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
-> +
-> +	/* The host kernel will handle the synchronous external abort. There
-> +	 * is no need to pass the error into the guest.
-> +	 */
-> +	if (is_abort_synchronous(fault_status))
-> +		sea_status = handle_guest_sea((unsigned long)fault_ipa,
-> +				    kvm_vcpu_get_hsr(vcpu));
->  
->  	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
-> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
-> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
->  		kvm_inject_vabt(vcpu);
->  		return 1;
->  	}
-       After the host kernel correctly handle the synchronous external abort, the sea_status
-       will return 0, so the code logical will be continue go-no, whether it is better directly return
-       after correctly handle the SEA? such as below.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
-  		kvm_inject_vabt(vcpu);
-  		return 1;
-  	} else
-                return 1;
-
->  
-> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+> ---
+>  arch/arm64/include/asm/cacheflush.h |  1 +
+>  arch/arm64/mm/pageattr.c            | 15 +++++++++------
+>  2 files changed, 10 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index 5a2a6ee65f65..728f933cef8c 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -154,5 +154,6 @@ int set_memory_ro(unsigned long addr, int numpages);
+>  int set_memory_rw(unsigned long addr, int numpages);
+>  int set_memory_x(unsigned long addr, int numpages);
+>  int set_memory_nx(unsigned long addr, int numpages);
+> +int set_memory_valid(unsigned long addr, unsigned long size, int enable);
+>
+>  #endif
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 8def55e7249b..3212ee0558f6 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -125,20 +125,23 @@ int set_memory_x(unsigned long addr, int numpages)
+>  }
+>  EXPORT_SYMBOL_GPL(set_memory_x);
+>
+> -#ifdef CONFIG_DEBUG_PAGEALLOC
+> -void __kernel_map_pages(struct page *page, int numpages, int enable)
+> +int set_memory_valid(unsigned long addr, int numpages, int enable)
+>  {
+> -       unsigned long addr = (unsigned long) page_address(page);
 > -
->  	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
->  			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
->  
-> -	/* Check the stage-2 fault is trans. fault or write fault */
-> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
->  	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>         if (enable)
+> -               __change_memory_common(addr, PAGE_SIZE * numpages,
+> +               return __change_memory_common(addr, PAGE_SIZE * numpages,
+>                                         __pgprot(PTE_VALID),
+>                                         __pgprot(0));
+>         else
+> -               __change_memory_common(addr, PAGE_SIZE * numpages,
+> +               return __change_memory_common(addr, PAGE_SIZE * numpages,
+>                                         __pgprot(0),
+>                                         __pgprot(PTE_VALID));
+>  }
+> +
+> +#ifdef CONFIG_DEBUG_PAGEALLOC
+> +void __kernel_map_pages(struct page *page, int numpages, int enable)
+> +{
+> +       set_memory_valid((unsigned long)page_address(page), numpages, enable);
+> +}
+>  #ifdef CONFIG_HIBERNATION
+>  /*
+>   * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
+> --
+> 2.11.1
+>
