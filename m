@@ -1,67 +1,57 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 28 Mar 2017 13:38:29 +0900
-Subject: [PATCH 2/2] phy: rockchip-inno-usb2: Replace the extcon API
-In-Reply-To: <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
-References: <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170328043830epcas5p2a949278d79e3741891991a3bbeafb9dc@epcas5p2.samsung.com>
-Message-ID: <1490675909-2533-2-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 28 Mar 2017 13:38:28 +0900
+Subject: [PATCH 1/2] phy: qcom-usb-hs: Replace the extcon API
+References: <CGME20170328043830epcas1p4069bda461ad648cfd6598905b7167e9f@epcas1p4.samsung.com>
+Message-ID: <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch uses the resource-managed extcon API for extcon_register_notifier()
 and replaces the deprecated extcon API as following:
-- extcon_get_cable_state_() -> extcon_get_state()
-- extcon_set_cable_state_() -> extcon_set_state_sync()
+- (deprecated) extcon_get_cable_state_() -> extcon_get_state()
 
 Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-rockchip at lists.infradead.org
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/phy/phy-rockchip-inno-usb2.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/phy/phy-qcom-usb-hs.c | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index 4ea95c28a66f..02751f70067e 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -540,7 +540,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
- 			rockchip_usb2phy_power_off(rport->phy);
- 		/* fall through */
- 	case OTG_STATE_B_IDLE:
--		if (extcon_get_cable_state_(rphy->edev, EXTCON_USB_HOST) > 0) {
-+		if (extcon_get_state(rphy->edev, EXTCON_USB_HOST) > 0) {
- 			dev_dbg(&rport->phy->dev, "usb otg host connect\n");
- 			rport->state = OTG_STATE_A_HOST;
- 			rockchip_usb2phy_power_on(rport->phy);
-@@ -596,7 +596,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
- 			rport->vbus_attached = vbus_attach;
- 
- 			if (notify_charger && rphy->edev) {
--				extcon_set_cable_state_(rphy->edev,
-+				extcon_set_state_sync(rphy->edev,
- 							cable, vbus_attach);
- 				if (cable == EXTCON_CHG_USB_SDP)
- 					extcon_set_state_sync(rphy->edev,
-@@ -617,7 +617,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
- 		sch_work = true;
- 		break;
- 	case OTG_STATE_A_HOST:
--		if (extcon_get_cable_state_(rphy->edev, EXTCON_USB_HOST) == 0) {
-+		if (extcon_get_state(rphy->edev, EXTCON_USB_HOST) == 0) {
- 			dev_dbg(&rport->phy->dev, "usb otg host disconnect\n");
- 			rport->state = OTG_STATE_B_IDLE;
- 			rockchip_usb2phy_power_off(rport->phy);
-@@ -1003,8 +1003,8 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
- 	if (!IS_ERR(rphy->edev)) {
- 		rport->event_nb.notifier_call = rockchip_otg_event;
- 
--		ret = extcon_register_notifier(rphy->edev, EXTCON_USB_HOST,
--					       &rport->event_nb);
-+		ret = devm_extcon_register_notifier(rphy->dev, rphy->edev,
-+					EXTCON_USB_HOST, &rport->event_nb);
- 		if (ret)
- 			dev_err(rphy->dev, "register USB HOST notifier failed\n");
+diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
+index 94dfbfd739c3..f630fa553b7d 100644
+--- a/drivers/phy/phy-qcom-usb-hs.c
++++ b/drivers/phy/phy-qcom-usb-hs.c
+@@ -156,12 +156,12 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
  	}
+ 
+ 	if (uphy->vbus_edev) {
+-		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
++		state = extcon_get_state(uphy->vbus_edev, EXTCON_USB);
+ 		/* setup initial state */
+ 		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
+ 					      uphy->vbus_edev);
+-		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
+-				&uphy->vbus_notify);
++		ret = devm_extcon_register_notifier(&ulpi->dev, uphy->vbus_edev,
++				EXTCON_USB, &uphy->vbus_notify);
+ 		if (ret)
+ 			goto err_ulpi;
+ 	}
+@@ -180,16 +180,8 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+ 
+ static int qcom_usb_hs_phy_power_off(struct phy *phy)
+ {
+-	int ret;
+ 	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
+ 
+-	if (uphy->vbus_edev) {
+-		ret = extcon_unregister_notifier(uphy->vbus_edev, EXTCON_USB,
+-						 &uphy->vbus_notify);
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	regulator_disable(uphy->v3p3);
+ 	regulator_disable(uphy->v1p8);
+ 	clk_disable_unprepare(uphy->sleep_clk);
 -- 
 1.9.1
