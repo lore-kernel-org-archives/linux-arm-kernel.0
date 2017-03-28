@@ -1,600 +1,285 @@
-From: harninder.rai@nxp.com (Harninder Rai)
-Date: Tue, 28 Mar 2017 22:03:08 +0530
-Subject: [PATCH][v3] arm64: dts: Add support for FSL's LS1088A SoC
-Message-ID: <1490718788-11283-1-git-send-email-harninder.rai@nxp.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 28 Mar 2017 10:35:22 -0600
+Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <bb4b4608-85ba-fd20-53b1-c19d99019de1@arm.com>
+References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
+ <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
+ <bb4b4608-85ba-fd20-53b1-c19d99019de1@arm.com>
+Message-ID: <ba39628f-f389-afe2-ea45-4b1e2de5c2e9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1088A contains eight ARM v8 CortexA53 processor cores
-with 32 KB L1-D cache and 32 KB L1-I cache
+Hello Marc,
 
-Features summary
- Eight 32-bit / 64-bit ARM v8 Cortex-A53 CPUs
-  - Arranged as two clusters of four cores sharing a 1 MB L2 cache
-  - Speed Up to 1.5 GHz
-  - Support for cluster power-gating.
- Cache coherent interconnect (CCI-400)
-  - Hardware-managed data coherency
-  - Up to 700 MHz
- One 64-bit DDR4 SDRAM memory controller with ECC
- Data path acceleration architecture 2.0 (DPAA2)
- Three PCIe 3.0 controllers
- One serial ATA (SATA 3.0) controller
- Three high-speed USB 3.0 controllers with integrated PHY
 
- Following levels of DTSI/DTS files have been created for the LS1088A
-  SoC family:
+On 3/24/2017 8:03 AM, Marc Zyngier wrote:
+> On 21/03/17 22:47, Tyler Baicar wrote:
+>> Currently external aborts are unsupported by the guest abort
+>> handling. Add handling for SEAs so that the host kernel reports
+>> SEAs which occur in the guest kernel.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> ---
+>>   arch/arm/include/asm/kvm_arm.h       | 10 +++++++++
+>>   arch/arm/include/asm/system_misc.h   |  5 +++++
+>>   arch/arm/kvm/mmu.c                   | 41 ++++++++++++++++++++++++++++++------
+>>   arch/arm64/include/asm/kvm_arm.h     | 10 +++++++++
+>>   arch/arm64/include/asm/system_misc.h |  2 ++
+>>   arch/arm64/mm/fault.c                | 19 +++++++++++++++--
+>>   drivers/acpi/apei/ghes.c             | 13 ++++++------
+>>   include/acpi/ghes.h                  |  2 +-
+>>   8 files changed, 86 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>> index a3f0b3d..ebf020b 100644
+>> --- a/arch/arm/include/asm/kvm_arm.h
+>> +++ b/arch/arm/include/asm/kvm_arm.h
+>> @@ -187,6 +187,16 @@
+>>   #define FSC_FAULT	(0x04)
+>>   #define FSC_ACCESS	(0x08)
+>>   #define FSC_PERM	(0x0c)
+>> +#define FSC_SEA		(0x10)
+>> +#define FSC_SEA_TTW0	(0x14)
+>> +#define FSC_SEA_TTW1	(0x15)
+>> +#define FSC_SEA_TTW2	(0x16)
+>> +#define FSC_SEA_TTW3	(0x17)
+>> +#define FSC_SECC	(0x18)
+>> +#define FSC_SECC_TTW0	(0x1c)
+>> +#define FSC_SECC_TTW1	(0x1d)
+>> +#define FSC_SECC_TTW2	(0x1e)
+>> +#define FSC_SECC_TTW3	(0x1f)
+>>   
+>>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>>   #define HPFAR_MASK	(~0xf)
+>> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+>> index a3d61ad..ea45d94 100644
+>> --- a/arch/arm/include/asm/system_misc.h
+>> +++ b/arch/arm/include/asm/system_misc.h
+>> @@ -24,4 +24,9 @@
+>>   
+>>   #endif /* !__ASSEMBLY__ */
+>>   
+>> +static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
+>> +{
+>> +	return -1;
+>> +}
+>> +
+> Shouldn't this be in the #ifndef __ASSEMBLY__ block? The assembler is
+> definitely going to barf on that...
+I will move this in the next patch set.
+>>   #endif /* __ASM_ARM_SYSTEM_MISC_H */
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 962616f..105b6ab 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -29,6 +29,7 @@
+>>   #include <asm/kvm_asm.h>
+>>   #include <asm/kvm_emulate.h>
+>>   #include <asm/virt.h>
+>> +#include <asm/system_misc.h>
+>>   
+>>   #include "trace.h"
+>>   
+>> @@ -1406,6 +1407,24 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+>>   		kvm_set_pfn_accessed(pfn);
+>>   }
+>>   
+>> +static bool is_abort_synchronous(unsigned long fault_status) {
+>> +	switch (fault_status) {
+>> +	case FSC_SEA:
+>> +	case FSC_SEA_TTW0:
+>> +	case FSC_SEA_TTW1:
+>> +	case FSC_SEA_TTW2:
+>> +	case FSC_SEA_TTW3:
+>> +	case FSC_SECC:
+>> +	case FSC_SECC_TTW0:
+>> +	case FSC_SECC_TTW1:
+>> +	case FSC_SECC_TTW2:
+>> +	case FSC_SECC_TTW3:
+>> +		return true;
+>> +	default:
+>> +		return false;
+>> +	}
+>> +}
+>> +
+>>   /**
+>>    * kvm_handle_guest_abort - handles all 2nd stage aborts
+>>    * @vcpu:	the VCPU pointer
+>> @@ -1426,23 +1445,31 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>   	unsigned long hva;
+>>   	bool is_iabt, write_fault, writable;
+>>   	gfn_t gfn;
+>> -	int ret, idx;
+>> +	int ret, idx, sea_status = 1;
+>> +
+>> +	/* Check the stage-2 fault is trans. fault or write fault */
+>> +	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>> +
+>> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+>> +
+>> +	/* The host kernel will handle the synchronous external abort. There
+>> +	 * is no need to pass the error into the guest.
+>> +	 */
+>> +	if (is_abort_synchronous(fault_status))
+>> +		sea_status = handle_guest_sea((unsigned long)fault_ipa,
+>> +				    kvm_vcpu_get_hsr(vcpu));
+>>   
+>>   	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+>> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
+>> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
+>>   		kvm_inject_vabt(vcpu);
+>>   		return 1;
+>>   	}
+>>   
+>> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+>> -
+>>   	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
+>>   			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+>>   
+>> -	/* Check the stage-2 fault is trans. fault or write fault */
+>> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>>   	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> -	    fault_status != FSC_ACCESS) {
+>> +	    fault_status != FSC_ACCESS && sea_status) {
+>>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>   			kvm_vcpu_trap_get_class(vcpu),
+>>   			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 6e99978..61d694c 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -204,6 +204,16 @@
+>>   #define FSC_FAULT	ESR_ELx_FSC_FAULT
+>>   #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+>>   #define FSC_PERM	ESR_ELx_FSC_PERM
+>> +#define FSC_SEA		ESR_ELx_FSC_EXTABT
+>> +#define FSC_SEA_TTW0	(0x14)
+>> +#define FSC_SEA_TTW1	(0x15)
+>> +#define FSC_SEA_TTW2	(0x16)
+>> +#define FSC_SEA_TTW3	(0x17)
+>> +#define FSC_SECC	(0x18)
+>> +#define FSC_SECC_TTW0	(0x1c)
+>> +#define FSC_SECC_TTW1	(0x1d)
+>> +#define FSC_SECC_TTW2	(0x1e)
+>> +#define FSC_SECC_TTW3	(0x1f)
+>>   
+>>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>>   #define HPFAR_MASK	(~UL(0xf))
+>> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+>> index bc81243..5b2cecd 100644
+>> --- a/arch/arm64/include/asm/system_misc.h
+>> +++ b/arch/arm64/include/asm/system_misc.h
+>> @@ -58,4 +58,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+>>   
+>>   #endif	/* __ASSEMBLY__ */
+>>   
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr);
+> Same remark here.
+Same here.
+>
+>> +
+>>   #endif	/* __ASM_SYSTEM_MISC_H */
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index f7372ce..ee96307 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -497,6 +497,7 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   {
+>>   	struct siginfo info;
+>> +	int ret = 0;
+>>   
+>>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>   		 fault_name(esr), esr, addr);
+>> @@ -508,7 +509,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   	 */
+>>   	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+>>   		nmi_enter();
+>> -		ghes_notify_sea();
+>> +		ret = ghes_notify_sea();
+>>   		nmi_exit();
+>>   	}
+>>   
+>> @@ -521,7 +522,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   		info.si_addr  = (void __user *)addr;
+>>   	arm64_notify_die("", regs, &info, esr);
+>>   
+>> -	return 0;
+>> +	return ret;
+>>   }
+>>   
+>>   static const struct fault_info {
+>> @@ -603,6 +604,20 @@ static const char *fault_name(unsigned int esr)
+>>   }
+>>   
+>>   /*
+>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>> + */
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+>> +{
+>> +	int ret = -ENOENT;
+>> +
+>> +	if(IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+>> +		ret = ghes_notify_sea();
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/*
+>>    * Dispatch a data abort to the relevant handler.
+>>    */
+>>   asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 230b095..81eabc6 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -810,17 +810,18 @@ static int ghes_notify_sci(struct notifier_block *this,
+>>   #ifdef CONFIG_ACPI_APEI_SEA
+>>   static LIST_HEAD(ghes_sea);
+>>   
+>> -void ghes_notify_sea(void)
+>> +int ghes_notify_sea(void)
+>>   {
+>>   	struct ghes *ghes;
+>> +	int ret = -ENOENT;
+>>   
+>> -	/*
+>> -	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+>> -	 * rcu_read_lock().
+>> -	 */
+>> +	rcu_read_lock();
+>>   	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+>> -		ghes_proc(ghes);
+>> +		if(!ghes_proc(ghes))
+>> +			ret = 0;
+>>   	}
+>> +	rcu_read_unlock();
+>> +	return ret;
+>>   }
+>>   
+>>   static void ghes_sea_add(struct ghes *ghes)
+>> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+>> index 18bc935..2a727dc 100644
+>> --- a/include/acpi/ghes.h
+>> +++ b/include/acpi/ghes.h
+>> @@ -99,6 +99,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
+>>   		gdata + 1;
+>>   }
+>>   
+>> -void ghes_notify_sea(void);
+>> +int ghes_notify_sea(void);
+>>   
+>>   #endif /* GHES_H */
+>>
+> Otherwise, the KVM changes look good to me. Assuming you fix the two
+> nits above:
+>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks!
+Tyler
 
-         - fsl-ls1088a.dtsi:
-                 DTS-Include file for NXP LS1088A SoC.
-
-         - fsl-ls1088a-qds.dts:
-                 DTS file for NXP LS1088A QDS board.
-
-         - fsl-ls1088a-rdb.dts:
-                 DTS file for NXP LS1088A RDB board
-
-Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
-Signed-off-by: Ashish Kumar <ashish.kumar@nxp.com>
-Signed-off-by: Raghav Dogra <raghav.dogra@nxp.com>`
----
-Changes in v3: Incorporated Shawn's comments
-- Sorted I2C devices in order of slave address
-- Changed pca node name to generic i2c-switch
-- Used define for interrupt polarity
-- Sorted labelled nodes
-
-Changes in v2: Incorporated Shawn's comments
-- License changed to GPL/X11 dual license
-- Device nodes in dtsi are disabled
-- Properly named temp-sensor node
-- Adjusted timer node to just after gic
-- Miscellaneous minor comments
-
- arch/arm64/boot/dts/freescale/Makefile            |   2 +
- arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts | 123 ++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts | 107 +++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 275 ++++++++++++++++++++++
- 4 files changed, 507 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 6d5df45..72c4b52 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -5,6 +5,8 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-new file mode 100644
-index 0000000..8c3cae5
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
-@@ -0,0 +1,123 @@
-+/*
-+ * Device Tree file for NXP LS1088A QDS Board.
-+ *
-+ * Copyright 2017 NXP
-+ *
-+ * Harninder Rai <harninder.rai@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "fsl-ls1088a.dtsi"
-+
-+/ {
-+	model = "LS1088A QDS Board";
-+	compatible = "fsl,ls1088a-qds", "fsl,ls1088a";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	i2c-switch at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			ina220 at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <1000>;
-+			};
-+
-+			ina220 at 41 {
-+				compatible = "ti,ina220";
-+				reg = <0x41>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			temp-sensor at 4c {
-+				compatible = "adi,adt7461a";
-+				reg = <0x4c>;
-+			};
-+
-+			rtc at 51 {
-+				compatible = "nxp,pcf2129";
-+				reg = <0x51>;
-+				/* IRQ10_B */
-+				interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			eeprom at 56 {
-+				compatible = "atmel,24c512";
-+				reg = <0x56>;
-+			};
-+
-+			eeprom at 57 {
-+				compatible = "atmel,24c512";
-+				reg = <0x57>;
-+			};
-+		};
-+	};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-new file mode 100644
-index 0000000..8a04fbb
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -0,0 +1,107 @@
-+/*
-+ * Device Tree file for NXP LS1088A RDB Board.
-+ *
-+ * Copyright 2017 NXP
-+ *
-+ * Harninder Rai <harninder.rai@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "fsl-ls1088a.dtsi"
-+
-+/ {
-+	model = "L1088A RDB Board";
-+	compatible = "fsl,ls1088a-rdb", "fsl,ls1088a";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	i2c-switch at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			ina220 at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			temp-sensor at 4c {
-+				compatible = "adi,adt7461a";
-+				reg = <0x4c>;
-+			};
-+
-+			rtc at 51 {
-+				compatible = "nxp,pcf2129";
-+				reg = <0x51>;
-+				/* IRQ10_B */
-+				interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+	};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-new file mode 100644
-index 0000000..2946fd7
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -0,0 +1,275 @@
-+/*
-+ * Device Tree Include file for NXP Layerscape-1088A family SoC.
-+ *
-+ * Copyright 2017 NXP
-+ *
-+ * Harninder Rai <harninder.rai@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "fsl,ls1088a";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* We have 2 clusters having 4 Cortex-A53 cores each */
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x0>;
-+			clocks = <&clockgen 1 0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x1>;
-+			clocks = <&clockgen 1 0>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x2>;
-+			clocks = <&clockgen 1 0>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x3>;
-+			clocks = <&clockgen 1 0>;
-+		};
-+
-+		cpu4: cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x100>;
-+			clocks = <&clockgen 1 1>;
-+		};
-+
-+		cpu5: cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x101>;
-+			clocks = <&clockgen 1 1>;
-+		};
-+
-+		cpu6: cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x102>;
-+			clocks = <&clockgen 1 1>;
-+		};
-+
-+		cpu7: cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0x103>;
-+			clocks = <&clockgen 1 1>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at 6000000 {
-+		compatible = "arm,gic-v3";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
-+		      <0x0 0x06100000 0 0x100000>, /* GICR(RD_base+SGI_base)*/
-+		      <0x0 0x0c0c0000 0 0x2000>, /* GICC */
-+		      <0x0 0x0c0d0000 0 0x1000>, /* GICH */
-+		      <0x0 0x0c0e0000 0 0x20000>; /* GICV */
-+		interrupts = <1 9 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 13 IRQ_TYPE_LEVEL_LOW>,/* Physical Secure PPI */
-+			     <1 14 IRQ_TYPE_LEVEL_LOW>,/* Physical Non-Secure PPI */
-+			     <1 11 IRQ_TYPE_LEVEL_LOW>,/* Virtual PPI */
-+			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
-+	};
-+
-+	sysclk: sysclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <100000000>;
-+		clock-output-names = "sysclk";
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		clockgen: clocking at 1300000 {
-+			compatible = "fsl,ls1088a-clockgen";
-+			reg = <0 0x1300000 0 0xa0000>;
-+			#clock-cells = <2>;
-+			clocks = <&sysclk>;
-+		};
-+
-+		duart0: serial at 21c0500 {
-+			compatible = "fsl,ns16550", "ns16550a";
-+			reg = <0x0 0x21c0500 0x0 0x100>;
-+			clocks = <&clockgen 4 3>;
-+			interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		duart1: serial at 21c0600 {
-+			compatible = "fsl,ns16550", "ns16550a";
-+			reg = <0x0 0x21c0600 0x0 0x100>;
-+			clocks = <&clockgen 4 3>;
-+			interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		gpio0: gpio at 2300000 {
-+			compatible = "fsl,qoriq-gpio";
-+			reg = <0x0 0x2300000 0x0 0x10000>;
-+			interrupts = <0 36 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		gpio1: gpio at 2310000 {
-+			compatible = "fsl,qoriq-gpio";
-+			reg = <0x0 0x2310000 0x0 0x10000>;
-+			interrupts = <0 36 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		gpio2: gpio at 2320000 {
-+			compatible = "fsl,qoriq-gpio";
-+			reg = <0x0 0x2320000 0x0 0x10000>;
-+			interrupts = <0 37 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		gpio3: gpio at 2330000 {
-+			compatible = "fsl,qoriq-gpio";
-+			reg = <0x0 0x2330000 0x0 0x10000>;
-+			interrupts = <0 37 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		ifc: ifc at 2240000 {
-+			compatible = "fsl,ifc", "simple-bus";
-+			reg = <0x0 0x2240000 0x0 0x20000>;
-+			interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
-+			little-endian;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+
-+			ranges = <0 0 0x5 0x80000000 0x08000000
-+				  2 0 0x5 0x30000000 0x00010000
-+				  3 0 0x5 0x20000000 0x00010000>;
-+			status = "disabled";
-+		};
-+
-+		i2c0: i2c at 2000000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2000000 0x0 0x10000>;
-+			interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 2010000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2010000 0x0 0x10000>;
-+			interrupts = <0 34 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 2020000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2020000 0x0 0x10000>;
-+			interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at 2030000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2030000 0x0 0x10000>;
-+			interrupts = <0 35 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			status = "disabled";
-+		};
-+
-+		sata: sata at 3200000 {
-+			compatible = "fsl,ls1088a-ahci", "fsl,ls1043a-ahci";
-+			reg = <0x0 0x3200000 0x0 0x10000>;
-+			interrupts = <0 133 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clockgen 4 3>;
-+			status = "disabled";
-+		};
-+	};
-+
-+};
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
