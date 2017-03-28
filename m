@@ -1,105 +1,138 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 27 Mar 2017 17:40:30 -0700
-Subject: [PATCH v6 13/39] ARM: dts: imx6-sabreauto: add the ADV7180 video
- decoder
+Date: Mon, 27 Mar 2017 17:40:32 -0700
+Subject: [PATCH v6 15/39] [media] v4l2-mc: add a function to inherit controls
+ from a pipeline
 In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1490661656-10318-14-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1490661656-10318-16-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the ADV7180 decoder sensor. The ADV7180 connects to the
-parallel-bus mux input on ipu1_csi0_mux.
-
-The ADV7180 power pin is via max7310_b port expander.
+v4l2_pipeline_inherit_controls() will add the v4l2 controls from
+all subdev entities in a pipeline to a given video device.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 58 ++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ drivers/media/v4l2-core/v4l2-mc.c | 50 +++++++++++++++++++++++++++++++++++++++
+ include/media/v4l2-mc.h           | 31 ++++++++++++++++++++++++
+ 2 files changed, 81 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 1212f82..a712ff1 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -124,6 +124,21 @@
- 			#size-cells = <0>;
- 			reg = <1>;
+diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
+index 303980b..fda580e 100644
+--- a/drivers/media/v4l2-core/v4l2-mc.c
++++ b/drivers/media/v4l2-core/v4l2-mc.c
+@@ -22,6 +22,7 @@
+ #include <linux/usb.h>
+ #include <media/media-device.h>
+ #include <media/media-entity.h>
++#include <media/v4l2-ctrls.h>
+ #include <media/v4l2-fh.h>
+ #include <media/v4l2-mc.h>
+ #include <media/v4l2-subdev.h>
+@@ -238,6 +239,55 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+ }
+ EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
  
-+			adv7180: camera at 21 {
-+				compatible = "adi,adv7180";
-+				reg = <0x21>;
-+				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <27 0x8>;
++int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
++				     struct media_entity *start_entity)
++{
++	struct media_device *mdev = start_entity->graph_obj.mdev;
++	struct media_entity *entity;
++	struct media_graph graph;
++	struct v4l2_subdev *sd;
++	int ret;
 +
-+				port {
-+					adv7180_to_ipu1_csi0_mux: endpoint {
-+						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+						bus-width = <8>;
-+					};
-+				};
-+			};
++	lockdep_assert_held(&mdev->graph_mutex);
 +
- 			max7310_a: gpio at 30 {
- 				compatible = "maxim,max7310";
- 				reg = <0x30>;
-@@ -151,6 +166,25 @@
- 	};
- };
++	ret = media_graph_walk_init(&graph, mdev);
++	if (ret)
++		return ret;
++
++	media_graph_walk_start(&graph, start_entity);
++
++	while ((entity = media_graph_walk_next(&graph))) {
++		if (!is_media_entity_v4l2_subdev(entity))
++			continue;
++
++		sd = media_entity_to_v4l2_subdev(entity);
++
++		ret = v4l2_ctrl_add_handler(vfd->ctrl_handler,
++					    sd->ctrl_handler,
++					    NULL);
++		if (ret)
++			break;
++	}
++
++	media_graph_walk_cleanup(&graph);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(__v4l2_pipeline_inherit_controls);
++
++int v4l2_pipeline_inherit_controls(struct video_device *vfd,
++				   struct media_entity *start_entity)
++{
++	struct media_device *mdev = start_entity->graph_obj.mdev;
++	int ret;
++
++	mutex_lock(&mdev->graph_mutex);
++	ret = __v4l2_pipeline_inherit_controls(vfd, start_entity);
++	mutex_unlock(&mdev->graph_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(v4l2_pipeline_inherit_controls);
++
+ /* -----------------------------------------------------------------------------
+  * Pipeline power management
+  *
+diff --git a/include/media/v4l2-mc.h b/include/media/v4l2-mc.h
+index 2634d9d..299d75d 100644
+--- a/include/media/v4l2-mc.h
++++ b/include/media/v4l2-mc.h
+@@ -171,6 +171,23 @@ void v4l_disable_media_source(struct video_device *vdev);
+  */
+ int v4l_vb2q_enable_media_source(struct vb2_queue *q);
  
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
-+	bus-width = <8>;
-+};
-+
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+
-+	/* enable frame interval monitor on this port */
-+	fim {
-+		status = "okay";
-+	};
-+};
-+
- &clks {
- 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
- 			  <&clks IMX6QDL_PLL4_BYPASS>,
-@@ -444,6 +478,30 @@
- 			>;
- 		};
++/**
++ * v4l2_pipeline_inherit_controls - Add the v4l2 controls from all
++ *				    subdev entities in a pipeline to
++ *				    the given video device.
++ * @vfd: the video device
++ * @start_entity: Starting entity
++ *
++ * This function is intended to be called from the link_notify callback,
++ * which holds the media graph mutex lock. __v4l2_pipeline_inherit_controls
++ * is provided (which does not acquire the lock) for this purpose.
++ * v4l2_pipeline_inherit_controls is also provided for use in other
++ * locations where the graph mutex is not held.
++ */
++int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
++				     struct media_entity *start_entity);
++int v4l2_pipeline_inherit_controls(struct video_device *vfd,
++				   struct media_entity *start_entity);
  
-+		pinctrl_ipu1_csi0: ipu1csi0grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
-+			>;
-+		};
+ /**
+  * v4l2_pipeline_pm_use - Update the use count of an entity
+@@ -231,6 +248,20 @@ static inline int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+ 	return 0;
+ }
+ 
++static inline int __v4l2_pipeline_inherit_controls(
++	struct video_device *vfd,
++	struct media_entity *start_entity)
++{
++	return 0;
++}
 +
- 		pinctrl_max7310: max7310grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
++static inline int v4l2_pipeline_inherit_controls(
++	struct video_device *vfd,
++	struct media_entity *start_entity)
++{
++	return 0;
++}
++
+ static inline int v4l2_pipeline_pm_use(struct media_entity *entity, int use)
+ {
+ 	return 0;
 -- 
 2.7.4
