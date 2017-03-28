@@ -1,183 +1,175 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Tue, 28 Mar 2017 08:20:24 +0200
-Subject: [PATCH] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <CAL_Jsq++rdPqNZk54S7gQaeLBdzSptogp3dp9P1HmNTV67Sk9w@mail.gmail.com>
-References: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
- <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
- <dce20025-9f42-e747-e325-e1667504e615@st.com>
- <CAL_Jsq++rdPqNZk54S7gQaeLBdzSptogp3dp9P1HmNTV67Sk9w@mail.gmail.com>
-Message-ID: <461b2321-c43c-6d88-c805-97a887cc431d@st.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 28 Mar 2017 15:48:31 +0900
+Subject: [PATCH v34 00/14] arm64: add kdump support
+Message-ID: <20170328064831.15894-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds kdump support on arm64.
+
+To load a crash-dump kernel to the systems, a series of patches to
+kexec-tools[1] are also needed. Please use the latest one, v6 [2].
+For your convinience, you can pick them up from:
+   https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+   https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
+
+To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+  - crash utility (v7.1.8 or later) [3]
+
+I tested this patchset on fast model and hikey.
+
+The previous versions were also:
+Tested-by: Pratyush Anand <panand@redhat.com> (v33, mustang and seattle)
+Tested-by: James Morse <james.morse@arm.com> (v27/v32?, Juno)
+Tested-by: Sameer Goel (v33, QDT2400)
+
+Changes for v34 (Mar 28, 2017)
+  o add and use set_memory_valid() instead of create_pgd_mapping()
+    (patch #5,6)
+  o rename functions from kexec_* to crash_* (patch #7)
+  o supress WARN_ON() message if successfully shutting down secondary cpus
+    (patch #8)
+
+Changes for v33 (Mar 15, 2017)
+  o rebased to v4.11-rc2+
+  o arch_kexec_(un)protect_crashkres() now protects loaded data segments
+    only along with moving copying of control_code_page back to machine_kexec()
+    (patch #6)
+  o reduce the size of hibernation image when kdump and hibernation are
+    comfigured at the same time (patch #7)
+  o clearify that "linux,usable-memory-range" and "linux,elfcorehdr"
+    have values of the size of root node's "#address-cells" and "#size-cells"
+    (patch #13)
+  o add "efi/libstub/arm*: Set default address and size cells values for
+    an empty dtb" from Sameer Goel (patch #14)
+    (I didn't test the case though.)
+
+Changes for v32 (Feb 7, 2017)
+  o isolate crash dump kernel memory as well as kernel text/data by using
+    MEMBLOCK_MAP attribute to and then specifically map them in map_mem()
+    (patch #1,6)
+  o delete remove_pgd_mapping() and instead modify create_pgd_mapping() to
+    allowing for unmapping a kernel mapping (patch #5)
+  o correct a commit message as well as a comment in the source (patch#10)
+  o other trivial changes after Mark's comments (patch#3,4)
+
+Changes for v31 (Feb 1, 2017)
+  o add/use remove_pgd_mapping() instead of modifying (__)create_pgd_mapping()
+    to protect crash dump kernel memory (patch #4,5)
+  o fix an issue at the isolation of crash dump kernel memory in
+    map_mem()/__map_memblock(), adding map_crashkernel() (patch#5)
+  o preserve the contents of crash dump kernel memory around hibernation
+    (patch#6)
+
+Changes for v30 (Jan 24, 2017)
+  o rebased to Linux-v4.10-rc5
+  o remove "linux,crashkernel-base/size" from exported device tree
+  o protect memory region for crash-dump kernel (adding patch#4,5)
+  o remove "in_crash_kexec" variable
+  o and other trivial changes
+
+Changes for v29 (Dec 28, 2016)
+  o rebased to Linux-v4.10-rc1
+  o change asm constraints in crash_setup_regs() per Catalin
+
+Changes for v28 (Nov 22, 2016)
+  o rebased to Linux-v4.9-rc6
+  o revamp patch #1 and merge memblock_cap_memory_range() with
+    memblock_mem_limit_remove_map()
+
+Changes for v27 (Nov 1, 2016)
+  o rebased to Linux-v4.9-rc3
+  o revert v26 change, i.e. revive "linux,usable-memory-range" property
+    (patch #2/#3, updating patch #9)
+  o minor fixes per review comments (patch #3/#4/#6/#8)
+  o re-order patches and improve commit messages for readability
+
+Changes for v26 (Sep 7, 2016):
+  o Use /reserved-memory instead of "linux,usable-memory-range" property
+    (dropping v25's patch#2 and #3, updating ex-patch#9.)
+
+Changes for v25 (Aug 29, 2016):
+  o Rebase to Linux-4.8-rc4
+  o Use memremap() instead of ioremap_cache() [patch#5]
+
+Changes for v24 (Aug 9, 2016):
+  o Rebase to Linux-4.8-rc1
+  o Update descriptions about newly added DT proerties
+
+Changes for v23 (July 26, 2016):
+
+  o Move memblock_reserve() to a single place in reserve_crashkernel()
+  o Use  cpu_park_loop() in ipi_cpu_crash_stop()
+  o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
+  o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
+    (for ACPI) from usable memory at crash kernel
+
+Changes for v22 (July 12, 2016):
+
+  o Export "crashkernel-base" and "crashkernel-size" via device-tree,
+    and add some descriptions about them in chosen.txt
+  o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
+    with powerpc's "usable-memory"
+  o Make cosmetic changes regarding "ifdef" usage
+  o Correct some wordings in kdump.txt
+
+Changes for v21 (July 6, 2016):
+
+  o Remove kexec patches.
+  o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
+  o Clarify the description about kvm in kdump.txt.
+
+See the link [4] for older changes.
 
 
-On 03/27/2017 09:04 PM, Rob Herring wrote:
-> On Fri, Mar 24, 2017 at 4:41 AM, Gabriel Fernandez
-> <gabriel.fernandez@st.com> wrote:
->> Hi Rob,
->>
->> Thanks for reviewing
->>
->>
->>
->> On 03/24/2017 03:06 AM, Rob Herring wrote:
->>> On Wed, Mar 15, 2017 at 10:23:30AM +0100, gabriel.fernandez at st.com wrote:
->>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>>
->>>> This patch enables clocks for STM32H743 boards.
->>>>
->>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>> ---
->>>>    .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  152 ++
->>>>    drivers/clk/Makefile                               |    1 +
->>>>    drivers/clk/clk-stm32h7.c                          | 1586
->>>> ++++++++++++++++++++
->>>>    include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
->>>>    include/dt-bindings/mfd/stm32h7-rcc.h              |  138 ++
->>>>    5 files changed, 2042 insertions(+)
->>>>    create mode 100644
->>>> Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>>    create mode 100644 drivers/clk/clk-stm32h7.c
->>>>    create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
->>>>    create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>> b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>> new file mode 100644
->>>> index 0000000..9d4b587
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>> @@ -0,0 +1,152 @@
->>>> +STMicroelectronics STM32H7 Reset and Clock Controller
->>>> +=====================================================
->>>> +
->>>> +The RCC IP is both a reset and a clock controller.
->>>> +
->>>> +Please refer to clock-bindings.txt for common clock controller binding
->>>> usage.
->>>> +Please also refer to reset.txt for common reset controller binding
->>>> usage.
->>>> +
->>>> +Required properties:
->>>> +- compatible: Should be:
->>>> +  "st,stm32h743-rcc"
->>>> +
->>>> +- reg: should be register base and length as documented in the
->>>> +  datasheet
->>>> +
->>>> +- #reset-cells: 1, see below
->>>> +
->>>> +- #clock-cells : from common clock binding; shall be set to 1
->>>> +
->>>> +- clocks: External oscillator clock phandle
->>>> +  - high speed external clock signal (HSE)
->>>> +  - low speed external clock signal (LSE)
->>>> +  - external I2S clock (I2S_CKIN)
->>>> +
->>>> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup
->>>> domain
->>>> +  write protection (RTC clock).
->>>> +
->>>> +- pll x node: Allow to register a pll with specific parameters.
->>>> +  Please see PLL section below.
->>>> +
->>>> +Example:
->>>> +
->>>> +       rcc: rcc at 58024400 {
->>>> +               #reset-cells = <1>;
->>>> +               #clock-cells = <2>
->>>> +               compatible = "st,stm32h743-rcc", "st,stm32-rcc";
->>>> +               reg = <0x58024400 0x400>;
->>>> +               clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
->>>> +
->>>> +               st,syscfg = <&pwrcfg>;
->>>> +
->>>> +               #address-cells = <1>;
->>>> +               #size-cells = <0>;
->>>> +
->>>> +               vco1 at 58024430 {
->>>> +                       #clock-cells = <0>;
->>>> +                       compatible = "stm32,pll";
->>>> +                       reg = <0>;
->>> The reg addr value and unit address don't match.
->> ok il will change into
->>
->>          vco1 at 0 {
->>                  reg = <0>;
->>
->>
->>>> +               };
->>>> +
->>>> +               vco2 at 58024438 {
->>>> +                       #clock-cells = <0>;
->>>> +                       compatible = "stm32,pll";
->>>> +                       reg = <1>;
->>>> +                       st,clock-div = <2>;
->>>> +                       st,clock-mult = <40>;
->>>> +                       st,frac-status = <0>;
->>>> +                       st,frac = <0>;
->>>> +                       st,vcosel = <1>;
->>>> +                       st,pllrge = <2>;
->>>> +               };
->>>> +       };
->>>> +
->>>> +
->>>> +STM32H7 PLL
->>>> +-----------
->>>> +
->>>> +The VCO of STM32 PLL could be reprensented like this:
->>>> +
->>>> +  Vref    ---------       --------
->>>> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
->>>> +          ---------       --------
->>>> +                            ^
->>>> +                            |
->>>> +                         -------
->>>> +                        | FRACN |
->>>> +                         -------
->>>> +
->>>> +When the PLL is configured in integer mode:
->>>> +- VCO = ( Vref / DIVM ) * DIVN
->>>> +
->>>> +When the PLL is configured in fractional mode:
->>>> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
->>>> +
->>>> +
->>>> +Required properties for pll node:
->>>> +- compatible: Should be:
->>>> +  "stm32,pll"
->>> Only 1 single PLL design for all STM32 chips ever?
->> no, i can change into "stm32h7,pll"
-> Actually, should be "st,stm32h7-pll".
-ok
+[1] https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git
+[2] http://lists.infradead.org/pipermail/kexec/2017-March/018356.html
+[3] https://github.com/crash-utility/crash.git
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
 
->>>> +
->>>> +- #clock-cells: from common clock binding; shall be set to 0
->>>> +- reg: Should be the pll number.
->>>> +
->>>> +Optional properties:
->>>> +- st,clock-div:  DIVM division factor       : <1..63>
->>>> +- st,clock-mult: DIVN multiplication factor : <4..512>
->>>> +
->>>> +- st,frac-status:
->>>> +   - 0 Pll is configured in integer mode
->>>> +   - 1 Pll is configure in fractional mode
->>> Isn't this implied by the presence of the next property?
->> do you prefer this ?
->>
->> - st,frac :
->> 0 : pll is configured in integer mode
->> 1..8191 : Fractional part of the multiplication factor and pll is configured
->> in fractional mode
-> Why not no st,frac property means integer mode?
-No
+AKASHI Takahiro (12):
+  memblock: add memblock_clear_nomap()
+  memblock: add memblock_cap_memory_range()
+  arm64: limit memory regions based on DT property, usable-memory-range
+  arm64: kdump: reserve memory for crash dump kernel
+  arm64: mm: add set_memory_valid()
+  arm64: kdump: protect crash dump kernel memory
+  arm64: hibernate: preserve kdump image around hibernation
+  arm64: kdump: implement machine_crash_shutdown()
+  arm64: kdump: add VMCOREINFO's for user-space tools
+  arm64: kdump: provide /proc/vmcore file
+  arm64: kdump: enable kdump in defconfig
+  Documentation: kdump: describe arm64 port
 
-no st,frac property means no change (keep default values from bootloader)
+James Morse (1):
+  Documentation: dt: chosen properties for arm64 kdump
 
+Sameer Goel (1):
+  efi/libstub/arm*: Set default address and size cells values for an
+    empty dtb
 
-Best Regards
+ Documentation/devicetree/bindings/chosen.txt |  45 +++++++
+ Documentation/kdump/kdump.txt                |  16 ++-
+ arch/arm64/Kconfig                           |  11 ++
+ arch/arm64/configs/defconfig                 |   1 +
+ arch/arm64/include/asm/cacheflush.h          |   1 +
+ arch/arm64/include/asm/hardirq.h             |   2 +-
+ arch/arm64/include/asm/kexec.h               |  52 +++++++-
+ arch/arm64/include/asm/smp.h                 |   3 +
+ arch/arm64/kernel/Makefile                   |   1 +
+ arch/arm64/kernel/crash_dump.c               |  71 +++++++++++
+ arch/arm64/kernel/hibernate.c                |  10 +-
+ arch/arm64/kernel/machine_kexec.c            | 170 +++++++++++++++++++++++--
+ arch/arm64/kernel/setup.c                    |   7 +-
+ arch/arm64/kernel/smp.c                      |  68 ++++++++++
+ arch/arm64/mm/init.c                         | 181 +++++++++++++++++++++++++++
+ arch/arm64/mm/mmu.c                          |  90 ++++++-------
+ arch/arm64/mm/pageattr.c                     |  15 ++-
+ drivers/firmware/efi/libstub/fdt.c           |  28 ++++-
+ include/linux/memblock.h                     |   2 +
+ mm/memblock.c                                |  56 ++++++---
+ 20 files changed, 749 insertions(+), 81 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
-Gabriel
-
-> Rob
+-- 
+2.11.1
