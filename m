@@ -1,74 +1,53 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Tue, 28 Mar 2017 11:44:45 +0200
-Subject: [PATCH v5 02/10] drm/fb-cma-helper: Add drm_fb_cma_get_gem_addr()
+Date: Tue, 28 Mar 2017 11:44:48 +0200
+Subject: [PATCH v5 05/10] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
 In-Reply-To: <1490694293-18358-1-git-send-email-yannick.fertre@st.com>
 References: <1490694293-18358-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1490694293-18358-3-git-send-email-yannick.fertre@st.com>
+Message-ID: <1490694293-18358-6-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add function drm_fb_cma_get_gem_addr() which return the physical address
-of framebuffer (1st pixel). This function will usually be called by plane
-callback (atomic_update).
+This patch adds documentation of device tree bindings for the WVGA panel
+Ampire AM-480272H3TMQW-T01H.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- drivers/gpu/drm/drm_fb_cma_helper.c | 27 +++++++++++++++++++++++++++
- include/drm/drm_fb_cma_helper.h     |  4 ++++
- 2 files changed, 31 insertions(+)
+ .../display/panel/ampire,am-480272h3tmqw-t01h.txt  | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
 
-diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
-index 74cd393..126f52a 100644
---- a/drivers/gpu/drm/drm_fb_cma_helper.c
-+++ b/drivers/gpu/drm/drm_fb_cma_helper.c
-@@ -260,6 +260,33 @@ struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
- EXPORT_SYMBOL_GPL(drm_fb_cma_get_gem_obj);
- 
- /**
-+ * drm_fb_cma_get_gem_addr() - Get physical address for framebuffer
-+ * @fb: The framebuffer
-+ * @state: Which state of drm plane
-+ * @plane: Which plane
-+ * Return the CMA GEM address for given framebuffer.
-+ *
-+ * This function will usually be called from the PLANE callback functions.
-+ */
-+dma_addr_t drm_fb_cma_get_gem_addr(struct drm_framebuffer *fb,
-+				   struct drm_plane_state *state,
-+				   unsigned int plane)
-+{
-+	struct drm_fb_cma *fb_cma = to_fb_cma(fb);
-+	dma_addr_t paddr;
+diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+new file mode 100644
+index 0000000..6812280
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+@@ -0,0 +1,26 @@
++Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
 +
-+	if (plane >= 4)
-+		return 0;
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
 +
-+	paddr = fb_cma->obj[plane]->paddr + fb->offsets[plane];
-+	paddr += fb->format->cpp[plane] * (state->src_x >> 16);
-+	paddr += fb->pitches[plane] * (state->src_y >> 16);
++Required properties:
++- compatible: should be "ampire,am-480272h3tmqw-t01h"
 +
-+	return paddr;
-+}
-+EXPORT_SYMBOL_GPL(drm_fb_cma_get_gem_addr);
++Optional properties:
++- power-supply: regulator to provide the supply voltage
++- enable-gpios: GPIO pin to enable or disable the panel
++- backlight: phandle of the backlight device attached to the panel
 +
-+/**
-  * drm_fb_cma_prepare_fb() - Prepare CMA framebuffer
-  * @plane: Which plane
-  * @state: Plane state attach fence to
-diff --git a/include/drm/drm_fb_cma_helper.h b/include/drm/drm_fb_cma_helper.h
-index a5ecc0a..199a63f 100644
---- a/include/drm/drm_fb_cma_helper.h
-+++ b/include/drm/drm_fb_cma_helper.h
-@@ -41,6 +41,10 @@ struct drm_framebuffer *drm_fb_cma_create(struct drm_device *dev,
- struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
- 	unsigned int plane);
- 
-+dma_addr_t drm_fb_cma_get_gem_addr(struct drm_framebuffer *fb,
-+				   struct drm_plane_state *state,
-+				   unsigned int plane);
++Optional nodes:
++- Video port for RGB input.
 +
- int drm_fb_cma_prepare_fb(struct drm_plane *plane,
- 			  struct drm_plane_state *state);
- 
++Example:
++	panel_rgb: panel-rgb {
++		compatible = "ampire,am-480272h3tmqw-t01h";
++		enable-gpios = <&gpioa 8 1>;
++		port {
++			panel_in_rgb: endpoint {
++				remote-endpoint = <&controller_out_rgb>;
++			};
++		};
++	};
 -- 
 1.9.1
