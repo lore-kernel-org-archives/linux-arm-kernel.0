@@ -1,50 +1,39 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 27 Mar 2017 17:40:28 -0700
-Subject: [PATCH v6 11/39] ARM: dts: imx6-sabreauto: add reset-gpios property
- for max7310_b
+Date: Mon, 27 Mar 2017 17:40:21 -0700
+Subject: [PATCH v6 04/39] ARM: dts: imx6qdl: Add compatible, clocks,
+ irqs to MIPI CSI-2 node
 In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1490661656-10318-12-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1490661656-10318-5-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset pin to the port expander chip (MAX7310) is controlled by a gpio,
-so define a reset-gpios property to control it. There are three MAX7310's
-on the SabreAuto CPU card (max7310_[abc]), but all use the same pin for
-their reset. Since all can't acquire the same pin, assign it to max7310_b,
-that chip is needed by more functions (usb and adv7180).
+Add to the MIPI CSI2 receiver node: compatible strings,
+interrupt sources, and clocks.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index c8e35c4..21dea5f 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -136,6 +136,9 @@
- 				reg = <0x32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_max7310>;
-+				reset-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 6d7bf64..d28a413 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1134,7 +1134,14 @@
  			};
  
- 			max7310_c: gpio at 34 {
-@@ -441,6 +444,12 @@
- 			>;
- 		};
+ 			mipi_csi: mipi at 021dc000 {
++				compatible = "fsl,imx6-mipi-csi2", "snps,dw-mipi-csi2";
+ 				reg = <0x021dc000 0x4000>;
++				interrupts = <0 100 0x04>, <0 101 0x04>;
++				clocks = <&clks IMX6QDL_CLK_HSI_TX>,
++					 <&clks IMX6QDL_CLK_VIDEO_27M>,
++					 <&clks IMX6QDL_CLK_EIM_PODF>;
++				clock-names = "dphy", "ref", "pix";
++				status = "disabled";
+ 			};
  
-+		pinctrl_max7310: max7310grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_pwm3: pwm1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+ 			mipi_dsi: mipi at 021e0000 {
 -- 
 2.7.4
