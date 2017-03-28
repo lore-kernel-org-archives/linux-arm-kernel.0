@@ -1,71 +1,51 @@
 From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Tue, 28 Mar 2017 11:25:43 +0200
-Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
+Date: Tue, 28 Mar 2017 11:25:44 +0200
+Subject: [PATCH v2,
+ 2/3] tty/serial: meson_uart: add documentation for the dt-bindings
 In-Reply-To: <20170328092545.4644-1-hgkr.klein@gmail.com>
 References: <20170328092545.4644-1-hgkr.klein@gmail.com>
-Message-ID: <20170328092545.4644-2-hgkr.klein@gmail.com>
+Message-ID: <20170328092545.4644-3-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the clock ids for the three none AO uarts to the dt-bindings
+Add the documentation for the device tree binding of meson_uart
 
 Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
 ---
- drivers/clk/meson/gxbb.h              | 6 +++---
- include/dt-bindings/clock/gxbb-clkc.h | 3 +++
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ .../bindings/serial/amlogic,meson_uart.txt         | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
 
-diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-index 8ee2022ce5d5..1edfaa5fe307 100644
---- a/drivers/clk/meson/gxbb.h
-+++ b/drivers/clk/meson/gxbb.h
-@@ -194,7 +194,7 @@
- /* #define CLKID_SAR_ADC */
- #define CLKID_SMART_CARD	  24
- #define CLKID_RNG0		  25
--#define CLKID_UART0		  26
-+/* CLKID_UART0 */
- #define CLKID_SDHC		  27
- #define CLKID_STREAM		  28
- #define CLKID_ASYNC_FIFO	  29
-@@ -216,7 +216,7 @@
- #define CLKID_ADC		  45
- #define CLKID_BLKMV		  46
- #define CLKID_AIU		  47
--#define CLKID_UART1		  48
-+/* CLKID_UART1 */
- #define CLKID_G2D		  49
- /* CLKID_USB0 */
- /* CLKID_USB1 */
-@@ -236,7 +236,7 @@
- /* CLKID_USB0_DDR_BRIDGE */
- #define CLKID_MMC_PCLK		  66
- #define CLKID_DVIN		  67
--#define CLKID_UART2		  68
-+/* CLKID_UART2 */
- /* #define CLKID_SANA */
- #define CLKID_VPU_INTR		  70
- #define CLKID_SEC_AHB_AHB3_BRIDGE 71
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index 692846c7941b..7b329df47752 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -15,13 +15,16 @@
- #define CLKID_SPI		34
- #define CLKID_I2C		22
- #define CLKID_SAR_ADC		23
-+#define CLKID_UART0		26
- #define CLKID_ETH		36
-+#define CLKID_UART1		48
- #define CLKID_USB0		50
- #define CLKID_USB1		51
- #define CLKID_USB		55
- #define CLKID_HDMI_PCLK		63
- #define CLKID_USB1_DDR_BRIDGE	64
- #define CLKID_USB0_DDR_BRIDGE	65
-+#define CLKID_UART2		68
- #define CLKID_SANA		69
- #define CLKID_GCLK_VENCI_INT0	77
- #define CLKID_AO_I2C		93
+diff --git a/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+new file mode 100644
+index 000000000000..6f94ba25760d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+@@ -0,0 +1,25 @@
++* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
++
++Required properties:
++- compatible	: "amlogic,meson-uart"
++- reg		: offset and length of the register set for the device.
++- interrupts	: device interrupt
++- clocks	: the baud rate clock for the UART and optionally the core clock for the none AO uarts
++e.g.
++uart_A: serial at 84c0 {
++	compatible = "amlogic,meson-uart";
++	reg = <0x0 0x84c0 0x0 0x14>;
++	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
++	interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
++	clocks = <&xtal>, <&clkc CLKID_UART0>;
++	clock-names = "xtal", "core";
++	status = "ok";
++};
++
++Note: Each port should have an alias correctly numbered in "aliases" node.
++
++e.g.
++aliases {
++	serial0 = &uart_AO;
++	serial1 = &uart_A;
++};
 --
 2.11.0
