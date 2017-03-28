@@ -1,36 +1,96 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 28 Mar 2017 20:43:08 +0300
-Subject: [PATCH v3 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <93183073.lKE0KLq0vu@tauon.atsec.com>
-References: <20170325162654.3827-1-krzk@kernel.org>
- <1564458.pWTRdRYEuG@positron.chronox.de>
- <20170328164824.3qjaojqzf2riwpqj@kozik-lap>
- <93183073.lKE0KLq0vu@tauon.atsec.com>
-Message-ID: <20170328174308.lwcogz2ae3bwnumr@kozik-lap>
+From: afd@ti.com (Andrew F. Davis)
+Date: Tue, 28 Mar 2017 12:52:34 -0500
+Subject: [PATCHv3] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <20170328170944.GY10760@atomide.com>
+References: <20170314180555.23597-1-tony@atomide.com>
+ <aa5d7ee3-2e54-2c6c-df5d-b5efff4b365e@ti.com>
+ <20170327164308.GK10760@atomide.com>
+ <20170328113657.GL23750@n2100.armlinux.org.uk>
+ <20170328170944.GY10760@atomide.com>
+Message-ID: <b1773b1c-8cd4-d085-c695-4d01a2223b02@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 07:41:47PM +0200, Stephan M?ller wrote:
-> Am Dienstag, 28. M?rz 2017, 18:48:24 CEST schrieb Krzysztof Kozlowski:
+On 03/28/2017 12:09 PM, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [170328 04:39]:
+>> On Mon, Mar 27, 2017 at 09:43:09AM -0700, Tony Lindgren wrote:
+>>> Yes problems still remains. I think the immediate fix there is to
+>>> disable kexec during runtime based on some criteria for your use
+>>> case rather than BUG() though. Somehow kexec needs to know if CPU1
+>>> reset is acceptable, then reset CPU1 before kexec.
+>>
+>> The only acceptable way to do that is to make the decision when loading
+>> the image(s), and refuse to load the image(s) if kexec is not possible.
+>> (As is already done when dealing with whether we can CPU hot-unplug the
+>> secondary CPUs.)
 > 
-> Hi Krzysztof,
+> OK so how about the following to disable kexec for Andrew's
+> test case?
 > 
-> > I tested a little bit and:
-> > 1. Seeding with some value
-> > 2. generating random,
-> > 3. kcapi_rng_destroy+kcrng_init, (I cannot do a hardware reset except
-> >    reboot of entire system)
-> > 4. seeding with the same value as in (1) - different random numbers.
-> > 
-> > Doing a system reboot and repeating above - different random numbers
-> > (all are different: step (2) and in (4)).
-> > 
-> > Your test case also produces different random values every time.
+> That is assuming that omap_type() test works for HS dra7
+> like it does for the other omap2 variants.
 > 
-> Then I would assume that simply adding an outer loop to your for() loop to 
-> inject seed larger than the minimum required seed size should be fine.
+> Regards,
+> 
+> Tony
+> 
+> 8< ---------------------
+> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> --- a/arch/arm/mach-omap2/common.h
+> +++ b/arch/arm/mach-omap2/common.h
+> @@ -260,6 +260,7 @@ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
+>  extern void omap_auxcoreboot_addr(u32 cpu_addr);
+>  extern u32 omap_read_auxcoreboot0(void);
+>  
+> +extern bool omap4_cpu_can_disable(unsigned int cpu);
+>  extern void omap4_cpu_die(unsigned int cpu);
+>  extern int omap4_cpu_kill(unsigned int cpu);
+>  
+> diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
+> --- a/arch/arm/mach-omap2/omap-hotplug.c
+> +++ b/arch/arm/mach-omap2/omap-hotplug.c
+> @@ -22,6 +22,15 @@
+>  #include "omap-wakeupgen.h"
+>  #include "common.h"
+>  #include "powerdomain.h"
+> +#include "soc.h"
+> +
+> +bool omap4_cpu_can_disable(unsigned int cpu)
+> +{
+> +	if (soc_is_dra7xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
+> +		return false;
+> +
 
-Yes, makes sense. I'll send an updated version of patch.
+NAK!
 
-Best regards,
-Krzysztof
+HS variants can have aux cores disabled, we are already doing it right
+now, this is another hack to avoid having to fix kexec.
+
+You are failing to park cores correctly, so instead of fixing that you
+hack around it on non-HS devices by hard-resetting those cores, now
+because you can't do that hack on HS devices you suggest we disable
+hotplug on HS devices altogether!?
+
+Kexec *does* work on HS devices. It only fails if we fail to park a core
+correctly, something that should never happen, the check here must be
+for that, unconditionally disabling Kexec for all HS devices is not a
+valid option.
+
+> +	return true;
+> +}
+>  
+>  /*
+>   * platform-specific code to shutdown a CPU
+> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -390,6 +390,7 @@ const struct smp_operations omap4_smp_ops __initconst = {
+>  	.smp_secondary_init	= omap4_secondary_init,
+>  	.smp_boot_secondary	= omap4_boot_secondary,
+>  #ifdef CONFIG_HOTPLUG_CPU
+> +	.cpu_can_disable	= omap4_cpu_can_disable,
+>  	.cpu_die		= omap4_cpu_die,
+>  	.cpu_kill		= omap4_cpu_kill,
+>  #endif
+> 
