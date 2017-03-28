@@ -1,32 +1,23 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Mar 2017 14:30:09 +0200
-Subject: [PATCH 0/4] ARM: dts: r8a7794: Correct clock of DU1
-In-Reply-To: <7112167.AJcfquYAnB@avalon>
-References: <1490697933-5849-1-git-send-email-geert+renesas@glider.be>
- <7112167.AJcfquYAnB@avalon>
-Message-ID: <20170328123008.GB20146@verge.net.au>
+From: minyard@acm.org (Corey Minyard)
+Date: Tue, 28 Mar 2017 07:31:50 -0500
+Subject: [PATCH V3] ACPI / IPMI: allow ACPI_IPMI with IPMI_SSIF
+In-Reply-To: <6b3eb826-acca-d3b5-5520-18d9ffd03e9c@codeaurora.org>
+References: <1490450575-29450-1-git-send-email-okaya@codeaurora.org>
+ <1b71a9cf-f7c7-7bc4-2934-a357b0b5016b@acm.org>
+ <6b3eb826-acca-d3b5-5520-18d9ffd03e9c@codeaurora.org>
+Message-ID: <43180304-6bc7-049e-dfc8-13f3c9a0fe48@acm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 03:08:11PM +0300, Laurent Pinchart wrote:
-> Hi Geert,
-> 
-> Thank you for the patches.
-> 
-> On Tuesday 28 Mar 2017 12:45:29 Geert Uytterhoeven wrote:
-> > 	Hi Simon, Magnus,
-> > 
-> > In the DTS files for the R-Car E2 SoC and for development boards based
-> > on this SoC, the second channel of the display unit incorrectly points
-> > to the module clock for the first channel.
-> > 
-> > This patch series adds the missing module clock for the second channel,
-> > and refers to it from the DU device node in the various DTS files.
-> > 
-> > Untested due to lack of hardware.
-> 
-> The patches look good to me.
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+On 03/27/2017 09:21 AM, Sinan Kaya wrote:
+> Rafael,
+>
+> On 3/25/2017 9:25 PM, Corey Minyard wrote:
+>> If the ACPI people ack this, I can queue it, or they can take it with:
+>>
+>> Acked-by: Corey Minyard <cminyard@mvista.com>
+> What's your preference?
 
-Thanks, I have queued these up.
+I can take it, it's all ready, I just need the ack.
+
+-corey
