@@ -1,64 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Mar 2017 08:03:16 -0700
-Subject: [PATCHv2 9/9] ARM: dts: omap4: convert to use the new clkctrl
- clocks for the drivers
-In-Reply-To: <8b502a89-dcc6-1932-70cc-e887b1404dbb@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-10-git-send-email-t-kristo@ti.com>
- <20170328001800.GR10760@atomide.com>
- <8b502a89-dcc6-1932-70cc-e887b1404dbb@ti.com>
-Message-ID: <20170328150316.GU10760@atomide.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 28 Mar 2017 08:09:18 -0700
+Subject: [PATCH 1/1] pinctrl: meson: meson8b: fix the NAND DQS pins
+In-Reply-To: <20170325184350.7677-2-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sat, 25 Mar 2017 19:43:50 +0100")
+References: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
+ <20170325184350.7677-2-martin.blumenstingl@googlemail.com>
+Message-ID: <m2shlxa15t.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170327 22:46]:
-> On 28/03/17 03:18, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> > > Convert the drivers to use the new clkctrl clocks.
-> > > 
-> > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > > ---
-> > >  arch/arm/boot/dts/omap4.dtsi | 164 ++++++++++++++++++++++++++++++++++++++-----
-> > >  1 file changed, 146 insertions(+), 18 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> > > index 3ecf616..c39304a 100644
-> > > --- a/arch/arm/boot/dts/omap4.dtsi
-> > > +++ b/arch/arm/boot/dts/omap4.dtsi
-> > > @@ -94,16 +94,22 @@
-> > >  			compatible = "ti,omap4-mpu";
-> > >  			ti,hwmods = "mpu";
-> > >  			sram = <&ocmcram>;
-> > > +			clocks = <&mpuss_clkctrl OMAP4_MPU_CLKCTRL 0>;
-> > > +			clock-names = "clkctrl";
-> > >  		};
-> > 
-> > Oh one more thing. I don't think we should add the clocks
-> > here as they are now wrongly allocated to the device within
-> > the interconnect target module. These clocks really belong
-> > to each interconnect target module that we don't have in the
-> > dts yet.
-> > 
-> > So we're better off adding the clockctrl clocks and then
-> > changing the dts to use the interconnect target modules
-> > with the clockctrl clocks.
-> 
-> The problem is, you can't just add the clkctrl clock nodes themselves alone,
-> as this introduces the problem that any clocks with no users will get
-> disabled => causes a boot time hang when all the device clocks get shut
-> down.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Hmm yeah. I wonder how to work around that.. What if we first updated
-the clocks in the hwmod code? Or updated the aliases?
+> The nand_groups table uses different names for the NAND DQS pins than
+> the GROUP() definition in meson8b_cbus_groups (nand_dqs_0 vs nand_dqs0).
+> This prevents using the NAND DQS pins in the devicetree.
+>
+> I decided to rename both pins to nand_dqs_15 and nand_dqs_18 as both seem
+> to serve the same function, just exposed on different pins (unlike the
+> ethernet TX pins for example, where there's eth_txd0..3 - all of these
+> can be active at the same time as they are different data lines).
+>
+> Fixes: 0fefcb6876d0 ("pinctrl: Add support for Meson8b")
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-> If you want to delay the usage of the clocks until you have interconnect
-> target modules in place, you need to introduce the clock nodes also at that
-> point, similar to what needs to be done now to squash patch #8 or #9.
+IMO, the fix should be a separate from the rename, since one is a fix
+for a real issue and the other is cosmetic.
 
-I'd like to do this one device at a time without any large
-flips as we have quite a few devices with special handling for
-reset and idling in the hwmod code.
+Kevin
 
-Regards,
-
-Tony
+> ---
+>  drivers/pinctrl/meson/pinctrl-meson8b.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
+> index 76f077f18193..bf747eb1f3f4 100644
+> --- a/drivers/pinctrl/meson/pinctrl-meson8b.c
+> +++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
+> @@ -267,8 +267,8 @@ static const unsigned int nand_ale_pins[]	= { PIN(BOOT_11, 0) };
+>  static const unsigned int nand_cle_pins[]	= { PIN(BOOT_12, 0) };
+>  static const unsigned int nand_wen_clk_pins[]	= { PIN(BOOT_13, 0) };
+>  static const unsigned int nand_ren_clk_pins[]	= { PIN(BOOT_14, 0) };
+> -static const unsigned int nand_dqs_0_pins[]	= { PIN(BOOT_15, 0) };
+> -static const unsigned int nand_dqs_1_pins[]	= { PIN(BOOT_18, 0) };
+> +static const unsigned int nand_dqs_15_pins[]	= { PIN(BOOT_15, 0) };
+> +static const unsigned int nand_dqs_18_pins[]	= { PIN(BOOT_18, 0) };
+>  
+>  static const unsigned int sdxc_d0_c_pins[]	= { PIN(BOOT_0, 0)};
+>  static const unsigned int sdxc_d13_c_pins[]	= { PIN(BOOT_1, 0), PIN(BOOT_2, 0),
+> @@ -527,8 +527,8 @@ static struct meson_pmx_group meson8b_cbus_groups[] = {
+>  	GROUP(nand_cle,		2,	20),
+>  	GROUP(nand_wen_clk,	2,	19),
+>  	GROUP(nand_ren_clk,	2,	18),
+> -	GROUP(nand_dqs_0,	2,	27),
+> -	GROUP(nand_dqs_1,	2,	28),
+> +	GROUP(nand_dqs_15,	2,	27),
+> +	GROUP(nand_dqs_18,	2,	28),
+>  	GROUP(sdxc_d0_c,	4,	30),
+>  	GROUP(sdxc_d13_c,	4,	29),
+>  	GROUP(sdxc_d47_c,	4,	28),
+> @@ -739,8 +739,8 @@ static const char * const sdxc_c_groups[] = {
+>  static const char * const nand_groups[] = {
+>  	"nand_io", "nand_io_ce0", "nand_io_ce1",
+>  	"nand_io_rb0", "nand_ale", "nand_cle",
+> -	"nand_wen_clk", "nand_ren_clk", "nand_dqs0",
+> -	"nand_dqs1"
+> +	"nand_wen_clk", "nand_ren_clk", "nand_dqs_15",
+> +	"nand_dqs_18"
+>  };
+>  
+>  static const char * const nor_groups[] = {
