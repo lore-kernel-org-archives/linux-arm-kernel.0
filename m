@@ -1,83 +1,90 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 14:46:04 +0200
-Subject: [PATCH v2 7/9] arm64: KVM: Do not corrupt registers on failed
- 64bit CP read
-In-Reply-To: <20170327160345.12402-8-marc.zyngier@arm.com>
+Date: Tue, 28 Mar 2017 14:46:09 +0200
+Subject: [PATCH v2 8/9] arm: KVM: Make unexpected register accesses
+ inject an undef
+In-Reply-To: <20170327160345.12402-9-marc.zyngier@arm.com>
 References: <20170327160345.12402-1-marc.zyngier@arm.com>
- <20170327160345.12402-8-marc.zyngier@arm.com>
-Message-ID: <20170328124600.GG31156@cbox>
+ <20170327160345.12402-9-marc.zyngier@arm.com>
+Message-ID: <20170328124609.GH31156@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:03:43PM +0100, Marc Zyngier wrote:
-> If we fail to emulate a mrrc instruction, we:
-> 1) deliver an exception,
-> 2) spit a nastygram on the console,
-> 3) write back some garbage to Rt/Rt2
+On Mon, Mar 27, 2017 at 05:03:44PM +0100, Marc Zyngier wrote:
+> Reads from write-only system registers are generally confined to
+> EL1 and not propagated to EL2 (that's what the architecture
+> mantates). In order to be sure that we have a sane behaviour
+> even in the unlikely event that we have a broken system, we still
+> handle it in KVM. Same goes for write to RO registers.
 > 
-> While 1) and 2) are perfectly acceptable, 3) is out of the scope of
-> the architecture... Let's mimick the code in kvm_handle_cp_32 and
-> be more cautious.
+> In that case, let's inject an undef into the guest.
 > 
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/kvm/sys_regs.c | 20 +++++++++-----------
->  1 file changed, 9 insertions(+), 11 deletions(-)
+>  arch/arm/kvm/coproc.c | 18 ++++++++++++++++++
+>  arch/arm/kvm/coproc.h | 18 ------------------
+>  2 files changed, 18 insertions(+), 18 deletions(-)
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 4e5d4eee8cec..1080a76e960f 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1678,20 +1678,18 @@ static int kvm_handle_cp_64(struct kvm_vcpu *vcpu,
->  		params.regval |= vcpu_get_reg(vcpu, Rt2) << 32;
->  	}
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 3e5e4194ef86..519aac12b365 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -40,6 +40,24 @@
+>   * Co-processor emulation
+>   *****************************************************************************/
 >  
-> -	if (!emulate_cp(vcpu, &params, target_specific, nr_specific))
-> -		goto out;
-> -	if (!emulate_cp(vcpu, &params, global, nr_global))
-> -		goto out;
-> -
-> -	unhandled_cp_access(vcpu, &params);
-> +	if (!emulate_cp(vcpu, &params, target_specific, nr_specific) ||
-> +	    !emulate_cp(vcpu, &params, global, nr_global)) {
-
-super nit: I choked a bit on this contruct, any objections to adding a
-comment like the following above:
-
-	/*
-	 * Try to emulate the coprocessor access using the target
-	 * specific table first, and using the global table aftwards.
-	 * If either of the tables contains a handler, handle the
-	 * potential register operation in the case of a read and return
-	 * with success.
-	 */
-
-Too much?
-
-(If not, I can also add this when applying).
-
-> +		/* Split up the value between registers for the read side */
-> +		if (!params.is_write) {
-> +			vcpu_set_reg(vcpu, Rt, lower_32_bits(params.regval));
-> +			vcpu_set_reg(vcpu, Rt2, upper_32_bits(params.regval));
-> +		}
+> +static bool write_to_read_only(struct kvm_vcpu *vcpu,
+> +			       const struct coproc_params *params)
+> +{
+> +	WARN_ONCE(1, "CP15 write to read-only register\n");
+> +	print_cp_instr(params);
+> +	kvm_inject_undefined(vcpu);
+> +	return false;
+> +}
+> +
+> +static bool read_from_write_only(struct kvm_vcpu *vcpu,
+> +				 const struct coproc_params *params)
+> +{
+> +	WARN_ONCE(1, "CP15 read to write-only register\n");
+> +	print_cp_instr(params);
+> +	kvm_inject_undefined(vcpu);
+> +	return false;
+> +}
+> +
+>  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+>  static u32 cache_levels;
 >  
-> -out:
-> -	/* Split up the value between registers for the read side */
-> -	if (!params.is_write) {
-> -		vcpu_set_reg(vcpu, Rt, lower_32_bits(params.regval));
-> -		vcpu_set_reg(vcpu, Rt2, upper_32_bits(params.regval));
-> +		return 1;
->  	}
->  
-> +	unhandled_cp_access(vcpu, &params);
->  	return 1;
+> diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
+> index eef1759c2b65..3a41b7d1eb86 100644
+> --- a/arch/arm/kvm/coproc.h
+> +++ b/arch/arm/kvm/coproc.h
+> @@ -81,24 +81,6 @@ static inline bool read_zero(struct kvm_vcpu *vcpu,
+>  	return true;
 >  }
 >  
+> -static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
+> -				      const struct coproc_params *params)
+> -{
+> -	kvm_debug("CP15 write to read-only register at: %08lx\n",
+> -		  *vcpu_pc(vcpu));
+> -	print_cp_instr(params);
+> -	return false;
+> -}
+> -
+> -static inline bool read_from_write_only(struct kvm_vcpu *vcpu,
+> -					const struct coproc_params *params)
+> -{
+> -	kvm_debug("CP15 read to write-only register at: %08lx\n",
+> -		  *vcpu_pc(vcpu));
+> -	print_cp_instr(params);
+> -	return false;
+> -}
+> -
+>  /* Reset functions */
+>  static inline void reset_unknown(struct kvm_vcpu *vcpu,
+>  				 const struct coproc_reg *r)
 > -- 
 > 2.11.0
 > 
-
-Otherwise:
-
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
