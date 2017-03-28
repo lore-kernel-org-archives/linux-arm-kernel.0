@@ -1,10 +1,10 @@
 From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Tue, 28 Mar 2017 11:56:41 +0300
-Subject: [PATCH 14/16] drivers, net,
- ppp: convert syncppp.refcnt from atomic_t to refcount_t
+Date: Tue, 28 Mar 2017 11:56:42 +0300
+Subject: [PATCH 15/16] drivers, net,
+ intersil: convert hostap_cmd_queue.usecnt from atomic_t to refcount_t
 In-Reply-To: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
 References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1490691403-4016-15-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1490691403-4016-16-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,64 +19,88 @@ Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
 Signed-off-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: David Windsor <dwindsor@gmail.com>
 ---
- drivers/net/ppp/ppp_synctty.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/net/wireless/intersil/hostap/hostap_hw.c   | 12 ++++++------
+ drivers/net/wireless/intersil/hostap/hostap_wlan.h |  3 ++-
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/ppp/ppp_synctty.c b/drivers/net/ppp/ppp_synctty.c
-index 9ae5398..4a643f8 100644
---- a/drivers/net/ppp/ppp_synctty.c
-+++ b/drivers/net/ppp/ppp_synctty.c
-@@ -46,6 +46,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/slab.h>
+diff --git a/drivers/net/wireless/intersil/hostap/hostap_hw.c b/drivers/net/wireless/intersil/hostap/hostap_hw.c
+index 04dfd040..d4f0b73 100644
+--- a/drivers/net/wireless/intersil/hostap/hostap_hw.c
++++ b/drivers/net/wireless/intersil/hostap/hostap_hw.c
+@@ -190,7 +190,7 @@ static inline void __hostap_cmd_queue_free(local_info_t *local,
+ 		}
+ 	}
+ 
+-	if (atomic_dec_and_test(&entry->usecnt) && entry->del_req)
++	if (refcount_dec_and_test(&entry->usecnt) && entry->del_req)
+ 		kfree(entry);
+ }
+ 
+@@ -228,7 +228,7 @@ static void prism2_clear_cmd_queue(local_info_t *local)
+ 	spin_lock_irqsave(&local->cmdlock, flags);
+ 	list_for_each_safe(ptr, n, &local->cmd_queue) {
+ 		entry = list_entry(ptr, struct hostap_cmd_queue, list);
+-		atomic_inc(&entry->usecnt);
++		refcount_inc(&entry->usecnt);
+ 		printk(KERN_DEBUG "%s: removed pending cmd_queue entry "
+ 		       "(type=%d, cmd=0x%04x, param0=0x%04x)\n",
+ 		       local->dev->name, entry->type, entry->cmd,
+@@ -350,7 +350,7 @@ static int hfa384x_cmd(struct net_device *dev, u16 cmd, u16 param0,
+ 	if (entry == NULL)
+ 		return -ENOMEM;
+ 
+-	atomic_set(&entry->usecnt, 1);
++	refcount_set(&entry->usecnt, 1);
+ 	entry->type = CMD_SLEEP;
+ 	entry->cmd = cmd;
+ 	entry->param0 = param0;
+@@ -516,7 +516,7 @@ static int hfa384x_cmd_callback(struct net_device *dev, u16 cmd, u16 param0,
+ 	if (entry == NULL)
+ 		return -ENOMEM;
+ 
+-	atomic_set(&entry->usecnt, 1);
++	refcount_set(&entry->usecnt, 1);
+ 	entry->type = CMD_CALLBACK;
+ 	entry->cmd = cmd;
+ 	entry->param0 = param0;
+@@ -666,7 +666,7 @@ static void prism2_cmd_ev(struct net_device *dev)
+ 	if (!list_empty(&local->cmd_queue)) {
+ 		entry = list_entry(local->cmd_queue.next,
+ 				   struct hostap_cmd_queue, list);
+-		atomic_inc(&entry->usecnt);
++		refcount_inc(&entry->usecnt);
+ 		list_del_init(&entry->list);
+ 		local->cmd_queue_len--;
+ 
+@@ -718,7 +718,7 @@ static void prism2_cmd_ev(struct net_device *dev)
+ 			entry = NULL;
+ 		}
+ 		if (entry)
+-			atomic_inc(&entry->usecnt);
++			refcount_inc(&entry->usecnt);
+ 	}
+ 	spin_unlock(&local->cmdlock);
+ 
+diff --git a/drivers/net/wireless/intersil/hostap/hostap_wlan.h b/drivers/net/wireless/intersil/hostap/hostap_wlan.h
+index ca25283..5352adb 100644
+--- a/drivers/net/wireless/intersil/hostap/hostap_wlan.h
++++ b/drivers/net/wireless/intersil/hostap/hostap_wlan.h
+@@ -6,6 +6,7 @@
+ #include <linux/netdevice.h>
+ #include <linux/etherdevice.h>
+ #include <linux/mutex.h>
 +#include <linux/refcount.h>
- #include <asm/unaligned.h>
- #include <linux/uaccess.h>
+ #include <net/iw_handler.h>
+ #include <net/ieee80211_radiotap.h>
+ #include <net/lib80211.h>
+@@ -557,7 +558,7 @@ struct hostap_cmd_queue {
+ 	u16 resp0, res;
+ 	volatile int issued, issuing;
  
-@@ -72,7 +73,7 @@ struct syncppp {
- 
- 	struct tasklet_struct tsk;
- 
--	atomic_t	refcnt;
-+	refcount_t	refcnt;
- 	struct completion dead_cmp;
- 	struct ppp_channel chan;	/* interface to generic ppp layer */
+-	atomic_t usecnt;
++	refcount_t usecnt;
+ 	int del_req;
  };
-@@ -141,14 +142,14 @@ static struct syncppp *sp_get(struct tty_struct *tty)
- 	read_lock(&disc_data_lock);
- 	ap = tty->disc_data;
- 	if (ap != NULL)
--		atomic_inc(&ap->refcnt);
-+		refcount_inc(&ap->refcnt);
- 	read_unlock(&disc_data_lock);
- 	return ap;
- }
- 
- static void sp_put(struct syncppp *ap)
- {
--	if (atomic_dec_and_test(&ap->refcnt))
-+	if (refcount_dec_and_test(&ap->refcnt))
- 		complete(&ap->dead_cmp);
- }
- 
-@@ -182,7 +183,7 @@ ppp_sync_open(struct tty_struct *tty)
- 	skb_queue_head_init(&ap->rqueue);
- 	tasklet_init(&ap->tsk, ppp_sync_process, (unsigned long) ap);
- 
--	atomic_set(&ap->refcnt, 1);
-+	refcount_set(&ap->refcnt, 1);
- 	init_completion(&ap->dead_cmp);
- 
- 	ap->chan.private = ap;
-@@ -232,7 +233,7 @@ ppp_sync_close(struct tty_struct *tty)
- 	 * our channel ops (i.e. ppp_sync_send/ioctl) are in progress
- 	 * by the time it returns.
- 	 */
--	if (!atomic_dec_and_test(&ap->refcnt))
-+	if (!refcount_dec_and_test(&ap->refcnt))
- 		wait_for_completion(&ap->dead_cmp);
- 	tasklet_kill(&ap->tsk);
  
 -- 
 2.7.4
