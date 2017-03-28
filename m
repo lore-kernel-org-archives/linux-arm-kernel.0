@@ -1,30 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 11:18:31 +0200
-Subject: [PATCH v4 3/4] pinctrl: rockchip: split out verification of mux
- settings
-In-Reply-To: <20170323105931.10455-4-john@metanate.com>
-References: <20170323105931.10455-1-john@metanate.com>
- <20170323105931.10455-4-john@metanate.com>
-Message-ID: <CACRpkda27uiDc_E-4Vkq8iT4FG0hXbirAjOva3w9YhacYJ8nvQ@mail.gmail.com>
+From: elena.reshetova@intel.com (Elena Reshetova)
+Date: Tue, 28 Mar 2017 11:56:39 +0300
+Subject: [PATCH 12/16] drivers, net,
+ ppp: convert asyncppp.refcnt from atomic_t to refcount_t
+In-Reply-To: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
+References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1490691403-4016-13-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:59 AM, John Keeping <john@metanate.com> wrote:
+refcount_t type and corresponding API should be
+used instead of atomic_t when the variable is used as
+a reference counter. This allows to avoid accidental
+refcounter overflows that might lead to use-after-free
+situations.
 
-> We need to avoid calling regmap functions from irq handlers, so the next
-> commit is going to move the call to rockchip_set_mux() into an
-> irq_bus_sync_unlock handler.  But we can't return an error from there so
-> we still need to check the settings from rockchip_irq_set_type() and we
-> will use this new rockchip_verify_mux() function from there.
->
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> v3: unchanged
-> v2: unchanged
+Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
+Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
+Signed-off-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: David Windsor <dwindsor@gmail.com>
+---
+ drivers/net/ppp/ppp_async.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Patch applied.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/net/ppp/ppp_async.c b/drivers/net/ppp/ppp_async.c
+index feb9569..2d08f7e 100644
+--- a/drivers/net/ppp/ppp_async.c
++++ b/drivers/net/ppp/ppp_async.c
+@@ -69,7 +69,7 @@ struct asyncppp {
+ 
+ 	struct tasklet_struct tsk;
+ 
+-	atomic_t	refcnt;
++	refcount_t	refcnt;
+ 	struct semaphore dead_sem;
+ 	struct ppp_channel chan;	/* interface to generic ppp layer */
+ 	unsigned char	obuf[OBUFSIZE];
+@@ -140,14 +140,14 @@ static struct asyncppp *ap_get(struct tty_struct *tty)
+ 	read_lock(&disc_data_lock);
+ 	ap = tty->disc_data;
+ 	if (ap != NULL)
+-		atomic_inc(&ap->refcnt);
++		refcount_inc(&ap->refcnt);
+ 	read_unlock(&disc_data_lock);
+ 	return ap;
+ }
+ 
+ static void ap_put(struct asyncppp *ap)
+ {
+-	if (atomic_dec_and_test(&ap->refcnt))
++	if (refcount_dec_and_test(&ap->refcnt))
+ 		up(&ap->dead_sem);
+ }
+ 
+@@ -185,7 +185,7 @@ ppp_asynctty_open(struct tty_struct *tty)
+ 	skb_queue_head_init(&ap->rqueue);
+ 	tasklet_init(&ap->tsk, ppp_async_process, (unsigned long) ap);
+ 
+-	atomic_set(&ap->refcnt, 1);
++	refcount_set(&ap->refcnt, 1);
+ 	sema_init(&ap->dead_sem, 0);
+ 
+ 	ap->chan.private = ap;
+@@ -234,7 +234,7 @@ ppp_asynctty_close(struct tty_struct *tty)
+ 	 * our channel ops (i.e. ppp_async_send/ioctl) are in progress
+ 	 * by the time it returns.
+ 	 */
+-	if (!atomic_dec_and_test(&ap->refcnt))
++	if (!refcount_dec_and_test(&ap->refcnt))
+ 		down(&ap->dead_sem);
+ 	tasklet_kill(&ap->tsk);
+ 
+-- 
+2.7.4
