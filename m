@@ -1,196 +1,228 @@
-From: majun258@huawei.com (majun (Euler7))
-Date: Tue, 28 Mar 2017 20:30:27 +0800
-Subject: [Update][PATCH v9.1 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
-References: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <58DA5763.4060509@huawei.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 28 Mar 2017 20:34:12 +0800
+Subject: [PATCH v22 00/11] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <1cc5a994-0af6-79ea-930d-44b3fc789427@jonmasters.org>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <1cc5a994-0af6-79ea-930d-44b3fc789427@jonmasters.org>
+Message-ID: <CADyBb7ujZKDF0aUJZRUN81jor04mZ-V5ESWScAjaxoHQUeVFSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi hanjun:
-	This patch works fine on my D05 board.
+Hi Jon,
 
-Tested-by: MaJun <majun258@huawei.com>
+Thanks for your email
+ An hour ago, I just got some feedback from Lorenzo, will update my
+patchset ASAP according to his suggestion.
 
-Best Regards
-Majun
+But I still need some feedback form Mark, I can see some progress here:
+https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arch-timer/gtdt
 
-? 2017/3/28 20:21, Hanjun Guo ??:
-> With the preparation of platform msi support and interrupt producer
-> in commit d44fa3d46079 ("ACPI: Add support for ResourceSource/IRQ
-> domain mapping"), we can add mbigen ACPI support now.
-> 
-> Now that the major framework changes are ready, we just need to add
-> the ACPI probe code which creates the irqdomain for devices connecting
-> to it.
-> 
-> In order to create the irqdomain, we need to know the number of hw
-> irqs as input which is provided by mbigen. In DT case, we are using
-> "num-pins" property to describe it, and we will take advantage of
-> that too using _DSD in ACPI as there is no standard way of describe
-> it in ACPI way, also according to the _DSD rule described in
-> Documentation/acpi/DSD-properties-rules.txt, it doesn't break
-> the rules.
-> 
-> The DSDT is represented as below:
-> 
-> For mbigen,
->   Device(MBI0) {
->           Name(_HID, "HISI0152")
->           Name(_UID, Zero)
->           Name(_CRS, ResourceTemplate() {
->                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->           })
-> 
->          Name(_DSD, Package () {
->                  ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
->                  Package () {
->                          Package () {"num-pins", 378}
->                  }
->         })
->  }
-> 
-> For devices,
->  Device(SAS0) {
->          Name(_HID, "HISIxxxx")
->          Name(_UID, Zero)
->          Name(_CRS, ResourceTemplate() {
->                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12, ...}
->          })
->  }
-> 
-> So for the devices connected to the mbigen, as we clearly say that
-> it refers to a specific interrupt controller (mbigen), we can get
-> the virq from mbigen's irqdomain once it's created successfully.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: MaJun <majun258@huawei.com>
-> Cc: Al Stone <ahs3@redhat.com>
-> Cc: Darren Hart <dvhart@infradead.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-mbigen.c | 75 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 72 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index 3756408..061cdb8 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -16,6 +16,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqchip.h>
->  #include <linux/module.h>
-> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
->  				    unsigned long *hwirq,
->  				    unsigned int *type)
->  {
-> -	if (is_of_node(fwspec->fwnode)) {
-> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
->  		if (fwspec->param_count != 2)
->  			return -EINVAL;
->  
-> @@ -271,6 +272,58 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +				     struct mbigen_device *mgn_chip)
-> +{
-> +	struct irq_domain *domain;
-> +	u32 num_pins = 0;
-> +	int ret;
-> +
-> +	/*
-> +	 * "num-pins" is the total number of interrupt pins implemented in
-> +	 * this mbigen instance, and mbigen is an interrupt controller
-> +	 * connected to ITS  converting wired interrupts into MSI, so we
-> +	 * use "num-pins" to alloc MSI vectors which are needed by client
-> +	 * devices connected to it.
-> +	 *
-> +	 * Here is the DSDT device node used for mbigen in firmware:
-> +	 *	Device(MBI0) {
-> +	 *		Name(_HID, "HISI0152")
-> +	 *		Name(_UID, Zero)
-> +	 *		Name(_CRS, ResourceTemplate() {
-> +	 *			Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-> +	 *		})
-> +	 *
-> +	 *		Name(_DSD, Package () {
-> +	 *			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
-> +	 *			Package () {
-> +	 *				Package () {"num-pins", 378}
-> +	 *			}
-> +	 *		})
-> +	 *	}
-> +	 */
-> +	ret = device_property_read_u32(&pdev->dev, "num-pins", &num_pins);
-> +	if (ret || num_pins == 0)
-> +		return -EINVAL;
-> +
-> +	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
-> +						   mbigen_write_msg,
-> +						   &mbigen_domain_ops,
-> +						   mgn_chip);
-> +	if (!domain)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +					    struct mbigen_device *mgn_chip)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
->  static int mbigen_device_probe(struct platform_device *pdev)
->  {
->  	struct mbigen_device *mgn_chip;
-> @@ -289,9 +342,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  	if (IS_ERR(mgn_chip->base))
->  		return PTR_ERR(mgn_chip->base);
->  
-> -	err = mbigen_of_create_domain(pdev, mgn_chip);
-> -	if (err)
-> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-> +		err = mbigen_of_create_domain(pdev, mgn_chip);
-> +	else if (ACPI_COMPANION(&pdev->dev))
-> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-> +	else
-> +		err = -EINVAL;
-> +
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain",
-> +			mgn_chip->base);
->  		return err;
-> +	}
->  
->  	platform_set_drvdata(pdev, mgn_chip);
->  	return 0;
-> @@ -303,10 +365,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  };
->  MODULE_DEVICE_TABLE(of, mbigen_of_match);
->  
-> +static const struct acpi_device_id mbigen_acpi_match[] = {
-> +	{ "HISI0152", 0 },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-> +
->  static struct platform_driver mbigen_platform_driver = {
->  	.driver = {
->  		.name		= "Hisilicon MBIGEN-V2",
->  		.of_match_table	= mbigen_of_match,
-> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
->  	},
->  	.probe			= mbigen_device_probe,
->  };
-> 
+I guess I should rebase my patchset to his gtdt branch for v23.
+
+So now, I am waiting for Mark's feedback to move on.
+
+On 28 March 2017 at 19:32, Jon Masters <jcm@jonmasters.org> wrote:
+> Anyone got review comments for this series?
+>
+> On 03/21/2017 12:31 PM, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patchset:
+>>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>>         1. Introduce a wrapper function to get the frequency from mmio.
+>>         2. separate out device-tree code from arch_timer_detect_rate
+>>         3. remove arch_timer_detect_rate use arch_timer_*get_cntfrq directly
+>>         4. Refactor arch_timer_needs_probing, and move it into DT init call
+>>         5. Introduce some new structs and refactor the MMIO timer init code
+>>         for reusing some common code.
+>>
+>>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>>     memory-mapped timer and SBSA Generic Watchdog timer.
+>>     This driver can help to simplify all the relevant timer drivers,
+>>     and separate all the ACPI GTDT knowledge from them.
+>>
+>>     (3)Simplify ACPI code for arm_arch_timer
+>>
+>>     (4)Add GTDT support for ARM memory-mapped timer.
+>>
+>> This patchset has been tested on the following platforms with ACPI enabled:
+>>     (1)ARM Foundation v8 model
+>>
+>> Changelog:
+>> v22: https://lkml.org/lkml/2017/3/21/
+>>      Rebase to git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/cleanup
+>>      Only Introduce arch_timer_mem_get_cntfrq to get the frequency from mmio.
+>>      Merged patch 2,3(about arch_timer_detect_rate).
+>>      Keep arch_timer_rate, do NOT split it for different types of timer.
+>>      Improve  memory-mapped timer support by comments and variable name:
+>>          data-->timer_mem
+>>          frame-->gtdt_frame
+>>      Delete zero check for SBSA watchdog irq.
+>>      Skip secure SBSA watchdog in GTDT driver.
+>>      Delete Kconfig modification for SBSA watchdog driver.
+>>      Delete no_irq, using nr_res instead.
+>>
+>> v21: https://lkml.org/lkml/2017/2/6/734
+>>      Introduce two functions to get the frequency from mmio and sysreg.
+>>      Remove arch_timer_detect_rate use arch_timer_get_*_freq directly
+>>      Split arch_timer_rate for different types of timer.
+>>      Skip secure timer frame in GTDT driver.
+>>      Rebase to git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/cleanup
+>>      (The first 6 patches in v20 have been merged into arch-timer/cleanup branch)
+>>
+>> v20: https://lkml.org/lkml/2017/1/18/534
+>>      Reorder the first 4 patches and split the 4th patches.
+>>      Leave CNTHCTL_* as they originally were.
+>>      Fix the bug in arch_timer_select_ppi.
+>>      Split "Rework counter frequency detection" patch.
+>>      Rework the arch_timer_detect_rate function.
+>>      Improve the commit message of "Refactor MMIO timer probing".
+>>      Rebase to 4.10.0-rc4
+>>
+>> v19: https://lkml.org/lkml/2016/12/21/25
+>>      Fix a '\n' missing in a error message in arch_timer_mem_init.
+>>      Add "request_mem_region" for ioremapping cntbase, according to
+>>      f947ee1 clocksource/drivers/arm_arch_timer: Map frame with of_io_request_and_map()
+>>      Rebase to 4.9.0-gfb779ff
+>>
+>> v18: https://lkml.org/lkml/2016/12/8/446
+>>      Fix 8/15 patch problem of "int ret;" in arch_timer_acpi_init.
+>>      Rebase to 4.9.0-rc8-g9269898
+>>
+>> v17: https://lkml.org/lkml/2016/11/25/140
+>>      Take out some cleanups from 4/15.
+>>      Merge 5/15 and 6/15, improve PPI determination code,
+>>      improve commit message.
+>>      Rework counter frequency detection.
+>>      Move arch_timer_needs_of_probing into DT init call.
+>>      Move Platform Timer scan loop back to timer init call to avoid allocating
+>>      and free memory.
+>>      Improve all the exported functions' comment.
+>>
+>> v16: https://lkml.org/lkml/2016/11/16/268
+>>      Fix patchset problem about static enum ppi_nr of 01/13 in v15.
+>>      Refactor arch_timer_detect_rate.
+>>      Refactor arch_timer_needs_probing.
+>>
+>> v15: https://lkml.org/lkml/2016/11/15/366
+>>      Re-order patches
+>>      Add arm_arch_timer refactoring patches to prepare for GTDT:
+>>          1. rename some  enums and defines, and some cleanups
+>>          2. separate out arch_timer_uses_ppi init code and fix a potential bug
+>>          3. Improve some new structs, refactor the timer init code.
+>>      Since the some structs have been changed, GTDT parser for memory-mapped
+>>      timer and SBSA Generic Watchdog timer have been update.
+>>
+>> v14: https://lkml.org/lkml/2016/9/28/573
+>>      Separate memory-mapped timer GTDT support into two patches
+>>          1. Refactor the timer init code to prepare for GTDT
+>>          2. Add GTDT support for memory-mapped timer
+>>
+>> v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
+>>      Improve arm_arch_timer code for memory-mapped
+>>      timer GTDT support, refactor original memory-mapped timer
+>>      dt support for reusing some common code.
+>>
+>> v12: https://lkml.org/lkml/2016/9/13/250
+>>      Rebase to latest Linux 4.8-rc6
+>>      Delete the confusing "skipping" in the error message.
+>>
+>> V11: https://lkml.org/lkml/2016/9/6/354
+>>      Rebase to latest Linux 4.8-rc5
+>>      Delete typedef (suggested by checkpatch.pl)
+>>
+>> V10: https://lkml.org/lkml/2016/7/26/215
+>>      Drop the "readq" patch.
+>>      Rebase to latest Linux 4.7.
+>>
+>> V9: https://lkml.org/lkml/2016/7/25/345
+>>     Improve pr_err message in acpi gtdt driver.
+>>     Update Commit message for 7/9
+>>     shorten the irq mapping function name
+>>     Improve GTDT driver for memory-mapped timer
+>>
+>> v8: https://lkml.org/lkml/2016/7/19/660
+>>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+>>     and also improve printk message.
+>>     Simplify is_timer_block and is_watchdog.
+>>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+>>     Delete __init in include/linux/acpi.h for GTDT API
+>>     Make ARM64 select GTDT.
+>>     Delete "#include <linux/module.h>" from acpi_gtdt.c
+>>     Simplify GT block parse code.
+>>
+>> v7: https://lkml.org/lkml/2016/7/13/769
+>>     Move the GTDT driver to drivers/acpi/arm64
+>>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+>>     Merge 3 patches of GTDT parser driver.
+>>     Fix the for_each_platform_timer bug.
+>>
+>> v6: https://lkml.org/lkml/2016/6/29/580
+>>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+>>     and SBSA Generic Watchdog timer
+>>     Improve driver by suggestions and example code from Daniel Lezcano
+>>
+>> v5: https://lkml.org/lkml/2016/5/24/356
+>>     Sorting out all patches, simplify the API of GTDT driver:
+>>     GTDT driver just fills the data struct for arm_arch_timer driver.
+>>
+>> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+>>     Delete the kvm relevant patches
+>>     Separate two patches for sorting out the code for arm_arch_timer.
+>>     Improve irq info export code to allow missing irq info in GTDT table.
+>>
+>> v3: https://lkml.org/lkml/2016/2/1/658
+>>     Improve GTDT driver code:
+>>       (1)improve pr_* by defining pr_fmt(fmt)
+>>       (2)simplify gtdt_sbsa_gwdt_init
+>>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+>>       to get GTDT table.
+>>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+>>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+>>
+>> v2: https://lkml.org/lkml/2015/12/2/10
+>>     Rebase to latest kernel version(4.4-rc3).
+>>     Fix the bug about the config problem,
+>>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+>>
+>> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+>>
+>> Fu Wei (11):
+>>   clocksource: arm_arch_timer: introduce a wrapper function to get the
+>>     frequency from mmio.
+>>   clocksource: arm_arch_timer: separate out device-tree code and remove
+>>     arch_timer_detect_rate
+>>   clocksource: arm_arch_timer: refactor arch_timer_needs_probing
+>>   clocksource: arm_arch_timer: move arch_timer_needs_of_probing into DT
+>>     init call
+>>   clocksource: arm_arch_timer: introduce some new structs to prepare for
+>>     GTDT
+>>   clocksource: arm_arch_timer: refactor MMIO timer probing.
+>>   acpi/arm64: Add GTDT table parse driver
+>>   clocksource: arm_arch_timer: simplify ACPI support code.
+>>   acpi/arm64: Add memory-mapped timer support in GTDT driver
+>>   clocksource: arm_arch_timer: add GTDT support for memory-mapped timer
+>>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+>>
+>>  arch/arm64/Kconfig                   |   1 +
+>>  drivers/acpi/arm64/Kconfig           |   3 +
+>>  drivers/acpi/arm64/Makefile          |   1 +
+>>  drivers/acpi/arm64/gtdt.c            | 381 +++++++++++++++++++++++++++++++++++
+>>  drivers/clocksource/arm_arch_timer.c | 326 +++++++++++++++++++-----------
+>>  include/clocksource/arm_arch_timer.h |  17 ++
+>>  include/linux/acpi.h                 |   7 +
+>>  7 files changed, 614 insertions(+), 122 deletions(-)
+>>  create mode 100644 drivers/acpi/arm64/gtdt.c
+>>
+>
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
