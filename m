@@ -1,50 +1,97 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Mar 2017 19:48:28 +0100
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <20170322183512.GB27921@leverpostej>
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
- <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
- <20170310183555.GB6271@arm.com>
- <20170322183512.GB27921@leverpostej>
-Message-ID: <20170328184828.GF8643@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Mar 2017 11:51:05 -0700
+Subject: [PATCHv3] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <b1773b1c-8cd4-d085-c695-4d01a2223b02@ti.com>
+References: <20170314180555.23597-1-tony@atomide.com>
+ <aa5d7ee3-2e54-2c6c-df5d-b5efff4b365e@ti.com>
+ <20170327164308.GK10760@atomide.com>
+ <20170328113657.GL23750@n2100.armlinux.org.uk>
+ <20170328170944.GY10760@atomide.com>
+ <b1773b1c-8cd4-d085-c695-4d01a2223b02@ti.com>
+Message-ID: <20170328185105.GA10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 06:35:13PM +0000, Mark Rutland wrote:
-> On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
-> > On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
-> 
-> > > The next question is how do we merge this. Obviously, we can't split it
-> > > between trees, and this is very likely to clash with anything that we
-> > > will merge on the KVM side (the sysreg table is a popular place).
-> > > 
-> > > Will, Catalin: Would it make sense to create a stable branch with these
-> > > patches, and merge it into both the arm64 and KVM trees? That'd make
-> > > things easier...
+* Andrew F. Davis <afd@ti.com> [170328 10:55]:
+> On 03/28/2017 12:09 PM, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@armlinux.org.uk> [170328 04:39]:
+> >> On Mon, Mar 27, 2017 at 09:43:09AM -0700, Tony Lindgren wrote:
+> >>> Yes problems still remains. I think the immediate fix there is to
+> >>> disable kexec during runtime based on some criteria for your use
+> >>> case rather than BUG() though. Somehow kexec needs to know if CPU1
+> >>> reset is acceptable, then reset CPU1 before kexec.
+> >>
+> >> The only acceptable way to do that is to make the decision when loading
+> >> the image(s), and refuse to load the image(s) if kexec is not possible.
+> >> (As is already done when dealing with whether we can CPU hot-unplug the
+> >> secondary CPUs.)
 > > 
-> > I think the scope for conflict on our side is pretty high too, so a shared
-> > branch might be the best way to go. I don't want to branch just yet though,
-> > so I'll probably wait a week or so before setting something in stone.
+> > OK so how about the following to disable kexec for Andrew's
+> > test case?
+> > 
+> > That is assuming that omap_type() test works for HS dra7
+> > like it does for the other omap2 variants.
+> > 
+> > Regards,
+> > 
+> > Tony
+> > 
+> > 8< ---------------------
+> > diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+> > --- a/arch/arm/mach-omap2/common.h
+> > +++ b/arch/arm/mach-omap2/common.h
+> > @@ -260,6 +260,7 @@ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
+> >  extern void omap_auxcoreboot_addr(u32 cpu_addr);
+> >  extern u32 omap_read_auxcoreboot0(void);
+> >  
+> > +extern bool omap4_cpu_can_disable(unsigned int cpu);
+> >  extern void omap4_cpu_die(unsigned int cpu);
+> >  extern int omap4_cpu_kill(unsigned int cpu);
+> >  
+> > diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
+> > --- a/arch/arm/mach-omap2/omap-hotplug.c
+> > +++ b/arch/arm/mach-omap2/omap-hotplug.c
+> > @@ -22,6 +22,15 @@
+> >  #include "omap-wakeupgen.h"
+> >  #include "common.h"
+> >  #include "powerdomain.h"
+> > +#include "soc.h"
+> > +
+> > +bool omap4_cpu_can_disable(unsigned int cpu)
+> > +{
+> > +	if (soc_is_dra7xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
+> > +		return false;
+> > +
 > 
-> Any further thoughts on this?
+> NAK!
 > 
-> Christoffer has Acked the KVM bits, so if you're happy to do so for the
-> arm64 bits I can make a stable branch.
+> HS variants can have aux cores disabled, we are already doing it right
+> now, this is another hack to avoid having to fix kexec.
 
-Looking around, it doesn't look like there's anything outside of arm64
-that'll conflict on the <asm/sysreg.h> changes, and git's happy to merge
-my changes with Suzuki's changes currently queued in arm64's
-for-next/core branch.
+Oh sorry the intention was to not break things for your. So probably
+just having a separate dra7_hs_smp_ops with no cpu_kill initialized
+should do the trick for kexec.
 
-I think it would make sense for those to be in a common branch taken by
-both the arm64 and KVM trees, with the KVM-specific parts being taken by
-KVM alone atop of that.
+> You are failing to park cores correctly, so instead of fixing that you
+> hack around it on non-HS devices by hard-resetting those cores, now
+> because you can't do that hack on HS devices you suggest we disable
+> hotplug on HS devices altogether!?
 
-Would everyone be happy with that?
+Me failing to park cores? The current code has always assumed that
+CPU1 enters a low power state for hot-unplug. And AFAIK, there's no
+way to have CPU1 continue at a different address at that point
+without a reset. The need for preserving CPU1 state through kexec
+boot without a reset is something new that you need.
 
-For reference, I've updated my branches so that arm64/common-sysreg only
-contains the common parts, with the KVM parts atop of that in
-kvm/common-sysreg.
+> Kexec *does* work on HS devices. It only fails if we fail to park a core
+> correctly, something that should never happen, the check here must be
+> for that, unconditionally disabling Kexec for all HS devices is not a
+> valid option.
 
-Thanks,
-Mark.
+Well sounds like you have to come up with checks for when we
+need to disable kexec and use dra7_hs_smp_ops with no cpu_kill.
+
+Regards,
+
+Tony
