@@ -1,41 +1,71 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 28 Mar 2017 13:14:27 +0300
-Subject: [PATCH v4 0/6] Pad retentions support for Exynos5433
-In-Reply-To: <CACRpkdY1snu8tNaUW4hR7zvMSMv10wUoeAnv28Ag=NJuHAS-Pw@mail.gmail.com>
-References: <CGME20170323080346eucas1p216eec41325d220774ecec05b397e83a6@eucas1p2.samsung.com>
- <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <CACRpkdY1snu8tNaUW4hR7zvMSMv10wUoeAnv28Ag=NJuHAS-Pw@mail.gmail.com>
-Message-ID: <CAJKOXPc7bmAFjqS59Tqm=-vqMpC8-w0KsmabZDZZLN13h593CQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Mar 2017 12:15:41 +0200
+Subject: [PATCH] ARM: orion5x: only call into phylib when available
+Message-ID: <20170328101606.53008-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 12:22 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Thu, Mar 23, 2017 at 9:03 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->
->> This patchset is a next step to add support for all power domains on
->> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
->> driver and Exynos LPASS MFD driver, which are needed to make the
->> platform ready for adding power domains support.
->>
->> Patches in this patchset have runtime dependency. They are order in such
->> a way to make the changes bisectable (mfd lpass changes should be applied
->> after pinctrl patches). Other dependencies mentioned previously in v3 of
->> this patchset has been finally merged to v4.11-rc1.
->>
->> Patches have been rebased on top of linux v4.11-rc3.
->
-> Pinctrl development is based on -rc1.
->
-> I expect Krzysztof to figure out and apply the patches to his Samsung pinctrl
-> branch and forward to me, all looks OK to me.
+Board code cannot call mdiobus_register_board_info() when phylib
+or mdio_device is a loadable module:
 
-Yes, I already have them:
-https://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git/log/?h=pinctrl-next
+arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
+:(.init.text+0x474): undefined reference to `mdiobus_register_board_info'
 
-However this reminds me to prepare a pull request for mfd tree because
-they base on top of it.
+I had a number of ideas for how this could be solved, but after the MDIO
+code got split out from PHYLIB it has gotten too hard, so I'm basically
+giving up, and only call the mdiobus_register_board_info() function
+if the MDIO layer is built-in to avoid the link error. This is similar
+to how we handle PHY registration on other ARM platforms.
 
-Best regards,
-Krzysztof
+Fixes: 90eff9096c01 ("net: phy: Allow splitting MDIO bus/device support from PHYs")
+Fixes: 648ea0134069 ("net: phy: Allow pre-declaration of MDIO devices")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-orion5x/Kconfig | 1 +
+ arch/arm/plat-orion/common.c  | 5 +++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index 468b8cb7fd5f..e3429c8c2e38 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -6,6 +6,7 @@ menuconfig ARCH_ORION5X
+ 	select GPIOLIB
+ 	select MVEBU_MBUS
+ 	select PCI
++	select PHYLIB if NETDEVICES
+ 	select PLAT_ORION_LEGACY
+ 	help
+ 	  Support for the following Marvell Orion 5x series SoCs:
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 9255b6d67ba5..aff6994950ba 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -468,6 +468,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ 		    eth_data, &orion_ge11);
+ }
+ 
++#ifdef CONFIG_ARCH_ORION5X
+ /*****************************************************************************
+  * Ethernet switch
+  ****************************************************************************/
+@@ -480,6 +481,9 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+ 	struct mdio_board_info *bd;
+ 	unsigned int i;
+ 
++	if (!IS_BUILTIN(CONFIG_PHYLIB))
++		return;
++
+ 	for (i = 0; i < ARRAY_SIZE(d->port_names); i++)
+ 		if (!strcmp(d->port_names[i], "cpu"))
+ 			break;
+@@ -493,6 +497,7 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+ 
+ 	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+ }
++#endif
+ 
+ /*****************************************************************************
+  * I2C
+-- 
+2.9.0
