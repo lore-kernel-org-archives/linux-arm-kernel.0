@@ -1,79 +1,65 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 28 Mar 2017 15:51:21 +0900
-Subject: [PATCH v34 03/14] arm64: limit memory regions based on DT property,
- usable-memory-range
+Date: Tue, 28 Mar 2017 15:51:23 +0900
+Subject: [PATCH v34 05/14] arm64: mm: add set_memory_valid()
 In-Reply-To: <20170328064831.15894-1-takahiro.akashi@linaro.org>
 References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
-Message-ID: <20170328065130.16019-1-takahiro.akashi@linaro.org>
+Message-ID: <20170328065130.16019-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Crash dump kernel uses only a limited range of available memory as System
-RAM. On arm64 kdump, This memory range is advertised to crash dump kernel
-via a device-tree property under /chosen,
-   linux,usable-memory-range = <BASE SIZE>
-
-Crash dump kernel reads this property at boot time and calls
-memblock_cap_memory_range() to limit usable memory which are listed either
-in UEFI memory map table or "memory" nodes of a device tree blob.
+This function validates and invalidates PTE entries, and will be utilized
+in kdump to protect loaded crash dump kernel image.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Geoff Levand <geoff@infradead.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/mm/init.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm64/include/asm/cacheflush.h |  1 +
+ arch/arm64/mm/pageattr.c            | 15 +++++++++------
+ 2 files changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index e19e06593e37..290794b1a0f1 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -188,10 +188,45 @@ static int __init early_mem(char *p)
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index 5a2a6ee65f65..728f933cef8c 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -154,5 +154,6 @@ int set_memory_ro(unsigned long addr, int numpages);
+ int set_memory_rw(unsigned long addr, int numpages);
+ int set_memory_x(unsigned long addr, int numpages);
+ int set_memory_nx(unsigned long addr, int numpages);
++int set_memory_valid(unsigned long addr, unsigned long size, int enable);
+ 
+ #endif
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index 8def55e7249b..3212ee0558f6 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -125,20 +125,23 @@ int set_memory_x(unsigned long addr, int numpages)
  }
- early_param("mem", early_mem);
+ EXPORT_SYMBOL_GPL(set_memory_x);
  
-+static int __init early_init_dt_scan_usablemem(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	struct memblock_region *usablemem = data;
-+	const __be32 *reg;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+static void __init fdt_enforce_memory_region(void)
-+{
-+	struct memblock_region reg = {
-+		.size = 0,
-+	};
-+
-+	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-+
-+	if (reg.size)
-+		memblock_cap_memory_range(reg.base, reg.size);
-+}
-+
- void __init arm64_memblock_init(void)
+-#ifdef CONFIG_DEBUG_PAGEALLOC
+-void __kernel_map_pages(struct page *page, int numpages, int enable)
++int set_memory_valid(unsigned long addr, int numpages, int enable)
  {
- 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
- 
-+	/* Handle linux,usable-memory-range property */
-+	fdt_enforce_memory_region();
+-	unsigned long addr = (unsigned long) page_address(page);
+-
+ 	if (enable)
+-		__change_memory_common(addr, PAGE_SIZE * numpages,
++		return __change_memory_common(addr, PAGE_SIZE * numpages,
+ 					__pgprot(PTE_VALID),
+ 					__pgprot(0));
+ 	else
+-		__change_memory_common(addr, PAGE_SIZE * numpages,
++		return __change_memory_common(addr, PAGE_SIZE * numpages,
+ 					__pgprot(0),
+ 					__pgprot(PTE_VALID));
+ }
 +
- 	/*
- 	 * Ensure that the linear region takes up exactly half of the kernel
- 	 * virtual address space. This way, we can distinguish a linear address
++#ifdef CONFIG_DEBUG_PAGEALLOC
++void __kernel_map_pages(struct page *page, int numpages, int enable)
++{
++	set_memory_valid((unsigned long)page_address(page), numpages, enable);
++}
+ #ifdef CONFIG_HIBERNATION
+ /*
+  * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
 -- 
 2.11.1
