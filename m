@@ -1,67 +1,41 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 28 Mar 2017 15:55:10 -0500
-Subject: [PATCH 1/2] Documentation: dt: Update ti,emif bindings
-In-Reply-To: <20170328205511.21166-1-d-gerlach@ti.com>
-References: <20170328205511.21166-1-d-gerlach@ti.com>
-Message-ID: <20170328205511.21166-2-d-gerlach@ti.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 28 Mar 2017 22:50:50 +0200
+Subject: [RFC 3/8] cpufreq: imx6q: Set max suspend_freq to avoid changes
+ during suspend
+In-Reply-To: <1490731431.15830.9.camel@nxp.com>
+References: <cover.1490199005.git.leonard.crestez@nxp.com>
+ <20170323043427.GE12094@vireshk-i7> <1490731431.15830.9.camel@nxp.com>
+Message-ID: <45185440.SBt0mf6LXq@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Texas Instruments EMIF binding document to include the device
-tree bindings for ti,emif-am3352 and ti,emif-am4372 which are used by
-the ti-emif-sram driver to provide low-level PM functionality.
+On Tuesday, March 28, 2017 11:03:51 PM Leonard Crestez wrote:
+> On Thu, 2017-03-23 at 10:04 +0530, Viresh Kumar wrote:
+> > On 22-03-17, 18:53, Leonard Crestez wrote:
+> > > If the cpufreq driver tries to modify voltage/freq during suspend/resume
+> > > it might need to control an external PMIC via I2C or SPI but those
+> > > devices might be already suspended.
+> > > 
+> > > To avoid this scenario we just increase cpufreq to highest setpoint
+> > > before suspend. This issue can easily be triggered by ldo-bypass but in
+> > > theory any regulator set_voltage call can end up having to modify
+> > > external supply voltages.
+> > > 
+> > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > > ---
+> > >  drivers/cpufreq/imx6q-cpufreq.c | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > 
+> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> The first couple of patches are obvious fixes despite being marked as
+> RFC. It would be great if you could apply them to your tree separately
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- .../devicetree/bindings/memory-controllers/ti/emif.txt | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+Why?
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-index 0db60470ebb6..8c0214b17c2b 100644
---- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-@@ -8,6 +8,7 @@ of the EMIF IP and memory parts attached to it.
- Required properties:
- - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-   is the IP revision of the specific EMIF instance.
-+		  For am335x should be ti,emif-am3352.
- 		  For am437x should be ti,emif-am4372.
- 
- - phy-type	: <u32> indicating the DDR phy type. Following are the
-@@ -21,6 +22,13 @@ Required properties:
-   the value shall be "emif<n>" where <n> is the number of the EMIF
-   instance with base 1.
- 
-+Required only for "ti,emif-am3352" and "ti,emif-am4372":
-+- sram			: Phandles for generic sram driver nodes,
-+  first should be type 'protect-exec' for the driver to use to copy
-+  and run PM functions, second should be regular pool to be used for
-+  data region for code. See Documentation/devicetree/bindings/sram/sram.txt
-+  for more details.
-+
- Optional properties:
- - cs1-used		: Have this property if CS1 of this EMIF
-   instance has a memory part attached to it. If there is a memory
-@@ -42,7 +50,7 @@ Optional properties:
- - hw-caps-temp-alert	: Have this property if the controller
-   has capability for generating SDRAM temperature alerts
- 
--Example:
-+-Examples:
- 
- emif1: emif at 0x4c000000 {
- 	compatible	= "ti,emif-4d";
-@@ -54,3 +62,11 @@ emif1: emif at 0x4c000000 {
- 	hw-caps-ll-interface;
- 	hw-caps-temp-alert;
- };
-+
-+/* From am33xx.dtsi */
-+emif: emif at 4c000000 {
-+        compatible = "ti,emif-am3352";
-+        reg =   <0x4C000000 0x1000>;
-+        sram = <&pm_sram_code
-+                &pm_sram_data>;
-+};
--- 
-2.11.0
+> from the rest of the series but I'm not sure what the process is here.
+
+Well, you have to talk to me.
+
+Thanks,
+Rafael
