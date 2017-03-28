@@ -1,91 +1,72 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 28 Mar 2017 17:40:08 +0900
-Subject: [PATCH] reset: uniphier: add NAND and eMMC reset control
-Message-ID: <1490690408-2616-1-git-send-email-yamada.masahiro@socionext.com>
+From: elena.reshetova@intel.com (Elena Reshetova)
+Date: Tue, 28 Mar 2017 11:56:27 +0300
+Subject: [PATCH 00/16] Networking drivers refcount conversions
+Message-ID: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset lines for the Denali NAND controller on all UniPhier SoCs,
-for the Cadence eMMC controller on LD11/LD20 SoCs.
+This series, for various different networking drivers, replaces atomic_t reference
+counters with the new refcount_t type and API (see include/linux/refcount.h).
+By doing this we prevent intentional or accidental
+underflows or overflows that can led to use-after-free vulnerabilities.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+The below patches are fully independent and can be cherry-picked separately.
+Since we convert all kernel subsystems in the same fashion, resulting
+in about 300 patches, we have to group them for sending at least in some
+fashion to be manageable. Please excuse the long cc list.
 
-Philipp,
+If there are no objections to these patches, please take them
+through the relevant trees.
 
-Sorry for sending this in the last minute.
-If it is not too late, please apply this for 4.12-rc1.
-Thanks!
+Elena Reshetova (16):
+  drivers, net, ethernet: convert clip_entry.refcnt from atomic_t to
+    refcount_t
+  drivers, net, ethernet: convert mtk_eth.dma_refcnt from atomic_t to
+    refcount_t
+  drivers, net, mlx4: convert mlx4_cq.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx4: convert mlx4_qp.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx4: convert mlx4_srq.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx5: convert mlx5_cq.refcount from atomic_t to
+    refcount_t
+  drivers, net, mlx5: convert fs_node.refcount from atomic_t to
+    refcount_t
+  drivers, net, hamradio: convert sixpack.refcnt from atomic_t to
+    refcount_t
+  drivers, net: convert masces_rx_sa.refcnt from atomic_t to refcount_t
+  drivers, net: convert masces_rx_sc.refcnt from atomic_t to refcount_t
+  drivers, net: convert masces_tx_sa.refcnt from atomic_t to refcount_t
+  drivers, net, ppp: convert asyncppp.refcnt from atomic_t to refcount_t
+  drivers, net, ppp: convert ppp_file.refcnt from atomic_t to refcount_t
+  drivers, net, ppp: convert syncppp.refcnt from atomic_t to refcount_t
+  drivers, net, intersil: convert hostap_cmd_queue.usecnt from atomic_t
+    to refcount_t
+  drivers, net, intersil: convert request_context.refcount from atomic_t
+    to refcount_t
 
+ drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c      | 13 ++++++-----
+ drivers/net/ethernet/chelsio/cxgb4/clip_tbl.h      |  4 +++-
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c        |  8 ++++---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.h        |  4 +++-
+ drivers/net/ethernet/mellanox/mlx4/cq.c            |  8 +++----
+ drivers/net/ethernet/mellanox/mlx4/qp.c            |  8 +++----
+ drivers/net/ethernet/mellanox/mlx4/srq.c           |  8 +++----
+ drivers/net/ethernet/mellanox/mlx5/core/cq.c       | 16 +++++++-------
+ drivers/net/ethernet/mellanox/mlx5/core/fs_core.c  | 24 ++++++++++-----------
+ drivers/net/ethernet/mellanox/mlx5/core/fs_core.h  |  3 ++-
+ drivers/net/hamradio/6pack.c                       | 12 +++++------
+ drivers/net/macsec.c                               | 25 +++++++++++-----------
+ drivers/net/ppp/ppp_async.c                        | 10 ++++-----
+ drivers/net/ppp/ppp_generic.c                      | 17 ++++++++-------
+ drivers/net/ppp/ppp_synctty.c                      | 11 +++++-----
+ drivers/net/wireless/intersil/hostap/hostap_hw.c   | 12 +++++------
+ drivers/net/wireless/intersil/hostap/hostap_wlan.h |  3 ++-
+ .../net/wireless/intersil/orinoco/orinoco_usb.c    | 15 +++++++------
+ include/linux/mlx4/device.h                        |  8 +++----
+ include/linux/mlx5/cq.h                            |  4 ++--
+ 20 files changed, 112 insertions(+), 101 deletions(-)
 
- drivers/reset/reset-uniphier.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index 7af60bc..c4ba898 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -50,6 +50,15 @@ struct uniphier_reset_data {
- 	}
- 
- /* System reset data */
-+#define UNIPHIER_SLD3_SYS_RESET_NAND(id)		\
-+	UNIPHIER_RESETX((id), 0x2004, 2)
-+
-+#define UNIPHIER_LD11_SYS_RESET_NAND(id)		\
-+	UNIPHIER_RESETX((id), 0x200c, 0)
-+
-+#define UNIPHIER_LD11_SYS_RESET_EMMC(id)		\
-+	UNIPHIER_RESETX((id), 0x200c, 2)
-+
- #define UNIPHIER_SLD3_SYS_RESET_STDMAC(id)		\
- 	UNIPHIER_RESETX((id), 0x2000, 10)
- 
-@@ -66,11 +75,13 @@ struct uniphier_reset_data {
- 	UNIPHIER_RESETX((id), 0x2000 + 0x4 * (ch), 17)
- 
- static const struct uniphier_reset_data uniphier_sld3_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_NAND(2),
- 	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* Ether, HSC, MIO */
- 	UNIPHIER_RESET_END,
- };
- 
- static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_NAND(2),
- 	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* HSC, MIO, RLE */
- 	UNIPHIER_PRO4_SYS_RESET_GIO(12),	/* Ether, SATA, USB3 */
- 	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
-@@ -79,6 +90,7 @@ static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
- };
- 
- static const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_NAND(2),
- 	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* HSC */
- 	UNIPHIER_PRO4_SYS_RESET_GIO(12),	/* PCIe, USB3 */
- 	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
-@@ -87,6 +99,7 @@ static const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
- };
- 
- static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_NAND(2),
- 	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* HSC, RLE */
- 	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
- 	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-@@ -101,11 +114,15 @@ static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
- };
- 
- static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
-+	UNIPHIER_LD11_SYS_RESET_NAND(2),
-+	UNIPHIER_LD11_SYS_RESET_EMMC(4),
- 	UNIPHIER_LD11_SYS_RESET_STDMAC(8),	/* HSC, MIO */
- 	UNIPHIER_RESET_END,
- };
- 
- static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
-+	UNIPHIER_LD11_SYS_RESET_NAND(2),
-+	UNIPHIER_LD11_SYS_RESET_EMMC(4),
- 	UNIPHIER_LD11_SYS_RESET_STDMAC(8),	/* HSC */
- 	UNIPHIER_LD20_SYS_RESET_GIO(12),	/* PCIe, USB3 */
- 	UNIPHIER_RESETX(16, 0x200c, 12),	/* USB30-PHY0 */
 -- 
 2.7.4
