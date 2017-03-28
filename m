@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 11:28:04 +0200
-Subject: [RFT PATCH 1/6] ARM64: dts: meson-gxbb: Add gpio-ranges properties
-In-Reply-To: <1490286449-19448-2-git-send-email-narmstrong@baylibre.com>
+Date: Tue, 28 Mar 2017 11:28:38 +0200
+Subject: [RFT PATCH 2/6] ARM64: dts: meson-gxl: Add gpio-ranges properties
+In-Reply-To: <1490286449-19448-3-git-send-email-narmstrong@baylibre.com>
 References: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com>
- <1490286449-19448-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CACRpkdaRQG8_94-ooEAZhNMHSpCvfBWAxzrQmDHeBS7=9M=gAg@mail.gmail.com>
+ <1490286449-19448-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdYj-39SbfKJw8X=5Ev2VtFcLhxkeS=59q5jNvm-1t2sLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
