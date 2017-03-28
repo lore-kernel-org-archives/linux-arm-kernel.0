@@ -1,89 +1,183 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Tue, 28 Mar 2017 06:02:03 +0000
-Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
-References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
- <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Tue, 28 Mar 2017 08:20:24 +0200
+Subject: [PATCH] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <CAL_Jsq++rdPqNZk54S7gQaeLBdzSptogp3dp9P1HmNTV67Sk9w@mail.gmail.com>
+References: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
+ <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
+ <dce20025-9f42-e747-e325-e1667504e615@st.com>
+ <CAL_Jsq++rdPqNZk54S7gQaeLBdzSptogp3dp9P1HmNTV67Sk9w@mail.gmail.com>
+Message-ID: <461b2321-c43c-6d88-c805-97a887cc431d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan
 
->Hi Mayurkumkar,
->
->On 3/25/2017 5:38 PM, Sinan Kaya wrote:
->> When the operating system is booted with the default ASPM policy
->> (POLICY_DEFAULT), current code is querying the enable/disable
->> states from ASPM registers to determine the policy.
->>
->> For example, a BIOS could set the power saving state to performance
->> and clear all ASPM control registers. A balanced ASPM policy could
->> enable L0s and disable L1. A power conscious BIOS could enable both
->> L0s and L1 to trade off latency and performance vs. power.
->>
->> After hotplug removal, pcie_aspm_exit_link_state() function clears
->> the ASPM registers. An insertion following hotplug removal reads
->> incorrect policy as ASPM disabled even though ASPM was enabled
->> during boot.
->>
->> This is caused by the fact that same function is used for reconfiguring
->> ASPM regardless of the power on state.
->>
->> ------------------------
->> Changes from v4 (http://www.spinics.net/lists/linux-pci/msg59245.html)
->> ------------------------
->> - pci_aspm_init(): Fix function comment.  Called for every device we
->>   enumerate.
->> 	Upstream link partner:  Shouldn't need to check pdev->link_state
->>         (should always be NULL for a brand-new device).
->>
->> - pcie_aspm_init_link_state(): Called for bridges (upstream end of
->>     link) after all children have been enumerated.  No longer needs to
->>     check aspm_support_enabled or pdev->has_secondary_link or the VIA
->>     quirk: pci_aspm_init() already checked that stuff, so we only need
->>     to check pdev->link_state here.
->>
->> - split the last patch into two
->>   PCI/ASPM: move link_state cleanup to bridge remove
->>   PCI/ASPM: save power on values during bridge init
->>
->> - create bugzilla (https://bugzilla.kernel.org/show_bug.cgi?id=194895)
->> - add fixes tags
->>
->> Sinan Kaya (4):
->>   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
->>   PCI/ASPM: add init hook to device_add
->>   PCI/ASPM: save power on values during bridge init
->>   PCI/ASPM: move link_state cleanup to bridge remove
->>
->>  drivers/pci/pcie/aspm.c | 93 +++++++++++++++++++++++++++++++++----------------
->>  drivers/pci/probe.c     |  3 ++
->>  drivers/pci/remove.c    |  3 +-
->>  include/linux/pci.h     |  2 ++
->>  4 files changed, 69 insertions(+), 32 deletions(-)
->>
->
->Can you test this on your system and provide your tested-by if all good?
->
->Sinan
->
 
-Thanks for your patches. I am seeing kernel panic after applying
-these patches (on top of latest kernel) each time during early boot in pci_aspm_init() (any hints already?) function.
-Need to check if it's something related to my local setup or it's because of these changes.
-For now I don't have more details why it crashes but I will dig in further and I will provide
-you more data as soon as I have it.
+On 03/27/2017 09:04 PM, Rob Herring wrote:
+> On Fri, Mar 24, 2017 at 4:41 AM, Gabriel Fernandez
+> <gabriel.fernandez@st.com> wrote:
+>> Hi Rob,
+>>
+>> Thanks for reviewing
+>>
+>>
+>>
+>> On 03/24/2017 03:06 AM, Rob Herring wrote:
+>>> On Wed, Mar 15, 2017 at 10:23:30AM +0100, gabriel.fernandez at st.com wrote:
+>>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>>
+>>>> This patch enables clocks for STM32H743 boards.
+>>>>
+>>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>> ---
+>>>>    .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  152 ++
+>>>>    drivers/clk/Makefile                               |    1 +
+>>>>    drivers/clk/clk-stm32h7.c                          | 1586
+>>>> ++++++++++++++++++++
+>>>>    include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
+>>>>    include/dt-bindings/mfd/stm32h7-rcc.h              |  138 ++
+>>>>    5 files changed, 2042 insertions(+)
+>>>>    create mode 100644
+>>>> Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>>>    create mode 100644 drivers/clk/clk-stm32h7.c
+>>>>    create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
+>>>>    create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>>> b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>>> new file mode 100644
+>>>> index 0000000..9d4b587
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>>>> @@ -0,0 +1,152 @@
+>>>> +STMicroelectronics STM32H7 Reset and Clock Controller
+>>>> +=====================================================
+>>>> +
+>>>> +The RCC IP is both a reset and a clock controller.
+>>>> +
+>>>> +Please refer to clock-bindings.txt for common clock controller binding
+>>>> usage.
+>>>> +Please also refer to reset.txt for common reset controller binding
+>>>> usage.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Should be:
+>>>> +  "st,stm32h743-rcc"
+>>>> +
+>>>> +- reg: should be register base and length as documented in the
+>>>> +  datasheet
+>>>> +
+>>>> +- #reset-cells: 1, see below
+>>>> +
+>>>> +- #clock-cells : from common clock binding; shall be set to 1
+>>>> +
+>>>> +- clocks: External oscillator clock phandle
+>>>> +  - high speed external clock signal (HSE)
+>>>> +  - low speed external clock signal (LSE)
+>>>> +  - external I2S clock (I2S_CKIN)
+>>>> +
+>>>> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup
+>>>> domain
+>>>> +  write protection (RTC clock).
+>>>> +
+>>>> +- pll x node: Allow to register a pll with specific parameters.
+>>>> +  Please see PLL section below.
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +       rcc: rcc at 58024400 {
+>>>> +               #reset-cells = <1>;
+>>>> +               #clock-cells = <2>
+>>>> +               compatible = "st,stm32h743-rcc", "st,stm32-rcc";
+>>>> +               reg = <0x58024400 0x400>;
+>>>> +               clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
+>>>> +
+>>>> +               st,syscfg = <&pwrcfg>;
+>>>> +
+>>>> +               #address-cells = <1>;
+>>>> +               #size-cells = <0>;
+>>>> +
+>>>> +               vco1 at 58024430 {
+>>>> +                       #clock-cells = <0>;
+>>>> +                       compatible = "stm32,pll";
+>>>> +                       reg = <0>;
+>>> The reg addr value and unit address don't match.
+>> ok il will change into
+>>
+>>          vco1 at 0 {
+>>                  reg = <0>;
+>>
+>>
+>>>> +               };
+>>>> +
+>>>> +               vco2 at 58024438 {
+>>>> +                       #clock-cells = <0>;
+>>>> +                       compatible = "stm32,pll";
+>>>> +                       reg = <1>;
+>>>> +                       st,clock-div = <2>;
+>>>> +                       st,clock-mult = <40>;
+>>>> +                       st,frac-status = <0>;
+>>>> +                       st,frac = <0>;
+>>>> +                       st,vcosel = <1>;
+>>>> +                       st,pllrge = <2>;
+>>>> +               };
+>>>> +       };
+>>>> +
+>>>> +
+>>>> +STM32H7 PLL
+>>>> +-----------
+>>>> +
+>>>> +The VCO of STM32 PLL could be reprensented like this:
+>>>> +
+>>>> +  Vref    ---------       --------
+>>>> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
+>>>> +          ---------       --------
+>>>> +                            ^
+>>>> +                            |
+>>>> +                         -------
+>>>> +                        | FRACN |
+>>>> +                         -------
+>>>> +
+>>>> +When the PLL is configured in integer mode:
+>>>> +- VCO = ( Vref / DIVM ) * DIVN
+>>>> +
+>>>> +When the PLL is configured in fractional mode:
+>>>> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
+>>>> +
+>>>> +
+>>>> +Required properties for pll node:
+>>>> +- compatible: Should be:
+>>>> +  "stm32,pll"
+>>> Only 1 single PLL design for all STM32 chips ever?
+>> no, i can change into "stm32h7,pll"
+> Actually, should be "st,stm32h7-pll".
+ok
 
->--
->Sinan Kaya
->Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+>>>> +
+>>>> +- #clock-cells: from common clock binding; shall be set to 0
+>>>> +- reg: Should be the pll number.
+>>>> +
+>>>> +Optional properties:
+>>>> +- st,clock-div:  DIVM division factor       : <1..63>
+>>>> +- st,clock-mult: DIVN multiplication factor : <4..512>
+>>>> +
+>>>> +- st,frac-status:
+>>>> +   - 0 Pll is configured in integer mode
+>>>> +   - 1 Pll is configure in fractional mode
+>>> Isn't this implied by the presence of the next property?
+>> do you prefer this ?
+>>
+>> - st,frac :
+>> 0 : pll is configured in integer mode
+>> 1..8191 : Fractional part of the multiplication factor and pll is configured
+>> in fractional mode
+> Why not no st,frac property means integer mode?
+No
+
+no st,frac property means no change (keep default values from bootloader)
+
+
+Best Regards
+
+Gabriel
+
+> Rob
