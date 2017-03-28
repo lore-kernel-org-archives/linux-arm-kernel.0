@@ -1,199 +1,97 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Mar 2017 10:19:10 -0500
-Subject: [PATCH] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <461b2321-c43c-6d88-c805-97a887cc431d@st.com>
-References: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
- <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
- <dce20025-9f42-e747-e325-e1667504e615@st.com>
- <CAL_Jsq++rdPqNZk54S7gQaeLBdzSptogp3dp9P1HmNTV67Sk9w@mail.gmail.com>
- <461b2321-c43c-6d88-c805-97a887cc431d@st.com>
-Message-ID: <CAL_JsqJ6ND_CdW5ktSf_mVxaVyye=ZRVbGiJk6E5-ExvoBN9Hg@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 28 Mar 2017 08:19:43 -0700
+Subject: [PATCH v8 0/2] GPCv2 power gating driver
+Message-ID: <20170328151945.32665-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 1:20 AM, Gabriel Fernandez
-<gabriel.fernandez@st.com> wrote:
->
->
-> On 03/27/2017 09:04 PM, Rob Herring wrote:
->>
->> On Fri, Mar 24, 2017 at 4:41 AM, Gabriel Fernandez
->> <gabriel.fernandez@st.com> wrote:
->>>
->>> Hi Rob,
->>>
->>> Thanks for reviewing
->>>
->>>
->>>
->>> On 03/24/2017 03:06 AM, Rob Herring wrote:
->>>>
->>>> On Wed, Mar 15, 2017 at 10:23:30AM +0100, gabriel.fernandez at st.com
->>>> wrote:
->>>>>
->>>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>>>
->>>>> This patch enables clocks for STM32H743 boards.
->>>>>
->>>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>>> ---
->>>>>    .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  152 ++
->>>>>    drivers/clk/Makefile                               |    1 +
->>>>>    drivers/clk/clk-stm32h7.c                          | 1586
->>>>> ++++++++++++++++++++
->>>>>    include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
->>>>>    include/dt-bindings/mfd/stm32h7-rcc.h              |  138 ++
->>>>>    5 files changed, 2042 insertions(+)
->>>>>    create mode 100644
->>>>> Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>>>    create mode 100644 drivers/clk/clk-stm32h7.c
->>>>>    create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
->>>>>    create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>>> b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>>> new file mode 100644
->>>>> index 0000000..9d4b587
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>>> @@ -0,0 +1,152 @@
->>>>> +STMicroelectronics STM32H7 Reset and Clock Controller
->>>>> +=====================================================
->>>>> +
->>>>> +The RCC IP is both a reset and a clock controller.
->>>>> +
->>>>> +Please refer to clock-bindings.txt for common clock controller binding
->>>>> usage.
->>>>> +Please also refer to reset.txt for common reset controller binding
->>>>> usage.
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible: Should be:
->>>>> +  "st,stm32h743-rcc"
->>>>> +
->>>>> +- reg: should be register base and length as documented in the
->>>>> +  datasheet
->>>>> +
->>>>> +- #reset-cells: 1, see below
->>>>> +
->>>>> +- #clock-cells : from common clock binding; shall be set to 1
->>>>> +
->>>>> +- clocks: External oscillator clock phandle
->>>>> +  - high speed external clock signal (HSE)
->>>>> +  - low speed external clock signal (LSE)
->>>>> +  - external I2S clock (I2S_CKIN)
->>>>> +
->>>>> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup
->>>>> domain
->>>>> +  write protection (RTC clock).
->>>>> +
->>>>> +- pll x node: Allow to register a pll with specific parameters.
->>>>> +  Please see PLL section below.
->>>>> +
->>>>> +Example:
->>>>> +
->>>>> +       rcc: rcc at 58024400 {
->>>>> +               #reset-cells = <1>;
->>>>> +               #clock-cells = <2>
->>>>> +               compatible = "st,stm32h743-rcc", "st,stm32-rcc";
->>>>> +               reg = <0x58024400 0x400>;
->>>>> +               clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
->>>>> +
->>>>> +               st,syscfg = <&pwrcfg>;
->>>>> +
->>>>> +               #address-cells = <1>;
->>>>> +               #size-cells = <0>;
->>>>> +
->>>>> +               vco1 at 58024430 {
->>>>> +                       #clock-cells = <0>;
->>>>> +                       compatible = "stm32,pll";
->>>>> +                       reg = <0>;
->>>>
->>>> The reg addr value and unit address don't match.
->>>
->>> ok il will change into
->>>
->>>          vco1 at 0 {
->>>                  reg = <0>;
->>>
->>>
->>>>> +               };
->>>>> +
->>>>> +               vco2 at 58024438 {
->>>>> +                       #clock-cells = <0>;
->>>>> +                       compatible = "stm32,pll";
->>>>> +                       reg = <1>;
->>>>> +                       st,clock-div = <2>;
->>>>> +                       st,clock-mult = <40>;
->>>>> +                       st,frac-status = <0>;
->>>>> +                       st,frac = <0>;
->>>>> +                       st,vcosel = <1>;
->>>>> +                       st,pllrge = <2>;
->>>>> +               };
->>>>> +       };
->>>>> +
->>>>> +
->>>>> +STM32H7 PLL
->>>>> +-----------
->>>>> +
->>>>> +The VCO of STM32 PLL could be reprensented like this:
->>>>> +
->>>>> +  Vref    ---------       --------
->>>>> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
->>>>> +          ---------       --------
->>>>> +                            ^
->>>>> +                            |
->>>>> +                         -------
->>>>> +                        | FRACN |
->>>>> +                         -------
->>>>> +
->>>>> +When the PLL is configured in integer mode:
->>>>> +- VCO = ( Vref / DIVM ) * DIVN
->>>>> +
->>>>> +When the PLL is configured in fractional mode:
->>>>> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
->>>>> +
->>>>> +
->>>>> +Required properties for pll node:
->>>>> +- compatible: Should be:
->>>>> +  "stm32,pll"
->>>>
->>>> Only 1 single PLL design for all STM32 chips ever?
->>>
->>> no, i can change into "stm32h7,pll"
->>
->> Actually, should be "st,stm32h7-pll".
->
-> ok
->
->>>>> +
->>>>> +- #clock-cells: from common clock binding; shall be set to 0
->>>>> +- reg: Should be the pll number.
->>>>> +
->>>>> +Optional properties:
->>>>> +- st,clock-div:  DIVM division factor       : <1..63>
->>>>> +- st,clock-mult: DIVN multiplication factor : <4..512>
->>>>> +
->>>>> +- st,frac-status:
->>>>> +   - 0 Pll is configured in integer mode
->>>>> +   - 1 Pll is configure in fractional mode
->>>>
->>>> Isn't this implied by the presence of the next property?
->>>
->>> do you prefer this ?
->>>
->>> - st,frac :
->>> 0 : pll is configured in integer mode
->>> 1..8191 : Fractional part of the multiplication factor and pll is
->>> configured
->>> in fractional mode
->>
->> Why not no st,frac property means integer mode?
->
-> No
->
-> no st,frac property means no change (keep default values from bootloader)
+Shawn,
 
-Okay, then 0 for integer mode is fine. Also state what the default means.
+Here's v8 of GPCv2 patches with more feedback from Dong incorporated.
 
-Rob
+Thanks,
+Andrey Smirnov
+
+Changes since v7 (see [v7]):
+
+	- Drop the code to support USB OTG power domains and simplify
+          a number of codepaths because of that
+
+	- Add access table to regmap config to prevent accesses to
+          undesired locations in the register file
+
+	- Dropped cache type specifier from regmap config
+
+	- Re-arrange constant definition to align more closesly with RM
+
+	- Minor stylistic adjustments
+
+Changes since v6 (see [v6]):
+
+	- Drop .readable_reg related code
+
+	- Switch regmap to REGCACHE_NONE and drop .volatile_reg
+
+	- Remove unnecessary #include directives
+
+Changes since v5 (see [v5]):
+
+	- Apply reverse tree variable declartaion fromatting to
+          imx_gpcv2_probe() and imx7_gpc_pu_pgc_sw_pxx_req()
+
+	- Drop patch #3 in favour of defaulting to y in Kconfig
+	
+Changes since v4 (see [v4]):
+
+	- Single patch is split into multiple as per Shawn's reques
+
+	- Incorporated various feedback from Shawn
+
+Changes since v3 (see [v3]):
+
+	- Minor device tree bindings documentation fixes as per
+          feedback from Rob Herring
+	- Collect Acked-by from Rob
+
+Changes since v2 (see [v2]):
+
+	- Fix a critical bug where incorrect state of a bit was
+          expected in a busy wait loop (bit set instead of bit
+          cleared) imx7_gpc_pu_pgc_sw_pxx_req()
+
+	- Add missing step (setting of PCR in GPC_PGC_nCTRL) in power
+          down procedure
+
+Changes since v1 (see [v1]):
+
+	- Various small DT bindings description fixes as per feedback
+          from Rob Herring
+
+
+[v1] https://lkml.org/lkml/2017/2/6/554
+[v2] https://lkml.org/lkml/2017/2/13/489
+[v3] https://lkml.org/lkml/2017/2/20/338
+[v4] https://lkml.org/lkml/2017/2/28/738
+[v5] https://lkml.org/lkml/2017/3/14/547
+[v6] https://lkml.org/lkml/2017/3/16/357
+[v7] https://lkml.org/lkml/2017/3/21/405
+
+
+Andrey Smirnov (2):
+  dt-bindings: Add GPCv2 power gating driver
+  soc/imx: Add GPCv2 power gating driver
+
+ .../devicetree/bindings/power/fsl,imx-gpcv2.txt    |  71 ++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/imx/Kconfig                            |  10 +
+ drivers/soc/imx/Makefile                           |   1 +
+ drivers/soc/imx/gpcv2.c                            | 363 +++++++++++++++++++++
+ include/dt-bindings/power/imx7-power.h             |  16 +
+ 6 files changed, 462 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+ create mode 100644 drivers/soc/imx/Kconfig
+ create mode 100644 drivers/soc/imx/gpcv2.c
+ create mode 100644 include/dt-bindings/power/imx7-power.h
+
+-- 
+2.9.3
