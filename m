@@ -1,709 +1,951 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 27 Mar 2017 17:40:41 -0700
-Subject: [PATCH v6 24/39] media: imx: Add MIPI CSI-2 Receiver subdev driver
+Date: Mon, 27 Mar 2017 17:40:39 -0700
+Subject: [PATCH v6 22/39] media: imx: Add VDIC subdev driver
 In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1490661656-10318-25-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1490661656-10318-23-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
-for sensors with a MIPI CSI2 interface.
+This is a media entity subdevice driver for the i.MX Video De-Interlacing
+or Combining Block. So far this entity does not implement the Combining
+function but only motion compensated deinterlacing. Video frames are
+received from the CSI and are routed to the IC PRPVF entity.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
  drivers/staging/media/imx/Makefile         |   1 +
- drivers/staging/media/imx/imx6-mipi-csi2.c | 673 +++++++++++++++++++++++++++++
- 2 files changed, 674 insertions(+)
- create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
+ drivers/staging/media/imx/imx-media-vdic.c | 911 +++++++++++++++++++++++++++++
+ 2 files changed, 912 insertions(+)
+ create mode 100644 drivers/staging/media/imx/imx-media-vdic.c
 
 diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
-index 878a126..3569625 100644
+index c054490..1f01520 100644
 --- a/drivers/staging/media/imx/Makefile
 +++ b/drivers/staging/media/imx/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-vdic.o
- obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-ic.o
+@@ -4,5 +4,6 @@ imx-media-common-objs := imx-media-utils.o imx-media-fim.o
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-capture.o
++obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-vdic.o
  
  obj-$(CONFIG_VIDEO_IMX_CSI) += imx-media-csi.o
-+obj-$(CONFIG_VIDEO_IMX_CSI) += imx6-mipi-csi2.o
-diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
+diff --git a/drivers/staging/media/imx/imx-media-vdic.c b/drivers/staging/media/imx/imx-media-vdic.c
 new file mode 100644
-index 0000000..6411b48
+index 0000000..aaf3590
 --- /dev/null
-+++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
-@@ -0,0 +1,673 @@
++++ b/drivers/staging/media/imx/imx-media-vdic.c
+@@ -0,0 +1,911 @@
 +/*
-+ * MIPI CSI-2 Receiver Subdev for Freescale i.MX6 SOC.
++ * V4L2 Deinterlacer Subdev for Freescale i.MX5/6 SOC
 + *
-+ * Copyright (c) 2012-2017 Mentor Graphics Inc.
++ * Copyright (c) 2017 Mentor Graphics Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
 + */
-+#include <linux/clk.h>
++#include <linux/delay.h>
 +#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/irq.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/timer.h>
++#include <media/v4l2-ctrls.h>
 +#include <media/v4l2-device.h>
-+#include <media/v4l2-of.h>
++#include <media/v4l2-ioctl.h>
++#include <media/v4l2-mc.h>
 +#include <media/v4l2-subdev.h>
++#include <media/imx.h>
 +#include "imx-media.h"
 +
 +/*
-+ * there must be 5 pads: 1 input pad from sensor, and
-+ * the 4 virtual channel output pads
++ * This subdev implements two different video pipelines:
++ *
++ * CSI -> VDIC
++ *
++ * In this pipeline, the CSI sends a single interlaced field F(n-1)
++ * directly to the VDIC (and optionally the following field F(n)
++ * can be sent to memory via IDMAC channel 13). This pipeline only works
++ * in VDIC's high motion mode, which only requires a single field for
++ * processing. The other motion modes (low and medium) require three
++ * fields, so this pipeline does not work in those modes. Also, it is
++ * not clear how this pipeline can deal with the various field orders
++ * (sequential BT/TB, interlaced BT/TB).
++ *
++ * MEM -> CH8,9,10 -> VDIC
++ *
++ * In this pipeline, previous field F(n-1), current field F(n), and next
++ * field F(n+1) are transferred to the VDIC via IDMAC channels 8,9,10.
++ * These memory buffers can come from a video output or mem2mem device.
++ * All motion modes are supported by this pipeline.
++ *
++ * The "direct" CSI->VDIC pipeline requires no DMA, but it can only be
++ * used in high motion mode.
 + */
-+#define CSI2_SINK_PAD       0
-+#define CSI2_NUM_SINK_PADS  1
-+#define CSI2_NUM_SRC_PADS   4
-+#define CSI2_NUM_PADS       5
++
++struct vdic_priv;
++
++struct vdic_pipeline_ops {
++	int (*setup)(struct vdic_priv *priv);
++	void (*start)(struct vdic_priv *priv);
++	void (*stop)(struct vdic_priv *priv);
++	void (*disable)(struct vdic_priv *priv);
++};
 +
 +/*
-+ * The default maximum bit-rate per lane in Mbps, if the
-+ * source subdev does not provide V4L2_CID_LINK_FREQ.
++ * Min/Max supported width and heights.
 + */
-+#define CSI2_DEFAULT_MAX_MBPS 849
++#define MIN_W       176
++#define MIN_H       144
++#define MAX_W_VDIC  968
++#define MAX_H_VDIC 2048
++#define W_ALIGN    4 /* multiple of 16 pixels */
++#define H_ALIGN    1 /* multiple of 2 lines */
++#define S_ALIGN    1 /* multiple of 2 */
 +
-+struct csi2_dev {
-+	struct device          *dev;
-+	struct v4l2_subdev      sd;
-+	struct media_pad       pad[CSI2_NUM_PADS];
-+	struct clk             *dphy_clk;
-+	struct clk             *pllref_clk;
-+	struct clk             *pix_clk; /* what is this? */
-+	void __iomem           *base;
-+	struct v4l2_of_bus_mipi_csi2 bus;
++struct vdic_priv {
++	struct device        *dev;
++	struct ipu_soc       *ipu;
++	struct imx_media_dev *md;
++	struct v4l2_subdev   sd;
++	struct media_pad pad[VDIC_NUM_PADS];
++	int ipu_id;
 +
 +	/* lock to protect all members below */
 +	struct mutex lock;
 +
-+	struct v4l2_mbus_framefmt format_mbus;
++	/* IPU units we require */
++	struct ipu_vdi *vdi;
 +
-+	int                     power_count;
-+	bool                    stream_on;
-+	struct v4l2_subdev      *src_sd;
-+	bool                    sink_linked[CSI2_NUM_SRC_PADS];
++	int active_input_pad;
++
++	struct ipuv3_channel *vdi_in_ch_p; /* F(n-1) transfer channel */
++	struct ipuv3_channel *vdi_in_ch;   /* F(n) transfer channel */
++	struct ipuv3_channel *vdi_in_ch_n; /* F(n+1) transfer channel */
++
++	/* pipeline operations */
++	struct vdic_pipeline_ops *ops;
++
++	/* current and previous input buffers indirect path */
++	struct imx_media_buffer *curr_in_buf;
++	struct imx_media_buffer *prev_in_buf;
++
++	/*
++	 * translated field type, input line stride, and field size
++	 * for indirect path
++	 */
++	u32 fieldtype;
++	u32 in_stride;
++	u32 field_size;
++
++	/* the source (a video device or subdev) */
++	struct media_entity *src;
++	/* the sink that will receive the progressive out buffers */
++	struct v4l2_subdev *sink_sd;
++
++	struct v4l2_mbus_framefmt format_mbus[VDIC_NUM_PADS];
++	const struct imx_media_pixfmt *cc[VDIC_NUM_PADS];
++
++	/* the video device at IDMAC input pad */
++	struct imx_media_video_dev *vdev;
++
++	bool csi_direct;  /* using direct CSI->VDIC->IC pipeline */
++
++	/* motion select control */
++	struct v4l2_ctrl_handler ctrl_hdlr;
++	enum ipu_motion_sel motion;
++
++	bool stream_on; /* streaming is on */
 +};
 +
-+#define DEVICE_NAME "imx6-mipi-csi2"
-+
-+/* Register offsets */
-+#define CSI2_VERSION            0x000
-+#define CSI2_N_LANES            0x004
-+#define CSI2_PHY_SHUTDOWNZ      0x008
-+#define CSI2_DPHY_RSTZ          0x00c
-+#define CSI2_RESETN             0x010
-+#define CSI2_PHY_STATE          0x014
-+#define PHY_STOPSTATEDATA_BIT   4
-+#define PHY_STOPSTATEDATA(n)    BIT(PHY_STOPSTATEDATA_BIT + (n))
-+#define PHY_RXCLKACTIVEHS       BIT(8)
-+#define PHY_RXULPSCLKNOT        BIT(9)
-+#define PHY_STOPSTATECLK        BIT(10)
-+#define CSI2_DATA_IDS_1         0x018
-+#define CSI2_DATA_IDS_2         0x01c
-+#define CSI2_ERR1               0x020
-+#define CSI2_ERR2               0x024
-+#define CSI2_MSK1               0x028
-+#define CSI2_MSK2               0x02c
-+#define CSI2_PHY_TST_CTRL0      0x030
-+#define PHY_TESTCLR		BIT(0)
-+#define PHY_TESTCLK		BIT(1)
-+#define CSI2_PHY_TST_CTRL1      0x034
-+#define PHY_TESTEN		BIT(16)
-+#define CSI2_SFT_RESET          0xf00
-+
-+static inline struct csi2_dev *sd_to_dev(struct v4l2_subdev *sdev)
++static void vdic_put_ipu_resources(struct vdic_priv *priv)
 +{
-+	return container_of(sdev, struct csi2_dev, sd);
++	if (!IS_ERR_OR_NULL(priv->vdi_in_ch_p))
++		ipu_idmac_put(priv->vdi_in_ch_p);
++	priv->vdi_in_ch_p = NULL;
++
++	if (!IS_ERR_OR_NULL(priv->vdi_in_ch))
++		ipu_idmac_put(priv->vdi_in_ch);
++	priv->vdi_in_ch = NULL;
++
++	if (!IS_ERR_OR_NULL(priv->vdi_in_ch_n))
++		ipu_idmac_put(priv->vdi_in_ch_n);
++	priv->vdi_in_ch_n = NULL;
++
++	if (!IS_ERR_OR_NULL(priv->vdi))
++		ipu_vdi_put(priv->vdi);
++	priv->vdi = NULL;
 +}
 +
-+/*
-+ * The required sequence of MIPI CSI-2 startup as specified in the i.MX6
-+ * reference manual is as follows:
-+ *
-+ * 1. Deassert presetn signal (global reset).
-+ *        It's not clear what this "global reset" signal is (maybe APB
-+ *        global reset), but in any case this step would be probably
-+ *        be carried out during driver load in csi2_probe().
-+ *
-+ * 2. Configure MIPI Camera Sensor to put all Tx lanes in LP-11 state.
-+ *        This must be carried out by the MIPI sensor's s_power(ON) subdev
-+ *        op.
-+ *
-+ * 3. D-PHY initialization.
-+ * 4. CSI2 Controller programming (Set N_LANES, deassert PHY_SHUTDOWNZ,
-+ *    deassert PHY_RSTZ, deassert CSI2_RESETN).
-+ * 5. Read the PHY status register (PHY_STATE) to confirm that all data and
-+ *    clock lanes of the D-PHY are in LP-11 state.
-+ *        These steps (3,4,5) are carried out by csi2_s_power(ON) here.
-+ *
-+ * 6. Configure the MIPI Camera Sensor to start transmitting a clock on the
-+ *    D-PHY clock lane.
-+ *        This must be carried out by the MIPI sensor's s_stream(ON) subdev
-+ *        op.
-+ *
-+ * 7. CSI2 Controller programming - Read the PHY status register (PHY_STATE)
-+ *    to confirm that the D-PHY is receiving a clock on the D-PHY clock lane.
-+ *        This step is carried out by csi2_s_stream(ON) here.
-+ */
-+
-+static void csi2_enable(struct csi2_dev *csi2, bool enable)
++static int vdic_get_ipu_resources(struct vdic_priv *priv)
 +{
-+	if (enable) {
-+		writel(0x1, csi2->base + CSI2_PHY_SHUTDOWNZ);
-+		writel(0x1, csi2->base + CSI2_DPHY_RSTZ);
-+		writel(0x1, csi2->base + CSI2_RESETN);
-+	} else {
-+		writel(0x0, csi2->base + CSI2_PHY_SHUTDOWNZ);
-+		writel(0x0, csi2->base + CSI2_DPHY_RSTZ);
-+		writel(0x0, csi2->base + CSI2_RESETN);
++	int ret, err_chan;
++
++	priv->ipu = priv->md->ipu[priv->ipu_id];
++
++	priv->vdi = ipu_vdi_get(priv->ipu);
++	if (IS_ERR(priv->vdi)) {
++		v4l2_err(&priv->sd, "failed to get VDIC\n");
++		ret = PTR_ERR(priv->vdi);
++		goto out;
 +	}
-+}
 +
-+static void csi2_set_lanes(struct csi2_dev *csi2)
-+{
-+	int lanes = csi2->bus.num_data_lanes;
++	if (!priv->csi_direct) {
++		priv->vdi_in_ch_p = ipu_idmac_get(priv->ipu,
++						  IPUV3_CHANNEL_MEM_VDI_PREV);
++		if (IS_ERR(priv->vdi_in_ch_p)) {
++			err_chan = IPUV3_CHANNEL_MEM_VDI_PREV;
++			ret = PTR_ERR(priv->vdi_in_ch_p);
++			goto out_err_chan;
++		}
 +
-+	writel(lanes - 1, csi2->base + CSI2_N_LANES);
-+}
++		priv->vdi_in_ch = ipu_idmac_get(priv->ipu,
++						IPUV3_CHANNEL_MEM_VDI_CUR);
++		if (IS_ERR(priv->vdi_in_ch)) {
++			err_chan = IPUV3_CHANNEL_MEM_VDI_CUR;
++			ret = PTR_ERR(priv->vdi_in_ch);
++			goto out_err_chan;
++		}
 +
-+static void dw_mipi_csi2_phy_write(struct csi2_dev *csi2,
-+				   u32 test_code, u32 test_data)
-+{
-+	/* Clear PHY test interface */
-+	writel(PHY_TESTCLR, csi2->base + CSI2_PHY_TST_CTRL0);
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL1);
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
++		priv->vdi_in_ch_n = ipu_idmac_get(priv->ipu,
++						  IPUV3_CHANNEL_MEM_VDI_NEXT);
++		if (IS_ERR(priv->vdi_in_ch_n)) {
++			err_chan = IPUV3_CHANNEL_MEM_VDI_NEXT;
++			ret = PTR_ERR(priv->vdi_in_ch_n);
++			goto out_err_chan;
++		}
++	}
 +
-+	/* Raise test interface strobe signal */
-+	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
++	return 0;
 +
-+	/* Configure address write on falling edge and lower strobe signal */
-+	writel(PHY_TESTEN | test_code, csi2->base + CSI2_PHY_TST_CTRL1);
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-+
-+	/* Configure data write on rising edge and raise strobe signal */
-+	writel(test_data, csi2->base + CSI2_PHY_TST_CTRL1);
-+	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
-+
-+	/* Clear strobe signal */
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
++out_err_chan:
++	v4l2_err(&priv->sd, "could not get IDMAC channel %u\n", err_chan);
++out:
++	vdic_put_ipu_resources(priv);
++	return ret;
 +}
 +
 +/*
-+ * This table is based on the table documented at
-+ * https://community.nxp.com/docs/DOC-94312. It assumes
-+ * a 27MHz D-PHY pll reference clock.
++ * This function is currently unused, but will be called when the
++ * output/mem2mem device at the IDMAC input pad sends us a new
++ * buffer. It kicks off the IDMAC read channels to bring in the
++ * buffer fields from memory and begin the conversions.
 + */
-+static const struct {
-+	u32 max_mbps;
-+	u32 hsfreqrange_sel;
-+} hsfreq_map[] = {
-+	{ 90, 0x00}, {100, 0x20}, {110, 0x40}, {125, 0x02},
-+	{140, 0x22}, {150, 0x42}, {160, 0x04}, {180, 0x24},
-+	{200, 0x44}, {210, 0x06}, {240, 0x26}, {250, 0x46},
-+	{270, 0x08}, {300, 0x28}, {330, 0x48}, {360, 0x2a},
-+	{400, 0x4a}, {450, 0x0c}, {500, 0x2c}, {550, 0x0e},
-+	{600, 0x2e}, {650, 0x10}, {700, 0x30}, {750, 0x12},
-+	{800, 0x32}, {850, 0x14}, {900, 0x34}, {950, 0x54},
-+	{1000, 0x74},
++static void __maybe_unused prepare_vdi_in_buffers(struct vdic_priv *priv,
++						  struct imx_media_buffer *curr)
++{
++	dma_addr_t prev_phys, curr_phys, next_phys;
++	struct imx_media_buffer *prev;
++	struct vb2_buffer *curr_vb, *prev_vb;
++	u32 fs = priv->field_size;
++	u32 is = priv->in_stride;
++
++	/* current input buffer is now previous */
++	priv->prev_in_buf = priv->curr_in_buf;
++	priv->curr_in_buf = curr;
++	prev = priv->prev_in_buf ? priv->prev_in_buf : curr;
++
++	prev_vb = &prev->vbuf.vb2_buf;
++	curr_vb = &curr->vbuf.vb2_buf;
++
++	switch (priv->fieldtype) {
++	case V4L2_FIELD_SEQ_TB:
++		prev_phys = vb2_dma_contig_plane_dma_addr(prev_vb, 0);
++		curr_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0) + fs;
++		next_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0);
++		break;
++	case V4L2_FIELD_SEQ_BT:
++		prev_phys = vb2_dma_contig_plane_dma_addr(prev_vb, 0) + fs;
++		curr_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0);
++		next_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0) + fs;
++		break;
++	case V4L2_FIELD_INTERLACED_BT:
++		prev_phys = vb2_dma_contig_plane_dma_addr(prev_vb, 0) + is;
++		curr_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0);
++		next_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0) + is;
++		break;
++	default:
++		/* assume V4L2_FIELD_INTERLACED_TB */
++		prev_phys = vb2_dma_contig_plane_dma_addr(prev_vb, 0);
++		curr_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0) + is;
++		next_phys = vb2_dma_contig_plane_dma_addr(curr_vb, 0);
++		break;
++	}
++
++	ipu_cpmem_set_buffer(priv->vdi_in_ch_p, 0, prev_phys);
++	ipu_cpmem_set_buffer(priv->vdi_in_ch,   0, curr_phys);
++	ipu_cpmem_set_buffer(priv->vdi_in_ch_n, 0, next_phys);
++
++	ipu_idmac_select_buffer(priv->vdi_in_ch_p, 0);
++	ipu_idmac_select_buffer(priv->vdi_in_ch, 0);
++	ipu_idmac_select_buffer(priv->vdi_in_ch_n, 0);
++}
++
++static int setup_vdi_channel(struct vdic_priv *priv,
++			     struct ipuv3_channel *channel,
++			     dma_addr_t phys0, dma_addr_t phys1)
++{
++	struct imx_media_video_dev *vdev = priv->vdev;
++	unsigned int burst_size;
++	struct ipu_image image;
++	int ret;
++
++	ipu_cpmem_zero(channel);
++
++	memset(&image, 0, sizeof(image));
++	image.pix = vdev->fmt.fmt.pix;
++	/* one field to VDIC channels */
++	image.pix.height /= 2;
++	image.rect.width = image.pix.width;
++	image.rect.height = image.pix.height;
++	image.phys0 = phys0;
++	image.phys1 = phys1;
++
++	ret = ipu_cpmem_set_image(channel, &image);
++	if (ret)
++		return ret;
++
++	burst_size = (image.pix.width & 0xf) ? 8 : 16;
++	ipu_cpmem_set_burstsize(channel, burst_size);
++
++	ipu_cpmem_set_axi_id(channel, 1);
++
++	ipu_idmac_set_double_buffer(channel, false);
++
++	return 0;
++}
++
++static int vdic_setup_direct(struct vdic_priv *priv)
++{
++	/* set VDIC to receive from CSI for direct path */
++	ipu_fsu_link(priv->ipu, IPUV3_CHANNEL_CSI_DIRECT,
++		     IPUV3_CHANNEL_CSI_VDI_PREV);
++
++	return 0;
++}
++
++static void vdic_start_direct(struct vdic_priv *priv)
++{
++}
++
++static void vdic_stop_direct(struct vdic_priv *priv)
++{
++}
++
++static void vdic_disable_direct(struct vdic_priv *priv)
++{
++	ipu_fsu_unlink(priv->ipu, IPUV3_CHANNEL_CSI_DIRECT,
++		       IPUV3_CHANNEL_CSI_VDI_PREV);
++}
++
++static int vdic_setup_indirect(struct vdic_priv *priv)
++{
++	struct v4l2_mbus_framefmt *infmt;
++	const struct imx_media_pixfmt *incc;
++	int in_size, ret;
++
++	infmt = &priv->format_mbus[VDIC_SINK_PAD_IDMAC];
++	incc = priv->cc[VDIC_SINK_PAD_IDMAC];
++
++	in_size = (infmt->width * incc->bpp * infmt->height) >> 3;
++
++	/* 1/2 full image size */
++	priv->field_size = in_size / 2;
++	priv->in_stride = incc->planar ?
++		infmt->width : (infmt->width * incc->bpp) >> 3;
++
++	priv->prev_in_buf = NULL;
++	priv->curr_in_buf = NULL;
++
++	priv->fieldtype = infmt->field;
++
++	/* init the vdi-in channels */
++	ret = setup_vdi_channel(priv, priv->vdi_in_ch_p, 0, 0);
++	if (ret)
++		return ret;
++	ret = setup_vdi_channel(priv, priv->vdi_in_ch, 0, 0);
++	if (ret)
++		return ret;
++	return setup_vdi_channel(priv, priv->vdi_in_ch_n, 0, 0);
++}
++
++static void vdic_start_indirect(struct vdic_priv *priv)
++{
++	/* enable the channels */
++	ipu_idmac_enable_channel(priv->vdi_in_ch_p);
++	ipu_idmac_enable_channel(priv->vdi_in_ch);
++	ipu_idmac_enable_channel(priv->vdi_in_ch_n);
++}
++
++static void vdic_stop_indirect(struct vdic_priv *priv)
++{
++	/* disable channels */
++	ipu_idmac_disable_channel(priv->vdi_in_ch_p);
++	ipu_idmac_disable_channel(priv->vdi_in_ch);
++	ipu_idmac_disable_channel(priv->vdi_in_ch_n);
++}
++
++static void vdic_disable_indirect(struct vdic_priv *priv)
++{
++}
++
++static struct vdic_pipeline_ops direct_ops = {
++	.setup = vdic_setup_direct,
++	.start = vdic_start_direct,
++	.stop = vdic_stop_direct,
++	.disable = vdic_disable_direct,
 +};
 +
-+static int max_mbps_to_hsfreqrange_sel(u32 max_mbps)
++static struct vdic_pipeline_ops indirect_ops = {
++	.setup = vdic_setup_indirect,
++	.start = vdic_start_indirect,
++	.stop = vdic_stop_indirect,
++	.disable = vdic_disable_indirect,
++};
++
++static int vdic_start(struct vdic_priv *priv)
 +{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(hsfreq_map); i++)
-+		if (hsfreq_map[i].max_mbps > max_mbps)
-+			return hsfreq_map[i].hsfreqrange_sel;
-+
-+	return -EINVAL;
-+}
-+
-+static int csi2_dphy_init(struct csi2_dev *csi2)
-+{
-+	struct v4l2_ctrl *ctrl;
-+	u32 mbps_per_lane;
-+	int sel;
-+
-+	ctrl = v4l2_ctrl_find(csi2->src_sd->ctrl_handler,
-+			      V4L2_CID_LINK_FREQ);
-+	if (!ctrl)
-+		mbps_per_lane = CSI2_DEFAULT_MAX_MBPS;
-+	else
-+		mbps_per_lane = DIV_ROUND_UP_ULL(2 * ctrl->qmenu_int[ctrl->val],
-+						 USEC_PER_SEC);
-+
-+	sel = max_mbps_to_hsfreqrange_sel(mbps_per_lane);
-+	if (sel < 0)
-+		return sel;
-+
-+	dw_mipi_csi2_phy_write(csi2, 0x44, sel);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Waits for ultra-low-power state on D-PHY clock lane. This is currently
-+ * unused and may not be needed@all, but keep around just in case.
-+ */
-+static int __maybe_unused csi2_dphy_wait_ulp(struct csi2_dev *csi2)
-+{
-+	u32 reg;
++	struct v4l2_mbus_framefmt *infmt;
 +	int ret;
 +
-+	/* wait for ULP on clock lane */
-+	ret = readl_poll_timeout(csi2->base + CSI2_PHY_STATE, reg,
-+				 !(reg & PHY_RXULPSCLKNOT), 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "ULP timeout, phy_state = 0x%08x\n", reg);
-+		return ret;
-+	}
++	infmt = &priv->format_mbus[priv->active_input_pad];
 +
-+	/* wait until no errors on bus */
-+	ret = readl_poll_timeout(csi2->base + CSI2_ERR1, reg,
-+				 reg == 0x0, 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "stable bus timeout, err1 = 0x%08x\n", reg);
++	priv->ops = priv->csi_direct ? &direct_ops : &indirect_ops;
++
++	ret = vdic_get_ipu_resources(priv);
++	if (ret)
 +		return ret;
-+	}
++
++	/*
++	 * init the VDIC.
++	 *
++	 * note we don't give infmt->code to ipu_vdi_setup(). The VDIC
++	 * only supports 4:2:2 or 4:2:0, and this subdev will only
++	 * negotiate 4:2:2 at its sink pads.
++	 */
++	ipu_vdi_setup(priv->vdi, MEDIA_BUS_FMT_UYVY8_2X8,
++		      infmt->width, infmt->height);
++	ipu_vdi_set_field_order(priv->vdi, V4L2_STD_UNKNOWN, infmt->field);
++	ipu_vdi_set_motion(priv->vdi, priv->motion);
++
++	ret = priv->ops->setup(priv);
++	if (ret)
++		goto out_put_ipu;
++
++	ipu_vdi_enable(priv->vdi);
++
++	priv->ops->start(priv);
 +
 +	return 0;
++
++out_put_ipu:
++	vdic_put_ipu_resources(priv);
++	return ret;
 +}
 +
-+/* Waits for low-power LP-11 state on data and clock lanes. */
-+static int csi2_dphy_wait_stopstate(struct csi2_dev *csi2)
++static void vdic_stop(struct vdic_priv *priv)
 +{
-+	u32 mask, reg;
-+	int ret;
++	priv->ops->stop(priv);
++	ipu_vdi_disable(priv->vdi);
++	priv->ops->disable(priv);
 +
-+	mask = PHY_STOPSTATECLK |
-+		((csi2->bus.num_data_lanes - 1) << PHY_STOPSTATEDATA_BIT);
-+
-+	ret = readl_poll_timeout(csi2->base + CSI2_PHY_STATE, reg,
-+				 (reg & mask) == mask, 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "LP-11 timeout, phy_state = 0x%08x\n", reg);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+/* Wait for active clock on the clock lane. */
-+static int csi2_dphy_wait_clock_lane(struct csi2_dev *csi2)
-+{
-+	u32 reg;
-+	int ret;
-+
-+	ret = readl_poll_timeout(csi2->base + CSI2_PHY_STATE, reg,
-+				 (reg & PHY_RXCLKACTIVEHS), 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "clock lane timeout, phy_state = 0x%08x\n",
-+			 reg);
-+		return ret;
-+	}
-+
-+	return 0;
++	vdic_put_ipu_resources(priv);
 +}
 +
 +/*
 + * V4L2 subdev operations.
 + */
 +
-+/* Startup Sequence Steps 3, 4, 5 */
-+static int csi2_s_power(struct v4l2_subdev *sd, int on)
++static int vdic_s_ctrl(struct v4l2_ctrl *ctrl)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
++	struct vdic_priv *priv = container_of(ctrl->handler,
++					      struct vdic_priv, ctrl_hdlr);
++	enum ipu_motion_sel motion;
 +	int ret = 0;
 +
-+	mutex_lock(&csi2->lock);
++	mutex_lock(&priv->lock);
 +
-+	/*
-+	 * If the power count is modified from 0 to != 0 or from != 0 to 0,
-+	 * update the power state.
-+	 */
-+	if (csi2->power_count == !on) {
-+		if (on) {
-+			dev_dbg(csi2->dev, "power ON\n");
-+
-+			if (!csi2->src_sd) {
-+				ret = -EPIPE;
-+				goto out;
-+			}
-+
-+			ret = clk_prepare_enable(csi2->pix_clk);
-+			if (ret)
-+				goto out;
-+
-+			/* Step 3 */
-+			ret = csi2_dphy_init(csi2);
-+			if (ret) {
-+				clk_disable_unprepare(csi2->pix_clk);
-+				goto out;
-+			}
-+
-+			/* Step 4 */
-+			csi2_set_lanes(csi2);
-+			csi2_enable(csi2, true);
-+
-+			/* Step 5 */
-+			ret = csi2_dphy_wait_stopstate(csi2);
-+			if (ret) {
-+				csi2_enable(csi2, false);
-+				clk_disable_unprepare(csi2->pix_clk);
-+				goto out;
-+			}
-+		} else {
-+			dev_dbg(csi2->dev, "power OFF\n");
-+			csi2_enable(csi2, false);
-+			clk_disable_unprepare(csi2->pix_clk);
-+		}
-+	}
-+
-+	/* Update the power count. */
-+	csi2->power_count += on ? 1 : -1;
-+	WARN_ON(csi2->power_count < 0);
-+out:
-+	mutex_unlock(&csi2->lock);
-+	return ret;
-+}
-+
-+static int csi2_s_stream(struct v4l2_subdev *sd, int enable)
-+{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	int i, ret = 0;
-+
-+	mutex_lock(&csi2->lock);
-+
-+	if (!csi2->src_sd) {
-+		ret = -EPIPE;
-+		goto out;
-+	}
-+
-+	for (i = 0; i < CSI2_NUM_SRC_PADS; i++) {
-+		if (csi2->sink_linked[i])
-+			break;
-+	}
-+	if (i >= CSI2_NUM_SRC_PADS) {
-+		ret = -EPIPE;
-+		goto out;
-+	}
-+
-+	if (enable && !csi2->stream_on) {
-+		dev_dbg(csi2->dev, "stream ON\n");
-+		ret = csi2_dphy_wait_clock_lane(csi2);
-+	} else if (!enable && csi2->stream_on) {
-+		dev_dbg(csi2->dev, "stream OFF\n");
-+	}
-+
-+	csi2->stream_on = enable;
-+out:
-+	mutex_unlock(&csi2->lock);
-+	return ret;
-+}
-+
-+static int csi2_link_setup(struct media_entity *entity,
-+			   const struct media_pad *local,
-+			   const struct media_pad *remote, u32 flags)
-+{
-+	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	struct v4l2_subdev *remote_sd;
-+	int ret = 0;
-+
-+	dev_dbg(csi2->dev, "link setup %s -> %s", remote->entity->name,
-+		local->entity->name);
-+
-+	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
-+
-+	mutex_lock(&csi2->lock);
-+
-+	if (local->flags & MEDIA_PAD_FL_SOURCE) {
-+		if (flags & MEDIA_LNK_FL_ENABLED) {
-+			if (csi2->sink_linked[local->index]) {
++	switch (ctrl->id) {
++	case V4L2_CID_DEINTERLACING_MODE:
++		motion = ctrl->val;
++		if (motion != priv->motion) {
++			/* can't change motion control mid-streaming */
++			if (priv->stream_on) {
 +				ret = -EBUSY;
 +				goto out;
 +			}
-+			csi2->sink_linked[local->index] = true;
-+		} else {
-+			csi2->sink_linked[local->index] = false;
++			priv->motion = motion;
 +		}
-+	} else {
-+		if (flags & MEDIA_LNK_FL_ENABLED) {
-+			if (csi2->src_sd) {
-+				ret = -EBUSY;
-+				goto out;
-+			}
-+			csi2->src_sd = remote_sd;
-+		} else {
-+			csi2->src_sd = NULL;
-+		}
++		break;
++	default:
++		v4l2_err(&priv->sd, "Invalid control\n");
++		ret = -EINVAL;
 +	}
 +
 +out:
-+	mutex_unlock(&csi2->lock);
++	mutex_unlock(&priv->lock);
 +	return ret;
 +}
 +
-+static int csi2_get_fmt(struct v4l2_subdev *sd,
-+			struct v4l2_subdev_pad_config *cfg,
-+			struct v4l2_subdev_format *sdformat)
++static const struct v4l2_ctrl_ops vdic_ctrl_ops = {
++	.s_ctrl = vdic_s_ctrl,
++};
++
++static const char * const vdic_ctrl_motion_menu[] = {
++	"No Motion Compensation",
++	"Low Motion",
++	"Medium Motion",
++	"High Motion",
++};
++
++static int vdic_init_controls(struct vdic_priv *priv)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	struct v4l2_mbus_framefmt *fmt;
++	struct v4l2_ctrl_handler *hdlr = &priv->ctrl_hdlr;
++	int ret;
 +
-+	mutex_lock(&csi2->lock);
++	v4l2_ctrl_handler_init(hdlr, 1);
 +
-+	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
-+		fmt = v4l2_subdev_get_try_format(&csi2->sd, cfg,
-+						 sdformat->pad);
-+	else
-+		fmt = &csi2->format_mbus;
++	v4l2_ctrl_new_std_menu_items(hdlr, &vdic_ctrl_ops,
++				     V4L2_CID_DEINTERLACING_MODE,
++				     HIGH_MOTION, 0, HIGH_MOTION,
++				     vdic_ctrl_motion_menu);
 +
-+	sdformat->format = *fmt;
++	priv->sd.ctrl_handler = hdlr;
 +
-+	mutex_unlock(&csi2->lock);
++	if (hdlr->error) {
++		ret = hdlr->error;
++		goto out_free;
++	}
 +
++	v4l2_ctrl_handler_setup(hdlr);
 +	return 0;
++
++out_free:
++	v4l2_ctrl_handler_free(hdlr);
++	return ret;
 +}
 +
-+static int csi2_set_fmt(struct v4l2_subdev *sd,
-+			struct v4l2_subdev_pad_config *cfg,
-+			struct v4l2_subdev_format *sdformat)
++static int vdic_s_stream(struct v4l2_subdev *sd, int enable)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
 +	int ret = 0;
 +
-+	if (sdformat->pad >= CSI2_NUM_PADS)
++	mutex_lock(&priv->lock);
++
++	if (!priv->src || !priv->sink_sd) {
++		ret = -EPIPE;
++		goto out;
++	}
++
++	dev_dbg(priv->dev, "stream %s\n", enable ? "ON" : "OFF");
++
++	if (enable && !priv->stream_on)
++		ret = vdic_start(priv);
++	else if (!enable && priv->stream_on)
++		vdic_stop(priv);
++
++	if (!ret)
++		priv->stream_on = enable;
++out:
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
++static int vdic_enum_mbus_code(struct v4l2_subdev *sd,
++			       struct v4l2_subdev_pad_config *cfg,
++			       struct v4l2_subdev_mbus_code_enum *code)
++{
++	if (code->pad >= VDIC_NUM_PADS)
 +		return -EINVAL;
 +
-+	mutex_lock(&csi2->lock);
++	if (code->pad == VDIC_SINK_PAD_IDMAC)
++		return imx_media_enum_format(NULL, &code->code, code->index,
++					     false, false);
 +
-+	if (csi2->stream_on) {
++	return imx_media_enum_ipu_format(NULL, &code->code, code->index, false);
++}
++
++static struct v4l2_mbus_framefmt *
++__vdic_get_fmt(struct vdic_priv *priv, struct v4l2_subdev_pad_config *cfg,
++	       unsigned int pad, enum v4l2_subdev_format_whence which)
++{
++	if (which == V4L2_SUBDEV_FORMAT_TRY)
++		return v4l2_subdev_get_try_format(&priv->sd, cfg, pad);
++	else
++		return &priv->format_mbus[pad];
++}
++
++static int vdic_get_fmt(struct v4l2_subdev *sd,
++			struct v4l2_subdev_pad_config *cfg,
++			struct v4l2_subdev_format *sdformat)
++{
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_mbus_framefmt *fmt;
++	int ret = 0;
++
++	if (sdformat->pad >= VDIC_NUM_PADS)
++		return -EINVAL;
++
++	mutex_lock(&priv->lock);
++
++	fmt = __vdic_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
++	if (!fmt) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	sdformat->format = *fmt;
++out:
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
++static int vdic_set_fmt(struct v4l2_subdev *sd,
++			struct v4l2_subdev_pad_config *cfg,
++			struct v4l2_subdev_format *sdformat)
++{
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
++	const struct imx_media_pixfmt *cc;
++	struct v4l2_mbus_framefmt *infmt;
++	int ret = 0;
++	u32 code;
++
++	if (sdformat->pad >= VDIC_NUM_PADS)
++		return -EINVAL;
++
++	mutex_lock(&priv->lock);
++
++	if (priv->stream_on) {
 +		ret = -EBUSY;
 +		goto out;
 +	}
 +
-+	/* Output pads mirror active input pad, no limits on input pads */
-+	if (sdformat->pad != CSI2_SINK_PAD)
-+		sdformat->format = csi2->format_mbus;
++	v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W_VDIC,
++			      W_ALIGN, &sdformat->format.height,
++			      MIN_H, MAX_H_VDIC, H_ALIGN, S_ALIGN);
 +
-+	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
++	switch (sdformat->pad) {
++	case VDIC_SRC_PAD_DIRECT:
++		infmt = __vdic_get_fmt(priv, cfg, priv->active_input_pad,
++				       sdformat->which);
++
++		cc = imx_media_find_ipu_format(0, sdformat->format.code, false);
++		if (!cc) {
++			imx_media_enum_ipu_format(NULL, &code, 0, false);
++			cc = imx_media_find_ipu_format(0, code, false);
++			sdformat->format.code = cc->codes[0];
++		}
++
++		sdformat->format.width = infmt->width;
++		sdformat->format.height = infmt->height;
++		/* output is always progressive! */
++		sdformat->format.field = V4L2_FIELD_NONE;
++		break;
++	case VDIC_SINK_PAD_IDMAC:
++	case VDIC_SINK_PAD_DIRECT:
++		if (sdformat->pad == VDIC_SINK_PAD_DIRECT) {
++			cc = imx_media_find_ipu_format(0, sdformat->format.code,
++						       false);
++			if (!cc) {
++				imx_media_enum_ipu_format(NULL, &code, 0,
++							  false);
++				cc = imx_media_find_ipu_format(0, code, false);
++				sdformat->format.code = cc->codes[0];
++			}
++		} else {
++			cc = imx_media_find_format(0, sdformat->format.code,
++						   false, false);
++			if (!cc) {
++				imx_media_enum_format(NULL, &code, 0,
++						      false, false);
++				cc = imx_media_find_format(0, code,
++							   false, false);
++				sdformat->format.code = cc->codes[0];
++			}
++		}
++
++		/* input must be interlaced! Choose SEQ_TB if not */
++		if (!V4L2_FIELD_HAS_BOTH(sdformat->format.field))
++			sdformat->format.field = V4L2_FIELD_SEQ_TB;
++		break;
++	default:
++		ret = -EINVAL;
++		goto out;
++	}
++
++	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
 +		cfg->try_fmt = sdformat->format;
-+	else
-+		csi2->format_mbus = sdformat->format;
++	} else {
++		priv->format_mbus[sdformat->pad] = sdformat->format;
++		priv->cc[sdformat->pad] = cc;
++	}
++
 +out:
-+	mutex_unlock(&csi2->lock);
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
++static int vdic_link_setup(struct media_entity *entity,
++			    const struct media_pad *local,
++			    const struct media_pad *remote, u32 flags)
++{
++	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_subdev *remote_sd;
++	int ret = 0;
++
++	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
++		local->entity->name);
++
++	mutex_lock(&priv->lock);
++
++	if (local->flags & MEDIA_PAD_FL_SOURCE) {
++		if (!is_media_entity_v4l2_subdev(remote->entity)) {
++			ret = -EINVAL;
++			goto out;
++		}
++
++		remote_sd = media_entity_to_v4l2_subdev(remote->entity);
++
++		if (flags & MEDIA_LNK_FL_ENABLED) {
++			if (priv->sink_sd) {
++				ret = -EBUSY;
++				goto out;
++			}
++			priv->sink_sd = remote_sd;
++		} else {
++			priv->sink_sd = NULL;
++		}
++
++		goto out;
++	}
++
++	/* this is a sink pad */
++
++	if (flags & MEDIA_LNK_FL_ENABLED) {
++		if (priv->src) {
++			ret = -EBUSY;
++			goto out;
++		}
++	} else {
++		priv->src = NULL;
++		goto out;
++	}
++
++	if (local->index == VDIC_SINK_PAD_IDMAC) {
++		struct imx_media_video_dev *vdev = priv->vdev;
++
++		if (!is_media_entity_v4l2_video_device(remote->entity)) {
++			ret = -EINVAL;
++			goto out;
++		}
++		if (!vdev) {
++			ret = -ENODEV;
++			goto out;
++		}
++
++		priv->csi_direct = false;
++	} else {
++		if (!is_media_entity_v4l2_subdev(remote->entity)) {
++			ret = -EINVAL;
++			goto out;
++		}
++
++		remote_sd = media_entity_to_v4l2_subdev(remote->entity);
++
++		/* direct pad must connect to a CSI */
++		if (!(remote_sd->grp_id & IMX_MEDIA_GRP_ID_CSI) ||
++		    remote->index != CSI_SRC_PAD_DIRECT) {
++			ret = -EINVAL;
++			goto out;
++		}
++
++		priv->csi_direct = true;
++	}
++
++	priv->src = remote->entity;
++	/* record which input pad is now active */
++	priv->active_input_pad = local->index;
++out:
++	mutex_unlock(&priv->lock);
++	return ret;
++}
++
++static int vdic_link_validate(struct v4l2_subdev *sd,
++			      struct media_link *link,
++			      struct v4l2_subdev_format *source_fmt,
++			      struct v4l2_subdev_format *sink_fmt)
++{
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
++	int ret;
++
++	ret = v4l2_subdev_link_validate_default(sd, link,
++						source_fmt, sink_fmt);
++	if (ret)
++		return ret;
++
++	mutex_lock(&priv->lock);
++
++	if (priv->csi_direct && priv->motion != HIGH_MOTION) {
++		v4l2_err(&priv->sd,
++			 "direct CSI pipeline requires high motion\n");
++		ret = -EINVAL;
++	}
++
++	mutex_unlock(&priv->lock);
 +	return ret;
 +}
 +
 +/*
 + * retrieve our pads parsed from the OF graph by the media device
 + */
-+static int csi2_registered(struct v4l2_subdev *sd)
++static int vdic_registered(struct v4l2_subdev *sd)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
 +	int i, ret;
++	u32 code;
 +
-+	for (i = 0; i < CSI2_NUM_PADS; i++) {
-+		csi2->pad[i].flags = (i == CSI2_SINK_PAD) ?
-+		MEDIA_PAD_FL_SINK : MEDIA_PAD_FL_SOURCE;
++	/* get media device */
++	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
++
++	for (i = 0; i < VDIC_NUM_PADS; i++) {
++		priv->pad[i].flags = (i == VDIC_SRC_PAD_DIRECT) ?
++			MEDIA_PAD_FL_SOURCE : MEDIA_PAD_FL_SINK;
++
++		code = 0;
++		if (i != VDIC_SINK_PAD_IDMAC)
++			imx_media_enum_ipu_format(NULL, &code, 0, true);
++
++		/* set a default mbus format  */
++		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
++					      640, 480, code, V4L2_FIELD_NONE,
++					      &priv->cc[i]);
++		if (ret)
++			return ret;
 +	}
 +
-+	/* set a default mbus format  */
-+	ret = imx_media_init_mbus_fmt(&csi2->format_mbus,
-+				      640, 480, 0, V4L2_FIELD_NONE, NULL);
++	priv->active_input_pad = VDIC_SINK_PAD_DIRECT;
++
++	ret = vdic_init_controls(priv);
 +	if (ret)
 +		return ret;
 +
-+	return media_entity_pads_init(&sd->entity, CSI2_NUM_PADS, csi2->pad);
-+}
-+
-+static struct media_entity_operations csi2_entity_ops = {
-+	.link_setup = csi2_link_setup,
-+	.link_validate = v4l2_subdev_link_validate,
-+};
-+
-+static struct v4l2_subdev_core_ops csi2_core_ops = {
-+	.s_power = csi2_s_power,
-+};
-+
-+static struct v4l2_subdev_video_ops csi2_video_ops = {
-+	.s_stream = csi2_s_stream,
-+};
-+
-+static struct v4l2_subdev_pad_ops csi2_pad_ops = {
-+	.get_fmt = csi2_get_fmt,
-+	.set_fmt = csi2_set_fmt,
-+};
-+
-+static struct v4l2_subdev_ops csi2_subdev_ops = {
-+	.core = &csi2_core_ops,
-+	.video = &csi2_video_ops,
-+	.pad = &csi2_pad_ops,
-+};
-+
-+static struct v4l2_subdev_internal_ops csi2_internal_ops = {
-+	.registered = csi2_registered,
-+};
-+
-+static int csi2_parse_endpoints(struct csi2_dev *csi2)
-+{
-+	struct device_node *node = csi2->dev->of_node;
-+	struct device_node *epnode;
-+	struct v4l2_of_endpoint ep;
-+
-+	epnode = of_graph_get_endpoint_by_regs(node, 0, -1);
-+	if (!epnode) {
-+		v4l2_err(&csi2->sd, "failed to get sink endpoint node\n");
-+		return -EINVAL;
-+	}
-+
-+	v4l2_of_parse_endpoint(epnode, &ep);
-+	of_node_put(epnode);
-+
-+	if (ep.bus_type != V4L2_MBUS_CSI2) {
-+		v4l2_err(&csi2->sd, "invalid bus type, must be MIPI CSI2\n");
-+		return -EINVAL;
-+	}
-+
-+	csi2->bus = ep.bus.mipi_csi2;
-+
-+	dev_dbg(csi2->dev, "data lanes: %d\n", csi2->bus.num_data_lanes);
-+	dev_dbg(csi2->dev, "flags: 0x%08x\n", csi2->bus.flags);
-+	return 0;
-+}
-+
-+static int csi2_probe(struct platform_device *pdev)
-+{
-+	struct csi2_dev *csi2;
-+	struct resource *res;
-+	int ret;
-+
-+	csi2 = devm_kzalloc(&pdev->dev, sizeof(*csi2), GFP_KERNEL);
-+	if (!csi2)
-+		return -ENOMEM;
-+
-+	csi2->dev = &pdev->dev;
-+
-+	v4l2_subdev_init(&csi2->sd, &csi2_subdev_ops);
-+	v4l2_set_subdevdata(&csi2->sd, &pdev->dev);
-+	csi2->sd.internal_ops = &csi2_internal_ops;
-+	csi2->sd.entity.ops = &csi2_entity_ops;
-+	csi2->sd.dev = &pdev->dev;
-+	csi2->sd.owner = THIS_MODULE;
-+	csi2->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
-+	strcpy(csi2->sd.name, DEVICE_NAME);
-+	csi2->sd.entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
-+	csi2->sd.grp_id = IMX_MEDIA_GRP_ID_CSI2;
-+
-+	ret = csi2_parse_endpoints(csi2);
++	ret = media_entity_pads_init(&sd->entity, VDIC_NUM_PADS, priv->pad);
 +	if (ret)
-+		return ret;
++		v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
 +
-+	csi2->pllref_clk = devm_clk_get(&pdev->dev, "ref");
-+	if (IS_ERR(csi2->pllref_clk)) {
-+		v4l2_err(&csi2->sd, "failed to get pll reference clock\n");
-+		ret = PTR_ERR(csi2->pllref_clk);
-+		return ret;
-+	}
-+
-+	csi2->dphy_clk = devm_clk_get(&pdev->dev, "dphy");
-+	if (IS_ERR(csi2->dphy_clk)) {
-+		v4l2_err(&csi2->sd, "failed to get dphy clock\n");
-+		ret = PTR_ERR(csi2->dphy_clk);
-+		return ret;
-+	}
-+
-+	csi2->pix_clk = devm_clk_get(&pdev->dev, "pix");
-+	if (IS_ERR(csi2->pix_clk)) {
-+		v4l2_err(&csi2->sd, "failed to get pixel clock\n");
-+		ret = PTR_ERR(csi2->pix_clk);
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		v4l2_err(&csi2->sd, "failed to get platform resources\n");
-+		return -ENODEV;
-+	}
-+
-+	csi2->base = devm_ioremap(&pdev->dev, res->start, PAGE_SIZE);
-+	if (!csi2->base) {
-+		v4l2_err(&csi2->sd, "failed to map CSI-2 registers\n");
-+		return -ENOMEM;
-+	}
-+
-+	mutex_init(&csi2->lock);
-+
-+	ret = clk_prepare_enable(csi2->pllref_clk);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "failed to enable pllref_clk\n");
-+		goto rmmutex;
-+	}
-+
-+	ret = clk_prepare_enable(csi2->dphy_clk);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "failed to enable dphy_clk\n");
-+		goto pllref_off;
-+	}
-+
-+	platform_set_drvdata(pdev, &csi2->sd);
-+
-+	ret = v4l2_async_register_subdev(&csi2->sd);
-+	if (ret)
-+		goto dphy_off;
-+
-+	return 0;
-+
-+dphy_off:
-+	clk_disable_unprepare(csi2->dphy_clk);
-+pllref_off:
-+	clk_disable_unprepare(csi2->pllref_clk);
-+rmmutex:
-+	mutex_destroy(&csi2->lock);
 +	return ret;
 +}
 +
-+static int csi2_remove(struct platform_device *pdev)
++static void vdic_unregistered(struct v4l2_subdev *sd)
++{
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
++
++	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
++}
++
++static struct v4l2_subdev_pad_ops vdic_pad_ops = {
++	.enum_mbus_code = vdic_enum_mbus_code,
++	.get_fmt = vdic_get_fmt,
++	.set_fmt = vdic_set_fmt,
++	.link_validate = vdic_link_validate,
++};
++
++static struct v4l2_subdev_video_ops vdic_video_ops = {
++	.s_stream = vdic_s_stream,
++};
++
++static struct media_entity_operations vdic_entity_ops = {
++	.link_setup = vdic_link_setup,
++	.link_validate = v4l2_subdev_link_validate,
++};
++
++static struct v4l2_subdev_ops vdic_subdev_ops = {
++	.video = &vdic_video_ops,
++	.pad = &vdic_pad_ops,
++};
++
++static struct v4l2_subdev_internal_ops vdic_internal_ops = {
++	.registered = vdic_registered,
++	.unregistered = vdic_unregistered,
++};
++
++static int imx_vdic_probe(struct platform_device *pdev)
++{
++	struct imx_media_internal_sd_platformdata *pdata;
++	struct vdic_priv *priv;
++	int ret;
++
++	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, &priv->sd);
++	priv->dev = &pdev->dev;
++
++	pdata = priv->dev->platform_data;
++	priv->ipu_id = pdata->ipu_id;
++
++	v4l2_subdev_init(&priv->sd, &vdic_subdev_ops);
++	v4l2_set_subdevdata(&priv->sd, priv);
++	priv->sd.internal_ops = &vdic_internal_ops;
++	priv->sd.entity.ops = &vdic_entity_ops;
++	priv->sd.entity.function = MEDIA_ENT_F_PROC_VIDEO_PIXEL_FORMATTER;
++	priv->sd.dev = &pdev->dev;
++	priv->sd.owner = THIS_MODULE;
++	priv->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
++	/* get our group id */
++	priv->sd.grp_id = pdata->grp_id;
++	strncpy(priv->sd.name, pdata->sd_name, sizeof(priv->sd.name));
++
++	mutex_init(&priv->lock);
++
++	ret = v4l2_async_register_subdev(&priv->sd);
++	if (ret)
++		goto free;
++
++	return 0;
++free:
++	mutex_destroy(&priv->lock);
++	return ret;
++}
++
++static int imx_vdic_remove(struct platform_device *pdev)
 +{
 +	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
++	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
++
++	v4l2_info(sd, "Removing\n");
 +
 +	v4l2_async_unregister_subdev(sd);
-+	clk_disable_unprepare(csi2->dphy_clk);
-+	clk_disable_unprepare(csi2->pllref_clk);
-+	mutex_destroy(&csi2->lock);
++	mutex_destroy(&priv->lock);
 +	media_entity_cleanup(&sd->entity);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id csi2_dt_ids[] = {
-+	{ .compatible = "fsl,imx6-mipi-csi2", },
-+	{ /* sentinel */ }
++static const struct platform_device_id imx_vdic_ids[] = {
++	{ .name = "imx-ipuv3-vdic" },
++	{ },
 +};
-+MODULE_DEVICE_TABLE(of, csi2_dt_ids);
++MODULE_DEVICE_TABLE(platform, imx_vdic_ids);
 +
-+static struct platform_driver csi2_driver = {
++static struct platform_driver imx_vdic_driver = {
++	.probe = imx_vdic_probe,
++	.remove = imx_vdic_remove,
++	.id_table = imx_vdic_ids,
 +	.driver = {
-+		.name = DEVICE_NAME,
-+		.of_match_table = csi2_dt_ids,
++		.name = "imx-ipuv3-vdic",
 +	},
-+	.probe = csi2_probe,
-+	.remove = csi2_remove,
 +};
++module_platform_driver(imx_vdic_driver);
 +
-+module_platform_driver(csi2_driver);
-+
-+MODULE_DESCRIPTION("i.MX5/6 MIPI CSI-2 Receiver driver");
++MODULE_DESCRIPTION("i.MX VDIC subdev driver");
 +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
 +MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:imx-ipuv3-vdic");
 -- 
 2.7.4
