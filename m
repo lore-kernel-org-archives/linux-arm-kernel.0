@@ -1,52 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Mar 2017 20:15:24 +0100
-Subject: [PATCHv3] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <20170328170944.GY10760@atomide.com>
-References: <20170314180555.23597-1-tony@atomide.com>
- <aa5d7ee3-2e54-2c6c-df5d-b5efff4b365e@ti.com>
- <20170327164308.GK10760@atomide.com>
- <20170328113657.GL23750@n2100.armlinux.org.uk>
- <20170328170944.GY10760@atomide.com>
-Message-ID: <20170328191524.GM23750@n2100.armlinux.org.uk>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 28 Mar 2017 21:16:02 +0200
+Subject: [PATCH v2, 3/3] tty/serial: meson_uart: add the core clock
+ handling to the driver
+In-Reply-To: <20170328092545.4644-4-hgkr.klein@gmail.com>
+References: <20170328092545.4644-1-hgkr.klein@gmail.com>
+ <20170328092545.4644-4-hgkr.klein@gmail.com>
+Message-ID: <1490728562.20764.9.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 10:09:44AM -0700, Tony Lindgren wrote:
-> OK so how about the following to disable kexec for Andrew's
-> test case?
+On Tue, 2017-03-28 at 11:25 +0200, Helmut Klein wrote:
+> This patch gets the core clock as provided by the DT and enables it.
+> The code was taken from Amlogic's serial driver, and was tested on my
+> board.
+> 
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> ---
+> ?drivers/tty/serial/meson_uart.c | 10 ++++++++++
+> ?1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+> index 60f16795d16b..cb99112288eb 100644
+> --- a/drivers/tty/serial/meson_uart.c
+> +++ b/drivers/tty/serial/meson_uart.c
+> @@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
+> ?	struct resource *res_mem, *res_irq;
+> ?	struct uart_port *port;
+> ?	struct clk *clk;
+> +	struct clk *core_clk;
+> ?	int ret = 0;
+> 
+> ?	if (pdev->dev.of_node)
+> @@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
+> ?	if (!port)
+> ?		return -ENOMEM;
+> 
+> +	core_clk = devm_clk_get(&pdev->dev, "core");
+> +	if (!IS_ERR(core_clk)) {
+> +		ret = clk_prepare_enable(core_clk);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "couldn't enable clkc\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> ?	clk = clk_get(&pdev->dev, NULL);
+Now that you have 2 clocks, shouldn't this be named as well ?
 
-That won't work - the hook you're using is to decide whether a particular
-CPU (normally the boot CPU) can be hot-plugged.  It isn't expected to
-return false for all.
-
-The code in question is:
-
-        /*
-         * Validate that if the current HW supports SMP, then the SW supports
-         * and implements CPU hotplug for the current HW. If not, we won't be
-         * able to kexec reliably, so fail the prepare operation.
-         */
-        if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
-            !platform_can_cpu_hotplug())
-                return -EINVAL;
-
-and:
-
-int platform_can_cpu_hotplug(void)
-{
-#ifdef CONFIG_HOTPLUG_CPU
-        if (smp_ops.cpu_kill)
-                return 1;
-#endif
-
-        return 0;
-}
-
-Platforms don't get a say in that, other than whether they implement
-the operations necessary for hotplug.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> ?	if (IS_ERR(clk))
+> ?		return PTR_ERR(clk);
+> --
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
