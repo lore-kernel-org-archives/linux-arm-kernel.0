@@ -1,138 +1,72 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Mar 2017 13:19:36 +0200
-Subject: [PATCH v2 09/11] ARM: at91: pm: Merge all at91sam9*_pm_init
-In-Reply-To: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
-References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170328111938.21297-10-alexandre.belloni@free-electrons.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Mar 2017 13:23:28 +0200
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <58DA3F68.6090901@arm.com>
+References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
+ <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
+ <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+ <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com>
+ <58CFF058.8020205@arm.com>
+ <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+ <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
+ <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
+Message-ID: <20170328112328.GA31156@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PM initialization is now identical for all at91sam9. Merge the
-functions.
+On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
+> Hi Christoffer,
+> 
+> (CC: Leif and Achin who know more about how UEFI fits into this picture)
+> 
+> On 21/03/17 19:39, Christoffer Dall wrote:
+> > On Tue, Mar 21, 2017 at 07:11:44PM +0000, James Morse wrote:
+> >> On 21/03/17 11:34, Christoffer Dall wrote:
+> >>> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
+> >>>> On 2017/3/20 23:08, James Morse wrote:
+> >>>>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
+> >>>>>>>>> In the RAS implementation, hardware pass the virtual SEI
+> >>>>>>>>> syndrome information through the VSESR_EL2, so set the virtual
+> >>>>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
+> >>>>>>>>> the guest OS
+> >>>>>
+> >>>>> How does this work with firmware first?
+> >>>>
+> >>>> I explained it in previous mail about the work flow.
+> >>>
+> >>> When delivering and reporting SEIs to the VM, should this happen
+> >>> directly to the OS running in the VM, or to the guest firmware (e.g.
+> >>> UEFI) running in the VM as well?
+> >>
+> >> 'firmware first' is the ACPI specs name for x86's BIOS or management-mode
+> >> handling the error. On arm64 we have multiple things called firmware, so the
+> >> name might be more confusing than helpful.
+> >>
+> >> As far as I understand it, firmware here refers to the secure-world and EL3.
+> >> Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
+> >> routing them to EL3 where secure platform specific firmware generates CPER records.
+> >> For a guest, Qemu takes the role of this EL3-firmware.
+> >>
+> > Thanks for the clarification.  So UEFI in the VM would not be involved
+> > in this at all?
+> 
+> On the host, part of UEFI is involved to generate the CPER records.
+> In a guest?, I don't know.
+> Qemu could generate the records, or drive some other component to do it.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/at91sam9.c | 45 +++----------------------------------------
- arch/arm/mach-at91/generic.h  |  8 ++------
- arch/arm/mach-at91/pm.c       | 14 +-------------
- 3 files changed, 6 insertions(+), 61 deletions(-)
+I think I am beginning to understand this a bit.  Since the guet UEFI
+instance is specifically built for the machine it runs on, QEMU's virt
+machine in this case, they could simply agree (by some contract) to
+place the records at some specific location in memory, and if the guest
+kernel asks its guest UEFI for that location, things should just work by
+having logic in QEMU to process error reports and populate guest memory.
 
-diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
-index ba28e9cc584d..c089bfd0dc2f 100644
---- a/arch/arm/mach-at91/at91sam9.c
-+++ b/arch/arm/mach-at91/at91sam9.c
-@@ -52,7 +52,7 @@ static const struct at91_soc at91sam9_socs[] = {
- 	{ /* sentinel */ },
- };
- 
--static void __init at91sam9_common_init(void)
-+static void __init at91sam9_init(void)
- {
- 	struct soc_device *soc;
- 	struct device *soc_dev = NULL;
-@@ -62,12 +62,8 @@ static void __init at91sam9_common_init(void)
- 		soc_dev = soc_device_to_device(soc);
- 
- 	of_platform_default_populate(NULL, NULL, soc_dev);
--}
- 
--static void __init at91sam9_dt_device_init(void)
--{
--	at91sam9_common_init();
--	at91sam9260_pm_init();
-+	at91sam9_pm_init();
- }
- 
- static const char *const at91_dt_board_compat[] __initconst = {
-@@ -77,41 +73,6 @@ static const char *const at91_dt_board_compat[] __initconst = {
- 
- DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM9")
- 	/* Maintainer: Atmel */
--	.init_machine	= at91sam9_dt_device_init,
-+	.init_machine	= at91sam9_init,
- 	.dt_compat	= at91_dt_board_compat,
- MACHINE_END
--
--static void __init at91sam9g45_dt_device_init(void)
--{
--	at91sam9_common_init();
--	at91sam9g45_pm_init();
--}
--
--static const char *const at91sam9g45_board_compat[] __initconst = {
--	"atmel,at91sam9g45",
--	NULL
--};
--
--DT_MACHINE_START(at91sam9g45_dt, "Atmel AT91SAM9G45")
--	/* Maintainer: Atmel */
--	.init_machine	= at91sam9g45_dt_device_init,
--	.dt_compat	= at91sam9g45_board_compat,
--MACHINE_END
--
--static void __init at91sam9x5_dt_device_init(void)
--{
--	at91sam9_common_init();
--	at91sam9x5_pm_init();
--}
--
--static const char *const at91sam9x5_board_compat[] __initconst = {
--	"atmel,at91sam9x5",
--	"atmel,at91sam9n12",
--	NULL
--};
--
--DT_MACHINE_START(at91sam9x5_dt, "Atmel AT91SAM9")
--	/* Maintainer: Atmel */
--	.init_machine	= at91sam9x5_dt_device_init,
--	.dt_compat	= at91sam9x5_board_compat,
--MACHINE_END
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 28ca57a2060f..f1ead0f13c19 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -13,15 +13,11 @@
- 
- #ifdef CONFIG_PM
- extern void __init at91rm9200_pm_init(void);
--extern void __init at91sam9260_pm_init(void);
--extern void __init at91sam9g45_pm_init(void);
--extern void __init at91sam9x5_pm_init(void);
-+extern void __init at91sam9_pm_init(void);
- extern void __init sama5_pm_init(void);
- #else
- static inline void __init at91rm9200_pm_init(void) { }
--static inline void __init at91sam9260_pm_init(void) { }
--static inline void __init at91sam9g45_pm_init(void) { }
--static inline void __init at91sam9x5_pm_init(void) { }
-+static inline void __init at91sam9_pm_init(void) { }
- static inline void __init sama5_pm_init(void) { }
- #endif
- 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index a7c047f0d21f..dedfe9038336 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -505,19 +505,7 @@ void __init at91rm9200_pm_init(void)
- 	at91_pm_init(at91rm9200_idle);
- }
- 
--void __init at91sam9260_pm_init(void)
--{
--	at91_dt_ramc();
--	at91_pm_init(at91sam9_idle);
--}
--
--void __init at91sam9g45_pm_init(void)
--{
--	at91_dt_ramc();
--	at91_pm_init(at91sam9_idle);
--}
--
--void __init at91sam9x5_pm_init(void)
-+void __init at91sam9_pm_init(void)
- {
- 	at91_dt_ramc();
- 	at91_pm_init(at91sam9_idle);
--- 
-2.11.0
+Is this how others see the world too?
+
+> 
+> Leif and Achin are the people with the UEFI/bigger picture.
+> 
+> 
+
+Thanks!
+-Christoffer
