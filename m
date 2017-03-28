@@ -1,145 +1,91 @@
-From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Tue, 28 Mar 2017 14:46:19 +0300
-Subject: [PATCH v2] arm64: dts: ls1012a: add crypto node
-In-Reply-To: <20170328104115.GT30608@dragon>
-References: <20170328104115.GT30608@dragon>
-Message-ID: <20170328114619.16568-1-horia.geanta@nxp.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 28 Mar 2017 12:48:38 +0100
+Subject: [PATCH] arm64: tegra: Add CPU and PSCI nodes for NVIDIA Tegra210
+ platforms
+Message-ID: <1490701718-16571-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1012A has a SEC v5.4 security engine.
+Add the CPU and PSCI nodes for the NVIDIA Tegra210 platforms so that
+all CPUs can be enabled on boot. This assumes that the PSCI firmware
+has been loaded during the initial bootstrap on the device before the
+kernel starts (which is typically the case for these platforms). The
+PSCI firmware version is set to v0.2 which aligns with the current
+shipping version for Tegra.
 
-Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+Reported-by: Martin Michlmayr <tbm@cyrius.com>
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
-v2: move aliases from board specific files into the shared dtsi.
+ arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 23 +++++++++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi | 24 ++++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
 
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 100 ++++++++++++++++++++++++-
- 1 file changed, 99 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index cffebb4b3df1..1c3493606cca 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -42,7 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+index 906fb836d241..de1696c28140 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+@@ -296,6 +296,29 @@
+ 		};
+ 	};
  
--#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
- 	compatible = "fsl,ls1012a";
-@@ -50,6 +50,15 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	aliases {
-+		crypto = &crypto;
-+		rtic_a = &rtic_a;
-+		rtic_b = &rtic_b;
-+		rtic_c = &rtic_c;
-+		rtic_d = &rtic_d;
-+		sec_mon = &sec_mon;
++	cpus {
++		cpu at 0 {
++			enable-method = "psci";
++		};
++
++		cpu at 1 {
++			enable-method = "psci";
++		};
++
++		cpu at 2 {
++			enable-method = "psci";
++		};
++
++		cpu at 3 {
++			enable-method = "psci";
++		};
 +	};
 +
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -113,6 +122,95 @@
- 			big-endian;
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
+ 	regulators {
+ 		vdd_gpu: regulator at 100 {
+ 			compatible = "pwm-regulator";
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
+index 0ec92578cacb..67cb039965fd 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
+@@ -51,4 +51,28 @@
+ 			clock-frequency = <32768>;
  		};
- 
-+		crypto: crypto at 1700000 {
-+			compatible = "fsl,sec-v5.4", "fsl,sec-v5.0",
-+				     "fsl,sec-v4.0";
-+			fsl,sec-era = <8>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x00 0x1700000 0x100000>;
-+			reg = <0x00 0x1700000 0x0 0x100000>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
 +
-+			sec_jr0: jr at 10000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x10000 0x10000>;
-+				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr1: jr at 20000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x20000 0x10000>;
-+				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr2: jr at 30000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x30000 0x10000>;
-+				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr3: jr at 40000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x40000 0x10000>;
-+				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			rtic at 60000 {
-+				compatible = "fsl,sec-v5.4-rtic",
-+					     "fsl,sec-v5.0-rtic",
-+					     "fsl,sec-v4.0-rtic";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x60000 0x100 0x60e00 0x18>;
-+				ranges = <0x0 0x60100 0x500>;
-+
-+				rtic_a: rtic-a at 0 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x00 0x20 0x100 0x100>;
-+				};
-+
-+				rtic_b: rtic-b at 20 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x20 0x20 0x200 0x100>;
-+				};
-+
-+				rtic_c: rtic-c at 40 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x40 0x20 0x300 0x100>;
-+				};
-+
-+				rtic_d: rtic-d at 60 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x60 0x20 0x400 0x100>;
-+				};
-+			};
++	cpus {
++		cpu at 0 {
++			enable-method = "psci";
 +		};
 +
-+		sec_mon: sec_mon at 1e90000 {
-+			compatible = "fsl,sec-v5.4-mon", "fsl,sec-v5.0-mon",
-+				     "fsl,sec-v4.0-mon";
-+			reg = <0x0 0x1e90000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
++		cpu at 1 {
++			enable-method = "psci";
 +		};
 +
- 		dcfg: dcfg at 1ee0000 {
- 			compatible = "fsl,ls1012a-dcfg",
- 				     "syscon";
++		cpu at 2 {
++			enable-method = "psci";
++		};
++
++		cpu at 3 {
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
+ };
 -- 
-2.12.0.264.gd6db3f216544
+2.7.4
