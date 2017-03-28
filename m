@@ -1,106 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Mar 2017 09:21:51 +0100
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <b180c091-e4a4-7f58-7378-e0f3a24e44d6@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <cc958b0c-b947-2b3f-9e4b-9216e0085e6e@free.fr> <8637dyo2d9.fsf@arm.com>
- <b180c091-e4a4-7f58-7378-e0f3a24e44d6@free.fr>
-Message-ID: <05801ad3-23b0-be04-883c-a018fd5df6f8@arm.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 28 Mar 2017 17:26:32 +0900
+Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
+In-Reply-To: <93e79e92-a102-e931-8d63-843031848888@samsung.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
+ <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
+ <93e79e92-a102-e931-8d63-843031848888@samsung.com>
+Message-ID: <58DA1E38.50907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 23:04, Mason wrote:
-> On 27/03/2017 23:07, Marc Zyngier wrote:
-> 
->> On Mon, Mar 27 2017 at 08:44:08 PM, Mason wrote:
->>
->>> On 27/03/2017 19:09, Marc Zyngier wrote:
->>>
->>>> On 27/03/17 16:53, Mason wrote:
->>>>
->>>>> I have one remaining issue with bitmaps.
->>>>>
->>>>> My HW regs are 32b. How do I grab e.g. bits 96-127?
->>>>> All I can think of is
->>>>>   u32 val = ((u32 *)bitmap)[3];
->>>>>
->>>>> Is this acceptable?
->>>>
->>>> No.
->>>>
->>>>> mrutland mentioned bitmap_to_u32array() but IIUC it is used to
->>>>> copy an entire bitmap.
->>>>
->>>> The real question is "Why do you need such a thing?".
->>>
->>> You told me to use an in-memory version of the "unmasked"
->>> bitmap, yes? In that case, I need to be able to grab
->>> a piece of said bitmap, to update the corresponding piece
->>> of the HW bitmap.
->>>
->>> For example, assume the first 3 MSIs are unmasked,
->>> in other words, unmasked = 0x7
->>>
->>> A new user comes along and wants to assign an MSI.
->>> Scan "unmasked", found bit at pos 3.
->>> Update "unmasked" to 0xf.
->>> At some point, I need to write 0xf to some HW reg.
->>> So I need to grab a piece of "unmasked" (bits 0-31 in my example)
->>>
->>>   pos = find_first_zero_bit(unmasked, COUNT);
->>>   __set_bit(pos, unmasked);
->>>   int reg_index = pos / 32;
->>>   u32 val = ((u32 *)unmasked)[reg_index];
->>>   writel_relaxed(val, pcie->enabled + reg_index * 4);
->>>
->>> Or did I miss something in your suggestion?
->>
->> I don't know, I'm sightly taken aback by your question. Completely
->> puzzled, actually. "Read Modify Write" is a fairly obvious construct.
->>
->>      val = readl_relaxed(pcie->enabled + reg_index);
->>      writel_relaxed(val | BIT(pos % 32), pcie->enabled + reg_index);
->>
->> I never realized this could be such a novel concept. Replace pos with
->> hwirq, add a spinlock, and that's your irq_unmask.
-> 
-> I'm not sure why you would think I'm not familiar with RMW.
-> 
-> My original code was:
-> 
-> 	mask = readl_relaxed(pcie->msi_mask);
-> 	pos = find_first_zero_bit(&mask, 32);
-> 	writel(mask | BIT(pos), pcie->msi_mask);
-> 
-> To which you replied:
-> "Do you really need to read this from the HW each time you allocate an
-> interrupt? That feels pretty crazy. You're much better off having an
-> in-memory bitmap that will make things more efficient"
-> 
-> This is why I was trying to avoid a MMIO read from the HW
-> each time I allocate an interrupt.
+Merged.
 
-Yes, and I stand by this comment. I also said, in the bit that you
-didn't quote, that the RMW was to be moved to the irq_unmask method.
-This ensures separation of IRQ allocation and IRQ chip operations.
+Thanks,
+Inki Dae
 
->> My suggestion was to use a bitmap in order not to perform extra MMIO
->> accesses on the fast path. It doesn't mean that you cannot read from the
->> register under any circumstances. It just means that you don't do it
->> when there are more efficient ways to do it.
+2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
+> Hi inki,
 > 
-> The fast path is the interrupt handler, right?
-> (I didn't read the interrupt mask in the ISR.)
-
-You didn't then, and yet you have to, since you need to support more
-than 32 MSIs, requiring you to either read these mask regs in the HW, or
-(tata!) look into the allocation bitmap.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Could you check the this patch?
+> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
+> 
+> Best regards,
+> Hoegeun
+> 
+> 
+> On 03/08/2017 01:54 PM, Hoegeun Kwon wrote:
+>> The dsi + panel is a parental relationship, so OF grpah is not needed.
+>> Therefore, the current dsi_parse_dt function will throw an error,
+>> because there is no linked OF graph for the case fimd + dsi + panel.
+>>
+>> Parse the Pll burst and esc clock frequency properties in dsi_parse_dt()
+>> and create a bridge_node only if there is an OF graph associated with dsi.
+>>
+>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+>> ---
+>>   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 32 ++++++++------------------------
+>>   1 file changed, 8 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> index f5c04d0..2d4e118 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> @@ -1652,39 +1652,23 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+>>       if (ret < 0)
+>>           return ret;
+>>   -    ep = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
+>> -    if (!ep) {
+>> -        dev_err(dev, "no output port with endpoint specified\n");
+>> -        return -EINVAL;
+>> -    }
+>> -
+>> -    ret = exynos_dsi_of_read_u32(ep, "samsung,burst-clock-frequency",
+>> +    ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
+>>                        &dsi->burst_clk_rate);
+>>       if (ret < 0)
+>> -        goto end;
+>> +        return ret;
+>>   -    ret = exynos_dsi_of_read_u32(ep, "samsung,esc-clock-frequency",
+>> +    ret = exynos_dsi_of_read_u32(node, "samsung,esc-clock-frequency",
+>>                        &dsi->esc_clk_rate);
+>>       if (ret < 0)
+>> -        goto end;
+>> -
+>> -    of_node_put(ep);
+>> +        return ret;
+>>         ep = of_graph_get_next_endpoint(node, NULL);
+>> -    if (!ep) {
+>> -        ret = -EINVAL;
+>> -        goto end;
+>> -    }
+>> -
+>> -    dsi->bridge_node = of_graph_get_remote_port_parent(ep);
+>> -    if (!dsi->bridge_node) {
+>> -        ret = -EINVAL;
+>> -        goto end;
+>> +    if (ep) {
+>> +        dsi->bridge_node = of_graph_get_remote_port_parent(ep);
+>> +        of_node_put(ep);
+>>       }
+>> -end:
+>> -    of_node_put(ep);
+>>   -    return ret;
+>> +    return 0;
+>>   }
+>>     static int exynos_dsi_bind(struct device *dev, struct device *master,
+> 
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
