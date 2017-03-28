@@ -1,50 +1,63 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 28 Mar 2017 11:44:42 +0200
-Subject: [PATCH] arm64: dts: r8a7795: salvator-x: Add current sense amplifiers
-Message-ID: <1490694282-9439-1-git-send-email-geert+renesas@glider.be>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Tue, 28 Mar 2017 11:44:46 +0200
+Subject: [PATCH v5 03/10] dt-bindings: display: Add STM32 LTDC driver
+In-Reply-To: <1490694293-18358-1-git-send-email-yannick.fertre@st.com>
+References: <1490694293-18358-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1490694293-18358-4-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device nodes for two Maxim max961x current sense amplifiers
-sensing the VDD_0.8V and DVFS_0.8V lines.
+This patch adds documentation of device tree bindings for the STM32 LTDC
+(Lcd-Tft Display Controller).
 
-Based on a patch for r8a7796-salvator-x.dts by Jacopo Mondi.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
-Pending acceptance of the maxim,max9611 DT bindings.
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
 
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index f25241921067dcef..dca1c180757a2b68 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -400,6 +400,24 @@
- 	};
- };
- 
-+&i2c4 {
-+	status = "okay";
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+new file mode 100644
+index 0000000..8e14769
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -0,0 +1,36 @@
++* STMicroelectronics STM32 lcd-tft display controller
 +
-+	csa_vdd: adc at 7c {
-+		compatible = "maxim,max9611";
-+		reg = <0x7c>;
++- ltdc: lcd-tft display controller host
++  must be a sub-node of st-display-subsystem
++  Required properties:
++  - compatible: "st,stm32-ltdc"
++  - reg: Physical base address of the IP registers and length of memory mapped region.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For ltdc it should contain:
++      - "lcd" for the clock feeding the output pixel clock & IP clock.
++  - resets: reset to be used by the device (defined by use of RCC macro).
++  Required nodes:
++    - Video port for RGB output.
 +
-+		shunt-resistor-uohm = <5000>;
-+	};
++Example:
 +
-+	csa_dvfs: adc at 7f {
-+		compatible = "maxim,max9611";
-+		reg = <0x7f>;
++/ {
++	...
++	soc {
++	...
++		ltdc: display-controller at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
 +
-+		shunt-resistor-uohm = <5000>;
++			port {
++				ltdc_out_rgb: endpoint {
++				};
++			};
++		};
 +	};
 +};
-+
- &rcar_sound {
- 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
- 	pinctrl-names = "default";
 -- 
-2.7.4
+1.9.1
