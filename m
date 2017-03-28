@@ -1,315 +1,358 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 28 Mar 2017 15:33:17 -0600
-Subject: [PATCH V14 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <20170328202639.GE20211@cbox>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
- <1490729440-32591-11-git-send-email-tbaicar@codeaurora.org>
- <20170328202639.GE20211@cbox>
-Message-ID: <9607a684-89e9-a325-d957-f6ad81ef1245@codeaurora.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 28 Mar 2017 23:33:30 +0200
+Subject: [PATCH v2 2/2] phy: meson: add USB2 PHY support for Meson GXL and
+ GXM
+In-Reply-To: <20170318130013.20771-3-martin.blumenstingl@googlemail.com>
+References: <20170304222231.14496-1-martin.blumenstingl@googlemail.com>
+ <20170318130013.20771-1-martin.blumenstingl@googlemail.com>
+ <20170318130013.20771-3-martin.blumenstingl@googlemail.com>
+Message-ID: <CAFBinCCBkdADVX_9g54Lz2K3oPux2TnjPuotf1pz0mu6h6phTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Christoffer,
+Hi Kishon,
 
+On Sat, Mar 18, 2017 at 2:00 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> This adds a new driver for the USB2 PHYs found on Meson GXL and GXM SoCs
+> (both SoCs are using the same USB PHY register layout).
+>
+> The USB2 PHY is a simple PHY which only has a few registers to configure
+> the mode (host/device) and a reset register (to enable/disable the PHY).
+>
+> Unfortunately there are no datasheets available for this PHY. The driver
+> was written by reading the code from Amlogic's GPL kernel sources and
+> by analyzing the registers on an actual GXL and GXM device running the
+> kernel that was shipped on the boards I have.
+gentle ping - did you have time to review this patch in v2 yet?
 
-On 3/28/2017 2:26 PM, Christoffer Dall wrote:
-> On Tue, Mar 28, 2017 at 01:30:40PM -0600, Tyler Baicar wrote:
->> Currently external aborts are unsupported by the guest abort
->> handling. Add handling for SEAs so that the host kernel reports
->> SEAs which occur in the guest kernel.
->>
->> When an SEA occurs in the guest kernel, the guest exits and is
->> routed to kvm_handle_guest_abort(). Prior to this patch, a print
->> message of an unsupported FSC would be printed and nothing else
->> would happen. With this patch, the code gets routed to the APEI
->> handling of SEAs in the host kernel to report the SEA information.
->>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_arm.h       | 10 ++++++++++
->>   arch/arm/include/asm/system_misc.h   |  5 +++++
->>   arch/arm/kvm/mmu.c                   | 34 +++++++++++++++++++++++++++++++---
->>   arch/arm64/include/asm/kvm_arm.h     | 10 ++++++++++
->>   arch/arm64/include/asm/system_misc.h |  2 ++
->>   arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++--
->>   drivers/acpi/apei/ghes.c             | 13 +++++++------
->>   include/acpi/ghes.h                  |  2 +-
->>   8 files changed, 87 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
->> index a3f0b3d..ebf020b 100644
->> --- a/arch/arm/include/asm/kvm_arm.h
->> +++ b/arch/arm/include/asm/kvm_arm.h
->> @@ -187,6 +187,16 @@
->>   #define FSC_FAULT	(0x04)
->>   #define FSC_ACCESS	(0x08)
->>   #define FSC_PERM	(0x0c)
->> +#define FSC_SEA		(0x10)
->> +#define FSC_SEA_TTW0	(0x14)
->> +#define FSC_SEA_TTW1	(0x15)
->> +#define FSC_SEA_TTW2	(0x16)
->> +#define FSC_SEA_TTW3	(0x17)
->> +#define FSC_SECC	(0x18)
->> +#define FSC_SECC_TTW0	(0x1c)
->> +#define FSC_SECC_TTW1	(0x1d)
->> +#define FSC_SECC_TTW2	(0x1e)
->> +#define FSC_SECC_TTW3	(0x1f)
->>   
->>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
->>   #define HPFAR_MASK	(~0xf)
->> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
->> index a3d61ad..8c4a89f 100644
->> --- a/arch/arm/include/asm/system_misc.h
->> +++ b/arch/arm/include/asm/system_misc.h
->> @@ -22,6 +22,11 @@
->>   
->>   extern unsigned int user_debug;
->>   
->> +static inline int handle_guest_sea(phys_addr_t addr, unsigned int esr)
->> +{
->> +	return -1;
->> +}
->> +
->>   #endif /* !__ASSEMBLY__ */
->>   
->>   #endif /* __ASM_ARM_SYSTEM_MISC_H */
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 962616f..9a977c8 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -29,6 +29,7 @@
->>   #include <asm/kvm_asm.h>
->>   #include <asm/kvm_emulate.h>
->>   #include <asm/virt.h>
->> +#include <asm/system_misc.h>
->>   
->>   #include "trace.h"
->>   
->> @@ -1406,6 +1407,24 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->>   		kvm_set_pfn_accessed(pfn);
->>   }
->>   
->> +static bool is_abort_sea(unsigned long fault_status) {
->> +	switch (fault_status) {
->> +	case FSC_SEA:
->> +	case FSC_SEA_TTW0:
->> +	case FSC_SEA_TTW1:
->> +	case FSC_SEA_TTW2:
->> +	case FSC_SEA_TTW3:
->> +	case FSC_SECC:
->> +	case FSC_SECC_TTW0:
->> +	case FSC_SECC_TTW1:
->> +	case FSC_SECC_TTW2:
->> +	case FSC_SECC_TTW3:
->> +		return true;
->> +	default:
->> +		return false;
->> +	}
->> +}
->> +
->>   /**
->>    * kvm_handle_guest_abort - handles all 2nd stage aborts
->>    * @vcpu:	the VCPU pointer
->> @@ -1428,19 +1447,28 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>   	gfn_t gfn;
->>   	int ret, idx;
->>   
->> +	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
->> +
->> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
->> +
->> +	/*
->> +	 * The host kernel will handle the synchronous external abort. There
->> +	 * is no need to pass the error into the guest.
->> +	 */
->> +	if (is_abort_sea(fault_status))
->> +		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
->> +			return 1;
->> +
-> So what's the logic in presenting this as a vabt to the guest when the
-> host couldn't handle it?  What do you do in other parts of the kernel if
-> you see an abort that the host cannot handle?
-The only cases that handle_guest_sea() will not return zero are there is 
-no error to process
-(firmware support isn't there) or the error populated is invalid. If 
-there is no error to process,
-we want to continue here with the handling that exists. If the error is 
-invalid then GHES will
-report that and since the error wasn't handled properly we should 
-continue with existing
-handling.
-
-If there is an abort that GHES fails to handle in the host then GHES 
-just reports that and we
-also continue with the abort handling.
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/phy/Kconfig              |  14 ++
+>  drivers/phy/Makefile             |   1 +
+>  drivers/phy/phy-meson-gxl-usb2.c | 273 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 288 insertions(+)
+>  create mode 100644 drivers/phy/phy-meson-gxl-usb2.c
 >
-> nit: I'd prefer to see braces around the the multi-line block above.
-I will add braces.
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index dc5277ad1b5a..2573e139fd17 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -510,6 +510,19 @@ config PHY_MESON8B_USB2
+>           and GXBB SoCs.
+>           If unsure, say N.
 >
+> +config PHY_MESON_GXL_USB
+> +       tristate "Meson GXL and GXM USB2 PHY drivers"
+> +       default ARCH_MESON
+> +       depends on OF && (ARCH_MESON || COMPILE_TEST)
+> +       depends on USB_SUPPORT
+> +       select USB_COMMON
+> +       select GENERIC_PHY
+> +       select REGMAP_MMIO
+> +       help
+> +         Enable this to support the Meson USB2 PHYs found in Meson
+> +         GXL and GXM SoCs.
+> +         If unsure, say N.
+> +
+>  config PHY_NSP_USB3
+>         tristate "Broadcom NorthStar plus USB3 PHY driver"
+>         depends on OF && (ARCH_BCM_NSP || COMPILE_TEST)
+> @@ -518,4 +531,5 @@ config PHY_NSP_USB3
+>         help
+>           Enable this to support the Broadcom Northstar plus USB3 PHY.
+>           If unsure, say N.
+> +
+>  endmenu
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index e7b0feb1e125..e680b856e38e 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -62,4 +62,5 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)         += phy-bcm-cygnus-pcie.o
+>  obj-$(CONFIG_ARCH_TEGRA) += tegra/
+>  obj-$(CONFIG_PHY_NS2_PCIE)             += phy-bcm-ns2-pcie.o
+>  obj-$(CONFIG_PHY_MESON8B_USB2)         += phy-meson8b-usb2.o
+> +obj-$(CONFIG_PHY_MESON_GXL_USB)                += phy-meson-gxl-usb2.o
+>  obj-$(CONFIG_PHY_NSP_USB3)             += phy-bcm-nsp-usb3.o
+> diff --git a/drivers/phy/phy-meson-gxl-usb2.c b/drivers/phy/phy-meson-gxl-usb2.c
+> new file mode 100644
+> index 000000000000..4bf646a52c45
+> --- /dev/null
+> +++ b/drivers/phy/phy-meson-gxl-usb2.c
+> @@ -0,0 +1,273 @@
+> +/*
+> + * Meson GXL and GXM USB2 PHY driver
+> + *
+> + * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/usb/of.h>
+> +
+> +/* bits [31:27] are read-only */
+> +#define U2P_R0                                                 0x0
+> +       #define U2P_R0_BYPASS_SEL                               BIT(0)
+> +       #define U2P_R0_BYPASS_DM_EN                             BIT(1)
+> +       #define U2P_R0_BYPASS_DP_EN                             BIT(2)
+> +       #define U2P_R0_TXBITSTUFF_ENH                           BIT(3)
+> +       #define U2P_R0_TXBITSTUFF_EN                            BIT(4)
+> +       #define U2P_R0_DM_PULLDOWN                              BIT(5)
+> +       #define U2P_R0_DP_PULLDOWN                              BIT(6)
+> +       #define U2P_R0_DP_VBUS_VLD_EXT_SEL                      BIT(7)
+> +       #define U2P_R0_DP_VBUS_VLD_EXT                          BIT(8)
+> +       #define U2P_R0_ADP_PRB_EN                               BIT(9)
+> +       #define U2P_R0_ADP_DISCHARGE                            BIT(10)
+> +       #define U2P_R0_ADP_CHARGE                               BIT(11)
+> +       #define U2P_R0_DRV_VBUS                                 BIT(12)
+> +       #define U2P_R0_ID_PULLUP                                BIT(13)
+> +       #define U2P_R0_LOOPBACK_EN_B                            BIT(14)
+> +       #define U2P_R0_OTG_DISABLE                              BIT(15)
+> +       #define U2P_R0_COMMON_ONN                               BIT(16)
+> +       #define U2P_R0_FSEL_MASK                                GENMASK(19, 17)
+> +       #define U2P_R0_REF_CLK_SEL_MASK                         GENMASK(21, 20)
+> +       #define U2P_R0_POWER_ON_RESET                           BIT(22)
+> +       #define U2P_R0_V_ATE_TEST_EN_B_MASK                     GENMASK(24, 23)
+> +       #define U2P_R0_ID_SET_ID_DQ                             BIT(25)
+> +       #define U2P_R0_ATE_RESET                                BIT(26)
+> +       #define U2P_R0_FSV_MINUS                                BIT(27)
+> +       #define U2P_R0_FSV_PLUS                                 BIT(28)
+> +       #define U2P_R0_BYPASS_DM_DATA                           BIT(29)
+> +       #define U2P_R0_BYPASS_DP_DATA                           BIT(30)
+> +
+> +#define U2P_R1                                                 0x4
+> +       #define U2P_R1_BURN_IN_TEST                             BIT(0)
+> +       #define U2P_R1_ACA_ENABLE                               BIT(1)
+> +       #define U2P_R1_DCD_ENABLE                               BIT(2)
+> +       #define U2P_R1_VDAT_SRC_EN_B                            BIT(3)
+> +       #define U2P_R1_VDAT_DET_EN_B                            BIT(4)
+> +       #define U2P_R1_CHARGES_SEL                              BIT(5)
+> +       #define U2P_R1_TX_PREEMP_PULSE_TUNE                     BIT(6)
+> +       #define U2P_R1_TX_PREEMP_AMP_TUNE_MASK                  GENMASK(8, 7)
+> +       #define U2P_R1_TX_RES_TUNE_MASK                         GENMASK(10, 9)
+> +       #define U2P_R1_TX_RISE_TUNE_MASK                        GENMASK(12, 11)
+> +       #define U2P_R1_TX_VREF_TUNE_MASK                        GENMASK(16, 13)
+> +       #define U2P_R1_TX_FSLS_TUNE_MASK                        GENMASK(20, 17)
+> +       #define U2P_R1_TX_HSXV_TUNE_MASK                        GENMASK(22, 21)
+> +       #define U2P_R1_OTG_TUNE_MASK                            GENMASK(25, 23)
+> +       #define U2P_R1_SQRX_TUNE_MASK                           GENMASK(28, 26)
+> +       #define U2P_R1_COMP_DIS_TUNE_MASK                       GENMASK(31, 29)
+> +
+> +/* bits [31:14] are read-only */
+> +#define U2P_R2                                                 0x8
+> +       #define U2P_R2_DATA_IN_MASK                             GENMASK(3, 0)
+> +       #define U2P_R2_DATA_IN_EN_MASK                          GENMASK(7, 4)
+> +       #define U2P_R2_ADDR_MASK                                GENMASK(11, 8)
+> +       #define U2P_R2_DATA_OUT_SEL                             BIT(12)
+> +       #define U2P_R2_CLK                                      BIT(13)
+> +       #define U2P_R2_DATA_OUT_MASK                            GENMASK(17, 14)
+> +       #define U2P_R2_ACA_PIN_RANGE_C                          BIT(18)
+> +       #define U2P_R2_ACA_PIN_RANGE_B                          BIT(19)
+> +       #define U2P_R2_ACA_PIN_RANGE_A                          BIT(20)
+> +       #define U2P_R2_ACA_PIN_GND                              BIT(21)
+> +       #define U2P_R2_ACA_PIN_FLOAT                            BIT(22)
+> +       #define U2P_R2_CHARGE_DETECT                            BIT(23)
+> +       #define U2P_R2_DEVICE_SESSION_VALID                     BIT(24)
+> +       #define U2P_R2_ADP_PROBE                                BIT(25)
+> +       #define U2P_R2_ADP_SENSE                                BIT(26)
+> +       #define U2P_R2_SESSION_END                              BIT(27)
+> +       #define U2P_R2_VBUS_VALID                               BIT(28)
+> +       #define U2P_R2_B_VALID                                  BIT(29)
+> +       #define U2P_R2_A_VALID                                  BIT(30)
+> +       #define U2P_R2_ID_DIG                                   BIT(31)
+> +
+> +#define U2P_R3                                                 0xc
+> +
+> +#define RESET_COMPLETE_TIME                            500
+> +
+> +struct phy_meson_gxl_usb2_priv {
+> +       struct regmap           *regmap;
+> +       enum phy_mode           mode;
+> +       int                     is_enabled;
+> +};
+> +
+> +static const struct regmap_config phy_meson_gxl_usb2_regmap_conf = {
+> +       .reg_bits = 8,
+> +       .val_bits = 32,
+> +       .reg_stride = 4,
+> +       .max_register = U2P_R3,
+> +};
+> +
+> +static int phy_meson_gxl_usb2_reset(struct phy *phy)
+> +{
+> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
+> +
+> +       if (priv->is_enabled) {
+> +               /* reset the PHY and wait until settings are stabilized */
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET,
+> +                               U2P_R0_POWER_ON_RESET);
+> +               udelay(RESET_COMPLETE_TIME);
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET,
+> +                                  0);
+> +               udelay(RESET_COMPLETE_TIME);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int phy_meson_gxl_usb2_set_mode(struct phy *phy, enum phy_mode mode)
+> +{
+> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
+> +
+> +       switch (mode) {
+> +       case PHY_MODE_USB_HOST:
+> +       case PHY_MODE_USB_OTG:
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
+> +                                  U2P_R0_DM_PULLDOWN);
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
+> +                                  U2P_R0_DP_PULLDOWN);
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP, 0);
+> +               break;
+> +
+> +       case PHY_MODE_USB_DEVICE:
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
+> +                                  0);
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
+> +                                  0);
+> +               regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP,
+> +                                  U2P_R0_ID_PULLUP);
+> +               break;
+> +
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +
+> +       phy_meson_gxl_usb2_reset(phy);
+> +
+> +       priv->mode = mode;
+> +
+> +       return 0;
+> +}
+> +
+> +static int phy_meson_gxl_usb2_power_off(struct phy *phy)
+> +{
+> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
+> +
+> +       priv->is_enabled = 0;
+> +
+> +       /* power off the PHY by putting it into reset mode */
+> +       regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET,
+> +                          U2P_R0_POWER_ON_RESET);
+> +
+> +       return 0;
+> +}
+> +
+> +static int phy_meson_gxl_usb2_power_on(struct phy *phy)
+> +{
+> +       struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
+> +       int ret;
+> +
+> +       priv->is_enabled = 1;
+> +
+> +       /* power on the PHY by taking it out of reset mode */
+> +       regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_POWER_ON_RESET, 0);
+> +
+> +       ret = phy_meson_gxl_usb2_set_mode(phy, priv->mode);
+> +       if (ret) {
+> +               phy_meson_gxl_usb2_power_off(phy);
+> +
+> +               dev_err(&phy->dev, "Failed to initialize PHY with mode %d\n",
+> +                       priv->mode);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct phy_ops phy_meson_gxl_usb2_ops = {
+> +       .power_on       = phy_meson_gxl_usb2_power_on,
+> +       .power_off      = phy_meson_gxl_usb2_power_off,
+> +       .set_mode       = phy_meson_gxl_usb2_set_mode,
+> +       .reset          = phy_meson_gxl_usb2_reset,
+> +       .owner          = THIS_MODULE,
+> +};
+> +
+> +static int phy_meson_gxl_usb2_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct phy_provider *phy_provider;
+> +       struct resource *res;
+> +       struct phy_meson_gxl_usb2_priv *priv;
+> +       struct phy *phy;
+> +       void __iomem *base;
+> +
+> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +       if (!priv)
+> +               return -ENOMEM;
+> +
+> +       platform_set_drvdata(pdev, priv);
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       base = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(base))
+> +               return PTR_ERR(base);
+> +
+> +       switch (of_usb_get_dr_mode_by_phy(dev->of_node, -1)) {
+> +       case USB_DR_MODE_PERIPHERAL:
+> +               priv->mode = PHY_MODE_USB_DEVICE;
+> +               break;
+> +       case USB_DR_MODE_OTG:
+> +               priv->mode = PHY_MODE_USB_OTG;
+> +               break;
+> +       case USB_DR_MODE_HOST:
+> +       default:
+> +               priv->mode = PHY_MODE_USB_HOST;
+> +               break;
+> +       }
+> +
+> +       priv->regmap = devm_regmap_init_mmio(dev, base,
+> +                                            &phy_meson_gxl_usb2_regmap_conf);
+> +       if (IS_ERR(priv->regmap))
+> +               return PTR_ERR(priv->regmap);
+> +
+> +       phy = devm_phy_create(dev, NULL, &phy_meson_gxl_usb2_ops);
+> +       if (IS_ERR(phy)) {
+> +               dev_err(dev, "failed to create PHY\n");
+> +               return PTR_ERR(phy);
+> +       }
+> +
+> +       phy_set_drvdata(phy, priv);
+> +
+> +       phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +
+> +       return PTR_ERR_OR_ZERO(phy_provider);
+> +}
+> +
+> +static const struct of_device_id phy_meson_gxl_usb2_of_match[] = {
+> +       { .compatible = "amlogic,meson-gxl-usb2-phy", },
+> +       { },
+> +};
+> +MODULE_DEVICE_TABLE(of, phy_meson_gxl_usb2_of_match);
+> +
+> +static struct platform_driver phy_meson_gxl_usb2_driver = {
+> +       .probe  = phy_meson_gxl_usb2_probe,
+> +       .driver = {
+> +               .name           = "phy-meson-gxl-usb2",
+> +               .of_match_table = phy_meson_gxl_usb2_of_match,
+> +       },
+> +};
+> +module_platform_driver(phy_meson_gxl_usb2_driver);
+> +
+> +MODULE_AUTHOR("Martin Blumenstingl <martin.blumenstingl@googlemail.com>");
+> +MODULE_DESCRIPTION("Meson GXL and GXM USB2 PHY driver");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.12.0
 >
->>   	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
->>   	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
->>   		kvm_inject_vabt(vcpu);
->>   		return 1;
->>   	}
->>   
->> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
->> -
->>   	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
->>   			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
->>   
->>   	/* Check the stage-2 fault is trans. fault or write fault */
->> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
->>   	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
->>   	    fault_status != FSC_ACCESS) {
->>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index 6e99978..61d694c 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -204,6 +204,16 @@
->>   #define FSC_FAULT	ESR_ELx_FSC_FAULT
->>   #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
->>   #define FSC_PERM	ESR_ELx_FSC_PERM
->> +#define FSC_SEA		ESR_ELx_FSC_EXTABT
->> +#define FSC_SEA_TTW0	(0x14)
->> +#define FSC_SEA_TTW1	(0x15)
->> +#define FSC_SEA_TTW2	(0x16)
->> +#define FSC_SEA_TTW3	(0x17)
->> +#define FSC_SECC	(0x18)
->> +#define FSC_SECC_TTW0	(0x1c)
->> +#define FSC_SECC_TTW1	(0x1d)
->> +#define FSC_SECC_TTW2	(0x1e)
->> +#define FSC_SECC_TTW3	(0x1f)
->>   
->>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
->>   #define HPFAR_MASK	(~UL(0xf))
->> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
->> index bc81243..95aa442 100644
->> --- a/arch/arm64/include/asm/system_misc.h
->> +++ b/arch/arm64/include/asm/system_misc.h
->> @@ -56,6 +56,8 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
->>   	__show_ratelimited;						\
->>   })
->>   
->> +int handle_guest_sea(phys_addr_t addr, unsigned int esr);
->> +
->>   #endif	/* __ASSEMBLY__ */
->>   
->>   #endif	/* __ASM_SYSTEM_MISC_H */
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index f7372ce..3abb367 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -497,6 +497,7 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   {
->>   	struct siginfo info;
->> +	int ret = 0;
->>   
->>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->>   		 fault_name(esr), esr, addr);
->> @@ -508,7 +509,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   	 */
->>   	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
->>   		nmi_enter();
->> -		ghes_notify_sea();
->> +		ret = ghes_notify_sea();
->>   		nmi_exit();
->>   	}
->>   
->> @@ -521,7 +522,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   		info.si_addr  = (void __user *)addr;
->>   	arm64_notify_die("", regs, &info, esr);
->>   
->> -	return 0;
->> +	return ret;
->>   }
->>   
->>   static const struct fault_info {
->> @@ -603,6 +604,24 @@ static const char *fault_name(unsigned int esr)
->>   }
->>   
->>   /*
->> + * Handle Synchronous External Aborts that occur in a guest kernel.
->> + *
->> + * The return value will be zero if the SEA was successfully handled
->> + * and non-zero if there was an error processing the error or there was
->> + * no error to process.
->> + */
->> +int handle_guest_sea(phys_addr_t addr, unsigned int esr)
->> +{
->> +	int ret = -ENOENT;
->> +
->> +	if(IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-> nit: missing white space
-I will add the space.
->
->> +		ret = ghes_notify_sea();
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->> +/*
->>    * Dispatch a data abort to the relevant handler.
->>    */
->>   asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 230b095..81eabc6 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -810,17 +810,18 @@ static int ghes_notify_sci(struct notifier_block *this,
->>   #ifdef CONFIG_ACPI_APEI_SEA
->>   static LIST_HEAD(ghes_sea);
->>   
->> -void ghes_notify_sea(void)
->> +int ghes_notify_sea(void)
->>   {
->>   	struct ghes *ghes;
->> +	int ret = -ENOENT;
->>   
->> -	/*
->> -	 * synchronize_rcu() will wait for nmi_exit(), so no need to
->> -	 * rcu_read_lock().
->> -	 */
->> +	rcu_read_lock();
->>   	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
->> -		ghes_proc(ghes);
->> +		if(!ghes_proc(ghes))
->> +			ret = 0;
->>   	}
->> +	rcu_read_unlock();
->> +	return ret;
->>   }
->>   
->>   static void ghes_sea_add(struct ghes *ghes)
->> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
->> index 18bc935..2a727dc 100644
->> --- a/include/acpi/ghes.h
->> +++ b/include/acpi/ghes.h
->> @@ -99,6 +99,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
->>   		gdata + 1;
->>   }
->>   
->> -void ghes_notify_sea(void);
->> +int ghes_notify_sea(void);
->>   
->>   #endif /* GHES_H */
->> -- 
-> I feel like the changes to acpi/arm64 in this patch could have been a
-> separate patch or folded into previous patches, but for the KVM part of
-> this patch:
->
-> Acked-by: Christoffer Dall <cdall@linaro.org>
-Thank you. I can break out the GHES changes if that is really desired.
-
-Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
