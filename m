@@ -1,98 +1,85 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 28 Mar 2017 08:42:52 -0700
-Subject: [PATCH v8 4/4] PCI: imx6: Do not switch speed if Gen2 is disabled
-In-Reply-To: <20170328154252.6902-1-andrew.smirnov@gmail.com>
-References: <20170328154252.6902-1-andrew.smirnov@gmail.com>
-Message-ID: <20170328154252.6902-5-andrew.smirnov@gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 28 Mar 2017 17:51:17 +0200
+Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
+In-Reply-To: <20170328092545.4644-2-hgkr.klein@gmail.com>
+References: <20170328092545.4644-1-hgkr.klein@gmail.com>
+ <20170328092545.4644-2-hgkr.klein@gmail.com>
+Message-ID: <1490716277.20764.6.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save a bit of time and avoid going through link speed change procedure
-in configuration where link max speed is limited to Gen1 in DT.
+On Tue, 2017-03-28 at 11:25 +0200, Helmut Klein wrote:
+> Expose the clock ids for the three none AO uarts to the dt-bindings
 
-Cc: yurovsky at gmail.com
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Dong Aisheng <dongas86@gmail.com>
-Cc: linux-pci at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/pci/dwc/pci-imx6.c | 52 +++++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 26 deletions(-)
+Are they all used in the device tree ?
+We try to only expose what we need in the DT
+The recent discussion over CLKID_CPUCLK proved it was a sane thing to do.
 
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index c731e41..9407c03 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -533,40 +533,40 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- 		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
- 		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
- 		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
--	} else {
--		dev_info(dev, "Link: Gen2 disabled\n");
--	}
--
--	/*
--	 * Start Directed Speed Change so the best possible speed both link
--	 * partners support can be negotiated.
--	 */
--	tmp = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
--	tmp |= PORT_LOGIC_SPEED_CHANGE;
--	dw_pcie_writel_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
- 
--	if (imx6_pcie->variant != IMX7D) {
- 		/*
--		 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
--		 * from i.MX6 family when no link speed transition
--		 * occurs and we go Gen1 -> yep, Gen1. The difference
--		 * is that, in such case, it will not be cleared by HW
--		 * which will cause the following code to report false
--		 * failure.
-+		 * Start Directed Speed Change so the best possible
-+		 * speed both link partners support can be negotiated.
- 		 */
-+		tmp = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
-+		tmp |= PORT_LOGIC_SPEED_CHANGE;
-+		dw_pcie_writel_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
-+
-+		if (imx6_pcie->variant != IMX7D) {
-+			/*
-+			 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
-+			 * from i.MX6 family when no link speed transition
-+			 * occurs and we go Gen1 -> yep, Gen1. The difference
-+			 * is that, in such case, it will not be cleared by HW
-+			 * which will cause the following code to report false
-+			 * failure.
-+			 */
-+
-+			ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
-+			if (ret) {
-+				dev_err(dev, "Failed to bring link up!\n");
-+				goto err_reset_phy;
-+			}
-+		}
- 
--		ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
-+		/* Make sure link training is finished as well! */
-+		ret = imx6_pcie_wait_for_link(imx6_pcie);
- 		if (ret) {
- 			dev_err(dev, "Failed to bring link up!\n");
- 			goto err_reset_phy;
- 		}
--	}
--
--	/* Make sure link training is finished as well! */
--	ret = imx6_pcie_wait_for_link(imx6_pcie);
--	if (ret) {
--		dev_err(dev, "Failed to bring link up!\n");
--		goto err_reset_phy;
-+	} else {
-+		dev_info(dev, "Link: Gen2 disabled\n");
- 	}
- 
- 	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCSR);
--- 
-2.9.3
+> 
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> ---
+> ?drivers/clk/meson/gxbb.h??????????????| 6 +++---
+> ?include/dt-bindings/clock/gxbb-clkc.h | 3 +++
+> ?2 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 8ee2022ce5d5..1edfaa5fe307 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -194,7 +194,7 @@
+> ?/* #define CLKID_SAR_ADC */
+> ?#define CLKID_SMART_CARD	??24
+> ?#define CLKID_RNG0		??25
+> -#define CLKID_UART0		??26
+> +/* CLKID_UART0 */
+> ?#define CLKID_SDHC		??27
+> ?#define CLKID_STREAM		??28
+> ?#define CLKID_ASYNC_FIFO	??29
+> @@ -216,7 +216,7 @@
+> ?#define CLKID_ADC		??45
+> ?#define CLKID_BLKMV		??46
+> ?#define CLKID_AIU		??47
+> -#define CLKID_UART1		??48
+> +/* CLKID_UART1 */
+> ?#define CLKID_G2D		??49
+> ?/* CLKID_USB0 */
+> ?/* CLKID_USB1 */
+> @@ -236,7 +236,7 @@
+> ?/* CLKID_USB0_DDR_BRIDGE */
+> ?#define CLKID_MMC_PCLK		??66
+> ?#define CLKID_DVIN		??67
+> -#define CLKID_UART2		??68
+> +/* CLKID_UART2 */
+> ?/* #define CLKID_SANA */
+> ?#define CLKID_VPU_INTR		??70
+> ?#define CLKID_SEC_AHB_AHB3_BRIDGE 71
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-
+> bindings/clock/gxbb-clkc.h
+> index 692846c7941b..7b329df47752 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -15,13 +15,16 @@
+> ?#define CLKID_SPI		34
+> ?#define CLKID_I2C		22
+> ?#define CLKID_SAR_ADC		23
+> +#define CLKID_UART0		26
+> ?#define CLKID_ETH		36
+> +#define CLKID_UART1		48
+> ?#define CLKID_USB0		50
+> ?#define CLKID_USB1		51
+> ?#define CLKID_USB		55
+> ?#define CLKID_HDMI_PCLK		63
+> ?#define CLKID_USB1_DDR_BRIDGE	64
+> ?#define CLKID_USB0_DDR_BRIDGE	65
+> +#define CLKID_UART2		68
+> ?#define CLKID_SANA		69
+> ?#define CLKID_GCLK_VENCI_INT0	77
+> ?#define CLKID_AO_I2C		93
+> --
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
