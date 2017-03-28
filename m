@@ -1,33 +1,46 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 28 Mar 2017 14:34:25 -0700
-Subject: [PATCH v2 2/8] arm64: mm: mark fault_info __ro_after_init
+Date: Tue, 28 Mar 2017 14:34:26 -0700
+Subject: [PATCH v2 3/8] bus: brcmstb_gisb: Use register offsets with writes too
 In-Reply-To: <20170328213431.10904-1-opendmb@gmail.com>
 References: <20170328213431.10904-1-opendmb@gmail.com>
-Message-ID: <20170328213431.10904-3-opendmb@gmail.com>
+Message-ID: <20170328213431.10904-4-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fault_info table must be made writeable to allow installation
-of custom memory abort handlers, but it can be made read-only
-after initialization to provide some protection.
+This commit corrects the bug introduced in commit f80835875d3d
+("bus: brcmstb_gisb: Look up register offsets in a table") such
+that gisb_write() translates the register enumeration into an
+offset from the base address for writes as well as reads.
 
+Fixes: f80835875d3d ("bus: brcmstb_gisb: Look up register offsets in a table")
 Signed-off-by: Doug Berger <opendmb@gmail.com>
+Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- arch/arm64/mm/fault.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/bus/brcmstb_gisb.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index cdf1260f1005..43319ed58a47 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -493,7 +493,7 @@ static struct fault_info {
- 	int	sig;
- 	int	code;
- 	const char *name;
--} fault_info[] = {
-+} fault_info[] __ro_after_init = {
- 	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
- 	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
- 	{ do_bad,		SIGBUS,  0,		"level 2 address size fault"	},
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index 72fe0a5a8bf3..a94598d0945a 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2014 Broadcom Corporation
++ * Copyright (C) 2014-2017 Broadcom
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -127,9 +127,9 @@ static void gisb_write(struct brcmstb_gisb_arb_device *gdev, u32 val, int reg)
+ 		return;
+ 
+ 	if (gdev->big_endian)
+-		iowrite32be(val, gdev->base + reg);
++		iowrite32be(val, gdev->base + offset);
+ 	else
+-		iowrite32(val, gdev->base + reg);
++		iowrite32(val, gdev->base + offset);
+ }
+ 
+ static ssize_t gisb_arb_get_timeout(struct device *dev,
 -- 
 2.12.0
