@@ -1,199 +1,89 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 27 Mar 2017 17:40:17 -0700
-Subject: [PATCH v6 00/39] i.MX Media Driver
-Message-ID: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+Date: Mon, 27 Mar 2017 17:40:18 -0700
+Subject: [PATCH v6 01/39] [media] dt-bindings: Add bindings for
+ video-multiplexer device
+In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1490661656-10318-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In version 6:
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-- moved FIM error event back to a i.MX private event. I would like to
-  leave this as a (private) event rather than reporting a vb2 queue
-  error, for now. If and when the i.MX6 timer input capture patch is
-  accepted later, then this event can become a queue error.
+Add bindings documentation for the video multiplexer device.
 
-- removed new-frame-before-end-of-frame (NFB4EOF) event. Instead when
-  this IPU DMA channel error occurs, the next captured frame is marked
-  with the vb2 error flag.
-
-- updates to Documentation/media/v4l-drivers/imx.rst.
-
-- ov5640: propagate return codes from the register read/write primitives
-  in various places.
-
-- ov5640: removed the [gs]_parm ops.
-
-- ov5640: avoid possible divide-by-0's.
-
-- only the CSI subdevice implements [gs]_frame_interval now (or needs
-  to). Those ops have been removed from the subdevices that have no
-  control over frame rate.
-
-- removed the patch that adds v4l2_subdev_link_validate_frame_interval().
-
-- properly propagate the TRY formats from sink to source pads within the
-  subdevices (spotted by Philipp Zabel <p.zabel@pengutronix.de>).
-
-- added enum_frame_size op to imx-ic-prpencvf and CSI subdevices.
-
-- added enum_frame_intervals op to CSI subdevice (patch from Russell
-  King <rmk+kernel@armlinux.org.uk>).
-
-- added V4L2 interface ops enum_framesizes and enum_frameintervals, which
-  calls the corresponding subdev op at the connected source subdev (patch
-  from Russell King <rmk+kernel@armlinux.org.uk>).
-
-- added missing Bayer support to CSI subdevice (patch from Russell King
-  <rmk+kernel@armlinux.org.uk>).
-
-- switched to v4l2_pipeline_pm_use() and v4l2_pipeline_link_notify()
-  for the pipeline power management.
-
-- the power-on order has changed due to above: the sensor now
-  is powered on _before_ the MIPI CSI-2 receiver, which means
-  MIPI CSI-2 receiver startup sequence steps 3, 4, and 5 can
-  be moved up to csi2_s_power() from csi2_s_stream(). And that
-  means step 7 (wait for clock lane) now has a place to be called
-  in csi2_s_stream().
-
-- changed the bus_info string for the capture device interfaces to
-  "platform:[src_sd->name]" instead of using the capture device name,
-  so that the bus_info strings are unique between the capture devices.
-  I was hoping this would provide unique device node symlink names under
-  /dev/v4l/by-path/, but they are still named
-  "platform-capture-subsystem-video-indexNN".
-
-- fixed cropping and /2 downsizing in the CSI subdevice. These should be
-  specified using the crop and compose APIs at the sink pad, not the
-  source pad (patch from Philipp Zabel <p.zabel@pengutronix.de>).
-
-- added a check at CSI subdevice stream on. If the connected sensor
-  reports faulty frames at power on via g_skip_frames op, the CSI
-  should avoid capturing those frames before enabling the CSI.
-
-- moved imx.h UAPI header to include/linux/imx-media.h while imx-media
-  driver is still under staging.
-
-
-Philipp Zabel (8):
-  [media] dt-bindings: Add bindings for video-multiplexer device
-  ARM: dts: imx6qdl: Add mipi_ipu1/2 multiplexers, mipi_csi, and their
-    connections
-  add mux and video interface bridge entity functions
-  platform: add video-multiplexer subdevice driver
-  media: imx: csi: fix crop rectangle changes in set_fmt
-  media: imx: csi: add frame skipping support
-  media: imx: csi: fix crop rectangle reset in sink set_fmt
-  media: imx: csi: add sink selection rectangles
-
-Russell King (5):
-  media: imx: add support for bayer formats
-  media: imx: csi: add support for bayer formats
-  media: imx: csi/fim: add support for frame intervals
-  media: imx-csi: add frame size/interval enumeration
-  media: imx-media-capture: add frame sizes/interval enumeration
-
-Steve Longerbeam (26):
-  [media] dt-bindings: Add bindings for i.MX media driver
-  [media] dt/bindings: Add bindings for OV5640
-  ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
-  ARM: dts: imx6qdl: add capture-subsystem device
-  ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
-  ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
-  ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
-  ARM: dts: imx6-sabreauto: create i2cmux for i2c3
-  ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
-  ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
-  ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
-  [media] v4l2-mc: add a function to inherit controls from a pipeline
-  [media] add Omnivision OV5640 sensor driver
-  media: Add userspace header file for i.MX
-  media: Add i.MX media core driver
-  media: imx: Add Capture Device Interface
-  media: imx: Add CSI subdev driver
-  media: imx: Add VDIC subdev driver
-  media: imx: Add IC subdev drivers
-  media: imx: Add MIPI CSI-2 Receiver subdev driver
-  ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers
-  media: imx: csi: add __csi_get_fmt
-  media: imx: redo pixel format enumeration and negotiation
-  media: imx: csi: Avoid faulty sensor frames at stream start
-  media: imx: propagate sink pad formats to source pads
-  media: imx-ic-prpencvf: add frame size enumeration
-
- .../devicetree/bindings/media/i2c/ov5640.txt       |   45 +
- Documentation/devicetree/bindings/media/imx.txt    |   74 +
- .../bindings/media/video-multiplexer.txt           |   59 +
- Documentation/media/uapi/mediactl/media-types.rst  |   22 +
- Documentation/media/v4l-drivers/imx.rst            |  590 ++++++
- arch/arm/boot/dts/imx6dl-sabrelite.dts             |    5 +
- arch/arm/boot/dts/imx6dl-sabresd.dts               |    5 +
- arch/arm/boot/dts/imx6dl.dtsi                      |  185 ++
- arch/arm/boot/dts/imx6q-sabrelite.dts              |    5 +
- arch/arm/boot/dts/imx6q-sabresd.dts                |    5 +
- arch/arm/boot/dts/imx6q.dtsi                       |  121 ++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |  144 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |  152 +-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  114 +-
- arch/arm/boot/dts/imx6qdl.dtsi                     |   17 +-
- arch/arm/configs/imx_v6_v7_defconfig               |   11 +
- drivers/media/i2c/Kconfig                          |    7 +
- drivers/media/i2c/Makefile                         |    1 +
- drivers/media/i2c/ov5640.c                         | 2219 ++++++++++++++++++++
- drivers/media/platform/Kconfig                     |    8 +
- drivers/media/platform/Makefile                    |    2 +
- drivers/media/platform/video-multiplexer.c         |  451 ++++
- drivers/media/v4l2-core/v4l2-mc.c                  |   50 +
- drivers/staging/media/Kconfig                      |    2 +
- drivers/staging/media/Makefile                     |    1 +
- drivers/staging/media/imx/Kconfig                  |   20 +
- drivers/staging/media/imx/Makefile                 |   12 +
- drivers/staging/media/imx/TODO                     |   17 +
- drivers/staging/media/imx/imx-ic-common.c          |  113 +
- drivers/staging/media/imx/imx-ic-prp.c             |  452 ++++
- drivers/staging/media/imx/imx-ic-prpencvf.c        | 1232 +++++++++++
- drivers/staging/media/imx/imx-ic.h                 |   38 +
- drivers/staging/media/imx/imx-media-capture.c      |  776 +++++++
- drivers/staging/media/imx/imx-media-csi.c          | 1779 ++++++++++++++++
- drivers/staging/media/imx/imx-media-dev.c          |  503 +++++
- drivers/staging/media/imx/imx-media-fim.c          |  463 ++++
- drivers/staging/media/imx/imx-media-internal-sd.c  |  349 +++
- drivers/staging/media/imx/imx-media-of.c           |  267 +++
- drivers/staging/media/imx/imx-media-utils.c        |  947 +++++++++
- drivers/staging/media/imx/imx-media-vdic.c         |  910 ++++++++
- drivers/staging/media/imx/imx-media.h              |  305 +++
- drivers/staging/media/imx/imx6-mipi-csi2.c         |  673 ++++++
- include/linux/imx-media.h                          |   27 +
- include/media/imx.h                                |   15 +
- include/media/v4l2-mc.h                            |   31 +
- include/uapi/linux/media.h                         |    6 +
- include/uapi/linux/v4l2-controls.h                 |    4 +
- 47 files changed, 13207 insertions(+), 27 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
- create mode 100644 Documentation/devicetree/bindings/media/imx.txt
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ .../bindings/media/video-multiplexer.txt           | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
- create mode 100644 Documentation/media/v4l-drivers/imx.rst
- create mode 100644 drivers/media/i2c/ov5640.c
- create mode 100644 drivers/media/platform/video-multiplexer.c
- create mode 100644 drivers/staging/media/imx/Kconfig
- create mode 100644 drivers/staging/media/imx/Makefile
- create mode 100644 drivers/staging/media/imx/TODO
- create mode 100644 drivers/staging/media/imx/imx-ic-common.c
- create mode 100644 drivers/staging/media/imx/imx-ic-prp.c
- create mode 100644 drivers/staging/media/imx/imx-ic-prpencvf.c
- create mode 100644 drivers/staging/media/imx/imx-ic.h
- create mode 100644 drivers/staging/media/imx/imx-media-capture.c
- create mode 100644 drivers/staging/media/imx/imx-media-csi.c
- create mode 100644 drivers/staging/media/imx/imx-media-dev.c
- create mode 100644 drivers/staging/media/imx/imx-media-fim.c
- create mode 100644 drivers/staging/media/imx/imx-media-internal-sd.c
- create mode 100644 drivers/staging/media/imx/imx-media-of.c
- create mode 100644 drivers/staging/media/imx/imx-media-utils.c
- create mode 100644 drivers/staging/media/imx/imx-media-vdic.c
- create mode 100644 drivers/staging/media/imx/imx-media.h
- create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
- create mode 100644 include/linux/imx-media.h
- create mode 100644 include/media/imx.h
 
+diff --git a/Documentation/devicetree/bindings/media/video-multiplexer.txt b/Documentation/devicetree/bindings/media/video-multiplexer.txt
+new file mode 100644
+index 0000000..9d133d9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/video-multiplexer.txt
+@@ -0,0 +1,59 @@
++Video Multiplexer
++=================
++
++Video multiplexers allow to select between multiple input ports. Video received
++on the active input port is passed through to the output port. Muxes described
++by this binding may be controlled by a syscon register bitfield or by a GPIO.
++
++Required properties:
++- compatible : should be "video-multiplexer"
++- reg: should be register base of the register containing the control bitfield
++- bit-mask: bitmask of the control bitfield in the control register
++- bit-shift: bit offset of the control bitfield in the control register
++- gpios: alternatively to reg, bit-mask, and bit-shift, a single GPIO phandle
++  may be given to switch between two inputs
++- #address-cells: should be <1>
++- #size-cells: should be <0>
++- port@*: at least three port nodes containing endpoints connecting to the
++  source and sink devices according to of_graph bindings. The last port is
++  the output port, all others are inputs.
++
++Example:
++
++syscon {
++	compatible = "syscon", "simple-mfd";
++
++	mux {
++		compatible = "video-multiplexer";
++		/* Single bit (1 << 19) in syscon register 0x04: */
++		reg = <0x04>;
++		bit-mask = <1>;
++		bit-shift = <19>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			mux_in0: endpoint {
++				remote-endpoint = <&video_source0_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			mux_in1: endpoint {
++				remote-endpoint = <&video_source1_out>;
++			};
++		};
++
++		port at 2 {
++			reg = <2>;
++
++			mux_out: endpoint {
++				remote-endpoint = <&capture_interface_in>;
++			};
++		};
++	};
++};
 -- 
 2.7.4
