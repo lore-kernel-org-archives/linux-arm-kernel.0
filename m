@@ -1,68 +1,91 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Mar 2017 11:48:08 +0100
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <20170321193933.GB31111@cbox>
-References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
- <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
- <20170321193933.GB31111@cbox>
-Message-ID: <58DA3F68.6090901@arm.com>
+Date: Tue, 28 Mar 2017 11:57:52 +0100
+Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
+References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
+ <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <58DA41B0.8080203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Tyler,
 
-(CC: Leif and Achin who know more about how UEFI fits into this picture)
+On 21/03/17 22:47, Tyler Baicar wrote:
+> Currently external aborts are unsupported by the guest abort
+> handling. Add handling for SEAs so that the host kernel reports
+> SEAs which occur in the guest kernel.
 
-On 21/03/17 19:39, Christoffer Dall wrote:
-> On Tue, Mar 21, 2017 at 07:11:44PM +0000, James Morse wrote:
->> On 21/03/17 11:34, Christoffer Dall wrote:
->>> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
->>>> On 2017/3/20 23:08, James Morse wrote:
->>>>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
->>>>>>>>> In the RAS implementation, hardware pass the virtual SEI
->>>>>>>>> syndrome information through the VSESR_EL2, so set the virtual
->>>>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
->>>>>>>>> the guest OS
->>>>>
->>>>> How does this work with firmware first?
->>>>
->>>> I explained it in previous mail about the work flow.
->>>
->>> When delivering and reporting SEIs to the VM, should this happen
->>> directly to the OS running in the VM, or to the guest firmware (e.g.
->>> UEFI) running in the VM as well?
->>
->> 'firmware first' is the ACPI specs name for x86's BIOS or management-mode
->> handling the error. On arm64 we have multiple things called firmware, so the
->> name might be more confusing than helpful.
->>
->> As far as I understand it, firmware here refers to the secure-world and EL3.
->> Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
->> routing them to EL3 where secure platform specific firmware generates CPER records.
->> For a guest, Qemu takes the role of this EL3-firmware.
->>
-> Thanks for the clarification.  So UEFI in the VM would not be involved
-> in this at all?
+Looks good,
 
-On the host, part of UEFI is involved to generate the CPER records.
-In a guest?, I don't know.
-Qemu could generate the records, or drive some other component to do it.
-
-Leif and Achin are the people with the UEFI/bigger picture.
+Can we squash the APEI changes into the patch that added them? This would be one
+fewer patches that then need the ACPI maintainer to review.
 
 
-> My confusion here comes from not thinking about QEMU or KVM as firmware,
-> but as the machine, so it would be sort of like the functionality is
-> baked into hardware rather than firmware.
-> 
-> Note that to the VM, the environment will look like hardware without EL3
-> and without a secure world, so any software assuming there's something
-> 'hidden' behind the available non-secure modes must not decide to
-> disable features if discovering the lack of a secure world.
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 962616f..105b6ab 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -1406,6 +1407,24 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+>  		kvm_set_pfn_accessed(pfn);
+>  }
+>  
+> +static bool is_abort_synchronous(unsigned long fault_status) {
+
+I missed kvm_vcpu_dabt_isextabt() when I suggested we would need a helper (my
+fault). Can we use that instead?
+
+(my argument that the unused encodings are reserved doesn't hold if KVM is
+already doing this... )
+
+
+> @@ -1426,23 +1445,31 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	unsigned long hva;
+>  	bool is_iabt, write_fault, writable;
+>  	gfn_t gfn;
+> -	int ret, idx;
+> +	int ret, idx, sea_status = 1;
+> +
+> +	/* Check the stage-2 fault is trans. fault or write fault */
+> +	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+> +
+> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+> +
+> +	/* The host kernel will handle the synchronous external abort. There
+> +	 * is no need to pass the error into the guest.
+> +	 */
+> +	if (is_abort_synchronous(fault_status))
+> +		sea_status = handle_guest_sea((unsigned long)fault_ipa,
+> +				    kvm_vcpu_get_hsr(vcpu));
+
+
+Why not return from here if the error has been handled?
+
+You use sea_status to skip the next two things that KVM might do, but it goes on
+to try and process this, possibly calling user_mem_abort(), surely all this is
+unnecessary?
+
+
+>  
+>  	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
+> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
+>  		kvm_inject_vabt(vcpu);
+>  		return 1;
+>  	}
+>  
+> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+> -
+>  	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
+>  			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+>  
+> -	/* Check the stage-2 fault is trans. fault or write fault */
+> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>  	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+> -	    fault_status != FSC_ACCESS) {
+> +	    fault_status != FSC_ACCESS && sea_status) {
+>  		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>  			kvm_vcpu_trap_get_class(vcpu),
+>  			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
 
 
 Thanks,
