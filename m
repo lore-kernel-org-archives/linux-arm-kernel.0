@@ -1,32 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 11:22:59 +0200
-Subject: [PATCH v4 0/6] Pad retentions support for Exynos5433
-In-Reply-To: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170323080346eucas1p216eec41325d220774ecec05b397e83a6@eucas1p2.samsung.com>
- <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdY1snu8tNaUW4hR7zvMSMv10wUoeAnv28Ag=NJuHAS-Pw@mail.gmail.com>
+From: hgkr.klein@gmail.com (Helmut Klein)
+Date: Tue, 28 Mar 2017 11:25:42 +0200
+Subject: [PATCH v2,
+ 0/3] tty/serial: meson_uart: add support for core clock handling
+Message-ID: <20170328092545.4644-1-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 9:03 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+To be able to use the three none AO uarts of the s905 SoCs (uart_A, uart_B
+& uart_C), the core clock has to be enabled. (see chapter 22.3 of the
+public s905 data sheet) At least the u-boot of my s905 based media player
+(netxeon minimx) doesn't do this. so the driver must do it.
 
-> This patchset is a next step to add support for all power domains on
-> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
-> driver and Exynos LPASS MFD driver, which are needed to make the
-> platform ready for adding power domains support.
->
-> Patches in this patchset have runtime dependency. They are order in such
-> a way to make the changes bisectable (mfd lpass changes should be applied
-> after pinctrl patches). Other dependencies mentioned previously in v3 of
-> this patchset has been finally merged to v4.11-rc1.
->
-> Patches have been rebased on top of linux v4.11-rc3.
+This patch set does:
+- exposes the clock ids to the dtb
+- adds documentation for the dt-bindings of meson_uart
+- adds the core clock handling to the driver
 
-Pinctrl development is based on -rc1.
+The patchset is based on the branch master of the repository in [1]
 
-I expect Krzysztof to figure out and apply the patches to his Samsung pinctrl
-branch and forward to me, all looks OK to me.
+Changes since v1
+- use git to produce the patch set
+- added the clock ids for uart_B and uart_C
 
-Yours,
-Linus Walleij
+None of the available s905 dts use uart_A actively. So there is no patch
+for any of the existing dts files.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
+
+Helmut Klein (3):
+  tty/serial: meson_uart: expose CLKID_UARTx
+  tty/serial: meson_uart: add documentation for the dt-bindings
+  tty/serial: meson_uart: add the core clock handling to the driver
+
+ .../bindings/serial/amlogic,meson_uart.txt         | 25 ++++++++++++++++++++++
+ drivers/clk/meson/gxbb.h                           |  6 +++---
+ drivers/tty/serial/meson_uart.c                    | 10 +++++++++
+ include/dt-bindings/clock/gxbb-clkc.h              |  3 +++
+ 4 files changed, 41 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+
+--
+2.11.0
