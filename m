@@ -1,49 +1,57 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 29 Mar 2017 00:23:38 +0200
-Subject: [RFC 3/8] cpufreq: imx6q: Set max suspend_freq to avoid changes
- during suspend
-In-Reply-To: <45185440.SBt0mf6LXq@aspire.rjw.lan>
-References: <cover.1490199005.git.leonard.crestez@nxp.com>
- <1490731431.15830.9.camel@nxp.com> <45185440.SBt0mf6LXq@aspire.rjw.lan>
-Message-ID: <74548665.CVf2rD9Eyh@aspire.rjw.lan>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 28 Mar 2017 15:34:19 -0700
+Subject: [PATCH v4 0/3] arm64: usercopy: Implement stack frame object
+ validation
+In-Reply-To: <CAGXu5jJ9xis_X9qd-GxCM=oDDoynMrW=GZbfeOKKt_FpAuK83Q@mail.gmail.com>
+References: <20170216182917.19637-1-james.morse@arm.com>
+ <CAGXu5jJ9xis_X9qd-GxCM=oDDoynMrW=GZbfeOKKt_FpAuK83Q@mail.gmail.com>
+Message-ID: <CAGXu5jKhVzH9OB6QgGb1u0sbnFGn5J72FnzNeGo076f52Scn+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 28, 2017 10:50:50 PM Rafael J. Wysocki wrote:
-> On Tuesday, March 28, 2017 11:03:51 PM Leonard Crestez wrote:
-> > On Thu, 2017-03-23 at 10:04 +0530, Viresh Kumar wrote:
-> > > On 22-03-17, 18:53, Leonard Crestez wrote:
-> > > > If the cpufreq driver tries to modify voltage/freq during suspend/resume
-> > > > it might need to control an external PMIC via I2C or SPI but those
-> > > > devices might be already suspended.
-> > > > 
-> > > > To avoid this scenario we just increase cpufreq to highest setpoint
-> > > > before suspend. This issue can easily be triggered by ldo-bypass but in
-> > > > theory any regulator set_voltage call can end up having to modify
-> > > > external supply voltages.
-> > > > 
-> > > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > > > ---
-> > > >  drivers/cpufreq/imx6q-cpufreq.c | 2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > 
-> > > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > 
-> > The first couple of patches are obvious fixes despite being marked as
-> > RFC. It would be great if you could apply them to your tree separately
-> 
-> Why?
-> 
-> > from the rest of the series but I'm not sure what the process is here.
-> 
-> Well, you have to talk to me.
+On Thu, Feb 16, 2017 at 4:54 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
+>> Hi all,
+>>
+>> This version of Sahara's arch_within_stack_frames() series replaces the
+>> open-coded stack walker with a call to arm64's existing walker.
+>>
+>> Patch 2 can be tested independently with this change[0].
+>>
+>> lkdtm's use of unallocated stack regions is a separate problem, patch 3
+>> tries to address this.
+>>
+>> Sahara, it would be good to get your review of this!
+>> I'm afraid I omitted your patch-3 as it stopped the lkdtm test from working,
+>> I suspect its not tricking the compiler, but I haven't investigated.
+>>
+>>
+>> Thanks,
+>>
+>> James
+>>
+>> [0] Change to lkdtm to generate accesses that overlap stack frames.
+>> --------------%<--------------
+>> diff --git a/drivers/misc/lkdtm_usercopy.c b/drivers/misc/lkdtm_usercopy.c
+>> index 1dd611423d8b..fcbba3a14387 100644
+>> --- a/drivers/misc/lkdtm_usercopy.c
+>> +++ b/drivers/misc/lkdtm_usercopy.c
+>> @@ -57,7 +57,8 @@ static noinline void do_usercopy_stack(bool to_user, bool bad_frame)
+>>
+>>         /* This is a pointer to outside our current stack frame. */
+>>         if (bad_frame) {
+>> -               bad_stack = do_usercopy_stack_callee((uintptr_t)&bad_stack);
+>> +               bad_stack = __builtin_frame_address(0);
+>> +               bad_stack -= sizeof(good_stack)/2;
+>
+> Ah, sneaky, yeah, that'll work nicely.
+>
+> (Though it should likely get wrapped in a CONFIG_STACK_GROWSUP/DOWN test...)
 
-OK, so if I understand this correctly, you would like the patches ACKed by
-Viresh to be applied regardless of what happens to the rest of the series,
-right?
+Is this still in progress? Seemed like it was very close?
 
-In that case please resend them separately without the [RFC] tag and with
-the ACKs from Viresh.
+-Kees
 
-Thanks,
-Rafael
+-- 
+Kees Cook
+Pixel Security
