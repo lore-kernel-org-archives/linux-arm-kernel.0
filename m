@@ -1,152 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 28 Mar 2017 15:45:43 +0100
-Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
- interface
-In-Reply-To: <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
- <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170328144543.GA18046@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Mar 2017 15:48:23 +0100
+Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
+ multiple erratum detection methods
+In-Reply-To: <20170328143633.GC2123@mai>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+ <20170320174829.28182-7-marc.zyngier@arm.com> <20170322154114.GE30499@mai>
+ <a922484a-1bb0-cfd0-1996-fab026a4feae@arm.com> <20170323173030.GA24630@mai>
+ <5e8faa45-bb1b-fd9b-f34f-93ce5babb0a3@arm.com> <20170327075628.GE24630@mai>
+ <e0e0a3d7-2252-5fd6-3247-c128208fd9b9@arm.com> <20170328133438.GB2123@mai>
+ <ec5e673c-6d02-fc88-9913-b0f9261da05e@arm.com> <20170328143633.GC2123@mai>
+Message-ID: <ee4b5b59-e6ef-6f55-792c-6aa39d354adb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
-> On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
-> > The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-> > Posting") mandate non-posted configuration transactions. As further
-> > highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-> > Considerations for the Enhanced Configuration Access Mechanism"),
-> > through ECAM and ECAM-derivative configuration mechanism, the memory
-> > mapped transactions from the host CPU into Configuration Requests on the
-> > PCI express fabric may create ordering problems for software because
-> > writes to memory address are typically posted transactions (unless the
-> > architecture can enforce through virtual address mapping non-posted
-> > write transactions behaviour) but writes to Configuration Space are not
-> > posted on the PCI express fabric.
-> > 
-> > Current DT and ACPI host bridge controllers map PCI configuration space
-> > (ECAM and ECAM-derivative) into the virtual address space through
-> > ioremap() calls, that are non-cacheable device accesses on most
-> > architectures, but may provide "bufferable" or "posted" write semantics
-> > in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-> > to be buffered in the bus connecting the host CPU to the PCI fabric;
-> > this behaviour, as underlined in the PCIe specifications, may trigger
-> > transactions ordering rules and must be prevented.
-> > 
-> > Introduce a new generic and explicit API to create a memory
-> > mapping for ECAM and ECAM-derivative config space area that
-> > defaults to ioremap_nocache() (which should provide a sane default
-> > behaviour) but still allowing architectures on which ioremap_nocache()
-> > results in posted write transactions to override the function
-> > call with an arch specific implementation that complies with
-> > the PCI specifications for configuration transactions.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Richard Henderson <rth@twiddle.net>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Tony Luck <tony.luck@intel.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Ingo Molnar <mingo@redhat.com>
-> > Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
-> > ---
-> >  arch/alpha/include/asm/io.h | 1 +
-> >  arch/avr32/include/asm/io.h | 1 +
-> >  arch/frv/include/asm/io.h   | 1 +
-> >  arch/ia64/include/asm/io.h  | 1 +
-> >  arch/x86/include/asm/io.h   | 1 +
-> >  include/asm-generic/io.h    | 4 ++++
-> >  6 files changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/alpha/include/asm/io.h b/arch/alpha/include/asm/io.h
-> > index ff40491..27379ea 100644
-> > --- a/arch/alpha/include/asm/io.h
-> > +++ b/arch/alpha/include/asm/io.h
-> > @@ -300,6 +300,7 @@ static inline void __iomem * ioremap_nocache(unsigned long offset,
-> >  }
-> >  
-> >  #define ioremap_uc ioremap_nocache
-> > +#define ioremap_nopost ioremap_nocache
-> >  
-> >  static inline void iounmap(volatile void __iomem *addr)
-> >  {
-> > diff --git a/arch/avr32/include/asm/io.h b/arch/avr32/include/asm/io.h
-> > index f855646..3f1ced8 100644
-> > --- a/arch/avr32/include/asm/io.h
-> > +++ b/arch/avr32/include/asm/io.h
-> > @@ -298,6 +298,7 @@ extern void __iounmap(void __iomem *addr);
-> >  #define ioremap_wc ioremap_nocache
-> >  #define ioremap_wt ioremap_nocache
-> >  #define ioremap_uc ioremap_nocache
-> > +#define ioremap_nopost ioremap_nocache
-> >  
-> >  #define cached(addr) P1SEGADDR(addr)
-> >  #define uncached(addr) P2SEGADDR(addr)
-> > diff --git a/arch/frv/include/asm/io.h b/arch/frv/include/asm/io.h
-> > index 8062fc7..302fb8c 100644
-> > --- a/arch/frv/include/asm/io.h
-> > +++ b/arch/frv/include/asm/io.h
-> > @@ -290,6 +290,7 @@ static inline void __iomem *ioremap_fullcache(unsigned long physaddr, unsigned l
-> >  
-> >  #define ioremap_wc ioremap_nocache
-> >  #define ioremap_uc ioremap_nocache
-> > +#define ioremap_nopost ioremap_nocache
-> >  
-> >  extern void iounmap(void volatile __iomem *addr);
-> >  
-> > diff --git a/arch/ia64/include/asm/io.h b/arch/ia64/include/asm/io.h
-> > index 5de673a..70a4985 100644
-> > --- a/arch/ia64/include/asm/io.h
-> > +++ b/arch/ia64/include/asm/io.h
-> > @@ -434,6 +434,7 @@ static inline void __iomem * ioremap_cache (unsigned long phys_addr, unsigned lo
-> >  }
-> >  #define ioremap_cache ioremap_cache
-> >  #define ioremap_uc ioremap_nocache
-> > +#define ioremap_nopost ioremap_nocache
-> >  
-> >  
-> >  /*
-> > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-> > index 7afb0e2..50b292f 100644
-> > --- a/arch/x86/include/asm/io.h
-> > +++ b/arch/x86/include/asm/io.h
-> > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
-> >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
-> >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
-> >  #define ioremap_uc ioremap_uc
-> > +#define ioremap_nopost ioremap_nocache
+On 28/03/17 15:36, Daniel Lezcano wrote:
+> On Tue, Mar 28, 2017 at 03:07:52PM +0100, Marc Zyngier wrote:
 > 
-> These are all the same as the default from asm-generic.h.  Do we really
-> need these definitions in alpha, avr32, frv, ia64, x86?
+> [ ... ]
+> 
+>>>>> -bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+>>>>> -					 const void *arg)
+>>>>> +bool arch_timer_check_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+>>>>> +				  const void *arg)
+>>>>>  {
+>>>>> -	return cpus_have_cap((uintptr_t)wa->id);
+>>>>> +	return cpus_have_cap((uintptr_t)wa->id) | this_cpu_has_cap((uintptr_t)wa->id);
+>>>>
+>>>> Not quite. Here, you're making all capability-based errata to be be
+>>>> global (if a single CPU in the system has a capability, then by
+>>>> transitivity cpus_have_cap returns true). If that's a big-little system,
+>>>> you end-up applying the workaround to all CPUs, including those unaffected.
+>>>>
+>>>> I'd rather drop cpus_have_cap altogether and rely on individual CPU
+>>>> matching (since we don't have a need for a global capability erratum
+>>>> handling yet).
+>>>
+>>> Ok, thanks.
+>>
+>> Quick update. I've just implemented this, and found out that getting rid
+>> of local/global has an unfortunate effect:
+>>
+>> Since we only probe the global errata (using ACPI for example) on the
+>> boot CPU path, we lose propagation of the erratum across the secondary
+>> CPUs. One way of solving this is to convert the secondary boot path to
+>> be aware of DT vs ACPI vs detection method of the month. Which isn't
+>> easy, since by the time we boot secondary CPUs, we don't have the
+>> pointers to the various ACPI tables anymore. Also, assuming we were
+>> careful and saved the pointers, the tables may have been unmapped. Fun.
+> 
+> My proposal was supposed to prevent that. The detecion is done in the
+> subsystems, ACPI detects ACPI errata, DT detects DT errata and CPU detects CPU
+> errata. The drivers get the errata and enable the workaround. The id
+> association <-> errata self contains errata types (void *, char *, int). So
+> everything can be done in a CPU basis without local / global dance.
 
-Those arches do not include asm-generic.h (I suppose for a good reason)
-but a definition is needed anyway if we want code using ioremap_nopost()
-to be unconditional. This is one way of doing it, there are others not
-sure they are any better, I am open to suggestions.
+I'm sorry, but it feels like a Jumbo-Jet sized hammer to try and squash
+a fly (I'm staying away from the frozen shark metaphor here). You're
+willing to add a whole list of things with private ids that need
+matching to kill a flag? I don't think this buys us anything but extra
+complexity and another maintenance headache.
 
 Thanks,
-Lorenzo
 
-> >  extern void __iomem *ioremap_cache(resource_size_t offset, unsigned long size);
-> >  extern void __iomem *ioremap_prot(resource_size_t offset, unsigned long size, unsigned long prot_val);
-> > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > index 7ef015e..0e81938 100644
-> > --- a/include/asm-generic/io.h
-> > +++ b/include/asm-generic/io.h
-> > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
-> >  #endif /* CONFIG_GENERIC_IOMAP */
-> >  #endif /* CONFIG_HAS_IOPORT_MAP */
-> >  
-> > +#ifndef ioremap_nopost
-> > +#define ioremap_nopost ioremap_nocache
-> > +#endif
-> > +
-> >  #ifndef xlate_dev_kmem_ptr
-> >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
-> >  static inline void *xlate_dev_kmem_ptr(void *addr)
-> > -- 
-> > 2.10.0
-> > 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
