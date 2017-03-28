@@ -1,25 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 11:40:57 +0200
-Subject: [RFT PATCH 5/6] pinctrl: meson: use gpio-ranges from DT
-In-Reply-To: <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
-References: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com>
- <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CACRpkdYuj8-q-LbKYCH7dfLzF_10oViLwF3rjxULgmuw6AXYRg@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 28 Mar 2017 11:44:42 +0200
+Subject: [PATCH] arm64: dts: r8a7795: salvator-x: Add current sense amplifiers
+Message-ID: <1490694282-9439-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 5:27 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+Add device nodes for two Maxim max961x current sense amplifiers
+sensing the VDD_0.8V and DVFS_0.8V lines.
 
-> When trying to add a gpio-hog, we enter a weird loop where the gpio-ranges
-> is needed when gpiochip_add_data() is called but in the current implementation
-> the ranges are added from the driver afterwards.
->
-> A simple solution is to rely on the DR gpio-ranges attribute and remove the
-> call to gpiochip_add_pin_range().
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Based on a patch for r8a7796-salvator-x.dts by Jacopo Mondi.
 
-Patch applied.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Pending acceptance of the maxim,max9611 DT bindings.
 
-Yours,
-Linus Walleij
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index f25241921067dcef..dca1c180757a2b68 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -400,6 +400,24 @@
+ 	};
+ };
+ 
++&i2c4 {
++	status = "okay";
++
++	csa_vdd: adc at 7c {
++		compatible = "maxim,max9611";
++		reg = <0x7c>;
++
++		shunt-resistor-uohm = <5000>;
++	};
++
++	csa_dvfs: adc at 7f {
++		compatible = "maxim,max9611";
++		reg = <0x7f>;
++
++		shunt-resistor-uohm = <5000>;
++	};
++};
++
+ &rcar_sound {
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
+-- 
+2.7.4
