@@ -1,61 +1,54 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 28 Mar 2017 10:44:48 -0600
-Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <5c7f6092-9358-08ac-5341-2364637c2008@huawei.com>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
- <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
- <5c7f6092-9358-08ac-5341-2364637c2008@huawei.com>
-Message-ID: <35db9a6e-7ae3-3326-db1c-5cfff9ea27f3@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Mar 2017 17:47:54 +0100
+Subject: [RFC 4/8] regulator: core: Check enabling bypass respects
+ constraints
+In-Reply-To: <1490704781.3546.57.camel@nxp.com>
+References: <cover.1490199005.git.leonard.crestez@nxp.com>
+ <1edff9bc610969b0c53fa1080d5db021c8e00b2d.1490199005.git.leonard.crestez@nxp.com>
+ <20170324125212.vikgekqxsnu7htzl@sirena.org.uk>
+ <1490704781.3546.57.camel@nxp.com>
+Message-ID: <20170328164754.z2c2ttovs3sxbcos@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Mar 28, 2017 at 03:39:41PM +0300, Leonard Crestez wrote:
+> On Fri, 2017-03-24 at 12:52 +0000, Mark Brown wrote:
 
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.
 
-On 3/28/2017 3:53 AM, gengdongjiu wrote:
-> Hi,
->
-> On 2017/3/22 6:47, Tyler Baicar wrote:
->> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
->> +
->> +	/* The host kernel will handle the synchronous external abort. There
->> +	 * is no need to pass the error into the guest.
->> +	 */
->> +	if (is_abort_synchronous(fault_status))
->> +		sea_status = handle_guest_sea((unsigned long)fault_ipa,
->> +				    kvm_vcpu_get_hsr(vcpu));
->>   
->>   	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
->> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
->> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
->>   		kvm_inject_vabt(vcpu);
->>   		return 1;
->>   	}
->         After the host kernel correctly handle the synchronous external abort, the sea_status
->         will return 0, so the code logical will be continue go-no, whether it is better directly return
->         after correctly handle the SEA? such as below.
->
-> 	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
->    		kvm_inject_vabt(vcpu);
->    		return 1;
->    	} else
->                  return 1;
-Yes, I will return after successful SEA handling in the next patch set.
+> > to the supply.??Usually bypass is used for low power retention modes
+> > with different settings to those used in normal operation that wouldn't
+> > be desired in normal operation, if we were going to have constraints for
+> > this I'd expect a separate set used during bypass.
 
-Thanks,
-Tyler
->
->>   
->> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
->> -
->>   	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
->>   			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
->>   
->> -	/* Check the stage-2 fault is trans. fault or write fault */
->> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
->>   	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+> In this particular case it's not possible to set constraints on the parent
+> regulator so that both ldo-enable and ldo-bypass modes work. The maximum allowed
+> voltage for ldo-bypass is lower than the minimum required to support the chip at
+> max frequency wit ldo-enable.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+If things are really so sensitive that you can't bypass without lowering
+the voltage then it's hard to see how you can safely transition into and
+out of bypass mode.  
+
+> I'm not sure I understand why you are against applying constraints to the parent
+> when in bypass mode, it seems like the obvious thing to do if you want to
+> support flexible configuration. The check I introduced is probably not enough to
+> cover all cases, for example it would still be possible to explicitly change
+> parent voltage afterwards.
+
+To repeat what I said previously the whole point of bypassing is to not
+do regulation and generally the constraints in the unregulated idle case
+are substantially more relaxed.  This would break use cases relying on
+the existing behaviour which wouldn't expect to affect the parent
+voltage at all, either stopping things working or making them less
+efficient by needlessly regulating the voltage down which defeats the
+main point of bypassing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170328/d6a45c00/attachment.sig>
