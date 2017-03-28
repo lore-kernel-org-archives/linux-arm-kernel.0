@@ -1,126 +1,27 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Tue, 28 Mar 2017 13:30:39 -0600
-Subject: [PATCH V14 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1490729440-32591-10-git-send-email-tbaicar@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 28 Mar 2017 21:33:18 +0200
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: change switch2 label
+In-Reply-To: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
+References: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
+Message-ID: <20170328193318.GG2268@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there are trace events for the various RAS
-errors with the exception of ARM processor type errors.
-Add a new trace event for such errors so that the user
-will know when they occur. These trace events are
-consistent with the ARM processor error section type
-defined in UEFI 2.6 spec section N.2.4.4.
+On Tue, Mar 28, 2017 at 03:24:26PM -0400, Vivien Didelot wrote:
+> Rename the switch2 at 0 label of the switch2 node to switch at 0 to respect
+> the general unit at address DTS rule, and be consistent with the other
+> switch nodes of the DTS file.
+> 
+> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
----
- drivers/acpi/apei/ghes.c    |  8 +++++++-
- drivers/firmware/efi/cper.c |  1 +
- drivers/ras/ras.c           |  1 +
- include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 54 insertions(+), 1 deletion(-)
+Hi Vivien
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 3ecbacc..230b095 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -515,7 +515,13 @@ static void ghes_do_proc(struct ghes *ghes,
- 		}
- #endif
- #ifdef CONFIG_RAS
--		else if (trace_unknown_sec_event_enabled()) {
-+		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
-+			 trace_arm_event_enabled()) {
-+			struct cper_sec_proc_arm *arm_err;
-+
-+			arm_err = acpi_hest_generic_data_payload(gdata);
-+			trace_arm_event(arm_err);
-+		} else if (trace_unknown_sec_event_enabled()) {
- 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
- 			trace_unknown_sec_event(&sec_type,
- 					fru_id, fru_text, sec_sev,
-diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index d263bc8..37a39af 100644
---- a/drivers/firmware/efi/cper.c
-+++ b/drivers/firmware/efi/cper.c
-@@ -35,6 +35,7 @@
- #include <linux/printk.h>
- #include <linux/bcd.h>
- #include <acpi/ghes.h>
-+#include <ras/ras_event.h>
- 
- #define INDENT_SP	" "
- 
-diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-index fb2500b..8ba5a94 100644
---- a/drivers/ras/ras.c
-+++ b/drivers/ras/ras.c
-@@ -28,3 +28,4 @@ static int __init ras_init(void)
- #endif
- EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
- EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-+EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 5861b6f..13befad 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -162,6 +162,51 @@
- );
- 
- /*
-+ * ARM Processor Events Report
-+ *
-+ * This event is generated when hardware detects an ARM processor error
-+ * has occurred. UEFI 2.6 spec section N.2.4.4.
-+ */
-+TRACE_EVENT(arm_event,
-+
-+	TP_PROTO(const struct cper_sec_proc_arm *proc),
-+
-+	TP_ARGS(proc),
-+
-+	TP_STRUCT__entry(
-+		__field(u64, mpidr)
-+		__field(u64, midr)
-+		__field(u32, running_state)
-+		__field(u32, psci_state)
-+		__field(u8, affinity)
-+	),
-+
-+	TP_fast_assign(
-+		if (proc->validation_bits & CPER_ARM_VALID_AFFINITY_LEVEL)
-+			__entry->affinity = proc->affinity_level;
-+		else
-+			__entry->affinity = ~0;
-+		if (proc->validation_bits & CPER_ARM_VALID_MPIDR)
-+			__entry->mpidr = proc->mpidr;
-+		else
-+			__entry->mpidr = 0ULL;
-+		__entry->midr = proc->midr;
-+		if (proc->validation_bits & CPER_ARM_VALID_RUNNING_STATE) {
-+			__entry->running_state = proc->running_state;
-+			__entry->psci_state = proc->psci_state;
-+		} else {
-+			__entry->running_state = ~0;
-+			__entry->psci_state = ~0;
-+		}
-+	),
-+
-+	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
-+		  "running state: %d; PSCI state: %d",
-+		  __entry->affinity, __entry->mpidr, __entry->midr,
-+		  __entry->running_state, __entry->psci_state)
-+);
-+
-+/*
-  * Unknown Section Report
-  *
-  * This event is generated when hardware detected a hardware
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+You might need to rebase this onto
+
+git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+
+There have been a few other changes to the ZII dts files this cycle.
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+    Andrew
