@@ -1,93 +1,81 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Mar 2017 11:57:52 +0100
-Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
- <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58DA41B0.8080203@arm.com>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Tue, 28 Mar 2017 14:04:25 +0300
+Subject: [PATCH] ATM: dts: at91: sama5d2_xplained: add pwm controller
+In-Reply-To: <20170223084241.6eqm5jxe4t7fpn6a@piout.net>
+References: <1487838778-13473-1-git-send-email-claudiu.beznea@microchip.com>
+ <20170223084241.6eqm5jxe4t7fpn6a@piout.net>
+Message-ID: <60c37963-509f-7764-9554-520694294909@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hi Alexandre,
 
-On 21/03/17 22:47, Tyler Baicar wrote:
-> Currently external aborts are unsupported by the guest abort
-> handling. Add handling for SEAs so that the host kernel reports
-> SEAs which occur in the guest kernel.
+Sorry for the late response, I am seeing just now your question bellow.
 
-Looks good,
-
-Can we squash the APEI changes into the patch that added them? This would be one
-fewer patches that then need the ACPI maintainer to review.
+Thank you,
+Claudiu Beznea
 
 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 962616f..105b6ab 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1406,6 +1407,24 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->  		kvm_set_pfn_accessed(pfn);
->  }
->  
-> +static bool is_abort_synchronous(unsigned long fault_status) {
+On 23.02.2017 10:42, Alexandre Belloni wrote:
+> Hi,
+>
+> There is a typo in your subject, please fix.
+>
+> On 23/02/2017 at 10:32:58 +0200, Claudiu Beznea wrote:
+>> Add pwm controller bindings for sam5d2_xplained
+>> and enable it.
+>>
+>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>> ---
+>>  arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi | 4 ++++
+>>  arch/arm/boot/dts/sama5d2.dtsi                      | 8 ++++++++
+>>  2 files changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
+>> index 9fc270f..493ea29 100644
+>> --- a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
+>> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
+>> @@ -318,6 +318,10 @@
+>>  				};
+>>  			};
+>>  
+>> +			pwm0: pwm at f802c000 {
+>> +				status = "okay";
+>> +			};
+>> +
+>>  			flx0: flexcom at f8034000 {
+>>  				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+>>  				status = "disabled"; /* conflict with ISC_D2 & ISC_D3 data pins */
+>> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+>> index cd459e8..e88785e 100644
+>> --- a/arch/arm/boot/dts/sama5d2.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+>> @@ -1098,6 +1098,14 @@
+>>  				status = "disabled";
+>>  			};
+>>  
+>> +			pwm0: pwm at f802c000 {
+>> +				compatible = "atmel,sama5d2-pwm";
+> This compatible is not documented and is not used in any driver. Is that
+> really working?
 
-I missed kvm_vcpu_dabt_isextabt() when I suggested we would need a helper (my
-fault). Can we use that instead?
+At the moment I send this patch another driver patch was send
+to used this device tree bindings and also to document it.
+Meanwhile you reviewed also that other patch.
 
-(my argument that the unused encodings are reserved doesn't hold if KVM is
-already doing this... )
+Please let me know if you want to send again this DT patch since
+I didn't yet receive any inputs its v2.
 
-
-> @@ -1426,23 +1445,31 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	unsigned long hva;
->  	bool is_iabt, write_fault, writable;
->  	gfn_t gfn;
-> -	int ret, idx;
-> +	int ret, idx, sea_status = 1;
-> +
-> +	/* Check the stage-2 fault is trans. fault or write fault */
-> +	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-> +
-> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
-> +
-> +	/* The host kernel will handle the synchronous external abort. There
-> +	 * is no need to pass the error into the guest.
-> +	 */
-> +	if (is_abort_synchronous(fault_status))
-> +		sea_status = handle_guest_sea((unsigned long)fault_ipa,
-> +				    kvm_vcpu_get_hsr(vcpu));
-
-
-Why not return from here if the error has been handled?
-
-You use sea_status to skip the next two things that KVM might do, but it goes on
-to try and process this, possibly calling user_mem_abort(), surely all this is
-unnecessary?
-
-
->  
->  	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
-> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
-> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
->  		kvm_inject_vabt(vcpu);
->  		return 1;
->  	}
->  
-> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
-> -
->  	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
->  			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
->  
-> -	/* Check the stage-2 fault is trans. fault or write fault */
-> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
->  	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-> -	    fault_status != FSC_ACCESS) {
-> +	    fault_status != FSC_ACCESS && sea_status) {
->  		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->  			kvm_vcpu_trap_get_class(vcpu),
->  			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-
-
-Thanks,
-
-James
+>
+>> +				reg = <0xf802c000 0x4000>;
+>> +				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 7>;
+>> +				#pwm-cells = <3>;
+>> +				clocks = <&pwm_clk>;
+>> +			};
+>> +
+>>  			sfr: sfr at f8030000 {
+>>  				compatible = "atmel,sama5d2-sfr", "syscon";
+>>  				reg = <0xf8030000 0x98>;
+>> -- 
+>> 2.7.4
+>>
