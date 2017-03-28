@@ -1,51 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Mar 2017 15:53:26 +0100
-Subject: [PATCH v22 00/11] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <CADyBb7vddnQ4TZXaem3q=+v=vC41J7O4cVsokn04S2jGGU8veA@mail.gmail.com>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <1cc5a994-0af6-79ea-930d-44b3fc789427@jonmasters.org>
- <CADyBb7ujZKDF0aUJZRUN81jor04mZ-V5ESWScAjaxoHQUeVFSA@mail.gmail.com>
- <20170328130552.GA8643@leverpostej>
- <CADyBb7vddnQ4TZXaem3q=+v=vC41J7O4cVsokn04S2jGGU8veA@mail.gmail.com>
-Message-ID: <20170328145325.GD8643@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 28 Mar 2017 15:55:02 +0100
+Subject: [PATCH] arm64: tegra: Add CPU and PSCI nodes for NVIDIA Tegra210
+ platforms
+In-Reply-To: <1490701718-16571-1-git-send-email-jonathanh@nvidia.com>
+References: <1490701718-16571-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <bf527c4b-f17c-bfcf-e7fa-dab64b131996@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Mar 28, 2017 at 10:29:10PM +0800, Fu Wei wrote:
-> On 28 March 2017 at 21:05, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Sorry for the delay; I have not had the time to focus on this as I would
-> > like to. I'm happy with patches 1-4, but from patch 5 onwards, there's
-> > one change I'd like to see.
-> >
-> > I'd prefer that mmio timer frame rame N was always stored at
-> > arch_timer_mem::frame[N], rather than arch_timer_mem::frame[] being in
-> > an arbitrary order. That will make arch_timer_mem_frame::frame_nr
-> > redundant.
-> >
-> > To allow arch_timer_mem::frame[] this to be sparse, I'm happy to have a
-> > bool arch_timer_mem_frame::valid field that we set when probing each
-> > frame. Then we don't need arch_timer_mem::num_frames.
-> >
-> > This will make iterating over the frames far less confusing, and makes
-> > it simple to detect when a frame number is erroneously reused.
-> >
-> > Otherwise, I'm largely happy to pick the rest and apply any fixups
-> > myself.
+
+On 28/03/17 12:48, Jon Hunter wrote:
+> Add the CPU and PSCI nodes for the NVIDIA Tegra210 platforms so that
+> all CPUs can be enabled on boot. This assumes that the PSCI firmware
+> has been loaded during the initial bootstrap on the device before the
+> kernel starts (which is typically the case for these platforms). The
+> PSCI firmware version is set to v0.2 which aligns with the current
+> shipping version for Tegra.
 > 
-> Great thanks for your feedback!
-> I will follow your suggestion to improve my patches, then post it in a day.
+> Reported-by: Martin Michlmayr <tbm@cyrius.com>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 23 +++++++++++++++++++++++
+>  arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi | 24 ++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+> index 906fb836d241..de1696c28140 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+> @@ -296,6 +296,29 @@
+>  		};
+>  	};
+>  
+> +	cpus {
+> +		cpu at 0 {
+> +			enable-method = "psci";
 
-Thanks, that is much appreciated.
+Is some firmware expected to populate other required properties ?
 
-> So I will rebase my patchset on arch-timer/gtdt branch of your REPO
-> https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arch-timer/gtdt
+If yes, why not populate everything in the firmware ?
 
-Yes please! The current HEAD should be:
+If no, how does it even boot secondaries without the "reg" property
+that usually contains MPIDR.
 
-ebbfe8889cffa12f ("clocksource: arm_arch_timer: move arch_timer_needs_of_probing into DT init call").
-
-Thanks,
-Mark.
+-- 
+Regards,
+Sudeep
