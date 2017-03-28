@@ -1,81 +1,31 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 28 Mar 2017 21:22:58 +0200
-Subject: [RESEND PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c
- binding
-In-Reply-To: <1490694612.18582.11.camel@mhfsdcap03>
-References: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
- <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
- <20170322090543.sxacnddn2o7stjnq@ninjato>
- <1490694612.18582.11.camel@mhfsdcap03>
-Message-ID: <20170328192258.GA4525@katana>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Tue, 28 Mar 2017 15:24:26 -0400
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: change switch2 label
+Message-ID: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 05:50:12PM +0800, Jun Gao wrote:
-> On Wed, 2017-03-22 at 10:05 +0100, Wolfram Sang wrote:
-> > On Thu, Mar 09, 2017 at 11:13:04AM +0800, Jun Gao wrote:
-> > > From: Jun Gao <jun.gao@mediatek.com>
-> > > 
-> > > Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
-> > > modify i2c driver.
-> > > 
-> > > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > 
-> > There is still the issue which Matthias Brugger pointed out on January,
-> > 24th: you need to describe the fallback compatibles.
-> > 
-> 
-> IMHO the value under compatible are just inputs which can be accepted.
-> It's little strange to add fallback information in binding. Some other
-> bindings do not describe so detailedly.
-> Is it OK to make binding as minimum standard?
-> If we describe it very detailedly, we will have to modify binding if
-> there are some changes for mt2701.
+Rename the switch2 at 0 label of the switch2 node to switch at 0 to respect
+the general unit at address DTS rule, and be consistent with the other
+switch nodes of the DTS file.
 
-My reading of the below is that I could simply use "mediatek,mt2701-i2c"
-as compatible and things will work. But it won't, we don't have that in
-the driver IIRC. So, we need a fallback for that to work.
+Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+---
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Rob, could you give some suggestions?  Thanks!
-
-Would be welcome, yes. I lost track what the preferred solution is.
-
-> 
-> > > ---
-> > >  .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
-> > >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > > index 0ce6fa3..27dbbf9 100644
-> > > --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> > > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
-> > >  
-> > >  Required properties:
-> > >    - compatible: value should be either of the following.
-> > > -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-> > > -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-> > > -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> > > -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> > > -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-> > > +	"mediatek,mt2701-i2c"
-> > > +	"mediatek,mt6577-i2c"
-> > > +	"mediatek,mt6589-i2c"
-> > > +	"mediatek,mt8127-i2c"
-> > > +	"mediatek,mt8135-i2c"
-> > > +	"mediatek,mt8173-i2c"
-> > >    - reg: physical base address of the controller and dma base, length of memory
-> > >      mapped region.
-> > >    - interrupts: interrupt number to the cpu.
-> > > -- 
-> > > 1.7.9.5
-> > > 
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170328/b09df465/attachment.sig>
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index 7940408838df..5a93f2d875b1 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -239,7 +239,7 @@
+ 			#size-cells = <0>;
+ 			reg = <4>;
+ 
+-			switch2: switch2 at 0 {
++			switch2: switch at 0 {
+ 				compatible = "marvell,mv88e6085";
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-- 
+2.12.1
