@@ -1,62 +1,56 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 28 Mar 2017 14:34:31 -0700
-Subject: [PATCH v2 8/8] bus: brcmstb_gisb: update to support new revision
-In-Reply-To: <20170328213431.10904-1-opendmb@gmail.com>
-References: <20170328213431.10904-1-opendmb@gmail.com>
-Message-ID: <20170328213431.10904-9-opendmb@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Mar 2017 22:39:48 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+ <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
+ <20170323105727.GA2441@red-moon>
+ <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+Message-ID: <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 7278 introduces a new version of this core.  This
-commit adds support for that revision.
+On 28 March 2017 at 22:27, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Hi Lorenzo,
+>
+> On 3/23/2017 6:57 AM, Lorenzo Pieralisi wrote:
+>>> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
+>>> (or the legacy PCI bios) performed the resource assignment already.
+>>> One could argue that this is equally the case when running arm64 in
+>>> ACPI mode, but in general, you cannot assume the presence of firmware
+>>> on ARM/arm64 that has already taken care of this, and so the state of
+>>> the BARs has to be presumed invalid.
+>> The story is a bit more convoluted than that owing to x86 (and other
+>> arches) legacy.
+>>
+>> x86 tries to claim all PCI resources (in two passes - first enabled
+>> devices, second disabled devices) and that predates ACPI/UEFI.
+>>
+>> Mind, x86 reassign resources that can't be claimed too, the only
+>> difference with ARM64 is that, for the better or the worse, we
+>> have decided not to claim the FW PCI set-up on ARM64 even if it
+>> is sane, we do not even try, it was a deliberate choice.
+>>
+>> This patch should be harmless on x86 since if the FB PCI BAR is set
+>> up sanely, claiming it again should be a nop (to be checked).
+>>
+>> For all the talk about PCI being arch agnostic as I said manifold
+>> times before, that's just theory. In practice different arches
+>> treat PCI FW set-up differently, it would be ideal to make them
+>> uniform but legacy is huge and there is a massive risk of triggering
+>> regressions, it is no mean feat (if achievable at all).
+>
+> Can we explore having a uniform behavior across ALL ACPI bases systems
+> by trying to reuse the resources assigned by firmware first and reassign
+> them only if something is wrong?
+>
+> There are protocols like hotplug reservation in UEFI. It looks like Linux
+> is not honoring any of these protocols by being too smart.
+>
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt |  3 ++-
- drivers/bus/brcmstb_gisb.c                              | 10 ++++++++++
- 2 files changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-index 1eceefb20f01..8a6c3c2e58fe 100644
---- a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-+++ b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-@@ -3,7 +3,8 @@ Broadcom GISB bus Arbiter controller
- Required properties:
- 
- - compatible:
--    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for 28nm chips
-+    "brcm,bcm7278-gisb-arb" for V7 28nm chips
-+    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for other 28nm chips
-     "brcm,bcm7435-gisb-arb" for newer 40nm chips
-     "brcm,bcm7400-gisb-arb" for older 40nm chips and all 65nm chips
-     "brcm,bcm7038-gisb-arb" for 130nm chips
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 774729002b8c..6c3b0dda75f2 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -65,6 +65,15 @@ static const int gisb_offsets_bcm7038[] = {
- 	[ARB_ERR_CAP_MASTER]	= -1,
- };
- 
-+static const int gisb_offsets_bcm7278[] = {
-+	[ARB_TIMER]		= 0x008,
-+	[ARB_ERR_CAP_CLR]	= 0x7f8,
-+	[ARB_ERR_CAP_HI_ADDR]	= -1,
-+	[ARB_ERR_CAP_ADDR]	= 0x7e0,
-+	[ARB_ERR_CAP_STATUS]	= 0x7f0,
-+	[ARB_ERR_CAP_MASTER]	= 0x7f4,
-+};
-+
- static const int gisb_offsets_bcm7400[] = {
- 	[ARB_TIMER]		= 0x00c,
- 	[ARB_ERR_CAP_CLR]	= 0x0c8,
-@@ -328,6 +337,7 @@ static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
- 	{ .compatible = "brcm,bcm7445-gisb-arb", .data = gisb_offsets_bcm7445 },
- 	{ .compatible = "brcm,bcm7435-gisb-arb", .data = gisb_offsets_bcm7435 },
- 	{ .compatible = "brcm,bcm7400-gisb-arb", .data = gisb_offsets_bcm7400 },
-+	{ .compatible = "brcm,bcm7278-gisb-arb", .data = gisb_offsets_bcm7278 },
- 	{ .compatible = "brcm,bcm7038-gisb-arb", .data = gisb_offsets_bcm7038 },
- 	{ },
- };
--- 
-2.12.0
+Could you be more specific? Which protocol do you mean exactly, and
+how does not reusing resources interfere with it?
