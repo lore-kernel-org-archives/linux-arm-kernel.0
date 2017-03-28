@@ -1,30 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 11:19:31 +0200
-Subject: [PATCH v4 4/4] pinctrl: rockchip: avoid hardirq-unsafe functions
- in irq_chip
-In-Reply-To: <20170323105931.10455-5-john@metanate.com>
-References: <20170323105931.10455-1-john@metanate.com>
- <20170323105931.10455-5-john@metanate.com>
-Message-ID: <CACRpkdYy9cygGCYJcWQiO+iv2TSwphBxiiShsE4gWPUgM9z67A@mail.gmail.com>
+Date: Tue, 28 Mar 2017 11:22:59 +0200
+Subject: [PATCH v4 0/6] Pad retentions support for Exynos5433
+In-Reply-To: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170323080346eucas1p216eec41325d220774ecec05b397e83a6@eucas1p2.samsung.com>
+ <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CACRpkdY1snu8tNaUW4hR7zvMSMv10wUoeAnv28Ag=NJuHAS-Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:59 AM, John Keeping <john@metanate.com> wrote:
+On Thu, Mar 23, 2017 at 9:03 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-> With real-time preemption, regmap functions cannot be used in the
-> implementation of irq_chip since they use spinlocks which may sleep.
+> This patchset is a next step to add support for all power domains on
+> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
+> driver and Exynos LPASS MFD driver, which are needed to make the
+> platform ready for adding power domains support.
 >
-> Move the setting of the mux for IRQs to an irq_bus_sync_unlock handler
-> where we are allowed to sleep.
+> Patches in this patchset have runtime dependency. They are order in such
+> a way to make the changes bisectable (mfd lpass changes should be applied
+> after pinctrl patches). Other dependencies mentioned previously in v3 of
+> this patchset has been finally merged to v4.11-rc1.
 >
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> v3: unchanged
-> v2: unchanged
+> Patches have been rebased on top of linux v4.11-rc3.
 
-Patch applied.
+Pinctrl development is based on -rc1.
+
+I expect Krzysztof to figure out and apply the patches to his Samsung pinctrl
+branch and forward to me, all looks OK to me.
 
 Yours,
 Linus Walleij
