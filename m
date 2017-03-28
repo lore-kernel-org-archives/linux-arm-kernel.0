@@ -1,30 +1,29 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 28 Mar 2017 09:33:21 +0000
-Subject: [PATCH 06/16] drivers, net, mlx5: convert mlx5_cq.refcount from
- atomic_t to refcount_t
-In-Reply-To: <1490691403-4016-7-git-send-email-elena.reshetova@intel.com>
-References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
- <1490691403-4016-7-git-send-email-elena.reshetova@intel.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFFBE8AF@AcuExch.aculab.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Mar 2017 11:34:29 +0200
+Subject: [PATCH] MAINTAINERS: pinctrl: Add git tree to Samsung pinctrl
+ entry
+In-Reply-To: <20170320164851.5999-1-krzk@kernel.org>
+References: <20170320164851.5999-1-krzk@kernel.org>
+Message-ID: <CACRpkdbTOOjC-DKWn85iO_VwZNOvbcK1ATSQdq8Ri8H0JxVTAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Elena Reshetova
-> Sent: 28 March 2017 09:57
-> 
-> refcount_t type and corresponding API should be
-> used instead of atomic_t when the variable is used as
-> a reference counter. This allows to avoid accidental
-> refcounter overflows that might lead to use-after-free
-> situations.
+On Mon, Mar 20, 2017 at 5:48 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 
-I can't help feeling that you ought to find a scheme
-that will detect extra decrements and extra increments
-before the counter wraps 32 bits.
+> Add a Git tree on @kernel.org for maintaining the Samsung pinctrl
+> drivers.  The tree will be maintained in a shared model between current
+> Samsung pinctrl maintainers.  Pull requests will be going to Linus
+> Walleij.
+>
+> Also add the patchwork for linux-samsung-soc mailing list which will be
+> used for handling the patches.
+>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-If an extra reference is requested every 100us it takes 4.8 days
-for the counter to increment back to zero.
-Simple tests aren't doing to find that - but it can easily happen
-on a system that is running for several years.
+Patch applied with the ACKs.
 
-	David
+Yours,
+Linus Walleij
