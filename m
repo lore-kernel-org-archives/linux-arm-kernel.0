@@ -1,90 +1,55 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 14:46:09 +0200
-Subject: [PATCH v2 8/9] arm: KVM: Make unexpected register accesses
- inject an undef
-In-Reply-To: <20170327160345.12402-9-marc.zyngier@arm.com>
+Date: Tue, 28 Mar 2017 14:46:14 +0200
+Subject: [PATCH v2 9/9] arm: KVM: Treat CP15 accessors returning false as
+ successful
+In-Reply-To: <20170327160345.12402-10-marc.zyngier@arm.com>
 References: <20170327160345.12402-1-marc.zyngier@arm.com>
- <20170327160345.12402-9-marc.zyngier@arm.com>
-Message-ID: <20170328124609.GH31156@cbox>
+ <20170327160345.12402-10-marc.zyngier@arm.com>
+Message-ID: <20170328124614.GI31156@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:03:44PM +0100, Marc Zyngier wrote:
-> Reads from write-only system registers are generally confined to
-> EL1 and not propagated to EL2 (that's what the architecture
-> mantates). In order to be sure that we have a sane behaviour
-> even in the unlikely event that we have a broken system, we still
-> handle it in KVM. Same goes for write to RO registers.
+On Mon, Mar 27, 2017 at 05:03:45PM +0100, Marc Zyngier wrote:
+> Instead of considering that a CP15 accessor has failed when
+> returning false, let's consider that it is *always* successful
+> (after all, we won't stand for an incomplete emulation).
 > 
-> In that case, let's inject an undef into the guest.
+> The return value now simply indicates whether we should skip
+> the instruction (because it has now been emulated), or if we
+> should leave the PC alone if the emulation has injected an
+> exception.
 > 
 
 Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/kvm/coproc.c | 18 ++++++++++++++++++
->  arch/arm/kvm/coproc.h | 18 ------------------
->  2 files changed, 18 insertions(+), 18 deletions(-)
+>  arch/arm/kvm/coproc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
 > diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 3e5e4194ef86..519aac12b365 100644
+> index 519aac12b365..2c14b69511e9 100644
 > --- a/arch/arm/kvm/coproc.c
 > +++ b/arch/arm/kvm/coproc.c
-> @@ -40,6 +40,24 @@
->   * Co-processor emulation
->   *****************************************************************************/
->  
-> +static bool write_to_read_only(struct kvm_vcpu *vcpu,
-> +			       const struct coproc_params *params)
-> +{
-> +	WARN_ONCE(1, "CP15 write to read-only register\n");
-> +	print_cp_instr(params);
-> +	kvm_inject_undefined(vcpu);
-> +	return false;
-> +}
+> @@ -520,15 +520,15 @@ static int emulate_cp15(struct kvm_vcpu *vcpu,
+>  		if (likely(r->access(vcpu, params, r))) {
+>  			/* Skip instruction, since it was emulated */
+>  			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+> -			return 1;
+>  		}
+> -		/* If access function fails, it should complain. */
+>  	} else {
+> +		/* If access function fails, it should complain. */
+>  		kvm_err("Unsupported guest CP15 access at: %08lx\n",
+>  			*vcpu_pc(vcpu));
+>  		print_cp_instr(params);
+> +		kvm_inject_undefined(vcpu);
+>  	}
+> -	kvm_inject_undefined(vcpu);
 > +
-> +static bool read_from_write_only(struct kvm_vcpu *vcpu,
-> +				 const struct coproc_params *params)
-> +{
-> +	WARN_ONCE(1, "CP15 read to write-only register\n");
-> +	print_cp_instr(params);
-> +	kvm_inject_undefined(vcpu);
-> +	return false;
-> +}
-> +
->  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
->  static u32 cache_levels;
->  
-> diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
-> index eef1759c2b65..3a41b7d1eb86 100644
-> --- a/arch/arm/kvm/coproc.h
-> +++ b/arch/arm/kvm/coproc.h
-> @@ -81,24 +81,6 @@ static inline bool read_zero(struct kvm_vcpu *vcpu,
->  	return true;
+>  	return 1;
 >  }
 >  
-> -static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
-> -				      const struct coproc_params *params)
-> -{
-> -	kvm_debug("CP15 write to read-only register at: %08lx\n",
-> -		  *vcpu_pc(vcpu));
-> -	print_cp_instr(params);
-> -	return false;
-> -}
-> -
-> -static inline bool read_from_write_only(struct kvm_vcpu *vcpu,
-> -					const struct coproc_params *params)
-> -{
-> -	kvm_debug("CP15 read to write-only register at: %08lx\n",
-> -		  *vcpu_pc(vcpu));
-> -	print_cp_instr(params);
-> -	return false;
-> -}
-> -
->  /* Reset functions */
->  static inline void reset_unknown(struct kvm_vcpu *vcpu,
->  				 const struct coproc_reg *r)
 > -- 
 > 2.11.0
 > 
