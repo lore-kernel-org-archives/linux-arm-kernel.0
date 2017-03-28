@@ -1,113 +1,90 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Tue, 28 Mar 2017 09:37:15 -0700
-Subject: [PATCH] drm/rockchip: fix Kconfig dependencies
-In-Reply-To: <20170328101654.73624-1-arnd@arndb.de>
-References: <20170328101654.73624-1-arnd@arndb.de>
-Message-ID: <CABXOdTfAruXx0NPO3v9HA9biDd9gz8bGjQP16s9HP8Q3ihVqwA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 28 Mar 2017 09:38:35 -0700
+Subject: [PATCH] ARM: orion5x: only call into phylib when available
+In-Reply-To: <20170328101606.53008-1-arnd@arndb.de>
+References: <20170328101606.53008-1-arnd@arndb.de>
+Message-ID: <328515b4-e546-f66b-aecb-ab2c6168c56d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 3:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> A bug that I had fixed earlier just came back, with CONFIG_EXTCON=m,
-> the rockchip drm driver will fail to link:
->
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
-> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x30): undefined reference to `extcon_get_state'
-> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x6c): undefined reference to `extcon_get_property'
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_check_sink_connection':
-> cdn-dp-core.c:(.text.cdn_dp_check_sink_connection+0x80): undefined reference to `extcon_get_state'
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_enable':
-> cdn-dp-core.c:(.text.cdn_dp_enable+0x748): undefined reference to `extcon_get_property'
->
-> The problem is that that the sub-drivers are now all linked into the
-> main rockchip drm module, which breaks all the Kconfig dependencies
-> that are specified in the options for those sub-drivers.
->
-> This clarifies the dependency to ensure that we can only turn on the DP
-> driver when EXTCON is reachable. As the 'select' statements can now
-> cause additional options to become built-in when they should be
-> loadable modules, I'm moving those into the main driver config option.
-> The dependency on DRM_ROCKCHIP can be reduced into a single 'if'
-> statement here for brevity, but this has no functional effect.
->
-> Fixes: b6705157b2db ("drm/rockchip: add extcon dependency for DP")
-> Fixes: 8820b68bd378 ("drm/rockchip: Refactor the component match logic.")
+Hi Arnd,
+
+On 03/28/2017 03:15 AM, Arnd Bergmann wrote:
+> Board code cannot call mdiobus_register_board_info() when phylib
+> or mdio_device is a loadable module:
+> 
+> arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
+> :(.init.text+0x474): undefined reference to `mdiobus_register_board_info'
+> 
+> I had a number of ideas for how this could be solved, but after the MDIO
+> code got split out from PHYLIB it has gotten too hard, so I'm basically
+> giving up, and only call the mdiobus_register_board_info() function
+> if the MDIO layer is built-in to avoid the link error. This is similar
+> to how we handle PHY registration on other ARM platforms.
+
+Thanks for the fix, I still think we should be able to get
+mdio-boardinfo.o to be either built-in or modular, but more importantly,
+largely independent from MDIO_DEVICE and PHYLIB (and how they are selected).
+
+Your fix is definitively needed, but I agree with you that we should
+find something better (TBH, I was not expecting phy: Allow splitting
+MDIO bus/device support from PHYs to be merged that quickly).
+
+Thanks!
+
+> 
+> Fixes: 90eff9096c01 ("net: phy: Allow splitting MDIO bus/device support from PHYs")
+> Fixes: 648ea0134069 ("net: phy: Allow pre-declaration of MDIO devices")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Guenter Roeck <groeck@chromium.org>
-
 > ---
->  drivers/gpu/drm/rockchip/Kconfig | 19 +++++++++----------
->  1 file changed, 9 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-> index 50c41c0a50ef..dcc539ba85d6 100644
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
-> @@ -5,6 +5,10 @@ config DRM_ROCKCHIP
->         select DRM_KMS_HELPER
->         select DRM_PANEL
->         select VIDEOMODE_HELPERS
-> +       select DRM_ANALOGIX_DP if ROCKCHIP_ANALOGIX_DP
-> +       select DRM_DW_HDMI if ROCKCHIP_DW_HDMI
-> +       select DRM_MIPI_DSI if ROCKCHIP_DW_MIPI_DSI
-> +       select SND_SOC_HDMI_CODEC if ROCKCHIP_CDN_DP && SND_SOC
->         help
->           Choose this option if you have a Rockchip soc chipset.
->           This driver provides kernel mode setting and buffer
-> @@ -12,10 +16,10 @@ config DRM_ROCKCHIP
->           2D or 3D acceleration; acceleration is performed by other
->           IP found on the SoC.
->
-> +if DRM_ROCKCHIP
+>  arch/arm/mach-orion5x/Kconfig | 1 +
+>  arch/arm/plat-orion/common.c  | 5 +++++
+>  2 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+> index 468b8cb7fd5f..e3429c8c2e38 100644
+> --- a/arch/arm/mach-orion5x/Kconfig
+> +++ b/arch/arm/mach-orion5x/Kconfig
+> @@ -6,6 +6,7 @@ menuconfig ARCH_ORION5X
+>  	select GPIOLIB
+>  	select MVEBU_MBUS
+>  	select PCI
+> +	select PHYLIB if NETDEVICES
+>  	select PLAT_ORION_LEGACY
+>  	help
+>  	  Support for the following Marvell Orion 5x series SoCs:
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 9255b6d67ba5..aff6994950ba 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -468,6 +468,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+>  		    eth_data, &orion_ge11);
+>  }
+>  
+> +#ifdef CONFIG_ARCH_ORION5X
+>  /*****************************************************************************
+>   * Ethernet switch
+>   ****************************************************************************/
+> @@ -480,6 +481,9 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+>  	struct mdio_board_info *bd;
+>  	unsigned int i;
+>  
+> +	if (!IS_BUILTIN(CONFIG_PHYLIB))
+> +		return;
 > +
->  config ROCKCHIP_ANALOGIX_DP
->         bool "Rockchip specific extensions for Analogix DP driver"
-> -       depends on DRM_ROCKCHIP
-> -       select DRM_ANALOGIX_DP
->         help
->           This selects support for Rockchip SoC specific extensions
->           for the Analogix Core DP driver. If you want to enable DP
-> @@ -23,9 +27,7 @@ config ROCKCHIP_ANALOGIX_DP
->
->  config ROCKCHIP_CDN_DP
->          bool "Rockchip cdn DP"
-> -        depends on DRM_ROCKCHIP
-> -       depends on EXTCON
-> -       select SND_SOC_HDMI_CODEC if SND_SOC
-> +       depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
->          help
->           This selects support for Rockchip SoC specific extensions
->           for the cdn DP driver. If you want to enable Dp on
-> @@ -34,8 +36,6 @@ config ROCKCHIP_CDN_DP
->
->  config ROCKCHIP_DW_HDMI
->          bool "Rockchip specific extensions for Synopsys DW HDMI"
-> -        depends on DRM_ROCKCHIP
-> -        select DRM_DW_HDMI
->          help
->           This selects support for Rockchip SoC specific extensions
->           for the Synopsys DesignWare HDMI driver. If you want to
-> @@ -44,8 +44,6 @@ config ROCKCHIP_DW_HDMI
->
->  config ROCKCHIP_DW_MIPI_DSI
->         bool "Rockchip specific extensions for Synopsys DW MIPI DSI"
-> -       depends on DRM_ROCKCHIP
-> -       select DRM_MIPI_DSI
->         help
->          This selects support for Rockchip SoC specific extensions
->          for the Synopsys DesignWare HDMI driver. If you want to
-> @@ -54,8 +52,9 @@ config ROCKCHIP_DW_MIPI_DSI
->
->  config ROCKCHIP_INNO_HDMI
->         bool "Rockchip specific extensions for Innosilicon HDMI"
-> -       depends on DRM_ROCKCHIP
->         help
->           This selects support for Rockchip SoC specific extensions
->           for the Innosilicon HDMI driver. If you want to enable
->           HDMI on RK3036 based SoC, you should select this option.
-> +
-> +endif
-> --
-> 2.9.0
->
+>  	for (i = 0; i < ARRAY_SIZE(d->port_names); i++)
+>  		if (!strcmp(d->port_names[i], "cpu"))
+>  			break;
+> @@ -493,6 +497,7 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+>  
+>  	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+>  }
+> +#endif
+>  
+>  /*****************************************************************************
+>   * I2C
+> 
+
+
+-- 
+Florian
