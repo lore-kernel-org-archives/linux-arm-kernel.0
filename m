@@ -1,106 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Mar 2017 17:02:20 +0200
-Subject: [PATCH v22 03/11] clocksource: arm_arch_timer: refactor
- arch_timer_needs_probing
-In-Reply-To: <20170321163122.9183-4-fu.wei@linaro.org>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-4-fu.wei@linaro.org>
-Message-ID: <20170328150220.GF2123@mai>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Mar 2017 08:03:16 -0700
+Subject: [PATCHv2 9/9] ARM: dts: omap4: convert to use the new clkctrl
+ clocks for the drivers
+In-Reply-To: <8b502a89-dcc6-1932-70cc-e887b1404dbb@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-10-git-send-email-t-kristo@ti.com>
+ <20170328001800.GR10760@atomide.com>
+ <8b502a89-dcc6-1932-70cc-e887b1404dbb@ti.com>
+Message-ID: <20170328150316.GU10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:31:14AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+* Tero Kristo <t-kristo@ti.com> [170327 22:46]:
+> On 28/03/17 03:18, Tony Lindgren wrote:
+> > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> > > Convert the drivers to use the new clkctrl clocks.
+> > > 
+> > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > > ---
+> > >  arch/arm/boot/dts/omap4.dtsi | 164 ++++++++++++++++++++++++++++++++++++++-----
+> > >  1 file changed, 146 insertions(+), 18 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> > > index 3ecf616..c39304a 100644
+> > > --- a/arch/arm/boot/dts/omap4.dtsi
+> > > +++ b/arch/arm/boot/dts/omap4.dtsi
+> > > @@ -94,16 +94,22 @@
+> > >  			compatible = "ti,omap4-mpu";
+> > >  			ti,hwmods = "mpu";
+> > >  			sram = <&ocmcram>;
+> > > +			clocks = <&mpuss_clkctrl OMAP4_MPU_CLKCTRL 0>;
+> > > +			clock-names = "clkctrl";
+> > >  		};
+> > 
+> > Oh one more thing. I don't think we should add the clocks
+> > here as they are now wrongly allocated to the device within
+> > the interconnect target module. These clocks really belong
+> > to each interconnect target module that we don't have in the
+> > dts yet.
+> > 
+> > So we're better off adding the clockctrl clocks and then
+> > changing the dts to use the interconnect target modules
+> > with the clockctrl clocks.
 > 
-> When system init with device-tree, we don't know which node will be
-> initialized first. And the code in arch_timer_common_init should wait
-> until per-cpu timer and MMIO timer are both initialized. So we need
-> arch_timer_needs_probing to detect the init status of system.
-> 
-> But currently the code is dispersed in arch_timer_needs_probing and
-> arch_timer_common_init. And the function name doesn't specify that
-> it's only for device-tree. This is somewhat confusing.
+> The problem is, you can't just add the clkctrl clock nodes themselves alone,
+> as this introduces the problem that any clocks with no users will get
+> disabled => causes a boot time hang when all the device clocks get shut
+> down.
 
-Can the following patch help you to solve nicely the situation ?
+Hmm yeah. I wonder how to work around that.. What if we first updated
+the clocks in the hwmod code? Or updated the aliases?
 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1360007.html
- 
-> This patch move all related code from arch_timer_common_init to
-> arch_timer_needs_probing, refactor it, and rename it to
-> arch_timer_needs_of_probing. And make sure that it will be called
-> only if acpi is disabled.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
->  1 file changed, 19 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 29ca7d6..d1a05d9 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -839,15 +839,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
->  	{},
->  };
->  
-> -static bool __init
-> -arch_timer_needs_probing(int type, const struct of_device_id *matches)
-> +static bool __init arch_timer_needs_of_probing(void)
->  {
->  	struct device_node *dn;
->  	bool needs_probing = false;
-> +	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
->  
-> -	dn = of_find_matching_node(NULL, matches);
-> -	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
-> +	/* We have two timers, and both device-tree nodes are probed. */
-> +	if ((arch_timers_present & mask) == mask)
-> +		return false;
-> +
-> +	/*
-> +	 * Only one type of timer is probed,
-> +	 * check if we have another type of timer node in device-tree.
-> +	 */
-> +	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
-> +		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
-> +	else
-> +		dn = of_find_matching_node(NULL, arch_timer_of_match);
-> +
-> +	if (dn && of_device_is_available(dn))
->  		needs_probing = true;
-> +
->  	of_node_put(dn);
->  
->  	return needs_probing;
-> @@ -855,17 +868,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
->  
->  static int __init arch_timer_common_init(void)
->  {
-> -	unsigned mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
-> -
-> -	/* Wait until both nodes are probed if we have two timers */
-> -	if ((arch_timers_present & mask) != mask) {
-> -		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
-> -					     arch_timer_mem_of_match))
-> -			return 0;
-> -		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
-> -					     arch_timer_of_match))
-> -			return 0;
-> -	}
-> +	if (acpi_disabled && arch_timer_needs_of_probing())
-> +		return 0;
->  
->  	arch_timer_banner(arch_timers_present);
->  	arch_counter_register(arch_timers_present);
-> -- 
-> 2.9.3
-> 
+> If you want to delay the usage of the clocks until you have interconnect
+> target modules in place, you need to introduce the clock nodes also at that
+> point, similar to what needs to be done now to squash patch #8 or #9.
 
--- 
+I'd like to do this one device at a time without any large
+flips as we have quite a few devices with special handling for
+reset and idling in the hwmod code.
 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Regards,
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Tony
