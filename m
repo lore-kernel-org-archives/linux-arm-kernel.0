@@ -1,39 +1,59 @@
 From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 28 Mar 2017 10:44:07 -0600
+Date: Tue, 28 Mar 2017 10:44:48 -0600
 Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <734ab018-2112-eddf-10dc-426f8ebe3848@huawei.com>
+In-Reply-To: <5c7f6092-9358-08ac-5341-2364637c2008@huawei.com>
 References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
  <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
- <20170324160158.GH25903@cbox>
- <734ab018-2112-eddf-10dc-426f8ebe3848@huawei.com>
-Message-ID: <e5cf6a5a-eb15-1f32-b9af-785a5ce7627b@codeaurora.org>
+ <5c7f6092-9358-08ac-5341-2364637c2008@huawei.com>
+Message-ID: <35db9a6e-7ae3-3326-db1c-5cfff9ea27f3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
 
-On 3/27/2017 10:19 PM, gengdongjiu wrote:
-> Hi Tyler,
+On 3/28/2017 3:53 AM, gengdongjiu wrote:
+> Hi,
 >
-> I have a question for below code.
->
-> On 2017/3/25 0:01, Christoffer Dall wrote:
+> On 2017/3/22 6:47, Tyler Baicar wrote:
+>> +	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+>> +
+>> +	/* The host kernel will handle the synchronous external abort. There
+>> +	 * is no need to pass the error into the guest.
+>> +	 */
+>> +	if (is_abort_synchronous(fault_status))
+>> +		sea_status = handle_guest_sea((unsigned long)fault_ipa,
+>> +				    kvm_vcpu_get_hsr(vcpu));
+>>   
 >>   	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
 >> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
 >> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
 >>   		kvm_inject_vabt(vcpu);
-> when it is SEA synchronized abort, why here inject a asynchronous abort through kvm_inject_vabt(vcpu) instead of synchronized abort? seem the original kvm source code is also do that, so I am confused about that.
-> thanks .
-If the SEA was properly handled, then sea_status will avoid injecting 
-the vabt. I'm going to just return after the SEA handling in the next 
-patch though.
+>>   		return 1;
+>>   	}
+>         After the host kernel correctly handle the synchronous external abort, the sea_status
+>         will return 0, so the code logical will be continue go-no, whether it is better directly return
+>         after correctly handle the SEA? such as below.
+>
+> 	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
+>    		kvm_inject_vabt(vcpu);
+>    		return 1;
+>    	} else
+>                  return 1;
+Yes, I will return after successful SEA handling in the next patch set.
 
 Thanks,
 Tyler
 >
->>   		return 1;
->>   	}
+>>   
+>> -	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+>> -
+>>   	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
+>>   			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+>>   
+>> -	/* Check the stage-2 fault is trans. fault or write fault */
+>> -	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>>   	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
 
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
