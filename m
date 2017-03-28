@@ -1,107 +1,41 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 28 Mar 2017 12:12:38 +0200
-Subject: [PATCH v3] net: moxa: fix TX overrun memory leak
-Message-ID: <1490695958-23222-1-git-send-email-jonas.jensen@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 28 Mar 2017 13:14:27 +0300
+Subject: [PATCH v4 0/6] Pad retentions support for Exynos5433
+In-Reply-To: <CACRpkdY1snu8tNaUW4hR7zvMSMv10wUoeAnv28Ag=NJuHAS-Pw@mail.gmail.com>
+References: <CGME20170323080346eucas1p216eec41325d220774ecec05b397e83a6@eucas1p2.samsung.com>
+ <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+ <CACRpkdY1snu8tNaUW4hR7zvMSMv10wUoeAnv28Ag=NJuHAS-Pw@mail.gmail.com>
+Message-ID: <CAJKOXPc7bmAFjqS59Tqm=-vqMpC8-w0KsmabZDZZLN13h593CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-moxart_mac_start_xmit() doesn't care where tx_tail is, tx_head can
-catch and pass tx_tail, which is bad because moxart_tx_finished()
-isn't guaranteed to catch up on freeing resources from tx_tail.
+On Tue, Mar 28, 2017 at 12:22 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Thu, Mar 23, 2017 at 9:03 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>
+>> This patchset is a next step to add support for all power domains on
+>> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
+>> driver and Exynos LPASS MFD driver, which are needed to make the
+>> platform ready for adding power domains support.
+>>
+>> Patches in this patchset have runtime dependency. They are order in such
+>> a way to make the changes bisectable (mfd lpass changes should be applied
+>> after pinctrl patches). Other dependencies mentioned previously in v3 of
+>> this patchset has been finally merged to v4.11-rc1.
+>>
+>> Patches have been rebased on top of linux v4.11-rc3.
+>
+> Pinctrl development is based on -rc1.
+>
+> I expect Krzysztof to figure out and apply the patches to his Samsung pinctrl
+> branch and forward to me, all looks OK to me.
 
-Add a check in moxart_mac_start_xmit() stopping the queue at the
-end of the circular buffer. Also add a check in moxart_tx_finished()
-waking the queue if the buffer has TX_WAKE_THRESHOLD or more
-free descriptors.
+Yes, I already have them:
+https://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git/log/?h=pinctrl-next
 
-While we're at it, move spin_lock_irq() to happen before our
-descriptor pointer is assigned in moxart_mac_start_xmit().
+However this reminds me to prepare a pull request for mfd tree because
+they base on top of it.
 
-Addresses https://bugzilla.kernel.org/show_bug.cgi?id=99451
-
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
-
-Notes:
-    ChangeLog v2->v3:
-    - add wakeup threshold
-    ChangeLog v1->v2:
-    - stop queue instead of dropping frames
-    
-    Applies to next-20170310
-
- drivers/net/ethernet/moxa/moxart_ether.c | 20 ++++++++++++++++++--
- drivers/net/ethernet/moxa/moxart_ether.h |  1 +
- 2 files changed, 19 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index 06c9f41..6ad44be 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -25,6 +25,7 @@
- #include <linux/of_irq.h>
- #include <linux/crc32.h>
- #include <linux/crc32c.h>
-+#include <linux/circ_buf.h>
- 
- #include "moxart_ether.h"
- 
-@@ -278,6 +279,13 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 	return rx;
- }
- 
-+static int moxart_tx_queue_space(struct net_device *ndev)
-+{
-+	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-+
-+	return CIRC_SPACE(priv->tx_head, priv->tx_tail, TX_DESC_NUM);
-+}
-+
- static void moxart_tx_finished(struct net_device *ndev)
- {
- 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
-@@ -297,6 +305,9 @@ static void moxart_tx_finished(struct net_device *ndev)
- 		tx_tail = TX_NEXT(tx_tail);
- 	}
- 	priv->tx_tail = tx_tail;
-+	if (netif_queue_stopped(ndev) &&
-+	    moxart_tx_queue_space(ndev) >= TX_WAKE_THRESHOLD)
-+		netif_wake_queue(ndev);
- }
- 
- static irqreturn_t moxart_mac_interrupt(int irq, void *dev_id)
-@@ -324,13 +335,18 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
- 	void *desc;
- 	unsigned int len;
--	unsigned int tx_head = priv->tx_head;
-+	unsigned int tx_head;
- 	u32 txdes1;
- 	int ret = NETDEV_TX_BUSY;
- 
-+	spin_lock_irq(&priv->txlock);
-+
-+	tx_head = priv->tx_head;
- 	desc = priv->tx_desc_base + (TX_REG_DESC_SIZE * tx_head);
- 
--	spin_lock_irq(&priv->txlock);
-+	if (moxart_tx_queue_space(ndev) == 1)
-+		netif_stop_queue(ndev);
-+
- 	if (moxart_desc_read(desc + TX_REG_OFFSET_DESC0) & TX_DESC0_DMA_OWN) {
- 		net_dbg_ratelimited("no TX space for packet\n");
- 		priv->stats.tx_dropped++;
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.h b/drivers/net/ethernet/moxa/moxart_ether.h
-index 93a9563..afc32ec 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.h
-+++ b/drivers/net/ethernet/moxa/moxart_ether.h
-@@ -59,6 +59,7 @@
- #define TX_NEXT(N)		(((N) + 1) & (TX_DESC_NUM_MASK))
- #define TX_BUF_SIZE		1600
- #define TX_BUF_SIZE_MAX		(TX_DESC1_BUF_SIZE_MASK+1)
-+#define TX_WAKE_THRESHOLD	16
- 
- #define RX_DESC_NUM		64
- #define RX_DESC_NUM_MASK	(RX_DESC_NUM-1)
--- 
-1.8.2.1
+Best regards,
+Krzysztof
