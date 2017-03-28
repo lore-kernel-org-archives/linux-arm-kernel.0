@@ -1,58 +1,47 @@
 From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 28 Mar 2017 13:24:01 -0400
-Subject: [RESEND PATCH 1/3] dt: pwm: lpc32xx: add description of clocks
- and #pwm-cells properties
-In-Reply-To: <20170216202749.20653-2-slemieux.tyco@gmail.com>
-References: <20170216202749.20653-1-slemieux.tyco@gmail.com>
- <20170216202749.20653-2-slemieux.tyco@gmail.com>
-Message-ID: <1490721841.24147.1.camel@gmail.com>
+Date: Tue, 28 Mar 2017 13:25:59 -0400
+Subject: [PATCH] video: ARM CLCD: fix dma allocation size
+In-Reply-To: <20170308145805.1325-1-slemieux.tyco@gmail.com>
+References: <20170308145805.1325-1-slemieux.tyco@gmail.com>
+Message-ID: <1490721959.24147.3.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 ping
 
-On Thu, 2017-02-16 at 15:27 -0500, slemieux.tyco at gmail.com wrote:
-> From: Vladimir Zapolskiy <vz@mleia.com>
+On Wed, 2017-03-08 at 09:58 -0500, Sylvain Lemieux wrote:
+> From: Liam Beguin <lbeguin@tycoint.com>
 > 
-> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
-> output each, in this case there is no need to specify PWM channel argument
-> on client side, one cell for setting PWM output frequency is sufficient.
+> This patch forces the frambuffer size to be aligned on kernel pages.
 > 
-> Another added to the description property 'clocks' has a standard meaning
-> of a controller supply clock, in the LPC32xx User's Manual the clock is
-> denoted as PWM1_CLK or PWM2_CLK clock.
+> During the board startup, the splash screed did appear;
+> the "ts_test" program or our application were not able to start.
 > 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> Reviewed-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> The following error message was reported:
+> error: failed to map framebuffer device to memory.
+> LinuxFB: driver cannot connect
+> 
+> The issue was discovered, on the LPC32xx platform, during the migration
+> of the LCD definition from the board file to the device tree.
+> 
+> Signed-off-by: Liam Beguin <lbeguin@tycoint.com>
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
 > ---
->  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  drivers/video/fbdev/amba-clcd.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> index 74b5bc5dd19a..523d79662861 100644
-> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> @@ -3,15 +3,22 @@ LPC32XX PWM controller
->  Required properties:
->  - compatible: should be "nxp,lpc3220-pwm"
->  - reg: physical base address and length of the controller's registers
-> +- clocks: clock phandle and clock specifier pair
-> +- #pwm-cells: should be 1, the cell is used to specify the period in
-> +  nanoseconds.
+> diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+> index 0fab92c62828..ffc2c33c6cef 100644
+> --- a/drivers/video/fbdev/amba-clcd.c
+> +++ b/drivers/video/fbdev/amba-clcd.c
+> @@ -881,8 +881,8 @@ static int clcdfb_of_dma_setup(struct clcd_fb *fb)
+>  	if (err)
+>  		return err;
 >  
->  Examples:
->  
->  pwm at 4005c000 {
->  	compatible = "nxp,lpc3220-pwm";
->  	reg = <0x4005c000 0x4>;
-> +	clocks = <&clk LPC32XX_CLK_PWM1>;
-> +	#pwm-cells = <1>;
->  };
->  
->  pwm at 4005c004 {
->  	compatible = "nxp,lpc3220-pwm";
->  	reg = <0x4005c004 0x4>;
-> +	clocks = <&clk LPC32XX_CLK_PWM2>;
-> +	#pwm-cells = <1>;
->  };
+> -	framesize = fb->panel->mode.xres * fb->panel->mode.yres *
+> -			fb->panel->bpp / 8;
+> +	framesize = PAGE_ALIGN(fb->panel->mode.xres * fb->panel->mode.yres *
+> +			fb->panel->bpp / 8);
+>  	fb->fb.screen_base = dma_alloc_coherent(&fb->dev->dev, framesize,
+>  			&dma, GFP_KERNEL);
+>  	if (!fb->fb.screen_base)
