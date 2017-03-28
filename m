@@ -1,54 +1,47 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 Mar 2017 13:19:37 +0200
-Subject: [PATCH v2 10/11] ARM: at91: pm: Remove at91_pm_set_standby
+Date: Tue, 28 Mar 2017 13:19:32 +0200
+Subject: [PATCH v2 05/11] ARM: at91: pm: Simplify at91rm9200_standby
 In-Reply-To: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
 References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170328111938.21297-11-alexandre.belloni@free-electrons.com>
+Message-ID: <20170328111938.21297-6-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge at91_pm_set_standby() in at91_dt_ramc as this is the only callsite.
-That moves it to the init section.
+Since 2008, AT91_MC_SDRAMC_LPR is set to 0 at kernel initialization. There
+is no use saving, changing and restoring it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+ arch/arm/mach-at91/pm.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index dedfe9038336..2cd27c830ab6 100644
+index a35b1541b328..3d68d93c11c7 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -205,12 +205,6 @@ static struct platform_device at91_cpuidle_device = {
- 	.name = "cpuidle-at91",
- };
- 
--static void at91_pm_set_standby(void (*at91_standby)(void))
--{
--	if (at91_standby)
--		at91_cpuidle_device.dev.platform_data = at91_standby;
--}
+@@ -222,20 +222,15 @@ static void at91_pm_set_standby(void (*at91_standby)(void))
+  */
+ static void at91rm9200_standby(void)
+ {
+-	u32 lpr = at91_ramc_read(0, AT91_MC_SDRAMC_LPR);
 -
- /*
-  * The AT91RM9200 goes into self-refresh mode with this command, and will
-  * terminate self-refresh automatically on the next SDRAM access.
-@@ -354,7 +348,7 @@ static __init void at91_dt_ramc(void)
- 	struct device_node *np;
- 	const struct of_device_id *of_id;
- 	int idx = 0;
--	const void *standby = NULL;
-+	void *standby = NULL;
- 	const struct ramc_info *ramc;
- 
- 	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
-@@ -378,7 +372,7 @@ static __init void at91_dt_ramc(void)
- 		return;
- 	}
- 
--	at91_pm_set_standby(standby);
-+	at91_cpuidle_device.dev.platform_data = standby;
+ 	asm volatile(
+ 		"b    1f\n\t"
+ 		".align    5\n\t"
+ 		"1:  mcr    p15, 0, %0, c7, c10, 4\n\t"
+-		"    str    %0, [%1, %2]\n\t"
+-		"    str    %3, [%1, %4]\n\t"
++		"    str    %2, [%1, %3]\n\t"
+ 		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+-		"    str    %5, [%1, %2]"
+ 		:
+-		: "r" (0), "r" (pm_data.ramc[0]), "r" (AT91_MC_SDRAMC_LPR),
+-		  "r" (1), "r" (AT91_MC_SDRAMC_SRR),
+-		  "r" (lpr));
++		: "r" (0), "r" (pm_data.ramc[0]),
++		  "r" (1), "r" (AT91_MC_SDRAMC_SRR));
  }
  
- static void at91rm9200_idle(void)
+ /* We manage both DDRAM/SDRAM controllers, we need more than one value to
 -- 
 2.11.0
