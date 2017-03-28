@@ -1,49 +1,23 @@
-From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Tue, 28 Mar 2017 11:25:45 +0200
-Subject: [PATCH v2,
- 3/3] tty/serial: meson_uart: add the core clock handling to the driver
-In-Reply-To: <20170328092545.4644-1-hgkr.klein@gmail.com>
-References: <20170328092545.4644-1-hgkr.klein@gmail.com>
-Message-ID: <20170328092545.4644-4-hgkr.klein@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Mar 2017 11:26:16 +0200
+Subject: [PATCH v2 1/2] pinctrl: meson-gxl: Fix inverted registers and add
+ missing pins
+In-Reply-To: <20170323104112.16558-2-narmstrong@baylibre.com>
+References: <20170323104112.16558-1-narmstrong@baylibre.com>
+ <20170323104112.16558-2-narmstrong@baylibre.com>
+Message-ID: <CACRpkdbZanPxCGcgcrpGzOkMHvC27z_BPjXLgKAAHm_cdk+HTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch gets the core clock as provided by the DT and enables it.
-The code was taken from Amlogic's serial driver, and was tested on my
-board.
+On Thu, Mar 23, 2017 at 11:41 AM, Neil Armstrong
+<narmstrong@baylibre.com> wrote:
 
-Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
----
- drivers/tty/serial/meson_uart.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> Fix some inverted bit numbers in some pinctrl groups and add missing pins
+> and groups to be in pair with the GXBB pinctrl pins definition.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 60f16795d16b..cb99112288eb 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
- 	struct resource *res_mem, *res_irq;
- 	struct uart_port *port;
- 	struct clk *clk;
-+	struct clk *core_clk;
- 	int ret = 0;
+Patch applied.
 
- 	if (pdev->dev.of_node)
-@@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
- 	if (!port)
- 		return -ENOMEM;
-
-+	core_clk = devm_clk_get(&pdev->dev, "core");
-+	if (!IS_ERR(core_clk)) {
-+		ret = clk_prepare_enable(core_clk);
-+		if (ret) {
-+			dev_err(&pdev->dev, "couldn't enable clkc\n");
-+			return ret;
-+		}
-+	}
-+
- 	clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
---
-2.11.0
+Yours,
+Linus Walleij
