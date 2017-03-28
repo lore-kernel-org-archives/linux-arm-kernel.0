@@ -1,10 +1,10 @@
 From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Tue, 28 Mar 2017 11:56:38 +0300
-Subject: [PATCH 11/16] drivers,
- net: convert masces_tx_sa.refcnt from atomic_t to refcount_t
+Date: Tue, 28 Mar 2017 11:56:37 +0300
+Subject: [PATCH 10/16] drivers,
+ net: convert masces_rx_sc.refcnt from atomic_t to refcount_t
 In-Reply-To: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
 References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1490691403-4016-12-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1490691403-4016-11-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,44 +23,41 @@ Signed-off-by: David Windsor <dwindsor@gmail.com>
  1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/macsec.c b/drivers/net/macsec.c
-index 1869223..2851dda 100644
+index bc0b00a..1869223 100644
 --- a/drivers/net/macsec.c
 +++ b/drivers/net/macsec.c
-@@ -188,7 +188,7 @@ struct macsec_tx_sa {
- 	struct macsec_key key;
- 	spinlock_t lock;
- 	u32 next_pn;
+@@ -172,7 +172,7 @@ struct macsec_rx_sc {
+ 	bool active;
+ 	struct macsec_rx_sa __rcu *sa[MACSEC_NUM_AN];
+ 	struct pcpu_rx_sc_stats __percpu *stats;
 -	atomic_t refcnt;
 +	refcount_t refcnt;
- 	bool active;
- 	struct macsec_tx_sa_stats __percpu *stats;
- 	struct rcu_head rcu;
-@@ -362,7 +362,7 @@ static struct macsec_tx_sa *macsec_txsa_get(struct macsec_tx_sa __rcu *ptr)
- 	if (!sa || !sa->active)
- 		return NULL;
+ 	struct rcu_head rcu_head;
+ };
  
--	if (!atomic_inc_not_zero(&sa->refcnt))
-+	if (!refcount_inc_not_zero(&sa->refcnt))
- 		return NULL;
+@@ -331,12 +331,12 @@ static void free_rx_sc_rcu(struct rcu_head *head)
  
- 	return sa;
-@@ -379,7 +379,7 @@ static void free_txsa(struct rcu_head *head)
- 
- static void macsec_txsa_put(struct macsec_tx_sa *sa)
+ static struct macsec_rx_sc *macsec_rxsc_get(struct macsec_rx_sc *sc)
  {
--	if (atomic_dec_and_test(&sa->refcnt))
-+	if (refcount_dec_and_test(&sa->refcnt))
- 		call_rcu(&sa->rcu, free_txsa);
+-	return atomic_inc_not_zero(&sc->refcnt) ? sc : NULL;
++	return refcount_inc_not_zero(&sc->refcnt) ? sc : NULL;
  }
  
-@@ -1422,7 +1422,7 @@ static int init_tx_sa(struct macsec_tx_sa *tx_sa, char *sak, int key_len,
- 	}
+ static void macsec_rxsc_put(struct macsec_rx_sc *sc)
+ {
+-	if (atomic_dec_and_test(&sc->refcnt))
++	if (refcount_dec_and_test(&sc->refcnt))
+ 		call_rcu(&sc->rcu_head, free_rx_sc_rcu);
+ }
  
- 	tx_sa->active = false;
--	atomic_set(&tx_sa->refcnt, 1);
-+	refcount_set(&tx_sa->refcnt, 1);
- 	spin_lock_init(&tx_sa->lock);
+@@ -1396,7 +1396,7 @@ static struct macsec_rx_sc *create_rx_sc(struct net_device *dev, sci_t sci)
  
- 	return 0;
+ 	rx_sc->sci = sci;
+ 	rx_sc->active = true;
+-	atomic_set(&rx_sc->refcnt, 1);
++	refcount_set(&rx_sc->refcnt, 1);
+ 
+ 	secy = &macsec_priv(dev)->secy;
+ 	rcu_assign_pointer(rx_sc->next, secy->rx_sc);
 -- 
 2.7.4
