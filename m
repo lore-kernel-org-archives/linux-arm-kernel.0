@@ -1,29 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 27 Mar 2017 16:15:34 -0700 (PDT)
-Subject: [PATCH] net: mvneta: set rx mode during resume if interface is
- running
-In-Reply-To: <20170327105905.1404-1-jszhang@marvell.com>
-References: <20170327105905.1404-1-jszhang@marvell.com>
-Message-ID: <20170327.161534.60442857212281980.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Mar 2017 17:18:00 -0700
+Subject: [PATCHv2 9/9] ARM: dts: omap4: convert to use the new clkctrl
+ clocks for the drivers
+In-Reply-To: <1489741781-12816-10-git-send-email-t-kristo@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-10-git-send-email-t-kristo@ti.com>
+Message-ID: <20170328001800.GR10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
-Date: Mon, 27 Mar 2017 18:59:05 +0800
+* Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> Convert the drivers to use the new clkctrl clocks.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4.dtsi | 164 ++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 146 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 3ecf616..c39304a 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -94,16 +94,22 @@
+>  			compatible = "ti,omap4-mpu";
+>  			ti,hwmods = "mpu";
+>  			sram = <&ocmcram>;
+> +			clocks = <&mpuss_clkctrl OMAP4_MPU_CLKCTRL 0>;
+> +			clock-names = "clkctrl";
+>  		};
 
-> I found a bug by:
-> 
-> 0. boot and start dhcp client
-> 1. echo mem > /sys/power/state
-> 2. resume back immediately
-> 3. don't touch dhcp client to renew the lease
-> 4. ping the gateway. No acks
-> 
-> Usually, after step2, the DHCP lease isn't expired, so in theory we
-> should resume all back. But in fact, it doesn't. It turns out
-> the rx mode isn't resumed correctly. This patch fixes it by adding
-> mvneta_set_rx_mode(dev) in the resume hook if interface is running.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Oh one more thing. I don't think we should add the clocks
+here as they are now wrongly allocated to the device within
+the interconnect target module. These clocks really belong
+to each interconnect target module that we don't have in the
+dts yet.
 
-This doesn't apply cleanly to the net tree, please respin.
+So we're better off adding the clockctrl clocks and then
+changing the dts to use the interconnect target modules
+with the clockctrl clocks.
+
+Regards,
+
+Tony
