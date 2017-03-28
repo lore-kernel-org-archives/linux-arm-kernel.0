@@ -1,38 +1,53 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Tue, 28 Mar 2017 16:36:49 +0300
-Subject: [PATCH v5 1/5] usb: dwc2: Add support for STM32F429/439/469 USB
- OTG HS/FS in FS mode (internal PHY)
-In-Reply-To: <58187797-2c11-c75b-571c-27fe64578099@st.com>
-References: <20170201012547.76158-1-bruherrera@gmail.com>
- <20170201012547.76158-2-bruherrera@gmail.com>
- <2B3535C5ECE8B5419E3ECBE300772909021B411720@US01WEMBX2.internal.synopsys.com>
- <58187797-2c11-c75b-571c-27fe64578099@st.com>
-Message-ID: <8760ith6a6.fsf@linux.intel.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Mar 2017 15:37:18 +0200
+Subject: [PATCH v2 0/9] arm64: KVM: Fix PMU exception generation
+In-Reply-To: <20170327160345.12402-1-marc.zyngier@arm.com>
+References: <20170327160345.12402-1-marc.zyngier@arm.com>
+Message-ID: <20170328133718.GA20211@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 27, 2017 at 05:03:36PM +0100, Marc Zyngier wrote:
+> Running the following code:
+> 
+> root at zomby-woof:~# cat test-pmu.c
+> int main(int argc, char *argv[])
+> {
+> 	unsigned int val;
+> 	asm ("mrc p15, 0, %0, c9, c13, 0\n" : "=r" (val));
+> 	return val;
+> }
+> 
+> in a 32bit guest (or a 64bit guest with a 32bit userspace) results in
+> this surprising result:
+> 
+> [  120.347497] kvm [1150]: Unsupported guest CP15 access at: ab0945ae
+> [  120.353689] kvm [1142]:  { Op0( 0), Op1( 0), CRn( 9), CRm(13), Op2( 0), func_read },
+> 
+> which is weird, because the guest behaves correctly:
+> root at zomby-woof:~# ./test-pmu 
+> [   16.184422] test-pmu[740]: undefined instruction: pc=00000000ab0945ae
+> [   16.186043] Code: 00340001 b4800000 af00b085 60396078 (3f1dee19) 
+> Illegal instruction
+> 
+> It gets the expected UNDEF, and all is fine. So what?
+> 
+> It turns out that the PMU emulation code is a bit lazy, and tells the
+> rest of KVM that the emulation has failed, so that an exception gets
+> delivered. Subtle differences in the 32bit vs 64bit handling make it
+> spit an "Unsupported..." error.
+> 
+> This series tries to set things straight:
+> - Make all PMU illegal accesses inject an UNDEF
+> - Make these illegal accesses a successful emulation w.r.t the rest of KVM.
+> 
+> In the process, we also squash an interesting bug in the 64bit CP
+> access. Similar treatment is applied to the 32bit kernel, except that
+> we don't ever inject an exception there (no PMU support yet).
+> 
 
-Hi,
+I have applied this series to queue (not next since I haven't tested
+thoroughly yet), with the fixups agreed in the series.
 
-Alexandre Torgue <alexandre.torgue@st.com> writes:
-> Hi John,
->
-> On 02/01/2017 04:37 AM, John Youn wrote:
->> On 1/31/2017 5:26 PM, Bruno Herrera wrote:
->>> This patch introduces a new parameter to activate USB OTG HS/FS core
->>> embedded phy transceiver. The STM32F4x9 SoC uses the GGPIO register
->>> to enable the transceiver.
->>> Also add the dwc2_set_params function for stm32f4 otg fs.
->>>
->>> Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
->>
->> Acked-by: John Youn <johnyoun@synopsys.com>
->>
-> Do you plan to take those patches on your pull-request for 4.12?
-> I was wondering if I take machine parts (DT) in my pull request for 4.12 
-> or if I wait an official version with driver part merged.
-
-patches already in my queue for v4.12
-
--- 
-balbi
+Thanks,
+-Christoffer
