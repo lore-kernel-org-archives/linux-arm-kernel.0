@@ -1,54 +1,41 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 27 Mar 2017 17:40:35 -0700
-Subject: [PATCH v6 18/39] media: Add userspace header file for i.MX
-In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1490661656-10318-19-git-send-email-steve_longerbeam@mentor.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 28 Mar 2017 10:27:20 +0800
+Subject: [PATCH] net: mvneta: set rx mode during resume if interface is
+ running
+In-Reply-To: <20170327.161534.60442857212281980.davem@davemloft.net>
+References: <20170327105905.1404-1-jszhang@marvell.com>
+ <20170327.161534.60442857212281980.davem@davemloft.net>
+Message-ID: <20170328102720.71f530f8@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a header file for use by userspace programs wanting to interact
-with the i.MX media driver. It defines custom events and v4l2 controls for
-the i.MX v4l2 subdevices.
+Dear David,
 
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
----
- include/linux/imx-media.h | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 include/linux/imx-media.h
+On Mon, 27 Mar 2017 16:15:34 -0700 David Miller wrote:
 
-diff --git a/include/linux/imx-media.h b/include/linux/imx-media.h
-new file mode 100644
-index 0000000..267777f
---- /dev/null
-+++ b/include/linux/imx-media.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2014-2017 Mentor Graphics Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the
-+ * License, or (at your option) any later version
-+ */
-+
-+#ifndef __LINUX_IMX_MEDIA_H__
-+#define __LINUX_IMX_MEDIA_H__
-+
-+/*
-+ * events from the subdevs
-+ */
-+#define V4L2_EVENT_IMX_CLASS                V4L2_EVENT_PRIVATE_START
-+#define V4L2_EVENT_IMX_FRAME_INTERVAL_ERROR (V4L2_EVENT_IMX_CLASS + 1)
-+
-+enum imx_ctrl_id {
-+	V4L2_CID_IMX_FIM_ENABLE = (V4L2_CID_USER_IMX_BASE + 0),
-+	V4L2_CID_IMX_FIM_NUM,
-+	V4L2_CID_IMX_FIM_TOLERANCE_MIN,
-+	V4L2_CID_IMX_FIM_TOLERANCE_MAX,
-+	V4L2_CID_IMX_FIM_NUM_SKIP,
-+};
-+
-+#endif
--- 
-2.7.4
+> From: Jisheng Zhang <jszhang@marvell.com>
+> Date: Mon, 27 Mar 2017 18:59:05 +0800
+> 
+> > I found a bug by:
+> > 
+> > 0. boot and start dhcp client
+> > 1. echo mem > /sys/power/state
+> > 2. resume back immediately
+> > 3. don't touch dhcp client to renew the lease
+> > 4. ping the gateway. No acks
+> > 
+> > Usually, after step2, the DHCP lease isn't expired, so in theory we
+> > should resume all back. But in fact, it doesn't. It turns out
+> > the rx mode isn't resumed correctly. This patch fixes it by adding
+> > mvneta_set_rx_mode(dev) in the resume hook if interface is running.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>  
+> 
+> This doesn't apply cleanly to the net tree, please respin.
+
+This patch is generated against net-next, for mvneta suspend/resume support
+is added into net-next recently. I did need to use the "[PATCH net-next]" for
+the patch title, will take care in the future.
+
+Sorry for confusion,
+Jisheng
