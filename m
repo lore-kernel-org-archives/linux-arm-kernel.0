@@ -1,178 +1,186 @@
-From: sfaragnaus@gmail.com (Andrea della Porta)
-Date: Tue, 28 Mar 2017 13:21:06 +0100
-Subject: [PATCH] coding style issue fixed
-Message-ID: <20170328122106.GA2553@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 28 Mar 2017 20:21:05 +0800
+Subject: [Update][PATCH v9.1 15/15] irqchip: mbigen: Add ACPI support
+Message-ID: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coding style issues fixed
+With the preparation of platform msi support and interrupt producer
+in commit d44fa3d46079 ("ACPI: Add support for ResourceSource/IRQ
+domain mapping"), we can add mbigen ACPI support now.
 
-Signed-off-by: Andrea della Porta <sfaragnaus@gmail.com>
+Now that the major framework changes are ready, we just need to add
+the ACPI probe code which creates the irqdomain for devices connecting
+to it.
+
+In order to create the irqdomain, we need to know the number of hw
+irqs as input which is provided by mbigen. In DT case, we are using
+"num-pins" property to describe it, and we will take advantage of
+that too using _DSD in ACPI as there is no standard way of describe
+it in ACPI way, also according to the _DSD rule described in
+Documentation/acpi/DSD-properties-rules.txt, it doesn't break
+the rules.
+
+The DSDT is represented as below:
+
+For mbigen,
+  Device(MBI0) {
+          Name(_HID, "HISI0152")
+          Name(_UID, Zero)
+          Name(_CRS, ResourceTemplate() {
+                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+          })
+
+         Name(_DSD, Package () {
+                 ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+                 Package () {
+                         Package () {"num-pins", 378}
+                 }
+        })
+ }
+
+For devices,
+ Device(SAS0) {
+         Name(_HID, "HISIxxxx")
+         Name(_UID, Zero)
+         Name(_CRS, ResourceTemplate() {
+                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12, ...}
+         })
+ }
+
+So for the devices connected to the mbigen, as we clearly say that
+it refers to a specific interrupt controller (mbigen), we can get
+the virq from mbigen's irqdomain once it's created successfully.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: MaJun <majun258@huawei.com>
+Cc: Al Stone <ahs3@redhat.com>
+Cc: Darren Hart <dvhart@infradead.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../vc04_services/bcm2835-audio/bcm2835-pcm.c      | 47 ++++++++++------------
- 1 file changed, 22 insertions(+), 25 deletions(-)
+ drivers/irqchip/irq-mbigen.c | 75 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 72 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-index 8bd69b9..fa6d3d2 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-@@ -68,7 +68,7 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream)
- 	audio_info(" .. IN\n");
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 3756408..061cdb8 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -16,6 +16,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- 	audio_info("alsa_stream=%p substream=%p\n", alsa_stream,
--		alsa_stream ? alsa_stream->substream : 0);
-+		   alsa_stream ? alsa_stream->substream : 0);
++#include <linux/acpi.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/module.h>
+@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+ 				    unsigned long *hwirq,
+ 				    unsigned int *type)
+ {
+-	if (is_of_node(fwspec->fwnode)) {
++	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+ 		if (fwspec->param_count != 2)
+ 			return -EINVAL;
  
- 	if (alsa_stream->open)
- 		consumed = bcm2835_audio_retrieve_buffers(alsa_stream);
-@@ -83,10 +83,10 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream)
- 			new_period = 1;
- 	}
- 	audio_debug("updating pos cur: %d + %d max:%d period_bytes:%d, hw_ptr: %d new_period:%d\n",
--		alsa_stream->pos,
-+		    alsa_stream->pos,
- 		consumed,
- 		alsa_stream->buffer_size,
--		(int) (alsa_stream->period_size * alsa_stream->substream->runtime->periods),
-+		(int)(alsa_stream->period_size * alsa_stream->substream->runtime->periods),
- 		frames_to_bytes(alsa_stream->substream->runtime, alsa_stream->substream->runtime->status->hw_ptr),
- 		new_period);
- 	if (alsa_stream->buffer_size) {
-@@ -229,6 +229,7 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
- 	 */
- 	if (alsa_stream->running) {
- 		int err;
+@@ -271,6 +272,58 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_ACPI
++static int mbigen_acpi_create_domain(struct platform_device *pdev,
++				     struct mbigen_device *mgn_chip)
++{
++	struct irq_domain *domain;
++	u32 num_pins = 0;
++	int ret;
 +
- 		err = bcm2835_audio_stop(alsa_stream);
- 		alsa_stream->running = 0;
- 		if (err)
-@@ -259,7 +260,7 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
- 
- /* hw_params callback */
- static int snd_bcm2835_pcm_hw_params(struct snd_pcm_substream *substream,
--	struct snd_pcm_hw_params *params)
-+				     struct snd_pcm_hw_params *params)
++	/*
++	 * "num-pins" is the total number of interrupt pins implemented in
++	 * this mbigen instance, and mbigen is an interrupt controller
++	 * connected to ITS  converting wired interrupts into MSI, so we
++	 * use "num-pins" to alloc MSI vectors which are needed by client
++	 * devices connected to it.
++	 *
++	 * Here is the DSDT device node used for mbigen in firmware:
++	 *	Device(MBI0) {
++	 *		Name(_HID, "HISI0152")
++	 *		Name(_UID, Zero)
++	 *		Name(_CRS, ResourceTemplate() {
++	 *			Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
++	 *		})
++	 *
++	 *		Name(_DSD, Package () {
++	 *			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
++	 *			Package () {
++	 *				Package () {"num-pins", 378}
++	 *			}
++	 *		})
++	 *	}
++	 */
++	ret = device_property_read_u32(&pdev->dev, "num-pins", &num_pins);
++	if (ret || num_pins == 0)
++		return -EINVAL;
++
++	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
++						   mbigen_write_msg,
++						   &mbigen_domain_ops,
++						   mgn_chip);
++	if (!domain)
++		return -ENOMEM;
++
++	return 0;
++}
++#else
++static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
++					    struct mbigen_device *mgn_chip)
++{
++	return -ENODEV;
++}
++#endif
++
+ static int mbigen_device_probe(struct platform_device *pdev)
  {
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
-@@ -312,18 +313,16 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
- 		channels = alsa_stream->channels;
+ 	struct mbigen_device *mgn_chip;
+@@ -289,9 +342,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 	if (IS_ERR(mgn_chip->base))
+ 		return PTR_ERR(mgn_chip->base);
  
- 	err = bcm2835_audio_set_params(alsa_stream, channels,
--		alsa_stream->params_rate,
--		alsa_stream->pcm_format_width);
-+				       alsa_stream->params_rate,
-+				       alsa_stream->pcm_format_width);
- 	if (err < 0)
- 		audio_error(" error setting hw params\n");
+-	err = mbigen_of_create_domain(pdev, mgn_chip);
+-	if (err)
++	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
++		err = mbigen_of_create_domain(pdev, mgn_chip);
++	else if (ACPI_COMPANION(&pdev->dev))
++		err = mbigen_acpi_create_domain(pdev, mgn_chip);
++	else
++		err = -EINVAL;
++
++	if (err) {
++		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain",
++			mgn_chip->base);
+ 		return err;
++	}
  
--
- 	bcm2835_audio_setup(alsa_stream);
+ 	platform_set_drvdata(pdev, mgn_chip);
+ 	return 0;
+@@ -303,10 +365,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ };
+ MODULE_DEVICE_TABLE(of, mbigen_of_match);
  
- 	/* in preparation of the stream, set the controls (volume level) of the stream */
- 	bcm2835_audio_set_ctls(alsa_stream->chip);
- 
--
- 	memset(&alsa_stream->pcm_indirect, 0, sizeof(alsa_stream->pcm_indirect));
- 
- 	alsa_stream->pcm_indirect.hw_buffer_size =
-@@ -335,8 +334,8 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
- 	alsa_stream->pos = 0;
- 
- 	audio_debug("buffer_size=%d, period_size=%d pos=%d frame_bits=%d\n",
--		alsa_stream->buffer_size, alsa_stream->period_size,
--		alsa_stream->pos, runtime->frame_bits);
-+		    alsa_stream->buffer_size, alsa_stream->period_size,
-+		    alsa_stream->pos, runtime->frame_bits);
- 
- 	mutex_unlock(&chip->audio_mutex);
- 	audio_info(" .. OUT\n");
-@@ -344,17 +343,16 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
- }
- 
- static void snd_bcm2835_pcm_transfer(struct snd_pcm_substream *substream,
--	struct snd_pcm_indirect *rec, size_t bytes)
-+				     struct snd_pcm_indirect *rec, size_t bytes)
- {
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
--	void *src = (void *) (substream->runtime->dma_area + rec->sw_data);
-+	void *src = (void *)(substream->runtime->dma_area + rec->sw_data);
- 	int err;
- 
- 	err = bcm2835_audio_write(alsa_stream, bytes, src);
- 	if (err)
- 		audio_error(" Failed to transfer to alsa device (%d)\n", err);
--
- }
- 
- static int snd_bcm2835_pcm_ack(struct snd_pcm_substream *substream)
-@@ -381,14 +379,14 @@ static int snd_bcm2835_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
- 		audio_debug("bcm2835_AUDIO_TRIGGER_START running=%d\n",
--			alsa_stream->running);
-+			    alsa_stream->running);
- 		if (!alsa_stream->running) {
- 			err = bcm2835_audio_start(alsa_stream);
- 			if (!err) {
- 				alsa_stream->pcm_indirect.hw_io =
- 					alsa_stream->pcm_indirect.hw_data =
- 					bytes_to_frames(runtime,
--					alsa_stream->pos);
-+							alsa_stream->pos);
- 				substream->ops->ack(substream);
- 				alsa_stream->running = 1;
- 				alsa_stream->draining = 1;
-@@ -433,23 +431,23 @@ snd_bcm2835_pcm_pointer(struct snd_pcm_substream *substream)
- 	audio_info(" .. IN\n");
- 
- 	audio_debug("pcm_pointer... (%d) hwptr=%d appl=%d pos=%d\n", 0,
--		frames_to_bytes(runtime, runtime->status->hw_ptr),
--		frames_to_bytes(runtime, runtime->control->appl_ptr),
--		alsa_stream->pos);
-+		    frames_to_bytes(runtime, runtime->status->hw_ptr),
-+		    frames_to_bytes(runtime, runtime->control->appl_ptr),
-+		    alsa_stream->pos);
- 
- 	audio_info(" .. OUT\n");
- 	return snd_pcm_indirect_playback_pointer(substream,
--		&alsa_stream->pcm_indirect,
--		alsa_stream->pos);
-+						 &alsa_stream->pcm_indirect,
-+						 alsa_stream->pos);
- }
- 
- static int snd_bcm2835_pcm_lib_ioctl(struct snd_pcm_substream *substream,
--	unsigned int cmd, void *arg)
-+				     unsigned int cmd, void *arg)
- {
- 	int ret = snd_pcm_lib_ioctl(substream, cmd, arg);
- 
- 	audio_info(" .. substream=%p, cmd=%d, arg=%p (%x) ret=%d\n", substream,
--		cmd, arg, arg ? *(unsigned *) arg : 0, ret);
-+		   cmd, arg, arg ? *(unsigned *)arg : 0, ret);
- 	return ret;
- }
- 
-@@ -510,7 +508,6 @@ int snd_bcm2835_new_pcm(struct bcm2835_chip *chip, u32 numchannels)
- 					      snd_bcm2835_playback_hw.buffer_bytes_max,
- 					      snd_bcm2835_playback_hw.buffer_bytes_max);
- 
--
- out:
- 	mutex_unlock(&chip->audio_mutex);
- 	audio_info(" .. OUT\n");
-@@ -541,8 +538,8 @@ int snd_bcm2835_new_spdif_pcm(struct bcm2835_chip *chip)
- 	/* pre-allocation of buffers */
- 	/* NOTE: this may fail */
- 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
--		snd_dma_continuous_data(GFP_KERNEL),
--		snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
-+					      snd_dma_continuous_data(GFP_KERNEL),
-+					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
- out:
- 	mutex_unlock(&chip->audio_mutex);
- 	audio_info(" .. OUT\n");
++static const struct acpi_device_id mbigen_acpi_match[] = {
++	{ "HISI0152", 0 },
++	{}
++};
++MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
++
+ static struct platform_driver mbigen_platform_driver = {
+ 	.driver = {
+ 		.name		= "Hisilicon MBIGEN-V2",
+ 		.of_match_table	= mbigen_of_match,
++		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+ 	},
+ 	.probe			= mbigen_device_probe,
+ };
 -- 
-2.4.10
+1.9.1
