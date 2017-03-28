@@ -1,94 +1,49 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 14:22:29 +0200
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <20170328115413.GJ23682@e104320-lin>
-References: <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com>
- <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
- <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
- <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
-Message-ID: <20170328122229.GA31789@cbox>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Tue, 28 Mar 2017 17:57:29 +0530
+Subject: [PATCH v4 0/3] Support for USB DRD Phy driver for NS2
+Message-ID: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 12:54:13PM +0100, Achin Gupta wrote:
-> On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
-> > On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
-> > > Hi Christoffer,
-> > >
-> > > (CC: Leif and Achin who know more about how UEFI fits into this picture)
-> > >
-> > > On 21/03/17 19:39, Christoffer Dall wrote:
-> > > > On Tue, Mar 21, 2017 at 07:11:44PM +0000, James Morse wrote:
-> > > >> On 21/03/17 11:34, Christoffer Dall wrote:
-> > > >>> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
-> > > >>>> On 2017/3/20 23:08, James Morse wrote:
-> > > >>>>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
-> > > >>>>>>>>> In the RAS implementation, hardware pass the virtual SEI
-> > > >>>>>>>>> syndrome information through the VSESR_EL2, so set the virtual
-> > > >>>>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
-> > > >>>>>>>>> the guest OS
-> > > >>>>>
-> > > >>>>> How does this work with firmware first?
-> > > >>>>
-> > > >>>> I explained it in previous mail about the work flow.
-> > > >>>
-> > > >>> When delivering and reporting SEIs to the VM, should this happen
-> > > >>> directly to the OS running in the VM, or to the guest firmware (e.g.
-> > > >>> UEFI) running in the VM as well?
-> > > >>
-> > > >> 'firmware first' is the ACPI specs name for x86's BIOS or management-mode
-> > > >> handling the error. On arm64 we have multiple things called firmware, so the
-> > > >> name might be more confusing than helpful.
-> > > >>
-> > > >> As far as I understand it, firmware here refers to the secure-world and EL3.
-> > > >> Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
-> > > >> routing them to EL3 where secure platform specific firmware generates CPER records.
-> > > >> For a guest, Qemu takes the role of this EL3-firmware.
-> 
-> +1
-> 
-> > > >>
-> > > > Thanks for the clarification.  So UEFI in the VM would not be involved
-> > > > in this at all?
-> > >
-> > > On the host, part of UEFI is involved to generate the CPER records.
-> > > In a guest?, I don't know.
-> > > Qemu could generate the records, or drive some other component to do it.
-> >
-> > I think I am beginning to understand this a bit.  Since the guet UEFI
-> > instance is specifically built for the machine it runs on, QEMU's virt
-> > machine in this case, they could simply agree (by some contract) to
-> > place the records at some specific location in memory, and if the guest
-> > kernel asks its guest UEFI for that location, things should just work by
-> > having logic in QEMU to process error reports and populate guest memory.
-> >
-> > Is this how others see the world too?
-> 
-> I think so!
-> 
-> AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
-> the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
-> HEST for the guest Kernel?
-> 
-> If so, then the question is how the guest UEFI finds out where QEMU (acting as
-> EL3 firmware) will populate the CPERs. This could either be a contract between
-> the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
-> where the memory is.
-> 
-> This is the way I expect it to work at the EL3/EL2 boundary. So I am
-> extrapolating it to the guest/hypervisor boundary. Do shout if I am missing
-> anything.
+Changes in v4:
+=============
+Remove references to edev->name in debug prints.
 
-No that sounds like a resonable comparison.
+<clip: as before>
+Changes in v3:
+=============
+Remove unnecessary checks for poweron as suggested in review.
 
-I'm not entirely sure what a HEST or GHES is, but I think the only place
-where I'm still not clear is if when the guest kernel is notified of
-errors does it (a) just traverse memory by following some pointers
-(which it may have pre-loaded at boot from UEFI), or (b) run UEFI code
-which can call into QEMU and generate error records on demand?
+Changes in v2:
+=============
+1. Initialize file operations .owner field with THIS_MODULE.
+2. Remove unnecessary gpio example in DT bindings documentation.
+   This is previously acked by Rob Herring <robh@kernel.org>
 
-Thanks,
--Christoffer
+Introduction for PATCH v1:
+
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
+
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
+
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy_v4
+
+Raviteja Garimella (3):
+  Add DT bindings documentation for NS2 USB DRD phy
+  Broadcom USB DRD Phy driver for Northstar2
+  DT nodes for Broadcom Northstar2 USB DRD Phy
+
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 567 +++++++++++++++++++++
+ 5 files changed, 625 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+
+-- 
+2.1.0
