@@ -1,32 +1,45 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Tue, 28 Mar 2017 10:41:55 -0500
-Subject: [PATCH V3] ACPI / IPMI: allow ACPI_IPMI with IPMI_SSIF
-In-Reply-To: <2114234.4yPomsncjf@aspire.rjw.lan>
-References: <1490450575-29450-1-git-send-email-okaya@codeaurora.org>
- <6b3eb826-acca-d3b5-5520-18d9ffd03e9c@codeaurora.org>
- <43180304-6bc7-049e-dfc8-13f3c9a0fe48@acm.org>
- <2114234.4yPomsncjf@aspire.rjw.lan>
-Message-ID: <8e372d41-af13-9d10-4362-9346ef13012c@acm.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 28 Mar 2017 18:42:17 +0300
+Subject: [GIT PULL] mfd: exynos-lpass: Pinctrl dependency
+In-Reply-To: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170328154217.5405-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2017 10:20 AM, Rafael J. Wysocki wrote:
-> On Tuesday, March 28, 2017 07:31:50 AM Corey Minyard wrote:
->> On 03/27/2017 09:21 AM, Sinan Kaya wrote:
->>> Rafael,
->>>
->>> On 3/25/2017 9:25 PM, Corey Minyard wrote:
->>>> If the ACPI people ack this, I can queue it, or they can take it with:
->>>>
->>>> Acked-by: Corey Minyard <cminyard@mvista.com>
->>> What's your preference?
->> I can take it, it's all ready, I just need the ack.
-> OK, feel free to add an ACK from me then.
 
-Thanks, queued and going to the linux-next tomorrow.
+Hi Lee,
 
--corey
 
-> Thanks,
-> Rafael
->
+This is dependency for mfd/exynos-lpass driver changes from Marek Szyprowski.
+That's a material for v4.12 and I will be pushing this later to Linus Walleij.
+
+
+Best regards,
+Krzysztof
+
+
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-retention-4.12
+
+for you to fetch changes up to e1d7eb0c8fc9c33ef60ac31172fb0fbb78c24271:
+
+  pinctrl: samsung: Add support for pad retention control for Exynos5433 SoCs (2017-03-23 21:07:02 +0200)
+
+----------------------------------------------------------------
+Add retention control to Exynos5433 pinctrl driver, necessary for proper
+handling of runtime Power Management of Exynos Audio SubSystem and effectively
+allowing to power down the domain.
+
+----------------------------------------------------------------
+Marek Szyprowski (2):
+      pinctrl: samsung: Ensure that pad retention is disabled on driver init
+      pinctrl: samsung: Add support for pad retention control for Exynos5433 SoCs
+
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 63 ++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
