@@ -1,49 +1,71 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 28 Mar 2017 17:53:13 +0200
-Subject: [GIT PULL 2/3] Rockchip dts64 updates for 4.12 part1
-In-Reply-To: <5178456.jWASpzTAdU@phil>
-References: <5178456.jWASpzTAdU@phil>
-Message-ID: <17137029.z2AnQCnjUI@phil>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 28 Mar 2017 21:36:30 +0530
+Subject: [V9, 07/11] iommu: of: Handle IOMMU lookup failure with deferred
+ probing or error
+In-Reply-To: <20170328150001.j57jko6mx35npgp2@rob-hp-laptop>
+References: <1489086061-9356-8-git-send-email-sricharan@codeaurora.org>
+ <20170328150001.j57jko6mx35npgp2@rob-hp-laptop>
+Message-ID: <7312ddb8-3d6e-0665-9e7e-1a39c6fb597b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+Hi,
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+On 3/28/2017 8:30 PM, Rob Herring wrote:
+> On Fri, Mar 10, 2017 at 12:30:57AM +0530, Sricharan R wrote:
+>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>> be handled separately from the .of_xlate() failures to support deferred
+>> probing.
+>>
+>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>> been deferred, or having failed.
+>>
+>> The first case occurs when the device tree describes the bus master and
+>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>> or the device driver has not been compiled in. Return NULL, the caller
+>> will configure the device without an IOMMU.
+>>
+>> The second and third cases are handled by deferring the probe of the bus
+>> master device which will eventually get reprobed after the IOMMU.
+>>
+>> The last case is currently handled by deferring the probe of the bus
+>> master device as well. A mechanism to either configure the bus master
+>> device without an IOMMU or to fail the bus master device probe depending
+>> on whether the IOMMU is optional or mandatory would be a good
+>> enhancement.
+>>
+>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  drivers/base/dma-mapping.c | 5 +++--
+>>  drivers/iommu/of_iommu.c   | 4 ++--
+>>  drivers/of/device.c        | 7 ++++++-
+>>  include/linux/of_device.h  | 9 ++++++---
+>>  4 files changed, 17 insertions(+), 8 deletions(-)
+>
+> Maybe it is the same issue reported for VFIO, but virtio-pci is broken
+> with v8 of this series. Bisecting blames this commit which looks like it
+> hasn't changeed.
 
-are available in the git repository at:
+Ya, as Robin mentioned it was broken at patch #2 and
+comes out after this patch. I am going to repost this series with
+couple of more fixes added as well.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts64-1
+>
+> Rob
+>
+> P.S. Doesn't look like you have copied the DT maintainers nor list for
+> the DT changes.
 
-for you to fetch changes up to 41b464ef10219e45513d1bcaddacd47ce0bd6136:
+Ha, really sorry about that. will add it.
 
-  arm64: dts: rockchip: fix PCIe domain number for rk3399 (2017-03-22 17:50:09 +0100)
+Regards,
+  Sricharan
 
-----------------------------------------------------------------
-Contains various changes for the rk3368 (dma, i2s, disable mailbox per
-default, mmc-resets) and also removes the wrongly added idle states, that
-do not match the hardware's capabilities, as well as some general rk3399
-pcie fixes as well as also the mmc resets.
-
-----------------------------------------------------------------
-Brian Norris (1):
-      arm64: dts: rockchip: sort rk3399-pcie by unit address
-
-Heiko Stuebner (3):
-      arm64: dts: rockchip: remove wrongly added idle states on rk3368
-      arm64: dts: rockchip: add rk3368 dw-mmc resets
-      arm64: dts: rockchip: add rk3399 dw-mmc resets
-
-Huibin Hong (1):
-      arm64: dts: rockchip: add dmac nodes for rk3368 SoCs
-
-Jianqun Xu (2):
-      arm64: dts: rockchip: add i2s nodes support for RK3368 SoCs
-      arm64: dts: rockchip: disable mailbox of RK3368 SoCs per default
-
-Shawn Lin (1):
-      arm64: dts: rockchip: fix PCIe domain number for rk3399
-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 94 +++++++++++++++++++++++++-------
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 93 ++++++++++++++++---------------
- 2 files changed, 123 insertions(+), 64 deletions(-)
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
+member of Code Aurora Forum, hosted by The Linux Foundation
