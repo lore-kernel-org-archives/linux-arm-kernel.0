@@ -1,27 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 28 Mar 2017 21:33:18 +0200
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: change switch2 label
-In-Reply-To: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
-References: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
-Message-ID: <20170328193318.GG2268@lunn.ch>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 28 Mar 2017 12:37:28 -0700
+Subject: [PATCH v2 2/2] ARM64: dts: meson-gxl: Add missing pinctrl pins
+ groups
+In-Reply-To: <CACRpkdZ2LBafy6qxH6JFq2O8i-zv3Zs-2YPfVWs0RetnvCSzKg@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 28 Mar 2017 11:27:01 +0200")
+References: <20170323104112.16558-1-narmstrong@baylibre.com>
+ <20170323104112.16558-3-narmstrong@baylibre.com>
+ <CACRpkdZ2LBafy6qxH6JFq2O8i-zv3Zs-2YPfVWs0RetnvCSzKg@mail.gmail.com>
+Message-ID: <m2efxh9oqv.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 03:24:26PM -0400, Vivien Didelot wrote:
-> Rename the switch2 at 0 label of the switch2 node to switch at 0 to respect
-> the general unit at address DTS rule, and be consistent with the other
-> switch nodes of the DTS file.
-> 
-> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Hi Vivien
+> On Thu, Mar 23, 2017 at 11:41 AM, Neil Armstrong
+> <narmstrong@baylibre.com> wrote:
+>
+>> Add pinctrl pins nodes following the additions of missing pins in the pinctrl
+>> driver.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-You might need to rebase this onto
+Applied to amlogic v4.12/dt64 branch with Linus' ack,
 
-git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-
-There have been a few other changes to the ZII dts files this cycle.
-
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-    Andrew
+Kevin
