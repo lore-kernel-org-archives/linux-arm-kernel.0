@@ -1,57 +1,72 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 28 Mar 2017 13:38:28 +0900
-Subject: [PATCH 1/2] phy: qcom-usb-hs: Replace the extcon API
-References: <CGME20170328043830epcas1p4069bda461ad648cfd6598905b7167e9f@epcas1p4.samsung.com>
-Message-ID: <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 28 Mar 2017 13:42:02 +0900
+Subject: [PATCH] usb: mtu3: Replace the extcon API
+References: <CGME20170328044203epcas5p3a1c11c5eae084c06cdc5291f37232b83@epcas5p3.samsung.com>
+Message-ID: <1490676122-2655-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch uses the resource-managed extcon API for extcon_register_notifier()
 and replaces the deprecated extcon API as following:
-- (deprecated) extcon_get_cable_state_() -> extcon_get_state()
+- extcon_get_cable_state_() -> extcon_get_state()
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Cc: linux-usb at vger.kernel.org
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/phy/phy-qcom-usb-hs.c | 14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
+ drivers/usb/mtu3/mtu3_dr.c | 19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
-index 94dfbfd739c3..f630fa553b7d 100644
---- a/drivers/phy/phy-qcom-usb-hs.c
-+++ b/drivers/phy/phy-qcom-usb-hs.c
-@@ -156,12 +156,12 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
- 	}
+diff --git a/drivers/usb/mtu3/mtu3_dr.c b/drivers/usb/mtu3/mtu3_dr.c
+index 1a8987e7c5b0..11a0d3b84c5e 100644
+--- a/drivers/usb/mtu3/mtu3_dr.c
++++ b/drivers/usb/mtu3/mtu3_dr.c
+@@ -223,25 +223,25 @@ static int ssusb_extcon_register(struct otg_switch_mtk *otg_sx)
+ 		return 0;
  
- 	if (uphy->vbus_edev) {
--		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
-+		state = extcon_get_state(uphy->vbus_edev, EXTCON_USB);
- 		/* setup initial state */
- 		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
- 					      uphy->vbus_edev);
--		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
--				&uphy->vbus_notify);
-+		ret = devm_extcon_register_notifier(&ulpi->dev, uphy->vbus_edev,
-+				EXTCON_USB, &uphy->vbus_notify);
- 		if (ret)
- 			goto err_ulpi;
- 	}
-@@ -180,16 +180,8 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+ 	otg_sx->vbus_nb.notifier_call = ssusb_vbus_notifier;
+-	ret = extcon_register_notifier(edev, EXTCON_USB,
++	ret = devm_extcon_register_notifier(ssusb->dev, edev, EXTCON_USB,
+ 					&otg_sx->vbus_nb);
+ 	if (ret < 0)
+ 		dev_err(ssusb->dev, "failed to register notifier for USB\n");
  
- static int qcom_usb_hs_phy_power_off(struct phy *phy)
- {
--	int ret;
- 	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
+ 	otg_sx->id_nb.notifier_call = ssusb_id_notifier;
+-	ret = extcon_register_notifier(edev, EXTCON_USB_HOST,
++	ret = devm_extcon_register_notifier(ssusb->dev, edev, EXTCON_USB_HOST,
+ 					&otg_sx->id_nb);
+ 	if (ret < 0)
+ 		dev_err(ssusb->dev, "failed to register notifier for USB-HOST\n");
  
--	if (uphy->vbus_edev) {
--		ret = extcon_unregister_notifier(uphy->vbus_edev, EXTCON_USB,
--						 &uphy->vbus_notify);
--		if (ret)
--			return ret;
+ 	dev_dbg(ssusb->dev, "EXTCON_USB: %d, EXTCON_USB_HOST: %d\n",
+-		extcon_get_cable_state_(edev, EXTCON_USB),
+-		extcon_get_cable_state_(edev, EXTCON_USB_HOST));
++		extcon_get_state(edev, EXTCON_USB),
++		extcon_get_state(edev, EXTCON_USB_HOST));
+ 
+ 	/* default as host, switch to device mode if needed */
+-	if (extcon_get_cable_state_(edev, EXTCON_USB_HOST) == false)
++	if (extcon_get_state(edev, EXTCON_USB_HOST) == false)
+ 		ssusb_set_mailbox(otg_sx, MTU3_ID_FLOAT);
+-	if (extcon_get_cable_state_(edev, EXTCON_USB) == true)
++	if (extcon_get_state(edev, EXTCON_USB) == true)
+ 		ssusb_set_mailbox(otg_sx, MTU3_VBUS_VALID);
+ 
+ 	return 0;
+@@ -367,13 +367,6 @@ void ssusb_otg_switch_exit(struct ssusb_mtk *ssusb)
+ 
+ 	cancel_delayed_work(&otg_sx->extcon_reg_dwork);
+ 
+-	if (otg_sx->edev) {
+-		extcon_unregister_notifier(otg_sx->edev,
+-			EXTCON_USB, &otg_sx->vbus_nb);
+-		extcon_unregister_notifier(otg_sx->edev,
+-			EXTCON_USB_HOST, &otg_sx->id_nb);
 -	}
 -
- 	regulator_disable(uphy->v3p3);
- 	regulator_disable(uphy->v1p8);
- 	clk_disable_unprepare(uphy->sleep_clk);
+ 	if (otg_sx->manual_drd_enabled)
+ 		ssusb_debugfs_exit(ssusb);
+ }
 -- 
 1.9.1
