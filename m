@@ -1,65 +1,83 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Mar 2017 14:40:10 +0100
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com>
-References: <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
- <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
- <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
- <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com>
-Message-ID: <58DA67BA.8070404@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Mar 2017 14:45:13 +0200
+Subject: [PATCH v2 4/9] arm64: KVM: Make unexpected reads from WO
+ registers inject an undef
+In-Reply-To: <20170327160345.12402-5-marc.zyngier@arm.com>
+References: <20170327160345.12402-1-marc.zyngier@arm.com>
+ <20170327160345.12402-5-marc.zyngier@arm.com>
+Message-ID: <20170328124513.GD31156@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
-
-On 28/03/17 13:16, gengdongjiu wrote:
-> On 2017/3/28 19:54, Achin Gupta wrote:
->> On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
->>> On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
->>>> On the host, part of UEFI is involved to generate the CPER records.
->>>> In a guest?, I don't know.
->>>> Qemu could generate the records, or drive some other component to do it.
->>>
->>> I think I am beginning to understand this a bit.  Since the guet UEFI
->>> instance is specifically built for the machine it runs on, QEMU's virt
->>> machine in this case, they could simply agree (by some contract) to
->>> place the records at some specific location in memory, and if the guest
->>> kernel asks its guest UEFI for that location, things should just work by
->>> having logic in QEMU to process error reports and populate guest memory.
->>>
->>> Is this how others see the world too?
->>
->> I think so!
->>
->> AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
->> the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
->> HEST for the guest Kernel?
->>
->> If so, then the question is how the guest UEFI finds out where QEMU (acting as
->> EL3 firmware) will populate the CPERs. This could either be a contract between
->> the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
->> where the memory is.
+On Mon, Mar 27, 2017 at 05:03:40PM +0100, Marc Zyngier wrote:
+> Reads from write-only system registers are generally confined to
+> EL1 and not propagated to EL2 (that's what the architecture
+> mantates). In order to be sure that we have a sane behaviour
+> even in the unlikely event that we have a broken system, we still
+> handle it in KVM.
 > 
-> whether invoke the guest UEFI will be complex? not see the advantage. it seems x86 Qemu
-> directly generate the ACPI table, but I am not sure, we are checking the qemu
-logical.
-> let Qemu generate CPER record may be clear.
+> In that case, let's inject an undef into the guest.
+> 
+> Let's also remove write_to_read_only which isn't used anywhere.
+> 
 
-At boot UEFI in the guest will need to make sure the areas of memory that may be
-used for CPER records are reserved. Whether UEFI or Qemu decides where these are
-needs deciding, (but probably not here)...
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
-At runtime, when an error has occurred, I agree it would be simpler (fewer
-components involved) if Qemu generates the CPER records. But if UEFI made the
-memory choice above they need to interact and it gets complicated again. The
-CPER records are defined in the UEFI spec, so I would expect UEFI to contain
-code to generate/parse them.
-
-
-Thanks,
-
-James
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/sys_regs.c |  9 +++++++++
+>  arch/arm64/kvm/sys_regs.h | 18 ------------------
+>  2 files changed, 9 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 5e3ce7890b35..19a036b4f6ac 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -55,6 +55,15 @@
+>   * 64bit interface.
+>   */
+>  
+> +static bool read_from_write_only(struct kvm_vcpu *vcpu,
+> +				 const struct sys_reg_params *params)
+> +{
+> +	WARN_ONCE(1, "Unexpected sys_reg read to write-only register\n");
+> +	print_sys_reg_instr(params);
+> +	kvm_inject_undefined(vcpu);
+> +	return false;
+> +}
+> +
+>  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+>  static u32 cache_levels;
+>  
+> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+> index 9c6ffd0f0196..638f724e45af 100644
+> --- a/arch/arm64/kvm/sys_regs.h
+> +++ b/arch/arm64/kvm/sys_regs.h
+> @@ -83,24 +83,6 @@ static inline bool read_zero(struct kvm_vcpu *vcpu,
+>  	return true;
+>  }
+>  
+> -static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
+> -				      const struct sys_reg_params *params)
+> -{
+> -	kvm_debug("sys_reg write to read-only register at: %lx\n",
+> -		  *vcpu_pc(vcpu));
+> -	print_sys_reg_instr(params);
+> -	return false;
+> -}
+> -
+> -static inline bool read_from_write_only(struct kvm_vcpu *vcpu,
+> -					const struct sys_reg_params *params)
+> -{
+> -	kvm_debug("sys_reg read to write-only register at: %lx\n",
+> -		  *vcpu_pc(vcpu));
+> -	print_sys_reg_instr(params);
+> -	return false;
+> -}
+> -
+>  /* Reset functions */
+>  static inline void reset_unknown(struct kvm_vcpu *vcpu,
+>  				 const struct sys_reg_desc *r)
+> -- 
+> 2.11.0
+> 
