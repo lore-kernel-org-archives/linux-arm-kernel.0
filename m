@@ -1,99 +1,174 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Mar 2017 16:38:41 +0100
-Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
- multiple erratum detection methods
-In-Reply-To: <20170328145524.GD2123@mai>
-References: <20170322154114.GE30499@mai>
- <a922484a-1bb0-cfd0-1996-fab026a4feae@arm.com> <20170323173030.GA24630@mai>
- <5e8faa45-bb1b-fd9b-f34f-93ce5babb0a3@arm.com> <20170327075628.GE24630@mai>
- <e0e0a3d7-2252-5fd6-3247-c128208fd9b9@arm.com> <20170328133438.GB2123@mai>
- <ec5e673c-6d02-fc88-9913-b0f9261da05e@arm.com> <20170328143633.GC2123@mai>
- <ee4b5b59-e6ef-6f55-792c-6aa39d354adb@arm.com> <20170328145524.GD2123@mai>
-Message-ID: <645ab4be-2730-3197-9d70-4e44692ea693@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 28 Mar 2017 16:41:12 +0100
+Subject: [PATCH v22 11/11] acpi/arm64: Add SBSA Generic Watchdog support
+ in GTDT driver
+In-Reply-To: <20170321163122.9183-12-fu.wei@linaro.org>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <20170321163122.9183-12-fu.wei@linaro.org>
+Message-ID: <20170328154111.GC18046@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/03/17 15:55, Daniel Lezcano wrote:
-> On Tue, Mar 28, 2017 at 03:48:23PM +0100, Marc Zyngier wrote:
->> On 28/03/17 15:36, Daniel Lezcano wrote:
->>> On Tue, Mar 28, 2017 at 03:07:52PM +0100, Marc Zyngier wrote:
->>>
->>> [ ... ]
->>>
->>>>>>> -bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaround *wa,
->>>>>>> -					 const void *arg)
->>>>>>> +bool arch_timer_check_cap_erratum(const struct arch_timer_erratum_workaround *wa,
->>>>>>> +				  const void *arg)
->>>>>>>  {
->>>>>>> -	return cpus_have_cap((uintptr_t)wa->id);
->>>>>>> +	return cpus_have_cap((uintptr_t)wa->id) | this_cpu_has_cap((uintptr_t)wa->id);
->>>>>>
->>>>>> Not quite. Here, you're making all capability-based errata to be be
->>>>>> global (if a single CPU in the system has a capability, then by
->>>>>> transitivity cpus_have_cap returns true). If that's a big-little system,
->>>>>> you end-up applying the workaround to all CPUs, including those unaffected.
->>>>>>
->>>>>> I'd rather drop cpus_have_cap altogether and rely on individual CPU
->>>>>> matching (since we don't have a need for a global capability erratum
->>>>>> handling yet).
->>>>>
->>>>> Ok, thanks.
->>>>
->>>> Quick update. I've just implemented this, and found out that getting rid
->>>> of local/global has an unfortunate effect:
->>>>
->>>> Since we only probe the global errata (using ACPI for example) on the
->>>> boot CPU path, we lose propagation of the erratum across the secondary
->>>> CPUs. One way of solving this is to convert the secondary boot path to
->>>> be aware of DT vs ACPI vs detection method of the month. Which isn't
->>>> easy, since by the time we boot secondary CPUs, we don't have the
->>>> pointers to the various ACPI tables anymore. Also, assuming we were
->>>> careful and saved the pointers, the tables may have been unmapped. Fun.
->>>
->>> My proposal was supposed to prevent that. The detecion is done in the
->>> subsystems, ACPI detects ACPI errata, DT detects DT errata and CPU detects CPU
->>> errata. The drivers get the errata and enable the workaround. The id
->>> association <-> errata self contains errata types (void *, char *, int). So
->>> everything can be done in a CPU basis without local / global dance.
->>
->> I'm sorry, but it feels like a Jumbo-Jet sized hammer to try and squash
->> a fly (I'm staying away from the frozen shark metaphor here). You're
->> willing to add a whole list of things with private ids that need
->> matching to kill a flag? I don't think this buys us anything but extra
->> complexity and another maintenance headache.
+On Wed, Mar 22, 2017 at 12:31:22AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> Well, it is like your approach except it is split in two steps.
+> This driver adds support for parsing SBSA Generic Watchdog timer
+> in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
+> and creating a platform device with that information.
 > 
-> Can you explain where is the extra complexity ? May be I am missing the point.
+> This allows the operating system to obtain device data from the
+> resource of platform device. The platform device named "sbsa-gwdt"
+> can be used by the ARM SBSA Generic Watchdog driver.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+> ---
+>  drivers/acpi/arm64/gtdt.c | 94 +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 94 insertions(+)
+> 
+> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
+> index f471873..5d167f0 100644
+> --- a/drivers/acpi/arm64/gtdt.c
+> +++ b/drivers/acpi/arm64/gtdt.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/acpi.h>
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+> +#include <linux/platform_device.h>
+>  
+>  #include <clocksource/arm_arch_timer.h>
+>  
+> @@ -59,6 +60,17 @@ static inline bool is_timer_block(void *platform_timer)
+>  	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
+>  }
+>  
+> +static inline bool is_non_secure_watchdog(void *platform_timer)
+> +{
+> +	struct acpi_gtdt_header *gh = platform_timer;
+> +	struct acpi_gtdt_watchdog *wd = platform_timer;
+> +
+> +	if (gh->type != ACPI_GTDT_TYPE_WATCHDOG)
+> +		return false;
+> +
+> +	return !(wd->timer_flags & ACPI_GTDT_WATCHDOG_SECURE);
+> +}
+> +
+>  static int __init map_gt_gsi(u32 interrupt, u32 flags)
+>  {
+>  	int trigger, polarity;
+> @@ -285,3 +297,85 @@ int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
+>  
+>  	return 0;
+>  }
+> +
+> +/*
+> + * Initialize a SBSA generic Watchdog platform device info from GTDT
+> + */
+> +static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
+> +					int index)
+> +{
+> +	struct platform_device *pdev;
+> +	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
+> +
+> +	/*
+> +	 * According to SBSA specification the size of refresh and control
+> +	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
+> +	 */
+> +	struct resource res[] = {
+> +		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
+> +		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
+> +		DEFINE_RES_IRQ(irq),
+> +	};
+> +	int nr_res = ARRAY_SIZE(res);
+> +
+> +	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
+> +		 wd->refresh_frame_address, wd->control_frame_address,
+> +		 wd->timer_interrupt, wd->timer_flags);
+> +
+> +	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
+> +		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
+> +		return -EINVAL;
 
-This is how I understand your approach:
+You should unmap the gsi here.
 
-- Boot the first CPU
-- Build a list of errata discovered at that time
-- Apply erratum on the boot CPU if required, using a yet-to-be-invented
-private id matching mechanism,
-- Boot a secondary CPU
-- Apply erratum if required, parsing the list
-- Realise that you don't have the full list (this CPU comes with an
-erratum that was not in the initial list)
-- Add more to the list
-- Apply erratum, using the same matching mechanism
+> +	}
+> +
+> +	if (irq <= 0) {
+> +		pr_warn("failed to map the Watchdog interrupt.\n");
+> +		nr_res--;
+> +	}
+> +
+> +	/*
+> +	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
+> +	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
+> +	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
 
-This is mine:
+Nit: I would not hardcode drivers paths in comments.
 
-- Boot the first CPU
-- Apply global erratum to all CPUs
-- Apply local erratum
-- Boot a secondary CPU
-- Apply local erratum
+> +	 * info below by matching this name.
+> +	 */
+> +	pdev = platform_device_register_simple("sbsa-gwdt", index, res, nr_res);
+> +	if (IS_ERR(pdev)) {
+> +		acpi_unregister_gsi(wd->timer_interrupt);
+> +		return PTR_ERR(pdev);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init gtdt_sbsa_gwdt_init(void)
+> +{
+> +	int ret, i = 0;
+> +	void *platform_timer;
+> +	struct acpi_table_header *table;
+> +
+> +	if (acpi_disabled)
+> +		return 0;
+> +
+> +	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
+> +		return -EINVAL;
+> +
+> +	ret = acpi_gtdt_init(table, NULL);
+> +	if (ret)
+> +		return ret;
 
-In my case, everything is static, and I don't need to rematch each CPU
-against the list of globally applicable errata.
+Ok, I missed previous versions reviews so I miss the background
+here and I apologise.
 
-If my understanding is flawed, let me know.
+I do not understand why you call acpi_gtdt_init() again (or better,
+why acpi_gtdt_init() does not return straight away) here if the
+stashed pointer in acpi_gtdt_desc is already set. I am not a big fan
+of the for_each_platform_timer macro either, here you can just read
+the ACPI_SIG_GTDT and parse its entries, I see no point in calling
+acpi_gtdt_init() again, there is nothing to stash for later probing,
+is there ?
 
-Thanks,
+Or it is just to reuse common parsing code ? Regardless, if the
+acpi_gtdt_desc struct is already initialized acpi_gtdt_init() should
+just return or I am missing the point.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I would like clarifications on the acpi_gtdt_init() call above please
+(plus GSI unmap fix), apart from that:
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> +	for_each_platform_timer(platform_timer) {
+> +		if (is_non_secure_watchdog(platform_timer)) {
+> +			ret = gtdt_import_sbsa_gwdt(platform_timer, i);
+> +			if (ret)
+> +				break;
+> +			i++;
+> +		}
+> +	}
+> +
+> +	if (i)
+> +		pr_info("found %d SBSA generic Watchdog(s).\n", i);
+> +
+> +	return ret;
+> +}
+> +
+> +device_initcall(gtdt_sbsa_gwdt_init);
+> -- 
+> 2.9.3
+> 
