@@ -1,17 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 28 Mar 2017 08:42:50 -0700
-Subject: [PATCH v8 2/4] PCI: imx6: Allow probe deferal by reset GPIO
+Date: Tue, 28 Mar 2017 08:42:52 -0700
+Subject: [PATCH v8 4/4] PCI: imx6: Do not switch speed if Gen2 is disabled
 In-Reply-To: <20170328154252.6902-1-andrew.smirnov@gmail.com>
 References: <20170328154252.6902-1-andrew.smirnov@gmail.com>
-Message-ID: <20170328154252.6902-3-andrew.smirnov@gmail.com>
+Message-ID: <20170328154252.6902-5-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some designs implement reset GPIO via a GPIO expander connected to a
-peripheral bus. One such example would be i.MX7 Sabre board where said
-GPIO is provided by SPI shift register connected to a bitbanged SPI
-bus. In order to support such designs allow reset GPIO request to defer
-probing of the driver.
+Save a bit of time and avoid going through link speed change procedure
+in configuration where link max speed is limited to Gen1 in DT.
 
 Cc: yurovsky at gmail.com
 Cc: Lucas Stach <l.stach@pengutronix.de>
@@ -23,76 +20,79 @@ Cc: linux-kernel at vger.kernel.org
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/pci/dwc/pci-imx6.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ drivers/pci/dwc/pci-imx6.c | 52 +++++++++++++++++++++++-----------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index e0c36d6..64de9bb 100644
+index c731e41..9407c03 100644
 --- a/drivers/pci/dwc/pci-imx6.c
 +++ b/drivers/pci/dwc/pci-imx6.c
-@@ -595,8 +595,8 @@ static struct dw_pcie_host_ops imx6_pcie_host_ops = {
- 	.host_init = imx6_pcie_host_init,
- };
- 
--static int __init imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
--				     struct platform_device *pdev)
-+static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
-+			      struct platform_device *pdev)
- {
- 	struct dw_pcie *pci = imx6_pcie->pci;
- 	struct pcie_port *pp = &pci->pp;
-@@ -636,7 +636,7 @@ static const struct dw_pcie_ops dw_pcie_ops = {
- 	.link_up = imx6_pcie_link_up,
- };
- 
--static int __init imx6_pcie_probe(struct platform_device *pdev)
-+static int imx6_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct dw_pcie *pci;
-@@ -660,10 +660,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 	imx6_pcie->variant =
- 		(enum imx6_pcie_variants)of_device_get_match_data(dev);
- 
--	/* Added for PCI abort handling */
--	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
--		"imprecise external abort");
+@@ -533,40 +533,40 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+ 		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
+ 		dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
+-	} else {
+-		dev_info(dev, "Link: Gen2 disabled\n");
+-	}
 -
- 	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
- 	if (IS_ERR(pci->dbi_base))
-@@ -683,6 +679,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 			dev_err(dev, "unable to get reset gpio\n");
- 			return ret;
+-	/*
+-	 * Start Directed Speed Change so the best possible speed both link
+-	 * partners support can be negotiated.
+-	 */
+-	tmp = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
+-	tmp |= PORT_LOGIC_SPEED_CHANGE;
+-	dw_pcie_writel_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
+ 
+-	if (imx6_pcie->variant != IMX7D) {
+ 		/*
+-		 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
+-		 * from i.MX6 family when no link speed transition
+-		 * occurs and we go Gen1 -> yep, Gen1. The difference
+-		 * is that, in such case, it will not be cleared by HW
+-		 * which will cause the following code to report false
+-		 * failure.
++		 * Start Directed Speed Change so the best possible
++		 * speed both link partners support can be negotiated.
+ 		 */
++		tmp = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
++		tmp |= PORT_LOGIC_SPEED_CHANGE;
++		dw_pcie_writel_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
++
++		if (imx6_pcie->variant != IMX7D) {
++			/*
++			 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
++			 * from i.MX6 family when no link speed transition
++			 * occurs and we go Gen1 -> yep, Gen1. The difference
++			 * is that, in such case, it will not be cleared by HW
++			 * which will cause the following code to report false
++			 * failure.
++			 */
++
++			ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
++			if (ret) {
++				dev_err(dev, "Failed to bring link up!\n");
++				goto err_reset_phy;
++			}
++		}
+ 
+-		ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
++		/* Make sure link training is finished as well! */
++		ret = imx6_pcie_wait_for_link(imx6_pcie);
+ 		if (ret) {
+ 			dev_err(dev, "Failed to bring link up!\n");
+ 			goto err_reset_phy;
  		}
-+	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
-+		return imx6_pcie->reset_gpio;
+-	}
+-
+-	/* Make sure link training is finished as well! */
+-	ret = imx6_pcie_wait_for_link(imx6_pcie);
+-	if (ret) {
+-		dev_err(dev, "Failed to bring link up!\n");
+-		goto err_reset_phy;
++	} else {
++		dev_info(dev, "Link: Gen2 disabled\n");
  	}
  
- 	/* Fetch clocks */
-@@ -796,11 +794,22 @@ static struct platform_driver imx6_pcie_driver = {
- 		.name	= "imx6q-pcie",
- 		.of_match_table = imx6_pcie_of_match,
- 	},
-+	.probe    = imx6_pcie_probe,
- 	.shutdown = imx6_pcie_shutdown,
- };
- 
- static int __init imx6_pcie_init(void)
- {
--	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
-+	/*
-+	 * Since probe() can be deferred we need to make sure that
-+	 * hook_fault_code is not called after __init memory is freed
-+	 * by kernel and since imx6q_pcie_abort_handler() is a no-op
-+	 * we can install the handler here without risking it
-+	 * accessing some unitialized driver state
-+	 */
-+	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
-+			"imprecise external abort");
-+
-+	return platform_driver_register(&imx6_pcie_driver);
- }
- device_initcall(imx6_pcie_init);
+ 	tmp = dw_pcie_readl_dbi(pci, PCIE_RC_LCSR);
 -- 
 2.9.3
