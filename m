@@ -1,187 +1,149 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Mar 2017 15:05:58 +0100
-Subject: [PATCH v34 06/14] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <20170328110733.GB16309@linaro.org>
-References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
- <20170328065130.16019-4-takahiro.akashi@linaro.org>
- <CAKv+Gu8MFxQ8Lk2io7ywfe=em0qTm8MgCAfrFkQFtAoOaiNqkw@mail.gmail.com>
- <20170328110733.GB16309@linaro.org>
-Message-ID: <CAKv+Gu8_+WR3qrbxX4ZNZwnWDa=rpMgR=hsqzhtyC=n5+0zJUQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Mar 2017 15:07:52 +0100
+Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
+ multiple erratum detection methods
+In-Reply-To: <20170328133438.GB2123@mai>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+ <20170320174829.28182-7-marc.zyngier@arm.com> <20170322154114.GE30499@mai>
+ <a922484a-1bb0-cfd0-1996-fab026a4feae@arm.com> <20170323173030.GA24630@mai>
+ <5e8faa45-bb1b-fd9b-f34f-93ce5babb0a3@arm.com> <20170327075628.GE24630@mai>
+ <e0e0a3d7-2252-5fd6-3247-c128208fd9b9@arm.com> <20170328133438.GB2123@mai>
+Message-ID: <ec5e673c-6d02-fc88-9913-b0f9261da05e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 March 2017 at 12:07, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> Ard,
->
-> On Tue, Mar 28, 2017 at 11:07:05AM +0100, Ard Biesheuvel wrote:
->> On 28 March 2017 at 07:51, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->> > arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
->> > are meant to be called by kexec_load() in order to protect the memory
->> > allocated for crash dump kernel once the image is loaded.
->> >
->> > The protection is implemented by unmapping the relevant segments in crash
->> > dump kernel memory, rather than making it read-only as other archs do,
->> > to prevent any corruption due to potential cache alias (with different
->> > attributes) problem.
->> >
+On 28/03/17 14:34, Daniel Lezcano wrote:
+> On Tue, Mar 28, 2017 at 02:07:30PM +0100, Marc Zyngier wrote:
+>> On 27/03/17 08:56, Daniel Lezcano wrote:
+>>> On Fri, Mar 24, 2017 at 01:51:47PM +0000, Marc Zyngier wrote:
+>>>
+>>> [ ... ]
+>>>
+>>>>> Hi Marc,
+>>>>>
+>>>>> I have been through the driver after applying the patchset. Again thanks for
+>>>>> taking care of this. It is not a simple issue to solve, so here is my minor
+>>>>> contribution.
+>>>>>
+>>>>> The resulting code sounds like over-engineered because the errata check and its
+>>>>> workaround are done at the same place/moment, that forces to deal with an array
+>>>>> with element from different origin.
+>>>>>
+>>>>> I understand you wanted to create a single array to handle the errata
+>>>>> information from the DT, ACPI and CAPS. But IMHO, it does not fit well.
+>>>>>
+>>>>> I would suggest to create 3 arrays: ACPI, DT and CAPS.
+>>>>>
+>>>>> Those arrays contains the errata id *and* an unique private id.
+>>>>>
+>>>>> At boot time, you go through the corresponding array and fill a list of
+>>>>> detected errata with the private id.
+>>>>>
+>>>>> On the other side, an array with the private id and its workaround makes the
+>>>>> assocation. The private id is the contract between the errata and the workaround.
+>>>>>
+>>>>> So the errata handling will occur in two steps:
+>>>>>  1. Boot => errata detection
+>>>>>  2. CPU up => workaround put in place
+>>>>>
+>>>>> With this approach, you can write everything on a per cpu basis, getting rid of
+>>>>> 'global' / 'local'.
+>>>>>
+>>>>> What is this different from your approach ?
+>>>>>
+>>>>>  - no match_id
+>>>>>  - clear separation of errata and workaround
+>>>>>  - Simpler code
+>>>>>  - clear the scene for a more generic errata framework
+>>>>>
+>>>>> That said, now it would make sense to create a generic errata framework to be
+>>>>> filled by the different arch at boot time and retrieve from the different
+>>>>> subsystem in an agnostic way. Well, may be that is a long term suggestion.
+>>>>>
+>>>>> What do you think ?
+>>>>
+>>>> I don't think this buys us anything at all. Separating detection and
+>>>> enablement is not always feasible. In your example above, you assume
+>>>> that all errata are detectable at boot time. Consider that with CPU
+>>>> hotplug, we can bring up a new core at any time, possibly with an
+>>>> erratum that you haven't detected yet.
+>>>
+>>> I guess it has to pass through an init function before being powered on.
 >>
->> I think it would be more accurate to replace 'corruption' with
->> 'coherency issues', given that this patch does not solve the issue of
->> writable aliases that may be used to modify the contents of the
->> region, but it does prevent issues related to mismatched attributes
->> (which are arguably a bigger concern)
->
-> OK
->
->> > Page-level mappings are consistently used here so that we can change
->> > the attributes of segments in page granularity as well as shrink the region
->> > also in page granularity through /sys/kernel/kexec_crash_size, putting
->> > the freed memory back to buddy system.
->> >
->> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> Sure, I never said that the CPU would appear ex-nihilo. But that
+>> somewhat defeats your boot detection vs workaround application construct.
 >>
->> As a head's up, this patch is going to conflict heavily with patches
->> that are queued up in arm64/for-next/core atm.
->
-> I'll look into it later, but
->
->> Some questions below.
+>>>> And even then, what do we get: we trade a simple match ID for a list we
+>>>> build at runtime, another private ID, and additional code to perform
+>>>> that match. The gain is not obvious to me...
+>>>>
+>>>> What would such a generic errata framework look like? A table containing
+>>>> match functions returning a boolean, used to decide whether you need to
+>>>> call yet another function with a bunch of arbitrary parameters.
+>>>>
+>>>> In my experience, such a framework will be either an empty shell
+>>>> (because you need to keep it as generic as possible), or will be riddled
+>>>> with data structures ending up being the union of all the possible cases
+>>>> you've encountered in the kernel. Not a pretty sight.
+>>>
+>>> I disagree but I can understand you don't see the point to write a generic
+>>> framework while the patchset does the job.
 >>
->> > ---
->> >  arch/arm64/kernel/machine_kexec.c | 32 +++++++++++---
->> >  arch/arm64/mm/mmu.c               | 90 ++++++++++++++++++++-------------------
->> >  2 files changed, 72 insertions(+), 50 deletions(-)
->> >
->> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
->> > index bc96c8a7fc79..b63baa749609 100644
->> > --- a/arch/arm64/kernel/machine_kexec.c
->> > +++ b/arch/arm64/kernel/machine_kexec.c
->> > @@ -14,7 +14,9 @@
->> >
->> >  #include <asm/cacheflush.h>
->> >  #include <asm/cpu_ops.h>
->> > +#include <asm/mmu.h>
->> >  #include <asm/mmu_context.h>
->> > +#include <asm/page.h>
->> >
->> >  #include "cpu-reset.h"
->> >
->> > @@ -22,8 +24,6 @@
->> >  extern const unsigned char arm64_relocate_new_kernel[];
->> >  extern const unsigned long arm64_relocate_new_kernel_size;
->> >
->> > -static unsigned long kimage_start;
->> > -
->> >  /**
->> >   * kexec_image_info - For debugging output.
->> >   */
->> > @@ -64,8 +64,6 @@ void machine_kexec_cleanup(struct kimage *kimage)
->> >   */
->> >  int machine_kexec_prepare(struct kimage *kimage)
->> >  {
->> > -       kimage_start = kimage->start;
->> > -
->> >         kexec_image_info(kimage);
->> >
->> >         if (kimage->type != KEXEC_TYPE_CRASH && cpus_are_stuck_in_kernel()) {
->> > @@ -183,7 +181,7 @@ void machine_kexec(struct kimage *kimage)
->> >         kexec_list_flush(kimage);
->> >
->> >         /* Flush the new image if already in place. */
->> > -       if (kimage->head & IND_DONE)
->> > +       if ((kimage != kexec_crash_image) && (kimage->head & IND_DONE))
->> >                 kexec_segment_flush(kimage);
->> >
->> >         pr_info("Bye!\n");
->> > @@ -201,7 +199,7 @@ void machine_kexec(struct kimage *kimage)
->> >          */
->> >
->> >         cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
->> > -               kimage_start, 0);
->> > +               kimage->start, 0);
->> >
->> >         BUG(); /* Should never get here. */
->> >  }
->> > @@ -210,3 +208,25 @@ void machine_crash_shutdown(struct pt_regs *regs)
->> >  {
->> >         /* Empty routine needed to avoid build errors. */
->> >  }
->> > +
->> > +void arch_kexec_protect_crashkres(void)
->> > +{
->> > +       int i;
->> > +
->> > +       kexec_segment_flush(kexec_crash_image);
->> > +
->> > +       for (i = 0; i < kexec_crash_image->nr_segments; i++)
->> > +               set_memory_valid(
->> > +                       __phys_to_virt(kexec_crash_image->segment[i].mem),
->> > +                       kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 0);
->> > +}
->> > +
->> > +void arch_kexec_unprotect_crashkres(void)
->> > +{
->> > +       int i;
->> > +
->> > +       for (i = 0; i < kexec_crash_image->nr_segments; i++)
->> > +               set_memory_valid(
->> > +                       __phys_to_virt(kexec_crash_image->segment[i].mem),
->> > +                       kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 1);
->> > +}
->> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> > index d28dbcf596b6..f6a3c0e9d37f 100644
->> > --- a/arch/arm64/mm/mmu.c
->> > +++ b/arch/arm64/mm/mmu.c
->> > @@ -22,6 +22,8 @@
->> >  #include <linux/kernel.h>
->> >  #include <linux/errno.h>
->> >  #include <linux/init.h>
->> > +#include <linux/ioport.h>
->> > +#include <linux/kexec.h>
->> >  #include <linux/libfdt.h>
->> >  #include <linux/mman.h>
->> >  #include <linux/nodemask.h>
->> > @@ -332,56 +334,31 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
->> >                              NULL, debug_pagealloc_enabled());
->> >  }
->> >
->> > -static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
->> > +static void __init __map_memblock(pgd_t *pgd, phys_addr_t start,
->> > +                                 phys_addr_t end, pgprot_t prot,
->> > +                                 bool page_mappings_only)
->> > +{
->> > +       __create_pgd_mapping(pgd, start, __phys_to_virt(start), end - start,
->> > +                            prot, early_pgtable_alloc,
->> > +                            page_mappings_only);
->> > +}
->> > +
->> > +static void __init map_mem(pgd_t *pgd)
->> >  {
->> >         phys_addr_t kernel_start = __pa_symbol(_text);
->> >         phys_addr_t kernel_end = __pa_symbol(__init_begin);
->> > +       struct memblock_region *reg;
->> >
->> >         /*
->> > -        * Take care not to create a writable alias for the
->> > -        * read-only text and rodata sections of the kernel image.
->> > +        * Temporarily marked as NOMAP to skip mapping in the next for-loop
->> >          */
->> > +       memblock_mark_nomap(kernel_start, kernel_end - kernel_start);
->> >
+>> It is not about this series. Far from it. I'm convinced that a generic
+>> errata framework cannot be written without being either completely
+>> devoid of any useful semantic, or be the union of all possible
+>> semantics. There is simply too much diversity in the problem space. But
+>> feel free to prove me wrong! ;-)
+> 
+> I still think we can write something generic. However, as I have just recently
+> went through the errata handling, I'm certainly missing something. So perhaps,
+> if I have spare time, I can have a closer look and write some skeleton.
+> 
+>>> Let's refocus on the patchset itself.
+>>>
+>>> Can you do the change to have a percpu basis errata in order to remove
+>>> local/global ?
+>>>
+>>> Something as below:
+>>>
+>>>  
+>>>  static
+>>> -bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+>>> -					 const void *arg)
+>>> +bool arch_timer_check_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+>>> +				  const void *arg)
+>>>  {
+>>> -	return cpus_have_cap((uintptr_t)wa->id);
+>>> +	return cpus_have_cap((uintptr_t)wa->id) | this_cpu_has_cap((uintptr_t)wa->id);
 >>
->> OK, so the trick is to mark a memblock region NOMAP temporarily, so
->> that we can iterate over the regions more easily?
->> Is that the sole reason for using NOMAP in this series?
->
-> Yes. (I followed Mark's suggestion.)
->
+>> Not quite. Here, you're making all capability-based errata to be be
+>> global (if a single CPU in the system has a capability, then by
+>> transitivity cpus_have_cap returns true). If that's a big-little system,
+>> you end-up applying the workaround to all CPUs, including those unaffected.
+>>
+>> I'd rather drop cpus_have_cap altogether and rely on individual CPU
+>> matching (since we don't have a need for a global capability erratum
+>> handling yet).
+> 
+> Ok, thanks.
 
-OK. It is slightly hacky, but it should work without any problems afaict
+Quick update. I've just implemented this, and found out that getting rid
+of local/global has an unfortunate effect:
 
-> So I assume that my change here will be essentially orthogonal
-> with the chnages in for-next/core, at least, in its intent.
->
+Since we only probe the global errata (using ACPI for example) on the
+boot CPU path, we lose propagation of the erratum across the secondary
+CPUs. One way of solving this is to convert the secondary boot path to
+be aware of DT vs ACPI vs detection method of the month. Which isn't
+easy, since by the time we boot secondary CPUs, we don't have the
+pointers to the various ACPI tables anymore. Also, assuming we were
+careful and saved the pointers, the tables may have been unmapped. Fun.
 
-Yes. The changes should not conflict in fundamental ways, but the code
-has changed in ways that git will not be able to deal with.
-Unfortunately, that does mean another respin :-(
+Given that, I'm reintroducing the global/local flag for good. It's not
+pretty, but it doesn't require reinventing new ways of dealing with CPUs
+booting late.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
