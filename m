@@ -1,58 +1,138 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 30 Mar 2017 03:46:10 +0800
-Subject: [PATCH v3 08/11] drm/sun4i: tcon: add support for V3s TCON
-In-Reply-To: <20170329194613.55548-1-icenowy@aosc.io>
-References: <20170329194613.55548-1-icenowy@aosc.io>
-Message-ID: <20170329194613.55548-9-icenowy@aosc.io>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 29 Mar 2017 22:03:36 +0200
+Subject: [PATCH v2 1/2] mtd: nand: orion: fix clk handling
+In-Reply-To: <20170327180208.13414-1-gmbnomis@gmail.com>
+References: <20170327180208.13414-1-gmbnomis@gmail.com>
+Message-ID: <20170329220336.2b8bf0df@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+On Mon, 27 Mar 2017 20:02:07 +0200
+Simon Baatz <gmbnomis@gmail.com> wrote:
 
-Allwinner V3s SoC features a TCON without channel 1.
+> The clk handling in orion_nand.c had two problems:
+> 
+> - In the probe function, clk_put() was called for an enabled clock,
+>   which violates the API (see documentation for clk_put() in
+>   include/linux/clk.h)
+> 
+> - In the error path of the probe function, clk_put() could be called
+>   twice for the same clock.
+> 
+> In order to clean this up, use the managed function devm_clk_get() and
+> store the pointer to the clk in the driver data.
+> 
+> Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
+> Cc: <stable@vger.kernel.org> # v4.5+
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 
-Add support for it.
+Applied both.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- drivers/gpu/drm/sun4i/sun4i_drv.c  | 3 ++-
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 +++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+Thanks,
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 68c0b754cdb5..736b28e47281 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -176,7 +176,8 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
- 	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
--		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon");
-+		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
-+		of_device_is_compatible(node, "allwinner,sun8i-v3s-tcon");
- }
- 
- static int compare_of(struct device *dev, void *data)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 2f330e4e2ead..1a710d7d6a74 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -613,11 +613,16 @@ static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
- 	/* nothing is supported */
- };
- 
-+static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
-+	/* nothing is supported */
-+};
-+
- static const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun5i-a13-tcon", .data = &sun5i_a13_quirks },
- 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
- 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
-+	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_tcon_of_table);
--- 
-2.12.0
+Boris
+
+> ---
+> 
+> Changes in v2:
+> * changed whitespace alignment in orion_nand_info struct definition
+> 
+>  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
+>  1 file changed, 21 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> index 4a91c5d000be..3acdc20485f1 100644
+> --- a/drivers/mtd/nand/orion_nand.c
+> +++ b/drivers/mtd/nand/orion_nand.c
+> @@ -23,6 +23,11 @@
+>  #include <asm/sizes.h>
+>  #include <linux/platform_data/mtd-orion_nand.h>
+>  
+> +struct orion_nand_info {
+> +	struct nand_chip chip;
+> +	struct clk *clk;
+> +};
+> +
+>  static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+>  {
+>  	struct nand_chip *nc = mtd_to_nand(mtd);
+> @@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+>  
+>  static int __init orion_nand_probe(struct platform_device *pdev)
+>  {
+> +	struct orion_nand_info *info;
+>  	struct mtd_info *mtd;
+>  	struct nand_chip *nc;
+>  	struct orion_nand_data *board;
+>  	struct resource *res;
+> -	struct clk *clk;
+>  	void __iomem *io_base;
+>  	int ret = 0;
+>  	u32 val = 0;
+>  
+> -	nc = devm_kzalloc(&pdev->dev,
+> -			sizeof(struct nand_chip),
+> +	info = devm_kzalloc(&pdev->dev,
+> +			sizeof(struct orion_nand_info),
+>  			GFP_KERNEL);
+> -	if (!nc)
+> +	if (!info)
+>  		return -ENOMEM;
+> +	nc = &info->chip;
+>  	mtd = nand_to_mtd(nc);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+>  	if (board->dev_ready)
+>  		nc->dev_ready = board->dev_ready;
+>  
+> -	platform_set_drvdata(pdev, mtd);
+> +	platform_set_drvdata(pdev, info);
+>  
+>  	/* Not all platforms can gate the clock, so it is not
+>  	   an error if the clock does not exists. */
+> -	clk = clk_get(&pdev->dev, NULL);
+> -	if (!IS_ERR(clk)) {
+> -		clk_prepare_enable(clk);
+> -		clk_put(clk);
+> -	}
+> +	info->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(info->clk))
+> +		clk_prepare_enable(info->clk);
+>  
+>  	ret = nand_scan(mtd, 1);
+>  	if (ret)
+> @@ -169,26 +173,22 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  no_dev:
+> -	if (!IS_ERR(clk)) {
+> -		clk_disable_unprepare(clk);
+> -		clk_put(clk);
+> -	}
+> +	if (!IS_ERR(info->clk))
+> +		clk_disable_unprepare(info->clk);
+>  
+>  	return ret;
+>  }
+>  
+>  static int orion_nand_remove(struct platform_device *pdev)
+>  {
+> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
+> -	struct clk *clk;
+> +	struct orion_nand_info *info = platform_get_drvdata(pdev);
+> +	struct nand_chip *chip = &info->chip;
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+>  
+>  	nand_release(mtd);
+>  
+> -	clk = clk_get(&pdev->dev, NULL);
+> -	if (!IS_ERR(clk)) {
+> -		clk_disable_unprepare(clk);
+> -		clk_put(clk);
+> -	}
+> +	if (!IS_ERR(info->clk))
+> +		clk_disable_unprepare(info->clk);
+>  
+>  	return 0;
+>  }
