@@ -1,26 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Mar 2017 09:37:56 +0100
-Subject: [kvmtool PATCH v9 09/15] arm: allow creation of an MSI register
- frame region
-In-Reply-To: <20170202163223.15372-10-andre.przywara@arm.com>
-References: <20170202163223.15372-1-andre.przywara@arm.com>
- <20170202163223.15372-10-andre.przywara@arm.com>
-Message-ID: <8f74de98-0418-615b-f852-893a9fa9c98c@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 29 Mar 2017 10:38:36 +0200
+Subject: [PATCH linux-next v2 0/4] usb: gadget: udc: atmel: Endpoint
+ allocation scheme fixes
+In-Reply-To: <cover.1490715349.git.cristian.birsan@microchip.com>
+References: <cover.1490715349.git.cristian.birsan@microchip.com>
+Message-ID: <fd463735-2c32-c8db-2341-6fc0df6c7044@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/17 16:32, Andre Przywara wrote:
-> The GICv3 ITS expects a separate 64K page to hold ITS registers.
-> Add a function to reserve such a page in the guest's I/O memory and
-> use that for the ITS vGIC type.
+Le 28/03/2017 ? 18:07, cristian.birsan at microchip.com a ?crit :
+> From: Cristian Birsan <cristian.birsan@microchip.com>
+> 
+> This patch series provides fixes, based on the feedback received on the mailing list, for
+> the following:
+> 	- fifo table parameters validation against device tree values
+> 	- coding style
+> 	- message display for EP configuration error
+> 	- Kconfig comments for fifo_mode=0
+> 
+> Changes since v1:
+> 	- Removed static for usba_config_fifo_table() function from "Check fifo
+> 	configuration values against device tree" patch
 
-Strictly speaking, this should be a 128kB region, including the page
-containing GITS_TRANSLATER. Not that it matters much, but maybe we
-should consider some special handling if the guest wanders too close to
-the doorbell...
+As for previous revision, the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Thoughts?
+Regards,
 
-	M.
+> Cristian Birsan (4):
+>   usb: gadget: udc: atmel: Check fifo configuration values against
+>     device tree
+>   usb: gadget: udc: atmel: Minor code cleanup
+>   usb: gadget: udc: atmel: Use dev_warn() to display EP configuration
+>     error
+>   usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
+> 
+>  drivers/usb/gadget/udc/Kconfig          |  5 ++--
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 47 ++++++++++++++++++++++-----------
+>  2 files changed, 35 insertions(+), 17 deletions(-)
+> 
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Nicolas Ferre
