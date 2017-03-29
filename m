@@ -1,84 +1,75 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 29 Mar 2017 11:38:27 +0200
-Subject: [PATCH 3/3] ARM: dts: alpine: add valid clock-frequency values
-In-Reply-To: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
-References: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170329093827.18881-3-antoine.tenart@free-electrons.com>
+From: hgkr.klein@gmail.com (Helmut Klein)
+Date: Wed, 29 Mar 2017 11:47:27 +0200
+Subject: [PATCH v2, 3/3] tty/serial: meson_uart: add the core clock
+ handling to the driver
+In-Reply-To: <1490728562.20764.9.camel@baylibre.com>
+References: <20170328092545.4644-1-hgkr.klein@gmail.com>
+ <20170328092545.4644-4-hgkr.klein@gmail.com>
+ <1490728562.20764.9.camel@baylibre.com>
+Message-ID: <a699370f-b1b9-8a0b-c998-5c0432e030a6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Alpine clock-frequency values with valid default values. The
-bootloader can still update these values if needed, but at least we can
-boot if it does not.
+On 28.03.2017 21:16, Jerome Brunet wrote:
+> On Tue, 2017-03-28 at 11:25 +0200, Helmut Klein wrote:
+>> This patch gets the core clock as provided by the DT and enables it.
+>> The code was taken from Amlogic's serial driver, and was tested on my
+>> board.
+>>
+>> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+>> ---
+>>  drivers/tty/serial/meson_uart.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+>> index 60f16795d16b..cb99112288eb 100644
+>> --- a/drivers/tty/serial/meson_uart.c
+>> +++ b/drivers/tty/serial/meson_uart.c
+>> @@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
+>>  	struct resource *res_mem, *res_irq;
+>>  	struct uart_port *port;
+>>  	struct clk *clk;
+>> +	struct clk *core_clk;
+>>  	int ret = 0;
+>>
+>>  	if (pdev->dev.of_node)
+>> @@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
+>>  	if (!port)
+>>  		return -ENOMEM;
+>>
+>> +	core_clk = devm_clk_get(&pdev->dev, "core");
+>> +	if (!IS_ERR(core_clk)) {
+>> +		ret = clk_prepare_enable(core_clk);
+>> +		if (ret) {
+>> +			dev_err(&pdev->dev, "couldn't enable clkc\n");
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
+>>  	clk = clk_get(&pdev->dev, NULL);
+> Now that you have 2 clocks, shouldn't this be named as well ?
+>
+if i change the call to "clk = clk_get(&pdev->dev, "xtal");", then IMHO 
+i must add the
+"clock-names" parameter (clock-names = "xtal") to the sections of the 2 
+AO-UARTs
+(uart_AO & uart_AO_B).
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/alpine.dtsi | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Is this ok?  (or is my assumption wrong?)
 
-diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-index d84bd7955b54..731df7a8c4e6 100644
---- a/arch/arm/boot/dts/alpine.dtsi
-+++ b/arch/arm/boot/dts/alpine.dtsi
-@@ -41,28 +41,28 @@
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <0>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <1>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <2>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <3>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 	};
- 
-@@ -81,7 +81,7 @@
- 				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <50000000>;
- 		};
- 
- 		/* Interrupt Controller */
-@@ -123,7 +123,7 @@
- 		uart0: uart at fd883000 {
- 			compatible = "ns16550a";
- 			reg = <0x0 0xfd883000 0x0 0x1000>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <375000000>;
- 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
-@@ -132,7 +132,7 @@
- 		uart1: uart at fd884000 {
- 			compatible = "ns16550a";
- 			reg = <0x0 0xfd884000 0x0 0x1000>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <375000000>;
- 			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--- 
-2.11.0
+I'm going to add a patch meson-gx.dtsi anyway, so 2 lines more to add, 
+isn't a big deal.
+
+Helmut
+
+>>  	if (IS_ERR(clk))
+>>  		return PTR_ERR(clk);
+>> --
+>> 2.11.0
+>>
+>>
+>> _______________________________________________
+>> linux-amlogic mailing list
+>> linux-amlogic at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+>
