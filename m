@@ -1,84 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Mar 2017 17:33:35 +0100
-Subject: [PATCH] ARM: dma-mapping: Fix dma_get_sgtable() for regions
- without struct page
-In-Reply-To: <20170322224200.GH21222@n2100.armlinux.org.uk>
-References: <CGME20170221131655eucas1p2f2ca6e3c819aeae227c5e5c5f2bc7d3f@eucas1p2.samsung.com>
- <1487682998-2564-1-git-send-email-m.szyprowski@samsung.com>
- <20170322111020.GD21222@n2100.armlinux.org.uk>
- <CAKocOONSt=UjPPVEN0ESLBMAsbk_HeWGQdkzyuUW+X7ddaLwzQ@mail.gmail.com>
- <20170322163237.GF21222@n2100.armlinux.org.uk>
- <CAKocOOMqWByyAotnjKM3Zqq9xUBNcBFMens5Rj08aiM99wxEzg@mail.gmail.com>
- <20170322224200.GH21222@n2100.armlinux.org.uk>
-Message-ID: <20170329163335.GA7909@n2100.armlinux.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 29 Mar 2017 09:39:14 -0700 (PDT)
+Subject: [PATCH] Add hardware PTP support.
+In-Reply-To: <1490796051-28527-1-git-send-email-rafalo@cadence.com>
+References: <1490796051-28527-1-git-send-email-rafalo@cadence.com>
+Message-ID: <20170329.093914.152103359543418375.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, I'm about to merge the following patch for -rc, since refusing
-to create a scattertable for non-page backed memory is the only valid
-solution for that case.  I'm intending to queue this for -rc this
-evening.
+From: Rafal Ozieblo <rafalo@cadence.com>
+Date: Wed, 29 Mar 2017 15:00:51 +0100
 
-8<====
-ARM: dma-mapping: disallow dma_get_sgtable() for non-kernel managed memory
+> This patch is based on original Harini's patch and Andrei's patch,
+> implemented in aseparate file to ease the review/maintanance
+> and integration with other platforms.
+> 
+> In case that macb is compiled as a module, it has been renamed to
+> cadence-macb.ko to avoid naming confusion in Makefile.
+> 
+> This driver does support GEM-GXL:
+> - Enable HW time stamp
+> - Register ptp clock framework
+> - Initialize PTP related registers
+> - Updated dma buffer descriptor read/write mechanism
+> - HW time stamp on the PTP Ethernet packets are received using the
+>   SO_TIMESTAMPING API. Where timers are obtained from the dma buffer
+>   descriptors
+> - Added tsu_clk to device tree
+> 
+> Note: Patch on net-next, on March 15th.
+> 
+> Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
 
-dma_get_sgtable() tries to create a scatterlist table containing valid
-struct page pointers for the coherent memory allocation passed in to it.
+Your subject should provide a proper subsystem prefix such as
+"cadence: " after "[PATCH] ".
 
-However, memory can be declared via dma_declare_coherent_memory(), or
-via other reservation schemes which means that coherent memory is not
-guaranteed to be backed by struct pages.  This means it is not possible
-to create a valid scatterlist via this mechanism.
-
-This patch adds detection of such memory, and refuses to create a
-scatterlist table for such memory.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/mm/dma-mapping.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 63eabb06f9f1..475811f5383a 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -935,13 +935,31 @@ static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_add
- 	__arm_dma_free(dev, size, cpu_addr, handle, attrs, true);
- }
- 
-+/*
-+ * The whole dma_get_sgtable() idea is fundamentally unsafe - it seems
-+ * that the intention is to allow exporting memory allocated via the
-+ * coherent DMA APIs through the dma_buf API, which only accepts a
-+ * scattertable.  This presents a couple of problems:
-+ * 1. Not all memory allocated via the coherent DMA APIs is backed by
-+ *    a struct page
-+ * 2. Passing coherent DMA memory into the streaming APIs is not allowed
-+ *    as we will try to flush the memory through a different alias to that
-+ *    actually being used (and the flushes are redundant.)
-+ */
- int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
- 		 void *cpu_addr, dma_addr_t handle, size_t size,
- 		 unsigned long attrs)
- {
--	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
-+	unsigned long pfn = dma_to_pfn(dev, handle);
-+	struct page *page;
- 	int ret;
- 
-+	/* If the PFN is not valid, we do not have a struct page */
-+	if (!pfn_valid(pfn))
-+		return -ENXIO;
-+
-+	page = pfn_to_page(pfn);
-+
- 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
- 	if (unlikely(ret))
- 		return ret;
--- 
-2.7.4
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Also, March 15th is nearly half a month ago, you should generate
+patches against the current tree.
