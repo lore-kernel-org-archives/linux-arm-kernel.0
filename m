@@ -1,17 +1,44 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Mar 2017 11:49:49 +0800
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: change switch2 label
-In-Reply-To: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
-References: <20170328192426.13798-1-vivien.didelot@savoirfairelinux.com>
-Message-ID: <20170329034947.GA30608@dragon>
+Date: Wed, 29 Mar 2017 11:53:54 +0800
+Subject: [PATCH][v3] arm64: dts: Add support for FSL's LS1088A SoC
+In-Reply-To: <1490718788-11283-1-git-send-email-harninder.rai@nxp.com>
+References: <1490718788-11283-1-git-send-email-harninder.rai@nxp.com>
+Message-ID: <20170329035352.GB30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 03:24:26PM -0400, Vivien Didelot wrote:
-> Rename the switch2 at 0 label of the switch2 node to switch at 0 to respect
-> the general unit at address DTS rule, and be consistent with the other
-> switch nodes of the DTS file.
+On Tue, Mar 28, 2017 at 10:03:08PM +0530, Harninder Rai wrote:
+> LS1088A contains eight ARM v8 CortexA53 processor cores
+> with 32 KB L1-D cache and 32 KB L1-I cache
 > 
-> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+> Features summary
+>  Eight 32-bit / 64-bit ARM v8 Cortex-A53 CPUs
+>   - Arranged as two clusters of four cores sharing a 1 MB L2 cache
+>   - Speed Up to 1.5 GHz
+>   - Support for cluster power-gating.
+>  Cache coherent interconnect (CCI-400)
+>   - Hardware-managed data coherency
+>   - Up to 700 MHz
+>  One 64-bit DDR4 SDRAM memory controller with ECC
+>  Data path acceleration architecture 2.0 (DPAA2)
+>  Three PCIe 3.0 controllers
+>  One serial ATA (SATA 3.0) controller
+>  Three high-speed USB 3.0 controllers with integrated PHY
+> 
+>  Following levels of DTSI/DTS files have been created for the LS1088A
+>   SoC family:
+> 
+>          - fsl-ls1088a.dtsi:
+>                  DTS-Include file for NXP LS1088A SoC.
+> 
+>          - fsl-ls1088a-qds.dts:
+>                  DTS file for NXP LS1088A QDS board.
+> 
+>          - fsl-ls1088a-rdb.dts:
+>                  DTS file for NXP LS1088A RDB board
+> 
+> Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
+> Signed-off-by: Ashish Kumar <ashish.kumar@nxp.com>
+> Signed-off-by: Raghav Dogra <raghav.dogra@nxp.com>`
 
 Applied, thanks.
