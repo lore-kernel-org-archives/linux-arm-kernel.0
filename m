@@ -1,72 +1,211 @@
-From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Wed, 29 Mar 2017 04:55:17 +0000
-Subject: [PATCH v2 10/11] ARM: at91: pm: Remove at91_pm_set_standby
-In-Reply-To: <20170328111938.21297-11-alexandre.belloni@free-electrons.com>
-References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
- <20170328111938.21297-11-alexandre.belloni@free-electrons.com>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D7F7@CHN-SV-EXMX07.mchp-main.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 29 Mar 2017 13:11:58 +0800
+Subject: [PATCH v22 02/11] clocksource: arm_arch_timer: separate out
+ device-tree code and remove arch_timer_detect_rate
+In-Reply-To: <CADyBb7uD1OqpPZf+ADsgbWryCGMGE3GqXOxz_4+1RzC1Pqsccg@mail.gmail.com>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <20170321163122.9183-3-fu.wei@linaro.org>
+ <20170328145814.GE2123@mai>
+ <CADyBb7uD1OqpPZf+ADsgbWryCGMGE3GqXOxz_4+1RzC1Pqsccg@mail.gmail.com>
+Message-ID: <CADyBb7tzJAuvG73v6ZoBVO4ehCC3RMsc1pq5gKF2eQ94j6GXrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Daniel,
 
+On 29 March 2017 at 11:41, Fu Wei <fu.wei@linaro.org> wrote:
+> Hi Daniel,
+>
+> Great thanks for your review, allow me to answer your question below:
+>
+> On 28 March 2017 at 22:58, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>> On Wed, Mar 22, 2017 at 12:31:13AM +0800, fu.wei at linaro.org wrote:
+>>> From: Fu Wei <fu.wei@linaro.org>
+>>>
+>>> Currently, the counter frequency detection call(arch_timer_detect_rate)
+>>> includes getting the frequency from the device-tree property, the per-cpu
+>>> arch-timer and the memory-mapped (MMIO) timer interfaces.
+>>> But reading device-tree property will be needed only when system boot with
+>>> device-tree, and reading from the per-cpu arch-timer and the memory-mapped
+>>> (MMIO) timer interfaces will be needed only when the system initializes
+>>> the relevant timer.
+>>>
+>>> This patch separates out device-tree code, keep them in device-tree init
+>>> function, and removes arch_timer_detect_rate founction, then uses the
+>>> arch_timer_get_cntfrq and arch_timer_mem_get_cntfrq directly.
+>>>
+>>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>>> ---
+>>>  drivers/clocksource/arm_arch_timer.c | 58 +++++++++++++++++++-----------------
+>>>  1 file changed, 30 insertions(+), 28 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>> index 843f923..29ca7d6 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -560,30 +560,6 @@ static u32 arch_timer_mem_get_cntfrq(void __iomem *cntbase)
+>>>       return readl_relaxed(cntbase + CNTFRQ);
+>>>  }
+>>>
+>>> -static void
+>>> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+>>> -{
+>>> -     /* Who has more than one independent system counter? */
+>>> -     if (arch_timer_rate)
+>>> -             return;
+>>> -
+>>> -     /*
+>>> -      * Try to determine the frequency from the device tree or CNTFRQ,
+>>> -      * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
+>>> -      */
+>>> -     if (!acpi_disabled ||
+>>> -         of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+>>> -             if (cntbase)
+>>> -                     arch_timer_rate = arch_timer_mem_get_cntfrq(cntbase);
+>>> -             else
+>>> -                     arch_timer_rate = arch_timer_get_cntfrq();
+>>> -     }
+>>> -
+>>> -     /* Check the timer frequency. */
+>>> -     if (arch_timer_rate == 0)
+>>> -             pr_warn("frequency not available\n");
+>>> -}
+>>> -
+>>>  static void arch_timer_banner(unsigned type)
+>>>  {
+>>>       pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+>>> @@ -958,7 +934,17 @@ static int __init arch_timer_of_init(struct device_node *np)
+>>>       for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
+>>>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>>>
+>>> -     arch_timer_detect_rate(NULL, np);
+>>> +     /*
+>>> +      * Try to determine the frequency from the device tree,
+>>> +      * if fail, get the frequency from the sysreg CNTFRQ.
+>>> +      */
+>>> +     if (!arch_timer_rate &&
+>>
+>> This variable is set only if "arm,armv7-timer" and "arm,armv7-timer-mem" are
+>> declared together in the DT, right ?
+>>
+>> Two declarations for a single variable ? Ignore the !arch_timer_rate.
+>
+> In this function, we try to initialize per-CPU arm arch_timer by DT.
+> this "!arch_timer_rate" is for testing that if we have got system
+> counter frequency from the memory-mapped timer. If so, we just skip
+> getting the frequency from DT or sysreg cntfrq again.
+> This variable is set only if "arm,armv7-timer-mem" is initialized
+> earlier than "arm,armv7-timer", in another word, maybe the node of
+> "arm,armv7-timer-mem" is declared earlier than  "arm,armv7-timer-mem"
+> one in DT.
+>
+> we do this check is for keeping the same init logic as before in the
+> DT, try to avoid any possibility of  breaking devices which boot by
+> DT.
+>
+>>
+>>> +         of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+>>> +             arch_timer_rate = arch_timer_get_cntfrq();
+>>> +     if (!arch_timer_rate) {
+>>> +             pr_err(FW_BUG "frequency not available.\n");
+>>> +             return -EINVAL;
+>>> +     }
+>>
+>> Please, clarify this block, the conditions are unclear.
+>
+> this "!arch_timer_rate" is for verifying that if the system counter
+> frequency we just got from DT or sysreg cntfrq is valid(non-zero).
+>
+> So here, you can see I check arch_timer_rate twice, but they are for
+> different cases.
 
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2017?3?28? 19:20
-> To: Nicolas Ferre - M43238 <Nicolas.Ferre@microchip.com>
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Boris
-> Brezillon <boris.brezillon@free-electrons.com>; Wenyou Yang - A41535
-> <Wenyou.Yang@microchip.com>; Alexandre Belloni <alexandre.belloni@free-
-> electrons.com>
-> Subject: [PATCH v2 10/11] ARM: at91: pm: Remove at91_pm_set_standby
-> 
-> Merge at91_pm_set_standby() in at91_dt_ramc as this is the only callsite.
-> That moves it to the init section.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+I think about this several times,
+For this block, it is a little unclear, so I think this will be better:
 
-Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
++ /*
++ * Try to determine the frequency:
++ * If we have got it in arch_timer_mem_of_init, we don't need to get
+it again, skip.
++ * Otherwise, try to get the frequency from the device tree,
++ * if fail, try to get it from the sysreg CNTFRQ.
++ * Last, verify the arch_timer_rate before leaving this block.
++ */
++ if (!arch_timer_rate) {
++         if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
++                 arch_timer_rate = arch_timer_get_cntfrq();
++         if (!arch_timer_rate) {
++                 pr_err(FW_BUG "frequency not available.\n");
++                 return -EINVAL;
++         }
++ }
 
-> ---
->  arch/arm/mach-at91/pm.c | 10 ++--------
->  1 file changed, 2 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> dedfe9038336..2cd27c830ab6 100644
-> --- a/arch/arm/mach-at91/pm.c
-> +++ b/arch/arm/mach-at91/pm.c
-> @@ -205,12 +205,6 @@ static struct platform_device at91_cpuidle_device = {
->  	.name = "cpuidle-at91",
->  };
-> 
-> -static void at91_pm_set_standby(void (*at91_standby)(void)) -{
-> -	if (at91_standby)
-> -		at91_cpuidle_device.dev.platform_data = at91_standby;
-> -}
-> -
->  /*
->   * The AT91RM9200 goes into self-refresh mode with this command, and will
->   * terminate self-refresh automatically on the next SDRAM access.
-> @@ -354,7 +348,7 @@ static __init void at91_dt_ramc(void)
->  	struct device_node *np;
->  	const struct of_device_id *of_id;
->  	int idx = 0;
-> -	const void *standby = NULL;
-> +	void *standby = NULL;
->  	const struct ramc_info *ramc;
-> 
->  	for_each_matching_node_and_match(np, ramc_ids, &of_id) { @@ -378,7
-> +372,7 @@ static __init void at91_dt_ramc(void)
->  		return;
->  	}
-> 
-> -	at91_pm_set_standby(standby);
-> +	at91_cpuidle_device.dev.platform_data = standby;
->  }
-> 
->  static void at91rm9200_idle(void)
+>
+>>
+>>>
+>>>       arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+>>>
+>>> @@ -1069,7 +1055,19 @@ static int __init arch_timer_mem_init(struct device_node *np)
+>>>               goto out;
+>>>       }
+>>>
+>>> -     arch_timer_detect_rate(base, np);
+>>> +     /*
+>>> +      * Try to determine the frequency from the device tree,
+>>> +      * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
+>>> +      */
+>>> +     if (!arch_timer_rate &&
+>>> +         of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+>>> +             arch_timer_rate = arch_timer_mem_get_cntfrq(base);
+>>> +     if (!arch_timer_rate) {
+>>> +             pr_err(FW_BUG "MMIO frequency not available.\n");
+>>> +             ret = -EINVAL;
+>>> +             goto out;
+>>> +     }
+>>> +
+>>>       ret = arch_timer_mem_register(base, irq);
+>>>       if (ret)
+>>>               goto out;
+>>> @@ -1130,8 +1128,12 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+>>>               map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+>>>               gtdt->non_secure_el2_flags);
+>>>
+>>> -     /* Get the frequency from CNTFRQ */
+>>> -     arch_timer_detect_rate(NULL, NULL);
+>>> +     /* Get the frequency from the sysreg CNTFRQ */
+>>> +     arch_timer_rate = arch_timer_get_cntfrq();
+>>> +     if (!arch_timer_rate) {
+>>> +             pr_err(FW_BUG "frequency not available.\n");
+>>> +             return -EINVAL;
+>>> +     }
+>>>
+>>>       arch_timer_uses_ppi = arch_timer_select_ppi();
+>>>       if (!arch_timer_ppi[arch_timer_uses_ppi]) {
+>>> --
+>>> 2.9.3
+>>>
+>>
+>> --
+>>
+>>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>
+>
+>
 > --
-> 2.11.0
+> Best regards,
+>
+> Fu Wei
+> Software Engineer
+> Red Hat
 
-Best Regards,
-Wenyou Yang
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
