@@ -1,97 +1,65 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Mar 2017 09:39:05 +0100
-Subject: [PATCH v6 02/39] [media] dt-bindings: Add bindings for i.MX
- media driver
-In-Reply-To: <CAL_JsqJm_JjuVPcOBERCqsnjTDdNoKr9xRE9MXMO4ivxGath2Q@mail.gmail.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-3-git-send-email-steve_longerbeam@mentor.com>
- <CAL_JsqJm_JjuVPcOBERCqsnjTDdNoKr9xRE9MXMO4ivxGath2Q@mail.gmail.com>
-Message-ID: <20170329083904.GZ7909@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Mar 2017 09:41:47 +0100
+Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
+In-Reply-To: <20170328202931.GF20211@cbox>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+ <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+ <20170310183555.GB6271@arm.com>
+ <20170322183512.GB27921@leverpostej>
+ <20170328184828.GF8643@leverpostej> <20170328202931.GF20211@cbox>
+Message-ID: <20170329084146.GA15778@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 07:21:34PM -0500, Rob Herring wrote:
-> On Mon, Mar 27, 2017 at 7:40 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
-> > Add bindings documentation for the i.MX media driver.
-> >
-> > Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> > ---
-> >  Documentation/devicetree/bindings/media/imx.txt | 74 +++++++++++++++++++++++++
-> >  1 file changed, 74 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
-> > new file mode 100644
-> > index 0000000..3059c06
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/imx.txt
-> > @@ -0,0 +1,74 @@
-> > +Freescale i.MX Media Video Device
-> > +=================================
-> > +
-> > +Video Media Controller node
-> > +---------------------------
-> > +
-> > +This is the media controller node for video capture support. It is a
-> > +virtual device that lists the camera serial interface nodes that the
-> > +media device will control.
-> > +
-> > +Required properties:
-> > +- compatible : "fsl,imx-capture-subsystem";
-> > +- ports      : Should contain a list of phandles pointing to camera
-> > +               sensor interface ports of IPU devices
-> > +
-> > +example:
-> > +
-> > +capture-subsystem {
-> > +       compatible = "fsl,imx-capture-subsystem";
-> > +       ports = <&ipu1_csi0>, <&ipu1_csi1>;
-> > +};
-> > +
-> > +fim child node
-> > +--------------
-> > +
-> > +This is an optional child node of the ipu_csi port nodes. If present and
-> > +available, it enables the Frame Interval Monitor. Its properties can be
-> > +used to modify the method in which the FIM measures frame intervals.
-> > +Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
-> > +Frame Interval Monitor.
-> > +
-> > +Optional properties:
-> > +- fsl,input-capture-channel: an input capture channel and channel flags,
-> > +                            specified as <chan flags>. The channel number
-> > +                            must be 0 or 1. The flags can be
-> > +                            IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
-> > +                            IRQ_TYPE_EDGE_BOTH, and specify which input
-> > +                            capture signal edge will trigger the input
-> > +                            capture event. If an input capture channel is
-> > +                            specified, the FIM will use this method to
-> > +                            measure frame intervals instead of via the EOF
-> > +                            interrupt. The input capture method is much
-> > +                            preferred over EOF as it is not subject to
-> > +                            interrupt latency errors. However it requires
-> > +                            routing the VSYNC or FIELD output signals of
-> > +                            the camera sensor to one of the i.MX input
-> > +                            capture pads (SD1_DAT0, SD1_DAT1), which also
-> > +                            gives up support for SD1.
-> > +
-> > +
-> > +mipi_csi2 node
-> > +--------------
-> > +
-> > +This is the device node for the MIPI CSI-2 Receiver, required for MIPI
-> > +CSI-2 sensors.
-> > +
-> > +Required properties:
-> > +- compatible   : "fsl,imx6-mipi-csi2", "snps,dw-mipi-csi2";
+On Tue, Mar 28, 2017 at 10:29:31PM +0200, Christoffer Dall wrote:
+> On Tue, Mar 28, 2017 at 07:48:28PM +0100, Mark Rutland wrote:
+> > On Wed, Mar 22, 2017 at 06:35:13PM +0000, Mark Rutland wrote:
+> > > On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
+> > > > On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
+> > > 
+> > > > > The next question is how do we merge this. Obviously, we can't split it
+> > > > > between trees, and this is very likely to clash with anything that we
+> > > > > will merge on the KVM side (the sysreg table is a popular place).
+> > > > > 
+> > > > > Will, Catalin: Would it make sense to create a stable branch with these
+> > > > > patches, and merge it into both the arm64 and KVM trees? That'd make
+> > > > > things easier...
+> > > > 
+> > > > I think the scope for conflict on our side is pretty high too, so a shared
+> > > > branch might be the best way to go. I don't want to branch just yet though,
+> > > > so I'll probably wait a week or so before setting something in stone.
+> > > 
+> > > Any further thoughts on this?
+> > > 
+> > > Christoffer has Acked the KVM bits, so if you're happy to do so for the
+> > > arm64 bits I can make a stable branch.
+> > 
+> > Looking around, it doesn't look like there's anything outside of arm64
+> > that'll conflict on the <asm/sysreg.h> changes, and git's happy to merge
+> > my changes with Suzuki's changes currently queued in arm64's
+> > for-next/core branch.
+> > 
+> > I think it would make sense for those to be in a common branch taken by
+> > both the arm64 and KVM trees, with the KVM-specific parts being taken by
+> > KVM alone atop of that.
+> > 
+> > Would everyone be happy with that?
 > 
-> As I mentioned in v5, there's a DW CSI2 binding in progress. This
-> needs to be based on that.
+> I'm happy with that.
+> 
+> > 
+> > For reference, I've updated my branches so that arm64/common-sysreg only
+> > contains the common parts, with the KVM parts atop of that in
+> > kvm/common-sysreg.
+> > 
+> 
+> Will, Catalin:  Let me know if you're going to pull from common-sysreg
+> and I'll do the same and add the kvm patches above.
 
-Maybe someone can provide some kind of reference to it, and it's
-associated driver?
+I think that's what we'll do, but Catalin's out this week (we're taking it
+in turns to go to work). I'd say go ahead and pull it into kvm if there
+aren't any conflicts. No need to wait for us.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Mark -- those branches are stable, right?
+
+Will
