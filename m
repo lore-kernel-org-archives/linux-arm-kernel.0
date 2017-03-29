@@ -1,32 +1,251 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 29 Mar 2017 14:09:45 -0700 (PDT)
-Subject: [PATCH net-next v2] net: mvneta: set rx mode during resume if
- interface is running
-In-Reply-To: <20170329084719.3596-1-jszhang@marvell.com>
-References: <20170329084719.3596-1-jszhang@marvell.com>
-Message-ID: <20170329.140945.2213903265415651654.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 29 Mar 2017 16:11:05 -0500
+Subject: [PATCH v3 1/7] pinctrl: dt-bindings: Add documentation for
+ Armada 37xx pin controllers
+In-Reply-To: <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1490282185.git-series.gregory.clement@free-electrons.com>
+References: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
+ <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1490282185.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170329211105.ype3os6jldsjyrqa@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
-Date: Wed, 29 Mar 2017 16:47:19 +0800
-
-> I found a bug by:
+On Thu, Mar 23, 2017 at 04:19:01PM +0100, Gregory CLEMENT wrote:
+> Document the device tree binding for the pin controllers found on the
+> Armada 37xx SoCs.
 > 
-> 0. boot and start dhcp client
-> 1. echo mem > /sys/power/state
-> 2. resume back immediately
-> 3. don't touch dhcp client to renew the lease
-> 4. ping the gateway. No acks
+> Update the binding documention of the xtal clk which is a subnode of this
+> syscon node.
 > 
-> Usually, after step2, the DHCP lease isn't expired, so in theory we
-> should resume all back. But in fact, it doesn't. It turns out
-> the rx mode isn't resumed correctly. This patch fixes it by adding
-> mvneta_set_rx_mode(dev) in the resume hook if interface is running.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
-> Since v1:
->  - rebased to the latest net-next tree and explictly mention it
+>  Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +--
+>  Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 183 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 187 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> index a88f1f05fbd6..4c0807f28cfa 100644
+> --- a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> @@ -5,6 +5,7 @@ reading the gpio latch register.
+>  
+>  This node must be a subnode of the node exposing the register address
+>  of the GPIO block where the gpio latch is located.
+> +See Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+>  
+>  Required properties:
+>  - compatible : shall be one of the following:
+> @@ -16,9 +17,9 @@ Optional properties:
+>  	output names ("xtal")
+>  
+>  Example:
+> -gpio1: gpio at 13800 {
+> -	compatible = "marvell,armada-3700-gpio", "syscon", "simple-mfd";
+> -	reg = <0x13800 0x1000>;
+> +pinctrl_nb: pinctrl-nb at 13800 {
+> +	compatible = "armada3710-nb-pinctrl", "syscon", "simple-mfd";
+> +	reg = <0x13800 0x100>, <0x13C00 0x20>;
+>  
+>  	xtalclk: xtal-clk {
+>  		compatible = "marvell,armada-3700-xtal-clock";
+> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+> new file mode 100644
+> index 000000000000..2eda81e0bca1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+> @@ -0,0 +1,183 @@
+> +* Marvell Armada 37xx SoC pin and gpio controller
+> +
+> +Each Armada 37xx SoC come with two pin and gpio controller one for the
+> +south bridge and the other for the north bridge.
+> +
+> +Inside this set of register the gpio latch allows exposing some
+> +configuration of the SoC and especially the clock frequency of the
+> +xtal. Hence, this node is a represent as syscon allowing sharing the
+> +register between multiple hardware block.
+> +
+> +GPIO and pin controller:
+> +------------------------
+> +
+> +Main node:
+> +
+> +Refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices, including the meaning
+> +of the phrase "pin configuration node".
+> +
+> +Required properties for pinctrl driver:
+> +
+> +- compatible:	"marvell,armada3710-sb-pinctrl", "syscon, "simple-mfd"
+> +		for the south bridge
+> +		"marvell,armada3710-nb-pinctrl", "syscon, "simple-mfd"
+> +		for the north bridge
+> +- reg: The first set of register are for pinctrl/gpio and the second
+> +  set for the interrupt controller
+> +- interrupts: list of the interrupt use by the gpio
+> +
+> +Available groups and functions for the North bridge:
+> +
+> +group: jtag
+> + - pins 20-24
+> + - functions jtag, gpio
+> +
+> +group sdio0
+> + - pins 8-10
+> + - functions sdio, gpio
+> +
+> +group emmc_nb
+> + - pins 27-35
+> + - functions emmc, gpio
+> +
+> +group pwm0
+> + - pin 11 (GPIO1-11)
+> + - functions pwm, gpio
+> +
+> +group pwm1
+> + - pin 12
+> + - functions pwm, gpio
+> +
+> +group pwm2
+> + - pin 13
+> + - functions pwm, gpio
+> +
+> +group pwm3
+> + - pin 14
+> + - functions pwm, gpio
+> +
+> +group pmic1
+> + - pin 17
+> + - functions pmic, gpio
+> +
+> +group pmic0
+> + - pin 16
+> + - functions pmic, gpio
+> +
+> +group i2c2
+> + - pins 2-3
+> + - functions i2c, gpio
+> +
+> +group i2c1
+> + - pins 0-1
+> + - functions i2c, gpio
+> +
+> +group spi_cs1
+> + - pin 17
+> + - functions spi, gpio
+> +
+> +group spi_cs2
+> + - pin 18
+> + - functions spi, gpio
+> +
+> +group spi_cs3
+> + - pin 19
+> + - functions spi, gpio
+> +
+> +group onewire
+> + - pin 4
+> + - functions onewire, gpio
+> +
+> +group uart1
+> + - pins 25-26
+> + - functions uart, gpio
+> +
+> +group spi_quad
+> + - pins 15-16
+> + - functions spi, gpio
+> +
+> +group uart_2
+> + - pins 9-10
+> + - functions uart, gpio
+> +
+> +Available groups and functions for the South bridge:
+> +
+> +group usb32_drvvbus0
+> + - pin 36
+> + - functions drvbus, gpio
+> +
+> +group usb2_drvvbus1
+> + - pin 37
+> + - functions drvbus, gpio
+> +
+> +group sdio_sb
+> + - pins 60-64
+> + - functions sdio, gpio
+> +
+> +group rgmii
+> + - pins 42-55
+> + - functions mii, gpio
+> +
+> +group pcie1
+> + - pins 39-40
+> + - functions pcie, gpio
+> +
+> +group ptp
+> + - pins 56-58
+> + - functions ptp, gpio
+> +
+> +group ptp_clk
+> + - pin 57
+> + - functions ptp, mii
+> +
+> +group ptp_trig
+> + - pin 58
+> + - functions ptp, mii
+> +
+> +group mii_col
+> + - pin 59
+> + - functions mii, mii_err
+> +
+> +GPIO subnode:
+> +
+> +Please refer to gpio.txt in this directory for details of gpio-ranges property
+> +and the common GPIO bindings used by client devices.
+> +
+> +Required properties for gpio driver under the gpio subnode:
 
-Applied.
+Why does this need to be a sub node? You should probably have a 
+compatible if it is.
+
+> +- interrupts: List of interrupt specifier for the controllers interrupt.
+> +- gpio-controller: Marks the device node as a gpio controller.
+> +- #gpio-cells: Should be 2. The first cell is the GPIO number and the
+> +   second cell specifies GPIO flags, as defined in
+> +   <dt-bindings/gpio/gpio.h>. Only the GPIO_ACTIVE_HIGH and
+> +   GPIO_ACTIVE_LOW flags are supported.
+> +- gpio-ranges: Range of pins managed by the GPIO controller.
+> +
+> +Xtal Clock bindings for Marvell Armada 37xx SoCs
+> +------------------------------------------------
+> +
+> +see Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> +
+> +
+> +Example:
+> +pinctrl_sb: pinctrl-sb at 18800 {
+
+pinctrl@
+
+> +	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
+> +	reg = <0x18800 0x100>, <0x18C00 0x20>;
+> +	gpiosb: gpiosb {
+
+gpio@
+
+> +		#gpio-cells = <2>;
+> +		gpio-ranges = <&pinctrl_sb 0 0 29>;
+> +		gpio-controller;
+> +		interrupts =
+> +		<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+> +	rgmii_pins: mii-pins {
+> +		groups = "rgmii";
+> +		function = "mii";
+> +	};
+> +
+> +};
+> -- 
+> git-series 0.9.1
