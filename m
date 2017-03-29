@@ -1,48 +1,142 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 29 Mar 2017 16:47:19 +0800
-Subject: [PATCH net-next v2] net: mvneta: set rx mode during resume if
- interface is running
-Message-ID: <20170329084719.3596-1-jszhang@marvell.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Mar 2017 09:55:25 +0100
+Subject: [kvmtool PATCH v9 14/15] extend GSI IRQ routing to take a device
+ ID
+In-Reply-To: <20170202163223.15372-15-andre.przywara@arm.com>
+References: <20170202163223.15372-1-andre.przywara@arm.com>
+ <20170202163223.15372-15-andre.przywara@arm.com>
+Message-ID: <bd90c5e8-fa10-e863-9f5f-1dfe6e430367@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I found a bug by:
+On 02/02/17 16:32, Andre Przywara wrote:
+> For ITS emulation we need the device ID along with the MSI payload
+> and doorbell address to identify an MSI, so we need to put it in the
+> GSI IRQ routing table too.
+> There is a per-VM capability by which the kernel signals the need for
+> a device ID, so check this and put the device ID into the routing
+> table if needed.
+> For PCI devices we take the bus/device/function triplet and and that
+> to the routing setup call.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  hw/pci-shmem.c    |  3 ++-
+>  include/kvm/irq.h |  2 +-
+>  irq.c             | 24 ++++++++++++++++++++++--
+>  virtio/pci.c      |  6 ++++--
+>  4 files changed, 29 insertions(+), 6 deletions(-)
+> 
+> diff --git a/hw/pci-shmem.c b/hw/pci-shmem.c
+> index 7ce98cb..512b5b0 100644
+> --- a/hw/pci-shmem.c
+> +++ b/hw/pci-shmem.c
+> @@ -135,7 +135,8 @@ int pci_shmem__get_local_irqfd(struct kvm *kvm)
+>  			return fd;
+>  
+>  		if (pci_shmem_pci_device.msix.ctrl & cpu_to_le16(PCI_MSIX_FLAGS_ENABLE)) {
+> -			gsi = irq__add_msix_route(kvm, &msix_table[0].msg);
+> +			gsi = irq__add_msix_route(kvm, &msix_table[0].msg,
+> +						  pci_shmem_device.dev_num << 3);
+>  			if (gsi < 0)
+>  				return gsi;
+>  		} else {
+> diff --git a/include/kvm/irq.h b/include/kvm/irq.h
+> index f35eb7e..ee059e3 100644
+> --- a/include/kvm/irq.h
+> +++ b/include/kvm/irq.h
+> @@ -20,7 +20,7 @@ int irq__init(struct kvm *kvm);
+>  int irq__exit(struct kvm *kvm);
+>  
+>  int irq__allocate_routing_entry(void);
+> -int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg);
+> +int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg, u32 device_id);
+>  void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg);
+>  
+>  #endif
+> diff --git a/irq.c b/irq.c
+> index 6ec71c3..9ca6b19 100644
+> --- a/irq.c
+> +++ b/irq.c
+> @@ -66,7 +66,21 @@ static bool check_for_irq_routing(struct kvm *kvm)
+>  	return has_irq_routing > 0;
+>  }
+>  
+> -int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
+> +static bool check_for_msi_devid(struct kvm *kvm)
+> +{
+> +	static int needs_devid = 0;
+> +
+> +	if (needs_devid == 0) {
+> +		if (kvm__supports_vm_extension(kvm, KVM_CAP_MSI_DEVID))
+> +			needs_devid = 1;
+> +		else
+> +			needs_devid = -1;
+> +	}
 
-0. boot and start dhcp client
-1. echo mem > /sys/power/state
-2. resume back immediately
-3. don't touch dhcp client to renew the lease
-4. ping the gateway. No acks
+Same remark as the previous patch. Except that you don't have a PCI
+device directly here. Just store the flag in the kvm structure instead
+by probing at startup time? Or even by setting that flag altogether if
+you instantiate an ITS?
 
-Usually, after step2, the DHCP lease isn't expired, so in theory we
-should resume all back. But in fact, it doesn't. It turns out
-the rx mode isn't resumed correctly. This patch fixes it by adding
-mvneta_set_rx_mode(dev) in the resume hook if interface is running.
+> +
+> +	return needs_devid > 0;
+> +}
+> +
+> +int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg, u32 device_id)
+>  {
+>  	int r;
+>  
+> @@ -77,7 +91,7 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
+>  	if (r)
+>  		return r;
+>  
+> -	irq_routing->entries[irq_routing->nr++] =
+> +	irq_routing->entries[irq_routing->nr] =
+>  		(struct kvm_irq_routing_entry) {
+>  			.gsi = next_gsi,
+>  			.type = KVM_IRQ_ROUTING_MSI,
+> @@ -86,6 +100,12 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
+>  			.u.msi.data = msg->data,
+>  		};
+>  
+> +	if (check_for_msi_devid(kvm)) {
+> +		irq_routing->entries[irq_routing->nr].flags = KVM_MSI_VALID_DEVID;
+> +		irq_routing->entries[irq_routing->nr].u.msi.devid = device_id;
+> +	}
+> +	irq_routing->nr++;
+> +
+>  	r = ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+>  	if (r)
+>  		return r;
+> diff --git a/virtio/pci.c b/virtio/pci.c
+> index cecfe8a..b6ef389 100644
+> --- a/virtio/pci.c
+> +++ b/virtio/pci.c
+> @@ -192,7 +192,8 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+>  				break;
+>  
+>  			gsi = irq__add_msix_route(kvm,
+> -						  &vpci->msix_table[vec].msg);
+> +						  &vpci->msix_table[vec].msg,
+> +						  vpci->dev_hdr.dev_num << 3);
+>  			if (gsi >= 0) {
+>  				vpci->config_gsi = gsi;
+>  				break;
+> @@ -210,7 +211,8 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+>  				break;
+>  
+>  			gsi = irq__add_msix_route(kvm,
+> -						  &vpci->msix_table[vec].msg);
+> +						  &vpci->msix_table[vec].msg,
+> +						  vpci->dev_hdr.dev_num << 3);
+>  			if (gsi < 0) {
+>  				if (gsi == -ENXIO &&
+>  				    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
+> 
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
-Since v1:
- - rebased to the latest net-next tree and explictly mention it
+Thanks,
 
- drivers/net/ethernet/marvell/mvneta.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index aebbc5399a06..cc126204dc4d 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -4449,8 +4449,11 @@ static int mvneta_resume(struct device *device)
- 		mvneta_fixed_link_update(pp, dev->phydev);
- 
- 	netif_device_attach(dev);
--	if (netif_running(dev))
-+	if (netif_running(dev)) {
- 		mvneta_open(dev);
-+		mvneta_set_rx_mode(dev);
-+	}
-+
- 	return 0;
- }
- #endif
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
