@@ -1,25 +1,69 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 29 Mar 2017 17:33:33 +0100
-Subject: [PATCH v2 0/2] coresight: Allow sharing of STM 
-Message-ID: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
+Date: Wed, 29 Mar 2017 17:33:35 +0100
+Subject: [PATCH v2 2/2] coresight: Fix reference count for software sources
+In-Reply-To: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
+References: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1490805215-8125-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes the coresight generic layer to handle the reference
-counting for the STM source properly, to allow multiple applications
-to share the STM. Without this series, the STM is disabled when the
-first user closes its connection, causing trace data losses.
+For software sources (i.e STM), there could be multiple agents
+generating the trace data, unlike the ETMs. So we need to
+properly do the accounting for the active number of users
+to disable the device when the last user goes away. Right
+now, the reference counting is broken for sources as we skip
+the actions when we detect that the source is enabled.
 
+This patch fixes the problem by adding the refcounting for
+software sources, even when they are enabled.
 
-Changes since v1:
-  - Fixed minor coding style issues
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reported-by: Robert Walker <robert.walker@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-Suzuki K Poulose (2):
-  coresight: Disable the path only when the source is disabled
-  coresight: Fix reference count for software sources
-
- drivers/hwtracing/coresight/coresight.c | 33 +++++++++++++++++++++++++--------
- 1 file changed, 25 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 532a2ac..6a0202b7 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -558,6 +558,9 @@ int coresight_enable(struct coresight_device *csdev)
+ 	int cpu, ret = 0;
+ 	struct coresight_device *sink;
+ 	struct list_head *path;
++	enum coresight_dev_subtype_source subtype;
++
++	subtype = csdev->subtype.source_subtype;
+ 
+ 	mutex_lock(&coresight_mutex);
+ 
+@@ -565,8 +568,16 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (ret)
+ 		goto out;
+ 
+-	if (csdev->enable)
++	if (csdev->enable) {
++		/*
++		 * There could be multiple applications driving the software
++		 * source. So keep the refcount for each such user when the
++		 * source is already enabled.
++		 */
++		if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
++			atomic_inc(csdev->refcnt);
+ 		goto out;
++	}
+ 
+ 	/*
+ 	 * Search for a valid sink for this session but don't reset the
+@@ -593,7 +604,7 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (ret)
+ 		goto err_source;
+ 
+-	switch (csdev->subtype.source_subtype) {
++	switch (subtype) {
+ 	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+ 		/*
+ 		 * When working from sysFS it is important to keep track
 -- 
 2.7.4
