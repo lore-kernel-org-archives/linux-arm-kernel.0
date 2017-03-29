@@ -1,72 +1,92 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 29 Mar 2017 13:48:02 +0300
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-Message-ID: <0d4ff89ce2276dfbde2db8ced3fff10582a5b899.1490783707.git.leonard.crestez@nxp.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 29 Mar 2017 18:48:26 +0800
+Subject: [PATCH v22 07/11] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <20170329102118.GB10807@red-moon>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <20170321163122.9183-8-fu.wei@linaro.org>
+ <20170328113535.GA17440@red-moon>
+ <CADyBb7v9jaiQjaWzwafkih_tsU+-hNi+TA7hcDbFgtLLChXM_g@mail.gmail.com>
+ <20170329102118.GB10807@red-moon>
+Message-ID: <CADyBb7sDnp+p5Z=Cde-YS2UG8pxo9O=Tvkq8D79k37wOrUw19Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
-Add this driver to the default imx config since the device is present on
-one of the evaluation boards.
+Hi Lorenzo,
 
-This used to work mostly fine with the generic phy driver until
-commit 0878fff1f42c ("net: phy: Do not perform software reset for
-Generic PHY"). The fact that soft reset is no longer performed
-apparently causes RX to sometimes failes which can cause netboot to
-timeout on DHCP. This is eventually retried and it works after link
-up/down but can takes 90 seconds to reach the login prompt.
+On 29 March 2017 at 18:21, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Mar 29, 2017 at 05:48:17PM +0800, Fu Wei wrote:
+>
+> [...]
+>
+>>  * @platform_timer_count: It points to a integer variable which is used
+>>  *                           for storing the number of platform timers.
+>>  *                           This pointer could be NULL, if the caller
+>>  *                           doesn't need this info.
+>>
+>> >
+>> >> + *
+>> >> + * Return: 0 if success, -EINVAL if error.
+>> >> + */
+>> >> +int __init acpi_gtdt_init(struct acpi_table_header *table,
+>> >> +                       int *platform_timer_count)
+>> >> +{
+>> >> +     int ret = 0;
+>> >> +     int timer_count = 0;
+>> >> +     void *platform_timer = NULL;
+>> >> +     struct acpi_table_gtdt *gtdt;
+>> >> +
+>> >> +     gtdt = container_of(table, struct acpi_table_gtdt, header);
+>> >> +     acpi_gtdt_desc.gtdt = gtdt;
+>> >> +     acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
+>> >> +
+>> >> +     if (table->revision < 2)
+>> >> +             pr_warn("Revision:%d doesn't support Platform Timers.\n",
+>> >> +                     table->revision);
+>> >
+>> > Ok, two points here. First, I am not sure why you should warn if the
+>> > table revision is < 2, is that a FW bug ? I do not think it is, you
+>> > can just return 0.
+>>
+>> I used pr_debug here before v20, then I got Hanjun's suggestion:
+>> -------
+>> GTDT table revision is updated to 2 in ACPI 5.1, we will
+>> not support ACPI version under 5.1 and disable ACPI in FADT
+>> parse before this code is called, so if we get revision
+>> <2 here, I think we need to print warning (we need to keep
+>> the firmware stick to the spec on ARM64).
+>> -------
+>> https://lkml.org/lkml/2017/1/19/82
+>>
+>> So I started to use pr_warn.
+>
+> Thanks for the explanation, so it is a FW bug and the warning
+> is granted :) just leave it there.
+>
+> Still, please check my comment on acpi_gtdt_init() being called
+> multiple times on patch 11.
 
-This was generated with "make savedefconfig" and it includes a few
-additional minor cleanups.
+Thanks
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
----
+For calling acpi_gtdt_init() twice:
+(1) 1st time: in early boot(bootmem), for init arch_timer and
+memory-mapped timer, we initialize the acpi_gtdt_desc.
+you can see that all the items in this struct are pointer.
+(2) 2nd time: when system switch from bootmem to slab, all the
+pointers in the acpi_gtdt_desc are invalid, so we have to
+re-initialize(re-map) them.
 
-I also tried to do some debugging in the fec driver and it apparently receives
-corrupted packets when this happens. If I hack it to go into promiscuous mode
-unconditionally it gets a whole bunch of rx errors (crc errors, length errors
-and so on). So the phy config is probably wrong and is confusing the mac?
+I have tested it, if we don't re-initialize  the acpi_gtdt_desc,
+system will go wrong.
 
-In theory it might be possible to make that driver "just work" with phy
-settings from uboot but it's not clear that's worthwhile.
+>
+> Thanks,
+> Lorenzo
 
-Link to v1: https://lkml.org/lkml/2017/3/22/416
-Changes:
- * Improve commit message to fix checkpatch.pl warnings.
 
- arch/arm/configs/imx_v6_v7_defconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index eaba3b1..e605389 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -143,6 +143,7 @@ CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- CONFIG_AT803X_PHY=y
- CONFIG_MICREL_PHY=y
-+CONFIG_SMSC_PHY=y
- CONFIG_USB_PEGASUS=m
- CONFIG_USB_RTL8150=m
- CONFIG_USB_RTL8152=m
-@@ -152,7 +153,6 @@ CONFIG_BRCMFMAC=m
- CONFIG_WL12XX=m
- CONFIG_WLCORE_SDIO=m
- # CONFIG_WILINK_PLATFORM_DATA is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_EVBUG=m
- CONFIG_KEYBOARD_GPIO=y
-@@ -376,7 +376,6 @@ CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
- CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
--CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_PROVE_LOCKING=y
 -- 
-2.7.4
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
