@@ -1,109 +1,86 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Mar 2017 17:13:54 +0100
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
- <20170329123821.GA10988@red-moon> <58DBAFD6.7070300@linaro.org>
- <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
-Message-ID: <20170329161354.GC11297@red-moon>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 29 Mar 2017 18:13:46 +0200
+Subject: [PATCH 2/2] soc/imx: add workaround for i.MX6QP to the GPC PD
+ driver
+In-Reply-To: <DB5PR04MB1431A7CC91F55ECFE5BE31FB80350@DB5PR04MB1431.eurprd04.prod.outlook.com>
+References: <20170323144418.30977-1-l.stach@pengutronix.de>
+ <20170323144418.30977-3-l.stach@pengutronix.de>
+ <DB5PR04MB1431A7CC91F55ECFE5BE31FB80350@DB5PR04MB1431.eurprd04.prod.outlook.com>
+Message-ID: <1490804026.29083.29.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 03:52:47PM +0100, Marc Zyngier wrote:
-> On 29/03/17 14:00, Hanjun Guo wrote:
-> > On 03/29/2017 08:38 PM, Lorenzo Pieralisi wrote:
-> >> On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
-> >>> Hi Lorenzo,
-> >>>
-> >>> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
-> >>>> Hi Hanjun, Marc,
-> >>>>
-> >>>> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
-> >>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>>>
-> >>>>> For devices connecting to ITS, the devices need to identify themself
-> >>>>> through a dev id; this dev id is represented in the IORT table in named
-> >>>>> component node [1] for platform devices, so this patch adds code that
-> >>>>> scans the IORT table to retrieve the devices' dev id.
-> >>>>>
-> >>>>> Leveraging the iort_node_map_platform_id() IORT API, add a new function
-> >>>>> call, iort_pmsi_get_dev_id() and use it in its_pmsi_prepare() to allow
-> >>>>> retrieving dev id in ACPI platforms.
-> >>>>>
-> >>>>> [1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
-> >>>>>
-> >>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>>> [lorenzo.pieralisi at arm.com: rewrote commit log]
-> >>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>>> Tested-by: Ming Lei <ming.lei@canonical.com>
-> >>>>> Tested-by: Wei Xu <xuwei5@hisilicon.com>
-> >>>>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> >>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>>> Cc: Tomasz Nowicki <tn@semihalf.com>
-> >>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
-> >>>>> ---
-> >>>>>   drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
-> >>>>>   drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
-> >>>>>   include/linux/acpi_iort.h                     |  5 +++++
-> >>>>>   3 files changed, 31 insertions(+), 1 deletion(-)
-> >>>>
-> >>>> To simplify merging ACPI/IRQCHIP changes via different trees it
-> >>>> would be good to split this patch; I am not sure what's the best
-> >>>> way of handling it though given that we would end up in a merge
-> >>>> ordering dependency anyway (ie we can create an empty stub
-> >>>> for iort_pmsi_get_dev_id() but that would create a dependency
-> >>>> between ARM64 and irqchip trees anyway).
-> >>>
-> >>> The first 12 patches for ACPI platform MSI and later 3 patches
-> >>> for mbigen have no "physical" dependency, which means they can
-> >>> be merged and compiled independently, they only have functional
-> >>> dependency only.
-> >>>
-> >>> We already had SAS, XGE, USB and even UART drivers depend on
-> >>> the mbigen ACPI support, so I don't think the dependency of ACPI
-> >>> platform MSI and mbigen patches cares much if those two parts are
-> >>> merged in one merge window, even they are merged independently via
-> >>> different tree.
-> >>>
-> >>>>
-> >>>> Please let me know what's your preferred way of handling this.
-> >>>
-> >>> So in my opinion, they can be merged independently via ARM64 and
-> >>> irqchip tree with no ordering dependency, is it OK?
-> >>
-> >> I am speaking about merging MBIgen AND ITS patches via IRQCHIP and
-> >> ACPI/IORT for ARM64, that's why I replied to this patch. I do not
-> >> think that's feasible to split patches in two separate branches
-> >> without having a dependency between them.
-> >>
-> >> Sure, the last three patches can go via IRQCHIP but that was not
-> >> my question :)
+Am Mittwoch, den 29.03.2017, 16:08 +0000 schrieb A.S. Dong:
+> Hi Lucas,
+> 
+> > -----Original Message-----
+> > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > Sent: Thursday, March 23, 2017 10:44 PM
+> > To: Shawn Guo
+> > Cc: Fabio Estevam; A.S. Dong; devicetree at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; kernel at pengutronix.de; patchwork-
+> > lst at pengutronix.de
+> > Subject: [PATCH 2/2] soc/imx: add workaround for i.MX6QP to the GPC PD
+> > driver
 > > 
-> > Sorry, I misunderstood that :(
+> > On i.MX6QP, due to hardware erratum ERR009619, the PRE clocks may be
+> > stalled during the power up sequencing of the PU power domain. As this may
+> > lead to a complete loss of display output, the recommended workaround is
+> > to keep the PU domain enabled during normal system operation.
 > > 
-> > Since it's not feasible to split patches, the best way I got is that
-> > we get Marc's ack then merge it.
+> > Implement this by rejecting the domain power down request on the affected
+> > SoC.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  drivers/soc/imx/gpc.c | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> > 
+> > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c index
+> > 4294287e5f6c..599e1e46f694 100644
+> > --- a/drivers/soc/imx/gpc.c
+> > +++ b/drivers/soc/imx/gpc.c
+> > @@ -45,6 +45,7 @@ struct imx_pm_domain {
+> >  	unsigned int reg_offs;
+> >  	signed char cntr_pdn_bit;
+> >  	unsigned int ipg_rate_mhz;
+> > +	bool allow_dynamic_pd;
+> >  };
+> > 
+> >  static inline struct imx_pm_domain *
+> > @@ -59,6 +60,9 @@ static int imx6_pm_domain_power_off(struct
+> > generic_pm_domain *genpd)
+> >  	int iso, iso2sw;
+> >  	u32 val;
+> > 
+> > +	if (!pd->allow_dynamic_pd)
+> > +		return -EBUSY;
+> > +
+> >  	/* Read ISO and ISO2SW power down delays */
+> >  	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+> >  	iso = val & 0x3f;
+> > @@ -255,6 +259,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+> >  		},
+> >  		.reg_offs = 0x260,
+> >  		.cntr_pdn_bit = 0,
+> > +		.allow_dynamic_pd = true,
+> >  	}, {
+> >  		.base = {
+> >  			.name = "DISPLAY",
+> > @@ -263,23 +268,33 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+> >  		},
+> >  		.reg_offs = 0x240,
+> >  		.cntr_pdn_bit = 4,
+> > +		.allow_dynamic_pd = true,
 > 
-> I believe there is a way to make this work without too much hassle. I
-> suggest we drop the ITS change from this patch entirely, and I instead
-> queue this patch:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.12&id=e6db07d0f3b6da1f8cfd485776bfefa4fcdbfc45
-> 
-> That way, no dependency between the two trees. Lorenzo takes all the
-> patches flagged "ACPI", I take all those flagged "irqchip" or "msi", and
-> everything should be perfectly standalone.
-> 
-> Thoughts?
+> Just a Nitpick, besides shawn's comment in another mail,
+> if we use a domain flag like IMX_PD_ALWAYS_ON set by SoC errata flag,
+> then probably we can save all the default allow_dynamic_pd lines.
+> This also release the life when adding new domains.
 
-Perfect for me. Hanjun, I can cherry pick Marc's patch above, rework
-this patch and post the resulting branch for everyone to have a final
-test.
+If other things like that show up we can certainly switch to a flags
+field. In the meantime I like that the current style is more explicit
+about it.
 
-Ok ?
-
-Thanks !
-Lorenzo
+Regards,
+Lucas
