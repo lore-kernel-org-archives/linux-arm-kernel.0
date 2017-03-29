@@ -1,44 +1,24 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 29 Mar 2017 09:37:37 +0200
-Subject: [PATCH v3 3/9] arm: fix return value of parse_cpu_capacity
-In-Reply-To: <20170327131825.32134-4-juri.lelli@arm.com>
-References: <20170327131825.32134-1-juri.lelli@arm.com>
- <20170327131825.32134-4-juri.lelli@arm.com>
-Message-ID: <CAKfTPtCswVBMCaEUzBF4w_GZf-2iLORsS5S0HhGD94ps4+J1Xg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 29 Mar 2017 09:38:49 +0200
+Subject: [PATCH]: staging: vc04_services: fix checkpatch error
+In-Reply-To: <d86e9385-55cd-1cf7-a07f-121208bd695d@gmail.com>
+References: <d86e9385-55cd-1cf7-a07f-121208bd695d@gmail.com>
+Message-ID: <20170329073849.GB17585@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2017 at 15:18, Juri Lelli <juri.lelli@arm.com> wrote:
-> parse_cpu_capacity() has to return 0 on failure, but it currently returns
-> 1 instead if raw_capacity kcalloc failed.
->
-> Fix it by removing the negation of the return value.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Reported-by: Morten Rasmussen <morten.rasmussen@arm.com>
-> Fixes: 06073ee26775 ('ARM: 8621/3: parse cpu capacity-dmips-mhz from DT')
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+On Wed, Mar 29, 2017 at 08:48:50AM +0300, Haim Daniel wrote:
+
+> >From c840c64e0e662eee04b7d0403040be81eaa34c25 Mon Sep 17 00:00:00 2001
+> From: Haim Daniel <haimdaniel@gmail.com>
+> Date: Wed, 29 Mar 2017 08:43:46 +0300
+> Subject: [PATCH] staging: vc04_services: add parenthesis to macros
+> 
+> vchi_cfg.h:
+> 
+> fix checkpatch ERROR: Macros with complex values should be enclosed in parenthesis
 > ---
->  arch/arm/kernel/topology.c | 2 +-
+>  drivers/staging/vc04_services/interface/vchi/vchi_cfg.h | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index f8a3ab82e77f..4e4af809606a 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -166,7 +166,7 @@ static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
->                         if (!raw_capacity) {
->                                 pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
->                                 cap_parsing_failed = true;
-> -                               return !ret;
-> +                               return ret;
 
-Why not directly returning 0 ? whatever the value of ret, the parse of
-cpu capacity has failed in this case
-
->                         }
->                 }
->                 capacity_scale = max(cpu_capacity, capacity_scale);
-> --
-> 2.10.0
->
+No signed-off-by line :(
