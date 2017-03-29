@@ -1,371 +1,116 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 29 Mar 2017 22:31:42 +0800
-Subject: [PATCH v22 07/11] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7tZ35tAESxv+dkO_Fam87ZgJR=Agzms+M8VAmrOsgK9tg@mail.gmail.com>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-8-fu.wei@linaro.org>
- <20170328113535.GA17440@red-moon>
- <CADyBb7tZ35tAESxv+dkO_Fam87ZgJR=Agzms+M8VAmrOsgK9tg@mail.gmail.com>
-Message-ID: <CADyBb7szh0CjMemQ5pBRzBhwCqJ4qgvYSAdbnexQFaXfU+4Ahg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 29 Mar 2017 15:33:44 +0100
+Subject: [PATCH v3 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <96da696c-141a-3e8d-1fb7-2c024a295f58@free.fr>
+References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
+ <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
+ <01516ad9-e187-4bac-7c65-a7a90c576ce2@arm.com>
+ <96da696c-141a-3e8d-1fb7-2c024a295f58@free.fr>
+Message-ID: <84a8b26d-7d24-df29-3959-45fce880916d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2017 at 22:29, Fu Wei <fu.wei@linaro.org> wrote:
-> Hi Lorenzo,
->
-> On 28 March 2017 at 19:35, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> On Wed, Mar 22, 2017 at 12:31:18AM +0800, fu.wei at linaro.org wrote:
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> This patch adds support for parsing arch timer info in GTDT,
->>> provides some kernel APIs to parse all the PPIs and
->>> always-on info in GTDT and export them.
->>>
->>> By this driver, we can simplify arm_arch_timer drivers, and
->>> separate the ACPI GTDT knowledge from it.
->>>
->>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On 29/03/17 13:53, Mason wrote:
+> On 29/03/2017 14:19, Robin Murphy wrote:
+> 
+>> On 29/03/17 12:34, Marc Gonzalez wrote:
 >>
->> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> +	/*
+>>> +	 * QUIRK #3
+>>> +	 * Unfortunately, config and mem spaces are muxed.
+>>> +	 * Linux does not support such a setting, since drivers are free
+>>> +	 * to access mem space directly, at any time.
+>>> +	 * Therefore, we can only PRAY that config and mem space accesses
+>>> +	 * NEVER occur concurrently.
+>>> +	 */
 >>
->> Some nits below.
+>> What about David's suggestion of using an IPI for safe mutual exclusion?
+> 
+> I was left with the impression that this wouldn't solve the problem.
+> If a mem space access is "in flight" on core0 when core1 starts a
+> config space access, an IPI will not prevent breakage.
+> 
+> Did I misunderstand?
+> 
+> For my education, what is the API to send an IPI?
+> And the API to handle an IPI?
+
+There are a few ways you could implement some custom cross-call,
+although in this case I think stop_machine() would probably be the most
+appropriate candidate. However, you're right that in general it may not
+actually help enough to be worthwhile - a DSB SY would ensure that
+in-flight transactions have at least been observed by the CPUs and any
+other coherent masters, but for any writes with a memory type allowing
+early acknowledgement (i.e. a Normal or Device mapping of a BAR) that
+doesn't necessarily correlate with them having reached their ultimate
+destination. For a PCI destination in particular, I think the normal way
+to ensure all posted writes have completed would be to read from config
+space; ah...
+
+>>> +	if (of_device_is_compatible(dev->of_node, "sigma,smp8759-pcie"))
+>>> +		smp8759_init(pcie, base);
 >>
->>> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
->>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>  arch/arm64/Kconfig          |   1 +
->>>  drivers/acpi/arm64/Kconfig  |   3 +
->>>  drivers/acpi/arm64/Makefile |   1 +
->>>  drivers/acpi/arm64/gtdt.c   | 157 ++++++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/acpi.h        |   6 ++
->>>  5 files changed, 168 insertions(+)
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index 3741859..7e2baec 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -2,6 +2,7 @@ config ARM64
->>>       def_bool y
->>>       select ACPI_CCA_REQUIRED if ACPI
->>>       select ACPI_GENERIC_GSI if ACPI
->>> +     select ACPI_GTDT if ACPI
->>>       select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->>>       select ACPI_MCFG if ACPI
->>>       select ACPI_SPCR_TABLE if ACPI
->>> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
->>> index 4616da4..5a6f80f 100644
->>> --- a/drivers/acpi/arm64/Kconfig
->>> +++ b/drivers/acpi/arm64/Kconfig
->>> @@ -4,3 +4,6 @@
->>>
->>>  config ACPI_IORT
->>>       bool
->>> +
->>> +config ACPI_GTDT
->>> +     bool
->>> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
->>> index 72331f2..1017def 100644
->>> --- a/drivers/acpi/arm64/Makefile
->>> +++ b/drivers/acpi/arm64/Makefile
->>> @@ -1 +1,2 @@
->>>  obj-$(CONFIG_ACPI_IORT)      += iort.o
->>> +obj-$(CONFIG_ACPI_GTDT)      += gtdt.o
->>> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
->>> new file mode 100644
->>> index 0000000..8a03b4b
->>> --- /dev/null
->>> +++ b/drivers/acpi/arm64/gtdt.c
->>> @@ -0,0 +1,157 @@
->>> +/*
->>> + * ARM Specific GTDT table Support
->>> + *
->>> + * Copyright (C) 2016, Linaro Ltd.
->>> + * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> + *         Fu Wei <fu.wei@linaro.org>
->>> + *         Hanjun Guo <hanjun.guo@linaro.org>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#include <linux/acpi.h>
->>> +#include <linux/init.h>
->>> +#include <linux/kernel.h>
->>> +
->>> +#include <clocksource/arm_arch_timer.h>
->>> +
->>> +#undef pr_fmt
->>> +#define pr_fmt(fmt) "ACPI GTDT: " fmt
->>> +
->>> +/**
->>> + * struct acpi_gtdt_descriptor - Store the key info of GTDT for all functions
->>> + * @gtdt:    The pointer to the struct acpi_table_gtdt of GTDT table.
->>> + * @gtdt_end:        The pointer to the end of GTDT table.
->>> + * @platform_timer:  The pointer to the start of Platform Timer Structure
->>> + *
->>> + * The struct store the key info of GTDT table, it should be initialized by
->>> + * acpi_gtdt_init.
->>> + */
->>> +struct acpi_gtdt_descriptor {
->>> +     struct acpi_table_gtdt *gtdt;
->>> +     void *gtdt_end;
->>> +     void *platform_timer;
->>> +};
->>> +
->>> +static struct acpi_gtdt_descriptor acpi_gtdt_desc __initdata;
->>> +
->>> +static int __init map_gt_gsi(u32 interrupt, u32 flags)
->>> +{
->>> +     int trigger, polarity;
->>> +
->>> +     trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
->>> +                     : ACPI_LEVEL_SENSITIVE;
->>> +
->>> +     polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
->>> +                     : ACPI_ACTIVE_HIGH;
->>> +
->>> +     return acpi_register_gsi(NULL, interrupt, trigger, polarity);
->>> +}
->>> +
->>> +/**
->>> + * acpi_gtdt_map_ppi() - Map the PPIs of per-cpu arch_timer.
->>> + * @type:    the type of PPI.
->>> + *
->>> + * Note: Linux on arm64 isn't supported on the secure side.
->>
->> Note: Secure state is not managed by the kernel on ARM64 systems.
->>
->> Is that what you wanted to say ?
->>
->>> + * So we only handle the non-secure timer PPIs,
->>> + * ARCH_TIMER_PHYS_SECURE_PPI is treated as invalid type.
->>> + *
->>> + * Return: the mapped PPI value, 0 if error.
->>> + */
->>> +int __init acpi_gtdt_map_ppi(int type)
->>> +{
->>> +     struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
->>> +
->>> +     switch (type) {
->>> +     case ARCH_TIMER_PHYS_NONSECURE_PPI:
->>> +             return map_gt_gsi(gtdt->non_secure_el1_interrupt,
->>> +                               gtdt->non_secure_el1_flags);
->>> +     case ARCH_TIMER_VIRT_PPI:
->>> +             return map_gt_gsi(gtdt->virtual_timer_interrupt,
->>> +                               gtdt->virtual_timer_flags);
->>> +
->>> +     case ARCH_TIMER_HYP_PPI:
->>> +             return map_gt_gsi(gtdt->non_secure_el2_interrupt,
->>> +                               gtdt->non_secure_el2_flags);
->>> +     default:
->>> +             pr_err("Failed to map timer interrupt: invalid type.\n");
->>> +     }
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +/**
->>> + * acpi_gtdt_c3stop() - Got c3stop info from GTDT according to the type of PPI.
->>> + * @type:    the type of PPI.
->>> + *
->>> + * Return: 1 if the timer can be in deep idle state, 0 otherwise.
->>
->> Return: true if the timer HW state is lost when a CPU enters an idle
->>         state, false otherwise
->>
->>> + */
->>> +bool __init acpi_gtdt_c3stop(int type)
->>> +{
->>> +     struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
->>> +
->>> +     switch (type) {
->>> +     case ARCH_TIMER_PHYS_NONSECURE_PPI:
->>> +             return !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
->>> +
->>> +     case ARCH_TIMER_VIRT_PPI:
->>> +             return !(gtdt->virtual_timer_flags & ACPI_GTDT_ALWAYS_ON);
->>> +
->>> +     case ARCH_TIMER_HYP_PPI:
->>> +             return !(gtdt->non_secure_el2_flags & ACPI_GTDT_ALWAYS_ON);
->>> +
->>> +     default:
->>> +             pr_err("Failed to get c3stop info: invalid type.\n");
->>> +     }
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +/**
->>> + * acpi_gtdt_init() - Get the info of GTDT table to prepare for further init.
->>> + * @table:   The pointer to GTDT table.
->>> + * @platform_timer_count:    The pointer of int variate for returning the
->>
->> I do not understand what this means.
->>
->>> + *                           number of platform timers. It can be NULL, if
->>> + *                           driver don't need this info.
->>
->> driver doesn't
->>
->>> + *
->>> + * Return: 0 if success, -EINVAL if error.
->>> + */
->>> +int __init acpi_gtdt_init(struct acpi_table_header *table,
->>> +                       int *platform_timer_count)
->>> +{
->>> +     int ret = 0;
->>> +     int timer_count = 0;
->>> +     void *platform_timer = NULL;
->>> +     struct acpi_table_gtdt *gtdt;
->>> +
->>> +     gtdt = container_of(table, struct acpi_table_gtdt, header);
->>> +     acpi_gtdt_desc.gtdt = gtdt;
->>> +     acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
->>> +
->>> +     if (table->revision < 2)
->>> +             pr_warn("Revision:%d doesn't support Platform Timers.\n",
->>> +                     table->revision);
->>
->> Ok, two points here. First, I am not sure why you should warn if the
->> table revision is < 2, is that a FW bug ? I do not think it is, you
->> can just return 0.
->>
->>> +     else if (!gtdt->platform_timer_count)
->>> +             pr_debug("No Platform Timer.\n");
->>
->> Ditto. Why keep executing ? There is nothing to do, just bail out
->> with a return 0.
->>
->>> +     else
->>> +             timer_count = gtdt->platform_timer_count;
->>> +
->>> +     if (timer_count) {
->>> +             platform_timer = (void *)gtdt + gtdt->platform_timer_offset;
->>> +             if (platform_timer < (void *)table +
->>> +                                  sizeof(struct acpi_table_gtdt)) {
->>> +                     pr_err(FW_BUG "invalid timer data.\n");
->>> +                     timer_count = 0;
->>> +                     platform_timer = NULL;
->>> +             ret = -EINVAL;
->>
->> Same here, I suspect you want to consolidate the return path (I missed
->> previous rounds of reviews so you should not worry too much, I can clean
->> this up later) but to me a:
->>
->> return -EINVAL;
->>
->> would just do.
->
-> For this problem, Can I do this:
->
-> /**
->  * acpi_gtdt_init() - Get the info of GTDT table to prepare for further init.
->  * @table:                        The pointer to GTDT table.
->  * @platform_timer_count:        It points to a integer variable which is used
->  *                                for storing the number of platform timers.
->  *                                This pointer could be NULL, if the caller
->  *                                doesn't need this info.
->  *
->  * Return: 0 if success, -EINVAL if error.
->  */
-> int __init acpi_gtdt_init(struct acpi_table_header *table,
->                           int *platform_timer_count)
+>> ...then retrieve it with of_device_get_match_data() here. No need to
+>> reinvent the wheel (or have to worry about the ordering of multiple
+>> compatibles once rev. n+1 comes around).
+> 
+> I actually asked about this on IRC. The consensus was "use what
+> best fits your use case". I need to do some processing based on
+> the revision, so I thought
+> 
+>   if (chip_x)
+> 	do_chip_x_init()
+> 
+> was a good way to express my intent. Did I misunderstand?
+
+No, I'm in no way disputing that; what I'm pointing out is that you
+already have an explicitly provided way to associate a value of "chip_x"
+with a given compatible string - see other callers of
+of_device_get_match_data() for inspiration. I don't have much of an
+opinion as to whether it's an enum, a static structure of offsets and
+callbacks, or you embrace the nasal demons and just wedge the init
+function pointer in there directly (this'll never run on
+IA-64/M68k/etc., right? :P). The point is that not only is it cleaner
+and scales better as the driver grows, it stops you having to worry at
+all about setting this trap for yourself:
+
+	compatible = "rev3-with-extra-fun", "rev3";
+	...
+
+	if (of_device_is_compatible(dev, "rev3"))
+		boring_init_without_extra_fun();	/* :( */
+
+because once you've made your code robust against that, you'll realise
+that what you've done is wasted your time open-coding a creaky
+approximation of of_match_device().
+
+Robin.
+
+> For example, the init function for rev2 currently looks like this:
+> 
+> static void rev2_init(struct tango_pcie *pcie, void __iomem *base)
 > {
->         void *platform_timer;
->         struct acpi_table_gtdt *gtdt;
->
->         gtdt = container_of(table, struct acpi_table_gtdt, header);
->         acpi_gtdt_desc.gtdt = gtdt;
->         acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
->         acpi_gtdt_desc.platform_timer = NULL;
->         if (platform_timer_count)
->                 *platform_timer_count = 0;
->
->         if (table->revision < 2) {
->                 pr_warn("Revision:%d doesn't support Platform Timers.\n",
->                         table->revision);
->                 return 0;
->         }
->
->         if (!gtdt->platform_timer_count) {
->                 pr_debug("No Platform Timer.\n");
->                 return 0;
->         }
->         if (platform_timer_count)
->                 *platform_timer_count = gtdt->platform_timer_count;
-
-sorry , this should be moved,
-
-
->
->         platform_timer = (void *)gtdt + gtdt->platform_timer_offset;
->         if (platform_timer < (void *)table + sizeof(struct acpi_table_gtdt)) {
->                 pr_err(FW_BUG "invalid timer data.\n");
->                 return -EINVAL;
->         }
->         acpi_gtdt_desc.platform_timer = platform_timer;
-
-         if (platform_timer_count)
-                 *platform_timer_count = gtdt->platform_timer_count;
-
-Here is the right place
-
->
->         return 0;
+> 	void __iomem *misc_irq	= base + 0x40;
+> 	void __iomem *doorbell	= base + 0x8c;
+> 
+> 	pcie->mux		= base + 0x2c;
+> 	pcie->msi_status	= base + 0x4c;
+> 	pcie->msi_mask		= base + 0x6c;
+> 	pcie->msi_doorbell	= 0x80000000;
+> 
+> 	writel(lower_32_bits(pcie->msi_doorbell), doorbell + 0);
+> 	writel(upper_32_bits(pcie->msi_doorbell), doorbell + 4);
+> 
+> 	/* Enable legacy PCI interrupts */
+> 	writel(BIT(15), misc_irq);
+> 	writel(0xf << 4, misc_irq + 4);
 > }
->
->
+> 
+>>> +#define VENDOR_SIGMA	0x1105
 >>
->> Lorenzo
->>
->>> +             }
->>> +     }
->>> +
->>> +     acpi_gtdt_desc.platform_timer = platform_timer;
->>> +     if (platform_timer_count)
->>> +             *platform_timer_count = timer_count;
->>> +
->>> +     return ret;
->>> +}
->>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->>> index 9b05886..4b5c146 100644
->>> --- a/include/linux/acpi.h
->>> +++ b/include/linux/acpi.h
->>> @@ -595,6 +595,12 @@ enum acpi_reconfig_event  {
->>>  int acpi_reconfig_notifier_register(struct notifier_block *nb);
->>>  int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
->>>
->>> +#ifdef CONFIG_ACPI_GTDT
->>> +int acpi_gtdt_init(struct acpi_table_header *table, int *platform_timer_count);
->>> +int acpi_gtdt_map_ppi(int type);
->>> +bool acpi_gtdt_c3stop(int type);
->>> +#endif
->>> +
->>>  #else        /* !CONFIG_ACPI */
->>>
->>>  #define acpi_disabled 1
->>> --
->>> 2.9.3
->>>
->
->
->
-> --
-> Best regards,
->
-> Fu Wei
-> Software Engineer
-> Red Hat
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+>> Should this not be in include/linux/pci_ids.h?
+> 
+> Doh! Very likely. Thanks.
+> 
+> Regards.
+> 
