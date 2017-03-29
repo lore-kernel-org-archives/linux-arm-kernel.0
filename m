@@ -1,44 +1,51 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Mar 2017 19:08:31 -0400
-Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <b0327163-2500-1541-6c23-454e3f28b6ea@codeaurora.org>
-References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
- <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
- <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
- <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
- <f3e76f8d-16bb-8ec5-da9b-d62ca66dafd6@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675D8C4@IRSMSX101.ger.corp.intel.com>
- <beb63ced-3e63-c09c-8c2c-5d5b0956d2fc@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675D9B9@IRSMSX101.ger.corp.intel.com>
- <b0327163-2500-1541-6c23-454e3f28b6ea@codeaurora.org>
-Message-ID: <7b0c887b-cd99-b752-c162-66fc7c864731@codeaurora.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 29 Mar 2017 16:21:12 -0700
+Subject: [PATCH 4/5] ARM: dts: imx7-colibri: remove 1.8V fixed regulator
+In-Reply-To: <20170329232113.19078-1-stefan@agner.ch>
+References: <20170329232113.19078-1-stefan@agner.ch>
+Message-ID: <20170329232113.19078-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/29/2017 4:36 PM, Sinan Kaya wrote:
-> On 3/29/2017 4:16 PM, Patel, Mayurkumar wrote:
->> Actually, I have taken same patches of yours which proposed and applied it correctly. Will try it with clean
->> build if that helps.
->>
->> But what I could understand from following patch is https://patchwork.codeaurora.org/patch/207653/ 
->>
->> We still have a flow of pci_aspm_init() -> alloc_pcie_link_state() -> pci_function_0()
->> Where I see the first Kernel NULL pointer crash while accessing pdev->subordinate in pci_function_0() function.
-> 
-> OK. It looks like somebody moved function_0 call around. I was looking at 4.11-rc1.
-> 
-> 3bd7db63a841e8c5297bb18ad801df67d5e38ad2 (PCI/ASPM: Always set link->downstream to avoid NULL dereference on remove)
-> 
-> I see the change in 4.11-rc3 now. 
-> 
-> Let me see what's going on.
-> 
+The ADC is directly supplied by the PMIC 1.8V rail, remove the
+superfluous fixed regulator.
 
-I posted V6 a minute ago with the bugfix. Let me know how that works for you.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx7-colibri.dtsi | 11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
+index cbcab937b905..2d87489f9105 100644
+--- a/arch/arm/boot/dts/imx7-colibri.dtsi
++++ b/arch/arm/boot/dts/imx7-colibri.dtsi
+@@ -60,13 +60,6 @@
+ 		regulator-max-microvolt = <3300000>;
+ 	};
+ 
+-	reg_vref_1v8: regulator-vref-1v8 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vref-1v8";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-	};
+-
+ 	sound {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "imx7-sgtl5000";
+@@ -85,11 +78,11 @@
+ };
+ 
+ &adc1 {
+-	vref-supply = <&reg_vref_1v8>;
++	vref-supply = <&reg_DCDC3>;
+ };
+ 
+ &adc2 {
+-	vref-supply = <&reg_vref_1v8>;
++	vref-supply = <&reg_DCDC3>;
+ };
+ 
+ &cpu0 {
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.12.1
