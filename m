@@ -1,170 +1,54 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 30 Mar 2017 15:15:48 +0800
-Subject: [PATCH v7 1/2] dt-bindings: Add GPCv2 power gating driver
-In-Reply-To: <CAHQ1cqH4HnVsiAT6wxVJ=b-AJKWCK6L7kTxLZ7JFrZ4B-t2PQg@mail.gmail.com>
-References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
- <20170321145004.21265-2-andrew.smirnov@gmail.com>
- <20170324063216.GC12604@b29396-OptiPlex-7040>
- <CAHQ1cqH4HnVsiAT6wxVJ=b-AJKWCK6L7kTxLZ7JFrZ4B-t2PQg@mail.gmail.com>
-Message-ID: <20170330071548.GB29432@b29396-OptiPlex-7040>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 29 Mar 2017 17:32:28 +0200
+Subject: [PATCH v22 03/11] clocksource: arm_arch_timer: refactor
+ arch_timer_needs_probing
+In-Reply-To: <20170329152408.GM23442@leverpostej>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <20170321163122.9183-4-fu.wei@linaro.org>
+ <20170328150220.GF2123@mai> <20170329152408.GM23442@leverpostej>
+Message-ID: <20170329153228.GN2123@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 11:42:51AM -0700, Andrey Smirnov wrote:
-> On Thu, Mar 23, 2017 at 11:32 PM, Dong Aisheng <dongas86@gmail.com> wrote:
-> > On Tue, Mar 21, 2017 at 07:50:03AM -0700, Andrey Smirnov wrote:
-> >> Add DT bindings for power domain driver for GPCv2 IP block found in
-> >> i.MX7 SoCs.
-> >>
-> >> Cc: yurovsky at gmail.com
-> >> Cc: Lucas Stach <l.stach@pengutronix.de>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> >> Cc: Dong Aisheng <dongas86@gmail.com>
-> >> Cc: devicetree at vger.kernel.org
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Cc: linux-kernel at vger.kernel.org
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> >> ---
-> >>  .../devicetree/bindings/power/fsl,imx-gpcv2.txt    | 71 ++++++++++++++++++++++
-> >>  include/dt-bindings/power/imx7-power.h             | 18 ++++++
-> >>  2 files changed, 89 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-> >>  create mode 100644 include/dt-bindings/power/imx7-power.h
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-> >> new file mode 100644
-> >> index 0000000..02f45c6
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-> >> @@ -0,0 +1,71 @@
-> >> +Freescale i.MX General Power Controller v2
-> >> +==========================================
-> >> +
-> >> +The i.MX7S/D General Power Control (GPC) block contains Power Gating
-> >> +Control (PGC) for various power domains.
-> >> +
-> >> +Required properties:
-> >> +
-> >> +- compatible: Should be "fsl,imx7d-gpc"
-> >> +
-> >> +- reg: should be register base and length as documented in the
-> >> +  datasheet
-> >> +
-> >> +- interrupts: Should contain GPC interrupt request 1
-> >> +
-> >> +Power domains contained within GPC node are generic power domain
-> >> +providers, documented in
-> >> +Documentation/devicetree/bindings/power/power_domain.txt, which are
-> >> +described as subnodes of the power gating controller 'pgc' node,
-> >> +which, in turn, is expected to contain the following:
-> >> +
-> >> +Required properties:
-> >> +
-> >> +- reg: Power domain index. Valid values are defined in
-> >> +  include/dt-bindings/power/imx7-power.h
-> >> +
-> >> +- #power-domain-cells: Should be 0
-> >> +
-> >> +Optional properties:
-> >> +
-> >> +- power-supply: Power supply used to power the domain
-> >> +
-> >> +Example:
-> >> +
-> >> +     gpc: gpc at 303a0000 {
-> >> +             compatible = "fsl,imx7d-gpc";
-> >> +             reg = <0x303a0000 0x1000>;
-> >> +             interrupt-controller;
-> >> +             interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> >> +             #interrupt-cells = <3>;
-> >> +             interrupt-parent = <&intc>;
-> >> +
-> >> +             pgc {
-> >> +                     #address-cells = <1>;
-> >> +                     #size-cells = <0>;
-> >> +
-> >> +                     pgc_pcie_phy: power-domain at 3 {
-> >> +                             #power-domain-cells = <0>;
-> >> +
-> >> +                             reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
-> >> +                             power-supply = <&reg_1p0d>;
-> >> +                     };
-> >> +             };
-> >> +     };
-> >> +
-> >> +
-> >> +Specifying power domain for IP modules
-> >> +======================================
-> >> +
-> >> +IP cores belonging to a power domain should contain a 'power-domains'
-> >> +property that is a phandle for PGC node representing the domain.
-> >> +
-> >> +Example of a device that is part of the PCIE_PHY power domain:
-> >> +
-> >> +     pcie: pcie at 33800000 {
-> >> +           reg = <0x33800000 0x4000>,
-> >> +                 <0x4ff00000 0x80000>;
-> >> +             /* ... */
-> >> +             power-domains = <&pgc_pcie_phy>;
-> >> +             /* ... */
-> >> +     };
-> >> diff --git a/include/dt-bindings/power/imx7-power.h b/include/dt-bindings/power/imx7-power.h
-> >> new file mode 100644
-> >> index 0000000..eb70023
-> >> --- /dev/null
-> >> +++ b/include/dt-bindings/power/imx7-power.h
-> >> @@ -0,0 +1,18 @@
-> >> +/*
-> >> + *  Copyright (C) 2017 Impinj
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + */
-> >> +
-> >> +#ifndef __DT_BINDINGS_IMX7_POWER_H__
-> >> +#define __DT_BINDINGS_IMX7_POWER_H__
-> >> +
-> >> +#define IMX7_POWER_DOMAIN_USB_HSIC_PHY       0
-> >> +#define IMX7_POWER_DOMAIN_USB_OTG2_PHY       1
-> >> +#define IMX7_POWER_DOMAIN_USB_OTG1_PHY       2
-> >> +#define IMX7_POWER_DOMAIN_PCIE_PHY   3
-> >> +#define IMX7_POWER_DOMAIN_MIPI_PHY   4
-> >
-> > Nitpick: Probably better to define according to the reference manual
-> > defined order.
-> >
-> > 0x800 ~ 0x83F : PGC for A7 core0
-> > 0x840 ~ 0x87F: PGC for A7 core1
-> > 0x880 ~ 0x8BF: PGC for A7 SCU
-> > 0xA00 ~ 0xA3F: PGC for fastmix/megamix
-> > 0xC00 ~ 0xC3F: PGC for MIPI PHY
-> > 0xC40 ~ 0xC7F: PGC for PCIE_PHY
-> > 0xC80 ~ 0xCBF: Reserved
-> > 0xCC0 ~ 0xCFF: Reserved
-> > 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
-> >
-> > You can drop A7 core/scu/fastmix/megamix as well.
-> >
+On Wed, Mar 29, 2017 at 04:24:08PM +0100, Mark Rutland wrote:
+> On Tue, Mar 28, 2017 at 05:02:20PM +0200, Daniel Lezcano wrote:
+> > On Wed, Mar 22, 2017 at 12:31:14AM +0800, fu.wei at linaro.org wrote:
+> > > From: Fu Wei <fu.wei@linaro.org>
+> > > 
+> > > When system init with device-tree, we don't know which node will be
+> > > initialized first. And the code in arch_timer_common_init should wait
+> > > until per-cpu timer and MMIO timer are both initialized. So we need
+> > > arch_timer_needs_probing to detect the init status of system.
+> > > 
+> > > But currently the code is dispersed in arch_timer_needs_probing and
+> > > arch_timer_common_init. And the function name doesn't specify that
+> > > it's only for device-tree. This is somewhat confusing.
+> > 
+> > Can the following patch help you to solve nicely the situation ?
+> > 
+> > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1360007.html
 > 
-> Sure, will do.
+> This does not help.
+> 
+> The needs_probing logic is all there to bodge around a problem with
+> registering sched_clock, when you have two sources of the same
+> frequency, but one is otherwise better.
+> 
+> The sysreg clocksource has much lower latency than the MMIO clocksource,
+> so we always want to use that as the sched_clock if we have it.
+> Currently, the code ensures this by deferring registration of
+> sched_clock.
+> 
+> Ideally, we'd figure that out dynamically, or we'd have a rating
+> argument.
 > 
 
-BTW, i read some other SoC power domain implementations,
-they keep the CPU domains although not used in kernel.
-e.g.
-include/dt-bindings/power/rk3288-power.h
-include/soc/tegra/pmc.h
+Ok, I see. Thanks.
 
-That probably is a good reference in case we may need them in the future.
-And device tree actually is describe HW.
-I wonder we may be better to keep them as well.
+-- 
 
-Regards
-Dong Aisheng
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> Thanks,
-> Andrey Smirnov
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
