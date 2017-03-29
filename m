@@ -1,9 +1,17 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 29 Mar 2017 14:38:41 -0700
-Subject: [GIT PULL] Amlogic: defconfig changes for v4.12
-Message-ID: <m2shlv69we.fsf@baylibre.com>
+Date: Wed, 29 Mar 2017 14:41:01 -0700
+Subject: [GIT PULL] Amlogic driver updates for v4.12:
+Message-ID: <m2lgrn69si.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Arnd, Olof,
+
+Below are some driver changes for Amlogic platforms for v4.12, with acks
+from the appropriate maintainers included.
+
+Kevin
+
 
 The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
@@ -11,19 +19,22 @@ The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
 
-for you to fetch changes up to 95fbe8b08b2d420e4f5a77701f165d6b23827862:
+for you to fetch changes up to 7a9bc330df9b8fb3245d50a198b5c6d4d634b06f:
 
-  ARM64: defconfig: enable the leds-pwm driver and default-on trigger (2017-03-06 09:54:57 -0800)
-
-----------------------------------------------------------------
-Amlogic: defconfig changes for v4.12
-- enable PWM LEDs and LEDs default-on trigger
+  firmware: meson-sm: Allow 0 as valid return value (2017-03-23 12:22:40 -0700)
 
 ----------------------------------------------------------------
-Martin Blumenstingl (1):
-      ARM64: defconfig: enable the leds-pwm driver and default-on trigger
+Amlogic driver updates for v4.12:
+- firmware: updates/fixes for meson-sm
 
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+----------------------------------------------------------------
+Carlo Caione (2):
+      firmware: meson-sm: Check for buffer output size
+      firmware: meson-sm: Allow 0 as valid return value
+
+ drivers/firmware/meson/meson_sm.c       | 20 ++++++++++++++++----
+ drivers/nvmem/meson-efuse.c             |  2 +-
+ include/linux/firmware/meson/meson_sm.h |  4 ++--
+ 3 files changed, 19 insertions(+), 7 deletions(-)
