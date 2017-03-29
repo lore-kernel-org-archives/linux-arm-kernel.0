@@ -1,143 +1,126 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:43:22 -0500
-Subject: [PATCH v4 05/23] drivers/fsi: Add slave & master read/write APIs
+Date: Wed, 29 Mar 2017 12:43:18 -0500
+Subject: [PATCH v4 01/23] drivers/fsi: Add fsi master definition
 In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
 References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170329174340.89109-6-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170329174340.89109-2-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Introduce functions to perform reads/writes on the slave address space;
-these simply pass the request on the slave's master with the correct
-link and slave ID.
+Add a `struct fsi_master` to represent a FSI master controller.
 
-We implement these on top of similar helpers for the master.
+FSI master drivers register one of these structs to provide
+device-specific of the standard operations: read/write/term/break and
+link control.
+
+Includes changes from Edward A. James <eajames@us.ibm.com> & Jeremy Kerr
+<jk@ozlabs.org>.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ drivers/fsi/fsi-core.c   | 35 +++++++++++++++++++++++++++++++++++
+ drivers/fsi/fsi-master.h | 41 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+ create mode 100644 drivers/fsi/fsi-master.h
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4bbca95..32698ed 100644
+index 3d55bd5..ca02913 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -32,6 +32,11 @@ struct fsi_slave {
+@@ -15,8 +15,43 @@
  
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ #include <linux/device.h>
+ #include <linux/fsi.h>
++#include <linux/idr.h>
+ #include <linux/module.h>
  
-+static int fsi_master_read(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, void *val, size_t size);
-+static int fsi_master_write(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
++#include "fsi-master.h"
 +
- /* crc helpers */
- static const uint8_t crc4_tab[] = {
- 	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
-@@ -57,6 +62,58 @@ uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
- EXPORT_SYMBOL_GPL(fsi_crc4);
- 
- /* FSI slave support */
-+static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
-+		uint8_t *idp)
++static DEFINE_IDA(master_ida);
++
++/* FSI master support */
++int fsi_master_register(struct fsi_master *master)
 +{
-+	uint32_t addr = *addrp;
-+	uint8_t id = *idp;
++	int rc;
 +
-+	if (addr > slave->size)
++	if (!master)
 +		return -EINVAL;
 +
-+	/* For 23 bit addressing, we encode the extra two bits in the slave
-+	 * id (and the slave's actual ID needs to be 0).
-+	 */
-+	if (addr > 0x1fffff) {
-+		if (slave->id != 0)
-+			return -EINVAL;
-+		id = (addr >> 21) & 0x3;
-+		addr &= 0x1fffff;
++	master->idx = ida_simple_get(&master_ida, 0, INT_MAX, GFP_KERNEL);
++	dev_set_name(&master->dev, "fsi%d", master->idx);
++
++	rc = device_register(&master->dev);
++	if (rc)
++		ida_simple_remove(&master_ida, master->idx);
++
++	return rc;
++}
++EXPORT_SYMBOL_GPL(fsi_master_register);
++
++void fsi_master_unregister(struct fsi_master *master)
++{
++	if (master->idx >= 0) {
++		ida_simple_remove(&master_ida, master->idx);
++		master->idx = -1;
 +	}
 +
-+	*addrp = addr;
-+	*idp = id;
-+	return 0;
++	device_unregister(&master->dev);
 +}
++EXPORT_SYMBOL_GPL(fsi_master_unregister);
 +
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+			void *val, size_t size)
-+{
-+	uint8_t id = slave->id;
-+	int rc;
-+
-+	rc = fsi_slave_calc_addr(slave, &addr, &id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_master_read(slave->master, slave->link, id,
-+			addr, val, size);
-+}
-+
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+			const void *val, size_t size)
-+{
-+	uint8_t id = slave->id;
-+	int rc;
-+
-+	rc = fsi_slave_calc_addr(slave, &addr, &id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_master_write(slave->master, slave->link, id,
-+			addr, val, size);
-+}
-+
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
- 	/* todo: initialise slave device, perform engine scan */
-@@ -65,6 +122,41 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- }
+ /* FSI core & Linux bus type definitions */
  
- /* FSI master support */
-+static int fsi_check_access(uint32_t addr, size_t size)
-+{
-+	if (size != 1 && size != 2 && size != 4)
-+		return -EINVAL;
+ static int fsi_bus_match(struct device *dev, struct device_driver *drv)
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+new file mode 100644
+index 0000000..7764b00
+--- /dev/null
++++ b/drivers/fsi/fsi-master.h
+@@ -0,0 +1,41 @@
++/*
++ * FSI master definitions. These comprise the core <--> master interface,
++ * to allow the core to interact with the (hardware-specific) masters.
++ *
++ * Copyright (C) IBM Corporation 2016
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+	if ((addr & 0x3) != (size & 0x3))
-+		return -EINVAL;
++#ifndef DRIVERS_FSI_MASTER_H
++#define DRIVERS_FSI_MASTER_H
 +
-+	return 0;
-+}
++#include <linux/device.h>
 +
-+static int fsi_master_read(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, void *val, size_t size)
-+{
-+	int rc;
++struct fsi_master {
++	struct device	dev;
++	int		idx;
++	int		n_links;
++	int		flags;
++	int		(*read)(struct fsi_master *, int link, uint8_t id,
++				uint32_t addr, void *val, size_t size);
++	int		(*write)(struct fsi_master *, int link, uint8_t id,
++				uint32_t addr, const void *val, size_t size);
++	int		(*term)(struct fsi_master *, int link, uint8_t id);
++	int		(*send_break)(struct fsi_master *, int link);
++	int		(*link_enable)(struct fsi_master *, int link);
++};
 +
-+	rc = fsi_check_access(addr, size);
-+	if (rc)
-+		return rc;
++#define dev_to_fsi_master(d) container_of(d, struct fsi_master, dev)
 +
-+	return master->read(master, link, slave_id, addr, val, size);
-+}
++extern int fsi_master_register(struct fsi_master *master);
++extern void fsi_master_unregister(struct fsi_master *master);
 +
-+static int fsi_master_write(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, const void *val, size_t size)
-+{
-+	int rc;
-+
-+	rc = fsi_check_access(addr, size);
-+	if (rc)
-+		return rc;
-+
-+	return master->write(master, link, slave_id, addr, val, size);
-+}
-+
- static int fsi_master_scan(struct fsi_master *master)
- {
- 	int link;
++#endif /* DRIVERS_FSI_MASTER_H */
 -- 
 1.8.2.2
