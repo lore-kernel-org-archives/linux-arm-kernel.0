@@ -1,430 +1,149 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 28 Mar 2017 20:57:58 -0500
-Subject: [PATCH 5/8] ARM: OMAP2+: Introduce low-level suspend code for AM43XX
+Date: Tue, 28 Mar 2017 20:57:54 -0500
+Subject: [PATCH 1/8] ARM: OMAP: Wakeupgen: Add context save/restore for AM43XX
 In-Reply-To: <20170329015801.22240-1-d-gerlach@ti.com>
 References: <20170329015801.22240-1-d-gerlach@ti.com>
-Message-ID: <20170329015801.22240-6-d-gerlach@ti.com>
+Message-ID: <20170329015801.22240-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although similar to AM33XX, introduce a new low-level asm file for
-suspend containing new context save and restore paths for EMIF and l2
-cache disabling and enabling.
+AM43XX has the same wakeupgen IP as OMAP4/5. The only
+notable difference is the presence of 7 register banks
+and lack of SAR area which has been used in OMAP4/5 for
+saving and restoring the context around low power states.
+
+In case of AM43XX the context is saved and restored by
+the kernel. Introduce wakeupgen_ops so that context save
+and restore can be set on a per-SoC basis during init.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/mach-omap2/sleep43xx.S | 403 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 403 insertions(+)
- create mode 100644 arch/arm/mach-omap2/sleep43xx.S
+ arch/arm/mach-omap2/omap-wakeupgen.c | 68 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 62 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/sleep43xx.S b/arch/arm/mach-omap2/sleep43xx.S
-new file mode 100644
-index 000000000000..6012f83cb7f4
---- /dev/null
-+++ b/arch/arm/mach-omap2/sleep43xx.S
-@@ -0,0 +1,403 @@
-+/*
-+ * Low level suspend code for AM43XX SoCs
-+ *
-+ * Copyright (C) 2013-2017 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Dave Gerlach, Vaibhav Bedia
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <linux/ti-emif-sram.h>
-+
-+#include <asm/asm-offsets.h>
-+#include <asm/assembler.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/memory.h>
-+
-+#include "cm33xx.h"
-+#include "common.h"
-+#include "iomap.h"
-+#include "omap-secure.h"
-+#include "omap44xx.h"
-+#include "prm33xx.h"
-+#include "prcm43xx.h"
-+
-+#define AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE		0x0003
-+#define AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE		0x0002
-+
-+#define AM43XX_EMIF_POWEROFF_ENABLE			0x1
-+#define AM43XX_EMIF_POWEROFF_DISABLE			0x0
-+
-+#define AM43XX_CM_CLKSTCTRL_CLKTRCTRL_SW_SLEEP		0x1
-+#define AM43XX_CM_CLKSTCTRL_CLKTRCTRL_HW_AUTO		0x3
-+
-+#define AM43XX_CM_BASE					0x44DF0000
-+
-+#define AM43XX_CM_REGADDR(inst, reg)                           \
-+       AM33XX_L4_WK_IO_ADDRESS(AM43XX_CM_BASE + (inst) + (reg))
-+
-+#define AM43XX_CM_MPU_CLKSTCTRL AM43XX_CM_REGADDR(AM43XX_CM_MPU_INST, \
-+					AM43XX_CM_MPU_MPU_CDOFFS)
-+#define AM43XX_CM_MPU_MPU_CLKCTRL AM43XX_CM_REGADDR(AM43XX_CM_MPU_INST, \
-+					AM43XX_CM_MPU_MPU_CLKCTRL_OFFSET)
-+#define AM43XX_CM_PER_EMIF_CLKCTRL  AM43XX_CM_REGADDR(AM43XX_CM_PER_INST, \
-+					AM43XX_CM_PER_EMIF_CLKCTRL_OFFSET)
-+#define AM43XX_PRM_EMIF_CTRL_OFFSET			0x0030
-+
-+	.align 3
-+
-+ENTRY(am43xx_do_wfi)
-+	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
-+
-+	/* Retrieve l2 cache virt address BEFORE we shut off EMIF */
-+	ldr	r1, get_l2cache_base
-+	blx	r1
-+	mov	r8, r0
-+
-+	/*
-+	 * Flush all data from the L1 and L2 data cache before disabling
-+	 * SCTLR.C bit.
-+	 */
-+	ldr	r1, kernel_flush
-+	blx	r1
-+
-+	/*
-+	 * Clear the SCTLR.C bit to prevent further data cache
-+	 * allocation. Clearing SCTLR.C would make all the data accesses
-+	 * strongly ordered and would not hit the cache.
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	bic	r0, r0, #(1 << 2)	@ Disable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+	dsb
-+
-+	/*
-+	 * Invalidate L1 and L2 data cache.
-+	 */
-+	ldr	r1, kernel_flush
-+	blx	r1
-+
-+	/*
-+	 * The kernel doesn't interwork: v7_flush_dcache_all in particluar will
-+	 * always return in Thumb state when CONFIG_THUMB2_KERNEL is enabled.
-+	 * This sequence switches back to ARM.  Note that .align may insert a
-+	 * nop: bx pc needs to be word-aligned in order to work.
-+	 */
-+ THUMB(	.thumb		)
-+ THUMB(	.align		)
-+ THUMB(	bx	pc	)
-+ THUMB(	nop		)
-+	.arm
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	/*
-+	 * Clean and invalidate the L2 cache.
-+	 */
-+#ifdef CONFIG_PL310_ERRATA_727915
-+	mov	r0, #0x03
-+	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
-+	dsb
-+	smc	#0
-+	dsb
-+#endif
-+	mov	r0, r8
-+	adr	r4, am43xx_pm_ro_sram_data
-+	ldr	r3, [r4, #AMX3_PM_RO_SRAM_DATA_VIRT_OFFSET]
-+
-+	mov	r2, r0
-+	ldr	r0, [r2, #L2X0_AUX_CTRL]
-+	str	r0, [r3, #AMX3_PM_L2_AUX_CTRL_VAL_OFFSET]
-+	ldr	r0, [r2, #L310_PREFETCH_CTRL]
-+	str	r0, [r3, #AMX3_PM_L2_PREFETCH_CTRL_VAL_OFFSET]
-+
-+	ldr	r0, l2_val
-+	str	r0, [r2, #L2X0_CLEAN_INV_WAY]
-+wait:
-+	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
-+	ldr	r1, l2_val
-+	ands	r0, r0, r1
-+	bne	wait
-+#ifdef CONFIG_PL310_ERRATA_727915
-+	mov	r0, #0x00
-+	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
-+	dsb
-+	smc	#0
-+	dsb
-+#endif
-+l2x_sync:
-+	mov	r0, r8
-+	mov	r2, r0
-+	mov	r0, #0x0
-+	str	r0, [r2, #L2X0_CACHE_SYNC]
-+sync:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	ands	r0, r0, #0x1
-+	bne	sync
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 369f95a703ac..33ed5d53fa45 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -58,6 +58,17 @@ static unsigned int irq_banks = DEFAULT_NR_REG_BANKS;
+ static unsigned int max_irqs = DEFAULT_IRQS;
+ static unsigned int omap_secure_apis;
+ 
++#ifdef CONFIG_CPU_PM
++static unsigned int wakeupgen_context[MAX_NR_REG_BANKS];
 +#endif
 +
-+	adr     r9, am43xx_emif_sram_table
++struct omap_wakeupgen_ops {
++	void (*save_context)(void);
++	void (*restore_context)(void);
++};
 +
-+	ldr     r3, [r9, #EMIF_PM_SAVE_CONTEXT_OFFSET]
-+	blx     r3
++static struct omap_wakeupgen_ops *wakeupgen_ops;
 +
-+	ldr     r3, [r9, #EMIF_PM_ENTER_SR_OFFSET]
-+	blx     r3
+ /*
+  * Static helper functions.
+  */
+@@ -264,6 +275,16 @@ static inline void omap5_irq_save_context(void)
+ 
+ }
+ 
++static inline void am43xx_irq_save_context(void)
++{
++	u32 i;
 +
-+	/* Disable EMIF */
-+	ldr	r1, am43xx_virt_emif_clkctrl
-+	ldr	r2, [r1]
-+	bic	r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
-+	str	r2, [r1]
++	for (i = 0; i < irq_banks; i++) {
++		wakeupgen_context[i] = wakeupgen_readl(i, 0);
++		wakeupgen_writel(0, i, CPU0_ID);
++	}
++}
 +
-+wait_emif_disable:
-+	ldr	r2, [r1]
-+	ldr	r3, module_disabled_val
-+	cmp	r2, r3
-+	bne	wait_emif_disable
+ /*
+  * Save WakeupGen interrupt context in SAR BANK3. Restore is done by
+  * ROM code. WakeupGen IP is integrated along with GIC to manage the
+@@ -280,11 +301,8 @@ static void irq_save_context(void)
+ 
+ 	if (!sar_base)
+ 		sar_base = omap4_get_sar_ram_base();
+-
+-	if (soc_is_omap54xx())
+-		omap5_irq_save_context();
+-	else
+-		omap4_irq_save_context();
++	if (wakeupgen_ops && wakeupgen_ops->save_context)
++		wakeupgen_ops->save_context();
+ }
+ 
+ /*
+@@ -306,6 +324,20 @@ static void irq_sar_clear(void)
+ 	writel_relaxed(val, sar_base + offset);
+ }
+ 
++static void am43xx_irq_restore_context(void)
++{
++	u32 i;
 +
-+	/*
-+	 * For the MPU WFI to be registered as an interrupt
-+	 * to WKUP_M3, MPU_CLKCTRL.MODULEMODE needs to be set
-+	 * to DISABLED
-+	 */
-+	ldr	r1, am43xx_virt_mpu_clkctrl
-+	ldr	r2, [r1]
-+	bic	r2, r2, #AM33XX_CM_CLKCTRL_MODULEMODE_DISABLE
-+	str	r2, [r1]
++	for (i = 0; i < irq_banks; i++)
++		wakeupgen_writel(wakeupgen_context[i], i, CPU0_ID);
++}
 +
-+	/*
-+	 * Put MPU CLKDM to SW_SLEEP
-+	 */
-+	ldr	r1, am43xx_virt_mpu_clkstctrl
-+	mov	r2, #AM43XX_CM_CLKSTCTRL_CLKTRCTRL_SW_SLEEP
-+	str	r2, [r1]
++static void irq_restore_context(void)
++{
++	if (wakeupgen_ops && wakeupgen_ops->restore_context)
++		wakeupgen_ops->restore_context();
++}
 +
-+	/*
-+	 * Execute a barrier instruction to ensure that all cache,
-+	 * TLB and branch predictor maintenance operations issued
-+	 * have completed.
-+	 */
-+	dsb
-+	dmb
+ /*
+  * Save GIC and Wakeupgen interrupt context using secure API
+  * for HS/EMU devices.
+@@ -319,6 +351,26 @@ static void irq_save_secure_context(void)
+ 	if (ret != API_HAL_RET_VALUE_OK)
+ 		pr_err("GIC and Wakeupgen context save failed\n");
+ }
 +
-+	/*
-+	 * Execute a WFI instruction and wait until the
-+	 * STANDBYWFI output is asserted to indicate that the
-+	 * CPU is in idle and low power state. CPU can specualatively
-+	 * prefetch the instructions so add NOPs after WFI. Sixteen
-+	 * NOPs as per Cortex-A9 pipeline.
-+	 */
-+	wfi
++/* Define ops for context save and restore for each SoC */
++static struct omap_wakeupgen_ops omap4_wakeupgen_ops = {
++	.save_context = omap4_irq_save_context,
++	.restore_context = irq_sar_clear,
++};
 +
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
-+	nop
++static struct omap_wakeupgen_ops omap5_wakeupgen_ops = {
++	.save_context = omap5_irq_save_context,
++	.restore_context = irq_sar_clear,
++};
 +
-+	/* We come here in case of an abort due to a late interrupt */
-+	ldr	r1, am43xx_virt_mpu_clkstctrl
-+	mov	r2, #AM43XX_CM_CLKSTCTRL_CLKTRCTRL_HW_AUTO
-+	str	r2, [r1]
-+
-+	/* Set MPU_CLKCTRL.MODULEMODE back to ENABLE */
-+	ldr	r1, am43xx_virt_mpu_clkctrl
-+	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-+	str	r2, [r1]
-+
-+	/* Re-enable EMIF */
-+	ldr	r1, am43xx_virt_emif_clkctrl
-+	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-+	str	r2, [r1]
-+wait_emif_enable:
-+	ldr	r3, [r1]
-+	cmp	r2, r3
-+	bne	wait_emif_enable
-+
-+	/*
-+	 * Set SCTLR.C bit to allow data cache allocation
-+	 */
-+	mrc	p15, 0, r0, c1, c0, 0
-+	orr	r0, r0, #(1 << 2)	@ Enable the C bit
-+	mcr	p15, 0, r0, c1, c0, 0
-+	isb
-+
-+	ldr     r1, [r9, #EMIF_PM_ABORT_SR_OFFSET]
-+	blx     r1
-+
-+	/* Let the suspend code know about the abort */
-+	mov	r0, #1
-+	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
-+ENDPROC(am43xx_do_wfi)
-+
-+	.align
-+ENTRY(am43xx_resume_offset)
-+	.word . - am43xx_do_wfi
-+
-+ENTRY(am43xx_resume_from_deep_sleep)
-+	/* Set MPU CLKSTCTRL to HW AUTO so that CPUidle works properly */
-+	ldr	r1, am43xx_virt_mpu_clkstctrl
-+	mov	r2, #AM43XX_CM_CLKSTCTRL_CLKTRCTRL_HW_AUTO
-+	str	r2, [r1]
-+
-+	/* For AM43xx, use EMIF power down until context is restored */
-+	ldr	r2, am43xx_phys_emif_poweroff
-+	mov	r1, #AM43XX_EMIF_POWEROFF_ENABLE
-+	str	r1, [r2, #0x0]
-+
-+	/* Re-enable EMIF */
-+	ldr	r1, am43xx_phys_emif_clkctrl
-+	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-+	str	r2, [r1]
-+wait_emif_enable1:
-+	ldr	r3, [r1]
-+	cmp	r2, r3
-+	bne	wait_emif_enable1
-+
-+	adr     r9, am43xx_emif_sram_table
-+
-+	ldr     r1, [r9, #EMIF_PM_RESTORE_CONTEXT_OFFSET]
-+	blx     r1
-+
-+	ldr     r1, [r9, #EMIF_PM_EXIT_SR_OFFSET]
-+	blx     r1
-+
-+	ldr     r2, am43xx_phys_emif_poweroff
-+	mov     r1, #AM43XX_EMIF_POWEROFF_DISABLE
-+	str     r1, [r2, #0x0]
-+
-+#ifdef CONFIG_CACHE_L2X0
-+	ldr	r2, l2_cache_base
-+	ldr	r0, [r2, #L2X0_CTRL]
-+	and	r0, #0x0f
-+	cmp	r0, #1
-+	beq	skip_l2en			@ Skip if already enabled
-+
-+	adr	r4, am43xx_pm_ro_sram_data
-+	ldr	r3, [r4, #AMX3_PM_RO_SRAM_DATA_PHYS_OFFSET]
-+	ldr     r0, [r3, #AMX3_PM_L2_PREFETCH_CTRL_VAL_OFFSET]
-+
-+	ldr	r12, l2_smc1
-+	dsb
-+	smc	#0
-+	dsb
-+set_aux_ctrl:
-+	ldr     r0, [r3, #AMX3_PM_L2_AUX_CTRL_VAL_OFFSET]
-+	ldr	r12, l2_smc2
-+	dsb
-+	smc	#0
-+	dsb
-+
-+	/* L2 invalidate on resume */
-+	ldr	r0, l2_val
-+	ldr	r2, l2_cache_base
-+	str	r0, [r2, #L2X0_INV_WAY]
-+wait2:
-+	ldr	r0, [r2, #L2X0_INV_WAY]
-+	ldr	r1, l2_val
-+	ands	r0, r0, r1
-+	bne	wait2
-+#ifdef CONFIG_PL310_ERRATA_727915
-+	mov	r0, #0x00
-+	mov	r12, #OMAP4_MON_L2X0_DBG_CTRL_INDEX
-+	dsb
-+	smc	#0
-+	dsb
-+#endif
-+l2x_sync2:
-+	ldr	r2, l2_cache_base
-+	mov	r0, #0x0
-+	str	r0, [r2, #L2X0_CACHE_SYNC]
-+sync2:
-+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-+	ands	r0, r0, #0x1
-+	bne	sync2
-+
-+	mov	r0, #0x1
-+	ldr	r12, l2_smc3
-+	dsb
-+	smc	#0
-+	dsb
-+#endif
-+skip_l2en:
-+	/* We are back. Branch to the common CPU resume routine */
-+	mov	r0, #0
-+	ldr	pc, resume_addr
-+ENDPROC(am43xx_resume_from_deep_sleep)
-+
-+/*
-+ * Local variables
-+ */
-+	.align
-+resume_addr:
-+	.word	cpu_resume - PAGE_OFFSET + 0x80000000
-+get_l2cache_base:
-+	.word	omap4_get_l2cache_base
-+kernel_flush:
-+	.word   v7_flush_dcache_all
-+ddr_start:
-+	.word	PAGE_OFFSET
-+
-+am43xx_phys_emif_poweroff:
-+	.word   (AM43XX_CM_BASE + AM43XX_PRM_DEVICE_INST + \
-+		 AM43XX_PRM_EMIF_CTRL_OFFSET)
-+am43xx_virt_mpu_clkstctrl:
-+	.word	(AM43XX_CM_MPU_CLKSTCTRL)
-+am43xx_virt_mpu_clkctrl:
-+	.word	(AM43XX_CM_MPU_MPU_CLKCTRL)
-+am43xx_virt_emif_clkctrl:
-+	.word	(AM43XX_CM_PER_EMIF_CLKCTRL)
-+am43xx_phys_emif_clkctrl:
-+	.word	(AM43XX_CM_BASE + AM43XX_CM_PER_INST + \
-+		 AM43XX_CM_PER_EMIF_CLKCTRL_OFFSET)
-+module_disabled_val:
-+	.word	0x30000
-+
-+/* L2 cache related defines for AM437x */
-+l2_cache_base:
-+	.word	OMAP44XX_L2CACHE_BASE
-+l2_smc1:
-+	.word	OMAP4_MON_L2X0_PREFETCH_INDEX
-+l2_smc2:
-+	.word	OMAP4_MON_L2X0_AUXCTRL_INDEX
-+l2_smc3:
-+	.word	OMAP4_MON_L2X0_CTRL_INDEX
-+l2_val:
-+	.word	0xffff
-+
-+/* DDR related defines */
-+ENTRY(am43xx_emif_sram_table)
-+	.space EMIF_PM_FUNCTIONS_SIZE
-+
-+ENTRY(am43xx_pm_sram)
-+.word am43xx_do_wfi
-+.word am43xx_do_wfi_sz
-+.word am43xx_resume_offset
-+.word am43xx_emif_sram_table
-+.word am43xx_pm_ro_sram_data
-+
-+ENTRY(am43xx_pm_ro_sram_data)
-+	.space AMX3_PM_RO_SRAM_DATA_SIZE
-+
-+ENTRY(am43xx_do_wfi_sz)
-+	.word	. - am43xx_do_wfi
++static struct omap_wakeupgen_ops am43xx_wakeupgen_ops = {
++	.save_context = am43xx_irq_save_context,
++	.restore_context = am43xx_irq_restore_context,
++};
++#else
++static struct omap_wakeupgen_ops omap4_wakeupgen_ops = {};
++static struct omap_wakeupgen_ops omap5_wakeupgen_ops = {};
++static struct omap_wakeupgen_ops am43xx_wakeupgen_ops = {};
+ #endif
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+@@ -359,7 +411,7 @@ static int irq_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+ 		break;
+ 	case CPU_CLUSTER_PM_EXIT:
+ 		if (omap_type() == OMAP2_DEVICE_TYPE_GP)
+-			irq_sar_clear();
++			irq_restore_context();
+ 		break;
+ 	}
+ 	return NOTIFY_OK;
+@@ -494,9 +546,13 @@ static int __init wakeupgen_init(struct device_node *node,
+ 		irq_banks = OMAP4_NR_BANKS;
+ 		max_irqs = OMAP4_NR_IRQS;
+ 		omap_secure_apis = 1;
++		wakeupgen_ops = &omap4_wakeupgen_ops;
++	} else if (soc_is_omap54xx()) {
++		wakeupgen_ops = &omap5_wakeupgen_ops;
+ 	} else if (soc_is_am43xx()) {
+ 		irq_banks = AM43XX_NR_REG_BANKS;
+ 		max_irqs = AM43XX_IRQS;
++		wakeupgen_ops = &am43xx_wakeupgen_ops;
+ 	}
+ 
+ 	domain = irq_domain_add_hierarchy(parent_domain, 0, max_irqs,
 -- 
 2.11.0
