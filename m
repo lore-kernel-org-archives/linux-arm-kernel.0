@@ -1,81 +1,53 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 29 Mar 2017 11:15:56 -0700
-Subject: [RFC v2][PATCH 04/11] x86: Implement __arch_rare_write_begin/unmap()
-In-Reply-To: <1490811363-93944-1-git-send-email-keescook@chromium.org>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
-Message-ID: <1490811363-93944-5-git-send-email-keescook@chromium.org>
+Date: Wed, 29 Mar 2017 11:15:52 -0700
+Subject: [RFC v2] Introduce rare_write() infrastructure
+Message-ID: <1490811363-93944-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on PaX's x86 pax_{open,close}_kernel() implementation, this
-allows HAVE_ARCH_RARE_WRITE to work on x86.
+This is take 2 of an RFC series to demonstrate a possible infrastructure
+for the "write rarely" memory storage type in the kernel (patch 1). The
+intent is to further reduce the internal attack surface of the kernel
+by making more variables read-only while "at rest". This is heavily
+based on the "__read_only" portion of the KERNEXEC infrastructure from
+PaX/grsecurity, though I tried to adjust it to be more in line with
+the upstream discussions around the APIs.
 
-There is missing work to sort out some header file issues where preempt.h
-is missing, though it can't be included in pg_table.h unconditionally...
-some other solution will be needed, perhaps an entirely separate header
-file for rare_write()-related defines...
+Also included is the PaX/grsecurity constify plugin (patch 10) which will
+automatically make all instances of certain structures read-only, to help
+demonstrate more complex cases of "write rarely" targets. (The plugin in
+this series is altered to only operate on marked structures, rather than
+the full automatic constification.)
 
-This patch is also missing paravirt support.
+As part of the series I've included both x86 support (patch 4), exactly
+as done in PaX, and ARM support (patches 5-7), similar to what is done in
+grsecurity but without support for earlier ARM CPUs. Both are lightly
+tested by me, though they need a bit more work, especially ARM as it is
+missing the correct domain marking for kernel modules.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/x86/Kconfig               |  1 +
- arch/x86/include/asm/pgtable.h | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+I've added an lkdtm test (patch 2), which serves as a stand-alone example
+of the new infrastructure.
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index cc98d5a294ee..2d1d707aa036 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -106,6 +106,7 @@ config X86
- 	select HAVE_ARCH_KMEMCHECK
- 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if MMU && COMPAT
-+	select HAVE_ARCH_RARE_WRITE
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-diff --git a/arch/x86/include/asm/pgtable.h b/arch/x86/include/asm/pgtable.h
-index 1cfb36b8c024..2e6bf661bb84 100644
---- a/arch/x86/include/asm/pgtable.h
-+++ b/arch/x86/include/asm/pgtable.h
-@@ -91,6 +91,37 @@ extern struct mm_struct *pgd_page_get_mm(struct page *page);
- 
- #endif	/* CONFIG_PARAVIRT */
- 
-+/* TODO: Bad hack to deal with preempt macros being missing sometimes. */
-+#ifndef preempt_disable
-+#include <linux/preempt.h>
-+#endif
-+
-+static __always_inline unsigned long __arch_rare_write_begin(void)
-+{
-+	unsigned long cr0;
-+
-+	preempt_disable();
-+	barrier();
-+	cr0 = read_cr0() ^ X86_CR0_WP;
-+	BUG_ON(cr0 & X86_CR0_WP);
-+	write_cr0(cr0);
-+	barrier();
-+	return cr0 ^ X86_CR0_WP;
-+}
-+
-+static __always_inline unsigned long __arch_rare_write_end(void)
-+{
-+	unsigned long cr0;
-+
-+	barrier();
-+	cr0 = read_cr0() ^ X86_CR0_WP;
-+	BUG_ON(!(cr0 & X86_CR0_WP));
-+	write_cr0(cr0);
-+	barrier();
-+	preempt_enable_no_resched();
-+	return cr0 ^ X86_CR0_WP;
-+}
-+
- /*
-  * The following only work if pte_present() is true.
-  * Undefined behaviour if not..
--- 
-2.7.4
+Included are two example "conversions" to the rare_write()-style of
+variable manipulation: a simple one, which switches the inet diag handler
+table to write-rarely during register/unregister calls (patch 3), and
+a more complex one: cgroup types (patch 11), which is made read-only via
+the constify plugin. The latter uses rare-write linked lists (patch 9)
+and multi-field updates. Both examples are refactorings of what already
+appears in PaX/grsecurity.
+
+The patches are:
+
+	[PATCH 01/11] Introduce rare_write() infrastructure
+	[PATCH 02/11] lkdtm: add test for rare_write() infrastructure
+	[PATCH 03/11] net: switch sock_diag handlers to rare_write()
+	[PATCH 04/11] x86: Implement __arch_rare_write_begin/unmap()
+	[PATCH 05/11] ARM: mm: dump: Add domain to output
+	[PATCH 06/11] ARM: domains: Extract common USER domain init
+	[PATCH 07/11] ARM: mm: set DOMAIN_WR_RARE for rodata
+	[PATCH 08/11] ARM: Implement __arch_rare_write_begin/unmap()
+	[PATCH 09/11] list: add rare_write() list helpers
+	[PATCH 10/11] gcc-plugins: Add constify plugin
+	[PATCH 11/11] cgroups: force all struct cftype const
+
+-Kees
