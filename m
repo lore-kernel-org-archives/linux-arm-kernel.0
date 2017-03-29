@@ -1,33 +1,36 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 29 Mar 2017 16:32:23 +0300
-Subject: [RFC 8/8] ARM: dts: imx6qdl-sabresd: Enable fsl,ldo-bypass
-In-Reply-To: <1490202830.29056.8.camel@pengutronix.de>
-References: <cover.1490199005.git.leonard.crestez@nxp.com>
- <8f4dca5609781f0362009dfa7f6d5c0990b5ea6d.1490199005.git.leonard.crestez@nxp.com>
- <1490202830.29056.8.camel@pengutronix.de>
-Message-ID: <1490794343.5481.33.camel@nxp.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 29 Mar 2017 15:35:37 +0200
+Subject: [PATCH] ARM: dts: imx6: ZII-RDU2: fix FEC node properties
+Message-ID: <20170329133537.26028-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-03-22 at 18:13 +0100, Lucas Stach wrote:
-> Am Mittwoch, den 22.03.2017, 18:53 +0200 schrieb Leonard Crestez:
+These have been messed up during mainlining of the DT files.
+Fix them to be valid properties.
 
-> > This enables LDO bypass by default on the imx6qdl-sabresd boards. New
-> > dts files with -ldo suffix are added for users who want to run with LDOs
-> > enabled on these boards anyway.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+Shawn, if possible, it would be nice to squash this fix into the
+broken patch adding those DT files, but that's up to you.
+8b44da415afc (ARM: dts: imx6: add ZII RDU2 boards)
+---
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> Given that using LDO bypass affects the device lifetime negatively (see
-> AN4724), I think the default should still be to use LDO enabled mode and
-> have new DTs for people that desire to shorten the lifetime of the SoC
-> for a minimal drop in power consumption.
-
-This was based on what the Freescale BSP does, I don't particularly
-object to upstream having a different default. It would be nice for
-testing if this ldo-bypass path was enabled by default for some boards
-but it's not a very good reason.
-
-I will switch the default.
-
---?
-Regards,
-Leonard
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+index bcff7876b1df..5d94b5ee6aa0 100644
+--- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -615,8 +615,8 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet>;
+ 	phy-mode = "rmii";
+-	phy-reset-gpios = <&gpio1 23 0 GPIO_ACTIVE_LOW>;
+-	phy-reset-duration = "100";
++	phy-reset-gpios = <&gpio1 23 GPIO_ACTIVE_LOW>;
++	phy-reset-duration = <100>;
+ 	phy-supply = <&reg_3p3v>;
+ 	status = "okay";
+ 
+-- 
+2.11.0
