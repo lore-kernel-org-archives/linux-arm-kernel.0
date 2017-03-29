@@ -1,143 +1,227 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 29 Mar 2017 17:12:28 +0200
-Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
- code
-In-Reply-To: <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
-References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
- <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
- <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
-Message-ID: <073f1feb-d6da-c93f-8e67-0910befec27b@samsung.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed, 29 Mar 2017 16:17:19 +0100
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <20170329030735.GA23889@leoy-linaro>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
+ <20170329030735.GA23889@leoy-linaro>
+Message-ID: <CAJ9a7VgsnFYpOGVjD4m7+EjFXkBoRqVR2F2Pgtn-T0NB+YP6tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.03.2017 14:55, Robin Murphy wrote:
-> On 29/03/17 11:05, Andrzej Hajda wrote:
->> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
->> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
->> it. In first case temporary pages array is passed to iommu_dma_mmap,
->> in 2nd case single entry sg table is created directly instead
->> of calling helper.
+On 29 March 2017 at 04:07, Leo Yan <leo.yan@linaro.org> wrote:
+> Hi Suzuki,
+>
+> On Mon, Mar 27, 2017 at 05:34:57PM +0100, Suzuki K Poulose wrote:
+>> On 25/03/17 18:23, Leo Yan wrote:
+>
+> [...]
+>
+>> Leo,
 >>
->> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
->> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->> ---
->> Hi,
+>> Thanks a lot for the quick rework. I don't fully understand (yet!) why we need the
+>> idle_constraint. I will leave it for Sudeep to comment on it, as he is the expert
+>> in that area. Some minor comments below.
+>
+> Thanks a lot for quick reviewing :)
+>
+>> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>> >---
+>> > drivers/hwtracing/coresight/Kconfig               |  11 +
+>> > drivers/hwtracing/coresight/Makefile              |   1 +
+>> > drivers/hwtracing/coresight/coresight-cpu-debug.c | 704 ++++++++++++++++++++++
+>> > 3 files changed, 716 insertions(+)
+>> > create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+>> >
+>> >diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+>> >index 130cb21..18d7931 100644
+>> >--- a/drivers/hwtracing/coresight/Kconfig
+>> >+++ b/drivers/hwtracing/coresight/Kconfig
+>> >@@ -89,4 +89,15 @@ config CORESIGHT_STM
+>> >       logging useful software events or data coming from various entities
+>> >       in the system, possibly running different OSs
+>> >
+>> >+config CORESIGHT_CPU_DEBUG
+>> >+    tristate "CoreSight CPU Debug driver"
+>> >+    depends on ARM || ARM64
+>> >+    depends on DEBUG_FS
+>> >+    help
+>> >+      This driver provides support for coresight debugging module. This
+>> >+      is primarily used to dump sample-based profiling registers when
+>> >+      system triggers panic, the driver will parse context registers so
+>> >+      can quickly get to know program counter (PC), secure state,
+>> >+      exception level, etc.
 >>
->> I am not familiar with this framework so please don't be too cruel ;)
->> Alternative solution I see is to always create vm_area->pages,
->> I do not know which approach is preferred.
+>> May be we should mention/warn the user about the possible caveats of using
+>> this feature to help him make a better decision ? And / Or we should add a documentation
+>> for it. We have collected some real good information over the discussions and
+>> it is a good idea to capture it somewhere.
+>
+> Sure, I will add a documentation for this.
+>
+> [...]
+>
+>> >+static struct pm_qos_request debug_qos_req;
+>> >+static int idle_constraint = PM_QOS_DEFAULT_VALUE;
+>> >+module_param(idle_constraint, int, 0600);
+>> >+MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
+>> >+             "idle states (default is -1, which means have no limiation "
+>> >+             "to CPU idle states; 0 means disabling all idle states; user "
+>> >+             "can choose other platform dependent values so can disable "
+>> >+             "specific idle states for the platform)");
 >>
->> Regards
->> Andrzej
->> ---
->>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 38 insertions(+), 2 deletions(-)
+>> Correct me if I am wrong,
 >>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index f7b5401..bba2bc8 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->>  		return ret;
->>  
->>  	area = find_vm_area(cpu_addr);
->> -	if (WARN_ON(!area || !area->pages))
->> +	if (WARN_ON(!area))
-> >From the look of things, it doesn't seem strictly necessary to change
-> this, but whether that's a good thing is another matter. I'm not sure
-> that dma_common_contiguous_remap() should really be leaving a dangling
-> pointer in area->pages as it apparently does... :/
->
->> +		return -ENXIO;
->> +
->> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
->> +		struct page *page = vmalloc_to_page(cpu_addr);
->> +		unsigned int count = size >> PAGE_SHIFT;
->> +		struct page **pages;
->> +		unsigned long pfn;
->> +		int i;
->> +
->> +		pages = kmalloc_array(count, sizeof(*pages), GFP_KERNEL);
->> +		if (!pages)
->> +			return -ENOMEM;
->> +
->> +		for (i = 0, pfn = page_to_pfn(page); i < count; i++)
->> +			pages[i] = pfn_to_page(pfn + i);
->> +
->> +		ret = iommu_dma_mmap(pages, size, vma);
-> /**
->  * iommu_dma_mmap - Map a buffer into provided user VMA
->  * @pages: Array representing buffer from iommu_dma_alloc()
->    ...
->
-> In this case, the buffer has not come from iommu_dma_alloc(), so passing
-> into iommu_dma_mmap() is wrong by contract, even if having to fake up a
-> page array wasn't enough of a red flag. Given that a FORCE_CONTIGUOUS
-> allocation is essentially the same as for the non-IOMMU case, I think it
-> should be sufficient to defer to that path, i.e.:
->
-> 	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
-> 		return __swiotlb_mmap(dev, vma, cpu_addr,
-> 				phys_to_dma(virt_to_phys(cpu_addr)),
-> 				size, attrs);
-
-Maybe I have make mistake somewhere but it does not work, here and below
-(hangs or crashes). I suppose it can be due to different address
-translations, my patch uses
-    page = vmalloc_to_page(cpu_addr).
-And here we have:
-    handle = phys_to_dma(dev, virt_to_phys(cpu_addr)); // in
-__iommu_mmap_attrs
-    page = phys_to_page(dma_to_phys(dev, handle)); // in
-__swiotlb_get_sgtable
-I guess it is similarly in __swiotlb_mmap.
-
-Are these translations equivalent?
-
-
-Regards
-Andrzej
-
->> +		kfree(pages);
->> +
->> +		return ret;
->> +	}
->> +
->> +	if (WARN_ON(!area->pages))
->>  		return -ENXIO;
->>  
->>  	return iommu_dma_mmap(area->pages, size, vma);
->> @@ -717,7 +740,20 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
->>  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->>  	struct vm_struct *area = find_vm_area(cpu_addr);
->>  
->> -	if (WARN_ON(!area || !area->pages))
->> +	if (WARN_ON(!area))
->> +		return -ENXIO;
->> +
->> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
->> +		int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
->> +
->> +		if (!ret)
->> +			sg_set_page(sgt->sgl, vmalloc_to_page(cpu_addr),
->> +				PAGE_ALIGN(size), 0);
->> +
->> +		return ret;
->> +	}
-> As above, this may as well just go straight to the non-IOMMU version,
-> although I agree with Russell's concerns[1] that in general is is not
-> safe to assume a coherent allocation is backed by struct pages at all.
->
-> Robin.
->
-> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/496068.html
->
->> +
->> +	if (WARN_ON(!area->pages))
->>  		return -ENXIO;
->>  
->>  	return sg_alloc_table_from_pages(sgt, area->pages, count, 0, size,
+>> All we want to do is disable the CPUIdle explicitly if the user knows that this
+>> could be a problem to use CPU debug on his platform. So, in effect, we should
+>> only be using idle_constraint = 0 or -1.
 >>
+>> In which case, we could make it easier for the user to tell us, either
+>>
+>>  0 - Don't do anything with CPUIdle (default)
+>>  1 - Disable CPUIdle for me as I know the platform has issues with CPU debug and CPUidle.
 >
+> The reason for not using bool flag is: usually SoC may have many idle
+> states, so if user wants to partially enable some states then can set
+> the latency to constraint.
 >
+> But of course, we can change this to binary value as you suggested,
+> this means turn on of turn off all states. The only one reason to use
+> latency value is it is more friendly for hardware design, e.g. some
+> platforms can enable partial states to save power and avoid overheat
+> after using this driver.
 >
+> If you guys think this is a bit over design, I will follow up your
+> suggestion. I also have some replying in Mathieu's reviewing, please
+> help review as well.
+>
+>> than explaining the miscrosecond latency etc and make the appropriate calls underneath.
+>> something like (not necessarily the same name) :
+>>
+>> module_param(broken_with_cpuidle, bool, 0600);
+>> MODULE_PARAM_DESC(broken_with_cpuidle, "Specifies whether the CPU debug has issues with CPUIdle on"
+>>                                      " the platform. Non-zero value implies CPUIdle has to be"
+>>                                      " explicitly disabled.",);
+>
+> [...]
+>
+>> >+    /*
+>> >+     * Unfortunately the CPU cannot be powered up, so return
+>> >+     * back and later has no permission to access other
+>> >+     * registers. For this case, should set 'idle_constraint'
+>> >+     * to ensure CPU power domain is enabled!
+>> >+     */
+>> >+    if (!(drvdata->edprsr & EDPRSR_PU)) {
+>> >+            pr_err("%s: power up request for CPU%d failed\n",
+>> >+                    __func__, drvdata->cpu);
+>> >+            goto out;
+>> >+    }
+>> >+
+>> >+out_powered_up:
+>> >+    debug_os_unlock(drvdata);
+>>
+>> Question: Do we need a matching debug_os_lock() once we are done ?
+>
+> I have checked ARM ARMv8, but there have no detailed description for
+> this. I refered coresight-etmv4 code and Mike's pseudo code, ther have
+> no debug_os_lock() related operations.
+>
+> Mike, Mathieu, could you also help confirm this?
+>
+
+Debug OS lock / unlock allows the power management code running on the
+core to lock out the external debugger while the debug registers are
+saved/restored during a core power event.
+
+e.g. A sequence such as this might occur in a correctly programmed system....
+
+debug_os_lock()
+save_debug_regs() // visible from core power domain - incl breakpoints etc
+save_etm_regs()
+... // other stuff prior to core power down,
+<power_down_core>
+
+Followed by...
+
+<power_up_core>
+restore_etm_regs()
+restore_debug_regs() // visible from core power domain - incl breakpoints etc
+debug_os_unlock()
+
+The value is 1 (locked) if cold resetting into AArch64 - it is
+expected that some system software will set this to 0 as part of the
+boot process.
+The lock prevents write access to the external debug registers so we
+need to clear it to set up the external debug registers we are using.
+This suggests that it should be restored as we found it when done.
+
+Mike
+
+> [...]
+>
+>> >+static void debug_init_arch_data(void *info)
+>> >+{
+>> >+    struct debug_drvdata *drvdata = info;
+>> >+    u32 mode, pcsr_offset;
+>> >+
+>> >+    CS_UNLOCK(drvdata->base);
+>> >+
+>> >+    debug_os_unlock(drvdata);
+>> >+
+>> >+    /* Read device info */
+>> >+    drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
+>> >+    drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
+>>
+>> As mentioned above, both of these registers are only need at init time to
+>> figure out the flags we set here. So we could remove them.
+>>
+>> >+
+>> >+    CS_LOCK(drvdata->base);
+>> >+
+>> >+    /* Parse implementation feature */
+>> >+    mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
+>> >+    pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
+>>
+>>
+>> >+
+>> >+    if (mode == EDDEVID_IMPL_NONE) {
+>> >+            drvdata->edpcsr_present  = false;
+>> >+            drvdata->edcidsr_present = false;
+>> >+            drvdata->edvidsr_present = false;
+>> >+    } else if (mode == EDDEVID_IMPL_EDPCSR) {
+>> >+            drvdata->edpcsr_present  = true;
+>> >+            drvdata->edcidsr_present = false;
+>> >+            drvdata->edvidsr_present = false;
+>> >+    } else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+>> >+            if (!IS_ENABLED(CONFIG_64BIT) &&
+>> >+                    (pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
+>> >+                    drvdata->edpcsr_present = false;
+>> >+            else
+>> >+                    drvdata->edpcsr_present = true;
+>>
+>> Sorry, I forgot why we do this check only in this mode. Shouldn't this be
+>> common to all modes (of course which implies PCSR is present) ?
+>
+> No. PCSROffset is defined differently in ARMv7 and ARMv8; So finally we
+> simplize PCSROffset value :
+> 0000 - Sample offset applies based on the instruction state (indicated by PCSR[0])
+> 0001 - No offset applies.
+> 0010 - No offset applies, but do not use in AArch32 mode!
+>
+> So we need handle the corner case is when CPU runs AArch32 mode and
+> PCSRoffset = 'b0010. Other cases the pcsr should be present.
+>
+> [...]
+>
+> Other suggestions are good for me, will take them in next version.
+>
+> Thanks,
+> Leo Yan
+
+
+
+-- 
+Mike Leach
+Principal Engineer, ARM Ltd.
+Blackburn Design Centre. UK
