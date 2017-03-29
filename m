@@ -1,224 +1,152 @@
-From: sfaragnaus@gmail.com (Andrea della Porta)
-Date: Wed, 29 Mar 2017 06:15:35 +0100
-Subject: [PATCH 1/3] Fixed checkpatch warning about unaligned function params
-In-Reply-To: <cover.1490760735.git.sfaragnaus@gmail.com>
-References: <cover.1490760735.git.sfaragnaus@gmail.com>
-Message-ID: <a7afd06fb8a7e36568e639020c07662692da2589.1490760735.git.sfaragnaus@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 29 Mar 2017 15:09:06 -0400
+Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846675D8C4@IRSMSX101.ger.corp.intel.com>
+References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
+ <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
+ <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
+ <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
+ <f3e76f8d-16bb-8ec5-da9b-d62ca66dafd6@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675D8C4@IRSMSX101.ger.corp.intel.com>
+Message-ID: <beb63ced-3e63-c09c-8c2c-5d5b0956d2fc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed issues:
-CHECK: Alignment should match open parenthesis
-#71: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:71:
-+       audio_info("alsa_stream=%p substream=%p\n", alsa_stream,
-+               alsa_stream ? alsa_stream->substream : 0);
+On 3/29/2017 1:27 PM, Patel, Mayurkumar wrote:
+> Hi Kaya
+> 
+>>
+>> On 3/28/2017 9:04 AM, Sinan Kaya wrote:
+>>> On 3/28/2017 8:52 AM, Sinan Kaya wrote:
+>>>> On 3/28/2017 2:02 AM, Patel, Mayurkumar wrote:
+>>>>> Thanks for your patches. I am seeing kernel panic after applying
+>>>>> these patches (on top of latest kernel) each time during early boot in pci_aspm_init() (any hints already?) function.
+>>>>> Need to check if it's something related to my local setup or it's because of these changes.
+>>>>> For now I don't have more details why it crashes but I will dig in further and I will provide
+>>>>> you more data as soon as I have it.
+>>>>>
+>>>>
+>>>> Interesting, I retested Qemu and I don't see an issue.
+>>>> Can you share your bootlog when you see the crash?
+>>>>
+>>> Thinking more...
+>>>
+>>> Can you add this to the top of pci_aspm_init() and try again?
+>>>
+>>> if (!pci_is_pcie(pdev))
+>>>           return -EINVAL;
+>>>
+>>
+>> Did this help?
+> 
+> No, It did not helped. I tested without your patches and no panic seen.
 
-CHECK: Alignment should match open parenthesis
-#262: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:262:
-+static int snd_bcm2835_pcm_hw_params(struct snd_pcm_substream *substream,
-+       struct snd_pcm_hw_params *params)
+I think you have a mixture of old and new patches or a mixture of old/new object files.
+pci_function_0() is no longer getting called from pci_aspm_init(). This was done in V4 of the patch.
 
-CHECK: Alignment should match open parenthesis
-#315: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:315:
-+       err = bcm2835_audio_set_params(alsa_stream, channels,
-+               alsa_stream->params_rate,
+> 
+> I found with your patch in pci_aspm_init() call, pdev->subordinate is not valid which causes a crash in
+> pci_function_0().
+> I tentatively started validating pdev->subordinate pointer and proceeding pci_aspm_init()  without allocating link->downstream pointer,
+> then I got another following issue during boot. I will further debug it but if you have any other suggestion or some other clicks in your mind
+> what this could be I could try that too.
+> 
 
-CHECK: Alignment should match open parenthesis
-#384: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:384:
-+               audio_debug("bcm2835_AUDIO_TRIGGER_START running=%d\n",
-+                       alsa_stream->running);
+I think you have a mixture of old and new patches or a mixture of old/new object files.
 
-CHECK: Alignment should match open parenthesis
-#391: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:391:
-+                                       bytes_to_frames(runtime,
-+                                       alsa_stream->pos);
+> [    2.339374]  pcie_get_aspm_reg+0x39/0x1a0
+> [    2.387312]  pcie_aspm_init_link_state+0x2aa/0x900
+> [    2.444611]  ? pci_device_add+0x20a/0x300
 
-CHECK: Alignment should match open parenthesis
-#436: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:436:
-+       audio_debug("pcm_pointer... (%d) hwptr=%d appl=%d pos=%d\n", 0,
-+               frames_to_bytes(runtime, runtime->status->hw_ptr),
+This was also done in V4 of the patch. This was replaced by pci_aspm_init() in V5 and
+there is no call from device_add path into pci_aspm_init() function. The 
+pcie_aspm_init_link_state() gets called from the pci_scan_slot() as it used to be.
 
-CHECK: Alignment should match open parenthesis
-#447: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:447:
-+static int snd_bcm2835_pcm_lib_ioctl(struct snd_pcm_substream *substream,
-+       unsigned int cmd, void *arg)
+Can you try it on a clean tree with the following patches?
 
-CHECK: Alignment should match open parenthesis
-#452: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:452:
-+       audio_info(" .. substream=%p, cmd=%d, arg=%p (%x) ret=%d\n", substream,
-+               cmd, arg, arg ? *(unsigned *) arg : 0, ret);
+https://patchwork.codeaurora.org/patch/207667/
+https://patchwork.codeaurora.org/patch/207653/
+https://patchwork.codeaurora.org/patch/207669/
+https://patchwork.codeaurora.org/patch/207651/
 
-CHECK: Alignment should match open parenthesis
-#544: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:544:
-+       snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
-+               snd_dma_continuous_data(GFP_KERNEL),
+The only change you should need on top of this is this.
 
-Signed-off-by: Andrea della Porta <sfaragnaus@gmail.com>
----
- .../vc04_services/bcm2835-audio/bcm2835-pcm.c      | 47 ++++++++++------------
- 1 file changed, 22 insertions(+), 25 deletions(-)
+--- a/drivers/pci/pcie/aspm.c
++++ b/drivers/pci/pcie/aspm.c
+@@ -847,6 +847,9 @@ int pci_aspm_init(struct pci_dev *pdev)
+        if (!pdev->has_secondary_link)
+                return 0;
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-index 8bd69b9..fa6d3d2 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-@@ -68,7 +68,7 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream)
- 	audio_info(" .. IN\n");
- 
- 	audio_info("alsa_stream=%p substream=%p\n", alsa_stream,
--		alsa_stream ? alsa_stream->substream : 0);
-+		   alsa_stream ? alsa_stream->substream : 0);
- 
- 	if (alsa_stream->open)
- 		consumed = bcm2835_audio_retrieve_buffers(alsa_stream);
-@@ -83,10 +83,10 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream)
- 			new_period = 1;
- 	}
- 	audio_debug("updating pos cur: %d + %d max:%d period_bytes:%d, hw_ptr: %d new_period:%d\n",
--		alsa_stream->pos,
-+		    alsa_stream->pos,
- 		consumed,
- 		alsa_stream->buffer_size,
--		(int) (alsa_stream->period_size * alsa_stream->substream->runtime->periods),
-+		(int)(alsa_stream->period_size * alsa_stream->substream->runtime->periods),
- 		frames_to_bytes(alsa_stream->substream->runtime, alsa_stream->substream->runtime->status->hw_ptr),
- 		new_period);
- 	if (alsa_stream->buffer_size) {
-@@ -229,6 +229,7 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
- 	 */
- 	if (alsa_stream->running) {
- 		int err;
++       if (!pci_is_pcie(pdev))
++               return -EINVAL;
 +
- 		err = bcm2835_audio_stop(alsa_stream);
- 		alsa_stream->running = 0;
- 		if (err)
-@@ -259,7 +260,7 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
- 
- /* hw_params callback */
- static int snd_bcm2835_pcm_hw_params(struct snd_pcm_substream *substream,
--	struct snd_pcm_hw_params *params)
-+				     struct snd_pcm_hw_params *params)
- {
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
-@@ -312,18 +313,16 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
- 		channels = alsa_stream->channels;
- 
- 	err = bcm2835_audio_set_params(alsa_stream, channels,
--		alsa_stream->params_rate,
--		alsa_stream->pcm_format_width);
-+				       alsa_stream->params_rate,
-+				       alsa_stream->pcm_format_width);
- 	if (err < 0)
- 		audio_error(" error setting hw params\n");
- 
--
- 	bcm2835_audio_setup(alsa_stream);
- 
- 	/* in preparation of the stream, set the controls (volume level) of the stream */
- 	bcm2835_audio_set_ctls(alsa_stream->chip);
- 
--
- 	memset(&alsa_stream->pcm_indirect, 0, sizeof(alsa_stream->pcm_indirect));
- 
- 	alsa_stream->pcm_indirect.hw_buffer_size =
-@@ -335,8 +334,8 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
- 	alsa_stream->pos = 0;
- 
- 	audio_debug("buffer_size=%d, period_size=%d pos=%d frame_bits=%d\n",
--		alsa_stream->buffer_size, alsa_stream->period_size,
--		alsa_stream->pos, runtime->frame_bits);
-+		    alsa_stream->buffer_size, alsa_stream->period_size,
-+		    alsa_stream->pos, runtime->frame_bits);
- 
- 	mutex_unlock(&chip->audio_mutex);
- 	audio_info(" .. OUT\n");
-@@ -344,17 +343,16 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
- }
- 
- static void snd_bcm2835_pcm_transfer(struct snd_pcm_substream *substream,
--	struct snd_pcm_indirect *rec, size_t bytes)
-+				     struct snd_pcm_indirect *rec, size_t bytes)
- {
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
--	void *src = (void *) (substream->runtime->dma_area + rec->sw_data);
-+	void *src = (void *)(substream->runtime->dma_area + rec->sw_data);
- 	int err;
- 
- 	err = bcm2835_audio_write(alsa_stream, bytes, src);
- 	if (err)
- 		audio_error(" Failed to transfer to alsa device (%d)\n", err);
--
- }
- 
- static int snd_bcm2835_pcm_ack(struct snd_pcm_substream *substream)
-@@ -381,14 +379,14 @@ static int snd_bcm2835_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
- 		audio_debug("bcm2835_AUDIO_TRIGGER_START running=%d\n",
--			alsa_stream->running);
-+			    alsa_stream->running);
- 		if (!alsa_stream->running) {
- 			err = bcm2835_audio_start(alsa_stream);
- 			if (!err) {
- 				alsa_stream->pcm_indirect.hw_io =
- 					alsa_stream->pcm_indirect.hw_data =
- 					bytes_to_frames(runtime,
--					alsa_stream->pos);
-+							alsa_stream->pos);
- 				substream->ops->ack(substream);
- 				alsa_stream->running = 1;
- 				alsa_stream->draining = 1;
-@@ -433,23 +431,23 @@ snd_bcm2835_pcm_pointer(struct snd_pcm_substream *substream)
- 	audio_info(" .. IN\n");
- 
- 	audio_debug("pcm_pointer... (%d) hwptr=%d appl=%d pos=%d\n", 0,
--		frames_to_bytes(runtime, runtime->status->hw_ptr),
--		frames_to_bytes(runtime, runtime->control->appl_ptr),
--		alsa_stream->pos);
-+		    frames_to_bytes(runtime, runtime->status->hw_ptr),
-+		    frames_to_bytes(runtime, runtime->control->appl_ptr),
-+		    alsa_stream->pos);
- 
- 	audio_info(" .. OUT\n");
- 	return snd_pcm_indirect_playback_pointer(substream,
--		&alsa_stream->pcm_indirect,
--		alsa_stream->pos);
-+						 &alsa_stream->pcm_indirect,
-+						 alsa_stream->pos);
- }
- 
- static int snd_bcm2835_pcm_lib_ioctl(struct snd_pcm_substream *substream,
--	unsigned int cmd, void *arg)
-+				     unsigned int cmd, void *arg)
- {
- 	int ret = snd_pcm_lib_ioctl(substream, cmd, arg);
- 
- 	audio_info(" .. substream=%p, cmd=%d, arg=%p (%x) ret=%d\n", substream,
--		cmd, arg, arg ? *(unsigned *) arg : 0, ret);
-+		   cmd, arg, arg ? *(unsigned *)arg : 0, ret);
- 	return ret;
- }
- 
-@@ -510,7 +508,6 @@ int snd_bcm2835_new_pcm(struct bcm2835_chip *chip, u32 numchannels)
- 					      snd_bcm2835_playback_hw.buffer_bytes_max,
- 					      snd_bcm2835_playback_hw.buffer_bytes_max);
- 
--
- out:
- 	mutex_unlock(&chip->audio_mutex);
- 	audio_info(" .. OUT\n");
-@@ -541,8 +538,8 @@ int snd_bcm2835_new_spdif_pcm(struct bcm2835_chip *chip)
- 	/* pre-allocation of buffers */
- 	/* NOTE: this may fail */
- 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
--		snd_dma_continuous_data(GFP_KERNEL),
--		snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
-+					      snd_dma_continuous_data(GFP_KERNEL),
-+					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
- out:
- 	mutex_unlock(&chip->audio_mutex);
- 	audio_info(" .. OUT\n");
+        link = alloc_pcie_link_state(pdev);
+        if (!link)
+                return -ENOMEM;
+
+
+
+> [    0.835443] BUG: unable to handle kernel NULL pointer dereference at 000000000000003e
+> [    0.929138] IP: pcie_capability_read_dword+0x82/0x1a0
+> [    0.989555] PGD 0
+> [    0.989556]
+> [    1.031360] Oops: 0000 [#1] SMP
+> [    1.068901] Modules linked in:
+> [    1.105403] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc4-aspmtestv6 #24
+> [    1.192861] Hardware name:    /IC97, BIOS IV97R903 02/25/2016
+> [    1.261600] task: ffff9141435c8000 task.stack: ffffa6b8418c0000
+> [    1.332419] RIP: 0010:pcie_capability_read_dword+0x82/0x1a0
+> [    1.399077] RSP: 0000:ffffa6b8418c39b0 EFLAGS: 00010246
+> [    1.461575] RAX: 0000000000000000 RBX: 000000000000000c RCX: ffffffff85e5be08
+> [    1.546954] RDX: ffffa6b8418c39ec RSI: 000000000000000c RDI: 0000000000000000
+> [    1.632332] RBP: ffffa6b8418c39d8 R08: 0000000000000001 R09: 0000000000000171
+> [    1.717707] R10: 0000000000000000 R11: 0000000000000170 R12: 0000000000000000
+> [    1.803085] R13: ffffa6b8418c39ec R14: ffff914142e370c0 R15: 0000000000000000
+> [    1.888462] FS:  0000000000000000(0000) GS:ffff914155c80000(0000) knlGS:0000000000000000
+> [    1.985278] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+> [    2.054017] CR2: 000000000000003e CR3: 0000000300e09000 CR4: 00000000003406e0
+> [    2.139396] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+> [    2.224772] DR3: 0000000000000000 DR6: 00000000fffe0ff0 DR7: 0000000000000400
+> [    2.310150] Call Trace:
+> [    2.339374]  pcie_get_aspm_reg+0x39/0x1a0
+> [    2.387312]  pcie_aspm_init_link_state+0x2aa/0x900
+> [    2.444611]  ? pci_device_add+0x20a/0x300
+> [    2.492554]  pci_scan_slot+0xd7/0x110
+> [    2.536335]  pci_scan_child_bus+0x30/0x180
+> [    2.585313]  pci_scan_bridge+0x3f0/0x670
+> [    2.632215]  ? pci_scan_single_device+0x6d/0xd0
+> [    2.686394]  pci_scan_child_bus+0x9f/0x180
+> [    2.735375]  acpi_pci_root_create+0x182/0x1de
+> [    2.787475]  pci_acpi_scan_root+0x15f/0x1b0
+> [    2.837493]  acpi_pci_root_add+0x3bf/0x4c4
+> [    2.886474]  acpi_bus_attach+0xdf/0x18e
+> [    2.932336]  acpi_bus_attach+0x135/0x18e
+> [    2.979234]  acpi_bus_attach+0x135/0x18e
+> [    3.026135]  acpi_bus_scan+0x6e/0x8d
+> [    3.068877]  ? acpi_sleep_proc_init+0x28/0x28
+> [    3.120976]  acpi_scan_init+0xda/0x237
+> [    3.165795]  ? acpi_sleep_proc_init+0x28/0x28
+> [    3.217895]  acpi_init+0x2be/0x347
+> 
+>>
+>> --
+>> Sinan Kaya
+>> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Intel Deutschland GmbH
+> Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+> Tel: +49 89 99 8853-0, www.intel.de
+> Managing Directors: Christin Eisenschmid, Christian Lamprechter
+> Chairperson of the Supervisory Board: Nicole Lau
+> Registered Office: Munich
+> Commercial Register: Amtsgericht Muenchen HRB 186928
+> 
+> 
+
+
 -- 
-2.4.10
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
