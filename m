@@ -1,34 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 29 Mar 2017 09:09:53 +0200
-Subject: [PATCH 1/2] drm/sun4i: Add display backend interrupt to device
- tree binding
-In-Reply-To: <20170327143847.16259-2-wens@csie.org>
-References: <20170327143847.16259-1-wens@csie.org>
- <20170327143847.16259-2-wens@csie.org>
-Message-ID: <20170329070953.x64daho2kfgr4fbc@lukather>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Wed, 29 Mar 2017 14:30:07 +0800
+Subject: [PATCH v3 0/2] add dts files for hi3798cv200-Poplar board
+Message-ID: <1490769009-12552-1-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 10:38:46PM +0800, Chen-Yu Tsai wrote:
-> The display backend has an interrupt line. Add it to the device tree
-> binding.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This patch set mainly adds dts files for hi3798cv200-Poplar board.
 
-The patches prefix for the binding documentation is usually
-dt-bindings:
+Jiancheng Xue (2):
+  dt-bindings: arm: hisilicon: add bindings for hi3798cv200 SoC and
+    Poplar board
+  arm64: dts: hisilicon: add dts files for hi3798cv200-poplar board
 
-I've changed that and applied that patch, thanks!
-Maxime
+ .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 163 +++++++++
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 405 +++++++++++++++++++++
+ 4 files changed, 573 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170329/2a3e4e0d/attachment.sig>
+1.9.1
