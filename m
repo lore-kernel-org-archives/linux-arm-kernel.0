@@ -1,34 +1,36 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 29 Mar 2017 13:50:15 -0500
-Subject: [PATCH 0/8] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume support
-In-Reply-To: <20170329171314.GD10760@atomide.com>
-References: <20170329015801.22240-1-d-gerlach@ti.com>
- <20170329171314.GD10760@atomide.com>
-Message-ID: <cd340d7a-c0cf-9227-1382-2277ffa5b1b0@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Mar 2017 20:00:08 +0100
+Subject: [RFC v2] Introduce rare_write() infrastructure
+In-Reply-To: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+Message-ID: <20170329190008.GE7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-On 03/29/2017 12:13 PM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [170328 19:00]:
->> Hi,
->> This series contains the remaining code to enable suspend to mem and standby on
->> am335x and am437x platforms. It depends on the ti-emif-sram series sent here [1].
->
-> Looks good to me in general. To remove the dependency, can some
-> of this be merged separately without breaking things before [1]?
-> Maybe by disabling some of the PM states until [1] is in place?
+On Wed, Mar 29, 2017 at 11:15:52AM -0700, Kees Cook wrote:
+> This is take 2 of an RFC series to demonstrate a possible infrastructure
+> for the "write rarely" memory storage type in the kernel (patch 1). The
+> intent is to further reduce the internal attack surface of the kernel
+> by making more variables read-only while "at rest". This is heavily
+> based on the "__read_only" portion of the KERNEXEC infrastructure from
+> PaX/grsecurity, though I tried to adjust it to be more in line with
+> the upstream discussions around the APIs.
 
-Thanks for the feedback. Actually, patch 7 is the only patch with a dependency 
-to [1]. The rest of the patches just add platform PM support needed for suspend 
-but won't do much of anything until patch 7 actually enables the suspend states, 
-so there is no reason why patches 1-6 and patch 8 can't be merged now.
+How much data are we talking about here?
 
-Regards,
-Dave
+> As part of the series I've included both x86 support (patch 4), exactly
+> as done in PaX, and ARM support (patches 5-7), similar to what is done in
+> grsecurity but without support for earlier ARM CPUs. Both are lightly
+> tested by me, though they need a bit more work, especially ARM as it is
+> missing the correct domain marking for kernel modules.
 
->
-> Regards,
->
-> Tony
->
+The implementation as it stands on ARM is going to gobble up
+multiples of 1MB of RAM as you need it to be section aligned due to
+using domains, so if we're talking about a small amount of data,
+this is very inefficient.  That also only works for non-LPAE as LPAE
+is unable to use that method.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
