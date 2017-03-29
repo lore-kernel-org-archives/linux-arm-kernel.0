@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Mar 2017 03:45:57 +0200
-Subject: [PATCH 2/5] drivers/rtc/rtc-pl030.c: Convert to use devm_*()
-In-Reply-To: <1490539314-9681-3-git-send-email-leo.yan@linaro.org>
+Date: Wed, 29 Mar 2017 03:46:42 +0200
+Subject: [PATCH 3/5] drivers/rtc/rtc-pl031.c: Convert to use devm_*()
+In-Reply-To: <1490539314-9681-4-git-send-email-leo.yan@linaro.org>
 References: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
- <1490539314-9681-3-git-send-email-leo.yan@linaro.org>
-Message-ID: <CACRpkdYHJinMhgUQLe3vf6P8hj3o_3ASi8pT+dtM5JtrE5ccJg@mail.gmail.com>
+ <1490539314-9681-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <CACRpkdYXeD8zXrzVwnOfVxk+NQHY3PPw3FXvmJ-0AO00UHj3Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
