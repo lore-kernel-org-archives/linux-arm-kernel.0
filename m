@@ -1,39 +1,33 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 29 Mar 2017 11:00:55 +0530
-Subject: [PATCH v7 3/3] mailbox: Remove depends on COMPILE_TEST for
- BCM_FLEXRM_MBOX
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 29 Mar 2017 11:05:32 +0530
+Subject: [PATCH v7 0/3] Broadcom FlexRM ring manager support
 In-Reply-To: <1490765455-8556-1-git-send-email-anup.patel@broadcom.com>
 References: <1490765455-8556-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1490765455-8556-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <CABb+yY3n2OuvBKfsWj5m5RvdBEZ5_aWpVNUJ9V8oikyJjchZAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom FlexRM mailbox driver uses platform MSI support but
-not all ARCHs provide asm/msi.h. Due to this, we get compilation
-error in Broadcom FlexRM mailbox driver via linux/msi.h on ARCHs
-which lack asm/msi.h.
-
-This patch removes "depends on COMPILE_TEST" for Kconfig option
-BCM_FLEXRM_MBOX so that Broadcom FlexRM mailbox driver is only
-compiled for ARM64.
-
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
----
- drivers/mailbox/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 305018c..9c19b9f 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -155,7 +155,7 @@ config BCM_PDC_MBOX
- 
- config BCM_FLEXRM_MBOX
- 	tristate "Broadcom FlexRM Mailbox"
--	depends on ARM64 || COMPILE_TEST
-+	depends on ARM64
- 	depends on HAS_DMA
- 	select GENERIC_MSI_IRQ_DOMAIN
- 	default ARCH_BCM_IPROC
--- 
-2.7.4
+On Wed, Mar 29, 2017 at 11:00 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> The Broadcom FlexRM ring manager provides producer-consumer style
+> ring interface for offload engines on Broadcom iProc SoCs. We can
+> have one or more instances of Broadcom FlexRM ring manager in a SoC.
+>
+> This patchset adds a mailbox driver for Broadcom FlexRM ring manager
+> which can be used by offload engine drivers as mailbox clients.
+>
+> The Broadcom FlexRM mailbox driver is feature complete for RAID and
+> Crypto offload engines. We will have incremental patches in-future
+> for ring-level statistics using debugfs and minor optimizations.
+>
+> This patchset is based on Linux-4.11-rc4 and it is also available
+> at flexrm-v7 branch of https://github.com/Broadcom/arm64-linux.git
+>
+> Changes since v6:
+>  - Rebased patches for Linux-4.11-rc4
+>  - Added a patch to remove depends on COMPILE_TEST for kconfig
+>    option BCM_FLEXRM_MBOX
+>
+You only needed to send the fix to compilation failure reports, not
+the whole series.
+I believe only the patch-3 is new in the series and I need not even
+look at patch-1,2 ?
