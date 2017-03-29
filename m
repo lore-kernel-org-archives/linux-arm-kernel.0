@@ -1,55 +1,42 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 28 Mar 2017 21:33:04 -0700
-Subject: [PATCH v2 3/8] ARM: OMAP5: Thermal: Add slope and offset values
-In-Reply-To: <1489046762-11288-4-git-send-email-j-keerthy@ti.com>
-References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
- <1489046762-11288-4-git-send-email-j-keerthy@ti.com>
-Message-ID: <20170329043302.GA1596@localhost.localdomain>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 29 Mar 2017 10:06:41 +0530
+Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
+In-Reply-To: <0e8ac72a-6b2f-171d-41e7-7a6cefc4c7c4@broadcom.com>
+References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
+ <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
+ <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
+ <CABb+yY1o7QTYLm3HGWNeFDPnfpL7AAJ6+R91Stn-gNvO7afxoA@mail.gmail.com>
+ <22d07bb1-9e93-4ae5-7215-923bde9ebfe5@broadcom.com>
+ <CABb+yY1kbFOKJPO95SRw995zt=fCoA+SkXgECOj774i_hJUCNg@mail.gmail.com>
+ <0e8ac72a-6b2f-171d-41e7-7a6cefc4c7c4@broadcom.com>
+Message-ID: <CABb+yY31oW09-fq_t4V6vatMe50Ed2Mi00kT4bOJv2=qFBT+QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 01:35:57PM +0530, Keerthy wrote:
-> Currently the slope and offset values for calculating the
-> hot spot temperature of a particular thermal zone is part
-> of driver data. Pass them here instead and obtain the values
-> while of node parsing.
+On Tue, Mar 28, 2017 at 11:00 PM, Jonathan Richardson
+<jonathan.richardson@broadcom.com> wrote:
+> On 17-03-15 10:30 AM, Jassi Brar wrote:
 
+>> The right way to do is have a 'server/owner' client that accepts
+>> requests from various clients and serially queue them to mailbox. That
+>> way you can keep the controller driver free from quirks (like max wait
+>> time of 30us) of your present platform.
+>
+> Do you mean 1 mailbox client with one mailbox channel that all the mbox client drivers share?
+> I thought this would work when I suggested it previously but the client callbacks are necessary
+> in all txdone modes. Client drivers that send the messages need the callbacks
+>
+That's a legit requirement.
 
-The patch is fine.. but
+> and this is only possible with multiple mbox clients.
+>
+That is incorrect.
+It is trivial to support callbacks to end clients from your common
+code... just ask for callback along with the message to be submitted
+to mailbox api.
 
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->  arch/arm/boot/dts/omap5.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 222155c..eaff2a5 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -1127,6 +1127,15 @@
->  
->  &cpu_thermal {
->  	polling-delay = <500>; /* milliseconds */
-> +	coefficients = <65 (-1791)>;
-
-I suppose you tried this change with this patch:
-https://patchwork.kernel.org/patch/9619577/
-?
-
-Otherwise, I do not see how your coeff would work, right?
-
->  };
->  
->  /include/ "omap54xx-clocks.dtsi"
-> +
-> +&gpu_thermal {
-> +	coefficients = <117 (-2992)>;
-> +};
-> +
-> +&core_thermal {
-> +	coefficients = <0 2000>;
-> +};
-> -- 
-> 1.9.1
-> 
+> And a channel can only have 1 mbox client. Clients in multiple drivers need the callbacks to either know when to start polling, or be notified when the transaction is complete. It would be nice if multiple clients could use the same channel.
+>
+We had to choose from shared vs exclusive access to channels... latter
+was chosen because there are ways to still support former.
