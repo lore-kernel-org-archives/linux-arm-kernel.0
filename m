@@ -1,111 +1,45 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Mar 2017 12:20:31 +0100
-Subject: [PATCH v2 6/8] bus: brcmstb_gisb: Add ARM64 support
-In-Reply-To: <20170328213431.10904-7-opendmb@gmail.com>
+Date: Wed, 29 Mar 2017 12:23:26 +0100
+Subject: [PATCH v2 2/8] arm64: mm: mark fault_info __ro_after_init
+In-Reply-To: <20170328213431.10904-3-opendmb@gmail.com>
 References: <20170328213431.10904-1-opendmb@gmail.com>
- <20170328213431.10904-7-opendmb@gmail.com>
-Message-ID: <20170329112030.GD23442@leverpostej>
+ <20170328213431.10904-3-opendmb@gmail.com>
+Message-ID: <20170329112326.GE23442@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Mar 28, 2017 at 02:34:29PM -0700, Doug Berger wrote:
-> From: Florian Fainelli <f.fainelli@gmail.com>
+On Tue, Mar 28, 2017 at 02:34:25PM -0700, Doug Berger wrote:
+> The fault_info table must be made writeable to allow installation
+> of custom memory abort handlers, but it can be made read-only
+> after initialization to provide some protection.
 > 
-> Hook to the ARM64 data abort exception #16: synchronous external
-> abort, which is how the GISB errors will be funneled back to the
-> ARM64 CPU in case of problems
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
 
-I believe that you can use a die notifier for this, and that you don't
-need to hook the low-level architectural fault here.
+Thanks for putting this together. I agree that making this RO is good.
 
-I note that the code doesn't even look at the faulting address, and
-likely doesn't have the information to do anything with it, so it make
-no sense to me for this code to hook the low-level fault.
-
-Further, as an aside, from digging into how we handle unexpected faults
-it appears that we don't always treat some faults (e.g. TLB conflict,
-faults on PTW) sufficiently fatally when they occur at EL0, so we likely
-need to do so rework there.
+However, I also think that we should not allow arbitrary hooking of
+fault codes, and thus this can be const.
 
 Thanks,
 Mark.
 
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
->  drivers/bus/Kconfig        |  2 +-
->  drivers/bus/brcmstb_gisb.c | 15 ++++++++++++---
->  2 files changed, 13 insertions(+), 4 deletions(-)
+>  arch/arm64/mm/fault.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 0a52da439abf..d2a5f1184022 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -57,7 +57,7 @@ config ARM_CCN
->  
->  config BRCMSTB_GISB_ARB
->  	bool "Broadcom STB GISB bus arbiter"
-> -	depends on ARM || MIPS
-> +	depends on ARM || ARM64 || MIPS
->  	default ARCH_BRCMSTB || BMIPS_GENERIC
->  	help
->  	  Driver for the Broadcom Set Top Box System-on-a-chip internal bus
-> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-> index edf79432f899..500b6bb5c739 100644
-> --- a/drivers/bus/brcmstb_gisb.c
-> +++ b/drivers/bus/brcmstb_gisb.c
-> @@ -30,6 +30,11 @@
->  #include <asm/signal.h>
->  #endif
->  
-> +#ifdef CONFIG_ARM64
-> +#include <asm/signal.h>
-> +#include <asm/system_misc.h>
-> +#endif
-> +
->  #ifdef CONFIG_MIPS
->  #include <asm/traps.h>
->  #endif
-> @@ -225,7 +230,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_ARM
-> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
->  static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
->  				     struct pt_regs *regs)
->  {
-> @@ -235,7 +240,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
->  	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
->  		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
->  
-> -#if !defined(CONFIG_ARM_LPAE)
-> +#if defined(CONFIG_ARM) && !defined(CONFIG_ARM_LPAE)
->  	/*
->  	 * If it was an imprecise abort, then we need to correct the
->  	 * return address to be _after_ the instruction.
-> @@ -247,7 +252,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
->  	/* Always report unhandled exception */
->  	return 1;
->  }
-> -#endif
-> +#endif /* CONFIG_ARM || CONFIG_ARM64 */
->  
->  #ifdef CONFIG_MIPS
->  static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
-> @@ -395,6 +400,10 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
->  			"imprecise external abort");
->  #endif
->  #endif /* CONFIG_ARM */
-> +#ifdef CONFIG_ARM64
-> +	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
-> +			"synchronous external abort");
-> +#endif
->  #ifdef CONFIG_MIPS
->  	board_be_handler = brcmstb_bus_error_handler;
->  #endif
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index cdf1260f1005..43319ed58a47 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -493,7 +493,7 @@ static struct fault_info {
+>  	int	sig;
+>  	int	code;
+>  	const char *name;
+> -} fault_info[] = {
+> +} fault_info[] __ro_after_init = {
+>  	{ do_bad,		SIGBUS,  0,		"ttbr address size fault"	},
+>  	{ do_bad,		SIGBUS,  0,		"level 1 address size fault"	},
+>  	{ do_bad,		SIGBUS,  0,		"level 2 address size fault"	},
 > -- 
 > 2.12.0
 > 
