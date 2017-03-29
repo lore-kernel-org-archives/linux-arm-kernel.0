@@ -1,49 +1,78 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Wed, 29 Mar 2017 18:36:39 +0800
-Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
-In-Reply-To: <CAPDyKFokoSw+udsGERhz+nJxpj41tVEyhBF9zLJtCU4itahTOw@mail.gmail.com>
-References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
- <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
- <13a83728-0031-5683-c371-4b517df32299@intel.com>
- <1490344369.22814.10.camel@mhfsdcap03>
- <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
- <1490348427.22814.19.camel@mhfsdcap03>
- <CAPDyKFoo5sJ2XtjyiW1DLjhFdJySbDK7+N05vrKpeiZsp25qrA@mail.gmail.com>
- <1490578500.22814.31.camel@mhfsdcap03>
- <CAPDyKFoWyVrdk7bG1n=rTSOddvqaj-uTO70QoGmcKQK1Fhio2w@mail.gmail.com>
- <CAPDyKFokoSw+udsGERhz+nJxpj41tVEyhBF9zLJtCU4itahTOw@mail.gmail.com>
-Message-ID: <1490783799.22814.45.camel@mhfsdcap03>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 29 Mar 2017 18:37:12 +0800
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <89b6c6c7-0da0-6891-312a-c9221851c20a@arm.com>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
+ <20170329030735.GA23889@leoy-linaro>
+ <5584203e-cb19-a5d2-45b1-3e78d3482c55@arm.com>
+ <20170329102740.GA20804@leoy-linaro>
+ <89b6c6c7-0da0-6891-312a-c9221851c20a@arm.com>
+Message-ID: <20170329103712.GA22480@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-03-29 at 12:33 +0200, Ulf Hansson wrote:
-> [...]
-> 
-> >> Below is the fail log of suspend fail.
-> >> the normal command tune result should be 0xffffff9ff, but some time, we
-> >> get the tune result of 0xffffffff, then we choose the 10 as the best
-> >> tune parameter, which is not stable.
-> >> I know that we should focus on why we get the result of 0xffffffff, this
-> >> may be result of device/host timing shifting while tuning. but what I
-> >> want to do is that when get a response CRC error, we can do re-tune to
-> >> recovery it, but not only return the -84 and cause suspend fail
-> >> eventually. if all hardware are perfect, then we don't need the re-tune
-> >> mechanism.
+On Wed, Mar 29, 2017 at 11:31:03AM +0100, Suzuki K Poulose wrote:
+> On 29/03/17 11:27, Leo Yan wrote:
+> >On Wed, Mar 29, 2017 at 10:07:07AM +0100, Suzuki K Poulose wrote:
 > >
-> > Thanks for elaborating!
+> >[...]
 > >
-> > Can you please also tell exactly which of the CMD6 commands in the
-> > suspend sequence that is triggering this problem? Cache flush? Power
-> > off notification?
+> >>>>>+	if (mode == EDDEVID_IMPL_NONE) {
+> >>>>>+		drvdata->edpcsr_present  = false;
+> >>>>>+		drvdata->edcidsr_present = false;
+> >>>>>+		drvdata->edvidsr_present = false;
+> >>>>>+	} else if (mode == EDDEVID_IMPL_EDPCSR) {
+> >>>>>+		drvdata->edpcsr_present  = true;
+> >>>>>+		drvdata->edcidsr_present = false;
+> >>>>>+		drvdata->edvidsr_present = false;
+> >>>>>+	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+> >>>>>+		if (!IS_ENABLED(CONFIG_64BIT) &&
+> >>>>>+			(pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
+> >>>>>+			drvdata->edpcsr_present = false;
+> >>>>>+		else
+> >>>>>+			drvdata->edpcsr_present = true;
+> >>>>
+> >>>>Sorry, I forgot why we do this check only in this mode. Shouldn't this be
+> >>>>common to all modes (of course which implies PCSR is present) ?
+> >>>
+> >>>No. PCSROffset is defined differently in ARMv7 and ARMv8; So finally we
+> >>>simplize PCSROffset value :
+> >>>0000 - Sample offset applies based on the instruction state (indicated by PCSR[0])
+> >>>0001 - No offset applies.
+> >>>0010 - No offset applies, but do not use in AArch32 mode!
+> >>>
+> >>>So we need handle the corner case is when CPU runs AArch32 mode and
+> >>>PCSRoffset = 'b0010. Other cases the pcsr should be present.
+> >>
+> >>I understand that reasoning. But my question is, why do we check for PCSROffset
+> >>only when mode == EDDEVID_IMPL_EDPCSR_EDCIDSR and not for say mode == EDDEVID_IMPL_EDPCSR or
+> >>any other mode where PCSR is present.
+> >
+> >Sorry I misunderstood your question.
+> >
+> >I made mistake when I analyzed the possbile combination for mode and
+> >PCSROffset so I thought it's the only case should handle:
+> >{ EDDEVID_IMPL_EDPCSR_EDCIDSR, EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 }
+> >
+> >Below three combinations are possible to exist; so you are right, I
+> >should move this out for the checking:
+> >{ EDDEVID_IMPL_NONE,           EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 }
 > 
-> You didn't answer this question. I would really like to know the
-> sequence of the commands you see that are being sent to the card
-> during suspend. And of course in particular what command that fails.
-> 
-Sorry, it's cache flush.
-I assume that you have noticed the fail log(it shows that cache flush
-error)
-> [...]
-> 
-> Kind regards
-> Uffe
+> That need not be covered, as IMPL_NONE says PCSR is not implemented hence you
+> don't worry about anything as the functionality is missing. This should rather be:
+> EDDEVID_IMPL_EDPCSR, where only PCSR is implemented.
+
+I think below combination doesn't really exist:
+{ EDDEVID_IMPL_EDPCSR, EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 };
+
+EDDEVID_IMPL_EDPCSR is only defined in ARMv7 ARM, and
+EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 is only defined in ARMv8 ARM.
+
+> My switch...case suggestion makes it easier to do all this checking.
+
+Agree. Will do this.
+
+Thanks,
+Leo Yan
