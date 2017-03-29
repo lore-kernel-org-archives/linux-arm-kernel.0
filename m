@@ -1,58 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Mar 2017 04:18:19 +0200
-Subject: [PATCH v2 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <87mvc5a3hh.fsf@free-electrons.com>
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
- <0e60fccd7913b83ee53d2921ce8f297927e8b6f3.1490120798.git-series.gregory.clement@free-electrons.com>
- <CACRpkdYv6WDWM60dRMaYfEt50M8N-yLYk2TRguNi78aQtt6X9A@mail.gmail.com>
- <87vaqtadry.fsf@free-electrons.com>
- <CACRpkdY0DzMGiRTWeS23iCY3Vja9dnXJVaMqOnhJRpBLowfYTA@mail.gmail.com>
- <87mvc5a3hh.fsf@free-electrons.com>
-Message-ID: <CACRpkdYA9xq3TmW-=0+cxdeBcq6v3HAFf3f5E-FAvUpGZqns3g@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Wed, 29 Mar 2017 10:27:55 +0800
+Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
+In-Reply-To: <CAPDyKFo=DwzUqFZzh0tcRiYg6GagL8VrXwpd6PyfdZ+qkYgXqw@mail.gmail.com>
+References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
+ <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+ <13a83728-0031-5683-c371-4b517df32299@intel.com>
+ <1490344369.22814.10.camel@mhfsdcap03>
+ <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
+ <1490348427.22814.19.camel@mhfsdcap03>
+ <CAPDyKFoo5sJ2XtjyiW1DLjhFdJySbDK7+N05vrKpeiZsp25qrA@mail.gmail.com>
+ <1490578500.22814.31.camel@mhfsdcap03>
+ <CAPDyKFoWyVrdk7bG1n=rTSOddvqaj-uTO70QoGmcKQK1Fhio2w@mail.gmail.com>
+ <a0df1a1d-a776-f1e6-1ee2-e66faff375d3@intel.com>
+ <CAPDyKFq5st=eBW98A1VUjnGwNbocay6gf-7trcUXbUNbUThSBA@mail.gmail.com>
+ <CAPDyKFo=DwzUqFZzh0tcRiYg6GagL8VrXwpd6PyfdZ+qkYgXqw@mail.gmail.com>
+Message-ID: <1490754475.22814.43.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 4:19 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On mar., mars 28 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
-
->> What you're doing is mocking around with core irqchip semantics.
->> Is ->mask really supposed to be played around with from the outsid
->> like this?
->
-> According to the documentation mask is a "precomputed bitmask for
-> accessing the chip registers" and it is exactly the way it is used in
-> this driver.
->
-> Moreover, currently ->mask is only used by the generic irqchip framework
-> and not by the core of the irqchip subsystem. So the mask initialization
-> is not done from the oustide but at the same level as the generic
-> irqchip which is not used here.
-
-OK excellent, sorry for my ignorance. We should rather point to your driver
-as a good example of how to do this. Care to add some few lines of comment
-as to what is going on for others that need to do the same?
-
-Actually it would even be good to have something in
-Documentation/gpio/driver.txt
-
->> It has irq_create_mapping(gpiochip->irqdomain, offset); that get
->> called for every IRQ, and that will eventually call irq_of_parse_and_map()
->> if the IRQs are defined in the device tree. (IIRC)
->
-> When I followed the functions called I never find a call to
-> irq_of_parse_and_map(), the closer things related to device tree I found
-> was:
-> "virq = irq_domain_alloc_descs(-1, 1, hwirq, of_node_to_nid(of_node),
-> NULL);"
-> http://elixir.free-electrons.com/source/kernel/irq/irqdomain.c?v=4.11-rc4#L507
-
-I don't know if I'm rambling or what. I'm pretty sure it gets called, maybe
-even earlier, like when the DT is parsed for the platform. We have so many
-drivers not seemingly needing this, but if your driver needs it, all others
-may need to be fixed too.
-
-Can you put a print in irq_of_parse_and_map() and see what happens?
-
-Yours,
-Linus Walleij
+On Tue, 2017-03-28 at 11:59 +0200, Ulf Hansson wrote:
+> [...]
+> 
+> >> The retry mechanism provided by mmc_wait_for_cmd() and friends really only
+> >> makes sense for simple commands.  In other cases, like this, we need to
+> >> consider what state the card is in.  For __mmc_switch we need to consider
+> >> whether the card is busy or whether a timing change been made.
+> >
+> > I definitely agree. We should remove retries for CMD6 and perhaps also
+> > for some other cases.
+> >
+just only remove retries ? how to do error handle of CMD6 response CRC
+error ?
+> > When we have changed the above in __mmc_switch(), the change Chaotian
+> > suggest gets a different impact, as it would potentially allow a
+> > re-tuning to happen before the next CMD1to poll for busy or to check
+> 
+> /s/CMD1/CMD13
+> 
+> > the switch status. This isn't okay.
+> >
+> > This all sounds to me that Chaotian's issue may not all be related to
+> > tuning, but to the CMD6 switch sequence itself. However I may be wrong
+> > - of course. :-)
+We had already noticed this issue and do busy check before CMD6 was sent
+in our host driver. so that for me, the rest work is to do re-tune
+before the next cmd6...
+> >
+> > [...]
+> >
+> > Kind regards
+> > Uffe
