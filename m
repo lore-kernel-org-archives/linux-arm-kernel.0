@@ -1,86 +1,30 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 29 Mar 2017 17:36:37 +0800
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <58DA67BA.8070404@arm.com>
-References: <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
- <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
- <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
- <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
-Message-ID: <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 29 Mar 2017 11:38:25 +0200
+Subject: [PATCH 1/3] ARM: dts: alpine: remove 0x's from the uart1 node unit
+ address
+Message-ID: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove 0x's from the uart1 node unit address to have consistent nodes.
 
-Hi Laszlo/Biesheuvel/Qemu developer,
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/alpine.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-   Now I encounter a issue and want to consult with you in ARM64 platform? as described below:
-
-   when guest OS happen synchronous or asynchronous abort, kvm needs to send the error address to Qemu or UEFI through sigbus to dynamically generate APEI table. from my investigation, there are two ways:
-
-   (1) Qemu get the error address, and generate the APEI table, then notify UEFI to know this generation, then inject abort error to guest OS, guest OS read the APEI table.
-   (2) Qemu get the error address, and let UEFI to generate the APEI table, then inject abort error to guest OS, guest OS read the APEI table.
-
-
-   Do you think which modules generates the APEI table is better? UEFI or Qemu?
-
-
-
-
-On 2017/3/28 21:40, James Morse wrote:
-> Hi gengdongjiu,
-> 
-> On 28/03/17 13:16, gengdongjiu wrote:
->> On 2017/3/28 19:54, Achin Gupta wrote:
->>> On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
->>>> On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
->>>>> On the host, part of UEFI is involved to generate the CPER records.
->>>>> In a guest?, I don't know.
->>>>> Qemu could generate the records, or drive some other component to do it.
->>>>
->>>> I think I am beginning to understand this a bit.  Since the guet UEFI
->>>> instance is specifically built for the machine it runs on, QEMU's virt
->>>> machine in this case, they could simply agree (by some contract) to
->>>> place the records at some specific location in memory, and if the guest
->>>> kernel asks its guest UEFI for that location, things should just work by
->>>> having logic in QEMU to process error reports and populate guest memory.
->>>>
->>>> Is this how others see the world too?
->>>
->>> I think so!
->>>
->>> AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
->>> the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
->>> HEST for the guest Kernel?
->>>
->>> If so, then the question is how the guest UEFI finds out where QEMU (acting as
->>> EL3 firmware) will populate the CPERs. This could either be a contract between
->>> the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
->>> where the memory is.
->>
->> whether invoke the guest UEFI will be complex? not see the advantage. it seems x86 Qemu
->> directly generate the ACPI table, but I am not sure, we are checking the qemu
-> logical.
->> let Qemu generate CPER record may be clear.
-> 
-> At boot UEFI in the guest will need to make sure the areas of memory that may be
-> used for CPER records are reserved. Whether UEFI or Qemu decides where these are
-> needs deciding, (but probably not here)...
-> 
-> At runtime, when an error has occurred, I agree it would be simpler (fewer
-> components involved) if Qemu generates the CPER records. But if UEFI made the
-> memory choice above they need to interact and it gets complicated again. The
-> CPER records are defined in the UEFI spec, so I would expect UEFI to contain
-> code to generate/parse them.
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> .
-> 
+diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
+index f09f9c8e178a..341a500c8d8a 100644
+--- a/arch/arm/boot/dts/alpine.dtsi
++++ b/arch/arm/boot/dts/alpine.dtsi
+@@ -129,7 +129,7 @@
+ 			reg-io-width = <4>;
+ 		};
+ 
+-		uart1:uart at 0xfd884000 {
++		uart1:uart at fd884000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x0 0xfd884000 0x0 0x1000>;
+ 			clock-frequency = <0>; /* Filled by loader */
+-- 
+2.11.0
