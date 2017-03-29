@@ -1,83 +1,158 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 29 Mar 2017 16:22:15 +0300
-Subject: [PATCH v7 0/7] Implement clocksource for rockchip SoC using
- rockchip timer
-In-Reply-To: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
-References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <DAFDD95C-3244-4217-B3A4-E9FB176AE989@gmail.com>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Wed, 29 Mar 2017 15:25:18 +0200
+Subject: [PATCH v1 0/8] Add support for DCMI camera interface of
+ STMicroelectronics STM32 SoC series
+Message-ID: <1490793926-6477-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Daniel.
+This patchset introduces a basic support for Digital Camera Memory Interface
+(DCMI) of STMicroelectronics STM32 SoC series.
 
-Due to recent comments from Mark[1], may be is better to apply v6[2] series instead of v7[3]?
-Because my main goal was to fix wall time on rk3188. And I did it the same way how that was
-already done for other timer drivers (one of possible solution).
+This first basic support implements RGB565 & YUV frame grabbing.
+Cropping and JPEG support will be added later on.
 
-You can rename CLOCKSOURCE_OF to TIMER_OF later. I can help with that, but I don?t
-think it is good idea to combine my changes and timer framework cleanups/improvements
-into single series.
+This has been tested on STM324x9I-EVAL evaluation board embedding
+an OV2640 camera sensor.
 
-And I thinks, that probably is is better to drop [3] and [4] and revert 0c8893c9095d ("clockevents: Add a
-clkevt-of mechanism like clksrc-of?).
+This driver depends on:
+  - [PATCHv6 00/14] atmel-isi/ov7670/ov2640: convert to standalone drivers http://www.spinics.net/lists/linux-media/msg113480.html
 
-What do you think?
+===========
+= history =
+===========
+version 1:
+  - Initial submission
 
-[1] https://lkml.org/lkml/2017/3/29/286
-[2] https://lkml.org/lkml/2017/1/31/401
-[3] https://lkml.org/lkml/2017/3/22/508
-[4] https://lkml.org/lkml/2017/3/22/420
-[5] https://lkml.org/lkml/2017/3/22/426
+===================
+= v4l2-compliance =
+===================
+Below is the v4l2-compliance report for this current version of the DCMI camera interface.
+v4l2-compliance has been built from v4l-utils-1.12.3.
 
-> 22 ????? 2017 ?., ? 18:48, Alexander Kochetkov <al.kochet@gmail.com> ???????(?):
-> 
-> Hello, Daniel, Heiko.
-> 
-> Here is try 7 :) Could you please take a look into it?
-> 
-> rockchip_timer init code implemented using CLOCKEVENT_OF_DECLARE()
-> introduced in commit 0c8893c9095d ("clockevents: Add a clkevt-of
-> mechanism like clksrc-of")
-> 
-> There is change in the arch/arm/mach-rockchip/rockchip.c.
-> 
-> This series should be applied after the commit:
-> https://lkml.org/lkml/2017/3/22/426
-> 
-> As without the commit, you will get linker error ("clkevt-probe.c:63:
-> undefined reference to `__clkevt_of_table?")
-> 
-> Regards,
-> Alexander.
-> 
-> 
-> Alexander Kochetkov (6):
->  dt-bindings: clarify compatible property for rockchip timers
->  ARM: dts: rockchip: update compatible property for rk322x timer
->  ARM: dts: rockchip: add clockevent attribute to rockchip timers
->  clocksource/drivers/rockchip_timer: implement clocksource timer
->  ARM: dts: rockchip: add timer entries to rk3188 SoC
->  ARM: dts: rockchip: disable arm-global-timer for rk3188
-> 
-> Daniel Lezcano (1):
->  clocksource/drivers/clksrc-evt-probe: Describe with the DT both the
->    clocksource and the clockevent
-> 
-> .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
-> Documentation/devicetree/bindings/timer/timer.txt  |   38 ++++
-> arch/arm/boot/dts/rk3036.dtsi                      |    1 +
-> arch/arm/boot/dts/rk3188.dtsi                      |   19 ++
-> arch/arm/boot/dts/rk322x.dtsi                      |    3 +-
-> arch/arm/boot/dts/rk3288.dtsi                      |    1 +
-> arch/arm/mach-rockchip/rockchip.c                  |    2 +
-> arch/arm64/boot/dts/rockchip/rk3368.dtsi           |    1 +
-> drivers/clocksource/Kconfig                        |    2 +
-> drivers/clocksource/clkevt-probe.c                 |    7 +
-> drivers/clocksource/clksrc-probe.c                 |    7 +
-> drivers/clocksource/rockchip_timer.c               |  215 ++++++++++++++------
-> 12 files changed, 241 insertions(+), 67 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/timer/timer.txt
-> 
-> -- 
-> 1.7.9.5
-> 
+v4l2-compliance SHA   : f5f45e17ee98a0ebad7836ade2b34ceec909d751
+
+Driver Info:
+        Driver name   : stm32-dcmi
+        Card type     : STM32 Digital Camera Memory Int
+        Bus info      : platform:dcmi
+        Driver version: 4.11.0
+        Capabilities  : 0x85200001
+                Video Capture
+                Read/Write
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x05200001
+                Video Capture
+                Read/Write
+                Streaming
+                Extended Pix Format
+
+Compliance test for device /dev/video0 (not using libv4l2):
+
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
+        test for unlimited opens: OK
+
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 1 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+Test input 0:
+
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
+                test VIDIOC_QUERYCTRL: OK
+                test VIDIOC_G/S_CTRL: OK
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 3 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                test VIDIOC_S_FMT: OK
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+                test Cropping: OK (Not Supported)
+                test Composing: OK (Not Supported)
+                test Scaling: OK
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                test VIDIOC_EXPBUF: OK
+
+Test input 0:
+
+Streaming ioctls:
+        test read/write: OK
+        test MMAP: OK
+        test USERPTR: OK (Not Supported)
+        test DMABUF: Cannot test, specify --expbuf-device
+
+
+Total: 46, Succeeded: 46, Failed: 0, Warnings: 0
+
+Hugues Fruchet (8):
+  dt-bindings: Document STM32 DCMI bindings
+  [media] stm32-dcmi: STM32 DCMI camera interface driver
+  ARM: dts: stm32: Enable DCMI support on STM32F429 MCU
+  ARM: dts: stm32: Enable DCMI camera interface on STM32F429-EVAL board
+  ARM: dts: stm32: Enable stmpe1600 gpio expandor of STM32F429-EVAL
+    board
+  ARM: dts: stm32: Enable ov2640 camera support of STM32F429-EVAL board
+  ARM: configs: stm32: stmpe 1600 GPIO expandor
+  ARM: configs: stm32: DCMI + OV2640 camera support
+
+ .../devicetree/bindings/media/st,stm32-dcmi.txt    |   77 ++
+ arch/arm/boot/dts/stm32429i-eval.dts               |   56 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   37 +
+ arch/arm/configs/stm32_defconfig                   |    9 +
+ drivers/media/platform/Kconfig                     |   12 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/stm32/Makefile              |    1 +
+ drivers/media/platform/stm32/stm32-dcmi.c          | 1417 ++++++++++++++++++++
+ 8 files changed, 1611 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+ create mode 100644 drivers/media/platform/stm32/Makefile
+ create mode 100644 drivers/media/platform/stm32/stm32-dcmi.c
+
+-- 
+1.9.1
