@@ -1,105 +1,177 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Mar 2017 11:29:12 +0800
-Subject: [PATCH v2 10/15] ARM: dts: imx6dl-icore-rqs: Add sgtl5000 codec
- node
-In-Reply-To: <1490372330-5611-11-git-send-email-jagan@openedev.com>
-References: <1490372330-5611-1-git-send-email-jagan@openedev.com>
- <1490372330-5611-11-git-send-email-jagan@openedev.com>
-Message-ID: <20170329032910.GX30608@dragon>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 29 Mar 2017 11:41:07 +0800
+Subject: [PATCH v22 02/11] clocksource: arm_arch_timer: separate out
+ device-tree code and remove arch_timer_detect_rate
+In-Reply-To: <20170328145814.GE2123@mai>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <20170321163122.9183-3-fu.wei@linaro.org>
+ <20170328145814.GE2123@mai>
+Message-ID: <CADyBb7uD1OqpPZf+ADsgbWryCGMGE3GqXOxz_4+1RzC1Pqsccg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:48:45PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> - Moved sound card node on imx6qdl-icore-rqs.dtsi
-> - Added codec node in imx6dl-icore-rqs from imx6q-icore-rqs
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - Newly added patch
-> 
->  arch/arm/boot/dts/imx6dl-icore-rqs.dts   | 11 +++++++++++
->  arch/arm/boot/dts/imx6q-icore-rqs.dts    | 13 -------------
->  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 13 +++++++++++++
->  3 files changed, 24 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-> index cf42c2f..5b4c14c 100644
-> --- a/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-> +++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-> @@ -49,3 +49,14 @@
->  	model = "Engicam i.CoreM6 DualLite/Solo RQS Starter Kit";
->  	compatible = "engicam,imx6-icore-rqs", "fsl,imx6dl";
->  };
-> +
-> +&i2c3 {
-> +	codec: sgtl5000 at 0a {
+Hi Daniel,
 
-Why adding something that the following patch will change right away?
+Great thanks for your review, allow me to answer your question below:
 
-Shawn
+On 28 March 2017 at 22:58, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On Wed, Mar 22, 2017 at 12:31:13AM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> Currently, the counter frequency detection call(arch_timer_detect_rate)
+>> includes getting the frequency from the device-tree property, the per-cpu
+>> arch-timer and the memory-mapped (MMIO) timer interfaces.
+>> But reading device-tree property will be needed only when system boot with
+>> device-tree, and reading from the per-cpu arch-timer and the memory-mapped
+>> (MMIO) timer interfaces will be needed only when the system initializes
+>> the relevant timer.
+>>
+>> This patch separates out device-tree code, keep them in device-tree init
+>> function, and removes arch_timer_detect_rate founction, then uses the
+>> arch_timer_get_cntfrq and arch_timer_mem_get_cntfrq directly.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 58 +++++++++++++++++++-----------------
+>>  1 file changed, 30 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 843f923..29ca7d6 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -560,30 +560,6 @@ static u32 arch_timer_mem_get_cntfrq(void __iomem *cntbase)
+>>       return readl_relaxed(cntbase + CNTFRQ);
+>>  }
+>>
+>> -static void
+>> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+>> -{
+>> -     /* Who has more than one independent system counter? */
+>> -     if (arch_timer_rate)
+>> -             return;
+>> -
+>> -     /*
+>> -      * Try to determine the frequency from the device tree or CNTFRQ,
+>> -      * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
+>> -      */
+>> -     if (!acpi_disabled ||
+>> -         of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+>> -             if (cntbase)
+>> -                     arch_timer_rate = arch_timer_mem_get_cntfrq(cntbase);
+>> -             else
+>> -                     arch_timer_rate = arch_timer_get_cntfrq();
+>> -     }
+>> -
+>> -     /* Check the timer frequency. */
+>> -     if (arch_timer_rate == 0)
+>> -             pr_warn("frequency not available\n");
+>> -}
+>> -
+>>  static void arch_timer_banner(unsigned type)
+>>  {
+>>       pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+>> @@ -958,7 +934,17 @@ static int __init arch_timer_of_init(struct device_node *np)
+>>       for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
+>>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+>>
+>> -     arch_timer_detect_rate(NULL, np);
+>> +     /*
+>> +      * Try to determine the frequency from the device tree,
+>> +      * if fail, get the frequency from the sysreg CNTFRQ.
+>> +      */
+>> +     if (!arch_timer_rate &&
+>
+> This variable is set only if "arm,armv7-timer" and "arm,armv7-timer-mem" are
+> declared together in the DT, right ?
+>
+> Two declarations for a single variable ? Ignore the !arch_timer_rate.
 
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0x0a>;
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		VDDA-supply = <&reg_2p5v>;
-> +		VDDIO-supply = <&reg_3p3v>;
-> +		VDDD-supply = <&reg_1p8v>;
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> index e451b4c..441a28e5 100644
-> --- a/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> +++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> @@ -47,19 +47,6 @@
->  / {
->  	model = "Engicam i.CoreM6 Quad/Dual RQS Starter Kit";
->  	compatible = "engicam,imx6-icore-rqs", "fsl,imx6q";
-> -
-> -	sound {
-> -		compatible = "fsl,imx-audio-sgtl5000";
-> -		model = "imx-audio-sgtl5000";
-> -		ssi-controller = <&ssi1>;
-> -		audio-codec = <&codec>;
-> -		audio-routing =
-> -			"MIC_IN", "Mic Jack",
-> -			"Mic Jack", "Mic Bias",
-> -			"Headphone Jack", "HP_OUT";
-> -		mux-int-port = <1>;
-> -		mux-ext-port = <4>;
-> -	};
->  };
->  
->  &i2c3 {
-> diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> index 5fab5be..4032d38 100644
-> --- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> @@ -118,6 +118,19 @@
->  		clocks = <&clks IMX6QDL_CLK_LVDS2_GATE>;
->  		clock-names = "refclk";
->  	};
-> +
-> +	sound {
-> +		compatible = "fsl,imx-audio-sgtl5000";
-> +		model = "imx-audio-sgtl5000";
-> +		ssi-controller = <&ssi1>;
-> +		audio-codec = <&codec>;
-> +		audio-routing =
-> +			"MIC_IN", "Mic Jack",
-> +			"Mic Jack", "Mic Bias",
-> +			"Headphone Jack", "HP_OUT";
-> +		mux-int-port = <1>;
-> +		mux-ext-port = <4>;
-> +	};
->  };
->  
->  &clks {
-> -- 
-> 1.9.1
-> 
+In this function, we try to initialize per-CPU arm arch_timer by DT.
+this "!arch_timer_rate" is for testing that if we have got system
+counter frequency from the memory-mapped timer. If so, we just skip
+getting the frequency from DT or sysreg cntfrq again.
+This variable is set only if "arm,armv7-timer-mem" is initialized
+earlier than "arm,armv7-timer", in another word, maybe the node of
+"arm,armv7-timer-mem" is declared earlier than  "arm,armv7-timer-mem"
+one in DT.
+
+we do this check is for keeping the same init logic as before in the
+DT, try to avoid any possibility of  breaking devices which boot by
+DT.
+
+>
+>> +         of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+>> +             arch_timer_rate = arch_timer_get_cntfrq();
+>> +     if (!arch_timer_rate) {
+>> +             pr_err(FW_BUG "frequency not available.\n");
+>> +             return -EINVAL;
+>> +     }
+>
+> Please, clarify this block, the conditions are unclear.
+
+this "!arch_timer_rate" is for verifying that if the system counter
+frequency we just got from DT or sysreg cntfrq is valid(non-zero).
+
+So here, you can see I check arch_timer_rate twice, but they are for
+different cases.
+
+>
+>>
+>>       arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+>>
+>> @@ -1069,7 +1055,19 @@ static int __init arch_timer_mem_init(struct device_node *np)
+>>               goto out;
+>>       }
+>>
+>> -     arch_timer_detect_rate(base, np);
+>> +     /*
+>> +      * Try to determine the frequency from the device tree,
+>> +      * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
+>> +      */
+>> +     if (!arch_timer_rate &&
+>> +         of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+>> +             arch_timer_rate = arch_timer_mem_get_cntfrq(base);
+>> +     if (!arch_timer_rate) {
+>> +             pr_err(FW_BUG "MMIO frequency not available.\n");
+>> +             ret = -EINVAL;
+>> +             goto out;
+>> +     }
+>> +
+>>       ret = arch_timer_mem_register(base, irq);
+>>       if (ret)
+>>               goto out;
+>> @@ -1130,8 +1128,12 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+>>               map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+>>               gtdt->non_secure_el2_flags);
+>>
+>> -     /* Get the frequency from CNTFRQ */
+>> -     arch_timer_detect_rate(NULL, NULL);
+>> +     /* Get the frequency from the sysreg CNTFRQ */
+>> +     arch_timer_rate = arch_timer_get_cntfrq();
+>> +     if (!arch_timer_rate) {
+>> +             pr_err(FW_BUG "frequency not available.\n");
+>> +             return -EINVAL;
+>> +     }
+>>
+>>       arch_timer_uses_ppi = arch_timer_select_ppi();
+>>       if (!arch_timer_ppi[arch_timer_uses_ppi]) {
+>> --
+>> 2.9.3
+>>
+>
+> --
+>
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
