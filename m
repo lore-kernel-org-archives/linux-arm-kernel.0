@@ -1,90 +1,41 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 29 Mar 2017 15:16:59 +0200
-Subject: [PATCH v3 1/2] PCI: Add tango MSI controller support
-In-Reply-To: <a12a79fd-94f9-5aa4-5aa0-5dccb6c5d615@arm.com>
-References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
- <f37d7b55-e065-72aa-e690-13dd4718a9ce@sigmadesigns.com>
- <a12a79fd-94f9-5aa4-5aa0-5dccb6c5d615@arm.com>
-Message-ID: <0541e62a-c87a-2e69-a7d1-28f886ad04c2@free.fr>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 29 Mar 2017 09:18:46 -0400
+Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
+References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
+ <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
+ <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
+ <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
+Message-ID: <f3e76f8d-16bb-8ec5-da9b-d62ca66dafd6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/2017 14:29, Marc Zyngier wrote:
-
-> On 29/03/17 12:29, Marc Gonzalez wrote:
->
->> The MSI controller in Tango supports 256 message-signaled interrupts,
->> and a single doorbell address.
+On 3/28/2017 9:04 AM, Sinan Kaya wrote:
+> On 3/28/2017 8:52 AM, Sinan Kaya wrote:
+>> On 3/28/2017 2:02 AM, Patel, Mayurkumar wrote:
+>>> Thanks for your patches. I am seeing kernel panic after applying
+>>> these patches (on top of latest kernel) each time during early boot in pci_aspm_init() (any hints already?) function.
+>>> Need to check if it's something related to my local setup or it's because of these changes.
+>>> For now I don't have more details why it crashes but I will dig in further and I will provide
+>>> you more data as soon as I have it.
+>>>
 >>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->> Changes since v0.2
->> - Support 256 MSIs instead of only 32
->> - Use spinlock_t instead of struct mutex
->> - Add MSI_FLAG_PCI_MSIX flag
+>> Interesting, I retested Qemu and I don't see an issue. 
+>> Can you share your bootlog when you see the crash?
 >>
->> IRQs are acked in tango_msi_isr because handle_simple_irq leaves
->> ack, clear, mask and unmask up to the driver. For the same reason,
->> interrupt enable mask is updated from tango_irq_domain_alloc/free.
+> Thinking more...
 > 
-> I've asked you to move this to individual methods. You've decided not
-> to, and that's your call. But I now wonder why I'm even bothering to
-> review this, as you've so far just wasted my time.
-
-I misunderstood what you wrote. When you pointed out the comment at
-the top of handle_simple_irq (which I mentioned in my above blurb)
-I took that to mean that I had to follow those instructions.
-
-Judging by what you wrote below, I must replace handle_simple_irq
-with handle_edge_irq, which will call the irq_chip callbacks.
-
-But I don't understand how to get my pcie pointer back in irq_ack
-or irq_unmask, or the relevant msi. Can you throw me a clue?
-
->> +static struct irq_chip tango_msi_irq_chip = {
->> +	.name = "MSI",
->> +	.irq_mask = pci_msi_mask_irq,
->> +	.irq_unmask = pci_msi_unmask_irq,
+> Can you add this to the top of pci_aspm_init() and try again?
 > 
-> How do you make that work if the PCI device doesn't support per-MSI masking?
-
-It seems you're saying this code is broken. Is it functional
-in the Altera driver, and I did something to break it?
-
->> +static int find_free_msi(struct irq_domain *dom, unsigned int virq)
->> +{
->> +	u32 val;
->> +	struct tango_pcie *pcie = dom->host_data;
->> +	unsigned int offset, pos;
->> +
->> +	pos = find_first_zero_bit(pcie->bitmap, MSI_MAX);
->> +	if (pos >= MSI_MAX)
->> +		return -ENOSPC;
->> +
->> +	offset = (pos / 32) * 4;
->> +	val = readl_relaxed(pcie->msi_mask + offset);
->> +	writel_relaxed(val | BIT(pos % 32), pcie->msi_mask + offset);
+> if (!pci_is_pcie(pdev))
+>           return -EINVAL;
 > 
-> Great. I'm now in a position where I can take an interrupt (because of
-> the broken locking that doesn't disable interrupts), but the bitmap
-> doesn't indicate it yet. With a bit of luck, I'll never make any forward
-> progress.
 
-Is this the Yoda way to say:
-"Hey moron, use spin_lock_irqsave instead of spin_lock"?
+Did this help?
 
->> +	irq_domain_set_info(dom, virq, pos, &tango_msi_chip,
->> +			dom->host_data, handle_simple_irq, NULL, NULL);
-> 
-> I've told you a number of times that PCI MSIs are edge triggered...
-
-I will register handle_edge_irq.
-
-> So there is not much progress from the previous version. It is just
-> broken in a different ways, and ignores most of the work that is already
-> done in the irqchip core.
-
-I wish nothing more than to be able to use as much infrastructure
-as possible, in order to write as little code as possible.
-
-Regards.
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
