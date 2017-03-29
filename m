@@ -1,384 +1,107 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 29 Mar 2017 15:56:23 +0100
-Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
-In-Reply-To: <20170329015423.GA5035@leoy-linaro>
-References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
- <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
- <20170328165010.GA21937@linaro.org>
- <20170329015423.GA5035@leoy-linaro>
-Message-ID: <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Mar 2017 15:56:52 +0100
+Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
+ multiple erratum detection methods
+In-Reply-To: <20170329142723.GK2123@mai>
+References: <20170323173030.GA24630@mai>
+ <5e8faa45-bb1b-fd9b-f34f-93ce5babb0a3@arm.com> <20170327075628.GE24630@mai>
+ <e0e0a3d7-2252-5fd6-3247-c128208fd9b9@arm.com> <20170328133438.GB2123@mai>
+ <ec5e673c-6d02-fc88-9913-b0f9261da05e@arm.com> <20170328143633.GC2123@mai>
+ <ee4b5b59-e6ef-6f55-792c-6aa39d354adb@arm.com> <20170328145524.GD2123@mai>
+ <645ab4be-2730-3197-9d70-4e44692ea693@arm.com> <20170329142723.GK2123@mai>
+Message-ID: <36733343-8f16-f009-dd4d-1ee63614b053@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Leo
+On 29/03/17 15:27, Daniel Lezcano wrote:
+> On Tue, Mar 28, 2017 at 04:38:41PM +0100, Marc Zyngier wrote:
+>> On 28/03/17 15:55, Daniel Lezcano wrote:
+>>> On Tue, Mar 28, 2017 at 03:48:23PM +0100, Marc Zyngier wrote:
+>>>> On 28/03/17 15:36, Daniel Lezcano wrote:
+>>>>> On Tue, Mar 28, 2017 at 03:07:52PM +0100, Marc Zyngier wrote:
+>>>>>
+>>>>> [ ... ]
+>>>>>
+>>>>>>>>> -bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+>>>>>>>>> -					 const void *arg)
+>>>>>>>>> +bool arch_timer_check_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+>>>>>>>>> +				  const void *arg)
+>>>>>>>>>  {
+>>>>>>>>> -	return cpus_have_cap((uintptr_t)wa->id);
+>>>>>>>>> +	return cpus_have_cap((uintptr_t)wa->id) | this_cpu_has_cap((uintptr_t)wa->id);
+>>>>>>>>
+>>>>>>>> Not quite. Here, you're making all capability-based errata to be be
+>>>>>>>> global (if a single CPU in the system has a capability, then by
+>>>>>>>> transitivity cpus_have_cap returns true). If that's a big-little system,
+>>>>>>>> you end-up applying the workaround to all CPUs, including those unaffected.
+>>>>>>>>
+>>>>>>>> I'd rather drop cpus_have_cap altogether and rely on individual CPU
+>>>>>>>> matching (since we don't have a need for a global capability erratum
+>>>>>>>> handling yet).
+>>>>>>>
+>>>>>>> Ok, thanks.
+>>>>>>
+>>>>>> Quick update. I've just implemented this, and found out that getting rid
+>>>>>> of local/global has an unfortunate effect:
+>>>>>>
+>>>>>> Since we only probe the global errata (using ACPI for example) on the
+>>>>>> boot CPU path, we lose propagation of the erratum across the secondary
+>>>>>> CPUs. One way of solving this is to convert the secondary boot path to
+>>>>>> be aware of DT vs ACPI vs detection method of the month. Which isn't
+>>>>>> easy, since by the time we boot secondary CPUs, we don't have the
+>>>>>> pointers to the various ACPI tables anymore. Also, assuming we were
+>>>>>> careful and saved the pointers, the tables may have been unmapped. Fun.
+>>>>>
+>>>>> My proposal was supposed to prevent that. The detecion is done in the
+>>>>> subsystems, ACPI detects ACPI errata, DT detects DT errata and CPU detects CPU
+>>>>> errata. The drivers get the errata and enable the workaround. The id
+>>>>> association <-> errata self contains errata types (void *, char *, int). So
+>>>>> everything can be done in a CPU basis without local / global dance.
+>>>>
+>>>> I'm sorry, but it feels like a Jumbo-Jet sized hammer to try and squash
+>>>> a fly (I'm staying away from the frozen shark metaphor here). You're
+>>>> willing to add a whole list of things with private ids that need
+>>>> matching to kill a flag? I don't think this buys us anything but extra
+>>>> complexity and another maintenance headache.
+>>>
+>>> Well, it is like your approach except it is split in two steps.
+>>>
+>>> Can you explain where is the extra complexity ? May be I am missing the point.
+>>
+>> This is how I understand your approach:
+>>
+>> - Boot the first CPU
+>> - Build a list of errata discovered at that time
+>> - Apply erratum on the boot CPU if required, using a yet-to-be-invented
+>> private id matching mechanism,
+>> - Boot a secondary CPU
+>> - Apply erratum if required, parsing the list
+>> - Realise that you don't have the full list (this CPU comes with an
+>> erratum that was not in the initial list)
+>> - Add more to the list
+>> - Apply erratum, using the same matching mechanism
+>>
+>> This is mine:
+>>
+>> - Boot the first CPU
+>> - Apply global erratum to all CPUs
+>> - Apply local erratum
+>> - Boot a secondary CPU
+>> - Apply local erratum
+>>
+>> In my case, everything is static, and I don't need to rematch each CPU
+>> against the list of globally applicable errata.
+>>
+>> If my understanding is flawed, let me know.
+> 
+> Any of our understanding is flawed. I think that needs a maturation period.
 
-On 29 March 2017 at 02:54, Leo Yan <leo.yan@linaro.org> wrote:
-> Hi Mathieu,
->
-> On Tue, Mar 28, 2017 at 10:50:10AM -0600, Mathieu Poirier wrote:
->> On Sun, Mar 26, 2017 at 02:23:14AM +0800, Leo Yan wrote:
->
-> [...]
->
->> > +static void debug_force_cpu_powered_up(struct debug_drvdata *drvdata)
->> > +{
->> > +   int timeout = DEBUG_WAIT_TIMEOUT;
->> > +
->> > +   drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
->> > +
->> > +   CS_UNLOCK(drvdata->base);
->> > +
->> > +   /* Bail out if CPU is powered up yet */
->> > +   if (drvdata->edprsr & EDPRSR_PU)
->> > +           goto out_powered_up;
->> > +
->> > +   /*
->> > +    * Send request to power management controller and assert
->> > +    * DBGPWRUPREQ signal; if power management controller has
->> > +    * sane implementation, it should enable CPU power domain
->> > +    * in case CPU is in low power state.
->> > +    */
->> > +   drvdata->edprsr = readl(drvdata->base + EDPRCR);
->> > +   drvdata->edprsr |= EDPRCR_COREPURQ;
->> > +   writel(drvdata->edprsr, drvdata->base + EDPRCR);
->>
->> Here ->edprsr is used but EDPRCR is accessed.  Is this intentional or a
->> copy/paste error?  The same is true for accesses in the out_powered_up section.
->
-> Thanks for pointing out. This is a typo error and will fix.
->
->> > +
->> > +   /* Wait for CPU to be powered up (timeout~=32ms) */
->> > +   while (timeout--) {
->> > +           drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
->> > +           if (drvdata->edprsr & EDPRSR_PU)
->> > +                   break;
->> > +
->> > +           usleep_range(1000, 2000);
->> > +   }
->>
->> See if function readx_poll_timeout() can be used.
->
-> Will use it.
->
->> > +
->> > +   /*
->> > +    * Unfortunately the CPU cannot be powered up, so return
->> > +    * back and later has no permission to access other
->> > +    * registers. For this case, should set 'idle_constraint'
->> > +    * to ensure CPU power domain is enabled!
->> > +    */
->> > +   if (!(drvdata->edprsr & EDPRSR_PU)) {
->> > +           pr_err("%s: power up request for CPU%d failed\n",
->> > +                   __func__, drvdata->cpu);
->> > +           goto out;
->> > +   }
->> > +
->> > +out_powered_up:
->> > +   debug_os_unlock(drvdata);
->> > +
->> > +   /*
->> > +    * At this point the CPU is powered up, so set the no powerdown
->> > +    * request bit so we don't lose power and emulate power down.
->> > +    */
->> > +   drvdata->edprsr = readl(drvdata->base + EDPRCR);
->> > +   drvdata->edprsr |= EDPRCR_COREPURQ | EDPRCR_CORENPDRQ;
->>
->> If we are here the core is already up.  Shouldn't we need to set
->> EDPRCR_CORENPDRQ only?
->
-> Yeah. Will fix.
+Well, these patches have been maturing for a while, and time is running
+out. If you have a better idea that is more than a concept, please post
+the code, I'd be happy to review it.
 
-No - EDPRCR_COREPURQ and EDPRCR_CORENPDRQ have different semantics and purposes
+Thanks,
 
-EDPRCR_COREPURQ is in the debug power domain an is tied to an external
-debug request that should be an input to the external (to the PE)
-system power controller.
-The requirement is that the system power controller powers up the core
-domain and does not power it down while it remains asserted.
-
-EDPRCR_CORENPDRQ is in the core power domain and thus to the specific
-core only. This ensures that any power control software running on
-that core should emulate a power down if this is set to one.
-
-We cannot know the power control design of the system, so the safe
-solution is to set both bits.
-
-Mike
->
->> > +   writel(drvdata->edprsr, drvdata->base + EDPRCR);
->>
->> This section is a little racy - between the time the PU bit has been
->> checked and the time COREPDRQ has been flipped, the state of PU may have
->> changed.  You can probably get around this by checking edprsr.PU rigth here.  If
->> it is not set you go through the process again.  Note that doing this will
->> probably force a refactoring of the whole function.
->
-> Agree. Will handle this.
->
-> [...]
->
->> > +static ssize_t debug_func_knob_write(struct file *f,
->> > +           const char __user *buf, size_t count, loff_t *ppos)
->> > +{
->> > e   u8 on;
->> > +   int ret;
->> > +
->> > +   ret = kstrtou8_from_user(buf, count, 2, &on);
->> > +   if (ret)
->> > +           return ret;
->> > +
->> > +   mutex_lock(&debug_lock);
->> > +
->> > +   if (!on ^ debug_enable)
->> > +           goto out;
->>
->> I had to read this condition too many times - please refactor.
->
-> Will do it.
->
->> > +
->> > +   if (on) {
->> > +           ret = debug_enable_func();
->> > +           if (ret) {
->> > +                   pr_err("%s: unable to disable debug function: %d\n",
->> > +                          __func__, ret);
->>
->> Based on the semantic this is the wrong error message.
->
-> Yeah. Will fix.
->
->> > +                   goto err;
->> > +           }
->> > +   } else
->> > +           debug_disable_func();
->>
->> Did checkpatch.pl complain about extra curly braces?  If not please add them.
->
-> checkpatch.pl doesn't report for this. Will add.
->
->> > +
->> > +   debug_enable = on;
->>
->> Here we can't set debug_enable if we just called debug_disable_func().  Maybe
->> I'm missing something.  If that's the case a comment in the code would be worth
->> it.
->
-> After called debug_disable_func(), debug_enable is set to 0 (on = 0).
->
->> > +
->> > +out:
->> > +   ret = count;
->> > +err:
->> > +   mutex_unlock(&debug_lock);
->> > +   return ret;
->> > +}
->> > +
->> > +static ssize_t debug_func_knob_read(struct file *f,
->> > +           char __user *ubuf, size_t count, loff_t *ppos)
->> > +{
->> > +   char val[] = { '0' + debug_enable, '\n' };
->> > +
->> > +   return simple_read_from_buffer(ubuf, count, ppos, val, sizeof(val));
->>
->> Use the debug_lock to avoid race conditions.
->
-> Will do it.
->
->> > +}
->> > +
->> > +static ssize_t debug_idle_constraint_write(struct file *f,
->> > +           const char __user *buf, size_t count, loff_t *ppos)
->> > +{
->> > +   int val;
->> > +   ssize_t ret;
->> > +
->> > +   ret = kstrtoint_from_user(buf, count, 10, &val);
->> > +   if (ret)
->> > +           return ret;
->> > +
->> > +   mutex_lock(&debug_lock);
->> > +   idle_constraint = val;
->> > +
->> > +   if (debug_enable)
->> > +           pm_qos_update_request(&debug_qos_req, idle_constraint);
->> > +
->> > +   mutex_unlock(&debug_lock);
->> > +   return count;
->> > +}
->> > +
->> > +static ssize_t debug_idle_constraint_read(struct file *f,
->> > +           char __user *ubuf, size_t count, loff_t *ppos)
->> > +{
->> > +   char buf[32];
->> > +   int len;
->> > +
->> > +   if (*ppos)
->> > +           return 0;
->> > +
->> > +   len = sprintf(buf, "%d\n", idle_constraint);
->> > +   return simple_read_from_buffer(ubuf, count, ppos, buf, len);
->>
->> Use the debug_lock to avoid race conditions.
->
-> Will do it.
->
->> > +}
->> > +
->> > +static const struct file_operations debug_func_knob_fops = {
->> > +   .open   = simple_open,
->> > +   .read   = debug_func_knob_read,
->> > +   .write  = debug_func_knob_write,
->> > +};
->> > +
->> > +static const struct file_operations debug_idle_constraint_fops = {
->> > +   .open   = simple_open,
->> > +   .read   = debug_idle_constraint_read,
->> > +   .write  = debug_idle_constraint_write,
->> > +};
->> > +
->> > +static int debug_func_init(void)
->> > +{
->> > +   struct dentry *file;
->> > +   int ret;
->> > +
->> > +   /* Create debugfs node */
->> > +   debug_debugfs_dir = debugfs_create_dir("coresight_cpu_debug", NULL);
->> > +   if (!debug_debugfs_dir) {
->> > +           pr_err("%s: unable to create debugfs directory\n", __func__);
->> > +           return -ENOMEM;
->>
->> return PTR_ERR(debug_debugfs_dir);
->
-> Here cannot use PTR_ERR(debug_debugfs_dir). If create debugfs failed
-> the pointer is NULL value, so finally we will return zero value for
-> PTR_ERR(debug_debugfs_dir).
->
-> [...]
->
->> > +   }
->> > +
->> > +   file = debugfs_create_file("enable", S_IRUGO | S_IWUSR,
->> > +                   debug_debugfs_dir, NULL, &debug_func_knob_fops);
->> > +   if (!file) {
->> > +           pr_err("%s: unable to create enable knob file\n", __func__);
->> > +           ret = -ENOMEM;
->>
->> Same as above.
->>
->> > +           goto err;
->> > +   }
->> > +
->> > +   file = debugfs_create_file("idle_constraint", S_IRUGO | S_IWUSR,
->> > +                   debug_debugfs_dir, NULL, &debug_idle_constraint_fops);
->> > +   if (!file) {
->> > +           pr_err("%s: unable to create idle constraint file\n", __func__);
->> > +           ret = -ENOMEM;
->>
->> Same as above.
->>
->> > +           goto err;
->> > +   }
->> > +
->> > +   /* Use sysfs node to enable functionality */
->> > +   if (!debug_enable)
->> > +           return 0;
->> > +
->> > +   /* Enable debug module at boot time */
->> > +   ret = debug_enable_func();
->> > +   if (ret) {
->> > +           pr_err("%s: unable to disable debug function: %d\n",
->> > +                  __func__, ret);
->> > +           goto err;
->> > +   }
->>
->> Use the debug_lock to avoid race conditions.
->
-> I'm struggling to understand what's race condition at here? The
-> function pairs debug_func_init()/debug_func_exit() are used for
-> module's probing and removing, so naturally module's probing and
-> removing are sequential, right?
->
->> > +
->> > +   return 0;
->> > +
->> > +err:
->> > +   debugfs_remove_recursive(debug_debugfs_dir);
->> > +   return ret;
->> > +}
->> > +
->> > +static void debug_func_exit(void)
->> > +{
->> > +   debugfs_remove_recursive(debug_debugfs_dir);
->> > +
->> > +   /* Disable functionality if has enabled */
->> > +   if (debug_enable)
->> > +           debug_disable_func();
->> > +}
->> > +
->> > +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
->> > +{
->> > +   void __iomem *base;
->> > +   struct device *dev = &adev->dev;
->> > +   struct debug_drvdata *drvdata;
->> > +   struct resource *res = &adev->res;
->> > +   struct device_node *np = adev->dev.of_node;
->> > +   int ret;
->> > +
->> > +   drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
->> > +   if (!drvdata)
->> > +           return -ENOMEM;
->> > +
->> > +   drvdata->cpu = np ? of_coresight_get_cpu(np) : 0;
->> > +   if (per_cpu(debug_drvdata, drvdata->cpu)) {
->> > +           dev_err(dev, "CPU's drvdata has been initialized\n");
->>
->> Might be worth adding the CPU number in the error message.
->
-> Yeah, will add it.
->
-> [...]
->
->> This driver doesn't call the pm_runtime_put/get() operations needed to handle the
->> debug power domain.  See the other CoreSight drivers for details.
->
-> Sure, will do it.
->
->> Also, from the conversation that followed the previous post we agreed that we wouldn't
->> deal with CPUidle issues in this driver.  We deal with the CPU power domain
->> using the EDPRCR register (like you did) and that's it.  System that don't honor that register
->> can use other (external) means to solve this.  As such please remove the
->> pm_qos_xyz() functions.
->
-> From previous discussion, Mike reminds the CPU power domain design is
-> quite SoC specific and usually the SoC has many different low power
-> states, e.g. except CPU level and cluster level low power states, they
-> also can define SoC level low power states. Any SoC with any power
-> state is possible finally impact CPU power domain, so this is why I add
-> this interface to let user can have the final decision based on their
-> working platform.
->
-> We can rely on "nohlt" and "cpuidle.off=1" in kernel command line to
-> disable whole SoC low power states at boot time; or we can use sysfs
-> node "echo 1 > /sys/devices/system/cpu/cpuX/cpuidle/stateX/disble" to
-> disable CPU low power states at runtime. But that means we need use
-> different interfaces to control CPU power domain for booting and
-> runtime, it's not nice for usage.
->
-> So this is why add "idle_constraint" as a central place to control
-> power domain for CPU debug purpose and I also think this is more
-> friendly for hardware design, e.g. some platforms can enable partial
-> low power states to save power and avoid overheat after using this
-> driver.
->
-> How about you think for this?
->
-> Thanks,
-> Leo Yan
-
-
-
+	M.
 -- 
-Mike Leach
-Principal Engineer, ARM Ltd.
-Blackburn Design Centre. UK
+Jazz is not dead. It just smells funny...
