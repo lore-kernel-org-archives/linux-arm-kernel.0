@@ -1,35 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 29 Mar 2017 15:26:05 +0800
-Subject: [PATCH 2/2] ARM: dts: sun5i: Add interrupt for display backend
-In-Reply-To: <20170329071303.ft7oukmhczihy2xb@lukather>
-References: <20170327143847.16259-1-wens@csie.org>
- <20170327143847.16259-3-wens@csie.org>
- <20170329071303.ft7oukmhczihy2xb@lukather>
-Message-ID: <CAGb2v66BsX=6906ubPcLD=ayGp4EmrbHyPmjDOVbZw9a_ZO_Dg@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 29 Mar 2017 09:37:37 +0200
+Subject: [PATCH v3 3/9] arm: fix return value of parse_cpu_capacity
+In-Reply-To: <20170327131825.32134-4-juri.lelli@arm.com>
+References: <20170327131825.32134-1-juri.lelli@arm.com>
+ <20170327131825.32134-4-juri.lelli@arm.com>
+Message-ID: <CAKfTPtCswVBMCaEUzBF4w_GZf-2iLORsS5S0HhGD94ps4+J1Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 3:13 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Mar 27, 2017 at 10:38:47PM +0800, Chen-Yu Tsai wrote:
->> The display backend on sun5i shares the same interrupt line as the
->> display frontend. Add it.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On 27 March 2017 at 15:18, Juri Lelli <juri.lelli@arm.com> wrote:
+> parse_cpu_capacity() has to return 0 on failure, but it currently returns
+> 1 instead if raw_capacity kcalloc failed.
 >
-> And ideally, patches prefix shouldn't have dts here too. I've dropped
-> it and applied, thanks!
-
-Seems like this was a recent policy change? Or almost everyone was getting
-it wrong in the past.
-
->> This won't directly apply to old releases. We may want to backport
->> them though?
+> Fix it by removing the negation of the return value.
 >
-> Yep, probably. Do you want to send it to stable?
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Reported-by: Morten Rasmussen <morten.rasmussen@arm.com>
+> Fixes: 06073ee26775 ('ARM: 8621/3: parse cpu capacity-dmips-mhz from DT')
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> ---
+>  arch/arm/kernel/topology.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index f8a3ab82e77f..4e4af809606a 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -166,7 +166,7 @@ static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+>                         if (!raw_capacity) {
+>                                 pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
+>                                 cap_parsing_failed = true;
+> -                               return !ret;
+> +                               return ret;
 
-It won't apply, due to the recent sun5i merger. We could wait until
-it lands in Linus' tree, then send a backport patch to stable, to
-keep the noise to a minimum.
+Why not directly returning 0 ? whatever the value of ret, the parse of
+cpu capacity has failed in this case
 
-ChenYu
+>                         }
+>                 }
+>                 capacity_scale = max(cpu_capacity, capacity_scale);
+> --
+> 2.10.0
+>
