@@ -1,50 +1,92 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 29 Mar 2017 11:15:55 -0700
-Subject: [RFC v2][PATCH 03/11] net: switch sock_diag handlers to rare_write()
+Date: Wed, 29 Mar 2017 11:16:00 -0700
+Subject: [RFC v2][PATCH 08/11] ARM: Implement __arch_rare_write_begin/end()
 In-Reply-To: <1490811363-93944-1-git-send-email-keescook@chromium.org>
 References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
-Message-ID: <1490811363-93944-4-git-send-email-keescook@chromium.org>
+Message-ID: <1490811363-93944-9-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a simple example a register/unregister case for __wr_rare markings,
-which only needs a simple rare_write() call to make updates.
+Based on grsecurity's ARM pax_{open,close}_kernel() implementation, this
+allows HAVE_ARCH_RARE_WRITE to work on ARM.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- net/core/sock_diag.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig               |  1 +
+ arch/arm/include/asm/domain.h  |  3 ++-
+ arch/arm/include/asm/pgtable.h | 27 +++++++++++++++++++++++++++
+ 3 files changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/net/core/sock_diag.c b/net/core/sock_diag.c
-index 6b10573cc9fa..67253026106f 100644
---- a/net/core/sock_diag.c
-+++ b/net/core/sock_diag.c
-@@ -14,7 +14,7 @@
- #include <linux/inet_diag.h>
- #include <linux/sock_diag.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0d4e71b42c77..57b8aeaf501c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -45,6 +45,7 @@ config ARM
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
++	select HAVE_ARCH_RARE_WRITE if MMU && !ARM_LPAE && !CPU_USE_DOMAINS
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARM_SMCCC if CPU_V7
+diff --git a/arch/arm/include/asm/domain.h b/arch/arm/include/asm/domain.h
+index b5ca80ac823c..b3fb5c0a2efd 100644
+--- a/arch/arm/include/asm/domain.h
++++ b/arch/arm/include/asm/domain.h
+@@ -54,6 +54,7 @@
+ #define DOMAIN_MANAGER	3
+ #else
+ #define DOMAIN_MANAGER	1
++#define DOMAIN_FORCE_MANAGER 3
+ #endif
  
--static const struct sock_diag_handler *sock_diag_handlers[AF_MAX];
-+static const struct sock_diag_handler *sock_diag_handlers[AF_MAX] __wr_rare;
- static int (*inet_rcv_compat)(struct sk_buff *skb, struct nlmsghdr *nlh);
- static DEFINE_MUTEX(sock_diag_table_mutex);
- static struct workqueue_struct *broadcast_wq;
-@@ -194,7 +194,7 @@ int sock_diag_register(const struct sock_diag_handler *hndl)
- 	if (sock_diag_handlers[hndl->family])
- 		err = -EBUSY;
- 	else
--		sock_diag_handlers[hndl->family] = hndl;
-+		rare_write(sock_diag_handlers[hndl->family], hndl);
- 	mutex_unlock(&sock_diag_table_mutex);
- 
- 	return err;
-@@ -210,7 +210,7 @@ void sock_diag_unregister(const struct sock_diag_handler *hnld)
- 
- 	mutex_lock(&sock_diag_table_mutex);
- 	BUG_ON(sock_diag_handlers[family] != hnld);
--	sock_diag_handlers[family] = NULL;
-+	rare_write(sock_diag_handlers[family], NULL);
- 	mutex_unlock(&sock_diag_table_mutex);
+ #define domain_mask(dom)	((3) << (2 * (dom)))
+@@ -118,7 +119,7 @@ static inline void set_domain(unsigned val)
  }
- EXPORT_SYMBOL_GPL(sock_diag_unregister);
+ #endif
+ 
+-#ifdef CONFIG_CPU_USE_DOMAINS
++#if defined(CONFIG_CPU_USE_DOMAINS) || defined(CONFIG_HAVE_ARCH_RARE_WRITE)
+ #define modify_domain(dom,type)					\
+ 	do {							\
+ 		unsigned int domain = get_domain();		\
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 1c462381c225..104923ea9eb5 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -57,6 +57,33 @@ extern void __pgd_error(const char *file, int line, pgd_t);
+ #define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd)
+ #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd)
+ 
++#ifdef CONFIG_HAVE_ARCH_RARE_WRITE
++#include <asm/domain.h>
++#include <linux/preempt.h>
++
++static inline int test_domain(int domain, int domaintype)
++{
++	return (get_domain() & domain_val(domain, 3)) ==
++		domain_val(domain, domaintype);
++}
++
++static inline unsigned long __arch_rare_write_begin(void)
++{
++	preempt_disable();
++	BUG_ON(test_domain(DOMAIN_WR_RARE, DOMAIN_FORCE_MANAGER));
++	modify_domain(DOMAIN_WR_RARE, DOMAIN_FORCE_MANAGER);
++	return 0;
++}
++
++static inline unsigned long __arch_rare_write_end(void)
++{
++	BUG_ON(test_domain(DOMAIN_WR_RARE, DOMAIN_CLIENT));
++	modify_domain(DOMAIN_WR_RARE, DOMAIN_CLIENT);
++	preempt_enable_no_resched();
++	return 0;
++}
++#endif
++
+ /*
+  * This is the lowest virtual address we can permit any user space
+  * mapping to be mapped at.  This is particularly important for
 -- 
 2.7.4
