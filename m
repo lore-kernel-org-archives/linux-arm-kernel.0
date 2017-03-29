@@ -1,65 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Mar 2017 09:41:47 +0100
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <20170328202931.GF20211@cbox>
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
- <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
- <20170310183555.GB6271@arm.com>
- <20170322183512.GB27921@leverpostej>
- <20170328184828.GF8643@leverpostej> <20170328202931.GF20211@cbox>
-Message-ID: <20170329084146.GA15778@arm.com>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Wed, 29 Mar 2017 10:45:23 +0200
+Subject: [REPOST PATCH] ARM: dts: imx6qp-nitrogen6_som2: add Quad Plus variant
+ of the SOM
+In-Reply-To: <20170327160601.12871-1-gary.bisson@boundarydevices.com>
+References: <20170327160601.12871-1-gary.bisson@boundarydevices.com>
+Message-ID: <20170329084523.8065-1-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 10:29:31PM +0200, Christoffer Dall wrote:
-> On Tue, Mar 28, 2017 at 07:48:28PM +0100, Mark Rutland wrote:
-> > On Wed, Mar 22, 2017 at 06:35:13PM +0000, Mark Rutland wrote:
-> > > On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
-> > > > On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
-> > > 
-> > > > > The next question is how do we merge this. Obviously, we can't split it
-> > > > > between trees, and this is very likely to clash with anything that we
-> > > > > will merge on the KVM side (the sysreg table is a popular place).
-> > > > > 
-> > > > > Will, Catalin: Would it make sense to create a stable branch with these
-> > > > > patches, and merge it into both the arm64 and KVM trees? That'd make
-> > > > > things easier...
-> > > > 
-> > > > I think the scope for conflict on our side is pretty high too, so a shared
-> > > > branch might be the best way to go. I don't want to branch just yet though,
-> > > > so I'll probably wait a week or so before setting something in stone.
-> > > 
-> > > Any further thoughts on this?
-> > > 
-> > > Christoffer has Acked the KVM bits, so if you're happy to do so for the
-> > > arm64 bits I can make a stable branch.
-> > 
-> > Looking around, it doesn't look like there's anything outside of arm64
-> > that'll conflict on the <asm/sysreg.h> changes, and git's happy to merge
-> > my changes with Suzuki's changes currently queued in arm64's
-> > for-next/core branch.
-> > 
-> > I think it would make sense for those to be in a common branch taken by
-> > both the arm64 and KVM trees, with the KVM-specific parts being taken by
-> > KVM alone atop of that.
-> > 
-> > Would everyone be happy with that?
-> 
-> I'm happy with that.
-> 
-> > 
-> > For reference, I've updated my branches so that arm64/common-sysreg only
-> > contains the common parts, with the KVM parts atop of that in
-> > kvm/common-sysreg.
-> > 
-> 
-> Will, Catalin:  Let me know if you're going to pull from common-sysreg
-> and I'll do the same and add the kvm patches above.
+https://boundarydevices.com/product/nit6x-som-v2/
 
-I think that's what we'll do, but Catalin's out this week (we're taking it
-in turns to go to work). I'd say go ahead and pull it into kvm if there
-aren't any conflicts. No need to wait for us.
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+Hi,
 
-Mark -- those branches are stable, right?
+This is just a re-post to LAKML as suggested by Shawn [1].
 
-Will
+Also include the Review tag from Fabio [2].
+
+Regards,
+Gary
+
+[1] http://www.spinics.net/lists/devicetree/msg170732.html
+[2] http://www.spinics.net/lists/devicetree/msg170354.html
+---
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/imx6qp-nitrogen6_som2.dts | 55 +++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qp-nitrogen6_som2.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 011808490fed..6190afe94371 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -426,6 +426,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb \
+ 	imx6qp-nitrogen6_max.dtb \
++	imx6qp-nitrogen6_som2.dtb \
+ 	imx6qp-sabreauto.dtb \
+ 	imx6qp-sabresd.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+diff --git a/arch/arm/boot/dts/imx6qp-nitrogen6_som2.dts b/arch/arm/boot/dts/imx6qp-nitrogen6_som2.dts
+new file mode 100644
+index 000000000000..011726c836cd
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qp-nitrogen6_som2.dts
+@@ -0,0 +1,55 @@
++/*
++ * Copyright 2017 Boundary Devices, Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6qp.dtsi"
++#include "imx6qdl-nitrogen6_som2.dtsi"
++
++/ {
++	model = "Boundary Devices i.MX6 Quad Plus Nitrogen6_SOM2 Board";
++	compatible = "boundary,imx6qp-nitrogen6_som2", "fsl,imx6qp";
++};
++
++&sata {
++	status = "okay";
++};
+-- 
+2.11.0
