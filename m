@@ -1,115 +1,87 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:43:24 -0500
-Subject: [PATCH v4 07/23] drivers/fsi: Implement slave initialisation
-In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170329174340.89109-8-cbostic@linux.vnet.ibm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 29 Mar 2017 11:15:54 -0700
+Subject: [RFC v2][PATCH 02/11] lkdtm: add test for rare_write() infrastructure
+In-Reply-To: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+Message-ID: <1490811363-93944-3-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+This adds the WRITE_RARE_WRITE test to validate variables marked with
+__wr_rare.
 
-Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
-devices and register with the driver core.
-
-Includes changes from Chris Bostic <cbostic@linux.vnet.ibm.com>.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- drivers/fsi/fsi-core.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 64 insertions(+), 2 deletions(-)
+ drivers/misc/lkdtm.h       |  1 +
+ drivers/misc/lkdtm_core.c  |  1 +
+ drivers/misc/lkdtm_perms.c | 19 ++++++++++++++++++-
+ 3 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 6e1cfdf..c705ca2 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -17,9 +17,12 @@
- #include <linux/fsi.h>
- #include <linux/idr.h>
- #include <linux/module.h>
-+#include <linux/slab.h>
+diff --git a/drivers/misc/lkdtm.h b/drivers/misc/lkdtm.h
+index 67d27be60405..d1fd5aefa235 100644
+--- a/drivers/misc/lkdtm.h
++++ b/drivers/misc/lkdtm.h
+@@ -39,6 +39,7 @@ void lkdtm_READ_BUDDY_AFTER_FREE(void);
+ void __init lkdtm_perms_init(void);
+ void lkdtm_WRITE_RO(void);
+ void lkdtm_WRITE_RO_AFTER_INIT(void);
++void lkdtm_WRITE_RARE_WRITE(void);
+ void lkdtm_WRITE_KERN(void);
+ void lkdtm_EXEC_DATA(void);
+ void lkdtm_EXEC_STACK(void);
+diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
+index b9a4cd4a9b68..ac8a55947189 100644
+--- a/drivers/misc/lkdtm_core.c
++++ b/drivers/misc/lkdtm_core.c
+@@ -219,6 +219,7 @@ struct crashtype crashtypes[] = {
+ 	CRASHTYPE(ACCESS_USERSPACE),
+ 	CRASHTYPE(WRITE_RO),
+ 	CRASHTYPE(WRITE_RO_AFTER_INIT),
++	CRASHTYPE(WRITE_RARE_WRITE),
+ 	CRASHTYPE(WRITE_KERN),
+ 	CRASHTYPE(REFCOUNT_SATURATE_INC),
+ 	CRASHTYPE(REFCOUNT_SATURATE_ADD),
+diff --git a/drivers/misc/lkdtm_perms.c b/drivers/misc/lkdtm_perms.c
+index c7635a79341f..8fbadfa4cc34 100644
+--- a/drivers/misc/lkdtm_perms.c
++++ b/drivers/misc/lkdtm_perms.c
+@@ -20,12 +20,15 @@
+ /* This is non-const, so it will end up in the .data section. */
+ static u8 data_area[EXEC_SIZE];
  
- #include "fsi-master.h"
+-/* This is cost, so it will end up in the .rodata section. */
++/* This is const, so it will end up in the .rodata section. */
+ static const unsigned long rodata = 0xAA55AA55;
  
-+#define FSI_SLAVE_SIZE_23b		0x800000
+ /* This is marked __ro_after_init, so it should ultimately be .rodata. */
+ static unsigned long ro_after_init __ro_after_init = 0x55AA5500;
+ 
++/* This is marked __wr_rare, so it should ultimately be .rodata. */
++static unsigned long wr_rare __wr_rare = 0xAA66AA66;
 +
- static DEFINE_IDA(master_ida);
- 
- struct fsi_slave {
-@@ -114,11 +117,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
+ /*
+  * This just returns to the caller. It is designed to be copied into
+  * non-executable memory regions.
+@@ -103,6 +106,20 @@ void lkdtm_WRITE_RO_AFTER_INIT(void)
+ 	*ptr ^= 0xabcd1234;
  }
  
-+static void fsi_slave_release(struct device *dev)
++void lkdtm_WRITE_RARE_WRITE(void)
 +{
-+	struct fsi_slave *slave = to_fsi_slave(dev);
++	/* Explicitly cast away "const" for the test. */
++	unsigned long *ptr = (unsigned long *)&wr_rare;
 +
-+	kfree(slave);
++	pr_info("attempting good rare write at %p\n", ptr);
++	rare_write(*ptr, 0x11335577);
++	if (wr_rare != 0x11335577)
++		pr_warn("Yikes: wr_rare did not actually change!\n");
++
++	pr_info("attempting bad rare write at %p\n", ptr);
++	*ptr ^= 0xbcd12345;
 +}
 +
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ void lkdtm_WRITE_KERN(void)
  {
--	/* todo: initialise slave device, perform engine scan */
-+	struct fsi_slave *slave;
-+	uint32_t chip_id;
-+	uint8_t crc;
-+	int rc;
-+
-+	/* Currently, we only support single slaves on a link, and use the
-+	 * full 23-bit address range
-+	 */
-+	if (id != 0)
-+		return -EINVAL;
-+
-+	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
-+	if (rc) {
-+		dev_warn(&master->dev, "can't read slave %02x:%02x %d\n",
-+				link, id, rc);
-+		return -ENODEV;
-+	}
-+	chip_id = be32_to_cpu(chip_id);
-+
-+	crc = fsi_crc4(0, chip_id, 32);
-+	if (crc) {
-+		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
-+				link, id);
-+		return -EIO;
-+	}
-+
-+	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
-+			chip_id, master->idx, link, id);
-+
-+	/* We can communicate with a slave; create the slave device and
-+	 * register.
-+	 */
-+	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
-+	if (!slave)
-+		return -ENOMEM;
-+
-+	slave->master = master;
-+	slave->dev.parent = &master->dev;
-+	slave->dev.release = fsi_slave_release;
-+	slave->link = link;
-+	slave->id = id;
-+	slave->size = FSI_SLAVE_SIZE_23b;
-+
-+	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
-+	rc = device_register(&slave->dev);
-+	if (rc < 0) {
-+		dev_warn(&master->dev, "failed to create slave device: %d\n",
-+				rc);
-+		put_device(&slave->dev);
-+		return rc;
-+	}
-+
-+	/* todo: perform engine scan */
- 
--	return -ENODEV;
-+	return rc;
- }
- 
- /* FSI master support */
+ 	size_t size;
 -- 
-1.8.2.2
+2.7.4
