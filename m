@@ -1,118 +1,147 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Mar 2017 16:48:22 +0200
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <CAMj-D2BT3ByY-iFrRVVK7y=G7zhRBtM031VgLn6JzwUE-WCdWQ@mail.gmail.com>
-References: <58D17AF0.2010802@arm.com> <20170321193933.GB31111@cbox>
- <58DA3F68.6090901@arm.com> <20170328112328.GA31156@cbox>
- <20170328115413.GJ23682@e104320-lin>
- <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com>
- <58DA67BA.8070404@arm.com>
- <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
- <20170329103658.GQ23682@e104320-lin>
- <CAMj-D2BT3ByY-iFrRVVK7y=G7zhRBtM031VgLn6JzwUE-WCdWQ@mail.gmail.com>
-Message-ID: <20170329144822.GA1020@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Mar 2017 15:34:12 +0100
+Subject: [PATCH v7 1/7] clocksource/drivers/clksrc-evt-probe: Describe
+ with the DT both the clocksource and the clockevent
+In-Reply-To: <20170329134134.GJ2123@mai>
+References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+ <1490197714-25415-2-git-send-email-al.kochet@gmail.com>
+ <20170329015146.ey5rlptzsnnynpnt@rob-hp-laptop>
+ <20170329092210.GH2123@mai> <20170329104911.GC23442@leverpostej>
+ <20170329123638.GI2123@mai> <20170329125713.GH23442@leverpostej>
+ <20170329134134.GJ2123@mai>
+Message-ID: <20170329143411.GL23442@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 10:36:51PM +0800, gengdongjiu wrote:
-> Hi Achin,
->   Thanks for your mail and  answer.
-> 
-> 2017-03-29 18:36 GMT+08:00, Achin Gupta <achin.gupta@arm.com>:
-> > Hi gengdongjiu,
-> >
-> > On Wed, Mar 29, 2017 at 05:36:37PM +0800, gengdongjiu wrote:
-> >>
-> >> Hi Laszlo/Biesheuvel/Qemu developer,
-> >>
-> >>    Now I encounter a issue and want to consult with you in ARM64 platform?
-> >> as described below:
-> >>
-> >>    when guest OS happen synchronous or asynchronous abort, kvm needs to
-> >> send the error address to Qemu or UEFI through sigbus to dynamically
-> >> generate APEI table. from my investigation, there are two ways:
-> >>
-> >>    (1) Qemu get the error address, and generate the APEI table, then
-> >> notify UEFI to know this generation, then inject abort error to guest OS,
-> >> guest OS read the APEI table.
-> >>    (2) Qemu get the error address, and let UEFI to generate the APEI
-> >> table, then inject abort error to guest OS, guest OS read the APEI table.
-> 
-> The description may be not precise, I update it
-> 
->    (1) Qemu get the error address, and generate the CPER table, then
-> notify guest UEFI to place this CPER table to Guest OS memory, then
-> Qemu let KVM inject abort error to guest OS, guest OS read the CPER
-> table.
-> 
->  (2) Qemu get the error address, and let guest UEFI to directly
-> generate the CPER
-> table and place this table to the guest OS memory, not let Qemu gerate
-> it. then KVM inject abort error to guest OS, guest OS read the CPER
-> table.
-> 
+On Wed, Mar 29, 2017 at 03:41:34PM +0200, Daniel Lezcano wrote:
+> On Wed, Mar 29, 2017 at 01:57:14PM +0100, Mark Rutland wrote:
+> > On Wed, Mar 29, 2017 at 02:36:38PM +0200, Daniel Lezcano wrote:
 
-I don't understand how you are going to notify the guest UEFI instance
-of anything or run the guest UEFI instance without going through the
-guest kernel.
-
-AFAIU, the guest UEFI instance is just a blob of software running at EL1
-together with the guest kernel, and you're notification mechanism from
-QEMU to the VM is pretty much limited to injecting a virtual interrupt
-(of some kind) which is initially handled by the guest kernel.
-
-> >
-> > Just being pedantic! I don't think we are talking about creating the APEI
-> > table
-> > dynamically here. The issue is: Once KVM has received an error that is
-> > destined
-> > for a guest it will raise a SIGBUS to Qemu. Now before Qemu can inject the
-> > error
-> > into the guest OS, a CPER (Common Platform Error Record) has to be
-> > generated
-> > corresponding to the error source (GHES corresponding to memory subsystem,
-> > processor etc) to allow the guest OS to do anything meaningful with the
-> > error. So who should create the CPER is the question.
-> >
-> > At the EL3/EL2 interface (Secure Firmware and OS/Hypervisor), an error
-> > arrives
-> > at EL3 and secure firmware (at EL3 or a lower secure exception level) is
-> > responsible for creating the CPER. ARM is experimenting with using a
-> > Standalone
-> > MM EDK2 image in the secure world to do the CPER creation. This will avoid
-> > adding the same code in ARM TF in EL3 (better for security). The error will
-> > then
-> > be injected into the OS/Hypervisor (through SEA/SEI/SDEI) through ARM
-> > Trusted
-> > Firmware.
-> >
-> > Qemu is essentially fulfilling the role of secure firmware at the EL2/EL1
-> > interface (as discussed with Christoffer below). So it should generate the
-> > CPER
-> > before injecting the error.
-> >
-> > This is corresponds to (1) above apart from notifying UEFI (I am assuming
-> > you
-> > mean guest UEFI). At this time, the guest OS already knows where to pick up
-> > the
-> > CPER from through the HEST. Qemu has to create the CPER and populate its
-> > address
-> > at the address exported in the HEST. Guest UEFI should not be involved in
-> > this
-> > flow. Its job was to create the HEST at boot and that has been done by this
-> > stage.
+> > > arch/arc/boot/dts/abilis_tb10x.dtsi:
+> > > 
+> > >         /* TIMER0 with interrupt for clockevent */
+> > >         timer0 {
+> > >                 compatible = "snps,arc-timer";
+> > >                 interrupts = <3>;
+> > >                 interrupt-parent = <&intc>;
+> > >                 clocks = <&cpu_clk>;
+> > >         };
+> > > 
+> > >         /* TIMER1 for free running clocksource */
+> > >         timer1 {
+> > >                 compatible = "snps,arc-timer";
+> > >                 clocks = <&cpu_clk>;
+> > >         };
+> > > 
+> > > drivers/clocksource/arc_timer.c:
+> > > 
+> > > static int __init arc_of_timer_init(struct device_node *np)
+> > > {
+> > >         static int init_count = 0;
+> > >         int ret;
+> > > 
+> > >         if (!init_count) {
+> > >                 init_count = 1;
+> > >                 ret = arc_clockevent_setup(np);
+> > >         } else {
+> > >                 ret = arc_cs_setup_timer1(np);
+> > >         }
+> > > 
+> > >         return ret;
+> > > }
+> > > 
+> > > So the purpose of these changes is to provide a stronger timer declaration in
+> > > order to clearly split in the kernel a clocksource and a clockevent
+> > > initialization.
+> > 
+> > I agree that this pattern is not nice. However, I think that splitting
+> > devices as this level makes the problem *worse*.
+> > 
+> > Users care that they have a clocksource and a clockevent device. They
+> > do not care *which* particular device is used as either. The comments in
+> > the DT above are at best misleading.
 > 
->  Sorry,  As I understand it, after Qemu generate the CPER table, it
-> should pass the CPER table to the guest UEFI, then Guest UEFI  place
-> this CPER table to the guest OS memory. In this flow, the Guest UEFI
-> should be involved, else the Guest OS can not see the CPER table.
+> Agree.
 > 
+> And the driver is assuming the first node is the clockevent and the second one
+> is the clocksource. If the DT invert these nodes, that breaks the driver.
 
-I think you need to explain the "pass the CPER table to the guest UEFI"
-concept in terms of what really happens, step by step, and when you say
-"then Guest UEFI place the CPER table to the guest OS memory", I'm
-curious who is running what code on the hardware when doing that.
+Sure, but that is something we can and should fix within Linux.
 
+> > What we need is for the kernel to understand that devices can be both
+> > clockevent and clocksource (perhaps mutually exclusively), such that the
+> > kernel can decide how to make use of devices.
+> > 
+> > That way, for the above the kernel can figure out that timer0 could be
+> > used as clocksource or clockevent, while timer1 can only be used as a
+> > clocksource due to the lack of an interrupt. Thus, it can choose to use
+> > timer0 as a clockevent, and timer1 and a clocksource.
+> 
+> Well, 'interrupt' gives an indication the timer can be used as a clockevent and
+> clocksource, not the clockevent only.
+
+Which is exactly what I said above, when I said:
+
+	the kernel can figure out that timer0 could be used as
+	clocksource or clockevent
+
+Considering both timer0 and timer1 is how we can figure out timer0 must
+be the clockevent, since timer1 cannot be.
+
+> If we take the case of the rockchip, the arm_arch_timer clocksource is stopped
+> when the CPU is clock gated. So specifically, we don't want to use this
+> clocksource but we want to use the arch clockevents because they are better.
+
+Sure. As I pointed out, we want to consider the holistic details to make
+the right decision. i.e. the infrastructure should make the choice, not
+the individual drivers.
+
+Consider that the kernel may need to make decisions that differ it a
+kernel is built wihout certain drivers. That cannot work if the use is
+allocated in the DT.
+
+[...]
+
+> > > 2. A node can have a clockevent and|or a clocksource attributes
+> > 
+> > As above, this should not be in the DT given it's describing a
+> > (Linux-specific) SW policy and not a HW detail.
+> > 
+> > So I must disagree with this.
+> 
+> IIUC my discussion with Rob, an attribute is acceptable (btw if
+> 'clocksource'|'clockevent' names are too Linux specific (+1), what
+> about a more generic name like 'tick' and 'time' ?).
+
+The *meaning* of these is Linux specific. The naming is irrelevant.
+
+> > > 3. The timer_probe pass a flag to the driver's init function, so this one knows
+> > >    if it should invoke the clockevent/clocksource init functions.
+> > >    No attribute defaults to clocksource|clockevent.
+> > > 
+> > > That would be backward compatible and will let to create drivers with clutch
+> > > activated device via DT. Also, it will give the opportunity to the existing
+> > > drivers to change consolidate their initialization routines.
+> > 
+> > I think that if anything, we need a combined clocksource+clockevent
+> > device that we register to the core code. That means all
+> > clocksource/clockevent drivers have a consolidated routine.
+> > 
+> > Subsequently, core code should determine how specifically to use the
+> > device (e.g. based on what other devices are registered, and their
+> > capabilities).
+> 
+> IMO, the core code is complex enough and that may imply more heuristics.
+
+Given that the majority of cases are going to be multiple instances of
+the same IP, I cannot imagine it is complex to get something that works.
+
+A generally optimal configuration may require some heuristics, but
+that's a different matter to a correct and functional configuration.
+
+I must disagree with trying to push that complexity into the DT by means
+of static SW policy, rather than solving the problem in SW where we have
+all the information to do so.
 
 Thanks,
--Christoffer
+Mark.
