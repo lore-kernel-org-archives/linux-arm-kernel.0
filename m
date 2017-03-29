@@ -1,61 +1,85 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 29 Mar 2017 21:40:20 +0200
-Subject: [PATCH v2 1/2] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170329193607.GA24737@gandalf>
-References: <20170327180208.13414-1-gmbnomis@gmail.com>
- <20170327181949.isafnqsnxkzed5nv@pengutronix.de>
- <20170329193607.GA24737@gandalf>
-Message-ID: <20170329214020.3e4112e5@bbrezillon>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 30 Mar 2017 03:46:02 +0800
+Subject: [PATCH v3 00/11] Initial Allwinner Display Engine 2.0 Support
+Message-ID: <20170329194613.55548-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Mar 2017 21:36:08 +0200
-Simon Baatz <gmbnomis@gmail.com> wrote:
+This patchset is the initial patchset for Allwinner DE2 support.
 
-> Hello Uwe,
-> 
-> On Mon, Mar 27, 2017 at 08:19:49PM +0200, Uwe Kleine-K?nig wrote:
-> > Hello,
-> >   
-> > > @@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
-> > >  	if (board->dev_ready)
-> > >  		nc->dev_ready = board->dev_ready;
-> > >  
-> > > -	platform_set_drvdata(pdev, mtd);
-> > > +	platform_set_drvdata(pdev, info);
-> > >  
-> > >  	/* Not all platforms can gate the clock, so it is not
-> > >  	   an error if the clock does not exists. */
-> > > -	clk = clk_get(&pdev->dev, NULL);
-> > > -	if (!IS_ERR(clk)) {
-> > > -		clk_prepare_enable(clk);
-> > > -		clk_put(clk);
-> > > -	}
-> > > +	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > > +	if (!IS_ERR(info->clk))
-> > > +		clk_prepare_enable(info->clk);  
-> > 
-> > you could to the following here instead:
-> > 
-> > 	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > 	if (IS_ERR(info->clk))
-> > 		/*
-> > 		 * We ignore all errors here, that's wrong but only for
-> > 		 * one commit.
-> > 		 */
-> > 		info->clk = NULL;
-> > 
-> > 	ret = clk_prepare_enable(info->clk);
-> > 	if (ret) ...
-> >   
-> 
-> Makes sense.  I don't think we should have such a comment, though. 
-> The patch description states what it fixes and the patch fixes
-> exactly that.  Moreover, I tagged this patch for stable (because of
-> the double free it fixes) and there might be no other commit.  (I
-> think the error handling problem is not severe enough for stable.  It
-> has been this way a couple of years and nobody seems to have
-> noticed.)
+It contains the support of clocks in DE2 and the mixers in DE2.
 
-No need to resend a new version, I'm fine with this one (actually I
-already applied it and am about to push it on nand/next).
+The SoC used to develop this patchset is V3s, as V3s is the simplest
+one of the SoCs that have DE2.
+(Allwinner V3s features only one mixer, although its clock control
+unit contains support for second mixer's clock; and its only video
+output is RGB LCD, which is already supported in our TCON driver)
+
+The last patch is only a testing patch, it shouldn't be merged; and
+for the patch to be really usable, the RFC fix of the TCON driver [1]
+is needed.
+
+No HDMI, TV encoder or other internal bridges' support is included
+in this patchset, which makes it currently not usable on H3.
+
+Thanks to Jean-Francois Moine and Jernej Skrabec for their efforts
+to discover the internal of DE2!
+
+[1] https://lists.freedesktop.org/archives/dri-devel/2016-December/126264.html
+
+Icenowy Zheng (11):
+  dt-bindings: add binding for the Allwinner DE2 CCU
+  clk: sunxi-ng: add support for DE2 CCU
+  dt-bindings: add bindings for DE2 on V3s SoC
+  drm/sun4i: abstruct the layer type
+  drm/sun4i: abstract a mixer type
+  drm/sun4i: add support for Allwinner DE2 mixers
+  drm/sun4i: Add compatible string for V3s display engine
+  drm/sun4i: tcon: add support for V3s TCON
+  ARM: dts: sun8i: add DE2 nodes for V3s SoC
+  ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
+  [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of Lichee Pi Zero
+
+ .../devicetree/bindings/clock/sun8i-de2.txt        |  31 ++
+ .../bindings/display/sunxi/sun4i-drm.txt           |  37 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |  36 ++
+ arch/arm/boot/dts/sun8i-v3s.dtsi                   |  96 +++++
+ drivers/clk/sunxi-ng/Kconfig                       |   5 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 204 +++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h               |  28 ++
+ drivers/gpu/drm/sun4i/Kconfig                      |  20 ++
+ drivers/gpu/drm/sun4i/Makefile                     |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c              |  26 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.h              |   5 -
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 |  31 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.h                 |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   4 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c                |  22 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |   6 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |   7 +-
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   |   8 +-
+ drivers/gpu/drm/sun4i/sun8i_layer.c                | 156 +++++++++
+ drivers/gpu/drm/sun4i/sun8i_layer.h                |  35 ++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                | 386 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                | 131 +++++++
+ drivers/gpu/drm/sun4i/sunxi_layer.h                |  17 +
+ drivers/gpu/drm/sun4i/sunxi_mixer.h                |  22 ++
+ include/dt-bindings/clock/sun8i-de2.h              |  54 +++
+ include/dt-bindings/reset/sun8i-de2.h              |  50 +++
+ 28 files changed, 1391 insertions(+), 50 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sunxi_layer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sunxi_mixer.h
+ create mode 100644 include/dt-bindings/clock/sun8i-de2.h
+ create mode 100644 include/dt-bindings/reset/sun8i-de2.h
+
+-- 
+2.12.0
