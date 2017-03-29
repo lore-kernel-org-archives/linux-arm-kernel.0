@@ -1,31 +1,22 @@
-From: haimdaniel@gmail.com (Haim Daniel)
-Date: Wed, 29 Mar 2017 10:58:56 +0300
-Subject: [PATCH v3] staging: vc04_services: add parenthesis to macros
-In-Reply-To: <20170329073849.GB17585@kroah.com>
-References: <20170329073849.GB17585@kroah.com>
-Message-ID: <1490774336-7781-1-git-send-email-haimdaniel@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 29 Mar 2017 10:04:17 +0200
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add IMR-L[S]X3 clocks
+In-Reply-To: <a802018c-9943-22e5-0f78-28b8ab9689d9@cogentembedded.com>
+References: <20170321200443.078095898@cogentembedded.com>
+ <34050114-752a-08b6-700e-697e78102af7@cogentembedded.com>
+ <a802018c-9943-22e5-0f78-28b8ab9689d9@cogentembedded.com>
+Message-ID: <20170329080417.GD6512@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vchi_cfg.h: fix checkpatch ERROR: Macros with complex values should be enclosed in parenthesis
+On Tue, Mar 21, 2017 at 11:14:43PM +0300, Sergei Shtylyov wrote:
+> On 03/21/2017 11:08 PM, Sergei Shtylyov wrote:
+> 
+> >Still not cover letter but I think it's better now, so I won't retry...
+> >The patches are against Simon Horman's 'renesas.git' repo,
+> >'renesas-devel-20170321-v4.11-rc3' tag.
+> 
+>    The patches depend on the IMR driver patches adding the IMR-L[S]X3
+> support for the "compatible" values.
 
-Signed-off-by: Haim Daniel <haimdaniel@gmail.com>
----
- drivers/staging/vc04_services/interface/vchi/vchi_cfg.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_cfg.h b/drivers/staging/vc04_services/interface/vchi/vchi_cfg.h
-index 26bc2d3..b6f42b8 100644
---- a/drivers/staging/vc04_services/interface/vchi/vchi_cfg.h
-+++ b/drivers/staging/vc04_services/interface/vchi/vchi_cfg.h
-@@ -173,7 +173,7 @@
-  * under the carpet. */
- #if VCHI_RX_MSG_QUEUE_SIZE < (VCHI_MAX_MSG_SIZE/16 + 1) * VCHI_NUM_READ_SLOTS
- #  undef VCHI_RX_MSG_QUEUE_SIZE
--#  define VCHI_RX_MSG_QUEUE_SIZE (VCHI_MAX_MSG_SIZE/16 + 1) * VCHI_NUM_READ_SLOTS
-+#  define VCHI_RX_MSG_QUEUE_SIZE ((VCHI_MAX_MSG_SIZE/16 + 1) * VCHI_NUM_READ_SLOTS)
- #endif
- 
- /* How many bulk transmits can we have pending. Once exhausted, vchi_bulk_queue_transmit
--- 
-1.9.1
+I have marked these patches as deferred accordingly.
