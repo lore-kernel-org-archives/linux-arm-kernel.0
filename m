@@ -1,103 +1,195 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Wed, 29 Mar 2017 17:37:49 +0200
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <20170329144822.GA1020@cbox>
-References: <58D17AF0.2010802@arm.com> <20170321193933.GB31111@cbox>
- <58DA3F68.6090901@arm.com> <20170328112328.GA31156@cbox>
- <20170328115413.GJ23682@e104320-lin>
- <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
- <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
- <20170329103658.GQ23682@e104320-lin>
- <CAMj-D2BT3ByY-iFrRVVK7y=G7zhRBtM031VgLn6JzwUE-WCdWQ@mail.gmail.com>
- <20170329144822.GA1020@cbox>
-Message-ID: <fa712d47-4f77-7710-c4f7-cd7eab9fed9e@redhat.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 29 Mar 2017 09:41:15 -0600
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <20170329030735.GA23889@leoy-linaro>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
+ <20170329030735.GA23889@leoy-linaro>
+Message-ID: <20170329154115.GA24889@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/17 16:48, Christoffer Dall wrote:
-> On Wed, Mar 29, 2017 at 10:36:51PM +0800, gengdongjiu wrote:
->> 2017-03-29 18:36 GMT+08:00, Achin Gupta <achin.gupta@arm.com>:
-
->>> Qemu is essentially fulfilling the role of secure firmware at the
->>> EL2/EL1 interface (as discussed with Christoffer below). So it
->>> should generate the CPER before injecting the error.
->>>
->>> This is corresponds to (1) above apart from notifying UEFI (I am
->>> assuming you mean guest UEFI). At this time, the guest OS already
->>> knows where to pick up the CPER from through the HEST. Qemu has
->>> to create the CPER and populate its address at the address
->>> exported in the HEST. Guest UEFI should not be involved in this 
->>> flow. Its job was to create the HEST at boot and that has been
->>> done by this stage.
->>
->> Sorry,  As I understand it, after Qemu generate the CPER table, it
->> should pass the CPER table to the guest UEFI, then Guest UEFI  place
->> this CPER table to the guest OS memory. In this flow, the Guest UEFI
->> should be involved, else the Guest OS can not see the CPER table.
->>
+On Wed, Mar 29, 2017 at 11:07:35AM +0800, Leo Yan wrote:
+> Hi Suzuki,
 > 
-> I think you need to explain the "pass the CPER table to the guest UEFI"
-> concept in terms of what really happens, step by step, and when you say
-> "then Guest UEFI place the CPER table to the guest OS memory", I'm
-> curious who is running what code on the hardware when doing that.
+> On Mon, Mar 27, 2017 at 05:34:57PM +0100, Suzuki K Poulose wrote:
+> > On 25/03/17 18:23, Leo Yan wrote:
+> 
+> [...]
+> 
+> > Leo,
+> > 
+> > Thanks a lot for the quick rework. I don't fully understand (yet!) why we need the
+> > idle_constraint. I will leave it for Sudeep to comment on it, as he is the expert
+> > in that area. Some minor comments below.
+> 
+> Thanks a lot for quick reviewing :)
+> 
+> > >Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > >---
+> > > drivers/hwtracing/coresight/Kconfig               |  11 +
+> > > drivers/hwtracing/coresight/Makefile              |   1 +
+> > > drivers/hwtracing/coresight/coresight-cpu-debug.c | 704 ++++++++++++++++++++++
+> > > 3 files changed, 716 insertions(+)
+> > > create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+> > >
+> > >diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> > >index 130cb21..18d7931 100644
+> > >--- a/drivers/hwtracing/coresight/Kconfig
+> > >+++ b/drivers/hwtracing/coresight/Kconfig
+> > >@@ -89,4 +89,15 @@ config CORESIGHT_STM
+> > > 	  logging useful software events or data coming from various entities
+> > > 	  in the system, possibly running different OSs
+> > >
+> > >+config CORESIGHT_CPU_DEBUG
+> > >+	tristate "CoreSight CPU Debug driver"
+> > >+	depends on ARM || ARM64
+> > >+	depends on DEBUG_FS
+> > >+	help
+> > >+	  This driver provides support for coresight debugging module. This
+> > >+	  is primarily used to dump sample-based profiling registers when
+> > >+	  system triggers panic, the driver will parse context registers so
+> > >+	  can quickly get to know program counter (PC), secure state,
+> > >+	  exception level, etc.
+> > 
+> > May be we should mention/warn the user about the possible caveats of using
+> > this feature to help him make a better decision ? And / Or we should add a documentation
+> > for it. We have collected some real good information over the discussions and
+> > it is a good idea to capture it somewhere.
+> 
+> Sure, I will add a documentation for this.
+> 
+> [...]
+> 
+> > >+static struct pm_qos_request debug_qos_req;
+> > >+static int idle_constraint = PM_QOS_DEFAULT_VALUE;
+> > >+module_param(idle_constraint, int, 0600);
+> > >+MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
+> > >+		 "idle states (default is -1, which means have no limiation "
+> > >+		 "to CPU idle states; 0 means disabling all idle states; user "
+> > >+		 "can choose other platform dependent values so can disable "
+> > >+		 "specific idle states for the platform)");
+> > 
+> > Correct me if I am wrong,
+> > 
+> > All we want to do is disable the CPUIdle explicitly if the user knows that this
+> > could be a problem to use CPU debug on his platform. So, in effect, we should
+> > only be using idle_constraint = 0 or -1.
+> > 
+> > In which case, we could make it easier for the user to tell us, either
+> > 
+> >  0 - Don't do anything with CPUIdle (default)
+> >  1 - Disable CPUIdle for me as I know the platform has issues with CPU debug and CPUidle.
+> 
+> The reason for not using bool flag is: usually SoC may have many idle
+> states, so if user wants to partially enable some states then can set
+> the latency to constraint.
+> 
+> But of course, we can change this to binary value as you suggested,
+> this means turn on of turn off all states. The only one reason to use
+> latency value is it is more friendly for hardware design, e.g. some
+> platforms can enable partial states to save power and avoid overheat
+> after using this driver.
+> 
+> If you guys think this is a bit over design, I will follow up your
+> suggestion. I also have some replying in Mathieu's reviewing, please
+> help review as well.
+> 
+> > than explaining the miscrosecond latency etc and make the appropriate calls underneath.
+> > something like (not necessarily the same name) :
+> > 
+> > module_param(broken_with_cpuidle, bool, 0600);
+> > MODULE_PARAM_DESC(broken_with_cpuidle, "Specifies whether the CPU debug has issues with CPUIdle on"
+> > 				       " the platform. Non-zero value implies CPUIdle has to be"
+> > 				       " explicitly disabled.",);
+> 
+> [...]
+> 
+> > >+	/*
+> > >+	 * Unfortunately the CPU cannot be powered up, so return
+> > >+	 * back and later has no permission to access other
+> > >+	 * registers. For this case, should set 'idle_constraint'
+> > >+	 * to ensure CPU power domain is enabled!
+> > >+	 */
+> > >+	if (!(drvdata->edprsr & EDPRSR_PU)) {
+> > >+		pr_err("%s: power up request for CPU%d failed\n",
+> > >+			__func__, drvdata->cpu);
+> > >+		goto out;
+> > >+	}
+> > >+
+> > >+out_powered_up:
+> > >+	debug_os_unlock(drvdata);
+> > 
+> > Question: Do we need a matching debug_os_lock() once we are done ?
+> 
+> I have checked ARM ARMv8, but there have no detailed description for
+> this. I refered coresight-etmv4 code and Mike's pseudo code, ther have
+> no debug_os_lock() related operations.
+> 
+> Mike, Mathieu, could you also help confirm this?
 
-I strongly suggest to keep the guest firmware's runtime involvement to
-zero. Two reasons:
+I'm not strongly opiniated on the usage of the OS lock, hence being a little
+nonchalent in the coresight-etmv4 driver.   
 
-(1) As you explained above (... which I conveniently snipped), when you
-inject an interrupt to the guest, the handler registered for that
-interrupt will come from the guest kernel.
-
-The only exception to this is when the platform provides a type of
-interrupt whose handler can be registered and then locked down by the
-firmware. On x86, this is the SMI.
-
-In practice though,
-- in OVMF (x86), we only do synchronous (software-initiated) SMIs (for
-privileged UEFI varstore access),
-- and in ArmVirtQemu (ARM / aarch64), none of the management mode stuff
-exists at all.
-
-I understand that the Platform Init 1.5 (or 1.6?) spec abstracted away
-the MM (management mode) protocols from Intel SMM, but at this point
-there is zero code in ArmVirtQemu for that. (And I'm unsure how much of
-any eligible underlying hw emulation exists in QEMU.)
-
-So you can't get the guest firmware to react to the injected interrupt
-without the guest OS coming between first.
-
-(2) Achin's description matches really-really closely what is possible,
-and what should be done with QEMU, ArmVirtQemu, and the guest kernel.
-
-In any solution for this feature, the firmware has to reserve some
-memory from the OS at boot. The current facilities we have enable this.
-As I described previously, the ACPI linker/loader actions can be mapped
-more or less 1:1 to Achin's design. From a practical perspective, you
-really want to keep the guest firmware as dumb as possible (meaning: as
-generic as possible), and keep the ACPI specifics to the QEMU and the
-guest kernel sides.
-
-The error serialization actions -- the co-operation between guest kernel
-and QEMU on the special memory areas -- that were mentioned earlier by
-Michael and Punit look like a complication. But, IMO, they don't differ
-from any other device emulation -- DMA actions in particular -- that
-QEMU already does. Device models are what QEMU *does*. Read the command
-block that the guest driver placed in guest memory, parse it, sanity
-check it, verify it, execute it, write back the status code, inject an
-interrupt (and/or let any polling guest driver notice it "soon after" --
-use barriers as necessary).
-
-Thus, I suggest to rely on the generic ACPI linker/loader interface
-(between QEMU and guest firmware) *only* to make the firmware lay out
-stuff (= reserve buffers, set up pointers, install QEMU's ACPI tables)
-*at boot*. Then, at runtime, let the guest kernel and QEMU (the "device
-model") talk to each other directly. Keep runtime firmware involvement
-to zero.
-
-You *really* don't want to debug three components at runtime, when you
-can solve the thing with two. (Two components whose build systems won't
-drive you mad, I should add.)
-
-IMO, Achin's design nailed it. We can do that.
-
-Laszlo
+> 
+> [...]
+> 
+> > >+static void debug_init_arch_data(void *info)
+> > >+{
+> > >+	struct debug_drvdata *drvdata = info;
+> > >+	u32 mode, pcsr_offset;
+> > >+
+> > >+	CS_UNLOCK(drvdata->base);
+> > >+
+> > >+	debug_os_unlock(drvdata);
+> > >+
+> > >+	/* Read device info */
+> > >+	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
+> > >+	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
+> > 
+> > As mentioned above, both of these registers are only need at init time to
+> > figure out the flags we set here. So we could remove them.
+> > 
+> > >+
+> > >+	CS_LOCK(drvdata->base);
+> > >+
+> > >+	/* Parse implementation feature */
+> > >+	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
+> > >+	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
+> > 
+> > 
+> > >+
+> > >+	if (mode == EDDEVID_IMPL_NONE) {
+> > >+		drvdata->edpcsr_present  = false;
+> > >+		drvdata->edcidsr_present = false;
+> > >+		drvdata->edvidsr_present = false;
+> > >+	} else if (mode == EDDEVID_IMPL_EDPCSR) {
+> > >+		drvdata->edpcsr_present  = true;
+> > >+		drvdata->edcidsr_present = false;
+> > >+		drvdata->edvidsr_present = false;
+> > >+	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+> > >+		if (!IS_ENABLED(CONFIG_64BIT) &&
+> > >+			(pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
+> > >+			drvdata->edpcsr_present = false;
+> > >+		else
+> > >+			drvdata->edpcsr_present = true;
+> > 
+> > Sorry, I forgot why we do this check only in this mode. Shouldn't this be
+> > common to all modes (of course which implies PCSR is present) ?
+> 
+> No. PCSROffset is defined differently in ARMv7 and ARMv8; So finally we
+> simplize PCSROffset value :
+> 0000 - Sample offset applies based on the instruction state (indicated by PCSR[0])
+> 0001 - No offset applies.
+> 0010 - No offset applies, but do not use in AArch32 mode!
+> 
+> So we need handle the corner case is when CPU runs AArch32 mode and
+> PCSRoffset = 'b0010. Other cases the pcsr should be present.
+> 
+> [...]
+> 
+> Other suggestions are good for me, will take them in next version.
+> 
+> Thanks,
+> Leo Yan
