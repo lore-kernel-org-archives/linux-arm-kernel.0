@@ -1,77 +1,44 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Mar 2017 19:04:27 -0400
-Subject: [PATCH V6 5/5] PCI/ASPM: move link_state cleanup to bridge remove
-In-Reply-To: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
-References: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490828667-30973-6-git-send-email-okaya@codeaurora.org>
+Date: Wed, 29 Mar 2017 19:08:31 -0400
+Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <b0327163-2500-1541-6c23-454e3f28b6ea@codeaurora.org>
+References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
+ <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
+ <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
+ <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
+ <f3e76f8d-16bb-8ec5-da9b-d62ca66dafd6@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675D8C4@IRSMSX101.ger.corp.intel.com>
+ <beb63ced-3e63-c09c-8c2c-5d5b0956d2fc@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675D9B9@IRSMSX101.ger.corp.intel.com>
+ <b0327163-2500-1541-6c23-454e3f28b6ea@codeaurora.org>
+Message-ID: <7b0c887b-cd99-b752-c162-66fc7c864731@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For endpoints, change pcie_aspm_exit_link_state() so it cleans up
-the device's own state and disables ASPM if necessary, but doesn't
-remove the parent's link_state.
+On 3/29/2017 4:36 PM, Sinan Kaya wrote:
+> On 3/29/2017 4:16 PM, Patel, Mayurkumar wrote:
+>> Actually, I have taken same patches of yours which proposed and applied it correctly. Will try it with clean
+>> build if that helps.
+>>
+>> But what I could understand from following patch is https://patchwork.codeaurora.org/patch/207653/ 
+>>
+>> We still have a flow of pci_aspm_init() -> alloc_pcie_link_state() -> pci_function_0()
+>> Where I see the first Kernel NULL pointer crash while accessing pdev->subordinate in pci_function_0() function.
+> 
+> OK. It looks like somebody moved function_0 call around. I was looking at 4.11-rc1.
+> 
+> 3bd7db63a841e8c5297bb18ad801df67d5e38ad2 (PCI/ASPM: Always set link->downstream to avoid NULL dereference on remove)
+> 
+> I see the change in 4.11-rc3 now. 
+> 
+> Let me see what's going on.
+> 
 
-For bridges, change pcie_aspm_exit_link_state() so it frees the
-bridge's own link_state.
+I posted V6 a minute ago with the bugfix. Let me know how that works for you.
 
-Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pcie/aspm.c | 20 +++++++++++++++-----
- drivers/pci/remove.c    |  3 +--
- 2 files changed, 16 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index a38602a..37ca9b3 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -963,6 +963,21 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
- 	if (!parent || !parent->link_state)
- 		return;
- 
-+	if (pdev->has_secondary_link) {
-+		link = pdev->link_state;
-+		down_read(&pci_bus_sem);
-+		mutex_lock(&aspm_lock);
-+
-+		list_del(&link->sibling);
-+		list_del(&link->link);
-+
-+		/* Clock PM is for endpoint device */
-+		free_link_state(link);
-+		mutex_unlock(&aspm_lock);
-+		up_read(&pci_bus_sem);
-+		return;
-+	}
-+
- 	down_read(&pci_bus_sem);
- 	mutex_lock(&aspm_lock);
- 	/*
-@@ -978,11 +993,6 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
- 
- 	/* All functions are removed, so just disable ASPM for the link */
- 	pcie_config_aspm_link(link, 0);
--	list_del(&link->sibling);
--	list_del(&link->link);
--	/* Clock PM is for endpoint device */
--	free_link_state(link);
--
- 	/* Recheck latencies and configure upstream links */
- 	if (parent_link) {
- 		pcie_update_aspm_capable(root);
-diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
-index 73a03d3..7e14ebd 100644
---- a/drivers/pci/remove.c
-+++ b/drivers/pci/remove.c
-@@ -25,8 +25,7 @@ static void pci_stop_dev(struct pci_dev *dev)
- 		dev->is_added = 0;
- 	}
- 
--	if (dev->bus->self)
--		pcie_aspm_exit_link_state(dev);
-+	pcie_aspm_exit_link_state(dev);
- }
- 
- static void pci_destroy_dev(struct pci_dev *dev)
 -- 
-1.9.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
