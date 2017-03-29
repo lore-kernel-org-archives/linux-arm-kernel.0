@@ -1,40 +1,103 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 29 Mar 2017 11:35:52 -0400
-Subject: [PATCH v3 0/5] ATA/ARM: convert ARM/DaVinci to use libata PATA
- drivers
-In-Reply-To: <7423344.GzQhW9fIvG@amdc3058>
-References: <CGME20170322182127epcas1p267b13e8c92205223458863783bdea476@epcas1p2.samsung.com>
- <1490206862-26065-1-git-send-email-b.zolnierkie@samsung.com>
- <aaf669ba-4439-9af7-7943-c9163bd99020@ti.com>
- <7423344.GzQhW9fIvG@amdc3058>
-Message-ID: <20170329153552.GC30385@htj.duckdns.org>
+From: lersek@redhat.com (Laszlo Ersek)
+Date: Wed, 29 Mar 2017 17:37:49 +0200
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <20170329144822.GA1020@cbox>
+References: <58D17AF0.2010802@arm.com> <20170321193933.GB31111@cbox>
+ <58DA3F68.6090901@arm.com> <20170328112328.GA31156@cbox>
+ <20170328115413.GJ23682@e104320-lin>
+ <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
+ <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
+ <20170329103658.GQ23682@e104320-lin>
+ <CAMj-D2BT3ByY-iFrRVVK7y=G7zhRBtM031VgLn6JzwUE-WCdWQ@mail.gmail.com>
+ <20170329144822.GA1020@cbox>
+Message-ID: <fa712d47-4f77-7710-c4f7-cd7eab9fed9e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 04:38:24PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> On Thursday, March 23, 2017 07:27:05 PM Sekhar Nori wrote:
-> > On Wednesday 22 March 2017 11:50 PM, Bartlomiej Zolnierkiewicz wrote:
-> > > Hi,
-> > > 
-> > > This patchset adds Palmchip BK3710 IDE controller driver to
-> > > libata and switches ARM/DaVinci to use it (instead of the old
-> > > IDE driver).
-> > > 
-> > > Sekhar, please check that it still works after changes, thanks.
-> > 
-> > Did some basic mount/read/write tests, it passed.
+On 03/29/17 16:48, Christoffer Dall wrote:
+> On Wed, Mar 29, 2017 at 10:36:51PM +0800, gengdongjiu wrote:
+>> 2017-03-29 18:36 GMT+08:00, Achin Gupta <achin.gupta@arm.com>:
+
+>>> Qemu is essentially fulfilling the role of secure firmware at the
+>>> EL2/EL1 interface (as discussed with Christoffer below). So it
+>>> should generate the CPER before injecting the error.
+>>>
+>>> This is corresponds to (1) above apart from notifying UEFI (I am
+>>> assuming you mean guest UEFI). At this time, the guest OS already
+>>> knows where to pick up the CPER from through the HEST. Qemu has
+>>> to create the CPER and populate its address at the address
+>>> exported in the HEST. Guest UEFI should not be involved in this 
+>>> flow. Its job was to create the HEST at boot and that has been
+>>> done by this stage.
+>>
+>> Sorry,  As I understand it, after Qemu generate the CPER table, it
+>> should pass the CPER table to the guest UEFI, then Guest UEFI  place
+>> this CPER table to the guest OS memory. In this flow, the Guest UEFI
+>> should be involved, else the Guest OS can not see the CPER table.
+>>
 > 
-> Thanks for checking.
-> 
-> I guess that you can merge the patchset now to your tree
-> (with Tejun's ACK for the whole patches and Sergei's ACK
-> for ATA changes).
+> I think you need to explain the "pass the CPER table to the guest UEFI"
+> concept in terms of what really happens, step by step, and when you say
+> "then Guest UEFI place the CPER table to the guest OS memory", I'm
+> curious who is running what code on the hardware when doing that.
 
-Acked-by: Tejun Heo <tj@kernel.org>
+I strongly suggest to keep the guest firmware's runtime involvement to
+zero. Two reasons:
 
-Yeah, please feel free to route the series as you see fit.
+(1) As you explained above (... which I conveniently snipped), when you
+inject an interrupt to the guest, the handler registered for that
+interrupt will come from the guest kernel.
 
-Thanks.
+The only exception to this is when the platform provides a type of
+interrupt whose handler can be registered and then locked down by the
+firmware. On x86, this is the SMI.
 
--- 
-tejun
+In practice though,
+- in OVMF (x86), we only do synchronous (software-initiated) SMIs (for
+privileged UEFI varstore access),
+- and in ArmVirtQemu (ARM / aarch64), none of the management mode stuff
+exists at all.
+
+I understand that the Platform Init 1.5 (or 1.6?) spec abstracted away
+the MM (management mode) protocols from Intel SMM, but at this point
+there is zero code in ArmVirtQemu for that. (And I'm unsure how much of
+any eligible underlying hw emulation exists in QEMU.)
+
+So you can't get the guest firmware to react to the injected interrupt
+without the guest OS coming between first.
+
+(2) Achin's description matches really-really closely what is possible,
+and what should be done with QEMU, ArmVirtQemu, and the guest kernel.
+
+In any solution for this feature, the firmware has to reserve some
+memory from the OS at boot. The current facilities we have enable this.
+As I described previously, the ACPI linker/loader actions can be mapped
+more or less 1:1 to Achin's design. From a practical perspective, you
+really want to keep the guest firmware as dumb as possible (meaning: as
+generic as possible), and keep the ACPI specifics to the QEMU and the
+guest kernel sides.
+
+The error serialization actions -- the co-operation between guest kernel
+and QEMU on the special memory areas -- that were mentioned earlier by
+Michael and Punit look like a complication. But, IMO, they don't differ
+from any other device emulation -- DMA actions in particular -- that
+QEMU already does. Device models are what QEMU *does*. Read the command
+block that the guest driver placed in guest memory, parse it, sanity
+check it, verify it, execute it, write back the status code, inject an
+interrupt (and/or let any polling guest driver notice it "soon after" --
+use barriers as necessary).
+
+Thus, I suggest to rely on the generic ACPI linker/loader interface
+(between QEMU and guest firmware) *only* to make the firmware lay out
+stuff (= reserve buffers, set up pointers, install QEMU's ACPI tables)
+*at boot*. Then, at runtime, let the guest kernel and QEMU (the "device
+model") talk to each other directly. Keep runtime firmware involvement
+to zero.
+
+You *really* don't want to debug three components at runtime, when you
+can solve the thing with two. (Two components whose build systems won't
+drive you mad, I should add.)
+
+IMO, Achin's design nailed it. We can do that.
+
+Laszlo
