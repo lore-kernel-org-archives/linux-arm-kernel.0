@@ -1,74 +1,89 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:43:23 -0500
-Subject: [PATCH v4 06/23] drivers/fsi: Set up links for slave communication
+Date: Wed, 29 Mar 2017 12:43:28 -0500
+Subject: [PATCH v4 11/23] drivers/fsi: Add master unscan
 In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
 References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170329174340.89109-7-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170329174340.89109-12-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Enable each link and send a break command, and try to detect a slave by
-reading from the SMODE register.
+Allow a master to undo a previous scan.  Should a master scan a bus
+twice it will need to ensure it doesn't double register any
+previously detected device.
 
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 37 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
+ drivers/fsi/fsi-core.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 32698ed..6e1cfdf 100644
+index 4da0b030..75d2a88 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -157,12 +157,45 @@ static int fsi_master_write(struct fsi_master *master, int link,
- 	return master->write(master, link, slave_id, addr, val, size);
- }
+@@ -69,6 +69,7 @@ struct fsi_slave {
+ 	uint32_t		size;	/* size of slave address space */
+ };
  
-+static int fsi_master_link_enable(struct fsi_master *master, int link)
-+{
-+	if (master->link_enable)
-+		return master->link_enable(master, link);
-+
-+	return 0;
-+}
-+
-+/*
-+ * Issue a break command on this link
-+ */
-+static int fsi_master_break(struct fsi_master *master, int link)
-+{
-+	if (master->send_break)
-+		return master->send_break(master, link);
-+
-+	return 0;
-+}
-+
- static int fsi_master_scan(struct fsi_master *master)
- {
--	int link;
-+	int link, rc;
-+
-+	for (link = 0; link < master->n_links; link++) {
-+		rc = fsi_master_link_enable(master, link);
-+		if (rc) {
-+			dev_dbg(&master->dev,
-+				"enable link %d failed: %d\n", link, rc);
-+			continue;
-+		}
-+		rc = fsi_master_break(master, link);
-+		if (rc) {
-+			dev_dbg(&master->dev,
-+				"break to link %d failed: %d\n", link, rc);
-+			continue;
-+		}
++#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
  
--	for (link = 0; link < master->n_links; link++)
- 		fsi_slave_init(master, link, 0);
-+	}
- 
+ static int fsi_master_read(struct fsi_master *master, int link,
+@@ -491,6 +492,37 @@ static int fsi_master_scan(struct fsi_master *master)
  	return 0;
  }
+ 
++static int __fsi_slave_remove_device(struct device *dev, void *arg)
++{
++	device_unregister(dev);
++	return 0;
++}
++
++static int __fsi_master_remove_slave(struct device *dev, void *arg)
++{
++	device_for_each_child(dev, NULL, __fsi_slave_remove_device);
++	device_unregister(dev);
++	return 0;
++}
++
++static void fsi_master_unscan(struct fsi_master *master)
++{
++	device_for_each_child(&master->dev, NULL, __fsi_master_remove_slave);
++}
++
++static ssize_t master_rescan_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	struct fsi_master *master = to_fsi_master(dev);
++
++	fsi_master_unscan(master);
++	fsi_master_scan(master);
++
++	return count;
++}
++
++static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
++
+ int fsi_master_register(struct fsi_master *master)
+ {
+ 	int rc;
+@@ -507,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
+ 		return rc;
+ 	}
+ 
++	rc = device_create_file(&master->dev, &dev_attr_rescan);
++	if (rc) {
++		device_unregister(&master->dev);
++		ida_simple_remove(&master_ida, master->idx);
++		return rc;
++	}
++
+ 	fsi_master_scan(master);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(fsi_master_register);
 -- 
 1.8.2.2
