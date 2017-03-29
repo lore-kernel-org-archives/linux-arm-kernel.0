@@ -1,71 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Mar 2017 09:30:23 +0100
-Subject: [kvmtool PATCH v9 06/15] PCI: Only allocate IRQ routing entry
- when available
-In-Reply-To: <20170202163223.15372-7-andre.przywara@arm.com>
-References: <20170202163223.15372-1-andre.przywara@arm.com>
- <20170202163223.15372-7-andre.przywara@arm.com>
-Message-ID: <d26dea9f-386b-316c-a2b3-d42ea1883997@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 29 Mar 2017 10:31:02 +0200
+Subject: [PATCH/RFC v2 1/2] arm64: dts: r8a7795: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <20170329081352.GF6512@verge.net.au>
+References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
+ <1490362665-4422-2-git-send-email-geert+renesas@glider.be>
+ <1612430.SNEha5n02K@avalon> <20170329081352.GF6512@verge.net.au>
+Message-ID: <CAMuHMdWvR71V_JyR6273KmdtGfrrT_vaU2vcDTpNt2MAG0WdLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/17 16:32, Andre Przywara wrote:
-> If we need to inject an MSI into the guest, we rely at the moment on a
-> working GSI MSI routing functionality. However we can get away without
-> IRQ routing, if the host supports MSI injection via the KVM_SIGNAL_MSI
-> ioctl.
-> So we try the GSI routing first, but if that fails due to a missing
-> IRQ routing functionality, we fall back to KVM_SIGNAL_MSI (if that is
-> supported).
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virtio/pci.c | 16 ++++++++++++++--
->  1 file changed, 14 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virtio/pci.c b/virtio/pci.c
-> index 7cc0ba4..98bf6b7 100644
-> --- a/virtio/pci.c
-> +++ b/virtio/pci.c
-> @@ -193,8 +193,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
->  
->  			gsi = irq__add_msix_route(kvm,
->  						  &vpci->msix_table[vec].msg);
-> -			if (gsi >= 0)
-> +			if (gsi >= 0) {
->  				vpci->config_gsi = gsi;
-> +				break;
-> +			}
-> +			if (gsi == -ENXIO &&
-> +			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
-> +					break;
-> +			die("failed to configure MSIs");
->  			break;
->  		case VIRTIO_MSI_QUEUE_VECTOR:
->  			vec = ioport__read16(data);
-> @@ -205,8 +211,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
->  
->  			gsi = irq__add_msix_route(kvm,
->  						  &vpci->msix_table[vec].msg);
-> -			if (gsi < 0)
-> +			if (gsi < 0) {
-> +				if (gsi == -ENXIO &&
-> +				    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
-> +					break;
-> +
-> +				die("failed to configure MSIs");
->  				break;
-> +			}
->  			vpci->gsis[vpci->queue_selector] = gsi;
+Hi Simon,
 
-Is it really expected to find -ENXIO in this array instead of a GSI?
+On Wed, Mar 29, 2017 at 10:13 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Mar 27, 2017 at 11:48:12AM +0300, Laurent Pinchart wrote:
+>> On Friday 24 Mar 2017 14:37:44 Geert Uytterhoeven wrote:
+>> > Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
+>> >   - The following devices no longer exist on ES2.0, and are thus removed:
+>> >     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
+>> >   - The DU <-> VSPD topology is different on ES2.0, hence remove the
+>> >     "vsps" property from the DU node until the driver can handle this.
+>>
+>> I think I'll need a different compatible string between ES1.x and ES2 for the
+>> DU. It could make sense to move the whole DU node to *-es1.dtsi. We can decide
+>> about that later when I'll have a DU driver prototype ready.
+>
+> That makes sense to me.
+>
+> Geert, will you respin this?
 
->  			if (vdev->ops->notify_vq_gsi)
->  				vdev->ops->notify_vq_gsi(kvm, vpci->dev,
-> 
+Sure. The DTS parts are definitely not v4.12 material.
+  - For ES2.0, they depend on clk/pfc/rcar-sysc updates.
+  - For ES1.x, I don't want to break people's setup (scripts copying
+    r8a7795-salvator-x.dtb) prematurely.
 
-Thanks,
+Gr{oetje,eeting}s,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
