@@ -1,52 +1,83 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 29 Mar 2017 15:21:48 +0200
-Subject: Including Alpine -next tree in linux-next
-In-Reply-To: <20170330001444.62ac2ad1@canb.auug.org.au>
-References: <20170329131201.j4e7cnmgufj2i7tr@kwain>
- <20170330001444.62ac2ad1@canb.auug.org.au>
-Message-ID: <20170329132148.fzn4pxc4523os4y7@kwain>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 29 Mar 2017 16:22:15 +0300
+Subject: [PATCH v7 0/7] Implement clocksource for rockchip SoC using
+ rockchip timer
+In-Reply-To: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <DAFDD95C-3244-4217-B3A4-E9FB176AE989@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hello, Daniel.
 
-On Thu, Mar 30, 2017 at 12:14:54AM +1100, Stephen Rothwell wrote:
-> On Wed, 29 Mar 2017 15:12:01 +0200 Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-> >
-> > Hello Eric,
+Due to recent comments from Mark[1], may be is better to apply v6[2] series instead of v7[3]?
+Because my main goal was to fix wall time on rk3188. And I did it the same way how that was
+already done for other timer drivers (one of possible solution).
+
+You can rename CLOCKSOURCE_OF to TIMER_OF later. I can help with that, but I don?t
+think it is good idea to combine my changes and timer framework cleanups/improvements
+into single series.
+
+And I thinks, that probably is is better to drop [3] and [4] and revert 0c8893c9095d ("clockevents: Add a
+clkevt-of mechanism like clksrc-of?).
+
+What do you think?
+
+[1] https://lkml.org/lkml/2017/3/29/286
+[2] https://lkml.org/lkml/2017/1/31/401
+[3] https://lkml.org/lkml/2017/3/22/508
+[4] https://lkml.org/lkml/2017/3/22/420
+[5] https://lkml.org/lkml/2017/3/22/426
+
+> 22 ????? 2017 ?., ? 18:48, Alexander Kochetkov <al.kochet@gmail.com> ???????(?):
 > 
-> Who is this "Eric" person? ;-)
-
-My apologies. I completely messed up my copy-and-paste I guess... Of
-course I meant "Stephen" :)
-
-> > Would it be possible to include Alpine's -next tree in linux-next?
-> > 
-> > Repo: https://git.kernel.org/pub/scm/linux/kernel/git/atenart/linux.git
-> > Branch: alpine/for-next
+> Hello, Daniel, Heiko.
 > 
-> Could you give me a short idea about what this tree contains?  Also,
-> whose tree will it be merged via (or does it go direct to Linus
-> (Torvalds)?
-
-The Alpine SoCs are ARM and ARM64 processors. This branch will contain
-patches we plan to send to arm-soc during their merge window. So mostly
-device tree and SoC specific patches.
-
-The patches will be merged through arm-soc before getting to Linus.
-
-Thanks,
-Antoine
-
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170329/06123696/attachment.sig>
+> Here is try 7 :) Could you please take a look into it?
+> 
+> rockchip_timer init code implemented using CLOCKEVENT_OF_DECLARE()
+> introduced in commit 0c8893c9095d ("clockevents: Add a clkevt-of
+> mechanism like clksrc-of")
+> 
+> There is change in the arch/arm/mach-rockchip/rockchip.c.
+> 
+> This series should be applied after the commit:
+> https://lkml.org/lkml/2017/3/22/426
+> 
+> As without the commit, you will get linker error ("clkevt-probe.c:63:
+> undefined reference to `__clkevt_of_table?")
+> 
+> Regards,
+> Alexander.
+> 
+> 
+> Alexander Kochetkov (6):
+>  dt-bindings: clarify compatible property for rockchip timers
+>  ARM: dts: rockchip: update compatible property for rk322x timer
+>  ARM: dts: rockchip: add clockevent attribute to rockchip timers
+>  clocksource/drivers/rockchip_timer: implement clocksource timer
+>  ARM: dts: rockchip: add timer entries to rk3188 SoC
+>  ARM: dts: rockchip: disable arm-global-timer for rk3188
+> 
+> Daniel Lezcano (1):
+>  clocksource/drivers/clksrc-evt-probe: Describe with the DT both the
+>    clocksource and the clockevent
+> 
+> .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
+> Documentation/devicetree/bindings/timer/timer.txt  |   38 ++++
+> arch/arm/boot/dts/rk3036.dtsi                      |    1 +
+> arch/arm/boot/dts/rk3188.dtsi                      |   19 ++
+> arch/arm/boot/dts/rk322x.dtsi                      |    3 +-
+> arch/arm/boot/dts/rk3288.dtsi                      |    1 +
+> arch/arm/mach-rockchip/rockchip.c                  |    2 +
+> arch/arm64/boot/dts/rockchip/rk3368.dtsi           |    1 +
+> drivers/clocksource/Kconfig                        |    2 +
+> drivers/clocksource/clkevt-probe.c                 |    7 +
+> drivers/clocksource/clksrc-probe.c                 |    7 +
+> drivers/clocksource/rockchip_timer.c               |  215 ++++++++++++++------
+> 12 files changed, 241 insertions(+), 67 deletions(-)
+> create mode 100644 Documentation/devicetree/bindings/timer/timer.txt
+> 
+> -- 
+> 1.7.9.5
+> 
