@@ -1,145 +1,66 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 29 Mar 2017 21:42:39 +0800
-Subject: [PATCH v22 07/11] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <20170329113305.GA10960@red-moon>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-8-fu.wei@linaro.org>
- <20170328113535.GA17440@red-moon>
- <CADyBb7v9jaiQjaWzwafkih_tsU+-hNi+TA7hcDbFgtLLChXM_g@mail.gmail.com>
- <20170329102118.GB10807@red-moon>
- <CADyBb7sDnp+p5Z=Cde-YS2UG8pxo9O=Tvkq8D79k37wOrUw19Q@mail.gmail.com>
- <20170329113305.GA10960@red-moon>
-Message-ID: <CADyBb7snT+fvZYDyjUW7ZCVLX-ha4VXYBhfZsi8a3wOeYtdHkQ@mail.gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 29 Mar 2017 16:54:41 +0300
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <756e3032-e619-a70d-3e29-d2797e52fecf@redhat.com>
+References: <58DA3F68.6090901@arm.com> <20170328112328.GA31156@cbox>
+ <20170328115413.GJ23682@e104320-lin>
+ <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com>
+ <58DA67BA.8070404@arm.com>
+ <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
+ <20170329103658.GQ23682@e104320-lin>
+ <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
+ <20170329154539-mutt-send-email-mst@kernel.org>
+ <756e3032-e619-a70d-3e29-d2797e52fecf@redhat.com>
+Message-ID: <20170329164811-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Wed, Mar 29, 2017 at 03:36:59PM +0200, Laszlo Ersek wrote:
+> On 03/29/17 14:51, Michael S. Tsirkin wrote:
+> > On Wed, Mar 29, 2017 at 01:58:29PM +0200, Laszlo Ersek wrote:
+> >> (8) When QEMU gets SIGBUS from the kernel -- I hope that's going to come
+> >> through a signalfd -- QEMU can format the CPER right into guest memory,
+> >> and then inject whatever interrupt (or assert whatever GPIO line) is
+> >> necessary for notifying the guest.
+> > 
+> > I think I see a race condition potential - what if guest accesses
+> > CPER in guest memory while it's being written?
+> 
+> I'm not entirely sure about the data flow here (these parts of the ACPI
+> spec are particularly hard to read...), but I thought the OS wouldn't
+> look until it got a notification.
 
-On 29 March 2017 at 19:33, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Mar 29, 2017 at 06:48:26PM +0800, Fu Wei wrote:
->> Hi Lorenzo,
->>
->> On 29 March 2017 at 18:21, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > On Wed, Mar 29, 2017 at 05:48:17PM +0800, Fu Wei wrote:
->> >
->> > [...]
->> >
->> >>  * @platform_timer_count: It points to a integer variable which is used
->> >>  *                           for storing the number of platform timers.
->> >>  *                           This pointer could be NULL, if the caller
->> >>  *                           doesn't need this info.
->> >>
->> >> >
->> >> >> + *
->> >> >> + * Return: 0 if success, -EINVAL if error.
->> >> >> + */
->> >> >> +int __init acpi_gtdt_init(struct acpi_table_header *table,
->> >> >> +                       int *platform_timer_count)
->> >> >> +{
->> >> >> +     int ret = 0;
->> >> >> +     int timer_count = 0;
->> >> >> +     void *platform_timer = NULL;
->> >> >> +     struct acpi_table_gtdt *gtdt;
->> >> >> +
->> >> >> +     gtdt = container_of(table, struct acpi_table_gtdt, header);
->> >> >> +     acpi_gtdt_desc.gtdt = gtdt;
->> >> >> +     acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
->> >> >> +
->> >> >> +     if (table->revision < 2)
->> >> >> +             pr_warn("Revision:%d doesn't support Platform Timers.\n",
->> >> >> +                     table->revision);
->> >> >
->> >> > Ok, two points here. First, I am not sure why you should warn if the
->> >> > table revision is < 2, is that a FW bug ? I do not think it is, you
->> >> > can just return 0.
->> >>
->> >> I used pr_debug here before v20, then I got Hanjun's suggestion:
->> >> -------
->> >> GTDT table revision is updated to 2 in ACPI 5.1, we will
->> >> not support ACPI version under 5.1 and disable ACPI in FADT
->> >> parse before this code is called, so if we get revision
->> >> <2 here, I think we need to print warning (we need to keep
->> >> the firmware stick to the spec on ARM64).
->> >> -------
->> >> https://lkml.org/lkml/2017/1/19/82
->> >>
->> >> So I started to use pr_warn.
->> >
->> > Thanks for the explanation, so it is a FW bug and the warning
->> > is granted :) just leave it there.
->> >
->> > Still, please check my comment on acpi_gtdt_init() being called
->> > multiple times on patch 11.
->>
->> Thanks
->>
->> For calling acpi_gtdt_init() twice:
->> (1) 1st time: in early boot(bootmem), for init arch_timer and
->> memory-mapped timer, we initialize the acpi_gtdt_desc.
->> you can see that all the items in this struct are pointer.
->> (2) 2nd time: when system switch from bootmem to slab, all the
->> pointers in the acpi_gtdt_desc are invalid, so we have to
->> re-initialize(re-map) them.
->>
->> I have tested it, if we don't re-initialize  the acpi_gtdt_desc,
->> system will go wrong.
->
-> Ok, that's what I feared. My complaint on patch 11 is that:
->
-> 1) Stashing the GTDT pointer in acpi_gtdt_desc is not needed to
->    parse SBSA watchdogs
+There could be multiple notifications, OS might be looking
+there because of them.
 
-The acpi_gtdt_desc is for sharing the info between acpi_gtdt_init and
-acpi_gtdt_c3stop, ;acpi_gtdt_map_ppi
-I re-use it in parsing SBSA watchdogs, because I try to re-use acpi_gtdt_init.
+> Or, are you concerned about the next CPER write by QEMU, while the OS is
+> reading the last one (and maybe the CPER area could wrap around?)
+> 
+> > 
+> > We can probably use another level of indirection to fix this:
+> > 
+> > allocate twice the space, add a pointer to where the valid
+> > table is located and update that after writing CPER completely.
+> > The pointer can be written atomically but also needs to
+> > be read atomically, so I suspect it should be a single byte
+> > as we don't know how are OSPMs implementing this.
+> > 
+> 
+> A-B-A problem? (Is that usually solved with a cookie or a wider
+> generation counter? But that would again require wider atomics.)
+> 
+> I do wonder though how this is handled on physical hardware. Assuming
+> the hardware error traps to the firmware first (which, on phys hw, is
+> responsible for depositing the CPER), in that scenario the phys firmware
+> would face the same issue (i.e., asynchronously interrupting the OS,
+> which could be reading the previously stored CPER).
+> 
+> Thanks,
+> Laszlo
 
-> 2) It is not clear at all from the code or the commit log _why_ you
->    need to call acpi_gtdt_init() again (ie technically you don't need
->    to call it - you grab a valid pointer to the table and parse the
->    watchdogs in the _same_ function gtdt_sbsa_gwdt_init())
-
-yes, we can avoid calling acpi_gtdt_init(), do the same thing in
-parsing SBSA watchdogs info.
-But if we will do the same thing(getting gtdt, platform_timer,
-timer_count), why not just re-using the same function?
-
-So my suggestion is that:
-Could we re-use acpi_gtdt_init, and a comment at the head of SBSA
-watchdogs info parsing function to summarize this issue?
-The comment like this
-
-Note: although the global variable acpi_gtdt_desc has been initialized
-by acpi_gtdt_init, when we initialized arch_timer. But when we call this
-function to get SBSA watchdogs info from GTDT, the system has switch
-from bootmem  to slab, so the pointers in acpi_gtdt_desc are dated, we
-need to  re-initialize(remap) them. So we call acpi_gtdt_init again here.
-
-Is that OK for you? :-)
-
->
-> I do not think there is much you can do to improve the arch timer gtdt
-> interface (and it is too late for that anyway) but in patch 11 it would
-> be ideal if you avoid calling acpi_gtdt_init() again, just parse GTDT
-> entries and initialize the corresponding watchdogs (ie pointers stashed
-> in acpi_gtdt_desc are stale anyway but that's __initdata so I can live
-> with that).
->
-> You should add comments to summarize this issue so that it can be
-> easily understood by anyone maintaining this code, it is not crystal
-> clear by reading the code why you need to multiple acpi_gtdt_init()
-> calls and that's not a piffling detail.
->
-> The ACPI patches are fine with me otherwise, I will complete the
-> review shortly.
->
-> Thanks !
-> Lorenzo
-
-
+ACPI spec seems to specify a set of serialization actions. I'm guessing
+this is what you need to use to avoid changing guest state
+while it's reading entries.
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+MST
