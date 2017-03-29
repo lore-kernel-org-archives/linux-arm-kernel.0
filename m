@@ -1,69 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 29 Mar 2017 17:33:35 +0100
-Subject: [PATCH v2 2/2] coresight: Fix reference count for software sources
+Date: Wed, 29 Mar 2017 17:33:34 +0100
+Subject: [PATCH v2 1/2] coresight: Disable the path only when the source is
+ disabled
 In-Reply-To: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
 References: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1490805215-8125-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1490805215-8125-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For software sources (i.e STM), there could be multiple agents
-generating the trace data, unlike the ETMs. So we need to
-properly do the accounting for the active number of users
-to disable the device when the last user goes away. Right
-now, the reference counting is broken for sources as we skip
-the actions when we detect that the source is enabled.
-
-This patch fixes the problem by adding the refcounting for
-software sources, even when they are enabled.
+With a coresight tracing session, the components along the path
+from the source to sink are disabled after the source is disabled.
+However, if the source was not actually disabled due to active
+users, we should not disable the components in the path.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reported-by: Robert Walker <robert.walker@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 532a2ac..6a0202b7 100644
+index 0c37356..532a2ac 100644
 --- a/drivers/hwtracing/coresight/coresight.c
 +++ b/drivers/hwtracing/coresight/coresight.c
-@@ -558,6 +558,9 @@ int coresight_enable(struct coresight_device *csdev)
- 	int cpu, ret = 0;
- 	struct coresight_device *sink;
- 	struct list_head *path;
-+	enum coresight_dev_subtype_source subtype;
-+
-+	subtype = csdev->subtype.source_subtype;
+@@ -253,14 +253,22 @@ static int coresight_enable_source(struct coresight_device *csdev, u32 mode)
+ 	return 0;
+ }
  
- 	mutex_lock(&coresight_mutex);
+-static void coresight_disable_source(struct coresight_device *csdev)
++/**
++ *  coresight_disable_source - Drop the reference count by 1 and disable
++ *  the device if there are no users left.
++ *
++ *  @csdev - The coresight device to disable
++ *
++ *  Returns true if the device has been disabled.
++ */
++static bool coresight_disable_source(struct coresight_device *csdev)
+ {
+ 	if (atomic_dec_return(csdev->refcnt) == 0) {
+-		if (source_ops(csdev)->disable) {
++		if (source_ops(csdev)->disable)
+ 			source_ops(csdev)->disable(csdev, NULL);
+-			csdev->enable = false;
+-		}
++		csdev->enable = false;
+ 	}
++	return !csdev->enable;
+ }
  
-@@ -565,8 +568,16 @@ int coresight_enable(struct coresight_device *csdev)
+ void coresight_disable_path(struct list_head *path)
+@@ -629,7 +637,7 @@ void coresight_disable(struct coresight_device *csdev)
  	if (ret)
  		goto out;
  
--	if (csdev->enable)
-+	if (csdev->enable) {
-+		/*
-+		 * There could be multiple applications driving the software
-+		 * source. So keep the refcount for each such user when the
-+		 * source is already enabled.
-+		 */
-+		if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
-+			atomic_inc(csdev->refcnt);
+-	if (!csdev->enable)
++	if (!csdev->enable || !coresight_disable_source(csdev))
  		goto out;
-+	}
  
- 	/*
- 	 * Search for a valid sink for this session but don't reset the
-@@ -593,7 +604,7 @@ int coresight_enable(struct coresight_device *csdev)
- 	if (ret)
- 		goto err_source;
+ 	switch (csdev->subtype.source_subtype) {
+@@ -647,7 +655,6 @@ void coresight_disable(struct coresight_device *csdev)
+ 		break;
+ 	}
  
--	switch (csdev->subtype.source_subtype) {
-+	switch (subtype) {
- 	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
- 		/*
- 		 * When working from sysFS it is important to keep track
+-	coresight_disable_source(csdev);
+ 	coresight_disable_path(path);
+ 	coresight_release_path(path);
+ 
 -- 
 2.7.4
