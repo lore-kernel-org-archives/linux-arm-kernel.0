@@ -1,38 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Mar 2017 20:57:55 -0500
-Subject: [PATCH v8 2/3] dt-bindings: input: touchscreen: Add max11801-ts
- binding
-In-Reply-To: <1490209518-20790-2-git-send-email-jagan@openedev.com>
-References: <1490209518-20790-1-git-send-email-jagan@openedev.com>
- <1490209518-20790-2-git-send-email-jagan@openedev.com>
-Message-ID: <20170329015755.zi77exu7tpne3g3n@rob-hp-laptop>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 28 Mar 2017 20:58:01 -0500
+Subject: [PATCH 8/8] ARM: OMAP2+: Create dummy platform_device for pm33xx
+In-Reply-To: <20170329015801.22240-1-d-gerlach@ti.com>
+References: <20170329015801.22240-1-d-gerlach@ti.com>
+Message-ID: <20170329015801.22240-9-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 12:35:17AM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> Add missing documentation of max11801-ts dt-binding details.
-> 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v8:
-> - Use IRQ_TYPE_EDGE_FALLING for interrupt trigger type. 
-> Changes for v7:
-> - add vendor prefix as maxim
-> Changes for v6:
-> - Replace the lable and name of the node
->    ts: max11801 => max11801: touchscreen at 48
-> Changes for v5:
-> - Newly added patch
-> 
->  .../bindings/input/touchscreen/max11801-ts.txt         | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+Add amx3_common_pm_init to create a dummy platform_device for
+pm33xx so that our pm33xx module can probe and am335x and am437x
+platforms to enable basic suspend to mem and standby support.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/common.h      |  7 +++++++
+ arch/arm/mach-omap2/io.c          |  2 ++
+ arch/arm/mach-omap2/pm33xx-core.c | 12 ++++++++++++
+ 3 files changed, 21 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index c4f2ace91ea2..21fe3e44b125 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -77,6 +77,13 @@ static inline int omap4_pm_init_early(void)
+ }
+ #endif
+ 
++#if defined(CONFIG_PM) && (defined(CONFIG_SOC_AM33XX) || \
++	defined(CONFIG_SOC_AM43XX))
++void amx3_common_pm_init(void);
++#else
++static inline void amx3_common_pm_init(void) { }
++#endif
++
+ extern void omap2_init_common_infrastructure(void);
+ 
+ extern void omap_init_time(void);
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 5aafb8449c40..1bbbf19c93ea 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -652,6 +652,7 @@ void __init am33xx_init_early(void)
+ void __init am33xx_init_late(void)
+ {
+ 	omap_common_late_init();
++	amx3_common_pm_init();
+ }
+ #endif
+ 
+@@ -676,6 +677,7 @@ void __init am43xx_init_late(void)
+ {
+ 	omap_common_late_init();
+ 	omap2_clk_enable_autoidle_all();
++	amx3_common_pm_init();
+ }
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
+index c84ffc4de2e9..b5d90841c27a 100644
+--- a/arch/arm/mach-omap2/pm33xx-core.c
++++ b/arch/arm/mach-omap2/pm33xx-core.c
+@@ -179,3 +179,15 @@ struct am33xx_pm_platform_data *am33xx_pm_get_pdata(void)
+ 	else
+ 		return NULL;
+ }
++
++void __init amx3_common_pm_init(void)
++{
++	struct platform_device_info devinfo = { };
++	struct am33xx_pm_platform_data *pdata;
++
++	pdata = am33xx_pm_get_pdata();
++	devinfo.name = "pm33xx";
++	devinfo.data = pdata;
++	devinfo.size_data = sizeof(*pdata);
++	platform_device_register_full(&devinfo);
++}
+-- 
+2.11.0
