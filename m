@@ -1,33 +1,78 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 29 Mar 2017 14:44:32 +0200
-Subject: [PATCH 7/7] arm64: defconfig: enable the Safexcel crypto engine as a
- module
-In-Reply-To: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
-References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170329124432.27457-8-antoine.tenart@free-electrons.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 29 Mar 2017 14:53:47 +0200
+Subject: [PATCH v3 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <01516ad9-e187-4bac-7c65-a7a90c576ce2@arm.com>
+References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
+ <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
+ <01516ad9-e187-4bac-7c65-a7a90c576ce2@arm.com>
+Message-ID: <96da696c-141a-3e8d-1fb7-2c024a295f58@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Safexcel EIP197 cryptographic engine is used on some Marvell SoCs,
-such as Armada 7040 and Armada 8040. Enable this driver as a module in
-the ARM64 defconfig.
+On 29/03/2017 14:19, Robin Murphy wrote:
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> On 29/03/17 12:34, Marc Gonzalez wrote:
+> 
+>> +	/*
+>> +	 * QUIRK #3
+>> +	 * Unfortunately, config and mem spaces are muxed.
+>> +	 * Linux does not support such a setting, since drivers are free
+>> +	 * to access mem space directly, at any time.
+>> +	 * Therefore, we can only PRAY that config and mem space accesses
+>> +	 * NEVER occur concurrently.
+>> +	 */
+> 
+> What about David's suggestion of using an IPI for safe mutual exclusion?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fece4d3c2095..76308fa2fa7a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -519,6 +519,7 @@ CONFIG_MEMTEST=y
- CONFIG_SECURITY=y
- CONFIG_CRYPTO_ECHAINIV=y
- CONFIG_CRYPTO_ANSI_CPRNG=y
-+CONFIG_CRYPTO_DEV_SAFEXCEL=m
- CONFIG_ARM64_CRYPTO=y
- CONFIG_CRYPTO_SHA1_ARM64_CE=y
- CONFIG_CRYPTO_SHA2_ARM64_CE=y
--- 
-2.11.0
+I was left with the impression that this wouldn't solve the problem.
+If a mem space access is "in flight" on core0 when core1 starts a
+config space access, an IPI will not prevent breakage.
+
+Did I misunderstand?
+
+For my education, what is the API to send an IPI?
+And the API to handle an IPI?
+
+>> +	if (of_device_is_compatible(dev->of_node, "sigma,smp8759-pcie"))
+>> +		smp8759_init(pcie, base);
+> 
+> ...then retrieve it with of_device_get_match_data() here. No need to
+> reinvent the wheel (or have to worry about the ordering of multiple
+> compatibles once rev. n+1 comes around).
+
+I actually asked about this on IRC. The consensus was "use what
+best fits your use case". I need to do some processing based on
+the revision, so I thought
+
+  if (chip_x)
+	do_chip_x_init()
+
+was a good way to express my intent. Did I misunderstand?
+
+For example, the init function for rev2 currently looks like this:
+
+static void rev2_init(struct tango_pcie *pcie, void __iomem *base)
+{
+	void __iomem *misc_irq	= base + 0x40;
+	void __iomem *doorbell	= base + 0x8c;
+
+	pcie->mux		= base + 0x2c;
+	pcie->msi_status	= base + 0x4c;
+	pcie->msi_mask		= base + 0x6c;
+	pcie->msi_doorbell	= 0x80000000;
+
+	writel(lower_32_bits(pcie->msi_doorbell), doorbell + 0);
+	writel(upper_32_bits(pcie->msi_doorbell), doorbell + 4);
+
+	/* Enable legacy PCI interrupts */
+	writel(BIT(15), misc_irq);
+	writel(0xf << 4, misc_irq + 4);
+}
+
+>> +#define VENDOR_SIGMA	0x1105
+> 
+> Should this not be in include/linux/pci_ids.h?
+
+Doh! Very likely. Thanks.
+
+Regards.
