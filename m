@@ -1,72 +1,105 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Mar 2017 11:27:36 +0800
-Subject: [PATCH v2 07/15] ARM: dts: imx6ul-isiot: Add Sound card with
- codec node
-In-Reply-To: <1490372330-5611-8-git-send-email-jagan@openedev.com>
+Date: Wed, 29 Mar 2017 11:29:12 +0800
+Subject: [PATCH v2 10/15] ARM: dts: imx6dl-icore-rqs: Add sgtl5000 codec
+ node
+In-Reply-To: <1490372330-5611-11-git-send-email-jagan@openedev.com>
 References: <1490372330-5611-1-git-send-email-jagan@openedev.com>
- <1490372330-5611-8-git-send-email-jagan@openedev.com>
-Message-ID: <20170329032733.GW30608@dragon>
+ <1490372330-5611-11-git-send-email-jagan@openedev.com>
+Message-ID: <20170329032910.GX30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:48:42PM +0530, Jagan Teki wrote:
+On Fri, Mar 24, 2017 at 09:48:45PM +0530, Jagan Teki wrote:
 > From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> Add support for Sound card and related codec(via i2c1) nodes
-> on Engicam Is.IoT MX6UL variant module boards.
+> - Moved sound card node on imx6qdl-icore-rqs.dtsi
+> - Added codec node in imx6dl-icore-rqs from imx6q-icore-rqs
 > 
 > Cc: Shawn Guo <shawnguo@kernel.org>
 > Cc: Matteo Lisi <matteo.lisi@engicam.com>
 > Cc: Michael Trimarchi <michael@amarulasolutions.com>
 > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v2:
+> - Newly added patch
+> 
+>  arch/arm/boot/dts/imx6dl-icore-rqs.dts   | 11 +++++++++++
+>  arch/arm/boot/dts/imx6q-icore-rqs.dts    | 13 -------------
+>  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 13 +++++++++++++
+>  3 files changed, 24 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
+> index cf42c2f..5b4c14c 100644
+> --- a/arch/arm/boot/dts/imx6dl-icore-rqs.dts
+> +++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
+> @@ -49,3 +49,14 @@
+>  	model = "Engicam i.CoreM6 DualLite/Solo RQS Starter Kit";
+>  	compatible = "engicam,imx6-icore-rqs", "fsl,imx6dl";
+>  };
+> +
+> +&i2c3 {
+> +	codec: sgtl5000 at 0a {
 
-<snip>
+Why adding something that the following patch will change right away?
 
-> diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-> index ea30380..9648de9 100644
-> --- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-> @@ -69,6 +69,35 @@
->  				    100>;
->  		default-brightness-level = <100>;
+Shawn
+
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p8v>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
+> index e451b4c..441a28e5 100644
+> --- a/arch/arm/boot/dts/imx6q-icore-rqs.dts
+> +++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
+> @@ -47,19 +47,6 @@
+>  / {
+>  	model = "Engicam i.CoreM6 Quad/Dual RQS Starter Kit";
+>  	compatible = "engicam,imx6-icore-rqs", "fsl,imx6q";
+> -
+> -	sound {
+> -		compatible = "fsl,imx-audio-sgtl5000";
+> -		model = "imx-audio-sgtl5000";
+> -		ssi-controller = <&ssi1>;
+> -		audio-codec = <&codec>;
+> -		audio-routing =
+> -			"MIC_IN", "Mic Jack",
+> -			"Mic Jack", "Mic Bias",
+> -			"Headphone Jack", "HP_OUT";
+> -		mux-int-port = <1>;
+> -		mux-ext-port = <4>;
+> -	};
+>  };
+>  
+>  &i2c3 {
+> diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> index 5fab5be..4032d38 100644
+> --- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+> @@ -118,6 +118,19 @@
+>  		clocks = <&clks IMX6QDL_CLK_LVDS2_GATE>;
+>  		clock-names = "refclk";
 >  	};
-> +
-> +	reg_1p8v: regulator-1p8v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "1P8V";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	reg_3p3v: regulator-3p3v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3P3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
 > +
 > +	sound {
 > +		compatible = "fsl,imx-audio-sgtl5000";
-> +		model = "imx6ul-isiot-sgtl5000";
-> +		cpu-dai = <&sai2>;
-> +		audio-codec = <&sgtl5000>;
+> +		model = "imx-audio-sgtl5000";
+> +		ssi-controller = <&ssi1>;
+> +		audio-codec = <&codec>;
 > +		audio-routing =
 > +			"MIC_IN", "Mic Jack",
 > +			"Mic Jack", "Mic Bias",
 > +			"Headphone Jack", "HP_OUT";
+> +		mux-int-port = <1>;
+> +		mux-ext-port = <4>;
 > +	};
-
-Can you consider to use simple-audio-card bindings instead?
-
-Shawn
-
 >  };
 >  
->  &i2c1 {
+>  &clks {
 > -- 
 > 1.9.1
 > 
