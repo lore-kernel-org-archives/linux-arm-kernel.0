@@ -1,309 +1,134 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Wed, 29 Mar 2017 10:23:46 +0530
-Subject: [RFC PATCH] of: Fix DMA configuration for non-DT masters
-In-Reply-To: <67d1f46172599be243405f4341665fd0ef9ab969.1490726288.git.robin.murphy@arm.com>
-References: <67d1f46172599be243405f4341665fd0ef9ab969.1490726288.git.robin.murphy@arm.com>
-Message-ID: <CAMSpPPfJKKRkuDKxUgVBdg7vp7Ux5=PiHSxnMLc7-LMcCSatzg@mail.gmail.com>
+From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
+Date: Wed, 29 Mar 2017 04:53:53 +0000
+Subject: [PATCH v2 07/11] ARM: at91: pm: Tie the memory controller type
+ to the ramc id
+In-Reply-To: <20170328111938.21297-8-alexandre.belloni@free-electrons.com>
+References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
+ <20170328111938.21297-8-alexandre.belloni@free-electrons.com>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D7CA@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 12:27 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> For PCI masters not represented in DT, we pass the OF node of their
-> associated host bridge to of_dma_configure(), such that they can inherit
-> the appropriate DMA configuration from whatever is described there.
-> Unfortunately, whilst this has worked for the "dma-coherent" property,
-> it turns out to miss the case where the host bridge node has a non-empty
-> "dma-ranges", since nobody is expecting the 'device' to be a bus itself.
->
-> It transpires, though, that the de-facto interface since the prototype
-> change in 1f5c69aa51f9 ("of: Move of_dma_configure() to device.c to help
-> re-use") is very clear-cut: either the master_np argument is redundant
-> with dev->of_node, or dev->of_node is NULL and master_np is the relevant
-> parent bus. Let's ratify that behaviour, then teach the whole
-> of_dma_configure() pipeline to cope with both cases properly.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+
+
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: 2017?3?28? 19:20
+> To: Nicolas Ferre - M43238 <Nicolas.Ferre@microchip.com>
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Boris
+> Brezillon <boris.brezillon@free-electrons.com>; Wenyou Yang - A41535
+> <Wenyou.Yang@microchip.com>; Alexandre Belloni <alexandre.belloni@free-
+> electrons.com>
+> Subject: [PATCH v2 07/11] ARM: at91: pm: Tie the memory controller type to the
+> ramc id
+> 
+> Instead of relying on the SoC type to select the memory controller type, use the
+> device tree ids as they are parsed anyway.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
+
 > ---
->
-> This is what I'd consider the better fix - rather than adding yet more
-> special cases - which will also make it simple to handle multiple
-> "dma-ranges" entries with minimal further disruption. The callers now
-> left passing dev->of_node as 'parent' are harmless, but look a bit silly
-> and clearly want cleaning up - I'd be partial to renaming the existing
-> function and having a single-argument wrapper for the 'normal' case, e.g.:
->
-> static inline int of_dma_configure(struct device_node *dev)
-> {
->         return of_dma_configure_parent(dev, NULL);
-> }
->
-> Thoughts?
->
-> Robin.
->
->  drivers/iommu/of_iommu.c   |  7 ++++---
->  drivers/of/address.c       | 37 +++++++++++++++++++++++++------------
->  drivers/of/device.c        | 12 +++++++-----
->  include/linux/of_address.h |  7 ++++---
->  include/linux/of_device.h  |  4 ++--
->  include/linux/of_iommu.h   |  4 ++--
->  6 files changed, 44 insertions(+), 27 deletions(-)
->
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 2683e9fc0dcf..35aff07bb5eb 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -138,21 +138,22 @@ static const struct iommu_ops
->  }
->
->  const struct iommu_ops *of_iommu_configure(struct device *dev,
-> -                                          struct device_node *master_np)
-> +                                          struct device_node *parent)
->  {
->         struct of_phandle_args iommu_spec;
-> -       struct device_node *np;
-> +       struct device_node *np, *master_np;
->         const struct iommu_ops *ops = NULL;
->         int idx = 0;
->
->         if (dev_is_pci(dev))
-> -               return of_pci_iommu_configure(to_pci_dev(dev), master_np);
-> +               return of_pci_iommu_configure(to_pci_dev(dev), parent);
->
->         /*
->          * We don't currently walk up the tree looking for a parent IOMMU.
->          * See the `Notes:' section of
->          * Documentation/devicetree/bindings/iommu/iommu.txt
->          */
-> +       master_np = dev->of_node ? dev->of_node : parent;
->         while (!of_parse_phandle_with_args(master_np, "iommus",
->                                            "#iommu-cells", idx,
->                                            &iommu_spec)) {
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 02b2903fe9d2..833bc17f5e55 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -808,6 +808,7 @@ EXPORT_SYMBOL(of_io_request_and_map);
->  /**
->   * of_dma_get_range - Get DMA range info
->   * @np:                device node to get DMA range info
-> + * @parent:    node of device's parent bus, if @np is NULL
->   * @dma_addr:  pointer to store initial DMA address of DMA range
->   * @paddr:     pointer to store initial CPU address of DMA range
->   * @size:      pointer to store size of DMA range
-> @@ -822,36 +823,48 @@ EXPORT_SYMBOL(of_io_request_and_map);
->   * It returns -ENODEV if "dma-ranges" property was not found
->   * for this device in DT.
->   */
-> -int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
-> +int of_dma_get_range(struct device_node *np, struct device_node *parent,
-> +                    u64 *dma_addr, u64 *paddr, u64 *size)
->  {
-> -       struct device_node *node = of_node_get(np);
-> +       struct device_node *node;
->         const __be32 *ranges = NULL;
->         int len, naddr, nsize, pna;
->         int ret = 0;
->         u64 dmaaddr;
->
-> -       if (!node)
-> -               return -EINVAL;
-> -
-> -       while (1) {
-> +       if (np) {
-> +               node = of_node_get(np);
->                 naddr = of_n_addr_cells(node);
->                 nsize = of_n_size_cells(node);
->                 node = of_get_next_parent(node);
-> -               if (!node)
-> -                       break;
-> +       } else if (parent) {
-> +               node = of_node_get(parent);
-> +               np = parent;
-> +               if (of_property_read_u32(node, "#address-cells", &naddr))
-> +                       naddr = of_n_addr_cells(node);
-> +               if (of_property_read_u32(node, "#size-cells", &nsize))
-> +                       nsize = of_n_size_cells(node);
-> +       } else {
-> +               return -EINVAL;
-> +       }
->
-> +       while (node) {
->                 ranges = of_get_property(node, "dma-ranges", &len);
->
-> -               /* Ignore empty ranges, they imply no translation required */
-> -               if (ranges && len > 0)
-> -                       break;
-> -
->                 /*
->                  * At least empty ranges has to be defined for parent node if
->                  * DMA is supported
->                  */
->                 if (!ranges)
->                         break;
+>  arch/arm/mach-at91/pm.c | 30 ++++++++++++++++++++----------
+>  1 file changed, 20 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
+> 488549bc2bed..ddf62a006635 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -329,11 +329,23 @@ static void at91sam9_sdram_standby(void)
+>  		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);  }
+> 
+> +struct ramc_info {
+> +	void (*idle)(void);
+> +	unsigned int memctrl;
+> +};
 > +
-> +               /* Ignore empty ranges, they imply no translation required */
-> +               if (len > 0)
-> +                       break;
+> +static const struct ramc_info ramc_infos[] __initconst = {
+> +	{ .idle = at91rm9200_standby, .memctrl = AT91_MEMCTRL_MC},
+> +	{ .idle = at91sam9_sdram_standby, .memctrl =
+> AT91_MEMCTRL_SDRAMC},
+> +	{ .idle = at91_ddr_standby, .memctrl = AT91_MEMCTRL_DDRSDR},
+> +	{ .idle = sama5d3_ddr_standby, .memctrl =
+> AT91_MEMCTRL_DDRSDR}, };
 > +
-> +               naddr = of_n_addr_cells(node);
-> +               nsize = of_n_size_cells(node);
-> +               node = of_get_next_parent(node);
->         }
->
->         if (!ranges) {
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 9bb8518b28f2..57ec5324ed6c 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -73,7 +73,8 @@ int of_device_add(struct platform_device *ofdev)
->  /**
->   * of_dma_configure - Setup DMA configuration
->   * @dev:       Device to apply DMA configuration
-> - * @np:                Pointer to OF node having DMA configuration
-> + * @parent:    OF node of device's parent bus, if @dev is not
-> + *             represented in DT (i.e. @dev->of_node is NULL)
->   *
->   * Try to get devices's DMA configuration from DT and update it
->   * accordingly.
-> @@ -82,13 +83,14 @@ int of_device_add(struct platform_device *ofdev)
->   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
->   * to fix up DMA configuration.
->   */
-> -void of_dma_configure(struct device *dev, struct device_node *np)
-> +void of_dma_configure(struct device *dev, struct device_node *parent)
->  {
->         u64 dma_addr, paddr, size;
->         int ret;
->         bool coherent;
->         unsigned long offset;
->         const struct iommu_ops *iommu;
-> +       struct device_node *np = dev->of_node;
->
->         /*
->          * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-> @@ -104,7 +106,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->         if (!dev->dma_mask)
->                 dev->dma_mask = &dev->coherent_dma_mask;
->
-> -       ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-> +       ret = of_dma_get_range(np, parent, &dma_addr, &paddr, &size);
->         if (ret < 0) {
->                 dma_addr = offset = 0;
->                 size = dev->coherent_dma_mask + 1;
-> @@ -132,11 +134,11 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->         dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(dma_addr + size));
->         *dev->dma_mask = dev->coherent_dma_mask;
->
-> -       coherent = of_dma_is_coherent(np);
-> +       coherent = of_dma_is_coherent(np ? np : parent);
->         dev_dbg(dev, "device is%sdma coherent\n",
->                 coherent ? " " : " not ");
->
-> -       iommu = of_iommu_configure(dev, np);
-> +       iommu = of_iommu_configure(dev, parent);
->         dev_dbg(dev, "device is%sbehind an iommu\n",
->                 iommu ? " " : " not ");
->
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index 37864734ca50..f1a507f3ae57 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -52,8 +52,8 @@ extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
->  extern struct of_pci_range *of_pci_range_parser_one(
->                                         struct of_pci_range_parser *parser,
->                                         struct of_pci_range *range);
-> -extern int of_dma_get_range(struct device_node *np, u64 *dma_addr,
-> -                               u64 *paddr, u64 *size);
-> +extern int of_dma_get_range(struct device_node *np, struct device_node *parent,
-> +                               u64 *dma_addr, u64 *paddr, u64 *size);
->  extern bool of_dma_is_coherent(struct device_node *np);
->  #else /* CONFIG_OF_ADDRESS */
->  static inline void __iomem *of_io_request_and_map(struct device_node *device,
-> @@ -95,7 +95,8 @@ static inline struct of_pci_range *of_pci_range_parser_one(
->         return NULL;
+>  static const struct of_device_id const ramc_ids[] __initconst = {
+> -	{ .compatible = "atmel,at91rm9200-sdramc", .data =
+> at91rm9200_standby },
+> -	{ .compatible = "atmel,at91sam9260-sdramc", .data =
+> at91sam9_sdram_standby },
+> -	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
+> -	{ .compatible = "atmel,sama5d3-ddramc", .data = sama5d3_ddr_standby },
+> +	{ .compatible = "atmel,at91rm9200-sdramc", .data = &ramc_infos[0] },
+> +	{ .compatible = "atmel,at91sam9260-sdramc", .data = &ramc_infos[1] },
+> +	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &ramc_infos[2] },
+> +	{ .compatible = "atmel,sama5d3-ddramc", .data = &ramc_infos[3] },
+>  	{ /*sentinel*/ }
+>  };
+> 
+> @@ -343,14 +355,17 @@ static __init void at91_dt_ramc(void)
+>  	const struct of_device_id *of_id;
+>  	int idx = 0;
+>  	const void *standby = NULL;
+> +	const struct ramc_info *ramc;
+> 
+>  	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
+>  		pm_data.ramc[idx] = of_iomap(np, 0);
+>  		if (!pm_data.ramc[idx])
+>  			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"),
+> idx);
+> 
+> +		ramc = of_id->data;
+>  		if (!standby)
+> -			standby = of_id->data;
+> +			standby = ramc->idle;
+> +		pm_data.memctrl = ramc->memctrl;
+> 
+>  		idx++;
+>  	}
+> @@ -473,7 +488,6 @@ void __init at91rm9200_pm_init(void)
+>  	at91_ramc_write(0, AT91_MC_SDRAMC_LPR, 0);
+> 
+>  	pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP |
+> AT91RM9200_PMC_UDP;
+> -	pm_data.memctrl = AT91_MEMCTRL_MC;
+> 
+>  	at91_pm_init(at91rm9200_idle);
 >  }
->
-> -static inline int of_dma_get_range(struct device_node *np, u64 *dma_addr,
-> +static inline int of_dma_get_range(struct device_node *np,
-> +                               struct device_node *parent, u64 *dma_addr,
->                                 u64 *paddr, u64 *size)
->  {
->         return -ENODEV;
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index c12dace043f3..bcd2b6fbeef3 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -55,7 +55,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->         return of_node_get(cpu_dev->of_node);
+> @@ -481,7 +495,6 @@ void __init at91rm9200_pm_init(void)  void __init
+> at91sam9260_pm_init(void)  {
+>  	at91_dt_ramc();
+> -	pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
+>  	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP |
+> AT91SAM926x_PMC_UDP;
+>  	at91_pm_init(at91sam9_idle);
 >  }
->
-> -void of_dma_configure(struct device *dev, struct device_node *np);
-> +void of_dma_configure(struct device *dev, struct device_node *parent);
->  #else /* CONFIG_OF */
->
->  static inline int of_driver_match_device(struct device *dev,
-> @@ -103,7 +103,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  {
->         return NULL;
+> @@ -490,7 +503,6 @@ void __init at91sam9g45_pm_init(void)  {
+>  	at91_dt_ramc();
+>  	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
+> -	pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+>  	at91_pm_init(at91sam9_idle);
 >  }
-> -static inline void of_dma_configure(struct device *dev, struct device_node *np)
-> +static inline void of_dma_configure(struct device *dev, struct device_node *parent)
->  {}
->  #endif /* CONFIG_OF */
->
-> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> index 13394ac83c66..c02b62e8e6ed 100644
-> --- a/include/linux/of_iommu.h
-> +++ b/include/linux/of_iommu.h
-> @@ -12,7 +12,7 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
->                              size_t *size);
->
->  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
-> -                                       struct device_node *master_np);
-> +                                       struct device_node *parent);
->
->  #else
->
-> @@ -24,7 +24,7 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+> 
+> @@ -498,7 +510,6 @@ void __init at91sam9x5_pm_init(void)  {
+>  	at91_dt_ramc();
+>  	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP |
+> AT91SAM926x_PMC_UDP;
+> -	pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+>  	at91_pm_init(at91sam9_idle);
 >  }
->
->  static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
-> -                                        struct device_node *master_np)
-> +                                        struct device_node *parent)
->  {
->         return NULL;
+> 
+> @@ -506,6 +517,5 @@ void __init sama5_pm_init(void)  {
+>  	at91_dt_ramc();
+>  	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP |
+> AT91SAM926x_PMC_UDP;
+> -	pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
+>  	at91_pm_init(NULL);
 >  }
 > --
-> 2.11.0.dirty
->
+> 2.11.0
 
-pci and memory mapped device world is different. of course if you talk
-from iommu perspective, all the master are same for IOMMU
 
-but the original intention of the patch is to try to solve 2 problems.
-please refer to https://lkml.org/lkml/2017/3/29/10
-
-1) expose generic API for pci world clients to configure their
-dma-ranges. right now there is none.
-2) same API can be used by IOMMU to derive dma_mask.
-
-while the current patch posted to handle dma-ranges for both memory
-mapped and pci devices, which I think is overdoing.
-
-besides we have different configuration of dma-ranges based on iommu
-is enabled or not enabled.
- #define PCIE_DMA_RANGES dma-ranges = <0x43000000 0x00 0x80000000 0x00
-0x80000000 0x00 0x80000000 \
-                                      0x43000000 0x08 0x00000000 0x08
-0x00000000 0x08 0x00000000 \
-                                      0x43000000 0x80 0x00000000 0x80
-0x00000000 0x40 0x00000000>;
-Not sure if this patch will consider above dma-ranges.
-
-my suggestion is to leave existing of_dma_get_range as is, and have
-new function for pci world as discussed in
-please refer to https://lkml.org/lkml/2017/3/29/10
-
-Regards,
-Oza.
+Best Regards,
+Wenyou Yang
