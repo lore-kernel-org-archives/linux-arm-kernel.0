@@ -1,39 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 29 Mar 2017 21:39:03 +0200
-Subject: [PATCH v2 1/2] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170329193607.GA24737@gandalf>
-References: <20170327180208.13414-1-gmbnomis@gmail.com>
- <20170327181949.isafnqsnxkzed5nv@pengutronix.de>
- <20170329193607.GA24737@gandalf>
-Message-ID: <20170329193903.u2wmutwz3bodholp@pengutronix.de>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 29 Mar 2017 21:38:53 +0200
+Subject: [PATCH v2 1/2] base: soc: Let soc_device_match() return no match when
+ called too early
+In-Reply-To: <1490816334-14568-1-git-send-email-geert+renesas@glider.be>
+References: <1490816334-14568-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1490816334-14568-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 09:36:08PM +0200, Simon Baatz wrote:
-> On Mon, Mar 27, 2017 at 08:19:49PM +0200, Uwe Kleine-K?nig wrote:
-> > you could to the following here instead:
-> > 
-> > 	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > 	if (IS_ERR(info->clk))
-> > 		/*
-> > 		 * We ignore all errors here, that's wrong but only for
-> > 		 * one commit.
-> > 		 */
-> > 		info->clk = NULL;
-> > 
-> > 	ret = clk_prepare_enable(info->clk);
-> > 	if (ret) ...
-> > 
-> 
-> Makes sense.  I don't think we should have such a comment, though. 
+If soc_device_match() is called before the SoC bus has been registered,
+bus_for_each_dev() returns -EINVAL, which is considered a match, as it
+is non-zero.
 
-Yes I agree, I just wanted to prevent people thinking I suggest this
-code snipet for optional clock handling and so wanted to write a big
-No-No-No onto it.
+While calling soc_device_match() too early can be considered an
+integration mistake, returning a match is counter-intuitive:
+soc_device_match() is typically used to handle quirks, i.e. to deviate
+from the default path.  Hence add a check to abort checking and return
+no match instead.
 
-Best regards
-Uwe
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2:
+  - Drop RFC state,
+  - Add Acked-by,
+  - Add missing "too early" to second paragraph of description.
+---
+ drivers/base/soc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+index dc26e5949a320223..50033081834a9ccd 100644
+--- a/drivers/base/soc.c
++++ b/drivers/base/soc.c
+@@ -230,6 +230,8 @@ const struct soc_device_attribute *soc_device_match(
+ 			break;
+ 		ret = bus_for_each_dev(&soc_bus_type, NULL, (void *)matches,
+ 				       soc_device_match_one);
++		if (ret < 0)
++			return NULL;
+ 		if (!ret)
+ 			matches++;
+ 		else
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
