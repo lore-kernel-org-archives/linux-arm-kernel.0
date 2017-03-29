@@ -1,36 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Mar 2017 20:00:08 +0100
-Subject: [RFC v2] Introduce rare_write() infrastructure
-In-Reply-To: <1490811363-93944-1-git-send-email-keescook@chromium.org>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
-Message-ID: <20170329190008.GE7909@n2100.armlinux.org.uk>
+From: sfaragnaus@gmail.com (Andrea della Porta)
+Date: Wed, 29 Mar 2017 06:15:36 +0100
+Subject: [PATCH 2/3] fixed codepatch coding style issue, line over 80
+In-Reply-To: <a7afd06fb8a7e36568e639020c07662692da2589.1490760735.git.sfaragnaus@gmail.com>
+References: <cover.1490760735.git.sfaragnaus@gmail.com>
+ <a7afd06fb8a7e36568e639020c07662692da2589.1490760735.git.sfaragnaus@gmail.com>
+Message-ID: <d34e8125d5819066756e245e5759b39932afafa0.1490760735.git.sfaragnaus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:15:52AM -0700, Kees Cook wrote:
-> This is take 2 of an RFC series to demonstrate a possible infrastructure
-> for the "write rarely" memory storage type in the kernel (patch 1). The
-> intent is to further reduce the internal attack surface of the kernel
-> by making more variables read-only while "at rest". This is heavily
-> based on the "__read_only" portion of the KERNEXEC infrastructure from
-> PaX/grsecurity, though I tried to adjust it to be more in line with
-> the upstream discussions around the APIs.
+Fixed issue:
+WARNING: line over 80 characters
+#545: FILE: drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c:545:
++               snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
 
-How much data are we talking about here?
+Signed-off-by: Andrea della Porta <sfaragnaus@gmail.com>
+---
+ drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> As part of the series I've included both x86 support (patch 4), exactly
-> as done in PaX, and ARM support (patches 5-7), similar to what is done in
-> grsecurity but without support for earlier ARM CPUs. Both are lightly
-> tested by me, though they need a bit more work, especially ARM as it is
-> missing the correct domain marking for kernel modules.
-
-The implementation as it stands on ARM is going to gobble up
-multiples of 1MB of RAM as you need it to be section aligned due to
-using domains, so if we're talking about a small amount of data,
-this is very inefficient.  That also only works for non-LPAE as LPAE
-is unable to use that method.
-
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+index fa6d3d2..f1ce5cf 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+@@ -539,7 +539,8 @@ int snd_bcm2835_new_spdif_pcm(struct bcm2835_chip *chip)
+ 	/* NOTE: this may fail */
+ 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
+ 					      snd_dma_continuous_data(GFP_KERNEL),
+-					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
++					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max, 
++					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
+ out:
+ 	mutex_unlock(&chip->audio_mutex);
+ 	audio_info(" .. OUT\n");
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.4.10
