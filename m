@@ -1,10 +1,10 @@
 From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Wed, 29 Mar 2017 04:54:48 +0000
-Subject: [PATCH v2 09/11] ARM: at91: pm: Merge all at91sam9*_pm_init
-In-Reply-To: <20170328111938.21297-10-alexandre.belloni@free-electrons.com>
+Date: Wed, 29 Mar 2017 04:55:17 +0000
+Subject: [PATCH v2 10/11] ARM: at91: pm: Remove at91_pm_set_standby
+In-Reply-To: <20170328111938.21297-11-alexandre.belloni@free-electrons.com>
 References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
- <20170328111938.21297-10-alexandre.belloni@free-electrons.com>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D7EA@CHN-SV-EXMX07.mchp-main.com>
+ <20170328111938.21297-11-alexandre.belloni@free-electrons.com>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D7F7@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,132 +18,55 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Brezillon <boris.brezillon@free-electrons.com>; Wenyou Yang - A41535
 > <Wenyou.Yang@microchip.com>; Alexandre Belloni <alexandre.belloni@free-
 > electrons.com>
-> Subject: [PATCH v2 09/11] ARM: at91: pm: Merge all at91sam9*_pm_init
+> Subject: [PATCH v2 10/11] ARM: at91: pm: Remove at91_pm_set_standby
 > 
-> The PM initialization is now identical for all at91sam9. Merge the functions.
+> Merge at91_pm_set_standby() in at91_dt_ramc as this is the only callsite.
+> That moves it to the init section.
 > 
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
 
 > ---
->  arch/arm/mach-at91/at91sam9.c | 45 +++----------------------------------------
->  arch/arm/mach-at91/generic.h  |  8 ++------
->  arch/arm/mach-at91/pm.c       | 14 +-------------
->  3 files changed, 6 insertions(+), 61 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
-> index ba28e9cc584d..c089bfd0dc2f 100644
-> --- a/arch/arm/mach-at91/at91sam9.c
-> +++ b/arch/arm/mach-at91/at91sam9.c
-> @@ -52,7 +52,7 @@ static const struct at91_soc at91sam9_socs[] = {
->  	{ /* sentinel */ },
->  };
-> 
-> -static void __init at91sam9_common_init(void)
-> +static void __init at91sam9_init(void)
->  {
->  	struct soc_device *soc;
->  	struct device *soc_dev = NULL;
-> @@ -62,12 +62,8 @@ static void __init at91sam9_common_init(void)
->  		soc_dev = soc_device_to_device(soc);
-> 
->  	of_platform_default_populate(NULL, NULL, soc_dev); -}
-> 
-> -static void __init at91sam9_dt_device_init(void) -{
-> -	at91sam9_common_init();
-> -	at91sam9260_pm_init();
-> +	at91sam9_pm_init();
->  }
-> 
->  static const char *const at91_dt_board_compat[] __initconst = { @@ -77,41
-> +73,6 @@ static const char *const at91_dt_board_compat[] __initconst = {
-> 
->  DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM9")
->  	/* Maintainer: Atmel */
-> -	.init_machine	= at91sam9_dt_device_init,
-> +	.init_machine	= at91sam9_init,
->  	.dt_compat	= at91_dt_board_compat,
->  MACHINE_END
-> -
-> -static void __init at91sam9g45_dt_device_init(void) -{
-> -	at91sam9_common_init();
-> -	at91sam9g45_pm_init();
-> -}
-> -
-> -static const char *const at91sam9g45_board_compat[] __initconst = {
-> -	"atmel,at91sam9g45",
-> -	NULL
-> -};
-> -
-> -DT_MACHINE_START(at91sam9g45_dt, "Atmel AT91SAM9G45")
-> -	/* Maintainer: Atmel */
-> -	.init_machine	= at91sam9g45_dt_device_init,
-> -	.dt_compat	= at91sam9g45_board_compat,
-> -MACHINE_END
-> -
-> -static void __init at91sam9x5_dt_device_init(void) -{
-> -	at91sam9_common_init();
-> -	at91sam9x5_pm_init();
-> -}
-> -
-> -static const char *const at91sam9x5_board_compat[] __initconst = {
-> -	"atmel,at91sam9x5",
-> -	"atmel,at91sam9n12",
-> -	NULL
-> -};
-> -
-> -DT_MACHINE_START(at91sam9x5_dt, "Atmel AT91SAM9")
-> -	/* Maintainer: Atmel */
-> -	.init_machine	= at91sam9x5_dt_device_init,
-> -	.dt_compat	= at91sam9x5_board_compat,
-> -MACHINE_END
-> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h index
-> 28ca57a2060f..f1ead0f13c19 100644
-> --- a/arch/arm/mach-at91/generic.h
-> +++ b/arch/arm/mach-at91/generic.h
-> @@ -13,15 +13,11 @@
-> 
->  #ifdef CONFIG_PM
->  extern void __init at91rm9200_pm_init(void); -extern void __init
-> at91sam9260_pm_init(void); -extern void __init at91sam9g45_pm_init(void); -
-> extern void __init at91sam9x5_pm_init(void);
-> +extern void __init at91sam9_pm_init(void);
->  extern void __init sama5_pm_init(void);  #else  static inline void __init
-> at91rm9200_pm_init(void) { } -static inline void __init at91sam9260_pm_init(void)
-> { } -static inline void __init at91sam9g45_pm_init(void) { } -static inline void __init
-> at91sam9x5_pm_init(void) { }
-> +static inline void __init at91sam9_pm_init(void) { }
->  static inline void __init sama5_pm_init(void) { }  #endif
+>  arch/arm/mach-at91/pm.c | 10 ++--------
+>  1 file changed, 2 insertions(+), 8 deletions(-)
 > 
 > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> a7c047f0d21f..dedfe9038336 100644
+> dedfe9038336..2cd27c830ab6 100644
 > --- a/arch/arm/mach-at91/pm.c
 > +++ b/arch/arm/mach-at91/pm.c
-> @@ -505,19 +505,7 @@ void __init at91rm9200_pm_init(void)
->  	at91_pm_init(at91rm9200_idle);
+> @@ -205,12 +205,6 @@ static struct platform_device at91_cpuidle_device = {
+>  	.name = "cpuidle-at91",
+>  };
+> 
+> -static void at91_pm_set_standby(void (*at91_standby)(void)) -{
+> -	if (at91_standby)
+> -		at91_cpuidle_device.dev.platform_data = at91_standby;
+> -}
+> -
+>  /*
+>   * The AT91RM9200 goes into self-refresh mode with this command, and will
+>   * terminate self-refresh automatically on the next SDRAM access.
+> @@ -354,7 +348,7 @@ static __init void at91_dt_ramc(void)
+>  	struct device_node *np;
+>  	const struct of_device_id *of_id;
+>  	int idx = 0;
+> -	const void *standby = NULL;
+> +	void *standby = NULL;
+>  	const struct ramc_info *ramc;
+> 
+>  	for_each_matching_node_and_match(np, ramc_ids, &of_id) { @@ -378,7
+> +372,7 @@ static __init void at91_dt_ramc(void)
+>  		return;
+>  	}
+> 
+> -	at91_pm_set_standby(standby);
+> +	at91_cpuidle_device.dev.platform_data = standby;
 >  }
 > 
-> -void __init at91sam9260_pm_init(void)
-> -{
-> -	at91_dt_ramc();
-> -	at91_pm_init(at91sam9_idle);
-> -}
-> -
-> -void __init at91sam9g45_pm_init(void)
-> -{
-> -	at91_dt_ramc();
-> -	at91_pm_init(at91sam9_idle);
-> -}
-> -
-> -void __init at91sam9x5_pm_init(void)
-> +void __init at91sam9_pm_init(void)
->  {
->  	at91_dt_ramc();
->  	at91_pm_init(at91sam9_idle);
+>  static void at91rm9200_idle(void)
 > --
 > 2.11.0
-
 
 Best Regards,
 Wenyou Yang
