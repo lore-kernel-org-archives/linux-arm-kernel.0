@@ -1,185 +1,106 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 29 Mar 2017 14:36:38 +0200
-Subject: [PATCH v7 1/7] clocksource/drivers/clksrc-evt-probe: Describe
- with the DT both the clocksource and the clockevent
-In-Reply-To: <20170329104911.GC23442@leverpostej>
-References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
- <1490197714-25415-2-git-send-email-al.kochet@gmail.com>
- <20170329015146.ey5rlptzsnnynpnt@rob-hp-laptop>
- <20170329092210.GH2123@mai> <20170329104911.GC23442@leverpostej>
-Message-ID: <20170329123638.GI2123@mai>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 29 Mar 2017 18:06:14 +0530
+Subject: [GIT PULL] PCI: Support for configurable PCI endpoint
+In-Reply-To: <99ae043b-35fd-0723-c8a7-e2625a862c6d@ti.com>
+References: <20170327094520.3129-1-kishon@ti.com>
+ <0cfe5acf-332c-00c9-e5d5-1403c4e80ebe@axis.com>
+ <99ae043b-35fd-0723-c8a7-e2625a862c6d@ti.com>
+Message-ID: <6868a887-a270-96d6-0600-af2a1af383a8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:49:11AM +0100, Mark Rutland wrote:
-> Hi,
+Hi,
+
+On Wednesday 29 March 2017 05:40 PM, Kishon Vijay Abraham I wrote:
+> Hi Niklas,
 > 
-> On Wed, Mar 29, 2017 at 11:22:10AM +0200, Daniel Lezcano wrote:
-> > On Tue, Mar 28, 2017 at 08:51:46PM -0500, Rob Herring wrote:
-> > > On Wed, Mar 22, 2017 at 06:48:28PM +0300, Alexander Kochetkov wrote:
-> > > > From: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > > > 
-> > > > The CLOCKSOURCE_OF_DECLARE() was introduced before the
-> > > > CLOCKEVENT_OF_DECLARE() and that resulted in some abuse where the
-> > > > clockevent and the clocksource are both initialized in the same init
-> > > > routine.
-> > > > 
-> > > > With the introduction of the CLOCKEVENT_OF_DECLARE(), the driver can
-> > > > now split the clocksource and the clockevent init code. However, the
-> > > > device tree may specify a single node, so the same node will be passed
-> > > > to the clockevent/clocksource's init function, with the same base
-> > > > address.
-> > > > 
-> > > > with this patch it is possible to specify an attribute to the timer's node to
-> > > > specify if it is a clocksource or a clockevent and define two timers node.
-> > > 
-> > > Daniel and I discussed and agreed against this a while back. What 
-> > > changed?
-> > 
-> > Hi Rob,
-> > 
-> > > > For example:
-> > > > 
-> > > >         timer: timer at 98400000 {
-> > > >                 compatible = "moxa,moxart-timer";
-> > > >                 reg = <0x98400000 0x42>;
-> > > 
-> > > This overlaps the next node. You can change this to 0x10, but are these 
-> > > really 2 independent h/w blocks? Don't design the nodes around the 
-> > > current needs of Linux.
-> > 
-> > Mmh, thanks for raising this. Conceptually speaking there are two (or more)
-> > different entities, the clocksource and the clockevents but they share the same
-> > IP block.
+> On Wednesday 29 March 2017 05:12 PM, Niklas Cassel wrote:
+>> On 03/27/2017 11:44 AM, Kishon Vijay Abraham I wrote:
+>>> Hi Bjorn,
+>>>
+>>> Please find the pull request for PCI endpoint support below. I've
+>>> also included all the history here.
+>>>
+>>> Changes from v4:
+>>> *) add #syscon-cells property and used of_parse_phandle_with_args
+>>>    to perform a configuration in syscon module (as suggested by
+>>>    Rob Herring)
+>>> *) Remove unnecessary white space.
+>>>
+>>> Changes from v3:
+>>> *) fixed a typo and adapted to https://lkml.org/lkml/2017/3/13/562.
+>>>
+>>> Changes from v2:
+>>> *) changed the configfs structure as suggested by Christoph Hellwig. With
+>>>    this change the framework creates configfs entry for EP function driver
+>>>    and EP controller. Previously these entries have to be created by the
+>>>    the user. (Haven't changed the epc core or epf core except for invoking
+>>>    configfs APIs to create entries for EP function driver and EP controller.
+>>>    That's mostly because the EP function device can still be created by
+>>>    directly invoking the epf core API without using configfs).
+>>> *) Now the user has to use configfs entry 'start' to start the link.
+>>>    This was previously done by the function driver. However in the case of
+>>>    multi function EP, the function driver shouldn't start the link.
+>>>
+>>> Changes from v1:
+>>> *) The preparation patches for adding EP support is removed and is sent
+>>>    separately
+>>> *) Added device ID for DRA74x/DRA72x and used it instead of
+>>>    using "PCI_ANY_ID"
+>>> *) Added userguide for PCI endpoint test function
+>>>
+>>> Major Improvements from RFC:
+>>>  *) support multi-function devices (hw supported not virtual)
+>>>  *) Access host side buffers
+>>>  *) Raise MSI interrupts
+>>>  *) Add user space program to use the host side PCI driver
+>>>  *) Adapt all other users of designware to use the new design (only
+>>>     compile tested. Since I have only dra7xx boards, the new design
+>>>     has only been tested in dra7xx. I'd require the help of others
+>>>     to test the platforms they have access to).
+>>>
+>>> This series has been developed over 4.11-rc1 + [1]
+>>> [1] -> https://lkml.org/lkml/2017/3/13/562
+>>>
+>>> Let me know if this has to be re-based to some of your branch.
+>>>
+>>> Thanks
+>>> Kishon
+>>>
+>>> The following changes since commit 623e87fec8ab7867fb51b3079196bd10718a60ce:
+>>>
+>>>   PCI: dwc: dra7xx: Push request_irq call to the bottom of probe (2017-03-22 20:35:30 +0530)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/kishon/pci-endpoint.git tags/pci-endpoint-for-4.12
+>>>
+>>> for you to fetch changes up to e98bf80074be4654faae42fe0f5a622a776b6fdd:
+>>>
+>>>   ARM: DRA7: clockdomain: Change the CLKTRCTRL of CM_PCIE_CLKSTCTRL to SW_WKUP (2017-03-27 15:08:22 +0530)
+>>>
+>>> ----------------------------------------------------------------
+>>
+>> FWIW:
+>> I've tested Kishon's tag pci-endpoint-for-4.12
+>> and PCIe on artpec6 SoC is still working fine.
 > 
-> From the DT's PoV, this is one entity, which is the IP block.
+> Thanks for testing it.
+>>
+>> I also included the DRA7xx PCIe driver in my
+>> kernel so that pcie-designware-ep.c gets built.
+>>
+>> My only worry is that the code in pcie-designware-ep.c
+>> is not compile tested if DRA7xx is not selected
+>> (as it is the only driver using PCIE_DW_EP at
+>> the moment).
 > 
-> The clocksource/clockevent concept is a Linux implementation detail. The
-> DT cannot and should not be aware of that.
-> 
-> [...]
-> 
-> > > >                 interrupts = <19 1>;
-> > > >                 clocks = <&coreclk>;
-> > > >                 clockevent;
-> > > 
-> > > This is not needed. The presence of "interrupts" is enough to say use 
-> > > this timer for clockevent.
-> > 
-> > Yes, that is true if no drivers was already taking CLOCKSOURCE_OF and
-> > initializing the clockevent. The driver will pass through the clocksource_probe
-> > function, check the interrupt and bail out because there is an interrupt
-> > declared and assume it is a clockevent, so no initialization for the driver.
-> > IOW, it is not backward compatible.
-> > 
-> > We need this attribute somehow in order to separate clearly a clocksource or a
-> > clockevent with a new implementation.
-> 
-> Why? A single IP block can provide the functionality of both (though
-> there are reasons that functionality may be mutually exclusive). What is
-> the benefit of this split?
+> yeah, we should plan to include COMPILE_TEST in all pci drivers but I guess
+> there is some problem with non-ARM builds [1]. As Bjorn mentioned in the
+> thread, we could add #ifdef ARM and then include COMPILE_TEST.
 
-Hi Mark,
+I think I misunderstood your concern. yeah, there is no direct way to compile
+pcie-designware-ep.c without selecting DRA7xx.
 
-You can have several timers on the system and may want to use the clockevents
-from one IP block and the clocksource from another IP block. For example, in
-the case of a bogus clocksource.
-
-Moreover there are some drivers with a node for a clocksource and
-another one for the clockevent, and the driver is assuming the clockevent is
-defined first and then the clocksource.
-
-eg.
-
-arch/arc/boot/dts/abilis_tb10x.dtsi:
-
-        /* TIMER0 with interrupt for clockevent */
-        timer0 {
-                compatible = "snps,arc-timer";
-                interrupts = <3>;
-                interrupt-parent = <&intc>;
-                clocks = <&cpu_clk>;
-        };
-
-        /* TIMER1 for free running clocksource */
-        timer1 {
-                compatible = "snps,arc-timer";
-                clocks = <&cpu_clk>;
-        };
-
-drivers/clocksource/arc_timer.c:
-
-static int __init arc_of_timer_init(struct device_node *np)
-{
-        static int init_count = 0;
-        int ret;
-
-        if (!init_count) {
-                init_count = 1;
-                ret = arc_clockevent_setup(np);
-        } else {
-                ret = arc_cs_setup_timer1(np);
-        }
-
-        return ret;
-}
-
-Even if that works, it is a fragile mechanism.
-
-So the purpose of these changes is to provide a stronger timer declaration in
-order to clearly split in the kernel a clocksource and a clockevent
-initialization.
-
-> > > > With this approach, we allow a mechanism to clearly define a clocksource or a
-> > > > clockevent without aerobatics we can find around in some drivers:
-> > > > 	timer-sp804.c, arc-timer.c, dw_apb_timer_of.c, mps2-timer.c,
-> > > > 	renesas-ostm.c, time-efm32.c, time-lpc32xx.c.
-> > > 
-> > > These all already have bindings and work. What problem are you trying to 
-> > > solve other than restructuring Linux?
-> > 
-> > Yes, there is already the bindings, but that force to do some hackish
-> > initialization.
-> 
-> Here, you are forcing hackish DT changes that do not truly describe HW.
-> How is that better?
-
-So if this is hackish DT changes, then the existing DTs should be fixed, no?
-
-> > I would like to give the opportunity to declare separately a clocksource and a
-> > clockevent, in order to have full control of how this is initialized.
-> 
-> To me it sounds like what we need is Linux infrastructure that allows
-> one to register a device as having both clockevent/clocksource
-> functionality.
-
-That was the idea. Create a macro CLOCKEVENT_OF and CLOCKSOURCE_OF both of them
-calling their respective init routines. And in addition a TIMER_OF doing both
-CLOCKEVENT_OF and CLOCKSOURCE_OF.
-
-It is the DT which does not allow to do this separation.
-
-Would be the following approach more acceptable ?
-
-1. Replace all CLOCKSOURCE_OF by TIMER_OF (just renaming)
-2. A node can have a clockevent and|or a clocksource attributes
-3. The timer_probe pass a flag to the driver's init function, so this one knows
-   if it should invoke the clockevent/clocksource init functions.
-   No attribute defaults to clocksource|clockevent.
-
-That would be backward compatible and will let to create drivers with clutch
-activated device via DT. Also, it will give the opportunity to the existing
-drivers to change consolidate their initialization routines.
-
-> That way, we can choose to do something sane at boot time, and if the
-> user really wants specific devices used in specific ways, they can
-> request that.
-
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks
+Kishon
