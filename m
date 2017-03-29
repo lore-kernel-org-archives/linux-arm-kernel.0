@@ -1,90 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Mar 2017 11:13:58 +0100
-Subject: [PATCH v2 7/8] bus: brcmstb_gisb: add notifier handling
-In-Reply-To: <20170328213431.10904-8-opendmb@gmail.com>
-References: <20170328213431.10904-1-opendmb@gmail.com>
- <20170328213431.10904-8-opendmb@gmail.com>
-Message-ID: <20170329101357.GB23442@leverpostej>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 29 Mar 2017 18:27:40 +0800
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <5584203e-cb19-a5d2-45b1-3e78d3482c55@arm.com>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
+ <20170329030735.GA23889@leoy-linaro>
+ <5584203e-cb19-a5d2-45b1-3e78d3482c55@arm.com>
+Message-ID: <20170329102740.GA20804@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On Wed, Mar 29, 2017 at 10:07:07AM +0100, Suzuki K Poulose wrote:
 
-On Tue, Mar 28, 2017 at 02:34:30PM -0700, Doug Berger wrote:
-> Check for GISB arbitration errors through a chained notifier
-> when a process dies or a kernel panic occurs.  This allows a
-> meaningful diagnostic message to occur along with other
-> diagnostic information.
+[...]
+
+> >>>+	if (mode == EDDEVID_IMPL_NONE) {
+> >>>+		drvdata->edpcsr_present  = false;
+> >>>+		drvdata->edcidsr_present = false;
+> >>>+		drvdata->edvidsr_present = false;
+> >>>+	} else if (mode == EDDEVID_IMPL_EDPCSR) {
+> >>>+		drvdata->edpcsr_present  = true;
+> >>>+		drvdata->edcidsr_present = false;
+> >>>+		drvdata->edvidsr_present = false;
+> >>>+	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+> >>>+		if (!IS_ENABLED(CONFIG_64BIT) &&
+> >>>+			(pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
+> >>>+			drvdata->edpcsr_present = false;
+> >>>+		else
+> >>>+			drvdata->edpcsr_present = true;
+> >>
+> >>Sorry, I forgot why we do this check only in this mode. Shouldn't this be
+> >>common to all modes (of course which implies PCSR is present) ?
+> >
+> >No. PCSROffset is defined differently in ARMv7 and ARMv8; So finally we
+> >simplize PCSROffset value :
+> >0000 - Sample offset applies based on the instruction state (indicated by PCSR[0])
+> >0001 - No offset applies.
+> >0010 - No offset applies, but do not use in AArch32 mode!
+> >
+> >So we need handle the corner case is when CPU runs AArch32 mode and
+> >PCSRoffset = 'b0010. Other cases the pcsr should be present.
 > 
-> Notably writes to a bad GISB address on an ARM64 architecture
-> kernel cause unrecoverable SError aborts and this allows the
-> cause of the abort to be seen.
-> 
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> I understand that reasoning. But my question is, why do we check for PCSROffset
+> only when mode == EDDEVID_IMPL_EDPCSR_EDCIDSR and not for say mode == EDDEVID_IMPL_EDPCSR or
+> any other mode where PCSR is present.
 
-Thanks for changing this.
+Sorry I misunderstood your question.
 
-> ---
->  drivers/bus/brcmstb_gisb.c | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-> index 500b6bb5c739..774729002b8c 100644
-> --- a/drivers/bus/brcmstb_gisb.c
-> +++ b/drivers/bus/brcmstb_gisb.c
-> @@ -24,6 +24,8 @@
->  #include <linux/of.h>
->  #include <linux/bitops.h>
->  #include <linux/pm.h>
-> +#include <linux/kernel.h>
-> +#include <linux/kdebug.h>
->  
->  #ifdef CONFIG_ARM
->  #include <asm/bug.h>
-> @@ -290,6 +292,25 @@ static irqreturn_t brcmstb_gisb_tea_handler(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> +/*
-> + * Dump out gisb errors on die or panic.
-> + */
-> +static int dump_gisb_error(struct notifier_block *self, unsigned long v,
-> +			   void *p)
-> +{
-> +	struct brcmstb_gisb_arb_device *gdev;
-> +
-> +	/* iterate over each GISB arb registered handlers */
-> +	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
-> +		brcmstb_gisb_arb_decode_addr(gdev, "async abort");
-> +
-> +	return 0;
+I made mistake when I analyzed the possbile combination for mode and
+PCSROffset so I thought it's the only case should handle:
+{ EDDEVID_IMPL_EDPCSR_EDCIDSR, EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 }
 
-I think this should be NOTIFY_OK.
-
-> +}
-> +
-> +static struct notifier_block gisb_error_notifier = {
-> +	.notifier_call = dump_gisb_error,
-> +};
-> +
->  static DEVICE_ATTR(gisb_arb_timeout, S_IWUSR | S_IRUGO,
->  		gisb_arb_get_timeout, gisb_arb_set_timeout);
->  
-> @@ -408,6 +429,12 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
->  	board_be_handler = brcmstb_bus_error_handler;
->  #endif
->  
-> +	if (list_is_singular(&brcmstb_gisb_arb_device_list)) {
-> +		register_die_notifier(&gisb_error_notifier);
-> +		atomic_notifier_chain_register(&panic_notifier_list,
-> +					       &gisb_error_notifier);
-
-I don't think this is quite right. A notifier_block can only be
-registered to one notifier chain at a time, and this has the potential
-to corrupt both chains.
-
-I also think you only need to register the panic notifier. An SError
-should always result in a panic.
+Below three combinations are possible to exist; so you are right, I
+should move this out for the checking:
+{ EDDEVID_IMPL_NONE,           EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 }
+{ EDDEVID_IMPL_EDPCSR_EDCIDSR, EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 }
+{ EDDEVID_IMPL_FULL,           EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32 }
 
 Thanks,
-Mark.
+Leo Yan
