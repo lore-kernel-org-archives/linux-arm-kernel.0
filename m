@@ -1,104 +1,324 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:43:32 -0500
-Subject: [PATCH v4 15/23] drivers/fsi: expose direct-access slave API
+Date: Wed, 29 Mar 2017 12:43:38 -0500
+Subject: [PATCH v4 21/23] drivers/fsi: Add SCOM FSI client device driver
 In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
 References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170329174340.89109-16-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170329174340.89109-22-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Allow drivers to access the slave address ranges.
+Create a simple SCOM engine device driver that reads and writes
+its control registers via an FSI bus.
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
+Includes changes from Edward A. James <eajames@us.ibm.com>.
+
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Edward A. James <eajames@us.ibm.com>
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 ---
- drivers/fsi/fsi-core.c | 26 ++++++++++++++++++++------
- include/linux/fsi.h    | 12 ++++++++++++
- 2 files changed, 32 insertions(+), 6 deletions(-)
+ drivers/fsi/Kconfig    |   6 ++
+ drivers/fsi/Makefile   |   1 +
+ drivers/fsi/fsi-scom.c | 263 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 270 insertions(+)
+ create mode 100644 drivers/fsi/fsi-scom.c
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index f0f0556..f7e55e7 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -76,10 +76,6 @@ static int fsi_master_read(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
- static int fsi_master_write(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
--static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
--		void *val, size_t size);
--static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
--		const void *val, size_t size);
+diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+index 9cf8345..0fa265c 100644
+--- a/drivers/fsi/Kconfig
++++ b/drivers/fsi/Kconfig
+@@ -18,6 +18,12 @@ config FSI_MASTER_GPIO
+ 	---help---
+ 	This option enables a FSI master driver using GPIO lines.
  
- /* FSI endpoint-device support */
++config FSI_SCOM
++	tristate "SCOM FSI client device driver"
++	depends on FSI
++	---help---
++	This option enables an FSI based SCOM device driver.
++
+ endif
  
-@@ -181,7 +177,7 @@ static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
- 	return 0;
- }
+ endmenu
+diff --git a/drivers/fsi/Makefile b/drivers/fsi/Makefile
+index ed28ac0..3466f08 100644
+--- a/drivers/fsi/Makefile
++++ b/drivers/fsi/Makefile
+@@ -1,3 +1,4 @@
  
--static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
- 			void *val, size_t size)
- {
- 	uint8_t id = slave->id;
-@@ -195,7 +191,7 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
- 
--static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			const void *val, size_t size)
- {
- 	uint8_t id = slave->id;
-@@ -209,6 +205,24 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
- 
-+extern int fsi_slave_claim_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size)
+ obj-$(CONFIG_FSI) += fsi-core.o
+ obj-$(CONFIG_FSI_MASTER_GPIO) += fsi-master-gpio.o
++obj-$(CONFIG_FSI_SCOM) += fsi-scom.o
+diff --git a/drivers/fsi/fsi-scom.c b/drivers/fsi/fsi-scom.c
+new file mode 100644
+index 0000000..98d062f
+--- /dev/null
++++ b/drivers/fsi/fsi-scom.c
+@@ -0,0 +1,263 @@
++/*
++ * SCOM FSI Client device driver
++ *
++ * Copyright (C) IBM Corporation 2016
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERGCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/fsi.h>
++#include <linux/module.h>
++#include <linux/cdev.h>
++#include <linux/delay.h>
++#include <linux/fs.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
++#include <linux/miscdevice.h>
++#include <linux/list.h>
++#include <linux/idr.h>
++
++#define FSI_ENGID_SCOM		0x5
++
++#define SCOM_FSI2PIB_DELAY	50
++
++/* SCOM engine register set */
++#define SCOM_DATA0_REG		0x00
++#define SCOM_DATA1_REG		0x04
++#define SCOM_CMD_REG		0x08
++#define SCOM_RESET_REG		0x1C
++
++#define SCOM_RESET_CMD		0x80000000
++#define SCOM_WRITE_CMD		0x80000000
++
++struct scom_device {
++	struct list_head link;
++	struct fsi_device *fsi_dev;
++	struct miscdevice mdev;
++	char	name[32];
++	int idx;
++};
++
++#define to_scom_dev(x)		container_of((x), struct scom_device, mdev)
++
++static struct list_head scom_devices;
++
++static DEFINE_IDA(scom_ida);
++
++static int put_scom(struct scom_device *scom_dev, uint64_t value,
++			uint32_t addr)
 +{
-+	if (addr + size < addr)
-+		return -EINVAL;
++	int rc;
++	uint32_t data;
 +
-+	if (addr + size > slave->size)
-+		return -EINVAL;
++	data = cpu_to_be32(SCOM_RESET_CMD);
++	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_RESET_REG, &data,
++				sizeof(uint32_t));
++	if (rc)
++		return rc;
 +
-+	/* todo: check for overlapping claims */
++	data = cpu_to_be32((value >> 32) & 0xffffffff);
++	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_DATA0_REG, &data,
++				sizeof(uint32_t));
++	if (rc)
++		return rc;
++
++	data = cpu_to_be32(value & 0xffffffff);
++	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_DATA1_REG, &data,
++				sizeof(uint32_t));
++	if (rc)
++		return rc;
++
++	data = cpu_to_be32(SCOM_WRITE_CMD | addr);
++	return fsi_device_write(scom_dev->fsi_dev, SCOM_CMD_REG, &data,
++				sizeof(uint32_t));
++}
++
++static int get_scom(struct scom_device *scom_dev, uint64_t *value,
++			uint32_t addr)
++{
++	uint32_t result, data;
++	int rc;
++
++	*value = 0ULL;
++	data = cpu_to_be32(addr);
++	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_CMD_REG, &data,
++				sizeof(uint32_t));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(scom_dev->fsi_dev, SCOM_DATA0_REG, &result,
++				sizeof(uint32_t));
++	if (rc)
++		return rc;
++
++	*value |= (uint64_t)cpu_to_be32(result) << 32;
++	rc = fsi_device_read(scom_dev->fsi_dev, SCOM_DATA1_REG, &result,
++				sizeof(uint32_t));
++	if (rc)
++		return rc;
++
++	*value |= cpu_to_be32(result);
++
 +	return 0;
 +}
 +
-+extern void fsi_slave_release_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size)
++static ssize_t scom_read(struct file *filep, char __user *buf, size_t len,
++			loff_t *offset)
 +{
++	int rc;
++	struct miscdevice *mdev =
++				(struct miscdevice *)filep->private_data;
++	struct scom_device *scom = to_scom_dev(mdev);
++	struct device *dev = &scom->fsi_dev->dev;
++	uint64_t val;
++
++	if (len != sizeof(uint64_t))
++		return -EINVAL;
++
++	rc = get_scom(scom, &val, *offset);
++	if (rc) {
++		dev_dbg(dev, "get_scom fail:%d\n", rc);
++		return rc;
++	}
++
++	rc = copy_to_user(buf, &val, len);
++	if (rc)
++		dev_dbg(dev, "copy to user failed:%d\n", rc);
++
++	return rc ? rc : len;
 +}
 +
- static int fsi_slave_scan(struct fsi_slave *slave)
- {
- 	uint32_t engine_addr;
-diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index 34f1e9a..141fd38 100644
---- a/include/linux/fsi.h
-+++ b/include/linux/fsi.h
-@@ -66,6 +66,18 @@ struct fsi_driver {
- 		module_driver(__fsi_driver, fsi_driver_register, \
- 				fsi_driver_unregister)
- 
-+/* direct slave API */
-+extern int fsi_slave_claim_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size);
-+extern void fsi_slave_release_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size);
-+extern int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+		void *val, size_t size);
-+extern int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+		const void *val, size_t size);
++static ssize_t scom_write(struct file *filep, const char __user *buf,
++			size_t len, loff_t *offset)
++{
++	int rc;
++	struct miscdevice *mdev = filep->private_data;
++	struct scom_device *scom = to_scom_dev(mdev);
++	struct device *dev = &scom->fsi_dev->dev;
++	uint64_t val;
 +
++	if (len != sizeof(uint64_t))
++		return -EINVAL;
 +
++	rc = copy_from_user(&val, buf, len);
++	if (rc) {
++		dev_dbg(dev, "copy from user failed:%d\n", rc);
++		return -EINVAL;
++	}
 +
- extern struct bus_type fsi_bus_type;
- 
- #endif /* LINUX_FSI_H */
++	rc = put_scom(scom, val, *offset);
++	if (rc) {
++		dev_dbg(dev, "put_scom failed with:%d\n", rc);
++		return rc;
++	}
++
++	return len;
++}
++
++static loff_t scom_llseek(struct file *file, loff_t offset, int whence)
++{
++	switch (whence) {
++	case SEEK_CUR:
++		break;
++	case SEEK_SET:
++		file->f_pos = offset;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return offset;
++}
++
++static const struct file_operations scom_fops = {
++	.owner	= THIS_MODULE,
++	.llseek	= scom_llseek,
++	.read	= scom_read,
++	.write	= scom_write,
++};
++
++static int scom_probe(struct device *dev)
++{
++	struct fsi_device *fsi_dev = to_fsi_dev(dev);
++	struct scom_device *scom;
++
++	scom = devm_kzalloc(dev, sizeof(*scom), GFP_KERNEL);
++	if (!scom)
++		return -ENOMEM;
++
++	scom->idx = ida_simple_get(&scom_ida, 1, INT_MAX, GFP_KERNEL);
++	snprintf(scom->name, sizeof(scom->name), "scom%d", scom->idx);
++	scom->fsi_dev = fsi_dev;
++	scom->mdev.minor = MISC_DYNAMIC_MINOR;
++	scom->mdev.fops = &scom_fops;
++	scom->mdev.name = scom->name;
++	scom->mdev.parent = dev;
++	list_add(&scom->link, &scom_devices);
++
++	return misc_register(&scom->mdev);
++}
++
++static int scom_remove(struct device *dev)
++{
++	struct scom_device *scom, *scom_tmp;
++	struct fsi_device *fsi_dev = to_fsi_dev(dev);
++
++	list_for_each_entry_safe(scom, scom_tmp, &scom_devices, link) {
++		if (scom->fsi_dev == fsi_dev) {
++			list_del(&scom->link);
++			ida_simple_remove(&scom_ida, scom->idx);
++			misc_deregister(&scom->mdev);
++		}
++	}
++
++	return 0;
++}
++
++static struct fsi_device_id scom_ids[] = {
++	{
++		.engine_type = FSI_ENGID_SCOM,
++		.version = FSI_VERSION_ANY,
++	},
++	{ 0 }
++};
++
++static struct fsi_driver scom_drv = {
++	.id_table = scom_ids,
++	.drv = {
++		.name = "scom",
++		.bus = &fsi_bus_type,
++		.probe = scom_probe,
++		.remove = scom_remove,
++	}
++};
++
++static int scom_init(void)
++{
++	INIT_LIST_HEAD(&scom_devices);
++	return fsi_driver_register(&scom_drv);
++}
++
++static void scom_exit(void)
++{
++	struct list_head *pos;
++	struct scom_device *scom;
++
++	list_for_each(pos, &scom_devices) {
++		scom = list_entry(pos, struct scom_device, link);
++		misc_deregister(&scom->mdev);
++		devm_kfree(&scom->fsi_dev->dev, scom);
++	}
++	fsi_driver_unregister(&scom_drv);
++}
++
++module_init(scom_init);
++module_exit(scom_exit);
++MODULE_LICENSE("GPL");
 -- 
 1.8.2.2
