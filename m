@@ -1,38 +1,124 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Mar 2017 10:57:44 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-In-Reply-To: <1490699810.3546.10.camel@nxp.com>
-References: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
- <20170324064318.GD12604@b29396-OptiPlex-7040>
- <1490699810.3546.10.camel@nxp.com>
-Message-ID: <20170329025742.GU30608@dragon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 29 Mar 2017 11:01:02 +0800
+Subject: [Update][PATCH v9.1 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <6fb7a454-7829-0147-9b53-2d85e9200ad3@redhat.com>
+References: <1490703665-4932-1-git-send-email-hanjun.guo@linaro.org>
+ <6fb7a454-7829-0147-9b53-2d85e9200ad3@redhat.com>
+Message-ID: <58DB236E.9000006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 02:16:50PM +0300, Leonard Crestez wrote:
-> On Fri, 2017-03-24 at 14:43 +0800, Dong Aisheng wrote:
-> > Hi Leonard,
-> > 
-> > On Wed, Mar 22, 2017 at 04:27:37PM +0200, Leonard Crestez wrote:
-> > > 
-> > > The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
-> > > Add this driver to the default imx config since the device is present on
-> > > one of the evaluation boards.
-> > Upstream currently no evaluation board support.
-> > 
-> > This may leave to Shawn to decide whether apply it.
-> 
-> Really? But the dts for this eval board is included in upstream. Shouldn't the
-> default config try to work with the default imx*.dts files included?
-> 
-> > > This used to work mostly fine with the generic phy driver but since
-> > > commit 0878fff1f42c18e448ab5b8b4f6a3eb32365b5b6 that driver no longer
-> > I guess you should get a checkpatch error here.
-> 
-> Because I didn't reference that other commit right? Sorry about this.
-> 
-> Should I submit again with an improved commit message?
+On 03/29/2017 03:13 AM, Al Stone wrote:
+> On 03/28/2017 06:21 AM, Hanjun Guo wrote:
+[...]
+>>
+>> +#ifdef CONFIG_ACPI
+>> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
+>> +				     struct mbigen_device *mgn_chip)
+>> +{
+>> +	struct irq_domain *domain;
+>> +	u32 num_pins = 0;
+>> +	int ret;
+>> +
+>> +	/*
+>> +	 * "num-pins" is the total number of interrupt pins implemented in
+>> +	 * this mbigen instance, and mbigen is an interrupt controller
+>> +	 * connected to ITS  converting wired interrupts into MSI, so we
+>> +	 * use "num-pins" to alloc MSI vectors which are needed by client
+>> +	 * devices connected to it.
+>> +	 *
+>> +	 * Here is the DSDT device node used for mbigen in firmware:
+>> +	 *	Device(MBI0) {
+>> +	 *		Name(_HID, "HISI0152")
+>> +	 *		Name(_UID, Zero)
+>> +	 *		Name(_CRS, ResourceTemplate() {
+>> +	 *			Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>> +	 *		})
+>> +	 *
+>> +	 *		Name(_DSD, Package () {
+>> +	 *			ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>> +	 *			Package () {
+>> +	 *				Package () {"num-pins", 378}
+>> +	 *			}
+>> +	 *		})
+>> +	 *	}
+>> +	 */
+>
+> Excellent.  These comments I really like.  Thanks for doing this!
+>
+>> +	ret = device_property_read_u32(&pdev->dev, "num-pins", &num_pins);
+>> +	if (ret || num_pins == 0)
+>> +		return -EINVAL;
+>> +
+>> +	domain = platform_msi_create_device_domain(&pdev->dev, num_pins,
+>> +						   mbigen_write_msg,
+>> +						   &mbigen_domain_ops,
+>> +						   mgn_chip);
+>> +	if (!domain)
+>> +		return -ENOMEM;
+>> +
+>> +	return 0;
+>> +}
+>> +#else
+>> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
+>> +					    struct mbigen_device *mgn_chip)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +#endif
+>> +
+>>   static int mbigen_device_probe(struct platform_device *pdev)
+>>   {
+>>   	struct mbigen_device *mgn_chip;
+>> @@ -289,9 +342,18 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>>   	if (IS_ERR(mgn_chip->base))
+>>   		return PTR_ERR(mgn_chip->base);
+>>
+>> -	err = mbigen_of_create_domain(pdev, mgn_chip);
+>> -	if (err)
+>> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
+>> +		err = mbigen_of_create_domain(pdev, mgn_chip);
+>> +	else if (ACPI_COMPANION(&pdev->dev))
+>> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
+>> +	else
+>> +		err = -EINVAL;
+>> +
+>> +	if (err) {
+>> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain",
+>> +			mgn_chip->base);
+>>   		return err;
+>> +	}
+>>
+>>   	platform_set_drvdata(pdev, mgn_chip);
+>>   	return 0;
+>> @@ -303,10 +365,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>>   };
+>>   MODULE_DEVICE_TABLE(of, mbigen_of_match);
+>>
+>> +static const struct acpi_device_id mbigen_acpi_match[] = {
+>> +	{ "HISI0152", 0 },
+>> +	{}
+>> +};
+>> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
+>> +
+>>   static struct platform_driver mbigen_platform_driver = {
+>>   	.driver = {
+>>   		.name		= "Hisilicon MBIGEN-V2",
+>>   		.of_match_table	= mbigen_of_match,
+>> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+>>   	},
+>>   	.probe			= mbigen_device_probe,
+>>   };
+>>
+>
+> All LGTM.
+>
+> Reviewed-by: Al Stone <ahs3@redhat.com>
 
-Yes, please, and make sure that checkpatch.pl is happy about the patch.
+Thank you Al :)
 
-Shawn
+Marc, Lorenzo, since it's little bit late and urgent, could we merge
+this version?
+
+Thanks
+Hanjun
