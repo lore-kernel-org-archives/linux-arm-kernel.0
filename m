@@ -1,10 +1,10 @@
 From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Wed, 29 Mar 2017 04:49:36 +0000
-Subject: [PATCH v2 01/11] ARM: at91: pm: Cleanup headers
-In-Reply-To: <20170328111938.21297-2-alexandre.belloni@free-electrons.com>
+Date: Wed, 29 Mar 2017 04:50:18 +0000
+Subject: [PATCH v2 02/11] ARM: at91: pm: Move at91_ramc_read/write to pm.c
+In-Reply-To: <20170328111938.21297-3-alexandre.belloni@free-electrons.com>
 References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
- <20170328111938.21297-2-alexandre.belloni@free-electrons.com>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D77A@CHN-SV-EXMX07.mchp-main.com>
+ <20170328111938.21297-3-alexandre.belloni@free-electrons.com>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D786@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,55 +18,54 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Brezillon <boris.brezillon@free-electrons.com>; Wenyou Yang - A41535
 > <Wenyou.Yang@microchip.com>; Alexandre Belloni <alexandre.belloni@free-
 > electrons.com>
-> Subject: [PATCH v2 01/11] ARM: at91: pm: Cleanup headers
+> Subject: [PATCH v2 02/11] ARM: at91: pm: Move at91_ramc_read/write to pm.c
 > 
-> Remove unnecessary header inclusions and reorder the remaining ones.
+> Those macros are only used in pm.c, move them there so we can remove the test
+> on __ASSEMBLY__.
 > 
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
 
 > ---
->  arch/arm/mach-at91/pm.c | 21 +++++----------------
->  1 file changed, 5 insertions(+), 16 deletions(-)
+>  arch/arm/mach-at91/pm.c | 6 ++++++
+>  arch/arm/mach-at91/pm.h | 8 --------
+>  2 files changed, 6 insertions(+), 8 deletions(-)
 > 
 > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> a277981f414d..9e2b5c1e503e 100644
+> 9e2b5c1e503e..41789aa4df86 100644
 > --- a/arch/arm/mach-at91/pm.c
 > +++ b/arch/arm/mach-at91/pm.c
-> @@ -10,28 +10,17 @@
->   * (at your option) any later version.
->   */
+> @@ -45,6 +45,12 @@ static struct {
+>  } at91_pm_data;
 > 
-> -#include <linux/gpio.h>
-> -#include <linux/suspend.h>
-> -#include <linux/sched.h>
-> -#include <linux/proc_fs.h>
->  #include <linux/genalloc.h>
-> -#include <linux/interrupt.h>
-> -#include <linux/sysfs.h>
-> -#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> -#include <linux/of_address.h>
-> -#include <linux/platform_device.h>
-> -#include <linux/platform_data/atmel.h>
-> -#include <linux/io.h>
-> +#include <linux/suspend.h>
+>  static void __iomem *at91_ramc_base[2];
+> +#define at91_ramc_read(id, field) \
+> +	__raw_readl(at91_ramc_base[id] + field)
 > +
->  #include <linux/clk/at91_pmc.h>
+> +#define at91_ramc_write(id, field, value) \
+> +	__raw_writel(value, at91_ramc_base[id] + field)
+> +
 > 
-> -#include <asm/irq.h>
-> -#include <linux/atomic.h>
-> -#include <asm/mach/time.h>
-> -#include <asm/mach/irq.h>
-> -#include <asm/fncpy.h>
->  #include <asm/cacheflush.h>
-> +#include <asm/fncpy.h>
->  #include <asm/system_misc.h>
+>  static int at91_pm_valid_state(suspend_state_t state)  { diff --git
+> a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h index
+> bf980c6ef294..8eed156ef19a 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -17,14 +17,6 @@
+>  #include <soc/at91/at91sam9_ddrsdr.h>
+>  #include <soc/at91/at91sam9_sdramc.h>
 > 
->  #include "generic.h"
+> -#ifndef __ASSEMBLY__
+> -#define at91_ramc_read(id, field) \
+> -	__raw_readl(at91_ramc_base[id] + field)
+> -
+> -#define at91_ramc_write(id, field, value) \
+> -	__raw_writel(value, at91_ramc_base[id] + field)
+> -#endif
+> -
+>  #define AT91_MEMCTRL_MC		0
+>  #define AT91_MEMCTRL_SDRAMC	1
+>  #define AT91_MEMCTRL_DDRSDR	2
 > --
 > 2.11.0
