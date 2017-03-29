@@ -1,108 +1,94 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Mar 2017 12:33:05 +0100
-Subject: [PATCH v22 07/11] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7sDnp+p5Z=Cde-YS2UG8pxo9O=Tvkq8D79k37wOrUw19Q@mail.gmail.com>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-8-fu.wei@linaro.org>
- <20170328113535.GA17440@red-moon>
- <CADyBb7v9jaiQjaWzwafkih_tsU+-hNi+TA7hcDbFgtLLChXM_g@mail.gmail.com>
- <20170329102118.GB10807@red-moon>
- <CADyBb7sDnp+p5Z=Cde-YS2UG8pxo9O=Tvkq8D79k37wOrUw19Q@mail.gmail.com>
-Message-ID: <20170329113305.GA10960@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Mar 2017 12:32:51 +0100
+Subject: [PATCH v2 1/8] arm64: mm: Allow installation of memory abort
+ handlers
+In-Reply-To: <20170328213431.10904-2-opendmb@gmail.com>
+References: <20170328213431.10904-1-opendmb@gmail.com>
+ <20170328213431.10904-2-opendmb@gmail.com>
+Message-ID: <20170329113250.GG23442@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 06:48:26PM +0800, Fu Wei wrote:
-> Hi Lorenzo,
+Hi,
+
+On Tue, Mar 28, 2017 at 02:34:24PM -0700, Doug Berger wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
 > 
-> On 29 March 2017 at 18:21, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > On Wed, Mar 29, 2017 at 05:48:17PM +0800, Fu Wei wrote:
-> >
-> > [...]
-> >
-> >>  * @platform_timer_count: It points to a integer variable which is used
-> >>  *                           for storing the number of platform timers.
-> >>  *                           This pointer could be NULL, if the caller
-> >>  *                           doesn't need this info.
-> >>
-> >> >
-> >> >> + *
-> >> >> + * Return: 0 if success, -EINVAL if error.
-> >> >> + */
-> >> >> +int __init acpi_gtdt_init(struct acpi_table_header *table,
-> >> >> +                       int *platform_timer_count)
-> >> >> +{
-> >> >> +     int ret = 0;
-> >> >> +     int timer_count = 0;
-> >> >> +     void *platform_timer = NULL;
-> >> >> +     struct acpi_table_gtdt *gtdt;
-> >> >> +
-> >> >> +     gtdt = container_of(table, struct acpi_table_gtdt, header);
-> >> >> +     acpi_gtdt_desc.gtdt = gtdt;
-> >> >> +     acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
-> >> >> +
-> >> >> +     if (table->revision < 2)
-> >> >> +             pr_warn("Revision:%d doesn't support Platform Timers.\n",
-> >> >> +                     table->revision);
-> >> >
-> >> > Ok, two points here. First, I am not sure why you should warn if the
-> >> > table revision is < 2, is that a FW bug ? I do not think it is, you
-> >> > can just return 0.
-> >>
-> >> I used pr_debug here before v20, then I got Hanjun's suggestion:
-> >> -------
-> >> GTDT table revision is updated to 2 in ACPI 5.1, we will
-> >> not support ACPI version under 5.1 and disable ACPI in FADT
-> >> parse before this code is called, so if we get revision
-> >> <2 here, I think we need to print warning (we need to keep
-> >> the firmware stick to the spec on ARM64).
-> >> -------
-> >> https://lkml.org/lkml/2017/1/19/82
-> >>
-> >> So I started to use pr_warn.
-> >
-> > Thanks for the explanation, so it is a FW bug and the warning
-> > is granted :) just leave it there.
-> >
-> > Still, please check my comment on acpi_gtdt_init() being called
-> > multiple times on patch 11.
+> Similarly to what the ARM/Linux kernel provides, add a hook_fault_code()
+> function which allows drivers or other parts of the kernel to install
+> custom memory abort handlers. This is useful when a given SoC's busing
+> does not propagate the exact faulting physical address, but there is a
+> way to read it through e.g: a special arbiter driver.
 > 
-> Thanks
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+
+Personally, I do not think that it makes sense to allow arbitrary code
+to hook such low-level fault handling.
+
+IMO, if it is truly necessary to allow drivers to handle particular
+faults, that should be driven by data associated with the relevant
+mapping (e.g. the VMA), rather than allowing code to hook *all* faults.
+
+>From my PoV, NAK to this interface to take over low-level fault
+handling.
+
+Catalin and Will have the final say here, as the arm64 maintainers.
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/include/asm/system_misc.h |  3 +++
+>  arch/arm64/mm/fault.c                | 15 ++++++++++++++-
+>  2 files changed, 17 insertions(+), 1 deletion(-)
 > 
-> For calling acpi_gtdt_init() twice:
-> (1) 1st time: in early boot(bootmem), for init arch_timer and
-> memory-mapped timer, we initialize the acpi_gtdt_desc.
-> you can see that all the items in this struct are pointer.
-> (2) 2nd time: when system switch from bootmem to slab, all the
-> pointers in the acpi_gtdt_desc are invalid, so we have to
-> re-initialize(re-map) them.
+> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> index bc812435bc76..e05f5b8c7c1c 100644
+> --- a/arch/arm64/include/asm/system_misc.h
+> +++ b/arch/arm64/include/asm/system_misc.h
+> @@ -38,6 +38,9 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+>  void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+>  					     struct pt_regs *),
+>  			   int sig, int code, const char *name);
+> +void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+> +				       struct pt_regs *),
+> +		     int sig, int code, const char *name);
+>  
+>  struct mm_struct;
+>  extern void show_pte(struct mm_struct *mm, unsigned long addr);
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 4bf899fb451b..cdf1260f1005 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -488,7 +488,7 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  	return 1;
+>  }
+>  
+> -static const struct fault_info {
+> +static struct fault_info {
+>  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
+>  	int	sig;
+>  	int	code;
+> @@ -560,6 +560,19 @@ static const struct fault_info {
+>  	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
+>  };
+>  
+> +void __init hook_fault_code(int nr,
+> +			    int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+> +			    int sig, int code, const char *name)
+> +{
+> +	BUG_ON(nr < 0 || nr >= ARRAY_SIZE(fault_info));
+> +
+> +	fault_info[nr].fn	= fn;
+> +	fault_info[nr].sig	= sig;
+> +	fault_info[nr].code	= code;
+> +	fault_info[nr].name	= name;
+> +}
+> +
+> +
+>  static const char *fault_name(unsigned int esr)
+>  {
+>  	const struct fault_info *inf = fault_info + (esr & 63);
+> -- 
+> 2.12.0
 > 
-> I have tested it, if we don't re-initialize  the acpi_gtdt_desc,
-> system will go wrong.
-
-Ok, that's what I feared. My complaint on patch 11 is that:
-
-1) Stashing the GTDT pointer in acpi_gtdt_desc is not needed to
-   parse SBSA watchdogs
-2) It is not clear at all from the code or the commit log _why_ you
-   need to call acpi_gtdt_init() again (ie technically you don't need
-   to call it - you grab a valid pointer to the table and parse the
-   watchdogs in the _same_ function gtdt_sbsa_gwdt_init())
-
-I do not think there is much you can do to improve the arch timer gtdt
-interface (and it is too late for that anyway) but in patch 11 it would
-be ideal if you avoid calling acpi_gtdt_init() again, just parse GTDT
-entries and initialize the corresponding watchdogs (ie pointers stashed
-in acpi_gtdt_desc are stale anyway but that's __initdata so I can live
-with that).
-
-You should add comments to summarize this issue so that it can be
-easily understood by anyone maintaining this code, it is not crystal
-clear by reading the code why you need to multiple acpi_gtdt_init()
-calls and that's not a piffling detail.
-
-The ACPI patches are fine with me otherwise, I will complete the
-review shortly.
-
-Thanks !
-Lorenzo
