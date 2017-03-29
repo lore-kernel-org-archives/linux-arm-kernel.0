@@ -1,107 +1,73 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:43:27 -0500
-Subject: [PATCH v4 10/23] drivers/fsi: Add device read/write/peek API
+Date: Wed, 29 Mar 2017 12:43:30 -0500
+Subject: [PATCH v4 13/23] drivers/fsi: Add client driver register utilities
 In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
 References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170329174340.89109-11-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170329174340.89109-14-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-This change introduces the fsi device API: simple read, write and peek
-accessors for the devices' address spaces.
+Add driver_register and driver_unregister wrappers for FSI.
 
-Includes contributions from Chris Bostic <cbostic@linux.vnet.ibm.com>
-and Edward A. James <eajames@us.ibm.com>.
-
-Signed-off-by: Edward A. James <eajames@us.ibm.com>
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 33 +++++++++++++++++++++++++++++++++
- include/linux/fsi.h    |  7 ++++++-
- 2 files changed, 39 insertions(+), 1 deletion(-)
+ drivers/fsi/fsi-core.c | 17 +++++++++++++++++
+ include/linux/fsi.h    | 12 ++++++++++++
+ 2 files changed, 29 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index a8faa89..4da0b030 100644
+index 75d2a88..4359e26 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -32,6 +32,8 @@
- #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
- #define FSI_SLAVE_CONF_DATA_BITS	28
+@@ -585,6 +585,23 @@ static int fsi_bus_match(struct device *dev, struct device_driver *drv)
+ 	return 0;
+ }
  
-+#define FSI_PEEK_BASE			0x410
-+
- static const int engine_page_size = 0x400;
- 
- #define FSI_SLAVE_BASE			0x800
-@@ -73,9 +75,40 @@ static int fsi_master_read(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
- static int fsi_master_write(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+		void *val, size_t size);
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+		const void *val, size_t size);
- 
- /* FSI endpoint-device support */
- 
-+int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
-+		size_t size)
++int fsi_driver_register(struct fsi_driver *fsi_drv)
 +{
-+	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++	if (!fsi_drv)
++		return -EINVAL;
++	if (!fsi_drv->id_table)
 +		return -EINVAL;
 +
-+	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
++	return driver_register(&fsi_drv->drv);
 +}
-+EXPORT_SYMBOL_GPL(fsi_device_read);
++EXPORT_SYMBOL_GPL(fsi_driver_register);
 +
-+int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
-+		size_t size)
++void fsi_driver_unregister(struct fsi_driver *fsi_drv)
 +{
-+	if (addr > dev->size || size > dev->size || addr > dev->size - size)
-+		return -EINVAL;
-+
-+	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
++	driver_unregister(&fsi_drv->drv);
 +}
-+EXPORT_SYMBOL_GPL(fsi_device_write);
++EXPORT_SYMBOL_GPL(fsi_driver_unregister);
 +
-+int fsi_device_peek(struct fsi_device *dev, void *val)
-+{
-+	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
-+
-+	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
-+}
-+
- static void fsi_device_release(struct device *_device)
- {
- 	struct fsi_device *device = to_fsi_dev(_device);
+ struct bus_type fsi_bus_type = {
+ 	.name		= "fsi",
+ 	.match		= fsi_bus_match,
 diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index efa55ba..66bce48 100644
+index 66bce48..34f1e9a 100644
 --- a/include/linux/fsi.h
 +++ b/include/linux/fsi.h
-@@ -27,6 +27,12 @@ struct fsi_device {
- 	uint32_t		size;
- };
+@@ -54,6 +54,18 @@ struct fsi_driver {
+ #define to_fsi_dev(devp) container_of(devp, struct fsi_device, dev)
+ #define to_fsi_drv(drvp) container_of(drvp, struct fsi_driver, drv)
  
-+extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
-+		void *val, size_t size);
-+extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
-+		const void *val, size_t size);
-+extern int fsi_device_peek(struct fsi_device *dev, void *val);
++extern int fsi_driver_register(struct fsi_driver *fsi_drv);
++extern void fsi_driver_unregister(struct fsi_driver *fsi_drv);
 +
- struct fsi_device_id {
- 	u8	engine_type;
- 	u8	version;
-@@ -40,7 +46,6 @@ struct fsi_device_id {
- #define FSI_DEVICE_VERSIONED(t, v) \
- 	.engine_type = (t), .version = (v),
++/* module_fsi_driver() - Helper macro for drivers that don't do
++ * anything special in module init/exit.  This eliminates a lot of
++ * boilerplate.  Each module may only use this macro once, and
++ * calling it replaces module_init() and module_exit()
++ */
++#define module_fsi_driver(__fsi_driver) \
++		module_driver(__fsi_driver, fsi_driver_register, \
++				fsi_driver_unregister)
++
+ extern struct bus_type fsi_bus_type;
  
--
- struct fsi_driver {
- 	struct device_driver		drv;
- 	const struct fsi_device_id	*id_table;
+ #endif /* LINUX_FSI_H */
 -- 
 1.8.2.2
