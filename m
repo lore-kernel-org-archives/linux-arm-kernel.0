@@ -1,633 +1,292 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 29 Mar 2017 14:30:09 +0800
-Subject: [PATCH v3 2/2] arm64: dts: hisilicon: add dts files for
- hi3798cv200-poplar board
-In-Reply-To: <1490769009-12552-1-git-send-email-xuejiancheng@hisilicon.com>
-References: <1490769009-12552-1-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <1490769009-12552-3-git-send-email-xuejiancheng@hisilicon.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 29 Mar 2017 08:54:05 +0200
+Subject: [RFC PATCH 2/3] iio: adc: sun4i-gpadc-iio: add support for H3
+ thermal sensor
+In-Reply-To: <20170328173013.16539-3-icenowy@aosc.io>
+References: <20170328173013.16539-1-icenowy@aosc.io>
+ <20170328173013.16539-3-icenowy@aosc.io>
+Message-ID: <813dc1d8-89b4-9c0e-c1cc-e76efde2be1f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic dts files for hi3798cv200-poplar board. Poplar is the
-first development board compliant with the 96Boards Enterprise
-Edition TV Platform specification. The board features the
-Hi3798CV200 with an integrated quad-core 64-bit ARM Cortex A53
-processor and high performance Mali T720 GPU.
+Hi,
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
-Reviewed-by: Alex Elder <elder@linaro.org>
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
----
-Changed Log:
-v3:
-- Refined the patch according to Andreas's suggestions.
-  1. Changed the license.
-  2. Added alias for uart2.
-  3. Reordered the device nodes. 
-v2:
-- Fixed issues pointed by Rob Herring.
-  1. Moved the led node out of the soc node.
-  2. Restrained the ranges property of soc node smaller.
-- Refined the patch according to Andreas's suggestions.
-- Enabled gmac1 device node instead of gmac0.
-- Added a compatible string "syscon" for crg nodes.
+On 28/03/2017 19:30, Icenowy Zheng wrote:
+> This adds support for the Allwinner H3 thermal sensor.
+> 
+> Allwinner H3 has a thermal sensor like the one in A33, but have its
+> registers nearly all re-arranged, sample clock moved to CCU and a pair
+> of bus clock and reset added. It's also the base of newer SoCs' thermal
+> sensors.
+> 
+> An option is added to gpadc_data struct, to indicate whether this device
+> is a new-generation Allwinner thermal sensor.
+> 
+> The thermal sensors on A64 and H5 is like the one on H3, but with of
+> course different formula factors.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 130 ++++++++++++++++++++++++++++++++------
+>  include/linux/mfd/sun4i-gpadc.h   |  33 +++++++++-
+>  2 files changed, 141 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 74705aa37982..7512b1cae877 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -22,6 +22,7 @@
+>   * shutdown for not being used.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/completion.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> @@ -31,6 +32,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> +#include <linux/reset.h>
+>  #include <linux/thermal.h>
+>  #include <linux/delay.h>
+>  
+> @@ -56,6 +58,7 @@ struct gpadc_data {
+>  	unsigned int	tp_adc_select;
+>  	unsigned int	(*adc_chan_select)(unsigned int chan);
+>  	unsigned int	adc_chan_mask;
+> +	bool		gen2_ths;
+>  };
+>  
 
- arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 163 +++++++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 405 +++++++++++++++++++++
- 3 files changed, 569 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+Instead of a boolean, give the TEMP_DATA register address.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
-index c3a6c19..8960eca 100644
---- a/arch/arm64/boot/dts/hisilicon/Makefile
-+++ b/arch/arm64/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_HISI) += hi3660-hikey960.dtb
-+dtb-$(CONFIG_ARCH_HISI) += hi3798cv200-poplar.dtb
- dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip05-d02.dtb
- dtb-$(CONFIG_ARCH_HISI) += hip06-d03.dtb
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-new file mode 100644
-index 0000000..fe2f9f1
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-@@ -0,0 +1,163 @@
-+/*
-+ * DTS File for HiSilicon Poplar Development Board
-+ *
-+ * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
-+ *
-+ * Released under the GPLv2 only.
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include "hi3798cv200.dtsi"
-+
-+/ {
-+	model = "HiSilicon Poplar Development Board";
-+	compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial2 = &uart2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		user-led0 {
-+			label = "USER-LED0";
-+			gpios = <&gpio6 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+
-+		user-led1 {
-+			label = "USER-LED1";
-+			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "mmc0";
-+			default-state = "off";
-+		};
-+
-+		user-led2 {
-+			label = "USER-LED2";
-+			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "none";
-+			default-state = "off";
-+		};
-+
-+		user-led3 {
-+			label = "USER-LED3";
-+			gpios = <&gpio10 6 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "cpu0";
-+			default-state = "off";
-+		};
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	phy-handle = <&eth_phy1>;
-+	phy-mode = "rgmii";
-+	hisilicon,phy-reset-delays-us = <10000 10000 30000>;
-+
-+	eth_phy1: phy at 3 {
-+		reg = <3>;
-+	};
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+	gpio-line-names = "LS-GPIO-E",	"",
-+			  "",		"",
-+			  "",		"LS-GPIO-F",
-+			  "",		"LS-GPIO-J";
-+};
-+
-+&gpio2 {
-+	status = "okay";
-+	gpio-line-names = "LS-GPIO-H",	"LS-GPIO-I",
-+			  "LS-GPIO-L",	"LS-GPIO-G",
-+			  "LS-GPIO-K",	"",
-+			  "",		"";
-+};
-+
-+&gpio3 {
-+	status = "okay";
-+	gpio-line-names = "",		"",
-+			  "",		"",
-+			  "LS-GPIO-C",	"",
-+			  "",		"LS-GPIO-B";
-+};
-+
-+&gpio4 {
-+	status = "okay";
-+	gpio-line-names = "",		"",
-+			  "",		"",
-+			  "",		"LS-GPIO-D",
-+			  "",		"";
-+};
-+
-+&gpio5 {
-+	status = "okay";
-+	gpio-line-names = "",		"USER-LED-1",
-+			  "USER-LED-2",	"",
-+			  "",		"LS-GPIO-A",
-+			  "",		"";
-+};
-+
-+&gpio6 {
-+	status = "okay";
-+	gpio-line-names = "",		"",
-+			  "",		"USER-LED-0",
-+			  "",		"",
-+			  "",		"";
-+};
-+
-+&gpio10 {
-+	status = "okay";
-+	gpio-line-names = "",		"",
-+			  "",		"",
-+			  "",		"",
-+			  "USER-LED-3",	"";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	label = "LS-I2C0";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+	label = "LS-I2C1";
-+};
-+
-+&ir {
-+	status = "okay";
-+};
-+
-+&spi0 {
-+	status = "okay";
-+	label = "LS-SPI0";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+	label = "LS-UART0";
-+};
-+/* No optional LS-UART1 on Low Speed Expansion Connector. */
-+
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-new file mode 100644
-index 0000000..e94d6f6
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-@@ -0,0 +1,405 @@
-+/*
-+ * DTS File for HiSilicon Hi3798cv200 SoC.
-+ *
-+ * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
-+ *
-+ * Released under the GPLv2 only.
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#include <dt-bindings/clock/histb-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/reset/ti-syscon.h>
-+
-+/ {
-+	compatible = "hisilicon,hi3798cv200";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a53";
-+			device_type = "cpu";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a53";
-+			device_type = "cpu";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a53";
-+			device_type = "cpu";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a53";
-+			device_type = "cpu";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	gic: interrupt-controller at f1001000 {
-+		compatible = "arm,gic-400";
-+		reg = <0x0 0xf1001000 0x0 0x1000>,  /* GICD */
-+		      <0x0 0xf1002000 0x0 0x100>;   /* GICC */
-+		#address-cells = <0>;
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc: soc at f0000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x0 0xf0000000 0x10000000>;
-+
-+		crg: clock-reset-controller at 8a22000 {
-+			compatible = "hisilicon,hi3798cv200-crg", "syscon", "simple-mfd";
-+			reg = <0x8a22000 0x1000>;
-+			#clock-cells = <1>;
-+			#reset-cells = <2>;
-+
-+			gmacphyrst: reset-controller {
-+				compatible = "ti,syscon-reset";
-+				#reset-cells = <1>;
-+				ti,reset-bits =
-+					<0xcc 12 0xcc 12 0 0 (ASSERT_CLEAR|DEASSERT_SET|STATUS_NONE)>,  /* 0: gmac0-phy-rst */
-+					<0xcc 13 0xcc 13 0 0 (ASSERT_CLEAR|DEASSERT_SET|STATUS_NONE)>;  /* 1: gmac1-phy-rst */
-+			};
-+		};
-+
-+		sysctrl: system-controller at 8000000 {
-+			compatible = "hisilicon,hi3798cv200-sysctrl", "syscon";
-+			reg = <0x8000000 0x1000>;
-+			#clock-cells = <1>;
-+			#reset-cells = <2>;
-+		};
-+
-+		uart0: serial at 8b00000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x8b00000 0x1000>;
-+			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysctrl HISTB_UART0_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 8b02000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x8b02000 0x1000>;
-+			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HISTB_UART2_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		i2c0: i2c at 8b10000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0x8b10000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <400000>;
-+			clocks = <&crg HISTB_I2C0_CLK>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 8b11000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0x8b11000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <400000>;
-+			clocks = <&crg HISTB_I2C1_CLK>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 8b12000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0x8b12000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <400000>;
-+			clocks = <&crg HISTB_I2C2_CLK>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at 8b13000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0x8b13000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <400000>;
-+			clocks = <&crg HISTB_I2C3_CLK>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at 8b14000 {
-+			compatible = "hisilicon,hix5hd2-i2c";
-+			reg = <0x8b14000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <400000>;
-+			clocks = <&crg HISTB_I2C4_CLK>;
-+			status = "disabled";
-+		};
-+
-+		spi0: spi at 8b1a000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x8b1a000 0x1000>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			num-cs = <1>;
-+			cs-gpios = <&gpio7 1 0>;
-+			clocks = <&crg HISTB_SPI0_CLK>;
-+			clock-names = "apb_pclk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		emmc: mmc at 9830000 {
-+			compatible = "snps,dw-mshc";
-+			reg = <0x9830000 0x10000>;
-+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HISTB_MMC_CIU_CLK>,
-+				 <&crg HISTB_MMC_BIU_CLK>;
-+			clock-names = "ciu", "biu";
-+		};
-+
-+		gpio0: gpio at 8b20000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b20000 0x1000>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio1: gpio at 8b21000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b21000 0x1000>;
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio2: gpio at 8b22000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b22000 0x1000>;
-+			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio3: gpio at 8b23000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b23000 0x1000>;
-+			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio4: gpio at 8b24000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b24000 0x1000>;
-+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio5: gpio at 8004000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8004000 0x1000>;
-+			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio6: gpio at 8b26000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b26000 0x1000>;
-+			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio7: gpio at 8b27000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b27000 0x1000>;
-+			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio8: gpio at 8b28000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b28000 0x1000>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio9: gpio at 8b29000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b29000 0x1000>;
-+			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio10: gpio at 8b2a000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b2a000 0x1000>;
-+			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio11: gpio at 8b2b000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b2b000 0x1000>;
-+			interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpio12: gpio at 8b2c000 {
-+			compatible = "arm,pl061", "arm,primecell";
-+			reg = <0x8b2c000 0x1000>;
-+			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			clocks = <&crg HISTB_APB_CLK>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gmac0: ethernet at 9840000 {
-+			compatible = "hisilicon,hi3798cv200-gmac", "hisilicon,hisi-gmac-v2";
-+			reg = <0x9840000 0x1000>,
-+			      <0x984300c 0x4>;
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HISTB_ETH0_MAC_CLK>,
-+				 <&crg HISTB_ETH0_MACIF_CLK>;
-+			clock-names = "mac_core", "mac_ifc";
-+			resets = <&crg 0xcc 8>,
-+				 <&crg 0xcc 10>,
-+				 <&gmacphyrst 0>;
-+			reset-names = "mac_core", "mac_ifc", "phy";
-+			status = "disabled";
-+		};
-+
-+		gmac1: ethernet at 9841000 {
-+			compatible = "hisilicon,hi3798cv200-gmac", "hisilicon,hisi-gmac-v2";
-+			reg = <0x9841000 0x1000>,
-+			      <0x9843010 0x4>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg HISTB_ETH1_MAC_CLK>,
-+				 <&crg HISTB_ETH1_MACIF_CLK>;
-+			clock-names = "mac_core", "mac_ifc";
-+			resets = <&crg 0xcc 9>,
-+				 <&crg 0xcc 11>,
-+				 <&gmacphyrst 1>;
-+			reset-names = "mac_core", "mac_ifc", "phy";
-+			status = "disabled";
-+		};
-+
-+		ir: ir at 8001000 {
-+			compatible = "hisilicon,hix5hd2-ir";
-+			reg = <0x8001000 0x1000>;
-+			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysctrl HISTB_IR_CLK>;
-+			status = "disabled";
-+		};
-+	};
-+};
+>  static const struct gpadc_data sun4i_gpadc_data = {
+> @@ -88,7 +91,20 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.temp_offset = -1662,
+>  	.temp_scale = 162,
+> -	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
+> +	.tp_mode_en = SUN8I_A23_GPADC_CTRL1_CHOP_TEMP_EN,
+> +};
+
+Separate patch for this?
+
+> +
+> +static const struct gpadc_data sun8i_h3_gpadc_data = {
+> +	/*
+> +	 * The original formula on the datasheet seems to be wrong.
+> +	 * These factors are calculated based on the formula in the BSP
+> +	 * kernel, which is originally Tem = 217 - (T / 8.253), in which Tem
+> +	 * is the temperature in Celsius degree and T is the raw value
+> +	 * from the sensor.
+> +	 */
+> +	.temp_offset = -1791,
+> +	.temp_scale = -121,
+> +	.gen2_ths = true,
+>  };
+>  
+>  struct sun4i_gpadc_iio {
+> @@ -103,6 +119,9 @@ struct sun4i_gpadc_iio {
+>  	atomic_t			ignore_temp_data_irq;
+>  	const struct gpadc_data		*data;
+>  	bool				no_irq;
+> +	struct clk			*ths_bus_clk;
+> +	struct clk			*ths_clk;
+> +	struct reset_control		*reset;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+>  };
+> @@ -274,7 +293,11 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+>  	if (info->no_irq) {
+>  		pm_runtime_get_sync(indio_dev->dev.parent);
+>  
+> -		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
+> +		if (info->data->gen2_ths)
+> +			regmap_read(info->regmap, SUN8I_H3_GPADC_TEMP_DATA,
+> +				    val);
+> +		else
+> +			regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
+>  
+
+Instead of gen2_ths, use the TEMP_DATA register address.
+
+>  		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>  		pm_runtime_put_autosuspend(indio_dev->dev.parent);
+> @@ -386,10 +409,15 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>  
+> -	/* Disable the ADC on IP */
+> -	regmap_write(info->regmap, SUN4I_GPADC_CTRL1, 0);
+> -	/* Disable temperature sensor on IP */
+> -	regmap_write(info->regmap, SUN4I_GPADC_TPR, 0);
+> +	if (info->data->gen2_ths) {
+> +		/* Disable temperature sensor */
+> +		regmap_write(info->regmap, SUN8I_H3_GPADC_CTRL2, 0);
+> +	} else {
+> +		/* Disable the ADC on IP */
+> +		regmap_write(info->regmap, SUN4I_GPADC_CTRL1, 0);
+> +		/* Disable temperature sensor on IP */
+> +		regmap_write(info->regmap, SUN4I_GPADC_TPR, 0);
+> +	}
+>  
+
+Either use another register address or add a suspend function to struct
+gpadc_data which will be different for each version of the IP.
+
+>  	return 0;
+>  }
+> @@ -398,19 +426,36 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>  
+> -	/* clkin = 6MHz */
+> -	regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
+> -		     SUN4I_GPADC_CTRL0_ADC_CLK_DIVIDER(2) |
+> -		     SUN4I_GPADC_CTRL0_FS_DIV(7) |
+> -		     SUN4I_GPADC_CTRL0_T_ACQ(63));
+> -	regmap_write(info->regmap, SUN4I_GPADC_CTRL1, info->data->tp_mode_en);
+> -	regmap_write(info->regmap, SUN4I_GPADC_CTRL3,
+> -		     SUN4I_GPADC_CTRL3_FILTER_EN |
+> -		     SUN4I_GPADC_CTRL3_FILTER_TYPE(1));
+> -	/* period = SUN4I_GPADC_TPR_TEMP_PERIOD * 256 * 16 / clkin; ~0.6s */
+> -	regmap_write(info->regmap, SUN4I_GPADC_TPR,
+> -		     SUN4I_GPADC_TPR_TEMP_ENABLE |
+> -		     SUN4I_GPADC_TPR_TEMP_PERIOD(800));
+> +	if (info->data->gen2_ths) {
+> +		regmap_write(info->regmap, SUN8I_H3_GPADC_CTRL2,
+> +			     SUN8I_H3_GPADC_CTRL2_TEMP_SENSE_EN |
+> +			     SUN8I_H3_GPADC_CTRL2_T_ACQ1(31));
+> +		regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
+> +			     SUN4I_GPADC_CTRL0_T_ACQ(31));
+> +		regmap_write(info->regmap, SUN8I_H3_GPADC_CTRL3,
+> +			     SUN4I_GPADC_CTRL3_FILTER_EN |
+> +			     SUN4I_GPADC_CTRL3_FILTER_TYPE(1));
+> +		regmap_write(info->regmap, SUN8I_H3_GPADC_INTC,
+> +			     SUN8I_H3_GPADC_INTC_TEMP_PERIOD(800));
+> +	} else {
+> +		/* clkin = 6MHz */
+> +		regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
+> +			     SUN4I_GPADC_CTRL0_ADC_CLK_DIVIDER(2) |
+> +			     SUN4I_GPADC_CTRL0_FS_DIV(7) |
+> +			     SUN4I_GPADC_CTRL0_T_ACQ(63));
+> +		regmap_write(info->regmap, SUN4I_GPADC_CTRL1,
+> +			     info->data->tp_mode_en);
+> +		regmap_write(info->regmap, SUN4I_GPADC_CTRL3,
+> +			     SUN4I_GPADC_CTRL3_FILTER_EN |
+> +			     SUN4I_GPADC_CTRL3_FILTER_TYPE(1));
+> +		/*
+> +		 * period = SUN4I_GPADC_TPR_TEMP_PERIOD * 256 * 16 / clkin;
+> +		 * ~0.6s
+> +		 */
+> +		regmap_write(info->regmap, SUN4I_GPADC_TPR,
+> +			     SUN4I_GPADC_TPR_TEMP_ENABLE |
+> +			     SUN4I_GPADC_TPR_TEMP_PERIOD(800));
+> +	}
+>  
+
+Same here as suspend function?
+
+>  	return 0;
+>  }
+> @@ -494,6 +539,10 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
+>  		.compatible = "allwinner,sun8i-a33-ths",
+>  		.data = &sun8i_a33_gpadc_data,
+>  	},
+> +	{
+> +		.compatible = "allwinner,sun8i-h3-ths",
+> +		.data = &sun8i_h3_gpadc_data,
+> +	},
+>  	{ /* sentinel */ }
+>  };
+>  
+> @@ -529,6 +578,43 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  		return ret;
+>  	}
+>  
+> +	if (info->data->gen2_ths) {
+> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
+> +		if (IS_ERR(info->reset)) {
+> +			ret = PTR_ERR(info->reset);
+> +			return ret;
+> +		}
+> +
+> +		ret = reset_control_deassert(info->reset);
+> +		if (ret)
+> +			return ret;
+> +
+> +		info->ths_bus_clk = devm_clk_get(&pdev->dev, "bus");
+> +		if (IS_ERR(info->ths_bus_clk)) {
+> +			ret = PTR_ERR(info->ths_bus_clk);
+> +			return ret;
+> +		}
+> +
+> +		ret = clk_prepare_enable(info->ths_bus_clk);
+> +		if (ret)
+> +			return ret;
+> +
+> +		info->ths_clk = devm_clk_get(&pdev->dev, "ths");
+> +		if (IS_ERR(info->ths_clk)) {
+> +			ret = PTR_ERR(info->ths_clk);
+> +			return ret;
+> +		}
+> +
+> +		/* Running at 6MHz */
+> +		ret = clk_set_rate(info->ths_clk, 6000000);
+> +		if (ret)
+> +			return ret;
+> +
+> +		ret = clk_prepare_enable(info->ths_clk);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	if (!IS_ENABLED(CONFIG_THERMAL_OF))
+>  		return 0;
+>  
+> @@ -691,6 +777,12 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
+>  	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
+>  		iio_map_array_unregister(indio_dev);
+>  
+> +	if (info->data->gen2_ths) {
+> +		clk_disable_unprepare(info->ths_clk);
+> +		clk_disable_unprepare(info->ths_bus_clk);
+> +		reset_control_deassert(info->reset);
+> +	}
+> +
+
+I'm not really fond of using this boolean as I don't see it being
+possibly reused for any other SoCs that has a GPADC or THS.
+
+Here, you could make use of a list/array of clk which then can be reused
+for other SoCs just by changing the list. Add a default rate to the
+gpadc_data structure and you're go to go.
+
+>  	return 0;
+>  }
+>  
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 139872c2e0fe..f794a2988a93 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -38,9 +38,12 @@
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
+>  
+> -/* TP_CTRL1 bits for sun8i SoCs */
+> -#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
+> -#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
+> +/* TP_CTRL1 bits for sun8i A23/A33 SoCs */
+> +#define SUN8I_A23_GPADC_CTRL1_CHOP_TEMP_EN		BIT(8)
+> +#define SUN8I_A23_GPADC_CTRL1_GPADC_CALI_EN		BIT(7)
+> +
+
+Different patch for these?
+
+Thanks,
+Quentin
 -- 
-1.9.1
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
