@@ -1,189 +1,385 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 29 Mar 2017 11:07:35 +0800
-Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
-In-Reply-To: <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
-References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
- <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
- <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
-Message-ID: <20170329030735.GA23889@leoy-linaro>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 28 Mar 2017 20:15:15 -0700
+Subject: [PATCH v3 2/5] drivers: watchdog: Add STM32 IWDG driver
+In-Reply-To: <1490195083-25117-3-git-send-email-yannick.fertre@st.com>
+References: <1490195083-25117-1-git-send-email-yannick.fertre@st.com>
+ <1490195083-25117-3-git-send-email-yannick.fertre@st.com>
+Message-ID: <ac425e69-2d3c-2257-7183-115fbe9eb2b0@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+On 03/22/2017 08:04 AM, Yannick Fertre wrote:
+> This patch adds IWDG (Independent WatchDoG) support for STM32 platform.
+>
+> Change-Id: Iab218745fc25566f12558fae7f52e2f8c21db74e
 
-On Mon, Mar 27, 2017 at 05:34:57PM +0100, Suzuki K Poulose wrote:
-> On 25/03/17 18:23, Leo Yan wrote:
+No gerrit tags, please.
 
-[...]
+> Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
+> ---
+>  drivers/watchdog/Kconfig      |  11 ++
+>  drivers/watchdog/Makefile     |   1 +
+>  drivers/watchdog/stm32_iwdg.c | 289 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 301 insertions(+)
+>  create mode 100644 drivers/watchdog/stm32_iwdg.c
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 52a70ee..d9745a5 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -744,6 +744,17 @@ config ZX2967_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called zx2967_wdt.
+>
+> +config STM32_WATCHDOG
+> +	tristate "STM32 Independent WatchDoG (IWDG) support"
+> +	depends on ARCH_STM32
+> +	select WATCHDOG_CORE
+> +	default y
+> +	help
+> +	  Say Y here to include Watchdog timer support.
 
-> Leo,
-> 
-> Thanks a lot for the quick rework. I don't fully understand (yet!) why we need the
-> idle_constraint. I will leave it for Sudeep to comment on it, as he is the expert
-> in that area. Some minor comments below.
+... for <pick your text>.
 
-Thanks a lot for quick reviewing :)
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called stm32_iwdg.
+> +
+>  # AVR32 Architecture
+>
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index a2126e2..a35e423 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -84,6 +84,7 @@ obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
+>  obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+> +obj-$(CONFIG_STM32_WATCHDOG) += stm32_iwdg.o
+>
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
+> new file mode 100644
+> index 0000000..507dfc4
+> --- /dev/null
+> +++ b/drivers/watchdog/stm32_iwdg.c
+> @@ -0,0 +1,289 @@
+> +/*
+> + * Driver for STM32 Independent Watchdog
+> + *
+> + * Copyright (C) Yannick Fertre 2017
+> + * Author: Yannick Fertre <yannick.fertre@st.com>
+> + *
+> + * This driver is based on tegra_wdt.c
+> + *
+> + * License terms:  GNU General Public License (GPL), version 2
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/watchdog.h>
+> +
+> +/* minimum watchdog trigger timeout, in seconds */
+> +#define MIN_WDT_TIMEOUT	1
+> +
+> +/* IWDG registers */
+> +#define IWDG_KR		0x00 /* Key register */
+> +#define IWDG_PR		0x04 /* Prescaler Register */
+> +#define IWDG_RLR	0x08 /* ReLoad Register */
+> +#define IWDG_SR		0x0C /* Status Register */
+> +#define IWDG_WINR	0x10 /* Windows Register */
+> +
+> +/* IWDG_KR register bit mask */
+> +#define KR_KEY_RELOAD	0xAAAA /* reload counter enable */
+> +#define KR_KEY_ENABLE	0xCCCC /* peripheral enable */
+> +#define KR_KEY_EWA	0x5555 /* write access enable */
+> +#define KR_KEY_DWA	0x0000 /* write access disable */
+> +
+> +/* IWDG_PR register bit values */
+> +#define PR_4    0x00 /* prescaler set to 4 */
+> +#define PR_8    0x01 /* prescaler set to 8 */
+> +#define PR_16   0x02 /* prescaler set to 16 */
+> +#define PR_32   0x03 /* prescaler set to 32 */
+> +#define PR_64   0x04 /* prescaler set to 64 */
+> +#define PR_128  0x05 /* prescaler set to 128 */
+> +#define PR_256	0x06 /* prescaler set to 256 */
+> +
+> +/* IWDG_RLR register values */
+> +#define RLR_MAX		0xFFF /* max value supported by reload register */
+> +
+> +/* IWDG_SR register bit mask */
+> +#define FLAG_PVU	BIT(0) /* Watchdog prescaler value update */
+> +#define FLAG_RVU	BIT(1) /* Watchdog counter reload value update */
+> +
+> +/* set timeout to 100000 us */
+> +#define TIMEOUT_US	100000
+> +#define SLEEP_US	1000
+> +
+> +struct stm32_iwdg {
+> +	struct watchdog_device	wdd;
+> +	struct device		*dev;
+> +	void __iomem		*regs;
+> +	struct clk		*clk;
+> +	unsigned int		rate;
+> +};
+> +
+> +static int heartbeat = MIN_WDT_TIMEOUT;
+> +module_param(heartbeat, int, 0x0);
+> +MODULE_PARM_DESC(heartbeat,
+> +		 "Watchdog heartbeats in seconds. (default = "
+> +		 __MODULE_STRING(WDT_HEARTBEAT) ")");
+> +
+> +static inline u32 reg_read(void __iomem *base, u32 reg)
+> +{
+> +	return readl_relaxed(base + reg);
+> +}
+> +
+> +static inline void reg_write(void __iomem *base, u32 reg, u32 val)
+> +{
+> +	writel_relaxed(val, base + reg);
+> +}
+> +
+> +static int stm32_iwdg_start(struct watchdog_device *wdd)
+> +{
+> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +	u32 val = FLAG_PVU | FLAG_RVU;
+> +	u32 reload;
+> +	int ret;
+> +
+> +	dev_dbg(wdt->dev, "%s\n", __func__);
+> +
+> +	/* prescaler fixed to 256 */
+> +	reload = (wdd->timeout * wdt->rate) / 256;
+> +	if (reload > RLR_MAX + 1) {
+> +		dev_err(wdt->dev,
+> +			"Watchdog doesn't support reload value: %d\n", reload);
+> +		return -EINVAL;
+> +	}
 
-> >Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> >---
-> > drivers/hwtracing/coresight/Kconfig               |  11 +
-> > drivers/hwtracing/coresight/Makefile              |   1 +
-> > drivers/hwtracing/coresight/coresight-cpu-debug.c | 704 ++++++++++++++++++++++
-> > 3 files changed, 716 insertions(+)
-> > create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
-> >
-> >diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> >index 130cb21..18d7931 100644
-> >--- a/drivers/hwtracing/coresight/Kconfig
-> >+++ b/drivers/hwtracing/coresight/Kconfig
-> >@@ -89,4 +89,15 @@ config CORESIGHT_STM
-> > 	  logging useful software events or data coming from various entities
-> > 	  in the system, possibly running different OSs
-> >
-> >+config CORESIGHT_CPU_DEBUG
-> >+	tristate "CoreSight CPU Debug driver"
-> >+	depends on ARM || ARM64
-> >+	depends on DEBUG_FS
-> >+	help
-> >+	  This driver provides support for coresight debugging module. This
-> >+	  is primarily used to dump sample-based profiling registers when
-> >+	  system triggers panic, the driver will parse context registers so
-> >+	  can quickly get to know program counter (PC), secure state,
-> >+	  exception level, etc.
-> 
-> May be we should mention/warn the user about the possible caveats of using
-> this feature to help him make a better decision ? And / Or we should add a documentation
-> for it. We have collected some real good information over the discussions and
-> it is a good idea to capture it somewhere.
+This should not happen if min_timeout and max_timeout are set properly.
 
-Sure, I will add a documentation for this.
+> +
+> +	/* enable watchdog */
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_ENABLE);
+> +
+> +	/* set prescaler & reload registers */
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_EWA);
+> +	reg_write(wdt->regs, IWDG_PR, PR_256); /* prescaler fix to 256 */
+> +	reg_write(wdt->regs, IWDG_RLR, reload - 1);
+> +
+> +	/* wait for the registers to be updated (max 100ms) */
+> +	ret = readl_relaxed_poll_timeout(wdt->regs + IWDG_SR, val,
+> +					 !(val & (FLAG_PVU | FLAG_RVU)),
+> +					 SLEEP_US, TIMEOUT_US);
+> +	if (ret) {
+> +		dev_err(wdt->dev,
+> +			"Fail to set prescaler or reload registers\n");
+> +		return -EINVAL;
 
-[...]
+Any reason for overriding the return value ?
 
-> >+static struct pm_qos_request debug_qos_req;
-> >+static int idle_constraint = PM_QOS_DEFAULT_VALUE;
-> >+module_param(idle_constraint, int, 0600);
-> >+MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
-> >+		 "idle states (default is -1, which means have no limiation "
-> >+		 "to CPU idle states; 0 means disabling all idle states; user "
-> >+		 "can choose other platform dependent values so can disable "
-> >+		 "specific idle states for the platform)");
-> 
-> Correct me if I am wrong,
-> 
-> All we want to do is disable the CPUIdle explicitly if the user knows that this
-> could be a problem to use CPU debug on his platform. So, in effect, we should
-> only be using idle_constraint = 0 or -1.
-> 
-> In which case, we could make it easier for the user to tell us, either
-> 
->  0 - Don't do anything with CPUIdle (default)
->  1 - Disable CPUIdle for me as I know the platform has issues with CPU debug and CPUidle.
+> +	}
+> +
+> +	/* reload watchdog */
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_iwdg_stop(struct watchdog_device *wdd)
+> +{
+> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	if (watchdog_active(wdd)) {
+> +		dev_err(wdt->dev,
+> +			"Watchdog can't be stopped once started(no way out)\n");
+> +		return -EPERM;
 
-The reason for not using bool flag is: usually SoC may have many idle
-states, so if user wants to partially enable some states then can set
-the latency to constraint.
+The infrastructure takes care of this. Don't provide a stop function, and provide
+the maximum hardware timeout.
 
-But of course, we can change this to binary value as you suggested,
-this means turn on of turn off all states. The only one reason to use
-latency value is it is more friendly for hardware design, e.g. some
-platforms can enable partial states to save power and avoid overheat
-after using this driver.
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_iwdg_ping(struct watchdog_device *wdd)
+> +{
+> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	dev_dbg(wdt->dev, "%s\n", __func__);
+> +
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
+> +				  unsigned int timeout)
+> +{
+> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	dev_dbg(wdt->dev, "%s timeout: %d sec\n", __func__, timeout);
+> +
+> +	wdd->timeout = timeout;
+> +
+> +	if (watchdog_active(wdd))
+> +		return stm32_iwdg_start(wdd);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct watchdog_info stm32_iwdg_info = {
+> +	.options	= WDIOF_SETTIMEOUT |
+> +			  WDIOF_MAGICCLOSE |
+> +			  WDIOF_KEEPALIVEPING,
+> +	.identity	= "STM32 Independent Watchdog",
+> +};
+> +
+> +static struct watchdog_ops stm32_iwdg_ops = {
+> +	.owner		= THIS_MODULE,
+> +	.start		= stm32_iwdg_start,
+> +	.stop		= stm32_iwdg_stop,
+> +	.ping		= stm32_iwdg_ping,
+> +	.set_timeout	= stm32_iwdg_set_timeout,
+> +};
+> +
+> +static int stm32_iwdg_probe(struct platform_device *pdev)
+> +{
+> +	struct watchdog_device *wdd;
+> +	struct stm32_iwdg *wdt;
+> +	struct resource *res;
+> +	void __iomem *regs;
+> +	struct clk *clk;
+> +	int max_wdt_timeout;
+> +	int ret;
+> +
+> +	/* This is the timer base. */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(regs)) {
+> +		dev_err(&pdev->dev, "Could not get resource\n");
+> +		return PTR_ERR(regs);
+> +	}
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&pdev->dev, "Unable to get clock\n");
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
+> +		return ret;
+> +	}
+> +
+> +	/*
+> +	 * Allocate our watchdog driver data, which has the
+> +	 * struct watchdog_device nested within it.
+> +	 */
+> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt) {
+> +		ret = -ENOMEM;
+> +		goto err;
+> +	}
+> +
+> +	/* Initialize struct stm32_iwdg. */
+> +	wdt->regs = regs;
+> +	wdt->dev = &pdev->dev;
+> +	wdt->clk = clk;
+> +	/*
+> +	 * iwdg is clocked by its own dedicated low-speed clock (LSI)
+> +	 * at 32khz.
+> +	 */
+> +	wdt->rate = 32 * 1024;
 
-If you guys think this is a bit over design, I will follow up your
-suggestion. I also have some replying in Mathieu's reviewing, please
-help review as well.
+Why not clk_get_rate() ?
 
-> than explaining the miscrosecond latency etc and make the appropriate calls underneath.
-> something like (not necessarily the same name) :
-> 
-> module_param(broken_with_cpuidle, bool, 0600);
-> MODULE_PARAM_DESC(broken_with_cpuidle, "Specifies whether the CPU debug has issues with CPUIdle on"
-> 				       " the platform. Non-zero value implies CPUIdle has to be"
-> 				       " explicitly disabled.",);
+> +
+> +	/* get max timeout & set heartbeat */
+> +	max_wdt_timeout = ((RLR_MAX + 1) * 256) / wdt->rate;
+> +	heartbeat = max_wdt_timeout;
 
-[...]
+What is the value of overwriting this variable ? Why don't you just use max_wdt_timeout,
+and what is the point of making heartbeat configurable if you overwrite it anyway ?
 
-> >+	/*
-> >+	 * Unfortunately the CPU cannot be powered up, so return
-> >+	 * back and later has no permission to access other
-> >+	 * registers. For this case, should set 'idle_constraint'
-> >+	 * to ensure CPU power domain is enabled!
-> >+	 */
-> >+	if (!(drvdata->edprsr & EDPRSR_PU)) {
-> >+		pr_err("%s: power up request for CPU%d failed\n",
-> >+			__func__, drvdata->cpu);
-> >+		goto out;
-> >+	}
-> >+
-> >+out_powered_up:
-> >+	debug_os_unlock(drvdata);
-> 
-> Question: Do we need a matching debug_os_lock() once we are done ?
+I would suggest to use watchdog_init_timeout() to set optional non-default
+timeout values, especially since this also enables getting the timeout value from
+devicetree.
 
-I have checked ARM ARMv8, but there have no detailed description for
-this. I refered coresight-etmv4 code and Mike's pseudo code, ther have
-no debug_os_lock() related operations.
+> +
+> +	/* Initialize struct watchdog_device. */
+> +	wdd = &wdt->wdd;
+> +	wdd->timeout = heartbeat;
+> +	wdd->info = &stm32_iwdg_info;
+> +	wdd->ops = &stm32_iwdg_ops;
+> +	wdd->min_timeout = MIN_WDT_TIMEOUT;
+> +	wdd->max_timeout = max_wdt_timeout;
 
-Mike, Mathieu, could you also help confirm this?
+You might want to consider setting max_hw_heartbeat_ms instead and drop the stop function.
 
-[...]
+> +	watchdog_set_drvdata(wdd, wdt);
+> +	watchdog_set_nowayout(wdd, true);
+> +
+> +	ret = watchdog_register_device(wdd);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"failed to register watchdog device\n");
+> +		goto err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +
+> +	dev_info(&pdev->dev,
+> +		 "initialized (heartbeat = %d sec)\n", heartbeat);
+> +	return 0;
+> +
+> +err:
+> +	clk_disable_unprepare(clk);
+> +	return ret;
+> +}
+> +
+> +static int stm32_iwdg_remove(struct platform_device *pdev)
+> +{
+> +	struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdd);
+> +	clk_disable_unprepare(wdt->clk);
+> +
+> +	dev_info(&pdev->dev, "removed watchdog device\n");
 
-> >+static void debug_init_arch_data(void *info)
-> >+{
-> >+	struct debug_drvdata *drvdata = info;
-> >+	u32 mode, pcsr_offset;
-> >+
-> >+	CS_UNLOCK(drvdata->base);
-> >+
-> >+	debug_os_unlock(drvdata);
-> >+
-> >+	/* Read device info */
-> >+	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
-> >+	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
-> 
-> As mentioned above, both of these registers are only need at init time to
-> figure out the flags we set here. So we could remove them.
-> 
-> >+
-> >+	CS_LOCK(drvdata->base);
-> >+
-> >+	/* Parse implementation feature */
-> >+	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
-> >+	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
-> 
-> 
-> >+
-> >+	if (mode == EDDEVID_IMPL_NONE) {
-> >+		drvdata->edpcsr_present  = false;
-> >+		drvdata->edcidsr_present = false;
-> >+		drvdata->edvidsr_present = false;
-> >+	} else if (mode == EDDEVID_IMPL_EDPCSR) {
-> >+		drvdata->edpcsr_present  = true;
-> >+		drvdata->edcidsr_present = false;
-> >+		drvdata->edvidsr_present = false;
-> >+	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
-> >+		if (!IS_ENABLED(CONFIG_64BIT) &&
-> >+			(pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
-> >+			drvdata->edpcsr_present = false;
-> >+		else
-> >+			drvdata->edpcsr_present = true;
-> 
-> Sorry, I forgot why we do this check only in this mode. Shouldn't this be
-> common to all modes (of course which implies PCSR is present) ?
+Is this message really useful ? I think it is just noise.
 
-No. PCSROffset is defined differently in ARMv7 and ARMv8; So finally we
-simplize PCSROffset value :
-0000 - Sample offset applies based on the instruction state (indicated by PCSR[0])
-0001 - No offset applies.
-0010 - No offset applies, but do not use in AArch32 mode!
-
-So we need handle the corner case is when CPU runs AArch32 mode and
-PCSRoffset = 'b0010. Other cases the pcsr should be present.
-
-[...]
-
-Other suggestions are good for me, will take them in next version.
-
-Thanks,
-Leo Yan
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id stm32_iwdg_of_match[] = {
+> +	{ .compatible = "st,stm32-iwdg" },
+> +	{ /* end node */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+> +
+> +static struct platform_driver stm32_iwdg_driver = {
+> +	.probe		= stm32_iwdg_probe,
+> +	.remove		= stm32_iwdg_remove,
+> +	.driver = {
+> +		.name	= "iwdg",
+> +		.of_match_table = stm32_iwdg_of_match,
+> +	},
+> +};
+> +module_platform_driver(stm32_iwdg_driver);
+> +
+> +MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
+> +MODULE_DESCRIPTION("STMicroelectronics STM32 Independent Watchdog Driver");
+> +MODULE_LICENSE("GPL v2");
+>
