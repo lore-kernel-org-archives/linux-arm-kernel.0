@@ -1,100 +1,75 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 29 Mar 2017 16:21:10 -0700
-Subject: [PATCH 2/5] ARM: dts: imx7-colibri: fix PMIC voltages
+Date: Wed, 29 Mar 2017 16:21:13 -0700
+Subject: [PATCH 5/5] ARM: dts: imx7-colibri: add Carrier Board 3.3V/5V
+ regulators
 In-Reply-To: <20170329232113.19078-1-stefan@agner.ch>
 References: <20170329232113.19078-1-stefan@agner.ch>
-Message-ID: <20170329232113.19078-2-stefan@agner.ch>
+Message-ID: <20170329232113.19078-5-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix wrong voltage of PWR_EN_+V3.3 rail. The error had no noticeable
-effect since no consumer explicitly requested a specific voltage.
-Also use round voltages as it is common in other device trees.
+Model the Carrier Board power distribution by adding a fixed 3.3V
+and 5V regulator. The 3.3V regulator is connected to the backlight
+as well as the display supply. The 5V regulator is used to supply
+USB VBUS.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/imx7d-colibri-eval-v3.dts |  1 +
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index a171545478be..47eab920666f 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -151,29 +151,29 @@
+diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+index 7a98a45a0d95..18bebd6d8d47 100644
+--- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+@@ -48,6 +48,7 @@
+ 	panel: panel {
+ 		compatible = "edt,et057090dhu";
+ 		backlight = <&bl>;
++		power-supply = <&reg_3v3>;
  
- 		regulators {
- 			reg_DCDC1: DCDC1 {  /* V1.0_SOC */
--				regulator-min-microvolt =  <975000>;
--				regulator-max-microvolt = <1125000>;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1100000>;
- 				regulator-boot-on;
- 				regulator-always-on;
+ 		port {
+ 			panel_in: endpoint {
+@@ -55,11 +56,27 @@
  			};
+ 		};
+ 	};
++
++	reg_3v3: regulator-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	reg_5v0: regulator-5v0 {
++		compatible = "regulator-fixed";
++		regulator-name = "5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
+ };
  
- 			reg_DCDC2: DCDC2 { /* V1.1_ARM */
--				regulator-min-microvolt =  <975000>;
--				regulator-max-microvolt = <1125000>;
-+				regulator-min-microvolt = <975000>;
-+				regulator-max-microvolt = <1100000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
+ &bl {
+ 	brightness-levels = <0 4 8 16 32 64 128 255>;
+ 	default-brightness-level = <6>;
++	power-supply = <&reg_3v3>;
++
+ 	status = "okay";
+ };
  
- 			reg_DCDC3: DCDC3 { /* V1.8 */
--				regulator-min-microvolt = <1775000>;
--				regulator-max-microvolt = <1825000>;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
+diff --git a/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts b/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
+index bd01d2cc642d..a608a14d8c85 100644
+--- a/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
++++ b/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
+@@ -57,6 +57,7 @@
+ 		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
+ 		gpio = <&gpio4 7 GPIO_ACTIVE_LOW>;
++		vin-supply = <&reg_5v0>;
+ 	};
+ };
  
- 			reg_DCDC4: DCDC4 { /* V1.35_DRAM */
--				regulator-min-microvolt = <1325000>;
--				regulator-max-microvolt = <1375000>;
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
-@@ -185,29 +185,29 @@
- 			};
- 
- 			reg_LDO2: LDO2 { /* +V1.8_SD */
--				regulator-min-microvolt = <1775000>;
--				regulator-max-microvolt = <3325000>;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
- 
- 			reg_LDO3: LDO3 { /* PWR_EN_+V3.3_LPSR */
--				regulator-min-microvolt = <3275000>;
--				regulator-max-microvolt = <3325000>;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
- 
- 			reg_LDO4: LDO4 { /* V1.8_LPSR */
--				regulator-min-microvolt = <1775000>;
--				regulator-max-microvolt = <1825000>;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
- 
- 			reg_LDO5: LDO5 { /* PWR_EN_+V3.3 */
--				regulator-min-microvolt = <1775000>;
--				regulator-max-microvolt = <1825000>;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
 -- 
 2.12.1
