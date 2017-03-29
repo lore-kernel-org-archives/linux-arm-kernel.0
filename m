@@ -1,78 +1,114 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 29 Mar 2017 14:53:47 +0200
-Subject: [PATCH v3 2/2] PCI: Add tango PCIe host bridge support
-In-Reply-To: <01516ad9-e187-4bac-7c65-a7a90c576ce2@arm.com>
-References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
- <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
- <01516ad9-e187-4bac-7c65-a7a90c576ce2@arm.com>
-Message-ID: <96da696c-141a-3e8d-1fb7-2c024a295f58@free.fr>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 29 Mar 2017 14:54:43 +0200
+Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+In-Reply-To: <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
+ <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <CAMuHMdXfSdD3EXsm4AgA0R0jE9563jSUxzm40yfjkeUc4rhaLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/2017 14:19, Robin Murphy wrote:
+Hi Andrzej,
 
-> On 29/03/17 12:34, Marc Gonzalez wrote:
-> 
->> +	/*
->> +	 * QUIRK #3
->> +	 * Unfortunately, config and mem spaces are muxed.
->> +	 * Linux does not support such a setting, since drivers are free
->> +	 * to access mem space directly, at any time.
->> +	 * Therefore, we can only PRAY that config and mem space accesses
->> +	 * NEVER occur concurrently.
->> +	 */
-> 
-> What about David's suggestion of using an IPI for safe mutual exclusion?
+On Wed, Mar 29, 2017 at 12:05 PM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
+> it. In first case temporary pages array is passed to iommu_dma_mmap,
+> in 2nd case single entry sg table is created directly instead
+> of calling helper.
+>
+> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
+> Hi,
+>
+> I am not familiar with this framework so please don't be too cruel ;)
+> Alternative solution I see is to always create vm_area->pages,
+> I do not know which approach is preferred.
+>
+> Regards
+> Andrzej
+> ---
+>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 38 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index f7b5401..bba2bc8 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>                 return ret;
+>
+>         area = find_vm_area(cpu_addr);
+> -       if (WARN_ON(!area || !area->pages))
+> +       if (WARN_ON(!area))
+> +               return -ENXIO;
+> +
+> +       if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+> +               struct page *page = vmalloc_to_page(cpu_addr);
+> +               unsigned int count = size >> PAGE_SHIFT;
+> +               struct page **pages;
+> +               unsigned long pfn;
+> +               int i;
+> +
+> +               pages = kmalloc_array(count, sizeof(*pages), GFP_KERNEL);
+> +               if (!pages)
+> +                       return -ENOMEM;
+> +
+> +               for (i = 0, pfn = page_to_pfn(page); i < count; i++)
+> +                       pages[i] = pfn_to_page(pfn + i);
 
-I was left with the impression that this wouldn't solve the problem.
-If a mem space access is "in flight" on core0 when core1 starts a
-config space access, an IPI will not prevent breakage.
+If we're gonna allocate and set up such an array over and over again
+(dma_common_contiguous_remap() has already done the same), we may as well
+just keep the initial array.
 
-Did I misunderstand?
+Hence replace the call to dma_common_contiguous_remap() in
+__iommu_alloc_attrs() by an open coded version that doesn't free the pages,
+and handle the other operations like the !DMA_ATTR_FORCE_CONTIGUOUS
+case.
 
-For my education, what is the API to send an IPI?
-And the API to handle an IPI?
+> +
+> +               ret = iommu_dma_mmap(pages, size, vma);
+> +               kfree(pages);
+> +
+> +               return ret;
+> +       }
+> +
+> +       if (WARN_ON(!area->pages))
+>                 return -ENXIO;
+>
+>         return iommu_dma_mmap(area->pages, size, vma);
+> @@ -717,7 +740,20 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+>         unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>         struct vm_struct *area = find_vm_area(cpu_addr);
+>
+> -       if (WARN_ON(!area || !area->pages))
+> +       if (WARN_ON(!area))
+> +               return -ENXIO;
+> +
+> +       if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+> +               int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+> +
+> +               if (!ret)
+> +                       sg_set_page(sgt->sgl, vmalloc_to_page(cpu_addr),
+> +                               PAGE_ALIGN(size), 0);
+> +
+> +               return ret;
+> +       }
+> +
+> +       if (WARN_ON(!area->pages))
+>                 return -ENXIO;
+>
+>         return sg_alloc_table_from_pages(sgt, area->pages, count, 0, size,
 
->> +	if (of_device_is_compatible(dev->of_node, "sigma,smp8759-pcie"))
->> +		smp8759_init(pcie, base);
-> 
-> ...then retrieve it with of_device_get_match_data() here. No need to
-> reinvent the wheel (or have to worry about the ordering of multiple
-> compatibles once rev. n+1 comes around).
+Gr{oetje,eeting}s,
 
-I actually asked about this on IRC. The consensus was "use what
-best fits your use case". I need to do some processing based on
-the revision, so I thought
+                        Geert
 
-  if (chip_x)
-	do_chip_x_init()
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-was a good way to express my intent. Did I misunderstand?
-
-For example, the init function for rev2 currently looks like this:
-
-static void rev2_init(struct tango_pcie *pcie, void __iomem *base)
-{
-	void __iomem *misc_irq	= base + 0x40;
-	void __iomem *doorbell	= base + 0x8c;
-
-	pcie->mux		= base + 0x2c;
-	pcie->msi_status	= base + 0x4c;
-	pcie->msi_mask		= base + 0x6c;
-	pcie->msi_doorbell	= 0x80000000;
-
-	writel(lower_32_bits(pcie->msi_doorbell), doorbell + 0);
-	writel(upper_32_bits(pcie->msi_doorbell), doorbell + 4);
-
-	/* Enable legacy PCI interrupts */
-	writel(BIT(15), misc_irq);
-	writel(0xf << 4, misc_irq + 4);
-}
-
->> +#define VENDOR_SIGMA	0x1105
-> 
-> Should this not be in include/linux/pci_ids.h?
-
-Doh! Very likely. Thanks.
-
-Regards.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
