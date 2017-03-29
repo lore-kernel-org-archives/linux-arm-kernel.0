@@ -1,60 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 29 Mar 2017 00:26:27 -0700
-Subject: [PATCH v8 1/3] Input: max11801_ts: Add missing of_match_table
-In-Reply-To: <1490209518-20790-1-git-send-email-jagan@openedev.com>
-References: <1490209518-20790-1-git-send-email-jagan@openedev.com>
-Message-ID: <20170329072627.GE38261@dtor-ws>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 29 Mar 2017 15:26:05 +0800
+Subject: [PATCH 2/2] ARM: dts: sun5i: Add interrupt for display backend
+In-Reply-To: <20170329071303.ft7oukmhczihy2xb@lukather>
+References: <20170327143847.16259-1-wens@csie.org>
+ <20170327143847.16259-3-wens@csie.org>
+ <20170329071303.ft7oukmhczihy2xb@lukather>
+Message-ID: <CAGb2v66BsX=6906ubPcLD=ayGp4EmrbHyPmjDOVbZw9a_ZO_Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 12:35:16AM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> Added missing of_match_table for max11801_ts driver with
-> compatible as "maxim,max11801_ts"
-> 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+On Wed, Mar 29, 2017 at 3:13 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Mar 27, 2017 at 10:38:47PM +0800, Chen-Yu Tsai wrote:
+>> The display backend on sun5i shares the same interrupt line as the
+>> display frontend. Add it.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> And ideally, patches prefix shouldn't have dts here too. I've dropped
+> it and applied, thanks!
 
-Applied, thank you.
+Seems like this was a recent policy change? Or almost everyone was getting
+it wrong in the past.
 
-> ---
-> Changes for v8:
-> - use the compatible as maxim,max11801 with remove suffix _ts since
->   i2c node follow the same.
-> Changes for v7:
-> - newly added patch
-> 
->  drivers/input/touchscreen/max11801_ts.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/input/touchscreen/max11801_ts.c b/drivers/input/touchscreen/max11801_ts.c
-> index a595ae5..d3c7fc0 100644
-> --- a/drivers/input/touchscreen/max11801_ts.c
-> +++ b/drivers/input/touchscreen/max11801_ts.c
-> @@ -224,9 +224,16 @@ static int max11801_ts_probe(struct i2c_client *client,
->  };
->  MODULE_DEVICE_TABLE(i2c, max11801_ts_id);
->  
-> +static const struct of_device_id max11801_ts_dt_ids[] = {
-> +	{ .compatible = "maxim,max11801" },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, max11801_ts_dt_ids);
-> +
->  static struct i2c_driver max11801_ts_driver = {
->  	.driver = {
->  		.name	= "max11801_ts",
-> +		.of_match_table	= max11801_ts_dt_ids,
->  	},
->  	.id_table	= max11801_ts_id,
->  	.probe		= max11801_ts_probe,
-> -- 
-> 1.9.1
-> 
+>> This won't directly apply to old releases. We may want to backport
+>> them though?
+>
+> Yep, probably. Do you want to send it to stable?
 
--- 
-Dmitry
+It won't apply, due to the recent sun5i merger. We could wait until
+it lands in Linus' tree, then send a backport patch to stable, to
+keep the noise to a minimum.
+
+ChenYu
