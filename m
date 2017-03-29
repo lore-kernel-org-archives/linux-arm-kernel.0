@@ -1,42 +1,60 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 29 Mar 2017 10:06:41 +0530
-Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
-In-Reply-To: <0e8ac72a-6b2f-171d-41e7-7a6cefc4c7c4@broadcom.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
- <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
- <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
- <CABb+yY1o7QTYLm3HGWNeFDPnfpL7AAJ6+R91Stn-gNvO7afxoA@mail.gmail.com>
- <22d07bb1-9e93-4ae5-7215-923bde9ebfe5@broadcom.com>
- <CABb+yY1kbFOKJPO95SRw995zt=fCoA+SkXgECOj774i_hJUCNg@mail.gmail.com>
- <0e8ac72a-6b2f-171d-41e7-7a6cefc4c7c4@broadcom.com>
-Message-ID: <CABb+yY31oW09-fq_t4V6vatMe50Ed2Mi00kT4bOJv2=qFBT+QA@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 28 Mar 2017 21:37:55 -0700
+Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset
+ data to device tree
+In-Reply-To: <20170324142610.GX10760@atomide.com>
+References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+ <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
+ <20170323205256.GO10760@atomide.com>
+ <a410d37f-92e5-39b4-ac6c-158673163cb0@ti.com>
+ <20170324142610.GX10760@atomide.com>
+Message-ID: <20170329043753.GB1596@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 11:00 PM, Jonathan Richardson
-<jonathan.richardson@broadcom.com> wrote:
-> On 17-03-15 10:30 AM, Jassi Brar wrote:
+Keerthy,
 
->> The right way to do is have a 'server/owner' client that accepts
->> requests from various clients and serially queue them to mailbox. That
->> way you can keep the controller driver free from quirks (like max wait
->> time of 30us) of your present platform.
->
-> Do you mean 1 mailbox client with one mailbox channel that all the mbox client drivers share?
-> I thought this would work when I suggested it previously but the client callbacks are necessary
-> in all txdone modes. Client drivers that send the messages need the callbacks
->
-That's a legit requirement.
+On Fri, Mar 24, 2017 at 07:26:10AM -0700, Tony Lindgren wrote:
+> * Keerthy <j-keerthy@ti.com> [170323 20:29]:
+> > 
+> > 
+> > On Friday 24 March 2017 02:22 AM, Tony Lindgren wrote:
+> > > * Keerthy <j-keerthy@ti.com> [170321 20:45]:
+> > >>
+> > >>
+> > >> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
+> > >>> Currently the slope and offset values for calculating the
+> > >>> hot spot temperature of a particular thermal zone is part
+> > >>> of driver data. Pass them here instead and obtain the values
+> > >>> while of node parsing.
+> > >>>
+> > >>> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
 
-> and this is only possible with multiple mbox clients.
->
-That is incorrect.
-It is trivial to support callbacks to end clients from your common
-code... just ask for callback along with the message to be submitted
-to mailbox api.
+Have you tried on boards that need negative coefficients?
 
-> And a channel can only have 1 mbox client. Clients in multiple drivers need the callbacks to either know when to start polling, or be notified when the transaction is complete. It would be nice if multiple clients could use the same channel.
->
-We had to choose from shared vs exclusive access to channels... latter
-was chosen because there are ways to still support former.
+https://patchwork.kernel.org/patch/9619577/
+
+> > >>
+> > >> Hi Eduardo,
+> > >>
+> > >> If the series looks okay could you please pull this?
+> > > 
+> > > Also.. Are the dts changes safe for me to pick separately?
+> > 
+> > Yes Tony they are safe to pulled separately.
+> 
+> OK applying patches 1 - 5 of this series into omap-for-v4.12/dt-v2.
+
+Keerthy,
+
+The only thing I want you to confirm is if you are really getting the
+negative coefficients, because currently of-thermal reads the array
+using an OF helper that understands only unsigned. For this reason, I
+will be queueing your patches only for next merge window, not as a fix,
+not for rc's.
+
+
+> 
+> Thanks,
+> 
+> Tony
