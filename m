@@ -1,103 +1,71 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Wed, 29 Mar 2017 15:25:19 +0200
-Subject: [PATCH v1 1/8] dt-bindings: Document STM32 DCMI bindings
+Date: Wed, 29 Mar 2017 15:25:21 +0200
+Subject: [PATCH v1 3/8] ARM: dts: stm32: Enable DCMI support on STM32F429 MCU
 In-Reply-To: <1490793926-6477-1-git-send-email-hugues.fruchet@st.com>
 References: <1490793926-6477-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1490793926-6477-2-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1490793926-6477-4-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the STM32 DCMI
-(Digital Camera Memory Interface).
-
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- .../devicetree/bindings/media/st,stm32-dcmi.txt    | 77 ++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+ arch/arm/boot/dts/stm32f429.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-new file mode 100644
-index 0000000..f0dc709
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-@@ -0,0 +1,77 @@
-+STMicroelectronics STM32 Digital Camera Memory Interface (DCMI)
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index ee0da97..e1ff978 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -736,6 +736,29 @@
+ 					slew-rate = <3>;
+ 				};
+ 			};
 +
-+Required properties:
-+- compatible: "st,stm32-dcmi"
-+- reg: physical base address and length of the registers set for the device;
-+- interrupts: should contain IRQ line for the DCMI;
-+- clocks: list of clock specifiers, corresponding to entries in
-+          the clock-names property;
-+- clock-names: must contain "mclk", which is the DCMI peripherial clock.
-+- resets: Reference to a reset controller
-+- reset-names: see Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-+
-+DCMI supports a single port node with parallel bus. It should contain one
-+'port' child node with child 'endpoint' node. Please refer to the bindings
-+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+
-+Device node example
-+-------------------
-+	dcmi: dcmi at 50050000 {
-+		compatible = "st,stm32-dcmi";
-+		reg = <0x50050000 0x400>;
-+		interrupts = <78>;
-+		resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
-+		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
-+		clock-names = "mclk";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dcmi_pins>;
-+		dmas = <&dma2 1 1 0x414 0x3>;
-+		dma-names = "tx";
-+		status = "disabled";
-+	};
-+
-+Board setup example
-+-------------------
-+
-+&dcmi {
-+	status = "okay";
-+
-+	port {
-+		dcmi_0: endpoint at 0 {
-+			remote-endpoint = <&ov2640_0>;
-+			bus-width = <8>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+		};
-+	};
-+};
-+
-+{
-+	[...]
-+	i2c at 0 {
-+		ov2640: camera at 30 {
-+			compatible = "ovti,ov2640";
-+			reg = <0x30>;
-+			resetb-gpios = <&stmpegpio 2 GPIO_ACTIVE_HIGH>;
-+			pwdn-gpios = <&stmpegpio 0 GPIO_ACTIVE_LOW>;
-+			clocks = <&clk_ext_camera>;
-+			clock-names = "xvclk";
-+			status = "okay";
-+
-+			port {
-+				ov2640_0: endpoint {
-+					remote-endpoint = <&dcmi_0>;
++			dcmi_pins: dcmi_pins at 0 {
++				pins {
++					pinmux = <STM32F429_PA4_FUNC_DCMI_HSYNC>,
++						 <STM32F429_PB7_FUNC_DCMI_VSYNC>,
++						 <STM32F429_PA6_FUNC_DCMI_PIXCLK>,
++						 <STM32F429_PC6_FUNC_DCMI_D0>,
++						 <STM32F429_PC7_FUNC_DCMI_D1>,
++						 <STM32F429_PC8_FUNC_DCMI_D2>,
++						 <STM32F429_PC9_FUNC_DCMI_D3>,
++						 <STM32F429_PC11_FUNC_DCMI_D4>,
++						 <STM32F429_PD3_FUNC_DCMI_D5>,
++						 <STM32F429_PB8_FUNC_DCMI_D6>,
++						 <STM32F429_PE6_FUNC_DCMI_D7>,
++						 <STM32F429_PC10_FUNC_DCMI_D8>,
++						 <STM32F429_PC12_FUNC_DCMI_D9>,
++						 <STM32F429_PD6_FUNC_DCMI_D10>,
++						 <STM32F429_PD2_FUNC_DCMI_D11>;
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <3>;
 +				};
 +			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
+@@ -805,6 +828,20 @@
+ 			status = "disabled";
+ 		};
+ 
++		dcmi: dcmi at 50050000 {
++			compatible = "st,stm32-dcmi";
++			reg = <0x50050000 0x400>;
++			interrupts = <78>;
++			resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
++			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
++			clock-names = "mclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&dcmi_pins>;
++			dmas = <&dma2 1 1 0x414 0x3>;
++			dma-names = "tx";
++			status = "disabled";
 +		};
-+	};
 +
-+	clk_ext_camera: clk-ext-camera {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+	};
-+}
+ 		rng: rng at 50060800 {
+ 			compatible = "st,stm32-rng";
+ 			reg = <0x50060800 0x400>;
 -- 
 1.9.1
