@@ -1,24 +1,71 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Mar 2017 16:22:50 +0800
-Subject: [PATCH v8 3/3] ARM: dts: imx6q-icore: Add touchscreen node
-In-Reply-To: <1490209518-20790-3-git-send-email-jagan@openedev.com>
-References: <1490209518-20790-1-git-send-email-jagan@openedev.com>
- <1490209518-20790-3-git-send-email-jagan@openedev.com>
-Message-ID: <20170329082248.GA683@dragon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Mar 2017 09:30:23 +0100
+Subject: [kvmtool PATCH v9 06/15] PCI: Only allocate IRQ routing entry
+ when available
+In-Reply-To: <20170202163223.15372-7-andre.przywara@arm.com>
+References: <20170202163223.15372-1-andre.przywara@arm.com>
+ <20170202163223.15372-7-andre.przywara@arm.com>
+Message-ID: <d26dea9f-386b-316c-a2b3-d42ea1883997@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 12:35:18AM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
+On 02/02/17 16:32, Andre Przywara wrote:
+> If we need to inject an MSI into the guest, we rely at the moment on a
+> working GSI MSI routing functionality. However we can get away without
+> IRQ routing, if the host supports MSI injection via the KVM_SIGNAL_MSI
+> ioctl.
+> So we try the GSI routing first, but if that fails due to a missing
+> IRQ routing functionality, we fall back to KVM_SIGNAL_MSI (if that is
+> supported).
 > 
-> max11801 touchscreen on Engicam iCoreM6 Quad module is
-> connected via i2c1, so add max11801: touchscreen at 48 on i2c1.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virtio/pci.c | 16 ++++++++++++++--
+>  1 file changed, 14 insertions(+), 2 deletions(-)
 > 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Domenico Acri <domenico.acri@engicam.com>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> diff --git a/virtio/pci.c b/virtio/pci.c
+> index 7cc0ba4..98bf6b7 100644
+> --- a/virtio/pci.c
+> +++ b/virtio/pci.c
+> @@ -193,8 +193,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+>  
+>  			gsi = irq__add_msix_route(kvm,
+>  						  &vpci->msix_table[vec].msg);
+> -			if (gsi >= 0)
+> +			if (gsi >= 0) {
+>  				vpci->config_gsi = gsi;
+> +				break;
+> +			}
+> +			if (gsi == -ENXIO &&
+> +			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
+> +					break;
+> +			die("failed to configure MSIs");
+>  			break;
+>  		case VIRTIO_MSI_QUEUE_VECTOR:
+>  			vec = ioport__read16(data);
+> @@ -205,8 +211,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+>  
+>  			gsi = irq__add_msix_route(kvm,
+>  						  &vpci->msix_table[vec].msg);
+> -			if (gsi < 0)
+> +			if (gsi < 0) {
+> +				if (gsi == -ENXIO &&
+> +				    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
+> +					break;
+> +
+> +				die("failed to configure MSIs");
+>  				break;
+> +			}
+>  			vpci->gsis[vpci->queue_selector] = gsi;
 
-Applied, thanks.
+Is it really expected to find -ENXIO in this array instead of a GSI?
+
+>  			if (vdev->ops->notify_vq_gsi)
+>  				vdev->ops->notify_vq_gsi(kvm, vpci->dev,
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
