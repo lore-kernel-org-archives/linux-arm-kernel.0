@@ -1,58 +1,69 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 29 Mar 2017 11:23:57 -0700
-Subject: [RFC v2][PATCH 01/11] Introduce rare_write() infrastructure
-In-Reply-To: <1490811363-93944-2-git-send-email-keescook@chromium.org>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-2-git-send-email-keescook@chromium.org>
-Message-ID: <CAGXu5jJuuUSwS61d7Joc=6y2BUyTo6koEsrVxeqMu_u7j9Mb9w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Mar 2017 19:17:14 +0100
+Subject: [PATCH v2 7/8] bus: brcmstb_gisb: add notifier handling
+In-Reply-To: <e6bb68fa-dd2f-7d18-6031-b709f8fd162e@gmail.com>
+References: <20170328213431.10904-1-opendmb@gmail.com>
+ <20170328213431.10904-8-opendmb@gmail.com>
+ <20170329101357.GB23442@leverpostej>
+ <e6bb68fa-dd2f-7d18-6031-b709f8fd162e@gmail.com>
+Message-ID: <20170329181714.GD26135@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:15 AM, Kees Cook <keescook@chromium.org> wrote:
-> +/*
-> + * Build "write rarely" infrastructure for flipping memory r/w
-> + * on a per-CPU basis.
-> + */
-> +#ifndef CONFIG_HAVE_ARCH_RARE_WRITE
-> +# define __wr_rare
-> +# define __wr_rare_type
-> +# define __rare_write(__var, __val)    (__var = (__val))
-> +# define rare_write_begin()            do { } while (0)
-> +# define rare_write_end()              do { } while (0)
-> +#else
-> +# define __wr_rare                     __ro_after_init
-> +# define __wr_rare_type                        const
-> +# ifdef CONFIG_HAVE_ARCH_RARE_WRITE_MEMCPY
-> +#  define __rare_write_n(dst, src, len)        ({                      \
-> +               BUILD_BUG(!builtin_const(len));                 \
-> +               __arch_rare_write_memcpy((dst), (src), (len));  \
-> +       })
-> +#  define __rare_write(var, val)  __rare_write_n(&(var), &(val), sizeof(var))
-> +# else
-> +#  define __rare_write(var, val)  ((*(typeof((typeof(var))0) *)&(var)) = (val))
-> +# endif
-> +# define rare_write_begin()    __arch_rare_write_begin()
-> +# define rare_write_end()      __arch_rare_write_end()
-> +#endif
-> +#define rare_write(__var, __val) ({                    \
-> +       rare_write_begin();                             \
-> +       __rare_write(__var, __val);                     \
-> +       rare_write_end();                               \
-> +       __var;                                          \
-> +})
-> +
+On Wed, Mar 29, 2017 at 10:39:11AM -0700, Doug Berger wrote:
+> On 03/29/2017 03:13 AM, Mark Rutland wrote:
 
-Of course, only after sending this do I realize that the MEMCPY case
-will need to be further adjusted, since it currently can't take
-literals. I guess something like this needs to be done:
+> >> +static int dump_gisb_error(struct notifier_block *self, unsigned long v,
+> >> +			   void *p)
 
-#define __rare_write(var, val) ({ \
-    typeof(var) __src = (val);     \
-    __rare_write_n(&(var), &(__src), sizeof(var)); \
-})
+> >> +	return 0;
+> > 
+> > I think this should be NOTIFY_OK.
+> > 
+> I used dump_mem_limit() as a template and didn't catch this (work to
+> do...).  Upon review I think I would prefer NOTIFY_DONE since this call
+> is opportunistic (i.e. it is taking the opportunity to check whether
+> additional diagnostic data is available to display) and has no interest
+> in affecting the overall handling of the event.
 
--Kees
+That's fine by me.
 
--- 
-Kees Cook
-Pixel Security
+Does the distinction matter here?
+
+Most notifer users treat NOTIFY_OK and NOTIFY_DONE as equivalent, and
+notifier_call_chain only terminates when it sees NOTIFY_STOP_MASK.
+
+[...]
+
+> >> +	if (list_is_singular(&brcmstb_gisb_arb_device_list)) {
+> >> +		register_die_notifier(&gisb_error_notifier);
+> >> +		atomic_notifier_chain_register(&panic_notifier_list,
+> >> +					       &gisb_error_notifier);
+> > 
+> > I don't think this is quite right. A notifier_block can only be
+> > registered to one notifier chain at a time, and this has the potential
+> > to corrupt both chains.
+> > 
+> A VERY good point thanks for pointing this out.
+> 
+> > I also think you only need to register the panic notifier. An SError
+> > should always result in a panic.
+> > 
+> That was my initial thought as well.  However, testing revealed that the
+> bad mode Oops actually exits the user space process and doesn't reach
+> the panic so there was no helpful diagnostic message.  This may be in
+> line with your comments about insufficient fatality of failures in PATCH
+> v2 6/8, but it actually is more in line with our desired behavior for
+> the aborted write.  Setting the notify on die gave us the result we are
+> looking for, but as noted above I should have created a separate notifier.
+> 
+> I had hoped that the same approach (i.e. die notifier) would remove the
+> need for PATCH v2 6/8 as well, but I found that the Unhandled fault
+> error didn't actually die from user mode.
+
+In my mind it's a bug that we don't treat those errors more fatally.
+
+I'll try to dig into that.
+
+Thanks,
+Mark.
