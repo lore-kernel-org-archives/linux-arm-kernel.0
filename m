@@ -1,53 +1,51 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Mar 2017 18:03:25 +0100
-Subject: [PATCH] ARM: dma-mapping: Fix dma_get_sgtable() for regions
- without struct page
-In-Reply-To: <CAKocOOPjqdyLbtbeRLr9NZaNoqefjobYhev+0hr3OGwNLwNjmw@mail.gmail.com>
-References: <CGME20170221131655eucas1p2f2ca6e3c819aeae227c5e5c5f2bc7d3f@eucas1p2.samsung.com>
- <1487682998-2564-1-git-send-email-m.szyprowski@samsung.com>
- <20170322111020.GD21222@n2100.armlinux.org.uk>
- <CAKocOONSt=UjPPVEN0ESLBMAsbk_HeWGQdkzyuUW+X7ddaLwzQ@mail.gmail.com>
- <20170322163237.GF21222@n2100.armlinux.org.uk>
- <CAKocOOMqWByyAotnjKM3Zqq9xUBNcBFMens5Rj08aiM99wxEzg@mail.gmail.com>
- <20170322224200.GH21222@n2100.armlinux.org.uk>
- <20170329163335.GA7909@n2100.armlinux.org.uk>
- <CAKocOOPjqdyLbtbeRLr9NZaNoqefjobYhev+0hr3OGwNLwNjmw@mail.gmail.com>
-Message-ID: <20170329170325.GC7909@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Mar 2017 10:07:23 -0700
+Subject: [GIT PULL] omap fixes for v4.11-rc cycle
+Message-ID: <pull-1490807222-802520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 10:51:05AM -0600, Shuah Khan wrote:
-> Hi Russell,
-> 
-> On Wed, Mar 29, 2017 at 10:33 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > Okay, I'm about to merge the following patch for -rc, since refusing
-> > to create a scattertable for non-page backed memory is the only valid
-> > solution for that case.  I'm intending to queue this for -rc this
-> > evening.
-> 
-> I was bit sidetracked and getting back to this today. I am just about
-> to test this change on my system. I will test your patch and send you
-> results.
-> 
-> This might not help my use-case - I suspect it will trip this check.
-> That said I will send you results very soon.
+The following changes since commit e24bce8fb4c26bd0d8eca74cbbee1ad049246be3:
 
-I do hope that it _does_ trip this check - the result should be that you
-get an error without the kernel oopsing.
+  Merge tag 'v4.11-rc1' into omap-for-v4.11/fixes (2017-03-06 08:37:53 -0800)
 
-> I have been thinking about this some. I would like to see if we can
-> provide a way forward to address the cases where coherent memory is
-> not guaranteed to be backed by struct pages. We know the memory isn't
-> backed at alloc time in dma_alloc_coherent(). Can we key off of that
-> maybe add a new attr flag to avoid page lookups. I am willing to work
-> on the fixing it.
+are available in the git repository at:
 
-What we need is to revise the dma-buf API and DMA APIs to allow passing
-coherent memory through it - there is no current provision in the DMA APIs
-to have coherent memory mapped for two peripherals.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-rc4
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+for you to fetch changes up to 351b7c490700747d1dba1b0a10fbfe3448d11c35:
+
+  ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot (2017-03-27 10:10:42 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps for v4.11-rc cycle. The biggest fix is to stop doing
+unconditional reset of CPU1 as that caused a regression for cases with
+custom bootloader loaded code running on CPU1. The rest are just minor
+fixes for devices and one warning fix.
+
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: dts: OMAP3: Fix MFG ID EEPROM
+
+Reizer, Eyal (1):
+      ARM: dts: am335x-evmsk: adjust mmc2 param to allow suspend
+
+Rob Herring (1):
+      ARM: dts: ti: fix PCI bus dtc warnings
+
+Tony Lindgren (1):
+      ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot
+
+Yegor Yefremov (1):
+      ARM: dts: am335x-baltos: disable EEE for Atheros 8035 PHY
+
+ arch/arm/boot/dts/am335x-baltos.dtsi       |  2 +
+ arch/arm/boot/dts/am335x-evmsk.dts         |  1 +
+ arch/arm/boot/dts/dra7.dtsi                |  2 +
+ arch/arm/boot/dts/logicpd-torpedo-som.dtsi |  2 +-
+ arch/arm/mach-omap2/common.h               |  1 +
+ arch/arm/mach-omap2/omap-hotplug.c         |  2 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c  | 22 ++++++--
+ arch/arm/mach-omap2/omap-smc.S             |  1 -
+ arch/arm/mach-omap2/omap-smp.c             | 90 +++++++++++++++++++++++++-----
+ 9 files changed, 102 insertions(+), 21 deletions(-)
