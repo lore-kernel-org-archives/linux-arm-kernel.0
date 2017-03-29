@@ -1,115 +1,81 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Mar 2017 18:32:43 +0100
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <20170329161354.GC11297@red-moon>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
- <20170329123821.GA10988@red-moon> <58DBAFD6.7070300@linaro.org>
- <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
- <20170329161354.GC11297@red-moon>
-Message-ID: <20170329173243.GA6091@red-moon>
+From: opendmb@gmail.com (Doug Berger)
+Date: Wed, 29 Mar 2017 10:39:11 -0700
+Subject: [PATCH v2 7/8] bus: brcmstb_gisb: add notifier handling
+In-Reply-To: <20170329101357.GB23442@leverpostej>
+References: <20170328213431.10904-1-opendmb@gmail.com>
+ <20170328213431.10904-8-opendmb@gmail.com>
+ <20170329101357.GB23442@leverpostej>
+Message-ID: <e6bb68fa-dd2f-7d18-6031-b709f8fd162e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 05:13:54PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Mar 29, 2017 at 03:52:47PM +0100, Marc Zyngier wrote:
-> > On 29/03/17 14:00, Hanjun Guo wrote:
-> > > On 03/29/2017 08:38 PM, Lorenzo Pieralisi wrote:
-> > >> On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
-> > >>> Hi Lorenzo,
-> > >>>
-> > >>> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
-> > >>>> Hi Hanjun, Marc,
-> > >>>>
-> > >>>> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
-> > >>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
-> > >>>>>
-> > >>>>> For devices connecting to ITS, the devices need to identify themself
-> > >>>>> through a dev id; this dev id is represented in the IORT table in named
-> > >>>>> component node [1] for platform devices, so this patch adds code that
-> > >>>>> scans the IORT table to retrieve the devices' dev id.
-> > >>>>>
-> > >>>>> Leveraging the iort_node_map_platform_id() IORT API, add a new function
-> > >>>>> call, iort_pmsi_get_dev_id() and use it in its_pmsi_prepare() to allow
-> > >>>>> retrieving dev id in ACPI platforms.
-> > >>>>>
-> > >>>>> [1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
-> > >>>>>
-> > >>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > >>>>> [lorenzo.pieralisi at arm.com: rewrote commit log]
-> > >>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > >>>>> Tested-by: Ming Lei <ming.lei@canonical.com>
-> > >>>>> Tested-by: Wei Xu <xuwei5@hisilicon.com>
-> > >>>>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> > >>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > >>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > >>>>> Cc: Tomasz Nowicki <tn@semihalf.com>
-> > >>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
-> > >>>>> ---
-> > >>>>>   drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
-> > >>>>>   drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
-> > >>>>>   include/linux/acpi_iort.h                     |  5 +++++
-> > >>>>>   3 files changed, 31 insertions(+), 1 deletion(-)
-> > >>>>
-> > >>>> To simplify merging ACPI/IRQCHIP changes via different trees it
-> > >>>> would be good to split this patch; I am not sure what's the best
-> > >>>> way of handling it though given that we would end up in a merge
-> > >>>> ordering dependency anyway (ie we can create an empty stub
-> > >>>> for iort_pmsi_get_dev_id() but that would create a dependency
-> > >>>> between ARM64 and irqchip trees anyway).
-> > >>>
-> > >>> The first 12 patches for ACPI platform MSI and later 3 patches
-> > >>> for mbigen have no "physical" dependency, which means they can
-> > >>> be merged and compiled independently, they only have functional
-> > >>> dependency only.
-> > >>>
-> > >>> We already had SAS, XGE, USB and even UART drivers depend on
-> > >>> the mbigen ACPI support, so I don't think the dependency of ACPI
-> > >>> platform MSI and mbigen patches cares much if those two parts are
-> > >>> merged in one merge window, even they are merged independently via
-> > >>> different tree.
-> > >>>
-> > >>>>
-> > >>>> Please let me know what's your preferred way of handling this.
-> > >>>
-> > >>> So in my opinion, they can be merged independently via ARM64 and
-> > >>> irqchip tree with no ordering dependency, is it OK?
-> > >>
-> > >> I am speaking about merging MBIgen AND ITS patches via IRQCHIP and
-> > >> ACPI/IORT for ARM64, that's why I replied to this patch. I do not
-> > >> think that's feasible to split patches in two separate branches
-> > >> without having a dependency between them.
-> > >>
-> > >> Sure, the last three patches can go via IRQCHIP but that was not
-> > >> my question :)
-> > > 
-> > > Sorry, I misunderstood that :(
-> > > 
-> > > Since it's not feasible to split patches, the best way I got is that
-> > > we get Marc's ack then merge it.
-> > 
-> > I believe there is a way to make this work without too much hassle. I
-> > suggest we drop the ITS change from this patch entirely, and I instead
-> > queue this patch:
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.12&id=e6db07d0f3b6da1f8cfd485776bfefa4fcdbfc45
-> > 
-> > That way, no dependency between the two trees. Lorenzo takes all the
-> > patches flagged "ACPI", I take all those flagged "irqchip" or "msi", and
-> > everything should be perfectly standalone.
-> > 
-> > Thoughts?
+On 03/29/2017 03:13 AM, Mark Rutland wrote:
+
+snip
+
+>> +/*
+>> + * Dump out gisb errors on die or panic.
+>> + */
+>> +static int dump_gisb_error(struct notifier_block *self, unsigned long v,
+>> +			   void *p)
+>> +{
+>> +	struct brcmstb_gisb_arb_device *gdev;
+>> +
+>> +	/* iterate over each GISB arb registered handlers */
+>> +	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
+>> +		brcmstb_gisb_arb_decode_addr(gdev, "async abort");
+>> +
+>> +	return 0;
 > 
-> Perfect for me. Hanjun, I can cherry pick Marc's patch above, rework
-> this patch and post the resulting branch for everyone to have a final
-> test.
+> I think this should be NOTIFY_OK.
+> 
+I used dump_mem_limit() as a template and didn't catch this (work to
+do...).  Upon review I think I would prefer NOTIFY_DONE since this call
+is opportunistic (i.e. it is taking the opportunity to check whether
+additional diagnostic data is available to display) and has no interest
+in affecting the overall handling of the event.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/arm64-acpi-4.12
+>> +}
+>> +
+>> +static struct notifier_block gisb_error_notifier = {
+>> +	.notifier_call = dump_gisb_error,
+>> +};
+>> +
+>>  static DEVICE_ATTR(gisb_arb_timeout, S_IWUSR | S_IRUGO,
+>>  		gisb_arb_get_timeout, gisb_arb_set_timeout);
+>>  
+>> @@ -408,6 +429,12 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+>>  	board_be_handler = brcmstb_bus_error_handler;
+>>  #endif
+>>  
+>> +	if (list_is_singular(&brcmstb_gisb_arb_device_list)) {
+>> +		register_die_notifier(&gisb_error_notifier);
+>> +		atomic_notifier_chain_register(&panic_notifier_list,
+>> +					       &gisb_error_notifier);
+> 
+> I don't think this is quite right. A notifier_block can only be
+> registered to one notifier chain at a time, and this has the potential
+> to corrupt both chains.
+> 
+A VERY good point thanks for pointing this out.
 
-Please have a look and let me know if that's ok, I planned to send
-a PR to Catalin by the end of the week (first 7 patches up to
-7fc3061df075 ("ACPI: platform: setup MSI domain for ACPI based platform
-device")).
+> I also think you only need to register the panic notifier. An SError
+> should always result in a panic.
+> 
+That was my initial thought as well.  However, testing revealed that the
+bad mode Oops actually exits the user space process and doesn't reach
+the panic so there was no helpful diagnostic message.  This may be in
+line with your comments about insufficient fatality of failures in PATCH
+v2 6/8, but it actually is more in line with our desired behavior for
+the aborted write.  Setting the notify on die gave us the result we are
+looking for, but as noted above I should have created a separate notifier.
 
-Lorenzo
+I had hoped that the same approach (i.e. die notifier) would remove the
+need for PATCH v2 6/8 as well, but I found that the Unhandled fault
+error didn't actually die from user mode.
+
+> Thanks,
+> Mark.
+> 
+Thank you for your help with this,
+    Doug
