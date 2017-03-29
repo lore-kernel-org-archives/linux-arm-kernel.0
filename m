@@ -1,46 +1,42 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 29 Mar 2017 09:06:03 +0100
-Subject: [PATCH v3 3/9] arm: fix return value of parse_cpu_capacity
-In-Reply-To: <CAKfTPtCswVBMCaEUzBF4w_GZf-2iLORsS5S0HhGD94ps4+J1Xg@mail.gmail.com>
-References: <20170327131825.32134-1-juri.lelli@arm.com>
- <20170327131825.32134-4-juri.lelli@arm.com>
- <CAKfTPtCswVBMCaEUzBF4w_GZf-2iLORsS5S0HhGD94ps4+J1Xg@mail.gmail.com>
-Message-ID: <20170329080603.GV10289@e106622-lin>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Wed, 29 Mar 2017 10:07:51 +0200
+Subject: [PATCH 1/2] dt-bindings: Document the STM32 MDMA bindings
+In-Reply-To: <CAL_JsqLMn7W=r+JRX51zOScs9N04PcTtX8EFy2eacwadCxwaRg@mail.gmail.com>
+References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
+ <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
+ <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
+ <CAOAejn10dPjYTj8vBTDj5bc_RPTmkYC7uuBMPnP-R0BsQiRwhw@mail.gmail.com>
+ <CAL_JsqLMn7W=r+JRX51zOScs9N04PcTtX8EFy2eacwadCxwaRg@mail.gmail.com>
+Message-ID: <CAOAejn2zkVDBPwxvid32TPt-cParDkxFMd+uqr+tnRxbHMj7LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/17 09:37, Vincent Guittot wrote:
-> On 27 March 2017 at 15:18, Juri Lelli <juri.lelli@arm.com> wrote:
-> > parse_cpu_capacity() has to return 0 on failure, but it currently returns
-> > 1 instead if raw_capacity kcalloc failed.
-> >
-> > Fix it by removing the negation of the return value.
-> >
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Reported-by: Morten Rasmussen <morten.rasmussen@arm.com>
-> > Fixes: 06073ee26775 ('ARM: 8621/3: parse cpu capacity-dmips-mhz from DT')
-> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> > ---
-> >  arch/arm/kernel/topology.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> > index f8a3ab82e77f..4e4af809606a 100644
-> > --- a/arch/arm/kernel/topology.c
-> > +++ b/arch/arm/kernel/topology.c
-> > @@ -166,7 +166,7 @@ static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
-> >                         if (!raw_capacity) {
-> >                                 pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
-> >                                 cap_parsing_failed = true;
-> > -                               return !ret;
-> > +                               return ret;
-> 
-> Why not directly returning 0 ? whatever the value of ret, the parse of
-> cpu capacity has failed in this case
-> 
+Hi Rob,
 
-Sure, can change that.
+> stm32 is not a specific SoC. Compatible strings should be specific to
+> an SoC (with fallback strings to whatever they are compatible with) so
+> you can handle SoC specific differences or errata.
 
-Thanks,
+Ok I see. I will add a more specific SoC description in my compatible.
+Thanks.
 
-- Juri
+
+> I still don't understand. Is the difference in DMA addresses vs. CPU
+> addresses? If so, you should dma-ranges to translate these.
+
+Not really.
+In fact, the MDMA controller provides a master AXI interface for
+memories like DDR/SRAM and peripheral registers access (system access
+port).
+It also provides a master AHB interface only for Cortex-M7 TCM memory
+access (TCM access port).
+So the goal of this st,ahb-addr-masks property is to list all TCM
+addresses avalaible in the SoC, in order to correctly configure the
+MDMA as an AHB master in that particular case.
+For all other cases (other memories or peripheral registers access),
+the MDMA will act as AXI master.
+
+Hope it helps to understand.
+
+BR,
+Cedric
