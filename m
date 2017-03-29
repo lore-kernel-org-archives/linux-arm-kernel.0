@@ -1,85 +1,121 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 30 Mar 2017 15:04:51 +0800
-Subject: [PATCH v7 2/2] soc/imx: Add GPCv2 power gating driver
-In-Reply-To: <20170330065836.GD19596@b29396-OptiPlex-7040>
-References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
- <20170321145004.21265-3-andrew.smirnov@gmail.com>
- <20170324062451.GB12604@b29396-OptiPlex-7040>
- <CAHQ1cqEvE=P6Vrwmm-DEL6sD+ppy3XSeih2_1VynESr9ZmtSOw@mail.gmail.com>
- <20170330065836.GD19596@b29396-OptiPlex-7040>
-Message-ID: <20170330070451.GA29432@b29396-OptiPlex-7040>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 29 Mar 2017 17:12:05 +0200
+Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
+ multiple erratum detection methods
+In-Reply-To: <36733343-8f16-f009-dd4d-1ee63614b053@arm.com>
+References: <20170327075628.GE24630@mai>
+ <e0e0a3d7-2252-5fd6-3247-c128208fd9b9@arm.com>
+ <20170328133438.GB2123@mai>
+ <ec5e673c-6d02-fc88-9913-b0f9261da05e@arm.com>
+ <20170328143633.GC2123@mai>
+ <ee4b5b59-e6ef-6f55-792c-6aa39d354adb@arm.com>
+ <20170328145524.GD2123@mai>
+ <645ab4be-2730-3197-9d70-4e44692ea693@arm.com>
+ <20170329142723.GK2123@mai>
+ <36733343-8f16-f009-dd4d-1ee63614b053@arm.com>
+Message-ID: <20170329151205.GM2123@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 02:58:36PM +0800, Dong Aisheng wrote:
-> On Mon, Mar 27, 2017 at 11:42:15AM -0700, Andrey Smirnov wrote:
-> > On Thu, Mar 23, 2017 at 11:24 PM, Dong Aisheng <dongas86@gmail.com> wrote:
-> > > On Tue, Mar 21, 2017 at 07:50:04AM -0700, Andrey Smirnov wrote:
-> > >> Add code allowing for control of various power domains managed by GPCv2
-> > >> IP block found in i.MX7 series of SoCs. Power domains covered by this
-> > >> patch are:
-> > >>
-> > >>     - PCIE PHY
-> > >>     - MIPI PHY
-> > >>     - USB HSIC PHY
-> > >>     - USB OTG1/2 PHY
-> > >>
-> > >
-> > > You probably may need drop USB OTG which is not claimed in current RM.
-> > > See the PGC definition in 5.5.10 GPC Memory Map section.
-> > >
-> > > Each PGC (CPU type, MIX type, PU type) will occupy 64 Bytes address space,
-> > > the specific base address of each PGC are listed as below.
-> > > ? 0x800 ~ 0x83F : PGC for A7 core0
-> > > ? 0x840 ~ 0x87F: PGC for A7 core1
-> > > ? 0x880 ~ 0x8BF: PGC for A7 SCU
-> > > ? 0xA00 ~ 0xA3F: PGC for fastmix/megamix
-> > > ? 0xC00 ~ 0xC3F: PGC for MIPI PHY
-> > > ? 0xC40 ~ 0xC7F: PGC for PCIE_PHY
-> > > ? 0xC80 ~ 0xCBF: Reserved
-> > > ? 0xCC0 ~ 0xCFF: Reserved
-> > > ? 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
-> > >
-> > > And in 5.4 Power Management Unit (PMU) chapter,
-> > > you will find the USB OTG phy power is directly supplied by
-> > > VDD_USB_OTG1_3P3_IN/VDD_USB_OTG2_3P3_IN.
-> > >
-> > > http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX7DRM.pdf
-> > >
-> > > I understand that there's also some USB OTG code exist in NXP internal
-> > > tree, but that's legacy for early doc implementation and may be deprecated.
-> > > so i assume it should be gone.
-> > >
-> > > Hopefully i will double confirm with our IC designer tomorrow.
-> > >
+On Wed, Mar 29, 2017 at 03:56:52PM +0100, Marc Zyngier wrote:
+> On 29/03/17 15:27, Daniel Lezcano wrote:
+> > On Tue, Mar 28, 2017 at 04:38:41PM +0100, Marc Zyngier wrote:
+> >> On 28/03/17 15:55, Daniel Lezcano wrote:
+> >>> On Tue, Mar 28, 2017 at 03:48:23PM +0100, Marc Zyngier wrote:
+> >>>> On 28/03/17 15:36, Daniel Lezcano wrote:
+> >>>>> On Tue, Mar 28, 2017 at 03:07:52PM +0100, Marc Zyngier wrote:
+> >>>>>
+> >>>>> [ ... ]
+> >>>>>
+> >>>>>>>>> -bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+> >>>>>>>>> -					 const void *arg)
+> >>>>>>>>> +bool arch_timer_check_cap_erratum(const struct arch_timer_erratum_workaround *wa,
+> >>>>>>>>> +				  const void *arg)
+> >>>>>>>>>  {
+> >>>>>>>>> -	return cpus_have_cap((uintptr_t)wa->id);
+> >>>>>>>>> +	return cpus_have_cap((uintptr_t)wa->id) | this_cpu_has_cap((uintptr_t)wa->id);
+> >>>>>>>>
+> >>>>>>>> Not quite. Here, you're making all capability-based errata to be be
+> >>>>>>>> global (if a single CPU in the system has a capability, then by
+> >>>>>>>> transitivity cpus_have_cap returns true). If that's a big-little system,
+> >>>>>>>> you end-up applying the workaround to all CPUs, including those unaffected.
+> >>>>>>>>
+> >>>>>>>> I'd rather drop cpus_have_cap altogether and rely on individual CPU
+> >>>>>>>> matching (since we don't have a need for a global capability erratum
+> >>>>>>>> handling yet).
+> >>>>>>>
+> >>>>>>> Ok, thanks.
+> >>>>>>
+> >>>>>> Quick update. I've just implemented this, and found out that getting rid
+> >>>>>> of local/global has an unfortunate effect:
+> >>>>>>
+> >>>>>> Since we only probe the global errata (using ACPI for example) on the
+> >>>>>> boot CPU path, we lose propagation of the erratum across the secondary
+> >>>>>> CPUs. One way of solving this is to convert the secondary boot path to
+> >>>>>> be aware of DT vs ACPI vs detection method of the month. Which isn't
+> >>>>>> easy, since by the time we boot secondary CPUs, we don't have the
+> >>>>>> pointers to the various ACPI tables anymore. Also, assuming we were
+> >>>>>> careful and saved the pointers, the tables may have been unmapped. Fun.
+> >>>>>
+> >>>>> My proposal was supposed to prevent that. The detecion is done in the
+> >>>>> subsystems, ACPI detects ACPI errata, DT detects DT errata and CPU detects CPU
+> >>>>> errata. The drivers get the errata and enable the workaround. The id
+> >>>>> association <-> errata self contains errata types (void *, char *, int). So
+> >>>>> everything can be done in a CPU basis without local / global dance.
+> >>>>
+> >>>> I'm sorry, but it feels like a Jumbo-Jet sized hammer to try and squash
+> >>>> a fly (I'm staying away from the frozen shark metaphor here). You're
+> >>>> willing to add a whole list of things with private ids that need
+> >>>> matching to kill a flag? I don't think this buys us anything but extra
+> >>>> complexity and another maintenance headache.
+> >>>
+> >>> Well, it is like your approach except it is split in two steps.
+> >>>
+> >>> Can you explain where is the extra complexity ? May be I am missing the point.
+> >>
+> >> This is how I understand your approach:
+> >>
+> >> - Boot the first CPU
+> >> - Build a list of errata discovered at that time
+> >> - Apply erratum on the boot CPU if required, using a yet-to-be-invented
+> >> private id matching mechanism,
+> >> - Boot a secondary CPU
+> >> - Apply erratum if required, parsing the list
+> >> - Realise that you don't have the full list (this CPU comes with an
+> >> erratum that was not in the initial list)
+> >> - Add more to the list
+> >> - Apply erratum, using the same matching mechanism
+> >>
+> >> This is mine:
+> >>
+> >> - Boot the first CPU
+> >> - Apply global erratum to all CPUs
+> >> - Apply local erratum
+> >> - Boot a secondary CPU
+> >> - Apply local erratum
+> >>
+> >> In my case, everything is static, and I don't need to rematch each CPU
+> >> against the list of globally applicable errata.
+> >>
+> >> If my understanding is flawed, let me know.
 > > 
-> > USB OTG domains are absent from that list, true, but they are
-> > mentioned all of the place further in that section in register map
-> > documentation, which makes it difficult to tell which part of the
-> > datasheet is not up to date.
-> > 
-> > I'm going to drop those power domains for now, since I don't have a
-> > use-case for them and it would also allow me to get rid of the chunk
-> > of code you thought was messy. However it would be nice to get an
-> > updated version of RM where all of that is straightened out.
-> > 
+> > Any of our understanding is flawed. I think that needs a maturation period.
 > 
-> I checked with our IC designer and he confirmed the USB OTG is removed
-> and not supported in GPC. SW should not control it, instead, its power
-> domain is handled by hardware automatically.
-> 
-> Currently there's true some incorrectness in GPC chapter, i already
-> reported the issue to the designer, but still no timeline when i
-> can get a updated version.
-> 
-> But i think it's fine if you're going to only support PCIE/MIPI/USB HSIC
-> PHY power domain. I suppose those bits are correct in RM.
-> 
+> Well, these patches have been maturing for a while, and time is running
+> out. If you have a better idea that is more than a concept, please post
+> the code, I'd be happy to review it.
 
-BTW, would you please CC my company email next time?
-aisheng.dong at nxp.com
+No. I had a comment regarding global/local but it is apparently not possible.
+Let put the concept apart and move forward.
 
-Then i can see them in time to help the review.
+Thanks.
 
-Regards
-Dong Aisheng
+  -- Daniel
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
