@@ -1,35 +1,29 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 29 Mar 2017 15:51:44 +0300
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
-References: <58D17AF0.2010802@arm.com> <20170321193933.GB31111@cbox>
- <58DA3F68.6090901@arm.com> <20170328112328.GA31156@cbox>
- <20170328115413.GJ23682@e104320-lin>
- <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com>
- <58DA67BA.8070404@arm.com>
- <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
- <20170329103658.GQ23682@e104320-lin>
- <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
-Message-ID: <20170329154539-mutt-send-email-mst@kernel.org>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 29 Mar 2017 15:12:01 +0200
+Subject: Including Alpine -next tree in linux-next
+Message-ID: <20170329131201.j4e7cnmgufj2i7tr@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 01:58:29PM +0200, Laszlo Ersek wrote:
-> (8) When QEMU gets SIGBUS from the kernel -- I hope that's going to come
-> through a signalfd -- QEMU can format the CPER right into guest memory,
-> and then inject whatever interrupt (or assert whatever GPIO line) is
-> necessary for notifying the guest.
+Hello Eric,
 
-I think I see a race condition potential - what if guest accesses
-CPER in guest memory while it's being written?
+Would it be possible to include Alpine's -next tree in linux-next?
 
-We can probably use another level of indirection to fix this:
+Repo: https://git.kernel.org/pub/scm/linux/kernel/git/atenart/linux.git
+Branch: alpine/for-next
 
-allocate twice the space, add a pointer to where the valid
-table is located and update that after writing CPER completely.
-The pointer can be written atomically but also needs to
-be read atomically, so I suspect it should be a single byte
-as we don't know how are OSPMs implementing this.
+Thanks a lot!
+
+Antoine
 
 -- 
-MST
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170329/ee19585c/attachment.sig>
