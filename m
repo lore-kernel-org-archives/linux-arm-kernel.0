@@ -1,75 +1,88 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 29 Mar 2017 16:21:13 -0700
-Subject: [PATCH 5/5] ARM: dts: imx7-colibri: add Carrier Board 3.3V/5V
- regulators
-In-Reply-To: <20170329232113.19078-1-stefan@agner.ch>
-References: <20170329232113.19078-1-stefan@agner.ch>
-Message-ID: <20170329232113.19078-5-stefan@agner.ch>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 29 Mar 2017 16:54:53 -0700
+Subject: [PATCH V5 3/9] kernel/cpu_pm: Add runtime PM support for CPUs
+In-Reply-To: <CAPDyKFqXLzuge6+pQV-UzotENTV2gxZUCT6eU4CLtckdNZoYSw@mail.gmail.com>
+ (Ulf Hansson's message of "Tue, 14 Mar 2017 08:45:00 +0100")
+References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
+ <1488573695-106680-4-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFqXLzuge6+pQV-UzotENTV2gxZUCT6eU4CLtckdNZoYSw@mail.gmail.com>
+Message-ID: <m2tw6b4p0y.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Model the Carrier Board power distribution by adding a fixed 3.3V
-and 5V regulator. The 3.3V regulator is connected to the backlight
-as well as the display supply. The 5V regulator is used to supply
-USB VBUS.
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/imx7d-colibri-eval-v3.dts |  1 +
- 2 files changed, 18 insertions(+)
+> On 3 March 2017 at 21:41, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> Notify runtime PM when the CPU is going to be powered off in the idle
+>> state. This allows for runtime PM suspend/resume of the CPU as well as
+>> its PM domain.
+>>
+>> Cc: Kevin Hilman <khilman@kernel.org>
+>> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-index 7a98a45a0d95..18bebd6d8d47 100644
---- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-@@ -48,6 +48,7 @@
- 	panel: panel {
- 		compatible = "edt,et057090dhu";
- 		backlight = <&bl>;
-+		power-supply = <&reg_3v3>;
- 
- 		port {
- 			panel_in: endpoint {
-@@ -55,11 +56,27 @@
- 			};
- 		};
- 	};
-+
-+	reg_3v3: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_5v0: regulator-5v0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "5V";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
- };
- 
- &bl {
- 	brightness-levels = <0 4 8 16 32 64 128 255>;
- 	default-brightness-level = <6>;
-+	power-supply = <&reg_3v3>;
-+
- 	status = "okay";
- };
- 
-diff --git a/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts b/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
-index bd01d2cc642d..a608a14d8c85 100644
---- a/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
-@@ -57,6 +57,7 @@
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
- 		gpio = <&gpio4 7 GPIO_ACTIVE_LOW>;
-+		vin-supply = <&reg_5v0>;
- 	};
- };
- 
--- 
-2.12.1
+[...]
+
+>> @@ -99,6 +102,7 @@ int cpu_pm_enter(void)
+>>  {
+>>         int nr_calls;
+>>         int ret = 0;
+>> +       struct device *dev = get_cpu_device(smp_processor_id());
+>>
+>>         read_lock(&cpu_pm_notifier_lock);
+>>         ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
+>> @@ -110,6 +114,10 @@ int cpu_pm_enter(void)
+>>                 cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
+>>         read_unlock(&cpu_pm_notifier_lock);
+>>
+>> +       /* Notify Runtime PM that we are suspending the CPU */
+>> +       if (!ret && dev)
+>> +               RCU_NONIDLE(pm_runtime_put_sync_suspend(dev));
+>> +
+>
+> I am trying to understand how the runtime PM usage count becomes
+> properly balanced.
+>
+> I believe you could you end up first calling a
+> pm_runtime_put_sync_suspend(), without earlier having called
+> pm_runtime_get*(). I am not sure though, but perhaps you can
+> elaborate.
+>
+> Anyway, in patch2/9, where you enable runtime PM there is only a call
+> to pm_runtime_set_active(), which doesn't increase the usage count. To
+> me, it seems like that change also needs a pm_runtime_get_noresume().
+
+IIUC, the CPU hotplug callback below (cpu_pm_cpu_starting) will do the
+first _get_sync(), and I'm assuming that will happen before any of the
+CPU PM notifiers get called, so I think the usecount will always be at
+least 1 by the time any CPU PM callbacks happen.
+
+[...]
+
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +static int cpu_pm_cpu_dying(unsigned int cpu)
+>> +{
+>> +       struct device *dev = get_cpu_device(cpu);
+>> +
+>> +       if (dev)
+>> +               pm_runtime_put_sync_suspend(dev);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int cpu_pm_cpu_starting(unsigned int cpu)
+>> +{
+>> +       struct device *dev = get_cpu_device(cpu);
+>> +
+>> +       if (dev)
+>> +               pm_runtime_get_sync(dev);
+>
+> I assume that according to my comment above, you somehow need to
+> compensate for either of the cases when CONFIG_HOTPLUG_CPU is set or
+> unset. Right?
+
+Right, if for some reason CONFIG_HOTPLUG_CPU=n, we'll have a problem
+where there is never an initial _get() so the usecount will be zero when
+CPU PM notifiers get called the first time.
+
+Kevin
