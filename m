@@ -1,39 +1,87 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Mar 2017 16:36:04 -0400
-Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846675D9B9@IRSMSX101.ger.corp.intel.com>
-References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
- <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
- <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
- <1f677feb-b561-1dd3-69ad-afd4049b6d59@codeaurora.org>
- <f3e76f8d-16bb-8ec5-da9b-d62ca66dafd6@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675D8C4@IRSMSX101.ger.corp.intel.com>
- <beb63ced-3e63-c09c-8c2c-5d5b0956d2fc@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846675D9B9@IRSMSX101.ger.corp.intel.com>
-Message-ID: <b0327163-2500-1541-6c23-454e3f28b6ea@codeaurora.org>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Wed, 29 Mar 2017 21:44:47 +0100
+Subject: [kvmtool PATCH v9 06/15] PCI: Only allocate IRQ routing entry
+ when available
+In-Reply-To: <d26dea9f-386b-316c-a2b3-d42ea1883997@arm.com>
+References: <20170202163223.15372-1-andre.przywara@arm.com>
+ <20170202163223.15372-7-andre.przywara@arm.com>
+ <d26dea9f-386b-316c-a2b3-d42ea1883997@arm.com>
+Message-ID: <6371fdda-bdd5-2aa0-de8c-4f97953ee326@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/29/2017 4:16 PM, Patel, Mayurkumar wrote:
-> Actually, I have taken same patches of yours which proposed and applied it correctly. Will try it with clean
-> build if that helps.
+Hi Marc,
+
+thanks for having a look!
+
+On 29/03/17 09:30, Marc Zyngier wrote:
+> On 02/02/17 16:32, Andre Przywara wrote:
+>> If we need to inject an MSI into the guest, we rely at the moment on a
+>> working GSI MSI routing functionality. However we can get away without
+>> IRQ routing, if the host supports MSI injection via the KVM_SIGNAL_MSI
+>> ioctl.
+>> So we try the GSI routing first, but if that fails due to a missing
+>> IRQ routing functionality, we fall back to KVM_SIGNAL_MSI (if that is
+>> supported).
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  virtio/pci.c | 16 ++++++++++++++--
+>>  1 file changed, 14 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virtio/pci.c b/virtio/pci.c
+>> index 7cc0ba4..98bf6b7 100644
+>> --- a/virtio/pci.c
+>> +++ b/virtio/pci.c
+>> @@ -193,8 +193,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+>>  
+>>  			gsi = irq__add_msix_route(kvm,
+>>  						  &vpci->msix_table[vec].msg);
+>> -			if (gsi >= 0)
+>> +			if (gsi >= 0) {
+>>  				vpci->config_gsi = gsi;
+>> +				break;
+>> +			}
+>> +			if (gsi == -ENXIO &&
+>> +			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
+>> +					break;
+>> +			die("failed to configure MSIs");
+>>  			break;
+>>  		case VIRTIO_MSI_QUEUE_VECTOR:
+>>  			vec = ioport__read16(data);
+>> @@ -205,8 +211,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+>>  
+>>  			gsi = irq__add_msix_route(kvm,
+>>  						  &vpci->msix_table[vec].msg);
+>> -			if (gsi < 0)
+>> +			if (gsi < 0) {
+>> +				if (gsi == -ENXIO &&
+>> +				    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
+>> +					break;
+>> +
+>> +				die("failed to configure MSIs");
+>>  				break;
+>> +			}
+>>  			vpci->gsis[vpci->queue_selector] = gsi;
 > 
-> But what I could understand from following patch is https://patchwork.codeaurora.org/patch/207653/ 
+> Is it really expected to find -ENXIO in this array instead of a GSI?
+
+Not sure I get this "in this array" comment here. Any negative return
+value ends up in a break, without writing it anywhere.
+Later on we check for VIRTIO_PCI_F_SIGNAL_MSI first before referencing
+the array. This is admittedly a bit convoluted.
+So shall I add comments here? Or rewrite the if statement to make this
+more obvious?
+
+Cheers,
+Andre.
+
 > 
-> We still have a flow of pci_aspm_init() -> alloc_pcie_link_state() -> pci_function_0()
-> Where I see the first Kernel NULL pointer crash while accessing pdev->subordinate in pci_function_0() function.
-
-OK. It looks like somebody moved function_0 call around. I was looking at 4.11-rc1.
-
-3bd7db63a841e8c5297bb18ad801df67d5e38ad2 (PCI/ASPM: Always set link->downstream to avoid NULL dereference on remove)
-
-I see the change in 4.11-rc3 now. 
-
-Let me see what's going on.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>  			if (vdev->ops->notify_vq_gsi)
+>>  				vdev->ops->notify_vq_gsi(kvm, vpci->dev,
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
