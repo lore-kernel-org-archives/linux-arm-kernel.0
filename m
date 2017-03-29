@@ -1,107 +1,111 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Mar 2017 11:49:11 +0100
-Subject: [PATCH v7 1/7] clocksource/drivers/clksrc-evt-probe: Describe
- with the DT both the clocksource and the clockevent
-In-Reply-To: <20170329092210.GH2123@mai>
-References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
- <1490197714-25415-2-git-send-email-al.kochet@gmail.com>
- <20170329015146.ey5rlptzsnnynpnt@rob-hp-laptop>
- <20170329092210.GH2123@mai>
-Message-ID: <20170329104911.GC23442@leverpostej>
+Date: Wed, 29 Mar 2017 12:20:31 +0100
+Subject: [PATCH v2 6/8] bus: brcmstb_gisb: Add ARM64 support
+In-Reply-To: <20170328213431.10904-7-opendmb@gmail.com>
+References: <20170328213431.10904-1-opendmb@gmail.com>
+ <20170328213431.10904-7-opendmb@gmail.com>
+Message-ID: <20170329112030.GD23442@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Mar 29, 2017 at 11:22:10AM +0200, Daniel Lezcano wrote:
-> On Tue, Mar 28, 2017 at 08:51:46PM -0500, Rob Herring wrote:
-> > On Wed, Mar 22, 2017 at 06:48:28PM +0300, Alexander Kochetkov wrote:
-> > > From: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > > 
-> > > The CLOCKSOURCE_OF_DECLARE() was introduced before the
-> > > CLOCKEVENT_OF_DECLARE() and that resulted in some abuse where the
-> > > clockevent and the clocksource are both initialized in the same init
-> > > routine.
-> > > 
-> > > With the introduction of the CLOCKEVENT_OF_DECLARE(), the driver can
-> > > now split the clocksource and the clockevent init code. However, the
-> > > device tree may specify a single node, so the same node will be passed
-> > > to the clockevent/clocksource's init function, with the same base
-> > > address.
-> > > 
-> > > with this patch it is possible to specify an attribute to the timer's node to
-> > > specify if it is a clocksource or a clockevent and define two timers node.
-> > 
-> > Daniel and I discussed and agreed against this a while back. What 
-> > changed?
+On Tue, Mar 28, 2017 at 02:34:29PM -0700, Doug Berger wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
 > 
-> Hi Rob,
-> 
-> > > For example:
-> > > 
-> > >         timer: timer at 98400000 {
-> > >                 compatible = "moxa,moxart-timer";
-> > >                 reg = <0x98400000 0x42>;
-> > 
-> > This overlaps the next node. You can change this to 0x10, but are these 
-> > really 2 independent h/w blocks? Don't design the nodes around the 
-> > current needs of Linux.
-> 
-> Mmh, thanks for raising this. Conceptually speaking there are two (or more)
-> different entities, the clocksource and the clockevents but they share the same
-> IP block.
+> Hook to the ARM64 data abort exception #16: synchronous external
+> abort, which is how the GISB errors will be funneled back to the
+> ARM64 CPU in case of problems
 
->From the DT's PoV, this is one entity, which is the IP block.
+I believe that you can use a die notifier for this, and that you don't
+need to hook the low-level architectural fault here.
 
-The clocksource/clockevent concept is a Linux implementation detail. The
-DT cannot and should not be aware of that.
+I note that the code doesn't even look at the faulting address, and
+likely doesn't have the information to do anything with it, so it make
+no sense to me for this code to hook the low-level fault.
 
-[...]
-
-> > >                 interrupts = <19 1>;
-> > >                 clocks = <&coreclk>;
-> > >                 clockevent;
-> > 
-> > This is not needed. The presence of "interrupts" is enough to say use 
-> > this timer for clockevent.
-> 
-> Yes, that is true if no drivers was already taking CLOCKSOURCE_OF and
-> initializing the clockevent. The driver will pass through the clocksource_probe
-> function, check the interrupt and bail out because there is an interrupt
-> declared and assume it is a clockevent, so no initialization for the driver.
-> IOW, it is not backward compatible.
-> 
-> We need this attribute somehow in order to separate clearly a clocksource or a
-> clockevent with a new implementation.
-
-Why? A single IP block can provide the functionality of both (though
-there are reasons that functionality may be mutually exclusive). What is
-the benefit of this split?
-
-> > > With this approach, we allow a mechanism to clearly define a clocksource or a
-> > > clockevent without aerobatics we can find around in some drivers:
-> > > 	timer-sp804.c, arc-timer.c, dw_apb_timer_of.c, mps2-timer.c,
-> > > 	renesas-ostm.c, time-efm32.c, time-lpc32xx.c.
-> > 
-> > These all already have bindings and work. What problem are you trying to 
-> > solve other than restructuring Linux?
-> 
-> Yes, there is already the bindings, but that force to do some hackish
-> initialization.
-
-Here, you are forcing hackish DT changes that do not truly describe HW.
-How is that better?
-
-> I would like to give the opportunity to declare separately a clocksource and a
-> clockevent, in order to have full control of how this is initialized.
-
-To me it sounds like what we need is Linux infrastructure that allows
-one to register a device as having both clockevent/clocksource
-functionality.
-
-That way, we can choose to do something sane at boot time, and if the
-user really wants specific devices used in specific ways, they can
-request that.
+Further, as an aside, from digging into how we handle unexpected faults
+it appears that we don't always treat some faults (e.g. TLB conflict,
+faults on PTW) sufficiently fatally when they occur at EL0, so we likely
+need to do so rework there.
 
 Thanks,
 Mark.
+
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  drivers/bus/Kconfig        |  2 +-
+>  drivers/bus/brcmstb_gisb.c | 15 ++++++++++++---
+>  2 files changed, 13 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index 0a52da439abf..d2a5f1184022 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -57,7 +57,7 @@ config ARM_CCN
+>  
+>  config BRCMSTB_GISB_ARB
+>  	bool "Broadcom STB GISB bus arbiter"
+> -	depends on ARM || MIPS
+> +	depends on ARM || ARM64 || MIPS
+>  	default ARCH_BRCMSTB || BMIPS_GENERIC
+>  	help
+>  	  Driver for the Broadcom Set Top Box System-on-a-chip internal bus
+> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+> index edf79432f899..500b6bb5c739 100644
+> --- a/drivers/bus/brcmstb_gisb.c
+> +++ b/drivers/bus/brcmstb_gisb.c
+> @@ -30,6 +30,11 @@
+>  #include <asm/signal.h>
+>  #endif
+>  
+> +#ifdef CONFIG_ARM64
+> +#include <asm/signal.h>
+> +#include <asm/system_misc.h>
+> +#endif
+> +
+>  #ifdef CONFIG_MIPS
+>  #include <asm/traps.h>
+>  #endif
+> @@ -225,7 +230,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_ARM
+> +#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+>  static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+>  				     struct pt_regs *regs)
+>  {
+> @@ -235,7 +240,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+>  	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
+>  		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
+>  
+> -#if !defined(CONFIG_ARM_LPAE)
+> +#if defined(CONFIG_ARM) && !defined(CONFIG_ARM_LPAE)
+>  	/*
+>  	 * If it was an imprecise abort, then we need to correct the
+>  	 * return address to be _after_ the instruction.
+> @@ -247,7 +252,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+>  	/* Always report unhandled exception */
+>  	return 1;
+>  }
+> -#endif
+> +#endif /* CONFIG_ARM || CONFIG_ARM64 */
+>  
+>  #ifdef CONFIG_MIPS
+>  static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
+> @@ -395,6 +400,10 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+>  			"imprecise external abort");
+>  #endif
+>  #endif /* CONFIG_ARM */
+> +#ifdef CONFIG_ARM64
+> +	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
+> +			"synchronous external abort");
+> +#endif
+>  #ifdef CONFIG_MIPS
+>  	board_be_handler = brcmstb_bus_error_handler;
+>  #endif
+> -- 
+> 2.12.0
+> 
