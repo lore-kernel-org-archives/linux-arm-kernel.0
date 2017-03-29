@@ -1,119 +1,72 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 29 Mar 2017 18:42:45 +0800
-Subject: [PATCH v3 4/5] ARM: sunxi: h3/h5: switch apb0-related clocks to r_ccu
-In-Reply-To: <20170329104246.34204-1-icenowy@aosc.io>
-References: <20170329104246.34204-1-icenowy@aosc.io>
-Message-ID: <20170329104246.34204-5-icenowy@aosc.io>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 29 Mar 2017 13:48:02 +0300
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
+Message-ID: <0d4ff89ce2276dfbde2db8ced3fff10582a5b899.1490783707.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
+Add this driver to the default imx config since the device is present on
+one of the evaluation boards.
 
-Now we have driver for the PRCM CCU, switch to use it instead of
-old-style clock nodes for apb0-related clocks in sunxi-h3-h5.dtsi .
+This used to work mostly fine with the generic phy driver until
+commit 0878fff1f42c ("net: phy: Do not perform software reset for
+Generic PHY"). The fact that soft reset is no longer performed
+apparently causes RX to sometimes failes which can cause netboot to
+timeout on DHCP. This is eventually retried and it works after link
+up/down but can takes 90 seconds to reach the login prompt.
 
-The mux 3 of R_CCU is still the internal oscillator, which is said to be
-16MHz plus minus 30%, and get a measured value of 15MHz~16MHz on my two
-H3 boards and one H5 board.
+This was generated with "make savedefconfig" and it includes a few
+additional minor cleanups.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Acked-by: Fugang Duan <fugang.duan@nxp.com>
 ---
-Changes in v3:
-- Change osc32000 to iosc.
 
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 47 +++++++++++++-------------------------
- 1 file changed, 16 insertions(+), 31 deletions(-)
+I also tried to do some debugging in the fec driver and it apparently receives
+corrupted packets when this happens. If I hack it to go into promiscuous mode
+unconditionally it gets a whole bunch of rx errors (crc errors, length errors
+and so on). So the phy config is probably wrong and is confusing the mac?
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 6640ebfa6419..a7e858a82c90 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -41,8 +41,10 @@
-  */
- 
- #include <dt-bindings/clock/sun8i-h3-ccu.h>
-+#include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/sun8i-h3-ccu.h>
-+#include <dt-bindings/reset/sun8i-r-ccu.h>
- 
- / {
- 	interrupt-parent = <&gic>;
-@@ -68,31 +70,12 @@
- 			clock-output-names = "osc32k";
- 		};
- 
--		apb0: apb0_clk {
--			compatible = "fixed-factor-clock";
-+		iosc: internal-osc-clk {
- 			#clock-cells = <0>;
--			clock-div = <1>;
--			clock-mult = <1>;
--			clocks = <&osc24M>;
--			clock-output-names = "apb0";
--		};
--
--		apb0_gates: clk at 01f01428 {
--			compatible = "allwinner,sun8i-h3-apb0-gates-clk",
--				     "allwinner,sun4i-a10-gates-clk";
--			reg = <0x01f01428 0x4>;
--			#clock-cells = <1>;
--			clocks = <&apb0>;
--			clock-indices = <0>, <1>;
--			clock-output-names = "apb0_pio", "apb0_ir";
--		};
--
--		ir_clk: ir_clk at 01f01454 {
--			compatible = "allwinner,sun4i-a10-mod0-clk";
--			reg = <0x01f01454 0x4>;
--			#clock-cells = <0>;
--			clocks = <&osc32k>, <&osc24M>;
--			clock-output-names = "ir";
-+			compatible = "fixed-clock";
-+			clock-frequency = <16000000>;
-+			clock-accuracy = <300000000>;
-+			clock-output-names = "iosc";
- 		};
- 	};
- 
-@@ -576,9 +559,12 @@
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
--		apb0_reset: reset at 01f014b0 {
--			reg = <0x01f014b0 0x4>;
--			compatible = "allwinner,sun6i-a31-clock-reset";
-+		r_ccu: clock at 1f01400 {
-+			compatible = "allwinner,sun50i-a64-r-ccu";
-+			reg = <0x01f01400 0x100>;
-+			clocks = <&osc24M>, <&osc32k>, <&iosc>;
-+			clock-names = "hosc", "losc", "iosc";
-+			#clock-cells = <1>;
- 			#reset-cells = <1>;
- 		};
- 
-@@ -589,9 +575,9 @@
- 
- 		ir: ir at 01f02000 {
- 			compatible = "allwinner,sun5i-a13-ir";
--			clocks = <&apb0_gates 1>, <&ir_clk>;
-+			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
- 			clock-names = "apb", "ir";
--			resets = <&apb0_reset 1>;
-+			resets = <&r_ccu RST_APB0_IR>;
- 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0x01f02000 0x40>;
- 			status = "disabled";
-@@ -601,9 +587,8 @@
- 			compatible = "allwinner,sun8i-h3-r-pinctrl";
- 			reg = <0x01f02c00 0x400>;
- 			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&apb0_gates 0>, <&osc24M>, <&osc32k>;
-+			clocks = <&r_ccu CLK_APB0_PIO>, <&osc24M>, <&osc32k>;
- 			clock-names = "apb", "hosc", "losc";
--			resets = <&apb0_reset 0>;
- 			gpio-controller;
- 			#gpio-cells = <3>;
- 			interrupt-controller;
+In theory it might be possible to make that driver "just work" with phy
+settings from uboot but it's not clear that's worthwhile.
+
+Link to v1: https://lkml.org/lkml/2017/3/22/416
+Changes:
+ * Improve commit message to fix checkpatch.pl warnings.
+
+ arch/arm/configs/imx_v6_v7_defconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index eaba3b1..e605389 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -143,6 +143,7 @@ CONFIG_SMSC911X=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ CONFIG_AT803X_PHY=y
+ CONFIG_MICREL_PHY=y
++CONFIG_SMSC_PHY=y
+ CONFIG_USB_PEGASUS=m
+ CONFIG_USB_RTL8150=m
+ CONFIG_USB_RTL8152=m
+@@ -152,7 +153,6 @@ CONFIG_BRCMFMAC=m
+ CONFIG_WL12XX=m
+ CONFIG_WLCORE_SDIO=m
+ # CONFIG_WILINK_PLATFORM_DATA is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_INPUT_EVBUG=m
+ CONFIG_KEYBOARD_GPIO=y
+@@ -376,7 +376,6 @@ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=m
+ CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
+-CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ # CONFIG_SCHED_DEBUG is not set
+ CONFIG_PROVE_LOCKING=y
 -- 
-2.12.0
+2.7.4
