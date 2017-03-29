@@ -1,70 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Mar 2017 09:50:03 +0100
-Subject: [kvmtool PATCH v9 12/15] PCI: inject PCI device ID on MSI
- injection
-In-Reply-To: <20170202163223.15372-13-andre.przywara@arm.com>
-References: <20170202163223.15372-1-andre.przywara@arm.com>
- <20170202163223.15372-13-andre.przywara@arm.com>
-Message-ID: <1655aef3-44f2-d07c-08ee-9d211b108628@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 29 Mar 2017 16:47:19 +0800
+Subject: [PATCH net-next v2] net: mvneta: set rx mode during resume if
+ interface is running
+Message-ID: <20170329084719.3596-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/17 16:32, Andre Przywara wrote:
-> The ITS emulation requires a unique device ID to be passed along the
-> MSI payload when kvmtool wants to trigger an MSI in the guest.
-> According to the proposed changes to the interface add the PCI
-> bus/device/function triple to the structure passed with the ioctl.
-> Check the respective capability before actually adding the device ID
-> to the kvm_msi struct.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virtio/pci.c | 16 +++++++++++++++-
->  1 file changed, 15 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virtio/pci.c b/virtio/pci.c
-> index 98bf6b7..cecfe8a 100644
-> --- a/virtio/pci.c
-> +++ b/virtio/pci.c
-> @@ -321,14 +321,28 @@ static void virtio_pci__msix_mmio_callback(struct kvm_cpu *vcpu,
->  		update_msix_map(vpci, table, vecnum);
->  }
->  
-> -static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci, int vec)
-> +static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci,
-> +				   int vec)
->  {
-> +	static int needs_devid = 0;
->  	struct kvm_msi msi = {
->  		.address_lo = vpci->msix_table[vec].msg.address_lo,
->  		.address_hi = vpci->msix_table[vec].msg.address_hi,
->  		.data = vpci->msix_table[vec].msg.data,
->  	};
->  
-> +	if (needs_devid == 0) {
-> +		if (kvm__supports_vm_extension(kvm, KVM_CAP_MSI_DEVID))
+I found a bug by:
 
-Grump... Pretty horrible, even if it works. Even if we will never end-up
-in a situation where we can mix ITS and non-ITS MSIs, could we instead
-store this as a flag in the virtio_pci device?
+0. boot and start dhcp client
+1. echo mem > /sys/power/state
+2. resume back immediately
+3. don't touch dhcp client to renew the lease
+4. ping the gateway. No acks
 
-> +			needs_devid = 1;
-> +		else
-> +			needs_devid = -1;
-> +	}
-> +
-> +	if (needs_devid > 0) {
-> +		msi.flags = KVM_MSI_VALID_DEVID;
-> +		msi.devid = vpci->dev_hdr.dev_num << 3;
-> +	}
-> +
->  	ioctl(kvm->vm_fd, KVM_SIGNAL_MSI, &msi);
->  }
->  
-> 
+Usually, after step2, the DHCP lease isn't expired, so in theory we
+should resume all back. But in fact, it doesn't. It turns out
+the rx mode isn't resumed correctly. This patch fixes it by adding
+mvneta_set_rx_mode(dev) in the resume hook if interface is running.
 
-Thanks,
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+Since v1:
+ - rebased to the latest net-next tree and explictly mention it
 
-	M.
+ drivers/net/ethernet/marvell/mvneta.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index aebbc5399a06..cc126204dc4d 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -4449,8 +4449,11 @@ static int mvneta_resume(struct device *device)
+ 		mvneta_fixed_link_update(pp, dev->phydev);
+ 
+ 	netif_device_attach(dev);
+-	if (netif_running(dev))
++	if (netif_running(dev)) {
+ 		mvneta_open(dev);
++		mvneta_set_rx_mode(dev);
++	}
++
+ 	return 0;
+ }
+ #endif
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
