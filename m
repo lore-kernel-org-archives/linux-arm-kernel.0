@@ -1,30 +1,75 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 29 Mar 2017 15:38:43 -0700
-Subject: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <1490811363-93944-5-git-send-email-keescook@chromium.org>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
-Message-ID: <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 29 Mar 2017 19:04:23 -0400
+Subject: [PATCH V6 1/5] PCI/ASPM: introduce pci_aspm_init() and add to
+ pci_init_capabilities()
+In-Reply-To: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
+References: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1490828667-30973-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:15 AM, Kees Cook <keescook@chromium.org> wrote:
-> Based on PaX's x86 pax_{open,close}_kernel() implementation, this
-> allows HAVE_ARCH_RARE_WRITE to work on x86.
->
+We need a callback from pci_init_capabilities function for every
+single new PCI device that is currently being added.
 
-> +
-> +static __always_inline unsigned long __arch_rare_write_begin(void)
-> +{
-> +       unsigned long cr0;
-> +
-> +       preempt_disable();
+pci_aspm_init() will be used to save the power on state of the HW.
 
-This looks wrong.  DEBUG_LOCKS_WARN_ON(!irqs_disabled()) would work,
-as would local_irq_disable().  There's no way that just disabling
-preemption is enough.
+Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pcie/aspm.c | 10 ++++++++++
+ drivers/pci/probe.c     |  3 +++
+ include/linux/pci.h     |  2 ++
+ 3 files changed, 15 insertions(+)
 
-(Also, how does this interact with perf nmis?)
-
---Andy
+diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+index 1dfa10c..dc36717 100644
+--- a/drivers/pci/pcie/aspm.c
++++ b/drivers/pci/pcie/aspm.c
+@@ -827,6 +827,16 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
+ }
+ 
+ /*
++ * pci_aspm_init: Initiate PCI express link state.
++ * It is called from device_add for every single pci device.
++ * @pdev: all pci devices
++ */
++int pci_aspm_init(struct pci_dev *pdev)
++{
++	return 0;
++}
++
++/*
+  * pcie_aspm_init_link_state: Initiate PCI express link state.
+  * It is called after the pcie and its children devices are scanned.
+  * @pdev: the root port or switch downstream port
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index dfc9a27..1e19364 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1847,6 +1847,9 @@ static void pci_init_capabilities(struct pci_dev *dev)
+ 
+ 	/* Advanced Error Reporting */
+ 	pci_aer_init(dev);
++
++	/* Active State Power Management */
++	pci_aspm_init(dev);
+ }
+ 
+ /*
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index eb3da1a..8828dd7 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1396,8 +1396,10 @@ static inline int pci_irq_get_node(struct pci_dev *pdev, int vec)
+ 
+ #ifdef CONFIG_PCIEASPM
+ bool pcie_aspm_support_enabled(void);
++int pci_aspm_init(struct pci_dev *pdev);
+ #else
+ static inline bool pcie_aspm_support_enabled(void) { return false; }
++static inline int pci_aspm_init(struct pci_dev *pdev) { return -ENODEV; }
+ #endif
+ 
+ #ifdef CONFIG_PCIEAER
+-- 
+1.9.1
