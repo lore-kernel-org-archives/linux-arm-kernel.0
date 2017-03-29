@@ -1,80 +1,124 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Mar 2017 13:38:21 +0100
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <58DBA010.1020002@linaro.org>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
-Message-ID: <20170329123821.GA10988@red-moon>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Wed, 29 Mar 2017 14:42:38 +0200
+Subject: [PATCH v3 10/11] ASoC: add bindings for stm32 DFSDM filter
+In-Reply-To: <20170324145208.6tj5swol5du5lkyc@rob-hp-laptop>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-11-git-send-email-arnaud.pouliquen@st.com>
+ <20170324145208.6tj5swol5du5lkyc@rob-hp-laptop>
+Message-ID: <473f36db-0c0e-00d2-3610-c24bf3f1d541@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
-> Hi Lorenzo,
-> 
-> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
-> >Hi Hanjun, Marc,
-> >
-> >On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
-> >>From: Hanjun Guo <hanjun.guo@linaro.org>
-> >>
-> >>For devices connecting to ITS, the devices need to identify themself
-> >>through a dev id; this dev id is represented in the IORT table in named
-> >>component node [1] for platform devices, so this patch adds code that
-> >>scans the IORT table to retrieve the devices' dev id.
-> >>
-> >>Leveraging the iort_node_map_platform_id() IORT API, add a new function
-> >>call, iort_pmsi_get_dev_id() and use it in its_pmsi_prepare() to allow
-> >>retrieving dev id in ACPI platforms.
-> >>
-> >>[1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
-> >>
-> >>Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>[lorenzo.pieralisi at arm.com: rewrote commit log]
-> >>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>Tested-by: Ming Lei <ming.lei@canonical.com>
-> >>Tested-by: Wei Xu <xuwei5@hisilicon.com>
-> >>Tested-by: Sinan Kaya <okaya@codeaurora.org>
-> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>Cc: Tomasz Nowicki <tn@semihalf.com>
-> >>Cc: Thomas Gleixner <tglx@linutronix.de>
-> >>---
-> >>  drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
-> >>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
-> >>  include/linux/acpi_iort.h                     |  5 +++++
-> >>  3 files changed, 31 insertions(+), 1 deletion(-)
-> >
-> >To simplify merging ACPI/IRQCHIP changes via different trees it
-> >would be good to split this patch; I am not sure what's the best
-> >way of handling it though given that we would end up in a merge
-> >ordering dependency anyway (ie we can create an empty stub
-> >for iort_pmsi_get_dev_id() but that would create a dependency
-> >between ARM64 and irqchip trees anyway).
-> 
-> The first 12 patches for ACPI platform MSI and later 3 patches
-> for mbigen have no "physical" dependency, which means they can
-> be merged and compiled independently, they only have functional
-> dependency only.
-> 
-> We already had SAS, XGE, USB and even UART drivers depend on
-> the mbigen ACPI support, so I don't think the dependency of ACPI
-> platform MSI and mbigen patches cares much if those two parts are
-> merged in one merge window, even they are merged independently via
-> different tree.
-> 
-> >
-> >Please let me know what's your preferred way of handling this.
-> 
-> So in my opinion, they can be merged independently via ARM64 and
-> irqchip tree with no ordering dependency, is it OK?
+Hello Rob,
 
-I am speaking about merging MBIgen AND ITS patches via IRQCHIP and
-ACPI/IORT for ARM64, that's why I replied to this patch. I do not
-think that's feasible to split patches in two separate branches
-without having a dependency between them.
+Sorry for this dirty/crappy patch...
+Please find answers below
 
-Sure, the last three patches can go via IRQCHIP but that was not
-my question :)
+Thanks
 
-Lorenzo
+Arnaud
+
+
+On 03/24/2017 03:52 PM, Rob Herring wrote:
+> On Fri, Mar 17, 2017 at 03:08:23PM +0100, Arnaud Pouliquen wrote:
+>> Add bindings that describes audio settings to support
+>> Digital Filter for pulse density modulation(PDM) microphone.
+>>
+>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+>> ---
+>> V2->V3:
+>>    Fixes based on V2 comments
+>>
+>>  .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 41 ++++++++++++++++++++++
+>>  1 file changed, 41 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+>> new file mode 100644
+>> index 0000000..ab610bc
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+>> @@ -0,0 +1,40 @@
+>> +STMicroelectronics audio DFSDM DT bindings
+>> +
+>> +This driver supports audio PDM microphone capture through Digital Filter format
+>> +Sigma Delta modulators (DFSDM).
+>> +
+>> +Required properties:
+>> +  - compatible: "st,stm32h7-adfsdm".
+>> +
+>> +  - #sound-dai-cells : Must be equal to 0
+>> +
+>> +  - io-channels : phandle to iio dfsdm instance node.
+>> +
+>> +
+>> +Example of a simple sound card using audio DFSDM node.
+>> +
+>> +	dmic0: dmic_ at 0 {
+> 
+> Drop the '_' and unit address.
+> 
+>> +		compatible = "dmic-codec";
+>> +		#sound-dai-cells = <0>;
+>> +	};
+>> +
+>> +	asoc-pdm at 0 {
+> 
+> asoc is a Linux term. Drop the unit address.
+> 
+>> +		compatible = "st,stm32h7-adfsdm";
+> 
+> Is this a separate block from the ADC? A drawing of the h/w blocks and 
+> connections would help.
+I don't know how to explain it...So don't hesitate is still not clear.
+On DFSDM we can connect 2 ADC types:
+- Generic Sigma delta(SD) ADC for analog to digital conversion
+- Digital microphones for audio capture.
+
+In both cases, an SPI or Manchester bus is used to transfer 1-bit stream
+ to DFSDM.
+1) In case of SD ADC, The link is described in IIO declaration using
+"io-channels" property ( [04/11] IIO: add DT bindings for stm32 DFSDM
+filter)
+2) For audio purpose, the link is done by the simple or the graph card
+So this device exposes the Digital audio interface (DAI) associated to
+the DFSDM ADC.
+Link between the DFSDM DAI and the DFSDM IIO device is done through the
+"io-channels" property.
+
+> 
+>> +		#sound-dai-cells = <0>;
+>> +		io-channels = <&dfsdm_adc0 0>;
+>> +	};
+>> +
+>> +	sound_dfsdm_pdm {
+> 
+> sound-card {
+> 
+>> + 		compatible = "simple-audio-card";
+>> + 		simple-audio-card,name = "dfsdm_pdm";
+>> +
+>> + 		dfsdm0_mic0: simple-audio-card,dai-link at 0 {
+> 
+> I'd suggest moving to the graph card.
+yes should be in V4
+> 
+>> + 			format = "pdm";
+>> + 			cpu {
+>> + 				sound-dai = <&asoc_pdm1>;
+> 
+> This phandle doesn't point to anything.
+> 
+>> + 			};
+>> + 			dmic0_codec: codec {
+>> + 				sound-dai = <&dmic0>;
+>> + 			};
+>> + 		};
+>> +	};
+>> \ No newline at end of file
+> 
+> ^^^
+> 
+>> -- 
+>> 1.9.1
+>>
