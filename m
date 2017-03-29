@@ -1,61 +1,105 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Mar 2017 18:51:00 +0100
-Subject: [BUG] v4.11-rc1: CPUFREQ Circular locking dependency
-In-Reply-To: <1489373088.5841.15.camel@intel.com>
-References: <20170310150218.GW21222@n2100.armlinux.org.uk>
- <CAJZ5v0jGRH_hwvvm9OLsaYgbghqWKOke9PyGNnkvP_ZiMqAxSw@mail.gmail.com>
- <BY2PR21MB00362E60448FD2E00C120FFCCB200@BY2PR21MB0036.namprd21.prod.outlook.com>
- <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
- <20170310234325.GB21222@n2100.armlinux.org.uk>
- <1489373088.5841.15.camel@intel.com>
-Message-ID: <20170329175100.GD7909@n2100.armlinux.org.uk>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Wed, 29 Mar 2017 12:43:40 -0500
+Subject: [PATCH v4 23/23] drivers/fsi: Use asynchronous slave mode
+In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
+References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170329174340.89109-24-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 10:44:48AM +0800, Zhang Rui wrote:
-> On Fri, 2017-03-10 at 23:43 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Mar 10, 2017 at 06:33:28PM +0000, Matthew Wilcox wrote:
-> > > 
-> > > From cd5401d81633d5e48e39d67d4e65156e6759537e Mon Sep 17 00:00:00
-> > > 2001
-> > > From: Matthew Wilcox <mawilcox@microsoft.com>
-> > > Date: Fri, 10 Mar 2017 13:22:53 -0500
-> > > Subject: [PATCH] thermal: Fix potential deadlock in cpu_cooling
-> > > 
-> > > I expanded the scope of cooling_list_lock a little too far; it was
-> > > not just covering cpufreq_dev_count, it was also covering the calls
-> > > to cpufreq_register_notifier() and cpufreq_unregister_notifier().
-> > > Since cooling_list_lock is also used within
-> > > cpufreq_thermal_notifier(),
-> > > lockdep reports a potential deadlock.??I don't think that's
-> > > actually
-> > > possible, but it's easy enough to make it impossible by testing the
-> > > condition under cooling_list_lock and dropping the lock before
-> > > calling
-> > > cpufreq_register_notifier().
-> > > 
-> > > As a bonus, I noticed that cpufreq_dev_count is only used for the
-> > > purpose
-> > > of knowing whether this is the first or last cooling device
-> > > registered,
-> > > and we know that anyway because we know whether the list
-> > > transitioned
-> > > between empty and not-empty.??So we can delete that variable too.
-> > > 
-> > > Fixes: ae606089621ef0349402cfcbeca33a82abbd0fd0
-> > > Reported-by: Russell King <linux@armlinux.org.uk>
-> > > Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
-> > Thanks Matthew, appears to solve the problem.
-> > 
-> > Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > 
-> 
-> patch applied.
+From: Jeremy Kerr <jk@ozlabs.org>
 
-It's almost three weeks, and it isn't in Linus' tree.  What's happening
-with this _fix_ for a regression that occured during the merge window?
+For slaves that are behind a software-clocked master, we want FSI CFAMs
+to run asynchronously to the FSI clock, so set up our slaves to be in
+async mode.
 
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+---
+ drivers/fsi/fsi-core.c        | 22 +++++++++++++++++++++-
+ drivers/fsi/fsi-master-gpio.c |  1 +
+ drivers/fsi/fsi-master.h      |  2 ++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 747d0e3..a6ed34f 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -47,6 +47,7 @@
+ #define FSI_SMODE		0x0	/* R/W: Mode register */
+ #define FSI_SISC		0x8	/* R/W: Interrupt condition */
+ #define FSI_SSTAT		0x14	/* R  : Slave status */
++#define FSI_LLMODE		0x100	/* R/W: Link layer mode register */
+ 
+ /*
+  * SMODE fields
+@@ -62,6 +63,11 @@
+ #define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
+ #define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
+ 
++/*
++ * LLMODE fields
++ */
++#define FSI_LLMODE_ASYNC	0x1
++
+ #define FSI_SLAVE_SIZE_23b		0x800000
+ 
+ static DEFINE_IDA(master_ida);
+@@ -560,8 +566,8 @@ static void fsi_slave_release(struct device *dev)
+ 
+ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ {
++	uint32_t chip_id, llmode;
+ 	struct fsi_slave *slave;
+-	uint32_t chip_id;
+ 	uint8_t crc;
+ 	int rc;
+ 
+@@ -597,6 +603,20 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ 		return -ENODEV;
+ 	}
+ 
++	/* If we're behind a master that doesn't provide a self-running bus
++	 * clock, put the slave into async mode
++	 */
++	if (master->flags & FSI_MASTER_FLAG_SWCLOCK) {
++		llmode = cpu_to_be32(FSI_LLMODE_ASYNC);
++		rc = fsi_master_write(master, link, id,
++				FSI_SLAVE_BASE + FSI_LLMODE,
++				&llmode, sizeof(llmode));
++		if (rc)
++			dev_warn(&master->dev,
++				"can't set llmode on slave:%02x:%02x %d\n",
++				link, id, rc);
++	}
++
+ 	/* We can communicate with a slave; create the slave device and
+ 	 * register.
+ 	 */
+diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
+index 84d5595..f3fcede 100644
+--- a/drivers/fsi/fsi-master-gpio.c
++++ b/drivers/fsi/fsi-master-gpio.c
+@@ -573,6 +573,7 @@ static int fsi_master_gpio_probe(struct platform_device *pdev)
+ 	master->gpio_mux = gpio;
+ 
+ 	master->master.n_links = 1;
++	master->master.flags = FSI_MASTER_FLAG_SWCLOCK;
+ 	master->master.read = fsi_master_gpio_read;
+ 	master->master.write = fsi_master_gpio_write;
+ 	master->master.term = fsi_master_gpio_term;
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+index d6a4885..fd39924 100644
+--- a/drivers/fsi/fsi-master.h
++++ b/drivers/fsi/fsi-master.h
+@@ -19,6 +19,8 @@
+ 
+ #include <linux/device.h>
+ 
++#define FSI_MASTER_FLAG_SWCLOCK	0x1
++
+ struct fsi_master {
+ 	struct device	dev;
+ 	int		idx;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.8.2.2
