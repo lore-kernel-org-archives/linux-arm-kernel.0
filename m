@@ -1,39 +1,146 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Mar 2017 09:58:41 +0100
-Subject: [kvmtool PATCH v9 00/15] kvmtool: arm: ITS emulation and GSI
- routing support
-In-Reply-To: <20170202163223.15372-1-andre.przywara@arm.com>
-References: <20170202163223.15372-1-andre.przywara@arm.com>
-Message-ID: <997ccfcb-b569-cf99-aa72-36450f62c807@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 29 Mar 2017 11:03:07 +0200
+Subject: [RFC PATCHv2 00/21] Ion clean in preparation for moving out of
+ staging
+In-Reply-To: <1489798493-16600-1-git-send-email-labbott@redhat.com>
+References: <1489798493-16600-1-git-send-email-labbott@redhat.com>
+Message-ID: <CA+M3ks4ykYszxmzscnCAwKdahTZxwNWjPg7HvWDHh6bNdnD1=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/17 16:32, Andre Przywara wrote:
+2017-03-18 1:54 GMT+01:00 Laura Abbott <labbott@redhat.com>:
+>
 > Hi,
-> 
-> an update to the ITS emulation series for kvmtool.
-> I reworked the phandle allocation by actually removing and replacing it
-> with some simple, static assignments. That definitely fits kvmtool's
-> needs today, where the GIC and the PCI controller are statically
-> assigned anyway. If that is too much of a simplification, let me know.
-> Also I fixed the error return in case some GSI routing setup fails.
-> On that way I use the opportunity to merge in 32-bit ARM support for the
-> ITS and the VGICv3, as the kernel learned about it recently as well.
-> The rest is effectively unchanged apart from some rebasing and
-> adjustments due to the mentioned changes.
+>
+> This is v2 of the series to do some serious Ion clean up in preparation for
+> moving out of staging. I got good feedback last time so this series mostly
+> attempts to address that feedback and do more still more cleanup. Highlights:
+>
+> - All calls to DMA APIs should now be with a real actual proper device
+>   structure
+> - Patch to stop setting sg_dma_address manually now included
+> - Fix for a bug in the query interface
+> - Removal of custom ioctl interface
+> - Removal of import interface
+> - Removal of any notion of using Ion as an in kernel interface.
+> - Cleanup of ABI so compat interface is no longer needed
+> - Deletion of a bit more platform code
+> - Combined heap enumeration and heap registration code up so there are fewer
+>   layers of abstraction
+> - Some general cleanup and header reduction.
+> - Removal of both the ion_client and ion_handle structures since these mostly
+>   become redundant. As a result, Ion only returns a dma_buf fd. The overall
+>   result is that the only Ion interfaces are the query ioctl and the alloc
+>   ioctl.
+>
+> The following are still TODOs/open problems:
+> - Sumit's comments about the CMA naming.
+> - Bindings/platform for chunk and carveout heap
+> - There was some discussion about making the sg_table duplication generic. I
+>   got bogged down in handling some of the edge cases for generic handling
+>   so I put this aside. Making it generic is still something that should happen.
+> - More fine-grained support for restricting heap access. There are good
+>   arguments to be made for having a way for having good integration with
+>   selinux and other policy mechanisms.
+> - While not on the original list, there is still no good good test standalone
+>   test framework. I noticed that the existing ion_test was fairly generic so I
+>   proposed moving it to dma_buf. Daniel Vetter suggested just using the VGEM
+>   module instead. Ideally, the tests can live as part of some other existing
+>   test set (drm tests maybe?)
+>
+> Feedback appreciated as always.
 
-Hi Andre,
+Thanks for this v2, it really clean up and simplify ION.
 
-Sorry for the time it took me to get to this series. Overall, this is
-looking good. There is a number of nits I'd like you to address (the
-DEVID detection is pretty nasty), and I suspect a weird corner case when
-irq__add_msix_route() fails in patch 6.
+For me the last question mark is about restricting heap access with
+SElinux policy.
+Since I haven't see other proposals I still believe that we should
+have a /dev/ion/$heapname
+per heap.
 
-If you can respin it quickly, I promise to get back to it quickly, and
-we can (finally) merge it!
+>
+> Thanks,
+> Laura
+>
+> Laura Abbott (21):
+>   cma: Store a name in the cma structure
+>   cma: Introduce cma_for_each_area
+>   staging: android: ion: Remove dmap_cnt
+>   staging: android: ion: Remove alignment from allocation field
+>   staging: android: ion: Duplicate sg_table
+>   staging: android: ion: Call dma_map_sg for syncing and mapping
+>   staging: android: ion: Remove page faulting support
+>   staging: android: ion: Remove crufty cache support
+>   staging: android: ion: Remove custom ioctl interface
+>   staging: android: ion: Remove import interface
+>   staging: android: ion: Remove duplicate ION_IOC_MAP
+>   staging: android: ion: Remove old platform support
+>   staging: android: ion: Use CMA APIs directly
+>   staging: android: ion: Stop butchering the DMA address
+>   staging: android: ion: Break the ABI in the name of forward progress
+>   staging: android: ion: Get rid of ion_phys_addr_t
+>   staging: android: ion: Collapse internal header files
+>   staging: android: ion: Rework heap registration/enumeration
+>   staging: android: ion: Drop ion_map_kernel interface
+>   staging: android: ion: Remove ion_handle and ion_client
+>   staging: android: ion: Set query return value
+>
+>  drivers/base/dma-contiguous.c                      |    5 +-
+>  drivers/staging/android/ion/Kconfig                |   56 +-
+>  drivers/staging/android/ion/Makefile               |   18 +-
+>  drivers/staging/android/ion/compat_ion.c           |  195 ----
+>  drivers/staging/android/ion/compat_ion.h           |   29 -
+>  drivers/staging/android/ion/hisilicon/Kconfig      |    5 -
+>  drivers/staging/android/ion/hisilicon/Makefile     |    1 -
+>  drivers/staging/android/ion/hisilicon/hi6220_ion.c |  113 --
+>  drivers/staging/android/ion/ion-ioctl.c            |   85 +-
+>  drivers/staging/android/ion/ion.c                  | 1164 +++-----------------
+>  drivers/staging/android/ion/ion.h                  |  393 +++++--
+>  drivers/staging/android/ion/ion_carveout_heap.c    |   37 +-
+>  drivers/staging/android/ion/ion_chunk_heap.c       |   27 +-
+>  drivers/staging/android/ion/ion_cma_heap.c         |  125 +--
+>  drivers/staging/android/ion/ion_dummy_driver.c     |  156 ---
+>  drivers/staging/android/ion/ion_heap.c             |   68 --
+>  drivers/staging/android/ion/ion_of.c               |  184 ----
+>  drivers/staging/android/ion/ion_of.h               |   37 -
+>  drivers/staging/android/ion/ion_page_pool.c        |    6 +-
+>  drivers/staging/android/ion/ion_priv.h             |  473 --------
+>  drivers/staging/android/ion/ion_system_heap.c      |   53 +-
+>  drivers/staging/android/ion/ion_test.c             |  305 -----
+>  drivers/staging/android/ion/tegra/Makefile         |    1 -
+>  drivers/staging/android/ion/tegra/tegra_ion.c      |   80 --
+>  drivers/staging/android/uapi/ion.h                 |   86 +-
+>  drivers/staging/android/uapi/ion_test.h            |   69 --
+>  include/linux/cma.h                                |    6 +-
+>  mm/cma.c                                           |   25 +-
+>  mm/cma.h                                           |    1 +
+>  mm/cma_debug.c                                     |    2 +-
+>  30 files changed, 610 insertions(+), 3195 deletions(-)
+>  delete mode 100644 drivers/staging/android/ion/compat_ion.c
+>  delete mode 100644 drivers/staging/android/ion/compat_ion.h
+>  delete mode 100644 drivers/staging/android/ion/hisilicon/Kconfig
+>  delete mode 100644 drivers/staging/android/ion/hisilicon/Makefile
+>  delete mode 100644 drivers/staging/android/ion/hisilicon/hi6220_ion.c
+>  delete mode 100644 drivers/staging/android/ion/ion_dummy_driver.c
+>  delete mode 100644 drivers/staging/android/ion/ion_of.c
+>  delete mode 100644 drivers/staging/android/ion/ion_of.h
+>  delete mode 100644 drivers/staging/android/ion/ion_priv.h
+>  delete mode 100644 drivers/staging/android/ion/ion_test.c
+>  delete mode 100644 drivers/staging/android/ion/tegra/Makefile
+>  delete mode 100644 drivers/staging/android/ion/tegra/tegra_ion.c
+>  delete mode 100644 drivers/staging/android/uapi/ion_test.h
+>
+> --
+> 2.7.4
+>
 
-Thanks,
 
-	M.
+
 -- 
-Jazz is not dead. It just smells funny...
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
