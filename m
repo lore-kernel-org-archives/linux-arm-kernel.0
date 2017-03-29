@@ -1,45 +1,97 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 29 Mar 2017 10:38:36 +0200
-Subject: [PATCH linux-next v2 0/4] usb: gadget: udc: atmel: Endpoint
- allocation scheme fixes
-In-Reply-To: <cover.1490715349.git.cristian.birsan@microchip.com>
-References: <cover.1490715349.git.cristian.birsan@microchip.com>
-Message-ID: <fd463735-2c32-c8db-2341-6fc0df6c7044@atmel.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Mar 2017 09:39:05 +0100
+Subject: [PATCH v6 02/39] [media] dt-bindings: Add bindings for i.MX
+ media driver
+In-Reply-To: <CAL_JsqJm_JjuVPcOBERCqsnjTDdNoKr9xRE9MXMO4ivxGath2Q@mail.gmail.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-3-git-send-email-steve_longerbeam@mentor.com>
+ <CAL_JsqJm_JjuVPcOBERCqsnjTDdNoKr9xRE9MXMO4ivxGath2Q@mail.gmail.com>
+Message-ID: <20170329083904.GZ7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/03/2017 ? 18:07, cristian.birsan at microchip.com a ?crit :
-> From: Cristian Birsan <cristian.birsan@microchip.com>
+On Tue, Mar 28, 2017 at 07:21:34PM -0500, Rob Herring wrote:
+> On Mon, Mar 27, 2017 at 7:40 PM, Steve Longerbeam <slongerbeam@gmail.com> wrote:
+> > Add bindings documentation for the i.MX media driver.
+> >
+> > Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> > ---
+> >  Documentation/devicetree/bindings/media/imx.txt | 74 +++++++++++++++++++++++++
+> >  1 file changed, 74 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+> > new file mode 100644
+> > index 0000000..3059c06
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/imx.txt
+> > @@ -0,0 +1,74 @@
+> > +Freescale i.MX Media Video Device
+> > +=================================
+> > +
+> > +Video Media Controller node
+> > +---------------------------
+> > +
+> > +This is the media controller node for video capture support. It is a
+> > +virtual device that lists the camera serial interface nodes that the
+> > +media device will control.
+> > +
+> > +Required properties:
+> > +- compatible : "fsl,imx-capture-subsystem";
+> > +- ports      : Should contain a list of phandles pointing to camera
+> > +               sensor interface ports of IPU devices
+> > +
+> > +example:
+> > +
+> > +capture-subsystem {
+> > +       compatible = "fsl,imx-capture-subsystem";
+> > +       ports = <&ipu1_csi0>, <&ipu1_csi1>;
+> > +};
+> > +
+> > +fim child node
+> > +--------------
+> > +
+> > +This is an optional child node of the ipu_csi port nodes. If present and
+> > +available, it enables the Frame Interval Monitor. Its properties can be
+> > +used to modify the method in which the FIM measures frame intervals.
+> > +Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
+> > +Frame Interval Monitor.
+> > +
+> > +Optional properties:
+> > +- fsl,input-capture-channel: an input capture channel and channel flags,
+> > +                            specified as <chan flags>. The channel number
+> > +                            must be 0 or 1. The flags can be
+> > +                            IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
+> > +                            IRQ_TYPE_EDGE_BOTH, and specify which input
+> > +                            capture signal edge will trigger the input
+> > +                            capture event. If an input capture channel is
+> > +                            specified, the FIM will use this method to
+> > +                            measure frame intervals instead of via the EOF
+> > +                            interrupt. The input capture method is much
+> > +                            preferred over EOF as it is not subject to
+> > +                            interrupt latency errors. However it requires
+> > +                            routing the VSYNC or FIELD output signals of
+> > +                            the camera sensor to one of the i.MX input
+> > +                            capture pads (SD1_DAT0, SD1_DAT1), which also
+> > +                            gives up support for SD1.
+> > +
+> > +
+> > +mipi_csi2 node
+> > +--------------
+> > +
+> > +This is the device node for the MIPI CSI-2 Receiver, required for MIPI
+> > +CSI-2 sensors.
+> > +
+> > +Required properties:
+> > +- compatible   : "fsl,imx6-mipi-csi2", "snps,dw-mipi-csi2";
 > 
-> This patch series provides fixes, based on the feedback received on the mailing list, for
-> the following:
-> 	- fifo table parameters validation against device tree values
-> 	- coding style
-> 	- message display for EP configuration error
-> 	- Kconfig comments for fifo_mode=0
-> 
-> Changes since v1:
-> 	- Removed static for usba_config_fifo_table() function from "Check fifo
-> 	configuration values against device tree" patch
+> As I mentioned in v5, there's a DW CSI2 binding in progress. This
+> needs to be based on that.
 
-As for previous revision, the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-Regards,
-
-> Cristian Birsan (4):
->   usb: gadget: udc: atmel: Check fifo configuration values against
->     device tree
->   usb: gadget: udc: atmel: Minor code cleanup
->   usb: gadget: udc: atmel: Use dev_warn() to display EP configuration
->     error
->   usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
-> 
->  drivers/usb/gadget/udc/Kconfig          |  5 ++--
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 47 ++++++++++++++++++++++-----------
->  2 files changed, 35 insertions(+), 17 deletions(-)
-> 
-
+Maybe someone can provide some kind of reference to it, and it's
+associated driver?
 
 -- 
-Nicolas Ferre
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
