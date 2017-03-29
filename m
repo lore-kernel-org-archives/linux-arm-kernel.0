@@ -1,146 +1,190 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 29 Mar 2017 11:03:07 +0200
-Subject: [RFC PATCHv2 00/21] Ion clean in preparation for moving out of
- staging
-In-Reply-To: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-References: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-Message-ID: <CA+M3ks4ykYszxmzscnCAwKdahTZxwNWjPg7HvWDHh6bNdnD1=A@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 29 Mar 2017 10:07:07 +0100
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <20170329030735.GA23889@leoy-linaro>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
+ <20170329030735.GA23889@leoy-linaro>
+Message-ID: <5584203e-cb19-a5d2-45b1-3e78d3482c55@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-18 1:54 GMT+01:00 Laura Abbott <labbott@redhat.com>:
+On 29/03/17 04:07, Leo Yan wrote:
+> Hi Suzuki,
 >
-> Hi,
+> On Mon, Mar 27, 2017 at 05:34:57PM +0100, Suzuki K Poulose wrote:
+>> On 25/03/17 18:23, Leo Yan wrote:
 >
-> This is v2 of the series to do some serious Ion clean up in preparation for
-> moving out of staging. I got good feedback last time so this series mostly
-> attempts to address that feedback and do more still more cleanup. Highlights:
+> [...]
 >
-> - All calls to DMA APIs should now be with a real actual proper device
->   structure
-> - Patch to stop setting sg_dma_address manually now included
-> - Fix for a bug in the query interface
-> - Removal of custom ioctl interface
-> - Removal of import interface
-> - Removal of any notion of using Ion as an in kernel interface.
-> - Cleanup of ABI so compat interface is no longer needed
-> - Deletion of a bit more platform code
-> - Combined heap enumeration and heap registration code up so there are fewer
->   layers of abstraction
-> - Some general cleanup and header reduction.
-> - Removal of both the ion_client and ion_handle structures since these mostly
->   become redundant. As a result, Ion only returns a dma_buf fd. The overall
->   result is that the only Ion interfaces are the query ioctl and the alloc
->   ioctl.
+>> Leo,
+>>
+>> Thanks a lot for the quick rework. I don't fully understand (yet!) why we need the
+>> idle_constraint. I will leave it for Sudeep to comment on it, as he is the expert
+>> in that area. Some minor comments below.
 >
-> The following are still TODOs/open problems:
-> - Sumit's comments about the CMA naming.
-> - Bindings/platform for chunk and carveout heap
-> - There was some discussion about making the sg_table duplication generic. I
->   got bogged down in handling some of the edge cases for generic handling
->   so I put this aside. Making it generic is still something that should happen.
-> - More fine-grained support for restricting heap access. There are good
->   arguments to be made for having a way for having good integration with
->   selinux and other policy mechanisms.
-> - While not on the original list, there is still no good good test standalone
->   test framework. I noticed that the existing ion_test was fairly generic so I
->   proposed moving it to dma_buf. Daniel Vetter suggested just using the VGEM
->   module instead. Ideally, the tests can live as part of some other existing
->   test set (drm tests maybe?)
+> Thanks a lot for quick reviewing :)
 >
-> Feedback appreciated as always.
+>>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>>> ---
+>>> drivers/hwtracing/coresight/Kconfig               |  11 +
+>>> drivers/hwtracing/coresight/Makefile              |   1 +
+>>> drivers/hwtracing/coresight/coresight-cpu-debug.c | 704 ++++++++++++++++++++++
+>>> 3 files changed, 716 insertions(+)
+>>> create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+>>> index 130cb21..18d7931 100644
+>>> --- a/drivers/hwtracing/coresight/Kconfig
+>>> +++ b/drivers/hwtracing/coresight/Kconfig
+>>> @@ -89,4 +89,15 @@ config CORESIGHT_STM
+>>> 	  logging useful software events or data coming from various entities
+>>> 	  in the system, possibly running different OSs
+>>>
+>>> +config CORESIGHT_CPU_DEBUG
+>>> +	tristate "CoreSight CPU Debug driver"
+>>> +	depends on ARM || ARM64
+>>> +	depends on DEBUG_FS
+>>> +	help
+>>> +	  This driver provides support for coresight debugging module. This
+>>> +	  is primarily used to dump sample-based profiling registers when
+>>> +	  system triggers panic, the driver will parse context registers so
+>>> +	  can quickly get to know program counter (PC), secure state,
+>>> +	  exception level, etc.
+>>
+>> May be we should mention/warn the user about the possible caveats of using
+>> this feature to help him make a better decision ? And / Or we should add a documentation
+>> for it. We have collected some real good information over the discussions and
+>> it is a good idea to capture it somewhere.
+>
+> Sure, I will add a documentation for this.
+>
+> [...]
+>
+>>> +static struct pm_qos_request debug_qos_req;
+>>> +static int idle_constraint = PM_QOS_DEFAULT_VALUE;
+>>> +module_param(idle_constraint, int, 0600);
+>>> +MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
+>>> +		 "idle states (default is -1, which means have no limiation "
+>>> +		 "to CPU idle states; 0 means disabling all idle states; user "
+>>> +		 "can choose other platform dependent values so can disable "
+>>> +		 "specific idle states for the platform)");
+>>
+>> Correct me if I am wrong,
+>>
+>> All we want to do is disable the CPUIdle explicitly if the user knows that this
+>> could be a problem to use CPU debug on his platform. So, in effect, we should
+>> only be using idle_constraint = 0 or -1.
+>>
+>> In which case, we could make it easier for the user to tell us, either
+>>
+>>  0 - Don't do anything with CPUIdle (default)
+>>  1 - Disable CPUIdle for me as I know the platform has issues with CPU debug and CPUidle.
+>
+> The reason for not using bool flag is: usually SoC may have many idle
+> states, so if user wants to partially enable some states then can set
+> the latency to constraint.
+>
+> But of course, we can change this to binary value as you suggested,
+> this means turn on of turn off all states. The only one reason to use
+> latency value is it is more friendly for hardware design, e.g. some
+> platforms can enable partial states to save power and avoid overheat
+> after using this driver.
+>
+> If you guys think this is a bit over design, I will follow up your
+> suggestion. I also have some replying in Mathieu's reviewing, please
+> help review as well.
+>
+>> than explaining the miscrosecond latency etc and make the appropriate calls underneath.
+>> something like (not necessarily the same name) :
+>>
+>> module_param(broken_with_cpuidle, bool, 0600);
+>> MODULE_PARAM_DESC(broken_with_cpuidle, "Specifies whether the CPU debug has issues with CPUIdle on"
+>> 				       " the platform. Non-zero value implies CPUIdle has to be"
+>> 				       " explicitly disabled.",);
+>
+> [...]
+>
+>>> +	/*
+>>> +	 * Unfortunately the CPU cannot be powered up, so return
+>>> +	 * back and later has no permission to access other
+>>> +	 * registers. For this case, should set 'idle_constraint'
+>>> +	 * to ensure CPU power domain is enabled!
+>>> +	 */
+>>> +	if (!(drvdata->edprsr & EDPRSR_PU)) {
+>>> +		pr_err("%s: power up request for CPU%d failed\n",
+>>> +			__func__, drvdata->cpu);
+>>> +		goto out;
+>>> +	}
+>>> +
+>>> +out_powered_up:
+>>> +	debug_os_unlock(drvdata);
+>>
+>> Question: Do we need a matching debug_os_lock() once we are done ?
+>
+> I have checked ARM ARMv8, but there have no detailed description for
+> this. I refered coresight-etmv4 code and Mike's pseudo code, ther have
+> no debug_os_lock() related operations.
+>
+> Mike, Mathieu, could you also help confirm this?
+>
+> [...]
+>
+>>> +static void debug_init_arch_data(void *info)
+>>> +{
+>>> +	struct debug_drvdata *drvdata = info;
+>>> +	u32 mode, pcsr_offset;
+>>> +
+>>> +	CS_UNLOCK(drvdata->base);
+>>> +
+>>> +	debug_os_unlock(drvdata);
+>>> +
+>>> +	/* Read device info */
+>>> +	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
+>>> +	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
+>>
+>> As mentioned above, both of these registers are only need at init time to
+>> figure out the flags we set here. So we could remove them.
+>>
+>>> +
+>>> +	CS_LOCK(drvdata->base);
+>>> +
+>>> +	/* Parse implementation feature */
+>>> +	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
+>>> +	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
+>>
+>>
+>>> +
+>>> +	if (mode == EDDEVID_IMPL_NONE) {
+>>> +		drvdata->edpcsr_present  = false;
+>>> +		drvdata->edcidsr_present = false;
+>>> +		drvdata->edvidsr_present = false;
+>>> +	} else if (mode == EDDEVID_IMPL_EDPCSR) {
+>>> +		drvdata->edpcsr_present  = true;
+>>> +		drvdata->edcidsr_present = false;
+>>> +		drvdata->edvidsr_present = false;
+>>> +	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+>>> +		if (!IS_ENABLED(CONFIG_64BIT) &&
+>>> +			(pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
+>>> +			drvdata->edpcsr_present = false;
+>>> +		else
+>>> +			drvdata->edpcsr_present = true;
+>>
+>> Sorry, I forgot why we do this check only in this mode. Shouldn't this be
+>> common to all modes (of course which implies PCSR is present) ?
+>
+> No. PCSROffset is defined differently in ARMv7 and ARMv8; So finally we
+> simplize PCSROffset value :
+> 0000 - Sample offset applies based on the instruction state (indicated by PCSR[0])
+> 0001 - No offset applies.
+> 0010 - No offset applies, but do not use in AArch32 mode!
+>
+> So we need handle the corner case is when CPU runs AArch32 mode and
+> PCSRoffset = 'b0010. Other cases the pcsr should be present.
 
-Thanks for this v2, it really clean up and simplify ION.
+I understand that reasoning. But my question is, why do we check for PCSROffset
+only when mode == EDDEVID_IMPL_EDPCSR_EDCIDSR and not for say mode == EDDEVID_IMPL_EDPCSR or
+any other mode where PCSR is present.
 
-For me the last question mark is about restricting heap access with
-SElinux policy.
-Since I haven't see other proposals I still believe that we should
-have a /dev/ion/$heapname
-per heap.
-
->
-> Thanks,
-> Laura
->
-> Laura Abbott (21):
->   cma: Store a name in the cma structure
->   cma: Introduce cma_for_each_area
->   staging: android: ion: Remove dmap_cnt
->   staging: android: ion: Remove alignment from allocation field
->   staging: android: ion: Duplicate sg_table
->   staging: android: ion: Call dma_map_sg for syncing and mapping
->   staging: android: ion: Remove page faulting support
->   staging: android: ion: Remove crufty cache support
->   staging: android: ion: Remove custom ioctl interface
->   staging: android: ion: Remove import interface
->   staging: android: ion: Remove duplicate ION_IOC_MAP
->   staging: android: ion: Remove old platform support
->   staging: android: ion: Use CMA APIs directly
->   staging: android: ion: Stop butchering the DMA address
->   staging: android: ion: Break the ABI in the name of forward progress
->   staging: android: ion: Get rid of ion_phys_addr_t
->   staging: android: ion: Collapse internal header files
->   staging: android: ion: Rework heap registration/enumeration
->   staging: android: ion: Drop ion_map_kernel interface
->   staging: android: ion: Remove ion_handle and ion_client
->   staging: android: ion: Set query return value
->
->  drivers/base/dma-contiguous.c                      |    5 +-
->  drivers/staging/android/ion/Kconfig                |   56 +-
->  drivers/staging/android/ion/Makefile               |   18 +-
->  drivers/staging/android/ion/compat_ion.c           |  195 ----
->  drivers/staging/android/ion/compat_ion.h           |   29 -
->  drivers/staging/android/ion/hisilicon/Kconfig      |    5 -
->  drivers/staging/android/ion/hisilicon/Makefile     |    1 -
->  drivers/staging/android/ion/hisilicon/hi6220_ion.c |  113 --
->  drivers/staging/android/ion/ion-ioctl.c            |   85 +-
->  drivers/staging/android/ion/ion.c                  | 1164 +++-----------------
->  drivers/staging/android/ion/ion.h                  |  393 +++++--
->  drivers/staging/android/ion/ion_carveout_heap.c    |   37 +-
->  drivers/staging/android/ion/ion_chunk_heap.c       |   27 +-
->  drivers/staging/android/ion/ion_cma_heap.c         |  125 +--
->  drivers/staging/android/ion/ion_dummy_driver.c     |  156 ---
->  drivers/staging/android/ion/ion_heap.c             |   68 --
->  drivers/staging/android/ion/ion_of.c               |  184 ----
->  drivers/staging/android/ion/ion_of.h               |   37 -
->  drivers/staging/android/ion/ion_page_pool.c        |    6 +-
->  drivers/staging/android/ion/ion_priv.h             |  473 --------
->  drivers/staging/android/ion/ion_system_heap.c      |   53 +-
->  drivers/staging/android/ion/ion_test.c             |  305 -----
->  drivers/staging/android/ion/tegra/Makefile         |    1 -
->  drivers/staging/android/ion/tegra/tegra_ion.c      |   80 --
->  drivers/staging/android/uapi/ion.h                 |   86 +-
->  drivers/staging/android/uapi/ion_test.h            |   69 --
->  include/linux/cma.h                                |    6 +-
->  mm/cma.c                                           |   25 +-
->  mm/cma.h                                           |    1 +
->  mm/cma_debug.c                                     |    2 +-
->  30 files changed, 610 insertions(+), 3195 deletions(-)
->  delete mode 100644 drivers/staging/android/ion/compat_ion.c
->  delete mode 100644 drivers/staging/android/ion/compat_ion.h
->  delete mode 100644 drivers/staging/android/ion/hisilicon/Kconfig
->  delete mode 100644 drivers/staging/android/ion/hisilicon/Makefile
->  delete mode 100644 drivers/staging/android/ion/hisilicon/hi6220_ion.c
->  delete mode 100644 drivers/staging/android/ion/ion_dummy_driver.c
->  delete mode 100644 drivers/staging/android/ion/ion_of.c
->  delete mode 100644 drivers/staging/android/ion/ion_of.h
->  delete mode 100644 drivers/staging/android/ion/ion_priv.h
->  delete mode 100644 drivers/staging/android/ion/ion_test.c
->  delete mode 100644 drivers/staging/android/ion/tegra/Makefile
->  delete mode 100644 drivers/staging/android/ion/tegra/tegra_ion.c
->  delete mode 100644 drivers/staging/android/uapi/ion_test.h
->
-> --
-> 2.7.4
->
-
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Suzuki
