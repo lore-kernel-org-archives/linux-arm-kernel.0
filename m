@@ -1,138 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 29 Mar 2017 22:03:36 +0200
-Subject: [PATCH v2 1/2] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170327180208.13414-1-gmbnomis@gmail.com>
-References: <20170327180208.13414-1-gmbnomis@gmail.com>
-Message-ID: <20170329220336.2b8bf0df@bbrezillon>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Wed, 29 Mar 2017 12:28:59 -0700
+Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
+In-Reply-To: <CABb+yY31oW09-fq_t4V6vatMe50Ed2Mi00kT4bOJv2=qFBT+QA@mail.gmail.com>
+References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
+ <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
+ <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
+ <CABb+yY1o7QTYLm3HGWNeFDPnfpL7AAJ6+R91Stn-gNvO7afxoA@mail.gmail.com>
+ <22d07bb1-9e93-4ae5-7215-923bde9ebfe5@broadcom.com>
+ <CABb+yY1kbFOKJPO95SRw995zt=fCoA+SkXgECOj774i_hJUCNg@mail.gmail.com>
+ <0e8ac72a-6b2f-171d-41e7-7a6cefc4c7c4@broadcom.com>
+ <CABb+yY31oW09-fq_t4V6vatMe50Ed2Mi00kT4bOJv2=qFBT+QA@mail.gmail.com>
+Message-ID: <414f9d26-c62f-d1dd-69b4-717d42be38ba@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Mar 2017 20:02:07 +0200
-Simon Baatz <gmbnomis@gmail.com> wrote:
 
-> The clk handling in orion_nand.c had two problems:
-> 
-> - In the probe function, clk_put() was called for an enabled clock,
->   which violates the API (see documentation for clk_put() in
->   include/linux/clk.h)
-> 
-> - In the error path of the probe function, clk_put() could be called
->   twice for the same clock.
-> 
-> In order to clean this up, use the managed function devm_clk_get() and
-> store the pointer to the clk in the driver data.
-> 
-> Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
-> Cc: <stable@vger.kernel.org> # v4.5+
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 
-Applied both.
+On 17-03-28 09:36 PM, Jassi Brar wrote:
+> On Tue, Mar 28, 2017 at 11:00 PM, Jonathan Richardson
+> <jonathan.richardson@broadcom.com> wrote:
+>> On 17-03-15 10:30 AM, Jassi Brar wrote:
+>>> The right way to do is have a 'server/owner' client that accepts
+>>> requests from various clients and serially queue them to mailbox. That
+>>> way you can keep the controller driver free from quirks (like max wait
+>>> time of 30us) of your present platform.
+>> Do you mean 1 mailbox client with one mailbox channel that all the mbox client drivers share?
+>> I thought this would work when I suggested it previously but the client callbacks are necessary
+>> in all txdone modes. Client drivers that send the messages need the callbacks
+>>
+> That's a legit requirement.
+>
+>> and this is only possible with multiple mbox clients.
+>>
+> That is incorrect.
+> It is trivial to support callbacks to end clients from your common
+> code... just ask for callback along with the message to be submitted
+> to mailbox api.
 
-Thanks,
+Ok, if we can provide our own callbacks in the message instead of the client then that's perfectly fine.
 
-Boris
+>
+>> And a channel can only have 1 mbox client. Clients in multiple drivers need the callbacks to either know when to start polling, or be notified when the transaction is complete. It would be nice if multiple clients could use the same channel.
+>>
+> We had to choose from shared vs exclusive access to channels... latter
+> was chosen because there are ways to still support former.
 
-> ---
-> 
-> Changes in v2:
-> * changed whitespace alignment in orion_nand_info struct definition
-> 
->  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
->  1 file changed, 21 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-> index 4a91c5d000be..3acdc20485f1 100644
-> --- a/drivers/mtd/nand/orion_nand.c
-> +++ b/drivers/mtd/nand/orion_nand.c
-> @@ -23,6 +23,11 @@
->  #include <asm/sizes.h>
->  #include <linux/platform_data/mtd-orion_nand.h>
->  
-> +struct orion_nand_info {
-> +	struct nand_chip chip;
-> +	struct clk *clk;
-> +};
-> +
->  static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
->  {
->  	struct nand_chip *nc = mtd_to_nand(mtd);
-> @@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
->  
->  static int __init orion_nand_probe(struct platform_device *pdev)
->  {
-> +	struct orion_nand_info *info;
->  	struct mtd_info *mtd;
->  	struct nand_chip *nc;
->  	struct orion_nand_data *board;
->  	struct resource *res;
-> -	struct clk *clk;
->  	void __iomem *io_base;
->  	int ret = 0;
->  	u32 val = 0;
->  
-> -	nc = devm_kzalloc(&pdev->dev,
-> -			sizeof(struct nand_chip),
-> +	info = devm_kzalloc(&pdev->dev,
-> +			sizeof(struct orion_nand_info),
->  			GFP_KERNEL);
-> -	if (!nc)
-> +	if (!info)
->  		return -ENOMEM;
-> +	nc = &info->chip;
->  	mtd = nand_to_mtd(nc);
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
->  	if (board->dev_ready)
->  		nc->dev_ready = board->dev_ready;
->  
-> -	platform_set_drvdata(pdev, mtd);
-> +	platform_set_drvdata(pdev, info);
->  
->  	/* Not all platforms can gate the clock, so it is not
->  	   an error if the clock does not exists. */
-> -	clk = clk_get(&pdev->dev, NULL);
-> -	if (!IS_ERR(clk)) {
-> -		clk_prepare_enable(clk);
-> -		clk_put(clk);
-> -	}
-> +	info->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (!IS_ERR(info->clk))
-> +		clk_prepare_enable(info->clk);
->  
->  	ret = nand_scan(mtd, 1);
->  	if (ret)
-> @@ -169,26 +173,22 @@ static int __init orion_nand_probe(struct platform_device *pdev)
->  	return 0;
->  
->  no_dev:
-> -	if (!IS_ERR(clk)) {
-> -		clk_disable_unprepare(clk);
-> -		clk_put(clk);
-> -	}
-> +	if (!IS_ERR(info->clk))
-> +		clk_disable_unprepare(info->clk);
->  
->  	return ret;
->  }
->  
->  static int orion_nand_remove(struct platform_device *pdev)
->  {
-> -	struct mtd_info *mtd = platform_get_drvdata(pdev);
-> -	struct clk *clk;
-> +	struct orion_nand_info *info = platform_get_drvdata(pdev);
-> +	struct nand_chip *chip = &info->chip;
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
->  
->  	nand_release(mtd);
->  
-> -	clk = clk_get(&pdev->dev, NULL);
-> -	if (!IS_ERR(clk)) {
-> -		clk_disable_unprepare(clk);
-> -		clk_put(clk);
-> -	}
-> +	if (!IS_ERR(info->clk))
-> +		clk_disable_unprepare(info->clk);
->  
->  	return 0;
->  }
+This makes more sense now. Thanks for clarifying.
+
+Jon
