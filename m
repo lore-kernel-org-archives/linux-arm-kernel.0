@@ -1,27 +1,31 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 29 Mar 2017 10:12:01 +0200
-Subject: [PATCH] reset: uniphier: add NAND and eMMC reset control
-In-Reply-To: <1490690408-2616-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1490690408-2616-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1490775121.2274.29.camel@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 29 Mar 2017 10:13:52 +0200
+Subject: [PATCH/RFC v2 1/2] arm64: dts: r8a7795: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <1612430.SNEha5n02K@avalon>
+References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
+ <1490362665-4422-2-git-send-email-geert+renesas@glider.be>
+ <1612430.SNEha5n02K@avalon>
+Message-ID: <20170329081352.GF6512@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-28 at 17:40 +0900, Masahiro Yamada wrote:
-> Add reset lines for the Denali NAND controller on all UniPhier SoCs,
-> for the Cadence eMMC controller on LD11/LD20 SoCs.
+On Mon, Mar 27, 2017 at 11:48:12AM +0300, Laurent Pinchart wrote:
+> Hi Geert,
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> Thank you for the patch.
 > 
-> Philipp,
+> On Friday 24 Mar 2017 14:37:44 Geert Uytterhoeven wrote:
+> > Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
+> >   - The following devices no longer exist on ES2.0, and are thus removed:
+> >     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
+> >   - The DU <-> VSPD topology is different on ES2.0, hence remove the
+> >     "vsps" property from the DU node until the driver can handle this.
 > 
-> Sorry for sending this in the last minute.
-> If it is not too late, please apply this for 4.12-rc1.
-> Thanks!
+> I think I'll need a different compatible string between ES1.x and ES2 for the 
+> DU. It could make sense to move the whole DU node to *-es1.dtsi. We can decide 
+> about that later when I'll have a DU driver prototype ready.
 
-I've applied it to reset/next, will send another pull request at the end
-of the week.
+That makes sense to me.
 
-regards
-Philipp
+Geert, will you respin this?
