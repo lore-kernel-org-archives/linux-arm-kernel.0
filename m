@@ -1,61 +1,107 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 29 Mar 2017 13:12:21 +0200
-Subject: [PATCH 0/4] ARM: exynos: Fix Odroid U3 USB/LAN when TFTP booting
- (power sequence)
-In-Reply-To: <20170107085203.4431-1-krzk@kernel.org>
-References: <20170107085203.4431-1-krzk@kernel.org>
-Message-ID: <308964a5-84f0-d144-6358-bd334f9dc603@xs4all.nl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Mar 2017 11:49:11 +0100
+Subject: [PATCH v7 1/7] clocksource/drivers/clksrc-evt-probe: Describe
+ with the DT both the clocksource and the clockevent
+In-Reply-To: <20170329092210.GH2123@mai>
+References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+ <1490197714-25415-2-git-send-email-al.kochet@gmail.com>
+ <20170329015146.ey5rlptzsnnynpnt@rob-hp-laptop>
+ <20170329092210.GH2123@mai>
+Message-ID: <20170329104911.GC23442@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi,
 
-On 07/01/17 09:51, Krzysztof Kozlowski wrote:
-> Hi,
+On Wed, Mar 29, 2017 at 11:22:10AM +0200, Daniel Lezcano wrote:
+> On Tue, Mar 28, 2017 at 08:51:46PM -0500, Rob Herring wrote:
+> > On Wed, Mar 22, 2017 at 06:48:28PM +0300, Alexander Kochetkov wrote:
+> > > From: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > 
+> > > The CLOCKSOURCE_OF_DECLARE() was introduced before the
+> > > CLOCKEVENT_OF_DECLARE() and that resulted in some abuse where the
+> > > clockevent and the clocksource are both initialized in the same init
+> > > routine.
+> > > 
+> > > With the introduction of the CLOCKEVENT_OF_DECLARE(), the driver can
+> > > now split the clocksource and the clockevent init code. However, the
+> > > device tree may specify a single node, so the same node will be passed
+> > > to the clockevent/clocksource's init function, with the same base
+> > > address.
+> > > 
+> > > with this patch it is possible to specify an attribute to the timer's node to
+> > > specify if it is a clocksource or a clockevent and define two timers node.
+> > 
+> > Daniel and I discussed and agreed against this a while back. What 
+> > changed?
 > 
-> Thanks to Markus Reichl, I got an Odroid U3 to work with. Thanks to Peter
-> Chen, we got a power sequence generic library which solves my long
-> standing Odroid U3 problem - no LAN9730 if it was enabled by bootloader.
+> Hi Rob,
 > 
-> My previous attempts for this can be found here [0].
+> > > For example:
+> > > 
+> > >         timer: timer at 98400000 {
+> > >                 compatible = "moxa,moxart-timer";
+> > >                 reg = <0x98400000 0x42>;
+> > 
+> > This overlaps the next node. You can change this to 0x10, but are these 
+> > really 2 independent h/w blocks? Don't design the nodes around the 
+> > current needs of Linux.
 > 
-> This patchset is based on Peter's v11 of power sequence [1].
-> Patchset is available also on my Github [2].
-> 
-> More detailed analysis is described in patch 2/4 ("ARM: dts: exynos: Fix
-> LAN9730 on Odroid U3 after tftpboot").
+> Mmh, thanks for raising this. Conceptually speaking there are two (or more)
+> different entities, the clocksource and the clockevents but they share the same
+> IP block.
 
-It's rather late, but I finally had a chance to test this and it works.
+>From the DT's PoV, this is one entity, which is the IP block.
 
-So:
+The clocksource/clockevent concept is a Linux implementation detail. The
+DT cannot and should not be aware of that.
 
-Tested-by: Hans Verkuil <hans.verkuil@cisco.com>
+[...]
 
-This was with u-boot version v2016.09.01 and kernel 4.11.0-rc1.
+> > >                 interrupts = <19 1>;
+> > >                 clocks = <&coreclk>;
+> > >                 clockevent;
+> > 
+> > This is not needed. The presence of "interrupts" is enough to say use 
+> > this timer for clockevent.
+> 
+> Yes, that is true if no drivers was already taking CLOCKSOURCE_OF and
+> initializing the clockevent. The driver will pass through the clocksource_probe
+> function, check the interrupt and bail out because there is an interrupt
+> declared and assume it is a clockevent, so no initialization for the driver.
+> IOW, it is not backward compatible.
+> 
+> We need this attribute somehow in order to separate clearly a clocksource or a
+> clockevent with a new implementation.
 
-Regards,
+Why? A single IP block can provide the functionality of both (though
+there are reasons that functionality may be mutually exclusive). What is
+the benefit of this split?
 
-	Hans
+> > > With this approach, we allow a mechanism to clearly define a clocksource or a
+> > > clockevent without aerobatics we can find around in some drivers:
+> > > 	timer-sp804.c, arc-timer.c, dw_apb_timer_of.c, mps2-timer.c,
+> > > 	renesas-ostm.c, time-efm32.c, time-lpc32xx.c.
+> > 
+> > These all already have bindings and work. What problem are you trying to 
+> > solve other than restructuring Linux?
+> 
+> Yes, there is already the bindings, but that force to do some hackish
+> initialization.
 
-> 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> [0] http://www.spinics.net/lists/linux-mmc/msg37386.html
-> [1] https://lwn.net/Articles/710736/
-> [2] https://github.com/krzk/linux/commits/for-next/odroid-u3-usb3503-pwrseq
-> 
-> Krzysztof Kozlowski (4):
->   ARM: dts: exynos: Fix indentation of EHCI and OHCI ports
->   ARM: dts: exynos: Fix LAN9730 on Odroid U3 after tftpboot
->   ARM: exynos_defconfig: Enable power sequence for Odroid U3
->   ARM: multi_v7_defconfig: Enable power sequence for Odroid U3
-> 
->  arch/arm/boot/dts/exynos4.dtsi            | 24 ++++++++++++------------
->  arch/arm/boot/dts/exynos4412-odroidu3.dts | 21 +++++++++++++++++++++
->  arch/arm/configs/exynos_defconfig         |  2 ++
->  arch/arm/configs/multi_v7_defconfig       |  1 +
->  4 files changed, 36 insertions(+), 12 deletions(-)
-> 
+Here, you are forcing hackish DT changes that do not truly describe HW.
+How is that better?
+
+> I would like to give the opportunity to declare separately a clocksource and a
+> clockevent, in order to have full control of how this is initialized.
+
+To me it sounds like what we need is Linux infrastructure that allows
+one to register a device as having both clockevent/clocksource
+functionality.
+
+That way, we can choose to do something sane at boot time, and if the
+user really wants specific devices used in specific ways, they can
+request that.
+
+Thanks,
+Mark.
