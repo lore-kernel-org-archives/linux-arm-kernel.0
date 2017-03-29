@@ -1,65 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Mar 2017 11:21:18 +0100
-Subject: [PATCH v22 07/11] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7v9jaiQjaWzwafkih_tsU+-hNi+TA7hcDbFgtLLChXM_g@mail.gmail.com>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-8-fu.wei@linaro.org>
- <20170328113535.GA17440@red-moon>
- <CADyBb7v9jaiQjaWzwafkih_tsU+-hNi+TA7hcDbFgtLLChXM_g@mail.gmail.com>
-Message-ID: <20170329102118.GB10807@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Mar 2017 11:13:58 +0100
+Subject: [PATCH v2 7/8] bus: brcmstb_gisb: add notifier handling
+In-Reply-To: <20170328213431.10904-8-opendmb@gmail.com>
+References: <20170328213431.10904-1-opendmb@gmail.com>
+ <20170328213431.10904-8-opendmb@gmail.com>
+Message-ID: <20170329101357.GB23442@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 05:48:17PM +0800, Fu Wei wrote:
+Hi Doug,
 
-[...]
-
->  * @platform_timer_count: It points to a integer variable which is used
->  *                           for storing the number of platform timers.
->  *                           This pointer could be NULL, if the caller
->  *                           doesn't need this info.
+On Tue, Mar 28, 2017 at 02:34:30PM -0700, Doug Berger wrote:
+> Check for GISB arbitration errors through a chained notifier
+> when a process dies or a kernel panic occurs.  This allows a
+> meaningful diagnostic message to occur along with other
+> diagnostic information.
 > 
-> >
-> >> + *
-> >> + * Return: 0 if success, -EINVAL if error.
-> >> + */
-> >> +int __init acpi_gtdt_init(struct acpi_table_header *table,
-> >> +                       int *platform_timer_count)
-> >> +{
-> >> +     int ret = 0;
-> >> +     int timer_count = 0;
-> >> +     void *platform_timer = NULL;
-> >> +     struct acpi_table_gtdt *gtdt;
-> >> +
-> >> +     gtdt = container_of(table, struct acpi_table_gtdt, header);
-> >> +     acpi_gtdt_desc.gtdt = gtdt;
-> >> +     acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
-> >> +
-> >> +     if (table->revision < 2)
-> >> +             pr_warn("Revision:%d doesn't support Platform Timers.\n",
-> >> +                     table->revision);
-> >
-> > Ok, two points here. First, I am not sure why you should warn if the
-> > table revision is < 2, is that a FW bug ? I do not think it is, you
-> > can just return 0.
+> Notably writes to a bad GISB address on an ARM64 architecture
+> kernel cause unrecoverable SError aborts and this allows the
+> cause of the abort to be seen.
 > 
-> I used pr_debug here before v20, then I got Hanjun's suggestion:
-> -------
-> GTDT table revision is updated to 2 in ACPI 5.1, we will
-> not support ACPI version under 5.1 and disable ACPI in FADT
-> parse before this code is called, so if we get revision
-> <2 here, I think we need to print warning (we need to keep
-> the firmware stick to the spec on ARM64).
-> -------
-> https://lkml.org/lkml/2017/1/19/82
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
+
+Thanks for changing this.
+
+> ---
+>  drivers/bus/brcmstb_gisb.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
-> So I started to use pr_warn.
+> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+> index 500b6bb5c739..774729002b8c 100644
+> --- a/drivers/bus/brcmstb_gisb.c
+> +++ b/drivers/bus/brcmstb_gisb.c
+> @@ -24,6 +24,8 @@
+>  #include <linux/of.h>
+>  #include <linux/bitops.h>
+>  #include <linux/pm.h>
+> +#include <linux/kernel.h>
+> +#include <linux/kdebug.h>
+>  
+>  #ifdef CONFIG_ARM
+>  #include <asm/bug.h>
+> @@ -290,6 +292,25 @@ static irqreturn_t brcmstb_gisb_tea_handler(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +/*
+> + * Dump out gisb errors on die or panic.
+> + */
+> +static int dump_gisb_error(struct notifier_block *self, unsigned long v,
+> +			   void *p)
+> +{
+> +	struct brcmstb_gisb_arb_device *gdev;
+> +
+> +	/* iterate over each GISB arb registered handlers */
+> +	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
+> +		brcmstb_gisb_arb_decode_addr(gdev, "async abort");
+> +
+> +	return 0;
 
-Thanks for the explanation, so it is a FW bug and the warning
-is granted :) just leave it there.
+I think this should be NOTIFY_OK.
 
-Still, please check my comment on acpi_gtdt_init() being called
-multiple times on patch 11.
+> +}
+> +
+> +static struct notifier_block gisb_error_notifier = {
+> +	.notifier_call = dump_gisb_error,
+> +};
+> +
+>  static DEVICE_ATTR(gisb_arb_timeout, S_IWUSR | S_IRUGO,
+>  		gisb_arb_get_timeout, gisb_arb_set_timeout);
+>  
+> @@ -408,6 +429,12 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+>  	board_be_handler = brcmstb_bus_error_handler;
+>  #endif
+>  
+> +	if (list_is_singular(&brcmstb_gisb_arb_device_list)) {
+> +		register_die_notifier(&gisb_error_notifier);
+> +		atomic_notifier_chain_register(&panic_notifier_list,
+> +					       &gisb_error_notifier);
+
+I don't think this is quite right. A notifier_block can only be
+registered to one notifier chain at a time, and this has the potential
+to corrupt both chains.
+
+I also think you only need to register the panic notifier. An SError
+should always result in a panic.
 
 Thanks,
-Lorenzo
+Mark.
