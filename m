@@ -1,10 +1,11 @@
 From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Wed, 29 Mar 2017 04:50:18 +0000
-Subject: [PATCH v2 02/11] ARM: at91: pm: Move at91_ramc_read/write to pm.c
-In-Reply-To: <20170328111938.21297-3-alexandre.belloni@free-electrons.com>
+Date: Wed, 29 Mar 2017 04:51:02 +0000
+Subject: [PATCH v2 03/11] ARM: at91: pm: Move global variables into
+ at91_pm_data
+In-Reply-To: <20170328111938.21297-4-alexandre.belloni@free-electrons.com>
 References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
- <20170328111938.21297-3-alexandre.belloni@free-electrons.com>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D786@CHN-SV-EXMX07.mchp-main.com>
+ <20170328111938.21297-4-alexandre.belloni@free-electrons.com>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB51D797@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,60 +13,184 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> Sent: 2017?3?28? 19:19
+> Sent: 2017?3?28? 19:20
 > To: Nicolas Ferre - M43238 <Nicolas.Ferre@microchip.com>
 > Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Boris
 > Brezillon <boris.brezillon@free-electrons.com>; Wenyou Yang - A41535
 > <Wenyou.Yang@microchip.com>; Alexandre Belloni <alexandre.belloni@free-
 > electrons.com>
-> Subject: [PATCH v2 02/11] ARM: at91: pm: Move at91_ramc_read/write to pm.c
+> Subject: [PATCH v2 03/11] ARM: at91: pm: Move global variables into
+> at91_pm_data
 > 
-> Those macros are only used in pm.c, move them there so we can remove the test
-> on __ASSEMBLY__.
+> Instead of having separate global variables to hold IP addresses, move them to
+> struct at91_pm_data.
 > 
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
 
 > ---
->  arch/arm/mach-at91/pm.c | 6 ++++++
->  arch/arm/mach-at91/pm.h | 8 --------
->  2 files changed, 6 insertions(+), 8 deletions(-)
+>  arch/arm/mach-at91/pm.c | 44 +++++++++++++++++++++-----------------------
+>  1 file changed, 21 insertions(+), 23 deletions(-)
 > 
 > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c index
-> 9e2b5c1e503e..41789aa4df86 100644
+> 41789aa4df86..c780dda3b604 100644
 > --- a/arch/arm/mach-at91/pm.c
 > +++ b/arch/arm/mach-at91/pm.c
-> @@ -45,6 +45,12 @@ static struct {
+> @@ -26,8 +26,6 @@
+>  #include "generic.h"
+>  #include "pm.h"
+> 
+> -static void __iomem *pmc;
+> -
+>  /*
+>   * FIXME: this is needed to communicate between the pinctrl driver and
+>   * the PM implementation in the machine. Possibly part of the PM @@ -40,17
+> +38,17 @@ extern void at91_pinctrl_gpio_resume(void);  #endif
+> 
+>  static struct {
+> +	void __iomem *pmc;
+> +	void __iomem *ramc[2];
+>  	unsigned long uhp_udp_mask;
+>  	int memctrl;
 >  } at91_pm_data;
 > 
->  static void __iomem *at91_ramc_base[2];
-> +#define at91_ramc_read(id, field) \
-> +	__raw_readl(at91_ramc_base[id] + field)
-> +
-> +#define at91_ramc_write(id, field, value) \
-> +	__raw_writel(value, at91_ramc_base[id] + field)
-> +
-> 
->  static int at91_pm_valid_state(suspend_state_t state)  { diff --git
-> a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h index
-> bf980c6ef294..8eed156ef19a 100644
-> --- a/arch/arm/mach-at91/pm.h
-> +++ b/arch/arm/mach-at91/pm.h
-> @@ -17,14 +17,6 @@
->  #include <soc/at91/at91sam9_ddrsdr.h>
->  #include <soc/at91/at91sam9_sdramc.h>
-> 
-> -#ifndef __ASSEMBLY__
-> -#define at91_ramc_read(id, field) \
+> -static void __iomem *at91_ramc_base[2];  #define at91_ramc_read(id, field) \
 > -	__raw_readl(at91_ramc_base[id] + field)
-> -
-> -#define at91_ramc_write(id, field, value) \
+> +	__raw_readl(at91_pm_data.ramc[id] + field)
+> 
+>  #define at91_ramc_write(id, field, value) \
 > -	__raw_writel(value, at91_ramc_base[id] + field)
-> -#endif
 > -
->  #define AT91_MEMCTRL_MC		0
->  #define AT91_MEMCTRL_SDRAMC	1
->  #define AT91_MEMCTRL_DDRSDR	2
+> +	__raw_writel(value, at91_pm_data.ramc[id] + field)
+> 
+>  static int at91_pm_valid_state(suspend_state_t state)  { @@ -86,7 +84,7 @@
+> static int at91_pm_verify_clocks(void)
+>  	unsigned long scsr;
+>  	int i;
+> 
+> -	scsr = readl(pmc + AT91_PMC_SCSR);
+> +	scsr = readl(at91_pm_data.pmc + AT91_PMC_SCSR);
+> 
+>  	/* USB must not be using PLLB */
+>  	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) { @@ -100,7 +98,7 @@
+> static int at91_pm_verify_clocks(void)
+> 
+>  		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
+>  			continue;
+> -		css = readl(pmc + AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
+> +		css = readl(at91_pm_data.pmc + AT91_PMC_PCKR(i)) &
+> AT91_PMC_CSS;
+>  		if (css != AT91_PMC_CSS_SLOW) {
+>  			pr_err("AT91: PM - Suspend-to-RAM with PCK%d
+> src %d\n", i, css);
+>  			return 0;
+> @@ -143,8 +141,8 @@ static void at91_pm_suspend(suspend_state_t state)
+>  	flush_cache_all();
+>  	outer_disable();
+> 
+> -	at91_suspend_sram_fn(pmc, at91_ramc_base[0],
+> -			     at91_ramc_base[1], pm_data);
+> +	at91_suspend_sram_fn(at91_pm_data.pmc, at91_pm_data.ramc[0],
+> +			     at91_pm_data.ramc[1], pm_data);
+> 
+>  	outer_resume();
+>  }
+> @@ -247,7 +245,7 @@ static void at91rm9200_standby(void)
+>  		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+>  		"    str    %5, [%1, %2]"
+>  		:
+> -		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91_MC_SDRAMC_LPR),
+> +		: "r" (0), "r" (at91_pm_data.ramc[0]), "r"
+> (AT91_MC_SDRAMC_LPR),
+>  		  "r" (1), "r" (AT91_MC_SDRAMC_SRR),
+>  		  "r" (lpr));
+>  }
+> @@ -262,7 +260,7 @@ static void at91_ddr_standby(void)
+>  	u32 lpr0, lpr1 = 0;
+>  	u32 saved_lpr0, saved_lpr1 = 0;
+> 
+> -	if (at91_ramc_base[1]) {
+> +	if (at91_pm_data.ramc[1]) {
+>  		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+>  		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+>  		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH; @@ -274,13
+> +272,13 @@ static void at91_ddr_standby(void)
+> 
+>  	/* self-refresh mode now */
+>  	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
+> -	if (at91_ramc_base[1])
+> +	if (at91_pm_data.ramc[1])
+>  		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+> 
+>  	cpu_do_idle();
+> 
+>  	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+> -	if (at91_ramc_base[1])
+> +	if (at91_pm_data.ramc[1])
+>  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);  }
+> 
+> @@ -308,7 +306,7 @@ static void at91sam9_sdram_standby(void)
+>  	u32 lpr0, lpr1 = 0;
+>  	u32 saved_lpr0, saved_lpr1 = 0;
+> 
+> -	if (at91_ramc_base[1]) {
+> +	if (at91_pm_data.ramc[1]) {
+>  		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+>  		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+>  		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH; @@ -320,13
+> +318,13 @@ static void at91sam9_sdram_standby(void)
+> 
+>  	/* self-refresh mode now */
+>  	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
+> -	if (at91_ramc_base[1])
+> +	if (at91_pm_data.ramc[1])
+>  		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+> 
+>  	cpu_do_idle();
+> 
+>  	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
+> -	if (at91_ramc_base[1])
+> +	if (at91_pm_data.ramc[1])
+>  		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);  }
+> 
+> @@ -346,8 +344,8 @@ static __init void at91_dt_ramc(void)
+>  	const void *standby = NULL;
+> 
+>  	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
+> -		at91_ramc_base[idx] = of_iomap(np, 0);
+> -		if (!at91_ramc_base[idx])
+> +		at91_pm_data.ramc[idx] = of_iomap(np, 0);
+> +		if (!at91_pm_data.ramc[idx])
+>  			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"),
+> idx);
+> 
+>  		if (!standby)
+> @@ -373,12 +371,12 @@ static void at91rm9200_idle(void)
+>  	 * Disable the processor clock.  The processor will be automatically
+>  	 * re-enabled by an interrupt or by a reset.
+>  	 */
+> -	writel(AT91_PMC_PCK, pmc + AT91_PMC_SCDR);
+> +	writel(AT91_PMC_PCK, at91_pm_data.pmc + AT91_PMC_SCDR);
+>  }
+> 
+>  static void at91sam9_idle(void)
+>  {
+> -	writel(AT91_PMC_PCK, pmc + AT91_PMC_SCDR);
+> +	writel(AT91_PMC_PCK, at91_pm_data.pmc + AT91_PMC_SCDR);
+>  	cpu_do_idle();
+>  }
+> 
+> @@ -447,8 +445,8 @@ static void __init at91_pm_init(void (*pm_idle)(void))
+>  		platform_device_register(&at91_cpuidle_device);
+> 
+>  	pmc_np = of_find_matching_node(NULL, atmel_pmc_ids);
+> -	pmc = of_iomap(pmc_np, 0);
+> -	if (!pmc) {
+> +	at91_pm_data.pmc = of_iomap(pmc_np, 0);
+> +	if (!at91_pm_data.pmc) {
+>  		pr_err("AT91: PM not supported, PMC not found\n");
+>  		return;
+>  	}
 > --
 > 2.11.0
