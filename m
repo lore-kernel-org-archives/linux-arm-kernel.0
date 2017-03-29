@@ -1,41 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Mar 2017 12:25:44 +0100
-Subject: [PATCH v2 8/8] bus: brcmstb_gisb: update to support new revision
-In-Reply-To: <20170328213431.10904-9-opendmb@gmail.com>
-References: <20170328213431.10904-1-opendmb@gmail.com>
- <20170328213431.10904-9-opendmb@gmail.com>
-Message-ID: <20170329112544.GF23442@leverpostej>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 29 Mar 2017 18:42:46 +0800
+Subject: [PATCH v3 5/5] arm64: allwinner: a64: add R_PIO pinctrl node
+In-Reply-To: <20170329104246.34204-1-icenowy@aosc.io>
+References: <20170329104246.34204-1-icenowy@aosc.io>
+Message-ID: <20170329104246.34204-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 02:34:31PM -0700, Doug Berger wrote:
-> The 7278 introduces a new version of this core.  This
-> commit adds support for that revision.
-> 
-> Signed-off-by: Doug Berger <opendmb@gmail.com>
-> ---
->  Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt |  3 ++-
->  drivers/bus/brcmstb_gisb.c                              | 10 ++++++++++
->  2 files changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-> index 1eceefb20f01..8a6c3c2e58fe 100644
-> --- a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-> +++ b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-> @@ -3,7 +3,8 @@ Broadcom GISB bus Arbiter controller
->  Required properties:
->  
->  - compatible:
-> -    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for 28nm chips
-> +    "brcm,bcm7278-gisb-arb" for V7 28nm chips
-> +    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for other 28nm chips
->      "brcm,bcm7435-gisb-arb" for newer 40nm chips
->      "brcm,bcm7400-gisb-arb" for older 40nm chips and all 65nm chips
->      "brcm,bcm7038-gisb-arb" for 130nm chips
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-For the binding:
+Allwinner A64 have a dedicated pin controller to manage the PL pin bank.
+As the driver and the required clock support are added, add the device
+node for it.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Thanks,
-Mark.
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 0fe9865d4bd6..165dbc848aa6 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -411,5 +411,17 @@
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
+ 		};
++
++		r_pio: pinctrl at 01f02c00 {
++			compatible = "allwinner,sun50i-a64-r-pinctrl";
++			reg = <0x01f02c00 0x400>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&r_ccu CLK_APB0_PIO>, <&osc24M>, <&osc32k>;
++			clock-names = "apb", "hosc", "losc";
++			gpio-controller;
++			#gpio-cells = <3>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
+ 	};
+ };
+-- 
+2.12.0
