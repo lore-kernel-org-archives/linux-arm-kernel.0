@@ -1,160 +1,74 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Mar 2017 19:04:25 -0400
-Subject: [PATCH V6 3/5] PCI/ASPM: add init hook to device_add
+Date: Wed, 29 Mar 2017 19:04:26 -0400
+Subject: [PATCH V6 4/5] PCI/ASPM: save power on values during bridge init
 In-Reply-To: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
 References: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490828667-30973-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1490828667-30973-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For bridges, have pcie_aspm_init_link_state() allocate a link_state,
-regardless of whether it currently has any children.
-
-pcie_aspm_init_link_state(): Called for bridges (upstream end of
-link) after all children have been enumerated.  No longer needs to
-check aspm_support_enabled or pdev->has_secondary_link or the VIA
-quirk: pci_aspm_init() already checked that stuff, so we only need
-to check pdev->link_state here.
-
-Now that we are calling alloc_pcie_link_state() from pci_aspm_init()
-, get rid of pci_function_0 function and detect downstream link in
-pci_aspm_init_upstream() instead when the function number is 0.
+Now that we added a hook to be called from device_add, save the
+default values from the HW registers early in the boot for further
+reuse during hot device add/remove operations.
 
 Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pcie/aspm.c | 72 ++++++++++++++++++++++++-------------------------
- 1 file changed, 36 insertions(+), 36 deletions(-)
+ drivers/pci/pcie/aspm.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index a80d64b..e33f84b 100644
+index e33f84b..a38602a 100644
 --- a/drivers/pci/pcie/aspm.c
 +++ b/drivers/pci/pcie/aspm.c
-@@ -422,20 +422,6 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
- 	}
- }
+@@ -505,8 +505,10 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+ 	 */
+ 	if (dwreg.support & upreg.support & PCIE_LINK_STATE_L0S)
+ 		link->aspm_support |= ASPM_STATE_L0S;
+-	if (dwreg.enabled & PCIE_LINK_STATE_L0S)
++	if (dwreg.enabled & PCIE_LINK_STATE_L0S) {
+ 		link->aspm_enabled |= ASPM_STATE_L0S_UP;
++		link->aspm_default |= ASPM_STATE_L0S_UP;
++	}
+ 	if (upreg.enabled & PCIE_LINK_STATE_L0S)
+ 		link->aspm_enabled |= ASPM_STATE_L0S_DW;
+ 	link->latency_up.l0s = calc_l0s_latency(upreg.latency_encoding_l0s);
+@@ -542,9 +544,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+ 	if (link->aspm_support & ASPM_STATE_L1SS)
+ 		aspm_calc_l1ss_info(link, &upreg, &dwreg);
  
--/*
-- * The L1 PM substate capability is only implemented in function 0 in a
-- * multi function device.
-- */
--static struct pci_dev *pci_function_0(struct pci_bus *linkbus)
--{
--	struct pci_dev *child;
+-	/* Save default state */
+-	link->aspm_default = link->aspm_enabled;
 -
--	list_for_each_entry(child, &linkbus->devices, bus_list)
--		if (PCI_FUNC(child->devfn) == 0)
--			return child;
--	return NULL;
--}
--
- /* Calculate L1.2 PM substate timing parameters */
- static void aspm_calc_l1ss_info(struct pcie_link_state *link,
- 				struct aspm_register_info *upreg,
-@@ -798,7 +784,6 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
- 	INIT_LIST_HEAD(&link->children);
- 	INIT_LIST_HEAD(&link->link);
- 	link->pdev = pdev;
--	link->downstream = pci_function_0(pdev->subordinate);
- 
+ 	/* Setup initial capable state. Will be updated later */
+ 	link->aspm_capable = link->aspm_support;
  	/*
- 	 * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
-@@ -828,11 +813,33 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
- 
- static int pci_aspm_init_downstream(struct pci_dev *pdev)
- {
-+	struct pcie_link_state *link;
-+	struct pci_dev *parent;
-+
-+	/*
-+	 * The L1 PM substate capability is only implemented in function 0 in a
-+	 * multi function device.
-+	 */
-+	if (PCI_FUNC(pdev->devfn) != 0)
-+		return -EINVAL;
-+
-+	parent = pdev->bus->self;
-+	if (!parent)
-+		return -EINVAL;
-+
-+	link = parent->link_state;
-+	link->downstream = pdev;
- 	return 0;
- }
- 
+@@ -835,11 +834,26 @@ static int pci_aspm_init_downstream(struct pci_dev *pdev)
  static int pci_aspm_init_upstream(struct pci_dev *pdev)
  {
-+	struct pcie_link_state *link;
-+
-+	link = alloc_pcie_link_state(pdev);
-+	if (!link)
-+		return -ENOMEM;
+ 	struct pcie_link_state *link;
++	struct aspm_register_info upreg;
+ 
+ 	link = alloc_pcie_link_state(pdev);
+ 	if (!link)
+ 		return -ENOMEM;
+ 
++	pcie_get_aspm_reg(pdev, &upreg);
++	if (upreg.enabled & PCIE_LINK_STATE_L0S)
++		link->aspm_default |= ASPM_STATE_L0S_DW;
++	if (upreg.enabled & PCIE_LINK_STATE_L1)
++		link->aspm_default |= ASPM_STATE_L1;
++	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_1)
++		link->aspm_default |= ASPM_STATE_L1_1;
++	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_2)
++		link->aspm_default |= ASPM_STATE_L1_2;
++	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_1)
++		link->aspm_default |= ASPM_STATE_L1_1_PCIPM;
++	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
++		link->aspm_default |= ASPM_STATE_L1_2_PCIPM;
 +
  	return 0;
  }
  
-@@ -843,6 +850,17 @@ static int pci_aspm_init_upstream(struct pci_dev *pdev)
-  */
- int pci_aspm_init(struct pci_dev *pdev)
- {
-+	if (!aspm_support_enabled)
-+		return 0;
-+
-+	if (!pci_is_pcie(pdev))
-+		return -EINVAL;
-+
-+	/* VIA has a strange chipset, root port is under a bridge */
-+	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
-+	    pdev->bus->self)
-+		return 0;
-+
- 	if (!pdev->has_secondary_link)
- 		return pci_aspm_init_downstream(pdev);
- 
-@@ -859,33 +877,16 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
- 	struct pcie_link_state *link;
- 	int blacklist = !!pcie_aspm_sanity_check(pdev);
- 
--	if (!aspm_support_enabled)
--		return;
--
--	if (pdev->link_state)
--		return;
--
--	/*
--	 * We allocate pcie_link_state for the component on the upstream
--	 * end of a Link, so there's nothing to do unless this device has a
--	 * Link on its secondary side.
--	 */
--	if (!pdev->has_secondary_link)
--		return;
--
--	/* VIA has a strange chipset, root port is under a bridge */
--	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
--	    pdev->bus->self)
-+	if (!pdev->link_state)
- 		return;
- 
-+	link = pdev->link_state;
- 	down_read(&pci_bus_sem);
- 	if (list_empty(&pdev->subordinate->devices))
- 		goto out;
- 
- 	mutex_lock(&aspm_lock);
--	link = alloc_pcie_link_state(pdev);
--	if (!link)
--		goto unlock;
-+
- 	/*
- 	 * Setup initial ASPM state. Note that we need to configure
- 	 * upstream links also because capable state of them can be
-@@ -910,7 +911,6 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
- 		pcie_set_clkpm(link, policy_to_clkpm_state(link));
- 	}
- 
--unlock:
- 	mutex_unlock(&aspm_lock);
- out:
- 	up_read(&pci_bus_sem);
 -- 
 1.9.1
