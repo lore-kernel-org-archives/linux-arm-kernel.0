@@ -1,106 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Mar 2017 18:06:14 +0530
-Subject: [GIT PULL] PCI: Support for configurable PCI endpoint
-In-Reply-To: <99ae043b-35fd-0723-c8a7-e2625a862c6d@ti.com>
-References: <20170327094520.3129-1-kishon@ti.com>
- <0cfe5acf-332c-00c9-e5d5-1403c4e80ebe@axis.com>
- <99ae043b-35fd-0723-c8a7-e2625a862c6d@ti.com>
-Message-ID: <6868a887-a270-96d6-0600-af2a1af383a8@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 29 Mar 2017 13:38:21 +0100
+Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <58DBA010.1020002@linaro.org>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
+ <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
+Message-ID: <20170329123821.GA10988@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 29 March 2017 05:40 PM, Kishon Vijay Abraham I wrote:
-> Hi Niklas,
+On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
+> Hi Lorenzo,
 > 
-> On Wednesday 29 March 2017 05:12 PM, Niklas Cassel wrote:
->> On 03/27/2017 11:44 AM, Kishon Vijay Abraham I wrote:
->>> Hi Bjorn,
->>>
->>> Please find the pull request for PCI endpoint support below. I've
->>> also included all the history here.
->>>
->>> Changes from v4:
->>> *) add #syscon-cells property and used of_parse_phandle_with_args
->>>    to perform a configuration in syscon module (as suggested by
->>>    Rob Herring)
->>> *) Remove unnecessary white space.
->>>
->>> Changes from v3:
->>> *) fixed a typo and adapted to https://lkml.org/lkml/2017/3/13/562.
->>>
->>> Changes from v2:
->>> *) changed the configfs structure as suggested by Christoph Hellwig. With
->>>    this change the framework creates configfs entry for EP function driver
->>>    and EP controller. Previously these entries have to be created by the
->>>    the user. (Haven't changed the epc core or epf core except for invoking
->>>    configfs APIs to create entries for EP function driver and EP controller.
->>>    That's mostly because the EP function device can still be created by
->>>    directly invoking the epf core API without using configfs).
->>> *) Now the user has to use configfs entry 'start' to start the link.
->>>    This was previously done by the function driver. However in the case of
->>>    multi function EP, the function driver shouldn't start the link.
->>>
->>> Changes from v1:
->>> *) The preparation patches for adding EP support is removed and is sent
->>>    separately
->>> *) Added device ID for DRA74x/DRA72x and used it instead of
->>>    using "PCI_ANY_ID"
->>> *) Added userguide for PCI endpoint test function
->>>
->>> Major Improvements from RFC:
->>>  *) support multi-function devices (hw supported not virtual)
->>>  *) Access host side buffers
->>>  *) Raise MSI interrupts
->>>  *) Add user space program to use the host side PCI driver
->>>  *) Adapt all other users of designware to use the new design (only
->>>     compile tested. Since I have only dra7xx boards, the new design
->>>     has only been tested in dra7xx. I'd require the help of others
->>>     to test the platforms they have access to).
->>>
->>> This series has been developed over 4.11-rc1 + [1]
->>> [1] -> https://lkml.org/lkml/2017/3/13/562
->>>
->>> Let me know if this has to be re-based to some of your branch.
->>>
->>> Thanks
->>> Kishon
->>>
->>> The following changes since commit 623e87fec8ab7867fb51b3079196bd10718a60ce:
->>>
->>>   PCI: dwc: dra7xx: Push request_irq call to the bottom of probe (2017-03-22 20:35:30 +0530)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/kishon/pci-endpoint.git tags/pci-endpoint-for-4.12
->>>
->>> for you to fetch changes up to e98bf80074be4654faae42fe0f5a622a776b6fdd:
->>>
->>>   ARM: DRA7: clockdomain: Change the CLKTRCTRL of CM_PCIE_CLKSTCTRL to SW_WKUP (2017-03-27 15:08:22 +0530)
->>>
->>> ----------------------------------------------------------------
->>
->> FWIW:
->> I've tested Kishon's tag pci-endpoint-for-4.12
->> and PCIe on artpec6 SoC is still working fine.
+> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
+> >Hi Hanjun, Marc,
+> >
+> >On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
+> >>From: Hanjun Guo <hanjun.guo@linaro.org>
+> >>
+> >>For devices connecting to ITS, the devices need to identify themself
+> >>through a dev id; this dev id is represented in the IORT table in named
+> >>component node [1] for platform devices, so this patch adds code that
+> >>scans the IORT table to retrieve the devices' dev id.
+> >>
+> >>Leveraging the iort_node_map_platform_id() IORT API, add a new function
+> >>call, iort_pmsi_get_dev_id() and use it in its_pmsi_prepare() to allow
+> >>retrieving dev id in ACPI platforms.
+> >>
+> >>[1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
+> >>
+> >>Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>[lorenzo.pieralisi at arm.com: rewrote commit log]
+> >>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Tested-by: Ming Lei <ming.lei@canonical.com>
+> >>Tested-by: Wei Xu <xuwei5@hisilicon.com>
+> >>Tested-by: Sinan Kaya <okaya@codeaurora.org>
+> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>Cc: Tomasz Nowicki <tn@semihalf.com>
+> >>Cc: Thomas Gleixner <tglx@linutronix.de>
+> >>---
+> >>  drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
+> >>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
+> >>  include/linux/acpi_iort.h                     |  5 +++++
+> >>  3 files changed, 31 insertions(+), 1 deletion(-)
+> >
+> >To simplify merging ACPI/IRQCHIP changes via different trees it
+> >would be good to split this patch; I am not sure what's the best
+> >way of handling it though given that we would end up in a merge
+> >ordering dependency anyway (ie we can create an empty stub
+> >for iort_pmsi_get_dev_id() but that would create a dependency
+> >between ARM64 and irqchip trees anyway).
 > 
-> Thanks for testing it.
->>
->> I also included the DRA7xx PCIe driver in my
->> kernel so that pcie-designware-ep.c gets built.
->>
->> My only worry is that the code in pcie-designware-ep.c
->> is not compile tested if DRA7xx is not selected
->> (as it is the only driver using PCIE_DW_EP at
->> the moment).
+> The first 12 patches for ACPI platform MSI and later 3 patches
+> for mbigen have no "physical" dependency, which means they can
+> be merged and compiled independently, they only have functional
+> dependency only.
 > 
-> yeah, we should plan to include COMPILE_TEST in all pci drivers but I guess
-> there is some problem with non-ARM builds [1]. As Bjorn mentioned in the
-> thread, we could add #ifdef ARM and then include COMPILE_TEST.
+> We already had SAS, XGE, USB and even UART drivers depend on
+> the mbigen ACPI support, so I don't think the dependency of ACPI
+> platform MSI and mbigen patches cares much if those two parts are
+> merged in one merge window, even they are merged independently via
+> different tree.
+> 
+> >
+> >Please let me know what's your preferred way of handling this.
+> 
+> So in my opinion, they can be merged independently via ARM64 and
+> irqchip tree with no ordering dependency, is it OK?
 
-I think I misunderstood your concern. yeah, there is no direct way to compile
-pcie-designware-ep.c without selecting DRA7xx.
+I am speaking about merging MBIgen AND ITS patches via IRQCHIP and
+ACPI/IORT for ARM64, that's why I replied to this patch. I do not
+think that's feasible to split patches in two separate branches
+without having a dependency between them.
 
-Thanks
-Kishon
+Sure, the last three patches can go via IRQCHIP but that was not
+my question :)
+
+Lorenzo
