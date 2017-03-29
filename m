@@ -1,63 +1,21 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Wed, 29 Mar 2017 18:09:32 +0200
-Subject: [PATCH] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
-Message-ID: <20170329160932.27157-1-abailon@baylibre.com>
+From: sebastian.siewior@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 29 Mar 2017 18:10:40 +0200
+Subject: [PATCH 1/1] tty: serial: st-asc: Make the locking RT aware
+In-Reply-To: <1490202751-16581-1-git-send-email-lionel.debieve@st.com>
+References: <1490202751-16581-1-git-send-email-lionel.debieve@st.com>
+Message-ID: <20170329161040.ktv4qpiyhjfjzdss@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPPI 4.1 DMA is sharing its clock with the USB OTG,
-and most of the time, the clock will be enabled by USB.
-But during the init of the DMA, USB is not enabled (waiting for DMA),
-and then we must enable the clock before to do anything.
-Add the clock for the CPPI 4.1 DMA engine.
+On 2017-03-22 18:12:31 [+0100], Lionel Debieve wrote:
+> The lock is a sleeping lock and local_irq_save() is not the
+> standard implementation now. Working for both -RT and non
+> RT.
+> 
+> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
 
-Note:
-This patch is to apply instead of:
-"ARM: davinci: Make the usb20 clock available to PM runtime"
+Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
----
- arch/arm/mach-davinci/da830.c    | 1 +
- arch/arm/mach-davinci/da850.c    | 1 +
- arch/arm/mach-davinci/da8xx-dt.c | 2 ++
- 3 files changed, 4 insertions(+)
+This is how serial8250_console_write() looks upstream, too.
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 073c458..ae4a8a5 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -413,6 +413,7 @@ static struct clk_lookup da830_clks[] = {
- 	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
- 	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
- 	CLK("musb-da8xx",	"usb20",	&usb20_clk),
-+	CLK("cppi41-dmaengine",	NULL,		&usb20_clk),
- 	CLK(NULL,		"aemif",	&aemif_clk),
- 	CLK(NULL,		"aintc",	&aintc_clk),
- 	CLK(NULL,		"secu_mgr",	&secu_mgr_clk),
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index ccad2f9..9739aaa 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -560,6 +560,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("davinci-nand.0",	"aemif",	&aemif_nand_clk),
- 	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
- 	CLK("musb-da8xx",	"usb20",	&usb20_clk),
-+	CLK("cppi41-dmaengine",	NULL,		&usb20_clk),
- 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
- 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
- 	CLK("vpif",		NULL,		&vpif_clk),
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index e3cef50..5bf08ba 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -53,6 +53,8 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
- 	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
- 	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
-+	OF_DEV_AUXDATA("ti,da830-cppi41", 0x01e01000, "cppi41-dma-engine",
-+		       NULL),
- 	{}
- };
- 
--- 
-2.10.2
+Sebastian
