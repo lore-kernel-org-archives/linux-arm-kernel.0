@@ -1,43 +1,13 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 29 Mar 2017 11:22:25 +0530
-Subject: [PATCH v7 0/3] Broadcom FlexRM ring manager support
-In-Reply-To: <CABb+yY3n2OuvBKfsWj5m5RvdBEZ5_aWpVNUJ9V8oikyJjchZAw@mail.gmail.com>
-References: <1490765455-8556-1-git-send-email-anup.patel@broadcom.com>
- <CABb+yY3n2OuvBKfsWj5m5RvdBEZ5_aWpVNUJ9V8oikyJjchZAw@mail.gmail.com>
-Message-ID: <CAALAos-mFVCYFo31NJ=MTkU00mLthn9Rqre7sgMBpW9ZP--rPw@mail.gmail.com>
+From: haimdaniel@gmail.com (Haim Daniel)
+Date: Wed, 29 Mar 2017 08:53:23 +0300
+Subject: [PATCH v2]: staging: vc04_services: fix checkpatch error
+Message-ID: <ce315e69-4362-3877-3a07-3d0f91a0a24e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:05 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Wed, Mar 29, 2017 at 11:00 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->> The Broadcom FlexRM ring manager provides producer-consumer style
->> ring interface for offload engines on Broadcom iProc SoCs. We can
->> have one or more instances of Broadcom FlexRM ring manager in a SoC.
->>
->> This patchset adds a mailbox driver for Broadcom FlexRM ring manager
->> which can be used by offload engine drivers as mailbox clients.
->>
->> The Broadcom FlexRM mailbox driver is feature complete for RAID and
->> Crypto offload engines. We will have incremental patches in-future
->> for ring-level statistics using debugfs and minor optimizations.
->>
->> This patchset is based on Linux-4.11-rc4 and it is also available
->> at flexrm-v7 branch of https://github.com/Broadcom/arm64-linux.git
->>
->> Changes since v6:
->>  - Rebased patches for Linux-4.11-rc4
->>  - Added a patch to remove depends on COMPILE_TEST for kconfig
->>    option BCM_FLEXRM_MBOX
->>
-> You only needed to send the fix to compilation failure reports, not
-> the whole series.
-
-My bad for the noise.
-
-> I believe only the patch-3 is new in the series and I need not even
-> look at patch-1,2 ?
-
-Yes, only patch-3 is required to fix compilation failure.
-
-Regards,
-Anup
+A non-text attachment was scrubbed...
+Name: 0001-staging-vc04_services-add-parenthesis-to-macros.patch
+Type: text/x-patch
+Size: 1148 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170329/2306c199/attachment.bin>
