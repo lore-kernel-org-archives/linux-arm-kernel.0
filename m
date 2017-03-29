@@ -1,24 +1,38 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 29 Mar 2017 14:30:07 +0800
-Subject: [PATCH v3 0/2] add dts files for hi3798cv200-Poplar board
-Message-ID: <1490769009-12552-1-git-send-email-xuejiancheng@hisilicon.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 29 Mar 2017 09:13:03 +0200
+Subject: [PATCH 2/2] ARM: dts: sun5i: Add interrupt for display backend
+In-Reply-To: <20170327143847.16259-3-wens@csie.org>
+References: <20170327143847.16259-1-wens@csie.org>
+ <20170327143847.16259-3-wens@csie.org>
+Message-ID: <20170329071303.ft7oukmhczihy2xb@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set mainly adds dts files for hi3798cv200-Poplar board.
+On Mon, Mar 27, 2017 at 10:38:47PM +0800, Chen-Yu Tsai wrote:
+> The display backend on sun5i shares the same interrupt line as the
+> display frontend. Add it.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Jiancheng Xue (2):
-  dt-bindings: arm: hisilicon: add bindings for hi3798cv200 SoC and
-    Poplar board
-  arm64: dts: hisilicon: add dts files for hi3798cv200-poplar board
+And ideally, patches prefix shouldn't have dts here too. I've dropped
+it and applied, thanks!
 
- .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
- arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 163 +++++++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 405 +++++++++++++++++++++
- 4 files changed, 573 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+> This won't directly apply to old releases. We may want to backport
+> them though?
+
+Yep, probably. Do you want to send it to stable?
+
+Thanks,
+Maxime
 
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170329/fd517d70/attachment.sig>
