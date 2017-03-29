@@ -1,95 +1,74 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:43:21 -0500
-Subject: [PATCH v4 04/23] drivers/fsi: Add crc4 helpers
+Date: Wed, 29 Mar 2017 12:43:23 -0500
+Subject: [PATCH v4 06/23] drivers/fsi: Set up links for slave communication
 In-Reply-To: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
 References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170329174340.89109-5-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170329174340.89109-7-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Add some helpers for the crc checks for the slave configuration table.
-This works 4-bits-at-a-time, using a simple table approach.
+Enable each link and send a break command, and try to detect a slave by
+reading from the SMODE register.
 
-We will need this in the FSI core code, as well as any master
-implementations that need to calculate CRCs in software.
-
-We add this to the fsi code (rather than lib/), as we need a specific
-polynomial for FSI CRCs.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c   | 24 ++++++++++++++++++++++++
- drivers/fsi/fsi-master.h | 21 +++++++++++++++++++++
- 2 files changed, 45 insertions(+)
+ drivers/fsi/fsi-core.c | 37 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 35 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index e90d45d..4bbca95 100644
+index 32698ed..6e1cfdf 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -32,6 +32,30 @@ struct fsi_slave {
+@@ -157,12 +157,45 @@ static int fsi_master_write(struct fsi_master *master, int link,
+ 	return master->write(master, link, slave_id, addr, val, size);
+ }
  
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
- 
-+/* crc helpers */
-+static const uint8_t crc4_tab[] = {
-+	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
-+	0x1, 0x6, 0xf, 0x8, 0xa, 0xd, 0x4, 0x3,
-+};
-+
-+uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
++static int fsi_master_link_enable(struct fsi_master *master, int link)
 +{
-+	int i;
++	if (master->link_enable)
++		return master->link_enable(master, link);
 +
-+	/* Align to 4-bits */
-+	bits = (bits + 3) & ~0x3;
-+
-+	/* mask off anything above the top bit */
-+	x &= (1ull << bits) - 1;
-+
-+	/* Calculate crc4 over four-bit nibbles, starting@the MSbit */
-+	for (i = bits - 4; i >= 0; i -= 4)
-+		c = crc4_tab[c ^ ((x >> i) & 0xf)];
-+
-+	return c;
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(fsi_crc4);
 +
- /* FSI slave support */
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-index 7764b00..d6a4885 100644
---- a/drivers/fsi/fsi-master.h
-+++ b/drivers/fsi/fsi-master.h
-@@ -38,4 +38,25 @@ struct fsi_master {
- extern int fsi_master_register(struct fsi_master *master);
- extern void fsi_master_unregister(struct fsi_master *master);
- 
-+/**
-+ * crc4 helper: Given a starting crc4 state @c, calculate the crc4 vaue of @x,
-+ * which is @bits in length. This may be required by master implementations
-+ * that do not provide their own hardware checksums.
-+ *
-+ * The crc4 is performed on 4-bit chunks (which is all we need for FSI
-+ * calculations). Typically, we'll want a starting state of 0:
-+ *
-+ *  c = fsi_crc4(0, msg, len);
-+ *
-+ * To crc4 a message that includes a single start bit, initialise crc4 state
-+ * with:
-+ *
-+ *  c = fsi_crc4(0, 1, 1);
-+ *
-+ * Then update with message data:
-+ *
-+ *  c = fsi_crc4(c, msg, len);
++/*
++ * Issue a break command on this link
 + */
-+uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits);
++static int fsi_master_break(struct fsi_master *master, int link)
++{
++	if (master->send_break)
++		return master->send_break(master, link);
 +
- #endif /* DRIVERS_FSI_MASTER_H */
++	return 0;
++}
++
+ static int fsi_master_scan(struct fsi_master *master)
+ {
+-	int link;
++	int link, rc;
++
++	for (link = 0; link < master->n_links; link++) {
++		rc = fsi_master_link_enable(master, link);
++		if (rc) {
++			dev_dbg(&master->dev,
++				"enable link %d failed: %d\n", link, rc);
++			continue;
++		}
++		rc = fsi_master_break(master, link);
++		if (rc) {
++			dev_dbg(&master->dev,
++				"break to link %d failed: %d\n", link, rc);
++			continue;
++		}
+ 
+-	for (link = 0; link < master->n_links; link++)
+ 		fsi_slave_init(master, link, 0);
++	}
+ 
+ 	return 0;
+ }
 -- 
 1.8.2.2
