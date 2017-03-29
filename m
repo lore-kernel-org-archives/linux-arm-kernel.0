@@ -1,170 +1,61 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed, 29 Mar 2017 12:49:53 -0500
-Subject: [PATCH v4 14/23] drivers/fsi: Add sysfs files for FSI master & slave
- accesses
-Message-ID: <20170329174953.89247-1-cbostic@linux.vnet.ibm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Mar 2017 18:51:00 +0100
+Subject: [BUG] v4.11-rc1: CPUFREQ Circular locking dependency
+In-Reply-To: <1489373088.5841.15.camel@intel.com>
+References: <20170310150218.GW21222@n2100.armlinux.org.uk>
+ <CAJZ5v0jGRH_hwvvm9OLsaYgbghqWKOke9PyGNnkvP_ZiMqAxSw@mail.gmail.com>
+ <BY2PR21MB00362E60448FD2E00C120FFCCB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+ <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+ <20170310234325.GB21222@n2100.armlinux.org.uk>
+ <1489373088.5841.15.camel@intel.com>
+Message-ID: <20170329175100.GD7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On Mon, Mar 13, 2017 at 10:44:48AM +0800, Zhang Rui wrote:
+> On Fri, 2017-03-10 at 23:43 +0000, Russell King - ARM Linux wrote:
+> > On Fri, Mar 10, 2017 at 06:33:28PM +0000, Matthew Wilcox wrote:
+> > > 
+> > > From cd5401d81633d5e48e39d67d4e65156e6759537e Mon Sep 17 00:00:00
+> > > 2001
+> > > From: Matthew Wilcox <mawilcox@microsoft.com>
+> > > Date: Fri, 10 Mar 2017 13:22:53 -0500
+> > > Subject: [PATCH] thermal: Fix potential deadlock in cpu_cooling
+> > > 
+> > > I expanded the scope of cooling_list_lock a little too far; it was
+> > > not just covering cpufreq_dev_count, it was also covering the calls
+> > > to cpufreq_register_notifier() and cpufreq_unregister_notifier().
+> > > Since cooling_list_lock is also used within
+> > > cpufreq_thermal_notifier(),
+> > > lockdep reports a potential deadlock.??I don't think that's
+> > > actually
+> > > possible, but it's easy enough to make it impossible by testing the
+> > > condition under cooling_list_lock and dropping the lock before
+> > > calling
+> > > cpufreq_register_notifier().
+> > > 
+> > > As a bonus, I noticed that cpufreq_dev_count is only used for the
+> > > purpose
+> > > of knowing whether this is the first or last cooling device
+> > > registered,
+> > > and we know that anyway because we know whether the list
+> > > transitioned
+> > > between empty and not-empty.??So we can delete that variable too.
+> > > 
+> > > Fixes: ae606089621ef0349402cfcbeca33a82abbd0fd0
+> > > Reported-by: Russell King <linux@armlinux.org.uk>
+> > > Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
+> > Thanks Matthew, appears to solve the problem.
+> > 
+> > Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > 
+> 
+> patch applied.
 
-This change adds a 'raw' file for reads & writes, and a 'term' file for
-the TERM command, and a 'break' file for issuing a BREAK.
+It's almost three weeks, and it isn't in Linus' tree.  What's happening
+with this _fix_ for a regression that occured during the merge window?
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
-Signed-off-by: Chris Bostic <cbostic@linux.net.ibm.com>
----
- drivers/fsi/fsi-core.c | 116 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 116 insertions(+)
-
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4359e26..f0f0556 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -294,6 +294,95 @@ static int fsi_slave_scan(struct fsi_slave *slave)
- 	return 0;
- }
- 
-+static ssize_t fsi_slave_sysfs_raw_read(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr, char *buf,
-+		loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	size_t total_len, read_len;
-+	int rc;
-+
-+	if (off < 0)
-+		return -EINVAL;
-+
-+	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
-+		return -EINVAL;
-+
-+	for (total_len = 0; total_len < count; total_len += read_len) {
-+		read_len = min_t(size_t, count, 4);
-+		read_len -= off & 0x3;
-+
-+		rc = fsi_slave_read(slave, off, buf + total_len, read_len);
-+		if (rc)
-+			return rc;
-+
-+		off += read_len;
-+	}
-+
-+	return count;
-+}
-+
-+static ssize_t fsi_slave_sysfs_raw_write(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr,
-+		char *buf, loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	size_t total_len, write_len;
-+	int rc;
-+
-+	if (off < 0)
-+		return -EINVAL;
-+
-+	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
-+		return -EINVAL;
-+
-+	for (total_len = 0; total_len < count; total_len += write_len) {
-+		write_len = min_t(size_t, count, 4);
-+		write_len -= off & 0x3;
-+
-+		rc = fsi_slave_write(slave, off, buf + total_len, write_len);
-+		if (rc)
-+			return rc;
-+
-+		off += write_len;
-+	}
-+
-+	return count;
-+}
-+
-+static struct bin_attribute fsi_slave_raw_attr = {
-+	.attr = {
-+		.name = "raw",
-+		.mode = 0600,
-+	},
-+	.size = 0,
-+	.read = fsi_slave_sysfs_raw_read,
-+	.write = fsi_slave_sysfs_raw_write,
-+};
-+
-+static ssize_t fsi_slave_sysfs_term_write(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr,
-+		char *buf, loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	struct fsi_master *master = slave->master;
-+
-+	if (!master->term)
-+		return -ENODEV;
-+
-+	master->term(master, slave->link, slave->id);
-+	return count;
-+}
-+
-+static struct bin_attribute fsi_slave_term_attr = {
-+	.attr = {
-+		.name = "term",
-+		.mode = 0200,
-+	},
-+	.size = 0,
-+	.write = fsi_slave_sysfs_term_write,
-+};
-+
- /* Encode slave local bus echo delay */
- static inline uint32_t fsi_smode_echodly(int x)
- {
-@@ -409,6 +498,14 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 		return rc;
- 	}
- 
-+	rc = device_create_bin_file(&slave->dev, &fsi_slave_raw_attr);
-+	if (rc)
-+		dev_warn(&slave->dev, "failed to create raw attr: %d\n", rc);
-+
-+	rc = device_create_bin_file(&slave->dev, &fsi_slave_term_attr);
-+	if (rc)
-+		dev_warn(&slave->dev, "failed to create term attr: %d\n", rc);
-+
- 	fsi_slave_scan(slave);
- 	return 0;
- }
-@@ -523,6 +620,18 @@ static ssize_t master_rescan_store(struct device *dev,
- 
- static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
- 
-+static ssize_t master_break_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	struct fsi_master *master = to_fsi_master(dev);
-+
-+	fsi_master_break(master, 0);
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(break, 0200, NULL, master_break_store);
-+
- int fsi_master_register(struct fsi_master *master)
- {
- 	int rc;
-@@ -546,6 +655,13 @@ int fsi_master_register(struct fsi_master *master)
- 		return rc;
- 	}
- 
-+	rc = device_create_file(&master->dev, &dev_attr_break);
-+	if (rc) {
-+		device_unregister(&master->dev);
-+		ida_simple_remove(&master_ida, master->idx);
-+		return rc;
-+	}
-+
- 	fsi_master_scan(master);
- 
- 	return 0;
 -- 
-1.8.2.2
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
