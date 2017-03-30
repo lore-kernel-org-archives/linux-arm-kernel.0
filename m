@@ -1,39 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 17:46:10 +0200
-Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.12 (#1)
-In-Reply-To: <87lgrubncr.fsf@free-electrons.com>
-References: <87lgrubncr.fsf@free-electrons.com>
-Message-ID: <CAK8P3a18XD9xiuY4fdiTRXHf_g3Jy7kJxmHo29wOdONYcL6Okw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 30 Mar 2017 09:46:21 -0600
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <20170330015941.GD3038@leoy-linaro>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <20170328165010.GA21937@linaro.org>
+ <20170329015423.GA5035@leoy-linaro> <20170329165535.GB24889@linaro.org>
+ <20170330015941.GD3038@leoy-linaro>
+Message-ID: <CANLsYkwPYSvy2xjf8uuvx1WGWpGdMFy7kF=30VbvgW+jDvnFuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 6:23 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
+On 29 March 2017 at 19:59, Leo Yan <leo.yan@linaro.org> wrote:
+> On Wed, Mar 29, 2017 at 10:55:35AM -0600, Mathieu Poirier wrote:
 >
-> Here is the first pull request for defconfig64 for mvebu for v4.12.
+> [...]
 >
-> Gregory
+>> > So this is why add "idle_constraint" as a central place to control
+>> > power domain for CPU debug purpose and I also think this is more
+>> > friendly for hardware design, e.g. some platforms can enable partial
+>> > low power states to save power and avoid overheat after using this
+>> > driver.
+>> >
+>> > How about you think for this?
+>>
+>> Like Sudeep pointed out we should concentrate on doing the right thing,
+>> that is work with EDPRSR.PU, EDPRCR.COREPURQ and EDPRCR.CORENPDRQ.
 >
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> Agree, and I think we have aligned for this.
 >
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>> Anything outside of that becomes platform specific and can't be handled in
+>> this driver.
 >
-> are available in the git repository at:
+> Sorry I argue a bit for this just want to make things more clear and
+> if can have better method.
 >
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.12-1
->
-> for you to fetch changes up to 66e56302842e9971426bd7e504c4db4f88cbb037:
->
->   arm64: defconfig: enable MVPP2 (2017-03-23 17:50:13 +0100)
->
-> ----------------------------------------------------------------
-> mvebu defconfig64 for 4.12 (part 1)
->
-> Update arm64 defconfig by adding MVPP2 for Marvell Armada 7K/8K and
-> MVNETA and I2C_PXA for Armada 37xx.
->
+> Though the issue is platform specific, but the code is to seek common
+> method to handle them. So the driver has no any platform specific code.
 
-Pulled into next/arm64, thanks!
+Seeking a common way to handle platform specific problems doesn't
+scale and will never be encompassing.  There will always be a quirk
+somewhere to deal with, hence the idea of keeping things separate.
 
-      Arnd
+>
+> I read again for Suziki's suggestion: "4) Should document the fact that,
+> on some platforms, the user may have to disable CPUidle explicitly to
+> get the driver working. But let us not make it the default. The user
+> with a not so ideal platform could add "nohlt" and get it working."
+
+Suzuki and I are expressing the same view using different words.
+
+>
+> So I'm not strong to resist and if this is alignment yet, I should
+> document well for this but doesn't handle it in driver (keep driver
+> simple).
+>
+> Thanks,
+> Leo Yan
