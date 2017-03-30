@@ -1,152 +1,89 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Thu, 30 Mar 2017 15:42:10 -0600
-Subject: [PATCH V8 0/7] LPC: legacy ISA I/O support
-In-Reply-To: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <CALdTtnsoxNrfmaRn=OtessSC=Ln7pHV5dUBd75uDax3watEoAw@mail.gmail.com>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Thu, 30 Mar 2017 23:51:03 +0200
+Subject: [PATCH 1/2] drm/bridge: ti-tfp410: support hpd via gpio
+In-Reply-To: <e63e628794b044c2a615091697622d50@rwthex-w1-b.rwth-ad.de>
+References: <2e47786ab3d04078ae70d0c4064f7c4d@rwthex-s1-b.rwth-ad.de>
+ <093b4e9c0ae6413499e5bf8ec309fa41@rwthex-s1-b.rwth-ad.de>
+ <6dfb2b66ec2a408dabe80d703f411ce0@rwthex-s1-b.rwth-ad.de>
+ <d6b2391f-3e4a-2761-b6a0-8997d2c78600@codeaurora.org>
+ <f87195b3-bd89-d698-c935-4e3aa97c01e2@ti.com>
+ <e63e628794b044c2a615091697622d50@rwthex-w1-b.rwth-ad.de>
+Message-ID: <09a6bf1b-f743-4f1f-9bd3-d2c137365b16@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 9:26 AM, zhichang.yuan
-<yuanzhichang@hisilicon.com> wrote:
-> This patchset supports the IPMI-bt device attached to the Low-Pin-Count
-> interface implemented on Hisilicon Hip06/Hip07 SoC.
->                         -----------
->                         | LPC host|
->                         |         |
->                         -----------
->                              |
->                 _____________V_______________LPC
->                   |                       |
->                   V                       V
->                                      ------------
->                                      |  BT(ipmi)|
->                                      ------------
->
-> When master accesses those peripherals beneath the Hip06/Hip07 LPC, a specific
-> LPC driver is needed to make LPC host generate the standard LPC I/O cycles with
-> the target peripherals'I/O port addresses. But on curent arm64 world, there is
-> no real I/O accesses. All the I/O operations through in/out pair are based on
-> MMIO which is not satisfied the I/O mechanism on Hip06/Hip07 LPC.
-> To solve this issue and keep the relevant existing peripherals' driver
-> untouched, this patchset implements:
->   - introduces a generic I/O space management framwork, LIBIO, to support I/O
->     operations of both MMIO buses and the host controllers which access their
->     peripherals with host local I/O addresses;
->   - redefines the in/out accessors to provide unified interfaces for MMIO and
->     legacy I/O. Based on the LIBIO, the calling of in/out() from upper-layer
->     drivers, such as ipmi-si, will be redirected to the corresponding
->     device-specific I/O hooks to perfrom the I/O accesses.
-> Based on this patch-set, all the I/O accesses to Hip06/Hip07 LPC peripherals can
-> be supported without any changes on the existing ipmi-si driver.
->
-> Changes from V7:
->   - Based on Arnd's comment, rename the LIBIO as LOGIC_PIO;
->   - Improved the mapping process in LOGIC_PIO to gain better efficiency when
->     redirecting the I/O accesses to right device driver;
->   - To reduce the impact on PCI MMIO to a minimum, add a new
->     CONFIG_INDIRECT_PIO for indirect-IO hosts/devices;
->   - Added a new ACPI handler for indirect-IO hosts/devices;
->   - Fixed the compile issues on V6;
->
-> Changes from V6:
->   - According to the comments from Bjorn and Alex, merge PCI IO and indirect-IO
->     into a generic I/O space management, LIBIO;
->   - Adopted the '_DEP' to replace the platform bus notifier. In this way, we can
->     ensure the LPC peripherals' I/O resources had been translated to logical IO
->     before the LPC peripheral enumeration;
->   - Replaced the rwlock with rcu list based on Alex's suggestion;
->   - Applied relaxed write/read to LPC driver;
->   - Some bugs fixing and some optimazations based on the comments of V6;
->
-> Changes from V5:
->   - Made the extio driver more generic and locate in lib/;
->   - Supported multiple indirect-IO bus instances;
->   - Extended the pci_register_io_range() to support indirect-IO, then dropped
->   the I/O reservation used in previous patchset;
->   - Reimplemented the ACPI LPC support;
->   - Fixed some bugs, including the compile error on other archs, the module
->   building failure found by Ming Lei, etc;
->
-> Changes from V4:
->   - Some revises based on the comments from Bjorn, Rob on V4;
->   - Fixed the compile error on some platforms, such as openrisc;
->
-> Changes from V3:
->   - UART support deferred to a separate patchset; This patchset only support
->   ipmi device under LPC;
->   - LPC bus I/O range is fixed to 0 ~ (PCIBIOS_MIN_IO - 1), which is separeted
->   from PCI/PCIE PIO space;
->   - Based on Arnd's remarks, removed the ranges property from Hip06 lpc dts and
->   added a new fixup function, of_isa_indirect_io(), to get the I/O address
->   directly from LPC dts configurations;
->   - Support in(w,l)/out(w,l) for Hip06 lpc I/O;
->   - Decouple the header file dependency on the gerenic io.h by defining in/out
->   as normal functions in c file;
->   - removed unused macro definitions in the LPC driver;
->
-> Changes from V2:
->   - Support the PIO retrieval from the linux PIO generated by
->   pci_address_to_pio. This method replace the 4K PIO reservation in V2;
->   - Support the flat-tree earlycon;
->   - Some revises based on Arnd's remarks;
->   - Make sure the linux PIO range allocated to Hip06 LPC peripherals starts
->   from non-ZERO;
->
-> Changes from V1:
->   - Support the ACPI LPC device;
->   - Optimize the dts LPC driver in ISA compatible mode;
->   - Reserve the IO range below 4K in avoid the possible conflict with PCI host
->   IO ranges;
->   - Support the LPC uart and relevant earlycon;
->
-> V7 thread here: https://lkml.org/lkml/2017/3/12/279
-> v6 thread here: https://lkml.org/lkml/2017/1/24/25
-> v5 thread here: https://lkml.org/lkml/2016/11/7/955
-> v4 thread here: https://lkml.org/lkml/2016/10/20/149
-> v3 thread here: https://lkml.org/lkml/2016/9/14/326
-> v2 thread here: https://lkml.org/lkml/2016/9/7/356
-> v1 thread here: https://lkml.org/lkml/2015/12/29/154
->
->
-> Signed-off-by: Zhichang Yuan <yuanzhichang@hisilicon.com>
-> zhichang.yuan (6):
->   LIBIO: Introduce a generic PIO mapping method
->   PCI: Apply the new generic I/O management on PCI IO hosts
->   OF: Add missing I/O range exception for indirect-IO devices
->   LPC: Support the device-tree LPC host on Hip06/Hip07
->   ACPI: Support the probing on the devices which apply indirect-IO
->   LPC: Add the ACPI LPC support
->
->  .../arm/hisilicon/hisilicon-low-pin-count.txt      |  33 ++
->  MAINTAINERS                                        |   8 +
->  arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   4 +
->  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  14 +
->  arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   4 +
->  arch/arm64/boot/dts/hisilicon/hip07.dtsi           |  14 +
->  drivers/acpi/Makefile                              |   1 +
->  drivers/acpi/acpi_indirectio.c                     | 344 +++++++++++++
->  drivers/acpi/internal.h                            |   5 +
->  drivers/acpi/pci_root.c                            |   8 +-
->  drivers/acpi/scan.c                                |   1 +
->  drivers/bus/Kconfig                                |   9 +
->  drivers/bus/Makefile                               |   1 +
->  drivers/bus/hisi_lpc.c                             | 547 +++++++++++++++++++++
->  drivers/of/address.c                               |  95 +++-
->  drivers/pci/pci.c                                  | 104 +---
->  include/asm-generic/io.h                           |  50 ++
->  include/linux/logic_pio.h                          | 174 +++++++
->  include/linux/pci.h                                |   3 +-
->  lib/Kconfig                                        |  26 +
->  lib/Makefile                                       |   2 +
->  lib/logic_pio.c                                    | 413 ++++++++++++++++
->  22 files changed, 1758 insertions(+), 102 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
->  create mode 100644 drivers/acpi/acpi_indirectio.c
->  create mode 100644 drivers/bus/hisi_lpc.c
->  create mode 100644 include/linux/logic_pio.h
->  create mode 100644 lib/logic_pio.c
+Hi,
 
-Booted up on a D05, was able to use the LPC-connected IPMI interface.
+On 03/30/2017 11:49 AM, Archit Taneja wrote:
+>
+>
+> On 03/28/2017 07:02 PM, Jyri Sarha wrote:
+>> On 03/27/17 08:58, Archit Taneja wrote:
+>>> Hi,
+>>>
+>>> On 03/07/2017 03:21 AM, Christopher Spinrath wrote:
+>>>> Hi Fabio,
+>>>>
+>>>> On 03/06/2017 10:46 PM, Fabio Estevam wrote:
+>>>>> Hi Christopher,
+>>>>>
+>>>>> On Mon, Mar 6, 2017 at 6:40 PM,
+>>>>> <christopher.spinrath@rwth-aachen.de> wrote:
+>>>>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>>>>>>
+>>>>>> On some boards the hpd pin of a hdmi connector is wired up to a gpio
+>>>>>> pin. Since in the DRM world the tfp410 driver is responsible for
+>>>>>> handling the connector, add support for hpd gpios in this very
+>>>>>> driver.
+>>>>>>
+>>>>>> Signed-off-by: Christopher Spinrath
+>>>>>> <christopher.spinrath@rwth-aachen.de>
+>>>>>> ---
+>>>>>>  drivers/gpu/drm/bridge/ti-tfp410.c | 72
+>>>>>> ++++++++++++++++++++++++++++++++++++--
+>>>>>
+>> ...
+>>>>
+>>>
+>>> The patch looks good to me.
+>>>
+>>> Jyri,
+>>>
+>>> Is it possible for you to verify this on Beaglebone platform?
+>>>
+>>
+>> If I read my BeagleBone DVI-D Cape docs right, it does not have the HPD
+>> pin connected. At least it does not mention any gpio that could be used
+>> for the purpose. So I can not easily test this patch in real world
+>> situation. For what it is worth the patch looks ok to me too.
+>
+> Thanks for the review. I looked at the tfp410 data sheet[1], there isn't
+> a HPD pin on the chip at all. My guess is that boards using tfp410 most
+> likely have the HPD pin routed to the SoC from the HDMI connector
+> (with a level shifter/shield in between).
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
+Exactly. I tried to say that in the commit message (and, actually, 
+that's what I did in Patch 2/2 for the Utilite Pro).
+
+Thanks,
+Christopher
+
+> We would eventually need to move the both ddc and hpd stuff to
+> a generic hdmi connector driver later on. I've queued this to
+> drm-misc-next.
+>
+> [1]: http://www.ti.com/lit/ds/symlink/tfp410.pdf
+>
+> Archit
+>
+>>
+>> Best regards,
+>> Jyri
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
