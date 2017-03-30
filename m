@@ -1,86 +1,50 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:15 +0800
-Subject: [PATCH v3 6/8] arm64: RAS: add ras extension runtime detection
-In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-16-git-send-email-xiexiuqi@huawei.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 30 Mar 2017 13:38:34 +0300
+Subject: [PATCH linux-next v2 1/4] usb: gadget: udc: atmel: Check fifo
+ configuration values against device tree
+In-Reply-To: <4b91a4973e19a5b7ac05d5e0f5b4dcc8cffb75cf.1490715349.git.cristian.birsan@microchip.com>
+References: <cover.1490715349.git.cristian.birsan@microchip.com>
+ <4b91a4973e19a5b7ac05d5e0f5b4dcc8cffb75cf.1490715349.git.cristian.birsan@microchip.com>
+Message-ID: <87fuhvjbh1.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to <<RAS Extension PRD03>> document, we add RAS extension
-feature runtime detection, which would be used for error recovery
-in the future.
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Reviewed-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/include/asm/sysreg.h  |  2 ++
- arch/arm64/kernel/cpufeature.c   | 11 +++++++++++
- 3 files changed, 15 insertions(+), 1 deletion(-)
+Hi,
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index fb78a5d..3847cf8 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -37,7 +37,8 @@
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_REPEAT_TLBI		17
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
-+#define ARM64_HAS_RAS_EXTN			19
- 
--#define ARM64_NCAPS				19
-+#define ARM64_NCAPS				20
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ac24b6e..32964c7 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -157,6 +157,7 @@
- #define ID_AA64ISAR0_AES_SHIFT		4
- 
- /* id_aa64pfr0 */
-+#define ID_AA64PFR0_RAS_SHIFT		28
- #define ID_AA64PFR0_GIC_SHIFT		24
- #define ID_AA64PFR0_ASIMD_SHIFT		20
- #define ID_AA64PFR0_FP_SHIFT		16
-@@ -165,6 +166,7 @@
- #define ID_AA64PFR0_EL1_SHIFT		4
- #define ID_AA64PFR0_EL0_SHIFT		0
- 
-+#define ID_AA64PFR0_RAS_V1		0x1
- #define ID_AA64PFR0_FP_NI		0xf
- #define ID_AA64PFR0_FP_SUPPORTED	0x0
- #define ID_AA64PFR0_ASIMD_NI		0xf
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index abda8e8..b0fb81e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -98,6 +98,7 @@
- };
- 
- static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_RAS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
-@@ -860,6 +861,16 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.min_field_value = 0,
- 		.matches = has_no_fpsimd,
- 	},
-+	{
-+		.desc = "ARM64 RAS Extension Support",
-+		.capability = ARM64_HAS_RAS_EXTN,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64PFR0_RAS_SHIFT,
-+		.min_field_value = ID_AA64PFR0_RAS_V1,
-+	},
- 	{},
- };
- 
+cristian.birsan at microchip.com writes:
+> From: Cristian Birsan <cristian.birsan@microchip.com>
+>
+> Check fifo configuration values against device tree values for endpoint fifo
+> in auto configuration mode (fifo_mode=0).
+>
+> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+> ---
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 24 ++++++++++++++++++++++--
+>  1 file changed, 22 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index 2035906b..3fd43fb 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -2118,14 +2118,34 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>  			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
+>  			goto err;
+>  		}
+> -		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
+> +		if (fifo_mode) {
+> +			if (val < udc->fifo_cfg[i].fifo_size) {
+> +				dev_warn(&pdev->dev,
+> +					 "of_probe: fifo-size table value not supported by HW, using DT value\n");
+
+114 characters long. Is this even worth a warning? probably not.
+
 -- 
-1.8.3.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/354868fe/attachment-0001.sig>
