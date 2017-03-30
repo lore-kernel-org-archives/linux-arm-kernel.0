@@ -1,39 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 17:26:05 +0200
-Subject: [GIT PULL] ARM: mvebu: soc for v4.12 (#1)
-In-Reply-To: <5870357.rnziWtROX5@wuerfel> (Arnd Bergmann's message of "Thu, 30
- Mar 2017 17:10:21 +0200")
-References: <87k27ebncc.fsf@free-electrons.com> <5870357.rnziWtROX5@wuerfel>
-Message-ID: <87a882air6.fsf@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 30 Mar 2017 17:39:27 +0200
+Subject: next-20170330 build: 2 failures 8 warnings (next-20170330)
+In-Reply-To: <20170330150742.wflswzqhg53mozx2@sirena.org.uk>
+References: <E1ctZXC-0008DB-4g@optimist>
+ <20170330150742.wflswzqhg53mozx2@sirena.org.uk>
+Message-ID: <20170330173927.5665a0da@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On jeu., mars 30 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+Hi Mark,
 
-> On Friday, March 24, 2017 6:23:31 PM CEST Gregory CLEMENT wrote:
->> mvebu soc for 4.12 (part 1)
->> 
->> Update maintainer entry for Dove by adding more files
->> 
->> ----------------------------------------------------------------
->> Geert Uytterhoeven (1):
->>       MAINTAINERS: Add file patterns for dove device tree bindings
->> 
->
-> I tend to put maintainer file updates into next/fixes-non-critical,
-> so that's where I ended up putting this one as well.
+On Thu, 30 Mar 2017 16:07:42 +0100
+Mark Brown <broonie@kernel.org> wrote:
 
-OK I will use a fixes-non-critical branch for next changes in the
-MAINTAINERS file.
+> On Thu, Mar 30, 2017 at 01:50:39PM +0100, Build bot for Mark Brown wrote:
+> 
+> Today's -next fails to build an ARM allmodconfig due to:
+> 
+> > 	arm-allmodconfig
+> > ../drivers/mtd/nand/atmel/nand-controller.c:2126:25: error: 'atmel_nc_id_table' undeclared here (not in a function)
+> > ../include/linux/module.h:212:27: error: '__mod_of__atmel_nc_id_table_device_table' aliased to undefined symbol 'atmel_nc_id_table'  
+> 
+> caused by d09703f9459c94c78e029 (mtd: nand: Cleanup/rework the
+> atmel_nand driver), it tries to export atmel_nc_id_table as the DT ID
+> table but the variable is called atmel_nand_controller_of_ids. 
 
-Thanks,
+Pushed a fixed version to nand/next.
 
-Gregory
+Thanks for the report.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Boris
