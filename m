@@ -1,51 +1,41 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 30 Mar 2017 17:04:25 +0200
-Subject: [GIT PULL] ARM: OXNAS SoC update for 4.12
-In-Reply-To: <CAK8P3a0uexaSYw_Wnim3-00=Zn8Bn85nfpTrKzgRoBY+NUhr+w@mail.gmail.com>
-References: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
- <7432624.QZN9TsYLQF@wuerfel>
- <CAK8P3a0uexaSYw_Wnim3-00=Zn8Bn85nfpTrKzgRoBY+NUhr+w@mail.gmail.com>
-Message-ID: <1f3fc8db-d87b-57e9-3eee-a21c969c6b54@baylibre.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 30 Mar 2017 17:05:57 +0200
+Subject: [PATCH v4 0/6] initialize dtsi file and dts file for RK3328 SoCs
+In-Reply-To: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
+References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
+Message-ID: <20170330150557.znttalrsxpnmccx6@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2017 05:03 PM, Arnd Bergmann wrote:
-> On Thu, Mar 30, 2017 at 4:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Monday, March 20, 2017 10:39:56 AM CEST Neil Armstrong wrote:
->>> Dear arm-soc maintainers,
->>>
->>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->>>
->>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->>>
->>> are available in the git repository at:
->>>
->>>   https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.12
->>>
->>> for you to fetch changes up to b44327d198b4f1bbebaf83f714cde450471de644:
->>>
->>>   ARM: oxnas: remove redundant select CPU_V6K (2017-03-20 10:13:45 +0100)
->>>
->>> ----------------------------------------------------------------
->>> - Fix OX820 Kconfig
->>>
->>
->> I've merged this into next/fixes-non-critical. Thanks,
+On Mon, Mar 27, 2017 at 05:40:45PM +0800, cl at rock-chips.com wrote:
+> From: Liang Chen <cl@rock-chips.com>
 > 
-> BTW, it took 20 minutes to pull this branch from github.com, possibly they
-> had moved this to cold storage. Are you able to migrate your git tree to
-> kernel.org or host it yourself on baylibre.com in the future?
+> Changes in v4:
+>     Remove some assigned-clocks as they should be inited in their
+>     respective device nodes.
 > 
-> It's not urgent, but the delay was rather annoying and I had already
-> given up and applied the patch manually when the pull finally succeeded.
+> Changes in v3:
+>     Adjust some descriptions in dtsi.
 > 
->        Arnd
+> Changes in v2:
+>     Remove RK_FUNC_* in dtsi as it dose not help understand things better.
+>     Adjust the order of description in dt-bindings.
 > 
+> v1:
+> These patchs depend on pinctrl patchs as below:
 
-Hi Arnd,
+Why didn't you renumber the patches? I and probably others wondered
+where and what patch 2 is and why it could be missing. I recall now that
+I applied it already. Other maintainers don't have that knowledge. Also,
+since I applied your patch, no need for me or the i2c-list to be on CC.
 
-Sorry for the inconvenience, I'll request an account on kernel.org to avoid further
-issues.
+Please no "quick fixes" when sending out patch series. I know it is
+tempting but it usually creates confusion.
 
-Thanks,
-Neil
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/a5c34961/attachment.sig>
