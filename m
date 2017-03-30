@@ -1,150 +1,96 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 30 Mar 2017 17:56:30 +0100
-Subject: [PATCH v2 2/4] iommu/arm-smmu: Tidy up context bank indexing
-In-Reply-To: <cover.1490890890.git.robin.murphy@arm.com>
-References: <cover.1490890890.git.robin.murphy@arm.com>
-Message-ID: <331119ede82f893a5f032a7b322ad5bae0c73548.1490890890.git.robin.murphy@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 30 Mar 2017 10:02:55 -0700
+Subject: [RFC v2][PATCH 01/11] Introduce rare_write() infrastructure
+In-Reply-To: <466B31B4-0535-44EE-B0F0-F758A79A7B4F@gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-2-git-send-email-keescook@chromium.org>
+ <CAGXu5jJuuUSwS61d7Joc=6y2BUyTo6koEsrVxeqMu_u7j9Mb9w@mail.gmail.com>
+ <466B31B4-0535-44EE-B0F0-F758A79A7B4F@gmail.com>
+Message-ID: <CAGXu5j+ym33s=nUqmpViR0UJrHo6Bu7+LxsMtvKgvpOzhYxXkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_AMMU_CB() is calculated relative to ARM_SMMU_CB_BASE(), but the
-latter is never of use on its own, and what we end up with is the same
-ARM_SMMU_CB_BASE() + ARM_AMMU_CB() expression being duplicated at every
-callsite. Folding the two together gives us a self-contained context
-bank accessor which is much more pleasant to work with.
+On Thu, Mar 30, 2017 at 12:44 AM, Ho-Eun Ryu <hoeun.ryu@gmail.com> wrote:
+>
+>> On 30 Mar 2017, at 3:23 AM, Kees Cook <keescook@chromium.org> wrote:
+>>
+>> On Wed, Mar 29, 2017 at 11:15 AM, Kees Cook <keescook@chromium.org> wrote:
+>>> +/*
+>>> + * Build "write rarely" infrastructure for flipping memory r/w
+>>> + * on a per-CPU basis.
+>>> + */
+>>> +#ifndef CONFIG_HAVE_ARCH_RARE_WRITE
+>>> +# define __wr_rare
+>>> +# define __wr_rare_type
+>>> +# define __rare_write(__var, __val)    (__var = (__val))
+>>> +# define rare_write_begin()            do { } while (0)
+>>> +# define rare_write_end()              do { } while (0)
+>>> +#else
+>>> +# define __wr_rare                     __ro_after_init
+>>> +# define __wr_rare_type                        const
+>>> +# ifdef CONFIG_HAVE_ARCH_RARE_WRITE_MEMCPY
+>>> +#  define __rare_write_n(dst, src, len)        ({                      \
+>>> +               BUILD_BUG(!builtin_const(len));                 \
+>>> +               __arch_rare_write_memcpy((dst), (src), (len));  \
+>>> +       })
+>>> +#  define __rare_write(var, val)  __rare_write_n(&(var), &(val), sizeof(var))
+>>> +# else
+>>> +#  define __rare_write(var, val)  ((*(typeof((typeof(var))0) *)&(var)) = (val))
+>>> +# endif
+>>> +# define rare_write_begin()    __arch_rare_write_begin()
+>>> +# define rare_write_end()      __arch_rare_write_end()
+>>> +#endif
+>>> +#define rare_write(__var, __val) ({                    \
+>>> +       rare_write_begin();                             \
+>>> +       __rare_write(__var, __val);                     \
+>>> +       rare_write_end();                               \
+>>> +       __var;                                          \
+>>> +})
+>>> +
+>>
+>> Of course, only after sending this do I realize that the MEMCPY case
+>> will need to be further adjusted, since it currently can't take
+>> literals. I guess something like this needs to be done:
+>>
+>> #define __rare_write(var, val) ({ \
+>>    typeof(var) __src = (val);     \
+>>    __rare_write_n(&(var), &(__src), sizeof(var)); \
+>> })
+>>
+>
+> Right, and it has a problem with BUILD_BUG, which causes compilation error when CONFIG_HABE_ARCH_RARE_WRITE_MEMCPY is true
+> BUILD_BUG is defined in <linux/bug.h> but <linux/bug.h> includes <linux/compiler.h>
+>
+> Please see the following.
+>
+> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+> index 3334fa9..3fa50e1 100644
+> --- a/include/linux/compiler.h
+> +++ b/include/linux/compiler.h
+> @@ -350,11 +350,11 @@ static __always_inline void __write_once_size(volatile vo\
+> id *p, void *res, int s
+>  # define __wr_rare                     __ro_after_init
+>  # define __wr_rare_type                        const
+>  # ifdef CONFIG_HAVE_ARCH_RARE_WRITE_MEMCPY
+> -#  define __rare_write_n(dst, src, len)        ({                      \
+> -               BUILD_BUG(!builtin_const(len));                         \
+> -               __arch_rare_write_memcpy((dst), (src), (len));   \
+> +#  define __rare_write_n(var, val, len)        ({                                 \
+> +               typeof(val) __val = val;                                                    \
+> +               __arch_rare_write_memcpy(&(var), &(__val), (len));      \
+>         })
+> -#  define __rare_write(var, val)  __rare_write_n(&(var), &(val), sizeof(var))
+> +#  define __rare_write(var, val)  __rare_write_n((var), (val), sizeof(var))
+>  # else
+>  #  define __rare_write(var, val)  ((*(typeof((typeof(var))0) *)&(var)) = (val)\
+> )
+>  # endif
 
-Secondly, we might as well simplify CB_BASE itself at the same time.
-We use the address space size for its own sake precisely once, at probe
-time, and every other usage is to dynamically calculate CB_BASE over
-and over and over again. Let's flip things around so that we just
-maintain the CB_BASE address directly.
+Thanks for the catch, I'll update this (I'll use compiletime_assert,
+which is defined in compiler.h).
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+-Kees
 
-v2: No change
-
- drivers/iommu/arm-smmu.c | 29 ++++++++++++++---------------
- 1 file changed, 14 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 34b745bf59f2..e79b623f9165 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -216,8 +216,7 @@ enum arm_smmu_s2cr_privcfg {
- #define CBA2R_VMID_MASK			0xffff
- 
- /* Translation context bank */
--#define ARM_SMMU_CB_BASE(smmu)		((smmu)->base + ((smmu)->size >> 1))
--#define ARM_SMMU_CB(smmu, n)		((n) * (1 << (smmu)->pgshift))
-+#define ARM_SMMU_CB(smmu, n)	((smmu)->cb_base + ((n) << (smmu)->pgshift))
- 
- #define ARM_SMMU_CB_SCTLR		0x0
- #define ARM_SMMU_CB_ACTLR		0x4
-@@ -344,7 +343,7 @@ struct arm_smmu_device {
- 	struct device			*dev;
- 
- 	void __iomem			*base;
--	unsigned long			size;
-+	void __iomem			*cb_base;
- 	unsigned long			pgshift;
- 
- #define ARM_SMMU_FEAT_COHERENT_WALK	(1 << 0)
-@@ -603,7 +602,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- 	void __iomem *base;
- 
- 	if (stage1) {
--		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+		base = ARM_SMMU_CB(smmu, cfg->cbndx);
- 		writel_relaxed(cfg->asid, base + ARM_SMMU_CB_S1_TLBIASID);
- 	} else {
- 		base = ARM_SMMU_GR0(smmu);
-@@ -623,7 +622,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 	void __iomem *reg;
- 
- 	if (stage1) {
--		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+		reg = ARM_SMMU_CB(smmu, cfg->cbndx);
- 		reg += leaf ? ARM_SMMU_CB_S1_TLBIVAL : ARM_SMMU_CB_S1_TLBIVA;
- 
- 		if (cfg->fmt != ARM_SMMU_CTX_FMT_AARCH64) {
-@@ -642,7 +641,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 			} while (size -= granule);
- 		}
- 	} else if (smmu->version == ARM_SMMU_V2) {
--		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+		reg = ARM_SMMU_CB(smmu, cfg->cbndx);
- 		reg += leaf ? ARM_SMMU_CB_S2_TLBIIPAS2L :
- 			      ARM_SMMU_CB_S2_TLBIIPAS2;
- 		iova >>= 12;
-@@ -672,7 +671,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	void __iomem *cb_base;
- 
--	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
- 	fsr = readl_relaxed(cb_base + ARM_SMMU_CB_FSR);
- 
- 	if (!(fsr & FSR_FAULT))
-@@ -725,7 +724,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 
- 	gr1_base = ARM_SMMU_GR1(smmu);
- 	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
--	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
- 
- 	if (smmu->version > ARM_SMMU_V1) {
- 		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH64)
-@@ -1007,7 +1006,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 	 * Disable the context bank and free the page tables before freeing
- 	 * it.
- 	 */
--	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
- 	writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
- 
- 	if (cfg->irptndx != INVALID_IRPTNDX) {
-@@ -1358,7 +1357,7 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
- 	u64 phys;
- 	unsigned long va;
- 
--	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
-+	cb_base = ARM_SMMU_CB(smmu, cfg->cbndx);
- 
- 	/* ATS1 registers can only be written atomically */
- 	va = iova & ~0xfffUL;
-@@ -1685,7 +1684,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
- 	for (i = 0; i < smmu->num_context_banks; ++i) {
--		cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, i);
-+		cb_base = ARM_SMMU_CB(smmu, i);
- 		writel_relaxed(0, cb_base + ARM_SMMU_CB_SCTLR);
- 		writel_relaxed(FSR_FAULT, cb_base + ARM_SMMU_CB_FSR);
- 		/*
-@@ -1865,11 +1864,11 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 
- 	/* Check for size mismatch of SMMU address space from mapped region */
- 	size = 1 << (((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
--	size *= 2 << smmu->pgshift;
--	if (smmu->size != size)
-+	size <<= smmu->pgshift;
-+	if (smmu->cb_base != gr0_base + size)
- 		dev_warn(smmu->dev,
- 			"SMMU address space size (0x%lx) differs from mapped region size (0x%lx)!\n",
--			size, smmu->size);
-+			size * 2, (smmu->cb_base - gr0_base) * 2);
- 
- 	smmu->num_s2_context_banks = (id >> ID1_NUMS2CB_SHIFT) & ID1_NUMS2CB_MASK;
- 	smmu->num_context_banks = (id >> ID1_NUMCB_SHIFT) & ID1_NUMCB_MASK;
-@@ -2105,7 +2104,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 	smmu->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(smmu->base))
- 		return PTR_ERR(smmu->base);
--	smmu->size = resource_size(res);
-+	smmu->cb_base = smmu->base + resource_size(res) / 2;
- 
- 	num_irqs = 0;
- 	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, num_irqs))) {
 -- 
-2.11.0.dirty
+Kees Cook
+Pixel Security
