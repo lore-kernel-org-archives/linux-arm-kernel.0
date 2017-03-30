@@ -1,66 +1,73 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 30 Mar 2017 09:16:29 -0700
-Subject: [kernel-hardening] [RFC v2][PATCH 02/11] lkdtm: add test for
- rare_write() infrastructure
-In-Reply-To: <1490866441.10874.44.camel@hellion.org.uk>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-3-git-send-email-keescook@chromium.org>
- <1490866441.10874.44.camel@hellion.org.uk>
-Message-ID: <CAGXu5jLMKA3OwshsQn4yc1eXFwSuD3xbaYY56RY_Uu3TBAWG3A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Mar 2017 18:18:08 +0200
+Subject: [PATCH v3 1/7] pinctrl: dt-bindings: Add documentation for Armada
+ 37xx pin controllers
+In-Reply-To: <20170329211105.ype3os6jldsjyrqa@rob-hp-laptop> (Rob Herring's
+ message of "Wed, 29 Mar 2017 16:11:05 -0500")
+References: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
+ <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1490282185.git-series.gregory.clement@free-electrons.com>
+ <20170329211105.ype3os6jldsjyrqa@rob-hp-laptop>
+Message-ID: <87d1cy91rz.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 2:34 AM, Ian Campbell <ijc@hellion.org.uk> wrote:
-> On Wed, 2017-03-29 at 11:15 -0700, Kees Cook wrote:
->> diff --git a/drivers/misc/lkdtm_perms.c b/drivers/misc/lkdtm_perms.c
->> index c7635a79341f..8fbadfa4cc34 100644
->> --- a/drivers/misc/lkdtm_perms.c
->> +++ b/drivers/misc/lkdtm_perms.c
->> [...]
->> +/* This is marked __wr_rare, so it should ultimately be .rodata. */
->> +static unsigned long wr_rare __wr_rare = 0xAA66AA66;
->> [...]
->> +void lkdtm_WRITE_RARE_WRITE(void)
->> +{
->> +     /* Explicitly cast away "const" for the test. */
+Hi Rob,
+ 
+ On mer., mars 29 2017, Rob Herring <robh@kernel.org> wrote:
+
+>> +GPIO subnode:
+>> +
+>> +Please refer to gpio.txt in this directory for details of gpio-ranges property
+>> +and the common GPIO bindings used by client devices.
+>> +
+>> +Required properties for gpio driver under the gpio subnode:
 >
-> wr_rare isn't actually declared const above though? I don't think
-> __wr_rare includes a const, apologies if I missed it.
+> Why does this need to be a sub node? You should probably have a 
+> compatible if it is.
 
-Yeah, good point. I think this was a left-over from an earlier version
-where I'd forgotten about that detail.
+It is needed to be able to have a phandle associated to the gpio. Then
+the other node can refer to it.
 
-> OOI, if wr_rare _were_ const then can the compiler optimise the a pair
-> of reads spanning the rare_write? i.e. adding const to the declaration
-> above to get:
+But if we can do without it I would happy to do it.
+
+
 >
->     static const unsigned long wr_rare __wr_rare = 0xAA66AA66;
-> x = wr_read;
-> rare_write(x, 0xf000baaa);
-> y = wr_read;
+>> +- interrupts: List of interrupt specifier for the controllers interrupt.
+>> +- gpio-controller: Marks the device node as a gpio controller.
+>> +- #gpio-cells: Should be 2. The first cell is the GPIO number and the
+>> +   second cell specifies GPIO flags, as defined in
+>> +   <dt-bindings/gpio/gpio.h>. Only the GPIO_ACTIVE_HIGH and
+>> +   GPIO_ACTIVE_LOW flags are supported.
+>> +- gpio-ranges: Range of pins managed by the GPIO controller.
+>> +
+>> +Xtal Clock bindings for Marvell Armada 37xx SoCs
+>> +------------------------------------------------
+>> +
+>> +see Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+>> +
+>> +
+>> +Example:
+>> +pinctrl_sb: pinctrl-sb at 18800 {
 >
-> Is it possible that x == y == 0xaa66aa66 because gcc realises the x and
-> y came from the same const location? Have I missed a clobber somewhere
-> (I can't actually find a definition of __arch_rare_write_memcpy in this
-> series so maybe it's there), or is such code expected to always cast
-> away the const first?
+> pinctrl@
+
+OK
+
 >
-> I suppose such constructs are rare in practice in the sorts of places
-> where rare_write is appropriate, but with aggressive inlining it could
-> occur as an unexpected trap for the unwary perhaps.
+>> +	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
+>> +	reg = <0x18800 0x100>, <0x18C00 0x20>;
+>> +	gpiosb: gpiosb {
+>
+> gpio@
 
-Right, __wr_rare is actually marked as .data..ro_after_init, which gcc
-effectively ignores (thinking it's part of .data), but the linker
-script later movies this section into the read-only portion with
-.rodata. As a result, the compiler treats it as writable, but the
-storage location is actually read-only.
+There is no reg property so we don't use the @
 
-(And, AIUI, the constify plugin makes things read-only in a similar
-way, though I think it's more subtle but still avoids the
-const-optimization dangers.)
+Thanks,
 
--Kees
+Gregory
 
 -- 
-Kees Cook
-Pixel Security
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
