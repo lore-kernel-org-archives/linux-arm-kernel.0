@@ -1,67 +1,33 @@
-From: majun258@huawei.com (majun (Euler7))
-Date: Thu, 30 Mar 2017 12:08:39 +0800
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <58DC7674.8020301@linaro.org>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
- <20170329123821.GA10988@red-moon> <58DBAFD6.7070300@linaro.org>
- <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
- <20170329161354.GC11297@red-moon> <20170329173243.GA6091@red-moon>
- <58DC7674.8020301@linaro.org>
-Message-ID: <58DC84C7.5050608@huawei.com>
+From: markivx@codeaurora.org (Vikram Mulukutla)
+Date: Wed, 29 Mar 2017 21:12:23 -0700
+Subject: spin_lock behavior with ARM64 big.Little/HMP
+In-Reply-To: <f17207e7-e58c-2e42-04a8-50ed83a9616f@arm.com>
+References: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
+ <8d9d6333-0ebe-65c4-c6f1-3e3475e3e535@arm.com>
+ <f9fc9549d801fece7422d97d5d89df8b@codeaurora.org>
+ <f17207e7-e58c-2e42-04a8-50ed83a9616f@arm.com>
+Message-ID: <537888bcf5dd5ea3c3418fc9e9e3ff79@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all:
 
-? 2017/3/30 11:07, Hanjun Guo ??:
-> On 03/30/2017 01:32 AM, Lorenzo Pieralisi wrote:
->> On Wed, Mar 29, 2017 at 05:13:54PM +0100, Lorenzo Pieralisi wrote:
->>> On Wed, Mar 29, 2017 at 03:52:47PM +0100, Marc Zyngier wrote:
->>>> On 29/03/17 14:00, Hanjun Guo wrote:
->>>>> On 03/29/2017 08:38 PM, Lorenzo Pieralisi wrote:
->>>>>> On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
->>>>>>> Hi Lorenzo,
->>>>>>>
->>>>>>> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
->>>>>>>> Hi Hanjun, Marc,
->>>>>>>>
->>>>>>>> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
-> [...]
->>>>>>>>>    drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
->>>>>>>>>    drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
-[...]
->>>>
->>>> Thoughts?
->>>
->>> Perfect for me. Hanjun, I can cherry pick Marc's patch above, rework
->>> this patch and post the resulting branch for everyone to have a final
->>> test.
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/arm64-acpi-4.12
->>
->> Please have a look and let me know if that's ok, I planned to send
->> a PR to Catalin by the end of the week (first 7 patches up to
->> 7fc3061df075 ("ACPI: platform: setup MSI domain for ACPI based platform
->> device")).
-> 
-> Perfect for me too, Lorenzo, Marc, Thank you very much.
-> 
-> I'm currently in paternity leave and can't reach the machine,
-> I had a detail review with the patches, they looks good to me,
-> Ma Jun and Wei Xu will test on Hisilicon machines and give the
-> feedback.
-
-The sas/xge/uart are working fine on my hisilicon board with
-Lorenzo's branch (arm64-acpi-4.12)
-
-Thanks
-Majun
+Hi Sudeep,
 
 > 
-> Thanks
-> Hanjun
-> 
-> .
-> 
+> Interesting. Just curious if this is r0p0/p1 A53 ? If so, is the errata
+> 819472 enabled ?
+
+Sorry for bringing this up after the loo-ong delay, but I've been 
+assured that the A53 involved is > r0p1. I've also confirmed this 
+problem on multiple internal platforms, and I'm pretty sure that it 
+occurs on any b.L out there today. Also, we found the same problematic 
+lock design used in the workqueue code in the kernel, causing the same 
+livelock. It's very very rare and requires a perfect set of 
+circumstances.
+
+If it would help I can provide a unit test if you folks would be 
+generous enough to test it on the latest Juno or something b.L that's 
+also upstream.
+
+Thanks,
+Vikram
