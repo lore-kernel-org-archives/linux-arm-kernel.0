@@ -1,42 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 17:29:47 +0200
-Subject: [GIT PULL 1/7] Broadcom soc changes for 4.12
-In-Reply-To: <20170324175807.27272-1-f.fainelli@gmail.com>
-References: <20170324175807.27272-1-f.fainelli@gmail.com>
-Message-ID: <CAK8P3a3qFRKDcCHHxAXBiy-g9-tLJ7j1iVQW_67dLSA3+z2vsA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Mar 2017 17:31:59 +0200
+Subject: [PATCH] ARM: orion5x: only call into phylib when available
+In-Reply-To: <20170328101606.53008-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Tue, 28 Mar 2017 12:15:41 +0200")
+References: <20170328101606.53008-1-arnd@arndb.de>
+Message-ID: <8760iqaihc.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+Hi Arnd,
+ 
+ On mar., mars 28 2017, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> Board code cannot call mdiobus_register_board_info() when phylib
+> or mdio_device is a loadable module:
 >
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
+> :(.init.text+0x474): undefined reference to `mdiobus_register_board_info'
 >
-> are available in the git repository at:
+> I had a number of ideas for how this could be solved, but after the MDIO
+> code got split out from PHYLIB it has gotten too hard, so I'm basically
+> giving up, and only call the mdiobus_register_board_info() function
+> if the MDIO layer is built-in to avoid the link error. This is similar
+> to how we handle PHY registration on other ARM platforms.
 >
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/soc
+> Fixes: 90eff9096c01 ("net: phy: Allow splitting MDIO bus/device support from PHYs")
+> Fixes: 648ea0134069 ("net: phy: Allow pre-declaration of MDIO devices")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Applied on mvebu/fixes
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/mach-orion5x/Kconfig | 1 +
+>  arch/arm/plat-orion/common.c  | 5 +++++
+>  2 files changed, 6 insertions(+)
 >
-> for you to fetch changes up to d47b51ad31e21ab8129da64d42e2fc48e7a215eb:
->
->   ARM: brcmstb: Add entry for 7260 (2017-03-15 14:57:50 -0700)
->
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoC Kconfig/platform changes for
-> 4.12, please pull the following:
->
-> - Al enables ZONE_DMA for BRCMSTB platforms since a bunch of on-chip
->   peripherals such as USB (OHCI and EHCI) and SDHCI cannot support physical
->   addresses > 32-bit. This is only required when ARM_LPAE is enabled
->
-> - Danesh enables ARCH_HAS_HOLES_MEMORYMODEL in order for the kernel to provide
->   a pfn_valid() implementation despite BRCMSTB enabling the SPARSEMEM model by
->   default.
->
-> - Florian adds support for a new 28nm generation chip: 7260 by updating the
->   runtime detection UART debuggin stub used for DEBUG_LL.
+> diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+> index 468b8cb7fd5f..e3429c8c2e38 100644
+> --- a/arch/arm/mach-orion5x/Kconfig
+> +++ b/arch/arm/mach-orion5x/Kconfig
+> @@ -6,6 +6,7 @@ menuconfig ARCH_ORION5X
+>  	select GPIOLIB
+>  	select MVEBU_MBUS
+>  	select PCI
+> +	select PHYLIB if NETDEVICES
+>  	select PLAT_ORION_LEGACY
+>  	help
+>  	  Support for the following Marvell Orion 5x series SoCs:
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 9255b6d67ba5..aff6994950ba 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -468,6 +468,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+>  		    eth_data, &orion_ge11);
+>  }
+>  
+> +#ifdef CONFIG_ARCH_ORION5X
+>  /*****************************************************************************
+>   * Ethernet switch
+>   ****************************************************************************/
+> @@ -480,6 +481,9 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+>  	struct mdio_board_info *bd;
+>  	unsigned int i;
+>  
+> +	if (!IS_BUILTIN(CONFIG_PHYLIB))
+> +		return;
+> +
+>  	for (i = 0; i < ARRAY_SIZE(d->port_names); i++)
+>  		if (!strcmp(d->port_names[i], "cpu"))
+>  			break;
+> @@ -493,6 +497,7 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+>  
+>  	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+>  }
+> +#endif
+>  
+>  /*****************************************************************************
+>   * I2C
+> -- 
+> 2.9.0
 >
 
-I tried pulling this, but github appears to be particularly slow today, so
-I deferred all your branches for the moment. We'll get there.
-
-       Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
