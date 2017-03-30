@@ -1,69 +1,73 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 30 Mar 2017 09:33:32 -0700
-Subject: [PATCH v3 0/6] bus: brcmstb_gisb: add support for GISBv7 arbiter
-In-Reply-To: <20170330002914.7371-1-opendmb@gmail.com>
-References: <20170330002914.7371-1-opendmb@gmail.com>
-Message-ID: <c3182c24-2245-cf2e-32e4-248b8046a30f@gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 30 Mar 2017 17:38:45 +0100
+Subject: [PATCH 0/4] Add hstate parameter to huge_pte_offset()
+Message-ID: <20170330163849.18402-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2017 05:29 PM, Doug Berger wrote:
-> This patch set contains changes to enable the GISB arbiter driver
-> on the latest ARM64 architecture Set-Top Box chips from Broadcom.
-> 
-> Since the ARM64 architecture does not support the hooking of low
-> level fault handlers the driver has been adjusted to depend solely
-> on GISB interrupts and notify events to provide diagnostic
-> messaging.  The GISB hardware still triggers bus faults for the
-> processor so the default low-level aborts will occur and will be
-> handled based on the architecture specific kernel implementation.
-> 
-> While this tends to obsure the GISB error messaging it is still
-> reasonable so the same approach is applied to the ARM architecture
-> for consistency.
-> 
-> The patches also correct some issues with the existing driver
-> and add the new register map for the GISBv7 hardware first
-> appearing in the BCM7278 device.
+On architectures that support hugepages composed of contiguous pte(s)
+as well as block entries at the same level in the page table,
+huge_pte_offset() is not able to determine the correct offset to
+return when it encounters a swap entry (which is used to mark poisoned
+as well as migrated pages in the page table).
 
-This all looks great to me, and since there are no more ARM64
-dependencies I can take this via the Broadcom ARM/ARM64 SoC pull requests.
+huge_pte_offset() needs to know the size of the hugepage at the
+requested address to determine the offset to return - the current
+entry or the first entry of a set of contiguous hugepages. This came
+up while enabling support for memory failure handling on arm64 (Patch
+3-4 add this support and are included here for completeness).
 
-Mark, are you also happy with this v3?
+Patch 1 adds a hstate parameter to huge_pte_offset() to provide
+additional information about the target address. It also updates the
+signatures (and usage) of huge_pte_offset() for architectures that
+override the generic implementation.
 
-Thanks Doug!
+Patch 2 uses the size determined by the parameter added in Patch 1, to
+return the correct page table offset in the arm64 implementation of
+huge_pte_offset().
 
-> 
-> Changes since v2 at [2]:
->  - Removed code associated with enabling the hooking of ARM64
->    memory faults as well as the code that hooks them for both
->    ARM and ARM64 architectures within the GISB arbiter driver.
->  - Created separate notifiers for die and panic events to
->    prevent list corruption, and substituted the notifier return
->    name for the previous magic number (Thanks Mark!)
-> 
-> Changes since v1 at [1]:
->  - Removed code associated with hooking SError handling in favor
->    of a registered notifier (Thanks Mark!)
->  - Removed an unnecessary explicit cast (Thanks Gregory!)
-> 
-> [1] https://lkml.org/lkml/2017/3/24/413
-> [2] https://lkml.org/lkml/2017/3/28/1125
-> 
-> Doug Berger (6):
->   bus: brcmstb_gisb: Use register offsets with writes too
->   bus: brcmstb_gisb: correct support for 64-bit address output
->   bus: brcmstb_gisb: add notifier handling
->   bus: brcmstb_gisb: remove low-level ARM hooks
->   bus: brcmstb_gisb: enable driver for ARM64 architecture
->   bus: brcmstb_gisb: update to support new revision
-> 
->  .../devicetree/bindings/bus/brcm,gisb-arb.txt      |   3 +-
->  drivers/bus/Kconfig                                |   2 +-
->  drivers/bus/brcmstb_gisb.c                         | 121 ++++++++++++---------
->  3 files changed, 75 insertions(+), 51 deletions(-)
-> 
+The patchset is based on top of v4.11-rc4 and the arm64 huge page
+cleanup for break-before-make[0]. Previous posting can be found at
+[1].
 
+Changes RFC -> v1
+
+* Fixed a missing conversion of huge_pte_offset() prototype to add
+  hstate parameter. Reported by 0-day.
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/497027.html
+[1] https://lkml.org/lkml/2017/3/23/293
+
+
+Jonathan (Zhixiong) Zhang (2):
+  arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+  arm64: kconfig: allow support for memory failure handling
+
+Punit Agrawal (2):
+  mm/hugetlb.c: add hstate parameter to huge_pte_offset()
+  arm64: hugetlbpages: Correctly handle swap entries in
+    huge_pte_offset()
+
+ arch/arm64/Kconfig            |  1 +
+ arch/arm64/mm/fault.c         | 22 +++++++++++++++++++---
+ arch/arm64/mm/hugetlbpage.c   | 34 ++++++++++++++++++----------------
+ arch/ia64/mm/hugetlbpage.c    |  4 ++--
+ arch/metag/mm/hugetlbpage.c   |  3 ++-
+ arch/mips/mm/hugetlbpage.c    |  3 ++-
+ arch/parisc/mm/hugetlbpage.c  |  3 ++-
+ arch/powerpc/mm/hugetlbpage.c |  2 +-
+ arch/s390/mm/hugetlbpage.c    |  3 ++-
+ arch/sh/mm/hugetlbpage.c      |  3 ++-
+ arch/sparc/mm/hugetlbpage.c   |  3 ++-
+ arch/tile/mm/hugetlbpage.c    |  3 ++-
+ arch/x86/mm/hugetlbpage.c     |  2 +-
+ drivers/acpi/apei/Kconfig     |  1 +
+ fs/userfaultfd.c              |  7 +++++--
+ include/linux/hugetlb.h       |  5 +++--
+ mm/hugetlb.c                  | 21 ++++++++++++---------
+ mm/page_vma_mapped.c          |  3 ++-
+ mm/pagewalk.c                 |  2 +-
+ 19 files changed, 80 insertions(+), 45 deletions(-)
 
 -- 
-Florian
+2.11.0
