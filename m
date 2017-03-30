@@ -1,96 +1,173 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 30 Mar 2017 08:29:34 +0100
-Subject: [kvmtool PATCH v9 06/15] PCI: Only allocate IRQ routing entry
- when available
-In-Reply-To: <6371fdda-bdd5-2aa0-de8c-4f97953ee326@arm.com> (=?utf-8?Q?=22?=
- =?utf-8?Q?Andr=C3=A9?=
- Przywara"'s message of "Wed, 29 Mar 2017 21:44:47 +0100")
-References: <20170202163223.15372-1-andre.przywara@arm.com>
- <20170202163223.15372-7-andre.przywara@arm.com>
- <d26dea9f-386b-316c-a2b3-d42ea1883997@arm.com>
- <6371fdda-bdd5-2aa0-de8c-4f97953ee326@arm.com>
-Message-ID: <87k277ql29.fsf@on-the-bus.cambridge.arm.com>
+From: xiaolong.ye@intel.com (Ye Xiaolong)
+Date: Thu, 30 Mar 2017 15:29:08 +0800
+Subject: [kbuild-all] [PATCH v4 13/22] KVM: arm64: ITS:
+ KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
+In-Reply-To: <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
+References: <201703272354.OaYhCMvV%fengguang.wu@intel.com>
+ <0d43e874-c443-7d55-b741-ce27bd103cb5@redhat.com>
+ <20170330022159.GB15042@yexl-desktop>
+ <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
+Message-ID: <20170330072908.GA21772@yexl-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29 2017 at  9:44:47 pm BST, Andr? Przywara <andre.przywara@arm.com> wrote:
-> Hi Marc,
+On 03/30, Auger Eric wrote:
+>Hi Xiaolong
 >
-> thanks for having a look!
->
-> On 29/03/17 09:30, Marc Zyngier wrote:
->> On 02/02/17 16:32, Andre Przywara wrote:
->>> If we need to inject an MSI into the guest, we rely at the moment on a
->>> working GSI MSI routing functionality. However we can get away without
->>> IRQ routing, if the host supports MSI injection via the KVM_SIGNAL_MSI
->>> ioctl.
->>> So we try the GSI routing first, but if that fails due to a missing
->>> IRQ routing functionality, we fall back to KVM_SIGNAL_MSI (if that is
->>> supported).
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  virtio/pci.c | 16 ++++++++++++++--
->>>  1 file changed, 14 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/virtio/pci.c b/virtio/pci.c
->>> index 7cc0ba4..98bf6b7 100644
->>> --- a/virtio/pci.c
->>> +++ b/virtio/pci.c
->>> @@ -193,8 +193,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
->>>  
->>>  			gsi = irq__add_msix_route(kvm,
->>>  						  &vpci->msix_table[vec].msg);
->>> -			if (gsi >= 0)
->>> +			if (gsi >= 0) {
->>>  				vpci->config_gsi = gsi;
->>> +				break;
->>> +			}
->>> +			if (gsi == -ENXIO &&
->>> +			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
->>> +					break;
->>> +			die("failed to configure MSIs");
->>>  			break;
->>>  		case VIRTIO_MSI_QUEUE_VECTOR:
->>>  			vec = ioport__read16(data);
->>> @@ -205,8 +211,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
->>>  
->>>  			gsi = irq__add_msix_route(kvm,
->>>  						  &vpci->msix_table[vec].msg);
->>> -			if (gsi < 0)
->>> +			if (gsi < 0) {
->>> +				if (gsi == -ENXIO &&
->>> +				    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
->>> +					break;
->>> +
->>> +				die("failed to configure MSIs");
->>>  				break;
->>> +			}
->>>  			vpci->gsis[vpci->queue_selector] = gsi;
+>On 30/03/2017 04:21, Ye Xiaolong wrote:
+>> Hi, Eric
 >> 
->> Is it really expected to find -ENXIO in this array instead of a GSI?
+>> On 03/27, Auger Eric wrote:
+>>> Hi,
+>>>
+>>> On 27/03/2017 17:04, kbuild test robot wrote:
+>>>> Hi Eric,
+>>>>
+>>>> [auto build test ERROR on kvmarm/next]
+>>>> [also build test ERROR on v4.11-rc4 next-20170327]
+>>>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>>>>
+>>>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/vITS-save-restore/20170327-195443
+>>>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
+>>>> config: arm64-defconfig (attached as .config)
+>>>> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+>>>> reproduce:
+>>>>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>>>>         chmod +x ~/bin/make.cross
+>>>>         # save the attached .config to linux build tree
+>>>>         make.cross ARCH=arm64 
+>>>>
+>>>> All errors (new ones prefixed by >>):
+>>>>
+>>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c: In function 'vgic_its_has_attr':
+>>>>>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: error: 'its' undeclared (first use in this function)
+>>>>       return vgic_its_table_restore(its);
+>>>
+>>> I think this is due to the fact the series is applied on KVM: arm/arm64:
+>>> Emulate the EL1 phys timer registers (kvmarm-for-4.11).
+>>>
+>>> Please apply it to (kvmarm/queue, kvmarm/next, kvm_next) KVM: arm/arm64:
+>>> vgic: Improve sync_hwstate performance  (255905e)
+>>> I also checked it compiles on 4.11-rc4.
+>> 
+>> Hmm, we did apply your series on top of kvarm/next, judging from the function
+>> code below, I can't see the 'its' declaration. 
+>> 
+>> static int vgic_its_has_attr(struct kvm_device *dev,
+>>                              struct kvm_device_attr *attr)
+>> {
+>>         switch (attr->group) {
+>>         case KVM_DEV_ARM_VGIC_GRP_ADDR:
+>>                 switch (attr->attr) {
+>>                 case KVM_VGIC_ITS_ADDR_TYPE:
+>>                         return 0;
+>>                 }
+>>                 break;
+>>         case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>>                 switch (attr->attr) {
+>>                 case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>>                         return 0;
+>>                 }
+>>                 break;
+>>         case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
+>>                 u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+>>                 u64 reg;
+>> 
+>>                 if (get_user(reg, uaddr))
+>>                         return -EFAULT;
+>> 
+>>                 return vgic_its_attr_regs_access(dev, attr, &reg, true);
+>>         }
+>>         case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
+>>                 if (attr->attr)
+>>                         return -EINVAL;
+>>                 return vgic_its_table_restore(its);
+>The above code shows that my series is not correctly applied since that
+>call to vgic_its_table_restore() should normally be in
+>vgic_its_set_attr() and not in vgic_its_has_attr() function
+>(virt/kvm/arm/vgic-its.c).
 >
-> Not sure I get this "in this array" comment here. Any negative return
-> value ends up in a break, without writing it anywhere.
-> Later on we check for VIRTIO_PCI_F_SIGNAL_MSI first before referencing
-> the array. This is admittedly a bit convoluted.
-> So shall I add comments here? Or rewrite the if statement to make this
-> more obvious?
 
-Ah! Of course you're right, I completely misread the code. Maybe indeed
-rewriting a bit to make it more obvious:
+Er, you are right, the real problem here seems we had a rather old kvmarm/next mirror
+at the time 0day applied your series.
 
-	if (gsi == -ENXIO && vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
-		break;
-        if (gsi < 0) {
-        	die("failed to configure MSIs");
-                break
-        }
-
-which is closer to the first.
+Thanks for the clarification and sorry for the noise.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Xiaolong
+>I pushed this series applied on top of up to date kvmarm/next at
+>https://github.com/eauger/linux/tree/v4.11-rc3-its-mig-v4.
+>
+>As noticed earlier, the series is applied on top of 255905e (KVM:
+>arm/arm64: vgic: Improve sync_hwstate performance)
+>
+>Thanks
+>
+>Eric
+>
+>
+>>         }
+>>         return -ENXIO;
+>> }
+>> 
+>> Thanks,
+>> Xiaolong
+>> 
+>>>
+>>> Please let me know if I got something wrong.
+>>>
+>>> Thanks
+>>>
+>>> Eric
+>>>>                                     ^~~
+>>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: note: each undeclared identifier is reported only once for each function it appears in
+>>>>
+>>>> vim +/its +1766 arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c
+>>>>
+>>>>   1750			case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>>>>   1751				return 0;
+>>>>   1752			}
+>>>>   1753			break;
+>>>>   1754		case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
+>>>>   1755			u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+>>>>   1756			u64 reg;
+>>>>   1757	
+>>>>   1758			if (get_user(reg, uaddr))
+>>>>   1759				return -EFAULT;
+>>>>   1760	
+>>>>   1761			return vgic_its_attr_regs_access(dev, attr, &reg, true);
+>>>>   1762		}
+>>>>   1763		case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
+>>>>   1764			if (attr->attr)
+>>>>   1765				return -EINVAL;
+>>>>> 1766			return vgic_its_table_restore(its);
+>>>>   1767		}
+>>>>   1768		return -ENXIO;
+>>>>   1769	}
+>>>>   1770	
+>>>>   1771	static int vgic_its_set_attr(struct kvm_device *dev,
+>>>>   1772				     struct kvm_device_attr *attr)
+>>>>   1773	{
+>>>>   1774		struct vgic_its *its = dev->private;
+>>>>
+>>>> ---
+>>>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>>>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>>
+>>> _______________________________________________
+>>> kbuild-all mailing list
+>>> kbuild-all at lists.01.org
+>>> https://lists.01.org/mailman/listinfo/kbuild-all
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> 
