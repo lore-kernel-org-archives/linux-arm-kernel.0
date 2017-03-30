@@ -1,26 +1,59 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 30 Mar 2017 13:09:04 +0200
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
-Message-ID: <dcbf9767-d0bc-03f2-3664-7fd74b96969c@free.fr>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Mar 2017 13:13:03 +0200
+Subject: [PATCH/RFC v2 0/2] arm64: dts: r8a7795: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <1490870898.3471.3.camel@collabora.co.uk>
+References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
+ <1490870898.3471.3.camel@collabora.co.uk>
+Message-ID: <CAMuHMdV+=pNpFO7H3J0=JM1BnXtm4t=Q+1bx=R+f9=JxvJZT_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/2017 14:05, Mason wrote:
+Hi Sjoerd,
 
-> +/*
-> + * This should probably be module_platform_driver ?
-> + */
-> +builtin_platform_driver(tango_pcie_driver);
+On Thu, Mar 30, 2017 at 12:48 PM, Sjoerd Simons
+<sjoerd.simons@collabora.co.uk> wrote:
+> On Fri, 2017-03-24 at 14:37 +0100, Geert Uytterhoeven wrote:
+>> This patch series adds preliminary support for Renesas Salvator-X
+>> development boards equipped with revision ES2.0 of the R-Car H3 Soc.
+>>
+>>   - Patch 1 adds support for the R-Car H3 ES2.0 Soc,
+>>     While this patch is safe as-is, as it doesn't affect any existing
+>>     setups, it's probably a bit premature to apply it.
+>>   - Patch 2 adds support for Salvator-X boards with R-Car H3 ES2.0.
+>>     This patch does affect existing development setups, as it changes
+>> the
+>>     name of the DTB for Salvator-X boards equipped with ES1.x SoCs.
+>>     Given most developers have access to ES1.x only, this patch must
+>> not be
+>>     applied yet.
+>
+> Would it make more sense to add a new r8a7795-es2.dtsi and keep the
+> current dtsi for es1? Having to load different device-trees based on
+> which kernel is used would be rather nasty.
 
-For the sake of completeness,
+We definitely considered that option.
+However, we concluded that in the end, we want to mainly support production
+SoCs.  Hence the default files should represent the production version.
+Using a preproduction SoC can be considered a special case, and thus needs
+a file with a special esX ID in its name.
 
-ERROR: "pci_ecam_map_bus" [drivers/pci/host/pcie-tango.ko] undefined!
-ERROR: "pci_host_common_probe" [drivers/pci/host/pcie-tango.ko] undefined!
+We do realize this can cause some inconveniences during the transition period,
+when most developers don't have access to ES2.0 SoCs yet, or have mixed
+environments of ES1.x and ES2.0.
 
-The two above functions are currently not exported to modules.
+Of course you can keep on using the current DTB (binary) on your H3 ES1.x
+boards, as long as you don't need to use devices not yet described in that DTB.
 
-I don't know whether this is intentional.
+Thanks!
 
-Regards.
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
