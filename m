@@ -1,151 +1,58 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Thu, 30 Mar 2017 13:33:49 +0200
-Subject: [PATCH 3/3] ARM: dts: ARTPEC-6: Add pinctrl configuration
-Message-ID: <20170330113349.GG29118@axis.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Thu, 30 Mar 2017 07:42:12 -0400
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+ <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
+ <20170323105727.GA2441@red-moon>
+ <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+ <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
+ <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
+ <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
+ <20170330100524.GA22801@red-moon>
+ <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+Message-ID: <0c8ba1ac389560358458c10915d85526@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the pinctrl driver for ARTPEC-6 in the artpec6.dtsi
-with all main pinmux functions.
-Add pinctrl information to the relevant (uart) nodes.
+On 2017-03-30 06:09, Ard Biesheuvel wrote:
+> On 30 March 2017 at 11:05, Lorenzo Pieralisi 
+> <lorenzo.pieralisi@arm.com> wrote:
+>> On Thu, Mar 30, 2017 at 09:46:39AM +0100, Ard Biesheuvel wrote:
+>> 
+>> [...]
+>> 
+>>> > I'm asking why we don't fix the actual problem in PCIe ARM64 adaptation instead
+>>> > of working around it by quirks.
+>>> >
+>>> > I don't see any reason why ACPI ARM64 should carry the burden of legacy systems.
+>>> >
+>>> > Legacy only applies to DT based systems.
+>>> >
+>>> 
+>>> I fully agree with this point: ACPI implies firmware, and so we 
+>>> should
+>>> be able to rely on firmware to have initialized the PCIe subsystem by
+>>> the time the kernel gets to access it.
+>> 
+>> https://lkml.org/lkml/2016/3/3/458
+>> 
+> 
+> I don't think the fact that at least one system existed over a year
+> ago whose UEFI assigned resources incorrectly should prevent us from
+> being normative in this case.
 
-Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
----
- arch/arm/boot/dts/artpec6.dtsi | 87 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 87 insertions(+)
+My suggestion is to try to reuse the resources if possible. Otherwise, 
+reassign the resources.
 
-diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
-index 767cbe8..471eaee 100644
---- a/arch/arm/boot/dts/artpec6.dtsi
-+++ b/arch/arm/boot/dts/artpec6.dtsi
-@@ -181,6 +181,85 @@
- 		status = "disabled";
- 	};
- 
-+	pinctrl: pinctrl at f801d000 {
-+		compatible = "axis,artpec6-pinctrl";
-+		reg = <0xf801d000 0x400>;
-+
-+		pinctrl_uart0: uart0grp {
-+			function = "uart0";
-+			groups = "uart0grp1";
-+			bias-pull-up;
-+		};
-+		pinctrl_uart1: uart1grp {
-+			function = "uart1";
-+			groups = "uart1grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_uart2: uart2grp {
-+			function = "uart2";
-+			groups = "uart2grp1";
-+			bias-pull-up;
-+		};
-+		pinctrl_uart3: uart3grp {
-+			function = "uart3";
-+			groups = "uart3grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_uart4: uart4grp {
-+			function = "uart4";
-+			groups = "uart4grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_uart5: uart5grp {
-+			function = "uart5";
-+			groups = "uart5grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_i2c1: i2c1grp {
-+			function = "i2c1";
-+			groups = "i2c1grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_i2c2: i2c2grp {
-+			function = "i2c2";
-+			groups = "i2c2grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_i2c3: i2c3grp {
-+			function = "i2c3";
-+			groups = "i2c3grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_i2s0: i2s0grp {
-+			function = "i2s0";
-+			groups = "i2s0grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_i2s1: i2s1grp {
-+			function = "i2s1";
-+			groups = "i2s1grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_spi0: spi0grp {
-+			function = "spi0";
-+			groups = "spi0grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_spi1: spi1grp {
-+			function = "spi1";
-+			groups = "spi1grp0";
-+			bias-pull-up;
-+		};
-+		pinctrl_sdio0: sdio0grp {
-+			function = "sdio0";
-+			groups = "sdio0grp0";
-+		};
-+		pinctrl_sdio1: sdio1grp {
-+			function = "sdio1";
-+			groups = "sdio1grp0";
-+		};
-+	};
-+
- 	amba at 0 {
- 		compatible = "simple-bus";
- 		#address-cells = <0x1>;
-@@ -214,6 +293,8 @@
- 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
- 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
- 			clock-names = "uart_clk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart0>;
- 			status = "disabled";
- 		};
- 		uart1: serial at f8037000 {
-@@ -223,6 +304,8 @@
- 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
- 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
- 			clock-names = "uart_clk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart1>;
- 			status = "disabled";
- 		};
- 		uart2: serial at f8038000 {
-@@ -232,6 +315,8 @@
- 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
- 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
- 			clock-names = "uart_clk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart2>;
- 			status = "disabled";
- 		};
- 		uart3: serial at f8039000 {
-@@ -241,6 +326,8 @@
- 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
- 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
- 			clock-names = "uart_clk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart3>;
- 			status = "disabled";
- 		};
- 	};
--- 
-2.1.4
+There were implementation problems by the time you proposed your patch 
+and it was delaying progess. That was my objection.
 
-Reply-To: 
+Now that base pci support is in and everybody is  somewhat happy, let's 
+figure out the bugs and get this done.
 
-
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+I am ready to test/debug.
