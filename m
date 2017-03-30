@@ -1,101 +1,190 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 30 Mar 2017 11:07:32 +0800
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <20170329173243.GA6091@red-moon>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
- <20170329123821.GA10988@red-moon> <58DBAFD6.7070300@linaro.org>
- <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
- <20170329161354.GC11297@red-moon> <20170329173243.GA6091@red-moon>
-Message-ID: <58DC7674.8020301@linaro.org>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Thu, 30 Mar 2017 08:51:21 +0530
+Subject: [RFC PATCH] of: Fix DMA configuration for non-DT masters
+In-Reply-To: <b02ace9b-f8f3-269d-6db4-3c1b1ea1e816@arm.com>
+References: <67d1f46172599be243405f4341665fd0ef9ab969.1490726288.git.robin.murphy@arm.com>
+ <CAMSpPPfJKKRkuDKxUgVBdg7vp7Ux5=PiHSxnMLc7-LMcCSatzg@mail.gmail.com>
+ <CAMSpPPcSWxua_6ECZd4iEbTiAYk-KtapBDcOUxNdGaQkFF-LOQ@mail.gmail.com>
+ <b02ace9b-f8f3-269d-6db4-3c1b1ea1e816@arm.com>
+Message-ID: <CAMSpPPfw3+vDoD_rJD9Ny=kUtXf2v6Fm6Qksi=K=OEhfVNYy1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2017 01:32 AM, Lorenzo Pieralisi wrote:
-> On Wed, Mar 29, 2017 at 05:13:54PM +0100, Lorenzo Pieralisi wrote:
->> On Wed, Mar 29, 2017 at 03:52:47PM +0100, Marc Zyngier wrote:
->>> On 29/03/17 14:00, Hanjun Guo wrote:
->>>> On 03/29/2017 08:38 PM, Lorenzo Pieralisi wrote:
->>>>> On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
->>>>>> Hi Lorenzo,
->>>>>>
->>>>>> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
->>>>>>> Hi Hanjun, Marc,
->>>>>>>
->>>>>>> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
-[...]
->>>>>>>>    drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
->>>>>>>>    drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
->>>>>>>>    include/linux/acpi_iort.h                     |  5 +++++
->>>>>>>>    3 files changed, 31 insertions(+), 1 deletion(-)
->>>>>>>
->>>>>>> To simplify merging ACPI/IRQCHIP changes via different trees it
->>>>>>> would be good to split this patch; I am not sure what's the best
->>>>>>> way of handling it though given that we would end up in a merge
->>>>>>> ordering dependency anyway (ie we can create an empty stub
->>>>>>> for iort_pmsi_get_dev_id() but that would create a dependency
->>>>>>> between ARM64 and irqchip trees anyway).
->>>>>>
->>>>>> The first 12 patches for ACPI platform MSI and later 3 patches
->>>>>> for mbigen have no "physical" dependency, which means they can
->>>>>> be merged and compiled independently, they only have functional
->>>>>> dependency only.
->>>>>>
->>>>>> We already had SAS, XGE, USB and even UART drivers depend on
->>>>>> the mbigen ACPI support, so I don't think the dependency of ACPI
->>>>>> platform MSI and mbigen patches cares much if those two parts are
->>>>>> merged in one merge window, even they are merged independently via
->>>>>> different tree.
->>>>>>
->>>>>>>
->>>>>>> Please let me know what's your preferred way of handling this.
->>>>>>
->>>>>> So in my opinion, they can be merged independently via ARM64 and
->>>>>> irqchip tree with no ordering dependency, is it OK?
->>>>>
->>>>> I am speaking about merging MBIgen AND ITS patches via IRQCHIP and
->>>>> ACPI/IORT for ARM64, that's why I replied to this patch. I do not
->>>>> think that's feasible to split patches in two separate branches
->>>>> without having a dependency between them.
->>>>>
->>>>> Sure, the last three patches can go via IRQCHIP but that was not
->>>>> my question :)
+On Wed, Mar 29, 2017 at 11:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 29/03/17 06:46, Oza Oza wrote:
+>> On Wed, Mar 29, 2017 at 10:23 AM, Oza Oza <oza.oza@broadcom.com> wrote:
+>>> On Wed, Mar 29, 2017 at 12:27 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>> For PCI masters not represented in DT, we pass the OF node of their
+>>>> associated host bridge to of_dma_configure(), such that they can inherit
+>>>> the appropriate DMA configuration from whatever is described there.
+>>>> Unfortunately, whilst this has worked for the "dma-coherent" property,
+>>>> it turns out to miss the case where the host bridge node has a non-empty
+>>>> "dma-ranges", since nobody is expecting the 'device' to be a bus itself.
 >>>>
->>>> Sorry, I misunderstood that :(
+>>>> It transpires, though, that the de-facto interface since the prototype
+>>>> change in 1f5c69aa51f9 ("of: Move of_dma_configure() to device.c to help
+>>>> re-use") is very clear-cut: either the master_np argument is redundant
+>>>> with dev->of_node, or dev->of_node is NULL and master_np is the relevant
+>>>> parent bus. Let's ratify that behaviour, then teach the whole
+>>>> of_dma_configure() pipeline to cope with both cases properly.
 >>>>
->>>> Since it's not feasible to split patches, the best way I got is that
->>>> we get Marc's ack then merge it.
+>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>
+> [...]
+>
 >>>
->>> I believe there is a way to make this work without too much hassle. I
->>> suggest we drop the ITS change from this patch entirely, and I instead
->>> queue this patch:
+>>> pci and memory mapped device world is different.
+>
+> ???
+>
+> No they aren't. There is nothing magic about PCI. PCI *is* a
+> memory-mapped bus.
+>
+> The only PCI-specific aspect here is the Linux code path which passes a
+> host controller node into of_dma_configure() where the latter expects a
+> node for the actual endpoint device. It managed to work for
+> "dma-coherent", because that may appear either directly on a device node
+> or on any of its parent buses, but "dma-ranges" is *only* valid for DT
+> nodes representing buses, thus reveals that using a parent bus to stand
+> in for a device isn't actually correct. I only posted that horrible hack
+> patch to prove the point that having a child node to represent the
+> actual device is indeed sufficient to make of_dma_configure() work
+> correctly for PCI masters as-is (modulo the other issues).
+>
+>> of course if you talk
+>>> from iommu perspective, all the master are same for IOMMU
+>
+> I don't understand what you mean by that. There's nothing about IOMMUs
+> here, it's purely about parsing DT properties correctly.
+>
+>>> but the original intention of the patch is to try to solve 2 problems.
+>>> please refer to https://lkml.org/lkml/2017/3/29/10
+>
+> One patch should not solve two separate problems anyway. Taking a step
+> back, there are at least 3 things that this discussion has brought up:
+>
+> 1) The way in which we call of_dma_configure() for PCI devices causes
+> the "dma-ranges" property on PCI host controllers to be ignored.
+>
+> 2) of_dma_get_range() only considers the first entry in any "dma-ranges"
+> property.
+>
+> 3) When of_dma_configure() does set a DMA mask, there is nothing on
+> arm64 and other architectures to prevent drivers overriding that with a
+> wider mask later.
+>
+> Those are 3 separate problems, to solve with 3 or more separate patches,
+> and I have deliberately put the second and third to one side for the
+> moment. This patch fixes problem 1.
+>
+>>> 1) expose generic API for pci world clients to configure their
+>>> dma-ranges. right now there is none.
+>>> 2) same API can be used by IOMMU to derive dma_mask.
 >>>
->>> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.12&id=e6db07d0f3b6da1f8cfd485776bfefa4fcdbfc45
+>>> while the current patch posted to handle dma-ranges for both memory
+>>> mapped and pci devices, which I think is overdoing.
+>
+> No, of_dma_configure() handles the "dma-ranges" property as it is
+> defined in the DT spec to describe the mapping between a child bus
+> address space and a parent bus address space. Whether those
+> memory-mapped parent and child buses are PCI, ISA, AMBA, HyperTransport,
+> or anything else is irrelevant other than for the encoding of the
+> address specifiers. All this patch does is sort out the cases where we
+> have a real device node to start at, from the cases where we don't and
+> so start directly at the device's parent bus node instead.
+>
+>>> besides we have different configuration of dma-ranges based on iommu
+>>> is enabled or not enabled.
+>
+> That doesn't sound right, unless you mean the firmware actually programs
+> the host controller's AXI bridge differently for system configurations
+> where the IOMMU is expected to be used or not? (and even then, I don't
+> really see why it would be necessary to do that...)
+>
+>>>  #define PCIE_DMA_RANGES dma-ranges = <0x43000000 0x00 0x80000000 0x00
+>>> 0x80000000 0x00 0x80000000 \
+>>>                                       0x43000000 0x08 0x00000000 0x08
+>>> 0x00000000 0x08 0x00000000 \
+>>>                                       0x43000000 0x80 0x00000000 0x80
+>>> 0x00000000 0x40 0x00000000>;
+>>> Not sure if this patch will consider above dma-ranges.
 >>>
->>> That way, no dependency between the two trees. Lorenzo takes all the
->>> patches flagged "ACPI", I take all those flagged "irqchip" or "msi", and
->>> everything should be perfectly standalone.
+>>> my suggestion is to leave existing of_dma_get_range as is, and have
+>>> new function for pci world as discussed in
+>>> please refer to https://lkml.org/lkml/2017/3/29/10
+>
+> And then we keep adding new functions to do the exact same thing for
+> every other discoverable bus type whose bridge is be described in DT? I
+> fail to see how that is in any way better than simply fixing the
+> existing code to work as it was intended to.
+>
+> of_dma_get_ranges() uses of_translate_dma_address() just the same way as
+> existing PowerPC PCI code does, which further disproves your assertion
+> that parsing PCI addresses is somehow special - it's really only a
+> matter of getting the right number of address cells in order to to read
+> a child address to give to of_translate_dma_address() in the first
+> place. Incidentally, I now notice that the proposed
+> of_pci_get_dma_ranges() is incomplete as it doesn't use
+> of_translate_dma_address() or otherwise traverse upwards through the
+> dma-ranges of any further parent buses.
+>
 >>>
->>> Thoughts?
+>>> Regards,
+>>> Oza.
 >>
->> Perfect for me. Hanjun, I can cherry pick Marc's patch above, rework
->> this patch and post the resulting branch for everyone to have a final
->> test.
+>> also I see that, in case of multiple ranges of_dma_get_range doesnt handle that.
+>> and also it is not meant to handle.
 >
-> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/arm64-acpi-4.12
+> Yes, the existing code doesn't handle multiple dma-ranges entries,
+> because nobody's had the need to implement that so far, and this patch
+> does not change that because it's fixing a separate problem.
 >
-> Please have a look and let me know if that's ok, I planned to send
-> a PR to Catalin by the end of the week (first 7 patches up to
-> 7fc3061df075 ("ACPI: platform: setup MSI domain for ACPI based platform
-> device")).
+> Now, of course of_dma_get_range() *should* be capable of handling
+> multiple entries regardless of this patch, and I'm going to write *that*
+> patch right now (it's going to be a case of adding a handful of lines
+> which probably won't even conflict with this one at all). If we had a
+> bunch of different range parsing functions, we'd then have to duplicate
+> the equivalent logic across all of them, which is clearly undesirable
+> when it can easily be avoided altogether.
+>
+> Robin.
+>
+>> so with this patch will return wrong size and hence wrong dma_mask.
+>> having said, I think it is better to separate pci world dma-ranges
+>> function on of_pci.c
+>>
+>> for which my discussion with Rob already, (same thread)
+>> https://lkml.org/lkml/2017/3/29/10
+>> Waiting for Rob's viewpoint on this.
+>>
+>>
+>> Regards,
+>> Oza.
+>>
+>
 
-Perfect for me too, Lorenzo, Marc, Thank you very much.
+In my opinion NAKing to this, because
 
-I'm currently in paternity leave and can't reach the machine,
-I had a detail review with the patches, they looks good to me,
-Ma Jun and Wei Xu will test on Hisilicon machines and give the
-feedback.
+1) some reasons already mentioned in https://lkml.org/lkml/2017/3/29/10
 
-Thanks
-Hanjun
+2) also of_dma_get_range is supposed to handle traditional dma-ranges
+(not pci one)
+
+3) we need separate function for pci users such as iproc or rcar SOCs
+to have their dma-ranges parsed,
+which can be extended later for e.g. pci flags have some meanings.
+
+besides of_dma_configure is written to pass only single out parameter
+(..., *dma_addr, *size)
+handling multiple ranges here, and passing only one range out is not desirable.
+
+also you would not like to handle pci flags (the first portion of DT
+entry) in this function if required in future.
+
+this new function will be similar to of_pci_get_host_bridge_resources
+https://lkml.org/lkml/2017/3/29/10
+which I am writing/improving right now..
+
+
+Regards,
+Oza.
