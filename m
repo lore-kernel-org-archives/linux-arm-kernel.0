@@ -1,89 +1,32 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 30 Mar 2017 17:43:30 +0100
-Subject: KVM/ARM: sleeping function called from invalid context
-In-Reply-To: <7047d954-5c43-600a-3511-4c7dbd60c175@arm.com>
-References: <20170330143112.GI16211@leverpostej>
- <20170330152955.GJ16211@leverpostej>
- <e25e57ee-5ba5-4343-ed4e-aad6f4e665b4@arm.com>
- <7047d954-5c43-600a-3511-4c7dbd60c175@arm.com>
-Message-ID: <3f857347-8132-52d8-7263-ea79b40938b1@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 30 Mar 2017 11:47:32 -0500
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
+ interface
+In-Reply-To: <20170328144543.GA18046@red-moon>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
+ <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
+ <20170328144543.GA18046@red-moon>
+Message-ID: <20170330164732.GA8437@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/17 17:40, Suzuki K Poulose wrote:
-> On 30/03/17 16:41, Marc Zyngier wrote:
->> On 30/03/17 16:29, Mark Rutland wrote:
->>> On Thu, Mar 30, 2017 at 03:31:12PM +0100, Mark Rutland wrote:
->>>> Hi,
->>>>
->>>> I'm seeing the splat below when running KVM on an arm64 host with
->>>> CONFIG_DEBUG_ATOMIC_SLEEP and CONFIG_LOCKDEP enabled.
->>>>
->>>> I saw this on v4.11-rc1, and I can reproduce the problem on the current
->>>> kvmarm master branch (563e2f5daa66fbc1).
->>>>
->>>> I've hacked noinlines into arch/arm/kvm/mmu.c in an attempt to get a
->>>> better backtrace; without this, the report says the call is at
->>>> arch/arm/kvm/mmu.c:299, which is somewhat confusing.
->>>
->>> Looking again, that initial kernel was not a vanilla v4.11-rc1, and I am
->>> *not* able to reproduce this issue with a vanilla v4.11-rc1.
->>>
->>> I believe I had applied an earlier fix for the locking issue Suzuki
->>> recently addressed, which was why my line numbers were off.
->>>
->>> I *can* trigger this issue with the current kvmarm master, and the log I
->>> posted is valid.
->>>
->>> Sorry for the bogus info; I will be more careful next time.
->>
->> No worries, thanks Mark.
->>
->> So here's my (very) superficial analysis of the issue:
->> - Memory pressure, we try to swap out something
->> - try_to_unmap_one takes a spinlock (via page_vma_mapped_walk)
->> - MMU notifier kick in with the spinlock held
->> - we take kvm->mmu_lock
->> - in unmap_stage2_range, we do a cond_resched_lock(kvm->mmu_lock)
->> - we still hold the page_vma_mapped_walk spinlock, might_sleep screams
->
-> Correct.
->
->>
->> I can see multiple ways of doing this:
->> 1) We track that we're coming via an MMU notifier, and don't call
->> cond_resched_lock() in that case
->> 2) We get rid of cond_resched_lock()
->> 3) we have a different code path for the MMU notifier that doesn't
->> involve cond_resched_lock().
->>
->> Only (1) vaguely appeals to me, and I positively hate (3). We could
->> revert to (2), but it is likely to be helpful when tearing down large
->> ranges.
->>
->> Another possibility is that the might_sleep() warning is just spurious,
->> and I think that Suzuki has a theory...
->
-> So the cond_resched_lock() thinks that it could drop the lock and do a sched.
-> So it issues __might_sleep(PREEMPT_LOCK_OFFSET) to make sure the preempt_count
-> is as if there is only one {i.e, this} spin_lock preventing the preemption, and
-> it could drop the lock after verifying should_resched(PREEMPT_LOCK_OFFSET) (and bit more
-> other checks) turns true. But since we are holding two spin_locks in this rare path,
-> the preempt_offset is PREEMPT_LOCK_OFFSET + 1 (as we do preempt_count_inc for each
-> lock).
->
-> Now, ___might_sleep() checks if the preempt_count exactly matches the passed count, using
-> preempt_count_equals(), and goes ahead to complain if it doesn't, even if the preempt_count
-> is greater than the passed count, in which case the should_resched() should deny the schedule
-> operation and we skip it. So, I think, ___might_sleep should really check
-> if (preempt_count >= preempt_offset) to scream about it, of course making sure that the callers
+On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
+> On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
+> > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
 
-s/to scream/not to scream/
+> > >  #define ioremap_uc ioremap_uc
+> > > +#define ioremap_nopost ioremap_nocache
+> > 
+> > These are all the same as the default from asm-generic.h.  Do we really
+> > need these definitions in alpha, avr32, frv, ia64, x86?
+> 
+> Those arches do not include asm-generic.h (I suppose for a good reason)
 
-> honoring the same case.
->
-> To summarise, since we do have two locks held, we won't be able to reschedule in this case
-> but the might_sleep screams even if we are safe.
->
+OK, that explains it.  I'm not at all sure there's a good reason for
+those arches not using asm-generic.h, but I haven't looked at the code
+to see.
 
-> Suzuki
+> but a definition is needed anyway if we want code using ioremap_nopost()
+> to be unconditional. This is one way of doing it, there are others not
+> sure they are any better, I am open to suggestions.
