@@ -1,59 +1,41 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 30 Mar 2017 09:46:21 -0600
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Mar 2017 16:47:59 +0100
 Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
-In-Reply-To: <20170330015941.GD3038@leoy-linaro>
+In-Reply-To: <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
 References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
  <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
- <20170328165010.GA21937@linaro.org>
- <20170329015423.GA5035@leoy-linaro> <20170329165535.GB24889@linaro.org>
- <20170330015941.GD3038@leoy-linaro>
-Message-ID: <CANLsYkwPYSvy2xjf8uuvx1WGWpGdMFy7kF=30VbvgW+jDvnFuw@mail.gmail.com>
+ <20170328165010.GA21937@linaro.org> <20170329015423.GA5035@leoy-linaro>
+ <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
+Message-ID: <b3bed726-921c-0f5c-8b51-2beaa19921c9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2017 at 19:59, Leo Yan <leo.yan@linaro.org> wrote:
-> On Wed, Mar 29, 2017 at 10:55:35AM -0600, Mathieu Poirier wrote:
->
-> [...]
->
->> > So this is why add "idle_constraint" as a central place to control
->> > power domain for CPU debug purpose and I also think this is more
->> > friendly for hardware design, e.g. some platforms can enable partial
->> > low power states to save power and avoid overheat after using this
->> > driver.
->> >
->> > How about you think for this?
->>
->> Like Sudeep pointed out we should concentrate on doing the right thing,
->> that is work with EDPRSR.PU, EDPRCR.COREPURQ and EDPRCR.CORENPDRQ.
->
-> Agree, and I think we have aligned for this.
->
->> Anything outside of that becomes platform specific and can't be handled in
->> this driver.
->
-> Sorry I argue a bit for this just want to make things more clear and
-> if can have better method.
->
-> Though the issue is platform specific, but the code is to seek common
-> method to handle them. So the driver has no any platform specific code.
 
-Seeking a common way to handle platform specific problems doesn't
-scale and will never be encompassing.  There will always be a quirk
-somewhere to deal with, hence the idea of keeping things separate.
 
->
-> I read again for Suziki's suggestion: "4) Should document the fact that,
-> on some platforms, the user may have to disable CPUidle explicitly to
-> get the driver working. But let us not make it the default. The user
-> with a not so ideal platform could add "nohlt" and get it working."
+On 29/03/17 15:56, Mike Leach wrote:
 
-Suzuki and I are expressing the same view using different words.
+[...]
+> 
+> No - EDPRCR_COREPURQ and EDPRCR_CORENPDRQ have different semantics and purposes
+> 
+> EDPRCR_COREPURQ is in the debug power domain an is tied to an external
+> debug request that should be an input to the external (to the PE)
+> system power controller.
+> The requirement is that the system power controller powers up the core
+> domain and does not power it down while it remains asserted.
+> 
+> EDPRCR_CORENPDRQ is in the core power domain and thus to the specific
+> core only. This ensures that any power control software running on
+> that core should emulate a power down if this is set to one.
+> 
+> We cannot know the power control design of the system, so the safe
+> solution is to set both bits.
+> 
 
->
-> So I'm not strong to resist and if this is alignment yet, I should
-> document well for this but doesn't handle it in driver (keep driver
-> simple).
->
-> Thanks,
-> Leo Yan
++1
+
+I agree that's the safe bet.
+
+-- 
+Regards,
+Sudeep
