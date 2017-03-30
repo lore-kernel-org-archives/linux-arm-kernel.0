@@ -1,82 +1,40 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Thu, 30 Mar 2017 15:44:18 +0530
-Subject: [RFC PATCH 1/3] of/pci: dma-ranges to account highest possible
- host bridge dma_mask
-In-Reply-To: <CAL_JsqLvvc75Z_bk46vQpMJGBiFv1mnEfTRJyNwAboHDyYGYAw@mail.gmail.com>
-References: <1490419893-5073-1-git-send-email-oza.oza@broadcom.com>
- <CAL_JsqLtTiH7DhqKf_x7xy1KZYQyiOreK=M90HFr=8BDW9542w@mail.gmail.com>
- <CAMSpPPdnQdWeyTsnESRFx52gtxQLxwfPQwQgDFSN=katfW7suA@mail.gmail.com>
- <CAL_JsqLvvc75Z_bk46vQpMJGBiFv1mnEfTRJyNwAboHDyYGYAw@mail.gmail.com>
-Message-ID: <CAMSpPPdc2O93DJgKgmZx87CCrEePR9JGoCiLtCFRPJx6UYHrjA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Mar 2017 11:23:54 +0100
+Subject: spin_lock behavior with ARM64 big.Little/HMP
+In-Reply-To: <537888bcf5dd5ea3c3418fc9e9e3ff79@codeaurora.org>
+References: <400ab4b8b2354c5b9283f6ed657363a0@codeaurora.org>
+ <8d9d6333-0ebe-65c4-c6f1-3e3475e3e535@arm.com>
+ <f9fc9549d801fece7422d97d5d89df8b@codeaurora.org>
+ <f17207e7-e58c-2e42-04a8-50ed83a9616f@arm.com>
+ <537888bcf5dd5ea3c3418fc9e9e3ff79@codeaurora.org>
+Message-ID: <e2566794-5818-c42e-ec1b-aa8ac7bc196f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 7:43 PM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Mar 28, 2017 at 12:27 AM, Oza Oza <oza.oza@broadcom.com> wrote:
->> On Mon, Mar 27, 2017 at 8:16 PM, Rob Herring <robh@kernel.org> wrote:
->>> On Sat, Mar 25, 2017 at 12:31 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
->>>> it is possible that PCI device supports 64-bit DMA addressing,
->>>> and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
->>>> however PCI host bridge may have limitations on the inbound
->>>> transaction addressing. As an example, consider NVME SSD device
->>>> connected to iproc-PCIe controller.
->>>>
->>>> Currently, the IOMMU DMA ops only considers PCI device dma_mask
->>>> when allocating an IOVA. This is particularly problematic on
->>>> ARM/ARM64 SOCs where the IOMMU (i.e. SMMU) translates IOVA to
->>>> PA for in-bound transactions only after PCI Host has forwarded
->>>> these transactions on SOC IO bus. This means on such ARM/ARM64
->>>> SOCs the IOVA of in-bound transactions has to honor the addressing
->>>> restrictions of the PCI Host.
->>>>
->>>> current pcie frmework and of framework integration assumes dma-ranges
->>>> in a way where memory-mapped devices define their dma-ranges.
->>>> dma-ranges: (child-bus-address, parent-bus-address, length).
->>>>
->>>> but iproc based SOCs and even Rcar based SOCs has PCI world dma-ranges.
->>>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
->>>
->>> If you implement a common function, then I expect to see other users
->>> converted to use it. There's also PCI hosts in arch/powerpc that parse
->>> dma-ranges.
+
+
+On 30/03/17 05:12, Vikram Mulukutla wrote:
+> 
+> Hi Sudeep,
+> 
 >>
->> the common function should be similar to what
->> of_pci_get_host_bridge_resources is doing right now.
->> it parses ranges property right now.
->>
->> the new function would look look following.
->>
->> of_pci_get_dma_ranges(struct device_node *dev, struct list_head *resources)
->> where resources would return the dma-ranges.
->>
->> but right now if you see the patch, of_dma_configure calls the new
->> function, which actually returns the largest possible size.
->> so this new function has to be generic in a way where other PCI hosts
->> can use it. but certainly iproc(Broadcom SOC) , rcar based SOCs can
->> use it for sure.
->>
->> although having powerpc using it;  is a separate exercise, since I do
->> not have any access to other PCI hosts such as powerpc. but we can
->> workout with them on thsi forum if required.
->
-> You don't need h/w. You can analyze what parts are common, write
-> patches to convert to common implementation, and build test. The PPC
-> and rcar folks can test on h/w.
->
-> Rob
+>> Interesting. Just curious if this is r0p0/p1 A53 ? If so, is the errata
+>> 819472 enabled ?
+> 
+> Sorry for bringing this up after the loo-ong delay, but I've been
+> assured that the A53 involved is > r0p1. I've also confirmed this
+> problem on multiple internal platforms, and I'm pretty sure that it
+> occurs on any b.L out there today. Also, we found the same problematic
+> lock design used in the workqueue code in the kernel, causing the same
+> livelock. It's very very rare and requires a perfect set of circumstances.
+> 
+> If it would help I can provide a unit test if you folks would be
+> generous enough to test it on the latest Juno or something b.L that's
+> also upstream.
+> 
 
+Sure, please do share the unit test. I will give that a try on Juno.
 
-Hi Rob,
-
-I have addressed your comment and made generic function.
-Gentle request to have a look at following approach and patch.
-
-[RFC PATCH 2/2] of/pci: call pci specific dma-ranges instead of memory-mapped.
-[RFC PATCH 1/2] of/pci: implement inbound dma-ranges for PCI
-
-I have tested this on our platform, with and without iommu, and seems to work.
-
-let me know your view on this.
-
+-- 
 Regards,
-Oza.
+Sudeep
