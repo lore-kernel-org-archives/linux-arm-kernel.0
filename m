@@ -1,60 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 16:03:59 +0200
-Subject: [PATCH v9 07/12] ARM: EXYNOS: introduce soc specific pm ops
-In-Reply-To: <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170330131434epcas1p4e42fe06bae3456c39e0f93a2f8ae4bc0@epcas1p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAK8P3a3wTa0ckx3Uo37ptDxQCK_24aDK9dmETtog_qU7VrMygA@mail.gmail.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Thu, 30 Mar 2017 19:34:16 +0530
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <58DAF908.8010404@iogearbox.net>
+References: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
+ <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
+ <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
+ <20170315.145512.1542025976162251828.davem@davemloft.net>
+ <CAHgaXd+4QkFxnt-_iCqH8AyCN_Y8gXwr+y=iugz38NKSWspsbA@mail.gmail.com>
+ <58DAF908.8010404@iogearbox.net>
+Message-ID: <CAHgaXdKfbob3WHMho32JSh_dmfp2A=cjcePqk+NfajVpShPE6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+Thanks Daniel.
 
-> +               .soc_id = "EXYNOS5250",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5260",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5440",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5410",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5420",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5800",
-> +               .data = &exynos_common_s2r_data
+Can you tell me how to test the eBPF JIT compiler? It would be great
+if you could tell me starting from compiling to proper testing.
+Best,
+Shubham Bansal
 
-If these are all the same, just make that soc_id="EXYNOS5*"
-to match them all at once.
 
-> +int __init exynos_s2r_init(void)
-> +{
-> +       const struct soc_device_attribute *match;
-> +
-> +       match = soc_device_match(exynos_soc_revision);
-> +
-> +       if (match)
-> +               s2r_data = (const struct exynos_s2r_data *) match->data;
-> +
-> +       if (!s2r_data)
-> +               return -ENODEV;
-> +
-> +       return 0;
-> +}
-> +arch_initcall(exynos_s2r_init);
-> +
-
-Can you replace the arch_initcall with a direct call from the machine
-init function?
-
-        Arnd
+On Wed, Mar 29, 2017 at 5:30 AM, Daniel Borkmann <daniel@iogearbox.net> wrote:
+> Hi Shubham,
+>
+> On 03/28/2017 10:49 PM, Shubham Bansal wrote:
+> [...]
+>>
+>> Do you have any document to understand the working of tail calls? I
+>> looked at your presentations but it seemed confusing to me. Anything
+>> simple would be great, just about the tail calls. I don't think I need
+>> examples, I can get them from your presentations. I just need a very
+>> general idea. May be you know the code in kernel where it is
+>> implemented.
+>
+>
+> Sure, it's in __bpf_prog_run(), see the JMP_TAIL_CALL (kernel/bpf/core.c
+> +1019).
+> That's effectively what JITs implement. [1] page 3 has a high-level
+> description
+> as well, hope that helps.
+>
+> Thanks,
+> Daniel
+>
+>   [1]
+> http://www.netdevconf.org/1.1/proceedings/papers/On-getting-tc-classifier-fully-programmable-with-cls-bpf.pdf
