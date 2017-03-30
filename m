@@ -1,74 +1,61 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 30 Mar 2017 10:19:40 +0530
-Subject: [PATCH v6 0/4] Broadcom SBA RAID support
-In-Reply-To: <CAALAos-P6CDdWTJxg8YQfT1V+iCxUcbYHiQ35EdZzz9PnN3cuA@mail.gmail.com>
-References: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
- <20170321083052.GY2843@localhost>
- <CAALAos-k_DBYAz49278wBr_GoceOKYVH_UuzTLn1h7QCiUd8pg@mail.gmail.com>
- <20170321091829.GZ2843@localhost>
- <CAALAos-P6CDdWTJxg8YQfT1V+iCxUcbYHiQ35EdZzz9PnN3cuA@mail.gmail.com>
-Message-ID: <20170330044940.GU9308@localhost>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 30 Mar 2017 11:02:41 +0530
+Subject: [PATCH] phy: rockchip-inno-usb2: fix spelling mistake:
+ "connecetd" -> "connected"
+In-Reply-To: <20170222233052.8016-1-colin.king@canonical.com>
+References: <20170222233052.8016-1-colin.king@canonical.com>
+Message-ID: <07c054ae-69bf-6348-b7a6-afa367358ba4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:35:43AM +0530, Anup Patel wrote:
-> On Tue, Mar 21, 2017 at 2:48 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Tue, Mar 21, 2017 at 02:17:21PM +0530, Anup Patel wrote:
-> >> On Tue, Mar 21, 2017 at 2:00 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> >> > On Mon, Mar 06, 2017 at 03:13:24PM +0530, Anup Patel wrote:
-> >> >> The Broadcom SBA RAID is a stream-based device which provides
-> >> >> RAID5/6 offload.
-> >> >>
-> >> >> It requires a SoC specific ring manager (such as Broadcom FlexRM
-> >> >> ring manager) to provide ring-based programming interface. Due to
-> >> >> this, the Broadcom SBA RAID driver (mailbox client) implements
-> >> >> DMA device having one DMA channel using a set of mailbox channels
-> >> >> provided by Broadcom SoC specific ring manager driver (mailbox
-> >> >> controller).
-> >> >>
-> >> >> The Broadcom SBA RAID hardware requires PQ disk position instead
-> >> >> of PQ disk coefficient. To address this, we have added raid_gflog
-> >> >> table which will help driver to convert PQ disk coefficient to PQ
-> >> >> disk position.
-> >> >>
-> >> >> This patchset is based on Linux-4.11-rc1 and depends on patchset
-> >> >> "[PATCH v5 0/2] Broadcom FlexRM ring manager support"
-> >> >
-> >> > Okay I applied and was about to push when I noticed this :(
-> >> >
-> >> > So what is the status of this..?
-> >>
-> >> PATCH2 is Acked but PATCH1 is under-review. Currently, its
-> >> v6 of that patchset.
-> >>
-> >> The only dependency on that patchset is the changes in
-> >> brcm-message.h which are required by this BCM-SBA-RAID
-> >> driver.
-> >>
-> >> @Jassi,
-> >> Can you please have a look at PATCH v6?
-> >
-> > And I would need an immutable branch/tag once merged. I am going to keep
-> > this series pending till then.
+
+
+On Thursday 23 February 2017 05:00 AM, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> The Broadcom FlexRM patchset is pickedup by Jassi and
-> can be found in mailbox-for-next branch of
-> git://git.linaro.org/landing-teams/working/fujitsu/integration
+> trivial fix to spelling mistake in dev_dbg message, also rejoin
+> lines to clean up checkpatch warning
 > 
-> Both patchset (Broadcom FlexRM patchset and this one) are
-> also available in sba-raid-v7 branch of
-> https://github.com/Broadcom/arm64-linux.git
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-Jassi,
+merged, thanks.
 
-Can you provide an immutable branch/tag please for this, latter is
-preferred.
-
-Btw didn't find your tree in MAINTAINERS..
-
+-Kishon
+> ---
+>  drivers/phy/phy-rockchip-inno-usb2.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> Regards,
-> Anup
-
--- 
-~Vinod
+> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
+> index 4ea95c2..761a921 100644
+> --- a/drivers/phy/phy-rockchip-inno-usb2.c
+> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
+> @@ -554,8 +554,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
+>  			case USB_CHG_STATE_DETECTED:
+>  				switch (rphy->chg_type) {
+>  				case POWER_SUPPLY_TYPE_USB:
+> -					dev_dbg(&rport->phy->dev,
+> -						"sdp cable is connecetd\n");
+> +					dev_dbg(&rport->phy->dev, "sdp cable is connected\n");
+>  					rockchip_usb2phy_power_on(rport->phy);
+>  					rport->state = OTG_STATE_B_PERIPHERAL;
+>  					notify_charger = true;
+> @@ -563,16 +562,14 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
+>  					cable = EXTCON_CHG_USB_SDP;
+>  					break;
+>  				case POWER_SUPPLY_TYPE_USB_DCP:
+> -					dev_dbg(&rport->phy->dev,
+> -						"dcp cable is connecetd\n");
+> +					dev_dbg(&rport->phy->dev, "dcp cable is connected\n");
+>  					rockchip_usb2phy_power_off(rport->phy);
+>  					notify_charger = true;
+>  					sch_work = true;
+>  					cable = EXTCON_CHG_USB_DCP;
+>  					break;
+>  				case POWER_SUPPLY_TYPE_USB_CDP:
+> -					dev_dbg(&rport->phy->dev,
+> -						"cdp cable is connecetd\n");
+> +					dev_dbg(&rport->phy->dev, "cdp cable is connected\n");
+>  					rockchip_usb2phy_power_on(rport->phy);
+>  					rport->state = OTG_STATE_B_PERIPHERAL;
+>  					notify_charger = true;
+> 
