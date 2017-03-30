@@ -1,55 +1,115 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:12 +0800
-Subject: [PATCH v3 3/8] arm64: apei: add a per-cpu variable to indecate sei is
- processing
+Date: Thu, 30 Mar 2017 18:31:14 +0800
+Subject: [PATCH v3 5/8] arm64: KVM: add guest SEI support
 In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
 References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-13-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1490869877-118713-15-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a per-cpu variable to indicate sei is processing, with which we could use to
-reserve a separate virtual space address page for sei in next patch
+Add ghes handling for SEI so that the host kernel could parse and
+report detailed error information for SEI which occur in the guest
+kernel.
+
+If there were no CPER records, (or the system doesn't support SEI as a GHES
+notification mechanism), then yes we should still call kvm_inject_vabt().
 
 Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
 ---
- arch/arm64/kernel/traps.c | 4 ++++
- include/acpi/ghes.h       | 2 ++
- 2 files changed, 6 insertions(+)
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/kernel/traps.c            | 14 ++++++++++++++
+ arch/arm64/kvm/handle_exit.c         | 22 ++++++++++++++++++++--
+ 3 files changed, 35 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 5b2cecd..d68d61f 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -59,5 +59,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ #endif	/* __ASSEMBLY__ */
+ 
+ int handle_guest_sea(unsigned long addr, unsigned int esr);
++int handle_guest_sei(unsigned long addr, unsigned int esr);
+ 
+ #endif	/* __ASM_SYSTEM_MISC_H */
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 53710a2..955dc8c 100644
+index 955dc8c..b6d6727 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -615,6 +615,8 @@ const char *esr_get_class_string(u32 esr)
- 	return esr_class_str[ESR_ELx_EC(esr)];
- }
+@@ -618,6 +618,20 @@ const char *esr_get_class_string(u32 esr)
+ DEFINE_PER_CPU(int, sei_in_process);
  
-+DEFINE_PER_CPU(int, sei_in_process);
-+
  /*
++ * Handle asynchronous SError interrupt that occur in a guest kernel.
++ */
++int handle_guest_sei(unsigned long addr, unsigned int esr)
++{
++        int ret = -ENOENT;
++
++        if(IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
++                ret = ghes_notify_sei();
++        }
++
++        return ret;
++}
++
++/*
   * bad_mode handles the impossible case in the exception vector. This is always
   * fatal.
-@@ -632,7 +634,9 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
- 	 */
- 	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI) && ESR_ELx_EC(esr) == ESR_ELx_EC_SERROR) {
-+		this_cpu_inc(sei_in_process);
- 		ghes_notify_sei();
-+		this_cpu_dec(sei_in_process);
+  */
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index fa1b18e..c89d83a 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/system_misc.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -177,6 +178,23 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 	return arm_exit_handlers[hsr_ec];
+ }
+ 
++static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
++
++	if (handle_guest_sei((unsigned long)fault_ipa,
++				kvm_vcpu_get_hsr(vcpu))) {
++		kvm_err("Failed to handle guest SEI, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++				kvm_vcpu_trap_get_class(vcpu),
++				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++				(unsigned long)kvm_vcpu_get_hsr(vcpu));
++
++		kvm_inject_vabt(vcpu);
++	}
++
++	return 0;
++}
++
+ /*
+  * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
+  * proper exit to userspace.
+@@ -200,7 +218,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			*vcpu_pc(vcpu) -= adj;
+ 		}
+ 
+-		kvm_inject_vabt(vcpu);
++		kvm_handle_guest_sei(vcpu, run);
+ 		return 1;
  	}
  
- 	die("Oops - bad mode", regs, 0);
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 10d752e..eed79ea 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -102,4 +102,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
- int ghes_notify_sea(void);
- int ghes_notify_sei(void);
- 
-+DECLARE_PER_CPU(int, sei_in_process);
-+
- #endif /* GHES_H */
+@@ -210,7 +228,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	case ARM_EXCEPTION_IRQ:
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+-		kvm_inject_vabt(vcpu);
++		kvm_handle_guest_sei(vcpu, run);
+ 		return 1;
+ 	case ARM_EXCEPTION_TRAP:
+ 		/*
 -- 
 1.8.3.1
