@@ -1,177 +1,151 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 30 Mar 2017 13:16:24 +0200
-Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
- code
-In-Reply-To: <41097b2c-9bbc-31e4-d17d-8c3f638ec1a6@arm.com>
-References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
- <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
- <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
- <073f1feb-d6da-c93f-8e67-0910befec27b@samsung.com>
- <c13f6475-f503-238f-c101-4f9cdf1b0ae2@arm.com>
- <45fde94b-9487-c28e-9d4e-3b36c4b4a934@samsung.com>
- <CAMuHMdWkOdAD=d0DAy7cJTHcQc7oq5HVDvTNtjfQETMynx1_+g@mail.gmail.com>
- <8dcbb0b3-dd13-d2b3-90f5-64b900d67778@samsung.com>
- <41097b2c-9bbc-31e4-d17d-8c3f638ec1a6@arm.com>
-Message-ID: <bd77ea57-96a8-bbc4-8184-9ddfd443f3c6@samsung.com>
+From: jesper.nilsson@axis.com (Jesper Nilsson)
+Date: Thu, 30 Mar 2017 13:33:49 +0200
+Subject: [PATCH 3/3] ARM: dts: ARTPEC-6: Add pinctrl configuration
+Message-ID: <20170330113349.GG29118@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Enable the pinctrl driver for ARTPEC-6 in the artpec6.dtsi
+with all main pinmux functions.
+Add pinctrl information to the relevant (uart) nodes.
 
-On 30.03.2017 12:44, Robin Murphy wrote:
-> On 30/03/17 09:30, Andrzej Hajda wrote:
->> On 30.03.2017 09:40, Geert Uytterhoeven wrote:
->>> Hi Andrzej,
->>>
->>> On Thu, Mar 30, 2017 at 8:51 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
->>>> On 29.03.2017 17:33, Robin Murphy wrote:
->>>>> On 29/03/17 16:12, Andrzej Hajda wrote:
->>>>>> On 29.03.2017 14:55, Robin Murphy wrote:
->>>>>>> On 29/03/17 11:05, Andrzej Hajda wrote:
->>>>>>>> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
->>>>>>>> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
->>>>>>>> it. In first case temporary pages array is passed to iommu_dma_mmap,
->>>>>>>> in 2nd case single entry sg table is created directly instead
->>>>>>>> of calling helper.
->>>>>>>>
->>>>>>>> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
->>>>>>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
->>>>>>>> ---
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> I am not familiar with this framework so please don't be too cruel ;)
->>>>>>>> Alternative solution I see is to always create vm_area->pages,
->>>>>>>> I do not know which approach is preferred.
->>>>>>>>
->>>>>>>> Regards
->>>>>>>> Andrzej
->>>>>>>> ---
->>>>>>>>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
->>>>>>>>  1 file changed, 38 insertions(+), 2 deletions(-)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>>>>>>> index f7b5401..bba2bc8 100644
->>>>>>>> --- a/arch/arm64/mm/dma-mapping.c
->>>>>>>> +++ b/arch/arm64/mm/dma-mapping.c
->>>>>>>> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->>>>>>>>            return ret;
->>>>>>>>
->>>>>>>>    area = find_vm_area(cpu_addr);
->>>>>>>> -  if (WARN_ON(!area || !area->pages))
->>>>>>>> +  if (WARN_ON(!area))
->>>>>>> >From the look of things, it doesn't seem strictly necessary to change
->>>>>>> this, but whether that's a good thing is another matter. I'm not sure
->>>>>>> that dma_common_contiguous_remap() should really be leaving a dangling
->>>>>>> pointer in area->pages as it apparently does... :/
->>>>>>>
->>>>>>>> +          return -ENXIO;
->>>>>>>> +
->>>>>>>> +  if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
->>>>>>>> +          struct page *page = vmalloc_to_page(cpu_addr);
->>>>>>>> +          unsigned int count = size >> PAGE_SHIFT;
->>>>>>>> +          struct page **pages;
->>>>>>>> +          unsigned long pfn;
->>>>>>>> +          int i;
->>>>>>>> +
->>>>>>>> +          pages = kmalloc_array(count, sizeof(*pages), GFP_KERNEL);
->>>>>>>> +          if (!pages)
->>>>>>>> +                  return -ENOMEM;
->>>>>>>> +
->>>>>>>> +          for (i = 0, pfn = page_to_pfn(page); i < count; i++)
->>>>>>>> +                  pages[i] = pfn_to_page(pfn + i);
->>>>>>>> +
->>>>>>>> +          ret = iommu_dma_mmap(pages, size, vma);
->>>>>>> /**
->>>>>>>  * iommu_dma_mmap - Map a buffer into provided user VMA
->>>>>>>  * @pages: Array representing buffer from iommu_dma_alloc()
->>>>>>>    ...
->>>>>>>
->>>>>>> In this case, the buffer has not come from iommu_dma_alloc(), so passing
->>>>>>> into iommu_dma_mmap() is wrong by contract, even if having to fake up a
->>>>>>> page array wasn't enough of a red flag. Given that a FORCE_CONTIGUOUS
->>>>>>> allocation is essentially the same as for the non-IOMMU case, I think it
->>>>>>> should be sufficient to defer to that path, i.e.:
->>>>>>>
->>>>>>>     if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
->>>>>>>             return __swiotlb_mmap(dev, vma, cpu_addr,
->>>>>>>                             phys_to_dma(virt_to_phys(cpu_addr)),
->>>>>>>                             size, attrs);
->>>>>> Maybe I have make mistake somewhere but it does not work, here and below
->>>>>> (hangs or crashes). I suppose it can be due to different address
->>>>>> translations, my patch uses
->>>>>>     page = vmalloc_to_page(cpu_addr).
->>>>>> And here we have:
->>>>>>     handle = phys_to_dma(dev, virt_to_phys(cpu_addr)); // in
->>>>>> __iommu_mmap_attrs
->>>>>>     page = phys_to_page(dma_to_phys(dev, handle)); // in
->>>>>> __swiotlb_get_sgtable
->>>>>> I guess it is similarly in __swiotlb_mmap.
->>>>>>
->>>>>> Are these translations equivalent?
->>>>> Ah, my mistake, sorry - I managed to forget that cpu_addr is always
->>>>> remapped for FORCE_CONTIGUOUS (*and* somehow overlook the use of
->>>>> vmalloc_to_page() in the patch itself), so the virt_to_phys() part of my
->>>>> example is indeed bogus. The general point still stands, though.
->>>> I guess Geert's proposition to create pages permanently is also not
->>>> acceptable[2]. So how to fix crashes which appeared after patch adding
->>> If I'm not mistaken, creating the pages permanently is what the
->>> !DMA_ATTR_FORCE_CONTIGUOUS does? The only difference is where
->>> the underlying memory is allocated from.
->>>
->>> Am I missing something?
->> Quoting Robin from his response:
->>> in general is is not
->>> safe to assume a coherent allocation is backed by struct pages at all
->> As I said before I am not familiar with the subject, so it is possible I
->> misunderstood something.
-> That's from the perspective of external callers of
-> dma_alloc_coherent()/dma_alloc_attrs(), wherein
-> dma_alloc_from_coherent() may have returned device-specific memory
-> without calling into the arch dma_map_ops implementation. Internal to
-> the arm64 implementation, however, everything *we* allocate comes from
-> either CMA or the normal page allocator, so should always be backed by
-> real kernel pages.
->
-> Robin.
+Signed-off-by: Jesper Nilsson <jesper.nilsson@axis.com>
+---
+ arch/arm/boot/dts/artpec6.dtsi | 87 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+
+diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+index 767cbe8..471eaee 100644
+--- a/arch/arm/boot/dts/artpec6.dtsi
++++ b/arch/arm/boot/dts/artpec6.dtsi
+@@ -181,6 +181,85 @@
+ 		status = "disabled";
+ 	};
+ 
++	pinctrl: pinctrl at f801d000 {
++		compatible = "axis,artpec6-pinctrl";
++		reg = <0xf801d000 0x400>;
++
++		pinctrl_uart0: uart0grp {
++			function = "uart0";
++			groups = "uart0grp1";
++			bias-pull-up;
++		};
++		pinctrl_uart1: uart1grp {
++			function = "uart1";
++			groups = "uart1grp0";
++			bias-pull-up;
++		};
++		pinctrl_uart2: uart2grp {
++			function = "uart2";
++			groups = "uart2grp1";
++			bias-pull-up;
++		};
++		pinctrl_uart3: uart3grp {
++			function = "uart3";
++			groups = "uart3grp0";
++			bias-pull-up;
++		};
++		pinctrl_uart4: uart4grp {
++			function = "uart4";
++			groups = "uart4grp0";
++			bias-pull-up;
++		};
++		pinctrl_uart5: uart5grp {
++			function = "uart5";
++			groups = "uart5grp0";
++			bias-pull-up;
++		};
++		pinctrl_i2c1: i2c1grp {
++			function = "i2c1";
++			groups = "i2c1grp0";
++			bias-pull-up;
++		};
++		pinctrl_i2c2: i2c2grp {
++			function = "i2c2";
++			groups = "i2c2grp0";
++			bias-pull-up;
++		};
++		pinctrl_i2c3: i2c3grp {
++			function = "i2c3";
++			groups = "i2c3grp0";
++			bias-pull-up;
++		};
++		pinctrl_i2s0: i2s0grp {
++			function = "i2s0";
++			groups = "i2s0grp0";
++			bias-pull-up;
++		};
++		pinctrl_i2s1: i2s1grp {
++			function = "i2s1";
++			groups = "i2s1grp0";
++			bias-pull-up;
++		};
++		pinctrl_spi0: spi0grp {
++			function = "spi0";
++			groups = "spi0grp0";
++			bias-pull-up;
++		};
++		pinctrl_spi1: spi1grp {
++			function = "spi1";
++			groups = "spi1grp0";
++			bias-pull-up;
++		};
++		pinctrl_sdio0: sdio0grp {
++			function = "sdio0";
++			groups = "sdio0grp0";
++		};
++		pinctrl_sdio1: sdio1grp {
++			function = "sdio1";
++			groups = "sdio1grp0";
++		};
++	};
++
+ 	amba at 0 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <0x1>;
+@@ -214,6 +293,8 @@
+ 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
+ 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
+ 			clock-names = "uart_clk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_uart0>;
+ 			status = "disabled";
+ 		};
+ 		uart1: serial at f8037000 {
+@@ -223,6 +304,8 @@
+ 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
+ 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
+ 			clock-names = "uart_clk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_uart1>;
+ 			status = "disabled";
+ 		};
+ 		uart2: serial at f8038000 {
+@@ -232,6 +315,8 @@
+ 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
+ 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
+ 			clock-names = "uart_clk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_uart2>;
+ 			status = "disabled";
+ 		};
+ 		uart3: serial at f8039000 {
+@@ -241,6 +326,8 @@
+ 			clocks = <&clkctrl ARTPEC6_CLK_UART_REFCLK>,
+ 				<&clkctrl ARTPEC6_CLK_UART_PCLK>;
+ 			clock-names = "uart_clk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_uart3>;
+ 			status = "disabled";
+ 		};
+ 	};
+-- 
+2.1.4
+
+Reply-To: 
 
 
-OK, so what do you exactly mean by "The general point still stands", my
-patch fixes handling of allocations made internally?
-Anyway as I understand approach "creating the pages permanently" in
-__iommu_alloc_attrs is OK. Is it worth to create patch adding it? It
-should solve the issue as well and also looks saner (for me).
-
-Regards
-Andrzej
-
->> Regards
->> Andrzej
->>
->>
->>> Thanks!
->>>
->>>> support to DMA_ATTR_FORCE_CONTIGUOUS in IOMMU on arm64 [1]?
->>>> Maybe temporary solution is to drop the patch until proper handling of
->>>> mmapping is proposed, without it the patch looks incomplete and causes
->>>> regression.
->>>> Moreover __iommu_alloc_attrs uses also dma_common_contiguous_remap which
->>>> also assumes existence of struct pages.
->>>>
->>>> [1]: https://patchwork.kernel.org/patch/9609551/
->>>> [2]: https://www.spinics.net/lists/arm-kernel/msg572688.html
->>> Gr{oetje,eeting}s,
->>>
->>>                         Geert
->>>
->>> --
->>> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->>>
->>> In personal conversations with technical people, I call myself a hacker. But
->>> when I'm talking to journalists I just say "programmer" or something like that.
->>>                                 -- Linus Torvalds
->>>
->>>
->>>
->
->
->
+/^JN - Jesper Nilsson
+-- 
+               Jesper Nilsson -- jesper.nilsson at axis.com
