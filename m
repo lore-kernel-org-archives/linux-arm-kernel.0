@@ -1,32 +1,25 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 30 Mar 2017 17:39:27 +0200
-Subject: next-20170330 build: 2 failures 8 warnings (next-20170330)
-In-Reply-To: <20170330150742.wflswzqhg53mozx2@sirena.org.uk>
-References: <E1ctZXC-0008DB-4g@optimist>
- <20170330150742.wflswzqhg53mozx2@sirena.org.uk>
-Message-ID: <20170330173927.5665a0da@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Mar 2017 17:36:17 +0200
+Subject: [PATCH] ARM: configs: stm32: Set CPU_V7M_NUM_IRQ to max value
+In-Reply-To: <1490263746-10512-1-git-send-email-alexandre.torgue@st.com>
+References: <1490263746-10512-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CAK8P3a3VYRUvFKd1CMTE-T-FhTx1YJr18Hqatmz7YK+A+JtFeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Mar 23, 2017 at 11:09 AM, Alexandre TORGUE
+<alexandre.torgue@st.com> wrote:
+> stm32_defconfig is used for several STM32 MCU: STM32F429, STM32F469,
+> STM32F746 and now STM32H743. Each of MCU listed have different interrupts
+> number mapped on NVIC. STM32F429: 81, STM32F469: 92, STM32F746: 97 and
+> STM32H743: 149. I could set CPU_V7M_NUM_IRQ to 149 but in order to avoid
+> forgetting to update this value for next STM32 MCU I prefer to set it to
+> max value: 240.
+>
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-On Thu, 30 Mar 2017 16:07:42 +0100
-Mark Brown <broonie@kernel.org> wrote:
+It's not entirely clear who you want to apply this (if any), given that you sent
+the patch to yourself. I've applied it to next/defconfig now, hope that's
+what you intended.
 
-> On Thu, Mar 30, 2017 at 01:50:39PM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build an ARM allmodconfig due to:
-> 
-> > 	arm-allmodconfig
-> > ../drivers/mtd/nand/atmel/nand-controller.c:2126:25: error: 'atmel_nc_id_table' undeclared here (not in a function)
-> > ../include/linux/module.h:212:27: error: '__mod_of__atmel_nc_id_table_device_table' aliased to undefined symbol 'atmel_nc_id_table'  
-> 
-> caused by d09703f9459c94c78e029 (mtd: nand: Cleanup/rework the
-> atmel_nand driver), it tries to export atmel_nc_id_table as the DT ID
-> table but the variable is called atmel_nand_controller_of_ids. 
-
-Pushed a fixed version to nand/next.
-
-Thanks for the report.
-
-Boris
+      Arnd
