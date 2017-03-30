@@ -1,73 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 18:18:08 +0200
-Subject: [PATCH v3 1/7] pinctrl: dt-bindings: Add documentation for Armada
- 37xx pin controllers
-In-Reply-To: <20170329211105.ype3os6jldsjyrqa@rob-hp-laptop> (Rob Herring's
- message of "Wed, 29 Mar 2017 16:11:05 -0500")
-References: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
- <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1490282185.git-series.gregory.clement@free-electrons.com>
- <20170329211105.ype3os6jldsjyrqa@rob-hp-laptop>
-Message-ID: <87d1cy91rz.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Mar 2017 17:19:31 +0100
+Subject: [PATCH v2 05/22] ARM64: implement ioremap_nopost() interface
+In-Reply-To: <20170327094954.7162-6-lorenzo.pieralisi@arm.com>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-6-lorenzo.pieralisi@arm.com>
+Message-ID: <20170330161931.GA5623@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
- 
- On mer., mars 29 2017, Rob Herring <robh@kernel.org> wrote:
+On Mon, Mar 27, 2017 at 10:49:33AM +0100, Lorenzo Pieralisi wrote:
+> The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+> and Posting") defines rules for PCI configuration space transactions
+> ordering and posting, that state that configuration writes
+> are non-posted transactions.
+> 
+> This rule is reinforced by the ARM v8 architecture reference manual
+> (issue A.k, Early Write Acknowledgment) that explicitly recommends
+> that No Early Write Acknowledgment attribute should be used to map
+> PCI configuration (write) transactions.
+> 
+> Current ioremap interface on ARM64 implements mapping functions
+> where the Early Write Acknowledgment hint is enabled, so they
+> cannot be used to map PCI configuration space in a PCI specs
+> compliant way.
+> 
+> Implement an ARM64 specific ioremap_nopost() interface
+> that allows to map PCI config region with nGnRnE attributes, providing
+> a remap function that complies with PCI specifications and the ARMv8
+> architecture reference manual recommendations.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/include/asm/io.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 
->> +GPIO subnode:
->> +
->> +Please refer to gpio.txt in this directory for details of gpio-ranges property
->> +and the common GPIO bindings used by client devices.
->> +
->> +Required properties for gpio driver under the gpio subnode:
->
-> Why does this need to be a sub node? You should probably have a 
-> compatible if it is.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-It is needed to be able to have a phandle associated to the gpio. Then
-the other node can refer to it.
+Let me know if you need this taken via the arm64 tree.
 
-But if we can do without it I would happy to do it.
-
-
->
->> +- interrupts: List of interrupt specifier for the controllers interrupt.
->> +- gpio-controller: Marks the device node as a gpio controller.
->> +- #gpio-cells: Should be 2. The first cell is the GPIO number and the
->> +   second cell specifies GPIO flags, as defined in
->> +   <dt-bindings/gpio/gpio.h>. Only the GPIO_ACTIVE_HIGH and
->> +   GPIO_ACTIVE_LOW flags are supported.
->> +- gpio-ranges: Range of pins managed by the GPIO controller.
->> +
->> +Xtal Clock bindings for Marvell Armada 37xx SoCs
->> +------------------------------------------------
->> +
->> +see Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
->> +
->> +
->> +Example:
->> +pinctrl_sb: pinctrl-sb at 18800 {
->
-> pinctrl@
-
-OK
-
->
->> +	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
->> +	reg = <0x18800 0x100>, <0x18C00 0x20>;
->> +	gpiosb: gpiosb {
->
-> gpio@
-
-There is no reg property so we don't use the @
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
