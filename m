@@ -1,80 +1,66 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 30 Mar 2017 13:06:59 -0700
-Subject: [RESEND] arm: ftrace: fix dynamic ftrace with DEBUG_RODATA and
- !FRAME_POINTER
-In-Reply-To: <1490543749-20376-1-git-send-email-abelvesa@linux.com>
-References: <1490543749-20376-1-git-send-email-abelvesa@linux.com>
-Message-ID: <CAGXu5jKFu2vPQf1PHGZEzmrZO=BbzETrPCVc8x0Xo2EximG9HA@mail.gmail.com>
+From: nicstange@gmail.com (Nicolai Stange)
+Date: Thu, 30 Mar 2017 22:10:21 +0200
+Subject: [PATCH] clockevents/drivers/atlas7: set ->min_delta_ticks and
+ ->max_delta_ticks
+In-Reply-To: <20170326134403.16226-1-nicstange@gmail.com>
+References: <20170326134403.16226-1-nicstange@gmail.com>
+Message-ID: <20170330201022.8548-1-nicstange@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 26, 2017 at 8:55 AM, Abel Vesa <abelvesa@linux.com> wrote:
-> The support for dynamic ftrace with CONFIG_DEBUG_RODATA involves
-> overriding the weak arch_ftrace_update_code() with a variant which makes
-> the kernel text writable around the patching.
->
-> This override was however added under the CONFIG_OLD_MCOUNT ifdef, and
-> CONFIG_OLD_MCOUNT is only enabled if frame pointers are enabled.
->
-> This leads to non-functional dynamic ftrace (ftrace triggers a
-> WARN_ON()) when CONFIG_DEBUG_RODATA is enabled and CONFIG_FRAME_POINTER
-> is not.
->
-> Move the override out of that ifdef and into the CONFIG_DYNAMIC_FTRACE
-> ifdef where it belongs.
->
-> Fixes: 80d6b0c2eed2a ("ARM: mm: allow text and rodata sections to be read-only")
->
-> Suggested-by: Nicolai Stange <nicstange@gmail.com>
-> Suggested-by: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> Acked-by: Rabin Vincent <rabin@rab.in>
+In preparation for making the clockevents core NTP correction aware,
+all clockevent device drivers must set ->min_delta_ticks and
+->max_delta_ticks rather than ->min_delta_ns and ->max_delta_ns: a
+clockevent device's rate is going to change dynamically and thus, the
+ratio of ns to ticks ceases to stay invariant.
 
-This looks fine to me. I'd send it to the ARM patch tracker since
-you've gotten an Ack:
-http://www.arm.linux.org.uk/developer/patches/info.php
+Make the timer-atlas7 clockevent driver initialize these fields properly.
 
--Kees
+This patch alone doesn't introduce any change in functionality as the
+clockevents core still looks exclusively at the (untouched) ->min_delta_ns
+and ->max_delta_ns. As soon as this has changed, a followup patch will
+purge the initialization of ->min_delta_ns and ->max_delta_ns from this
+driver.
 
-> ---
->  arch/arm/kernel/ftrace.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> index 3f17594..414e60e 100644
-> --- a/arch/arm/kernel/ftrace.c
-> +++ b/arch/arm/kernel/ftrace.c
-> @@ -29,11 +29,6 @@
->  #endif
->
->  #ifdef CONFIG_DYNAMIC_FTRACE
-> -#ifdef CONFIG_OLD_MCOUNT
-> -#define OLD_MCOUNT_ADDR        ((unsigned long) mcount)
-> -#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
-> -
-> -#define        OLD_NOP         0xe1a00000      /* mov r0, r0 */
->
->  static int __ftrace_modify_code(void *data)
->  {
-> @@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
->         stop_machine(__ftrace_modify_code, &command, NULL);
->  }
->
-> +#ifdef CONFIG_OLD_MCOUNT
-> +#define OLD_MCOUNT_ADDR        ((unsigned long) mcount)
-> +#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
-> +
-> +#define        OLD_NOP         0xe1a00000      /* mov r0, r0 */
-> +
->  static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
->  {
->         return rec->arch.old_mcount ? OLD_NOP : NOP;
-> --
-> 2.7.4
->
+Signed-off-by: Nicolai Stange <nicstange@gmail.com>
+---
 
+Notes:
+    This prerequisite patch is part of a larger effort to feed NTP
+    corrections into the clockevent devices' frequencies and thus
+    avoiding their notion of time to diverge from the system's
+    one. If you're interested, the current state of the whole series
+    can be found at [1].
+    
+    If you haven't got any objections and these prerequisites get
+    merged by 4.12 everywhere, I'll proceed with the remainder of
+    this series in 4.13.
+    
+    Applicable to next-20170324 as well as to John' Stultz tree [2].
+    
+    [1]
+      git://nicst.de/linux.git cev-freq-adj.v10.fortglx-4.12-time
+      https://nicst.de/git/?p=linux.git;a=shortlog;h=refs/heads/cev-freq-adj.v10.fortglx-4.12-time
+    
+    [2]
+      https://git.linaro.org/people/john.stultz/linux.git fortglx/4.12/time
 
+ drivers/clocksource/timer-atlas7.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/drivers/clocksource/timer-atlas7.c b/drivers/clocksource/timer-atlas7.c
+index 3d8a181f0252..50300eec4a39 100644
+--- a/drivers/clocksource/timer-atlas7.c
++++ b/drivers/clocksource/timer-atlas7.c
+@@ -192,7 +192,9 @@ static int sirfsoc_local_timer_starting_cpu(unsigned int cpu)
+ 	ce->set_next_event = sirfsoc_timer_set_next_event;
+ 	clockevents_calc_mult_shift(ce, atlas7_timer_rate, 60);
+ 	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
++	ce->max_delta_ticks = (unsigned long)-2;
+ 	ce->min_delta_ns = clockevent_delta2ns(2, ce);
++	ce->min_delta_ticks = 2;
+ 	ce->cpumask = cpumask_of(cpu);
+ 
+ 	action->dev_id = ce;
 -- 
-Kees Cook
-Pixel Security
+2.12.0
