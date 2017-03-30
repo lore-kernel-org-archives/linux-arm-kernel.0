@@ -1,411 +1,425 @@
-From: yannick.fertre@st.com (Yannick FERTRE)
-Date: Thu, 30 Mar 2017 15:10:34 +0000
-Subject: [PATCH v3 2/5] drivers: watchdog: Add STM32 IWDG driver
-In-Reply-To: <ac425e69-2d3c-2257-7183-115fbe9eb2b0@roeck-us.net>
-References: <1490195083-25117-1-git-send-email-yannick.fertre@st.com>
- <1490195083-25117-3-git-send-email-yannick.fertre@st.com>
- <ac425e69-2d3c-2257-7183-115fbe9eb2b0@roeck-us.net>
-Message-ID: <b235ad1e-1f06-3ef6-b182-c8bea3055b4c@st.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Thu, 30 Mar 2017 23:26:58 +0800
+Subject: [PATCH V8 5/6] ACPI: Support the probing on the devices which apply
+ indirect-IO
+In-Reply-To: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
+References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-Many thanks for your help, I will push corrections to V4.
+On some platforms(such as Hip06/Hip07), the legacy ISA/LPC devices access I/O
+with some special host-local I/O ports known on x86. To access the I/O
+peripherals, an indirect-IO mechanism is introduced to mapped the host-local
+I/O to system logical/fake PIO similar the PCI MMIO on architectures where no
+separate I/O space exists. Just as PCI MMIO, the host I/O range should be
+registered before probing the downstream devices and set up the I/O mapping.
+But current ACPI bus probing doesn't support these indirect-IO hosts/devices.
 
-Best regards
+This patch introdueces a new ACPI handler for this device category. Through the
+handler attach callback, the indirect-IO hosts I/O registration is done and
+all peripherals' I/O resources are translated into logic/fake PIO before
+starting the enumeration.
 
+Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+---
+ drivers/acpi/Makefile          |   1 +
+ drivers/acpi/acpi_indirectio.c | 344 +++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/internal.h        |   5 +
+ drivers/acpi/scan.c            |   1 +
+ 4 files changed, 351 insertions(+)
+ create mode 100644 drivers/acpi/acpi_indirectio.c
 
-On 03/29/2017 05:15 AM, Guenter Roeck wrote:
-> On 03/22/2017 08:04 AM, Yannick Fertre wrote:
->> This patch adds IWDG (Independent WatchDoG) support for STM32 platform.
->>
->> Change-Id: Iab218745fc25566f12558fae7f52e2f8c21db74e
->
-> No gerrit tags, please.
->
->> Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
->> ---
->>  drivers/watchdog/Kconfig      |  11 ++
->>  drivers/watchdog/Makefile     |   1 +
->>  drivers/watchdog/stm32_iwdg.c | 289
->> ++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 301 insertions(+)
->>  create mode 100644 drivers/watchdog/stm32_iwdg.c
->>
->> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->> index 52a70ee..d9745a5 100644
->> --- a/drivers/watchdog/Kconfig
->> +++ b/drivers/watchdog/Kconfig
->> @@ -744,6 +744,17 @@ config ZX2967_WATCHDOG
->>        To compile this driver as a module, choose M here: the
->>        module will be called zx2967_wdt.
->>
->> +config STM32_WATCHDOG
->> +    tristate "STM32 Independent WatchDoG (IWDG) support"
->> +    depends on ARCH_STM32
->> +    select WATCHDOG_CORE
->> +    default y
->> +    help
->> +      Say Y here to include Watchdog timer support.
->
-> ... for <pick your text>.
-Ok done
->
->> +
->> +      To compile this driver as a module, choose M here: the
->> +      module will be called stm32_iwdg.
->> +
->>  # AVR32 Architecture
->>
->>  config AT32AP700X_WDT
->> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
->> index a2126e2..a35e423 100644
->> --- a/drivers/watchdog/Makefile
->> +++ b/drivers/watchdog/Makefile
->> @@ -84,6 +84,7 @@ obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
->>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
->>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
->>  obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
->> +obj-$(CONFIG_STM32_WATCHDOG) += stm32_iwdg.o
->>
->>  # AVR32 Architecture
->>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
->> diff --git a/drivers/watchdog/stm32_iwdg.c
->> b/drivers/watchdog/stm32_iwdg.c
->> new file mode 100644
->> index 0000000..507dfc4
->> --- /dev/null
->> +++ b/drivers/watchdog/stm32_iwdg.c
->> @@ -0,0 +1,289 @@
->> +/*
->> + * Driver for STM32 Independent Watchdog
->> + *
->> + * Copyright (C) Yannick Fertre 2017
->> + * Author: Yannick Fertre <yannick.fertre@st.com>
->> + *
->> + * This driver is based on tegra_wdt.c
->> + *
->> + * License terms:  GNU General Public License (GPL), version 2
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/iopoll.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/watchdog.h>
->> +
->> +/* minimum watchdog trigger timeout, in seconds */
->> +#define MIN_WDT_TIMEOUT    1
->> +
->> +/* IWDG registers */
->> +#define IWDG_KR        0x00 /* Key register */
->> +#define IWDG_PR        0x04 /* Prescaler Register */
->> +#define IWDG_RLR    0x08 /* ReLoad Register */
->> +#define IWDG_SR        0x0C /* Status Register */
->> +#define IWDG_WINR    0x10 /* Windows Register */
->> +
->> +/* IWDG_KR register bit mask */
->> +#define KR_KEY_RELOAD    0xAAAA /* reload counter enable */
->> +#define KR_KEY_ENABLE    0xCCCC /* peripheral enable */
->> +#define KR_KEY_EWA    0x5555 /* write access enable */
->> +#define KR_KEY_DWA    0x0000 /* write access disable */
->> +
->> +/* IWDG_PR register bit values */
->> +#define PR_4    0x00 /* prescaler set to 4 */
->> +#define PR_8    0x01 /* prescaler set to 8 */
->> +#define PR_16   0x02 /* prescaler set to 16 */
->> +#define PR_32   0x03 /* prescaler set to 32 */
->> +#define PR_64   0x04 /* prescaler set to 64 */
->> +#define PR_128  0x05 /* prescaler set to 128 */
->> +#define PR_256    0x06 /* prescaler set to 256 */
->> +
->> +/* IWDG_RLR register values */
->> +#define RLR_MAX        0xFFF /* max value supported by reload
->> register */
->> +
->> +/* IWDG_SR register bit mask */
->> +#define FLAG_PVU    BIT(0) /* Watchdog prescaler value update */
->> +#define FLAG_RVU    BIT(1) /* Watchdog counter reload value update */
->> +
->> +/* set timeout to 100000 us */
->> +#define TIMEOUT_US    100000
->> +#define SLEEP_US    1000
->> +
->> +struct stm32_iwdg {
->> +    struct watchdog_device    wdd;
->> +    struct device        *dev;
->> +    void __iomem        *regs;
->> +    struct clk        *clk;
->> +    unsigned int        rate;
->> +};
->> +
->> +static int heartbeat = MIN_WDT_TIMEOUT;
->> +module_param(heartbeat, int, 0x0);
->> +MODULE_PARM_DESC(heartbeat,
->> +         "Watchdog heartbeats in seconds. (default = "
->> +         __MODULE_STRING(WDT_HEARTBEAT) ")");
->> +
->> +static inline u32 reg_read(void __iomem *base, u32 reg)
->> +{
->> +    return readl_relaxed(base + reg);
->> +}
->> +
->> +static inline void reg_write(void __iomem *base, u32 reg, u32 val)
->> +{
->> +    writel_relaxed(val, base + reg);
->> +}
->> +
->> +static int stm32_iwdg_start(struct watchdog_device *wdd)
->> +{
->> +    struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
->> +    u32 val = FLAG_PVU | FLAG_RVU;
->> +    u32 reload;
->> +    int ret;
->> +
->> +    dev_dbg(wdt->dev, "%s\n", __func__);
->> +
->> +    /* prescaler fixed to 256 */
->> +    reload = (wdd->timeout * wdt->rate) / 256;
->> +    if (reload > RLR_MAX + 1) {
->> +        dev_err(wdt->dev,
->> +            "Watchdog doesn't support reload value: %d\n", reload);
->> +        return -EINVAL;
->> +    }
->
-> This should not happen if min_timeout and max_timeout are set properly.
->
-Ok, I remove the test.
->> +
->> +    /* enable watchdog */
->> +    reg_write(wdt->regs, IWDG_KR, KR_KEY_ENABLE);
->> +
->> +    /* set prescaler & reload registers */
->> +    reg_write(wdt->regs, IWDG_KR, KR_KEY_EWA);
->> +    reg_write(wdt->regs, IWDG_PR, PR_256); /* prescaler fix to 256 */
->> +    reg_write(wdt->regs, IWDG_RLR, reload - 1);
->> +
->> +    /* wait for the registers to be updated (max 100ms) */
->> +    ret = readl_relaxed_poll_timeout(wdt->regs + IWDG_SR, val,
->> +                     !(val & (FLAG_PVU | FLAG_RVU)),
->> +                     SLEEP_US, TIMEOUT_US);
->> +    if (ret) {
->> +        dev_err(wdt->dev,
->> +            "Fail to set prescaler or reload registers\n");
->> +        return -EINVAL;
->
-> Any reason for overriding the return value ?
->
-Ok, done
->> +    }
->> +
->> +    /* reload watchdog */
->> +    reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
->> +
->> +    return 0;
->> +}
->> +
->> +static int stm32_iwdg_stop(struct watchdog_device *wdd)
->> +{
->> +    struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
->> +
->> +    if (watchdog_active(wdd)) {
->> +        dev_err(wdt->dev,
->> +            "Watchdog can't be stopped once started(no way out)\n");
->> +        return -EPERM;
->
-> The infrastructure takes care of this. Don't provide a stop function,
-> and provide
-> the maximum hardware timeout.
-Ok, I remove stop function
->
->> +    }
->> +
->> +    return 0;
->> +}
->> +
->> +static int stm32_iwdg_ping(struct watchdog_device *wdd)
->> +{
->> +    struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
->> +
->> +    dev_dbg(wdt->dev, "%s\n", __func__);
->> +
->> +    reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
->> +
->> +    return 0;
->> +}
->> +
->> +static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
->> +                  unsigned int timeout)
->> +{
->> +    struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
->> +
->> +    dev_dbg(wdt->dev, "%s timeout: %d sec\n", __func__, timeout);
->> +
->> +    wdd->timeout = timeout;
->> +
->> +    if (watchdog_active(wdd))
->> +        return stm32_iwdg_start(wdd);
->> +
->> +    return 0;
->> +}
->> +
->> +static const struct watchdog_info stm32_iwdg_info = {
->> +    .options    = WDIOF_SETTIMEOUT |
->> +              WDIOF_MAGICCLOSE |
->> +              WDIOF_KEEPALIVEPING,
->> +    .identity    = "STM32 Independent Watchdog",
->> +};
->> +
->> +static struct watchdog_ops stm32_iwdg_ops = {
->> +    .owner        = THIS_MODULE,
->> +    .start        = stm32_iwdg_start,
->> +    .stop        = stm32_iwdg_stop,
->> +    .ping        = stm32_iwdg_ping,
->> +    .set_timeout    = stm32_iwdg_set_timeout,
->> +};
->> +
->> +static int stm32_iwdg_probe(struct platform_device *pdev)
->> +{
->> +    struct watchdog_device *wdd;
->> +    struct stm32_iwdg *wdt;
->> +    struct resource *res;
->> +    void __iomem *regs;
->> +    struct clk *clk;
->> +    int max_wdt_timeout;
->> +    int ret;
->> +
->> +    /* This is the timer base. */
->> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +    regs = devm_ioremap_resource(&pdev->dev, res);
->> +    if (IS_ERR(regs)) {
->> +        dev_err(&pdev->dev, "Could not get resource\n");
->> +        return PTR_ERR(regs);
->> +    }
->> +
->> +    clk = devm_clk_get(&pdev->dev, NULL);
->> +    if (IS_ERR(clk)) {
->> +        dev_err(&pdev->dev, "Unable to get clock\n");
->> +        return PTR_ERR(clk);
->> +    }
->> +
->> +    ret = clk_prepare_enable(clk);
->> +    if (ret) {
->> +        dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
->> +        return ret;
->> +    }
->> +
->> +    /*
->> +     * Allocate our watchdog driver data, which has the
->> +     * struct watchdog_device nested within it.
->> +     */
->> +    wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
->> +    if (!wdt) {
->> +        ret = -ENOMEM;
->> +        goto err;
->> +    }
->> +
->> +    /* Initialize struct stm32_iwdg. */
->> +    wdt->regs = regs;
->> +    wdt->dev = &pdev->dev;
->> +    wdt->clk = clk;
->> +    /*
->> +     * iwdg is clocked by its own dedicated low-speed clock (LSI)
->> +     * at 32khz.
->> +     */
->> +    wdt->rate = 32 * 1024;
->
-> Why not clk_get_rate() ?
-Ok, done
->
->> +
->> +    /* get max timeout & set heartbeat */
->> +    max_wdt_timeout = ((RLR_MAX + 1) * 256) / wdt->rate;
->> +    heartbeat = max_wdt_timeout;
->
-> What is the value of overwriting this variable ? Why don't you just use
-> max_wdt_timeout,
-> and what is the point of making heartbeat configurable if you overwrite
-> it anyway ?
->
-> I would suggest to use watchdog_init_timeout() to set optional non-default
-> timeout values, especially since this also enables getting the timeout
-> value from
-> devicetree.
->
-Ok done
->> +
->> +    /* Initialize struct watchdog_device. */
->> +    wdd = &wdt->wdd;
->> +    wdd->timeout = heartbeat;
->> +    wdd->info = &stm32_iwdg_info;
->> +    wdd->ops = &stm32_iwdg_ops;
->> +    wdd->min_timeout = MIN_WDT_TIMEOUT;
->> +    wdd->max_timeout = max_wdt_timeout;
->
-> You might want to consider setting max_hw_heartbeat_ms instead and drop
-> the stop function.
->
-Ok, done
->> +    watchdog_set_drvdata(wdd, wdt);
->> +    watchdog_set_nowayout(wdd, true);
->> +
->> +    ret = watchdog_register_device(wdd);
->> +    if (ret) {
->> +        dev_err(&pdev->dev,
->> +            "failed to register watchdog device\n");
->> +        goto err;
->> +    }
->> +
->> +    platform_set_drvdata(pdev, wdt);
->> +
->> +    dev_info(&pdev->dev,
->> +         "initialized (heartbeat = %d sec)\n", heartbeat);
->> +    return 0;
->> +
->> +err:
->> +    clk_disable_unprepare(clk);
->> +    return ret;
->> +}
->> +
->> +static int stm32_iwdg_remove(struct platform_device *pdev)
->> +{
->> +    struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
->> +
->> +    watchdog_unregister_device(&wdt->wdd);
->> +    clk_disable_unprepare(wdt->clk);
->> +
->> +    dev_info(&pdev->dev, "removed watchdog device\n");
->
-> Is this message really useful ? I think it is just noise.
-Ok, removed
->
->> +    return 0;
->> +}
->> +
->> +static const struct of_device_id stm32_iwdg_of_match[] = {
->> +    { .compatible = "st,stm32-iwdg" },
->> +    { /* end node */ }
->> +};
->> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
->> +
->> +static struct platform_driver stm32_iwdg_driver = {
->> +    .probe        = stm32_iwdg_probe,
->> +    .remove        = stm32_iwdg_remove,
->> +    .driver = {
->> +        .name    = "iwdg",
->> +        .of_match_table = stm32_iwdg_of_match,
->> +    },
->> +};
->> +module_platform_driver(stm32_iwdg_driver);
->> +
->> +MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
->> +MODULE_DESCRIPTION("STMicroelectronics STM32 Independent Watchdog
->> Driver");
->> +MODULE_LICENSE("GPL v2");
->>
->
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index a391bbc..10e5f2b 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -57,6 +57,7 @@ acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
+ acpi-y				+= acpi_lpat.o
+ acpi-$(CONFIG_ACPI_GENERIC_GSI) += irq.o
+ acpi-$(CONFIG_ACPI_WATCHDOG)	+= acpi_watchdog.o
++acpi-$(CONFIG_INDIRECT_PIO)	+= acpi_indirectio.o
+ 
+ # These are (potentially) separate modules
+ 
+diff --git a/drivers/acpi/acpi_indirectio.c b/drivers/acpi/acpi_indirectio.c
+new file mode 100644
+index 0000000..c8c80b5
+--- /dev/null
++++ b/drivers/acpi/acpi_indirectio.c
+@@ -0,0 +1,344 @@
++/*
++ * ACPI support for indirect-IO bus.
++ *
++ * Copyright (C) 2017 Hisilicon Limited, All Rights Reserved.
++ * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/acpi.h>
++#include <linux/platform_device.h>
++#include <linux/logic_pio.h>
++
++#include "internal.h"
++
++ACPI_MODULE_NAME("indirect IO");
++
++#define INDIRECT_IO_INFO(desc) ((unsigned long)&desc)
++
++struct lpc_private_data {
++	resource_size_t io_size;
++	resource_size_t io_start;
++};
++
++struct indirectio_device_desc {
++	void *pdata; /* device relevant info data */
++	int (*pre_setup)(struct acpi_device *adev, void *pdata);
++};
++
++static struct lpc_private_data lpc_data = {
++	.io_size = LPC_BUS_IO_SIZE,
++	.io_start = LPC_MIN_BUS_RANGE,
++};
++
++static inline bool acpi_logicio_supported_resource(struct acpi_resource *res)
++{
++	switch (res->type) {
++	case ACPI_RESOURCE_TYPE_ADDRESS32:
++	case ACPI_RESOURCE_TYPE_ADDRESS64:
++		return true;
++	}
++	return false;
++}
++
++static acpi_status acpi_count_logiciores(struct acpi_resource *res,
++					   void *data)
++{
++	int *res_cnt = data;
++
++	if (acpi_logicio_supported_resource(res) &&
++		!acpi_dev_filter_resource_type(res, IORESOURCE_IO))
++		(*res_cnt)++;
++
++	return AE_OK;
++}
++
++static acpi_status acpi_read_one_logiciores(struct acpi_resource *res,
++		void *data)
++{
++	struct acpi_resource **resource = data;
++
++	if (acpi_logicio_supported_resource(res) &&
++		!acpi_dev_filter_resource_type(res, IORESOURCE_IO)) {
++		memcpy((*resource), res, sizeof(struct acpi_resource));
++		(*resource)->length = sizeof(struct acpi_resource);
++		(*resource)->type = res->type;
++		(*resource)++;
++	}
++
++	return AE_OK;
++}
++
++static acpi_status
++acpi_build_logiciores_template(struct acpi_device *adev,
++			struct acpi_buffer *buffer)
++{
++	acpi_handle handle = adev->handle;
++	struct acpi_resource *resource;
++	acpi_status status;
++	int res_cnt = 0;
++
++	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
++				     acpi_count_logiciores, &res_cnt);
++	if (ACPI_FAILURE(status) || !res_cnt) {
++		dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
++		return -EINVAL;
++	}
++
++	buffer->length = sizeof(struct acpi_resource) * (res_cnt + 1) + 1;
++	buffer->pointer = kzalloc(buffer->length - 1, GFP_KERNEL);
++	if (!buffer->pointer)
++		return -ENOMEM;
++
++	resource = (struct acpi_resource *)buffer->pointer;
++	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
++				     acpi_read_one_logiciores, &resource);
++	if (ACPI_FAILURE(status)) {
++		kfree(buffer->pointer);
++		dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
++		return -EINVAL;
++	}
++
++	resource->type = ACPI_RESOURCE_TYPE_END_TAG;
++	resource->length = sizeof(struct acpi_resource);
++
++	return 0;
++}
++
++static int acpi_translate_logiciores(struct acpi_device *adev,
++		struct acpi_device *host, struct acpi_buffer *buffer)
++{
++	int res_cnt = (buffer->length - 1) / sizeof(struct acpi_resource) - 1;
++	struct acpi_resource *resource = buffer->pointer;
++	struct acpi_resource_address64 addr;
++	unsigned long sys_port;
++	struct device *dev = &adev->dev;
++
++	/* only one I/O resource now */
++	if (res_cnt != 1) {
++		dev_err(dev, "encode %d resources whose type is(%d)!\n",
++			res_cnt, resource->type);
++		return -EINVAL;
++	}
++
++	if (ACPI_FAILURE(acpi_resource_to_address64(resource, &addr))) {
++		dev_err(dev, "convert acpi resource(%d) as addr64 FAIL!\n",
++			resource->type);
++		return -EFAULT;
++	}
++
++	/* For indirect-IO, addr length must be fixed. (>0, 0/1, 0/1)(0,0,0) */
++	if (addr.min_address_fixed != addr.max_address_fixed) {
++		dev_warn(dev, "variable I/O resource is invalid!\n");
++		return -EINVAL;
++	}
++
++	dev_info(dev, "CRS IO: len=0x%llx [0x%llx - 0x%llx]\n",
++			addr.address.address_length, addr.address.minimum,
++			addr.address.maximum);
++	sys_port = logic_pio_trans_hwaddr(&host->fwnode, addr.address.minimum);
++	if (sys_port == -1) {
++		dev_err(dev, "translate bus-addr(0x%llx) fail!\n",
++			addr.address.minimum);
++		return -EFAULT;
++	}
++
++	switch (resource->type) {
++	case ACPI_RESOURCE_TYPE_ADDRESS32:
++	{
++		struct acpi_resource_address32 *out_res;
++
++		out_res = &resource->data.address32;
++		if (!addr.address.address_length)
++			addr.address.address_length = out_res->address.maximum -
++				out_res->address.minimum + 1;
++		out_res->address.minimum = sys_port;
++		out_res->address.maximum = sys_port +
++				addr.address.address_length - 1;
++		out_res->address.address_length = addr.address.address_length;
++
++		dev_info(dev, "_SRS 32IO: [0x%x - 0x%x] len = 0x%x\n",
++			out_res->address.minimum,
++			out_res->address.maximum,
++			out_res->address.address_length);
++
++		break;
++	}
++
++	case ACPI_RESOURCE_TYPE_ADDRESS64:
++	{
++		struct acpi_resource_address64 *out_res;
++
++		out_res = &resource->data.address64;
++		if (!addr.address.address_length)
++			addr.address.address_length = out_res->address.maximum -
++				out_res->address.minimum + 1;
++		out_res->address.minimum = sys_port;
++		out_res->address.maximum = sys_port +
++				addr.address.address_length - 1;
++		out_res->address.address_length = addr.address.address_length;
++
++		dev_info(dev, "_SRS 64IO: [0x%llx - 0x%llx] len = 0x%llx\n",
++			out_res->address.minimum,
++			out_res->address.maximum,
++			out_res->address.address_length);
++
++		break;
++	}
++
++	default:
++		return -EINVAL;
++
++	}
++
++	return 0;
++}
++
++/*
++ * update/set the current I/O resource of the designated device node.
++ * after this calling, the enumeration can be started as the I/O resource
++ * had been translated to logicial I/O from bus-local I/O.
++ *
++ * @adev: the device node to be updated the I/O resource;
++ * @host: the device node where 'adev' is attached, which can be not
++ *	the parent of 'adev';
++ *
++ * return 0 when successful, negative is for failure.
++ */
++static int acpi_set_logicio_resource(struct device *child,
++		struct device *hostdev)
++{
++	struct acpi_device *adev;
++	struct acpi_device *host;
++	struct acpi_buffer buffer;
++	acpi_status status;
++	int ret;
++
++	if (!child || !hostdev)
++		return -EINVAL;
++
++	host = to_acpi_device(hostdev);
++	adev = to_acpi_device(child);
++
++	/* check the device state */
++	if (!adev->status.present) {
++		dev_info(child, "ACPI: device is not present!\n");
++		return 0;
++	}
++	/* whether the child had been enumerated? */
++	if (acpi_device_enumerated(adev)) {
++		dev_info(child, "ACPI: had been enumerated!\n");
++		return 0;
++	}
++
++	/* read the _CRS and convert as acpi_buffer */
++	status = acpi_build_logiciores_template(adev, &buffer);
++	if (ACPI_FAILURE(status)) {
++		dev_warn(child, "Failure evaluating %s\n", METHOD_NAME__CRS);
++		return -ENODEV;
++	}
++
++	/* translate the I/O resources */
++	ret = acpi_translate_logiciores(adev, host, &buffer);
++	if (ret) {
++		kfree(buffer.pointer);
++		dev_err(child, "Translate I/O range FAIL!\n");
++		return ret;
++	}
++
++	/* set current resource... */
++	status = acpi_set_current_resources(adev->handle, &buffer);
++	kfree(buffer.pointer);
++	if (ACPI_FAILURE(status)) {
++		dev_err(child, "Error evaluating _SRS (0x%x)\n", status);
++		ret = -EIO;
++	}
++
++	return ret;
++}
++
++static int lpc_host_io_setup(struct acpi_device *adev, void *pdata)
++{
++	struct logic_pio_hwaddr *range, *tmprange;
++	struct lpc_private_data *lpc_private;
++	struct acpi_device *child;
++
++	lpc_private = (struct lpc_private_data *)pdata;
++	range = kzalloc(sizeof(*range), GFP_KERNEL);
++	if (!range)
++		return -ENOMEM;
++	range->fwnode = &adev->fwnode;
++	range->flags = PIO_INDIRECT;
++	range->size = lpc_private->io_size;
++	range->hw_start = lpc_private->io_start;
++
++	tmprange = logic_pio_register_range(range, 1);
++	if (tmprange != range) {
++		kfree(range);
++		if (IS_ERR(tmprange))
++			return -EFAULT;
++	}
++
++	/* For hisilpc, only care about the sons of host. */
++	list_for_each_entry(child, &adev->children, node) {
++		int ret;
++
++		ret = acpi_set_logicio_resource(&child->dev, &adev->dev);
++		if (ret) {
++			dev_err(&child->dev, "set resource failed..\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static const struct indirectio_device_desc lpc_host_desc = {
++	.pdata = &lpc_data,
++	.pre_setup = lpc_host_io_setup,
++};
++
++/* All the host devices which apply indirect-IO can be listed here. */
++static const struct acpi_device_id acpi_indirect_host_id[] = {
++	{"HISI0191", INDIRECT_IO_INFO(lpc_host_desc)},
++	{""},
++};
++
++static int acpi_indirectio_attach(struct acpi_device *adev,
++				const struct acpi_device_id *id)
++{
++	struct indirectio_device_desc *hostdata;
++	struct platform_device *pdev;
++	int ret;
++
++	hostdata = (struct indirectio_device_desc *)id->driver_data;
++	if (!hostdata || !hostdata->pre_setup)
++		return -EINVAL;
++
++	ret = hostdata->pre_setup(adev, hostdata->pdata);
++	if (!ret) {
++		pdev = acpi_create_platform_device(adev, NULL);
++		if (IS_ERR_OR_NULL(pdev)) {
++			dev_err(&adev->dev, "Create platform device for host FAIL!\n");
++			return -EFAULT;
++		}
++		acpi_device_set_enumerated(adev);
++		ret = 1;
++	}
++
++	return ret;
++}
++
++
++static struct acpi_scan_handler acpi_indirect_handler = {
++	.ids = acpi_indirect_host_id,
++	.attach = acpi_indirectio_attach,
++};
++
++void __init acpi_indirectio_scan_init(void)
++{
++	acpi_scan_add_handler(&acpi_indirect_handler);
++}
+diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+index f159001..b11412d 100644
+--- a/drivers/acpi/internal.h
++++ b/drivers/acpi/internal.h
+@@ -31,6 +31,11 @@
+ void acpi_platform_init(void);
+ void acpi_pnp_init(void);
+ void acpi_int340x_thermal_init(void);
++#ifdef CONFIG_INDIRECT_PIO
++void acpi_indirectio_scan_init(void);
++#else
++static inline void acpi_indirectio_scan_init(void) {}
++#endif
+ #ifdef CONFIG_ARM_AMBA
+ void acpi_amba_init(void);
+ #else
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 1926918..eda79ce 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -2033,6 +2033,7 @@ int __init acpi_scan_init(void)
+ 	acpi_int340x_thermal_init();
+ 	acpi_amba_init();
+ 	acpi_watchdog_init();
++	acpi_indirectio_scan_init();
+ 
+ 	acpi_scan_add_handler(&generic_device_handler);
+ 
+-- 
+1.9.1
