@@ -1,62 +1,121 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 30 Mar 2017 09:18:39 +0800
-Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
-In-Reply-To: <CAJ9a7VgsnFYpOGVjD4m7+EjFXkBoRqVR2F2Pgtn-T0NB+YP6tg@mail.gmail.com>
-References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
- <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
- <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
- <20170329030735.GA23889@leoy-linaro>
- <CAJ9a7VgsnFYpOGVjD4m7+EjFXkBoRqVR2F2Pgtn-T0NB+YP6tg@mail.gmail.com>
-Message-ID: <20170330011839.GA939@leoy-linaro>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Thu, 30 Mar 2017 09:22:47 +0800
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <20170329174412.GA4472@cbox>
+References: <58DA3F68.6090901@arm.com> <20170328112328.GA31156@cbox>
+ <20170328115413.GJ23682@e104320-lin>
+ <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
+ <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
+ <20170329103658.GQ23682@e104320-lin>
+ <CAMj-D2BT3ByY-iFrRVVK7y=G7zhRBtM031VgLn6JzwUE-WCdWQ@mail.gmail.com>
+ <20170329144822.GA1020@cbox>
+ <fa712d47-4f77-7710-c4f7-cd7eab9fed9e@redhat.com>
+ <20170329174412.GA4472@cbox>
+Message-ID: <59037bde-e950-570b-4571-376589379308@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 04:17:19PM +0100, Mike Leach wrote:
+Hi Christoffer/Laszlo,
 
-[...]
+On 2017/3/30 1:44, Christoffer Dall wrote:
+> On Wed, Mar 29, 2017 at 05:37:49PM +0200, Laszlo Ersek wrote:
+>> On 03/29/17 16:48, Christoffer Dall wrote:
+>>> On Wed, Mar 29, 2017 at 10:36:51PM +0800, gengdongjiu wrote:
+>>>> 2017-03-29 18:36 GMT+08:00, Achin Gupta <achin.gupta@arm.com>:
+>>
+>>>>> Qemu is essentially fulfilling the role of secure firmware at the
+>>>>> EL2/EL1 interface (as discussed with Christoffer below). So it
+>>>>> should generate the CPER before injecting the error.
+>>>>>
+>>>>> This is corresponds to (1) above apart from notifying UEFI (I am
+>>>>> assuming you mean guest UEFI). At this time, the guest OS already
+>>>>> knows where to pick up the CPER from through the HEST. Qemu has
+>>>>> to create the CPER and populate its address at the address
+>>>>> exported in the HEST. Guest UEFI should not be involved in this 
+>>>>> flow. Its job was to create the HEST at boot and that has been
+>>>>> done by this stage.
+>>>>
+>>>> Sorry,  As I understand it, after Qemu generate the CPER table, it
+>>>> should pass the CPER table to the guest UEFI, then Guest UEFI  place
+>>>> this CPER table to the guest OS memory. In this flow, the Guest UEFI
+>>>> should be involved, else the Guest OS can not see the CPER table.
+>>>>
+>>>
+>>> I think you need to explain the "pass the CPER table to the guest UEFI"
+>>> concept in terms of what really happens, step by step, and when you say
+>>> "then Guest UEFI place the CPER table to the guest OS memory", I'm
+>>> curious who is running what code on the hardware when doing that.
+>>
+>> I strongly suggest to keep the guest firmware's runtime involvement to
+>> zero. Two reasons:
+>>
+>> (1) As you explained above (... which I conveniently snipped), when you
+>> inject an interrupt to the guest, the handler registered for that
+>> interrupt will come from the guest kernel.
+>>
+>> The only exception to this is when the platform provides a type of
+>> interrupt whose handler can be registered and then locked down by the
+>> firmware. On x86, this is the SMI.
+>>
+>> In practice though,
+>> - in OVMF (x86), we only do synchronous (software-initiated) SMIs (for
+>> privileged UEFI varstore access),
+>> - and in ArmVirtQemu (ARM / aarch64), none of the management mode stuff
+>> exists at all.
+>>
+>> I understand that the Platform Init 1.5 (or 1.6?) spec abstracted away
+>> the MM (management mode) protocols from Intel SMM, but at this point
+>> there is zero code in ArmVirtQemu for that. (And I'm unsure how much of
+>> any eligible underlying hw emulation exists in QEMU.)
+>>
+>> So you can't get the guest firmware to react to the injected interrupt
+>> without the guest OS coming between first.
+>>
+>> (2) Achin's description matches really-really closely what is possible,
+>> and what should be done with QEMU, ArmVirtQemu, and the guest kernel.
+>>
+>> In any solution for this feature, the firmware has to reserve some
+>> memory from the OS at boot. The current facilities we have enable this.
+>> As I described previously, the ACPI linker/loader actions can be mapped
+>> more or less 1:1 to Achin's design. From a practical perspective, you
+>> really want to keep the guest firmware as dumb as possible (meaning: as
+>> generic as possible), and keep the ACPI specifics to the QEMU and the
+>> guest kernel sides.
+>>
+>> The error serialization actions -- the co-operation between guest kernel
+>> and QEMU on the special memory areas -- that were mentioned earlier by
+>> Michael and Punit look like a complication. But, IMO, they don't differ
+>> from any other device emulation -- DMA actions in particular -- that
+>> QEMU already does. Device models are what QEMU *does*. Read the command
+>> block that the guest driver placed in guest memory, parse it, sanity
+>> check it, verify it, execute it, write back the status code, inject an
+>> interrupt (and/or let any polling guest driver notice it "soon after" --
+>> use barriers as necessary).
+>>
+>> Thus, I suggest to rely on the generic ACPI linker/loader interface
+>> (between QEMU and guest firmware) *only* to make the firmware lay out
+>> stuff (= reserve buffers, set up pointers, install QEMU's ACPI tables)
+>> *at boot*. Then, at runtime, let the guest kernel and QEMU (the "device
+>> model") talk to each other directly. Keep runtime firmware involvement
+>> to zero.
+>>
+>> You *really* don't want to debug three components at runtime, when you
+>> can solve the thing with two. (Two components whose build systems won't
+>> drive you mad, I should add.)
+>>
+>> IMO, Achin's design nailed it. We can do that.
+>>
+> I completely agree.
+> 
+> My questions were intended for gengdongjiu to clarify his/her 
+> and clear up any misunderstandings between what Achin suggested and what
+> he/she wrote.
 
-> >> >+out_powered_up:
-> >> >+    debug_os_unlock(drvdata);
-> >>
-> >> Question: Do we need a matching debug_os_lock() once we are done ?
-> >
-> > I have checked ARM ARMv8, but there have no detailed description for
-> > this. I refered coresight-etmv4 code and Mike's pseudo code, ther have
-> > no debug_os_lock() related operations.
-> >
-> > Mike, Mathieu, could you also help confirm this?
-> >
-> 
-> Debug OS lock / unlock allows the power management code running on the
-> core to lock out the external debugger while the debug registers are
-> saved/restored during a core power event.
-> 
-> e.g. A sequence such as this might occur in a correctly programmed system....
-> 
-> debug_os_lock()
-> save_debug_regs() // visible from core power domain - incl breakpoints etc
-> save_etm_regs()
-> ... // other stuff prior to core power down,
-> <power_down_core>
-> 
-> Followed by...
-> 
-> <power_up_core>
-> restore_etm_regs()
-> restore_debug_regs() // visible from core power domain - incl breakpoints etc
-> debug_os_unlock()
-> 
-> The value is 1 (locked) if cold resetting into AArch64 - it is
-> expected that some system software will set this to 0 as part of the
-> boot process.
-> The lock prevents write access to the external debug registers so we
-> need to clear it to set up the external debug registers we are using.
+  Achin and Laszlo's understanding are right. thanks for your suggestion.
 
-This description is conflict with upper restoring flows. During
-restore_debug_regs(), the os lock is locked so how it can write
-external debug register to restore context?
-
-> This suggests that it should be restored as we found it when done.
-
-Thanks,
-Leo Yan
+> 
+> Thanks,
+> -Christoffer
+> 
+> .
+> 
