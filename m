@@ -1,75 +1,45 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Mar 2017 09:30:32 -0400
-Subject: [PATCH V7 1/5] PCI/ASPM: introduce pci_aspm_init() and add to
- pci_init_capabilities()
-In-Reply-To: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490880636-30542-2-git-send-email-okaya@codeaurora.org>
+Date: Thu, 30 Mar 2017 09:30:31 -0400
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+Message-ID: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a callback from pci_init_capabilities function for every
-single new PCI device that is currently being added.
+When the operating system is booted with the default ASPM policy
+(POLICY_DEFAULT), current code is querying the enable/disable
+states from ASPM registers to determine the policy.
 
-pci_aspm_init() will be used to save the power on state of the HW.
+For example, a BIOS could set the power saving state to performance
+and clear all ASPM control registers. A balanced ASPM policy could
+enable L0s and disable L1. A power conscious BIOS could enable both
+L0s and L1 to trade off latency and performance vs. power.
 
-Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pcie/aspm.c | 10 ++++++++++
- drivers/pci/probe.c     |  3 +++
- include/linux/pci.h     |  2 ++
- 3 files changed, 15 insertions(+)
+After hotplug removal, pcie_aspm_exit_link_state() function clears
+the ASPM registers. An insertion following hotplug removal reads
+incorrect policy as ASPM disabled even though ASPM was enabled
+during boot.
 
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index 1dfa10c..dc36717 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -827,6 +827,16 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
- }
- 
- /*
-+ * pci_aspm_init: Initiate PCI express link state.
-+ * It is called from device_add for every single pci device.
-+ * @pdev: all pci devices
-+ */
-+int pci_aspm_init(struct pci_dev *pdev)
-+{
-+	return 0;
-+}
-+
-+/*
-  * pcie_aspm_init_link_state: Initiate PCI express link state.
-  * It is called after the pcie and its children devices are scanned.
-  * @pdev: the root port or switch downstream port
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index dfc9a27..1e19364 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1847,6 +1847,9 @@ static void pci_init_capabilities(struct pci_dev *dev)
- 
- 	/* Advanced Error Reporting */
- 	pci_aer_init(dev);
-+
-+	/* Active State Power Management */
-+	pci_aspm_init(dev);
- }
- 
- /*
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index eb3da1a..8828dd7 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1396,8 +1396,10 @@ static inline int pci_irq_get_node(struct pci_dev *pdev, int vec)
- 
- #ifdef CONFIG_PCIEASPM
- bool pcie_aspm_support_enabled(void);
-+int pci_aspm_init(struct pci_dev *pdev);
- #else
- static inline bool pcie_aspm_support_enabled(void) { return false; }
-+static inline int pci_aspm_init(struct pci_dev *pdev) { return -ENODEV; }
- #endif
- 
- #ifdef CONFIG_PCIEAER
+This is caused by the fact that same function is used for reconfiguring
+ASPM regardless of the power on state.
+
+------------------------
+Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
+------------------------
+- revert the accidental parent check in bridge remove
+
+Sinan Kaya (5):
+  PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+  PCI/ASPM: split pci_aspm_init() into two
+  PCI/ASPM: add init hook to device_add
+  PCI/ASPM: save power on values during bridge init
+  PCI/ASPM: move link_state cleanup to bridge remove
+
+ drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
+ drivers/pci/probe.c     |   3 ++
+ drivers/pci/remove.c    |   3 +-
+ include/linux/pci.h     |   2 +
+ 4 files changed, 98 insertions(+), 47 deletions(-)
+
 -- 
 1.9.1
