@@ -1,29 +1,85 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 30 Mar 2017 22:31:10 +0200
-Subject: [PATCH V8 5/6] ACPI: Support the probing on the devices which
- apply indirect-IO
-In-Reply-To: <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
- <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <1908501.jAQQKvjW4f@aspire.rjw.lan>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 31 Mar 2017 07:50:14 +1100
+Subject: [PATCH v4 19/23] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <0e1bcf3a-e8d7-9f50-bdf7-2a1e7466665b@linux.vnet.ibm.com>
+References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
+ <20170329174340.89109-20-cbostic@linux.vnet.ibm.com>
+ <CACPK8XfOSYPidHF6=psC4mP-tkRyWTu0psdcK6EwA2E6FF53Uw@mail.gmail.com>
+ <0e1bcf3a-e8d7-9f50-bdf7-2a1e7466665b@linux.vnet.ibm.com>
+Message-ID: <1490907014.3177.207.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 30, 2017 11:26:58 PM zhichang.yuan wrote:
-> On some platforms(such as Hip06/Hip07), the legacy ISA/LPC devices access I/O
-> with some special host-local I/O ports known on x86. To access the I/O
-> peripherals, an indirect-IO mechanism is introduced to mapped the host-local
-> I/O to system logical/fake PIO similar the PCI MMIO on architectures where no
-> separate I/O space exists. Just as PCI MMIO, the host I/O range should be
-> registered before probing the downstream devices and set up the I/O mapping.
-> But current ACPI bus probing doesn't support these indirect-IO hosts/devices.
-> 
-> This patch introdueces a new ACPI handler for this device category. Through the
-> handler attach callback, the indirect-IO hosts I/O registration is done and
-> all peripherals' I/O resources are translated into logic/fake PIO before
-> starting the enumeration.
+On Thu, 2017-03-30 at 13:15 -0500, Christopher Bostic wrote:
+> > > +static void serial_in(struct fsi_master_gpio *master, struct fsi_gpio_msg *msg,
+> > > +?????????????????????? uint8_t num_bits)
+> > > +{
+> > > +?????? uint8_t bit, in_bit;
+> > > +
+> > > +?????? set_sda_input(master);
+> > > +
+> > > +?????? for (bit = 0; bit < num_bits; bit++) {
+> > > +?????????????? clock_toggle(master, 1);
+> > > +?????????????? in_bit = sda_in(master);
+> > > +?????????????? msg->msg <<= 1;
+> > > +?????????????? msg->msg |= ~in_bit & 0x1;????? /* Data is negative active */
+> > > +?????? }
+> > > +?????? msg->bits += num_bi	ts;
+> > > +}
+> > > +
+> > > +static void serial_out(struct fsi_master_gpio *master,
+> > > +?????????????????????? const struct fsi_gpio_msg *cmd)
+> > > +{
+> > > +?????? uint8_t bit;
+> > > +?????? uint64_t msg = ~cmd->msg;?????? /* Data is negative active */
+> > > +?????? uint64_t sda_mask = 0x1ULL << (cmd->bits - 1);
+> > > +?????? uint64_t last_bit = ~0;
+> > > +?????? int next_bit;
+> > > +
+> > > +?????? if (!cmd->bits) {
+> > > +?????????????? dev_warn(master->dev, "trying to output 0 bits\n");
+> > > +?????????????? return;
+> > > +?????? }
+> > > +?????? set_sda_output(master, 0);
+> > > +
+> > > +?????? /* Send the start bit */
+> > > +?????? sda_out(master, 0);
+> > > +?????? clock_toggle(master, 1);
+> > > +
+> > > +?????? /* Send the message */
+> > > +?????? for (bit = 0; bit < cmd->bits; bit++) {
+> > > +?????????????? next_bit = (msg & sda_mask) >> (cmd->bits - 1);
+> > > +?????????????? if (last_bit ^ next_bit) {
+> > > +?????????????????????? sda_out(master, next_bit);
+> > > +?????????????????????? last_bit = next_bit;
+> > > +?????????????? }
+> > > +?????????????? clock_toggle(master, 1);
+> > > +?????????????? msg <<= 1;
+> > > +?????? }
+> > > +}
 
-Can you explain to me briefly what exactly this code is expected to be doing?
+As I mentioned privately, I don't think this is right, unless your
+clock signal is inverted or my protocol spec is wrong...
 
-Thanks,
-Rafael
+Your clock toggle is written so you call it right after the rising
+edge. It does delay, 0, delay, 1.
+
+But according to the FSI timing diagram I have, you need to establish
+the data around the falling edge, it gets sampled by the slave on the
+rising edge. So as it is, your code risks violating the slave hold
+time.
+
+On input, you need to sample on the falling edge, right before it. You
+are sampling after the rising edge, so you aren't leaving enough time
+for the slave to establish the data.
+
+You could probably just flip clock_toggle() around. Make it: 0, delay,
+1, delay.
+
+That way you can do for sends: sda_out + toggle, and for receive
+toggle + sda_in. That will make you establish your output data and
+sample right before the falling edge, which should be ok provided the
+diagram I have is right.
+
+Cheers,
+Ben.
