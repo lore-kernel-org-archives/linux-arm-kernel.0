@@ -1,39 +1,62 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 30 Mar 2017 12:54:54 -0700
-Subject: [PATCH v4 0/3] arm64: usercopy: Implement stack frame object
- validation
-In-Reply-To: <58DCC21C.6040705@arm.com>
-References: <20170216182917.19637-1-james.morse@arm.com>
- <CAGXu5jJ9xis_X9qd-GxCM=oDDoynMrW=GZbfeOKKt_FpAuK83Q@mail.gmail.com>
- <CAGXu5jKhVzH9OB6QgGb1u0sbnFGn5J72FnzNeGo076f52Scn+A@mail.gmail.com>
- <58DCC21C.6040705@arm.com>
-Message-ID: <CAGXu5jLE9h2+q9HN7MDGFbOtghBN5rSFvXUes=7OY4zfx0y0yQ@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 30 Mar 2017 14:58:18 -0500
+Subject: [PATCH] ARM: OMAP2+: omap_device: Sync omap_device and pm_runtime
+ after probe defer
+Message-ID: <20170330195818.17669-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 1:30 AM, James Morse <james.morse@arm.com> wrote:
-> Hi Kees,
->
-> On 28/03/17 23:34, Kees Cook wrote:
->> On Thu, Feb 16, 2017 at 4:54 PM, Kees Cook <keescook@chromium.org> wrote:
->>> On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
->>>> This version of Sahara's arch_within_stack_frames() series replaces the
->>>> open-coded stack walker with a call to arm64's existing walker.
->
->> Is this still in progress? Seemed like it was very close?
->
-> Ah, sorry, I lost track of this when it jumped between mail folders... Sahara
-> had comments on the last patch.
->
-> How does all this fit with Al Viro's uaccess unification tree?:
-> https://lkml.org/lkml/2017/3/29/61
+Starting from commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM
+states at probe error and driver unbind") pm_runtime core now changes
+device runtime_status back to after RPM_SUSPENDED after a probe defer.
+Certain OMAP devices make use of "ti,no-idle-on-init" flag which causes
+omap_device_enable to be called during the BUS_NOTIFY_ADD_DEVICE event
+during probe, along with pm_runtime_set_active.
 
-It's orthogonal, though it results in bringing the hardened usercopy
-to more architectures... (but the stack walker is still needed on a
-per-arch basis).
+This call to pm_runtime_set_active typically will prevent a call to
+pm_runtime_get in a driver probe function from re-enabling the
+omap_device. However, in the case of a probe defer that happens before
+the driver probe function is able to run, such as a missing pinctrl
+states defer, pm_runtime_reinit will set the device as RPM_SUSPENDED and
+then once driver probe is actually able to run, pm_runtime_get will see
+the device as suspended and call through to the omap_device layer,
+attempting to enable the already enabled omap_device and causing errors
+like this:
 
--Kees
+omap-gpmc 50000000.gpmc: omap_device: omap_device_enable() called from invalid state 1
+omap-gpmc 50000000.gpmc: use pm_runtime_put_sync_suspend() in driver?
 
+We can avoid this error by making sure the pm_runtime status of a device
+matches the omap_device state before a probe attempt. By extending the
+omap_device bus notifier to act on the BUS_NOTIFY_BIND_DRIVER event we
+can check if a device is enabled in omap_device but with a pm_runtime
+status of RPM_SUSPENDED and once again mark the device as RPM_ACTIVE to
+avoid a second incorrect call to omap_device_enable.
+
+Tested-by: Franklin S Cooper Jr. <fcooper@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/omap_device.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index e920dd83e443..f989145480c8 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -222,6 +222,14 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 				dev_err(dev, "failed to idle\n");
+ 		}
+ 		break;
++	case BUS_NOTIFY_BIND_DRIVER:
++		od = to_omap_device(pdev);
++		if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED) &&
++		    pm_runtime_status_suspended(dev)) {
++			od->_driver_status = BUS_NOTIFY_BIND_DRIVER;
++			pm_runtime_set_active(dev);
++		}
++		break;
+ 	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (pdev->dev.of_node)
+ 			omap_device_build_from_dt(pdev);
 -- 
-Kees Cook
-Pixel Security
+2.11.0
