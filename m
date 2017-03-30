@@ -1,83 +1,42 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu, 30 Mar 2017 10:29:07 -0500
-Subject: [PATCH 2/2] ARM: dts: keystone: Add minimum support for K2G ICE evm
-In-Reply-To: <20170330152907.12595-1-fcooper@ti.com>
-References: <20170330152907.12595-1-fcooper@ti.com>
-Message-ID: <20170330152907.12595-3-fcooper@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Mar 2017 17:29:47 +0200
+Subject: [GIT PULL 1/7] Broadcom soc changes for 4.12
+In-Reply-To: <20170324175807.27272-1-f.fainelli@gmail.com>
+References: <20170324175807.27272-1-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a3qFRKDcCHHxAXBiy-g9-tLJ7j1iVQW_67dLSA3+z2vsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add barebones dts support for TI's K2G Industrial Communication Engine evm.
-This dts allows the board to boot using a ram based filesystem.
+On Fri, Mar 24, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>
+> are available in the git repository at:
+>
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/soc
+>
+> for you to fetch changes up to d47b51ad31e21ab8129da64d42e2fc48e7a215eb:
+>
+>   ARM: brcmstb: Add entry for 7260 (2017-03-15 14:57:50 -0700)
+>
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM-based SoC Kconfig/platform changes for
+> 4.12, please pull the following:
+>
+> - Al enables ZONE_DMA for BRCMSTB platforms since a bunch of on-chip
+>   peripherals such as USB (OHCI and EHCI) and SDHCI cannot support physical
+>   addresses > 32-bit. This is only required when ARM_LPAE is enabled
+>
+> - Danesh enables ARCH_HAS_HOLES_MEMORYMODEL in order for the kernel to provide
+>   a pfn_valid() implementation despite BRCMSTB enabling the SPARSEMEM model by
+>   default.
+>
+> - Florian adds support for a new 28nm generation chip: 7260 by updating the
+>   runtime detection UART debuggin stub used for DEBUG_LL.
+>
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/Makefile             |  3 ++-
- arch/arm/boot/dts/keystone-k2g-ice.dts | 42 ++++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/keystone-k2g-ice.dts
+I tried pulling this, but github appears to be particularly slow today, so
+I deferred all your branches for the moment. We'll get there.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0118084..01a98f1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -193,7 +193,8 @@ dtb-$(CONFIG_ARCH_KEYSTONE) += \
- 	keystone-k2hk-evm.dtb \
- 	keystone-k2l-evm.dtb \
- 	keystone-k2e-evm.dtb \
--	keystone-k2g-evm.dtb
-+	keystone-k2g-evm.dtb \
-+	keystone-k2g-ice.dtb
- dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-b3.dtb \
- 	kirkwood-blackarmor-nas220.dtb \
-diff --git a/arch/arm/boot/dts/keystone-k2g-ice.dts b/arch/arm/boot/dts/keystone-k2g-ice.dts
-new file mode 100644
-index 0000000..9ab5f42
---- /dev/null
-+++ b/arch/arm/boot/dts/keystone-k2g-ice.dts
-@@ -0,0 +1,42 @@
-+/*
-+ * Device Tree Source for K2G Industrial Communication Engine EVM
-+ *
-+ * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+/dts-v1/;
-+
-+#include "keystone-k2g.dtsi"
-+
-+/ {
-+	compatible = "ti,k2g-ice", "ti,k2g", "ti,keystone";
-+	model = "Texas Instruments K2G Industrial Communication EVM";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000008 0x00000000 0x00000000 0x20000000>;
-+	};
-+};
-+
-+&k2g_pinctrl {
-+	uart0_pins: pinmux_uart0_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x11cc) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
-+			K2G_CORE_IOPAD(0x11d0) (BUFFER_CLASS_B | PIN_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
-+		>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
-+	status = "okay";
-+};
--- 
-2.10.0
+       Arnd
