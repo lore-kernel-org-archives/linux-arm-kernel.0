@@ -1,171 +1,115 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:10 +0800
-Subject: [PATCH v3 1/8] trace: ras: add ARM processor error information trace
- event
+Date: Thu, 30 Mar 2017 18:31:05 +0800
+Subject: [PATCH v3 5/8] arm64: KVM: add guest SEI support
 In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
 References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-11-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1490869877-118713-6-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new trace event for ARM processor error information, so that
-the user will know what error occurred. With this information the
-user may take appropriate action.
+Add ghes handling for SEI so that the host kernel could parse and
+report detailed error information for SEI which occur in the guest
+kernel.
 
-These trace events are consistent with the ARM processor error
-information table which defined in UEFI 2.6 spec section N.2.4.4.1.
+If there were no CPER records, (or the system doesn't support SEI as a GHES
+notification mechanism), then yes we should still call kvm_inject_vabt().
 
----
-v2: add trace enabled condition as Steven's suggestion.
-    fix a typo.
----
-
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Tyler Baicar <tbaicar@codeaurora.org>
 Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
 ---
- drivers/acpi/apei/ghes.c | 10 ++++++
- include/linux/cper.h     |  5 +++
- include/ras/ras_event.h  | 87 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 102 insertions(+)
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/kernel/traps.c            | 14 ++++++++++++++
+ arch/arm64/kvm/handle_exit.c         | 22 ++++++++++++++++++++--
+ 3 files changed, 35 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 81eabc6..6be0333 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -518,9 +518,19 @@ static void ghes_do_proc(struct ghes *ghes,
- 		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
- 			 trace_arm_event_enabled()) {
- 			struct cper_sec_proc_arm *arm_err;
-+			struct cper_arm_err_info *err_info;
-+			int i;
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 5b2cecd..d68d61f 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -59,5 +59,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ #endif	/* __ASSEMBLY__ */
  
- 			arm_err = acpi_hest_generic_data_payload(gdata);
- 			trace_arm_event(arm_err);
-+
-+			if (trace_arm_proc_err_enabled()) {
-+				err_info = (struct cper_arm_err_info *)(arm_err + 1);
-+				for (i = 0; i < arm_err->err_info_num; i++) {
-+					trace_arm_proc_err(err_info);
-+					err_info += 1;
-+				}
-+			}
- 		} else if (trace_unknown_sec_event_enabled()) {
- 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
- 			trace_unknown_sec_event(&sec_type,
-diff --git a/include/linux/cper.h b/include/linux/cper.h
-index 85450f3..0cae900 100644
---- a/include/linux/cper.h
-+++ b/include/linux/cper.h
-@@ -270,6 +270,11 @@ enum {
- #define CPER_ARM_INFO_VALID_VIRT_ADDR		0x0008
- #define CPER_ARM_INFO_VALID_PHYSICAL_ADDR	0x0010
+ int handle_guest_sea(unsigned long addr, unsigned int esr);
++int handle_guest_sei(unsigned long addr, unsigned int esr);
  
-+#define CPER_ARM_INFO_TYPE_CACHE		0
-+#define CPER_ARM_INFO_TYPE_TLB			1
-+#define CPER_ARM_INFO_TYPE_BUS			2
-+#define CPER_ARM_INFO_TYPE_UARCH		3
-+
- #define CPER_ARM_INFO_FLAGS_FIRST		0x0001
- #define CPER_ARM_INFO_FLAGS_LAST		0x0002
- #define CPER_ARM_INFO_FLAGS_PROPAGATED		0x0004
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 13befad..026b094 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -206,6 +206,93 @@
- 		  __entry->running_state, __entry->psci_state)
- );
+ #endif	/* __ASM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 955dc8c..b6d6727 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -618,6 +618,20 @@ const char *esr_get_class_string(u32 esr)
+ DEFINE_PER_CPU(int, sei_in_process);
  
-+#define ARM_PROC_ERR_TYPE	\
-+	EM ( CPER_ARM_INFO_TYPE_CACHE, "cache error" )	\
-+	EM ( CPER_ARM_INFO_TYPE_TLB,  "TLB error" )	\
-+	EM ( CPER_ARM_INFO_TYPE_BUS, "bus error" )	\
-+	EMe ( CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" )
+ /*
++ * Handle asynchronous SError interrupt that occur in a guest kernel.
++ */
++int handle_guest_sei(unsigned long addr, unsigned int esr)
++{
++        int ret = -ENOENT;
 +
-+#define ARM_PROC_ERR_FLAGS	\
-+	EM ( CPER_ARM_INFO_FLAGS_FIRST, "First error captured" )	\
-+	EM ( CPER_ARM_INFO_FLAGS_LAST,  "Last error captured" )	\
-+	EM ( CPER_ARM_INFO_FLAGS_PROPAGATED, "Propagated" )	\
-+	EMe ( CPER_ARM_INFO_FLAGS_OVERFLOW, "Overflow" )
++        if(IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
++                ret = ghes_notify_sei();
++        }
++
++        return ret;
++}
 +
 +/*
-+ * First define the enums in MM_ACTION_RESULT to be exported to userspace
-+ * via TRACE_DEFINE_ENUM().
-+ */
-+#undef EM
-+#undef EMe
-+#define EM(a, b) TRACE_DEFINE_ENUM(a);
-+#define EMe(a, b)	TRACE_DEFINE_ENUM(a);
+  * bad_mode handles the impossible case in the exception vector. This is always
+  * fatal.
+  */
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index fa1b18e..c89d83a 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/system_misc.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -177,6 +178,23 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 	return arm_exit_handlers[hsr_ec];
+ }
+ 
++static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
 +
-+ARM_PROC_ERR_TYPE
-+ARM_PROC_ERR_FLAGS
++	if (handle_guest_sei((unsigned long)fault_ipa,
++				kvm_vcpu_get_hsr(vcpu))) {
++		kvm_err("Failed to handle guest SEI, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++				kvm_vcpu_trap_get_class(vcpu),
++				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++				(unsigned long)kvm_vcpu_get_hsr(vcpu));
 +
-+/*
-+ * Now redefine the EM() and EMe() macros to map the enums to the strings
-+ * that will be printed in the output.
-+ */
-+#undef EM
-+#undef EMe
-+#define EM(a, b)		{ a, b },
-+#define EMe(a, b)	{ a, b }
++		kvm_inject_vabt(vcpu);
++	}
 +
-+TRACE_EVENT(arm_proc_err,
-+
-+	TP_PROTO(const struct cper_arm_err_info *err),
-+
-+	TP_ARGS(err),
-+
-+	TP_STRUCT__entry(
-+		__field(u8, type)
-+		__field(u16, multiple_error)
-+		__field(u8, flags)
-+		__field(u64, error_info)
-+		__field(u64, virt_fault_addr)
-+		__field(u64, physical_fault_addr)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->type = err->type;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
-+			__entry->multiple_error = err->multiple_error;
-+		else
-+			__entry->multiple_error = ~0;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
-+			__entry->flags = err->flags;
-+		else
-+			__entry->flags = ~0;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
-+			__entry->error_info = err->error_info;
-+		else
-+			__entry->error_info = 0ULL;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
-+			__entry->virt_fault_addr = err->virt_fault_addr;
-+		else
-+			__entry->virt_fault_addr = 0ULL;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
-+			__entry->physical_fault_addr = err->physical_fault_addr;
-+		else
-+			__entry->physical_fault_addr = 0ULL;
-+	),
-+
-+	TP_printk("ARM Processor Error: type %s; count: %u; flags: %s;"
-+		  " error info: %016llx; virtual address: %016llx;"
-+		  " physical address: %016llx",
-+		  __print_symbolic(__entry->type, ARCH_PROC_ERR_TYPE),
-+		  __entry->multiple_error,
-+		  __print_symbolic(__entry->flags, ARCH_PROC_ERR_FLAGS),
-+		  __entry->error_info, __entry->virt_fault_addr,
-+		  __entry->physical_fault_addr)
-+);
++	return 0;
++}
 +
  /*
-  * Unknown Section Report
-  *
+  * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
+  * proper exit to userspace.
+@@ -200,7 +218,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			*vcpu_pc(vcpu) -= adj;
+ 		}
+ 
+-		kvm_inject_vabt(vcpu);
++		kvm_handle_guest_sei(vcpu, run);
+ 		return 1;
+ 	}
+ 
+@@ -210,7 +228,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	case ARM_EXCEPTION_IRQ:
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+-		kvm_inject_vabt(vcpu);
++		kvm_handle_guest_sei(vcpu, run);
+ 		return 1;
+ 	case ARM_EXCEPTION_TRAP:
+ 		/*
 -- 
 1.8.3.1
