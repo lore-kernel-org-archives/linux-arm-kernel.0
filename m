@@ -1,11 +1,11 @@
 From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 30 Mar 2017 13:38:34 +0300
-Subject: [PATCH linux-next v2 1/4] usb: gadget: udc: atmel: Check fifo
- configuration values against device tree
-In-Reply-To: <4b91a4973e19a5b7ac05d5e0f5b4dcc8cffb75cf.1490715349.git.cristian.birsan@microchip.com>
+Date: Thu, 30 Mar 2017 13:39:43 +0300
+Subject: [PATCH linux-next v2 3/4] usb: gadget: udc: atmel: Use dev_warn()
+ to display EP configuration error
+In-Reply-To: <676bd6d232af7ce08f2fb1f7e4188fc20ef751db.1490715349.git.cristian.birsan@microchip.com>
 References: <cover.1490715349.git.cristian.birsan@microchip.com>
- <4b91a4973e19a5b7ac05d5e0f5b4dcc8cffb75cf.1490715349.git.cristian.birsan@microchip.com>
-Message-ID: <87fuhvjbh1.fsf@linux.intel.com>
+ <676bd6d232af7ce08f2fb1f7e4188fc20ef751db.1490715349.git.cristian.birsan@microchip.com>
+Message-ID: <87d1czjbf4.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,29 +15,25 @@ Hi,
 cristian.birsan at microchip.com writes:
 > From: Cristian Birsan <cristian.birsan@microchip.com>
 >
-> Check fifo configuration values against device tree values for endpoint fifo
-> in auto configuration mode (fifo_mode=0).
+> Use dev_warn() to display EP configuration error to avoid silent failure.
 >
 > Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 > ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 >
 > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 2035906b..3fd43fb 100644
+> index 2bd8410..942c9c9 100644
 > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
 > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -2118,14 +2118,34 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->  			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
->  			goto err;
->  		}
-> -		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
-> +		if (fifo_mode) {
-> +			if (val < udc->fifo_cfg[i].fifo_size) {
-> +				dev_warn(&pdev->dev,
-> +					 "of_probe: fifo-size table value not supported by HW, using DT value\n");
+> @@ -1851,7 +1851,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>  		 * but it's clearly harmless...
+>  		 */
+>  		if (!(usba_ep_readl(ep0, CFG) & USBA_EPT_MAPPED))
+> -			dev_dbg(&udc->pdev->dev,
+> +			dev_warn(&udc->pdev->dev,
 
-114 characters long. Is this even worth a warning? probably not.
+seems like dev_err() would've been more fitting.
 
 -- 
 balbi
@@ -47,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/354868fe/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/594f62d6/attachment.sig>
