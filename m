@@ -1,46 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Mar 2017 19:56:39 +0100
-Subject: [PATCH v7 00/13] mmc: Add support to Marvell Xenon SD Host
- Controller
-In-Reply-To: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
-References: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170330185639.GI7909@n2100.armlinux.org.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 30 Mar 2017 12:13:43 -0700
+Subject: [GIT PULL] bcm2835-dt-next-2017-03-30
+Message-ID: <20170330191343.31647-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 05:22:52PM +0200, Gregory CLEMENT wrote:
-> - Remove parse of child node mmc-card. Wait for a better solution.
+Hi Florian,
 
-So for mcbin, I have:
+Here's the pull request for those changes I'd misplaced from 4.11.
+This may be my last PR of the cycle.  The only change I have left on
+my radar for 4.12 is
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/006097.html
 
-&ap_sdhci0 {
-        bus-width = <8>;
-        marvell,xenon-emmc;
-        marvell,xenon-phy-type = "emmc 5.1 phy";
-        /*
-         * Not stable in HS modes - phy needs "more calibration", so add
-         * the "slow-mode" and disable SDR104, SDR50 and DDR50 modes.
-         */
-        marvell,xenon-phy-slow-mode;
-        no-1-8-v;
-        non-removable;
-        status = "okay";
-        vqmmc-supply = <&v_vddo_h>;
+The following changes since commit 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
 
-        #address-cells = <1>;
-        #size-cells = <0>;
-        mmccard: mmccard at 0 {
-                compatible = "mmc-card";
-                reg = <0>;
-        };
-};
+  ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
 
-Does this mean the "mmccard" bit is no longer required - or is it required
-for the eMMC to be detected but is no longer supported by the driver?
+are available in the git repository at:
 
-Thanks.
+  git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-30
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+for you to fetch changes up to 10b6c0c2e2bb8cd1be682f8d36ef597e3419cb88:
+
+  ARM: dts: bcm2835: add index to the ethernet alias (2017-03-27 10:10:39 -0700)
+
+----------------------------------------------------------------
+This pull request brings back bcm2835 DT fixups from Baruch Siach that
+got misplaced after a PR for 4.11 got rejected.
+
+----------------------------------------------------------------
+Baruch Siach (4):
+      ARM: dts: bcm2835: fix uart0 pinctrl node names
+      ARM: dts: bcm2835: fix i2c0 pins
+      ARM: dts: bcm2835: fix uart0/uart1 pins
+      ARM: dts: bcm2835: add index to the ethernet alias
+
+ arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi |  2 +-
+ arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi |  2 +-
+ arch/arm/boot/dts/bcm283x.dtsi              | 22 +++++++++++++---------
+ 3 files changed, 15 insertions(+), 11 deletions(-)
