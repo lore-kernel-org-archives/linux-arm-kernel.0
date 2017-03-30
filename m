@@ -1,25 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 17:39:01 +0200
-Subject: [PATCH v5 1/3] ARM: mmp: let clk_disable() return immediately if
- clk is NULL
-In-Reply-To: <1490692624-11931-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1490692624-11931-1-git-send-email-yamada.masahiro@socionext.com>
- <1490692624-11931-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK8P3a0cT_AnN_ypFMXPLs=ym12X0FdZ=PXF1r957=h2MhpRDA@mail.gmail.com>
+Date: Thu, 30 Mar 2017 17:40:44 +0200
+Subject: [PATCH v6 3/3] MAINTAINERS: Broadcom Vulcan is now Cavium
+ ThunderX2
+In-Reply-To: <1489608662-4434-4-git-send-email-jnair@caviumnetworks.com>
+References: <1489495634-2920-1-git-send-email-jnair@caviumnetworks.com>
+ <1489608662-4434-1-git-send-email-jnair@caviumnetworks.com>
+ <1489608662-4434-4-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <CAK8P3a1SL1jdW5MGJ7O7D2V_FJKsLqGNdWyYHki5u1fee5OJyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 11:17 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> In many of clk_disable() implementations, it is a no-op for a NULL
-> pointer input, but this is one of the exceptions.
+On Wed, Mar 15, 2017 at 9:11 PM, Jayachandran C
+<jnair@caviumnetworks.com> wrote:
+> Now that the dts files are moved to the new location, we can remove
+> the Broadcom Vulcan entry in the MAINTAINERS.
 >
-> Making it treewide consistent will allow clock consumers to call
-> clk_disable() without NULL pointer check.
+> Also fix up the Cavium ThunderX2 entry with the correct pattern for
+> the new names.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 > ---
->
-Applied to next/fixes-non-critical, thanks
 
-     Arnd
+
+Applied to next/arm64, thanks!
+
+      Arnd
