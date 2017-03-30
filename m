@@ -1,46 +1,56 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Wed, 29 Mar 2017 17:29:09 -0700
-Subject: [PATCH v3 1/6] bus: brcmstb_gisb: Use register offsets with writes too
-In-Reply-To: <20170330002914.7371-1-opendmb@gmail.com>
-References: <20170330002914.7371-1-opendmb@gmail.com>
-Message-ID: <20170330002914.7371-2-opendmb@gmail.com>
+Date: Wed, 29 Mar 2017 17:29:08 -0700
+Subject: [PATCH v3 0/6] bus: brcmstb_gisb: add support for GISBv7 arbiter
+Message-ID: <20170330002914.7371-1-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit corrects the bug introduced in commit f80835875d3d
-("bus: brcmstb_gisb: Look up register offsets in a table") such
-that gisb_write() translates the register enumeration into an
-offset from the base address for writes as well as reads.
+This patch set contains changes to enable the GISB arbiter driver
+on the latest ARM64 architecture Set-Top Box chips from Broadcom.
 
-Fixes: f80835875d3d ("bus: brcmstb_gisb: Look up register offsets in a table")
-Signed-off-by: Doug Berger <opendmb@gmail.com>
-Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
----
- drivers/bus/brcmstb_gisb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Since the ARM64 architecture does not support the hooking of low
+level fault handlers the driver has been adjusted to depend solely
+on GISB interrupts and notify events to provide diagnostic
+messaging.  The GISB hardware still triggers bus faults for the
+processor so the default low-level aborts will occur and will be
+handled based on the architecture specific kernel implementation.
 
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 72fe0a5a8bf3..a94598d0945a 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2014 Broadcom Corporation
-+ * Copyright (C) 2014-2017 Broadcom
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -127,9 +127,9 @@ static void gisb_write(struct brcmstb_gisb_arb_device *gdev, u32 val, int reg)
- 		return;
- 
- 	if (gdev->big_endian)
--		iowrite32be(val, gdev->base + reg);
-+		iowrite32be(val, gdev->base + offset);
- 	else
--		iowrite32(val, gdev->base + reg);
-+		iowrite32(val, gdev->base + offset);
- }
- 
- static ssize_t gisb_arb_get_timeout(struct device *dev,
+While this tends to obsure the GISB error messaging it is still
+reasonable so the same approach is applied to the ARM architecture
+for consistency.
+
+The patches also correct some issues with the existing driver
+and add the new register map for the GISBv7 hardware first
+appearing in the BCM7278 device.
+
+Changes since v2 at [2]:
+ - Removed code associated with enabling the hooking of ARM64
+   memory faults as well as the code that hooks them for both
+   ARM and ARM64 architectures within the GISB arbiter driver.
+ - Created separate notifiers for die and panic events to
+   prevent list corruption, and substituted the notifier return
+   name for the previous magic number (Thanks Mark!)
+
+Changes since v1 at [1]:
+ - Removed code associated with hooking SError handling in favor
+   of a registered notifier (Thanks Mark!)
+ - Removed an unnecessary explicit cast (Thanks Gregory!)
+
+[1] https://lkml.org/lkml/2017/3/24/413
+[2] https://lkml.org/lkml/2017/3/28/1125
+
+Doug Berger (6):
+  bus: brcmstb_gisb: Use register offsets with writes too
+  bus: brcmstb_gisb: correct support for 64-bit address output
+  bus: brcmstb_gisb: add notifier handling
+  bus: brcmstb_gisb: remove low-level ARM hooks
+  bus: brcmstb_gisb: enable driver for ARM64 architecture
+  bus: brcmstb_gisb: update to support new revision
+
+ .../devicetree/bindings/bus/brcm,gisb-arb.txt      |   3 +-
+ drivers/bus/Kconfig                                |   2 +-
+ drivers/bus/brcmstb_gisb.c                         | 121 ++++++++++++---------
+ 3 files changed, 75 insertions(+), 51 deletions(-)
+
 -- 
 2.12.0
