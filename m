@@ -1,60 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 Mar 2017 15:19:28 +0200
-Subject: [PATCH v2 2/4] clk: rockchip: rk3228: make noc and some special
- clk as critical_clocks
-In-Reply-To: <6718031.Ukr0mjLQLl@phil>
-References: <1490695614-3220-1-git-send-email-zhangqing@rock-chips.com>
- <1490695614-3220-3-git-send-email-zhangqing@rock-chips.com>
- <20170330124417.73ucpdkoonuiyhxz@lukather>
- <6718031.Ukr0mjLQLl@phil>
-Message-ID: <20170330131928.s6tr4rgx7bzwqiag@lukather>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 30 Mar 2017 09:20:21 -0400
+Subject: [PATCH V6 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846675E0C4@IRSMSX101.ger.corp.intel.com>
+References: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675E0C4@IRSMSX101.ger.corp.intel.com>
+Message-ID: <b7c7812d-8ee0-9ac7-272c-0ac53443ace8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 03:10:24PM +0200, Heiko Stuebner wrote:
-> Am Donnerstag, 30. M?rz 2017, 14:44:17 CEST schrieb Maxime Ripard:
-> > On Tue, Mar 28, 2017 at 06:06:52PM +0800, Elaine Zhang wrote:
-> > > Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> > > ---
-> > >  drivers/clk/rockchip/clk-rk3228.c | 30 +++++++++++++++++++++++++++++-
-> > >  1 file changed, 29 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
-> > > index db6e5a9e6de6..4d3203f887e2 100644
-> > > --- a/drivers/clk/rockchip/clk-rk3228.c
-> > > +++ b/drivers/clk/rockchip/clk-rk3228.c
-> > > @@ -445,7 +445,7 @@ enum rk3228_plls {
-> > >  			RK2928_CLKGATE_CON(2), 12, GFLAGS,
-> > >  			&rk3228_spdif_fracmux),
-> > >  
-> > > -	GATE(0, "jtag", "ext_jtag", 0,
-> > > +	GATE(0, "jtag", "ext_jtag", CLK_IGNORE_UNUSED,
-> > 
-> > CLK_IGNORE_UNUSED only prevents a given clock from being gated at
-> > late_initcall time, but will not prevent it from being gated later in
-> > the life of the system, for example if a reparenting occurs, or if all
-> > the clocks sharing the same clock tree become disabled.
-> > 
-> > If your clock really should never ever be gated in order for Linux to
-> > operate properly, you should use CLK_IS_CRITICAL.
+On 3/30/2017 9:07 AM, Patel, Mayurkumar wrote:
+> Thanks for quick patches. I can boot up now without any crash. I will test actual
+> functionality by next week as I am out for this week.
 > 
-> in the scope of the jtag clock, that is actually ok. As it only gates
-> some clock supplied from an external source (ext_jtag).
 
-It might, I don't know how your clocks work in general, this was just
-a warning that this probably isn't sufficient if the clock is actually
-critical.
+Yeah, no problem. Let me know how it goes.
 
-Maxime
+> 
+> 
+> 
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/eef540cd/attachment.sig>
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
