@@ -1,39 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 30 Mar 2017 19:19:32 +0100
-Subject: [PATCH v3 0/6] bus: brcmstb_gisb: add support for GISBv7 arbiter
-In-Reply-To: <c3182c24-2245-cf2e-32e4-248b8046a30f@gmail.com>
-References: <20170330002914.7371-1-opendmb@gmail.com>
- <c3182c24-2245-cf2e-32e4-248b8046a30f@gmail.com>
-Message-ID: <20170330181932.GB8062@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Mar 2017 19:26:39 +0100
+Subject: [PATCH v3 4/8] arm64: efi: clean up Image header after PE header
+ has been split off
+In-Reply-To: <20170323190051.14882-5-ard.biesheuvel@linaro.org>
+References: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
+ <20170323190051.14882-5-ard.biesheuvel@linaro.org>
+Message-ID: <20170330182636.GG14608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 09:33:32AM -0700, Florian Fainelli wrote:
-> On 03/29/2017 05:29 PM, Doug Berger wrote:
-> > This patch set contains changes to enable the GISB arbiter driver
-> > on the latest ARM64 architecture Set-Top Box chips from Broadcom.
-> > 
-> > Since the ARM64 architecture does not support the hooking of low
-> > level fault handlers the driver has been adjusted to depend solely
-> > on GISB interrupts and notify events to provide diagnostic
-> > messaging.  The GISB hardware still triggers bus faults for the
-> > processor so the default low-level aborts will occur and will be
-> > handled based on the architecture specific kernel implementation.
-> > 
-> > While this tends to obsure the GISB error messaging it is still
-> > reasonable so the same approach is applied to the ARM architecture
-> > for consistency.
-> > 
-> > The patches also correct some issues with the existing driver
-> > and add the new register map for the GISBv7 hardware first
-> > appearing in the BCM7278 device.
+On Thu, Mar 23, 2017 at 07:00:47PM +0000, Ard Biesheuvel wrote:
+> After having split off the PE header, clean up the bits that remain:
+> use .long consistently, merge two adjacent #ifdef CONFIG_EFI blocks,
+> fix the offset of the PE header pointer and remove the redundant .align
+> that follows it.
 > 
-> This all looks great to me, and since there are no more ARM64
-> dependencies I can take this via the Broadcom ARM/ARM64 SoC pull requests.
+> Also, since we will be eliminating all open coded constants from the
+> EFI header in subsequent patches, let's replace the open coded "ARM\x64"
+> magic number with its .ascii equivalent.
 > 
-> Mark, are you also happy with this v3?
+> No changes to the resulting binary image are intended.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
 
-It looks fine by me.
+Seems to do the right thing:
 
-Thanks,
-Mark.
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index c1977bed01db..6d49e716bf40 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -91,20 +91,14 @@ _head:
+>  	.quad	0				// reserved
+>  	.quad	0				// reserved
+>  	.quad	0				// reserved
+> -	.byte	0x41				// Magic number, "ARM\x64"
+> -	.byte	0x52
+> -	.byte	0x4d
+> -	.byte	0x64
+> +	.ascii	"ARM\x64"			// Magic number
+>  #ifdef CONFIG_EFI
+>  	.long	pe_header - _head		// Offset to the PE header.
+> -#else
+> -	.word	0				// reserved
+> -#endif
+>  
+> -#ifdef CONFIG_EFI
+> -	.align 3
+>  pe_header:
+>  	__EFI_PE_HEADER
+> +#else
+> +	.long	0				// reserved
+>  #endif
+>  
+>  	__INIT
+> -- 
+> 2.9.3
+> 
