@@ -1,31 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 17:44:14 +0200
-Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.12
-In-Reply-To: <20170323105106.20144-3-nsekhar@ti.com>
-References: <20170323105106.20144-1-nsekhar@ti.com>
- <20170323105106.20144-3-nsekhar@ti.com>
-Message-ID: <CAK8P3a0cQ_oxWE+Fx-+aw3+bb3qRgQ1y3Z9wycO2R2_sc5_vpQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Mar 2017 17:45:08 +0200
+Subject: [PATCH v4 2/4] mvebu: xp: Add PWM properties to .dtsi files
+In-Reply-To: <20170327194301.1104-3-ralph.sennhauser@gmail.com> (Ralph
+ Sennhauser's message of "Mon, 27 Mar 2017 21:42:58 +0200")
+References: <20170327194301.1104-1-ralph.sennhauser@gmail.com>
+ <20170327194301.1104-3-ralph.sennhauser@gmail.com>
+Message-ID: <87wpb693az.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:51 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/defconfig
->
-> for you to fetch changes up to 507c318d5ee7d05da6d94041dd42abe0cfdd62cf:
->
->   ARM: davinci_all_defconfig: Enable TI ADS7950 (2017-03-07 15:48:21 +0530)
->
-> ----------------------------------------------------------------
-> DaVinci defconfig updates for enabling
-> Video capture and display on DA850 and
-> an ADC driver thats used by Lego EV3.
+Hi Ralph,
+ 
+ On lun., mars 27 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-Pulled into next/defconfig, thanks!
+The title should start by ARM: dts: mvebu:
 
-      Arnd
+If there is no need to have a v5 then I wil take care of modifying the
+title while applying it.
+
+
+> From: Andrew Lunn <andrew@lunn.ch>
+>
+> Add properties to the GPIO nodes to allow them to be also used as PWM
+> lines.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> URL: https://patchwork.ozlabs.org/patch/427294/
+> [Ralph Sennhauser:
+>   * Use new compatible string marvell,armada-370-xp-gpio
+>   * Add missing reg-names / #pwm-cell properties to armada-xp-mv78260.dtsi
+>     'gpio1' node]
+> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-370.dtsi        | 16 +++++++++++-----
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 14 ++++++++++----
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 16 +++++++++++-----
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi | 16 +++++++++++-----
+>  4 files changed, 43 insertions(+), 19 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index cc011c8..e30b076 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -137,29 +137,35 @@
+>  			};
+>  
+>  			gpio0: gpio at 18100 {
+> -				compatible = "marvell,orion-gpio";
+> -				reg = <0x18100 0x40>;
+> +				compatible = "marvell,armada-370-xp-gpio";
+
+I think we should keep the "marvell,orion-gpio" too because the hardware
+is still compatible with it. Morever it will allow to use a recent dtb
+with an old kernel.
+
+
+> +				reg = <0x18100 0x40>, <0x181c0 0x08>;
+> +				reg-names = "gpio", "pwm";
+>  				ngpios = <32>;
+>  				gpio-controller;
+>  				#gpio-cells = <2>;
+> +				#pwm-cells = <2>;
+>  				interrupt-controller;
+>  				#interrupt-cells = <2>;
+>  				interrupts = <82>, <83>, <84>, <85>;
+> +				clocks = <&coreclk 0>;
+>  			};
+>  
+>  			gpio1: gpio at 18140 {
+> -				compatible = "marvell,orion-gpio";
+> -				reg = <0x18140 0x40>;
+> +				compatible = "marvell,armada-370-xp-gpio";
+
+Same here and for all the others...
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
