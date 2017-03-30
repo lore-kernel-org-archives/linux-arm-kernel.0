@@ -1,62 +1,72 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Wed, 29 Mar 2017 17:29:14 -0700
-Subject: [PATCH v3 6/6] bus: brcmstb_gisb: update to support new revision
-In-Reply-To: <20170330002914.7371-1-opendmb@gmail.com>
-References: <20170330002914.7371-1-opendmb@gmail.com>
-Message-ID: <20170330002914.7371-7-opendmb@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 29 Mar 2017 17:40:02 -0700
+Subject: [RFC PATCH] Memory hotplug support for arm64 platform
+In-Reply-To: <20170206111732.GA5589@samekh>
+References: <1481717765-31186-1-git-send-email-m.bielski@virtualopensystems.com>
+ <75156ea7-6e74-27e8-bf29-762f79151d23@broadcom.com>
+ <7977063a-20bb-cc85-449f-51bb7d20761e@virtualopensystems.com>
+ <6568a65d-79c0-6fe4-e4d0-f1d3fe205321@broadcom.com>
+ <20170206111732.GA5589@samekh>
+Message-ID: <ef53951f-ff03-91d2-506a-c5eccb6512b4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 7278 introduces a new version of this core.  This
-commit adds support for that revision.
+Hi Andrea, Maciej,
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt |  3 ++-
- drivers/bus/brcmstb_gisb.c                              | 10 ++++++++++
- 2 files changed, 12 insertions(+), 1 deletion(-)
+On 02/06/2017 03:17 AM, Andrea Reale wrote:
+> Hi Scott,
+> Hi all,
+> 
+> in reply to the issues that Scott reported last month, myself and Maciej
+> investigated further by running quite a number of experiments on the
+> physical and virtual environments we have avaialable.
+> 
+> We collected all the results and relevant logs in a Web page at
+> https://hotplug-tests.eu-gb.mybluemix.net/ so that anyone interested can
+> go there and check all the details.
+> 
+> The tl;dr version is that, in all configuration, we could not reproduce
+> what Scott has described as "memory corruption". The only issue we
+> encountered happens when the system is booted with a small amount of
+> initial memory (e.g., mem=64M) and one tries to hot-add several sections
+> of memory in ZONE_MOVABLE; in that case, the process is likely to fail
+> when vmemmap tries to allocate chunks of 2^9 consecutive pages to make
+> space for the `struct page`s describing the new memory; in fact, it
+> seems likely that, in low memory situations, the system cannot find enough
+> consecutive pages in ZONE_DMA or ZONE_NORMAL. This condition is not
+> dependand on memory hot-plug; in fact, we counter-tested this by writing
+> a simple module that just tries to allocate a few chunks of 2^9 pages,
+> and we experienced that it fails when the system is booted with low
+> memory (sources and logs in the Web page linked above).
+> 
+> @Scott: were your referring to this issue, by any chance, in your
+> previous emails? If not, we would really appreciate if you could help us
+> reproduce the condition you are experiencing and/or give us a more detail 
+> of what are the symptoms of the corruption you are referring to.
 
-diff --git a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-index 1eceefb20f01..8a6c3c2e58fe 100644
---- a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-+++ b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-@@ -3,7 +3,8 @@ Broadcom GISB bus Arbiter controller
- Required properties:
- 
- - compatible:
--    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for 28nm chips
-+    "brcm,bcm7278-gisb-arb" for V7 28nm chips
-+    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for other 28nm chips
-     "brcm,bcm7435-gisb-arb" for newer 40nm chips
-     "brcm,bcm7400-gisb-arb" for older 40nm chips and all 65nm chips
-     "brcm,bcm7038-gisb-arb" for 130nm chips
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 3fbc116e6b95..68ac3e93b600 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -56,6 +56,15 @@ static const int gisb_offsets_bcm7038[] = {
- 	[ARB_ERR_CAP_MASTER]	= -1,
- };
- 
-+static const int gisb_offsets_bcm7278[] = {
-+	[ARB_TIMER]		= 0x008,
-+	[ARB_ERR_CAP_CLR]	= 0x7f8,
-+	[ARB_ERR_CAP_HI_ADDR]	= -1,
-+	[ARB_ERR_CAP_ADDR]	= 0x7e0,
-+	[ARB_ERR_CAP_STATUS]	= 0x7f0,
-+	[ARB_ERR_CAP_MASTER]	= 0x7f4,
-+};
-+
- static const int gisb_offsets_bcm7400[] = {
- 	[ARB_TIMER]		= 0x00c,
- 	[ARB_ERR_CAP_CLR]	= 0x0c8,
-@@ -307,6 +316,7 @@ static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
- 	{ .compatible = "brcm,bcm7445-gisb-arb", .data = gisb_offsets_bcm7445 },
- 	{ .compatible = "brcm,bcm7435-gisb-arb", .data = gisb_offsets_bcm7435 },
- 	{ .compatible = "brcm,bcm7400-gisb-arb", .data = gisb_offsets_bcm7400 },
-+	{ .compatible = "brcm,bcm7278-gisb-arb", .data = gisb_offsets_bcm7278 },
- 	{ .compatible = "brcm,bcm7038-gisb-arb", .data = gisb_offsets_bcm7038 },
- 	{ },
- };
--- 
-2.12.0
+One question regarding your patch posted here:
+https://lkml.org/lkml/2016/12/14/188
+
+While the "hack" that sets/clears NOMAP in order for pfn_valid() to
+return false/true when appropriate during __add_pages() definitively
+does seem to work to probe the memory section, don't you also hit the
+same warning when you try to online that memory section in
+pages_correctly_reserved() once you have cleared the NOMAP flag?
+
+NB: I am working on the 4.1 kernel at the moment, but it seems to be
+nearly identical in that regard.
+
+> 
+> We are still running additional tests on other boards and we will update
+> the Web page while we get them. If anyone happens to try these patches
+> on their system, we warmly invite to send feedback with either 
+> negative or positive outcomes.
+
+I will definitively give this a try on ARM64 since I need to get it
+working there.
+
+Do you mind posting a non-RFC patch?
+
+Thanks!
+--
+Florian
