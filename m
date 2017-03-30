@@ -1,87 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 30 Mar 2017 15:31:12 +0100
-Subject: KVM/ARM: sleeping function called from invalid context
-Message-ID: <20170330143112.GI16211@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Mar 2017 16:32:49 +0200
+Subject: [GIT PULL] generic TEE subsystem for v4.12
+In-Reply-To: <20170314145305.GA12937@jax>
+References: <20170314145305.GA12937@jax>
+Message-ID: <8981963.xoBUojTFOS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday, March 14, 2017 3:57:34 PM CEST Jens Wiklander wrote:
+> Hi arm-soc maintainers,
+> 
+> Please consider this pull request for v4.12
+> 
+> This pull request contains version 16 of the generic TEE driver.
+> 
+> The TEE subsystem will contain drivers for various TEE implementations.
+> A TEE (Trusted Execution Environment) is a trusted OS running in some
+> secure environment, for example, TrustZone on ARM CPUs, or a separate
+> secure co-processor etc.
+> 
+> The patch set has been reviewed by different people during the different
+> versions. Now I think this has reached a state where it's mature enough
+> to merge.
+> 
+> The v16 cover letter containing detailed revision history can be found at
+> https://lkml.org/lkml/2017/3/10/1277
+> 
+> Thanks,
+> Jens
+> 
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org:/people/jens.wiklander/linux-tee.git tags/tee-drv-for-4.12
+> 
+> for you to fetch changes up to 14e21cb8f811100a2104e952b8f5bc0326a5e213:
+> 
+>   arm64: dt: hikey: Add optee node (2017-03-10 14:51:58 +0100)
+> 
+> ----------------------------------------------------------------
+> Introduce generic TEE subsystem:
+> - the TEE subsystem itself
+> - an OP-TEE driver using the subsystem
+> - optee bindings
+> - optee node for hi6220-hikey.dts
 
-I'm seeing the splat below when running KVM on an arm64 host with
-CONFIG_DEBUG_ATOMIC_SLEEP and CONFIG_LOCKDEP enabled.
+(+Linus, FYI)
 
-I saw this on v4.11-rc1, and I can reproduce the problem on the current
-kvmarm master branch (563e2f5daa66fbc1).
+I've put this into a separate next/tee branch in arm-soc,
+which means we will send this separately to Linus in the next
+merge window for the introduction of a new kernel subsystem,
+and I expect that future updates will get handled through the
+next/drivers branch in arm-soc, like we do for reset controllers.
 
-I've hacked noinlines into arch/arm/kvm/mmu.c in an attempt to get a
-better backtrace; without this, the report says the call is at
-arch/arm/kvm/mmu.c:299, which is somewhat confusing.
+I have reviewed earlier versions in the past, and have reviewed
+the latest version in person during Linaro Connect BUD17.
 
-Splat:
+Here is my overall assessment of the subsystem:
 
-[  135.549391] BUG: sleeping function called from invalid context at arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:302
-[  135.559712] in_atomic(): 1, irqs_disabled(): 0, pid: 2311, name: kvm-vcpu-0
-[  135.566709] 8 locks held by kvm-vcpu-0/2311:
-[  135.571010]  #0:  (&vcpu->mutex){+.+.+.}, at: [<ffff2000080d7c70>] vcpu_load+0x28/0x2b0
-[  135.579075]  #1:  (&kvm->srcu){......}, at: [<ffff2000080ff358>] kvm_handle_guest_abort+0x208/0x7d0
-[  135.588177]  #2:  (&mm->mmap_sem){++++++}, at: [<ffff2000084d57f4>] get_user_pages_unlocked+0xbc/0x370
-[  135.597540]  #3:  (&anon_vma->rwsem){++++..}, at: [<ffff20000851b064>] page_lock_anon_vma_read+0x164/0x588
-[  135.607244]  #4:  (&(ptlock_ptr(page))->rlock){+.+.-.}, at: [<ffff20000850e2c0>] page_vma_mapped_walk+0x8b0/0x14f0
-[  135.617647]  #5:  (&srcu){......}, at: [<ffff200008571c9c>] __mmu_notifier_invalidate_page+0x10c/0x3c0
-[  135.627012]  #6:  (&kvm->srcu){......}, at: [<ffff2000080dafd4>] kvm_mmu_notifier_invalidate_page+0x10c/0x320
-[  135.636980]  #7:  (&(&kvm->mmu_lock)->rlock){+.+.-.}, at: [<ffff2000080db00c>] kvm_mmu_notifier_invalidate_page+0x144/0x320
-[  135.648180] CPU: 1 PID: 2311 Comm: kvm-vcpu-0 Not tainted 4.11.0-rc1-00006-gf9bc6f5-dirty #2
-[  135.656616] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
-[  135.664183] Call trace:
-[  135.666636] [<ffff200008094ee0>] dump_backtrace+0x0/0x588
-[  135.672039] [<ffff200008095488>] show_stack+0x20/0x30
-[  135.677095] [<ffff200008c34a44>] dump_stack+0x16c/0x1e0
-[  135.682325] [<ffff2000081cb0fc>] ___might_sleep+0x2e4/0x508
-[  135.687902] [<ffff2000080faee4>] unmap_stage2_range+0x114/0x200
-[  135.693825] [<ffff2000080faff8>] kvm_unmap_hva_handler+0x28/0x38
-[  135.699836] [<ffff2000080fb908>] handle_hva_to_gpa+0x178/0x2a0
-[  135.705672] [<ffff2000080ff984>] kvm_unmap_hva+0x64/0xa0
-[  135.710989] [<ffff2000080db048>] kvm_mmu_notifier_invalidate_page+0x180/0x320
-[  135.718128] [<ffff200008571d6c>] __mmu_notifier_invalidate_page+0x1dc/0x3c0
-[  135.725094] [<ffff200008517cb8>] try_to_unmap_one+0x4a0/0x1360
-[  135.730931] [<ffff2000085121c0>] rmap_walk_anon+0x2d0/0xa68
-[  135.736507] [<ffff20000851b58c>] rmap_walk+0x104/0x1e0
-[  135.741649] [<ffff20000851c1b8>] try_to_unmap+0x1b8/0x500
-[  135.747053] [<ffff20000859bbcc>] __unmap_and_move+0x364/0x938
-[  135.752802] [<ffff20000859c31c>] unmap_and_move.isra.3+0x17c/0xd40
-[  135.758987] [<ffff20000859e0f0>] migrate_pages+0x228/0x960
-[  135.764477] [<ffff2000084c232c>] compact_zone+0xeec/0x1d10
-[  135.769967] [<ffff2000084c3264>] compact_zone_order+0x114/0x198
-[  135.775891] [<ffff2000084c5260>] try_to_compact_pages+0x338/0x758
-[  135.781992] [<ffff2000084439a0>] __alloc_pages_direct_compact+0x80/0x858
-[  135.788698] [<ffff2000084451d4>] __alloc_pages_nodemask+0x7bc/0x1b18
-[  135.795055] [<ffff20000856af2c>] alloc_pages_vma+0x48c/0x848
-[  135.800719] [<ffff2000085a9680>] do_huge_pmd_anonymous_page+0x2e0/0x1b48
-[  135.807423] [<ffff2000084f153c>] __handle_mm_fault+0xe64/0x1de8
-[  135.813346] [<ffff2000084f28cc>] handle_mm_fault+0x40c/0xbc0
-[  135.819009] [<ffff2000084d48f8>] __get_user_pages+0x210/0x888
-[  135.824760] [<ffff2000084d5920>] get_user_pages_unlocked+0x1e8/0x370
-[  135.831119] [<ffff2000080e265c>] __gfn_to_pfn_memslot+0x634/0xae0
-[  135.837220] [<ffff2000080e2b50>] gfn_to_pfn_prot+0x48/0x58
-[  135.842711] [<ffff2000080fdc78>] user_mem_abort+0x380/0x7c8
-[  135.848288] [<ffff2000080ff43c>] kvm_handle_guest_abort+0x2ec/0x7d0
-[  135.854559] [<ffff200008104184>] handle_exit+0x244/0x508
-[  135.859874] [<ffff2000080f39c8>] kvm_arch_vcpu_ioctl_run+0x890/0x1330
-[  135.866318] [<ffff2000080d9ffc>] kvm_vcpu_ioctl+0x6bc/0xe30
-[  135.871894] [<ffff20000863d1ac>] do_vfs_ioctl+0x194/0x14a0
-[  135.877383] [<ffff20000863e560>] SyS_ioctl+0xa8/0xb8
-[  135.882351] [<ffff200008084770>] el0_svc_naked+0x24/0x28
+* There is clearly demand for this, both for the generic
+  infrastructure and the specific OP-TEE implementation.
 
-I'm able to trigger this fairly reliably by having a guest touch a large
-amount of memory. I'm doing this by running two instances of the below,
-each with GUESTRAM set to half of the host physical memory, as I found
-that one instance was more likely to trigger the OoM killer.
+* The code has gone through a large number of reviews,
+  and the review comments have all been addressed, but
+  the reviews were not coming up with serious issues any more
+  and nobody volunteered to vouch for the quality.
 
-	lkvm sandbox --console virtio -m ${GUESTRAM} --kernel Image \
-	-p "memtest=1" -- true
+* The user space ioctl interface is sufficient to work with the
+  OP-TEE driver, and it should in principle work with other
+  TEE implementations that follow the GlobalPlatform[1] standards,
+  but it might need to be extended in minor ways depending on
+  specific requirements of future TEE implementations
 
-(note: lkvm sandbox assumes a dir called 'guests' exists in cwd. You may need
-to create it first if you do not already have one).
+* The main downside of the API to me is how the user space
+  is tied to the TEE implementation in hardware or firmware,
+  but uses a generic way to communicate with it. This seems
+  to be an inherent problem with what it is trying to do,
+  and I could not come up with any better solution than what
+  is implemented here.
 
-Thanks,
-Mark.
+      Arnd
+
+[1] https://www.globalplatform.org/mediaguidetee.asp
