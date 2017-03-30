@@ -1,85 +1,35 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 31 Mar 2017 07:50:14 +1100
-Subject: [PATCH v4 19/23] drivers/fsi: Add GPIO based FSI master
-In-Reply-To: <0e1bcf3a-e8d7-9f50-bdf7-2a1e7466665b@linux.vnet.ibm.com>
-References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
- <20170329174340.89109-20-cbostic@linux.vnet.ibm.com>
- <CACPK8XfOSYPidHF6=psC4mP-tkRyWTu0psdcK6EwA2E6FF53Uw@mail.gmail.com>
- <0e1bcf3a-e8d7-9f50-bdf7-2a1e7466665b@linux.vnet.ibm.com>
-Message-ID: <1490907014.3177.207.camel@kernel.crashing.org>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 30 Mar 2017 22:56:58 +0200
+Subject: [PATCH v3 0/2] Tango PCIe controller support
+In-Reply-To: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
+References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
+Message-ID: <1561c381-bfa7-6e4d-a016-8ad7293a60ce@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-03-30 at 13:15 -0500, Christopher Bostic wrote:
-> > > +static void serial_in(struct fsi_master_gpio *master, struct fsi_gpio_msg *msg,
-> > > +?????????????????????? uint8_t num_bits)
-> > > +{
-> > > +?????? uint8_t bit, in_bit;
-> > > +
-> > > +?????? set_sda_input(master);
-> > > +
-> > > +?????? for (bit = 0; bit < num_bits; bit++) {
-> > > +?????????????? clock_toggle(master, 1);
-> > > +?????????????? in_bit = sda_in(master);
-> > > +?????????????? msg->msg <<= 1;
-> > > +?????????????? msg->msg |= ~in_bit & 0x1;????? /* Data is negative active */
-> > > +?????? }
-> > > +?????? msg->bits += num_bi	ts;
-> > > +}
-> > > +
-> > > +static void serial_out(struct fsi_master_gpio *master,
-> > > +?????????????????????? const struct fsi_gpio_msg *cmd)
-> > > +{
-> > > +?????? uint8_t bit;
-> > > +?????? uint64_t msg = ~cmd->msg;?????? /* Data is negative active */
-> > > +?????? uint64_t sda_mask = 0x1ULL << (cmd->bits - 1);
-> > > +?????? uint64_t last_bit = ~0;
-> > > +?????? int next_bit;
-> > > +
-> > > +?????? if (!cmd->bits) {
-> > > +?????????????? dev_warn(master->dev, "trying to output 0 bits\n");
-> > > +?????????????? return;
-> > > +?????? }
-> > > +?????? set_sda_output(master, 0);
-> > > +
-> > > +?????? /* Send the start bit */
-> > > +?????? sda_out(master, 0);
-> > > +?????? clock_toggle(master, 1);
-> > > +
-> > > +?????? /* Send the message */
-> > > +?????? for (bit = 0; bit < cmd->bits; bit++) {
-> > > +?????????????? next_bit = (msg & sda_mask) >> (cmd->bits - 1);
-> > > +?????????????? if (last_bit ^ next_bit) {
-> > > +?????????????????????? sda_out(master, next_bit);
-> > > +?????????????????????? last_bit = next_bit;
-> > > +?????????????? }
-> > > +?????????????? clock_toggle(master, 1);
-> > > +?????????????? msg <<= 1;
-> > > +?????? }
-> > > +}
+On 29/03/2017 13:11, Marc Gonzalez wrote:
 
-As I mentioned privately, I don't think this is right, unless your
-clock signal is inverted or my protocol spec is wrong...
+>   PCI: Add tango MSI controller support
+>   PCI: Add tango PCIe host bridge support
 
-Your clock toggle is written so you call it right after the rising
-edge. It does delay, 0, delay, 1.
+I've run into an issue.
 
-But according to the FSI timing diagram I have, you need to establish
-the data around the falling edge, it gets sampled by the slave on the
-rising edge. So as it is, your code risks violating the slave hold
-time.
+If I boot the system with earlyprintk enabled (as I've
+been doing throughout my dev), things work as expected.
 
-On input, you need to sample on the falling edge, right before it. You
-are sampling after the rising edge, so you aren't leaving enough time
-for the slave to establish the data.
+But if I boot with earlyprintk disabled, then the system
+does not "see" the PCIe board, because reading the vendor
+ID returns 0xffffffff.
 
-You could probably just flip clock_toggle() around. Make it: 0, delay,
-1, delay.
+What we think is happening, is that when earlyprintk is
+disabled, the system proceeds much faster through the
+various inits, and the PCIe init happens when PCIe
+link training has not completed yet.
 
-That way you can do for sends: sda_out + toggle, and for receive
-toggle + sda_in. That will make you establish your output data and
-sample right before the falling edge, which should be ok provided the
-diagram I have is right.
+If that is the case, then it seems I would need to check
+the link state in my probe function.
 
-Cheers,
-Ben.
+Or would there be some other solution I haven't thought
+about?
+
+Regards.
