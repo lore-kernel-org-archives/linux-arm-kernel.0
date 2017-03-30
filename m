@@ -1,63 +1,250 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Mar 2017 15:09:00 +0100
-Subject: [PATCH 1/4] iommu/arm-smmu: Handle size mismatches better
-In-Reply-To: <6e61306e6823943b3eeb0c405d4505dd565e723e.1488907474.git.robin.murphy@arm.com>
-References: <cover.1488907474.git.robin.murphy@arm.com>
- <6e61306e6823943b3eeb0c405d4505dd565e723e.1488907474.git.robin.murphy@arm.com>
-Message-ID: <20170330140900.GF22160@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Mar 2017 15:09:25 +0100
+Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
+ private memory allocations
+In-Reply-To: <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
+References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
+ <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
+Message-ID: <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Roy,
 
-On Tue, Mar 07, 2017 at 06:09:04PM +0000, Robin Murphy wrote:
-> We currently warn if the firmware-described region size differs from the
-> SMMU address space size reported by the hardware, but continue to use
-> the former to calculate where our context bank base should be,
-> effectively guaranteeing that things will not work correctly.
-> 
-> Since over-mapping is effectively harmless, and under-mapping can be OK
-> provided all the usable context banks are still covered, let's let the
-> hardware information take precedence in the case of a mismatch, such
-> that we get the correct context bank base and in most cases things will
-> actually work instead of silently misbehaving. And at worst, if the
-> firmware is wrong enough to have not mapped something we actually try to
-> use, the resulting out-of-bounds access will hopefully provide a much
-> more obvious clue.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On 29/03/17 22:13, Roy Pledge wrote:
+> Use the shared-memory-pool mechanism for frame queue descriptor and
+> packed frame descriptor record area allocations.
+
+Thanks for persevering with this - in my opinion it's now looking like
+it was worth the effort :)
+
+AFAICS the ioremap_wc() that this leads to does appear to give back
+something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
+horrendously misnamed), and "no-map" should rule out any cacheable
+linear map alias existing, so it would seem that this approach should
+avert Scott's concerns about attribute mismatches.
+
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 > ---
->  drivers/iommu/arm-smmu.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  drivers/soc/fsl/qbman/qman_ccsr.c | 119 +++++++++++++++++++++-----------------
+>  drivers/soc/fsl/qbman/qman_priv.h |   4 +-
+>  drivers/soc/fsl/qbman/qman_test.h |   2 -
+>  3 files changed, 68 insertions(+), 57 deletions(-)
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index abf6496843a6..bc7ef6a0c54d 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1864,10 +1864,12 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  	/* Check for size mismatch of SMMU address space from mapped region */
->  	size = 1 << (((id >> ID1_NUMPAGENDXB_SHIFT) & ID1_NUMPAGENDXB_MASK) + 1);
->  	size *= 2 << smmu->pgshift;
-> -	if (smmu->size != size)
-> +	if (smmu->size != size) {
->  		dev_warn(smmu->dev,
->  			"SMMU address space size (0x%lx) differs from mapped region size (0x%lx)!\n",
->  			size, smmu->size);
-> +		smmu->size = size;
+> diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
+> index 90bc40c..35c59ca 100644
+> --- a/drivers/soc/fsl/qbman/qman_ccsr.c
+> +++ b/drivers/soc/fsl/qbman/qman_ccsr.c
+> @@ -400,63 +400,19 @@ static int qm_init_pfdr(struct device *dev, u32 pfdr_start, u32 num)
+>  	return -ENODEV;
+>  }
+>  
+> -/*
+> - * Ideally we would use the DMA API to turn rmem->base into a DMA address
+> - * (especially if iommu translations ever get involved).  Unfortunately, the
+> - * DMA API currently does not allow mapping anything that is not backed with
+> - * a struct page.
+> - */
+> +/* QMan needs two global memory areas initialized at boot time:
+> +    1) FQD: Frame Queue Descriptors used to manage frame queues
+> +    2) PFDR: Packed Frame Queue Descriptor Records used to store frames
+> +   Both areas are reserved using the device tree reserved memory framework
+> +   and the addresses and sizes are initialized when the QMan device is probed */
+>  static dma_addr_t fqd_a, pfdr_a;
+>  static size_t fqd_sz, pfdr_sz;
+>  
+> -static int qman_fqd(struct reserved_mem *rmem)
+> -{
+> -	fqd_a = rmem->base;
+> -	fqd_sz = rmem->size;
+> -
+> -	WARN_ON(!(fqd_a && fqd_sz));
+> -
+> -	return 0;
+> -}
+> -RESERVEDMEM_OF_DECLARE(qman_fqd, "fsl,qman-fqd", qman_fqd);
+> -
+> -static int qman_pfdr(struct reserved_mem *rmem)
+> -{
+> -	pfdr_a = rmem->base;
+> -	pfdr_sz = rmem->size;
+> -
+> -	WARN_ON(!(pfdr_a && pfdr_sz));
+> -
+> -	return 0;
+> -}
+> -RESERVEDMEM_OF_DECLARE(qman_pfdr, "fsl,qman-pfdr", qman_pfdr);
+> -
+
+I notice that patch #1 isn't removing the equivalent bman_fbpr() handler
+and declaration as here - is that deliberate or just an oversight?
+
+>  static unsigned int qm_get_fqid_maxcnt(void)
+>  {
+>  	return fqd_sz / 64;
+>  }
+>  
+> -/*
+> - * Flush this memory range from data cache so that QMAN originated
+> - * transactions for this memory region could be marked non-coherent.
+> - */
+> -static int zero_priv_mem(struct device *dev, struct device_node *node,
+> -			 phys_addr_t addr, size_t sz)
+> -{
+> -	/* map as cacheable, non-guarded */
+> -	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
+> -
+> -	if (!tmpp)
+> -		return -ENOMEM;
+> -
+> -	memset_io(tmpp, 0, sz);
+> -	flush_dcache_range((unsigned long)tmpp,
+> -			   (unsigned long)tmpp + sz);
+> -	iounmap(tmpp);
+> -
+> -	return 0;
+> -}
+> -
+>  static void log_edata_bits(struct device *dev, u32 bit_count)
+>  {
+>  	u32 i, j, mask = 0xffffffff;
+> @@ -687,11 +643,12 @@ static int qman_resource_init(struct device *dev)
+>  static int fsl_qman_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> -	struct device_node *node = dev->of_node;
+> +	struct device_node *mem_node, *node = dev->of_node;
+>  	struct resource *res;
+>  	int ret, err_irq;
+>  	u16 id;
+>  	u8 major, minor;
+> +	u64 size;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!res) {
+> @@ -727,10 +684,66 @@ static int fsl_qman_probe(struct platform_device *pdev)
+>  		qm_channel_caam = QMAN_CHANNEL_CAAM_REV3;
+>  	}
+>  
+> -	ret = zero_priv_mem(dev, node, fqd_a, fqd_sz);
+> -	WARN_ON(ret);
+> -	if (ret)
+> +	/* Order of memory regions is assumed as FQD followed by PFDR
+> +	   in order to ensure allocations from the correct regions the
+> +	   driver initializes then allocates each piece in order */
+> +
+> +	ret = of_reserved_mem_device_init_by_idx(dev, dev->of_node, 0);
+> +	if (ret) {
+> +		dev_err(dev, "of_reserved_mem_device_init_by_idx(0) failed 0x%x\n",
+> +			ret);
+> +		return -ENODEV;
+> +	}
+> +	mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
+> +	if (mem_node) {
+> +		ret = of_property_read_u64(mem_node, "size", &size);
+> +		if (ret) {
+> +			dev_err(dev, "FQD: of_address_to_resource fails 0x%x\n", ret);
+
+Nit: of_address_to_resource?
+
+> +			return -ENODEV;
+> +		}
+> +		fqd_sz = size;
+> +	} else {
+> +		dev_err(dev, "No memory-region found for FQD\n");
+> +		return -ENODEV;
+> +	}
+> +	if (!dma_zalloc_coherent(dev, fqd_sz, &fqd_a, 0)) {
+> +		dev_err(dev, "Alloc FQD memory failed\n");
+> +		return -ENODEV;
 > +	}
 
-I'm not really in favour of this, but I admit that this case is a bit weird.
-Basically, we always have two ways to determine the size of the SMMU:
+Between here, below, and patch #1, it looks like this "init, get size,
+alloc" pattern could be nicely factored out into a common helper function.
 
-  1. The device-tree reg property, since we need the base address to be
-     passed there and this will include a size.
+> +
+> +	dev_info(dev, "Allocated FQD 0x%llx 0x%zx\n", fqd_a, fqd_sz);
+> +
+> +	/* Disassociate the FQD reseverd memory area from the device because
+> +	   a device can only have one DMA memory area. This should be fine
+> +	   since the memory is allocated and initalized and only ever accessed
+> +	   by the QMan device from now on */
 
-  2. The ID register on the hardware itself
+Typos: reserved, initialized.
 
-Generally, I prefer that properties passed by firmware override those
-baked into the hardware, since this allows us to deal with broken ID
-registers easily. In this case, we basically have the size override from
-the reg property, so it takes precedence, but we warn if it differs from
-the hardware value so hopefully broken DTs are easily diagnosed.
+> +	of_reserved_mem_device_release(dev);
 
-Will
+I see the driver does not implement a .remove method where you would
+otherwise be technically expected to balance the allocation with a
+dma_free_coherent(), so I think this trick is acceptable. If anyone
+wants to change that in future, it wouldn't seem unreasonable to extend
+the core code to handle multiple areas per device (and at worst, I guess
+you could deviously juggle dev->dma_mem around the DMA API calls).
+
+Other than those first few nits, and any possible PPC-specific angles
+I'm not aware of, I think the series is looking good!
+
+Thanks,
+Robin.
+
+> +
+> +	/* Setup PFDR memory */
+> +	ret = of_reserved_mem_device_init_by_idx(dev, dev->of_node, 1);
+> +	if (ret) {
+> +		dev_err(dev, "of_reserved_mem_device_init(1) failed 0x%x\n",
+> +			ret);
+> +		return -ENODEV;
+> +	}
+> +	mem_node = of_parse_phandle(dev->of_node, "memory-region", 1);
+> +	if (mem_node) {
+> +		ret = of_property_read_u64(mem_node, "size", &size);
+> +		if (ret) {
+> +			dev_err(dev, "PFDR: of_address_to_resource fails 0x%x\n", ret);
+> +			return -ENODEV;
+> +		}
+> +		pfdr_sz = size;
+> +	} else {
+> +		dev_err(dev, "No memory-region found for PFDR\n");
+> +		return -ENODEV;
+> +	}
+> +	if (!dma_zalloc_coherent(dev, pfdr_sz, &pfdr_a, 0)) {
+> +		dev_err(dev, "Alloc PFDR Failed size 0x%zx\n", pfdr_sz);
+>  		return -ENODEV;
+> +	}
+> +
+> +	dev_info(dev, "Allocated PFDR 0x%llx 0x%zx\n", pfdr_a, pfdr_sz);
+>  
+>  	ret = qman_init_ccsr(dev);
+>  	if (ret) {
+> diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
+> index 22725bd..1e998ea5 100644
+> --- a/drivers/soc/fsl/qbman/qman_priv.h
+> +++ b/drivers/soc/fsl/qbman/qman_priv.h
+> @@ -28,12 +28,12 @@
+>   * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+>   */
+>  
+> -#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+> -
+>  #include "dpaa_sys.h"
+>  
+>  #include <soc/fsl/qman.h>
+>  #include <linux/iommu.h>
+> +#include <linux/dma-contiguous.h>
+> +#include <linux/of_address.h>
+>  
+>  #if defined(CONFIG_FSL_PAMU)
+>  #include <asm/fsl_pamu_stash.h>
+> diff --git a/drivers/soc/fsl/qbman/qman_test.h b/drivers/soc/fsl/qbman/qman_test.h
+> index d5f8cb2..41bdbc48 100644
+> --- a/drivers/soc/fsl/qbman/qman_test.h
+> +++ b/drivers/soc/fsl/qbman/qman_test.h
+> @@ -30,7 +30,5 @@
+>  
+>  #include "qman_priv.h"
+>  
+> -#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+> -
+>  int qman_test_stash(void);
+>  int qman_test_api(void);
+> 
