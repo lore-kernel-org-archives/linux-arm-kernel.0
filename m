@@ -1,43 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 30 Mar 2017 13:59:09 +0100
-Subject: [PATCH] arm64: remove redundant header file in current.h
-In-Reply-To: <1490877709-221439-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1490877709-221439-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <20170330125908.GF16211@leverpostej>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 30 Mar 2017 20:59:28 +0800
+Subject: [PATCH] ARM: dts: imx6: ZII-RDU2: fix FEC node properties
+In-Reply-To: <20170329133537.26028-1-l.stach@pengutronix.de>
+References: <20170329133537.26028-1-l.stach@pengutronix.de>
+Message-ID: <20170330125926.GD683@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 08:41:49PM +0800, Shaokun Zhang wrote:
-> Commint 9d84fb27fa1 ("arm64: restore get_current() optimisation") has 
-> removed read_sysreg() and asm/sysreg.h is redundant.
+On Wed, Mar 29, 2017 at 03:35:37PM +0200, Lucas Stach wrote:
+> These have been messed up during mainlining of the DT files.
+> Fix them to be valid properties.
 > 
-> This patch removes asm/sysreg.h header file.
-> 
-> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-
-Thanks for cleaning this up. FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > ---
->  arch/arm64/include/asm/current.h | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
-> index 86c4041..f6580d4 100644
-> --- a/arch/arm64/include/asm/current.h
-> +++ b/arch/arm64/include/asm/current.h
-> @@ -3,8 +3,6 @@
->  
->  #include <linux/compiler.h>
->  
-> -#include <asm/sysreg.h>
-> -
->  #ifndef __ASSEMBLY__
->  
->  struct task_struct;
-> -- 
-> 1.9.1
-> 
+> Shawn, if possible, it would be nice to squash this fix into the
+> broken patch adding those DT files, but that's up to you.
+> 8b44da415afc (ARM: dts: imx6: add ZII RDU2 boards)
+
+Squashed it into "ARM: dts: imx6: add ZII RDU2 boards".
+
+Shawn
