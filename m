@@ -1,45 +1,54 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Mar 2017 09:30:31 -0400
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-Message-ID: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+Date: Thu, 30 Mar 2017 09:30:33 -0400
+Subject: [PATCH V7 2/5] PCI/ASPM: split pci_aspm_init() into two
+In-Reply-To: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1490880636-30542-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the operating system is booted with the default ASPM policy
-(POLICY_DEFAULT), current code is querying the enable/disable
-states from ASPM registers to determine the policy.
+Split pci_aspm_init() body into pci_aspm_init_upstream()
+and pci_aspm_init_downstream() for bridge and endpoint
+specific code behavior.
 
-For example, a BIOS could set the power saving state to performance
-and clear all ASPM control registers. A balanced ASPM policy could
-enable L0s and disable L1. A power conscious BIOS could enable both
-L0s and L1 to trade off latency and performance vs. power.
+Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pcie/aspm.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-After hotplug removal, pcie_aspm_exit_link_state() function clears
-the ASPM registers. An insertion following hotplug removal reads
-incorrect policy as ASPM disabled even though ASPM was enabled
-during boot.
-
-This is caused by the fact that same function is used for reconfiguring
-ASPM regardless of the power on state.
-
-------------------------
-Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
-------------------------
-- revert the accidental parent check in bridge remove
-
-Sinan Kaya (5):
-  PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
-  PCI/ASPM: split pci_aspm_init() into two
-  PCI/ASPM: add init hook to device_add
-  PCI/ASPM: save power on values during bridge init
-  PCI/ASPM: move link_state cleanup to bridge remove
-
- drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
- drivers/pci/probe.c     |   3 ++
- drivers/pci/remove.c    |   3 +-
- include/linux/pci.h     |   2 +
- 4 files changed, 98 insertions(+), 47 deletions(-)
-
+diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+index dc36717..a80d64b 100644
+--- a/drivers/pci/pcie/aspm.c
++++ b/drivers/pci/pcie/aspm.c
+@@ -826,6 +826,16 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
+ 	return link;
+ }
+ 
++static int pci_aspm_init_downstream(struct pci_dev *pdev)
++{
++	return 0;
++}
++
++static int pci_aspm_init_upstream(struct pci_dev *pdev)
++{
++	return 0;
++}
++
+ /*
+  * pci_aspm_init: Initiate PCI express link state.
+  * It is called from device_add for every single pci device.
+@@ -833,7 +843,10 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
+  */
+ int pci_aspm_init(struct pci_dev *pdev)
+ {
+-	return 0;
++	if (!pdev->has_secondary_link)
++		return pci_aspm_init_downstream(pdev);
++
++	return pci_aspm_init_upstream(pdev);
+ }
+ 
+ /*
 -- 
 1.9.1
