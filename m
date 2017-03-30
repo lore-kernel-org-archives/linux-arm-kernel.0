@@ -1,50 +1,163 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 30 Mar 2017 08:24:05 +0200
-Subject: Including Alpine -next tree in linux-next
-In-Reply-To: <20170330092902.49cb4d4f@canb.auug.org.au>
-References: <20170329131201.j4e7cnmgufj2i7tr@kwain>
- <20170330001444.62ac2ad1@canb.auug.org.au>
- <20170329132148.fzn4pxc4523os4y7@kwain>
- <20170330092902.49cb4d4f@canb.auug.org.au>
-Message-ID: <20170330062405.nioiwh57snmdiutt@kwain>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 30 Mar 2017 08:46:43 +0200
+Subject: [kbuild-all] [PATCH v4 13/22] KVM: arm64: ITS:
+ KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
+In-Reply-To: <20170330022159.GB15042@yexl-desktop>
+References: <201703272354.OaYhCMvV%fengguang.wu@intel.com>
+ <0d43e874-c443-7d55-b741-ce27bd103cb5@redhat.com>
+ <20170330022159.GB15042@yexl-desktop>
+Message-ID: <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Xiaolong
 
-On Thu, Mar 30, 2017 at 09:29:09AM +1100, Stephen Rothwell wrote:
-> On Wed, 29 Mar 2017 15:21:48 +0200 Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
-> > On Thu, Mar 30, 2017 at 12:14:54AM +1100, Stephen Rothwell wrote:
-> > > On Wed, 29 Mar 2017 15:12:01 +0200 Antoine Tenart <antoine.tenart@free-electrons.com> wrote:  
-> > > > Would it be possible to include Alpine's -next tree in linux-next?
-> > > > 
-> > > > Repo: https://git.kernel.org/pub/scm/linux/kernel/git/atenart/linux.git
-> > > > Branch: alpine/for-next  
-> > > 
-> > > Could you give me a short idea about what this tree contains?  Also,
-> > > whose tree will it be merged via (or does it go direct to Linus
-> > > (Torvalds)?  
-> > 
-> > The Alpine SoCs are ARM and ARM64 processors. This branch will contain
-> > patches we plan to send to arm-soc during their merge window. So mostly
-> > device tree and SoC specific patches.
-> > 
-> > The patches will be merged through arm-soc before getting to Linus.
+On 30/03/2017 04:21, Ye Xiaolong wrote:
+> Hi, Eric
 > 
-> Included from today with just you as the contact.
+> On 03/27, Auger Eric wrote:
+>> Hi,
+>>
+>> On 27/03/2017 17:04, kbuild test robot wrote:
+>>> Hi Eric,
+>>>
+>>> [auto build test ERROR on kvmarm/next]
+>>> [also build test ERROR on v4.11-rc4 next-20170327]
+>>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>>>
+>>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/vITS-save-restore/20170327-195443
+>>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
+>>> config: arm64-defconfig (attached as .config)
+>>> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+>>> reproduce:
+>>>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>>>         chmod +x ~/bin/make.cross
+>>>         # save the attached .config to linux build tree
+>>>         make.cross ARCH=arm64 
+>>>
+>>> All errors (new ones prefixed by >>):
+>>>
+>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c: In function 'vgic_its_has_attr':
+>>>>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: error: 'its' undeclared (first use in this function)
+>>>       return vgic_its_table_restore(its);
+>>
+>> I think this is due to the fact the series is applied on KVM: arm/arm64:
+>> Emulate the EL1 phys timer registers (kvmarm-for-4.11).
+>>
+>> Please apply it to (kvmarm/queue, kvmarm/next, kvm_next) KVM: arm/arm64:
+>> vgic: Improve sync_hwstate performance  (255905e)
+>> I also checked it compiles on 4.11-rc4.
+> 
+> Hmm, we did apply your series on top of kvarm/next, judging from the function
+> code below, I can't see the 'its' declaration. 
+> 
+> static int vgic_its_has_attr(struct kvm_device *dev,
+>                              struct kvm_device_attr *attr)
+> {
+>         switch (attr->group) {
+>         case KVM_DEV_ARM_VGIC_GRP_ADDR:
+>                 switch (attr->attr) {
+>                 case KVM_VGIC_ITS_ADDR_TYPE:
+>                         return 0;
+>                 }
+>                 break;
+>         case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>                 switch (attr->attr) {
+>                 case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>                         return 0;
+>                 }
+>                 break;
+>         case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
+>                 u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+>                 u64 reg;
+> 
+>                 if (get_user(reg, uaddr))
+>                         return -EFAULT;
+> 
+>                 return vgic_its_attr_regs_access(dev, attr, &reg, true);
+>         }
+>         case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
+>                 if (attr->attr)
+>                         return -EINVAL;
+>                 return vgic_its_table_restore(its);
+The above code shows that my series is not correctly applied since that
+call to vgic_its_table_restore() should normally be in
+vgic_its_set_attr() and not in vgic_its_has_attr() function
+(virt/kvm/arm/vgic-its.c).
 
-Thanks!
+I pushed this series applied on top of up to date kvmarm/next at
+https://github.com/eauger/linux/tree/v4.11-rc3-its-mig-v4.
 
-Antoine
+As noticed earlier, the series is applied on top of 255905e (KVM:
+arm/arm64: vgic: Improve sync_hwstate performance)
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/6076a457/attachment.sig>
+Thanks
+
+Eric
+
+
+>         }
+>         return -ENXIO;
+> }
+> 
+> Thanks,
+> Xiaolong
+> 
+>>
+>> Please let me know if I got something wrong.
+>>
+>> Thanks
+>>
+>> Eric
+>>>                                     ^~~
+>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: note: each undeclared identifier is reported only once for each function it appears in
+>>>
+>>> vim +/its +1766 arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c
+>>>
+>>>   1750			case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>>>   1751				return 0;
+>>>   1752			}
+>>>   1753			break;
+>>>   1754		case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
+>>>   1755			u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+>>>   1756			u64 reg;
+>>>   1757	
+>>>   1758			if (get_user(reg, uaddr))
+>>>   1759				return -EFAULT;
+>>>   1760	
+>>>   1761			return vgic_its_attr_regs_access(dev, attr, &reg, true);
+>>>   1762		}
+>>>   1763		case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
+>>>   1764			if (attr->attr)
+>>>   1765				return -EINVAL;
+>>>> 1766			return vgic_its_table_restore(its);
+>>>   1767		}
+>>>   1768		return -ENXIO;
+>>>   1769	}
+>>>   1770	
+>>>   1771	static int vgic_its_set_attr(struct kvm_device *dev,
+>>>   1772				     struct kvm_device_attr *attr)
+>>>   1773	{
+>>>   1774		struct vgic_its *its = dev->private;
+>>>
+>>> ---
+>>> 0-DAY kernel test infrastructure                Open Source Technology Center
+>>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>> _______________________________________________
+>> kbuild-all mailing list
+>> kbuild-all at lists.01.org
+>> https://lists.01.org/mailman/listinfo/kbuild-all
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
