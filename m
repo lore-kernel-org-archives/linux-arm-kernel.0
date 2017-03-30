@@ -1,89 +1,35 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Thu, 30 Mar 2017 23:51:03 +0200
-Subject: [PATCH 1/2] drm/bridge: ti-tfp410: support hpd via gpio
-In-Reply-To: <e63e628794b044c2a615091697622d50@rwthex-w1-b.rwth-ad.de>
-References: <2e47786ab3d04078ae70d0c4064f7c4d@rwthex-s1-b.rwth-ad.de>
- <093b4e9c0ae6413499e5bf8ec309fa41@rwthex-s1-b.rwth-ad.de>
- <6dfb2b66ec2a408dabe80d703f411ce0@rwthex-s1-b.rwth-ad.de>
- <d6b2391f-3e4a-2761-b6a0-8997d2c78600@codeaurora.org>
- <f87195b3-bd89-d698-c935-4e3aa97c01e2@ti.com>
- <e63e628794b044c2a615091697622d50@rwthex-w1-b.rwth-ad.de>
-Message-ID: <09a6bf1b-f743-4f1f-9bd3-d2c137365b16@rwth-aachen.de>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Mar 2017 17:28:46 -0500
+Subject: [PATCH] Documentation: dt: Add binding for
+ /secure-chosen/stdout-path
+In-Reply-To: <e3e007ef9ee6a622ae4ccc74fd0fca32b3c5dfb5.1488531370.git.jerome.forissier@linaro.org>
+References: <e3e007ef9ee6a622ae4ccc74fd0fca32b3c5dfb5.1488531370.git.jerome.forissier@linaro.org>
+Message-ID: <20170330222845.ewddsnmkxwrsposl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 03, 2017 at 10:24:33AM +0100, Jerome Forissier wrote:
+> Some platforms may use a single device tree to describe two address
+> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
+> for Secure-only devices"). For these platforms it makes sense to define
+> a secure counterpart of /chosen, namely: /secure-chosen. This new node
+> is meant to be used by the secure firmware to pass data to the secure
+> OS. Only the stdout-path property is supported for now.
+> 
+> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/secure.txt | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+> 
+> v2
+> 
+> - Clarify the expected behavior when /secure-chosen/stdout-path is not
+> present (either the property or the node itself), as proposed by Peter
+> and Robin. Note that I have made the fallback to /chosen optional.
 
-On 03/30/2017 11:49 AM, Archit Taneja wrote:
->
->
-> On 03/28/2017 07:02 PM, Jyri Sarha wrote:
->> On 03/27/17 08:58, Archit Taneja wrote:
->>> Hi,
->>>
->>> On 03/07/2017 03:21 AM, Christopher Spinrath wrote:
->>>> Hi Fabio,
->>>>
->>>> On 03/06/2017 10:46 PM, Fabio Estevam wrote:
->>>>> Hi Christopher,
->>>>>
->>>>> On Mon, Mar 6, 2017 at 6:40 PM,
->>>>> <christopher.spinrath@rwth-aachen.de> wrote:
->>>>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>>>>>
->>>>>> On some boards the hpd pin of a hdmi connector is wired up to a gpio
->>>>>> pin. Since in the DRM world the tfp410 driver is responsible for
->>>>>> handling the connector, add support for hpd gpios in this very
->>>>>> driver.
->>>>>>
->>>>>> Signed-off-by: Christopher Spinrath
->>>>>> <christopher.spinrath@rwth-aachen.de>
->>>>>> ---
->>>>>>  drivers/gpu/drm/bridge/ti-tfp410.c | 72
->>>>>> ++++++++++++++++++++++++++++++++++++--
->>>>>
->> ...
->>>>
->>>
->>> The patch looks good to me.
->>>
->>> Jyri,
->>>
->>> Is it possible for you to verify this on Beaglebone platform?
->>>
->>
->> If I read my BeagleBone DVI-D Cape docs right, it does not have the HPD
->> pin connected. At least it does not mention any gpio that could be used
->> for the purpose. So I can not easily test this patch in real world
->> situation. For what it is worth the patch looks ok to me too.
->
-> Thanks for the review. I looked at the tfp410 data sheet[1], there isn't
-> a HPD pin on the chip at all. My guess is that boards using tfp410 most
-> likely have the HPD pin routed to the SoC from the HDMI connector
-> (with a level shifter/shield in between).
+I'm okay with this, but would like to hold off merging it until your are 
+really using it. You did say you were "experimenting" and it doesn't 
+sound like the DT usage in secure world is that far along. I just want 
+to see if there are other issues that come up.
 
-Exactly. I tried to say that in the commit message (and, actually, 
-that's what I did in Patch 2/2 for the Utilite Pro).
-
-Thanks,
-Christopher
-
-> We would eventually need to move the both ddc and hpd stuff to
-> a generic hdmi connector driver later on. I've queued this to
-> drm-misc-next.
->
-> [1]: http://www.ti.com/lit/ds/symlink/tfp410.pdf
->
-> Archit
->
->>
->> Best regards,
->> Jyri
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+Rob
