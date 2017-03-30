@@ -1,37 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 16:01:42 +0200
-Subject: [PATCH v9 12/12] ARM: EXYNOS: refactor of mach-exynos to use
- chipid information
-In-Reply-To: <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170330131444epcas5p45051cf7e6ec7a993c2c9f84254b89a19@epcas5p4.samsung.com>
+Date: Thu, 30 Mar 2017 16:03:59 +0200
+Subject: [PATCH v9 07/12] ARM: EXYNOS: introduce soc specific pm ops
+In-Reply-To: <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170330131434epcas1p4e42fe06bae3456c39e0f93a2f8ae4bc0@epcas1p4.samsung.com>
  <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
+ <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAK8P3a3wTa0ckx3Uo37ptDxQCK_24aDK9dmETtog_qU7VrMygA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
 
->   * register the standard cpu IO areas
->   */
-> -static void __init exynos_map_io(void)
-> +static int __init exynos_fdt_map_scu(unsigned long node, const char *uname,
-> +               int depth, void *data)
->  {
-> -       if (soc_is_exynos4())
-> -               iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
-> +       if (!of_flat_dt_is_compatible(node, "samsung,exynos4210") &&
-> +                       !of_flat_dt_is_compatible(node, "samsung,exynos4212") &&
-> +                       !of_flat_dt_is_compatible(node, "samsung,exynos4412"))
-> +               return 0;
+> +               .soc_id = "EXYNOS5250",
+> +               .data = &exynos_common_s2r_data
+> +       },
+> +       {
+> +               .soc_id = "EXYNOS5260",
+> +               .data = &exynos_common_s2r_data
+> +       },
+> +       {
+> +               .soc_id = "EXYNOS5440",
+> +               .data = &exynos_common_s2r_data
+> +       },
+> +       {
+> +               .soc_id = "EXYNOS5410",
+> +               .data = &exynos_common_s2r_data
+> +       },
+> +       {
+> +               .soc_id = "EXYNOS5420",
+> +               .data = &exynos_common_s2r_data
+> +       },
+> +       {
+> +               .soc_id = "EXYNOS5800",
+> +               .data = &exynos_common_s2r_data
+
+If these are all the same, just make that soc_id="EXYNOS5*"
+to match them all at once.
+
+> +int __init exynos_s2r_init(void)
+> +{
+> +       const struct soc_device_attribute *match;
 > +
-> +       iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
-> +       return 1;
->  }
+> +       match = soc_device_match(exynos_soc_revision);
+> +
+> +       if (match)
+> +               s2r_data = (const struct exynos_s2r_data *) match->data;
+> +
+> +       if (!s2r_data)
+> +               return -ENODEV;
+> +
+> +       return 0;
+> +}
+> +arch_initcall(exynos_s2r_init);
+> +
 
-This seems really overcomplicated. From what I can tell, this is only needed
-to find the SCU address, but there are better ways to do that, either by
-looking up the SCU in the DT at the time you actually need it,
-or by calling scu_a9_get_base().
+Can you replace the arch_initcall with a direct call from the machine
+init function?
 
-      Arnd
+        Arnd
