@@ -1,88 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 29 Mar 2017 16:54:53 -0700
-Subject: [PATCH V5 3/9] kernel/cpu_pm: Add runtime PM support for CPUs
-In-Reply-To: <CAPDyKFqXLzuge6+pQV-UzotENTV2gxZUCT6eU4CLtckdNZoYSw@mail.gmail.com>
- (Ulf Hansson's message of "Tue, 14 Mar 2017 08:45:00 +0100")
-References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
- <1488573695-106680-4-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFqXLzuge6+pQV-UzotENTV2gxZUCT6eU4CLtckdNZoYSw@mail.gmail.com>
-Message-ID: <m2tw6b4p0y.fsf@baylibre.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 29 Mar 2017 17:26:05 -0700
+Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3,
+ for arm32 (v4)
+Message-ID: <20170330002605.15213-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
+now, so it's useful to be able to test that mode on an upstream
+kernel.  It's also been useful for me to use the same board for 32-bit
+and 64-bit development.
 
-> On 3 March 2017 at 21:41, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Notify runtime PM when the CPU is going to be powered off in the idle
->> state. This allows for runtime PM suspend/resume of the CPU as well as
->> its PM domain.
->>
->> Cc: Kevin Hilman <khilman@kernel.org>
->> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
-[...]
+v1: Gerd's patch that put the ../../../arm64/... link in the Makefile
+v2: Michael's patch that #included from ../../../arm64/... in a new
+    bcm2837-rpi-3-b.dts.
+v3: Mine, using symlinks to make sure that we don't break the split DT
+    tree.
+v4: Rely on the new include/arm64 symlink.
 
->> @@ -99,6 +102,7 @@ int cpu_pm_enter(void)
->>  {
->>         int nr_calls;
->>         int ret = 0;
->> +       struct device *dev = get_cpu_device(smp_processor_id());
->>
->>         read_lock(&cpu_pm_notifier_lock);
->>         ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
->> @@ -110,6 +114,10 @@ int cpu_pm_enter(void)
->>                 cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
->>         read_unlock(&cpu_pm_notifier_lock);
->>
->> +       /* Notify Runtime PM that we are suspending the CPU */
->> +       if (!ret && dev)
->> +               RCU_NONIDLE(pm_runtime_put_sync_suspend(dev));
->> +
->
-> I am trying to understand how the runtime PM usage count becomes
-> properly balanced.
->
-> I believe you could you end up first calling a
-> pm_runtime_put_sync_suspend(), without earlier having called
-> pm_runtime_get*(). I am not sure though, but perhaps you can
-> elaborate.
->
-> Anyway, in patch2/9, where you enable runtime PM there is only a call
-> to pm_runtime_set_active(), which doesn't increase the usage count. To
-> me, it seems like that change also needs a pm_runtime_get_noresume().
+Assuming positive review feedback, I assume it would be acceptable to
+merge the shared/dt-symlinks branch in a PR of my own for the 32-bit
+DT branch?
 
-IIUC, the CPU hotplug callback below (cpu_pm_cpu_starting) will do the
-first _get_sync(), and I'm assuming that will happen before any of the
-CPU PM notifiers get called, so I think the usecount will always be at
-least 1 by the time any CPU PM callbacks happen.
+ arch/arm/boot/dts/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
-[...]
-
->> +#ifdef CONFIG_HOTPLUG_CPU
->> +static int cpu_pm_cpu_dying(unsigned int cpu)
->> +{
->> +       struct device *dev = get_cpu_device(cpu);
->> +
->> +       if (dev)
->> +               pm_runtime_put_sync_suspend(dev);
->> +
->> +       return 0;
->> +}
->> +
->> +static int cpu_pm_cpu_starting(unsigned int cpu)
->> +{
->> +       struct device *dev = get_cpu_device(cpu);
->> +
->> +       if (dev)
->> +               pm_runtime_get_sync(dev);
->
-> I assume that according to my comment above, you somehow need to
-> compensate for either of the cases when CONFIG_HOTPLUG_CPU is set or
-> unset. Right?
-
-Right, if for some reason CONFIG_HOTPLUG_CPU=n, we'll have a problem
-where there is never an initial _get() so the usecount will be zero when
-CPU PM notifiers get called the first time.
-
-Kevin
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 011808490fed..27d258cb50f2 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b-plus.dtb \
+ 	bcm2835-rpi-a-plus.dtb \
+ 	bcm2836-rpi-2-b.dtb \
++	include/arm64/broadcom/bcm2837-rpi-3-b.dtb \
+ 	bcm2835-rpi-zero.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-asus-rt-ac56u.dtb \
+-- 
+2.11.0
