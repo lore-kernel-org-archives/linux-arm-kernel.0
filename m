@@ -1,33 +1,78 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 30 Mar 2017 11:28:45 +0200
-Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
- multiple erratum detection methods
-In-Reply-To: <b40e0cc7-5580-a834-babe-0dfa8427629e@arm.com>
-References: <20170320174829.28182-1-marc.zyngier@arm.com>
- <20170320174829.28182-7-marc.zyngier@arm.com>
- <CALdTtnvyT1qjKp5C5AfvSSW7GqN3m2Y_CkTMEX+5OxyvH=+G2Q@mail.gmail.com>
- <b40e0cc7-5580-a834-babe-0dfa8427629e@arm.com>
-Message-ID: <71b97b4f-b1c4-1240-8108-426b5583f195@linaro.org>
+From: colin.king@canonical.com (Colin King)
+Date: Thu, 30 Mar 2017 10:34:03 +0100
+Subject: [PATCH] staging: bcm2835-camera: fix spelling mistake: "elementry" ->
+ "elementary"
+Message-ID: <20170330093403.18879-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/2017 19:00, Marc Zyngier wrote:
+From: Colin Ian King <colin.king@canonical.com>
 
-Hi Marc,
+trivial fix to spelling mistake in various comments and pr_debug messages
 
-[ ... ]
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h   | 2 +-
+ drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 6 +++---
+ drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-> Sure, I can add that in the next version of this series. [ ... ]
-
-When sending the new version, could you Cc Thomas Gleixner also.
-
-Thanks.
-
-  -- Daniel
-
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h b/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h
+index bf3d1f3f2c53..52cdf4da1b47 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h
+@@ -160,7 +160,7 @@ struct mmal_msg_port_info_get_reply {
+ 	s32 found;             /* unused */
+ 	u32 port_handle;               /**< Handle to use for this port */
+ 	struct mmal_port port;
+-	struct mmal_es_format format; /* elementry stream format */
++	struct mmal_es_format format; /* elementary stream format */
+ 	union mmal_es_specific_format es; /* es type specific data */
+ 	u8 extradata[MMAL_FORMAT_EXTRADATA_MAX_SIZE]; /* es extra data */
+ };
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+index ccb2ee547055..4360db6d4392 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+@@ -906,7 +906,7 @@ static void dump_port_info(struct vchiq_mmal_port *port)
+ 		 port->current_buffer.num,
+ 		 port->current_buffer.size, port->current_buffer.alignment);
+ 
+-	pr_debug("elementry stream: type:%d encoding:0x%x variant:0x%x\n",
++	pr_debug("elementary stream: type:%d encoding:0x%x variant:0x%x\n",
+ 		 port->format.type,
+ 		 port->format.encoding, port->format.encoding_variant);
+ 
+@@ -970,7 +970,7 @@ static int port_info_set(struct vchiq_mmal_instance *instance,
+ 
+ 	port_to_mmal_msg(port, &m.u.port_info_set.port);
+ 
+-	/* elementry stream format setup */
++	/* elementary stream format setup */
+ 	m.u.port_info_set.format.type = port->format.type;
+ 	m.u.port_info_set.format.encoding = port->format.encoding;
+ 	m.u.port_info_set.format.encoding_variant =
+@@ -1079,7 +1079,7 @@ static int port_info_get(struct vchiq_mmal_instance *instance,
+ 	port->format.bitrate = rmsg->u.port_info_get_reply.format.bitrate;
+ 	port->format.flags = rmsg->u.port_info_get_reply.format.flags;
+ 
+-	/* elementry stream format */
++	/* elementary stream format */
+ 	memcpy(&port->es,
+ 	       &rmsg->u.port_info_get_reply.es,
+ 	       sizeof(union mmal_es_specific_format));
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h
+index 5140b330325e..63db053532bf 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h
+@@ -75,7 +75,7 @@ struct vchiq_mmal_port {
+ 
+ 	/* stream format */
+ 	struct mmal_es_format_local format;
+-	/* elementry stream format */
++	/* elementary stream format */
+ 	union mmal_es_specific_format es;
+ 
+ 	/* data buffers to fill */
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.11.0
