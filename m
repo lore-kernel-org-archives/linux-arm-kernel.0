@@ -1,74 +1,145 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 30 Mar 2017 17:56:32 +0100
-Subject: [PATCH v2 4/4] iommu/arm-smmu: Poll for TLB sync completion more
- effectively
+Date: Thu, 30 Mar 2017 17:56:29 +0100
+Subject: [PATCH v2 1/4] iommu/arm-smmu: Simplify ASID/VMID handling
 In-Reply-To: <cover.1490890890.git.robin.murphy@arm.com>
 References: <cover.1490890890.git.robin.murphy@arm.com>
-Message-ID: <7c24c93137bc48f69225e6463d6d242b7d89d15c.1490890890.git.robin.murphy@arm.com>
+Message-ID: <0ba73e166470855948841ccb7fed7763dfaf023e.1490890890.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On relatively slow development platforms and software models, the
-inefficiency of our TLB sync loop tends not to show up - for instance on
-a Juno r1 board I typically see the TLBI has completed of its own accord
-by the time we get to the sync, such that the latter finishes instantly.
+Calculating ASIDs/VMIDs dynamically from arm_smmu_cfg was a neat trick,
+but the global uniqueness workaround makes it somewhat more awkward, and
+means we end up having to pass extra state around in certain cases just
+to keep a handle on the offset.
 
-However, on larger systems doing real I/O, it's less realistic for the
-TLBs to go idle immediately, and at that point falling into the 1MHz
-polling loop turns out to throw away performance drastically. Let's
-strike a balance by polling more than once between pauses, such that we
-have much more chance of catching normal operations completing before
-committing to the fixed delay, but also backing off exponentially, since
-if a sync really hasn't completed within one or two "reasonable time"
-periods, it becomes increasingly unlikely that it ever will.
+We already have 16 bits going spare in arm_smmu_cfg; let's just
+precalculate an ASID/VMID, plop it in there, and tidy up the users
+accordingly. We'd also need something like this anyway if we ever get
+near to thinking about SVM, so it's no bad thing.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-v2: Restored the cpu_relax() to the inner loop
+v2: No change
 
- drivers/iommu/arm-smmu.c | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+ drivers/iommu/arm-smmu.c | 36 +++++++++++++++++++-----------------
+ 1 file changed, 19 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 759d5f261160..a15ca86e9703 100644
+index abf6496843a6..34b745bf59f2 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -162,6 +162,7 @@
- #define ARM_SMMU_GR0_sTLBGSTATUS	0x74
- #define sTLBGSTATUS_GSACTIVE		(1 << 0)
- #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
-+#define TLB_SPIN_COUNT			10
+@@ -404,14 +404,15 @@ enum arm_smmu_context_fmt {
+ struct arm_smmu_cfg {
+ 	u8				cbndx;
+ 	u8				irptndx;
++	union {
++		u16			asid;
++		u16			vmid;
++	};
+ 	u32				cbar;
+ 	enum arm_smmu_context_fmt	fmt;
+ };
+ #define INVALID_IRPTNDX			0xff
  
- /* Stream mapping registers */
- #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
-@@ -574,18 +575,19 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
- static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
- 				void __iomem *sync, void __iomem *status)
- {
--	int count = 0;
-+	unsigned int spin_cnt, delay;
+-#define ARM_SMMU_CB_ASID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx)
+-#define ARM_SMMU_CB_VMID(smmu, cfg) ((u16)(smmu)->cavium_id_base + (cfg)->cbndx + 1)
+-
+ enum arm_smmu_domain_stage {
+ 	ARM_SMMU_DOMAIN_S1 = 0,
+ 	ARM_SMMU_DOMAIN_S2,
+@@ -603,12 +604,10 @@ static void arm_smmu_tlb_inv_context(void *cookie)
  
- 	writel_relaxed(0, sync);
--	while (readl_relaxed(status) & sTLBGSTATUS_GSACTIVE) {
--		cpu_relax();
--		if (++count == TLB_LOOP_TIMEOUT) {
--			dev_err_ratelimited(smmu->dev,
--			"TLB sync timed out -- SMMU may be deadlocked\n");
--			return;
-+	for (delay = 1; delay < TLB_LOOP_TIMEOUT; delay *= 2) {
-+		for (spin_cnt = TLB_SPIN_COUNT; spin_cnt > 0; spin_cnt--) {
-+			if (!(readl_relaxed(status) & sTLBGSTATUS_GSACTIVE))
-+				return;
-+			cpu_relax();
- 		}
--		udelay(1);
-+		udelay(delay);
+ 	if (stage1) {
+ 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+-		writel_relaxed(ARM_SMMU_CB_ASID(smmu, cfg),
+-			       base + ARM_SMMU_CB_S1_TLBIASID);
++		writel_relaxed(cfg->asid, base + ARM_SMMU_CB_S1_TLBIASID);
+ 	} else {
+ 		base = ARM_SMMU_GR0(smmu);
+-		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg),
+-			       base + ARM_SMMU_GR0_TLBIVMID);
++		writel_relaxed(cfg->vmid, base + ARM_SMMU_GR0_TLBIVMID);
  	}
-+	dev_err_ratelimited(smmu->dev,
-+			    "TLB sync timed out -- SMMU may be deadlocked\n");
+ 
+ 	__arm_smmu_tlb_sync(smmu);
+@@ -629,14 +628,14 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 
+ 		if (cfg->fmt != ARM_SMMU_CTX_FMT_AARCH64) {
+ 			iova &= ~12UL;
+-			iova |= ARM_SMMU_CB_ASID(smmu, cfg);
++			iova |= cfg->asid;
+ 			do {
+ 				writel_relaxed(iova, reg);
+ 				iova += granule;
+ 			} while (size -= granule);
+ 		} else {
+ 			iova >>= 12;
+-			iova |= (u64)ARM_SMMU_CB_ASID(smmu, cfg) << 48;
++			iova |= (u64)cfg->asid << 48;
+ 			do {
+ 				writeq_relaxed(iova, reg);
+ 				iova += granule >> 12;
+@@ -653,7 +652,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 		} while (size -= granule);
+ 	} else {
+ 		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
+-		writel_relaxed(ARM_SMMU_CB_VMID(smmu, cfg), reg);
++		writel_relaxed(cfg->vmid, reg);
+ 	}
  }
  
- static void arm_smmu_tlb_sync_global(struct arm_smmu_device *smmu)
+@@ -735,7 +734,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 			reg = CBA2R_RW64_32BIT;
+ 		/* 16-bit VMIDs live in CBA2R */
+ 		if (smmu->features & ARM_SMMU_FEAT_VMID16)
+-			reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBA2R_VMID_SHIFT;
++			reg |= cfg->vmid << CBA2R_VMID_SHIFT;
+ 
+ 		writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBA2R(cfg->cbndx));
+ 	}
+@@ -754,26 +753,24 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
+ 	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
+ 		/* 8-bit VMIDs live in CBAR */
+-		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
++		reg |= cfg->vmid << CBAR_VMID_SHIFT;
+ 	}
+ 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+ 
+ 	/* TTBRs */
+ 	if (stage1) {
+-		u16 asid = ARM_SMMU_CB_ASID(smmu, cfg);
+-
+ 		if (cfg->fmt == ARM_SMMU_CTX_FMT_AARCH32_S) {
+ 			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[0];
+ 			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR0);
+ 			reg = pgtbl_cfg->arm_v7s_cfg.ttbr[1];
+ 			writel_relaxed(reg, cb_base + ARM_SMMU_CB_TTBR1);
+-			writel_relaxed(asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
++			writel_relaxed(cfg->asid, cb_base + ARM_SMMU_CB_CONTEXTIDR);
+ 		} else {
+ 			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+-			reg64 |= (u64)asid << TTBRn_ASID_SHIFT;
++			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
+ 			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
+ 			reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+-			reg64 |= (u64)asid << TTBRn_ASID_SHIFT;
++			reg64 |= (u64)cfg->asid << TTBRn_ASID_SHIFT;
+ 			writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR1);
+ 		}
+ 	} else {
+@@ -941,6 +938,11 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		cfg->irptndx = cfg->cbndx;
+ 	}
+ 
++	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S2)
++		cfg->vmid = cfg->cbndx + 1 + smmu->cavium_id_base;
++	else
++		cfg->asid = cfg->cbndx + smmu->cavium_id_base;
++
+ 	pgtbl_cfg = (struct io_pgtable_cfg) {
+ 		.pgsize_bitmap	= smmu->pgsize_bitmap,
+ 		.ias		= ias,
 -- 
 2.11.0.dirty
