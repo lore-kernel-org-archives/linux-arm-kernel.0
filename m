@@ -1,60 +1,93 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Thu, 30 Mar 2017 13:16:34 -0400
-Subject: Device driver for Toshiba MIPI<->parallel device
-Message-ID: <CAF_dkJC2MHK7Jv6ih1H0aOe=d6do0Cydx_c-e7soEEB_SWPeUg@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 30 Mar 2017 18:36:07 +0100
+Subject: KVM/ARM: sleeping function called from invalid context
+In-Reply-To: <7047d954-5c43-600a-3511-4c7dbd60c175@arm.com>
+References: <7047d954-5c43-600a-3511-4c7dbd60c175@arm.com>
+Message-ID: <1490895367-10547-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-I am writing a device driver for a custom (evaluation) MIPI imager
-that I will connect to a parallel imager interface via a Toshiba "MIPI
-CSI-2 to Parallel port" bridge device (TC35874x).
+I have confirmed the theory using a sample code like :
 
-I am wondering if anybody has done anything like this and if I might
-be able emulate what has been done before.  There are 3 entities
-involved, the MIPI imager, the Toshiba bridge, and the Image Sensor
-Controller (ISC) built into the SAMA5 SoC.  The imager and the bridge
-both sit on the I2C bus, and must be configured via that bus.  There
-is support in the 4.4 (linux-at91) kernel for the ISC.
+	spin_lock(&a);
+	spin_lock(&b);
+	cond_resched_lock(&b);
+	spin_unlock(&b);
+	spin_unlock(&a);
 
-If you have continued reading this far and don't have any experience
-with this, then perhaps you might be able to answer a few questions
-that will help me get going in the right direction...
+Also, the following patch solves the problem for me.
 
-In the device tree, I must enable the ISC, and as part of that node, I
-have to include a "port" node specifying the device to which the ISC
-is connected (see
-Documentation/devicetree/bindings/media/video-interfaces.txt).  Should
-I specify the node for the Toshiba device (which is connected to the
-ISC) or the imager device (which is connected to the Toshiba device).
-It seems like I should specify the Toshiba device.
 
-Should I write separate drivers for the Toshiba and imager devices?
-Or should I combine them into one driver?  This is likely to be used
-only for a little while in a one-off experiment, but hopefully not.
-If I were to consider the imager+bridge as a single device, then a
-single device driver makes sense, and it makes configuring the two
-devices compatibly much easier.  But if I do that, how do I specify
-both devices in my device tree?  Or, do I even need to specify both
-devices in the tree?  If I probe the Toshiba device, then that must
-mean that the imager is present as well (even though it's at a
-separate I2C address).
+ ----8>-----
 
-Should I follow the port/endpoint model described in the
-video-interfaces.txt document and string the imager to the Toshiba
-part to the SoC?
+sched: Fix ___might_sleep preempt count checks
 
-Can you think of any way I could start working on this without having
-to fiddle with (and debug) the device tree in parallel with the device
-driver?  I found a fabulous answer to this question on SO that would
-work fine for me if I didn't have to couple the Tosiba device, the
-imager, and the ISC together.  (See
-http://stackoverflow.com/questions/18512421/device-tree-and-manual-registration).
+___might_sleep checks if the preempt_count equals the passed in
+preempt_offset to issue a warning. This could cause false warnings,
+when preempt_count is greater than the requested offset. Fix the
+check to make sure we handle this case.
 
-Please feel free to direct me at a linux-media mailing list if that
-would be a better place to ask these questions, but the combination of
-ARM, device tree, and device driver, made me think of this list first.
+e.g, following code sequence could cause false warning:
 
-Thank you.
+foo:
+	spin_lock(&a);
+	...
+	bar() --------->     bar:
+				spin_lock(&b);
+				cond_resched_lock(&b);
+				do_something();
+				spin_unlock(&b);
+		<-----------
+	...
+	spin_unlock(&a)
 
---wpd
+where locks a and b need not necessarily be related.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ kernel/sched/core.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 3b31fc0..28842dc 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6144,11 +6144,11 @@ void __init sched_init(void)
+ }
+ 
+ #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
+-static inline int preempt_count_equals(int preempt_offset)
++static inline int preempt_count_safe(int preempt_offset)
+ {
+ 	int nested = preempt_count() + rcu_preempt_depth();
+ 
+-	return (nested == preempt_offset);
++	return (nested >= preempt_offset);
+ }
+ 
+ void __might_sleep(const char *file, int line, int preempt_offset)
+@@ -6179,7 +6179,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
+ 	/* WARN_ON_ONCE() by default, no rate limit required: */
+ 	rcu_sleep_check();
+ 
+-	if ((preempt_count_equals(preempt_offset) && !irqs_disabled() &&
++	if ((preempt_count_safe(preempt_offset) && !irqs_disabled() &&
+ 	     !is_idle_task(current)) ||
+ 	    system_state != SYSTEM_RUNNING || oops_in_progress)
+ 		return;
+@@ -6205,7 +6205,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
+ 	if (irqs_disabled())
+ 		print_irqtrace_events(current);
+ 	if (IS_ENABLED(CONFIG_DEBUG_PREEMPT)
+-	    && !preempt_count_equals(preempt_offset)) {
++	    && !preempt_count_safe(preempt_offset)) {
+ 		pr_err("Preemption disabled at:");
+ 		print_ip_sym(preempt_disable_ip);
+ 		pr_cont("\n");
+-- 
+2.7.4
