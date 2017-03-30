@@ -1,250 +1,106 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 30 Mar 2017 15:09:25 +0100
-Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
- private memory allocations
-In-Reply-To: <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
-References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
- <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
-Message-ID: <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
+Date: Thu, 30 Mar 2017 15:10:16 +0100
+Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+In-Reply-To: <CAMuHMdUp3-pdZ+w+Y-GRfHbkdnjHbP=+H=A_ukTwDD5q_WMi1Q@mail.gmail.com>
+References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
+ <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+ <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
+ <073f1feb-d6da-c93f-8e67-0910befec27b@samsung.com>
+ <c13f6475-f503-238f-c101-4f9cdf1b0ae2@arm.com>
+ <45fde94b-9487-c28e-9d4e-3b36c4b4a934@samsung.com>
+ <CAMuHMdWkOdAD=d0DAy7cJTHcQc7oq5HVDvTNtjfQETMynx1_+g@mail.gmail.com>
+ <8dcbb0b3-dd13-d2b3-90f5-64b900d67778@samsung.com>
+ <41097b2c-9bbc-31e4-d17d-8c3f638ec1a6@arm.com>
+ <bd77ea57-96a8-bbc4-8184-9ddfd443f3c6@samsung.com>
+ <868d0c3c-6b85-0709-1686-66b484ede46d@arm.com>
+ <CAMuHMdUp3-pdZ+w+Y-GRfHbkdnjHbP=+H=A_ukTwDD5q_WMi1Q@mail.gmail.com>
+Message-ID: <f81eeedd-4de7-3a71-5199-63bc32495a7a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roy,
-
-On 29/03/17 22:13, Roy Pledge wrote:
-> Use the shared-memory-pool mechanism for frame queue descriptor and
-> packed frame descriptor record area allocations.
-
-Thanks for persevering with this - in my opinion it's now looking like
-it was worth the effort :)
-
-AFAICS the ioremap_wc() that this leads to does appear to give back
-something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
-horrendously misnamed), and "no-map" should rule out any cacheable
-linear map alias existing, so it would seem that this approach should
-avert Scott's concerns about attribute mismatches.
-
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-> ---
->  drivers/soc/fsl/qbman/qman_ccsr.c | 119 +++++++++++++++++++++-----------------
->  drivers/soc/fsl/qbman/qman_priv.h |   4 +-
->  drivers/soc/fsl/qbman/qman_test.h |   2 -
->  3 files changed, 68 insertions(+), 57 deletions(-)
+On 30/03/17 12:53, Geert Uytterhoeven wrote:
+> Hi Robin,
 > 
-> diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
-> index 90bc40c..35c59ca 100644
-> --- a/drivers/soc/fsl/qbman/qman_ccsr.c
-> +++ b/drivers/soc/fsl/qbman/qman_ccsr.c
-> @@ -400,63 +400,19 @@ static int qm_init_pfdr(struct device *dev, u32 pfdr_start, u32 num)
->  	return -ENODEV;
->  }
->  
-> -/*
-> - * Ideally we would use the DMA API to turn rmem->base into a DMA address
-> - * (especially if iommu translations ever get involved).  Unfortunately, the
-> - * DMA API currently does not allow mapping anything that is not backed with
-> - * a struct page.
-> - */
-> +/* QMan needs two global memory areas initialized at boot time:
-> +    1) FQD: Frame Queue Descriptors used to manage frame queues
-> +    2) PFDR: Packed Frame Queue Descriptor Records used to store frames
-> +   Both areas are reserved using the device tree reserved memory framework
-> +   and the addresses and sizes are initialized when the QMan device is probed */
->  static dma_addr_t fqd_a, pfdr_a;
->  static size_t fqd_sz, pfdr_sz;
->  
-> -static int qman_fqd(struct reserved_mem *rmem)
-> -{
-> -	fqd_a = rmem->base;
-> -	fqd_sz = rmem->size;
-> -
-> -	WARN_ON(!(fqd_a && fqd_sz));
-> -
-> -	return 0;
-> -}
-> -RESERVEDMEM_OF_DECLARE(qman_fqd, "fsl,qman-fqd", qman_fqd);
-> -
-> -static int qman_pfdr(struct reserved_mem *rmem)
-> -{
-> -	pfdr_a = rmem->base;
-> -	pfdr_sz = rmem->size;
-> -
-> -	WARN_ON(!(pfdr_a && pfdr_sz));
-> -
-> -	return 0;
-> -}
-> -RESERVEDMEM_OF_DECLARE(qman_pfdr, "fsl,qman-pfdr", qman_pfdr);
-> -
+> On Thu, Mar 30, 2017 at 1:46 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> On 30/03/17 12:16, Andrzej Hajda wrote:
+>> [...]
+>>>>>>> I guess Geert's proposition to create pages permanently is also not
+>>>>>>> acceptable[2]. So how to fix crashes which appeared after patch adding
+>>>>>> If I'm not mistaken, creating the pages permanently is what the
+>>>>>> !DMA_ATTR_FORCE_CONTIGUOUS does? The only difference is where
+>>>>>> the underlying memory is allocated from.
+>>>>>>
+>>>>>> Am I missing something?
+>>>>> Quoting Robin from his response:
+>>>>>> in general is is not
+>>>>>> safe to assume a coherent allocation is backed by struct pages at all
+>>>>> As I said before I am not familiar with the subject, so it is possible I
+>>>>> misunderstood something.
+>>>> That's from the perspective of external callers of
+>>>> dma_alloc_coherent()/dma_alloc_attrs(), wherein
+>>>> dma_alloc_from_coherent() may have returned device-specific memory
+>>>> without calling into the arch dma_map_ops implementation. Internal to
+>>>> the arm64 implementation, however, everything *we* allocate comes from
+>>>> either CMA or the normal page allocator, so should always be backed by
+>>>> real kernel pages.
+>>>>
+>>>> Robin.
+>>>
+>>> OK, so what do you exactly mean by "The general point still stands", my
+>>> patch fixes handling of allocations made internally?
+>>
+>> That since FORCE_CONTIGUOUS allocations always come from CMA, you can
+>> let the existing CMA-based implementations handle them just by fixing up
+>> dma_addr appropriately.
+>>
+>>> Anyway as I understand approach "creating the pages permanently" in
+>>> __iommu_alloc_attrs is OK. Is it worth to create patch adding it? It
+>>> should solve the issue as well and also looks saner (for me).
+>>
+>> Sure, you *could* - there's nothing technically wrong with that other
+>> than violating a strict interpretation of the iommu-dma API
+>> documentation if you pass it into iommu_dma_mmap() - it's just that the
+>> only point of using the pages array here in the first place is to cover
+>> the general case where an allocation might not be physically contiguous.
+>> If you have a guarantee that a given allocation definitely *is* both
+>> physically and virtually contiguous, then that's a bunch of extra work
+>> you simply have no need to do.
+> 
+> The same can be said for dma_common_contiguous_remap() below...
 
-I notice that patch #1 isn't removing the equivalent bman_fbpr() handler
-and declaration as here - is that deliberate or just an oversight?
+Indeed it can. See if you can spot anything I've said in defence of that
+particular function ;)
 
->  static unsigned int qm_get_fqid_maxcnt(void)
->  {
->  	return fqd_sz / 64;
->  }
->  
-> -/*
-> - * Flush this memory range from data cache so that QMAN originated
-> - * transactions for this memory region could be marked non-coherent.
-> - */
-> -static int zero_priv_mem(struct device *dev, struct device_node *node,
-> -			 phys_addr_t addr, size_t sz)
-> -{
-> -	/* map as cacheable, non-guarded */
-> -	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
-> -
-> -	if (!tmpp)
-> -		return -ENOMEM;
-> -
-> -	memset_io(tmpp, 0, sz);
-> -	flush_dcache_range((unsigned long)tmpp,
-> -			   (unsigned long)tmpp + sz);
-> -	iounmap(tmpp);
-> -
-> -	return 0;
-> -}
-> -
->  static void log_edata_bits(struct device *dev, u32 bit_count)
->  {
->  	u32 i, j, mask = 0xffffffff;
-> @@ -687,11 +643,12 @@ static int qman_resource_init(struct device *dev)
->  static int fsl_qman_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *node = dev->of_node;
-> +	struct device_node *mem_node, *node = dev->of_node;
->  	struct resource *res;
->  	int ret, err_irq;
->  	u16 id;
->  	u8 major, minor;
-> +	u64 size;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!res) {
-> @@ -727,10 +684,66 @@ static int fsl_qman_probe(struct platform_device *pdev)
->  		qm_channel_caam = QMAN_CHANNEL_CAAM_REV3;
->  	}
->  
-> -	ret = zero_priv_mem(dev, node, fqd_a, fqd_sz);
-> -	WARN_ON(ret);
-> -	if (ret)
-> +	/* Order of memory regions is assumed as FQD followed by PFDR
-> +	   in order to ensure allocations from the correct regions the
-> +	   driver initializes then allocates each piece in order */
-> +
-> +	ret = of_reserved_mem_device_init_by_idx(dev, dev->of_node, 0);
-> +	if (ret) {
-> +		dev_err(dev, "of_reserved_mem_device_init_by_idx(0) failed 0x%x\n",
-> +			ret);
-> +		return -ENODEV;
-> +	}
-> +	mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
-> +	if (mem_node) {
-> +		ret = of_property_read_u64(mem_node, "size", &size);
-> +		if (ret) {
-> +			dev_err(dev, "FQD: of_address_to_resource fails 0x%x\n", ret);
+>> If you do want to go down that route, then I would much rather we fix
+>> dma_common_contiguous_remap() to leave a valid array in area->pages in
+>> the first place, than be temporarily faking them up around individual calls.
+> 
+> The only point of using the pages array here in the first place is to cover
+> the general case in dma_common_pages_remap().
+>
+> Providing a contiguous variant of map_vm_area() could resolve that.
 
-Nit: of_address_to_resource?
+Isn't that what remap_pfn_range() already is? iommu_dma_mmap() had to
+exist specifically because the likes of dma_common_mmap() *are* using
+that on the assumption of physically contiguous ranges. I don't really
+have the time or inclination to go digging into this myself, but there's
+almost certainly room for some improvement and/or cleanup in the common
+code too (and as I said, if something can be done there than I would
+rather it were tackled head-on than worked around with point fixes in
+the arch code).
 
-> +			return -ENODEV;
-> +		}
-> +		fqd_sz = size;
-> +	} else {
-> +		dev_err(dev, "No memory-region found for FQD\n");
-> +		return -ENODEV;
-> +	}
-> +	if (!dma_zalloc_coherent(dev, fqd_sz, &fqd_a, 0)) {
-> +		dev_err(dev, "Alloc FQD memory failed\n");
-> +		return -ENODEV;
-> +	}
-
-Between here, below, and patch #1, it looks like this "init, get size,
-alloc" pattern could be nicely factored out into a common helper function.
-
-> +
-> +	dev_info(dev, "Allocated FQD 0x%llx 0x%zx\n", fqd_a, fqd_sz);
-> +
-> +	/* Disassociate the FQD reseverd memory area from the device because
-> +	   a device can only have one DMA memory area. This should be fine
-> +	   since the memory is allocated and initalized and only ever accessed
-> +	   by the QMan device from now on */
-
-Typos: reserved, initialized.
-
-> +	of_reserved_mem_device_release(dev);
-
-I see the driver does not implement a .remove method where you would
-otherwise be technically expected to balance the allocation with a
-dma_free_coherent(), so I think this trick is acceptable. If anyone
-wants to change that in future, it wouldn't seem unreasonable to extend
-the core code to handle multiple areas per device (and at worst, I guess
-you could deviously juggle dev->dma_mem around the DMA API calls).
-
-Other than those first few nits, and any possible PPC-specific angles
-I'm not aware of, I think the series is looking good!
-
-Thanks,
 Robin.
 
-> +
-> +	/* Setup PFDR memory */
-> +	ret = of_reserved_mem_device_init_by_idx(dev, dev->of_node, 1);
-> +	if (ret) {
-> +		dev_err(dev, "of_reserved_mem_device_init(1) failed 0x%x\n",
-> +			ret);
-> +		return -ENODEV;
-> +	}
-> +	mem_node = of_parse_phandle(dev->of_node, "memory-region", 1);
-> +	if (mem_node) {
-> +		ret = of_property_read_u64(mem_node, "size", &size);
-> +		if (ret) {
-> +			dev_err(dev, "PFDR: of_address_to_resource fails 0x%x\n", ret);
-> +			return -ENODEV;
-> +		}
-> +		pfdr_sz = size;
-> +	} else {
-> +		dev_err(dev, "No memory-region found for PFDR\n");
-> +		return -ENODEV;
-> +	}
-> +	if (!dma_zalloc_coherent(dev, pfdr_sz, &pfdr_a, 0)) {
-> +		dev_err(dev, "Alloc PFDR Failed size 0x%zx\n", pfdr_sz);
->  		return -ENODEV;
-> +	}
-> +
-> +	dev_info(dev, "Allocated PFDR 0x%llx 0x%zx\n", pfdr_a, pfdr_sz);
->  
->  	ret = qman_init_ccsr(dev);
->  	if (ret) {
-> diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
-> index 22725bd..1e998ea5 100644
-> --- a/drivers/soc/fsl/qbman/qman_priv.h
-> +++ b/drivers/soc/fsl/qbman/qman_priv.h
-> @@ -28,12 +28,12 @@
->   * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
->   */
->  
-> -#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> -
->  #include "dpaa_sys.h"
->  
->  #include <soc/fsl/qman.h>
->  #include <linux/iommu.h>
-> +#include <linux/dma-contiguous.h>
-> +#include <linux/of_address.h>
->  
->  #if defined(CONFIG_FSL_PAMU)
->  #include <asm/fsl_pamu_stash.h>
-> diff --git a/drivers/soc/fsl/qbman/qman_test.h b/drivers/soc/fsl/qbman/qman_test.h
-> index d5f8cb2..41bdbc48 100644
-> --- a/drivers/soc/fsl/qbman/qman_test.h
-> +++ b/drivers/soc/fsl/qbman/qman_test.h
-> @@ -30,7 +30,5 @@
->  
->  #include "qman_priv.h"
->  
-> -#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> -
->  int qman_test_stash(void);
->  int qman_test_api(void);
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
 > 
