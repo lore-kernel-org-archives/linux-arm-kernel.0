@@ -1,58 +1,194 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Thu, 30 Mar 2017 07:42:12 -0400
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322193111.GA8190@wunner.de>
- <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
- <20170323084819.GA23281@h08.hostsharing.net>
- <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
- <20170323105727.GA2441@red-moon>
- <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
- <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
- <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
- <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
- <20170330100524.GA22801@red-moon>
- <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
-Message-ID: <0c8ba1ac389560358458c10915d85526@codeaurora.org>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Thu, 30 Mar 2017 18:31:13 +0800
+Subject: [PATCH v3 4/8] APEI: GHES: reserve a virtual page for SEI context
+In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1490869877-118713-14-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-03-30 06:09, Ard Biesheuvel wrote:
-> On 30 March 2017 at 11:05, Lorenzo Pieralisi 
-> <lorenzo.pieralisi@arm.com> wrote:
->> On Thu, Mar 30, 2017 at 09:46:39AM +0100, Ard Biesheuvel wrote:
->> 
->> [...]
->> 
->>> > I'm asking why we don't fix the actual problem in PCIe ARM64 adaptation instead
->>> > of working around it by quirks.
->>> >
->>> > I don't see any reason why ACPI ARM64 should carry the burden of legacy systems.
->>> >
->>> > Legacy only applies to DT based systems.
->>> >
->>> 
->>> I fully agree with this point: ACPI implies firmware, and so we 
->>> should
->>> be able to rely on firmware to have initialized the PCIe subsystem by
->>> the time the kernel gets to access it.
->> 
->> https://lkml.org/lkml/2016/3/3/458
->> 
-> 
-> I don't think the fact that at least one system existed over a year
-> ago whose UEFI assigned resources incorrectly should prevent us from
-> being normative in this case.
+On arm64 platform, SEI may interrupt code which had interrupts masked.
+But SEI could be masked, so it's not treated as NMI, however SEA is
+treated as NMI.
 
-My suggestion is to try to reuse the resources if possible. Otherwise, 
-reassign the resources.
+So, the  memory area used to transfer hardware error information from
+BIOS to Linux can be determined only in NMI, SEI(arm64), IRQ or timer
+handler.
 
-There were implementation problems by the time you proposed your patch 
-and it was delaying progess. That was my objection.
+In this patch, we add a virtual page for SEI context.
 
-Now that base pci support is in and everybody is  somewhat happy, let's 
-figure out the bugs and get this done.
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+---
+ drivers/acpi/apei/ghes.c | 98 +++++++++++++++++++++++-------------------------
+ 1 file changed, 47 insertions(+), 51 deletions(-)
 
-I am ready to test/debug.
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 045d101..b1f9b1f 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -108,26 +108,33 @@
+ 
+ /*
+  * Because the memory area used to transfer hardware error information
+- * from BIOS to Linux can be determined only in NMI, IRQ or timer
+- * handler, but general ioremap can not be used in atomic context, so
+- * a special version of atomic ioremap is implemented for that.
++ * from BIOS to Linux can be determined only in NMI, SEI (ARM64), IRQ or
++ * timer handler, but general ioremap can not be used in atomic context,
++ * so a special version of atomic ioremap is implemented for that.
+  */
+ 
+ /*
+- * Two virtual pages are used, one for IRQ/PROCESS context, the other for
+- * NMI context (optionally).
++ * 3 virtual pages are used, one for IRQ/PROCESS context, one for SEI
++ * (on ARM64 platform), and the other for NMI context (optionally).
+  */
++#ifdef CONFIG_ACPI_APEI_SEI
++#define GHES_IOREMAP_PAGES           3
++#define GHES_IOREMAP_SEI_PAGE(base)	((base) + PAGE_SIZE*2)
++#else
+ #define GHES_IOREMAP_PAGES           2
++#endif
++
+ #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
+ #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
+ 
+ /* virtual memory area for atomic ioremap */
+ static struct vm_struct *ghes_ioremap_area;
+ /*
+- * These 2 spinlock is used to prevent atomic ioremap virtual memory
++ * These 3 spinlock is used to prevent atomic ioremap virtual memory
+  * area from being mapped simultaneously.
+  */
+ static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
++static DEFINE_SPINLOCK(ghes_ioremap_lock_sei);
+ static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
+ 
+ static struct gen_pool *ghes_estatus_pool;
+@@ -155,54 +162,55 @@ static void ghes_ioremap_exit(void)
+ 	free_vm_area(ghes_ioremap_area);
+ }
+ 
+-static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
++static void __iomem *ghes_ioremap_pfn(u64 pfn)
+ {
+-	unsigned long vaddr;
++	unsigned long vaddr, flags = 0;
+ 	phys_addr_t paddr;
+ 	pgprot_t prot;
+ 
+-	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
+-
+-	paddr = pfn << PAGE_SHIFT;
+-	prot = arch_apei_get_mem_attribute(paddr);
+-	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+-
+-	return (void __iomem *)vaddr;
+-}
+-
+-static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
+-{
+-	unsigned long vaddr, paddr;
+-	pgprot_t prot;
+-
+-	vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
++	if (in_nmi()) {
++		raw_spin_lock(&ghes_ioremap_lock_nmi);
++		vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
++	} else if (this_cpu_read(sei_in_process)) {
++		spin_lock_irqsave(&ghes_ioremap_lock_sei, flags);
++		vaddr = (unsigned long)GHES_IOREMAP_SEI_PAGE(ghes_ioremap_area->addr);
++	} else {
++		spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
++		vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
++	}
+ 
+ 	paddr = pfn << PAGE_SHIFT;
+ 	prot = arch_apei_get_mem_attribute(paddr);
+-
+ 	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+ 
+ 	return (void __iomem *)vaddr;
+ }
+ 
+-static void ghes_iounmap_nmi(void __iomem *vaddr_ptr)
++static void ghes_iounmap(void __iomem *vaddr_ptr)
+ {
+ 	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
+ 	void *base = ghes_ioremap_area->addr;
++	unsigned long page, flags = 0;
++
++	if (in_nmi()) {
++		page = (unsigned long)GHES_IOREMAP_NMI_PAGE(base);
++	} else if (this_cpu_read(sei_in_process)) {
++		page = (unsigned long)GHES_IOREMAP_SEI_PAGE(base);
++	} else {
++		page = (unsigned long)GHES_IOREMAP_IRQ_PAGE(base);
++	}
+ 
+-	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_NMI_PAGE(base));
++	BUG_ON(vaddr != page);
+ 	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
+ 	arch_apei_flush_tlb_one(vaddr);
+-}
+-
+-static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
+-{
+-	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
+-	void *base = ghes_ioremap_area->addr;
+ 
+-	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_IRQ_PAGE(base));
+-	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
+-	arch_apei_flush_tlb_one(vaddr);
++	if (in_nmi()) {
++		raw_spin_unlock(&ghes_ioremap_lock_nmi);
++	} else if (this_cpu_read(sei_in_process)) {
++		spin_unlock_irqrestore(&ghes_ioremap_lock_sei, flags);
++	} else {
++		spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
++	}
+ }
+ 
+ static int ghes_estatus_pool_init(void)
+@@ -327,20 +335,13 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 				  int from_phys)
+ {
+ 	void __iomem *vaddr;
+-	unsigned long flags = 0;
+-	int in_nmi = in_nmi();
+ 	u64 offset;
+ 	u32 trunk;
+ 
+ 	while (len > 0) {
+ 		offset = paddr - (paddr & PAGE_MASK);
+-		if (in_nmi) {
+-			raw_spin_lock(&ghes_ioremap_lock_nmi);
+-			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
+-		} else {
+-			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
+-			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
+-		}
++		vaddr = ghes_ioremap_pfn(paddr >> PAGE_SHIFT);
++
+ 		trunk = PAGE_SIZE - offset;
+ 		trunk = min(trunk, len);
+ 		if (from_phys)
+@@ -350,13 +351,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 		len -= trunk;
+ 		paddr += trunk;
+ 		buffer += trunk;
+-		if (in_nmi) {
+-			ghes_iounmap_nmi(vaddr);
+-			raw_spin_unlock(&ghes_ioremap_lock_nmi);
+-		} else {
+-			ghes_iounmap_irq(vaddr);
+-			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
+-		}
++
++		ghes_iounmap(vaddr);
+ 	}
+ }
+ 
+-- 
+1.8.3.1
