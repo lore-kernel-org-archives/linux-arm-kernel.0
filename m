@@ -1,31 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 10:37:04 +0200
-Subject: [GIT PULL] omap fixes for v4.11-rc cycle
-In-Reply-To: <8286423674296161545@unknownmsgid>
-References: <8286423674296161545@unknownmsgid>
-Message-ID: <CAK8P3a007Hik3fLZH+Me0GcJ15VFgWZTeqn4wx+NwJgh-T3mrw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Mar 2017 09:46:39 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+ <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
+ <20170323105727.GA2441@red-moon>
+ <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+ <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
+ <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
+Message-ID: <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 7:07 PM, Tony Lindgren <tony@atomide.com> wrote:
-> The following changes since commit e24bce8fb4c26bd0d8eca74cbbee1ad049246be3:
+On 28 March 2017 at 22:49, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 3/28/2017 5:39 PM, Ard Biesheuvel wrote:
+>> On 28 March 2017 at 22:27, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>> Hi Lorenzo,
+>>>
+>>> On 3/23/2017 6:57 AM, Lorenzo Pieralisi wrote:
+>>>>> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
+>>>>> (or the legacy PCI bios) performed the resource assignment already.
+>>>>> One could argue that this is equally the case when running arm64 in
+>>>>> ACPI mode, but in general, you cannot assume the presence of firmware
+>>>>> on ARM/arm64 that has already taken care of this, and so the state of
+>>>>> the BARs has to be presumed invalid.
+>>>> The story is a bit more convoluted than that owing to x86 (and other
+>>>> arches) legacy.
+>>>>
+>>>> x86 tries to claim all PCI resources (in two passes - first enabled
+>>>> devices, second disabled devices) and that predates ACPI/UEFI.
+>>>>
+>>>> Mind, x86 reassign resources that can't be claimed too, the only
+>>>> difference with ARM64 is that, for the better or the worse, we
+>>>> have decided not to claim the FW PCI set-up on ARM64 even if it
+>>>> is sane, we do not even try, it was a deliberate choice.
+>>>>
+>>>> This patch should be harmless on x86 since if the FB PCI BAR is set
+>>>> up sanely, claiming it again should be a nop (to be checked).
+>>>>
+>>>> For all the talk about PCI being arch agnostic as I said manifold
+>>>> times before, that's just theory. In practice different arches
+>>>> treat PCI FW set-up differently, it would be ideal to make them
+>>>> uniform but legacy is huge and there is a massive risk of triggering
+>>>> regressions, it is no mean feat (if achievable at all).
+>>>
+>>> Can we explore having a uniform behavior across ALL ACPI bases systems
+>>> by trying to reuse the resources assigned by firmware first and reassign
+>>> them only if something is wrong?
+>>>
+>>> There are protocols like hotplug reservation in UEFI. It looks like Linux
+>>> is not honoring any of these protocols by being too smart.
+>>>
+>>
+>> Could you be more specific? Which protocol do you mean exactly, and
+>> how does not reusing resources interfere with it?
+>>
 >
->   Merge tag 'v4.11-rc1' into omap-for-v4.11/fixes (2017-03-06 08:37:53 -0800)
+> Let's assume for the moment that if ARM64 adaptation of PCIE reused the firmware
+> assigned BAR addresses, would you still have this problem that you are trying to
+> fix by a quirk?
 >
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-rc4
->
-> for you to fetch changes up to 351b7c490700747d1dba1b0a10fbfe3448d11c35:
->
->   ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot (2017-03-27 10:10:42 -0700)
->
-> ----------------------------------------------------------------
-> Fixes for omaps for v4.11-rc cycle. The biggest fix is to stop doing
-> unconditional reset of CPU1 as that caused a regression for cases with
-> custom bootloader loaded code running on CPU1. The rest are just minor
-> fixes for devices and one warning fix.
 
-Pulled into fixes, thanks!
+Probably not. Although I should point out that the same issue exists
+on DT systems, and so we will need this patch regardless.
 
-      Arnd
+> The protocol that I was looking at specifically is called hotplug reservation
+> protocol.
+>
+> http://www.intel.com/content/www/us/en/architecture-and-technology/unified-extensible-firmware-interface/efi-hot-plug-pci-initialization-protocol-specification.html
+>
+> The idea is to pad the PCIe bridge window by some amount in UEFI. You boot the
+> system without any cards present. when you do to hotplug, OS uses the range
+> reserved by the BIOS for inserting the new card.
+>
+> what I see is that the bridge windows get overridden by the OS.
+>
+> I'm asking why we don't fix the actual problem in PCIe ARM64 adaptation instead
+> of working around it by quirks.
+>
+> I don't see any reason why ACPI ARM64 should carry the burden of legacy systems.
+>
+> Legacy only applies to DT based systems.
+>
+
+I fully agree with this point: ACPI implies firmware, and so we should
+be able to rely on firmware to have initialized the PCIe subsystem by
+the time the kernel gets to access it.
+
+> If there is still a legacy problem in ACPI ARM64, generic Linux code deals with
+> this using some DMI/SMBIOS and setting a time bomb like products after this date
+> shall follow the new behavior.
+>
+> We are not in a very hardened position when it comes to changes for ACPI based
+> systems.
+>
+> Sinan
+>
+> --
+> Sinan Kaya
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
