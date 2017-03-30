@@ -1,182 +1,85 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 29 Mar 2017 23:01:50 +0800
-Subject: [PATCH v22 02/11] clocksource: arm_arch_timer: separate out
- device-tree code and remove arch_timer_detect_rate
-In-Reply-To: <20170329144142.GL2123@mai>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-3-fu.wei@linaro.org>
- <20170328145814.GE2123@mai>
- <CADyBb7uD1OqpPZf+ADsgbWryCGMGE3GqXOxz_4+1RzC1Pqsccg@mail.gmail.com>
- <CADyBb7tzJAuvG73v6ZoBVO4ehCC3RMsc1pq5gKF2eQ94j6GXrg@mail.gmail.com>
- <20170329144142.GL2123@mai>
-Message-ID: <CADyBb7sTk_GH=vQcfwp7R+PeTtqc=EPRU8RpH9KTgEqO9c0FgA@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 30 Mar 2017 15:04:51 +0800
+Subject: [PATCH v7 2/2] soc/imx: Add GPCv2 power gating driver
+In-Reply-To: <20170330065836.GD19596@b29396-OptiPlex-7040>
+References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
+ <20170321145004.21265-3-andrew.smirnov@gmail.com>
+ <20170324062451.GB12604@b29396-OptiPlex-7040>
+ <CAHQ1cqEvE=P6Vrwmm-DEL6sD+ppy3XSeih2_1VynESr9ZmtSOw@mail.gmail.com>
+ <20170330065836.GD19596@b29396-OptiPlex-7040>
+Message-ID: <20170330070451.GA29432@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2017 at 22:41, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On Wed, Mar 29, 2017 at 01:11:58PM +0800, Fu Wei wrote:
->> Hi Daniel,
->>
->> On 29 March 2017 at 11:41, Fu Wei <fu.wei@linaro.org> wrote:
->> > Hi Daniel,
->> >
->> > Great thanks for your review, allow me to answer your question below:
->> >
->> > On 28 March 2017 at 22:58, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->> >> On Wed, Mar 22, 2017 at 12:31:13AM +0800, fu.wei at linaro.org wrote:
->> >>> From: Fu Wei <fu.wei@linaro.org>
->> >>>
->> >>> Currently, the counter frequency detection call(arch_timer_detect_rate)
->> >>> includes getting the frequency from the device-tree property, the per-cpu
->> >>> arch-timer and the memory-mapped (MMIO) timer interfaces.
->> >>> But reading device-tree property will be needed only when system boot with
->> >>> device-tree, and reading from the per-cpu arch-timer and the memory-mapped
->> >>> (MMIO) timer interfaces will be needed only when the system initializes
->> >>> the relevant timer.
->> >>>
->> >>> This patch separates out device-tree code, keep them in device-tree init
->> >>> function, and removes arch_timer_detect_rate founction, then uses the
->> >>> arch_timer_get_cntfrq and arch_timer_mem_get_cntfrq directly.
->> >>>
->> >>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> >>> ---
->> >>>  drivers/clocksource/arm_arch_timer.c | 58 +++++++++++++++++++-----------------
->> >>>  1 file changed, 30 insertions(+), 28 deletions(-)
->> >>>
->> >>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> >>> index 843f923..29ca7d6 100644
->> >>> --- a/drivers/clocksource/arm_arch_timer.c
->> >>> +++ b/drivers/clocksource/arm_arch_timer.c
->> >>> @@ -560,30 +560,6 @@ static u32 arch_timer_mem_get_cntfrq(void __iomem *cntbase)
->> >>>       return readl_relaxed(cntbase + CNTFRQ);
->> >>>  }
->> >>>
->> >>> -static void
->> >>> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->> >>> -{
->> >>> -     /* Who has more than one independent system counter? */
->> >>> -     if (arch_timer_rate)
->> >>> -             return;
->> >>> -
->> >>> -     /*
->> >>> -      * Try to determine the frequency from the device tree or CNTFRQ,
->> >>> -      * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
->> >>> -      */
->> >>> -     if (!acpi_disabled ||
->> >>> -         of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
->> >>> -             if (cntbase)
->> >>> -                     arch_timer_rate = arch_timer_mem_get_cntfrq(cntbase);
->> >>> -             else
->> >>> -                     arch_timer_rate = arch_timer_get_cntfrq();
->> >>> -     }
->> >>> -
->> >>> -     /* Check the timer frequency. */
->> >>> -     if (arch_timer_rate == 0)
->> >>> -             pr_warn("frequency not available\n");
->> >>> -}
->> >>> -
->> >>>  static void arch_timer_banner(unsigned type)
->> >>>  {
->> >>>       pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
->> >>> @@ -958,7 +934,17 @@ static int __init arch_timer_of_init(struct device_node *np)
->> >>>       for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
->> >>>               arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
->> >>>
->> >>> -     arch_timer_detect_rate(NULL, np);
->> >>> +     /*
->> >>> +      * Try to determine the frequency from the device tree,
->> >>> +      * if fail, get the frequency from the sysreg CNTFRQ.
->> >>> +      */
->> >>> +     if (!arch_timer_rate &&
->> >>
->> >> This variable is set only if "arm,armv7-timer" and "arm,armv7-timer-mem" are
->> >> declared together in the DT, right ?
->> >>
->> >> Two declarations for a single variable ? Ignore the !arch_timer_rate.
->> >
->> > In this function, we try to initialize per-CPU arm arch_timer by DT.
->> > this "!arch_timer_rate" is for testing that if we have got system
->> > counter frequency from the memory-mapped timer. If so, we just skip
->> > getting the frequency from DT or sysreg cntfrq again.
->> > This variable is set only if "arm,armv7-timer-mem" is initialized
->> > earlier than "arm,armv7-timer", in another word, maybe the node of
->> > "arm,armv7-timer-mem" is declared earlier than  "arm,armv7-timer-mem"
->> > one in DT.
->> >
->> > we do this check is for keeping the same init logic as before in the
->> > DT, try to avoid any possibility of  breaking devices which boot by
->> > DT.
->> >
->> >>
->> >>> +         of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
->> >>> +             arch_timer_rate = arch_timer_get_cntfrq();
->> >>> +     if (!arch_timer_rate) {
->> >>> +             pr_err(FW_BUG "frequency not available.\n");
->> >>> +             return -EINVAL;
->> >>> +     }
->> >>
->> >> Please, clarify this block, the conditions are unclear.
->> >
->> > this "!arch_timer_rate" is for verifying that if the system counter
->> > frequency we just got from DT or sysreg cntfrq is valid(non-zero).
->> >
->> > So here, you can see I check arch_timer_rate twice, but they are for
->> > different cases.
->>
->> I think about this several times,
->> For this block, it is a little unclear, so I think this will be better:
->>
->> + /*
->> + * Try to determine the frequency:
->> + * If we have got it in arch_timer_mem_of_init, we don't need to get
->> it again, skip.
->> + * Otherwise, try to get the frequency from the device tree,
->> + * if fail, try to get it from the sysreg CNTFRQ.
->> + * Last, verify the arch_timer_rate before leaving this block.
->> + */
->> + if (!arch_timer_rate) {
->> +         if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
->> +                 arch_timer_rate = arch_timer_get_cntfrq();
->> +         if (!arch_timer_rate) {
->> +                 pr_err(FW_BUG "frequency not available.\n");
->> +                 return -EINVAL;
->> +         }
->> + }
->
-> Hi Fu Wei,
->
-> in my previous comment, I was suggesting to remove the first arch_timer_rate
-> check.
->
-> The code assumes something else initialized this variable. There is clearly a
-> conflict in the variable assignment. So if a node is defined twice for this
-> variable, then it is more sane to consider the second pass overwrites the first
-> one. As the DT are specifying the same rate, for -mem and !-mem, then it should
-> have not an impact (to be verified).
+On Thu, Mar 30, 2017 at 02:58:36PM +0800, Dong Aisheng wrote:
+> On Mon, Mar 27, 2017 at 11:42:15AM -0700, Andrey Smirnov wrote:
+> > On Thu, Mar 23, 2017 at 11:24 PM, Dong Aisheng <dongas86@gmail.com> wrote:
+> > > On Tue, Mar 21, 2017 at 07:50:04AM -0700, Andrey Smirnov wrote:
+> > >> Add code allowing for control of various power domains managed by GPCv2
+> > >> IP block found in i.MX7 series of SoCs. Power domains covered by this
+> > >> patch are:
+> > >>
+> > >>     - PCIE PHY
+> > >>     - MIPI PHY
+> > >>     - USB HSIC PHY
+> > >>     - USB OTG1/2 PHY
+> > >>
+> > >
+> > > You probably may need drop USB OTG which is not claimed in current RM.
+> > > See the PGC definition in 5.5.10 GPC Memory Map section.
+> > >
+> > > Each PGC (CPU type, MIX type, PU type) will occupy 64 Bytes address space,
+> > > the specific base address of each PGC are listed as below.
+> > > ? 0x800 ~ 0x83F : PGC for A7 core0
+> > > ? 0x840 ~ 0x87F: PGC for A7 core1
+> > > ? 0x880 ~ 0x8BF: PGC for A7 SCU
+> > > ? 0xA00 ~ 0xA3F: PGC for fastmix/megamix
+> > > ? 0xC00 ~ 0xC3F: PGC for MIPI PHY
+> > > ? 0xC40 ~ 0xC7F: PGC for PCIE_PHY
+> > > ? 0xC80 ~ 0xCBF: Reserved
+> > > ? 0xCC0 ~ 0xCFF: Reserved
+> > > ? 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
+> > >
+> > > And in 5.4 Power Management Unit (PMU) chapter,
+> > > you will find the USB OTG phy power is directly supplied by
+> > > VDD_USB_OTG1_3P3_IN/VDD_USB_OTG2_3P3_IN.
+> > >
+> > > http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX7DRM.pdf
+> > >
+> > > I understand that there's also some USB OTG code exist in NXP internal
+> > > tree, but that's legacy for early doc implementation and may be deprecated.
+> > > so i assume it should be gone.
+> > >
+> > > Hopefully i will double confirm with our IC designer tomorrow.
+> > >
+> > 
+> > USB OTG domains are absent from that list, true, but they are
+> > mentioned all of the place further in that section in register map
+> > documentation, which makes it difficult to tell which part of the
+> > datasheet is not up to date.
+> > 
+> > I'm going to drop those power domains for now, since I don't have a
+> > use-case for them and it would also allow me to get rid of the chunk
+> > of code you thought was messy. However it would be nice to get an
+> > updated version of RM where all of that is straightened out.
+> > 
+> 
+> I checked with our IC designer and he confirmed the USB OTG is removed
+> and not supported in GPC. SW should not control it, instead, its power
+> domain is handled by hardware automatically.
+> 
+> Currently there's true some incorrectness in GPC chapter, i already
+> reported the issue to the designer, but still no timeline when i
+> can get a updated version.
+> 
+> But i think it's fine if you're going to only support PCIE/MIPI/USB HSIC
+> PHY power domain. I suppose those bits are correct in RM.
+> 
 
-So the code will be like this:
+BTW, would you please CC my company email next time?
+aisheng.dong at nxp.com
 
-+ /*
-+ * Try to determine the frequency:
-+ * If we try to get the frequency from the device tree,
-+ * if fail, try to get it from the sysreg CNTFRQ.
-+ * Then verify the arch_timer_rate.
-+ */
-+ if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
-+         arch_timer_rate = arch_timer_get_cntfrq();
-+ if (!arch_timer_rate) {
-+         pr_err(FW_BUG "frequency not available.\n");
-+         return -EINVAL;
-+ }
+Then i can see them in time to help the review.
 
-I am OK to delete the  first arch_timer_rate check,
-If arch_timer_mem is initialized first,  we just overwrite the
-existing rate to arch_timer rate.
-This makes sense to me.
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Regards
+Dong Aisheng
