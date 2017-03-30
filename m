@@ -1,35 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Mar 2017 17:20:16 +0100
-Subject: [PATCH v2 07/22] PCI: ECAM: use ioremap_nopost() to map config
- region
-In-Reply-To: <20170327094954.7162-8-lorenzo.pieralisi@arm.com>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-8-lorenzo.pieralisi@arm.com>
-Message-ID: <20170330162015.GB5623@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Mar 2017 17:27:30 +0100
+Subject: [PATCH v6 00/39] i.MX Media Driver
+In-Reply-To: <d715bcdf-b2df-8080-6ab4-854aeace31a8@gmail.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170330110249.GF7909@n2100.armlinux.org.uk>
+ <d715bcdf-b2df-8080-6ab4-854aeace31a8@gmail.com>
+Message-ID: <20170330162730.GH7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 10:49:35AM +0100, Lorenzo Pieralisi wrote:
-> Current ECAM kernel implementation uses ioremap() to map the ECAM
-> configuration space memory region; this is not safe in that on some
-> architectures the ioremap interface provides mappings that allow posted
-> write transactions. This, as highlighted in the PCIe specifications
-> (4.0 - Rev0.3, "Ordering Considerations for the Enhanced Configuration
-> Address Mechanism"), can create ordering issues for software because
-> posted writes transactions on the CPU host bus are non posted in the
-> PCI express fabric.
+On Thu, Mar 30, 2017 at 09:12:29AM -0700, Steve Longerbeam wrote:
 > 
-> Update the ioremap() interface to use ioremap_nopost() whose
-> mapping attributes guarantee that non-posted writes transactions
-> are issued for memory writes within the ECAM memory mapped address
-> region.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/ecam.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> On 03/30/2017 04:02 AM, Russell King - ARM Linux wrote:
+> >This fails at step 1.  The removal of the frame interval support now
+> >means my setup script fails when trying to set the frame interval on
+> >the camera:
+> >
+> >Enumerating pads and links
+> >Setting up format SRGGB8_1X8 816x616 on pad imx219 0-0010/0
+> >Format set: SRGGB8_1X8 816x616
+> >Setting up frame interval 1/25 on pad imx219 0-0010/0
+> >Frame interval set: 1/25
+> >Setting up format SRGGB8_1X8 816x616 on pad imx6-mipi-csi2/0
+> >Format set: SRGGB8_1X8 816x616
+> >Setting up frame interval 1/25 on pad imx6-mipi-csi2/0
+> >Unable to set frame interval: Inappropriate ioctl for device (-25)Unable to setup formats: Inappropriate ioctl for device (25)
+> >
+> >This is because media-ctl tries to propagate it from the imx219 source
+> >pad to the csi2 sink pad, and the csi2 now fails that ioctl.
+> 
+> I assume you're using Philipp's frame interval patches to media-ctl.
+> Can you make the frame interval propagation optional in those patches?
+> I.e. don't error-out with a failure code if the ioctl returns ENOTTY.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Damn, you're right.  There's way too much stuff to try and keep track
+of with this stuff.
 
-Will
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
