@@ -1,34 +1,22 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 31 Mar 2017 06:59:06 +0800
-Subject: [arm:sa1100 104/112] ERROR: "ipaq_micro_tx_msg"
- [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
-Message-ID: <201703310603.wstanCiK%fengguang.wu@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Mar 2017 18:19:16 -0500
+Subject: [PATCH v2 5/6] dt-bindings: List devicetree binding for the CCU
+ of Allwinner A10
+In-Reply-To: <28a3c670575f368a2bd9a67b451f0f45c474dc7b.1490545262.git-series.plaes@plaes.org>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <28a3c670575f368a2bd9a67b451f0f45c474dc7b.1490545262.git-series.plaes@plaes.org>
+Message-ID: <20170330231916.lwzpql4hx74devgr@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-head:   421be819b275def43bb042dfb9790025110cc784
-commit: 724317514340b01db9235264e17abc59f4d50cc9 [104/112] ARM: sa1100/h3xxx: sleeve support
-config: arm-simpad_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 724317514340b01db9235264e17abc59f4d50cc9
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Sun, Mar 26, 2017 at 08:20:20PM +0300, Priit Laes wrote:
+> Allwinner A10 is now driven by sunxi-ng CCU driver.
+> 
+> Add devicetree binding for it.
+> 
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-All errors (new ones prefixed by >>):
-
->> ERROR: "ipaq_micro_tx_msg" [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 12813 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170331/f3cf6f67/attachment.gz>
+Acked-by: Rob Herring <robh@kernel.org>
