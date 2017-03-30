@@ -1,70 +1,82 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Thu, 30 Mar 2017 13:07:47 +0000
-Subject: [PATCH V6 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
-References: <1490828667-30973-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846675E0C4@IRSMSX101.ger.corp.intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Mar 2017 15:08:15 +0200
+Subject: [PATCH v2 0/4] pinctrl: sh-pfc: Add support for R-Car H3 ES2.0
+In-Reply-To: <1489425167-22711-1-git-send-email-geert+renesas@glider.be>
+References: <1489425167-22711-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdXEJhs97_F70BfBkbLusMT_qnVVYn_iQq8oB4B1pjf1Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan
+On Mon, Mar 13, 2017 at 6:12 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> This patch series adds pinctrl support for R-Car H3 ES2.0, which differs
+> from ES1.x in several areas.
+>
+> The goal is twofold:
+>   1. Support both the ES1.x and ES2.0 SoC revisions in a single binary
+>      for now,
+>   2. Make it clear which code supports ES1.x, so it can easily be
+>      identified and removed later, when production SoCs are deemed
+>      ubiquitous.
+>
+> This is achieved by:
+>   1. Extracting the support for R-Car H3 ES1.x into a separate file, as
+>      the differences are quite large,
+>   2. Adding code for detecting the SoC revision at runtime using the new
+>      soc_device_match() API, and selecting pinctrl tables for the actual
+>      SoC revision,
+>   3. Replacing the core register and bitfield definitions, and pins,
+>      groups, and functions for basic devices by their counterparts for
+>      R-Car H3 ES2.0.
+>
+> Changes compared to v1:
+>   - Print correct subdriver name,
+>   - Extend Proof-of-Concept to basic support (SCIF serial port).
+>
+> The addition of pins, groups, and functions for other on-chip devices is
+> left to subsequent patches.
+>
+> For testers, this series and its dependencies are available in the
+> topic/r8a7795es2-pfc-v2 branch of my renesas-drivers git repository at
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+> An integration branch for testing on the R-Car H3 ES2.0 based Salvator-X
+> development board is provided as topic/r8a7795es2-integration.
+>
+> This has been tested on Salvator-X with R-Car H3 ES1.0, ES1.1, and ES2.0
+> SoCs.
+>
+> I plan to queue this up in sh-pfc-for-v4.12.
 
->
->When the operating system is booted with the default ASPM policy
->(POLICY_DEFAULT), current code is querying the enable/disable
->states from ASPM registers to determine the policy.
->
->For example, a BIOS could set the power saving state to performance
->and clear all ASPM control registers. A balanced ASPM policy could
->enable L0s and disable L1. A power conscious BIOS could enable both
->L0s and L1 to trade off latency and performance vs. power.
->
->After hotplug removal, pcie_aspm_exit_link_state() function clears
->the ASPM registers. An insertion following hotplug removal reads
->incorrect policy as ASPM disabled even though ASPM was enabled
->during boot.
->
->This is caused by the fact that same function is used for reconfiguring
->ASPM regardless of the power on state.
->
->------------------------
->Changes from v5 (https://www.spinics.net/lists/arm-kernel/msg571758.html)
->------------------------
->- rebase to 4.11-rc3
->- Split pci_aspm_init() body into pci_aspm_init_upstream()
->  and pci_aspm_init_downstream() for bridge and endpoint
->  specific code behavior.
->- Get rid of function0 function.
->  Detect downstream link in pci_aspm_init_upstream() instead
->
->Sinan Kaya (5):
->  PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
->  PCI/ASPM: split pci_aspm_init() into two
->  PCI/ASPM: add init hook to device_add
->  PCI/ASPM: save power on values during bridge init
->  PCI/ASPM: move link_state cleanup to bridge remove
->
+In the mean time:
+  - I renamed pfc-r8a7795es1.c to pfc-r8a7795-es1.c for compatibility with
+    the BSP, but I'm not gonna spam everybody with a v3 for such a trivial
+    change.
+  - I verified all physical pins against the R-Car H3 pin function rev0.551
+    and the R-Car H3SiP pin arrangement rev1.53 documents. No updates needed.
 
-Thanks for quick patches. I can boot up now without any crash. I will test actual
-functionality by next week as I am out for this week.
+So I've queued the remainder (patches 2-4) up in sh-pfc-for-v4.12.
 
-
-
-
-> drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
-> drivers/pci/probe.c     |   3 ++
-> drivers/pci/remove.c    |   3 +-
-> include/linux/pci.h     |   2 +
-> 4 files changed, 98 insertions(+), 47 deletions(-)
+> Geert Uytterhoeven (4):
+>   pinctrl: sh-pfc: Update info pointer after SoC-specific init
+>   pinctrl: sh-pfc: r8a7795: Add support for R-Car H3 ES2.0
+>   pinctrl: sh-pfc: r8a7795: Add SCIF support
+>   pinctrl: sh-pfc: r8a7795: Add SCIF_CLK support
 >
->--
->1.9.1
+>  drivers/pinctrl/sh-pfc/Makefile                    |    1 +
+>  drivers/pinctrl/sh-pfc/core.c                      |    3 +
+>  drivers/pinctrl/sh-pfc/pfc-r8a7795.c               | 4217 ++++----------------
+>  .../sh-pfc/{pfc-r8a7795.c => pfc-r8a7795es1.c}     |   25 +-
+>  drivers/pinctrl/sh-pfc/sh_pfc.h                    |    1 +
+>  5 files changed, 782 insertions(+), 3465 deletions(-)
+>  copy drivers/pinctrl/sh-pfc/{pfc-r8a7795.c => pfc-r8a7795es1.c} (99%)
 
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
