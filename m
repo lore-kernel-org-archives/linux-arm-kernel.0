@@ -1,31 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 16:40:44 +0200
-Subject: [GIT PULL] ARM: OXNAS SoC update for 4.12
-In-Reply-To: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
-References: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
-Message-ID: <7432624.QZN9TsYLQF@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Mar 2017 15:42:19 +0100
+Subject: [PATCH 5/4] iommu/arm-smmu: Poll for TLB sync completion more
+ effectively
+In-Reply-To: <67da197b56bb8763623fc215176b86ab04b1799e.1490291854.git.robin.murphy@arm.com>
+References: <cover.1488907474.git.robin.murphy@arm.com>
+ <67da197b56bb8763623fc215176b86ab04b1799e.1490291854.git.robin.murphy@arm.com>
+Message-ID: <20170330144219.GH22160@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 20, 2017 10:39:56 AM CEST Neil Armstrong wrote:
-> Dear arm-soc maintainers,
+On Thu, Mar 23, 2017 at 05:59:40PM +0000, Robin Murphy wrote:
+> On relatively slow development platforms and software models, the
+> inefficiency of our TLB sync loop tends not to show up - for instance on
+> a Juno r1 board I typically see the TLBI has completed of its own accord
+> by the time we get to the sync, such that the latter finishes instantly.
 > 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> However, on larger systems doing real I/O, it's less realistic for the
+> TLBs to go idle immediately, and at that point falling into the 1MHz
+> polling loop turns out to throw away performance drastically. Let's
+> strike a balance by polling more than once between pauses, such that we
+> have much more chance of catching normal operations completing before
+> committing to the fixed delay, but also backing off exponentially, since
+> if a sync really hasn't completed within one or two "reasonable time"
+> periods, it becomes increasingly unlikely that it ever will.
 > 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.12
-> 
-> for you to fetch changes up to b44327d198b4f1bbebaf83f714cde450471de644:
-> 
->   ARM: oxnas: remove redundant select CPU_V6K (2017-03-20 10:13:45 +0100)
-> 
-> ----------------------------------------------------------------
-> - Fix OX820 Kconfig
-> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
 
-I've merged this into next/fixes-non-critical. Thanks,
+Thanks, I like this patch.
 
-	Arnd
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f7411109670f..aa17f3d937a0 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -162,6 +162,7 @@
+>  #define ARM_SMMU_GR0_sTLBGSTATUS	0x74
+>  #define sTLBGSTATUS_GSACTIVE		(1 << 0)
+>  #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
+> +#define TLB_SPIN_COUNT			10
+>  
+>  /* Stream mapping registers */
+>  #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
+> @@ -574,18 +575,17 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+>  static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+>  				void __iomem *sync, void __iomem *status)
+>  {
+> -	int count = 0;
+> +	unsigned int spin_count, delay;
+>  
+>  	writel_relaxed(0, sync);
+> -	while (readl_relaxed(status) & sTLBGSTATUS_GSACTIVE) {
+> -		cpu_relax();
+> -		if (++count == TLB_LOOP_TIMEOUT) {
+> -			dev_err_ratelimited(smmu->dev,
+> -			"TLB sync timed out -- SMMU may be deadlocked\n");
+> -			return;
+> -		}
+> -		udelay(1);
+> +	for (delay = 1; delay < TLB_LOOP_TIMEOUT; delay *= 2) {
+> +		for (spin_count = TLB_SPIN_COUNT; spin_count > 0; spin_count--)
+> +			if (!(readl_relaxed(status) & sTLBGSTATUS_GSACTIVE))
+> +				return;
+
+Can you keep the cpu_relax in the inner loop please?
+
+> +		udelay(delay);
+>  	}
+> +	dev_err_ratelimited(smmu->dev,
+> +			    "TLB sync timed out -- SMMU may be deadlocked\n");
+
+Whilst we can have WFE-based spinning with SMMUv3, I suppose we should
+do something similar in queue_poll_cons... Fancy taking a look?
+
+Will
