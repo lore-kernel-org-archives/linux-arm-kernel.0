@@ -1,180 +1,165 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:11 +0800
-Subject: [PATCH v3 2/8] acpi: apei: handle SEI notification type for ARMv8
-In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-12-git-send-email-xiexiuqi@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Mar 2017 11:44:00 +0100
+Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+In-Reply-To: <8dcbb0b3-dd13-d2b3-90f5-64b900d67778@samsung.com>
+References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
+ <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+ <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
+ <073f1feb-d6da-c93f-8e67-0910befec27b@samsung.com>
+ <c13f6475-f503-238f-c101-4f9cdf1b0ae2@arm.com>
+ <45fde94b-9487-c28e-9d4e-3b36c4b4a934@samsung.com>
+ <CAMuHMdWkOdAD=d0DAy7cJTHcQc7oq5HVDvTNtjfQETMynx1_+g@mail.gmail.com>
+ <8dcbb0b3-dd13-d2b3-90f5-64b900d67778@samsung.com>
+Message-ID: <41097b2c-9bbc-31e4-d17d-8c3f638ec1a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM APEI extension proposal added SEI (asynchronous SError interrupt)
-notification type for ARMv8.
+On 30/03/17 09:30, Andrzej Hajda wrote:
+> On 30.03.2017 09:40, Geert Uytterhoeven wrote:
+>> Hi Andrzej,
+>>
+>> On Thu, Mar 30, 2017 at 8:51 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>>> On 29.03.2017 17:33, Robin Murphy wrote:
+>>>> On 29/03/17 16:12, Andrzej Hajda wrote:
+>>>>> On 29.03.2017 14:55, Robin Murphy wrote:
+>>>>>> On 29/03/17 11:05, Andrzej Hajda wrote:
+>>>>>>> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+>>>>>>> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
+>>>>>>> it. In first case temporary pages array is passed to iommu_dma_mmap,
+>>>>>>> in 2nd case single entry sg table is created directly instead
+>>>>>>> of calling helper.
+>>>>>>>
+>>>>>>> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+>>>>>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>>>>>> ---
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> I am not familiar with this framework so please don't be too cruel ;)
+>>>>>>> Alternative solution I see is to always create vm_area->pages,
+>>>>>>> I do not know which approach is preferred.
+>>>>>>>
+>>>>>>> Regards
+>>>>>>> Andrzej
+>>>>>>> ---
+>>>>>>>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>>>>>>>  1 file changed, 38 insertions(+), 2 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>>>>>>> index f7b5401..bba2bc8 100644
+>>>>>>> --- a/arch/arm64/mm/dma-mapping.c
+>>>>>>> +++ b/arch/arm64/mm/dma-mapping.c
+>>>>>>> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>>>>>>>            return ret;
+>>>>>>>
+>>>>>>>    area = find_vm_area(cpu_addr);
+>>>>>>> -  if (WARN_ON(!area || !area->pages))
+>>>>>>> +  if (WARN_ON(!area))
+>>>>>> >From the look of things, it doesn't seem strictly necessary to change
+>>>>>> this, but whether that's a good thing is another matter. I'm not sure
+>>>>>> that dma_common_contiguous_remap() should really be leaving a dangling
+>>>>>> pointer in area->pages as it apparently does... :/
+>>>>>>
+>>>>>>> +          return -ENXIO;
+>>>>>>> +
+>>>>>>> +  if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+>>>>>>> +          struct page *page = vmalloc_to_page(cpu_addr);
+>>>>>>> +          unsigned int count = size >> PAGE_SHIFT;
+>>>>>>> +          struct page **pages;
+>>>>>>> +          unsigned long pfn;
+>>>>>>> +          int i;
+>>>>>>> +
+>>>>>>> +          pages = kmalloc_array(count, sizeof(*pages), GFP_KERNEL);
+>>>>>>> +          if (!pages)
+>>>>>>> +                  return -ENOMEM;
+>>>>>>> +
+>>>>>>> +          for (i = 0, pfn = page_to_pfn(page); i < count; i++)
+>>>>>>> +                  pages[i] = pfn_to_page(pfn + i);
+>>>>>>> +
+>>>>>>> +          ret = iommu_dma_mmap(pages, size, vma);
+>>>>>> /**
+>>>>>>  * iommu_dma_mmap - Map a buffer into provided user VMA
+>>>>>>  * @pages: Array representing buffer from iommu_dma_alloc()
+>>>>>>    ...
+>>>>>>
+>>>>>> In this case, the buffer has not come from iommu_dma_alloc(), so passing
+>>>>>> into iommu_dma_mmap() is wrong by contract, even if having to fake up a
+>>>>>> page array wasn't enough of a red flag. Given that a FORCE_CONTIGUOUS
+>>>>>> allocation is essentially the same as for the non-IOMMU case, I think it
+>>>>>> should be sufficient to defer to that path, i.e.:
+>>>>>>
+>>>>>>     if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
+>>>>>>             return __swiotlb_mmap(dev, vma, cpu_addr,
+>>>>>>                             phys_to_dma(virt_to_phys(cpu_addr)),
+>>>>>>                             size, attrs);
+>>>>> Maybe I have make mistake somewhere but it does not work, here and below
+>>>>> (hangs or crashes). I suppose it can be due to different address
+>>>>> translations, my patch uses
+>>>>>     page = vmalloc_to_page(cpu_addr).
+>>>>> And here we have:
+>>>>>     handle = phys_to_dma(dev, virt_to_phys(cpu_addr)); // in
+>>>>> __iommu_mmap_attrs
+>>>>>     page = phys_to_page(dma_to_phys(dev, handle)); // in
+>>>>> __swiotlb_get_sgtable
+>>>>> I guess it is similarly in __swiotlb_mmap.
+>>>>>
+>>>>> Are these translations equivalent?
+>>>> Ah, my mistake, sorry - I managed to forget that cpu_addr is always
+>>>> remapped for FORCE_CONTIGUOUS (*and* somehow overlook the use of
+>>>> vmalloc_to_page() in the patch itself), so the virt_to_phys() part of my
+>>>> example is indeed bogus. The general point still stands, though.
+>>> I guess Geert's proposition to create pages permanently is also not
+>>> acceptable[2]. So how to fix crashes which appeared after patch adding
+>> If I'm not mistaken, creating the pages permanently is what the
+>> !DMA_ATTR_FORCE_CONTIGUOUS does? The only difference is where
+>> the underlying memory is allocated from.
+>>
+>> Am I missing something?
+> 
+> Quoting Robin from his response:
+>> in general is is not
+>> safe to assume a coherent allocation is backed by struct pages at all
+> 
+> As I said before I am not familiar with the subject, so it is possible I
+> misunderstood something.
 
-Add a new GHES error source handling function for SEI. In firmware
-first mode, if an error source's notification type is SEI. Then GHES
-could parse and report the detail error information.
+That's from the perspective of external callers of
+dma_alloc_coherent()/dma_alloc_attrs(), wherein
+dma_alloc_from_coherent() may have returned device-specific memory
+without calling into the arch dma_map_ops implementation. Internal to
+the arm64 implementation, however, everything *we* allocate comes from
+either CMA or the normal page allocator, so should always be backed by
+real kernel pages.
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
----
- arch/arm64/kernel/traps.c | 10 ++++++++
- drivers/acpi/apei/Kconfig | 14 ++++++++++++
- drivers/acpi/apei/ghes.c  | 58 +++++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h       |  1 +
- 4 files changed, 83 insertions(+)
+Robin.
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index e52be6a..53710a2 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -47,6 +47,8 @@
- #include <asm/system_misc.h>
- #include <asm/sysreg.h>
- 
-+#include <acpi/ghes.h>
-+
- static const char *handler[]= {
- 	"Synchronous Abort",
- 	"IRQ",
-@@ -625,6 +627,14 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 		handler[reason], smp_processor_id(), esr,
- 		esr_get_class_string(esr));
- 
-+	/*
-+	 * In firmware first mode, we could assume firmware will only generate one
-+	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
-+	 */
-+	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI) && ESR_ELx_EC(esr) == ESR_ELx_EC_SERROR) {
-+		ghes_notify_sei();
-+	}
-+
- 	die("Oops - bad mode", regs, 0);
- 	local_irq_disable();
- 	panic("bad mode");
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index b54bd33..c00c9d34 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -55,6 +55,20 @@ config ACPI_APEI_SEA
- 	  option allows the OS to look for such hardware error record, and
- 	  take appropriate action.
- 
-+config ACPI_APEI_SEI
-+	bool "APEI Asynchronous SError Interrupt logging/recovering support"
-+	depends on ARM64 && ACPI_APEI_GHES
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEI (asynchronous SError interrupt).
-+
-+	  SEI happens with invalid instruction access or asynchronous exceptions
-+	  on ARMv8 systems. If a system supports firmware first handling of SEI,
-+	  the platform analyzes and handles hardware error notifications from
-+	  SEI, and it may then form a HW error record for the OS to parse and
-+	  handle. This option allows the OS to look for such hardware error
-+	  record, and take appropriate action.
-+
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 6be0333..045d101 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -862,6 +862,51 @@ static inline void ghes_sea_remove(struct ghes *ghes)
- }
- #endif /* CONFIG_ACPI_APEI_SEA */
- 
-+#ifdef CONFIG_ACPI_APEI_SEI
-+static LIST_HEAD(ghes_sei);
-+
-+int ghes_notify_sei(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
-+		if(!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sei_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sei);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sei_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEI */
-+static inline void ghes_sei_add(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to add SEI notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+
-+static inline void ghes_sei_remove(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to remove SEI notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+#endif /* CONFIG_HAVE_ACPI_APEI_SEI */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1111,6 +1156,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEI)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
-+				generic->header.source_id);
-+			goto err;
-+		}
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1179,6 +1231,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_add(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1224,6 +1279,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 2a727dc..10d752e 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -100,5 +100,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
- }
- 
- int ghes_notify_sea(void);
-+int ghes_notify_sei(void);
- 
- #endif /* GHES_H */
--- 
-1.8.3.1
+> Regards
+> Andrzej
+> 
+> 
+>>
+>> Thanks!
+>>
+>>> support to DMA_ATTR_FORCE_CONTIGUOUS in IOMMU on arm64 [1]?
+>>> Maybe temporary solution is to drop the patch until proper handling of
+>>> mmapping is proposed, without it the patch looks incomplete and causes
+>>> regression.
+>>> Moreover __iommu_alloc_attrs uses also dma_common_contiguous_remap which
+>>> also assumes existence of struct pages.
+>>>
+>>> [1]: https://patchwork.kernel.org/patch/9609551/
+>>> [2]: https://www.spinics.net/lists/arm-kernel/msg572688.html
+>> Gr{oetje,eeting}s,
+>>
+>>                         Geert
+>>
+>> --
+>> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>>
+>> In personal conversations with technical people, I call myself a hacker. But
+>> when I'm talking to journalists I just say "programmer" or something like that.
+>>                                 -- Linus Torvalds
+>>
+>>
+>>
+> 
