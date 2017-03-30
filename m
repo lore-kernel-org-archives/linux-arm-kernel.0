@@ -1,183 +1,152 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 30 Mar 2017 10:29:45 +0200
-Subject: [kbuild-all] [PATCH v4 13/22] KVM: arm64: ITS:
- KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
-In-Reply-To: <20170330072908.GA21772@yexl-desktop>
-References: <201703272354.OaYhCMvV%fengguang.wu@intel.com>
- <0d43e874-c443-7d55-b741-ce27bd103cb5@redhat.com>
- <20170330022159.GB15042@yexl-desktop>
- <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
- <20170330072908.GA21772@yexl-desktop>
-Message-ID: <33373e19-66c2-e396-cc44-aadade85a372@redhat.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 30 Mar 2017 10:30:19 +0200
+Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+In-Reply-To: <CAMuHMdWkOdAD=d0DAy7cJTHcQc7oq5HVDvTNtjfQETMynx1_+g@mail.gmail.com>
+References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
+ <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+ <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
+ <073f1feb-d6da-c93f-8e67-0910befec27b@samsung.com>
+ <c13f6475-f503-238f-c101-4f9cdf1b0ae2@arm.com>
+ <45fde94b-9487-c28e-9d4e-3b36c4b4a934@samsung.com>
+ <CAMuHMdWkOdAD=d0DAy7cJTHcQc7oq5HVDvTNtjfQETMynx1_+g@mail.gmail.com>
+Message-ID: <8dcbb0b3-dd13-d2b3-90f5-64b900d67778@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiaolong,
+On 30.03.2017 09:40, Geert Uytterhoeven wrote:
+> Hi Andrzej,
+>
+> On Thu, Mar 30, 2017 at 8:51 AM, Andrzej Hajda <a.hajda@samsung.com> wrote:
+>> On 29.03.2017 17:33, Robin Murphy wrote:
+>>> On 29/03/17 16:12, Andrzej Hajda wrote:
+>>>> On 29.03.2017 14:55, Robin Murphy wrote:
+>>>>> On 29/03/17 11:05, Andrzej Hajda wrote:
+>>>>>> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+>>>>>> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
+>>>>>> it. In first case temporary pages array is passed to iommu_dma_mmap,
+>>>>>> in 2nd case single entry sg table is created directly instead
+>>>>>> of calling helper.
+>>>>>>
+>>>>>> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+>>>>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>>>>> ---
+>>>>>> Hi,
+>>>>>>
+>>>>>> I am not familiar with this framework so please don't be too cruel ;)
+>>>>>> Alternative solution I see is to always create vm_area->pages,
+>>>>>> I do not know which approach is preferred.
+>>>>>>
+>>>>>> Regards
+>>>>>> Andrzej
+>>>>>> ---
+>>>>>>  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
+>>>>>>  1 file changed, 38 insertions(+), 2 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>>>>>> index f7b5401..bba2bc8 100644
+>>>>>> --- a/arch/arm64/mm/dma-mapping.c
+>>>>>> +++ b/arch/arm64/mm/dma-mapping.c
+>>>>>> @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>>>>>>            return ret;
+>>>>>>
+>>>>>>    area = find_vm_area(cpu_addr);
+>>>>>> -  if (WARN_ON(!area || !area->pages))
+>>>>>> +  if (WARN_ON(!area))
+>>>>> >From the look of things, it doesn't seem strictly necessary to change
+>>>>> this, but whether that's a good thing is another matter. I'm not sure
+>>>>> that dma_common_contiguous_remap() should really be leaving a dangling
+>>>>> pointer in area->pages as it apparently does... :/
+>>>>>
+>>>>>> +          return -ENXIO;
+>>>>>> +
+>>>>>> +  if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+>>>>>> +          struct page *page = vmalloc_to_page(cpu_addr);
+>>>>>> +          unsigned int count = size >> PAGE_SHIFT;
+>>>>>> +          struct page **pages;
+>>>>>> +          unsigned long pfn;
+>>>>>> +          int i;
+>>>>>> +
+>>>>>> +          pages = kmalloc_array(count, sizeof(*pages), GFP_KERNEL);
+>>>>>> +          if (!pages)
+>>>>>> +                  return -ENOMEM;
+>>>>>> +
+>>>>>> +          for (i = 0, pfn = page_to_pfn(page); i < count; i++)
+>>>>>> +                  pages[i] = pfn_to_page(pfn + i);
+>>>>>> +
+>>>>>> +          ret = iommu_dma_mmap(pages, size, vma);
+>>>>> /**
+>>>>>  * iommu_dma_mmap - Map a buffer into provided user VMA
+>>>>>  * @pages: Array representing buffer from iommu_dma_alloc()
+>>>>>    ...
+>>>>>
+>>>>> In this case, the buffer has not come from iommu_dma_alloc(), so passing
+>>>>> into iommu_dma_mmap() is wrong by contract, even if having to fake up a
+>>>>> page array wasn't enough of a red flag. Given that a FORCE_CONTIGUOUS
+>>>>> allocation is essentially the same as for the non-IOMMU case, I think it
+>>>>> should be sufficient to defer to that path, i.e.:
+>>>>>
+>>>>>     if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
+>>>>>             return __swiotlb_mmap(dev, vma, cpu_addr,
+>>>>>                             phys_to_dma(virt_to_phys(cpu_addr)),
+>>>>>                             size, attrs);
+>>>> Maybe I have make mistake somewhere but it does not work, here and below
+>>>> (hangs or crashes). I suppose it can be due to different address
+>>>> translations, my patch uses
+>>>>     page = vmalloc_to_page(cpu_addr).
+>>>> And here we have:
+>>>>     handle = phys_to_dma(dev, virt_to_phys(cpu_addr)); // in
+>>>> __iommu_mmap_attrs
+>>>>     page = phys_to_page(dma_to_phys(dev, handle)); // in
+>>>> __swiotlb_get_sgtable
+>>>> I guess it is similarly in __swiotlb_mmap.
+>>>>
+>>>> Are these translations equivalent?
+>>> Ah, my mistake, sorry - I managed to forget that cpu_addr is always
+>>> remapped for FORCE_CONTIGUOUS (*and* somehow overlook the use of
+>>> vmalloc_to_page() in the patch itself), so the virt_to_phys() part of my
+>>> example is indeed bogus. The general point still stands, though.
+>> I guess Geert's proposition to create pages permanently is also not
+>> acceptable[2]. So how to fix crashes which appeared after patch adding
+> If I'm not mistaken, creating the pages permanently is what the
+> !DMA_ATTR_FORCE_CONTIGUOUS does? The only difference is where
+> the underlying memory is allocated from.
+>
+> Am I missing something?
 
-On 30/03/2017 09:29, Ye Xiaolong wrote:
-> On 03/30, Auger Eric wrote:
->> Hi Xiaolong
->>
->> On 30/03/2017 04:21, Ye Xiaolong wrote:
->>> Hi, Eric
->>>
->>> On 03/27, Auger Eric wrote:
->>>> Hi,
->>>>
->>>> On 27/03/2017 17:04, kbuild test robot wrote:
->>>>> Hi Eric,
->>>>>
->>>>> [auto build test ERROR on kvmarm/next]
->>>>> [also build test ERROR on v4.11-rc4 next-20170327]
->>>>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>>>>
->>>>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/vITS-save-restore/20170327-195443
->>>>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
->>>>> config: arm64-defconfig (attached as .config)
->>>>> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
->>>>> reproduce:
->>>>>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->>>>>         chmod +x ~/bin/make.cross
->>>>>         # save the attached .config to linux build tree
->>>>>         make.cross ARCH=arm64 
->>>>>
->>>>> All errors (new ones prefixed by >>):
->>>>>
->>>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c: In function 'vgic_its_has_attr':
->>>>>>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: error: 'its' undeclared (first use in this function)
->>>>>       return vgic_its_table_restore(its);
->>>>
->>>> I think this is due to the fact the series is applied on KVM: arm/arm64:
->>>> Emulate the EL1 phys timer registers (kvmarm-for-4.11).
->>>>
->>>> Please apply it to (kvmarm/queue, kvmarm/next, kvm_next) KVM: arm/arm64:
->>>> vgic: Improve sync_hwstate performance  (255905e)
->>>> I also checked it compiles on 4.11-rc4.
->>>
->>> Hmm, we did apply your series on top of kvarm/next, judging from the function
->>> code below, I can't see the 'its' declaration. 
->>>
->>> static int vgic_its_has_attr(struct kvm_device *dev,
->>>                              struct kvm_device_attr *attr)
->>> {
->>>         switch (attr->group) {
->>>         case KVM_DEV_ARM_VGIC_GRP_ADDR:
->>>                 switch (attr->attr) {
->>>                 case KVM_VGIC_ITS_ADDR_TYPE:
->>>                         return 0;
->>>                 }
->>>                 break;
->>>         case KVM_DEV_ARM_VGIC_GRP_CTRL:
->>>                 switch (attr->attr) {
->>>                 case KVM_DEV_ARM_VGIC_CTRL_INIT:
->>>                         return 0;
->>>                 }
->>>                 break;
->>>         case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
->>>                 u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->>>                 u64 reg;
->>>
->>>                 if (get_user(reg, uaddr))
->>>                         return -EFAULT;
->>>
->>>                 return vgic_its_attr_regs_access(dev, attr, &reg, true);
->>>         }
->>>         case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->>>                 if (attr->attr)
->>>                         return -EINVAL;
->>>                 return vgic_its_table_restore(its);
->> The above code shows that my series is not correctly applied since that
->> call to vgic_its_table_restore() should normally be in
->> vgic_its_set_attr() and not in vgic_its_has_attr() function
->> (virt/kvm/arm/vgic-its.c).
->>
-> 
-> Er, you are right, the real problem here seems we had a rather old kvmarm/next mirror
-> at the time 0day applied your series.
-> 
-> Thanks for the clarification and sorry for the noise.
+Quoting Robin from his response:
+> in general is is not
+> safe to assume a coherent allocation is backed by struct pages at all
 
-no worries
+As I said before I am not familiar with the subject, so it is possible I
+misunderstood something.
 
-Thanks
+Regards
+Andrzej
 
-Eric
-> 
-> Thanks,
-> Xiaolong
->> I pushed this series applied on top of up to date kvmarm/next at
->> https://github.com/eauger/linux/tree/v4.11-rc3-its-mig-v4.
+
+>
+> Thanks!
+>
+>> support to DMA_ATTR_FORCE_CONTIGUOUS in IOMMU on arm64 [1]?
+>> Maybe temporary solution is to drop the patch until proper handling of
+>> mmapping is proposed, without it the patch looks incomplete and causes
+>> regression.
+>> Moreover __iommu_alloc_attrs uses also dma_common_contiguous_remap which
+>> also assumes existence of struct pages.
 >>
->> As noticed earlier, the series is applied on top of 255905e (KVM:
->> arm/arm64: vgic: Improve sync_hwstate performance)
->>
->> Thanks
->>
->> Eric
->>
->>
->>>         }
->>>         return -ENXIO;
->>> }
->>>
->>> Thanks,
->>> Xiaolong
->>>
->>>>
->>>> Please let me know if I got something wrong.
->>>>
->>>> Thanks
->>>>
->>>> Eric
->>>>>                                     ^~~
->>>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: note: each undeclared identifier is reported only once for each function it appears in
->>>>>
->>>>> vim +/its +1766 arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c
->>>>>
->>>>>   1750			case KVM_DEV_ARM_VGIC_CTRL_INIT:
->>>>>   1751				return 0;
->>>>>   1752			}
->>>>>   1753			break;
->>>>>   1754		case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
->>>>>   1755			u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->>>>>   1756			u64 reg;
->>>>>   1757	
->>>>>   1758			if (get_user(reg, uaddr))
->>>>>   1759				return -EFAULT;
->>>>>   1760	
->>>>>   1761			return vgic_its_attr_regs_access(dev, attr, &reg, true);
->>>>>   1762		}
->>>>>   1763		case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->>>>>   1764			if (attr->attr)
->>>>>   1765				return -EINVAL;
->>>>>> 1766			return vgic_its_table_restore(its);
->>>>>   1767		}
->>>>>   1768		return -ENXIO;
->>>>>   1769	}
->>>>>   1770	
->>>>>   1771	static int vgic_its_set_attr(struct kvm_device *dev,
->>>>>   1772				     struct kvm_device_attr *attr)
->>>>>   1773	{
->>>>>   1774		struct vgic_its *its = dev->private;
->>>>>
->>>>> ---
->>>>> 0-DAY kernel test infrastructure                Open Source Technology Center
->>>>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->>>>>
->>>>>
->>>>>
->>>>> _______________________________________________
->>>>> linux-arm-kernel mailing list
->>>>> linux-arm-kernel at lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>>
->>>> _______________________________________________
->>>> kbuild-all mailing list
->>>> kbuild-all at lists.01.org
->>>> https://lists.01.org/mailman/listinfo/kbuild-all
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
+>> [1]: https://patchwork.kernel.org/patch/9609551/
+>> [2]: https://www.spinics.net/lists/arm-kernel/msg572688.html
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+>
+>
+>
