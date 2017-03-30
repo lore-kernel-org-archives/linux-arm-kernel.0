@@ -1,51 +1,71 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 29 Mar 2017 17:50:28 -0700
-Subject: [PATCH 1/2] clk: imx7d: fix USDHC NAND clock
-Message-ID: <20170330005029.6472-1-stefan@agner.ch>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 30 Mar 2017 09:03:43 +0800
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <20170328165010.GA21937@linaro.org>
+ <20170329015423.GA5035@leoy-linaro>
+ <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
+Message-ID: <20170330010343.GA31843@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USDHC NAND root clock is not gated by any CCM clock gate. Remove
-the bogus gate definition.
+On Wed, Mar 29, 2017 at 03:56:23PM +0100, Mike Leach wrote:
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-The IMX7D_NAND_USDHC_BUS_ROOT_CLK clock is also in clks_init_on.
-In a quick test I removed IMX7D_NAND_USDHC_BUS_ROOT_CLK from
-clks_init_on, and the system including SD-cards seemed to work
-fine... So I guess we could remove the clock from clks_init_on
-after the two both changes got applied, any thoughts?
+[...]
 
-The gate 0x4130 was actually the DRAM gate, hence disabling that
-clock lead to disabling this gate, and hence a crash before this
-fixes... Maybe that was the reason it landed in clks_init_on...?
+> >> > +   /*
+> >> > +    * Unfortunately the CPU cannot be powered up, so return
+> >> > +    * back and later has no permission to access other
+> >> > +    * registers. For this case, should set 'idle_constraint'
+> >> > +    * to ensure CPU power domain is enabled!
+> >> > +    */
+> >> > +   if (!(drvdata->edprsr & EDPRSR_PU)) {
+> >> > +           pr_err("%s: power up request for CPU%d failed\n",
+> >> > +                   __func__, drvdata->cpu);
+> >> > +           goto out;
+> >> > +   }
+> >> > +
+> >> > +out_powered_up:
+> >> > +   debug_os_unlock(drvdata);
+> >> > +
+> >> > +   /*
+> >> > +    * At this point the CPU is powered up, so set the no powerdown
+> >> > +    * request bit so we don't lose power and emulate power down.
+> >> > +    */
+> >> > +   drvdata->edprsr = readl(drvdata->base + EDPRCR);
+> >> > +   drvdata->edprsr |= EDPRCR_COREPURQ | EDPRCR_CORENPDRQ;
+> >>
+> >> If we are here the core is already up.  Shouldn't we need to set
+> >> EDPRCR_CORENPDRQ only?
+> >
+> > Yeah. Will fix.
+> 
+> No - EDPRCR_COREPURQ and EDPRCR_CORENPDRQ have different semantics and purposes
+> 
+> EDPRCR_COREPURQ is in the debug power domain an is tied to an external
+> debug request that should be an input to the external (to the PE)
+> system power controller.
+> The requirement is that the system power controller powers up the core
+> domain and does not power it down while it remains asserted.
+> 
+> EDPRCR_CORENPDRQ is in the core power domain and thus to the specific
+> core only. This ensures that any power control software running on
+> that core should emulate a power down if this is set to one.
 
---
-Stefan
+I'm curious the exact meaning for "power control software".
 
- drivers/clk/imx/clk-imx7d.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Does it mean EDPRCR_CORENPDRQ should be checked by kernel or PSCI
+liked code in ARM trusted firmware to avoid to run CPU power off flow?
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index ae1d31be906e..4466acaacb71 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -724,7 +724,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_MAIN_AXI_ROOT_DIV] = imx_clk_divider2("axi_post_div", "axi_pre_div", base + 0x8800, 0, 6);
- 	clks[IMX7D_DISP_AXI_ROOT_DIV] = imx_clk_divider2("disp_axi_post_div", "disp_axi_pre_div", base + 0x8880, 0, 6);
- 	clks[IMX7D_ENET_AXI_ROOT_DIV] = imx_clk_divider2("enet_axi_post_div", "enet_axi_pre_div", base + 0x8900, 0, 6);
--	clks[IMX7D_NAND_USDHC_BUS_ROOT_DIV] = imx_clk_divider2("nand_usdhc_post_div", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
-+	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_divider2("nand_usdhc_root_clk", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
- 	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider2("ahb_post_div", "ahb_pre_div", base + 0x9000, 0, 6);
- 	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider2("dram_post_div", "dram_cg", base + 0x9880, 0, 3);
- 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_DIV] = imx_clk_divider2("dram_phym_alt_post_div", "dram_phym_alt_pre_div", base + 0xa000, 0, 3);
-@@ -797,7 +797,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_ENET_AXI_ROOT_CLK] = imx_clk_gate4("enet_axi_root_clk", "enet_axi_post_div", base + 0x4060, 0);
- 	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "axi_post_div", base + 0x4110, 0);
- 	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk", "ahb_post_div", base + 0x4120, 0);
--	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_gate4("nand_usdhc_root_clk", "nand_usdhc_post_div", base + 0x4130, 0);
- 	clks[IMX7D_AHB_CHANNEL_ROOT_CLK] = imx_clk_gate4("ahb_root_clk", "ahb_post_div", base + 0x4200, 0);
- 	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk", "dram_post_div", base + 0x4130, 0);
- 	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
--- 
-2.12.1
+Or will EDPRCR_CORENPDRQ assert CPU external signal to notify power
+controller so power controller emulate a power down?
+
+> We cannot know the power control design of the system, so the safe
+> solution is to set both bits.
+
+Thanks a lot for the suggestion. Will set both bits.
+
+Thanks,
+Leo Yan
