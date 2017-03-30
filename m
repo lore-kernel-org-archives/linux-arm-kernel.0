@@ -1,478 +1,170 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 29 Mar 2017 23:27:45 +0800
-Subject: [PATCH v3 2/5] clk: sunxi-ng: add support for PRCM CCUs
-In-Reply-To: <20170329104246.34204-3-icenowy@aosc.io>
-References: <20170329104246.34204-1-icenowy@aosc.io>
- <20170329104246.34204-3-icenowy@aosc.io>
-Message-ID: <20170329232745.1546e332@x220i>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 30 Mar 2017 15:15:48 +0800
+Subject: [PATCH v7 1/2] dt-bindings: Add GPCv2 power gating driver
+In-Reply-To: <CAHQ1cqH4HnVsiAT6wxVJ=b-AJKWCK6L7kTxLZ7JFrZ4B-t2PQg@mail.gmail.com>
+References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
+ <20170321145004.21265-2-andrew.smirnov@gmail.com>
+ <20170324063216.GC12604@b29396-OptiPlex-7040>
+ <CAHQ1cqH4HnVsiAT6wxVJ=b-AJKWCK6L7kTxLZ7JFrZ4B-t2PQg@mail.gmail.com>
+Message-ID: <20170330071548.GB29432@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Mar 2017 18:42:43 +0800
-Icenowy Zheng <icenowy@aosc.io> wrote:
+On Mon, Mar 27, 2017 at 11:42:51AM -0700, Andrey Smirnov wrote:
+> On Thu, Mar 23, 2017 at 11:32 PM, Dong Aisheng <dongas86@gmail.com> wrote:
+> > On Tue, Mar 21, 2017 at 07:50:03AM -0700, Andrey Smirnov wrote:
+> >> Add DT bindings for power domain driver for GPCv2 IP block found in
+> >> i.MX7 SoCs.
+> >>
+> >> Cc: yurovsky at gmail.com
+> >> Cc: Lucas Stach <l.stach@pengutronix.de>
+> >> Cc: Rob Herring <robh+dt@kernel.org>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> >> Cc: Dong Aisheng <dongas86@gmail.com>
+> >> Cc: devicetree at vger.kernel.org
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Cc: linux-kernel at vger.kernel.org
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> >> ---
+> >>  .../devicetree/bindings/power/fsl,imx-gpcv2.txt    | 71 ++++++++++++++++++++++
+> >>  include/dt-bindings/power/imx7-power.h             | 18 ++++++
+> >>  2 files changed, 89 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+> >>  create mode 100644 include/dt-bindings/power/imx7-power.h
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+> >> new file mode 100644
+> >> index 0000000..02f45c6
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+> >> @@ -0,0 +1,71 @@
+> >> +Freescale i.MX General Power Controller v2
+> >> +==========================================
+> >> +
+> >> +The i.MX7S/D General Power Control (GPC) block contains Power Gating
+> >> +Control (PGC) for various power domains.
+> >> +
+> >> +Required properties:
+> >> +
+> >> +- compatible: Should be "fsl,imx7d-gpc"
+> >> +
+> >> +- reg: should be register base and length as documented in the
+> >> +  datasheet
+> >> +
+> >> +- interrupts: Should contain GPC interrupt request 1
+> >> +
+> >> +Power domains contained within GPC node are generic power domain
+> >> +providers, documented in
+> >> +Documentation/devicetree/bindings/power/power_domain.txt, which are
+> >> +described as subnodes of the power gating controller 'pgc' node,
+> >> +which, in turn, is expected to contain the following:
+> >> +
+> >> +Required properties:
+> >> +
+> >> +- reg: Power domain index. Valid values are defined in
+> >> +  include/dt-bindings/power/imx7-power.h
+> >> +
+> >> +- #power-domain-cells: Should be 0
+> >> +
+> >> +Optional properties:
+> >> +
+> >> +- power-supply: Power supply used to power the domain
+> >> +
+> >> +Example:
+> >> +
+> >> +     gpc: gpc at 303a0000 {
+> >> +             compatible = "fsl,imx7d-gpc";
+> >> +             reg = <0x303a0000 0x1000>;
+> >> +             interrupt-controller;
+> >> +             interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> >> +             #interrupt-cells = <3>;
+> >> +             interrupt-parent = <&intc>;
+> >> +
+> >> +             pgc {
+> >> +                     #address-cells = <1>;
+> >> +                     #size-cells = <0>;
+> >> +
+> >> +                     pgc_pcie_phy: power-domain at 3 {
+> >> +                             #power-domain-cells = <0>;
+> >> +
+> >> +                             reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
+> >> +                             power-supply = <&reg_1p0d>;
+> >> +                     };
+> >> +             };
+> >> +     };
+> >> +
+> >> +
+> >> +Specifying power domain for IP modules
+> >> +======================================
+> >> +
+> >> +IP cores belonging to a power domain should contain a 'power-domains'
+> >> +property that is a phandle for PGC node representing the domain.
+> >> +
+> >> +Example of a device that is part of the PCIE_PHY power domain:
+> >> +
+> >> +     pcie: pcie at 33800000 {
+> >> +           reg = <0x33800000 0x4000>,
+> >> +                 <0x4ff00000 0x80000>;
+> >> +             /* ... */
+> >> +             power-domains = <&pgc_pcie_phy>;
+> >> +             /* ... */
+> >> +     };
+> >> diff --git a/include/dt-bindings/power/imx7-power.h b/include/dt-bindings/power/imx7-power.h
+> >> new file mode 100644
+> >> index 0000000..eb70023
+> >> --- /dev/null
+> >> +++ b/include/dt-bindings/power/imx7-power.h
+> >> @@ -0,0 +1,18 @@
+> >> +/*
+> >> + *  Copyright (C) 2017 Impinj
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + */
+> >> +
+> >> +#ifndef __DT_BINDINGS_IMX7_POWER_H__
+> >> +#define __DT_BINDINGS_IMX7_POWER_H__
+> >> +
+> >> +#define IMX7_POWER_DOMAIN_USB_HSIC_PHY       0
+> >> +#define IMX7_POWER_DOMAIN_USB_OTG2_PHY       1
+> >> +#define IMX7_POWER_DOMAIN_USB_OTG1_PHY       2
+> >> +#define IMX7_POWER_DOMAIN_PCIE_PHY   3
+> >> +#define IMX7_POWER_DOMAIN_MIPI_PHY   4
+> >
+> > Nitpick: Probably better to define according to the reference manual
+> > defined order.
+> >
+> > 0x800 ~ 0x83F : PGC for A7 core0
+> > 0x840 ~ 0x87F: PGC for A7 core1
+> > 0x880 ~ 0x8BF: PGC for A7 SCU
+> > 0xA00 ~ 0xA3F: PGC for fastmix/megamix
+> > 0xC00 ~ 0xC3F: PGC for MIPI PHY
+> > 0xC40 ~ 0xC7F: PGC for PCIE_PHY
+> > 0xC80 ~ 0xCBF: Reserved
+> > 0xCC0 ~ 0xCFF: Reserved
+> > 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
+> >
+> > You can drop A7 core/scu/fastmix/megamix as well.
+> >
+> 
+> Sure, will do.
+> 
 
-> From: Icenowy Zheng <icenowy@aosc.xyz>
-> 
-> SoCs after A31 has a clock controller module in the PRCM part.
-> 
-> Support the clock controller module on H3/5 and A64 now.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v3:
-> - Change osc32000 mux to iosc, as its frequency varies between SoCs.
-> (And none of them is really 32000Hz)
-> Changes in v2:
-> - Replace all sun6i to sun8i, as this driver currently doesn't really
->   support sun6i(A31).
-> - Add osc32000 mux for ar100 clk. (Note: the frequency is proven to
-> be wrong during the development of PATCH v3).
-> - Rename some clocks.
-> - Add gate of TWD (Trusted Watchdog). There's no reset for TWD.
-> - Removed reset of PIO, which doesn't exist really.
-> 
->  drivers/clk/sunxi-ng/Kconfig            |   6 +
->  drivers/clk/sunxi-ng/Makefile           |   1 +
->  drivers/clk/sunxi-ng/ccu-sun8i-r.c      | 211
-> ++++++++++++++++++++++++++++++++
-> drivers/clk/sunxi-ng/ccu-sun8i-r.h      |  27 ++++
-> include/dt-bindings/clock/sun8i-r-ccu.h |  59 +++++++++
-> include/dt-bindings/reset/sun8i-r-ccu.h |  53 ++++++++ 6 files
-> changed, 357 insertions(+) create mode 100644
-> drivers/clk/sunxi-ng/ccu-sun8i-r.c create mode 100644
-> drivers/clk/sunxi-ng/ccu-sun8i-r.h create mode 100644
-> include/dt-bindings/clock/sun8i-r-ccu.h create mode 100644
-> include/dt-bindings/reset/sun8i-r-ccu.h
-> 
-> diff --git a/drivers/clk/sunxi-ng/Kconfig
-> b/drivers/clk/sunxi-ng/Kconfig index 8af8f4be8e3b..fbd3f8cd5c22 100644
-> --- a/drivers/clk/sunxi-ng/Kconfig
-> +++ b/drivers/clk/sunxi-ng/Kconfig
-> @@ -151,4 +151,10 @@ config SUN9I_A80_CCU
->  	default MACH_SUN9I
->  	depends on MACH_SUN9I || COMPILE_TEST
->  
-> +config SUN8I_R_CCU
-> +	bool "Support for Allwinner SoCs' PRCM CCUs"
-> +	select SUNXI_CCU_DIV
-> +	select SUNXI_CCU_GATE
-> +	default MACH_SUN8I || (ARCH_SUNXI && ARM64)
-> +
->  endif
-> diff --git a/drivers/clk/sunxi-ng/Makefile
-> b/drivers/clk/sunxi-ng/Makefile index 6feaac0c5600..0ec02fe14c50
-> 100644 --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -25,6 +25,7 @@ obj-$(CONFIG_SUN8I_A23_CCU)	+=
-> ccu-sun8i-a23.o obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
->  obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
->  obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
-> +obj-$(CONFIG_SUN8I_R_CCU)	+= ccu-sun8i-r.o
->  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
->  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-de.o
->  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-usb.o
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r.c
-> b/drivers/clk/sunxi-ng/ccu-sun8i-r.c new file mode 100644
-> index 000000000000..ddbb34018086
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-r.c
-> @@ -0,0 +1,211 @@
-> +/*
-> + * Copyright (c) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * This software is licensed under the terms of the GNU General
-> Public
-> + * License version 2, as published by the Free Software Foundation,
-> and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include "ccu_common.h"
-> +#include "ccu_reset.h"
-> +
-> +#include "ccu_div.h"
-> +#include "ccu_gate.h"
-> +#include "ccu_mp.h"
-> +#include "ccu_nm.h"
-> +
-> +#include "ccu-sun8i-r.h"
-> +
-> +static const char * const ar100_parents[] = { "osc32k", "osc24M",
-> +					     "pll-periph0", "iosc" };
-> +
-> +static struct ccu_div ar100_clk = {
-> +	.div		= _SUNXI_CCU_DIV_FLAGS(4, 2,
-> CLK_DIVIDER_POWER_OF_TWO), +
-> +	.mux		= {
-> +		.shift	= 16,
-> +		.width	= 2,
-> +
-> +		.variable_prediv	= {
-> +			.index	= 2,
-> +			.shift	= 8,
-> +			.width	= 5,
-> +		},
-> +	},
-> +
-> +	.common		= {
-> +		.reg		= 0x00,
-> +		.features	= CCU_FEATURE_VARIABLE_PREDIV,
-> +		.hw.init	= CLK_HW_INIT_PARENTS("ar100",
-> +						      ar100_parents,
-> +						      &ccu_div_ops,
-> +						      0),
-> +	},
-> +};
-> +
-> +static CLK_FIXED_FACTOR(ahb0_clk, "ahb0", "ar100", 1, 1, 0);
-> +
-> +static struct ccu_div apb0_clk = {
-> +	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2,
-> CLK_DIVIDER_POWER_OF_TWO), +
-> +	.common		= {
-> +		.reg		= 0x0c,
-> +		.hw.init	= CLK_HW_INIT("apb0",
-> +					      "ahb0",
-> +					      &ccu_div_ops,
-> +					      0),
-> +	},
-> +};
-> +
-> +static SUNXI_CCU_GATE(apb0_pio_clk,	"apb0-pio",	"apb0",
-> +		      0x28, BIT(0), 0);
-> +static SUNXI_CCU_GATE(apb0_ir_clk,	"apb0-ir",	"apb0",
-> +		      0x28, BIT(1), 0);
-> +static
-> SUNXI_CCU_GATE(apb0_timer_clk,	"apb0-timer",	"apb0",
-> +		      0x28, BIT(2), 0);
-> +static SUNXI_CCU_GATE(apb0_rsb_clk,	"apb0-rsb",	"apb0",
-> +		      0x28, BIT(3), 0);
-> +static
-> SUNXI_CCU_GATE(apb0_uart_clk,	"apb0-uart",	"apb0",
-> +		      0x28, BIT(4), 0);
-> +static SUNXI_CCU_GATE(apb0_i2c_clk,	"apb0-i2c",	"apb0",
-> +		      0x28, BIT(6), 0);
-> +static SUNXI_CCU_GATE(apb0_twd_clk,	"apb0-twd",	"apb0",
-> +		      0x28, BIT(7), 0);
-> +
-> +static const char * const r_mod0_default_parents[] = { "osc32K",
-> "osc24M" }; +static SUNXI_CCU_MP_WITH_MUX_GATE(ir_clk, "ir",
-> +				  r_mod0_default_parents, 0x54,
-> +				  0, 4,		/* M */
-> +				  16, 2,	/* P */
-> +				  24, 2,	/* mux */
-> +				  BIT(31),	/* gate */
-> +				  0);
-> +
-> +static struct ccu_common *sun8i_h3_r_ccu_clks[] = {
-> +	&ar100_clk.common,
-> +	&apb0_clk.common,
-> +	&apb0_pio_clk.common,
-> +	&apb0_ir_clk.common,
-> +	&apb0_timer_clk.common,
-> +	&apb0_uart_clk.common,
-> +	&apb0_i2c_clk.common,
-I'm sorry but I missed something here:
+BTW, i read some other SoC power domain implementations,
+they keep the CPU domains although not used in kernel.
+e.g.
+include/dt-bindings/power/rk3288-power.h
+include/soc/tegra/pmc.h
 
-+	&apb0_twd_clk.common,
+That probably is a good reference in case we may need them in the future.
+And device tree actually is describe HW.
+I wonder we may be better to keep them as well.
 
-> +	&ir_clk.common,
-> +};
-> +
-> +static struct ccu_common *sun50i_a64_r_ccu_clks[] = {
-> +	&ar100_clk.common,
-> +	&apb0_clk.common,
-> +	&apb0_pio_clk.common,
-> +	&apb0_ir_clk.common,
-> +	&apb0_timer_clk.common,
-> +	&apb0_rsb_clk.common,
-> +	&apb0_uart_clk.common,
-> +	&apb0_i2c_clk.common,
-+	&apb0_twd_clk.common,
-> +	&ir_clk.common,
-> +};
-> +
-> +static struct clk_hw_onecell_data sun8i_h3_r_hw_clks = {
-> +	.hws	= {
-> +		[CLK_AR100]		= &ar100_clk.common.hw,
-> +		[CLK_AHB0]		= &ahb0_clk.hw,
-> +		[CLK_APB0]		= &apb0_clk.common.hw,
-> +		[CLK_APB0_PIO]		=
-> &apb0_pio_clk.common.hw,
-> +		[CLK_APB0_IR]		=
-> &apb0_ir_clk.common.hw,
-> +		[CLK_APB0_TIMER]	= &apb0_timer_clk.common.hw,
-> +		[CLK_APB0_UART]		=
-> &apb0_uart_clk.common.hw,
-> +		[CLK_APB0_I2C]		=
-> &apb0_i2c_clk.common.hw,
-> +		[CLK_APB0_TWD]		=
-> &apb0_twd_clk.common.hw,
-> +		[CLK_IR]		= &ir_clk.common.hw,
-> +	},
-> +	.num	= CLK_NUMBER,
-> +};
-> +
-> +static struct clk_hw_onecell_data sun50i_a64_r_hw_clks = {
-> +	.hws	= {
-> +		[CLK_AR100]		= &ar100_clk.common.hw,
-> +		[CLK_AHB0]		= &ahb0_clk.hw,
-> +		[CLK_APB0]		= &apb0_clk.common.hw,
-> +		[CLK_APB0_PIO]		=
-> &apb0_pio_clk.common.hw,
-> +		[CLK_APB0_IR]		=
-> &apb0_ir_clk.common.hw,
-> +		[CLK_APB0_TIMER]	= &apb0_timer_clk.common.hw,
-> +		[CLK_APB0_RSB]		=
-> &apb0_rsb_clk.common.hw,
-> +		[CLK_APB0_UART]		=
-> &apb0_uart_clk.common.hw,
-> +		[CLK_APB0_I2C]		=
-> &apb0_i2c_clk.common.hw,
-> +		[CLK_APB0_TWD]		=
-> &apb0_twd_clk.common.hw,
-> +		[CLK_IR]		= &ir_clk.common.hw,
-> +	},
-> +	.num	= CLK_NUMBER,
-> +};
-> +
-> +static struct ccu_reset_map sun8i_h3_r_ccu_resets[] = {
-> +	[RST_APB0_IR]		=  { 0xb0, BIT(1) },
-> +	[RST_APB0_TIMER]	=  { 0xb0, BIT(2) },
-> +	[RST_APB0_UART]		=  { 0xb0, BIT(4) },
-> +	[RST_APB0_I2C]		=  { 0xb0, BIT(6) },
-> +};
-> +
-> +static struct ccu_reset_map sun50i_a64_r_ccu_resets[] = {
-> +	[RST_APB0_IR]		=  { 0xb0, BIT(1) },
-> +	[RST_APB0_TIMER]	=  { 0xb0, BIT(2) },
-> +	[RST_APB0_RSB]		=  { 0xb0, BIT(3) },
-> +	[RST_APB0_UART]		=  { 0xb0, BIT(4) },
-> +	[RST_APB0_I2C]		=  { 0xb0, BIT(6) },
-> +};
-> +
-> +static const struct sunxi_ccu_desc sun8i_h3_r_ccu_desc = {
-> +	.ccu_clks	= sun8i_h3_r_ccu_clks,
-> +	.num_ccu_clks	= ARRAY_SIZE(sun8i_h3_r_ccu_clks),
-> +
-> +	.hw_clks	= &sun8i_h3_r_hw_clks,
-> +
-> +	.resets		= sun8i_h3_r_ccu_resets,
-> +	.num_resets	= ARRAY_SIZE(sun8i_h3_r_ccu_resets),
-> +};
-> +
-> +static const struct sunxi_ccu_desc sun50i_a64_r_ccu_desc = {
-> +	.ccu_clks	= sun50i_a64_r_ccu_clks,
-> +	.num_ccu_clks	= ARRAY_SIZE(sun50i_a64_r_ccu_clks),
-> +
-> +	.hw_clks	= &sun50i_a64_r_hw_clks,
-> +
-> +	.resets		= sun50i_a64_r_ccu_resets,
-> +	.num_resets	= ARRAY_SIZE(sun50i_a64_r_ccu_resets),
-> +};
-> +
-> +static void __init sunxi_r_ccu_init(struct device_node *node,
-> +				    const struct sunxi_ccu_desc
-> *desc) +{
-> +	void __iomem *reg;
-> +
-> +	reg = of_io_request_and_map(node, 0,
-> of_node_full_name(node));
-> +	if (IS_ERR(reg)) {
-> +		pr_err("%s: Could not map the clock registers\n",
-> +		       of_node_full_name(node));
-> +		return;
-> +	}
-> +
-> +	sunxi_ccu_probe(node, reg, desc);
-> +}
-> +
-> +static void __init sun8i_h3_r_ccu_setup(struct device_node *node)
-> +{
-> +	sunxi_r_ccu_init(node, &sun8i_h3_r_ccu_desc);
-> +}
-> +CLK_OF_DECLARE(sun8i_h3_r_ccu, "allwinner,sun8i-h3-r-ccu",
-> +	       sun8i_h3_r_ccu_setup);
-> +
-> +static void __init sun50i_a64_r_ccu_setup(struct device_node *node)
-> +{
-> +	sunxi_r_ccu_init(node, &sun50i_a64_r_ccu_desc);
-> +}
-> +CLK_OF_DECLARE(sun50i_a64_r_ccu, "allwinner,sun50i-a64-r-ccu",
-> +	       sun50i_a64_r_ccu_setup);
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r.h
-> b/drivers/clk/sunxi-ng/ccu-sun8i-r.h new file mode 100644
-> index 000000000000..eaa431fd1d8f
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-r.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + * Copyright 2016 Icenowy <icenowy@aosc.xyz>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> modify
-> + * it under the terms of the GNU General Public License as published
-> by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef _CCU_SUN8I_R_H
-> +#define _CCU_SUN8I_R_H_
-> +
-> +#include <dt-bindings/clock/sun8i-r-ccu.h>
-> +#include <dt-bindings/reset/sun8i-r-ccu.h>
-> +
-> +/* AHB/APB bus clocks are not exported */
-> +#define CLK_AHB0	1
-> +#define CLK_APB0	2
-> +
-> +#define CLK_NUMBER	(CLK_APB0_TWD + 1)
-> +
-> +#endif /* _CCU_SUN8I_R_H */
-> diff --git a/include/dt-bindings/clock/sun8i-r-ccu.h
-> b/include/dt-bindings/clock/sun8i-r-ccu.h new file mode 100644
-> index 000000000000..779d20aa0d05
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/sun8i-r-ccu.h
-> @@ -0,0 +1,59 @@
-> +/*
-> + * Copyright (c) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2
-> of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the
-> Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_SUN8I_R_CCU_H_
-> +#define _DT_BINDINGS_CLK_SUN8I_R_CCU_H_
-> +
-> +#define CLK_AR100		0
-> +
-> +#define CLK_APB0_PIO		3
-> +#define CLK_APB0_IR		4
-> +#define CLK_APB0_TIMER		5
-> +#define CLK_APB0_RSB		6
-> +#define CLK_APB0_UART		7
-> +/* 8 is reserved for CLK_APB0_W1 on A31 */
-> +#define CLK_APB0_I2C		9
-> +#define CLK_APB0_TWD		10
-> +
-> +#define CLK_IR			11
-> +
-> +#endif /* _DT_BINDINGS_CLK_SUN8I_R_CCU_H_ */
-> diff --git a/include/dt-bindings/reset/sun8i-r-ccu.h
-> b/include/dt-bindings/reset/sun8i-r-ccu.h new file mode 100644
-> index 000000000000..4ba64f3d6fc9
-> --- /dev/null
-> +++ b/include/dt-bindings/reset/sun8i-r-ccu.h
-> @@ -0,0 +1,53 @@
-> +/*
-> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2
-> of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the
-> Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
-> KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-> WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_RST_SUN8I_R_CCU_H_
-> +#define _DT_BINDINGS_RST_SUN8I_R_CCU_H_
-> +
-> +#define RST_APB0_IR		0
-> +#define RST_APB0_TIMER		1
-> +#define RST_APB0_RSB		2
-> +#define RST_APB0_UART		3
-> +/* 4 is reserved for RST_APB0_W1 on A31 */
-> +#define RST_APB0_I2C		5
-> +
-> +#endif /* _DT_BINDINGS_RST_SUN8I_R_CCU_H_ */
+Regards
+Dong Aisheng
+
+> Thanks,
+> Andrey Smirnov
