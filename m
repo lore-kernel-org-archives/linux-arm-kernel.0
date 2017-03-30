@@ -1,71 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Mar 2017 09:54:48 -0700
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <20170317152536.GT20572@atomide.com>
- <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
- <20170323010057.GI10760@atomide.com>
- <20170323170210.GL10760@atomide.com>
- <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
-Message-ID: <20170330165448.GF10760@atomide.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Mar 2017 17:56:32 +0100
+Subject: [PATCH v2 4/4] iommu/arm-smmu: Poll for TLB sync completion more
+ effectively
+In-Reply-To: <cover.1490890890.git.robin.murphy@arm.com>
+References: <cover.1490890890.git.robin.murphy@arm.com>
+Message-ID: <7c24c93137bc48f69225e6463d6d242b7d89d15c.1490890890.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170330 00:20]:
-> On 23/03/17 19:02, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [170322 18:03]:
-> > > * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
-> > > > On 17/03/17 17:25, Tony Lindgren wrote:
-> > > > > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> > > > > > Any additional testing on omap4 welcome as this series basically
-> > > > > > tweaks every possible peripheral clock on the SoC.
-> > > > > 
-> > > > > Without the last patch in this series, booting fails for me:
-> > > > > 
-> > > > > [    5.074890] l4_per_cm:clk:0120:0: failed to disable
-> > > > > [    5.085113] l4_per_cm:clk:0128:0: failed to disable
-> > > > > 
-> > > > > Care to check that booting keeps working for each patch in the
-> > > > > series to avoid breaking git bisect for booting?
-> > > > 
-> > > > Hmm, I think patch 8+9 need to be squashed then. I can double check this
-> > > > next week though.
-> > > 
-> > > Also looks like with this set merged HDMI stops working on
-> > > omap4 with:
-> > > 
-> > > HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
-> > 
-> > Forgot to mention that's with omapdrm with encoder-tpd12s015 and
-> > encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
-> > dmesg output in case that provides more clues:
-> > 
-> > [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
-> > [   91.078308] [drm] Enabling DMM ywrap scrolling
-> > [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
-> > [   91.107879] omapdss HDMI error: failed to power on device
-> > [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
-> > [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-> > [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-> > [   91.620300] Console: switching to colour frame buffer device 128x48
-> > [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
-> > [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
-> > [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
-> > [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-> > [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-> > 
-> > Regards,
-> > 
-> > Tony
-> > 
-> 
-> Can you try with this additional hwmod data tweak in place? Apply this on
-> top of the existing series.
+On relatively slow development platforms and software models, the
+inefficiency of our TLB sync loop tends not to show up - for instance on
+a Juno r1 board I typically see the TLBI has completed of its own accord
+by the time we get to the sync, such that the latter finishes instantly.
 
-Does not seem to help, still get the same errors. But maybe I'm doing
-something wrong as the patch did not apply and I applied it manually.
+However, on larger systems doing real I/O, it's less realistic for the
+TLBs to go idle immediately, and at that point falling into the 1MHz
+polling loop turns out to throw away performance drastically. Let's
+strike a balance by polling more than once between pauses, such that we
+have much more chance of catching normal operations completing before
+committing to the fixed delay, but also backing off exponentially, since
+if a sync really hasn't completed within one or two "reasonable time"
+periods, it becomes increasingly unlikely that it ever will.
 
-Regards,
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Tony
+v2: Restored the cpu_relax() to the inner loop
+
+ drivers/iommu/arm-smmu.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 759d5f261160..a15ca86e9703 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -162,6 +162,7 @@
+ #define ARM_SMMU_GR0_sTLBGSTATUS	0x74
+ #define sTLBGSTATUS_GSACTIVE		(1 << 0)
+ #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
++#define TLB_SPIN_COUNT			10
+ 
+ /* Stream mapping registers */
+ #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
+@@ -574,18 +575,19 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+ 				void __iomem *sync, void __iomem *status)
+ {
+-	int count = 0;
++	unsigned int spin_cnt, delay;
+ 
+ 	writel_relaxed(0, sync);
+-	while (readl_relaxed(status) & sTLBGSTATUS_GSACTIVE) {
+-		cpu_relax();
+-		if (++count == TLB_LOOP_TIMEOUT) {
+-			dev_err_ratelimited(smmu->dev,
+-			"TLB sync timed out -- SMMU may be deadlocked\n");
+-			return;
++	for (delay = 1; delay < TLB_LOOP_TIMEOUT; delay *= 2) {
++		for (spin_cnt = TLB_SPIN_COUNT; spin_cnt > 0; spin_cnt--) {
++			if (!(readl_relaxed(status) & sTLBGSTATUS_GSACTIVE))
++				return;
++			cpu_relax();
+ 		}
+-		udelay(1);
++		udelay(delay);
+ 	}
++	dev_err_ratelimited(smmu->dev,
++			    "TLB sync timed out -- SMMU may be deadlocked\n");
+ }
+ 
+ static void arm_smmu_tlb_sync_global(struct arm_smmu_device *smmu)
+-- 
+2.11.0.dirty
