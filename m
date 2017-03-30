@@ -1,59 +1,31 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 17:22:57 +0200
-Subject: [PATCH v7 05/13] mmc: sdhci: Export sdhci_enable_sdio_irq() from
- sdhci.c
+Date: Thu, 30 Mar 2017 17:23:05 +0200
+Subject: [PATCH v7 13/13] arm64: configs: enable SDHCI driver for Xenon
 In-Reply-To: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
 References: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
-Message-ID: <eb72f50cf8a5dc4cfbcf2f9464d6781e8b71d70e.1490886907.git-series.gregory.clement@free-electrons.com>
+Message-ID: <13642de40b722ced00446e5b1e7aa95e6abb43f1.1490886907.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hu Ziji <huziji@marvell.com>
+This patch enables the driver for the SDHCI controller found on the
+Marvell Armada 3700 and 7K/8K ARM64 SoCs.
 
-Export sdhci_enable_sdio_irq() from sdhci.c.
-Thus vendor SDHC driver can implement its specific SDIO irq
-control.
-
-Signed-off-by: Hu Ziji <huziji@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- drivers/mmc/host/sdhci.c | 3 ++-
- drivers/mmc/host/sdhci.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index cc5bb9fb7706..5e090227c6c7 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1832,7 +1832,7 @@ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
- 	}
- }
- 
--static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
-+void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- {
- 	struct sdhci_host *host = mmc_priv(mmc);
- 	unsigned long flags;
-@@ -1846,6 +1846,7 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	sdhci_enable_sdio_irq_nolock(host, enable);
- 	spin_unlock_irqrestore(&host->lock, flags);
- }
-+EXPORT_SYMBOL_GPL(sdhci_enable_sdio_irq);
- 
- int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
- 				      struct mmc_ios *ios)
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index a741d8da6227..78437f82609e 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -706,6 +706,7 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
- void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
- int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
- 				      struct mmc_ios *ios);
-+void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable);
- 
- #ifdef CONFIG_PM
- int sdhci_suspend_host(struct sdhci_host *host);
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 7c48028ec64a..95954a4ecba2 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -398,6 +398,7 @@ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_MMC_DW_K3=y
+ CONFIG_MMC_DW_ROCKCHIP=y
+ CONFIG_MMC_SUNXI=y
++CONFIG_MMC_SDHCI_XENON=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
 -- 
 git-series 0.9.1
