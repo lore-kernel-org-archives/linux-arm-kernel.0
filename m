@@ -1,78 +1,74 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 29 Mar 2017 21:46:19 -0700
-Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset
- data to device tree
-In-Reply-To: <5380b1bc-f3c6-a0ef-e458-7509d95d631e@ti.com>
-References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
- <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
- <20170323205256.GO10760@atomide.com>
- <a410d37f-92e5-39b4-ac6c-158673163cb0@ti.com>
- <20170324142610.GX10760@atomide.com>
- <20170329043753.GB1596@localhost.localdomain>
- <5380b1bc-f3c6-a0ef-e458-7509d95d631e@ti.com>
-Message-ID: <20170330044617.GA12753@localhost.localdomain>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 30 Mar 2017 10:19:40 +0530
+Subject: [PATCH v6 0/4] Broadcom SBA RAID support
+In-Reply-To: <CAALAos-P6CDdWTJxg8YQfT1V+iCxUcbYHiQ35EdZzz9PnN3cuA@mail.gmail.com>
+References: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
+ <20170321083052.GY2843@localhost>
+ <CAALAos-k_DBYAz49278wBr_GoceOKYVH_UuzTLn1h7QCiUd8pg@mail.gmail.com>
+ <20170321091829.GZ2843@localhost>
+ <CAALAos-P6CDdWTJxg8YQfT1V+iCxUcbYHiQ35EdZzz9PnN3cuA@mail.gmail.com>
+Message-ID: <20170330044940.GU9308@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 08:59:31AM +0530, Keerthy wrote:
-> 
-> 
-> On Wednesday 29 March 2017 10:07 AM, Eduardo Valentin wrote:
-> > Keerthy,
-> > 
-> > On Fri, Mar 24, 2017 at 07:26:10AM -0700, Tony Lindgren wrote:
-> >> * Keerthy <j-keerthy@ti.com> [170323 20:29]:
-> >>>
-> >>>
-> >>> On Friday 24 March 2017 02:22 AM, Tony Lindgren wrote:
-> >>>> * Keerthy <j-keerthy@ti.com> [170321 20:45]:
-> >>>>>
-> >>>>>
-> >>>>> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
-> >>>>>> Currently the slope and offset values for calculating the
-> >>>>>> hot spot temperature of a particular thermal zone is part
-> >>>>>> of driver data. Pass them here instead and obtain the values
-> >>>>>> while of node parsing.
-> >>>>>>
-> >>>>>> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
-> > 
-> > Have you tried on boards that need negative coefficients?
-> > 
-> > https://patchwork.kernel.org/patch/9619577/
-> 
-> Yes. I retrieved the negative values nicely in the driver passed via
-> Device Tree.
-> 
-> > 
-> >>>>>
-> >>>>> Hi Eduardo,
-> >>>>>
-> >>>>> If the series looks okay could you please pull this?
-> >>>>
-> >>>> Also.. Are the dts changes safe for me to pick separately?
-> >>>
-> >>> Yes Tony they are safe to pulled separately.
+On Wed, Mar 29, 2017 at 11:35:43AM +0530, Anup Patel wrote:
+> On Tue, Mar 21, 2017 at 2:48 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Tue, Mar 21, 2017 at 02:17:21PM +0530, Anup Patel wrote:
+> >> On Tue, Mar 21, 2017 at 2:00 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> >> > On Mon, Mar 06, 2017 at 03:13:24PM +0530, Anup Patel wrote:
+> >> >> The Broadcom SBA RAID is a stream-based device which provides
+> >> >> RAID5/6 offload.
+> >> >>
+> >> >> It requires a SoC specific ring manager (such as Broadcom FlexRM
+> >> >> ring manager) to provide ring-based programming interface. Due to
+> >> >> this, the Broadcom SBA RAID driver (mailbox client) implements
+> >> >> DMA device having one DMA channel using a set of mailbox channels
+> >> >> provided by Broadcom SoC specific ring manager driver (mailbox
+> >> >> controller).
+> >> >>
+> >> >> The Broadcom SBA RAID hardware requires PQ disk position instead
+> >> >> of PQ disk coefficient. To address this, we have added raid_gflog
+> >> >> table which will help driver to convert PQ disk coefficient to PQ
+> >> >> disk position.
+> >> >>
+> >> >> This patchset is based on Linux-4.11-rc1 and depends on patchset
+> >> >> "[PATCH v5 0/2] Broadcom FlexRM ring manager support"
+> >> >
+> >> > Okay I applied and was about to push when I noticed this :(
+> >> >
+> >> > So what is the status of this..?
 > >>
-> >> OK applying patches 1 - 5 of this series into omap-for-v4.12/dt-v2.
-> > 
-> > Keerthy,
-> > 
-> > The only thing I want you to confirm is if you are really getting the
-> > negative coefficients, because currently of-thermal reads the array
-> > using an OF helper that understands only unsigned. For this reason, I
-> > will be queueing your patches only for next merge window, not as a fix,
-> > not for rc's.
+> >> PATCH2 is Acked but PATCH1 is under-review. Currently, its
+> >> v6 of that patchset.
+> >>
+> >> The only dependency on that patchset is the changes in
+> >> brcm-message.h which are required by this BCM-SBA-RAID
+> >> driver.
+> >>
+> >> @Jassi,
+> >> Can you please have a look at PATCH v6?
+> >
+> > And I would need an immutable branch/tag once merged. I am going to keep
+> > this series pending till then.
 > 
-> I am getting negative co-efficients.
+> The Broadcom FlexRM patchset is pickedup by Jassi and
+> can be found in mailbox-for-next branch of
+> git://git.linaro.org/landing-teams/working/fujitsu/integration
+> 
+> Both patchset (Broadcom FlexRM patchset and this one) are
+> also available in sba-raid-v7 branch of
+> https://github.com/Broadcom/arm64-linux.git
 
-OK. That is odd. Might be simply we get still converted after simply
-assigning the unsigned to the int in the thermal device data struct.
-Anyways, still not for rc, given the amount of changes in the driver.
+Jassi,
+
+Can you provide an immutable branch/tag please for this, latter is
+preferred.
+
+Btw didn't find your tree in MAINTAINERS..
 
 > 
-> > 
-> > 
-> >>
-> >> Thanks,
-> >>
-> >> Tony
+> Regards,
+> Anup
+
+-- 
+~Vinod
