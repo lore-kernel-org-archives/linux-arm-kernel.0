@@ -1,46 +1,180 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 30 Mar 2017 13:39:43 +0300
-Subject: [PATCH linux-next v2 3/4] usb: gadget: udc: atmel: Use dev_warn()
- to display EP configuration error
-In-Reply-To: <676bd6d232af7ce08f2fb1f7e4188fc20ef751db.1490715349.git.cristian.birsan@microchip.com>
-References: <cover.1490715349.git.cristian.birsan@microchip.com>
- <676bd6d232af7ce08f2fb1f7e4188fc20ef751db.1490715349.git.cristian.birsan@microchip.com>
-Message-ID: <87d1czjbf4.fsf@linux.intel.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Thu, 30 Mar 2017 18:31:11 +0800
+Subject: [PATCH v3 2/8] acpi: apei: handle SEI notification type for ARMv8
+In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1490869877-118713-12-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARM APEI extension proposal added SEI (asynchronous SError interrupt)
+notification type for ARMv8.
 
-Hi,
+Add a new GHES error source handling function for SEI. In firmware
+first mode, if an error source's notification type is SEI. Then GHES
+could parse and report the detail error information.
 
-cristian.birsan at microchip.com writes:
-> From: Cristian Birsan <cristian.birsan@microchip.com>
->
-> Use dev_warn() to display EP configuration error to avoid silent failure.
->
-> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-> ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 2bd8410..942c9c9 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -1851,7 +1851,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
->  		 * but it's clearly harmless...
->  		 */
->  		if (!(usba_ep_readl(ep0, CFG) & USBA_EPT_MAPPED))
-> -			dev_dbg(&udc->pdev->dev,
-> +			dev_warn(&udc->pdev->dev,
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+---
+ arch/arm64/kernel/traps.c | 10 ++++++++
+ drivers/acpi/apei/Kconfig | 14 ++++++++++++
+ drivers/acpi/apei/ghes.c  | 58 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/acpi/ghes.h       |  1 +
+ 4 files changed, 83 insertions(+)
 
-seems like dev_err() would've been more fitting.
-
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e52be6a..53710a2 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -47,6 +47,8 @@
+ #include <asm/system_misc.h>
+ #include <asm/sysreg.h>
+ 
++#include <acpi/ghes.h>
++
+ static const char *handler[]= {
+ 	"Synchronous Abort",
+ 	"IRQ",
+@@ -625,6 +627,14 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 		handler[reason], smp_processor_id(), esr,
+ 		esr_get_class_string(esr));
+ 
++	/*
++	 * In firmware first mode, we could assume firmware will only generate one
++	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
++	 */
++	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI) && ESR_ELx_EC(esr) == ESR_ELx_EC_SERROR) {
++		ghes_notify_sei();
++	}
++
+ 	die("Oops - bad mode", regs, 0);
+ 	local_irq_disable();
+ 	panic("bad mode");
+diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+index b54bd33..c00c9d34 100644
+--- a/drivers/acpi/apei/Kconfig
++++ b/drivers/acpi/apei/Kconfig
+@@ -55,6 +55,20 @@ config ACPI_APEI_SEA
+ 	  option allows the OS to look for such hardware error record, and
+ 	  take appropriate action.
+ 
++config ACPI_APEI_SEI
++	bool "APEI Asynchronous SError Interrupt logging/recovering support"
++	depends on ARM64 && ACPI_APEI_GHES
++	help
++	  This option should be enabled if the system supports
++	  firmware first handling of SEI (asynchronous SError interrupt).
++
++	  SEI happens with invalid instruction access or asynchronous exceptions
++	  on ARMv8 systems. If a system supports firmware first handling of SEI,
++	  the platform analyzes and handles hardware error notifications from
++	  SEI, and it may then form a HW error record for the OS to parse and
++	  handle. This option allows the OS to look for such hardware error
++	  record, and take appropriate action.
++
+ config ACPI_APEI_MEMORY_FAILURE
+ 	bool "APEI memory error recovering support"
+ 	depends on ACPI_APEI && MEMORY_FAILURE
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 6be0333..045d101 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -862,6 +862,51 @@ static inline void ghes_sea_remove(struct ghes *ghes)
+ }
+ #endif /* CONFIG_ACPI_APEI_SEA */
+ 
++#ifdef CONFIG_ACPI_APEI_SEI
++static LIST_HEAD(ghes_sei);
++
++int ghes_notify_sei(void)
++{
++	struct ghes *ghes;
++	int ret = -ENOENT;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
++		if(!ghes_proc(ghes))
++			ret = 0;
++	}
++	rcu_read_unlock();
++	return ret;
++}
++
++static void ghes_sei_add(struct ghes *ghes)
++{
++	mutex_lock(&ghes_list_mutex);
++	list_add_rcu(&ghes->list, &ghes_sei);
++	mutex_unlock(&ghes_list_mutex);
++}
++
++static void ghes_sei_remove(struct ghes *ghes)
++{
++	mutex_lock(&ghes_list_mutex);
++	list_del_rcu(&ghes->list);
++	mutex_unlock(&ghes_list_mutex);
++	synchronize_rcu();
++}
++#else /* CONFIG_ACPI_APEI_SEI */
++static inline void ghes_sei_add(struct ghes *ghes)
++{
++	pr_err(GHES_PFX "ID: %d, trying to add SEI notification which is not supported\n",
++	       ghes->generic->header.source_id);
++}
++
++static inline void ghes_sei_remove(struct ghes *ghes)
++{
++	pr_err(GHES_PFX "ID: %d, trying to remove SEI notification which is not supported\n",
++	       ghes->generic->header.source_id);
++}
++#endif /* CONFIG_HAVE_ACPI_APEI_SEI */
++
+ #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+ /*
+  * printk is not safe in NMI context.  So in NMI handler, we allocate
+@@ -1111,6 +1156,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 			goto err;
+ 		}
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEI)) {
++			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
++				generic->header.source_id);
++			goto err;
++		}
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+ 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+@@ -1179,6 +1231,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SEA:
+ 		ghes_sea_add(ghes);
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		ghes_sei_add(ghes);
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		ghes_nmi_add(ghes);
+ 		break;
+@@ -1224,6 +1279,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SEA:
+ 		ghes_sea_remove(ghes);
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		ghes_sei_remove(ghes);
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		ghes_nmi_remove(ghes);
+ 		break;
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 2a727dc..10d752e 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -100,5 +100,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
+ }
+ 
+ int ghes_notify_sea(void);
++int ghes_notify_sei(void);
+ 
+ #endif /* GHES_H */
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/594f62d6/attachment.sig>
+1.8.3.1
