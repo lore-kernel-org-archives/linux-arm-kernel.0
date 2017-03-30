@@ -1,180 +1,194 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:02 +0800
-Subject: [PATCH v3 2/8] acpi: apei: handle SEI notification type for ARMv8
+Date: Thu, 30 Mar 2017 18:31:04 +0800
+Subject: [PATCH v3 4/8] APEI: GHES: reserve a virtual page for SEI context
 In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
 References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-3-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1490869877-118713-5-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM APEI extension proposal added SEI (asynchronous SError interrupt)
-notification type for ARMv8.
+On arm64 platform, SEI may interrupt code which had interrupts masked.
+But SEI could be masked, so it's not treated as NMI, however SEA is
+treated as NMI.
 
-Add a new GHES error source handling function for SEI. In firmware
-first mode, if an error source's notification type is SEI. Then GHES
-could parse and report the detail error information.
+So, the  memory area used to transfer hardware error information from
+BIOS to Linux can be determined only in NMI, SEI(arm64), IRQ or timer
+handler.
+
+In this patch, we add a virtual page for SEI context.
 
 Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
 ---
- arch/arm64/kernel/traps.c | 10 ++++++++
- drivers/acpi/apei/Kconfig | 14 ++++++++++++
- drivers/acpi/apei/ghes.c  | 58 +++++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h       |  1 +
- 4 files changed, 83 insertions(+)
+ drivers/acpi/apei/ghes.c | 98 +++++++++++++++++++++++-------------------------
+ 1 file changed, 47 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index e52be6a..53710a2 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -47,6 +47,8 @@
- #include <asm/system_misc.h>
- #include <asm/sysreg.h>
- 
-+#include <acpi/ghes.h>
-+
- static const char *handler[]= {
- 	"Synchronous Abort",
- 	"IRQ",
-@@ -625,6 +627,14 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 		handler[reason], smp_processor_id(), esr,
- 		esr_get_class_string(esr));
- 
-+	/*
-+	 * In firmware first mode, we could assume firmware will only generate one
-+	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
-+	 */
-+	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI) && ESR_ELx_EC(esr) == ESR_ELx_EC_SERROR) {
-+		ghes_notify_sei();
-+	}
-+
- 	die("Oops - bad mode", regs, 0);
- 	local_irq_disable();
- 	panic("bad mode");
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index b54bd33..c00c9d34 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -55,6 +55,20 @@ config ACPI_APEI_SEA
- 	  option allows the OS to look for such hardware error record, and
- 	  take appropriate action.
- 
-+config ACPI_APEI_SEI
-+	bool "APEI Asynchronous SError Interrupt logging/recovering support"
-+	depends on ARM64 && ACPI_APEI_GHES
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEI (asynchronous SError interrupt).
-+
-+	  SEI happens with invalid instruction access or asynchronous exceptions
-+	  on ARMv8 systems. If a system supports firmware first handling of SEI,
-+	  the platform analyzes and handles hardware error notifications from
-+	  SEI, and it may then form a HW error record for the OS to parse and
-+	  handle. This option allows the OS to look for such hardware error
-+	  record, and take appropriate action.
-+
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 6be0333..045d101 100644
+index 045d101..b1f9b1f 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -862,6 +862,51 @@ static inline void ghes_sea_remove(struct ghes *ghes)
- }
- #endif /* CONFIG_ACPI_APEI_SEA */
+@@ -108,26 +108,33 @@
  
-+#ifdef CONFIG_ACPI_APEI_SEI
-+static LIST_HEAD(ghes_sei);
-+
-+int ghes_notify_sei(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
-+		if(!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sei_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sei);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sei_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEI */
-+static inline void ghes_sei_add(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to add SEI notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+
-+static inline void ghes_sei_remove(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to remove SEI notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+#endif /* CONFIG_HAVE_ACPI_APEI_SEI */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
  /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1111,6 +1156,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEI)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
-+				generic->header.source_id);
-+			goto err;
-+		}
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1179,6 +1231,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_add(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1224,6 +1279,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 2a727dc..10d752e 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -100,5 +100,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
+  * Because the memory area used to transfer hardware error information
+- * from BIOS to Linux can be determined only in NMI, IRQ or timer
+- * handler, but general ioremap can not be used in atomic context, so
+- * a special version of atomic ioremap is implemented for that.
++ * from BIOS to Linux can be determined only in NMI, SEI (ARM64), IRQ or
++ * timer handler, but general ioremap can not be used in atomic context,
++ * so a special version of atomic ioremap is implemented for that.
+  */
+ 
+ /*
+- * Two virtual pages are used, one for IRQ/PROCESS context, the other for
+- * NMI context (optionally).
++ * 3 virtual pages are used, one for IRQ/PROCESS context, one for SEI
++ * (on ARM64 platform), and the other for NMI context (optionally).
+  */
++#ifdef CONFIG_ACPI_APEI_SEI
++#define GHES_IOREMAP_PAGES           3
++#define GHES_IOREMAP_SEI_PAGE(base)	((base) + PAGE_SIZE*2)
++#else
+ #define GHES_IOREMAP_PAGES           2
++#endif
++
+ #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
+ #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
+ 
+ /* virtual memory area for atomic ioremap */
+ static struct vm_struct *ghes_ioremap_area;
+ /*
+- * These 2 spinlock is used to prevent atomic ioremap virtual memory
++ * These 3 spinlock is used to prevent atomic ioremap virtual memory
+  * area from being mapped simultaneously.
+  */
+ static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
++static DEFINE_SPINLOCK(ghes_ioremap_lock_sei);
+ static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
+ 
+ static struct gen_pool *ghes_estatus_pool;
+@@ -155,54 +162,55 @@ static void ghes_ioremap_exit(void)
+ 	free_vm_area(ghes_ioremap_area);
  }
  
- int ghes_notify_sea(void);
-+int ghes_notify_sei(void);
+-static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
++static void __iomem *ghes_ioremap_pfn(u64 pfn)
+ {
+-	unsigned long vaddr;
++	unsigned long vaddr, flags = 0;
+ 	phys_addr_t paddr;
+ 	pgprot_t prot;
  
- #endif /* GHES_H */
+-	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
+-
+-	paddr = pfn << PAGE_SHIFT;
+-	prot = arch_apei_get_mem_attribute(paddr);
+-	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+-
+-	return (void __iomem *)vaddr;
+-}
+-
+-static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
+-{
+-	unsigned long vaddr, paddr;
+-	pgprot_t prot;
+-
+-	vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
++	if (in_nmi()) {
++		raw_spin_lock(&ghes_ioremap_lock_nmi);
++		vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
++	} else if (this_cpu_read(sei_in_process)) {
++		spin_lock_irqsave(&ghes_ioremap_lock_sei, flags);
++		vaddr = (unsigned long)GHES_IOREMAP_SEI_PAGE(ghes_ioremap_area->addr);
++	} else {
++		spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
++		vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
++	}
+ 
+ 	paddr = pfn << PAGE_SHIFT;
+ 	prot = arch_apei_get_mem_attribute(paddr);
+-
+ 	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+ 
+ 	return (void __iomem *)vaddr;
+ }
+ 
+-static void ghes_iounmap_nmi(void __iomem *vaddr_ptr)
++static void ghes_iounmap(void __iomem *vaddr_ptr)
+ {
+ 	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
+ 	void *base = ghes_ioremap_area->addr;
++	unsigned long page, flags = 0;
++
++	if (in_nmi()) {
++		page = (unsigned long)GHES_IOREMAP_NMI_PAGE(base);
++	} else if (this_cpu_read(sei_in_process)) {
++		page = (unsigned long)GHES_IOREMAP_SEI_PAGE(base);
++	} else {
++		page = (unsigned long)GHES_IOREMAP_IRQ_PAGE(base);
++	}
+ 
+-	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_NMI_PAGE(base));
++	BUG_ON(vaddr != page);
+ 	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
+ 	arch_apei_flush_tlb_one(vaddr);
+-}
+-
+-static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
+-{
+-	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
+-	void *base = ghes_ioremap_area->addr;
+ 
+-	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_IRQ_PAGE(base));
+-	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
+-	arch_apei_flush_tlb_one(vaddr);
++	if (in_nmi()) {
++		raw_spin_unlock(&ghes_ioremap_lock_nmi);
++	} else if (this_cpu_read(sei_in_process)) {
++		spin_unlock_irqrestore(&ghes_ioremap_lock_sei, flags);
++	} else {
++		spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
++	}
+ }
+ 
+ static int ghes_estatus_pool_init(void)
+@@ -327,20 +335,13 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 				  int from_phys)
+ {
+ 	void __iomem *vaddr;
+-	unsigned long flags = 0;
+-	int in_nmi = in_nmi();
+ 	u64 offset;
+ 	u32 trunk;
+ 
+ 	while (len > 0) {
+ 		offset = paddr - (paddr & PAGE_MASK);
+-		if (in_nmi) {
+-			raw_spin_lock(&ghes_ioremap_lock_nmi);
+-			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
+-		} else {
+-			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
+-			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
+-		}
++		vaddr = ghes_ioremap_pfn(paddr >> PAGE_SHIFT);
++
+ 		trunk = PAGE_SIZE - offset;
+ 		trunk = min(trunk, len);
+ 		if (from_phys)
+@@ -350,13 +351,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 		len -= trunk;
+ 		paddr += trunk;
+ 		buffer += trunk;
+-		if (in_nmi) {
+-			ghes_iounmap_nmi(vaddr);
+-			raw_spin_unlock(&ghes_ioremap_lock_nmi);
+-		} else {
+-			ghes_iounmap_irq(vaddr);
+-			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
+-		}
++
++		ghes_iounmap(vaddr);
+ 	}
+ }
+ 
 -- 
 1.8.3.1
