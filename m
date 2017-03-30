@@ -1,57 +1,71 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 30 Mar 2017 18:54:04 +0200
-Subject: [PATCH] ARM: dts: armada-385-linksys: disk-activity trigger for all
-Message-ID: <20170330165405.14540-1-ralph.sennhauser@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Mar 2017 09:54:48 -0700
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com>
+ <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+Message-ID: <20170330165448.GF10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a4ee7e18d808 ("ARM: dts: armada: Add default trigger for sata
-led") adds the default trigger to individual boards, move it to
-armada-385-linksys.dtsi which effectively enables the definition for
-the WRT1900ACS (Shelby) as well as for future boards.
+* Tero Kristo <t-kristo@ti.com> [170330 00:20]:
+> On 23/03/17 19:02, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [170322 18:03]:
+> > > * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+> > > > On 17/03/17 17:25, Tony Lindgren wrote:
+> > > > > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> > > > > > Any additional testing on omap4 welcome as this series basically
+> > > > > > tweaks every possible peripheral clock on the SoC.
+> > > > > 
+> > > > > Without the last patch in this series, booting fails for me:
+> > > > > 
+> > > > > [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+> > > > > [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+> > > > > 
+> > > > > Care to check that booting keeps working for each patch in the
+> > > > > series to avoid breaking git bisect for booting?
+> > > > 
+> > > > Hmm, I think patch 8+9 need to be squashed then. I can double check this
+> > > > next week though.
+> > > 
+> > > Also looks like with this set merged HDMI stops working on
+> > > omap4 with:
+> > > 
+> > > HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+> > 
+> > Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+> > encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+> > dmesg output in case that provides more clues:
+> > 
+> > [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+> > [   91.078308] [drm] Enabling DMM ywrap scrolling
+> > [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+> > [   91.107879] omapdss HDMI error: failed to power on device
+> > [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+> > [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > [   91.620300] Console: switching to colour frame buffer device 128x48
+> > [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+> > [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+> > [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+> > [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > 
+> > Regards,
+> > 
+> > Tony
+> > 
+> 
+> Can you try with this additional hwmod data tweak in place? Apply this on
+> top of the existing series.
 
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
----
- arch/arm/boot/dts/armada-385-linksys-caiman.dts | 1 -
- arch/arm/boot/dts/armada-385-linksys-cobra.dts  | 1 -
- arch/arm/boot/dts/armada-385-linksys.dtsi       | 1 +
- 3 files changed, 1 insertion(+), 2 deletions(-)
+Does not seem to help, still get the same errors. But maybe I'm doing
+something wrong as the patch did not apply and I applied it manually.
 
-diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
-index a1b6e68..f3cee91 100644
---- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
-+++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
-@@ -109,7 +109,6 @@
- 
- 		sata {
- 			label = "caiman:white:sata";
--			linux,default-trigger = "disk-activity";
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
-index a1a75af..1110718 100644
---- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
-+++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
-@@ -109,7 +109,6 @@
- 
- 		sata {
- 			label = "cobra:white:sata";
--			linux,default-trigger = "disk-activity";
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index aa0d225..2306c45 100644
---- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-+++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -320,6 +320,7 @@
- 		sata {
- 			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
- 			default-state = "off";
-+			linux,default-trigger = "disk-activity";
- 		};
- 	};
- 
--- 
-2.10.2
+Regards,
+
+Tony
