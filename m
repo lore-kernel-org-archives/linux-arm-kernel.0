@@ -1,77 +1,55 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Mar 2017 09:30:36 -0400
-Subject: [PATCH V7 5/5] PCI/ASPM: move link_state cleanup to bridge remove
-In-Reply-To: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490880636-30542-6-git-send-email-okaya@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Mar 2017 14:38:26 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+ <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
+ <20170323105727.GA2441@red-moon>
+ <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+ <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
+ <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
+ <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
+ <20170330100524.GA22801@red-moon>
+ <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+Message-ID: <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For endpoints, change pcie_aspm_exit_link_state() so it cleans up
-the device's own state and disables ASPM if necessary, but doesn't
-remove the parent's link_state.
+On 30 March 2017 at 11:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 30 March 2017 at 11:05, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> On Thu, Mar 30, 2017 at 09:46:39AM +0100, Ard Biesheuvel wrote:
+>>
+>> [...]
+>>
+>>> > I'm asking why we don't fix the actual problem in PCIe ARM64 adaptation instead
+>>> > of working around it by quirks.
+>>> >
+>>> > I don't see any reason why ACPI ARM64 should carry the burden of legacy systems.
+>>> >
+>>> > Legacy only applies to DT based systems.
+>>> >
+>>>
+>>> I fully agree with this point: ACPI implies firmware, and so we should
+>>> be able to rely on firmware to have initialized the PCIe subsystem by
+>>> the time the kernel gets to access it.
+>>
+>> https://lkml.org/lkml/2016/3/3/458
+>>
+>
+> I don't think the fact that at least one system existed over a year
+> ago whose UEFI assigned resources incorrectly should prevent us from
+> being normative in this case.
 
-For bridges, change pcie_aspm_exit_link_state() so it frees the
-bridge's own link_state.
+In any case, given that EFIFB is enabled by default on some distros,
+and the fact that DT boot is affected as well, I should get this patch
+in to prevent serious potential issues that could arise when someone
+with a graphical UEFI stack updates to such a new kernel.
 
-Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pcie/aspm.c | 20 +++++++++++++++-----
- drivers/pci/remove.c    |  3 +--
- 2 files changed, 16 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index a38602a..e6fd297 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -960,6 +960,21 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
- 	struct pci_dev *parent = pdev->bus->self;
- 	struct pcie_link_state *link, *root, *parent_link;
- 
-+	if (pdev->has_secondary_link) {
-+		link = pdev->link_state;
-+		down_read(&pci_bus_sem);
-+		mutex_lock(&aspm_lock);
-+
-+		list_del(&link->sibling);
-+		list_del(&link->link);
-+
-+		/* Clock PM is for endpoint device */
-+		free_link_state(link);
-+		mutex_unlock(&aspm_lock);
-+		up_read(&pci_bus_sem);
-+		return;
-+	}
-+
- 	if (!parent || !parent->link_state)
- 		return;
- 
-@@ -978,11 +993,6 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
- 
- 	/* All functions are removed, so just disable ASPM for the link */
- 	pcie_config_aspm_link(link, 0);
--	list_del(&link->sibling);
--	list_del(&link->link);
--	/* Clock PM is for endpoint device */
--	free_link_state(link);
--
- 	/* Recheck latencies and configure upstream links */
- 	if (parent_link) {
- 		pcie_update_aspm_capable(root);
-diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
-index 73a03d3..7e14ebd 100644
---- a/drivers/pci/remove.c
-+++ b/drivers/pci/remove.c
-@@ -25,8 +25,7 @@ static void pci_stop_dev(struct pci_dev *dev)
- 		dev->is_added = 0;
- 	}
- 
--	if (dev->bus->self)
--		pcie_aspm_exit_link_state(dev);
-+	pcie_aspm_exit_link_state(dev);
- }
- 
- static void pci_destroy_dev(struct pci_dev *dev)
--- 
-1.9.1
+So I think we are in agreement that this is needed on both ARM and
+arm64, since their PCI configuration is usually not preserved. The
+open question is whether there is any harm in enabling it for x86 as
+well.
