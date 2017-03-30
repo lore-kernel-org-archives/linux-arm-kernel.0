@@ -1,87 +1,31 @@
-From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Thu, 30 Mar 2017 17:37:52 +0300
-Subject: [PATCH 3/3] dts: arm64: add LS1046A DPAA QBMan nodes
-In-Reply-To: <1490884672-18294-1-git-send-email-madalin.bucur@nxp.com>
-References: <1490884672-18294-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1490884672-18294-4-git-send-email-madalin.bucur@nxp.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Mar 2017 16:40:44 +0200
+Subject: [GIT PULL] ARM: OXNAS SoC update for 4.12
+In-Reply-To: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
+References: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
+Message-ID: <7432624.QZN9TsYLQF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the QBMan device tree nodes for LS1046A devices.
+On Monday, March 20, 2017 10:39:56 AM CEST Neil Armstrong wrote:
+> Dear arm-soc maintainers,
+> 
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.12
+> 
+> for you to fetch changes up to b44327d198b4f1bbebaf83f714cde450471de644:
+> 
+>   ARM: oxnas: remove redundant select CPU_V6K (2017-03-20 10:13:45 +0100)
+> 
+> ----------------------------------------------------------------
+> - Fix OX820 Kconfig
+> 
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 52 ++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+I've merged this into next/fixes-non-critical. Thanks,
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 4a164b8..67e073a 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -268,6 +268,30 @@
- 			};
- 		};
- 
-+		qman: qman at 1880000 {
-+			compatible = "fsl,qman";
-+			reg = <0x00 0x1880000 0x0 0x10000>;
-+			interrupts = <0 45 0x4>;
-+			memory-region = <&qman_fqd &qman_pfdr>;
-+
-+		};
-+
-+		bman: bman at 1890000 {
-+			compatible = "fsl,bman";
-+			reg = <0x00 0x1890000 0x0 0x10000>;
-+			interrupts = <0 45 0x4>;
-+			memory-region = <&bman_fbpr>;
-+
-+		};
-+
-+		qportals: qman-portals at 500000000 {
-+			ranges = <0x0 0x5 0x00000000 0x8000000>;
-+		};
-+
-+		bportals: bman-portals at 508000000 {
-+			ranges = <0x0 0x5 0x08000000 0x8000000>;
-+		};
-+
- 		dcfg: dcfg at 1ee0000 {
- 			compatible = "fsl,ls1046a-dcfg", "syscon";
- 			reg = <0x0 0x1ee0000 0x0 0x10000>;
-@@ -592,4 +616,32 @@
- 			clocks = <&clockgen 4 1>;
- 		};
- 	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		bman_fbpr: bman-fbpr {
-+			compatible = "shared-dma-pool";
-+			size = <0 0x1000000>;
-+			alignment = <0 0x1000000>;
-+			no-map;
-+		};
-+		qman_fqd: qman-fqd {
-+			compatible = "shared-dma-pool";
-+			size = <0 0x800000>;
-+			alignment = <0 0x800000>;
-+			no-map;
-+		};
-+		qman_pfdr: qman-pfdr {
-+			compatible = "shared-dma-pool";
-+			size = <0 0x2000000>;
-+			alignment = <0 0x2000000>;
-+			no-map;
-+		};
-+	};
- };
-+
-+#include "qoriq-qman1-portals.dtsi"
-+#include "qoriq-bman1-portals.dtsi"
--- 
-2.1.0
+	Arnd
