@@ -1,87 +1,128 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 16:32:49 +0200
-Subject: [GIT PULL] generic TEE subsystem for v4.12
-In-Reply-To: <20170314145305.GA12937@jax>
-References: <20170314145305.GA12937@jax>
-Message-ID: <8981963.xoBUojTFOS@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Mar 2017 15:37:44 +0100
+Subject: [PATCH 4/4] iommu/arm-smmu: Use per-context TLB sync as
+ appropriate
+In-Reply-To: <03ef837586cd991f2d8431908230fd3a3dd8c9cf.1488907474.git.robin.murphy@arm.com>
+References: <cover.1488907474.git.robin.murphy@arm.com>
+ <03ef837586cd991f2d8431908230fd3a3dd8c9cf.1488907474.git.robin.murphy@arm.com>
+Message-ID: <20170330143744.GG22160@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 14, 2017 3:57:34 PM CEST Jens Wiklander wrote:
-> Hi arm-soc maintainers,
-> 
-> Please consider this pull request for v4.12
-> 
-> This pull request contains version 16 of the generic TEE driver.
-> 
-> The TEE subsystem will contain drivers for various TEE implementations.
-> A TEE (Trusted Execution Environment) is a trusted OS running in some
-> secure environment, for example, TrustZone on ARM CPUs, or a separate
-> secure co-processor etc.
-> 
-> The patch set has been reviewed by different people during the different
-> versions. Now I think this has reached a state where it's mature enough
-> to merge.
-> 
-> The v16 cover letter containing detailed revision history can be found at
-> https://lkml.org/lkml/2017/3/10/1277
-> 
-> Thanks,
-> Jens
-> 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org:/people/jens.wiklander/linux-tee.git tags/tee-drv-for-4.12
-> 
-> for you to fetch changes up to 14e21cb8f811100a2104e952b8f5bc0326a5e213:
-> 
->   arm64: dt: hikey: Add optee node (2017-03-10 14:51:58 +0100)
-> 
-> ----------------------------------------------------------------
-> Introduce generic TEE subsystem:
-> - the TEE subsystem itself
-> - an OP-TEE driver using the subsystem
-> - optee bindings
-> - optee node for hi6220-hikey.dts
+Hi Robin,
 
-(+Linus, FYI)
+This mostly looks great, but I have a couple of minor comments below.
 
-I've put this into a separate next/tee branch in arm-soc,
-which means we will send this separately to Linus in the next
-merge window for the introduction of a new kernel subsystem,
-and I expect that future updates will get handled through the
-next/drivers branch in arm-soc, like we do for reset controllers.
+On Tue, Mar 07, 2017 at 06:09:07PM +0000, Robin Murphy wrote:
+> TLB synchronisation typically involves the SMMU blocking all incoming
+> transactions until the TLBs report completion of all outstanding
+> operations. In the common SMMUv2 configuration of a single distributed
+> SMMU serving multiple peripherals, that means that a single unmap
+> request has the potential to bring the hammer down on the entire system
+> if synchronised globally. Since stage 1 contexts, and stage 2 contexts
+> under SMMUv2, offer local sync operations, let's make use of those
+> wherever we can in the hope of minimising global disruption.
+> 
+> To that end, rather than add any more branches to the already unwieldy
+> monolithic TLB maintenance ops, break them up into smaller, neater,
+> functions which we can then mix and match as appropriate.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 156 ++++++++++++++++++++++++++++++-----------------
+>  1 file changed, 100 insertions(+), 56 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index c8aafe304171..f7411109670f 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -237,6 +237,8 @@ enum arm_smmu_s2cr_privcfg {
+>  #define ARM_SMMU_CB_S1_TLBIVAL		0x620
+>  #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
+>  #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
+> +#define ARM_SMMU_CB_TLBSYNC		0x7f0
+> +#define ARM_SMMU_CB_TLBSTATUS		0x7f4
+>  #define ARM_SMMU_CB_ATS1PR		0x800
+>  #define ARM_SMMU_CB_ATSR		0x8f0
+>  
+> @@ -569,14 +571,13 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+>  }
+>  
+>  /* Wait for any pending TLB invalidations to complete */
+> -static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+> +static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+> +				void __iomem *sync, void __iomem *status)
 
-I have reviewed earlier versions in the past, and have reviewed
-the latest version in person during Linaro Connect BUD17.
+Given that you take the arm_smmu_device anyway, I think I'd prefer just
+passing the offsets for sync and status and avoiding the additions
+in the caller (a bit like your other patch in this series ;).
 
-Here is my overall assessment of the subsystem:
+>  static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+> @@ -617,48 +638,66 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+>  {
+>  	struct arm_smmu_domain *smmu_domain = cookie;
+>  	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+> -	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>  	bool stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
+> -	void __iomem *reg;
+> +	void __iomem *reg = ARM_SMMU_CB(smmu_domain->smmu, cfg->cbndx);
+> +	size_t step;
+>  
+> -	if (stage1) {
+> -		reg = ARM_SMMU_CB(smmu, cfg->cbndx);
+> -		reg += leaf ? ARM_SMMU_CB_S1_TLBIVAL : ARM_SMMU_CB_S1_TLBIVA;
+> -
+> -		if (cfg->fmt != ARM_SMMU_CTX_FMT_AARCH64) {
+> -			iova &= ~12UL;
+> -			iova |= cfg->asid;
+> -			do {
+> -				writel_relaxed(iova, reg);
+> -				iova += granule;
+> -			} while (size -= granule);
+> -		} else {
+> -			iova >>= 12;
+> -			iova |= (u64)cfg->asid << 48;
+> -			do {
+> -				writeq_relaxed(iova, reg);
+> -				iova += granule >> 12;
+> -			} while (size -= granule);
+> -		}
+> -	} else if (smmu->version == ARM_SMMU_V2) {
+> -		reg = ARM_SMMU_CB(smmu, cfg->cbndx);
+> +	if (stage1)
+> +		reg += leaf ? ARM_SMMU_CB_S1_TLBIVAL :
+> +			      ARM_SMMU_CB_S1_TLBIVA;
+> +	else
+>  		reg += leaf ? ARM_SMMU_CB_S2_TLBIIPAS2L :
+>  			      ARM_SMMU_CB_S2_TLBIIPAS2;
+> -		iova >>= 12;
+> -		do {
+> -			smmu_write_atomic_lq(iova, reg);
+> -			iova += granule >> 12;
+> -		} while (size -= granule);
+> +
+> +	if (stage1 && cfg->fmt != ARM_SMMU_CTX_FMT_AARCH64) {
+> +		iova &= ~12UL;
+> +		iova |= cfg->asid;
+> +		step = granule;
+>  	} else {
+> -		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
+> -		writel_relaxed(cfg->vmid, reg);
+> +		iova >>= 12;
+> +		step = granule >> 12;
+> +		if (stage1)
+> +			iova |= (u64)cfg->asid << 48;
+>  	}
+> +
+> +	do {
+> +		smmu_write_atomic_lq(iova, reg);
+> +		iova += step;
+> +	} while (size -= granule);
 
-* There is clearly demand for this, both for the generic
-  infrastructure and the specific OP-TEE implementation.
+There seems to be a lot of refactoring going on here, but I'm not entirely
+comfortable with the unconditional move to smmu_write_atomic_lq. Given the
+way in which arm_smmu_tlb_inv_range_nosync is now called (i.e. only for
+stage-1 or SMMUv2 stage-2), then I think you just need to delete the final
+else clause in the current code and you're done.
 
-* The code has gone through a large number of reviews,
-  and the review comments have all been addressed, but
-  the reviews were not coming up with serious issues any more
-  and nobody volunteered to vouch for the quality.
-
-* The user space ioctl interface is sufficient to work with the
-  OP-TEE driver, and it should in principle work with other
-  TEE implementations that follow the GlobalPlatform[1] standards,
-  but it might need to be extended in minor ways depending on
-  specific requirements of future TEE implementations
-
-* The main downside of the API to me is how the user space
-  is tied to the TEE implementation in hardware or firmware,
-  but uses a generic way to communicate with it. This seems
-  to be an inherent problem with what it is trying to do,
-  and I could not come up with any better solution than what
-  is implemented here.
-
-      Arnd
-
-[1] https://www.globalplatform.org/mediaguidetee.asp
+Will
