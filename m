@@ -1,41 +1,59 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 17:23:02 +0200
-Subject: [PATCH v7 10/13] MAINTAINERS: add entry for Marvell Xenon MMC Host
- Controller drivers
+Date: Thu, 30 Mar 2017 17:22:57 +0200
+Subject: [PATCH v7 05/13] mmc: sdhci: Export sdhci_enable_sdio_irq() from
+ sdhci.c
 In-Reply-To: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
 References: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
-Message-ID: <9dc4051aec96f86ed1655fcbbbd4140e012ef5cb.1490886907.git-series.gregory.clement@free-electrons.com>
+Message-ID: <eb72f50cf8a5dc4cfbcf2f9464d6781e8b71d70e.1490886907.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hu Ziji <huziji@marvell.com>
 
-Add maintainer entry for Marvell Xenon eMMC/SD/SDIO
-Host Controller drivers.
+Export sdhci_enable_sdio_irq() from sdhci.c.
+Thus vendor SDHC driver can implement its specific SDIO irq
+control.
 
 Signed-off-by: Hu Ziji <huziji@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 ---
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/mmc/host/sdhci.c | 3 ++-
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c45c02bc6082..553b508e9134 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7862,6 +7862,13 @@ M:	Nicolas Pitre <nico@fluxnic.net>
- S:	Odd Fixes
- F:	drivers/mmc/host/mvsdio.*
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index cc5bb9fb7706..5e090227c6c7 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1832,7 +1832,7 @@ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
+ 	}
+ }
  
-+MARVELL XENON MMC/SD/SDIO HOST CONTROLLER DRIVER
-+M:	Hu Ziji <huziji@marvell.com>
-+L:	linux-mmc at vger.kernel.org
-+S:	Supported
-+F:	drivers/mmc/host/sdhci-xenon*
-+F:	Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
-+
- MATROX FRAMEBUFFER DRIVER
- L:	linux-fbdev at vger.kernel.org
- S:	Orphan
+-static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
++void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ {
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	unsigned long flags;
+@@ -1846,6 +1846,7 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 	sdhci_enable_sdio_irq_nolock(host, enable);
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
++EXPORT_SYMBOL_GPL(sdhci_enable_sdio_irq);
+ 
+ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 				      struct mmc_ios *ios)
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index a741d8da6227..78437f82609e 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -706,6 +706,7 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 				      struct mmc_ios *ios);
++void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable);
+ 
+ #ifdef CONFIG_PM
+ int sdhci_suspend_host(struct sdhci_host *host);
 -- 
 git-series 0.9.1
