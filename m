@@ -1,170 +1,87 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Mar 2017 15:28:20 +0100
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <58DCC2B9.9020109@hisilicon.com>
-References: <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
- <20170329123821.GA10988@red-moon> <58DBAFD6.7070300@linaro.org>
- <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
- <20170329161354.GC11297@red-moon> <20170329173243.GA6091@red-moon>
- <58DC7674.8020301@linaro.org> <58DCC2B9.9020109@hisilicon.com>
-Message-ID: <20170330142820.GA6865@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Mar 2017 15:31:12 +0100
+Subject: KVM/ARM: sleeping function called from invalid context
+Message-ID: <20170330143112.GI16211@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 09:32:57AM +0100, Wei Xu wrote:
-> Hi All,
-> 
-> On 2017/3/30 4:07, Hanjun Guo wrote:
-> > On 03/30/2017 01:32 AM, Lorenzo Pieralisi wrote:
-> >> On Wed, Mar 29, 2017 at 05:13:54PM +0100, Lorenzo Pieralisi wrote:
-> >>> On Wed, Mar 29, 2017 at 03:52:47PM +0100, Marc Zyngier wrote:
-> >>>> On 29/03/17 14:00, Hanjun Guo wrote:
-> >>>>> On 03/29/2017 08:38 PM, Lorenzo Pieralisi wrote:
-> >>>>>> On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
-> >>>>>>> Hi Lorenzo,
-> >>>>>>>
-> >>>>>>> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
-> >>>>>>>> Hi Hanjun, Marc,
-> >>>>>>>>
-> >>>>>>>> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
-> > [...]
-> >>>>>>>>>    drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
-> >>>>>>>>>    drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
-> >>>>>>>>>    include/linux/acpi_iort.h                     |  5 +++++
-> >>>>>>>>>    3 files changed, 31 insertions(+), 1 deletion(-)
-> >>>>>>>>
-> >>>>>>>> To simplify merging ACPI/IRQCHIP changes via different trees it
-> >>>>>>>> would be good to split this patch; I am not sure what's the best
-> >>>>>>>> way of handling it though given that we would end up in a merge
-> >>>>>>>> ordering dependency anyway (ie we can create an empty stub
-> >>>>>>>> for iort_pmsi_get_dev_id() but that would create a dependency
-> >>>>>>>> between ARM64 and irqchip trees anyway).
-> >>>>>>>
-> >>>>>>> The first 12 patches for ACPI platform MSI and later 3 patches
-> >>>>>>> for mbigen have no "physical" dependency, which means they can
-> >>>>>>> be merged and compiled independently, they only have functional
-> >>>>>>> dependency only.
-> >>>>>>>
-> >>>>>>> We already had SAS, XGE, USB and even UART drivers depend on
-> >>>>>>> the mbigen ACPI support, so I don't think the dependency of ACPI
-> >>>>>>> platform MSI and mbigen patches cares much if those two parts are
-> >>>>>>> merged in one merge window, even they are merged independently via
-> >>>>>>> different tree.
-> >>>>>>>
-> >>>>>>>>
-> >>>>>>>> Please let me know what's your preferred way of handling this.
-> >>>>>>>
-> >>>>>>> So in my opinion, they can be merged independently via ARM64 and
-> >>>>>>> irqchip tree with no ordering dependency, is it OK?
-> >>>>>>
-> >>>>>> I am speaking about merging MBIgen AND ITS patches via IRQCHIP and
-> >>>>>> ACPI/IORT for ARM64, that's why I replied to this patch. I do not
-> >>>>>> think that's feasible to split patches in two separate branches
-> >>>>>> without having a dependency between them.
-> >>>>>>
-> >>>>>> Sure, the last three patches can go via IRQCHIP but that was not
-> >>>>>> my question :)
-> >>>>>
-> >>>>> Sorry, I misunderstood that :(
-> >>>>>
-> >>>>> Since it's not feasible to split patches, the best way I got is that
-> >>>>> we get Marc's ack then merge it.
-> >>>>
-> >>>> I believe there is a way to make this work without too much hassle. I
-> >>>> suggest we drop the ITS change from this patch entirely, and I instead
-> >>>> queue this patch:
-> >>>>
-> >>>> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.12&id=e6db07d0f3b6da1f8cfd485776bfefa4fcdbfc45
-> >>>>
-> >>>> That way, no dependency between the two trees. Lorenzo takes all the
-> >>>> patches flagged "ACPI", I take all those flagged "irqchip" or "msi", and
-> >>>> everything should be perfectly standalone.
-> >>>>
-> >>>> Thoughts?
-> >>>
-> >>> Perfect for me. Hanjun, I can cherry pick Marc's patch above, rework
-> >>> this patch and post the resulting branch for everyone to have a final
-> >>> test.
-> >>
-> >> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/arm64-acpi-4.12
-> >>
-> >> Please have a look and let me know if that's ok, I planned to send
-> >> a PR to Catalin by the end of the week (first 7 patches up to
-> >> 7fc3061df075 ("ACPI: platform: setup MSI domain for ACPI based platform
-> >> device")).
-> > 
-> > Perfect for me too, Lorenzo, Marc, Thank you very much.
-> > 
-> > I'm currently in paternity leave and can't reach the machine,
-> > I had a detail review with the patches, they looks good to me,
-> > Ma Jun and Wei Xu will test on Hisilicon machines and give the
-> > feedback.
-> 
-> Thanks to all of you!
-> Tested on D05 board with this branch, the SAS disks and XGE port are working fine.
+Hi,
 
-Ma Jun and Wei Xu, I pushed out a signed tag in preparation for a pull
-request to Catalin tomorrow, please carry out last few checks before
-I send it:
+I'm seeing the splat below when running KVM on an arm64 host with
+CONFIG_DEBUG_ATOMIC_SLEEP and CONFIG_LOCKDEP enabled.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/acpi-arm64-for-v4.12
+I saw this on v4.11-rc1, and I can reproduce the problem on the current
+kvmarm master branch (563e2f5daa66fbc1).
 
-You should try to merge it with Marc's branch:
+I've hacked noinlines into arch/arm/kvm/mmu.c in an attempt to get a
+better backtrace; without this, the report says the call is at
+arch/arm/kvm/mmu.c:299, which is somewhat confusing.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip-4.12
+Splat:
 
-and test the resulting branch, that's how they will go upstream.
+[  135.549391] BUG: sleeping function called from invalid context at arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:302
+[  135.559712] in_atomic(): 1, irqs_disabled(): 0, pid: 2311, name: kvm-vcpu-0
+[  135.566709] 8 locks held by kvm-vcpu-0/2311:
+[  135.571010]  #0:  (&vcpu->mutex){+.+.+.}, at: [<ffff2000080d7c70>] vcpu_load+0x28/0x2b0
+[  135.579075]  #1:  (&kvm->srcu){......}, at: [<ffff2000080ff358>] kvm_handle_guest_abort+0x208/0x7d0
+[  135.588177]  #2:  (&mm->mmap_sem){++++++}, at: [<ffff2000084d57f4>] get_user_pages_unlocked+0xbc/0x370
+[  135.597540]  #3:  (&anon_vma->rwsem){++++..}, at: [<ffff20000851b064>] page_lock_anon_vma_read+0x164/0x588
+[  135.607244]  #4:  (&(ptlock_ptr(page))->rlock){+.+.-.}, at: [<ffff20000850e2c0>] page_vma_mapped_walk+0x8b0/0x14f0
+[  135.617647]  #5:  (&srcu){......}, at: [<ffff200008571c9c>] __mmu_notifier_invalidate_page+0x10c/0x3c0
+[  135.627012]  #6:  (&kvm->srcu){......}, at: [<ffff2000080dafd4>] kvm_mmu_notifier_invalidate_page+0x10c/0x320
+[  135.636980]  #7:  (&(&kvm->mmu_lock)->rlock){+.+.-.}, at: [<ffff2000080db00c>] kvm_mmu_notifier_invalidate_page+0x144/0x320
+[  135.648180] CPU: 1 PID: 2311 Comm: kvm-vcpu-0 Not tainted 4.11.0-rc1-00006-gf9bc6f5-dirty #2
+[  135.656616] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  135.664183] Call trace:
+[  135.666636] [<ffff200008094ee0>] dump_backtrace+0x0/0x588
+[  135.672039] [<ffff200008095488>] show_stack+0x20/0x30
+[  135.677095] [<ffff200008c34a44>] dump_stack+0x16c/0x1e0
+[  135.682325] [<ffff2000081cb0fc>] ___might_sleep+0x2e4/0x508
+[  135.687902] [<ffff2000080faee4>] unmap_stage2_range+0x114/0x200
+[  135.693825] [<ffff2000080faff8>] kvm_unmap_hva_handler+0x28/0x38
+[  135.699836] [<ffff2000080fb908>] handle_hva_to_gpa+0x178/0x2a0
+[  135.705672] [<ffff2000080ff984>] kvm_unmap_hva+0x64/0xa0
+[  135.710989] [<ffff2000080db048>] kvm_mmu_notifier_invalidate_page+0x180/0x320
+[  135.718128] [<ffff200008571d6c>] __mmu_notifier_invalidate_page+0x1dc/0x3c0
+[  135.725094] [<ffff200008517cb8>] try_to_unmap_one+0x4a0/0x1360
+[  135.730931] [<ffff2000085121c0>] rmap_walk_anon+0x2d0/0xa68
+[  135.736507] [<ffff20000851b58c>] rmap_walk+0x104/0x1e0
+[  135.741649] [<ffff20000851c1b8>] try_to_unmap+0x1b8/0x500
+[  135.747053] [<ffff20000859bbcc>] __unmap_and_move+0x364/0x938
+[  135.752802] [<ffff20000859c31c>] unmap_and_move.isra.3+0x17c/0xd40
+[  135.758987] [<ffff20000859e0f0>] migrate_pages+0x228/0x960
+[  135.764477] [<ffff2000084c232c>] compact_zone+0xeec/0x1d10
+[  135.769967] [<ffff2000084c3264>] compact_zone_order+0x114/0x198
+[  135.775891] [<ffff2000084c5260>] try_to_compact_pages+0x338/0x758
+[  135.781992] [<ffff2000084439a0>] __alloc_pages_direct_compact+0x80/0x858
+[  135.788698] [<ffff2000084451d4>] __alloc_pages_nodemask+0x7bc/0x1b18
+[  135.795055] [<ffff20000856af2c>] alloc_pages_vma+0x48c/0x848
+[  135.800719] [<ffff2000085a9680>] do_huge_pmd_anonymous_page+0x2e0/0x1b48
+[  135.807423] [<ffff2000084f153c>] __handle_mm_fault+0xe64/0x1de8
+[  135.813346] [<ffff2000084f28cc>] handle_mm_fault+0x40c/0xbc0
+[  135.819009] [<ffff2000084d48f8>] __get_user_pages+0x210/0x888
+[  135.824760] [<ffff2000084d5920>] get_user_pages_unlocked+0x1e8/0x370
+[  135.831119] [<ffff2000080e265c>] __gfn_to_pfn_memslot+0x634/0xae0
+[  135.837220] [<ffff2000080e2b50>] gfn_to_pfn_prot+0x48/0x58
+[  135.842711] [<ffff2000080fdc78>] user_mem_abort+0x380/0x7c8
+[  135.848288] [<ffff2000080ff43c>] kvm_handle_guest_abort+0x2ec/0x7d0
+[  135.854559] [<ffff200008104184>] handle_exit+0x244/0x508
+[  135.859874] [<ffff2000080f39c8>] kvm_arch_vcpu_ioctl_run+0x890/0x1330
+[  135.866318] [<ffff2000080d9ffc>] kvm_vcpu_ioctl+0x6bc/0xe30
+[  135.871894] [<ffff20000863d1ac>] do_vfs_ioctl+0x194/0x14a0
+[  135.877383] [<ffff20000863e560>] SyS_ioctl+0xa8/0xb8
+[  135.882351] [<ffff200008084770>] el0_svc_naked+0x24/0x28
 
-Please let me know, thank you for your help !
+I'm able to trigger this fairly reliably by having a guest touch a large
+amount of memory. I'm doing this by running two instances of the below,
+each with GUESTRAM set to half of the host physical memory, as I found
+that one instance was more likely to trigger the OoM killer.
 
-Lorenzo
+	lkvm sandbox --console virtio -m ${GUESTRAM} --kernel Image \
+	-p "memtest=1" -- true
 
-> The log is as below:
-> 
-> 	estuary:/$ dmesg
-> 	[    0.000000] Booting Linux on physical CPU 0x10000
-> 	[    0.000000] Linux version 4.11.0-rc3-14418-gea60d0a (xuwei at EstBuildSvr1) (gcc version 4.9.2 20140904 (prerelease) (crosstool-NG linaro-1.13.1-4.9-2014.09 - Linaro GCC 4.9-2014.09) ) #28 SMP PREEMPT Thu Mar 30 16:15:42 CST 2017
-> 	[    0.000000] Boot CPU: AArch64 Processor [410fd082]
-> 	[    0.000000] efi: Getting EFI parameters from FDT:
-> 	[    0.000000] efi: EFI v2.60 by EDK II
-> 	[    0.000000] efi:  SMBIOS=0x3f040000  SMBIOS 3.0=0x39af0000 ACPI=0x39bc0000  ACPI 2.0=0x39bc0014  MEMATTR=0x3ccb0098
-> 	[    0.000000] cma: Reserved 16 MiB at 0x000000003e000000
-> 
-> 
-> 	estuary:/$ ping 192.168.1.107
-> 	PING 192.168.1.107 (192.168.1.107): 56 data bytes
-> 	64 bytes from 192.168.1.107: seq=0 ttl=64 time=0.273 ms
-> 	64 bytes from 192.168.1.107: seq=1 ttl=64 time=0.102 ms
-> 	64 bytes from 192.168.1.107: seq=2 ttl=64 time=0.103 ms
-> 	64 bytes from 192.168.1.107: seq=3 ttl=64 time=0.098 ms
-> 	^C
-> 	--- 192.168.1.107 ping statistics ---
-> 	4 packets transmitted, 4 packets received, 0% packet loss
-> 	round-trip min/avg/max = 0.098/0.144/0.273 ms
-> 
-> 	estuary:/$ lspci -mk
-> 	30:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	91:00.0 "Class 0300" "19e5" "1711" "0000" "0000"
-> 	90:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	20:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	10:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	80:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	00:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	c0:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	88:00.0 "Class 0604" "19e5" "1610" "0000" "0000" "pcieport"
-> 	
-> 	estuary:/$ cat /dev/sd
-> 	sda   sdb   sdc   sdd   sde   sdf   sdg   sdh   sdi   sdj   sdk sdl
-> 	sda1  sdb1  sdc1  sdd1  sde1  sdf1  sdg1  sdh1  sdi1  sdj1  sdk1 sdl1
-> 
-> Best Regards,
-> Wei
-> 
-> > 
-> > Thanks
-> > Hanjun
-> > 
-> > .
-> > 
-> 
+(note: lkvm sandbox assumes a dir called 'guests' exists in cwd. You may need
+to create it first if you do not already have one).
+
+Thanks,
+Mark.
