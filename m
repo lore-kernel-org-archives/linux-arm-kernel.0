@@ -1,40 +1,50 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 29 Mar 2017 18:41:56 -0700
-Subject: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
-Message-ID: <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 30 Mar 2017 09:59:41 +0800
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <20170329165535.GB24889@linaro.org>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <20170328165010.GA21937@linaro.org>
+ <20170329015423.GA5035@leoy-linaro>
+ <20170329165535.GB24889@linaro.org>
+Message-ID: <20170330015941.GD3038@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 3:38 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Wed, Mar 29, 2017 at 11:15 AM, Kees Cook <keescook@chromium.org> wrote:
->> Based on PaX's x86 pax_{open,close}_kernel() implementation, this
->> allows HAVE_ARCH_RARE_WRITE to work on x86.
->>
->
->> +
->> +static __always_inline unsigned long __arch_rare_write_begin(void)
->> +{
->> +       unsigned long cr0;
->> +
->> +       preempt_disable();
->
-> This looks wrong.  DEBUG_LOCKS_WARN_ON(!irqs_disabled()) would work,
-> as would local_irq_disable().  There's no way that just disabling
-> preemption is enough.
->
-> (Also, how does this interact with perf nmis?)
+On Wed, Mar 29, 2017 at 10:55:35AM -0600, Mathieu Poirier wrote:
 
-Do you mean preempt_disable() isn't strong enough here? I'm open to
-suggestions. The goal would be to make sure nothing between _begin and
-_end would get executed without interruption...
+[...]
 
--Kees
+> > So this is why add "idle_constraint" as a central place to control
+> > power domain for CPU debug purpose and I also think this is more
+> > friendly for hardware design, e.g. some platforms can enable partial
+> > low power states to save power and avoid overheat after using this
+> > driver.
+> > 
+> > How about you think for this?
+> 
+> Like Sudeep pointed out we should concentrate on doing the right thing,
+> that is work with EDPRSR.PU, EDPRCR.COREPURQ and EDPRCR.CORENPDRQ.
 
--- 
-Kees Cook
-Pixel Security
+Agree, and I think we have aligned for this.
+
+> Anything outside of that becomes platform specific and can't be handled in
+> this driver.
+
+Sorry I argue a bit for this just want to make things more clear and
+if can have better method.
+
+Though the issue is platform specific, but the code is to seek common
+method to handle them. So the driver has no any platform specific code.
+
+I read again for Suziki's suggestion: "4) Should document the fact that,
+on some platforms, the user may have to disable CPUidle explicitly to
+get the driver working. But let us not make it the default. The user
+with a not so ideal platform could add "nohlt" and get it working."
+
+So I'm not strong to resist and if this is alignment yet, I should
+document well for this but doesn't handle it in driver (keep driver
+simple).
+
+Thanks,
+Leo Yan
