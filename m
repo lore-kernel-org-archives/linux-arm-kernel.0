@@ -1,42 +1,47 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 30 Mar 2017 12:29:50 -0700
-Subject: [PATCH v3 0/6] bus: brcmstb_gisb: add support for GISBv7 arbiter
-In-Reply-To: <20170330181932.GB8062@leverpostej>
-References: <20170330002914.7371-1-opendmb@gmail.com>
- <c3182c24-2245-cf2e-32e4-248b8046a30f@gmail.com>
- <20170330181932.GB8062@leverpostej>
-Message-ID: <baaf46b4-cd91-3c19-70a8-f5923e31aac9@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 30 Mar 2017 21:31:26 +0200
+Subject: [PATCH] mmc: host: s3cmci: fix broken conditional expression
+In-Reply-To: <20170329095250.2937200-1-arnd@arndb.de>
+References: <20170329095250.2937200-1-arnd@arndb.de>
+Message-ID: <CAPDyKFq6U9mXVz-msN4uDwDJANZqdVwcKTLVyqu1rthhsRx6KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2017 11:19 AM, Mark Rutland wrote:
-> On Thu, Mar 30, 2017 at 09:33:32AM -0700, Florian Fainelli wrote:
->> On 03/29/2017 05:29 PM, Doug Berger wrote:
->>> This patch set contains changes to enable the GISB arbiter driver
->>> on the latest ARM64 architecture Set-Top Box chips from Broadcom.
->>>
->>> Since the ARM64 architecture does not support the hooking of low
->>> level fault handlers the driver has been adjusted to depend solely
->>> on GISB interrupts and notify events to provide diagnostic
->>> messaging.  The GISB hardware still triggers bus faults for the
->>> processor so the default low-level aborts will occur and will be
->>> handled based on the architecture specific kernel implementation.
->>>
->>> While this tends to obsure the GISB error messaging it is still
->>> reasonable so the same approach is applied to the ARM architecture
->>> for consistency.
->>>
->>> The patches also correct some issues with the existing driver
->>> and add the new register map for the GISBv7 hardware first
->>> appearing in the BCM7278 device.
->>
->> This all looks great to me, and since there are no more ARM64
->> dependencies I can take this via the Broadcom ARM/ARM64 SoC pull requests.
->>
->> Mark, are you also happy with this v3?
-> 
-> It looks fine by me.
+On 29 March 2017 at 11:52, Arnd Bergmann <arnd@arndb.de> wrote:
+> The DT support introduced a typo that gcc detects when -Wempty-body
+> is enabled:
+>
+> drivers/mmc/host/s3cmci.c: In function 's3cmci_probe_pdata':
+> drivers/mmc/host/s3cmci.c:1543:29: error: suggest braces around empty body in an 'if' statement [-Werror=empty-body]
+>   if (pdata->wprotect_invert);
+>
+> Clearly the ';' was not intended here, so remove it.
+>
+> Fixes: 4b13f3b290d1 ("mmc: host: s3cmci: allow probing from device tree")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Series applied to drivers/next, thanks everyone!
--- 
-Florian
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/s3cmci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+> index 09eab2120bbd..bbf1fbbc8e2a 100644
+> --- a/drivers/mmc/host/s3cmci.c
+> +++ b/drivers/mmc/host/s3cmci.c
+> @@ -1540,7 +1540,7 @@ static int s3cmci_probe_pdata(struct s3cmci_host *host)
+>         if (pdata->no_detect)
+>                 mmc->caps |= MMC_CAP_NEEDS_POLL;
+>
+> -       if (pdata->wprotect_invert);
+> +       if (pdata->wprotect_invert)
+>                 mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+>
+>         if (pdata->detect_invert)
+> --
+> 2.9.0
+>
