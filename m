@@ -1,57 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 30 Mar 2017 14:58:15 +0200
-Subject: [PATCH v2 0/4] clk: renesas: Add support for R-Car H3 ES2.0
-In-Reply-To: <1489425153-22623-1-git-send-email-geert+renesas@glider.be>
-References: <1489425153-22623-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdXtaGWoafQMyRZqVm0Pg0oBO+554HujK=QFnR+kS7YJbQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Mar 2017 13:59:09 +0100
+Subject: [PATCH] arm64: remove redundant header file in current.h
+In-Reply-To: <1490877709-221439-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1490877709-221439-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20170330125908.GF16211@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 6:12 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> This patch series adds clock support for R-Car H3 ES2.0, which differs
-> from ES1.x in several areas.
->
-> The goal is twofold:
->   1. Support both the ES1.x and ES2.0 SoC revisions in a single binary
->      for now,
->   2. Make it clear which code supports ES1.x, so it can easily be
->      identified and removed later, when production SoCs are deemed
->      ubiquitous.
->
-> This is achieved by:
->   - Updating the clock tables for the latest revision (ES2.0), but not
->     removing clocks that only exist on earlier revisions (ES1.x),
->   - Detecting the SoC revision at runtime using the new
->     soc_device_match() API, and fixing up the clocks tables to match the
->     actual SoC revision, by:
->       - NULLifying core and module clocks of modules that do not exist,
->       - Reparenting module clocks that have a different parent on ES1.x.
->
-> Changes compared to v1:
->   - Update of various module clocks as per datasheet update,
->   - Add support for RCLK on R-Car H3 ES2.0.
->
-> For testers, this series and its dependencies are available in the
-> topic/r8a7795es2-clk-v2 branch of my renesas-drivers git repository at
-> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
-> An integration branch for testing on the R-Car H3 ES2.0 based Salvator-X
-> development board is provided as topic/r8a7795es2-integration.
->
-> This has been tested on Salvator-X with R-Car H3 ES1.0, ES1.1, and ES2.0
-> SoCs.
->
-> I plan to queue this up in clk-renesas-for-v4.12.
+On Thu, Mar 30, 2017 at 08:41:49PM +0800, Shaokun Zhang wrote:
+> Commint 9d84fb27fa1 ("arm64: restore get_current() optimisation") has 
+> removed read_sysreg() and asm/sysreg.h is redundant.
+> 
+> This patch removes asm/sysreg.h header file.
+> 
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 
-Queued in clk-renesas-for-v4.12.
+Thanks for cleaning this up. FWIW:
 
-Gr{oetje,eeting}s,
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-                        Geert
+Mark.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  arch/arm64/include/asm/current.h | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
+> index 86c4041..f6580d4 100644
+> --- a/arch/arm64/include/asm/current.h
+> +++ b/arch/arm64/include/asm/current.h
+> @@ -3,8 +3,6 @@
+>  
+>  #include <linux/compiler.h>
+>  
+> -#include <asm/sysreg.h>
+> -
+>  #ifndef __ASSEMBLY__
+>  
+>  struct task_struct;
+> -- 
+> 1.9.1
+> 
