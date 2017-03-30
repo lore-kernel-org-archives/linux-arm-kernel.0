@@ -1,17 +1,60 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 30 Mar 2017 21:16:56 +0800
-Subject: [PATCH 1/5] ARM: dts: imx7-colibri: use OF graph to describe the
- display
-In-Reply-To: <20170329232113.19078-1-stefan@agner.ch>
-References: <20170329232113.19078-1-stefan@agner.ch>
-Message-ID: <20170330131655.GE683@dragon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 30 Mar 2017 15:19:28 +0200
+Subject: [PATCH v2 2/4] clk: rockchip: rk3228: make noc and some special
+ clk as critical_clocks
+In-Reply-To: <6718031.Ukr0mjLQLl@phil>
+References: <1490695614-3220-1-git-send-email-zhangqing@rock-chips.com>
+ <1490695614-3220-3-git-send-email-zhangqing@rock-chips.com>
+ <20170330124417.73ucpdkoonuiyhxz@lukather>
+ <6718031.Ukr0mjLQLl@phil>
+Message-ID: <20170330131928.s6tr4rgx7bzwqiag@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 04:21:09PM -0700, Stefan Agner wrote:
-> To make use of the new eLCDIF DRM driver OF graph description is
-> required. Describe the display using OF graph nodes.
+On Thu, Mar 30, 2017 at 03:10:24PM +0200, Heiko Stuebner wrote:
+> Am Donnerstag, 30. M?rz 2017, 14:44:17 CEST schrieb Maxime Ripard:
+> > On Tue, Mar 28, 2017 at 06:06:52PM +0800, Elaine Zhang wrote:
+> > > Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> > > ---
+> > >  drivers/clk/rockchip/clk-rk3228.c | 30 +++++++++++++++++++++++++++++-
+> > >  1 file changed, 29 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
+> > > index db6e5a9e6de6..4d3203f887e2 100644
+> > > --- a/drivers/clk/rockchip/clk-rk3228.c
+> > > +++ b/drivers/clk/rockchip/clk-rk3228.c
+> > > @@ -445,7 +445,7 @@ enum rk3228_plls {
+> > >  			RK2928_CLKGATE_CON(2), 12, GFLAGS,
+> > >  			&rk3228_spdif_fracmux),
+> > >  
+> > > -	GATE(0, "jtag", "ext_jtag", 0,
+> > > +	GATE(0, "jtag", "ext_jtag", CLK_IGNORE_UNUSED,
+> > 
+> > CLK_IGNORE_UNUSED only prevents a given clock from being gated at
+> > late_initcall time, but will not prevent it from being gated later in
+> > the life of the system, for example if a reparenting occurs, or if all
+> > the clocks sharing the same clock tree become disabled.
+> > 
+> > If your clock really should never ever be gated in order for Linux to
+> > operate properly, you should use CLK_IS_CRITICAL.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> in the scope of the jtag clock, that is actually ok. As it only gates
+> some clock supplied from an external source (ext_jtag).
 
-Applied all, thanks.
+It might, I don't know how your clocks work in general, this was just
+a warning that this probably isn't sufficient if the clock is actually
+critical.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170330/eef540cd/attachment.sig>
