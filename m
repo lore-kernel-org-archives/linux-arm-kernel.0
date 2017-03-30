@@ -1,35 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 30 Mar 2017 22:56:58 +0200
-Subject: [PATCH v3 0/2] Tango PCIe controller support
-In-Reply-To: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
-References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
-Message-ID: <1561c381-bfa7-6e4d-a016-8ad7293a60ce@free.fr>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 31 Mar 2017 05:12:46 +0800
+Subject: [arm:cec-v18 12/12] ERROR: "cec_get_edid_phys_addr"
+ [drivers/gpu/drm/i2c/tda998x.ko] undefined!
+Message-ID: <201703310539.UqIGyVmA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/2017 13:11, Marc Gonzalez wrote:
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git cec-v18
+head:   803726e5c035daf0a07ecb33e9dc41c38f75d82e
+commit: 803726e5c035daf0a07ecb33e9dc41c38f75d82e [12/12] drm/i2c: tda998x: add CEC support
+config: x86_64-rhel (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 803726e5c035daf0a07ecb33e9dc41c38f75d82e
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
->   PCI: Add tango MSI controller support
->   PCI: Add tango PCIe host bridge support
+All errors (new ones prefixed by >>):
 
-I've run into an issue.
+>> ERROR: "cec_get_edid_phys_addr" [drivers/gpu/drm/i2c/tda998x.ko] undefined!
 
-If I boot the system with earlyprintk enabled (as I've
-been doing throughout my dev), things work as expected.
-
-But if I boot with earlyprintk disabled, then the system
-does not "see" the PCIe board, because reading the vendor
-ID returns 0xffffffff.
-
-What we think is happening, is that when earlyprintk is
-disabled, the system proceeds much faster through the
-various inits, and the PCIe init happens when PCIe
-link training has not completed yet.
-
-If that is the case, then it seems I would need to check
-the link state in my probe function.
-
-Or would there be some other solution I haven't thought
-about?
-
-Regards.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38441 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170331/5a06b6dd/attachment-0001.gz>
