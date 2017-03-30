@@ -1,43 +1,45 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Thu, 30 Mar 2017 17:15:22 +0200
-Subject: [PATCH v4 1/5] dt-bindings: watchdog: Document STM32 IWDG bindings
+Date: Thu, 30 Mar 2017 17:15:24 +0200
+Subject: [PATCH v4 3/5] ARM: dts: stm32: Add watchdog support for STM32F429 SoC
 In-Reply-To: <1490886926-20585-1-git-send-email-yannick.fertre@st.com>
 References: <1490886926-20585-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1490886926-20585-2-git-send-email-yannick.fertre@st.com>
+Message-ID: <1490886926-20585-4-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the STM32 IWDG
-(Independent WatchDoG).
+Add watchdog into DT for stm32f429 family.
 
-Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
-
-Author:    Yannick Fertre <yannick.fertre@st.com>
+Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
 ---
- .../devicetree/bindings/watchdog/st,stm32-iwdg.txt        | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+ arch/arm/boot/dts/stm32f429.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
-new file mode 100644
-index 0000000..15fef87
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
-@@ -0,0 +1,15 @@
-+STM32 Independent WatchDoG (IWDG)
-+---------------------------------
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 89327d6..d84dd44 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -64,7 +64,7 @@
+ 			clock-frequency = <32768>;
+ 		};
+ 
+-		clk-lsi {
++		clk_lsi: clk-lsi {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <32000>;
+@@ -306,6 +306,13 @@
+ 			status = "disabled";
+ 		};
+ 
++		iwdg: watchdog at 40003000 {
++			compatible = "st,stm32-iwdg";
++			reg = <0x40003000 0x400>;
++			clocks = <&clk_lsi>;
++			status = "disabled";
++		};
 +
-+Required properties:
-+- compatible: "st,stm32-iwdg"
-+- reg: physical base address and length of the registers set for the device
-+- clocks: must contain a single entry describing the clock input
-+
-+Example:
-+
-+iwdg: watchdog at 40003000 {
-+	compatible = "st,stm32-iwdg";
-+	reg = <0x40003000 0x400>;
-+	clocks = <&clk_lsi>;
-+};
+ 		usart2: serial at 40004400 {
+ 			compatible = "st,stm32-usart", "st,stm32-uart";
+ 			reg = <0x40004400 0x400>;
 -- 
 1.9.1
