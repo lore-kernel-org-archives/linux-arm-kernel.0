@@ -1,163 +1,448 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 30 Mar 2017 08:46:43 +0200
-Subject: [kbuild-all] [PATCH v4 13/22] KVM: arm64: ITS:
- KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
-In-Reply-To: <20170330022159.GB15042@yexl-desktop>
-References: <201703272354.OaYhCMvV%fengguang.wu@intel.com>
- <0d43e874-c443-7d55-b741-ce27bd103cb5@redhat.com>
- <20170330022159.GB15042@yexl-desktop>
-Message-ID: <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
+From: hw.wangxiaoyin@hisilicon.com (Wang Xiaoyin)
+Date: Thu, 30 Mar 2017 14:48:03 +0800
+Subject: [PATCH 2/2] arm64: dts: add pinctrl dtsi file for HiKey960
+ development board
+In-Reply-To: <20170330064803.18648-1-hw.wangxiaoyin@hisilicon.com>
+References: <20170330064803.18648-1-hw.wangxiaoyin@hisilicon.com>
+Message-ID: <20170330064803.18648-2-hw.wangxiaoyin@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiaolong
+Add pinctrl dtsi file for HiKey960 development board, enable
+5 pinmux devices and 1 pinconf device, also include some nodes
+of configurations for pins.
 
-On 30/03/2017 04:21, Ye Xiaolong wrote:
-> Hi, Eric
-> 
-> On 03/27, Auger Eric wrote:
->> Hi,
->>
->> On 27/03/2017 17:04, kbuild test robot wrote:
->>> Hi Eric,
->>>
->>> [auto build test ERROR on kvmarm/next]
->>> [also build test ERROR on v4.11-rc4 next-20170327]
->>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>>
->>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/vITS-save-restore/20170327-195443
->>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
->>> config: arm64-defconfig (attached as .config)
->>> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
->>> reproduce:
->>>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->>>         chmod +x ~/bin/make.cross
->>>         # save the attached .config to linux build tree
->>>         make.cross ARCH=arm64 
->>>
->>> All errors (new ones prefixed by >>):
->>>
->>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c: In function 'vgic_its_has_attr':
->>>>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: error: 'its' undeclared (first use in this function)
->>>       return vgic_its_table_restore(its);
->>
->> I think this is due to the fact the series is applied on KVM: arm/arm64:
->> Emulate the EL1 phys timer registers (kvmarm-for-4.11).
->>
->> Please apply it to (kvmarm/queue, kvmarm/next, kvm_next) KVM: arm/arm64:
->> vgic: Improve sync_hwstate performance  (255905e)
->> I also checked it compiles on 4.11-rc4.
-> 
-> Hmm, we did apply your series on top of kvarm/next, judging from the function
-> code below, I can't see the 'its' declaration. 
-> 
-> static int vgic_its_has_attr(struct kvm_device *dev,
->                              struct kvm_device_attr *attr)
-> {
->         switch (attr->group) {
->         case KVM_DEV_ARM_VGIC_GRP_ADDR:
->                 switch (attr->attr) {
->                 case KVM_VGIC_ITS_ADDR_TYPE:
->                         return 0;
->                 }
->                 break;
->         case KVM_DEV_ARM_VGIC_GRP_CTRL:
->                 switch (attr->attr) {
->                 case KVM_DEV_ARM_VGIC_CTRL_INIT:
->                         return 0;
->                 }
->                 break;
->         case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
->                 u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->                 u64 reg;
-> 
->                 if (get_user(reg, uaddr))
->                         return -EFAULT;
-> 
->                 return vgic_its_attr_regs_access(dev, attr, &reg, true);
->         }
->         case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->                 if (attr->attr)
->                         return -EINVAL;
->                 return vgic_its_table_restore(its);
-The above code shows that my series is not correctly applied since that
-call to vgic_its_table_restore() should normally be in
-vgic_its_set_attr() and not in vgic_its_has_attr() function
-(virt/kvm/arm/vgic-its.c).
+Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   1 +
+ .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 407 +++++++++++++++++++++
+ 2 files changed, 408 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
 
-I pushed this series applied on top of up to date kvmarm/next at
-https://github.com/eauger/linux/tree/v4.11-rc3-its-mig-v4.
-
-As noticed earlier, the series is applied on top of 255905e (KVM:
-arm/arm64: vgic: Improve sync_hwstate performance)
-
-Thanks
-
-Eric
-
-
->         }
->         return -ENXIO;
-> }
-> 
-> Thanks,
-> Xiaolong
-> 
->>
->> Please let me know if I got something wrong.
->>
->> Thanks
->>
->> Eric
->>>                                     ^~~
->>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: note: each undeclared identifier is reported only once for each function it appears in
->>>
->>> vim +/its +1766 arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c
->>>
->>>   1750			case KVM_DEV_ARM_VGIC_CTRL_INIT:
->>>   1751				return 0;
->>>   1752			}
->>>   1753			break;
->>>   1754		case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
->>>   1755			u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->>>   1756			u64 reg;
->>>   1757	
->>>   1758			if (get_user(reg, uaddr))
->>>   1759				return -EFAULT;
->>>   1760	
->>>   1761			return vgic_its_attr_regs_access(dev, attr, &reg, true);
->>>   1762		}
->>>   1763		case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->>>   1764			if (attr->attr)
->>>   1765				return -EINVAL;
->>>> 1766			return vgic_its_table_restore(its);
->>>   1767		}
->>>   1768		return -ENXIO;
->>>   1769	}
->>>   1770	
->>>   1771	static int vgic_its_set_attr(struct kvm_device *dev,
->>>   1772				     struct kvm_device_attr *attr)
->>>   1773	{
->>>   1774		struct vgic_its *its = dev->private;
->>>
->>> ---
->>> 0-DAY kernel test infrastructure                Open Source Technology Center
->>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->> _______________________________________________
->> kbuild-all mailing list
->> kbuild-all at lists.01.org
->> https://lists.01.org/mailman/listinfo/kbuild-all
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index ff37f0a0aa93..186251ffc6b2 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -8,6 +8,7 @@
+ /dts-v1/;
+ 
+ #include "hi3660.dtsi"
++#include "hikey960-pinctrl.dtsi"
+ 
+ / {
+ 	model = "HiKey960";
+diff --git a/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+new file mode 100644
+index 000000000000..c2096c6f46c4
+--- /dev/null
++++ b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+@@ -0,0 +1,407 @@
++/*
++ * pinctrl dts fils for Hislicon HiKey960 development board
++ *
++ */
++
++#include <dt-bindings/pinctrl/hisi.h>
++
++/ {
++	soc {
++		/* [IOMG_000, IOMG_123] */
++		range: gpio-range {
++			#pinctrl-single,gpio-range-cells = <3>;
++		};
++		pmx0: pinmux at e896c000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xe896c000 0x0 0x1f0>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <
++				&range 0 7 0
++				&range 8 116 0>;
++
++			isp0_pmx_func: isp0_pmx_func {
++				pinctrl-single,pins = <
++					0x058 MUX_M1 /* ISP_CLK0 */
++					0x064 MUX_M1 /* ISP_SCL0 */
++					0x068 MUX_M1 /* ISP_SDA0 */
++				>;
++			};
++
++			isp1_pmx_func: isp1_pmx_func {
++				pinctrl-single,pins = <
++					0x05c MUX_M1 /* ISP_CLK1 */
++					0x06c MUX_M1 /* ISP_SCL1 */
++					0x070 MUX_M1 /* ISP_SDA1 */
++				>;
++			};
++
++			i2c3_pmx_func: i2c3_pmx_func {
++				pinctrl-single,pins = <
++					0x02c MUX_M1 /* I2C3_SCL */
++					0x030 MUX_M1 /* I2C3_SDA */
++				>;
++			};
++
++			i2c4_pmx_func: i2c4_pmx_func {
++				pinctrl-single,pins = <
++					0x090 MUX_M1 /* I2C4_SCL */
++					0x094 MUX_M1 /* I2C4_SDA */
++				>;
++			};
++
++			pcie_perstn_pmx_func: pcie_perstn_pmx_func {
++				pinctrl-single,pins = <
++					0x15c MUX_M1 /* PCIE_PERST_N */
++				>;
++			};
++
++			usbhub5734_pmx_func: usbhub5734_pmx_func {
++				pinctrl-single,pins = <
++					0x11c MUX_M0 /* GPIO_073 */
++					0x120 MUX_M0 /* GPIO_074 */
++				>;
++			};
++
++			spi1_pmx_func: spi1_pmx_func {
++				pinctrl-single,pins = <
++					0x034 MUX_M1 /* SPI1_CLK */
++					0x038 MUX_M1 /* SPI1_DI */
++					0x03c MUX_M1 /* SPI1_DO */
++					0x040 MUX_M1 /* SPI1_CS_N */
++				>;
++			};
++
++			uart0_pmx_func: uart0_pmx_func {
++				pinctrl-single,pins = <
++					0x0cc MUX_M2 /* UART0_RXD */
++					0x0d0 MUX_M2 /* UART0_TXD */
++					0x0d4 MUX_M2 /* UART0_RXD_M */
++					0x0d8 MUX_M2 /* UART0_TXD_M */
++				>;
++			};
++
++			uart1_pmx_func: uart1_pmx_func {
++				pinctrl-single,pins = <
++					0x0b0 MUX_M2 /* UART1_CTS_N */
++					0x0b4 MUX_M2 /* UART1_RTS_N */
++					0x0a8 MUX_M2 /* UART1_RXD */
++					0x0ac MUX_M2 /* UART1_TXD */
++				>;
++			};
++
++			uart2_pmx_func: uart2_pmx_func {
++				pinctrl-single,pins = <
++					0x0bc MUX_M2 /* UART2_CTS_N */
++					0x0c0 MUX_M2 /* UART2_RTS_N */
++					0x0c8 MUX_M2 /* UART2_RXD */
++					0x0c4 MUX_M2 /* UART2_TXD */
++				>;
++			};
++
++			uart3_pmx_func: uart3_pmx_func {
++				pinctrl-single,pins = <
++					0x0dc MUX_M1 /* UART3_CTS_N */
++					0x0e0 MUX_M1 /* UART3_RTS_N */
++					0x0e4 MUX_M1 /* UART3_RXD */
++					0x0e8 MUX_M1 /* UART3_TXD */
++				>;
++			};
++
++			uart4_pmx_func: uart4_pmx_func {
++				pinctrl-single,pins = <
++					0x0ec MUX_M1 /* UART4_CTS_N */
++					0x0f0 MUX_M1 /* UART4_RTS_N */
++					0x0f4 MUX_M1 /* UART4_RXD */
++					0x0f8 MUX_M1 /* UART4_TXD */
++				>;
++			};
++
++			uart5_pmx_func: uart5_pmx_func {
++				pinctrl-single,pins = <
++					0x0c4 MUX_M3 /* UART5_CTS_N */
++					0x0c8 MUX_M3 /* UART5_RTS_N */
++					0x0bc MUX_M3 /* UART5_RXD */
++					0x0c0 MUX_M3 /* UART5_TXD */
++				>;
++			};
++
++			uart6_pmx_func: uart6_pmx_func {
++				pinctrl-single,pins = <
++					0x0cc MUX_M1 /* UART6_CTS_N */
++					0x0d0 MUX_M1 /* UART6_RTS_N */
++					0x0d4 MUX_M1 /* UART6_RXD */
++					0x0d8 MUX_M1 /* UART6_TXD */
++				>;
++			};
++		};
++
++		/* [IOMG_MMC0_000, IOMG_MMC0_005] */
++		pmx1: pinmux at ff37e000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xff37e000 0x0 0x18>;
++			#gpio-range-cells = <0x3>;
++			#pinctrl-cells = <1>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 6 0>;
++
++			sd_pmx_func: sd_pmx_func {
++				pinctrl-single,pins = <
++					0x000 MUX_M1 /* SD_CLK */
++					0x004 MUX_M1 /* SD_CMD */
++					0x008 MUX_M1 /* SD_DATA0 */
++					0x00c MUX_M1 /* SD_DATA1 */
++					0x010 MUX_M1 /* SD_DATA2 */
++					0x014 MUX_M1 /* SD_DATA3 */
++				>;
++			};
++		};
++
++		/* [IOMG_FIX_000, IOMG_FIX_011] */
++		pmx2: pinmux at ff3b6000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xff3b6000 0x0 0x30>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 12 0>;
++
++			spi3_pmx_func: spi3_pmx_func {
++				pinctrl-single,pins = <
++					0x008 MUX_M1 /* SPI3_CLK */
++					0x00c MUX_M1 /* SPI3_DI */
++					0x010 MUX_M1 /* SPI3_DO */
++					0x014 MUX_M1 /* SPI3_CS0_N */
++				>;
++			};
++		};
++
++		/* [IOMG_MMC1_000, IOMG_MMC1_005] */
++		pmx3: pinmux at ff3fd000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xff3fd000 0x0 0x18>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 6 0>;
++
++			sdio_pmx_func: sdio_pmx_func {
++				pinctrl-single,pins = <
++					0x000 MUX_M1 /* SDIO_CLK */
++					0x004 MUX_M1 /* SDIO_CMD */
++					0x008 MUX_M1 /* SDIO_DATA0 */
++					0x00c MUX_M1 /* SDIO_DATA1 */
++					0x010 MUX_M1 /* SDIO_DATA2 */
++					0x014 MUX_M1 /* SDIO_DATA3 */
++				>;
++			};
++		};
++
++		/* [IOMG_AO_000, IOMG_AO_041] */
++		pmx4: pinmux at fff11000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xfff11000 0x0 0xa8>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base in node, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 42 0>;
++
++			i2s2_pmx_func: i2s2_pmx_func {
++				pinctrl-single,pins = <
++					0x044 MUX_M1 /* I2S2_DI */
++					0x048 MUX_M1 /* I2S2_DO */
++					0x04c MUX_M1 /* I2S2_XCLK */
++					0x050 MUX_M1 /* I2S2_XFS */
++				>;
++			};
++
++			slimbus_pmx_func: slimbus_pmx_func {
++				pinctrl-single,pins = <
++					0x02c MUX_M1 /* SLIMBUS_CLK */
++					0x030 MUX_M1 /* SLIMBUS_DATA */
++				>;
++			};
++
++			i2c0_pmx_func: i2c0_pmx_func {
++				pinctrl-single,pins = <
++					0x014 MUX_M1 /* I2C0_SCL */
++					0x018 MUX_M1 /* I2C0_SDA */
++				>;
++			};
++
++			i2c1_pmx_func: i2c1_pmx_func {
++				pinctrl-single,pins = <
++					0x01c MUX_M1 /* I2C1_SCL */
++					0x020 MUX_M1 /* I2C1_SDA */
++				>;
++			};
++
++			i2c2_pmx_func: i2c2_pmx_func {
++				pinctrl-single,pins = <
++					0x024 MUX_M1 /* I2C2_SCL */
++					0x028 MUX_M1 /* I2C2_SDA */
++				>;
++			};
++
++			i2c7_pmx_func: i2c7_pmx_func {
++				pinctrl-single,pins = <
++					0x024 MUX_M3 /* I2C7_SCL */
++					0x028 MUX_M3 /* I2C7_SDA */
++				>;
++			};
++
++			spi2_pmx_func: spi2_pmx_func {
++				pinctrl-single,pins = <
++					0x08c MUX_M1 /* SPI2_CLK */
++					0x090 MUX_M1 /* SPI2_DI */
++					0x094 MUX_M1 /* SPI2_DO */
++					0x098 MUX_M1 /* SPI2_CS0_N */
++				>;
++			};
++
++			spi4_pmx_func: spi4_pmx_func {
++				pinctrl-single,pins = <
++					0x08c MUX_M4 /* SPI4_CLK */
++					0x090 MUX_M4 /* SPI4_DI */
++					0x094 MUX_M4 /* SPI4_DO */
++					0x098 MUX_M4 /* SPI4_CS0_N */
++				>;
++			};
++
++			i2s0_pmx_func: i2s0_pmx_func {
++				pinctrl-single,pins = <
++					0x034 MUX_M1 /* I2S0_DI */
++					0x038 MUX_M1 /* I2S0_DO */
++					0x03c MUX_M1 /* I2S0_XCLK */
++					0x040 MUX_M1 /* I2S0_XFS */
++				>;
++			};
++		};
++
++		pmx5: pinmux at ff3fd800 {
++			compatible = "pinconf-single";
++			reg = <0x0 0xff3fd800 0x0 0x18>;
++			#pinctrl-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			pinctrl-single,register-width = <32>;
++
++			sdio_clk_cfg_func: sdio_clk_cfg_func {
++				pinctrl-single,pins = <
++					0x000 0x0 /* SDIO_CLK */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE6_32MA
++					DRIVE6_MASK
++				>;
++			};
++
++			sdio_cfg_func: sdio_cfg_func {
++				pinctrl-single,pins = <
++					0x004 0x0 /* SDIO_CMD */
++					0x008 0x0 /* SDIO_DATA0 */
++					0x00c 0x0 /* SDIO_DATA1 */
++					0x010 0x0 /* SDIO_DATA2 */
++					0x014 0x0 /* SDIO_DATA3 */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_UP
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE6_19MA
++					DRIVE6_MASK
++				>;
++			};
++		};
++
++		pmx6: pinmux at ff37e800 {
++			compatible = "pinconf-single";
++			reg = <0x0 0xff37e800 0x0 0x18>;
++			#pinctrl-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			pinctrl-single,register-width = <32>;
++
++			sd_clk_cfg_func: sd_clk_cfg_func {
++				pinctrl-single,pins = <
++					0x000 0x0 /* SD_CLK */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_DIS
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE6_32MA
++					DRIVE6_MASK
++				>;
++			};
++
++			sd_cfg_func: sd_cfg_func {
++				pinctrl-single,pins = <
++					0x004 0x0 /* SD_CMD */
++					0x008 0x0 /* SD_DATA0 */
++					0x00c 0x0 /* SD_DATA1 */
++					0x010 0x0 /* SD_DATA2 */
++					0x014 0x0 /* SD_DATA3 */
++				>;
++				pinctrl-single,bias-pulldown = <
++					PULL_DIS
++					PULL_DOWN
++					PULL_DIS
++					PULL_DOWN
++				>;
++				pinctrl-single,bias-pullup = <
++					PULL_UP
++					PULL_UP
++					PULL_DIS
++					PULL_UP
++				>;
++				pinctrl-single,drive-strength = <
++					DRIVE6_19MA
++					DRIVE6_MASK
++				>;
++			};
++		};
++
++	};
++};
+-- 
+2.11.0-rc2
