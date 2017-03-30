@@ -1,44 +1,46 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 29 Mar 2017 17:26:05 -0700
-Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3,
- for arm32 (v4)
-Message-ID: <20170330002605.15213-1-eric@anholt.net>
+From: opendmb@gmail.com (Doug Berger)
+Date: Wed, 29 Mar 2017 17:29:09 -0700
+Subject: [PATCH v3 1/6] bus: brcmstb_gisb: Use register offsets with writes too
+In-Reply-To: <20170330002914.7371-1-opendmb@gmail.com>
+References: <20170330002914.7371-1-opendmb@gmail.com>
+Message-ID: <20170330002914.7371-2-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
-now, so it's useful to be able to test that mode on an upstream
-kernel.  It's also been useful for me to use the same board for 32-bit
-and 64-bit development.
+This commit corrects the bug introduced in commit f80835875d3d
+("bus: brcmstb_gisb: Look up register offsets in a table") such
+that gisb_write() translates the register enumeration into an
+offset from the base address for writes as well as reads.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
+Fixes: f80835875d3d ("bus: brcmstb_gisb: Look up register offsets in a table")
+Signed-off-by: Doug Berger <opendmb@gmail.com>
+Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
+ drivers/bus/brcmstb_gisb.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-v1: Gerd's patch that put the ../../../arm64/... link in the Makefile
-v2: Michael's patch that #included from ../../../arm64/... in a new
-    bcm2837-rpi-3-b.dts.
-v3: Mine, using symlinks to make sure that we don't break the split DT
-    tree.
-v4: Rely on the new include/arm64 symlink.
-
-Assuming positive review feedback, I assume it would be acceptable to
-merge the shared/dt-symlinks branch in a PR of my own for the 32-bit
-DT branch?
-
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 011808490fed..27d258cb50f2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -72,6 +72,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
- 	bcm2836-rpi-2-b.dtb \
-+	include/arm64/broadcom/bcm2837-rpi-3-b.dtb \
- 	bcm2835-rpi-zero.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-asus-rt-ac56u.dtb \
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index 72fe0a5a8bf3..a94598d0945a 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2014 Broadcom Corporation
++ * Copyright (C) 2014-2017 Broadcom
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -127,9 +127,9 @@ static void gisb_write(struct brcmstb_gisb_arb_device *gdev, u32 val, int reg)
+ 		return;
+ 
+ 	if (gdev->big_endian)
+-		iowrite32be(val, gdev->base + reg);
++		iowrite32be(val, gdev->base + offset);
+ 	else
+-		iowrite32(val, gdev->base + reg);
++		iowrite32(val, gdev->base + offset);
+ }
+ 
+ static ssize_t gisb_arb_get_timeout(struct device *dev,
 -- 
-2.11.0
+2.12.0
