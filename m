@@ -1,96 +1,146 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 30 Mar 2017 10:02:55 -0700
-Subject: [RFC v2][PATCH 01/11] Introduce rare_write() infrastructure
-In-Reply-To: <466B31B4-0535-44EE-B0F0-F758A79A7B4F@gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-2-git-send-email-keescook@chromium.org>
- <CAGXu5jJuuUSwS61d7Joc=6y2BUyTo6koEsrVxeqMu_u7j9Mb9w@mail.gmail.com>
- <466B31B4-0535-44EE-B0F0-F758A79A7B4F@gmail.com>
-Message-ID: <CAGXu5j+ym33s=nUqmpViR0UJrHo6Bu7+LxsMtvKgvpOzhYxXkw@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 30 Mar 2017 10:11:13 -0700
+Subject: [PATCH v6 1/4] clk: Add support for runtime PM
+In-Reply-To: <75509e0f-26cd-52e7-8c71-b004ab6abc81@samsung.com>
+References: <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170322113554eucas1p27471f0de278c55d5dce7fdf120395e09@eucas1p2.samsung.com>
+ <1490182543-28550-2-git-send-email-m.szyprowski@samsung.com>
+ <149081897388.31513.7062843004022908296@resonance>
+ <75509e0f-26cd-52e7-8c71-b004ab6abc81@samsung.com>
+Message-ID: <149089387341.31513.7531874072502656432@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 12:44 AM, Ho-Eun Ryu <hoeun.ryu@gmail.com> wrote:
->
->> On 30 Mar 2017, at 3:23 AM, Kees Cook <keescook@chromium.org> wrote:
->>
->> On Wed, Mar 29, 2017 at 11:15 AM, Kees Cook <keescook@chromium.org> wrote:
->>> +/*
->>> + * Build "write rarely" infrastructure for flipping memory r/w
->>> + * on a per-CPU basis.
->>> + */
->>> +#ifndef CONFIG_HAVE_ARCH_RARE_WRITE
->>> +# define __wr_rare
->>> +# define __wr_rare_type
->>> +# define __rare_write(__var, __val)    (__var = (__val))
->>> +# define rare_write_begin()            do { } while (0)
->>> +# define rare_write_end()              do { } while (0)
->>> +#else
->>> +# define __wr_rare                     __ro_after_init
->>> +# define __wr_rare_type                        const
->>> +# ifdef CONFIG_HAVE_ARCH_RARE_WRITE_MEMCPY
->>> +#  define __rare_write_n(dst, src, len)        ({                      \
->>> +               BUILD_BUG(!builtin_const(len));                 \
->>> +               __arch_rare_write_memcpy((dst), (src), (len));  \
->>> +       })
->>> +#  define __rare_write(var, val)  __rare_write_n(&(var), &(val), sizeof(var))
->>> +# else
->>> +#  define __rare_write(var, val)  ((*(typeof((typeof(var))0) *)&(var)) = (val))
->>> +# endif
->>> +# define rare_write_begin()    __arch_rare_write_begin()
->>> +# define rare_write_end()      __arch_rare_write_end()
->>> +#endif
->>> +#define rare_write(__var, __val) ({                    \
->>> +       rare_write_begin();                             \
->>> +       __rare_write(__var, __val);                     \
->>> +       rare_write_end();                               \
->>> +       __var;                                          \
->>> +})
->>> +
->>
->> Of course, only after sending this do I realize that the MEMCPY case
->> will need to be further adjusted, since it currently can't take
->> literals. I guess something like this needs to be done:
->>
->> #define __rare_write(var, val) ({ \
->>    typeof(var) __src = (val);     \
->>    __rare_write_n(&(var), &(__src), sizeof(var)); \
->> })
->>
->
-> Right, and it has a problem with BUILD_BUG, which causes compilation error when CONFIG_HABE_ARCH_RARE_WRITE_MEMCPY is true
-> BUILD_BUG is defined in <linux/bug.h> but <linux/bug.h> includes <linux/compiler.h>
->
-> Please see the following.
->
-> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-> index 3334fa9..3fa50e1 100644
-> --- a/include/linux/compiler.h
-> +++ b/include/linux/compiler.h
-> @@ -350,11 +350,11 @@ static __always_inline void __write_once_size(volatile vo\
-> id *p, void *res, int s
->  # define __wr_rare                     __ro_after_init
->  # define __wr_rare_type                        const
->  # ifdef CONFIG_HAVE_ARCH_RARE_WRITE_MEMCPY
-> -#  define __rare_write_n(dst, src, len)        ({                      \
-> -               BUILD_BUG(!builtin_const(len));                         \
-> -               __arch_rare_write_memcpy((dst), (src), (len));   \
-> +#  define __rare_write_n(var, val, len)        ({                                 \
-> +               typeof(val) __val = val;                                                    \
-> +               __arch_rare_write_memcpy(&(var), &(__val), (len));      \
->         })
-> -#  define __rare_write(var, val)  __rare_write_n(&(var), &(val), sizeof(var))
-> +#  define __rare_write(var, val)  __rare_write_n((var), (val), sizeof(var))
->  # else
->  #  define __rare_write(var, val)  ((*(typeof((typeof(var))0) *)&(var)) = (val)\
-> )
->  # endif
+Quoting Marek Szyprowski (2017-03-30 00:24:15)
+> Hi Michael,
+> 
+> On 2017-03-29 22:22, Michael Turquette wrote:
+> > Quoting Marek Szyprowski (2017-03-22 04:35:40)
+> >> Registers for some clocks might be located in the SOC area, which are under the
+> >> power domain. To enable access to those registers respective domain has to be
+> >> turned on. Additionally, registers for such clocks will usually loose its
+> >> contents when power domain is turned off, so additional saving and restoring of
+> >> them might be needed in the clock controller driver.
+> >>
+> >> This patch adds basic infrastructure in the clocks core to allow implementing
+> >> driver for such clocks under power domains. Clock provider can supply a
+> >> struct device pointer, which is the used by clock core for tracking and managing
+> >> clock's controller runtime pm state. Each clk_prepare() operation
+> >> will first call pm_runtime_get_sync() on the supplied device, while
+> >> clk_unprepare() will do pm_runtime_put_sync() at the end.
+> >>
+> >> Additional calls to pm_runtime_get/put functions are required to ensure that any
+> >> register access (like calculating/changing clock rates and unpreparing/disabling
+> >> unused clocks on boot) will be done with clock controller in runtime resumend
+> >> state.
+> > The above is a bit confusing. Is clk_prepare really special? It seems to
+> > me that every single clk_ops callback will need this?
+> 
+> clk_prepare/unprepare are special, because they allow sleeping, so they 
+> are natural
+> candidates for the place for calling runtime PM operations. 
+> clk_enable()/disable()
+> is called under a spinlock, so runtime pm cannot be called efficiently 
+> there, but
+> core guarantees that they are called after clk_prepare(), so accessing 
+> hw registers
+> is safe. The only remaining calls are not guaranteed to be called always 
+> after
+> clk_prepare(), so those additional calls and checks in runtime pm are 
+> needed there.
 
-Thanks for the catch, I'll update this (I'll use compiletime_assert,
-which is defined in compiler.h).
+Right, so any call that holds prepare_lock and might touch the hardware
+needs to first call pm_runtime_get_sync.
 
--Kees
+> 
+> > That leads to my second question: why put this in the clk core? Can the
+> > clk provider driver simply add pm_runtime_{get,put} calls into its
+> > clk_ops callbacks instead? The clk core does not directly touch hardware
+> > (e.g. reading registers) so putting the pm runtime calls into the
+> > provider callbacks should be sufficient.
+> 
+> In theory is should be possible to duplicate all kind of clock build blocks
+> (gates, muxes, dividers, ...) with additional runtime pm calls. This 
+> would however
+> end in much more code and a bit more complicated locking. Implementing 
+> it in clk
+> core made the code simpler. It also turned out that runtime pm 
+> integration is
+> needed for more that a single clock provider: besides Samsung SoCs 
+> (Exynos 5433
+> and newer, Exynos 4412 ISP, Exynos Audio Subsystem, hacks in Exynos 542x 
+> can be
+> also replaced by runtime PM calls), Ulf mentioned that exactly similar 
+> pattern
+> is used for some UX500 SoCs (STE). More will probably come once the 
+> feature is
+> in, because for now such drivers simply forces runtime active state as a
+> workaround or don't instantiate related power domains at all.
 
--- 
-Kees Cook
-Pixel Security
+I agree with the above, but I'm also wondering about the folks that use
+regmap internally to their own clock provider drivers. I guess they will
+have the option to either do their own thing or use this framework-level
+solution.
+
+I've started reviewing the code itself and will respond to those mails
+separately.
+
+Thanks,
+Mike
+
+> 
+> It is not that uncommon to have runtime PM integrated in the framework 
+> (examples:
+> mmc, scsi). Please not that this is optional for clock providers - if 
+> they don't
+> enable runtime PM for the provided clock controller device during clock
+> registration, the clock core will behave exactly the same way as now.
+> 
+> >> When one wants to register clock controller, which make use of this feature, he
+> >> has to:
+> >> 1. Provide a struct device to the core when registering the provider.
+> >> 2. Ensure to enable runtime PM for that device before registering clocks.
+> >> 3. Make sure that the runtime PM status of the controller device reflects
+> >>     the HW state.
+> > Third question: is there a case where more than one device is required?
+> > Is is possible that a single pm_runtime_get call against a single device
+> > will not be enough for some clk provider drivers? If so then this
+> > solution does not scale very well and the clk provider driver will have
+> > to implement this in the clk_ops callbacks (as I mentioned above in my
+> > second question).
+> 
+> This is a generic question about runtime PM. There are various methods to
+> model hardware relations to control pm/runtime pm state of a set of devices:
+> child-parent-bus relations (setting child to active state also activates a
+> parent), gen_pd power domains and sub-domains and recently merged device pm
+> links, which allows to model relations across the typical child-parent tree
+> hierarchy. IMHO device core pm related framework provides enough features to
+> solve the case when one needs to control more than one device - what is
+> worth to mention - in all cases the client only need to call pm_runtime
+> funtions on the ONE leaf device, everything else will be handled by pm core.
+> 
+> > Fourth & final question: I'm under the impression that pm runtime calls
+> > be be nested and re-enter, but I want to make sure (Ulf?). For instance
+> > it is highly likely that this new feature would cause something like:
+> >
+> > pm_runtime_get()              - called by random driver
+> > -> clk_prepare_enable()       - genpd enables functioal clocks
+> >     -> pm_runtime_get()        - called by clk_pm_runtime_get in clk core
+> >        -> clk_prepare_enable() - genpd enables interface or bus clocks
+> >
+> > I guess this is safe from the pm_runtime_get/genpd perspective, but want
+> > to make sure first.
+> 
+> Yes, this will work fine after recent fixes. Tested with Exynos IIS ASoC
+> driver (which is also a clock provider), which in turn is a client for
+> Exynos Audio Subsystem clock provider.
+> 
+> > Thanks,
+> 
+>  >> [...]
+> 
+> Best regards
+> -- 
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+> 
