@@ -1,177 +1,93 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Thu, 30 Mar 2017 17:37:50 +0300
-Subject: [PATCH 1/3] dts: arm64: add DPAA QBMan portals
+Date: Thu, 30 Mar 2017 17:37:51 +0300
+Subject: [PATCH 2/3] dts: arm64: add LS1043A DPAA QBMan nodes
 In-Reply-To: <1490884672-18294-1-git-send-email-madalin.bucur@nxp.com>
 References: <1490884672-18294-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1490884672-18294-2-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <1490884672-18294-3-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DPAA 1.x DPAA QMan and BMan portal nodes.
+Add the DPAA 1.x QMan and BMan nodes in the LS1043A device tree.
 
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- .../boot/dts/freescale/qoriq-bman1-portals.dtsi    | 67 +++++++++++++++++++
- .../boot/dts/freescale/qoriq-qman1-portals.dtsi    | 76 ++++++++++++++++++++++
- 2 files changed, 143 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
- create mode 100644 arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 52 ++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-new file mode 100644
-index 0000000..b007344
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-@@ -0,0 +1,67 @@
-+/*
-+ * QorIQ BMan Portals device tree
-+ *
-+ * Copyright 2011-2016 Freescale Semiconductor Inc.
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-+ */
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index ec13a6e..8434e89 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -106,6 +106,33 @@
+ 		      /* DRAM space 1, size: 2GiB DRAM */
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+&bportals {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible = "simple-bus";
++		bman_fbpr: bman-fbpr {
++			compatible = "shared-dma-pool";
++			size = <0 0x1000000>;
++			alignment = <0 0x1000000>;
++			no-map;
++		};
 +
-+	bman-portal at 0 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x0 0x4000 0x4000000 0x4000>;
-+		interrupts = <0 173 0x4>;
++		qman_fqd: qman-fqd {
++			compatible = "shared-dma-pool";
++			size = <0 0x400000>;
++			alignment = <0 0x400000>;
++			no-map;
++		};
++
++		qman_pfdr: qman-pfdr {
++			compatible = "shared-dma-pool";
++			size = <0 0x2000000>;
++			alignment = <0 0x2000000>;
++			no-map;
++		};
 +	};
 +
-+	bman-portal at 10000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x10000 0x4000 0x4010000 0x4000>;
-+		interrupts = <0 175 0x4>;
-+	};
+ 	sysclk: sysclk {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+@@ -333,6 +360,28 @@
+ 			};
+ 		};
+ 
++		qman: qman at 1880000 {
++			compatible = "fsl,qman";
++			reg = <0x00 0x1880000 0x0 0x10000>;
++			interrupts = <0 45 0x4>;
++			memory-region = <&qman_fqd &qman_pfdr>;
++		};
 +
-+	bman-portal at 20000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x20000 0x4000 0x4020000 0x4000>;
-+		interrupts = <0 177 0x4>;
-+	};
++		bman: bman at 1890000 {
++			compatible = "fsl,bman";
++			reg = <0x00 0x1890000 0x0 0x10000>;
++			interrupts = <0 45 0x4>;
++			memory-region = <&bman_fbpr>;
++		};
 +
-+	bman-portal at 30000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x30000 0x4000 0x4030000 0x4000>;
-+		interrupts = <0 179 0x4>;
-+	};
++		bportals: bman-portals at 508000000 {
++			ranges = <0x0 0x5 0x08000000 0x8000000>;
++		};
 +
-+	bman-portal at 40000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x40000 0x4000 0x4040000 0x4000>;
-+		interrupts = <0 181 0x4>;
-+	};
++		qportals: qman-portals at 500000000 {
++			ranges = <0x0 0x5 0x00000000 0x8000000>;
++		};
 +
-+	bman-portal at 50000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x50000 0x4000 0x4050000 0x4000>;
-+		interrupts = <0 183 0x4>;
-+	};
+ 		dspi0: dspi at 2100000 {
+ 			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+@@ -686,3 +735,6 @@
+ 	};
+ 
+ };
 +
-+	bman-portal at 60000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x60000 0x4000 0x4060000 0x4000>;
-+		interrupts = <0 185 0x4>;
-+	};
-+
-+	bman-portal at 70000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x70000 0x4000 0x4070000 0x4000>;
-+		interrupts = <0 187 0x4>;
-+	};
-+
-+	bman-portal at 80000 {
-+		compatible = "fsl,bman-portal";
-+		reg = <0x80000 0x4000 0x4080000 0x4000>;
-+		interrupts = <0 189 0x4>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi b/arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
-new file mode 100644
-index 0000000..4baec2c
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
-@@ -0,0 +1,76 @@
-+/*
-+ * QorIQ QMan Portals device tree
-+ *
-+ * Copyright 2011-2016 Freescale Semiconductor Inc.
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-+ */
-+
-+&qportals {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	compatible = "simple-bus";
-+
-+	qportal0: qman-portal at 0 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x0 0x4000 0x4000000 0x4000>;
-+		interrupts = <0 172 0x4>;
-+		cell-index = <0>;
-+	};
-+
-+	qportal1: qman-portal at 10000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x10000 0x4000 0x4010000 0x4000>;
-+		interrupts = <0 174 0x4>;
-+		cell-index = <1>;
-+	};
-+
-+	qportal2: qman-portal at 20000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x20000 0x4000 0x4020000 0x4000>;
-+		interrupts = <0 176 0x4>;
-+		cell-index = <2>;
-+	};
-+
-+	qportal3: qman-portal at 30000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x30000 0x4000 0x4030000 0x4000>;
-+		interrupts = <0 178 0x4>;
-+		cell-index = <3>;
-+	};
-+
-+	qportal4: qman-portal at 40000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x40000 0x4000 0x4040000 0x4000>;
-+		interrupts = <0 180 0x4>;
-+		cell-index = <4>;
-+	};
-+
-+	qportal5: qman-portal at 50000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x50000 0x4000 0x4050000 0x4000>;
-+		interrupts = <0 182 0x4>;
-+		cell-index = <5>;
-+	};
-+
-+	qportal6: qman-portal at 60000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x60000 0x4000 0x4060000 0x4000>;
-+		interrupts = <0 184 0x4>;
-+		cell-index = <6>;
-+	};
-+
-+	qportal7: qman-portal at 70000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x70000 0x4000 0x4070000 0x4000>;
-+		interrupts = <0 186 0x4>;
-+		cell-index = <7>;
-+	};
-+
-+	qportal8: qman-portal at 80000 {
-+		compatible = "fsl,qman-portal";
-+		reg = <0x80000 0x4000 0x4080000 0x4000>;
-+		interrupts = <0 188 0x4>;
-+		cell-index = <8>;
-+	};
-+};
++#include "qoriq-qman1-portals.dtsi"
++#include "qoriq-bman1-portals.dtsi"
 -- 
 2.1.0
