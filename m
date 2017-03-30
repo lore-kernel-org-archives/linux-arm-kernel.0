@@ -1,185 +1,40 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Thu, 30 Mar 2017 23:26:56 +0800
-Subject: [PATCH V8 3/6] OF: Add missing I/O range exception for indirect-IO
- devices
-In-Reply-To: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <1490887619-61732-4-git-send-email-yuanzhichang@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Mar 2017 17:03:00 +0200
+Subject: [GIT PULL] ARM: OXNAS SoC update for 4.12
+In-Reply-To: <7432624.QZN9TsYLQF@wuerfel>
+References: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
+ <7432624.QZN9TsYLQF@wuerfel>
+Message-ID: <CAK8P3a0uexaSYw_Wnim3-00=Zn8Bn85nfpTrKzgRoBY+NUhr+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some special ISA/LPC devices that work on a specific I/O range where
-it is not correct to specify a 'ranges' property in DTS parent node as cpu
-addresses translated from DTS node are only for memory space on some
-architectures, such as Arm64. Without the parent 'ranges' property, current
-of_translate_address() return an error.
-Here we add special handlings for this case.
-During the OF address translation, some checkings will be perfromed to
-identify whether the device node is registered as indirect-IO. If yes, the I/O
-translation will be done in a different way from that one of PCI MMIO.
-In this way, the I/O 'reg' property of the special ISA/LPC devices will be
-parsed correctly.
+On Thu, Mar 30, 2017 at 4:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, March 20, 2017 10:39:56 AM CEST Neil Armstrong wrote:
+>> Dear arm-soc maintainers,
+>>
+>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>>
+>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.12
+>>
+>> for you to fetch changes up to b44327d198b4f1bbebaf83f714cde450471de644:
+>>
+>>   ARM: oxnas: remove redundant select CPU_V6K (2017-03-20 10:13:45 +0100)
+>>
+>> ----------------------------------------------------------------
+>> - Fix OX820 Kconfig
+>>
+>
+> I've merged this into next/fixes-non-critical. Thanks,
 
-Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>    #earlier draft
-Acked-by: Rob Herring <robh@kernel.org>
----
- drivers/of/address.c | 90 ++++++++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 74 insertions(+), 16 deletions(-)
+BTW, it took 20 minutes to pull this branch from github.com, possibly they
+had moved this to cold storage. Are you able to migrate your git tree to
+kernel.org or host it yourself on baylibre.com in the future?
 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 1693a6f..d8ca284 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -552,9 +552,14 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
-  * that translation is impossible (that is we are not dealing with a value
-  * that can be mapped to a cpu physical address). This is not really specified
-  * that way, but this is traditionally the way IBM at least do things
-+ *
-+ * Whenever the translation fails, the *host pointer will be set to the
-+ * device that had registered logical PIO mapping, and the return code is relative to
-+ * that node.
-  */
- static u64 __of_translate_address(struct device_node *dev,
--				  const __be32 *in_addr, const char *rprop)
-+				  const __be32 *in_addr, const char *rprop,
-+				  struct device_node **host)
- {
- 	struct device_node *parent = NULL;
- 	struct of_bus *bus, *pbus;
-@@ -567,6 +572,7 @@ static u64 __of_translate_address(struct device_node *dev,
- 	/* Increase refcount at current level */
- 	of_node_get(dev);
- 
-+	*host = NULL;
- 	/* Get parent & match bus type */
- 	parent = of_get_parent(dev);
- 	if (parent == NULL)
-@@ -587,6 +593,8 @@ static u64 __of_translate_address(struct device_node *dev,
- 
- 	/* Translate */
- 	for (;;) {
-+		struct logic_pio_hwaddr *iorange;
-+
- 		/* Switch to parent bus */
- 		of_node_put(dev);
- 		dev = parent;
-@@ -599,6 +607,19 @@ static u64 __of_translate_address(struct device_node *dev,
- 			break;
- 		}
- 
-+		/*
-+		 * For indirectIO device which has no ranges property, get
-+		 * the address from reg directly.
-+		 */
-+		iorange = find_io_range_by_fwnode(&dev->fwnode);
-+		if (iorange && (iorange->flags != PIO_CPU_MMIO)) {
-+			result = of_read_number(addr + 1, na - 1);
-+			pr_debug("indirectIO matched(%s) 0x%llx\n",
-+					of_node_full_name(dev), result);
-+			*host = of_node_get(dev);
-+			break;
-+		}
-+
- 		/* Get new parent bus and counts */
- 		pbus = of_match_bus(parent);
- 		pbus->count_cells(dev, &pna, &pns);
-@@ -631,13 +652,32 @@ static u64 __of_translate_address(struct device_node *dev,
- 
- u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
- {
--	return __of_translate_address(dev, in_addr, "ranges");
-+	struct device_node *host;
-+	u64 ret;
-+
-+	ret =  __of_translate_address(dev, in_addr, "ranges", &host);
-+	if (host) {
-+		of_node_put(host);
-+		return OF_BAD_ADDR;
-+	}
-+
-+	return ret;
- }
- EXPORT_SYMBOL(of_translate_address);
- 
- u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
- {
--	return __of_translate_address(dev, in_addr, "dma-ranges");
-+	struct device_node *host;
-+	u64 ret;
-+
-+	ret = __of_translate_address(dev, in_addr, "dma-ranges", &host);
-+
-+	if (host) {
-+		of_node_put(host);
-+		return OF_BAD_ADDR;
-+	}
-+
-+	return ret;
- }
- EXPORT_SYMBOL(of_translate_dma_address);
- 
-@@ -679,29 +719,47 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
- }
- EXPORT_SYMBOL(of_get_address);
- 
-+static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr)
-+{
-+	u64 taddr;
-+	unsigned long port;
-+	struct device_node *host;
-+
-+	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-+	if (host) {
-+		/* host specific port access */
-+		port = logic_pio_trans_hwaddr(&host->fwnode, taddr);
-+		of_node_put(host);
-+	} else {
-+		/* memory mapped I/O range */
-+		port = pci_address_to_pio(taddr);
-+	}
-+
-+	if (port == (unsigned long)-1)
-+		return OF_BAD_ADDR;
-+
-+	return port;
-+}
-+
- static int __of_address_to_resource(struct device_node *dev,
- 		const __be32 *addrp, u64 size, unsigned int flags,
- 		const char *name, struct resource *r)
- {
- 	u64 taddr;
- 
--	if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
-+	if (flags & IORESOURCE_MEM)
-+		taddr = of_translate_address(dev, addrp);
-+	else if (flags & IORESOURCE_IO)
-+		taddr = of_translate_ioport(dev, addrp);
-+	else
- 		return -EINVAL;
--	taddr = of_translate_address(dev, addrp);
-+
- 	if (taddr == OF_BAD_ADDR)
- 		return -EINVAL;
- 	memset(r, 0, sizeof(struct resource));
--	if (flags & IORESOURCE_IO) {
--		unsigned long port;
--		port = pci_address_to_pio(taddr);
--		if (port == (unsigned long)-1)
--			return -EINVAL;
--		r->start = port;
--		r->end = port + size - 1;
--	} else {
--		r->start = taddr;
--		r->end = taddr + size - 1;
--	}
-+
-+	r->start = taddr;
-+	r->end = taddr + size - 1;
- 	r->flags = flags;
- 	r->name = name ? name : dev->full_name;
- 
--- 
-1.9.1
+It's not urgent, but the delay was rather annoying and I had already
+given up and applied the patch manually when the pull finally succeeded.
+
+       Arnd
