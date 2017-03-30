@@ -1,41 +1,42 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 30 Mar 2017 12:13:43 -0700
-Subject: [GIT PULL] bcm2835-dt-next-2017-03-30
-Message-ID: <20170330191343.31647-1-eric@anholt.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 30 Mar 2017 12:29:50 -0700
+Subject: [PATCH v3 0/6] bus: brcmstb_gisb: add support for GISBv7 arbiter
+In-Reply-To: <20170330181932.GB8062@leverpostej>
+References: <20170330002914.7371-1-opendmb@gmail.com>
+ <c3182c24-2245-cf2e-32e4-248b8046a30f@gmail.com>
+ <20170330181932.GB8062@leverpostej>
+Message-ID: <baaf46b4-cd91-3c19-70a8-f5923e31aac9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On 03/30/2017 11:19 AM, Mark Rutland wrote:
+> On Thu, Mar 30, 2017 at 09:33:32AM -0700, Florian Fainelli wrote:
+>> On 03/29/2017 05:29 PM, Doug Berger wrote:
+>>> This patch set contains changes to enable the GISB arbiter driver
+>>> on the latest ARM64 architecture Set-Top Box chips from Broadcom.
+>>>
+>>> Since the ARM64 architecture does not support the hooking of low
+>>> level fault handlers the driver has been adjusted to depend solely
+>>> on GISB interrupts and notify events to provide diagnostic
+>>> messaging.  The GISB hardware still triggers bus faults for the
+>>> processor so the default low-level aborts will occur and will be
+>>> handled based on the architecture specific kernel implementation.
+>>>
+>>> While this tends to obsure the GISB error messaging it is still
+>>> reasonable so the same approach is applied to the ARM architecture
+>>> for consistency.
+>>>
+>>> The patches also correct some issues with the existing driver
+>>> and add the new register map for the GISBv7 hardware first
+>>> appearing in the BCM7278 device.
+>>
+>> This all looks great to me, and since there are no more ARM64
+>> dependencies I can take this via the Broadcom ARM/ARM64 SoC pull requests.
+>>
+>> Mark, are you also happy with this v3?
+> 
+> It looks fine by me.
 
-Here's the pull request for those changes I'd misplaced from 4.11.
-This may be my last PR of the cycle.  The only change I have left on
-my radar for 4.12 is
-http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/006097.html
-
-The following changes since commit 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
-
-  ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
-
-are available in the git repository at:
-
-  git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-30
-
-for you to fetch changes up to 10b6c0c2e2bb8cd1be682f8d36ef597e3419cb88:
-
-  ARM: dts: bcm2835: add index to the ethernet alias (2017-03-27 10:10:39 -0700)
-
-----------------------------------------------------------------
-This pull request brings back bcm2835 DT fixups from Baruch Siach that
-got misplaced after a PR for 4.11 got rejected.
-
-----------------------------------------------------------------
-Baruch Siach (4):
-      ARM: dts: bcm2835: fix uart0 pinctrl node names
-      ARM: dts: bcm2835: fix i2c0 pins
-      ARM: dts: bcm2835: fix uart0/uart1 pins
-      ARM: dts: bcm2835: add index to the ethernet alias
-
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi |  2 +-
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi |  2 +-
- arch/arm/boot/dts/bcm283x.dtsi              | 22 +++++++++++++---------
- 3 files changed, 15 insertions(+), 11 deletions(-)
+Series applied to drivers/next, thanks everyone!
+-- 
+Florian
