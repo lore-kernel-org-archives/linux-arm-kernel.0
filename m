@@ -1,93 +1,67 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 30 Mar 2017 18:36:07 +0100
-Subject: KVM/ARM: sleeping function called from invalid context
-In-Reply-To: <7047d954-5c43-600a-3511-4c7dbd60c175@arm.com>
-References: <7047d954-5c43-600a-3511-4c7dbd60c175@arm.com>
-Message-ID: <1490895367-10547-1-git-send-email-suzuki.poulose@arm.com>
+From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
+Date: Thu, 30 Mar 2017 19:40:09 +0200
+Subject: [PATCH V1 1/1] mtd: mtk-nor: set controller to 4B mode with large
+ capacity flash
+In-Reply-To: <1490862222-723-2-git-send-email-guochun.mao@mediatek.com>
+References: <1490862222-723-1-git-send-email-guochun.mao@mediatek.com>
+ <1490862222-723-2-git-send-email-guochun.mao@mediatek.com>
+Message-ID: <24d60072-4124-7ec4-6cd3-fd70f4f6b10a@wedev4u.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have confirmed the theory using a sample code like :
+Hi Guochun,
 
-	spin_lock(&a);
-	spin_lock(&b);
-	cond_resched_lock(&b);
-	spin_unlock(&b);
-	spin_unlock(&a);
+Le 30/03/2017 ? 10:23, Guochun Mao a ?crit :
+> when nor's size larger than 16MByte, nor and controller should
+> enter 4Byte mode simultaneously.
+> 
+> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> ---
+>  drivers/mtd/spi-nor/mtk-quadspi.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+> index e661877..05cd8a8 100644
+> --- a/drivers/mtd/spi-nor/mtk-quadspi.c
+> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+> @@ -369,6 +369,13 @@ static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
+>  		/* We only handle 1 byte */
+>  		ret = mt8173_nor_wr_sr(mt8173_nor, *buf);
+>  		break;
+> +	case SPINOR_OP_EN4B:
+> +		/* Set nor controller to 4-byte address mode,
+> +		 * and simultaneously set nor flash.
+> +		 * This case should cooperate with default operation.
+> +		 */
+> +		writeb(readb(mt8173_nor->base + MTK_NOR_DUAL_REG) | 0x10,
+> +				mt8173_nor->base + MTK_NOR_DUAL_REG);
 
-Also, the following patch solves the problem for me.
+This is not good: you should check in both mt8173_nor_read() and
+mt8173_nor_write() whether nor->addr_width is either 3 or 4.
 
+from include/linux/mtd/spi-nor.h:
+ * @addr_width:		number of address bytes
 
- ----8>-----
+Besides SPI commands using an op code from 4-byte address instruction
+set always carry a 4-byte address. They can be used directly, without
+sending the SPINOR_OP_EN4B before. So you cannot assume that addresses
+will be 4-byte long only if your SPI controller driver has seen a
+SPINOR_OP_EN4B command before. This assumption is wrong.
 
-sched: Fix ___might_sleep preempt count checks
+SPI controller driver should never check SPINOR_OP_* op codes like this.
 
-___might_sleep checks if the preempt_count equals the passed in
-preempt_offset to issue a warning. This could cause false warnings,
-when preempt_count is greater than the requested offset. Fix the
-check to make sure we handle this case.
+Then, testing SPINOR_OP_RDSR from mt8173_nor_read_reg() or
+SPINOR_OP_WRSR from mt8173_nor_write_reg() is not a good practice too:
+op codes may change depending on the memory manufacturer. So testing op
+code values like you do can work with some memories but maybe not all.
 
-e.g, following code sequence could cause false warning:
+Finally, don't use 0x10, please define a macro instead.
 
-foo:
-	spin_lock(&a);
-	...
-	bar() --------->     bar:
-				spin_lock(&b);
-				cond_resched_lock(&b);
-				do_something();
-				spin_unlock(&b);
-		<-----------
-	...
-	spin_unlock(&a)
+Best regards,
 
-where locks a and b need not necessarily be related.
+Cyrille
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Frederic Weisbecker <fweisbec@gmail.com>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- kernel/sched/core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 3b31fc0..28842dc 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -6144,11 +6144,11 @@ void __init sched_init(void)
- }
- 
- #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
--static inline int preempt_count_equals(int preempt_offset)
-+static inline int preempt_count_safe(int preempt_offset)
- {
- 	int nested = preempt_count() + rcu_preempt_depth();
- 
--	return (nested == preempt_offset);
-+	return (nested >= preempt_offset);
- }
- 
- void __might_sleep(const char *file, int line, int preempt_offset)
-@@ -6179,7 +6179,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
- 	/* WARN_ON_ONCE() by default, no rate limit required: */
- 	rcu_sleep_check();
- 
--	if ((preempt_count_equals(preempt_offset) && !irqs_disabled() &&
-+	if ((preempt_count_safe(preempt_offset) && !irqs_disabled() &&
- 	     !is_idle_task(current)) ||
- 	    system_state != SYSTEM_RUNNING || oops_in_progress)
- 		return;
-@@ -6205,7 +6205,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
- 	if (irqs_disabled())
- 		print_irqtrace_events(current);
- 	if (IS_ENABLED(CONFIG_DEBUG_PREEMPT)
--	    && !preempt_count_equals(preempt_offset)) {
-+	    && !preempt_count_safe(preempt_offset)) {
- 		pr_err("Preemption disabled at:");
- 		print_ip_sym(preempt_disable_ip);
- 		pr_cont("\n");
--- 
-2.7.4
+>  	default:
+>  		ret = mt8173_nor_do_tx_rx(mt8173_nor, opcode, buf, len, NULL, 0);
+>  		if (ret)
+> 
