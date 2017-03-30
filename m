@@ -1,52 +1,47 @@
-From: ore@pengutronix.de (Oleksij Rempel)
-Date: Thu, 30 Mar 2017 13:02:54 +0200
-Subject: proper power off implementation for iMX6 with external pmic
-Message-ID: <d8d013f7-9417-c7c9-5f60-dd33465e9b42@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Mar 2017 12:02:49 +0100
+Subject: [PATCH v6 00/39] i.MX Media Driver
+In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170330110249.GF7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo all,
+This fails at step 1.  The removal of the frame interval support now
+means my setup script fails when trying to set the frame interval on
+the camera:
 
-i'm looking for proper way to implement pm_power_off for IMX6 with 
-external PMIC.
+Enumerating pads and links
+Setting up format SRGGB8_1X8 816x616 on pad imx219 0-0010/0
+Format set: SRGGB8_1X8 816x616
+Setting up frame interval 1/25 on pad imx219 0-0010/0
+Frame interval set: 1/25
+Setting up format SRGGB8_1X8 816x616 on pad imx6-mipi-csi2/0
+Format set: SRGGB8_1X8 816x616
+Setting up frame interval 1/25 on pad imx6-mipi-csi2/0
+Unable to set frame interval: Inappropriate ioctl for device (-25)Unable to setup formats: Inappropriate ioctl for device (25)
 
-http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-page 5083
+This is because media-ctl tries to propagate it from the imx219 source
+pad to the csi2 sink pad, and the csi2 now fails that ioctl.
 
-According to this documentation, there are two ways to power off, 
-depending on board configuration. With internal and external PMIC.
+This makes media-ctl return a failure code, which means that it's not
+possible for a script to determine whether the failure was due to the
+camera setup or something else.  So, we have to assume that the
+whole command failed.
 
-Internal variant is implemented in:
-drivers/power/reset/imx-snvs-poweroff.c
+This is completely broken, and I'm even more convinced that those
+arguing for this behaviour really have not thought it through well
+enough before demanding that this code was removed.
 
-and should provide support for fallowing sequence:
+As far as I'm concerned, the end result is completely broken and
+unusable.  I'm going to be merging the frame interval support back
+into my test tree, because that's the only sane thing to do.
 
-Configuration with internal PMIC:
-1.  SoC button is pressed for a short duration.
-2.  Interrupt request (irq) is sent to SoC from FSM
-3.  Alarm timer is set up by software routine and started.
-4.  Upon alarm_in assertion to '1', PMIC_ON_REQ goes '0'.
-5.  External regulator goes OFF.
+If v4l2 people want to object to having frame interval support present
+for all subdevs, then _they_ need to make sure that the rest of their
+software conforms to what they're telling people to do.
 
-Suddenly i can't find any existing code for external PMIC.
-
-Configuration with external PMIC:
-1.  Button is pressed for a short duration on the external PMIC.
-2.  Interrupt request (irq) is sent to SoC from external PMIC
-3.  SoC is programming PMIC for power off when standby is asserted.
-4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
-
-partially needed  code is implemented here:
-  arch/arm/mach-imx/pm-imx6.c
-...
-         case STOP_POWER_OFF:
-                 val |= 0x2 << BP_CLPCR_LPM;
-                 val |= 0x3 << BP_CLPCR_STBY_COUNT;
-                 val |= BM_CLPCR_VSTBY;
-                 val |= BM_CLPCR_SBYOS;
-....
-but used only for PM_SUSPEND_MEM and never for pm_power_off.
-
-do i miss some thing, or are there any patches floating around?
-If it is not implemented jet and no one is working on this i would do it.
-I assume it should be configurable over device tree. Correct?
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
