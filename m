@@ -1,11 +1,11 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Mar 2017 19:26:39 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Mar 2017 19:26:40 +0100
 Subject: [PATCH v3 4/8] arm64: efi: clean up Image header after PE header
  has been split off
 In-Reply-To: <20170323190051.14882-5-ard.biesheuvel@linaro.org>
 References: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
  <20170323190051.14882-5-ard.biesheuvel@linaro.org>
-Message-ID: <20170330182636.GG14608@arm.com>
+Message-ID: <20170330182640.GC8062@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,16 +22,17 @@ On Thu, Mar 23, 2017 at 07:00:47PM +0000, Ard Biesheuvel wrote:
 > No changes to the resulting binary image are intended.
 > 
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
 >  arch/arm64/kernel/head.S | 12 +++---------
 >  1 file changed, 3 insertions(+), 9 deletions(-)
-
-Seems to do the right thing:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
+> 
 > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
 > index c1977bed01db..6d49e716bf40 100644
 > --- a/arch/arm64/kernel/head.S
