@@ -1,85 +1,39 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 17:45:08 +0200
-Subject: [PATCH v4 2/4] mvebu: xp: Add PWM properties to .dtsi files
-In-Reply-To: <20170327194301.1104-3-ralph.sennhauser@gmail.com> (Ralph
- Sennhauser's message of "Mon, 27 Mar 2017 21:42:58 +0200")
-References: <20170327194301.1104-1-ralph.sennhauser@gmail.com>
- <20170327194301.1104-3-ralph.sennhauser@gmail.com>
-Message-ID: <87wpb693az.fsf@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Mar 2017 17:46:10 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.12 (#1)
+In-Reply-To: <87lgrubncr.fsf@free-electrons.com>
+References: <87lgrubncr.fsf@free-electrons.com>
+Message-ID: <CAK8P3a18XD9xiuY4fdiTRXHf_g3Jy7kJxmHo29wOdONYcL6Okw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph,
- 
- On lun., mars 27 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
-
-The title should start by ARM: dts: mvebu:
-
-If there is no need to have a v5 then I wil take care of modifying the
-title while applying it.
-
-
-> From: Andrew Lunn <andrew@lunn.ch>
+On Fri, Mar 24, 2017 at 6:23 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi,
 >
-> Add properties to the GPIO nodes to allow them to be also used as PWM
-> lines.
+> Here is the first pull request for defconfig64 for mvebu for v4.12.
 >
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> URL: https://patchwork.ozlabs.org/patch/427294/
-> [Ralph Sennhauser:
->   * Use new compatible string marvell,armada-370-xp-gpio
->   * Add missing reg-names / #pwm-cell properties to armada-xp-mv78260.dtsi
->     'gpio1' node]
-> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> ---
->  arch/arm/boot/dts/armada-370.dtsi        | 16 +++++++++++-----
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 14 ++++++++++----
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 16 +++++++++++-----
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi | 16 +++++++++++-----
->  4 files changed, 43 insertions(+), 19 deletions(-)
+> Gregory
 >
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index cc011c8..e30b076 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -137,29 +137,35 @@
->  			};
->  
->  			gpio0: gpio at 18100 {
-> -				compatible = "marvell,orion-gpio";
-> -				reg = <0x18100 0x40>;
-> +				compatible = "marvell,armada-370-xp-gpio";
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.12-1
+>
+> for you to fetch changes up to 66e56302842e9971426bd7e504c4db4f88cbb037:
+>
+>   arm64: defconfig: enable MVPP2 (2017-03-23 17:50:13 +0100)
+>
+> ----------------------------------------------------------------
+> mvebu defconfig64 for 4.12 (part 1)
+>
+> Update arm64 defconfig by adding MVPP2 for Marvell Armada 7K/8K and
+> MVNETA and I2C_PXA for Armada 37xx.
+>
 
-I think we should keep the "marvell,orion-gpio" too because the hardware
-is still compatible with it. Morever it will allow to use a recent dtb
-with an old kernel.
+Pulled into next/arm64, thanks!
 
-
-> +				reg = <0x18100 0x40>, <0x181c0 0x08>;
-> +				reg-names = "gpio", "pwm";
->  				ngpios = <32>;
->  				gpio-controller;
->  				#gpio-cells = <2>;
-> +				#pwm-cells = <2>;
->  				interrupt-controller;
->  				#interrupt-cells = <2>;
->  				interrupts = <82>, <83>, <84>, <85>;
-> +				clocks = <&coreclk 0>;
->  			};
->  
->  			gpio1: gpio at 18140 {
-> -				compatible = "marvell,orion-gpio";
-> -				reg = <0x18140 0x40>;
-> +				compatible = "marvell,armada-370-xp-gpio";
-
-Same here and for all the others...
-
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+      Arnd
