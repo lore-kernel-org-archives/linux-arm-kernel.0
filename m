@@ -1,194 +1,69 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:13 +0800
-Subject: [PATCH v3 4/8] APEI: GHES: reserve a virtual page for SEI context
-In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-14-git-send-email-xiexiuqi@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 30 Mar 2017 12:46:17 +0100
+Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+In-Reply-To: <bd77ea57-96a8-bbc4-8184-9ddfd443f3c6@samsung.com>
+References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
+ <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
+ <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
+ <073f1feb-d6da-c93f-8e67-0910befec27b@samsung.com>
+ <c13f6475-f503-238f-c101-4f9cdf1b0ae2@arm.com>
+ <45fde94b-9487-c28e-9d4e-3b36c4b4a934@samsung.com>
+ <CAMuHMdWkOdAD=d0DAy7cJTHcQc7oq5HVDvTNtjfQETMynx1_+g@mail.gmail.com>
+ <8dcbb0b3-dd13-d2b3-90f5-64b900d67778@samsung.com>
+ <41097b2c-9bbc-31e4-d17d-8c3f638ec1a6@arm.com>
+ <bd77ea57-96a8-bbc4-8184-9ddfd443f3c6@samsung.com>
+Message-ID: <868d0c3c-6b85-0709-1686-66b484ede46d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64 platform, SEI may interrupt code which had interrupts masked.
-But SEI could be masked, so it's not treated as NMI, however SEA is
-treated as NMI.
+On 30/03/17 12:16, Andrzej Hajda wrote:
+[...]
+>>>>> I guess Geert's proposition to create pages permanently is also not
+>>>>> acceptable[2]. So how to fix crashes which appeared after patch adding
+>>>> If I'm not mistaken, creating the pages permanently is what the
+>>>> !DMA_ATTR_FORCE_CONTIGUOUS does? The only difference is where
+>>>> the underlying memory is allocated from.
+>>>>
+>>>> Am I missing something?
+>>> Quoting Robin from his response:
+>>>> in general is is not
+>>>> safe to assume a coherent allocation is backed by struct pages at all
+>>> As I said before I am not familiar with the subject, so it is possible I
+>>> misunderstood something.
+>> That's from the perspective of external callers of
+>> dma_alloc_coherent()/dma_alloc_attrs(), wherein
+>> dma_alloc_from_coherent() may have returned device-specific memory
+>> without calling into the arch dma_map_ops implementation. Internal to
+>> the arm64 implementation, however, everything *we* allocate comes from
+>> either CMA or the normal page allocator, so should always be backed by
+>> real kernel pages.
+>>
+>> Robin.
+> 
+> 
+> OK, so what do you exactly mean by "The general point still stands", my
+> patch fixes handling of allocations made internally?
 
-So, the  memory area used to transfer hardware error information from
-BIOS to Linux can be determined only in NMI, SEI(arm64), IRQ or timer
-handler.
+That since FORCE_CONTIGUOUS allocations always come from CMA, you can
+let the existing CMA-based implementations handle them just by fixing up
+dma_addr appropriately.
 
-In this patch, we add a virtual page for SEI context.
+> Anyway as I understand approach "creating the pages permanently" in
+> __iommu_alloc_attrs is OK. Is it worth to create patch adding it? It
+> should solve the issue as well and also looks saner (for me).
 
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
----
- drivers/acpi/apei/ghes.c | 98 +++++++++++++++++++++++-------------------------
- 1 file changed, 47 insertions(+), 51 deletions(-)
+Sure, you *could* - there's nothing technically wrong with that other
+than violating a strict interpretation of the iommu-dma API
+documentation if you pass it into iommu_dma_mmap() - it's just that the
+only point of using the pages array here in the first place is to cover
+the general case where an allocation might not be physically contiguous.
+If you have a guarantee that a given allocation definitely *is* both
+physically and virtually contiguous, then that's a bunch of extra work
+you simply have no need to do.
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 045d101..b1f9b1f 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -108,26 +108,33 @@
- 
- /*
-  * Because the memory area used to transfer hardware error information
-- * from BIOS to Linux can be determined only in NMI, IRQ or timer
-- * handler, but general ioremap can not be used in atomic context, so
-- * a special version of atomic ioremap is implemented for that.
-+ * from BIOS to Linux can be determined only in NMI, SEI (ARM64), IRQ or
-+ * timer handler, but general ioremap can not be used in atomic context,
-+ * so a special version of atomic ioremap is implemented for that.
-  */
- 
- /*
-- * Two virtual pages are used, one for IRQ/PROCESS context, the other for
-- * NMI context (optionally).
-+ * 3 virtual pages are used, one for IRQ/PROCESS context, one for SEI
-+ * (on ARM64 platform), and the other for NMI context (optionally).
-  */
-+#ifdef CONFIG_ACPI_APEI_SEI
-+#define GHES_IOREMAP_PAGES           3
-+#define GHES_IOREMAP_SEI_PAGE(base)	((base) + PAGE_SIZE*2)
-+#else
- #define GHES_IOREMAP_PAGES           2
-+#endif
-+
- #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
- #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
- 
- /* virtual memory area for atomic ioremap */
- static struct vm_struct *ghes_ioremap_area;
- /*
-- * These 2 spinlock is used to prevent atomic ioremap virtual memory
-+ * These 3 spinlock is used to prevent atomic ioremap virtual memory
-  * area from being mapped simultaneously.
-  */
- static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
-+static DEFINE_SPINLOCK(ghes_ioremap_lock_sei);
- static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
- 
- static struct gen_pool *ghes_estatus_pool;
-@@ -155,54 +162,55 @@ static void ghes_ioremap_exit(void)
- 	free_vm_area(ghes_ioremap_area);
- }
- 
--static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
-+static void __iomem *ghes_ioremap_pfn(u64 pfn)
- {
--	unsigned long vaddr;
-+	unsigned long vaddr, flags = 0;
- 	phys_addr_t paddr;
- 	pgprot_t prot;
- 
--	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
--
--	paddr = pfn << PAGE_SHIFT;
--	prot = arch_apei_get_mem_attribute(paddr);
--	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
--
--	return (void __iomem *)vaddr;
--}
--
--static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
--{
--	unsigned long vaddr, paddr;
--	pgprot_t prot;
--
--	vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
-+	if (in_nmi()) {
-+		raw_spin_lock(&ghes_ioremap_lock_nmi);
-+		vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
-+	} else if (this_cpu_read(sei_in_process)) {
-+		spin_lock_irqsave(&ghes_ioremap_lock_sei, flags);
-+		vaddr = (unsigned long)GHES_IOREMAP_SEI_PAGE(ghes_ioremap_area->addr);
-+	} else {
-+		spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
-+		vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
-+	}
- 
- 	paddr = pfn << PAGE_SHIFT;
- 	prot = arch_apei_get_mem_attribute(paddr);
--
- 	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
- 
- 	return (void __iomem *)vaddr;
- }
- 
--static void ghes_iounmap_nmi(void __iomem *vaddr_ptr)
-+static void ghes_iounmap(void __iomem *vaddr_ptr)
- {
- 	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
- 	void *base = ghes_ioremap_area->addr;
-+	unsigned long page, flags = 0;
-+
-+	if (in_nmi()) {
-+		page = (unsigned long)GHES_IOREMAP_NMI_PAGE(base);
-+	} else if (this_cpu_read(sei_in_process)) {
-+		page = (unsigned long)GHES_IOREMAP_SEI_PAGE(base);
-+	} else {
-+		page = (unsigned long)GHES_IOREMAP_IRQ_PAGE(base);
-+	}
- 
--	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_NMI_PAGE(base));
-+	BUG_ON(vaddr != page);
- 	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
- 	arch_apei_flush_tlb_one(vaddr);
--}
--
--static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
--{
--	unsigned long vaddr = (unsigned long __force)vaddr_ptr;
--	void *base = ghes_ioremap_area->addr;
- 
--	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_IRQ_PAGE(base));
--	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
--	arch_apei_flush_tlb_one(vaddr);
-+	if (in_nmi()) {
-+		raw_spin_unlock(&ghes_ioremap_lock_nmi);
-+	} else if (this_cpu_read(sei_in_process)) {
-+		spin_unlock_irqrestore(&ghes_ioremap_lock_sei, flags);
-+	} else {
-+		spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
-+	}
- }
- 
- static int ghes_estatus_pool_init(void)
-@@ -327,20 +335,13 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 				  int from_phys)
- {
- 	void __iomem *vaddr;
--	unsigned long flags = 0;
--	int in_nmi = in_nmi();
- 	u64 offset;
- 	u32 trunk;
- 
- 	while (len > 0) {
- 		offset = paddr - (paddr & PAGE_MASK);
--		if (in_nmi) {
--			raw_spin_lock(&ghes_ioremap_lock_nmi);
--			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
--		} else {
--			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
--			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
--		}
-+		vaddr = ghes_ioremap_pfn(paddr >> PAGE_SHIFT);
-+
- 		trunk = PAGE_SIZE - offset;
- 		trunk = min(trunk, len);
- 		if (from_phys)
-@@ -350,13 +351,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 		len -= trunk;
- 		paddr += trunk;
- 		buffer += trunk;
--		if (in_nmi) {
--			ghes_iounmap_nmi(vaddr);
--			raw_spin_unlock(&ghes_ioremap_lock_nmi);
--		} else {
--			ghes_iounmap_irq(vaddr);
--			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
--		}
-+
-+		ghes_iounmap(vaddr);
- 	}
- }
- 
--- 
-1.8.3.1
+If you do want to go down that route, then I would much rather we fix
+dma_common_contiguous_remap() to leave a valid array in area->pages in
+the first place, than be temporarily faking them up around individual calls.
+
+Robin.
