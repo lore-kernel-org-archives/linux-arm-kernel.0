@@ -1,23 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Mar 2017 19:29:42 +0100
-Subject: [PATCH] arm64: drop non-existing vdso-offsets.h from .gitignore
-In-Reply-To: <1490895857-26856-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1490895857-26856-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170330182941.GB16364@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Mar 2017 19:29:43 +0100
+Subject: [PATCH v3 8/8] arm64: efi: split Image code and data into
+ separate PE/COFF sections
+In-Reply-To: <20170323190051.14882-9-ard.biesheuvel@linaro.org>
+References: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
+ <20170323190051.14882-9-ard.biesheuvel@linaro.org>
+Message-ID: <20170330182943.GD8062@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 02:44:17AM +0900, Masahiro Yamada wrote:
-> Since commit a66649dab350 ("arm64: fix vdso-offsets.h dependency"),
-> include/generated/vdso-offsets.h is directly generated without
-> arch/arm64/kernel/vdso/vdso-offsets.h.
+On Thu, Mar 23, 2017 at 07:00:51PM +0000, Ard Biesheuvel wrote:
+> To prevent unintended modifications to the kernel text (malicious or
+> otherwise) while running the EFI stub, describe the kernel image as
+> two separate sections: a .text section with read-execute permissions,
+> covering .text, .rodata and .init.text, and a .data section with
+> read-write permissions, covering .init.data, .data and .bss.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> This relies on the firmware to actually take the section permission
+> flags into account, but this is something that is currently being
+> implemented in EDK2, which means we will likely start seeing it in
+> the wild between one and two years from now.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
+>  arch/arm64/kernel/efi-header.S  | 23 +++++++++++++++-----
+>  arch/arm64/kernel/vmlinux.lds.S |  2 ++
+>  2 files changed, 20 insertions(+), 5 deletions(-)
 > 
->  arch/arm64/kernel/vdso/.gitignore | 1 -
->  1 file changed, 1 deletion(-)
-
-Thanks, queued as a fix.
-
-Will
+> diff --git a/arch/arm64/kernel/efi-header.S b/arch/arm64/kernel/efi-header.S
+> index 7637226ea9ca..613fc3000677 100644
+> --- a/arch/arm64/kernel/efi-header.S
+> +++ b/arch/arm64/kernel/efi-header.S
+> @@ -27,8 +27,8 @@ optional_header:
+>  	.short	PE_OPT_MAGIC_PE32PLUS			// PE32+ format
+>  	.byte	0x02					// MajorLinkerVersion
+>  	.byte	0x14					// MinorLinkerVersion
+> -	.long	_end - efi_header_end			// SizeOfCode
+> -	.long	0					// SizeOfInitializedData
+> +	.long	__initdata_begin - efi_header_end	// SizeOfCode
+> +	.long	__pecoff_data_size			// SizeOfInitializedData
+>  	.long	0					// SizeOfUninitializedData
+>  	.long	__efistub_entry - _head			// AddressOfEntryPoint
+>  	.long	efi_header_end - _head			// BaseOfCode
+> @@ -74,9 +74,9 @@ extra_header_fields:
+>  	// Section table
+>  section_table:
+>  	.ascii	".text\0\0\0"
+> -	.long	_end - efi_header_end			// VirtualSize
+> +	.long	__initdata_begin - efi_header_end	// VirtualSize
+>  	.long	efi_header_end - _head			// VirtualAddress
+> -	.long	_edata - efi_header_end			// SizeOfRawData
+> +	.long	__initdata_begin - efi_header_end	// SizeOfRawData
+>  	.long	efi_header_end - _head			// PointerToRawData
+>  
+>  	.long	0					// PointerToRelocations
+> @@ -84,7 +84,20 @@ section_table:
+>  	.short	0					// NumberOfRelocations
+>  	.short	0					// NumberOfLineNumbers
+>  	.long	IMAGE_SCN_CNT_CODE | \
+> -		IMAGE_SCN_MEM_EXECUTE | \
+> +		IMAGE_SCN_MEM_READ | \
+> +		IMAGE_SCN_MEM_EXECUTE			// Characteristics
+> +
+> +	.ascii	".data\0\0\0"
+> +	.long	__pecoff_data_size			// VirtualSize
+> +	.long	__initdata_begin - _head		// VirtualAddress
+> +	.long	__pecoff_data_rawsize			// SizeOfRawData
+> +	.long	__initdata_begin - _head		// PointerToRawData
+> +
+> +	.long	0					// PointerToRelocations
+> +	.long	0					// PointerToLineNumbers
+> +	.short	0					// NumberOfRelocations
+> +	.short	0					// NumberOfLineNumbers
+> +	.long	IMAGE_SCN_CNT_INITIALIZED_DATA | \
+>  		IMAGE_SCN_MEM_READ | \
+>  		IMAGE_SCN_MEM_WRITE			// Characteristics
+>  
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 2c93d259046c..987a00ee446c 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -213,6 +213,7 @@ SECTIONS
+>  	}
+>  
+>  	PECOFF_EDATA_PADDING
+> +	__pecoff_data_rawsize = ABSOLUTE(. - __initdata_begin);
+>  	_edata = .;
+>  
+>  	BSS_SECTION(0, 0, 0)
+> @@ -228,6 +229,7 @@ SECTIONS
+>  	. += RESERVED_TTBR0_SIZE;
+>  #endif
+>  
+> +	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+>  	_end = .;
+>  
+>  	STABS_DEBUG
+> -- 
+> 2.9.3
+> 
