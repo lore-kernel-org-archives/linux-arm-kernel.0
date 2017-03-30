@@ -1,78 +1,47 @@
-From: colin.king@canonical.com (Colin King)
-Date: Thu, 30 Mar 2017 10:34:03 +0100
-Subject: [PATCH] staging: bcm2835-camera: fix spelling mistake: "elementry" ->
- "elementary"
-Message-ID: <20170330093403.18879-1-colin.king@canonical.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 30 Mar 2017 10:34:01 +0100
+Subject: [kernel-hardening] [RFC v2][PATCH 02/11] lkdtm: add test for
+ rare_write() infrastructure
+In-Reply-To: <1490811363-93944-3-git-send-email-keescook@chromium.org>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-3-git-send-email-keescook@chromium.org>
+Message-ID: <1490866441.10874.44.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Wed, 2017-03-29 at 11:15 -0700, Kees Cook wrote:
+> diff --git a/drivers/misc/lkdtm_perms.c b/drivers/misc/lkdtm_perms.c
+> index c7635a79341f..8fbadfa4cc34 100644
+> --- a/drivers/misc/lkdtm_perms.c
+> +++ b/drivers/misc/lkdtm_perms.c
+> [...]
+> +/* This is marked __wr_rare, so it should ultimately be .rodata. */
+> +static unsigned long wr_rare __wr_rare = 0xAA66AA66;
+> [...]
+> +void lkdtm_WRITE_RARE_WRITE(void)
+> +{
+> +	/* Explicitly cast away "const" for the test. */
 
-trivial fix to spelling mistake in various comments and pr_debug messages
+wr_rare isn't actually declared const above though? I don't think
+__wr_rare includes a const, apologies if I missed it.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h   | 2 +-
- drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 6 +++---
- drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+OOI, if wr_rare _were_ const then can the compiler optimise the a pair
+of reads spanning the rare_write? i.e. adding const to the declaration
+above to get:
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h b/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h
-index bf3d1f3f2c53..52cdf4da1b47 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-msg.h
-@@ -160,7 +160,7 @@ struct mmal_msg_port_info_get_reply {
- 	s32 found;             /* unused */
- 	u32 port_handle;               /**< Handle to use for this port */
- 	struct mmal_port port;
--	struct mmal_es_format format; /* elementry stream format */
-+	struct mmal_es_format format; /* elementary stream format */
- 	union mmal_es_specific_format es; /* es type specific data */
- 	u8 extradata[MMAL_FORMAT_EXTRADATA_MAX_SIZE]; /* es extra data */
- };
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-index ccb2ee547055..4360db6d4392 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-@@ -906,7 +906,7 @@ static void dump_port_info(struct vchiq_mmal_port *port)
- 		 port->current_buffer.num,
- 		 port->current_buffer.size, port->current_buffer.alignment);
- 
--	pr_debug("elementry stream: type:%d encoding:0x%x variant:0x%x\n",
-+	pr_debug("elementary stream: type:%d encoding:0x%x variant:0x%x\n",
- 		 port->format.type,
- 		 port->format.encoding, port->format.encoding_variant);
- 
-@@ -970,7 +970,7 @@ static int port_info_set(struct vchiq_mmal_instance *instance,
- 
- 	port_to_mmal_msg(port, &m.u.port_info_set.port);
- 
--	/* elementry stream format setup */
-+	/* elementary stream format setup */
- 	m.u.port_info_set.format.type = port->format.type;
- 	m.u.port_info_set.format.encoding = port->format.encoding;
- 	m.u.port_info_set.format.encoding_variant =
-@@ -1079,7 +1079,7 @@ static int port_info_get(struct vchiq_mmal_instance *instance,
- 	port->format.bitrate = rmsg->u.port_info_get_reply.format.bitrate;
- 	port->format.flags = rmsg->u.port_info_get_reply.format.flags;
- 
--	/* elementry stream format */
-+	/* elementary stream format */
- 	memcpy(&port->es,
- 	       &rmsg->u.port_info_get_reply.es,
- 	       sizeof(union mmal_es_specific_format));
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h
-index 5140b330325e..63db053532bf 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.h
-@@ -75,7 +75,7 @@ struct vchiq_mmal_port {
- 
- 	/* stream format */
- 	struct mmal_es_format_local format;
--	/* elementry stream format */
-+	/* elementary stream format */
- 	union mmal_es_specific_format es;
- 
- 	/* data buffers to fill */
--- 
-2.11.0
+    static const unsigned long wr_rare __wr_rare = 0xAA66AA66;
+x = wr_read;
+rare_write(x, 0xf000baaa);
+y = wr_read;
+
+Is it possible that x == y == 0xaa66aa66 because gcc realises the x and
+y came from the same const location? Have I missed a clobber somewhere
+(I can't actually find a definition of __arch_rare_write_memcpy in this
+series so maybe it's there), or is such code expected to always cast
+away the const first?
+
+I suppose such constructs are rare in practice in the sorts of places
+where rare_write is appropriate, but with aggressive inlining it could
+occur as an unexpected trap for the unwary perhaps.
+
+Ian.
