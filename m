@@ -1,31 +1,36 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 30 Mar 2017 17:27:46 +0200
-Subject: [PATCH v2 7/8] ARM: configs: stm32: STMPE1600 GPIO expander
+Date: Thu, 30 Mar 2017 17:27:47 +0200
+Subject: [PATCH v2 8/8] ARM: configs: stm32: DCMI + OV2640 camera support
 In-Reply-To: <1490887667-8880-1-git-send-email-hugues.fruchet@st.com>
 References: <1490887667-8880-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1490887667-8880-8-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1490887667-8880-9-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable STMPE1600 GPIO expander.
+Enable DCMI camera interface and OV2640 camera sensor drivers.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/stm32_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index a9d8e3c..84adc88 100644
+index 84adc88..3f2e4ce 100644
 --- a/arch/arm/configs/stm32_defconfig
 +++ b/arch/arm/configs/stm32_defconfig
-@@ -49,6 +49,8 @@ CONFIG_SERIAL_STM32_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
- CONFIG_REGULATOR=y
-+CONFIG_GPIO_STMPE=y
-+CONFIG_MFD_STMPE=y
+@@ -53,6 +53,13 @@ CONFIG_GPIO_STMPE=y
+ CONFIG_MFD_STMPE=y
  CONFIG_REGULATOR_FIXED_VOLTAGE=y
  # CONFIG_USB_SUPPORT is not set
++CONFIG_VIDEO_V4L2=y
++CONFIG_MEDIA_SUBDRV_AUTOSELECT=n
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_VIDEO_STM32_DCMI=y
++CONFIG_VIDEO_OV2640=y
  CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
 -- 
 1.9.1
