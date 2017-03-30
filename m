@@ -1,71 +1,67 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 30 Mar 2017 08:59:31 +0530
-Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset data
- to device tree
-In-Reply-To: <20170329043753.GB1596@localhost.localdomain>
-References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
- <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
- <20170323205256.GO10760@atomide.com>
- <a410d37f-92e5-39b4-ac6c-158673163cb0@ti.com>
- <20170324142610.GX10760@atomide.com>
- <20170329043753.GB1596@localhost.localdomain>
-Message-ID: <5380b1bc-f3c6-a0ef-e458-7509d95d631e@ti.com>
+From: majun258@huawei.com (majun (Euler7))
+Date: Thu, 30 Mar 2017 12:08:39 +0800
+Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <58DC7674.8020301@linaro.org>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
+ <20170329101400.GA10807@red-moon> <58DBA010.1020002@linaro.org>
+ <20170329123821.GA10988@red-moon> <58DBAFD6.7070300@linaro.org>
+ <d620f35e-f335-bab5-49e0-a92375e00ea5@arm.com>
+ <20170329161354.GC11297@red-moon> <20170329173243.GA6091@red-moon>
+ <58DC7674.8020301@linaro.org>
+Message-ID: <58DC84C7.5050608@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all:
 
-
-On Wednesday 29 March 2017 10:07 AM, Eduardo Valentin wrote:
-> Keerthy,
-> 
-> On Fri, Mar 24, 2017 at 07:26:10AM -0700, Tony Lindgren wrote:
->> * Keerthy <j-keerthy@ti.com> [170323 20:29]:
->>>
->>>
->>> On Friday 24 March 2017 02:22 AM, Tony Lindgren wrote:
->>>> * Keerthy <j-keerthy@ti.com> [170321 20:45]:
->>>>>
->>>>>
->>>>> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
->>>>>> Currently the slope and offset values for calculating the
->>>>>> hot spot temperature of a particular thermal zone is part
->>>>>> of driver data. Pass them here instead and obtain the values
->>>>>> while of node parsing.
->>>>>>
->>>>>> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
-> 
-> Have you tried on boards that need negative coefficients?
-> 
-> https://patchwork.kernel.org/patch/9619577/
-
-Yes. I retrieved the negative values nicely in the driver passed via
-Device Tree.
-
-> 
->>>>>
->>>>> Hi Eduardo,
->>>>>
->>>>> If the series looks okay could you please pull this?
+? 2017/3/30 11:07, Hanjun Guo ??:
+> On 03/30/2017 01:32 AM, Lorenzo Pieralisi wrote:
+>> On Wed, Mar 29, 2017 at 05:13:54PM +0100, Lorenzo Pieralisi wrote:
+>>> On Wed, Mar 29, 2017 at 03:52:47PM +0100, Marc Zyngier wrote:
+>>>> On 29/03/17 14:00, Hanjun Guo wrote:
+>>>>> On 03/29/2017 08:38 PM, Lorenzo Pieralisi wrote:
+>>>>>> On Wed, Mar 29, 2017 at 07:52:48PM +0800, Hanjun Guo wrote:
+>>>>>>> Hi Lorenzo,
+>>>>>>>
+>>>>>>> On 03/29/2017 06:14 PM, Lorenzo Pieralisi wrote:
+>>>>>>>> Hi Hanjun, Marc,
+>>>>>>>>
+>>>>>>>> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
+> [...]
+>>>>>>>>>    drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
+>>>>>>>>>    drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
+[...]
 >>>>
->>>> Also.. Are the dts changes safe for me to pick separately?
+>>>> Thoughts?
 >>>
->>> Yes Tony they are safe to pulled separately.
+>>> Perfect for me. Hanjun, I can cherry pick Marc's patch above, rework
+>>> this patch and post the resulting branch for everyone to have a final
+>>> test.
 >>
->> OK applying patches 1 - 5 of this series into omap-for-v4.12/dt-v2.
+>> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/arm64-acpi-4.12
+>>
+>> Please have a look and let me know if that's ok, I planned to send
+>> a PR to Catalin by the end of the week (first 7 patches up to
+>> 7fc3061df075 ("ACPI: platform: setup MSI domain for ACPI based platform
+>> device")).
 > 
-> Keerthy,
+> Perfect for me too, Lorenzo, Marc, Thank you very much.
 > 
-> The only thing I want you to confirm is if you are really getting the
-> negative coefficients, because currently of-thermal reads the array
-> using an OF helper that understands only unsigned. For this reason, I
-> will be queueing your patches only for next merge window, not as a fix,
-> not for rc's.
+> I'm currently in paternity leave and can't reach the machine,
+> I had a detail review with the patches, they looks good to me,
+> Ma Jun and Wei Xu will test on Hisilicon machines and give the
+> feedback.
 
-I am getting negative co-efficients.
+The sas/xge/uart are working fine on my hisilicon board with
+Lorenzo's branch (arm64-acpi-4.12)
+
+Thanks
+Majun
 
 > 
+> Thanks
+> Hanjun
 > 
->>
->> Thanks,
->>
->> Tony
+> .
+> 
