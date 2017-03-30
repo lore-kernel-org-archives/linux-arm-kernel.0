@@ -1,83 +1,49 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 30 Mar 2017 15:29:46 +0530
-Subject: [RFC PATCH 2/2] of/pci: call pci specific dma-ranges instead of
- memory-mapped.
-In-Reply-To: <1490867986-5675-1-git-send-email-oza.oza@broadcom.com>
-References: <1490867986-5675-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1490867986-5675-2-git-send-email-oza.oza@broadcom.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 30 Mar 2017 12:00:27 +0200
+Subject: [PATCH V1 1/1] mtd: mtk-nor: set controller to 4B mode with large
+ capacity flash
+In-Reply-To: <1490862222-723-2-git-send-email-guochun.mao@mediatek.com>
+References: <1490862222-723-1-git-send-email-guochun.mao@mediatek.com>
+ <1490862222-723-2-git-send-email-guochun.mao@mediatek.com>
+Message-ID: <9d3a292b-8298-81ec-a049-b021616f1ddf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-it is possible that PCI device supports 64-bit DMA addressing,
-and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
-however PCI host bridge may have limitations on the inbound
-transaction addressing. As an example, consider NVME SSD device
-connected to iproc-PCIe controller.
+On 03/30/2017 10:23 AM, Guochun Mao wrote:
+> when nor's size larger than 16MByte, nor and controller should
+> enter 4Byte mode simultaneously.
+> 
+> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> ---
+>  drivers/mtd/spi-nor/mtk-quadspi.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+> index e661877..05cd8a8 100644
+> --- a/drivers/mtd/spi-nor/mtk-quadspi.c
+> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+> @@ -369,6 +369,13 @@ static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
+>  		/* We only handle 1 byte */
+>  		ret = mt8173_nor_wr_sr(mt8173_nor, *buf);
+>  		break;
+> +	case SPINOR_OP_EN4B:
+> +		/* Set nor controller to 4-byte address mode,
+> +		 * and simultaneously set nor flash.
+> +		 * This case should cooperate with default operation.
+> +		 */
+> +		writeb(readb(mt8173_nor->base + MTK_NOR_DUAL_REG) | 0x10,
+> +				mt8173_nor->base + MTK_NOR_DUAL_REG);
 
-Currently, the IOMMU DMA ops only considers PCI device dma_mask
-when allocating an IOVA. This is particularly problematic on
-ARM/ARM64 SOCs where the IOMMU (i.e. SMMU) translates IOVA to
-PA for in-bound transactions only after PCI Host has forwarded
-these transactions on SOC IO bus. This means on such ARM/ARM64
-SOCs the IOVA of in-bound transactions has to honor the addressing
-restrictions of the PCI Host.
+And what happens on READ then ? Who clears that bit when protocol
+changes ? You probably want something like cqspi_set_protocol()
+instead, which is invoked from {read,write}{,_reg}() and erase().
 
-this patch calls pci specific of_pci_dma_get_ranges, instead of
-calling memory-mapped one, which returns wrong size and also
-not meant for PCI world.
+>  	default:
+>  		ret = mt8173_nor_do_tx_rx(mt8173_nor, opcode, buf, len, NULL, 0);
+>  		if (ret)
+> 
 
-with this, it gets accurate resources back, and largest possible
-inbound window size. with that largest possible dma_mask can be
-generated.
 
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index b1e6beb..d6a8dde 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -9,6 +9,7 @@
- #include <linux/module.h>
- #include <linux/mod_devicetable.h>
- #include <linux/slab.h>
-+#include <linux/of_pci.h>
- 
- #include <asm/errno.h>
- #include "of_private.h"
-@@ -89,6 +90,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	bool coherent;
- 	unsigned long offset;
- 	const struct iommu_ops *iommu;
-+	struct resource_entry *window;
-+	LIST_HEAD(res);
- 
- 	/*
- 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-@@ -104,7 +107,24 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
- 
--	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-+	if (dev_is_pci(dev)) {
-+		size = 0;
-+		ret = of_pci_get_dma_ranges(np, &res);
-+		if (!ret) {
-+			resource_list_for_each_entry(window, &res) {
-+				struct resource *res_dma = window->res;
-+				if (size < resource_size(res_dma)) {
-+					dma_addr = res_dma->start - window->offset;
-+					paddr = res_dma->start;
-+					size = resource_size(res_dma);
-+				}
-+			}
-+		}
-+		pci_free_resource_list(&res);
-+	}
-+	else
-+		ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-+
- 	if (ret < 0) {
- 		dma_addr = offset = 0;
- 		size = dev->coherent_dma_mask + 1;
 -- 
-1.9.1
+Best regards,
+Marek Vasut
