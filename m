@@ -1,70 +1,66 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 30 Mar 2017 18:14:49 +0200
-Subject: [PATCH v4 2/4] mvebu: xp: Add PWM properties to .dtsi files
-In-Reply-To: <87wpb693az.fsf@free-electrons.com>
-References: <20170327194301.1104-1-ralph.sennhauser@gmail.com>
- <20170327194301.1104-3-ralph.sennhauser@gmail.com>
- <87wpb693az.fsf@free-electrons.com>
-Message-ID: <20170330181449.27508830@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 30 Mar 2017 09:16:29 -0700
+Subject: [kernel-hardening] [RFC v2][PATCH 02/11] lkdtm: add test for
+ rare_write() infrastructure
+In-Reply-To: <1490866441.10874.44.camel@hellion.org.uk>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-3-git-send-email-keescook@chromium.org>
+ <1490866441.10874.44.camel@hellion.org.uk>
+Message-ID: <CAGXu5jLMKA3OwshsQn4yc1eXFwSuD3xbaYY56RY_Uu3TBAWG3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Mar 2017 17:45:08 +0200
-Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Thu, Mar 30, 2017 at 2:34 AM, Ian Campbell <ijc@hellion.org.uk> wrote:
+> On Wed, 2017-03-29 at 11:15 -0700, Kees Cook wrote:
+>> diff --git a/drivers/misc/lkdtm_perms.c b/drivers/misc/lkdtm_perms.c
+>> index c7635a79341f..8fbadfa4cc34 100644
+>> --- a/drivers/misc/lkdtm_perms.c
+>> +++ b/drivers/misc/lkdtm_perms.c
+>> [...]
+>> +/* This is marked __wr_rare, so it should ultimately be .rodata. */
+>> +static unsigned long wr_rare __wr_rare = 0xAA66AA66;
+>> [...]
+>> +void lkdtm_WRITE_RARE_WRITE(void)
+>> +{
+>> +     /* Explicitly cast away "const" for the test. */
+>
+> wr_rare isn't actually declared const above though? I don't think
+> __wr_rare includes a const, apologies if I missed it.
 
-> Hi Ralph,
->  
->  On lun., mars 27 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> wrote:
-> 
-> The title should start by ARM: dts: mvebu:
-> 
-> If there is no need to have a v5 then I wil take care of modifying the
-> title while applying it.
+Yeah, good point. I think this was a left-over from an earlier version
+where I'd forgotten about that detail.
 
-Noted.
+> OOI, if wr_rare _were_ const then can the compiler optimise the a pair
+> of reads spanning the rare_write? i.e. adding const to the declaration
+> above to get:
+>
+>     static const unsigned long wr_rare __wr_rare = 0xAA66AA66;
+> x = wr_read;
+> rare_write(x, 0xf000baaa);
+> y = wr_read;
+>
+> Is it possible that x == y == 0xaa66aa66 because gcc realises the x and
+> y came from the same const location? Have I missed a clobber somewhere
+> (I can't actually find a definition of __arch_rare_write_memcpy in this
+> series so maybe it's there), or is such code expected to always cast
+> away the const first?
+>
+> I suppose such constructs are rare in practice in the sorts of places
+> where rare_write is appropriate, but with aggressive inlining it could
+> occur as an unexpected trap for the unwary perhaps.
 
-> 
-> 
-> > From: Andrew Lunn <andrew@lunn.ch>
-> >
-> > Add properties to the GPIO nodes to allow them to be also used as
-> > PWM lines.
-> >
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > URL: https://patchwork.ozlabs.org/patch/427294/
-> > [Ralph Sennhauser:
-> >   * Use new compatible string marvell,armada-370-xp-gpio
-> >   * Add missing reg-names / #pwm-cell properties to
-> > armada-xp-mv78260.dtsi 'gpio1' node]
-> > Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/armada-370.dtsi        | 16 +++++++++++-----
-> >  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 14 ++++++++++----
-> >  arch/arm/boot/dts/armada-xp-mv78260.dtsi | 16 +++++++++++-----
-> >  arch/arm/boot/dts/armada-xp-mv78460.dtsi | 16 +++++++++++-----
-> >  4 files changed, 43 insertions(+), 19 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/armada-370.dtsi
-> > b/arch/arm/boot/dts/armada-370.dtsi index cc011c8..e30b076 100644
-> > --- a/arch/arm/boot/dts/armada-370.dtsi
-> > +++ b/arch/arm/boot/dts/armada-370.dtsi
-> > @@ -137,29 +137,35 @@
-> >  			};
-> >  
-> >  			gpio0: gpio at 18100 {
-> > -				compatible = "marvell,orion-gpio";
-> > -				reg = <0x18100 0x40>;
-> > +				compatible =
-> > "marvell,armada-370-xp-gpio";  
-> 
-> I think we should keep the "marvell,orion-gpio" too because the
-> hardware is still compatible with it. Morever it will allow to use a
-> recent dtb with an old kernel.
+Right, __wr_rare is actually marked as .data..ro_after_init, which gcc
+effectively ignores (thinking it's part of .data), but the linker
+script later movies this section into the read-only portion with
+.rodata. As a result, the compiler treats it as writable, but the
+storage location is actually read-only.
 
-And it will remain compatible. Apart from not collecting compatible
-strings there is no reason to drop them right now, so will add them back
-for a (possible) v5.
+(And, AIUI, the constify plugin makes things read-only in a similar
+way, though I think it's more subtle but still avoids the
+const-optimization dangers.)
 
-Thanks
-Ralph
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
