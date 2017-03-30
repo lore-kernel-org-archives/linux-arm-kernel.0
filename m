@@ -1,71 +1,62 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 30 Mar 2017 09:03:43 +0800
+Date: Thu, 30 Mar 2017 09:18:39 +0800
 Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
-In-Reply-To: <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
+In-Reply-To: <CAJ9a7VgsnFYpOGVjD4m7+EjFXkBoRqVR2F2Pgtn-T0NB+YP6tg@mail.gmail.com>
 References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
  <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
- <20170328165010.GA21937@linaro.org>
- <20170329015423.GA5035@leoy-linaro>
- <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
-Message-ID: <20170330010343.GA31843@leoy-linaro>
+ <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
+ <20170329030735.GA23889@leoy-linaro>
+ <CAJ9a7VgsnFYpOGVjD4m7+EjFXkBoRqVR2F2Pgtn-T0NB+YP6tg@mail.gmail.com>
+Message-ID: <20170330011839.GA939@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 03:56:23PM +0100, Mike Leach wrote:
+On Wed, Mar 29, 2017 at 04:17:19PM +0100, Mike Leach wrote:
 
 [...]
 
-> >> > +   /*
-> >> > +    * Unfortunately the CPU cannot be powered up, so return
-> >> > +    * back and later has no permission to access other
-> >> > +    * registers. For this case, should set 'idle_constraint'
-> >> > +    * to ensure CPU power domain is enabled!
-> >> > +    */
-> >> > +   if (!(drvdata->edprsr & EDPRSR_PU)) {
-> >> > +           pr_err("%s: power up request for CPU%d failed\n",
-> >> > +                   __func__, drvdata->cpu);
-> >> > +           goto out;
-> >> > +   }
-> >> > +
-> >> > +out_powered_up:
-> >> > +   debug_os_unlock(drvdata);
-> >> > +
-> >> > +   /*
-> >> > +    * At this point the CPU is powered up, so set the no powerdown
-> >> > +    * request bit so we don't lose power and emulate power down.
-> >> > +    */
-> >> > +   drvdata->edprsr = readl(drvdata->base + EDPRCR);
-> >> > +   drvdata->edprsr |= EDPRCR_COREPURQ | EDPRCR_CORENPDRQ;
+> >> >+out_powered_up:
+> >> >+    debug_os_unlock(drvdata);
 > >>
-> >> If we are here the core is already up.  Shouldn't we need to set
-> >> EDPRCR_CORENPDRQ only?
+> >> Question: Do we need a matching debug_os_lock() once we are done ?
 > >
-> > Yeah. Will fix.
+> > I have checked ARM ARMv8, but there have no detailed description for
+> > this. I refered coresight-etmv4 code and Mike's pseudo code, ther have
+> > no debug_os_lock() related operations.
+> >
+> > Mike, Mathieu, could you also help confirm this?
+> >
 > 
-> No - EDPRCR_COREPURQ and EDPRCR_CORENPDRQ have different semantics and purposes
+> Debug OS lock / unlock allows the power management code running on the
+> core to lock out the external debugger while the debug registers are
+> saved/restored during a core power event.
 > 
-> EDPRCR_COREPURQ is in the debug power domain an is tied to an external
-> debug request that should be an input to the external (to the PE)
-> system power controller.
-> The requirement is that the system power controller powers up the core
-> domain and does not power it down while it remains asserted.
+> e.g. A sequence such as this might occur in a correctly programmed system....
 > 
-> EDPRCR_CORENPDRQ is in the core power domain and thus to the specific
-> core only. This ensures that any power control software running on
-> that core should emulate a power down if this is set to one.
+> debug_os_lock()
+> save_debug_regs() // visible from core power domain - incl breakpoints etc
+> save_etm_regs()
+> ... // other stuff prior to core power down,
+> <power_down_core>
+> 
+> Followed by...
+> 
+> <power_up_core>
+> restore_etm_regs()
+> restore_debug_regs() // visible from core power domain - incl breakpoints etc
+> debug_os_unlock()
+> 
+> The value is 1 (locked) if cold resetting into AArch64 - it is
+> expected that some system software will set this to 0 as part of the
+> boot process.
+> The lock prevents write access to the external debug registers so we
+> need to clear it to set up the external debug registers we are using.
 
-I'm curious the exact meaning for "power control software".
+This description is conflict with upper restoring flows. During
+restore_debug_regs(), the os lock is locked so how it can write
+external debug register to restore context?
 
-Does it mean EDPRCR_CORENPDRQ should be checked by kernel or PSCI
-liked code in ARM trusted firmware to avoid to run CPU power off flow?
-
-Or will EDPRCR_CORENPDRQ assert CPU external signal to notify power
-controller so power controller emulate a power down?
-
-> We cannot know the power control design of the system, so the safe
-> solution is to set both bits.
-
-Thanks a lot for the suggestion. Will set both bits.
+> This suggests that it should be restored as we found it when done.
 
 Thanks,
 Leo Yan
