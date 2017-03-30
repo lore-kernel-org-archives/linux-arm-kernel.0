@@ -1,85 +1,143 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Wed, 29 Mar 2017 17:29:11 -0700
-Subject: [PATCH v3 3/6] bus: brcmstb_gisb: add notifier handling
+Date: Wed, 29 Mar 2017 17:29:10 -0700
+Subject: [PATCH v3 2/6] bus: brcmstb_gisb: correct support for 64-bit address
+ output
 In-Reply-To: <20170330002914.7371-1-opendmb@gmail.com>
 References: <20170330002914.7371-1-opendmb@gmail.com>
-Message-ID: <20170330002914.7371-4-opendmb@gmail.com>
+Message-ID: <20170330002914.7371-3-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for GISB arbitration errors through a chained notifier
-when a process dies or a kernel panic occurs.  This allows a
-meaningful GISB diagnostic message to occur along with other
-diagnostic information from the event.
+The GISB bus can support addresses beyond 32-bits.  So this commit
+corrects support for reading a captured 64-bit address into a 64-bit
+variable by obtaining the high bits from the ARB_ERR_CAP_HI_ADDR
+register (when present) and then outputting the full 64-bit value.
 
+It also removes unused definitions.
+
+Fixes: 44127b771d9c ("bus: add Broadcom GISB bus arbiter timeout/error handler")
 Signed-off-by: Doug Berger <opendmb@gmail.com>
+Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- drivers/bus/brcmstb_gisb.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/bus/brcmstb_gisb.c | 36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 017c37b9c7c1..a2e1c5c25a3a 100644
+index a94598d0945a..017c37b9c7c1 100644
 --- a/drivers/bus/brcmstb_gisb.c
 +++ b/drivers/bus/brcmstb_gisb.c
-@@ -24,6 +24,9 @@
- #include <linux/of.h>
- #include <linux/bitops.h>
- #include <linux/pm.h>
-+#include <linux/kernel.h>
-+#include <linux/kdebug.h>
-+#include <linux/notifier.h>
+@@ -37,8 +37,6 @@
+ #define  ARB_ERR_CAP_CLEAR		(1 << 0)
+ #define  ARB_ERR_CAP_STATUS_TIMEOUT	(1 << 12)
+ #define  ARB_ERR_CAP_STATUS_TEA		(1 << 11)
+-#define  ARB_ERR_CAP_STATUS_BS_SHIFT	(1 << 2)
+-#define  ARB_ERR_CAP_STATUS_BS_MASK	0x3c
+ #define  ARB_ERR_CAP_STATUS_WRITE	(1 << 1)
+ #define  ARB_ERR_CAP_STATUS_VALID	(1 << 0)
  
- #ifdef CONFIG_ARM
- #include <asm/bug.h>
-@@ -283,6 +286,36 @@ static irqreturn_t brcmstb_gisb_tea_handler(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+@@ -47,7 +45,6 @@ enum {
+ 	ARB_ERR_CAP_CLR,
+ 	ARB_ERR_CAP_HI_ADDR,
+ 	ARB_ERR_CAP_ADDR,
+-	ARB_ERR_CAP_DATA,
+ 	ARB_ERR_CAP_STATUS,
+ 	ARB_ERR_CAP_MASTER,
+ };
+@@ -57,7 +54,6 @@ static const int gisb_offsets_bcm7038[] = {
+ 	[ARB_ERR_CAP_CLR]	= 0x0c4,
+ 	[ARB_ERR_CAP_HI_ADDR]	= -1,
+ 	[ARB_ERR_CAP_ADDR]	= 0x0c8,
+-	[ARB_ERR_CAP_DATA]	= 0x0cc,
+ 	[ARB_ERR_CAP_STATUS]	= 0x0d0,
+ 	[ARB_ERR_CAP_MASTER]	= -1,
+ };
+@@ -67,7 +63,6 @@ static const int gisb_offsets_bcm7400[] = {
+ 	[ARB_ERR_CAP_CLR]	= 0x0c8,
+ 	[ARB_ERR_CAP_HI_ADDR]	= -1,
+ 	[ARB_ERR_CAP_ADDR]	= 0x0cc,
+-	[ARB_ERR_CAP_DATA]	= 0x0d0,
+ 	[ARB_ERR_CAP_STATUS]	= 0x0d4,
+ 	[ARB_ERR_CAP_MASTER]	= 0x0d8,
+ };
+@@ -77,7 +72,6 @@ static const int gisb_offsets_bcm7435[] = {
+ 	[ARB_ERR_CAP_CLR]	= 0x168,
+ 	[ARB_ERR_CAP_HI_ADDR]	= -1,
+ 	[ARB_ERR_CAP_ADDR]	= 0x16c,
+-	[ARB_ERR_CAP_DATA]	= 0x170,
+ 	[ARB_ERR_CAP_STATUS]	= 0x174,
+ 	[ARB_ERR_CAP_MASTER]	= 0x178,
+ };
+@@ -87,7 +81,6 @@ static const int gisb_offsets_bcm7445[] = {
+ 	[ARB_ERR_CAP_CLR]	= 0x7e4,
+ 	[ARB_ERR_CAP_HI_ADDR]	= 0x7e8,
+ 	[ARB_ERR_CAP_ADDR]	= 0x7ec,
+-	[ARB_ERR_CAP_DATA]	= 0x7f0,
+ 	[ARB_ERR_CAP_STATUS]	= 0x7f4,
+ 	[ARB_ERR_CAP_MASTER]	= 0x7f8,
+ };
+@@ -109,9 +102,13 @@ static u32 gisb_read(struct brcmstb_gisb_arb_device *gdev, int reg)
+ {
+ 	int offset = gdev->gisb_offsets[reg];
+ 
+-	/* return 1 if the hardware doesn't have ARB_ERR_CAP_MASTER */
+-	if (offset == -1)
+-		return 1;
++	if (offset < 0) {
++		/* return 1 if the hardware doesn't have ARB_ERR_CAP_MASTER */
++		if (reg == ARB_ERR_CAP_MASTER)
++			return 1;
++		else
++			return 0;
++	}
+ 
+ 	if (gdev->big_endian)
+ 		return ioread32be(gdev->base + offset);
+@@ -119,6 +116,16 @@ static u32 gisb_read(struct brcmstb_gisb_arb_device *gdev, int reg)
+ 		return ioread32(gdev->base + offset);
  }
  
-+/*
-+ * Dump out gisb errors on die or panic.
-+ */
-+static int dump_gisb_error(struct notifier_block *self, unsigned long v,
-+			   void *p);
-+
-+static struct notifier_block gisb_die_notifier = {
-+	.notifier_call = dump_gisb_error,
-+};
-+
-+static struct notifier_block gisb_panic_notifier = {
-+	.notifier_call = dump_gisb_error,
-+};
-+
-+static int dump_gisb_error(struct notifier_block *self, unsigned long v,
-+			   void *p)
++static u64 gisb_read_address(struct brcmstb_gisb_arb_device *gdev)
 +{
-+	struct brcmstb_gisb_arb_device *gdev;
-+	const char *reason = "panic";
++	u64 value;
 +
-+	if (self == &gisb_die_notifier)
-+		reason = "die";
++	value = gisb_read(gdev, ARB_ERR_CAP_ADDR);
++	value |= (u64)gisb_read(gdev, ARB_ERR_CAP_HI_ADDR) << 32;
 +
-+	/* iterate over each GISB arb registered handlers */
-+	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
-+		brcmstb_gisb_arb_decode_addr(gdev, reason);
-+
-+	return NOTIFY_DONE;
++	return value;
 +}
 +
- static DEVICE_ATTR(gisb_arb_timeout, S_IWUSR | S_IRUGO,
- 		gisb_arb_get_timeout, gisb_arb_set_timeout);
+ static void gisb_write(struct brcmstb_gisb_arb_device *gdev, u32 val, int reg)
+ {
+ 	int offset = gdev->gisb_offsets[reg];
+@@ -185,7 +192,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
+ 					const char *reason)
+ {
+ 	u32 cap_status;
+-	unsigned long arb_addr;
++	u64 arb_addr;
+ 	u32 master;
+ 	const char *m_name;
+ 	char m_fmt[11];
+@@ -197,10 +204,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
+ 		return 1;
  
-@@ -390,6 +423,12 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
- 	board_be_handler = brcmstb_bus_error_handler;
- #endif
+ 	/* Read the address and master */
+-	arb_addr = gisb_read(gdev, ARB_ERR_CAP_ADDR) & 0xffffffff;
+-#if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT))
+-	arb_addr |= (u64)gisb_read(gdev, ARB_ERR_CAP_HI_ADDR) << 32;
+-#endif
++	arb_addr = gisb_read_address(gdev);
+ 	master = gisb_read(gdev, ARB_ERR_CAP_MASTER);
  
-+	if (list_is_singular(&brcmstb_gisb_arb_device_list)) {
-+		register_die_notifier(&gisb_die_notifier);
-+		atomic_notifier_chain_register(&panic_notifier_list,
-+					       &gisb_panic_notifier);
-+	}
-+
- 	dev_info(&pdev->dev, "registered mem: %p, irqs: %d, %d\n",
- 			gdev->base, timeout_irq, tea_irq);
+ 	m_name = brcmstb_gisb_master_to_str(gdev, master);
+@@ -209,7 +213,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
+ 		m_name = m_fmt;
+ 	}
  
+-	pr_crit("%s: %s at 0x%lx [%c %s], core: %s\n",
++	pr_crit("%s: %s@0x%llx [%c %s], core: %s\n",
+ 		__func__, reason, arb_addr,
+ 		cap_status & ARB_ERR_CAP_STATUS_WRITE ? 'W' : 'R',
+ 		cap_status & ARB_ERR_CAP_STATUS_TIMEOUT ? "timeout" : "",
 -- 
 2.12.0
