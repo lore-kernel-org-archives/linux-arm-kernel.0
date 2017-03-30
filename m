@@ -1,48 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 18:57:30 +0200
-Subject: [PATCH v2 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <CACRpkdYA9xq3TmW-=0+cxdeBcq6v3HAFf3f5E-FAvUpGZqns3g@mail.gmail.com>
- (Linus Walleij's message of "Wed, 29 Mar 2017 04:18:19 +0200")
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
- <0e60fccd7913b83ee53d2921ce8f297927e8b6f3.1490120798.git-series.gregory.clement@free-electrons.com>
- <CACRpkdYv6WDWM60dRMaYfEt50M8N-yLYk2TRguNi78aQtt6X9A@mail.gmail.com>
- <87vaqtadry.fsf@free-electrons.com>
- <CACRpkdY0DzMGiRTWeS23iCY3Vja9dnXJVaMqOnhJRpBLowfYTA@mail.gmail.com>
- <87mvc5a3hh.fsf@free-electrons.com>
- <CACRpkdYA9xq3TmW-=0+cxdeBcq6v3HAFf3f5E-FAvUpGZqns3g@mail.gmail.com>
-Message-ID: <874lya8zyd.fsf@free-electrons.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 30 Mar 2017 11:15:04 -0600
+Subject: [PATCH v2 0/2] coresight: Allow sharing of STM
+In-Reply-To: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
+References: <1490805215-8125-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkxOnwDRmWKFYwvE=z6KayYpDnXMX=ZuGquQspoBtLgR2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On mer., mars 29 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
-
->>> It has irq_create_mapping(gpiochip->irqdomain, offset); that get
->>> called for every IRQ, and that will eventually call irq_of_parse_and_map()
->>> if the IRQs are defined in the device tree. (IIRC)
->>
->> When I followed the functions called I never find a call to
->> irq_of_parse_and_map(), the closer things related to device tree I found
->> was:
->> "virq = irq_domain_alloc_descs(-1, 1, hwirq, of_node_to_nid(of_node),
->> NULL);"
->> http://elixir.free-electrons.com/source/kernel/irq/irqdomain.c?v=4.11-rc4#L507
+On 29 March 2017 at 10:33, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> This series fixes the coresight generic layer to handle the reference
+> counting for the STM source properly, to allow multiple applications
+> to share the STM. Without this series, the STM is disabled when the
+> first user closes its connection, causing trace data losses.
 >
-> I don't know if I'm rambling or what. I'm pretty sure it gets called, maybe
-> even earlier, like when the DT is parsed for the platform. We have so many
-> drivers not seemingly needing this, but if your driver needs it, all others
-> may need to be fixed too.
 >
-> Can you put a print in irq_of_parse_and_map() and see what happens?
+> Changes since v1:
+>   - Fixed minor coding style issues
+>
+> Suzuki K Poulose (2):
+>   coresight: Disable the path only when the source is disabled
+>   coresight: Fix reference count for software sources
+>
+>  drivers/hwtracing/coresight/coresight.c | 33 +++++++++++++++++++++++++--------
+>  1 file changed, 25 insertions(+), 8 deletions(-)
 
-So if I don't call it explicitly in my driver, then  this function is
-never called for the gpio.
+Applied - thanks,
+Mathieu
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+> --
+> 2.7.4
+>
