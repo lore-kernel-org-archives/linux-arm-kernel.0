@@ -1,86 +1,208 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:06 +0800
-Subject: [PATCH v3 6/8] arm64: RAS: add ras extension runtime detection
+Date: Thu, 30 Mar 2017 18:31:17 +0800
+Subject: [PATCH v3 8/8] arm64: exception: check shared writable page in SEI
+ handler
 In-Reply-To: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
 References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1490869877-118713-7-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1490869877-118713-18-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to <<RAS Extension PRD03>> document, we add RAS extension
-feature runtime detection, which would be used for error recovery
-in the future.
+From: Wang Xiongfeng <wangxiongfeng2@huawei.com>
 
+Since SEI is asynchronous, the error data has been consumed. So we must
+suppose that all the memory data current process can write are
+contaminated. If the process doesn't have shared writable pages, the
+process will be killed, and the system will continue running normally.
+Otherwise, the system must be terminated, because the error has been
+propagated to other processes running on other cores, and recursively
+the error may be propagated to several another processes.
+
+Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
 Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-Reviewed-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/include/asm/sysreg.h  |  2 ++
- arch/arm64/kernel/cpufeature.c   | 11 +++++++++++
- 3 files changed, 15 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/traps.c | 149 ++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 144 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index fb78a5d..3847cf8 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -37,7 +37,8 @@
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_REPEAT_TLBI		17
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
-+#define ARM64_HAS_RAS_EXTN			19
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 99be6d8..b222589 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -34,6 +34,8 @@
+ #include <linux/sched/task_stack.h>
+ #include <linux/syscalls.h>
+ #include <linux/mm_types.h>
++#include <linux/swap.h>
++#include <linux/swapops.h>
  
--#define ARM64_NCAPS				19
-+#define ARM64_NCAPS				20
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ac24b6e..32964c7 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -157,6 +157,7 @@
- #define ID_AA64ISAR0_AES_SHIFT		4
- 
- /* id_aa64pfr0 */
-+#define ID_AA64PFR0_RAS_SHIFT		28
- #define ID_AA64PFR0_GIC_SHIFT		24
- #define ID_AA64PFR0_ASIMD_SHIFT		20
- #define ID_AA64PFR0_FP_SHIFT		16
-@@ -165,6 +166,7 @@
- #define ID_AA64PFR0_EL1_SHIFT		4
- #define ID_AA64PFR0_EL0_SHIFT		0
- 
-+#define ID_AA64PFR0_RAS_V1		0x1
- #define ID_AA64PFR0_FP_NI		0xf
- #define ID_AA64PFR0_FP_SUPPORTED	0x0
- #define ID_AA64PFR0_ASIMD_NI		0xf
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index abda8e8..b0fb81e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -98,6 +98,7 @@
+ #include <asm/atomic.h>
+ #include <asm/bug.h>
+@@ -662,7 +664,144 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 	[ESR_ELx_AET_CE]	=	"Corrected",
  };
  
- static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
-+	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_RAS_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
- 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
-@@ -860,6 +861,16 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 		.min_field_value = 0,
- 		.matches = has_no_fpsimd,
- 	},
-+	{
-+		.desc = "ARM64 RAS Extension Support",
-+		.capability = ARM64_HAS_RAS_EXTN,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64PFR0_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64PFR0_RAS_SHIFT,
-+		.min_field_value = ID_AA64PFR0_RAS_V1,
-+	},
- 	{},
- };
++static void shared_writable_pte_entry(pte_t *pte, unsigned long addr,
++				struct mm_walk *walk)
++{
++	int *is_shared_writable = walk->private;
++	struct vm_area_struct *vma = walk->vma;
++	struct page *page = NULL;
++	int mapcount = -1;
++
++	if (!pte_write(__pte(pgprot_val(vma->vm_page_prot))))
++		return;
++
++	if (pte_present(*pte)) {
++		page = vm_normal_page(vma, addr, *pte);
++	} else if (is_swap_pte(*pte)) {
++		swp_entry_t swpent = pte_to_swp_entry(*pte);
++
++		if (!non_swap_entry(swpent))
++			mapcount = swp_swapcount(swpent);
++		else if (is_migration_entry(swpent))
++			page = migration_entry_to_page(swpent);
++	}
++
++	if (mapcount == -1 && page)
++		mapcount = page_mapcount(page);
++	if (mapcount >= 2)
++		*is_shared_writable = 1;
++}
++
++static void shared_writable_pmd_entry(pmd_t *pmd, unsigned long addr,
++				struct mm_walk *walk)
++{
++	struct page *page;
++	int mapcount;
++	int *is_shared_writable = walk->private;
++
++	if (!pmd_write(*pmd))
++		return;
++
++	page = pmd_page(*pmd);
++	if (page) {
++		mapcount = page_mapcount(page);
++		if (mapcount >= 2)
++			*is_shared_writable = 1;
++	}
++}
++
++static int shared_writable_pte_range(pmd_t *pmd, unsigned long addr,
++				unsigned long end, struct mm_walk *walk)
++{
++	pte_t *pte;
++
++	if (pmd_trans_huge(*pmd)) {
++		shared_writable_pmd_entry(pmd, addr, walk);
++		return 0;
++	}
++
++	if (pmd_trans_unstable(pmd))
++		return 0;
++
++	pte = pte_offset_map(pmd, addr);
++	for (; addr != end; pte++, addr += PAGE_SIZE)
++	shared_writable_pte_entry(pte, addr, walk);
++	return 0;
++}
++
++#ifdef CONFIG_HUGETLB_PAGE
++static int shared_writable_hugetlb_range(pte_t *pte, unsigned long hmask,
++					unsigned long addr, unsigned long end,
++					struct mm_walk *walk)
++{
++	struct vm_area_struct *vma = walk->vma;
++	int *is_shared_writable = walk->private;
++	struct page *page = NULL;
++	int mapcount;
++
++	if (!pte_write(*pte))
++		return 0;
++
++	if (pte_present(*pte)) {
++		page = vm_normal_page(vma, addr, *pte);
++	} else if (is_swap_pte(*pte)) {
++		swp_entry_t swpent = pte_to_swp_entry(*pte);
++
++		if (is_migration_entry(swpent))
++			page = migration_entry_to_page(swpent);
++	}
++
++	if (page) {
++		mapcount = page_mapcount(page);
++
++		if (mapcount >= 2)
++			*is_shared_writable = 1;
++	}
++	return 0;
++}
++#endif
++
++/*
++ *Check whether there exists a page in mm_struct which is shared with other
++ process and writable (not COW) at the same time. 0 means existing such a page.
++ */
++int mm_shared_writable(struct mm_struct *mm)
++{
++	struct vm_area_struct *vma;
++	int is_shared_writable = 0;
++	struct mm_walk shared_writable_walk = {
++		.pmd_entry = shared_writable_pte_range,
++#ifdef CONFIG_HUGETLB_PAGE
++		.hugetlb_entry = shared_writable_hugetlb_range,
++#endif
++		.mm = mm,
++		.private = &is_shared_writable,
++	};
++
++	if (!mm)
++		return -EPERM;
++
++	vma = mm->mmap;
++	while (vma) {
++		walk_page_vma(vma, &shared_writable_walk);
++		if (is_shared_writable)
++			return 1;
++		vma = vma->vm_next;
++	}
++	return 0;
++}
++
+ DEFINE_PER_CPU(int, sei_in_process);
++
++/*
++ * Since SEI is asynchronous, the error data has been consumed. So we must
++ * suppose that all the memory data current process can write are
++ * contaminated. If the process doesn't have shared writable pages, the
++ * process will be killed, and the system will continue running normally.
++ * Otherwise, the system must be terminated, because the error has been
++ * propagated to other processes running on other cores, and recursively
++ * the error may be propagated to several another processes.
++ */
+ asmlinkage void do_sei(struct pt_regs *regs, unsigned int esr, int el)
+ {
+ 	int aet = ESR_ELx_AET(esr);
+@@ -684,16 +823,16 @@ asmlinkage void do_sei(struct pt_regs *regs, unsigned int esr, int el)
+ 	if (el == 0 && IS_ENABLED(CONFIG_ARM64_ESB) &&
+ 	    cpus_have_cap(ARM64_HAS_RAS_EXTN)) {
+ 		siginfo_t info;
+-		void __user *pc = (void __user *)instruction_pointer(regs);
  
+ 		if (aet >= ESR_ELx_AET_UEO)
+ 			return;
+ 
+-		if (aet == ESR_ELx_AET_UEU) {
+-			info.si_signo = SIGILL;
++		if (aet == ESR_ELx_AET_UEU &&
++		    !mm_shared_writable(current->mm)) {
++			info.si_signo = SIGKILL;
+ 			info.si_errno = 0;
+-			info.si_code  = ILL_ILLOPC;
+-			info.si_addr  = pc;
++			info.si_code = 0;
++			info.si_addr = 0;
+ 
+ 			current->thread.fault_address = 0;
+ 			current->thread.fault_code = 0;
 -- 
 1.8.3.1
