@@ -1,62 +1,80 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 30 Mar 2017 14:58:18 -0500
-Subject: [PATCH] ARM: OMAP2+: omap_device: Sync omap_device and pm_runtime
- after probe defer
-Message-ID: <20170330195818.17669-1-d-gerlach@ti.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 30 Mar 2017 13:06:59 -0700
+Subject: [RESEND] arm: ftrace: fix dynamic ftrace with DEBUG_RODATA and
+ !FRAME_POINTER
+In-Reply-To: <1490543749-20376-1-git-send-email-abelvesa@linux.com>
+References: <1490543749-20376-1-git-send-email-abelvesa@linux.com>
+Message-ID: <CAGXu5jKFu2vPQf1PHGZEzmrZO=BbzETrPCVc8x0Xo2EximG9HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting from commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM
-states at probe error and driver unbind") pm_runtime core now changes
-device runtime_status back to after RPM_SUSPENDED after a probe defer.
-Certain OMAP devices make use of "ti,no-idle-on-init" flag which causes
-omap_device_enable to be called during the BUS_NOTIFY_ADD_DEVICE event
-during probe, along with pm_runtime_set_active.
+On Sun, Mar 26, 2017 at 8:55 AM, Abel Vesa <abelvesa@linux.com> wrote:
+> The support for dynamic ftrace with CONFIG_DEBUG_RODATA involves
+> overriding the weak arch_ftrace_update_code() with a variant which makes
+> the kernel text writable around the patching.
+>
+> This override was however added under the CONFIG_OLD_MCOUNT ifdef, and
+> CONFIG_OLD_MCOUNT is only enabled if frame pointers are enabled.
+>
+> This leads to non-functional dynamic ftrace (ftrace triggers a
+> WARN_ON()) when CONFIG_DEBUG_RODATA is enabled and CONFIG_FRAME_POINTER
+> is not.
+>
+> Move the override out of that ifdef and into the CONFIG_DYNAMIC_FTRACE
+> ifdef where it belongs.
+>
+> Fixes: 80d6b0c2eed2a ("ARM: mm: allow text and rodata sections to be read-only")
+>
+> Suggested-by: Nicolai Stange <nicstange@gmail.com>
+> Suggested-by: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Abel Vesa <abelvesa@linux.com>
+> Acked-by: Rabin Vincent <rabin@rab.in>
 
-This call to pm_runtime_set_active typically will prevent a call to
-pm_runtime_get in a driver probe function from re-enabling the
-omap_device. However, in the case of a probe defer that happens before
-the driver probe function is able to run, such as a missing pinctrl
-states defer, pm_runtime_reinit will set the device as RPM_SUSPENDED and
-then once driver probe is actually able to run, pm_runtime_get will see
-the device as suspended and call through to the omap_device layer,
-attempting to enable the already enabled omap_device and causing errors
-like this:
+This looks fine to me. I'd send it to the ARM patch tracker since
+you've gotten an Ack:
+http://www.arm.linux.org.uk/developer/patches/info.php
 
-omap-gpmc 50000000.gpmc: omap_device: omap_device_enable() called from invalid state 1
-omap-gpmc 50000000.gpmc: use pm_runtime_put_sync_suspend() in driver?
+-Kees
 
-We can avoid this error by making sure the pm_runtime status of a device
-matches the omap_device state before a probe attempt. By extending the
-omap_device bus notifier to act on the BUS_NOTIFY_BIND_DRIVER event we
-can check if a device is enabled in omap_device but with a pm_runtime
-status of RPM_SUSPENDED and once again mark the device as RPM_ACTIVE to
-avoid a second incorrect call to omap_device_enable.
+> ---
+>  arch/arm/kernel/ftrace.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index 3f17594..414e60e 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -29,11 +29,6 @@
+>  #endif
+>
+>  #ifdef CONFIG_DYNAMIC_FTRACE
+> -#ifdef CONFIG_OLD_MCOUNT
+> -#define OLD_MCOUNT_ADDR        ((unsigned long) mcount)
+> -#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+> -
+> -#define        OLD_NOP         0xe1a00000      /* mov r0, r0 */
+>
+>  static int __ftrace_modify_code(void *data)
+>  {
+> @@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
+>         stop_machine(__ftrace_modify_code, &command, NULL);
+>  }
+>
+> +#ifdef CONFIG_OLD_MCOUNT
+> +#define OLD_MCOUNT_ADDR        ((unsigned long) mcount)
+> +#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+> +
+> +#define        OLD_NOP         0xe1a00000      /* mov r0, r0 */
+> +
+>  static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+>  {
+>         return rec->arch.old_mcount ? OLD_NOP : NOP;
+> --
+> 2.7.4
+>
 
-Tested-by: Franklin S Cooper Jr. <fcooper@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/omap_device.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index e920dd83e443..f989145480c8 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -222,6 +222,14 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
- 				dev_err(dev, "failed to idle\n");
- 		}
- 		break;
-+	case BUS_NOTIFY_BIND_DRIVER:
-+		od = to_omap_device(pdev);
-+		if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED) &&
-+		    pm_runtime_status_suspended(dev)) {
-+			od->_driver_status = BUS_NOTIFY_BIND_DRIVER;
-+			pm_runtime_set_active(dev);
-+		}
-+		break;
- 	case BUS_NOTIFY_ADD_DEVICE:
- 		if (pdev->dev.of_node)
- 			omap_device_build_from_dt(pdev);
+
 -- 
-2.11.0
+Kees Cook
+Pixel Security
