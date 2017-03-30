@@ -1,35 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Mar 2017 15:51:27 +0200
-Subject: [PATCH v9 06/12] ARM64: EXYNOS: enable exynos_chipid for
- ARCH_EXYNOS
-In-Reply-To: <1490879826-16754-7-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170330131431epcas5p447a730e1bb194162f262a819ae665efb@epcas5p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-7-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAK8P3a2+DVK8gdFs_QVtdQvi_mej9hWVXuDOtg=HwoyrY-b70Q@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 30 Mar 2017 21:51:45 +0800
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <a9078a4e-152e-01ae-8750-1396da2bc623@arm.com>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <20170328165010.GA21937@linaro.org>
+ <20170329015423.GA5035@leoy-linaro>
+ <CAJ9a7VhQRuVOCJkjPc9RANGo=fgA8wjtB65dC5f19ZX22a5FHQ@mail.gmail.com>
+ <20170330010343.GA31843@leoy-linaro>
+ <a9078a4e-152e-01ae-8750-1396da2bc623@arm.com>
+Message-ID: <20170330135145.GA26911@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> This patch enables exynos_chipid driver for ARCH_EXYNOS
-> based SoC.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm64/Kconfig.platforms | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 9cdaecd..b238204 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -54,6 +54,7 @@ config ARCH_BRCMSTB
->  config ARCH_EXYNOS
->         bool "ARMv8 based Samsung Exynos SoC family"
->         select COMMON_CLK_SAMSUNG
-> +       select EXYNOS_CHIPID
+On Thu, Mar 30, 2017 at 10:00:30AM +0100, Suzuki K Poulose wrote:
 
-If you check for ARCH_EXYNOS in the driver Kconfig entry, then
-this patch is not needed.
+[...]
 
-       Arnd
+> Leo,
+> 
+> Also, it would be good to restore the PRCR register back to the original state
+> after we read the registers (if we changed them). I am exploring ways to make
+> use of this feature on demand (e.g, tie it to sysrq-t or sysrq-l) and not just
+> at panic time. So it would be good to have the state restored to not affect the
+> normal functioning even after dumping the registers.
+
+Got it. Will take care for this.
+
+Thanks,
+Leo Yan
+
+> PS: I have a small hack to hook this into a sysrq-x at runtime, but on a second thought
+> it is better not to consume the key and rather tie it to something which already exist,
+> as mentioned above.
+> 
+> Thanks
+> Suzuki
