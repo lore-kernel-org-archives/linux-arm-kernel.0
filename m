@@ -1,43 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Mar 2017 17:27:30 +0100
-Subject: [PATCH v6 00/39] i.MX Media Driver
-In-Reply-To: <d715bcdf-b2df-8080-6ab4-854aeace31a8@gmail.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <20170330110249.GF7909@n2100.armlinux.org.uk>
- <d715bcdf-b2df-8080-6ab4-854aeace31a8@gmail.com>
-Message-ID: <20170330162730.GH7909@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 30 Mar 2017 18:29:04 +0200
+Subject: [PATCH v6 1/4] clk: Add support for runtime PM
+In-Reply-To: <149081897388.31513.7062843004022908296@resonance>
+References: <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170322113554eucas1p27471f0de278c55d5dce7fdf120395e09@eucas1p2.samsung.com>
+ <1490182543-28550-2-git-send-email-m.szyprowski@samsung.com>
+ <149081897388.31513.7062843004022908296@resonance>
+Message-ID: <CAPDyKFpugXy0c0nx7ThsfQ7w7H_ZoA-f=k=a0xfRVHtiY9rNdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 09:12:29AM -0700, Steve Longerbeam wrote:
-> 
-> 
-> On 03/30/2017 04:02 AM, Russell King - ARM Linux wrote:
-> >This fails at step 1.  The removal of the frame interval support now
-> >means my setup script fails when trying to set the frame interval on
-> >the camera:
-> >
-> >Enumerating pads and links
-> >Setting up format SRGGB8_1X8 816x616 on pad imx219 0-0010/0
-> >Format set: SRGGB8_1X8 816x616
-> >Setting up frame interval 1/25 on pad imx219 0-0010/0
-> >Frame interval set: 1/25
-> >Setting up format SRGGB8_1X8 816x616 on pad imx6-mipi-csi2/0
-> >Format set: SRGGB8_1X8 816x616
-> >Setting up frame interval 1/25 on pad imx6-mipi-csi2/0
-> >Unable to set frame interval: Inappropriate ioctl for device (-25)Unable to setup formats: Inappropriate ioctl for device (25)
-> >
-> >This is because media-ctl tries to propagate it from the imx219 source
-> >pad to the csi2 sink pad, and the csi2 now fails that ioctl.
-> 
-> I assume you're using Philipp's frame interval patches to media-ctl.
-> Can you make the frame interval propagation optional in those patches?
-> I.e. don't error-out with a failure code if the ioctl returns ENOTTY.
+[...]
 
-Damn, you're right.  There's way too much stuff to try and keep track
-of with this stuff.
+>
+> Fourth & final question: I'm under the impression that pm runtime calls
+> be be nested and re-enter, but I want to make sure (Ulf?). For instance
+> it is highly likely that this new feature would cause something like:
+>
+> pm_runtime_get()              - called by random driver
+> -> clk_prepare_enable()       - genpd enables functioal clocks
+>    -> pm_runtime_get()        - called by clk_pm_runtime_get in clk core
+>       -> clk_prepare_enable() - genpd enables interface or bus clocks
+>
+> I guess this is safe from the pm_runtime_get/genpd perspective, but want
+> to make sure first.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I noticed Marek's reply, which perhaps is sufficient. However, to
+clarify also from genpd and runtime PM point of view the re-entrant
+issue is safe and it is already quite commonly used.
+
+For example, from a random driver's ->runtime_resume() callback
+clk_prepare_enable() is called. When such clock is managed behind a
+i2c interface the i2c controller also needs to be runtime resumed,
+meaning its driver calls pm_runtime_get_sync(), before it can serve
+the request and ungate the clock.
+
+[...]
+
+Kind regards
+Uffe
