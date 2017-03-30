@@ -1,88 +1,52 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 30 Mar 2017 18:31:00 +0800
-Subject: [PATCH v3 0/8] arm64: acpi: apei: handle SEI notification type for
- ARMv8
-Message-ID: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+From: ore@pengutronix.de (Oleksij Rempel)
+Date: Thu, 30 Mar 2017 13:02:54 +0200
+Subject: proper power off implementation for iMX6 with external pmic
+Message-ID: <d8d013f7-9417-c7c9-5f60-dd33465e9b42@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM APEI extension proposal added SEI (asynchronous SError interrupt)
-notification type for ARMv8.
+Hallo all,
 
-Add a new GHES error source handling function for SEI. In firmware
-first mode, if an error source's notification type is SEI. Then GHES
-could parse and report the detail error information.
+i'm looking for proper way to implement pm_power_off for IMX6 with 
+external PMIC.
 
-In firmware first mode, we could assume:
-1) The ghes for sei is a global table, firmware should report one sei at a time.
-2) SEI is masked while exception is processing
-3) SEI may interrupt while irq handler is running 
-4) SEA may interrupt while SEI handler is running
+http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
+page 5083
 
-So, the memory area used to transfer hardware error information from
-BIOS to Linux can be determined only in NMI, SEI(arm64), IRQ or timer
-handler. We add a virtual page for SEI context.
+According to this documentation, there are two ways to power off, 
+depending on board configuration. With internal and external PMIC.
 
-Error Synchronization Barrier (ESB; part of the ARMv8.2 Extensions)
-is used to synchronize Unrecoverable errors. That is, containable errors
-architecturally consumed by the PE and not silently propagated.
+Internal variant is implemented in:
+drivers/power/reset/imx-snvs-poweroff.c
 
-With ESB it is generally possible to isolate an unrecoverable error
-between two ESB instructions. So, it's possible to recovery from
-unrecoverable errors reported by asynchronous SError interrupt.
+and should provide support for fallowing sequence:
 
-Since SEI is asynchronous, a SEI generated on user process may propagate
-to another user process via shared memory, which may cause unrecoverable.
-We have a idea which only recover sei from user process which has no
-writable shared memory.
+Configuration with internal PMIC:
+1.  SoC button is pressed for a short duration.
+2.  Interrupt request (irq) is sent to SoC from FSM
+3.  Alarm timer is set up by software routine and started.
+4.  Upon alarm_in assertion to '1', PMIC_ON_REQ goes '0'.
+5.  External regulator goes OFF.
 
-The idea is still in the discussion, any comments is welcome.
+Suddenly i can't find any existing code for external PMIC.
 
-This series is based on Tyler's series "[PATCH V13 00/10] Add UEFI 2.6 and ACPI 6.1 updates
-for RAS on ARM64" and the latest mainline.
+Configuration with external PMIC:
+1.  Button is pressed for a short duration on the external PMIC.
+2.  Interrupt request (irq) is sent to SoC from external PMIC
+3.  SoC is programming PMIC for power off when standby is asserted.
+4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
 
-v3: add ARM processor error information trace event
-    add a per-cpu variable to indecate sei is processing
-    remove nmi_{enter/exit} protection for ghes_notify_sei()
-    reserve a virtual page for processing ghes table in SEI context
-    don't always inject vabt for sei
-    serprate do_sei from bad_mode
-    add esb which make recovery from sei possible
-    add an idea to recovery from sei for shared memory process
+partially needed  code is implemented here:
+  arch/arm/mach-imx/pm-imx6.c
+...
+         case STOP_POWER_OFF:
+                 val |= 0x2 << BP_CLPCR_LPM;
+                 val |= 0x3 << BP_CLPCR_STBY_COUNT;
+                 val |= BM_CLPCR_VSTBY;
+                 val |= BM_CLPCR_SBYOS;
+....
+but used only for PM_SUSPEND_MEM and never for pm_power_off.
 
-v2: add kvm guest SEI notification support
-    add nmi_{entry, exit} to protect ghes_notify_sei
-
-https://lkml.org/lkml/2017/3/7/962
-https://lkml.org/lkml/2017/3/3/189
-
-Wang Xiongfeng (1):
-  arm64: exception: check shared writable page in SEI handler
-
-Xie XiuQi (7):
-  trace: ras: add ARM processor error information trace event
-  acpi: apei: handle SEI notification type for ARMv8
-  arm64: apei: add a per-cpu variable to indecate sei is processing
-  APEI: GHES: reserve a virtual page for SEI context
-  arm64: KVM: add guest SEI support
-  arm64: RAS: add ras extension runtime detection
-  arm64: exception: handle asynchronous SError interrupt
-
- arch/arm64/Kconfig                   |  16 +++
- arch/arm64/include/asm/cpucaps.h     |   3 +-
- arch/arm64/include/asm/esr.h         |  14 +++
- arch/arm64/include/asm/sysreg.h      |   2 +
- arch/arm64/include/asm/system_misc.h |   1 +
- arch/arm64/kernel/cpufeature.c       |  11 ++
- arch/arm64/kernel/entry.S            |  70 ++++++++++-
- arch/arm64/kernel/traps.c            | 217 +++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/handle_exit.c         |  22 +++-
- drivers/acpi/apei/Kconfig            |  14 +++
- drivers/acpi/apei/ghes.c             | 166 +++++++++++++++++++--------
- include/acpi/ghes.h                  |   3 +
- include/linux/cper.h                 |   5 +
- include/ras/ras_event.h              |  87 ++++++++++++++
- 14 files changed, 575 insertions(+), 56 deletions(-)
-
--- 
-1.8.3.1
+do i miss some thing, or are there any patches floating around?
+If it is not implemented jet and no one is working on this i would do it.
+I assume it should be configurable over device tree. Correct?
