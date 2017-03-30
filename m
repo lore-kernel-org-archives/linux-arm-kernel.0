@@ -1,173 +1,88 @@
-From: xiaolong.ye@intel.com (Ye Xiaolong)
-Date: Thu, 30 Mar 2017 15:29:08 +0800
-Subject: [kbuild-all] [PATCH v4 13/22] KVM: arm64: ITS:
- KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
-In-Reply-To: <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
-References: <201703272354.OaYhCMvV%fengguang.wu@intel.com>
- <0d43e874-c443-7d55-b741-ce27bd103cb5@redhat.com>
- <20170330022159.GB15042@yexl-desktop>
- <202d880c-148f-acd3-08d3-867175cbe425@redhat.com>
-Message-ID: <20170330072908.GA21772@yexl-desktop>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 30 Mar 2017 10:33:55 +0300
+Subject: [PATCHv2 9/9] ARM: dts: omap4: convert to use the new clkctrl
+ clocks for the drivers
+In-Reply-To: <20170328150316.GU10760@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-10-git-send-email-t-kristo@ti.com>
+ <20170328001800.GR10760@atomide.com>
+ <8b502a89-dcc6-1932-70cc-e887b1404dbb@ti.com>
+ <20170328150316.GU10760@atomide.com>
+Message-ID: <87f1e815-baf6-f41a-99d2-8ba6ca6292c4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30, Auger Eric wrote:
->Hi Xiaolong
->
->On 30/03/2017 04:21, Ye Xiaolong wrote:
->> Hi, Eric
->> 
->> On 03/27, Auger Eric wrote:
->>> Hi,
->>>
->>> On 27/03/2017 17:04, kbuild test robot wrote:
->>>> Hi Eric,
+On 28/03/17 18:03, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170327 22:46]:
+>> On 28/03/17 03:18, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>>>> Convert the drivers to use the new clkctrl clocks.
 >>>>
->>>> [auto build test ERROR on kvmarm/next]
->>>> [also build test ERROR on v4.11-rc4 next-20170327]
->>>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>>>
->>>> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/vITS-save-restore/20170327-195443
->>>> base:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
->>>> config: arm64-defconfig (attached as .config)
->>>> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
->>>> reproduce:
->>>>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->>>>         chmod +x ~/bin/make.cross
->>>>         # save the attached .config to linux build tree
->>>>         make.cross ARCH=arm64 
->>>>
->>>> All errors (new ones prefixed by >>):
->>>>
->>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c: In function 'vgic_its_has_attr':
->>>>>> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: error: 'its' undeclared (first use in this function)
->>>>       return vgic_its_table_restore(its);
->>>
->>> I think this is due to the fact the series is applied on KVM: arm/arm64:
->>> Emulate the EL1 phys timer registers (kvmarm-for-4.11).
->>>
->>> Please apply it to (kvmarm/queue, kvmarm/next, kvm_next) KVM: arm/arm64:
->>> vgic: Improve sync_hwstate performance  (255905e)
->>> I also checked it compiles on 4.11-rc4.
->> 
->> Hmm, we did apply your series on top of kvarm/next, judging from the function
->> code below, I can't see the 'its' declaration. 
->> 
->> static int vgic_its_has_attr(struct kvm_device *dev,
->>                              struct kvm_device_attr *attr)
->> {
->>         switch (attr->group) {
->>         case KVM_DEV_ARM_VGIC_GRP_ADDR:
->>                 switch (attr->attr) {
->>                 case KVM_VGIC_ITS_ADDR_TYPE:
->>                         return 0;
->>                 }
->>                 break;
->>         case KVM_DEV_ARM_VGIC_GRP_CTRL:
->>                 switch (attr->attr) {
->>                 case KVM_DEV_ARM_VGIC_CTRL_INIT:
->>                         return 0;
->>                 }
->>                 break;
->>         case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
->>                 u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->>                 u64 reg;
->> 
->>                 if (get_user(reg, uaddr))
->>                         return -EFAULT;
->> 
->>                 return vgic_its_attr_regs_access(dev, attr, &reg, true);
->>         }
->>         case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->>                 if (attr->attr)
->>                         return -EINVAL;
->>                 return vgic_its_table_restore(its);
->The above code shows that my series is not correctly applied since that
->call to vgic_its_table_restore() should normally be in
->vgic_its_set_attr() and not in vgic_its_has_attr() function
->(virt/kvm/arm/vgic-its.c).
->
-
-Er, you are right, the real problem here seems we had a rather old kvmarm/next mirror
-at the time 0day applied your series.
-
-Thanks for the clarification and sorry for the noise.
-
-Thanks,
-Xiaolong
->I pushed this series applied on top of up to date kvmarm/next at
->https://github.com/eauger/linux/tree/v4.11-rc3-its-mig-v4.
->
->As noticed earlier, the series is applied on top of 255905e (KVM:
->arm/arm64: vgic: Improve sync_hwstate performance)
->
->Thanks
->
->Eric
->
->
->>         }
->>         return -ENXIO;
->> }
->> 
->> Thanks,
->> Xiaolong
->> 
->>>
->>> Please let me know if I got something wrong.
->>>
->>> Thanks
->>>
->>> Eric
->>>>                                     ^~~
->>>>    arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: note: each undeclared identifier is reported only once for each function it appears in
->>>>
->>>> vim +/its +1766 arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c
->>>>
->>>>   1750			case KVM_DEV_ARM_VGIC_CTRL_INIT:
->>>>   1751				return 0;
->>>>   1752			}
->>>>   1753			break;
->>>>   1754		case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
->>>>   1755			u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->>>>   1756			u64 reg;
->>>>   1757	
->>>>   1758			if (get_user(reg, uaddr))
->>>>   1759				return -EFAULT;
->>>>   1760	
->>>>   1761			return vgic_its_attr_regs_access(dev, attr, &reg, true);
->>>>   1762		}
->>>>   1763		case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->>>>   1764			if (attr->attr)
->>>>   1765				return -EINVAL;
->>>>> 1766			return vgic_its_table_restore(its);
->>>>   1767		}
->>>>   1768		return -ENXIO;
->>>>   1769	}
->>>>   1770	
->>>>   1771	static int vgic_its_set_attr(struct kvm_device *dev,
->>>>   1772				     struct kvm_device_attr *attr)
->>>>   1773	{
->>>>   1774		struct vgic_its *its = dev->private;
->>>>
+>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 >>>> ---
->>>> 0-DAY kernel test infrastructure                Open Source Technology Center
->>>> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>>>>  arch/arm/boot/dts/omap4.dtsi | 164 ++++++++++++++++++++++++++++++++++++++-----
+>>>>  1 file changed, 146 insertions(+), 18 deletions(-)
 >>>>
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
->>> _______________________________________________
->>> kbuild-all mailing list
->>> kbuild-all at lists.01.org
->>> https://lists.01.org/mailman/listinfo/kbuild-all
->> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> 
+>>>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>>>> index 3ecf616..c39304a 100644
+>>>> --- a/arch/arm/boot/dts/omap4.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>>>> @@ -94,16 +94,22 @@
+>>>>  			compatible = "ti,omap4-mpu";
+>>>>  			ti,hwmods = "mpu";
+>>>>  			sram = <&ocmcram>;
+>>>> +			clocks = <&mpuss_clkctrl OMAP4_MPU_CLKCTRL 0>;
+>>>> +			clock-names = "clkctrl";
+>>>>  		};
+>>>
+>>> Oh one more thing. I don't think we should add the clocks
+>>> here as they are now wrongly allocated to the device within
+>>> the interconnect target module. These clocks really belong
+>>> to each interconnect target module that we don't have in the
+>>> dts yet.
+>>>
+>>> So we're better off adding the clockctrl clocks and then
+>>> changing the dts to use the interconnect target modules
+>>> with the clockctrl clocks.
+>>
+>> The problem is, you can't just add the clkctrl clock nodes themselves alone,
+>> as this introduces the problem that any clocks with no users will get
+>> disabled => causes a boot time hang when all the device clocks get shut
+>> down.
+>
+> Hmm yeah. I wonder how to work around that.. What if we first updated
+> the clocks in the hwmod code? Or updated the aliases?
+
+Kind of a chicken-egg problem. You could maybe probe the "ti,clkctrl" 
+driver manually to avoid the issue.
+
+The core clocks get disabled when CCF notices they are not used. You 
+can't really avoid that with updating aliases / updating the clocks in 
+hwmod code. And, hwmod basically tries to still use the same registers 
+through the legacy route, which leads to conflict.
+
+>
+>> If you want to delay the usage of the clocks until you have interconnect
+>> target modules in place, you need to introduce the clock nodes also at that
+>> point, similar to what needs to be done now to squash patch #8 or #9.
+>
+> I'd like to do this one device at a time without any large
+> flips as we have quite a few devices with special handling for
+> reset and idling in the hwmod code.
+
+One thing that can be done also is to introduce the clkctrl clocks one 
+at a time in the data file also, but this is going to be cumbersome, as 
+you need to keep these three in sync:
+
+- drivers/clk/ti/clk-44xx.c
+- arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+- arch/arm/boot/dts/omap4.dtsi
+
+... and that per SoC of course.
+
+With the interconnect driver introduction, you should be able to flip 
+one device at a time from hwmod to interconnect. In this case, all the 
+clocks are already there, and you just need to modify DT + hwmod data to 
+do the flip.
+
+-Tero
