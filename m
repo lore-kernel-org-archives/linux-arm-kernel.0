@@ -1,54 +1,49 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Thu, 30 Mar 2017 23:26:59 +0800
-Subject: [PATCH V8 6/6] LPC: Add the ACPI LPC support
-In-Reply-To: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <1490887619-61732-7-git-send-email-yuanzhichang@hisilicon.com>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Thu, 30 Mar 2017 17:15:21 +0200
+Subject: [PATCH v4 0/5] STM32 Independent watchdog
+Message-ID: <1490886926-20585-1-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on the provious patches, this patch supports the ACPI LPC host on
-Hip06/Hip07.
+Version 4:
+- Update bindings (iwdg > watchdog)
+- Update typo
+- Update commit header
+- remove gerrit tags
+- Update driver (remove unnecessary tests) a add watchdog_init_timeout
 
-Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-Signed-off-by: John Garry <john.garry@huawei.com>
----
- drivers/bus/hisi_lpc.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Version 3:
+- Update typo into  bindings file
+- Reorder node in devicetree (ordering by address)
+- Remove unnecessary lines in commits
 
-diff --git a/drivers/bus/hisi_lpc.c b/drivers/bus/hisi_lpc.c
-index 018ea37..ef62045 100644
---- a/drivers/bus/hisi_lpc.c
-+++ b/drivers/bus/hisi_lpc.c
-@@ -458,7 +458,9 @@ static int hisilpc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* register the LPC host PIO resources */
--	if (!has_acpi_companion(dev)) {
-+	if (has_acpi_companion(dev)) {
-+		lpcdev->io_host = find_io_range_by_fwnode(dev->fwnode);
-+	} else {
- 		struct logic_pio_hwaddr *range, *tmprange;
- 
- 		range = kzalloc(sizeof(*range), GFP_KERNEL);
-@@ -526,10 +528,18 @@ static int hisilpc_probe(struct platform_device *pdev)
- 	{},
- };
- 
-+#ifdef CONFIG_ACPI
-+static const struct acpi_device_id hisilpc_acpi_match[] = {
-+	{"HISI0191", },
-+	{},
-+};
-+#endif
-+
- static struct platform_driver hisilpc_driver = {
- 	.driver = {
- 		.name           = "hisi_lpc",
- 		.of_match_table = hisilpc_of_match,
-+		.acpi_match_table = ACPI_PTR(hisilpc_acpi_match),
- 	},
- 	.probe = hisilpc_probe,
- };
+Version 2:
+- Add commit messages
+
+Version 1:
+- Initial commit
+
+The purpose of this set of patches is to add a new watchdog driver for
+stm32f429.
+This driver was developed and tested on evaluation board stm32429i.
+
+Yannick Fertre (5):
+  dt-bindings: watchdog: Document STM32 IWDG bindings
+  drivers: watchdog: Add STM32 IWDG driver
+  ARM: dts: stm32: Add watchdog support for STM32F429 SoC
+  ARM: dts: stm32: Add watchdog support for STM32F429 eval board
+  ARM: configs: stm32: Add watchdog support in STM32 defconfig
+
+ .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  15 ++
+ arch/arm/boot/dts/stm32429i-eval.dts               |   4 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   9 +-
+ arch/arm/configs/stm32_defconfig                   |   1 +
+ drivers/watchdog/Kconfig                           |  12 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/stm32_iwdg.c                      | 260 +++++++++++++++++++++
+ 7 files changed, 301 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+ create mode 100644 drivers/watchdog/stm32_iwdg.c
+
 -- 
 1.9.1
