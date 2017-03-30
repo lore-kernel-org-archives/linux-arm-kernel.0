@@ -1,50 +1,66 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Mar 2017 18:03:50 +0200
-Subject: [PATCH v4 0/4] gpio: mvebu: Add PWM fan support
-In-Reply-To: <20170327194301.1104-1-ralph.sennhauser@gmail.com> (Ralph
- Sennhauser's message of "Mon, 27 Mar 2017 21:42:56 +0200")
-References: <20170327194301.1104-1-ralph.sennhauser@gmail.com>
-Message-ID: <87o9wi92ft.fsf@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 30 Mar 2017 17:04:42 +0100
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <CANLsYkwPYSvy2xjf8uuvx1WGWpGdMFy7kF=30VbvgW+jDvnFuw@mail.gmail.com>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <20170328165010.GA21937@linaro.org> <20170329015423.GA5035@leoy-linaro>
+ <20170329165535.GB24889@linaro.org> <20170330015941.GD3038@leoy-linaro>
+ <CANLsYkwPYSvy2xjf8uuvx1WGWpGdMFy7kF=30VbvgW+jDvnFuw@mail.gmail.com>
+Message-ID: <5a4c5112-4934-c827-2a07-387e4555dc4b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph,
- 
- On lun., mars 27 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-[...]
-> Andrew Lunn (4):
->   gpio: mvebu: Add limited PWM support
 
->   mvebu: xp: Add PWM properties to .dtsi files
->   ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
->   mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
+On 30/03/17 16:46, Mathieu Poirier wrote:
+> On 29 March 2017 at 19:59, Leo Yan <leo.yan@linaro.org> wrote:
+>> On Wed, Mar 29, 2017 at 10:55:35AM -0600, Mathieu Poirier wrote:
+>>
+>> [...]
+>>
+>>>> So this is why add "idle_constraint" as a central place to control
+>>>> power domain for CPU debug purpose and I also think this is more
+>>>> friendly for hardware design, e.g. some platforms can enable partial
+>>>> low power states to save power and avoid overheat after using this
+>>>> driver.
+>>>>
+>>>> How about you think for this?
+>>>
+>>> Like Sudeep pointed out we should concentrate on doing the right thing,
+>>> that is work with EDPRSR.PU, EDPRCR.COREPURQ and EDPRCR.CORENPDRQ.
+>>
+>> Agree, and I think we have aligned for this.
+>>
+>>> Anything outside of that becomes platform specific and can't be handled in
+>>> this driver.
+>>
+>> Sorry I argue a bit for this just want to make things more clear and
+>> if can have better method.
+>>
+>> Though the issue is platform specific, but the code is to seek common
+>> method to handle them. So the driver has no any platform specific code.
+> 
+> Seeking a common way to handle platform specific problems doesn't
+> scale and will never be encompassing.  There will always be a quirk
+> somewhere to deal with, hence the idea of keeping things separate.
+> 
 
-I didn't see any big problem with this 3 patches, I will applied them
-once the first one will be applied on the gpio tree or at least acked.
+I completely agree and just responded to the original patch.
 
-Thanks,
+>>
+>> I read again for Suziki's suggestion: "4) Should document the fact that,
+>> on some platforms, the user may have to disable CPUidle explicitly to
+>> get the driver working. But let us not make it the default. The user
+>> with a not so ideal platform could add "nohlt" and get it working."
+> 
+> Suzuki and I are expressing the same view using different words.
+> 
 
-Gregory
-
->
->  .../devicetree/bindings/gpio/gpio-mvebu.txt        |  32 ++
->  MAINTAINERS                                        |   2 +
->  arch/arm/boot/dts/armada-370.dtsi                  |  16 +-
->  arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |   8 +-
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  14 +-
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  16 +-
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  16 +-
->  arch/arm/configs/mvebu_v7_defconfig                |   2 +
->  drivers/gpio/gpio-mvebu.c                          | 324 ++++++++++++++++++++-
->  9 files changed, 394 insertions(+), 36 deletions(-)
->
-> -- 
-> 2.10.2
->
++1, as I just mentioned on the patch, we can warn user to take action
+when this feature gets enabled to get desired result and *nothing more*
+than that. Please drop all these pm_qos stuff.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Sudeep
