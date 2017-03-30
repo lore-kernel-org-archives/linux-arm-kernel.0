@@ -1,182 +1,244 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Thu, 30 Mar 2017 23:39:33 +0900
-Subject: [RFCv2] arm64: support HAVE_ARCH_RARE_WRITE and
- HAVE_ARCH_RARE_WRITE_MEMCPY
-Message-ID: <1490884982-5066-1-git-send-email-hoeun.ryu@gmail.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Thu, 30 Mar 2017 23:26:55 +0800
+Subject: [PATCH V8 2/6] PCI: Apply the new generic I/O management on PCI IO
+ hosts
+In-Reply-To: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
+References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <1490887619-61732-3-git-send-email-yuanzhichang@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- This patch might be a part of Kees Cook's rare_write infrastructure series
-for [1] for arm64 architecture.
+After introducing the new generic I/O space management(LIBIO), the original PCI
+MMIO relevant helpers need to be updated based on the new interfaces defined in
+LOGIC_IO.
+This patch adapts the corresponding code to match the changes introduced by
+LOGIC_IO.
 
- This implementation is based on Mark Rutland's suggestions [2], which is
-that a special userspace mm that maps only __start/end_rodata as RW permi-
-ssion is prepared during early boot time (paging_init) and __arch_rare_-
-write_begin() switches to the mm [2].
-
- rare_write_mm address space is added for the special purpose and a page
-global directory is also prepared for it. The mm remaps __start_rodata ~
-__end_rodata to rodata_rw_alias_start which starts from TASK_SIZE_64 / 4
-+ kaslr_offset().
-
- It passes LKDTM's rare write test.
-
-[1] : http://www.openwall.com/lists/kernel-hardening/2017/02/27/5
-[2] : https://lkml.org/lkml/2017/3/29/704
-
-Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>        #earlier draft
 ---
- arch/arm64/Kconfig               |   2 +
- arch/arm64/include/asm/pgtable.h |   4 ++
- arch/arm64/mm/mmu.c              | 101 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 107 insertions(+)
+ drivers/acpi/pci_root.c |   8 ++--
+ drivers/of/address.c    |   5 ++-
+ drivers/pci/pci.c       | 104 +++++++++++-------------------------------------
+ include/linux/pci.h     |   3 +-
+ 4 files changed, 34 insertions(+), 86 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index f2b0b52..6e2c592 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -102,6 +102,8 @@ config ARM64
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_KPROBES
- 	select HAVE_KRETPROBES
-+	select HAVE_ARCH_RARE_WRITE
-+	select HAVE_ARCH_RARE_WRITE_MEMCPY
- 	select IOMMU_DMA if IOMMU_SUPPORT
- 	select IRQ_DOMAIN
- 	select IRQ_FORCED_THREADING
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index c213fdbd0..1514933 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -741,6 +741,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- #define kc_vaddr_to_offset(v)	((v) & ~VA_START)
- #define kc_offset_to_vaddr(o)	((o) | VA_START)
- 
-+unsigned long __arch_rare_write_begin(void);
-+unsigned long __arch_rare_write_end(void);
-+void __arch_rare_write_memcpy(void *dst, const void *src, __kernel_size_t len);
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* __ASM_PGTABLE_H */
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 91502e3..86b25c9 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -570,6 +570,105 @@ static void __init map_kernel(pgd_t *pgd)
- 	kasan_copy_shadow(pgd);
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index 919be0a..4d8cc24 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -730,7 +730,8 @@ static void acpi_pci_root_validate_resources(struct device *dev,
+ 	}
  }
  
-+struct mm_struct rare_write_mm = {
-+	.mm_rb		= RB_ROOT,
-+	.mm_users	= ATOMIC_INIT(2),
-+	.mm_count	= ATOMIC_INIT(1),
-+	.mmap_sem	= __RWSEM_INITIALIZER(rare_write_mm.mmap_sem),
-+	.page_table_lock= __SPIN_LOCK_UNLOCKED(rare_write_mm.page_table_lock),
-+	.mmlist		= LIST_HEAD_INIT(rare_write_mm.mmlist),
-+};
-+
-+#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
-+#include <asm/ptdump.h>
-+
-+static struct ptdump_info rare_write_ptdump_info = {
-+	.mm		= &rare_write_mm,
-+	.markers	= (struct addr_marker[]){
-+		{ 0,		"rare-write start" },
-+		{ TASK_SIZE_64,	"rare-write end" }
-+	},
-+	.base_addr	= 0,
-+};
-+
-+static int __init ptdump_init(void)
-+{
-+	return ptdump_debugfs_register(&rare_write_ptdump_info,
-+				       "rare_write_page_tables");
-+}
-+device_initcall(ptdump_init);
-+
-+#endif
-+
-+__always_inline unsigned long __arch_rare_write_begin(void)
-+{
-+	struct mm_struct *mm = &rare_write_mm;
-+
-+	preempt_disable();
-+
-+	__switch_mm(mm);
-+
-+	if (system_uses_ttbr0_pan()) {
-+		update_saved_ttbr0(current, mm);
-+		cpu_switch_mm(mm->pgd, mm);
-+	}
-+
-+	return 0;
-+}
-+
-+__always_inline unsigned long __arch_rare_write_end(void)
-+{
-+	struct mm_struct *mm = current->active_mm;
-+
-+	__switch_mm(mm);
-+
-+	if (system_uses_ttbr0_pan()) {
-+		cpu_set_reserved_ttbr0();
-+		if (mm != &init_mm)
-+			update_saved_ttbr0(current, mm);
-+	}
-+
-+	preempt_enable_no_resched();
-+
-+	return 0;
-+}
-+
-+static unsigned long rodata_rw_alias_start __ro_after_init = TASK_SIZE_64 / 4;
-+
-+__always_inline void __arch_rare_write_memcpy(void *dst, const void *src,
-+					      __kernel_size_t len)
-+{
-+	unsigned long __dst = (unsigned long)dst;
-+
-+	__dst -= (unsigned long)__start_rodata;
-+	__dst += rodata_rw_alias_start;
-+
-+	memcpy((void *)__dst, src, len);
-+}
-+
-+void __init rare_write_init(void)
-+{
-+	phys_addr_t pgd_phys = early_pgtable_alloc();
-+	pgd_t *pgd = (pgd_t *)__phys_to_virt(pgd_phys);
-+	phys_addr_t pa_start = __pa_symbol(__start_rodata);
-+	unsigned long size = __end_rodata - __start_rodata;
-+
-+	BUG_ON(!PAGE_ALIGNED(pa_start));
-+	BUG_ON(!PAGE_ALIGNED(size));
-+
-+	rodata_rw_alias_start += kaslr_offset();
-+
-+	BUG_ON(rodata_rw_alias_start + size > TASK_SIZE_64);
-+
-+	rare_write_mm.pgd = pgd;
-+	init_new_context(NULL, &rare_write_mm);
-+
-+	__create_pgd_mapping(pgd,
-+			     pa_start, rodata_rw_alias_start, size,
-+			     __pgprot(pgprot_val(PAGE_KERNEL) | PTE_NG),
-+			     early_pgtable_alloc, debug_pagealloc_enabled());
-+}
-+
+-static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
++static void acpi_pci_root_remap_iospace(struct fwnode_handle *fwnode,
++			struct resource_entry *entry)
+ {
+ #ifdef PCI_IOBASE
+ 	struct resource *res = entry->res;
+@@ -739,7 +740,7 @@ static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
+ 	resource_size_t length = resource_size(res);
+ 	unsigned long port;
+ 
+-	if (pci_register_io_range(cpu_addr, length))
++	if (pci_register_io_range(fwnode, cpu_addr, length))
+ 		goto err;
+ 
+ 	port = pci_address_to_pio(cpu_addr);
+@@ -781,7 +782,8 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ 	else {
+ 		resource_list_for_each_entry_safe(entry, tmp, list) {
+ 			if (entry->res->flags & IORESOURCE_IO)
+-				acpi_pci_root_remap_iospace(entry);
++				acpi_pci_root_remap_iospace(&device->fwnode,
++						entry);
+ 
+ 			if (entry->res->flags & IORESOURCE_DISABLED)
+ 				resource_list_destroy_entry(entry);
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 02b2903..1693a6f 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -2,8 +2,10 @@
+ #define pr_fmt(fmt)	"OF: " fmt
+ 
+ #include <linux/device.h>
++#include <linux/fwnode.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
++#include <linux/logic_pio.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/pci.h>
+@@ -323,7 +325,8 @@ int of_pci_range_to_resource(struct of_pci_range *range,
+ 
+ 	if (res->flags & IORESOURCE_IO) {
+ 		unsigned long port;
+-		err = pci_register_io_range(range->cpu_addr, range->size);
++		err = pci_register_io_range(&np->fwnode, range->cpu_addr,
++				range->size);
+ 		if (err)
+ 			goto invalid_range;
+ 		port = pci_address_to_pio(range->cpu_addr);
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 7904d02..c265f89 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3238,68 +3238,38 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
+ }
+ EXPORT_SYMBOL(pci_request_regions_exclusive);
+ 
+-#ifdef PCI_IOBASE
+-struct io_range {
+-	struct list_head list;
+-	phys_addr_t start;
+-	resource_size_t size;
+-};
+-
+-static LIST_HEAD(io_range_list);
+-static DEFINE_SPINLOCK(io_range_lock);
+-#endif
+-
  /*
-  * paging_init() sets up the page tables, initialises the zone memory
-  * maps and sets up the zero page.
-@@ -603,6 +702,8 @@ void __init paging_init(void)
- 	 */
- 	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
- 		      SWAPPER_DIR_SIZE - PAGE_SIZE);
+  * Record the PCI IO range (expressed as CPU physical address + size).
+  * Return a negative value if an error has occured, zero otherwise
+  */
+-int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
++int pci_register_io_range(struct fwnode_handle *fwnode, phys_addr_t addr,
++			resource_size_t	size)
+ {
+-	int err = 0;
+-
+ #ifdef PCI_IOBASE
+-	struct io_range *range;
+-	resource_size_t allocated_size = 0;
+-
+-	/* check if the range hasn't been previously recorded */
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(range, &io_range_list, list) {
+-		if (addr >= range->start && addr + size <= range->start + size) {
+-			/* range already registered, bail out */
+-			goto end_register;
+-		}
+-		allocated_size += range->size;
+-	}
+-
+-	/* range not registed yet, check for available space */
+-	if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
+-		/* if it's too big check if 64K space can be reserved */
+-		if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
+-			err = -E2BIG;
+-			goto end_register;
+-		}
++	struct logic_pio_hwaddr *range, *tmprange;
+ 
+-		size = SZ_64K;
+-		pr_warn("Requested IO range too big, new size set to 64K\n");
+-	}
++	if (!size || addr + size < addr)
++		return -EINVAL;
+ 
+-	/* add the range to the list */
+-	range = kzalloc(sizeof(*range), GFP_ATOMIC);
+-	if (!range) {
+-		err = -ENOMEM;
+-		goto end_register;
+-	}
++	WARN_ON(!PAGE_ALIGNED(addr) || !PAGE_ALIGNED(size));
+ 
+-	range->start = addr;
++	range = kzalloc(sizeof(*range), GFP_KERNEL);
++	if (!range)
++		return -ENOMEM;
++	range->fwnode = fwnode;
+ 	range->size = size;
+-
+-	list_add_tail(&range->list, &io_range_list);
+-
+-end_register:
+-	spin_unlock(&io_range_lock);
++	range->hw_start = addr;
++	range->flags = PIO_CPU_MMIO;
 +
-+	rare_write_init();
++	tmprange = logic_pio_register_range(range, PAGE_SIZE);
++	if (tmprange != range) {
++		kfree(range);
++		if (IS_ERR(tmprange))
++			return -EFAULT;
++	}
+ #endif
+ 
+-	return err;
++	return 0;
  }
  
- /*
+ phys_addr_t pci_pio_to_address(unsigned long pio)
+@@ -3307,21 +3277,10 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
+ 	phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
+ 
+ #ifdef PCI_IOBASE
+-	struct io_range *range;
+-	resource_size_t allocated_size = 0;
+-
+-	if (pio > IO_SPACE_LIMIT)
++	if ((PIO_SECT_ID(pio)) != PIO_CPU_MMIO)
+ 		return address;
+ 
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(range, &io_range_list, list) {
+-		if (pio >= allocated_size && pio < allocated_size + range->size) {
+-			address = range->start + pio - allocated_size;
+-			break;
+-		}
+-		allocated_size += range->size;
+-	}
+-	spin_unlock(&io_range_lock);
++	address = logic_pio_to_hwaddr(pio);
+ #endif
+ 
+ 	return address;
+@@ -3330,25 +3289,8 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
+ unsigned long __weak pci_address_to_pio(phys_addr_t address)
+ {
+ #ifdef PCI_IOBASE
+-	struct io_range *res;
+-	resource_size_t offset = 0;
+-	unsigned long addr = -1;
+-
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(res, &io_range_list, list) {
+-		if (address >= res->start && address < res->start + res->size) {
+-			addr = address - res->start + offset;
+-			break;
+-		}
+-		offset += res->size;
+-	}
+-	spin_unlock(&io_range_lock);
+-
+-	return addr;
++	return logic_pio_trans_cpuaddr(address);
+ #else
+-	if (address > IO_SPACE_LIMIT)
+-		return (unsigned long)-1;
+-
+ 	return (unsigned long) address;
+ #endif
+ }
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index eb3da1a..6401327 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1194,7 +1194,8 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
+ 			void *alignf_data);
+ 
+ 
+-int pci_register_io_range(phys_addr_t addr, resource_size_t size);
++int pci_register_io_range(struct fwnode_handle *fwnode, phys_addr_t addr,
++			resource_size_t size);
+ unsigned long pci_address_to_pio(phys_addr_t addr);
+ phys_addr_t pci_pio_to_address(unsigned long pio);
+ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
 -- 
-2.7.4
+1.9.1
