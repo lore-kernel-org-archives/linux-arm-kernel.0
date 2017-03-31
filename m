@@ -1,24 +1,71 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 31 Mar 2017 12:43:13 +0200
-Subject: [PATCH] multi_v7_defconfig: make Rockchip DRM drivers built-in
-In-Reply-To: <20170331103314.1067264-1-arnd@arndb.de>
-References: <20170331103314.1067264-1-arnd@arndb.de>
-Message-ID: <1995616.yTRRrZzmVW@phil>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 31 Mar 2017 13:02:51 +0200
+Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
+ code
+References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
+Message-ID: <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 31. M?rz 2017, 12:33:14 CEST schrieb Arnd Bergmann:
-> These cause warnings in linux-next, as the symbols have become 'bool' there:
-> 
-> arch/arm/configs/multi_v7_defconfig:600:warning: symbol value 'm' invalid for ROCKCHIP_INNO_HDMI
-> arch/arm/configs/multi_v7_defconfig:599:warning: symbol value 'm' invalid for ROCKCHIP_DW_MIPI_DSI
-> arch/arm/configs/multi_v7_defconfig:598:warning: symbol value 'm' invalid for ROCKCHIP_DW_HDMI
-> arch/arm/configs/multi_v7_defconfig:597:warning: symbol value 'm' invalid for ROCKCHIP_ANALOGIX_DP
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+is invalid. __iommu_mmap_attrs and __iommu_get_sgtable should not
+use it and take advantage of contiguous nature of the allocation.
 
-looks good, so for what it's worth:
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+Hi Robin, Geert,
 
+In this version of the patch I have replaced temporal pages and
+iommu_dma_mmap with remap_pfn_range or rather its simplified version
+vm_iomap_memory.
+Unfortunately I have not find nice helper for sgtable creation, so I
+left sg allocation inside _iommu_mmap_attrs.
 
-Heiko
+As the fixing of DMA_ATTR_FORCE_CONTIGUOUS related crashes has higher
+priority I have focused only on it in this patch.
+
+Regards
+Andrzej
+---
+ arch/arm64/mm/dma-mapping.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index f7b5401..41c7c36 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -703,6 +703,10 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+ 		return ret;
+ 
++	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
++		return vm_iomap_memory(vma,
++				page_to_phys(vmalloc_to_page(cpu_addr)), size);
++
+ 	area = find_vm_area(cpu_addr);
+ 	if (WARN_ON(!area || !area->pages))
+ 		return -ENXIO;
+@@ -715,8 +719,19 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 			       size_t size, unsigned long attrs)
+ {
+ 	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+-	struct vm_struct *area = find_vm_area(cpu_addr);
++	struct vm_struct *area;
++
++	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
++		int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
++
++		if (!ret)
++			sg_set_page(sgt->sgl, vmalloc_to_page(cpu_addr),
++				    PAGE_ALIGN(size), 0);
+ 
++		return ret;
++	}
++
++	area = find_vm_area(cpu_addr);
+ 	if (WARN_ON(!area || !area->pages))
+ 		return -ENXIO;
+ 
+-- 
+2.7.4
