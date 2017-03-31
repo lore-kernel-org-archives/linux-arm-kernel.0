@@ -1,57 +1,67 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Fri, 31 Mar 2017 22:11:23 +0200
-Subject: [PATCH V4 1/2] dt-bindings: thermal: add support for Broadcom's
- Northstar thermal
-In-Reply-To: <20170331073132.21457-2-zajec5@gmail.com>
-References: <20170331073132.21457-2-zajec5@gmail.com>
-Message-ID: <20170331201124.656-1-zajec5@gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 31 Mar 2017 17:05:02 -0500
+Subject: [PATCH] tty: pl011: fix earlycon work-around for QDF2400 erratum 44
+Message-ID: <1490997902-4894-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+The work-around for the Qualcomm Datacenter Technologies QDF2400
+erratum 44 sets the "qdf2400_e44_present" global variable if the
+work-around is needed.  However, this check does not happen until after
+earlycon is initialized, which means the work-around is not
+used, and the console hangs as soon as it displays one character.
 
-This commit documents binding for thermal used in Northstar family SoCs.
-
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Fixes: d8a4995bcea1 ("tty: pl011: Work around QDF2400 E44 stuck BUSY bit")
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
-V3: Add thermal-zones to the example
-    Rob: Because of this update, I didn't include Acked-by I got for V2
----
- .../devicetree/bindings/thermal/brcm,ns-thermal    | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+ drivers/tty/serial/amba-pl011.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
-new file mode 100644
-index 000000000000..c561c7349f17
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
-@@ -0,0 +1,26 @@
-+* Broadcom Northstar Thermal
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 56f92d7..b0a3777 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2452,18 +2452,37 @@ static void pl011_early_write(struct console *con, const char *s, unsigned n)
+ 	uart_console_write(&dev->port, s, n, pl011_putc);
+ }
+ 
++/*
++ * On non-ACPI systems, earlycon is enabled by specifying
++ * "earlycon=pl011,<address>" on the kernel command line.
++ *
++ * On ACPI ARM64 systems, an "early" console is enabled via the SPCR table,
++ * by specifying only "earlycon" on the command line.  Because it requires
++ * SPCR, the console starts after ACPI is parsed, which is later than a
++ * traditional early console.
++ *
++ * To get the traditional early console that starts before ACPI is parsed,
++ * specify the full "earlycon=pl011,<address>" option.
++ */
+ static int __init pl011_early_console_setup(struct earlycon_device *device,
+ 					    const char *opt)
+ {
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
+-	device->con->write = qdf2400_e44_present ?
+-				qdf2400_e44_early_write : pl011_early_write;
++	/* On QDF2400 SOCs affected by Erratum 44, the "qdf2400_e44" must
++	 * also be specified, e.g. "earlycon=pl011,<address>,qdf2400_e44".
++	 */
++	if (!strcmp(device->options, "qdf2400_e44"))
++		device->con->write = qdf2400_e44_early_write;
++	else
++		device->con->write = pl011_early_write;
 +
-+This binding describes thermal sensor that is part of Northstar's DMU (Device
-+Management Unit).
-+
-+Required properties:
-+- compatible : Must be "brcm,ns-thermal"
-+- reg : iomem address range of PVTMON registers
-+- #thermal-sensor-cells : Should be <0>
-+
-+Example:
-+
-+thermal: thermal at 1800c2c0 {
-+	compatible = "brcm,ns-thermal";
-+	reg = <0x1800c2c0 0x10>;
-+	#thermal-sensor-cells = <0>;
-+};
-+
-+thermal-zones {
-+	cpu_thermal: cpu-thermal {
-+		polling-delay-passive = <0>;
-+		polling-delay = <1000>;
-+		coefficients = <(-556) 418000>;
-+		thermal-sensors = <&thermal>;
-+	};
-+};
+ 	return 0;
+ }
+ OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+ OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
++EARLYCON_DECLARE(qdf2400_e44, pl011_early_console_setup);
+ 
+ #else
+ #define AMBA_CONSOLE	NULL
 -- 
-2.11.0
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
