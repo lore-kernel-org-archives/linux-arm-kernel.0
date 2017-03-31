@@ -1,96 +1,47 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 31 Mar 2017 09:35:25 -0700
-Subject: [PATCH v2] lkdtm: add bad USER_DS test
-In-Reply-To: <20170324175125.GA108985@beast>
-References: <20170324175125.GA108985@beast>
-Message-ID: <CAGXu5jJH7KCONQfkV_ZZE6Q2N9AMix7CnXu3sY++fxweiWJD=g@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 31 Mar 2017 17:44:23 +0100
+Subject: [PATCH 08/10] perf/core: Add PERF_AUX_FLAG_COLLISION to report
+ colliding samples
+In-Reply-To: <1485540470-11469-9-git-send-email-will.deacon@arm.com>
+References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
+ <1485540470-11469-9-git-send-email-will.deacon@arm.com>
+Message-ID: <72e0e51c-9abf-641f-f13e-ee07e12c02c1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 10:51 AM, Kees Cook <keescook@chromium.org> wrote:
-> This adds CORRUPT_USER_DS to check that the get_fs() test on syscall
-> return (via __VERIFY_PRE_USERMODE_STATE) still sees USER_DS. Since
-> trying to deal with values other than USER_DS and KERNEL_DS across all
-> architectures in a safe way is not sensible, this sets KERNEL_DS, but
-> since that could be extremely dangerous if the protection is not present,
-> it also raises SIGKILL for current, so that no matter what, the process
-> will die. A successful test will be visible with a BUG(), like all the
-> other LKDTM tests.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+Hi Will,
 
-Greg, can you add this to the drivers/misc tree when you get a moment?
-
-Thanks!
-
--Kees
-
+On 27/01/17 18:07, Will Deacon wrote:
+> The ARM SPE architecture permits an implementation to ignore a sample
+> if the sample is due to be taken whilst another sample is already being
+> produced. In this case, it is desirable to report the collision to
+> userspace, as they may want to lower the sample period.
+> 
+> This patch adds a PERF_AUX_FLAG_COLLISION flag, so that such events can
+> be relayed to userspace.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  drivers/misc/lkdtm.h      |  1 +
->  drivers/misc/lkdtm_bugs.c | 11 +++++++++++
->  drivers/misc/lkdtm_core.c |  1 +
->  3 files changed, 13 insertions(+)
->
-> diff --git a/drivers/misc/lkdtm.h b/drivers/misc/lkdtm.h
-> index 67d27be60405..3b4976396ec4 100644
-> --- a/drivers/misc/lkdtm.h
-> +++ b/drivers/misc/lkdtm.h
-> @@ -27,6 +27,7 @@ void lkdtm_REFCOUNT_ZERO_SUB(void);
->  void lkdtm_REFCOUNT_ZERO_ADD(void);
->  void lkdtm_CORRUPT_LIST_ADD(void);
->  void lkdtm_CORRUPT_LIST_DEL(void);
-> +void lkdtm_CORRUPT_USER_DS(void);
->
->  /* lkdtm_heap.c */
->  void lkdtm_OVERWRITE_ALLOCATION(void);
-> diff --git a/drivers/misc/lkdtm_bugs.c b/drivers/misc/lkdtm_bugs.c
-> index e3f4cd8876b5..ed4f4c56c796 100644
-> --- a/drivers/misc/lkdtm_bugs.c
-> +++ b/drivers/misc/lkdtm_bugs.c
-> @@ -8,6 +8,8 @@
->  #include <linux/list.h>
->  #include <linux/refcount.h>
->  #include <linux/sched.h>
-> +#include <linux/sched/signal.h>
-> +#include <linux/uaccess.h>
->
->  struct lkdtm_list {
->         struct list_head node;
-> @@ -279,3 +281,12 @@ void lkdtm_CORRUPT_LIST_DEL(void)
->         else
->                 pr_err("list_del() corruption not detected!\n");
->  }
-> +
-> +void lkdtm_CORRUPT_USER_DS(void)
-> +{
-> +       pr_info("setting bad task size limit\n");
-> +       set_fs(KERNEL_DS);
-> +
-> +       /* Make sure we do not keep running with a KERNEL_DS! */
-> +       force_sig(SIGKILL, current);
-> +}
-> diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-> index b9a4cd4a9b68..42d2b8e31e6b 100644
-> --- a/drivers/misc/lkdtm_core.c
-> +++ b/drivers/misc/lkdtm_core.c
-> @@ -199,6 +199,7 @@ struct crashtype crashtypes[] = {
->         CRASHTYPE(OVERFLOW),
->         CRASHTYPE(CORRUPT_LIST_ADD),
->         CRASHTYPE(CORRUPT_LIST_DEL),
-> +       CRASHTYPE(CORRUPT_USER_DS),
->         CRASHTYPE(CORRUPT_STACK),
->         CRASHTYPE(UNALIGNED_LOAD_STORE_WRITE),
->         CRASHTYPE(OVERWRITE_ALLOCATION),
-> --
-> 2.7.4
->
->
-> --
-> Kees Cook
-> Pixel Security
+>  include/uapi/linux/perf_event.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
+> index c66a485a24ac..68a4e542968e 100644
+> --- a/include/uapi/linux/perf_event.h
+> +++ b/include/uapi/linux/perf_event.h
+> @@ -885,6 +885,7 @@ enum perf_callchain_context {
+>   */
+>  #define PERF_AUX_FLAG_TRUNCATED		0x01	/* record was truncated to fit */
+>  #define PERF_AUX_FLAG_OVERWRITE		0x02	/* snapshot from overwrite mode */
+> +#define PERF_AUX_FLAG_COLLISION		0x03	/* sample collided with another */
 
+Does COLLISION really represent the combination of both TRUNCATED and
+OVERWRITE, or does that want to be 0x04? (The way they get ORed together
+at one point in the following patch makes me suspicious.)
 
+Robin.
 
--- 
-Kees Cook
-Pixel Security
+>  
+>  #define PERF_FLAG_FD_NO_GROUP		(1UL << 0)
+>  #define PERF_FLAG_FD_OUTPUT		(1UL << 1)
+> 
