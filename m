@@ -1,57 +1,46 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 31 Mar 2017 11:21:35 +0100
-Subject: [PATCH 3/3] drm/arm: hdlcd: check for rotation
-In-Reply-To: <20170331101123.GK30290@intel.com>
+Date: Fri, 31 Mar 2017 11:23:45 +0100
+Subject: [PATCH 1/3] drm/arm: hdlcd: properly validate plane state
+In-Reply-To: <20170331102035.GP7909@n2100.armlinux.org.uk>
 References: <20170331094937.GO7909@n2100.armlinux.org.uk>
- <E1cttDk-00067G-1b@rmk-PC.armlinux.org.uk>
- <20170331101123.GK30290@intel.com>
-Message-ID: <20170331102135.GE13355@e110455-lin.cambridge.arm.com>
+ <E1cttDZ-000671-Q1@rmk-PC.armlinux.org.uk>
+ <20170331101850.GD13355@e110455-lin.cambridge.arm.com>
+ <20170331102035.GP7909@n2100.armlinux.org.uk>
+Message-ID: <20170331102345.GF13355@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 01:11:23PM +0300, Ville Syrj?l? wrote:
-> On Fri, Mar 31, 2017 at 10:51:52AM +0100, Russell King wrote:
-> > hdlcd does not support rotation - check for it and reject plane updates
-> > that try to rotate a plane.
+On Fri, Mar 31, 2017 at 11:20:35AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Mar 31, 2017 at 11:18:50AM +0100, Liviu Dudau wrote:
+> > Hi Russell,
 > > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > ---
-> >  drivers/gpu/drm/arm/hdlcd_crtc.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
+> > You were Cc-ed in a patch from March 8th that did all this:
 > > 
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > index cf70184fd028..171acc842368 100644
-> > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > @@ -215,6 +215,10 @@ static int hdlcd_plane_atomic_check(struct drm_plane *plane,
-> >  	if (!crtc)
-> >  		return 0;
-> >  
-> > +	/* We do not support rotation */
-> > +	if (state->rotation != DRM_ROTATE_0)
-> > +		return -EINVAL;
+> > https://lists.freedesktop.org/archives/dri-devel/2017-March/135172.html
 > 
-> This can't happen unless you attach a rotation property with a bogus
-> set of supported rotations to the plane.
+> I'm aware of that (you may notice that this was threaded to that patch.)
+> 
+> > I have not received any response from you, so I have already pushed the
+> > patch in my public repo:
+> > 
+> > git://linux-arm.org/linux-ld.git for-upstream/hdlcd
+> > 
+> > It has been included into linux-next for at least a couple of weeks now.
+> 
+> I've not had a chance to test any of this, but I believe that your
+> patch does not fully address the issue, due to bits missing from
+> the validation path.
 
-Which we don't. I did toy with the idea of adding it as one can hack support for 0? and 180?
-rotation by playing with the line pitch, I've even created a patch but in the end I've
-decided not to publish it. If there is anyone interested at some moment on this, I can dig it out.
+Care to point out which bits were missing from my patch that are in yours?
 
 Best regards,
 Liviu
 
 > 
-> > +
-> >  	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
-> >  	if (!crtc_state->enable)
-> >  		return -EINVAL;
-> > -- 
-> > 2.7.4
-> 
 > -- 
-> Ville Syrj?l?
-> Intel OTC
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
 -- 
 ====================
