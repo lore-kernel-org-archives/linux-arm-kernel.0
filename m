@@ -1,72 +1,47 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 31 Mar 2017 10:14:33 +0530
-Subject: [PATCH v4 0/7] PCI: dwc: Miscellaneous fixes and cleanups
-In-Reply-To: <20170330234450.GC3912@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170313134328.1588-1-kishon@ti.com>
- <20170330234450.GC3912@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <12fe0097-e11c-e4ed-64e1-666d4a21dd55@ti.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Fri, 31 Mar 2017 11:06:14 +0530
+Subject: [PATCH v9 04/12] soc: samsung: add exynos chipid driver support
+In-Reply-To: <CAK8P3a0dq-Ve2N3yFbpZ7LHzZJ=w6-pLRTSZJZ2=rnk2gWphJw@mail.gmail.com>
+References: <CGME20170330131427epcas5p4c3d238022dc75694ad3baa8a1018ea04@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
+ <CAK8P3a0dq-Ve2N3yFbpZ7LHzZJ=w6-pLRTSZJZ2=rnk2gWphJw@mail.gmail.com>
+Message-ID: <a1be4b9c-0f68-dbe3-7799-d5acf4ec31e0@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
-
-On Friday 31 March 2017 05:14 AM, Bjorn Helgaas wrote:
-> On Mon, Mar 13, 2017 at 07:13:21PM +0530, Kishon Vijay Abraham I wrote:
->> This should be the final set of cleanups/fixes before endpoint
->> support can be merged.
+On Thursday 30 March 2017 07:20 PM, Arnd Bergmann wrote:
+> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
 >>
->> Keerthy's patch is a general fix in dra7xx driver and is not
->> directly related to endpoint mode.
->>
->> This v1 of this series was previously sent with a different
->> cover letter $subject [1]
->>
->> Changes from v3:
->> *) instead of changing all the callers of dbi accessors (taking
->>    dbi_base and size), manage it using static inline as suggested
->>    by Niklas (used static inline instead of macros because of
->>    checkpatch error).
->>
->> Changes from v2:
->> *) Kconfig changes that was spilled into a patch is removed.
->> *) In addition to renaming _unroll() to _ob_unroll(), all the
->>    _unroll configurations is also moved a separate function.
->>
->> Changes from v1:
->> *) included a patch to rename _unroll() to _ob_unroll() as
->>    similar thing has to be done for inbound window in the case
->>    of EP mode.
->> *) used 'size_t' instead of 'int' for specifying the size
->>    in read_dbi/write_dbi function arguments.
->> *) Populate cpu_addr_fixup ops for artpec6 as suggested by
->>    Niklas
->>
->> This series is based on 4.11-rc1
->>
->> [1] -> https://lkml.org/lkml/2017/2/16/270
->>
->> Keerthy (1):
->>   PCI: dwc: dra7xx: Push request_irq call to the bottom of probe
->>
->> Kishon Vijay Abraham I (6):
->>   PCI: dwc: designware: Add new *ops* for cpu addr fixup
->>   PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
->>   PCI: dwc: artpec6: Populate cpu_addr_fixup ops
->>   PCI: dwc: all: Modify dbi accessors to take dbi_base as argument
->>   PCI: dwc: all: Modify dbi accessors to access data of  4/2/1 bytes
->>   PCI: dwc: designware: Move _unroll configurations to a separate
->>     function
->>
->>  drivers/pci/dwc/pci-dra7xx.c      |  25 +++----
->>  drivers/pci/dwc/pci-exynos.c      |  14 ++--
->>  drivers/pci/dwc/pcie-artpec6.c    |  15 +++--
->>  drivers/pci/dwc/pcie-designware.c | 133 ++++++++++++++++++++++++--------------
->>  drivers/pci/dwc/pcie-designware.h |  23 +++++--
->>  5 files changed, 135 insertions(+), 75 deletions(-)
+>> +config EXYNOS_CHIPID
+>> +       bool "Exynos Chipid controller driver" if COMPILE_TEST
+>> +       depends on ARCH_EXYNOS || COMPILE_TEST
+>> +       select SOC_BUS
 > 
-> Applied to pci/host-designware for v4.12, with Niklas' ack on patches
-> 4 & 5, thanks!
+> This lets you disable the driver when COMPILE_TEST is set on exynos,
+> which is probably not what you wanted.
+> 
 
-Thanks Bjorn.
+Sorry I could not get this point. EXYNOS_CHIPID is invisible menu
+option, when I enabled COMPILE_TEST, option is visible in make
+menuconfig but it does not allow to disable this driver. I have adopted
+this config same as EXYNOS_PMU in the same file.
 
--Kishon
+> I'd do
+> 
+>          bool "Exynos Chipid controller driver" if COMPILE_TEST && !ARCHEXYNOS
+>          default ARCH_EXYNOS
+
+I can adopt, default ARCH_EXYNOS, which will allow me to drop patch 5/12
+and 6/12.
+
+Thanks for review.
+Pankaj Dubey
+
+> 
+>      Arnd
+> 
+> 
+> 
