@@ -1,141 +1,210 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 31 Mar 2017 19:30:27 +0800
-Subject: [PATCH v13 00/12] MT2701 DRM support
-Message-ID: <1490959839-39816-1-git-send-email-yt.shen@mediatek.com>
+Date: Fri, 31 Mar 2017 19:30:31 +0800
+Subject: [PATCH v13 04/12] drm/mediatek: add shadow register support
+In-Reply-To: <1490959839-39816-1-git-send-email-yt.shen@mediatek.com>
+References: <1490959839-39816-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1490959839-39816-5-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is MT2701 DRM support PATCH v13, based on 4.11-rc1.
-We add DSI interrupt control, transfer function for MIPI DSI panel support.
-Most codes are the same, except some register changed.
+We need to acquire mutex before using the resources,
+and need to release it after finished.
+So we don't need to write registers in the blanking period.
 
-For example:
- - DISP_OVL address offset changed, color format definition changed.
- - DISP_RDMA fifo size changed.
- - DISP_COLOR offset changed.
- - MIPI_TX setting changed.
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+Acked-by: CK Hu <ck.hu@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 75 ++++++++++++++++++++-------------
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 25 +++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  2 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  1 +
+ 4 files changed, 74 insertions(+), 29 deletions(-)
 
-We add a new component DDP_COMPONENT_BLS, and the connections are updated.
-OVL -> RDMA -> COLOR -> BLS -> DSI
-RDMA -> DPI
-And we have shadow register support in MT2701.
-
-Changes since v12:
-- Fix DSI enable flow we changed at v12
-
-Changes since v11:
-- Update mtk_dsi_poweron() and mtk_output_dsi_enable() to symmetric flow
-
-Changes since v10:
-- Add binding descriptions for newly added bindings
-- Remove color data pointer from generic mtk_ddp_comp
-- Remove "drm/mediatek: add mipi_tx data rate check" from the patch series
-- Remove "drm/mediatek: add dsi ulp mode control" from the patch series
-- Update descriptions for "drm/mediatek: add non-continuous clock mode and EOT packet control"
-- Fix DSI disable flow
-
-Changes since v9:
-- Split DSI patches into smaller parts
-- Use a real linux errno for return value
-- Add error handling in mtk_output_dsi_enable()
-- Remove unused changes and redundant delays
-- Add helpers and macros for configuration
-- Combine "drm/mediatek: rename macros, add chip prefix" and "drm/mediatek: add *driver_data for different hardware setting"
-
-Changes since v8:
-- enable 3 DSI interrupts only
-- move mtk_dsi_wait_for_irq_done() to the patch of irq control
-- use the name BLS in DRM driver part
-- move BLS declaration to a separate patch
-- update mtk_dsi_switch_to_cmd_mode()
-- update mtk_output_dsi_enable() and mtk_output_dsi_disable()
-
-Changes since v7:
-- Remove redundant codes
-- Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
-- Move _dsi_irq_wait_queue into platform driver data
-- Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
-- Add more descriptions in the commit messages
-
-Changes since v6:
-- Change data type of irq_data to u32
-- Rewrite mtk_dsi_host_transfer() for simplify
-- Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
-- Remove device tree from this patch series
-
-Changes since v5:
-- Remove DPI device tree and compatible string
-- Use one wait queue to handle interrupt status
-- Update the interrupt check flow and DSI_INT_ALL_BITS
-- Use same function for host read/write command
-- various fixes
-
-Changes since v4:
-- Add messages when timeout in mtk_disp_mutex_acquire()
-- Add descriptions for DISP_REG_MUTEX registers
-- Move connection settings for display modules to a separate patch
-- Remove 'mt2701-disp-wdma' because it is unused
-- Move cleaning up and renaming to a separate patch
-- Use wait_event_interruptible_timeout() to replace polling
-- Remove irq_num from mtk_dsi structure
-- Remove redundant and debug codes
-
-Changes since v3:
-- Add DSI support for MIPI DSI panels
-- Update BLS binding to PWM nodes
-- Remove ufoe device nodes
-- Remove redundant parentheses
-- Remove global variable initialization
-
-Changes since v2:
-- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
-- Update mt2701_mtk_ddp_ext components
-- Changed to prefix naming
-- Reorder the patch series
-- Use of_device_get_match_data() to get driver private data
-- Use iopoll macros to implement mtk_disp_mutex_acquire()
-- Removed empty device tree nodes
-
-Changes since v1:
-- Removed BLS bindings and codes, which belong to pwm driver
-- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
-- Split patch into smaller parts
-- Added const keyword to constant structure
-- Removed codes for special memory align
-
-Thanks,
-yt.shen
-
-YT Shen (10):
-  dt-bindings: display: mediatek: update supported chips
-  drm/mediatek: add helpers for coverting from the generic components
-  drm/mediatek: add *driver_data for different hardware settings
-  drm/mediatek: add shadow register support
-  drm/mediatek: add BLS component
-  drm/mediatek: update display module connections
-  drm/mediatek: cleaning up and refine
-  drm/mediatek: add non-continuous clock mode and EOT packet control
-  drm/mediatek: update DSI sub driver flow for sending commands to panel
-  drm/mediatek: add support for Mediatek SoC MT2701
-
-shaoming chen (2):
-  drm/mediatek: add dsi interrupt control
-  drm/mediatek: add dsi transfer function
-
- .../bindings/display/mediatek/mediatek,disp.txt    |   2 +
- .../bindings/display/mediatek/mediatek,dsi.txt     |   2 +
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c            |  64 ++-
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c           |  39 +-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |  75 +--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 138 +++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h             |   2 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  69 ++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |   2 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  54 +-
- drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   9 +
- drivers/gpu/drm/mediatek/mtk_dsi.c                 | 572 ++++++++++++++++-----
- drivers/gpu/drm/mediatek/mtk_mipi_tx.c             |  38 +-
- 13 files changed, 828 insertions(+), 238 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index a73de1e..4988e50 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -329,6 +329,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
+ 	pm_runtime_put(drm->dev);
+ }
+ 
++static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
++{
++	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
++	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
++	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
++	unsigned int i;
++
++	/*
++	 * TODO: instead of updating the registers here, we should prepare
++	 * working registers in atomic_commit and let the hardware command
++	 * queue update module registers on vblank.
++	 */
++	if (state->pending_config) {
++		mtk_ddp_comp_config(ovl, state->pending_width,
++				    state->pending_height,
++				    state->pending_vrefresh, 0);
++
++		state->pending_config = false;
++	}
++
++	if (mtk_crtc->pending_planes) {
++		for (i = 0; i < OVL_LAYER_NR; i++) {
++			struct drm_plane *plane = &mtk_crtc->planes[i];
++			struct mtk_plane_state *plane_state;
++
++			plane_state = to_mtk_plane_state(plane->state);
++
++			if (plane_state->pending.config) {
++				mtk_ddp_comp_layer_config(ovl, i, plane_state);
++				plane_state->pending.config = false;
++			}
++		}
++		mtk_crtc->pending_planes = false;
++	}
++}
++
+ static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+@@ -405,6 +441,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 				      struct drm_crtc_state *old_crtc_state)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
++	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 	unsigned int pending_planes = 0;
+ 	int i;
+ 
+@@ -426,6 +463,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 	if (crtc->state->color_mgmt_changed)
+ 		for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
+ 			mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], crtc->state);
++
++	if (priv->data->shadow_register) {
++		mtk_disp_mutex_acquire(mtk_crtc->mutex);
++		mtk_crtc_ddp_config(crtc);
++		mtk_disp_mutex_release(mtk_crtc->mutex);
++	}
+ }
+ 
+ static const struct drm_crtc_funcs mtk_crtc_funcs = {
+@@ -471,36 +514,10 @@ static int mtk_drm_crtc_init(struct drm_device *drm,
+ void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+-	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+-	unsigned int i;
++	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 
+-	/*
+-	 * TODO: instead of updating the registers here, we should prepare
+-	 * working registers in atomic_commit and let the hardware command
+-	 * queue update module registers on vblank.
+-	 */
+-	if (state->pending_config) {
+-		mtk_ddp_comp_config(ovl, state->pending_width,
+-				    state->pending_height,
+-				    state->pending_vrefresh, 0);
+-
+-		state->pending_config = false;
+-	}
+-
+-	if (mtk_crtc->pending_planes) {
+-		for (i = 0; i < OVL_LAYER_NR; i++) {
+-			struct drm_plane *plane = &mtk_crtc->planes[i];
+-			struct mtk_plane_state *plane_state;
+-
+-			plane_state = to_mtk_plane_state(plane->state);
+-
+-			if (plane_state->pending.config) {
+-				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+-				plane_state->pending.config = false;
+-			}
+-		}
+-		mtk_crtc->pending_planes = false;
+-	}
++	if (!priv->data->shadow_register)
++		mtk_crtc_ddp_config(crtc);
+ 
+ 	mtk_drm_finish_page_flip(mtk_crtc);
+ }
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 8030769..b77d456 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+@@ -32,10 +33,13 @@
+ #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+ 
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
++#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+ #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+ #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+ #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+ 
++#define INT_MUTEX				BIT(1)
++
+ #define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
+ #define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
+ #define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
+@@ -300,6 +304,27 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
+ 	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+ }
+ 
++void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
++{
++	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
++					   mutex[mutex->id]);
++	u32 tmp;
++
++	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
++	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
++	if (readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id),
++				      tmp, tmp & INT_MUTEX, 1, 10000))
++		pr_err("could not acquire mutex %d\n", mutex->id);
++}
++
++void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
++{
++	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
++					   mutex[mutex->id]);
++
++	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
++}
++
+ static int mtk_ddp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+index 92c1175..f9a7991 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+@@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+ 				enum mtk_ddp_comp_id id);
+ void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
+ void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
++void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
++void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+ 
+ #endif /* MTK_DRM_DDP_H */
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index 21a4339..aef8747 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
+ 	unsigned int main_len;
+ 	const enum mtk_ddp_comp_id *ext_path;
+ 	unsigned int ext_len;
++	bool shadow_register;
+ };
+ 
+ struct mtk_drm_private {
 -- 
 1.9.1
