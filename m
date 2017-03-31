@@ -1,43 +1,46 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 31 Mar 2017 17:37:37 +0200
-Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
-In-Reply-To: <m2y3vn6dhk.fsf@baylibre.com>
-References: <20170328092545.4644-1-hgkr.klein@gmail.com>
- <20170328092545.4644-2-hgkr.klein@gmail.com>
- <1490716277.20764.6.camel@baylibre.com>
- <71489b62-78c8-7082-587e-8598dc43ca59@gmail.com>
- <1490728490.20764.8.camel@baylibre.com>
- <CAFBinCDF29+kQpedsJPqRy6fztWrj91Qi6tCno_2S6UCkhW7XQ@mail.gmail.com>
- <m2y3vn6dhk.fsf@baylibre.com>
-Message-ID: <1490974657.12951.5.camel@baylibre.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 31 Mar 2017 09:01:31 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.12
+In-Reply-To: <CAK8P3a02e3DxjuW9pA66NSCc9vw_h1Xuk6TdEbRnEQ4v4W7NHA@mail.gmail.com>
+ (Arnd Bergmann's message of "Fri, 31 Mar 2017 16:02:41 +0200")
+References: <m28tnn69ls.fsf@baylibre.com>
+ <CAK8P3a02e3DxjuW9pA66NSCc9vw_h1Xuk6TdEbRnEQ4v4W7NHA@mail.gmail.com>
+Message-ID: <m2fuht4eqs.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-03-29 at 13:21 -0700, Kevin Hilman wrote:
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
-> 
-> [...]
-> 
-> > for Helmut this would mean that instead of dropping this patch (or
-> > dropping CLKID_UART1 and CLKID_UART2 from this patch) he would rather
-> > have to *add* another patch (for meson-gxbb.dtsi and meson-gxl.dtsi)
-> > which passes the core clocks to the corresponding UART controllers
-> > (similar to the CLKID_SD_EMMC_ clocks).
-> 
-> Yes, this is what I would like to see.
-> 
-> If a new CLKID is exposed, I want to see the users of it at the same
-> time.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Helmut,
+> On Wed, Mar 29, 2017 at 11:45 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Olof, Arnd,
+>>
+>> Below are some 64-bit DT changes for Amlogic platforms for v4.12.  Note
+>> that this branch includes a merge of an immutable branch from the clk
+>> tree (clk-meson) due to dependencies on new clocks added to the meson
+>> clock driver and used in these DT updates.
+>
+> I did not pull this one because of the silly dependency. The device tree
+> files should be completely independent of the driver changes.
 
-If you send another version of these patches, considering the feedback of Kevin
-and Martin, could you please change the subject of this patch to:
+Aaargh, this is getting very frustrating.
 
-dt-bindings: clock: gxbb: expose?UART clocks
+[...]
 
-Thx
-Jerome
+> Which add random macros in the middle of the number space.
+>
+> Since the header changes are in an immutable branch, it's probably
+> too late to fix this for 4.12, but maybe we can get the header into a
+> form that allows us to do future DT changes without having to
+> wait an extra release. The clock driver apparently already defines
+> some of the numbers above, so you can fill all of those in already.
 
-> 
-> Kevin
+We could, but this is in direct conflict with the recommendations of the
+clk maintainers to not expose clock IDs to the DT until we know they are
+used because, well, things change.
+
+Can we *please* get some clarity on on this between arm-soc and the clk
+maintainers?  I've been asking for a couple merge windows now.
+
+Irritated,
+
+Kevin
