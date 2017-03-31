@@ -1,51 +1,56 @@
 From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Fri, 31 Mar 2017 18:54:33 +0200
-Subject: [PATCH v3 0/4] tty/serial: meson_uart: add support for core clock
- handling
-Message-ID: <20170331165437.26227-1-hgkr.klein@gmail.com>
+Date: Fri, 31 Mar 2017 18:54:35 +0200
+Subject: [PATCH v3 2/4] dt-binding: meson_uart: add documentation for the
+ UARTs of amlogic
+In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+Message-ID: <20170331165437.26227-3-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To be able to use the three none AO uarts of the meson gx SoCs (uart_A,
-uart_B & uart_C), the core clock has to be enabled (see chapter 22.3 of
-the public s905 data sheet).
-At least the u-boot of my s905 based media player (netxeon minimx-g)
-doesn't do this. so the driver must enable the clock.
+Add the documentation for the device tree binding of meson_uart
 
-This patch set does:
-- exposes the UART clock ids to the dtb
-- adds documentation for the dt-bindings of meson_uart
-- adds the core clock handling to the driver
-- adds the core clock handling to meson-gxbb.dtsi and meson-gxl.dtsi
-
-The patchset is based on the branch "master" of the repository in [1]
-
-Changes since v2
-- mail subjects reworked
-- add clocks/clock-names to the documentation
-- add core clock handling to meson-gxbb.dtsi & meson-gxl.dtsi
-
-Changes since v1
-- use git to produce the patch set
-- added the clock ids for uart_B and uart_C
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
-
-Helmut Klein (4):
-  clk: meson: gxbb: expose CLKID_UARTx
-  dt-bindings: meson_uart: add documentation for meson UARTs
-  tty/serial: meson_uart: add the core clock handling to the driver
-  ARM64: dts: meson-gx: add core clock support for uart_A, uart_B and
-    uart_C
-
+Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+---
  .../bindings/serial/amlogic,meson_uart.txt         | 30 ++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 15 +++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 15 +++++++++++
- drivers/clk/meson/gxbb.h                           |  6 ++---
- drivers/tty/serial/meson_uart.c                    | 10 ++++++++
- include/dt-bindings/clock/gxbb-clkc.h              |  3 +++
- 6 files changed, 76 insertions(+), 3 deletions(-)
+ 1 file changed, 30 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
 
+diff --git a/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+new file mode 100644
+index 000000000000..8250a191c2fc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+@@ -0,0 +1,30 @@
++* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
++
++Required properties:
++- compatible	: "amlogic,meson-uart"
++- reg		: offset and length of the register set for the device.
++- interrupts	: device interrupt
++- clocks	: a list of phandle + clock-specifier pairs, one for each
++		    entry in clock names.
++- clocks-names	: contains:
++   * "xtal" for the baud rate clock
++   * "core" for the core clock of none AO UARTs (optional)
++
++e.g.
++uart_A: serial at 84c0 {
++	compatible = "amlogic,meson-uart";
++	reg = <0x0 0x84c0 0x0 0x14>;
++	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
++	interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
++	clocks = <&xtal>, <&clkc CLKID_UART0>;
++	clock-names = "xtal", "core";
++	status = "ok";
++};
++
++Note: Each port should have an alias correctly numbered in "aliases" node.
++
++e.g.
++aliases {
++	serial0 = &uart_AO;
++	serial1 = &uart_A;
++};
 --
 2.11.0
