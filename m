@@ -1,43 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Mar 2017 11:27:51 +0100
-Subject: [PATCH 1/3] drm/arm: hdlcd: properly validate plane state
-In-Reply-To: <20170331102345.GF13355@e110455-lin.cambridge.arm.com>
-References: <20170331094937.GO7909@n2100.armlinux.org.uk>
- <E1cttDZ-000671-Q1@rmk-PC.armlinux.org.uk>
- <20170331101850.GD13355@e110455-lin.cambridge.arm.com>
- <20170331102035.GP7909@n2100.armlinux.org.uk>
- <20170331102345.GF13355@e110455-lin.cambridge.arm.com>
-Message-ID: <20170331102751.GQ7909@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Mar 2017 12:33:14 +0200
+Subject: [PATCH] multi_v7_defconfig: make Rockchip DRM drivers built-in
+Message-ID: <20170331103314.1067264-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 11:23:45AM +0100, Liviu Dudau wrote:
-> On Fri, Mar 31, 2017 at 11:20:35AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Mar 31, 2017 at 11:18:50AM +0100, Liviu Dudau wrote:
-> > > Hi Russell,
-> > > 
-> > > You were Cc-ed in a patch from March 8th that did all this:
-> > > 
-> > > https://lists.freedesktop.org/archives/dri-devel/2017-March/135172.html
-> > 
-> > I'm aware of that (you may notice that this was threaded to that patch.)
-> > 
-> > > I have not received any response from you, so I have already pushed the
-> > > patch in my public repo:
-> > > 
-> > > git://linux-arm.org/linux-ld.git for-upstream/hdlcd
-> > > 
-> > > It has been included into linux-next for at least a couple of weeks now.
-> > 
-> > I've not had a chance to test any of this, but I believe that your
-> > patch does not fully address the issue, due to bits missing from
-> > the validation path.
-> 
-> Care to point out which bits were missing from my patch that are in yours?
+These cause warnings in linux-next, as the symbols have become 'bool' there:
 
-The visible check?
+arch/arm/configs/multi_v7_defconfig:600:warning: symbol value 'm' invalid for ROCKCHIP_INNO_HDMI
+arch/arm/configs/multi_v7_defconfig:599:warning: symbol value 'm' invalid for ROCKCHIP_DW_MIPI_DSI
+arch/arm/configs/multi_v7_defconfig:598:warning: symbol value 'm' invalid for ROCKCHIP_DW_HDMI
+arch/arm/configs/multi_v7_defconfig:597:warning: symbol value 'm' invalid for ROCKCHIP_ANALOGIX_DP
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I've applied this patch to next/defconfig to avoid some warnings we see in
+kernelci.
+
+ arch/arm/configs/multi_v7_defconfig | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 63b94d0e5503..ea54ef6f1f03 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -593,10 +593,10 @@ CONFIG_DRM_EXYNOS_DPI=y
+ CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_ROCKCHIP=m
+-CONFIG_ROCKCHIP_ANALOGIX_DP=m
+-CONFIG_ROCKCHIP_DW_HDMI=m
+-CONFIG_ROCKCHIP_DW_MIPI_DSI=m
+-CONFIG_ROCKCHIP_INNO_HDMI=m
++CONFIG_ROCKCHIP_ANALOGIX_DP=y
++CONFIG_ROCKCHIP_DW_HDMI=y
++CONFIG_ROCKCHIP_DW_MIPI_DSI=y
++CONFIG_ROCKCHIP_INNO_HDMI=y
+ CONFIG_DRM_ATMEL_HLCDC=m
+ CONFIG_DRM_RCAR_DU=m
+ CONFIG_DRM_RCAR_HDMI=y
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.0
