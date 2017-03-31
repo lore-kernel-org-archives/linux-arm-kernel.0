@@ -1,53 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 31 Mar 2017 15:23:52 +0100
-Subject: [PATCH v6 07/11] drivers: perf: hisi: Add support for Hisilicon
- SoC event counters
-In-Reply-To: <58DE6400.8030900@gmail.com>
-References: <1489127311-112778-1-git-send-email-anurup.m@huawei.com>
- <20170321165252.GA29116@leverpostej> <58DCD47C.2010501@gmail.com>
- <20170330104607.GC16211@leverpostej> <58DE6400.8030900@gmail.com>
-Message-ID: <20170331142351.GC6488@leverpostej>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 31 Mar 2017 16:29:13 +0200
+Subject: [PATCH] iommu/mediatek: Teach MTK-IOMMUv1 about 'struct iommu_device'
+Message-ID: <1490970553-19787-1-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 07:43:20PM +0530, Anurup M wrote:
-> On Thursday 30 March 2017 04:16 PM, Mark Rutland wrote:
-> >>>>>+	/*
-> >>>>>> >>>+	 * We must NOT create groups containing mixed PMUs, although
-> >>>>>> >>>+	 * software events are acceptable
-> >>>>>> >>>+	 */
-> >>>>>> >>>+	if (event->group_leader->pmu != event->pmu &&
-> >>>>>> >>>+	    !is_software_event(event->group_leader))
-> >>>>>> >>>+		return -EINVAL;
-> >>>>>> >>>+
-> >>>>>> >>>+	list_for_each_entry(sibling, &event->group_leader->sibling_list,
-> >>>>>> >>>+			    group_entry)
-> >>>>>> >>>+		if (sibling->pmu != event->pmu && !is_software_event(sibling))
-> >>>>>> >>>+			return -EINVAL;
-> >>>> >Please also check the number of counters.
-> >>>
-> >>>Sorry, I could not follow this comment correctly. Could you please explain ?
-> >>>I check the available counters and update used mask in pmu_add -->
-> >>>get_event_index
-> >What I meant was that here we should ensure that a group does not
-> >contain more events than can fit into counters.
-> >
-> >For example, if the HW had two counters, we should reject any group with
-> >more than two events. Such groups can never be scheduled, and make no
-> >sense.
-> 
-> I have referred drivers/bus/arm-cci.c and could find validate_group
-> and validate_event functions,
-> which create a fake_pmu to check the available counters for the
-> events in the group.
-> Is that the same way which is expected here? Please comment.
+From: Joerg Roedel <jroedel@suse.de>
 
-Something like that.
+Make use of the iommu_device_register() interface.
 
-I think it's simplest to have a validate_group() function, which counts
-the number of counters used. See my suggestion in [1].
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ drivers/iommu/mtk_iommu_v1.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-Thanks,
-Mark.
-
-[1] https://lkml.kernel.org/r/20170331135955.GB6488 at leverpostej
+diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
+index 19e0100..a27ef57 100644
+--- a/drivers/iommu/mtk_iommu_v1.c
++++ b/drivers/iommu/mtk_iommu_v1.c
+@@ -431,9 +431,10 @@ static int mtk_iommu_create_mapping(struct device *dev,
+ 
+ static int mtk_iommu_add_device(struct device *dev)
+ {
+-	struct iommu_group *group;
+ 	struct of_phandle_args iommu_spec;
+ 	struct of_phandle_iterator it;
++	struct mtk_iommu_data *data;
++	struct iommu_group *group;
+ 	int err;
+ 
+ 	of_for_each_phandle(&it, err, dev->of_node, "iommus",
+@@ -450,6 +451,9 @@ static int mtk_iommu_add_device(struct device *dev)
+ 	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
+ 		return -ENODEV; /* Not a iommu client device */
+ 
++	data = dev->iommu_fwspec->iommu_priv;
++	iommu_device_link(&data->iommu, dev);
++
+ 	group = iommu_group_get_for_dev(dev);
+ 	if (IS_ERR(group))
+ 		return PTR_ERR(group);
+@@ -460,9 +464,14 @@ static int mtk_iommu_add_device(struct device *dev)
+ 
+ static void mtk_iommu_remove_device(struct device *dev)
+ {
++	struct mtk_iommu_data *data;
++
+ 	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
+ 		return;
+ 
++	data = dev->iommu_fwspec->iommu_priv;
++	iommu_device_unlink(&data->iommu, dev);
++
+ 	iommu_group_remove_device(dev);
+ 	iommu_fwspec_free(dev);
+ }
+@@ -627,6 +636,17 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
++				     dev_name(&pdev->dev));
++	if (ret)
++		return ret;
++
++	iommu_device_set_ops(&data->iommu, &mtk_iommu_ops);
++
++	ret = iommu_device_register(&data->iommu);
++	if (ret)
++		return ret;
++
+ 	if (!iommu_present(&platform_bus_type))
+ 		bus_set_iommu(&platform_bus_type,  &mtk_iommu_ops);
+ 
+@@ -637,6 +657,9 @@ static int mtk_iommu_remove(struct platform_device *pdev)
+ {
+ 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
+ 
++	iommu_device_sysfs_remove(&data->iommu);
++	iommu_device_unregister(&data->iommu);
++
+ 	if (iommu_present(&platform_bus_type))
+ 		bus_set_iommu(&platform_bus_type, NULL);
+ 
+-- 
+1.9.1
