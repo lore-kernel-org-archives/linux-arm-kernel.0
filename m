@@ -1,68 +1,71 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 31 Mar 2017 17:11:17 +0100
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.12
-In-Reply-To: <m2fuht4eqs.fsf@baylibre.com>
-References: <m28tnn69ls.fsf@baylibre.com>
- <CAK8P3a02e3DxjuW9pA66NSCc9vw_h1Xuk6TdEbRnEQ4v4W7NHA@mail.gmail.com>
- <m2fuht4eqs.fsf@baylibre.com>
-Message-ID: <8e708a9f-b32e-a80c-b5d7-8979e59b6662@codethink.co.uk>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 31 Mar 2017 17:20:26 +0100
+Subject: [PATCH v3 2/8] acpi: apei: handle SEI notification type for ARMv8
+In-Reply-To: <1490869877-118713-3-git-send-email-xiexiuqi@huawei.com>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+ <1490869877-118713-3-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <58DE81CA.3020803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/17 17:01, Kevin Hilman wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
->
->> On Wed, Mar 29, 2017 at 11:45 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->>> Olof, Arnd,
->>>
->>> Below are some 64-bit DT changes for Amlogic platforms for v4.12.  Note
->>> that this branch includes a merge of an immutable branch from the clk
->>> tree (clk-meson) due to dependencies on new clocks added to the meson
->>> clock driver and used in these DT updates.
->>
->> I did not pull this one because of the silly dependency. The device tree
->> files should be completely independent of the driver changes.
->
-> Aaargh, this is getting very frustrating.
+Hi Xie XiuQi,
 
-I tried to make this point very early on in the development,
-we don't want to be changing both driver and dt if we are
-adding things like IDs for gated clocks.
+On 30/03/17 11:31, Xie XiuQi wrote:
+> ARM APEI extension proposal added SEI (asynchronous SError interrupt)
+> notification type for ARMv8.
+> 
+> Add a new GHES error source handling function for SEI. In firmware
+> first mode, if an error source's notification type is SEI. Then GHES
+> could parse and report the detail error information.
 
-For example, having an almost 1:1 mapping from clock-id to
-bit-in-hardware would make life much easier, even if the
-driver had a little bit more code to create clocks at the
-probe time, it would have meant that DT additions for new
-peripherals would have been much easier.
+The APEI additions are unsafe until patch 4 as SEA can interrupt SEI and
+deadlock while trying to take the same set of locks. This patch needs to be
+after that interaction is fixed/prevented, or we should prevent it by adding a
+depends-on-not to the Kconfig to prevent SEI and SEA being registered at the
+same time. (as a short term fix).
 
-> [...]
->
->> Which add random macros in the middle of the number space.
->>
->> Since the header changes are in an immutable branch, it's probably
->> too late to fix this for 4.12, but maybe we can get the header into a
->> form that allows us to do future DT changes without having to
->> wait an extra release. The clock driver apparently already defines
->> some of the numbers above, so you can fill all of those in already.
->
-> We could, but this is in direct conflict with the recommendations of the
-> clk maintainers to not expose clock IDs to the DT until we know they are
-> used because, well, things change.
->
-> Can we *please* get some clarity on on this between arm-soc and the clk
-> maintainers?  I've been asking for a couple merge windows now.
->
-> Irritated,
->
-> Kevin
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
->
+(more comments on this on that later patch)
 
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index e52be6a..53710a2 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+
+> @@ -625,6 +627,14 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+
+bad_mode() is called in other scenarios too, for example executing an undefined
+instruction at EL1. You split the SError path out of the vectors in patch 7, I
+think we should do that here.
+
+
+>  		handler[reason], smp_processor_id(), esr,
+>  		esr_get_class_string(esr));
+>  
+> +	/*
+> +	 * In firmware first mode, we could assume firmware will only generate one
+> +	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
+> +	 */
+
+I don't follow this comment, is this saying SError can't interrupt SError? We
+already get this guarantee as the CPU masks SError when it takes an exception.
+
+Firmware can generate multiple CPER records for a single 'event'. The CPER
+records are the 'Data' in ACPI:Table 18-343 Generic Error Data Entry, and there
+are 'zero or more' of these with a 'Generic Error Status Block' header that
+describes the overall event. (Table 18-342).
+
+I don't think we need this comment.
+
+
+> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI) && ESR_ELx_EC(esr) == ESR_ELx_EC_SERROR) {
+> +		ghes_notify_sei();
+> +	}
+
+>  	die("Oops - bad mode", regs, 0);
+>  	local_irq_disable();
+>  	panic("bad mode");
+
+Thanks,
+
+James
