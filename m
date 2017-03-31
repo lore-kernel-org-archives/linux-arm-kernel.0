@@ -1,53 +1,89 @@
-From: ar@linux.vnet.ibm.com (Andrea Reale)
-Date: Fri, 31 Mar 2017 15:16:04 +0100
-Subject: [RFC PATCH] Memory hotplug support for arm64 platform
-In-Reply-To: <ef53951f-ff03-91d2-506a-c5eccb6512b4@gmail.com>
-References: <1481717765-31186-1-git-send-email-m.bielski@virtualopensystems.com>
- <75156ea7-6e74-27e8-bf29-762f79151d23@broadcom.com>
- <7977063a-20bb-cc85-449f-51bb7d20761e@virtualopensystems.com>
- <6568a65d-79c0-6fe4-e4d0-f1d3fe205321@broadcom.com>
- <20170206111732.GA5589@samekh>
- <ef53951f-ff03-91d2-506a-c5eccb6512b4@gmail.com>
-Message-ID: <20170331141603.GA1440@samekh>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Fri, 31 Mar 2017 10:23:49 -0400
+Subject: [PATCH V2 2/2] thermal: broadcom: add Northstar thermal driver
+In-Reply-To: <d678d252-a95a-58c0-8098-4401c67040a1@gmail.com>
+References: <20170318155632.18099-1-zajec5@gmail.com>
+ <20170323223045.15786-1-zajec5@gmail.com>
+ <20170323223045.15786-2-zajec5@gmail.com>
+ <20170324143535.GA31953@broadcom.com>
+ <d678d252-a95a-58c0-8098-4401c67040a1@gmail.com>
+Message-ID: <CAC3K-4q=npvHBjb2YeWmyCv89r14=vXdUzRW74mcrETs+NRh1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Fri, Mar 31, 2017 at 3:03 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> On 03/24/2017 03:35 PM, Jon Mason wrote:
+>>
+>> On Thu, Mar 23, 2017 at 11:30:45PM +0100, Rafa? Mi?ecki wrote:
+>>>
+>>> diff --git a/drivers/thermal/broadcom/ns-thermal.c
+>>> b/drivers/thermal/broadcom/ns-thermal.c
+>>> new file mode 100644
+>>> index 000000000000..acf3a4de62a4
+>>> --- /dev/null
+>>> +++ b/drivers/thermal/broadcom/ns-thermal.c
+>>> @@ -0,0 +1,98 @@
+>>> +/*
+>>> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#include <linux/module.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/thermal.h>
+>>> +
+>>> +#define PVTMON_CONTROL0                                        0x00
+>>> +#define PVTMON_CONTROL0_SEL_MASK                       0x0000000e
+>>> +#define PVTMON_CONTROL0_SEL_TEMP_MONITOR               0x00000000
+>>> +#define PVTMON_CONTROL0_SEL_TEST_MODE                  0x0000000e
+>>> +#define PVTMON_STATUS                                  0x08
+>>> +
+>>> +struct ns_thermal {
+>>> +       void __iomem *pvtmon;
+>>> +};
+>>> +
+>>> +static int ns_thermal_get_temp(void *data, int *temp)
+>>> +{
+>>> +       struct ns_thermal *ns_thermal = data;
+>>> +       u32 val;
+>>> +
+>>> +       val = readl(ns_thermal->pvtmon + PVTMON_CONTROL0);
+>>> +       if ((val & PVTMON_CONTROL0_SEL_MASK) !=
+>>> PVTMON_CONTROL0_SEL_TEMP_MONITOR) {
+>>> +               val &= ~PVTMON_CONTROL0_SEL_MASK;
+>>> +               val |= PVTMON_CONTROL0_SEL_TEMP_MONITOR;
+>>
+>>
+>> I think this is slightly confusing here.  If this was off, ORing in 0
+>> will not enable it.  I think we need to flip the #define to make it
+>> PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE (or a less crappy name).
+>> then use this line here to toggle it.  Something like
+>>
+>>                 val &= ~PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE;
+>
+>
+> I don't understand this, can you help me further?
+>
+> OR-ing with 0 is only a cosmetic thing obviously - just to make it clear
+> which
+> value we expect to be set in bits 1:3. The important part is:
+> val &= ~PVTMON_CONTROL0_SEL_MASK;
 
-thanks for your message. Please, find the replies in-line.
+You are using a side effect of the masking to clear/enable the block.
+I'm simply saying that we should be explicit about enabling it.  My
+concern is that using the side effect hides what is being done and
+could result in a bug somewhere down the line.  I think this is
+improbable based on the code, but wanted to err on the side of
+caution.
 
-On Wed, Mar 29, 2017 at 05:40:02PM -0700, Florian Fainelli wrote:
-> While the "hack" that sets/clears NOMAP in order for pfn_valid() to
-> return false/true when appropriate during __add_pages() definitively
-> does seem to work to probe the memory section, don't you also hit the
-> same warning when you try to online that memory section in
-> pages_correctly_reserved() once you have cleared the NOMAP flag?
-
-Before arch_add_memory returns, we clear the nomap flag on the blocks,
-so that pfn_valid will return true when executing on the corresponding
-pages. This means that the condition in pages_correctly_reserved in
-drivers/base/memory.c:
-
-	if (WARN_ON_ONCE(!pfn_valid(pfn)))
-
-will evaluate to false, so no warning should be issued, and the function
-should continue to execute as expected.
-
-Is it that you were referring to or did I miss the point?
-
-> I will definitively give this a try on ARM64 since I need to get it
-> working there.
-
-Thanks a lot, any help in testing is really appreciated. 
- 
-> Do you mind posting a non-RFC patch?
-
-We should release the hot-remove code that myself and Maciej have been
-working on very soon (say, around one week); the plan is to rebase
-everything and release hot-add and hot-remove as a single patch series
-(including Scott's original patches and our hot-add patches). If you
-can wait until then, we will probably minimize entropy; otherwise we
-can also re-post the hot-add patches earlier and separately.
- 
-Thanks and regards,
-Andrea
+>
+> AFAIU selecting any mode other than TEMP_MONITOR will disable monitor
+> access.
+> AFAIU even switchint to TEST_MODE will prevent access to temp, so I don't
+> see
+> how we could use PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE. It could be any
+> value other than 0.
