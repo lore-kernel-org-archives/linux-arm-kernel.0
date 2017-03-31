@@ -1,60 +1,72 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 31 Mar 2017 13:20:45 +0900
-Subject: [PATCH] arm64: dts: uniphier: add input-delay properties to Cadence
- eMMC node
-Message-ID: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 31 Mar 2017 10:14:33 +0530
+Subject: [PATCH v4 0/7] PCI: dwc: Miscellaneous fixes and cleanups
+In-Reply-To: <20170330234450.GC3912@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170313134328.1588-1-kishon@ti.com>
+ <20170330234450.GC3912@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <12fe0097-e11c-e4ed-64e1-666d4a21dd55@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit a04e2b383401 ("mmc: sdhci-cadence: Update PHY delay
-configuration"), PHY parameters must be specified by DT.
 
-The hard-coded settings have been converted as follows:
-- SDHCI_CDNS_PHY_DLY_SD_DEFAULT -> cdns,phy-input-delay-legacy
-- SDHCI_CDNS_PHY_DLY_EMMC_SDR   -> cdns,phy-input-delay-mmc-highspeed
-- SDHCI_CDNS_PHY_DLY_EMMC_DDR   -> cdns,phy-input-delay-mmc-ddr
 
-The following have not been moved:
-- SDHCI_CDNS_PHY_DLY_SD_HS
-   this is unneeded in the eMMC configuration
-- SDHCI_CDNS_PHY_DLY_EMMC_LEGACY
-   this is never enabled by the driver as it is covered by
-   SDHCI_CDNS_PHY_DLY_SD_DEFAULT
+On Friday 31 March 2017 05:14 AM, Bjorn Helgaas wrote:
+> On Mon, Mar 13, 2017 at 07:13:21PM +0530, Kishon Vijay Abraham I wrote:
+>> This should be the final set of cleanups/fixes before endpoint
+>> support can be merged.
+>>
+>> Keerthy's patch is a general fix in dra7xx driver and is not
+>> directly related to endpoint mode.
+>>
+>> This v1 of this series was previously sent with a different
+>> cover letter $subject [1]
+>>
+>> Changes from v3:
+>> *) instead of changing all the callers of dbi accessors (taking
+>>    dbi_base and size), manage it using static inline as suggested
+>>    by Niklas (used static inline instead of macros because of
+>>    checkpatch error).
+>>
+>> Changes from v2:
+>> *) Kconfig changes that was spilled into a patch is removed.
+>> *) In addition to renaming _unroll() to _ob_unroll(), all the
+>>    _unroll configurations is also moved a separate function.
+>>
+>> Changes from v1:
+>> *) included a patch to rename _unroll() to _ob_unroll() as
+>>    similar thing has to be done for inbound window in the case
+>>    of EP mode.
+>> *) used 'size_t' instead of 'int' for specifying the size
+>>    in read_dbi/write_dbi function arguments.
+>> *) Populate cpu_addr_fixup ops for artpec6 as suggested by
+>>    Niklas
+>>
+>> This series is based on 4.11-rc1
+>>
+>> [1] -> https://lkml.org/lkml/2017/2/16/270
+>>
+>> Keerthy (1):
+>>   PCI: dwc: dra7xx: Push request_irq call to the bottom of probe
+>>
+>> Kishon Vijay Abraham I (6):
+>>   PCI: dwc: designware: Add new *ops* for cpu addr fixup
+>>   PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
+>>   PCI: dwc: artpec6: Populate cpu_addr_fixup ops
+>>   PCI: dwc: all: Modify dbi accessors to take dbi_base as argument
+>>   PCI: dwc: all: Modify dbi accessors to access data of  4/2/1 bytes
+>>   PCI: dwc: designware: Move _unroll configurations to a separate
+>>     function
+>>
+>>  drivers/pci/dwc/pci-dra7xx.c      |  25 +++----
+>>  drivers/pci/dwc/pci-exynos.c      |  14 ++--
+>>  drivers/pci/dwc/pcie-artpec6.c    |  15 +++--
+>>  drivers/pci/dwc/pcie-designware.c | 133 ++++++++++++++++++++++++--------------
+>>  drivers/pci/dwc/pcie-designware.h |  23 +++++--
+>>  5 files changed, 135 insertions(+), 75 deletions(-)
+> 
+> Applied to pci/host-designware for v4.12, with Niklas' ack on patches
+> 4 & 5, thanks!
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Thanks Bjorn.
 
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 3 +++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 3 +++
- 2 files changed, 6 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index 5dc5124..b6ebdc9 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -310,6 +310,9 @@
- 			bus-width = <8>;
- 			mmc-ddr-1_8v;
- 			mmc-hs200-1_8v;
-+			cdns,phy-input-delay-legacy = <4>;
-+			cdns,phy-input-delay-mmc-highspeed = <2>;
-+			cdns,phy-input-delay-mmc-ddr = <3>;
- 		};
- 
- 		usb0: usb at 5a800100 {
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index 6c9a72d..0ab6c2e 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -394,6 +394,9 @@
- 			bus-width = <8>;
- 			mmc-ddr-1_8v;
- 			mmc-hs200-1_8v;
-+			cdns,phy-input-delay-legacy = <4>;
-+			cdns,phy-input-delay-mmc-highspeed = <2>;
-+			cdns,phy-input-delay-mmc-ddr = <3>;
- 		};
- 
- 		sd: sdhc at 5a400000 {
--- 
-2.7.4
+-Kishon
