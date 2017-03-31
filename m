@@ -1,92 +1,92 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 31 Mar 2017 17:22:50 +0200
-Subject: [PATCH 4/4] dt-bindings: input: Add Atmel PTC subsystem bindings
-In-Reply-To: <20170331152250.12758-1-ludovic.desroches@microchip.com>
-References: <20170331152250.12758-1-ludovic.desroches@microchip.com>
-Message-ID: <20170331152250.12758-5-ludovic.desroches@microchip.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 31 Mar 2017 16:28:16 +0100
+Subject: [RFC PATCH v2 00/41] Scalable Vector Extension (SVE) core support
+In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAKv+Gu_JUqQu7nUB3MfJrpHL19NTSzGBDmZqLejBx8pNkwSq+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description of the Atmel PTC subsystem bindings.
+On 22 March 2017 at 14:50, Dave Martin <Dave.Martin@arm.com> wrote:
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
----
- .../devicetree/bindings/input/atmel,ptc.txt        | 67 ++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/atmel,ptc.txt
+Hi Dave,
 
-diff --git a/Documentation/devicetree/bindings/input/atmel,ptc.txt b/Documentation/devicetree/bindings/input/atmel,ptc.txt
-new file mode 100644
-index 0000000..a183fd5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/atmel,ptc.txt
-@@ -0,0 +1,67 @@
-+Atmel PTC Subsystem
-+
-+The Atmel Peripheral Touch Controller subsystem offers built-in hardware
-+for capacitive touch measurement on sensors that function as buttons, sliders
-+and wheels.
-+
-+1) PTC Subsystem node
-+
-+Required properties:
-+- compatible: 		Must be "atmel,sama5d2-ptc"
-+- reg: 			Address, length of the shared memory and ppp registers location
-+			and length.
-+- clocks: 		Phandlers to the clocks.
-+- clock-names: 		Must be "ptc_clk", "ptc_int_osc", "slow_clk".
-+- #address-cells:	Must be one. The cell is the button or scroller id.
-+- #size-cells: 		Must be zero.
-+
-+Example:
-+	ptc at fc060000 {
-+		compatible = "atmel,sama5d2-ptc";
-+		reg = <0x00800000 0x10000
-+		       0xfc060000 0xcf>;
-+		interrupts = <58 IRQ_TYPE_LEVEL_HIGH 7>;
-+		clocks = <&ptc_clk>, <&main>, <&clk32k>;
-+		clock-names = "ptc_clk", "ptc_int_osc", "slow_clk";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		[ child node definitions... ]
-+	};
-+
-+2) Scroller / buttons subnodes
-+
-+Subnodes describe the kind of sensors the customer want to use. They have to be
-+named according to their function: button, slider or wheel.
-+
-+2.1) Scroller subnodes
-+
-+Required properties:
-+- reg:	Id of the scroller, each id must be different.
-+
-+Example:
-+	slider at 0 {
-+		reg = <0>;
-+	};
-+
-+	wheel at 1 {
-+		reg = <1>;
-+	};
-+
-+2.2) Button subnodes
-+
-+Required properties:
-+- reg:			Id of node used for the button, each id must be
-+			different.
-+- linux,keycode: 	Key code of the button.
-+
-+Example:
-+		button at 8 {
-+			reg = <8>;
-+			linux,keycode = <2>;
-+		};
-+
-+		button at 9 {
-+			reg = <9>;
-+			linux,keycode = <3>;
-+		};
--- 
-2.9.0
+> The Scalable Vector Extension (SVE) [1] is an extension to AArch64 which
+> adds extra SIMD functionality and supports much larger vectors.
+>
+> This series implements core Linux support for SVE.
+>
+[...]
+> KERNEL_MODE_NEON (non-)support
+> ------------------------------
+>
+> "arm64/sve: [BROKEN] Basic support for KERNEL_MODE_NEON" is broken.
+> There are significant design issues here that need discussion -- see the
+> commit message for details.
+>
+> Options:
+>
+>  * Make KERNEL_MODE_NEON a runtime choice, and disable it if SVE is
+>    present.
+>
+>  * Fully SVE-ise the KERNEL_MODE_NEON code: this will involve complexity
+>    and effort, and may involve unfavourable (and VL-dependent) tradeoffs
+>    compared with the no-SVE case.
+>
+>    We will nonetheless need something like this if there is a desire to
+>    support "kernel mode SVE" in the future.  The fact that with SVE,
+>    KERNEL_MODE_NEON brings the cost of kernel-mode SVE but only the
+>    benefits of kernel-mode NEON argues in favour of this.
+>
+>  * Make KERNEL_MODE_NEON a dynamic choice, and have clients run fallback
+>    C code instead if at runtime on a case-by-case basis, if SVE regs
+>    would otherwise need saving.
+>
+>    This is an interface break, but all NEON-optimised kernel code
+>    necessarily requires a fallback C implementation to exist anyway, and
+>    the number of clients is not huge.
+>
+> We could go for a stopgap solution that at least works but is suboptimal
+> for SVE systems (such as the first choice above), and then improve it
+> later.
+>
+
+Without having looked at the patches in detail yet, let me reiterate
+my position after we discussed this when this series was sent out the
+first time around.
+
+- The primary use case for kernel mode NEON is special purpose
+instructions, i.e., AES is 20x faster when using the NEON, simply
+because that is how one accesses the logic gates that implement the
+AES algorithm. There is nothing SIMD or FP in nature about AES.
+Compare the CRC extensions, which use scalar registers and
+instructions. Of course, there are a couple of exceptions in the form
+of bit-slicing algorithms, but in general, like general SIMD, I don't
+think it is highly likely that SVE in kernel mode is something we will
+have a need for in the foreseeable future.
+
+- The current way of repeatedly stacking/unstacking NEON register
+contents in interrupt context is highly inefficient, given that we are
+usually interrupting user mode, not kernel mode, and so stacking once
+and unstacking when returning from the exception (which is how we
+usually deal with it) would be much better. So changing the current
+implementation to perform the eager stack/unstack only when a kernel
+mode NEON call is already in progress is likely to improve our current
+situation already, regardless of whether such a change is needed to
+accommodate SVE. Note that to my knowledge, the only in-tree users of
+kernel mode NEON operate in process context or softirq context, never
+in hardirq context.
+
+Given the above, I think it is perfectly reasonable to conditionally
+disallow kernel mode NEON in hardirq context. The crypto routines that
+rely on it can easily be fixed up (I already wrote the patches for
+that). This would only be necessary on SVE systems, and the reason for
+doing so is that - given how preserving and restoring the NEON
+register file blows away the upper SVE part of the registers - whoever
+arrives at the SVE-aware preserve routine first should be allowed to
+run to completion. This does require disabling softirqs during the
+time the preserved NEON state is being manipulated but that does not
+strike me as a huge price to pay. Note that both restrictions
+(disallowing kernel mode NEON in hardirq context, and the need to
+disable softirqs while manipulating the state) could be made runtime
+dependent on whether we are actually running on an SVE system.
