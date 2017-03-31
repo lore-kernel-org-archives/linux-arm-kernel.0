@@ -1,47 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Mar 2017 17:44:23 +0100
-Subject: [PATCH 08/10] perf/core: Add PERF_AUX_FLAG_COLLISION to report
- colliding samples
-In-Reply-To: <1485540470-11469-9-git-send-email-will.deacon@arm.com>
-References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
- <1485540470-11469-9-git-send-email-will.deacon@arm.com>
-Message-ID: <72e0e51c-9abf-641f-f13e-ee07e12c02c1@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 31 Mar 2017 18:50:15 +0200
+Subject: [PATCH] ARM: dts: armada-38x: label USB and SATA nodes
+In-Reply-To: <20170331074115.8111-1-ralph.sennhauser@gmail.com>
+References: <20170331074115.8111-1-ralph.sennhauser@gmail.com>
+Message-ID: <20170331165015.GJ12814@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+> -			sata at a8000 {
+> +			satac0: sata at a8000 {
 
-On 27/01/17 18:07, Will Deacon wrote:
-> The ARM SPE architecture permits an implementation to ignore a sample
-> if the sample is due to be taken whilst another sample is already being
-> produced. In this case, it is desirable to report the collision to
-> userspace, as they may want to lower the sample period.
-> 
-> This patch adds a PERF_AUX_FLAG_COLLISION flag, so that such events can
-> be relayed to userspace.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  include/uapi/linux/perf_event.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-> index c66a485a24ac..68a4e542968e 100644
-> --- a/include/uapi/linux/perf_event.h
-> +++ b/include/uapi/linux/perf_event.h
-> @@ -885,6 +885,7 @@ enum perf_callchain_context {
->   */
->  #define PERF_AUX_FLAG_TRUNCATED		0x01	/* record was truncated to fit */
->  #define PERF_AUX_FLAG_OVERWRITE		0x02	/* snapshot from overwrite mode */
-> +#define PERF_AUX_FLAG_COLLISION		0x03	/* sample collided with another */
+Hi Ralph
 
-Does COLLISION really represent the combination of both TRUNCATED and
-OVERWRITE, or does that want to be 0x04? (The way they get ORed together
-at one point in the following patch makes me suspicious.)
-
-Robin.
+Why the c in satac0?
 
 >  
->  #define PERF_FLAG_FD_NO_GROUP		(1UL << 0)
->  #define PERF_FLAG_FD_OUTPUT		(1UL << 1)
-> 
+> -			usb3 at f0000 {
+> +			usb3_0: usb3 at f0000 {
+>  				compatible = "marvell,armada-380-xhci";
+>  				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
+>  				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -598,7 +598,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			usb3 at f8000 {
+> +			usb3_1: usb3 at f8000 {
+>  				compatible = "marvell,armada-380-xhci";
+>  				reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
+>  				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+
+I can understand what you are saying. But does anybody else care? Are
+there other .dtsi files differentiating between USB 1.1, 2 and 3?
+
+      Andrew
