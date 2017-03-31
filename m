@@ -1,42 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 11:59:31 +0200
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.12
-In-Reply-To: <CAK7LNAScRBfD_2kDZYtr0S83kvLhSHAs0C4HjprNr5dKCSPRcw@mail.gmail.com>
-References: <CAK7LNAScRBfD_2kDZYtr0S83kvLhSHAs0C4HjprNr5dKCSPRcw@mail.gmail.com>
-Message-ID: <CAK8P3a3N-Y8_rB-9b-PqUqvBr+m6Auo292TMFpXqDK14PDPihg@mail.gmail.com>
+Date: Fri, 31 Mar 2017 12:00:20 +0200
+Subject: [PATCH] ARM: dts: augment Moxa ART GPIO node
+In-Reply-To: <20170322111209.14571-1-linus.walleij@linaro.org>
+References: <20170322111209.14571-1-linus.walleij@linaro.org>
+Message-ID: <CAK8P3a0ZBYZTc+5ty9SUmU3Lb-vvd7Dcco+Hai7yH_khyfbB-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:46 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Arnd, Olof,
+On Wed, Mar 22, 2017 at 12:12 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> The Moxa ART GPIO is a Faraday FTGPIO010. Augment the DTS node
+> to indicate both compatible values for the SoC and the IP part.
+> Also increase the register range to 0x100, it has at least 0x48
+> bytes of registers, and a few extra will not hurt.
 >
-> Here are UniPhier DT (32bit) updates for the v4.12 merge window.
-> Please pull!
->
->
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-dt-v4.12
->
-> for you to fetch changes up to facc7a551cda4c7091b0413438b280e654659890:
->
->   ARM: dts: uniphier: add pagesize property to EEPROM of proto boards
-> (2017-03-14 05:02:13 +0900)
->
-> ----------------------------------------------------------------
-> UniPhier ARM SoC DT updates for v4.12
->
-> - Remove skeleton.dtsi inclusion
-> - Fix W=* build warnings
-> - Fix eMMC pin-mux node
-> - Add pagesize properties to EEPROM nodes
+> Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please just apply this to DT for-next like the
+> other Moxa Faraday cleanup patch.
 
-Pulled into next/dt, thanks!
-
-     Arnd
+Applied on next/dt, thanks!
