@@ -1,49 +1,71 @@
-From: menschel.p@posteo.de (Patrick Menschel)
-Date: Fri, 31 Mar 2017 18:51:38 +0200
-Subject: [PATCH v2 2/2] ARM: dts: sun7i: Add CAN node and can0_pins_a
- pinctrl settings
-In-Reply-To: <20170327064625.we7ydn2oapwizncb@lukather>
-References: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
- <1490392339-23565-3-git-send-email-menschel.p@posteo.de>
- <20170327064625.we7ydn2oapwizncb@lukather>
-Message-ID: <91bc06e3-3173-43a1-32f2-a35d94855d46@posteo.de>
+From: hgkr.klein@gmail.com (Helmut Klein)
+Date: Fri, 31 Mar 2017 18:54:34 +0200
+Subject: [PATCH v3 1/4] dt-bindings: clock: gxbb: expose UART clocks
+In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+Message-ID: <20170331165437.26227-2-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+Expose the clock ids of the three none AO uarts to the dt-bindings
 
-Am 27.03.2017 um 08:46 schrieb Maxime Ripard:
->> @@ -1582,6 +1587,14 @@
->>  			#size-cells = <0>;
->>  		};
->>  
->> +		can0: can at 01c2bc00 {
->> +			compatible = "allwinner,sun4i-a10-can";
-> 
-> Sorry for not spotting this earlier, but this would need an A20
-> compatible too, to deal with the case where it turns out not to be
-> compatible.
-> 
-> you can do something like this:
-> compatible = "allwinner,sun7i-a20-can", "allwinner,sun4i-a10-can";
+Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+---
+ drivers/clk/meson/gxbb.h              | 6 +++---
+ include/dt-bindings/clock/gxbb-clkc.h | 3 +++
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-Adding "sun7i-a20-can" to the compatible list results in a checkpatch
-warning, that the "driver" is not documented.
-
- WARNING: DT compatible string "allwinner,sun7i-a20-can" appears
-un-documented -- check ./Documentation/devicetree/bindings/
-#27: FILE: arch/arm/boot/dts/sun7i-a20.dtsi:1586:
-+			compatible = "allwinner,sun7i-a20-can",
-
-Is it really OK to add a driver that doesn't exist yet?
-
-Thanks,
-Patrick
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 3709 bytes
-Desc: S/MIME Cryptographic Signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170331/e81c8fde/attachment.p7s>
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index 8ee2022ce5d5..1edfaa5fe307 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -194,7 +194,7 @@
+ /* #define CLKID_SAR_ADC */
+ #define CLKID_SMART_CARD	  24
+ #define CLKID_RNG0		  25
+-#define CLKID_UART0		  26
++/* CLKID_UART0 */
+ #define CLKID_SDHC		  27
+ #define CLKID_STREAM		  28
+ #define CLKID_ASYNC_FIFO	  29
+@@ -216,7 +216,7 @@
+ #define CLKID_ADC		  45
+ #define CLKID_BLKMV		  46
+ #define CLKID_AIU		  47
+-#define CLKID_UART1		  48
++/* CLKID_UART1 */
+ #define CLKID_G2D		  49
+ /* CLKID_USB0 */
+ /* CLKID_USB1 */
+@@ -236,7 +236,7 @@
+ /* CLKID_USB0_DDR_BRIDGE */
+ #define CLKID_MMC_PCLK		  66
+ #define CLKID_DVIN		  67
+-#define CLKID_UART2		  68
++/* CLKID_UART2 */
+ /* #define CLKID_SANA */
+ #define CLKID_VPU_INTR		  70
+ #define CLKID_SEC_AHB_AHB3_BRIDGE 71
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index 692846c7941b..7b329df47752 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -15,13 +15,16 @@
+ #define CLKID_SPI		34
+ #define CLKID_I2C		22
+ #define CLKID_SAR_ADC		23
++#define CLKID_UART0		26
+ #define CLKID_ETH		36
++#define CLKID_UART1		48
+ #define CLKID_USB0		50
+ #define CLKID_USB1		51
+ #define CLKID_USB		55
+ #define CLKID_HDMI_PCLK		63
+ #define CLKID_USB1_DDR_BRIDGE	64
+ #define CLKID_USB0_DDR_BRIDGE	65
++#define CLKID_UART2		68
+ #define CLKID_SANA		69
+ #define CLKID_GCLK_VENCI_INT0	77
+ #define CLKID_AO_I2C		93
+--
+2.11.0
