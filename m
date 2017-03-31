@@ -1,76 +1,170 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Mar 2017 13:21:17 +0100
-Subject: [PATCH 1/3] drm/arm: hdlcd: properly validate plane state
-In-Reply-To: <20170331114130.GG13355@e110455-lin.cambridge.arm.com>
-References: <20170331094937.GO7909@n2100.armlinux.org.uk>
- <E1cttDZ-000671-Q1@rmk-PC.armlinux.org.uk>
- <20170331101850.GD13355@e110455-lin.cambridge.arm.com>
- <20170331102035.GP7909@n2100.armlinux.org.uk>
- <20170331102345.GF13355@e110455-lin.cambridge.arm.com>
- <20170331102751.GQ7909@n2100.armlinux.org.uk>
- <20170331114130.GG13355@e110455-lin.cambridge.arm.com>
-Message-ID: <20170331122117.GS7909@n2100.armlinux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 31 Mar 2017 14:28:11 +0200
+Subject: [PATCH v7 2/2] soc/imx: Add GPCv2 power gating driver
+In-Reply-To: <20170401041007.GC24882@b29396-OptiPlex-7040>
+References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
+ <20170321145004.21265-3-andrew.smirnov@gmail.com>
+ <20170324062451.GB12604@b29396-OptiPlex-7040>
+ <1490279749.29056.33.camel@pengutronix.de>
+ <20170330075111.GC29432@b29396-OptiPlex-7040>
+ <1490803711.29083.25.camel@pengutronix.de>
+ <20170401041007.GC24882@b29396-OptiPlex-7040>
+Message-ID: <1490963291.29083.69.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 12:41:30PM +0100, Liviu Dudau wrote:
-> On Fri, Mar 31, 2017 at 11:27:51AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Mar 31, 2017 at 11:23:45AM +0100, Liviu Dudau wrote:
-> > > On Fri, Mar 31, 2017 at 11:20:35AM +0100, Russell King - ARM Linux wrote:
-> > > > On Fri, Mar 31, 2017 at 11:18:50AM +0100, Liviu Dudau wrote:
-> > > > > Hi Russell,
-> > > > > 
-> > > > > You were Cc-ed in a patch from March 8th that did all this:
-> > > > > 
-> > > > > https://lists.freedesktop.org/archives/dri-devel/2017-March/135172.html
-> > > > 
-> > > > I'm aware of that (you may notice that this was threaded to that patch.)
-> > > > 
-> > > > > I have not received any response from you, so I have already pushed the
-> > > > > patch in my public repo:
-> > > > > 
-> > > > > git://linux-arm.org/linux-ld.git for-upstream/hdlcd
-> > > > > 
-> > > > > It has been included into linux-next for at least a couple of weeks now.
-> > > > 
-> > > > I've not had a chance to test any of this, but I believe that your
-> > > > patch does not fully address the issue, due to bits missing from
-> > > > the validation path.
-> > > 
-> > > Care to point out which bits were missing from my patch that are in yours?
+Hi Dong,
+
+Am Samstag, den 01.04.2017, 12:10 +0800 schrieb Dong Aisheng:
+[...]
+> > If we need the domains to be up before the consumers, the only
+> > way to deal with that is to select CONFIG_PM and
+> > CONFIG_PM_GENERIC_DOMAINS from the platform, so we have proper probe
+> > defer handling for consumer devices of the power domains.
 > > 
-> > The visible check?
 > 
-> A plane's ->atomic_check() hook can be called with TEST_ONLY to figure out from
-> userspace if the given configuration is a valid one that can be accepted by
-> the hardware. There should be no error if the plane will not be visible, as we
-> are not programming anything yet.
+> A bit confuse about these words...
+
+If those options are selected we get proper PROBE_DEFER handling for
+consumers of the power domain, so probe order doesn't matter.
+
+> > > Personally i'd be more like Rockchip's power domain implementation.
+> > 
+> > Why?
+> > 
+> > > See:
+> > > arch/arm/boot/dts/rk3288.dtsi
+> > > drivers/soc/rockchip/pm_domains.c
+> > > Dcumentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> > > 
+> > > How about refer to the Rockchip's way?
+> > 
+> > Why? We just changed the way how it's done for GPCv1, after more than 1
+> > year of those patches being on the list. Why should we do it differently
+> > for GPCv2?
+> > 
 > 
-> I would also argue that the test that you remove and replace with state->visible
-> is important. We can't do *any* scaling, while with your patch we could accept
-> src_w != crtc_w as long as it is visible. Hardware is not capable of handling that.
+> Hmm?
+> 
+> I just thought your GPCv1 change was picked a few weeks ago (Feb 17 2017)
+> and there's no current users in kernel of the new binding.
+> That's why i come out of the idea if we could improve it before any users.
+> 
+> Maybe i made mistake?
 
-That's what the "DRM_PLANE_HELPER_NO_SCALING" arguments to
-drm_plane_helper_check_state() are doing:
+The patches to change this have been out for over 1 year. I'm less than
+motivated to change the binding again, after it has gone through the DT
+review and has finally been picked up.
 
-	drm_plane_helper_check_state()
-		drm_rect_calc_hscale()
+> See:
+> commit 721cabf6c6600dbe689ee2782bc087270e97e652
+> Author: Lucas Stach <l.stach@pengutronix.de>
+> Date:   Fri Feb 17 20:02:44 2017 +0100
+> 
+>     soc: imx: move PGC handling to a new GPC driver
+>     
+>     This is an almost complete re-write of the previous GPC power gating control
+>     code found in the IMX architecture code. It supports both the old and the new
+>     DT binding, allowing more domains to be added later and generally makes the
+>     driver easier to extend, while keeping compatibility with existing DTBs.
+>     
+>     As the result, all functionality regarding the power gating controller
+>     gets removed from the IMX architecture GPC driver.  It keeps only the
+>     IRQ controller code in the architecture, as this is closely coupled to
+>     the CPU idle implementation.
+>     
+>     Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>     Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> 
+> > > 
+> > > Then it could also address our issues and the binding would be
+> > > still like:
+> > > gpc: gpc at 303a0000 {
+> > >         compatible = "fsl,imx7d-gpc";
+> > >         reg = <0x303a0000 0x1000>;
+> > >         interrupt-controller;
+> > >         interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> > >         #interrupt-cells = <3>;
+> > >         interrupt-parent = <&intc>;
+> > > 
+> > >         pgc {
+> > >                 #address-cells = <1>;
+> > >                 #size-cells = <0>;
+> > > 
+> > >                 pgc_pcie_phy: power-domain at IMX7_POWER_DOMAIN_PCIE_PHY {
+> > >                         reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
+> > >                         power-supply = <&reg_1p0d>;
+> > > 			clocks = <xxx>;
+> > >                 };
+> > > 
+> > > 		....
+> > >         };
+> > > };
+> > > 
+> > > It also drops #power-domain-cells and register domain by
+> > > one provider with multi domains which is more align with HW.
+> > > 
+> > > How do you think of it?
+> > 
+> > How is this more aligned with the hardware? Both options are an
+> > arbitrary abstraction chosen in the DT binding.
+> > 
+> 
+> GPC is a Power Controller which controls multi power domains to subsystem
+> by its different registers bits.
+> e.g. PCIE/MIPI/USB HSIC PHY.
+> ? 0xC00 ~ 0xC3F: PGC for MIPI PHY
+> ? 0xC40 ~ 0xC7F: PGC for PCIE_PHY
+> ? 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
+> 
+> So i thought it looks more like GPC is a power domain provider with multi
+> domains support to different subsystems from HW point of view.
+> 
+> Isn't that true?
 
-		        if (hscale < min_hscale || hscale > max_hscale)
-                		return -ERANGE;
+Linux and hardware devices are not required to match 1:1. There is
+nothing that would make subdividing a single hardware device into
+multiple ones bad style.
 
-		drm_rect_calc_vscale()
+> 
+> And there's also other two concerns:
+> First, current genpd sysfs output still not include provider.
+> e.g.
+> root at imx6qdlsolo:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary 
+> domain                          status          slaves
+>     /device                                             runtime status
+> ----------------------------------------------------------------------
+> PU                              off-0           
+>     /devices/soc0/soc/130000.gpu                        suspended
+>     /devices/soc0/soc/134000.gpu                        suspended
+>     /devices/soc0/soc/2204000.gpu                       suspended
+>     /devices/soc0/soc/2000000.aips-bus/2040000.vpu      suspended
+> ARM                             off-0           
+> 
+> I wonder it might be a bit mess once the provider is added while each
+> domain is registered as a virtual provider.
 
-		        if (vscale < min_vscale || vscale > max_vscale)
-                		return -ERANGE;
+The provider is a Linux device. Linux devices don't necessarily have to
+correspond to hardware devices. There is no such rule.
 
-where DRM_PLANE_HELPER_NO_SCALING is 1.0 in 16:16 format.  So, this
-ensures that the scaling factor is 1.0, returning -ERANGE if it isn't.
+> 
+> Second, it sacrifices a bit performance when look-up PM domain in
+> genpd_get_from_provider if every domain is a provider.
+> 
+The performance penalty of a list walk won't hurt us in the probe path,
+where we are (re-)probing entire devices. There is a lot more going on
+than a simple list walk.
 
-If this lets through a scaled source, then there's a bug that needs
-fixing in the helper.
+> Though it is arguable that currently only 3 domains support on MX7,
+> but who knows the future when it becomes much more.
+> 
+> However, i did see many exist users in kernel using one provider one
+> domain way. Maybe i'm over worried and it's not big deal.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I see that one provider with multiple domains is used more often, that
+doesn't means it's necessarily better. At least I haven't hear a
+convincing argument on why the chosen implementation in the GPC driver
+is worse than the alternative.
+
+Regards,
+Lucas
