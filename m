@@ -1,71 +1,43 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 31 Mar 2017 11:59:50 -0500
-Subject: [PATCH] OF: mark released devices as no longer populated
-In-Reply-To: <VI1PR0401MB2591E5FD962023914F042C9B98370@VI1PR0401MB2591.eurprd04.prod.outlook.com>
-References: <E1bX3Pw-00088i-KU@rmk-PC.armlinux.org.uk>
- <CAL_Jsq+pDeL1_=p06ynrV4CK+h8-Yx_KDbH-W=d-aSdARe3ZHw@mail.gmail.com>
- <20170331103950.GA18376@n2100.armlinux.org.uk>
- <VI1PR0401MB2591E5FD962023914F042C9B98370@VI1PR0401MB2591.eurprd04.prod.outlook.com>
-Message-ID: <CAL_JsqLHEycZLaxLZcAnDS4gp6D8xQDpgZXV1g3dokzF_EeQtQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 31 Mar 2017 18:02:56 +0100
+Subject: [GIT PULL] firmware: scpi: updates for v4.12
+Message-ID: <bebdfb55-7704-716a-d00e-585be848af74@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 10:23 AM, Horia Geant? <horia.geanta@nxp.com> wrote:
-> On 3/31/2017 1:40 PM, Russell King - ARM Linux wrote:
->> Ping, this issue still exists with 4.11-rc4 - and there's been no
->> reaction from the alleged CAAM maintainers.
->>
-> Sorry, this somehow slipped through (Cc vs. To, no linux-crypto).
->
->> On Tue, Aug 09, 2016 at 11:48:38AM -0500, Rob Herring wrote:
->>> On Tue, Aug 9, 2016 at 4:33 AM, Russell King <rmk+kernel@armlinux.org.uk> wrote:
->>>> When a Linux device is released and cleaned up, we left the OF device
->>>> node marked as populated.  This causes the Freescale CAAM driver
->>>> (drivers/crypto/caam) problems when the module is removed and re-
->>>> inserted:
->>>>
->>>> JR0 Platform device creation error
->>>> JR0 Platform device creation error
->>>> caam 2100000.caam: no queues configured, terminating
->>>> caam: probe of 2100000.caam failed with error -12
->>>>
->>>> The reason is that CAAM creates platform devices for each job ring:
->>>>
->>>>         for_each_available_child_of_node(nprop, np)
->>>>                 if (of_device_is_compatible(np, "fsl,sec-v4.0-job-ring") ||
->>>>                     of_device_is_compatible(np, "fsl,sec4.0-job-ring")) {
->>>>                         ctrlpriv->jrpdev[ring] =
->>>>                                 of_platform_device_create(np, NULL, dev);
->>>>
->>>> which sets OF_POPULATED on the device node, but then it cleans these
->>>> up:
->>>>
->>>>         /* Remove platform devices for JobRs */
->>>>         for (ring = 0; ring < ctrlpriv->total_jobrs; ring++) {
->>>>                 if (ctrlpriv->jrpdev[ring])
->>>>                         of_device_unregister(ctrlpriv->jrpdev[ring]);
->>>
->>> This looks a bit asymmetrical to me with a of_platform_device_* call
->>> and a of_device_* call.
->>>
->>> I think you could use of_platform_{de}populate here instead. That
->>> would simplify things in the driver a bit too as you wouldn't need to
->>> store jrpdev. It wouldn't work if there are other child nodes with
-> Indeed, this would clean-up the driver a bit. However, the driver needs
-> to know how many of the devices probed successfully - to print the
-> number and more importantly to exit in case total_jobrs = 0.
+Hi ARM SoC Team,
 
-The only thing you are guaranteed is the OF code created some platform
-devices. That's it. Whether any driver probed successfully is separate
-and a lot more things can go wrong there. The only thing you are
-checking is that your dtb is not crap.
+Please pull !
 
-> Thus, I would keep the one-by-one probing of the devices.
-> What options are there in this case?
-> Should a function symmetric to of_platform_device_create() be added - to
-> replace of_device_unregister() - or rely on an open-coded solution?
+Regards,
+Sudeep
 
-Certainly not the latter. We don't want drivers mucking with flags
-internal to the DT code.
+---
 
-Rob
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+tags/scpi-update-4.12
+
+for you to fetch changes up to c511fa3f35e30982445fae2946f4aade3f42203d:
+
+  firmware: arm_scpi: reinit completion instead of full
+init_completion() (2017-03-31 11:00:23 +0100)
+
+----------------------------------------------------------------
+SCPI update for v4.12
+
+Single patch to optimise the completion initialisation using reinit_*
+API instead of full initialisation on each and every transfer.
+
+----------------------------------------------------------------
+Alexey Klimov (1):
+      firmware: arm_scpi: reinit completion instead of full
+init_completion()
+
+ drivers/firmware/arm_scpi.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
