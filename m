@@ -1,89 +1,53 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 31 Mar 2017 10:23:49 -0400
-Subject: [PATCH V2 2/2] thermal: broadcom: add Northstar thermal driver
-In-Reply-To: <d678d252-a95a-58c0-8098-4401c67040a1@gmail.com>
-References: <20170318155632.18099-1-zajec5@gmail.com>
- <20170323223045.15786-1-zajec5@gmail.com>
- <20170323223045.15786-2-zajec5@gmail.com>
- <20170324143535.GA31953@broadcom.com>
- <d678d252-a95a-58c0-8098-4401c67040a1@gmail.com>
-Message-ID: <CAC3K-4q=npvHBjb2YeWmyCv89r14=vXdUzRW74mcrETs+NRh1Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 31 Mar 2017 15:23:52 +0100
+Subject: [PATCH v6 07/11] drivers: perf: hisi: Add support for Hisilicon
+ SoC event counters
+In-Reply-To: <58DE6400.8030900@gmail.com>
+References: <1489127311-112778-1-git-send-email-anurup.m@huawei.com>
+ <20170321165252.GA29116@leverpostej> <58DCD47C.2010501@gmail.com>
+ <20170330104607.GC16211@leverpostej> <58DE6400.8030900@gmail.com>
+Message-ID: <20170331142351.GC6488@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 3:03 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 03/24/2017 03:35 PM, Jon Mason wrote:
->>
->> On Thu, Mar 23, 2017 at 11:30:45PM +0100, Rafa? Mi?ecki wrote:
->>>
->>> diff --git a/drivers/thermal/broadcom/ns-thermal.c
->>> b/drivers/thermal/broadcom/ns-thermal.c
->>> new file mode 100644
->>> index 000000000000..acf3a4de62a4
->>> --- /dev/null
->>> +++ b/drivers/thermal/broadcom/ns-thermal.c
->>> @@ -0,0 +1,98 @@
->>> +/*
->>> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#include <linux/module.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/thermal.h>
->>> +
->>> +#define PVTMON_CONTROL0                                        0x00
->>> +#define PVTMON_CONTROL0_SEL_MASK                       0x0000000e
->>> +#define PVTMON_CONTROL0_SEL_TEMP_MONITOR               0x00000000
->>> +#define PVTMON_CONTROL0_SEL_TEST_MODE                  0x0000000e
->>> +#define PVTMON_STATUS                                  0x08
->>> +
->>> +struct ns_thermal {
->>> +       void __iomem *pvtmon;
->>> +};
->>> +
->>> +static int ns_thermal_get_temp(void *data, int *temp)
->>> +{
->>> +       struct ns_thermal *ns_thermal = data;
->>> +       u32 val;
->>> +
->>> +       val = readl(ns_thermal->pvtmon + PVTMON_CONTROL0);
->>> +       if ((val & PVTMON_CONTROL0_SEL_MASK) !=
->>> PVTMON_CONTROL0_SEL_TEMP_MONITOR) {
->>> +               val &= ~PVTMON_CONTROL0_SEL_MASK;
->>> +               val |= PVTMON_CONTROL0_SEL_TEMP_MONITOR;
->>
->>
->> I think this is slightly confusing here.  If this was off, ORing in 0
->> will not enable it.  I think we need to flip the #define to make it
->> PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE (or a less crappy name).
->> then use this line here to toggle it.  Something like
->>
->>                 val &= ~PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE;
->
->
-> I don't understand this, can you help me further?
->
-> OR-ing with 0 is only a cosmetic thing obviously - just to make it clear
-> which
-> value we expect to be set in bits 1:3. The important part is:
-> val &= ~PVTMON_CONTROL0_SEL_MASK;
+On Fri, Mar 31, 2017 at 07:43:20PM +0530, Anurup M wrote:
+> On Thursday 30 March 2017 04:16 PM, Mark Rutland wrote:
+> >>>>>+	/*
+> >>>>>> >>>+	 * We must NOT create groups containing mixed PMUs, although
+> >>>>>> >>>+	 * software events are acceptable
+> >>>>>> >>>+	 */
+> >>>>>> >>>+	if (event->group_leader->pmu != event->pmu &&
+> >>>>>> >>>+	    !is_software_event(event->group_leader))
+> >>>>>> >>>+		return -EINVAL;
+> >>>>>> >>>+
+> >>>>>> >>>+	list_for_each_entry(sibling, &event->group_leader->sibling_list,
+> >>>>>> >>>+			    group_entry)
+> >>>>>> >>>+		if (sibling->pmu != event->pmu && !is_software_event(sibling))
+> >>>>>> >>>+			return -EINVAL;
+> >>>> >Please also check the number of counters.
+> >>>
+> >>>Sorry, I could not follow this comment correctly. Could you please explain ?
+> >>>I check the available counters and update used mask in pmu_add -->
+> >>>get_event_index
+> >What I meant was that here we should ensure that a group does not
+> >contain more events than can fit into counters.
+> >
+> >For example, if the HW had two counters, we should reject any group with
+> >more than two events. Such groups can never be scheduled, and make no
+> >sense.
+> 
+> I have referred drivers/bus/arm-cci.c and could find validate_group
+> and validate_event functions,
+> which create a fake_pmu to check the available counters for the
+> events in the group.
+> Is that the same way which is expected here? Please comment.
 
-You are using a side effect of the masking to clear/enable the block.
-I'm simply saying that we should be explicit about enabling it.  My
-concern is that using the side effect hides what is being done and
-could result in a bug somewhere down the line.  I think this is
-improbable based on the code, but wanted to err on the side of
-caution.
+Something like that.
 
->
-> AFAIU selecting any mode other than TEMP_MONITOR will disable monitor
-> access.
-> AFAIU even switchint to TEST_MODE will prevent access to temp, so I don't
-> see
-> how we could use PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE. It could be any
-> value other than 0.
+I think it's simplest to have a validate_group() function, which counts
+the number of counters used. See my suggestion in [1].
+
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/20170331135955.GB6488 at leverpostej
