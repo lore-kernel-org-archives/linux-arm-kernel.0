@@ -1,69 +1,59 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 31 Mar 2017 10:51:41 +0100
-Subject: [PATCH 1/3] drm/arm: hdlcd: properly validate plane state
+Date: Fri, 31 Mar 2017 10:51:46 +0100
+Subject: [PATCH 2/3] drm/arm: hdlcd: fix plane base address calculation
 In-Reply-To: <20170331094937.GO7909@n2100.armlinux.org.uk>
 References: <20170331094937.GO7909@n2100.armlinux.org.uk>
-Message-ID: <E1cttDZ-000671-Q1@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cttDe-000679-UD@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hdlcd crtc is unable to place planes in arbitary positions and sizes
-within the active area.  Use drm_plane_helper_check_state() to validate
-the requested state.
+The plane base address needs to be calculated using the source
+coordinates to position the source correctly - it's possible to have
+a larger source buffer than the CRTC size, and have several CRTCs
+reading from different parts of the buffer.
 
-Suggested-by: Daniel Vetter <daniel@ffwll.ch>
+In such a case, the pitch may be larger, and we will use the source
+position to select an area of the buffer to scan out.
+
+In order for this to work correctly, we need to also fix the atomic
+check to do a fuller validation of the new state.
+
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/arm/hdlcd_crtc.c | 28 +++++++++++++++++++++++-----
- 1 file changed, 23 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/arm/hdlcd_crtc.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-index 7d4e5aa77195..ba68fa2b5701 100644
+index ba68fa2b5701..cf70184fd028 100644
 --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
 +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <drm/drmP.h>
-+#include <drm/drm_atomic.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-@@ -205,13 +206,30 @@ static const struct drm_crtc_helper_funcs hdlcd_crtc_helper_funcs = {
- static int hdlcd_plane_atomic_check(struct drm_plane *plane,
- 				    struct drm_plane_state *state)
+@@ -240,21 +240,19 @@ static void hdlcd_plane_atomic_update(struct drm_plane *plane,
  {
--	u32 src_w, src_h;
-+	struct drm_crtc_state *crtc_state;
-+	struct drm_crtc *crtc;
-+	struct drm_rect clip = { 0 };
-+	int ret;
-+
-+	crtc = state->crtc;
-+	if (!crtc)
-+		return 0;
+ 	struct hdlcd_drm_private *hdlcd;
+ 	struct drm_gem_cma_object *gem;
+-	u32 src_w, src_h, dest_w, dest_h;
++	u32 src_x, src_y, dest_h;
+ 	dma_addr_t scanout_start;
  
--	src_w = state->src_w >> 16;
--	src_h = state->src_h >> 16;
-+	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
-+	if (!crtc_state->enable)
-+		return -EINVAL;
-+
-+	clip.x2 = crtc_state->adjusted_mode.hdisplay;
-+	clip.y2 = crtc_state->adjusted_mode.vdisplay;
-+
-+	ret = drm_plane_helper_check_state(state, &clip,
-+					   DRM_PLANE_HELPER_NO_SCALING,
-+					   DRM_PLANE_HELPER_NO_SCALING,
-+					   false, true);
-+	if (ret)
-+		return ret;
+ 	if (!plane->state->fb)
+ 		return;
  
--	/* we can't do any scaling of the plane source */
--	if ((src_w != state->crtc_w) || (src_h != state->crtc_h))
-+	if (!state->visible)
- 		return -EINVAL;
+-	src_w = plane->state->src_w >> 16;
+-	src_h = plane->state->src_h >> 16;
+-	dest_w = plane->state->crtc_w;
+-	dest_h = plane->state->crtc_h;
+ 	gem = drm_fb_cma_get_gem_obj(plane->state->fb, 0);
++	src_x = plane->state->src_x >> 16;
++	src_y = plane->state->src_y >> 16;
++	dest_h = plane->state->crtc_h;
+ 	scanout_start = gem->paddr + plane->state->fb->offsets[0] +
+-		plane->state->crtc_y * plane->state->fb->pitches[0] +
+-		plane->state->crtc_x *
+-		drm_format_plane_cpp(plane->state->fb->pixel_format, 0);
++		src_y * plane->state->fb->pitches[0] +
++		src_x * drm_format_plane_cpp(plane->state->fb->pixel_format, 0);
  
- 	return 0;
+ 	hdlcd = plane->dev->dev_private;
+ 	hdlcd_write(hdlcd, HDLCD_REG_FB_LINE_LENGTH, plane->state->fb->pitches[0]);
 -- 
 2.7.4
