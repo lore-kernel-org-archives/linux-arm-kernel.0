@@ -1,48 +1,77 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 31 Mar 2017 14:18:31 +0100
-Subject: [PATCH v2] drm: hdlcd: Fix the calculation of the scanout start
- address
-In-Reply-To: <20170331094937.GO7909@n2100.armlinux.org.uk>
-References: <20170222153036.GI31595@intel.com>
- <20170308163025.31098-1-Liviu.Dudau@arm.com>
- <20170331094937.GO7909@n2100.armlinux.org.uk>
-Message-ID: <20170331131830.GK13355@e110455-lin.cambridge.arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 31 Mar 2017 15:29:35 +0200
+Subject: [Patch v3 00/11] Add MFC v10.10 support
+In-Reply-To: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+References: <CGME20170331090425epcas1p4de8762ee73be91312a76a73638bac253@epcas1p4.samsung.com>
+ <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+Message-ID: <6a5fa537-0977-b18b-70be-56ad771a0c03@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 10:49:38AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Mar 08, 2017 at 04:30:25PM +0000, Liviu Dudau wrote:
-> > The calculation of the framebuffer's start address was wrongly using
-> > the CRTC's x and y position rather than the one of the source
-> > framebuffer. To fix that we need to update the plane_check code to
-> > call drm_plane_helper_check_state() to clip the src and dst coordinates.
-> > While there so some minor cleanup of redundant freeing of
-> > devm_alloc-ated memory.
-> 
-> The following series is what I came up with, although I've had no time
-> to test it.
+Hi Smitha,
 
-I'm afraid I'm going to NAK this series. It would've been nicer for you to
-comment on the v2 patch that I have sent rather than going around and coming
-back with effectively the same thing but split into 2 patches. I'm having
-trouble applying your series to the v4.11-rc4 (specially 2/3). Also 3/3 is
-superfluous, as we don't expose the DRM_ROTATE property to userspace.
+On 31.03.2017 11:06, Smitha T Murthy wrote:
+> This patch series adds MFC v10.10 support. MFC v10.10 is used in some
+> of Exynos7 variants.
 
-Best regards,
-Liviu
+Patch does not apply, please rebase on top of:
+   
 
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+git://linuxtv.org/snawrocki/samsung.git for-v4.12/media/next
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+
+Additionally quick test shows you do not handle V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH in s5p_mfc_enc_s_ctrl.
+
+Regards
+Andrzej
+
+>
+> This adds support for following:
+>
+> * Add support for HEVC encoder and decoder
+> * Add support for VP9 decoder
+> * Update Documentation for control id definitions
+> * Update computation of min scratch buffer size requirement for V8 onwards
+>
+> Changes since v2:
+>  - Addressed review comments by Andrzej Hajda.
+>  - Rebased on latest krzk/for-next tree.
+>  - This patches are tested on top of Marek's patch v2 [1]
+>  - Applied acked-by and r-o-b from Andrzej on respective patches.
+>  - Applied acked-by from Rob Herring on respective patch.
+>
+> [1]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg108520.html
+>
+> Smitha T Murthy (11):
+>   [media] s5p-mfc: Rename IS_MFCV8 macro
+>   [media] s5p-mfc: Adding initial support for MFC v10.10
+>   [media] s5p-mfc: Use min scratch buffer size as provided by F/W
+>   [media] s5p-mfc: Support MFCv10.10 buffer requirements
+>   [media] videodev2.h: Add v4l2 definition for HEVC
+>   [media] s5p-mfc: Add support for HEVC decoder
+>   Documentation: v4l: Documentation for HEVC v4l2 definition
+>   [media] s5p-mfc: Add VP9 decoder support
+>   [media] v4l2: Add v4l2 control IDs for HEVC encoder
+>   [media] s5p-mfc: Add support for HEVC encoder
+>   Documention: v4l: Documentation for HEVC CIDs
+>
+>  .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
+>  Documentation/media/uapi/v4l/extended-controls.rst | 355 ++++++++++++
+>  Documentation/media/uapi/v4l/pixfmt-013.rst        |   5 +
+>  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  88 +++
+>  drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc.c           |  33 ++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  71 ++-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  50 +-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 616 ++++++++++++++++++++-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 410 ++++++++++++--
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
+>  drivers/media/v4l2-core/v4l2-ctrls.c               | 103 ++++
+>  include/uapi/linux/v4l2-controls.h                 | 133 +++++
+>  include/uapi/linux/videodev2.h                     |   1 +
+>  17 files changed, 1835 insertions(+), 77 deletions(-)
+>  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+>
