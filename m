@@ -1,138 +1,466 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 31 Mar 2017 20:25:22 +0800
-Subject: [PATCH] arm64: enable ARCH_WANT_RELAX_ORDER for aarch64
-In-Reply-To: <05adceeb-856e-ce40-c23a-0cfd309549df@arm.com>
-References: <35233df0-3406-e66f-d9d2-bf7ed7814386@huawei.com>
- <d97d0876-3e00-1979-72de-35fd81bfedf5@arm.com>
- <5bcff420-2ba7-7f64-9c52-41a5c60e9c31@huawei.com>
- <05adceeb-856e-ce40-c23a-0cfd309549df@arm.com>
-Message-ID: <394a4691-4f21-448a-4616-7dd4b3e9aa9e@huawei.com>
+From: aishpant@gmail.com (Aishwarya Pant)
+Date: Fri, 31 Mar 2017 18:01:23 +0530
+Subject: [PATCH] staging: bcm2835-audio: remove unnecessary log messages
+Message-ID: <20170331123123.GA31657@aishwarya>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove unnecessary log messages in the driver which were just tracking
+function entry and exits.
 
+Signed-off-by: Aishwarya Pant <aishpant@gmail.com>
+---
 
-On 2017/3/20 22:00, Robin Murphy wrote:
-> On 14/03/17 14:06, Ding Tianhong wrote:
->> Hi Robin?
->>
->> On 2017/3/13 21:31, Robin Murphy wrote:
->>> On 13/03/17 12:03, Ding Tianhong wrote:
->>>> The ARCH_WANT_RELAX_ORDER will enable Relaxed Ordering (RO) which allows
->>>> transactions that do not have any order of completion requirements to
->>>> complete more efficiently compare to the Stricted Ordering (SO) for ixbge
->>>> nic card.
->>>
->>> Which ixgbe NIC? As far as I can see we have an arch-level config option
->>> here which applies to one single driver, and doesn't even cover all the
->>> hardware supported by that driver (82598, for example, still has the
->>> #ifndef CONFIG_SPARC in the equivalent place). Looking at the history,
->>> I'd prefer to at least know what the "various issues with certain
->>> chipsets" were, and why they wouldn't affect ARM systems,  before making
->>> any judgement about whether this could be considered universally safe
->>> for arm64.
->>>
->>
->> Indeed, in fact if the chipsets didn't support RO mode or has some errata for RO mode, it may
->> occur some issues, but it looks no such aarch64 chips, maybe I miss something.
->>
->> There are several intel nic card could support enable relax order, so need another patch to rename the SPARC
->> to ARCH_WANT_RELAX_ORDER, the universal name looks more better.
-> 
-> I'm sure I'm not alone in disagreeing outright that it looks better,
-> because ARCH_ is hardly the appropriate namespace for a driver option
-> unrelated to an architecture port's interaction with core kernel code;
-> plus it's further confounded by a name which both doesn't imply any
-> relationship with said driver, and does overlap with the kind of CPU
-> memory model terminology which *is* the purview of architecture ports.
-> 
-> As an equivalent example, consider how equally misleading it would be
-> from the ARM maintainer perspective if CONFIG_IOMMU_IO_PGTABLE_LPAE was
-> just called CONFIG_ARCH_WANT_LPAE and implemented in this manner.
-> 
-> Having looked into it, I see that "Relaxed Order" does actually turn out
-> to be a specific PCIe term, but even in that context it doesn't apply at
-> the arch level - that's going to be a matter for particular endpoints
-> and particular host controllers and all the quirks in between.
-> 
->>>> The system will see high write-to-memory performance when RO is
->>>> enabled on the data transactions just like the SPARC did.
->>>>
->>>> The aarch64 pcie controller could both support Relaxed Ordering (RO)
->>>
->>> What is "the AArch64 PCIe controller", exactly? Disregarding that
->>> talking of PCIe in terms of the CPU ISA makes little sense, I can barely
->>> name two ARMv8-based systems which nominally use the same PCIe IP, and
->>> the amount of various quirks and incompatibilities I'm aware of leaves
->>> me with the default assumption that any such unqualified blanket
->>> statement is probably wrong. I think we need some much more considered
->>> reasoning here.
->>>
->>
->> Agree, till now I could only test on hip06/hip07 board and get the better performance,
->> maybe I could test on other aarch64 platform.
->>
->>>> and Stricted Ordering (SO), so enable ARCH_WANT_RELAX_ORDER for ixgbe
->>>> nic card to get much more better performance, and didn't see any
->>>> adverse effects.
->>>>
->>>> Nic Card(Ixgbe)			Disable RO	|	Enable RO
->>>> Performance(Per thread)		8.4Gb/s		|	9.4Gb/s
->>>>
->>>> Tested by Iperf on Hip06/Hip07 Soc Board.
->>>>
->>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->>>> ---
->>>>  arch/arm64/Kconfig | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 8c7c244..36249a3 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -115,6 +115,7 @@ config ARM64
->>>>  	select SPARSE_IRQ
->>>>  	select SYSCTL_EXCEPTION_TRACE
->>>>  	select THREAD_INFO_IN_TASK
->>>> +	select ARCH_WANT_RELAX_ORDER
->>>
->>> I'd say the first order of business is to rename this config option to
->>> IXBGE_82599_WANT_RELAXED_ORDER so that it's not entirely misleading and
->>
->> not only for 82599, including 82598, 82576....
-> 
-> So why does ixgbe_start_hw_82598() still have the original #ifndef
-> CONFIG_SPARC from 887012e80aea?
-> 
-> It was pretty clear from the outset that this is one of those patches
-> for making a particular card go faster in a particular system based on
-> what's available in the test lab - there's nothing inherently wrong with
-> that, but if it were presented merely in those terms there would
-> probably be a lot less to object to.
-> 
->>> ambiguous. At first glance it looks far more like something scary to do
->>> with memory barriers than a network driver option. Howcome this isn't
->>> just in drivers/net/intel/Kconfig as a "default y if SPARC" bool anyway?
->>
->> didn't see any essential differences, and I still need to get some Acked by arm maintainer.
-> 
-> The big difference is that had people done the sensible thing by adding,
-> say, CONFIG_IXGBE_ALLOW_RELAXED_ORDER to drivers/net/intel/... and
-> sending a self-contained patch through the net tree, architecture
-> maintainers wouldn't even need to be aware, let alone ack anything. Then
-> in future if someone sends another patch against the net tree changing
-> "y if (SPARC || ARM64)" back to "y if SPARC" because it happens to break
-> on their system, the resulting discussion and resolution can happen on
-> netdev, and architecture maintainers who aren't necessarily familiar
-> with particular ixgbe/PCIe hardware details *still* don't need to care.
-> 
-> Robin.
-> 
+There are many functions here like:
+bcm2835_audio_setup(..)
+bcm2835_audio_flush_playback_buffers(..)
+bcm2835_audio_flush_buffers(..)
+which are not doing any work. Should they be removed or kept here as
+placeholder?
 
-Ok, after a period of thinking and verification, I believe it is not only affect for hisilicon,
-and will try to find a better way to fix this according to your opinions, thanks.
+ .../vc04_services/bcm2835-audio/bcm2835-ctl.c      |  2 --
+ .../vc04_services/bcm2835-audio/bcm2835-pcm.c      | 19 ------------
+ .../vc04_services/bcm2835-audio/bcm2835-vchiq.c    | 36 ----------------------
+ 3 files changed, 57 deletions(-)
 
-Ding
-
-> .
-> 
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+index 1fae169..f484bb0 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+@@ -41,7 +41,6 @@
+ static int snd_bcm2835_ctl_info(struct snd_kcontrol *kcontrol,
+ 				struct snd_ctl_elem_info *uinfo)
+ {
+-	audio_info(" ... IN\n");
+ 	if (kcontrol->private_value == PCM_PLAYBACK_VOLUME) {
+ 		uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+ 		uinfo->count = 1;
+@@ -58,7 +57,6 @@ static int snd_bcm2835_ctl_info(struct snd_kcontrol *kcontrol,
+ 		uinfo->value.integer.min = 0;
+ 		uinfo->value.integer.max = AUDIO_DEST_MAX - 1;
+ 	}
+-	audio_info(" ... OUT\n");
+ 	return 0;
+ }
+ 
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+index 8bd69b9..e8cf0b9 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
+@@ -65,7 +65,6 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream)
+ 	unsigned int consumed = 0;
+ 	int new_period = 0;
+ 
+-	audio_info(" .. IN\n");
+ 
+ 	audio_info("alsa_stream=%p substream=%p\n", alsa_stream,
+ 		alsa_stream ? alsa_stream->substream : 0);
+@@ -100,7 +99,6 @@ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream)
+ 	} else {
+ 		audio_warning(" unexpected NULL substream\n");
+ 	}
+-	audio_info(" .. OUT\n");
+ }
+ 
+ /* open callback */
+@@ -113,7 +111,6 @@ static int snd_bcm2835_playback_open_generic(
+ 	int idx;
+ 	int err;
+ 
+-	audio_info(" .. IN (%d)\n", substream->number);
+ 
+ 	if (mutex_lock_interruptible(&chip->audio_mutex)) {
+ 		audio_error("Interrupted whilst waiting for lock\n");
+@@ -187,7 +184,6 @@ static int snd_bcm2835_playback_open_generic(
+ out:
+ 	mutex_unlock(&chip->audio_mutex);
+ 
+-	audio_info(" .. OUT =%d\n", err);
+ 
+ 	return err;
+ }
+@@ -211,7 +207,6 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
+ 	struct snd_pcm_runtime *runtime;
+ 	struct bcm2835_alsa_stream *alsa_stream;
+ 
+-	audio_info(" .. IN\n");
+ 
+ 	chip = snd_pcm_substream_chip(substream);
+ 	if (mutex_lock_interruptible(&chip->audio_mutex)) {
+@@ -252,7 +247,6 @@ static int snd_bcm2835_playback_close(struct snd_pcm_substream *substream)
+ 	chip->opened &= ~(1 << substream->number);
+ 
+ 	mutex_unlock(&chip->audio_mutex);
+-	audio_info(" .. OUT\n");
+ 
+ 	return 0;
+ }
+@@ -265,7 +259,6 @@ static int snd_bcm2835_pcm_hw_params(struct snd_pcm_substream *substream,
+ 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
+ 	int err;
+ 
+-	audio_info(" .. IN\n");
+ 
+ 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(params));
+ 	if (err < 0) {
+@@ -277,7 +270,6 @@ static int snd_bcm2835_pcm_hw_params(struct snd_pcm_substream *substream,
+ 	alsa_stream->channels = params_channels(params);
+ 	alsa_stream->params_rate = params_rate(params);
+ 	alsa_stream->pcm_format_width = snd_pcm_format_width(params_format(params));
+-	audio_info(" .. OUT\n");
+ 
+ 	return err;
+ }
+@@ -285,7 +277,6 @@ static int snd_bcm2835_pcm_hw_params(struct snd_pcm_substream *substream,
+ /* hw_free callback */
+ static int snd_bcm2835_pcm_hw_free(struct snd_pcm_substream *substream)
+ {
+-	audio_info(" .. IN\n");
+ 	return snd_pcm_lib_free_pages(substream);
+ }
+ 
+@@ -298,7 +289,6 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
+ 	int channels;
+ 	int err;
+ 
+-	audio_info(" .. IN\n");
+ 
+ 	if (mutex_lock_interruptible(&chip->audio_mutex))
+ 		return -EINTR;
+@@ -339,7 +329,6 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
+ 		alsa_stream->pos, runtime->frame_bits);
+ 
+ 	mutex_unlock(&chip->audio_mutex);
+-	audio_info(" .. OUT\n");
+ 	return 0;
+ }
+ 
+@@ -376,7 +365,6 @@ static int snd_bcm2835_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+ 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
+ 	int err = 0;
+ 
+-	audio_info(" .. IN\n");
+ 
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+@@ -419,7 +407,6 @@ static int snd_bcm2835_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+ 		err = -EINVAL;
+ 	}
+ 
+-	audio_info(" .. OUT\n");
+ 	return err;
+ }
+ 
+@@ -430,14 +417,12 @@ snd_bcm2835_pcm_pointer(struct snd_pcm_substream *substream)
+ 	struct snd_pcm_runtime *runtime = substream->runtime;
+ 	struct bcm2835_alsa_stream *alsa_stream = runtime->private_data;
+ 
+-	audio_info(" .. IN\n");
+ 
+ 	audio_debug("pcm_pointer... (%d) hwptr=%d appl=%d pos=%d\n", 0,
+ 		frames_to_bytes(runtime, runtime->status->hw_ptr),
+ 		frames_to_bytes(runtime, runtime->control->appl_ptr),
+ 		alsa_stream->pos);
+ 
+-	audio_info(" .. OUT\n");
+ 	return snd_pcm_indirect_playback_pointer(substream,
+ 		&alsa_stream->pcm_indirect,
+ 		alsa_stream->pos);
+@@ -484,7 +469,6 @@ int snd_bcm2835_new_pcm(struct bcm2835_chip *chip, u32 numchannels)
+ 	struct snd_pcm *pcm;
+ 	int err;
+ 
+-	audio_info(" .. IN\n");
+ 	mutex_init(&chip->audio_mutex);
+ 	if (mutex_lock_interruptible(&chip->audio_mutex)) {
+ 		audio_error("Interrupted whilst waiting for lock\n");
+@@ -513,7 +497,6 @@ int snd_bcm2835_new_pcm(struct bcm2835_chip *chip, u32 numchannels)
+ 
+ out:
+ 	mutex_unlock(&chip->audio_mutex);
+-	audio_info(" .. OUT\n");
+ 
+ 	return 0;
+ }
+@@ -523,7 +506,6 @@ int snd_bcm2835_new_spdif_pcm(struct bcm2835_chip *chip)
+ 	struct snd_pcm *pcm;
+ 	int err;
+ 
+-	audio_info(" .. IN\n");
+ 	if (mutex_lock_interruptible(&chip->audio_mutex)) {
+ 		audio_error("Interrupted whilst waiting for lock\n");
+ 		return -EINTR;
+@@ -545,7 +527,6 @@ int snd_bcm2835_new_spdif_pcm(struct bcm2835_chip *chip)
+ 		snd_bcm2835_playback_spdif_hw.buffer_bytes_max, snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
+ out:
+ 	mutex_unlock(&chip->audio_mutex);
+-	audio_info(" .. OUT\n");
+ 
+ 	return 0;
+ }
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
+index 6e007db..dcc4dc4 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
+@@ -109,7 +109,6 @@ static void my_wq_function(struct work_struct *work)
+ 		container_of(work, struct bcm2835_audio_work, my_work);
+ 	int ret = -9;
+ 
+-	LOG_DBG(" .. IN %p:%d\n", w->alsa_stream, w->cmd);
+ 	switch (w->cmd) {
+ 	case BCM2835_AUDIO_START:
+ 		ret = bcm2835_audio_start_worker(w->alsa_stream);
+@@ -126,12 +125,10 @@ static void my_wq_function(struct work_struct *work)
+ 		break;
+ 	}
+ 	kfree((void *)work);
+-	LOG_DBG(" .. OUT %d\n", ret);
+ }
+ 
+ int bcm2835_audio_start(struct bcm2835_alsa_stream *alsa_stream)
+ {
+-	LOG_DBG(" .. IN\n");
+ 	if (alsa_stream->my_wq) {
+ 		struct bcm2835_audio_work *work;
+ 
+@@ -149,13 +146,11 @@ int bcm2835_audio_start(struct bcm2835_alsa_stream *alsa_stream)
+ 			return -EBUSY;
+ 		}
+ 	}
+-	LOG_DBG(" .. OUT\n");
+ 	return 0;
+ }
+ 
+ int bcm2835_audio_stop(struct bcm2835_alsa_stream *alsa_stream)
+ {
+-	LOG_DBG(" .. IN\n");
+ 	if (alsa_stream->my_wq) {
+ 		struct bcm2835_audio_work *work;
+ 
+@@ -173,14 +168,12 @@ int bcm2835_audio_stop(struct bcm2835_alsa_stream *alsa_stream)
+ 			return -EBUSY;
+ 		}
+ 	}
+-	LOG_DBG(" .. OUT\n");
+ 	return 0;
+ }
+ 
+ int bcm2835_audio_write(struct bcm2835_alsa_stream *alsa_stream,
+ 			unsigned int count, void *src)
+ {
+-	LOG_DBG(" .. IN\n");
+ 	if (alsa_stream->my_wq) {
+ 		struct bcm2835_audio_work *work;
+ 
+@@ -200,7 +193,6 @@ int bcm2835_audio_write(struct bcm2835_alsa_stream *alsa_stream,
+ 			return -EBUSY;
+ 		}
+ 	}
+-	LOG_DBG(" .. OUT\n");
+ 	return 0;
+ }
+ 
+@@ -227,7 +219,6 @@ static void audio_vchi_callback(void *param,
+ 	int msg_len;
+ 	struct vc_audio_msg m;
+ 
+-	LOG_DBG(" .. IN instance=%p, handle=%p, alsa=%p, reason=%d, handle=%p\n",
+ 		instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
+ 
+ 	if (reason != VCHI_CALLBACK_MSG_AVAILABLE)
+@@ -269,7 +260,6 @@ static void audio_vchi_callback(void *param,
+ 	} else {
+ 		LOG_ERR(" .. unexpected m.type=%d\n", m.type);
+ 	}
+-	LOG_DBG(" .. OUT\n");
+ }
+ 
+ static struct bcm2835_audio_instance *
+@@ -349,7 +339,6 @@ static int vc_vchi_audio_deinit(struct bcm2835_audio_instance *instance)
+ {
+ 	unsigned int i;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	if (!instance) {
+ 		LOG_ERR("%s: invalid handle %p\n", __func__, instance);
+@@ -382,7 +371,6 @@ static int vc_vchi_audio_deinit(struct bcm2835_audio_instance *instance)
+ 
+ 	kfree(instance);
+ 
+-	LOG_DBG(" .. OUT\n");
+ 
+ 	return 0;
+ }
+@@ -396,7 +384,6 @@ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream
+ 		(struct bcm2835_audio_instance *)alsa_stream->instance;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	LOG_INFO("%s: start\n", __func__);
+ 	BUG_ON(instance);
+@@ -447,7 +434,6 @@ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream
+ 	ret = 0;
+ err_free_mem:
+ 	kfree(vchi_instance);
+-	LOG_DBG(" .. OUT\n");
+ 
+ 	return ret;
+ }
+@@ -459,7 +445,6 @@ int bcm2835_audio_open(struct bcm2835_alsa_stream *alsa_stream)
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	my_workqueue_init(alsa_stream);
+ 
+@@ -497,7 +482,6 @@ int bcm2835_audio_open(struct bcm2835_alsa_stream *alsa_stream)
+ 	vchi_service_release(instance->vchi_handle[0]);
+ 	mutex_unlock(&instance->vchi_mutex);
+ exit:
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+@@ -509,7 +493,6 @@ static int bcm2835_audio_set_ctls_chan(struct bcm2835_alsa_stream *alsa_stream,
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	LOG_INFO(" Setting ALSA dest(%d), volume(%d)\n",
+ 		 chip->dest, chip->volume);
+@@ -558,7 +541,6 @@ static int bcm2835_audio_set_ctls_chan(struct bcm2835_alsa_stream *alsa_stream,
+ 	vchi_service_release(instance->vchi_handle[0]);
+ 	mutex_unlock(&instance->vchi_mutex);
+ 
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+@@ -567,7 +549,6 @@ int bcm2835_audio_set_ctls(struct bcm2835_chip *chip)
+ 	int i;
+ 	int ret = 0;
+ 
+-	LOG_DBG(" .. IN\n");
+ 	LOG_DBG(" Setting ALSA dest(%d), volume(%d)\n", chip->dest, chip->volume);
+ 
+ 	/* change ctls for all substreams */
+@@ -584,7 +565,6 @@ int bcm2835_audio_set_ctls(struct bcm2835_chip *chip)
+ 			}
+ 		}
+ 	}
+-	LOG_DBG(" .. OUT ret=%d\n", ret);
+ 	return ret;
+ }
+ 
+@@ -597,7 +577,6 @@ int bcm2835_audio_set_params(struct bcm2835_alsa_stream *alsa_stream,
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	LOG_INFO(" Setting ALSA channels(%d), samplerate(%d), bits-per-sample(%d)\n",
+ 		 channels, samplerate, bps);
+@@ -653,15 +632,12 @@ int bcm2835_audio_set_params(struct bcm2835_alsa_stream *alsa_stream,
+ 	vchi_service_release(instance->vchi_handle[0]);
+ 	mutex_unlock(&instance->vchi_mutex);
+ 
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+ int bcm2835_audio_setup(struct bcm2835_alsa_stream *alsa_stream)
+ {
+-	LOG_DBG(" .. IN\n");
+ 
+-	LOG_DBG(" .. OUT\n");
+ 
+ 	return 0;
+ }
+@@ -673,7 +649,6 @@ static int bcm2835_audio_start_worker(struct bcm2835_alsa_stream *alsa_stream)
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	if (mutex_lock_interruptible(&instance->vchi_mutex)) {
+ 		LOG_DBG("Interrupted whilst waiting for lock on (%d)\n",
+@@ -701,7 +676,6 @@ static int bcm2835_audio_start_worker(struct bcm2835_alsa_stream *alsa_stream)
+ unlock:
+ 	vchi_service_release(instance->vchi_handle[0]);
+ 	mutex_unlock(&instance->vchi_mutex);
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+@@ -712,7 +686,6 @@ static int bcm2835_audio_stop_worker(struct bcm2835_alsa_stream *alsa_stream)
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	if (mutex_lock_interruptible(&instance->vchi_mutex)) {
+ 		LOG_DBG("Interrupted whilst waiting for lock on (%d)\n",
+@@ -741,7 +714,6 @@ static int bcm2835_audio_stop_worker(struct bcm2835_alsa_stream *alsa_stream)
+ unlock:
+ 	vchi_service_release(instance->vchi_handle[0]);
+ 	mutex_unlock(&instance->vchi_mutex);
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+@@ -752,7 +724,6 @@ int bcm2835_audio_close(struct bcm2835_alsa_stream *alsa_stream)
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	my_workqueue_quit(alsa_stream);
+ 
+@@ -800,7 +771,6 @@ int bcm2835_audio_close(struct bcm2835_alsa_stream *alsa_stream)
+ 	vc_vchi_audio_deinit(instance);
+ 	alsa_stream->instance = NULL;
+ 
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+@@ -812,7 +782,6 @@ static int bcm2835_audio_write_worker(struct bcm2835_alsa_stream *alsa_stream,
+ 	int status;
+ 	int ret;
+ 
+-	LOG_DBG(" .. IN\n");
+ 
+ 	LOG_INFO(" Writing %d bytes from %p\n", count, src);
+ 
+@@ -878,7 +847,6 @@ static int bcm2835_audio_write_worker(struct bcm2835_alsa_stream *alsa_stream,
+ unlock:
+ 	vchi_service_release(instance->vchi_handle[0]);
+ 	mutex_unlock(&instance->vchi_mutex);
+-	LOG_DBG(" .. OUT\n");
+ 	return ret;
+ }
+ 
+@@ -887,8 +855,6 @@ static int bcm2835_audio_write_worker(struct bcm2835_alsa_stream *alsa_stream,
+  */
+ void bcm2835_audio_flush_buffers(struct bcm2835_alsa_stream *alsa_stream)
+ {
+-	LOG_DBG(" .. IN\n");
+-	LOG_DBG(" .. OUT\n");
+ }
+ 
+ /**
+@@ -897,8 +863,6 @@ void bcm2835_audio_flush_buffers(struct bcm2835_alsa_stream *alsa_stream)
+  */
+ void bcm2835_audio_flush_playback_buffers(struct bcm2835_alsa_stream *alsa_stream)
+ {
+-	LOG_DBG(" .. IN\n");
+-	LOG_DBG(" .. OUT\n");
+ }
+ 
+ unsigned int bcm2835_audio_retrieve_buffers(struct bcm2835_alsa_stream *alsa_stream)
+-- 
+2.7.4
