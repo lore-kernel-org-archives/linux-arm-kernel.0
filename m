@@ -1,47 +1,68 @@
 From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 31 Mar 2017 11:06:14 +0530
-Subject: [PATCH v9 04/12] soc: samsung: add exynos chipid driver support
-In-Reply-To: <CAK8P3a0dq-Ve2N3yFbpZ7LHzZJ=w6-pLRTSZJZ2=rnk2gWphJw@mail.gmail.com>
-References: <CGME20170330131427epcas5p4c3d238022dc75694ad3baa8a1018ea04@epcas5p4.samsung.com>
+Date: Fri, 31 Mar 2017 11:31:54 +0530
+Subject: [PATCH v9 12/12] ARM: EXYNOS: refactor of mach-exynos to use
+ chipid information
+In-Reply-To: <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
+References: <CGME20170330131444epcas5p45051cf7e6ec7a993c2c9f84254b89a19@epcas5p4.samsung.com>
  <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
- <CAK8P3a0dq-Ve2N3yFbpZ7LHzZJ=w6-pLRTSZJZ2=rnk2gWphJw@mail.gmail.com>
-Message-ID: <a1be4b9c-0f68-dbe3-7799-d5acf4ec31e0@samsung.com>
+ <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
+ <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
+Message-ID: <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On Thursday 30 March 2017 07:20 PM, Arnd Bergmann wrote:
-> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->>
->> +config EXYNOS_CHIPID
->> +       bool "Exynos Chipid controller driver" if COMPILE_TEST
->> +       depends on ARCH_EXYNOS || COMPILE_TEST
->> +       select SOC_BUS
+
+On Thursday 30 March 2017 07:31 PM, Arnd Bergmann wrote:
+> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
 > 
-> This lets you disable the driver when COMPILE_TEST is set on exynos,
-> which is probably not what you wanted.
+>>   * register the standard cpu IO areas
+>>   */
+>> -static void __init exynos_map_io(void)
+>> +static int __init exynos_fdt_map_scu(unsigned long node, const char *uname,
+>> +               int depth, void *data)
+>>  {
+>> -       if (soc_is_exynos4())
+>> -               iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+>> +       if (!of_flat_dt_is_compatible(node, "samsung,exynos4210") &&
+>> +                       !of_flat_dt_is_compatible(node, "samsung,exynos4212") &&
+>> +                       !of_flat_dt_is_compatible(node, "samsung,exynos4412"))
+>> +               return 0;
+>> +
+>> +       iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+>> +       return 1;
+>>  }
 > 
+> This seems really overcomplicated. From what I can tell, this is only needed
+> to find the SCU address, but there are better ways to do that, either by
+> looking up the SCU in the DT at the time you actually need it,
+> or by calling scu_a9_get_base().
 
-Sorry I could not get this point. EXYNOS_CHIPID is invisible menu
-option, when I enabled COMPILE_TEST, option is visible in make
-menuconfig but it does not allow to disable this driver. I have adopted
-this config same as EXYNOS_PMU in the same file.
+Indeed it's complicated and ugly, for the same reason I attempted to
+clean-up this part for Exynos SoC in patch series [1], which was
+accepted by Samsung maintainer Krzysztof and later during pull request
+rejected by ARM maintainers [2]
 
-> I'd do
-> 
->          bool "Exynos Chipid controller driver" if COMPILE_TEST && !ARCHEXYNOS
->          default ARCH_EXYNOS
+[1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
+[2]: http://lkml.iu.edu/hypermail/linux/kernel/1612.0/01508.html
 
-I can adopt, default ARCH_EXYNOS, which will allow me to drop patch 5/12
-and 6/12.
+Given the argument we can't adopt getting base address of SCU completely
+via DT without breaking OLD dtbs at some point, difficult to simplify
+these stuffs.
 
-Thanks for review.
+Please guide which is the best way to handle such stuffs.
+
+In fact I made another attempt [3] to cleanup this SCU related stuffs
+for other ARM based platforms, but we could not arrive on some consensus
+at that time. I will try to attempt it again soon.
+
+[3]: http://www.spinics.net/lists/arm-kernel/msg542351.html
+
+Thanks,
 Pankaj Dubey
 
 > 
->      Arnd
+>       Arnd
 > 
 > 
 > 
