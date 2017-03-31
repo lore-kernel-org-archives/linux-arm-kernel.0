@@ -1,101 +1,68 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 31 Mar 2017 10:02:57 +0800
-Subject: [PATCH 2/3] dts: arm64: add LS1043A DPAA QBMan nodes
-In-Reply-To: <1490884672-18294-3-git-send-email-madalin.bucur@nxp.com>
-References: <1490884672-18294-1-git-send-email-madalin.bucur@nxp.com>
- <1490884672-18294-3-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <20170331020255.GI683@dragon>
+From: huziji@marvell.com (Hu Ziji)
+Date: Fri, 31 Mar 2017 10:09:58 +0800
+Subject: [PATCH v7 00/13] mmc: Add support to Marvell Xenon SD Host
+ Controller
+In-Reply-To: <20170330185639.GI7909@n2100.armlinux.org.uk>
+References: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
+ <20170330185639.GI7909@n2100.armlinux.org.uk>
+Message-ID: <8ebf11c8-f8e0-e4bb-ed70-f8c2e68aa787@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 05:37:51PM +0300, Madalin Bucur wrote:
-> Add the DPAA 1.x QMan and BMan nodes in the LS1043A device tree.
+Hi Russell,
+
+On 2017/3/31 2:56, Russell King - ARM Linux wrote:
+> ----------------------------------------------------------------------
+> On Thu, Mar 30, 2017 at 05:22:52PM +0200, Gregory CLEMENT wrote:
+>> - Remove parse of child node mmc-card. Wait for a better solution.
 > 
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 52 ++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
+> So for mcbin, I have:
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index ec13a6e..8434e89 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -106,6 +106,33 @@
->  		      /* DRAM space 1, size: 2GiB DRAM */
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		bman_fbpr: bman-fbpr {
-> +			compatible = "shared-dma-pool";
-> +			size = <0 0x1000000>;
-> +			alignment = <0 0x1000000>;
-> +			no-map;
-> +		};
-> +
-> +		qman_fqd: qman-fqd {
-> +			compatible = "shared-dma-pool";
-> +			size = <0 0x400000>;
-> +			alignment = <0 0x400000>;
-> +			no-map;
-> +		};
-> +
-> +		qman_pfdr: qman-pfdr {
-> +			compatible = "shared-dma-pool";
-> +			size = <0 0x2000000>;
-> +			alignment = <0 0x2000000>;
-> +			no-map;
-> +		};
-> +	};
-> +
->  	sysclk: sysclk {
->  		compatible = "fixed-clock";
->  		#clock-cells = <0>;
-> @@ -333,6 +360,28 @@
->  			};
->  		};
->  
-> +		qman: qman at 1880000 {
-> +			compatible = "fsl,qman";
-> +			reg = <0x00 0x1880000 0x0 0x10000>;
+> &ap_sdhci0 {
+>         bus-width = <8>;
+>         marvell,xenon-emmc;
+>         marvell,xenon-phy-type = "emmc 5.1 phy";
+>         /*
+>          * Not stable in HS modes - phy needs "more calibration", so add
+>          * the "slow-mode" and disable SDR104, SDR50 and DDR50 modes.
+>          */
+>         marvell,xenon-phy-slow-mode;
+>         no-1-8-v;
+>         non-removable;
+>         status = "okay";
+>         vqmmc-supply = <&v_vddo_h>;
+> 
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         mmccard: mmccard at 0 {
+>                 compatible = "mmc-card";
+>                 reg = <0>;
+>         };
+> };
+> 
+> Does this mean the "mmccard" bit is no longer required - or is it required
+> for the eMMC to be detected but is no longer supported by the driver?
+> 
 
-s/0x00/0x0?
+	Based on the implementation in this release, "mmccard" is no longer required.
 
-Shawn
+	More details:
+	eMMC Vqmmc in Xenon is fixed without a regulator. Thus 1.8V Signaling Enable bit
+	in SDHC doesn't work.
+	As a result, Xenon driver has to skip sdhci_start_signal_voltage_switch() to avoid
+	checking 1.8V signaling enable bit when setting signaling voltage.
 
-> +			interrupts = <0 45 0x4>;
-> +			memory-region = <&qman_fqd &qman_pfdr>;
-> +		};
-> +
-> +		bman: bman at 1890000 {
-> +			compatible = "fsl,bman";
-> +			reg = <0x00 0x1890000 0x0 0x10000>;
-> +			interrupts = <0 45 0x4>;
-> +			memory-region = <&bman_fbpr>;
-> +		};
-> +
-> +		bportals: bman-portals at 508000000 {
-> +			ranges = <0x0 0x5 0x08000000 0x8000000>;
-> +		};
-> +
-> +		qportals: qman-portals at 500000000 {
-> +			ranges = <0x0 0x5 0x00000000 0x8000000>;
-> +		};
-> +
->  		dspi0: dspi at 2100000 {
->  			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
->  			#address-cells = <1>;
-> @@ -686,3 +735,6 @@
->  	};
->  
->  };
-> +
-> +#include "qoriq-qman1-portals.dtsi"
-> +#include "qoriq-bman1-portals.dtsi"
-> -- 
-> 2.1.0
+	Previously, we use "mmccard" to inform Xenon driver that it is an eMMC card
+	and therefore sdhci_start_signal_voltage_switch() is skipped.
+
+	Currently, Xenon driver directly checks if Vqmmc regulator is provided.
+	Skip sdhci_start_signal_voltage_switch() if Vqmmc is fixed.
+	In my own opinion, it is more direct and clear, than checking eMMC card type. 
+
+	Thank you.
+
+Best regards,
+Hu Ziji
+
+> Thanks.
 > 
