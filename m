@@ -1,26 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 11:40:44 +0200
-Subject: [PATCH v6 1/3] dt-bindings: Add arm64 ARCH_THUNDER2 platform
- documentation
-In-Reply-To: <1489608662-4434-2-git-send-email-jnair@caviumnetworks.com>
-References: <1489495634-2920-1-git-send-email-jnair@caviumnetworks.com>
- <1489608662-4434-1-git-send-email-jnair@caviumnetworks.com>
- <1489608662-4434-2-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <CAK8P3a1PFf_h8FXANw9Tp8_9BYpzEosj-uNYhfPnoo2K5wMjiQ@mail.gmail.com>
+Date: Fri, 31 Mar 2017 11:44:13 +0200
+Subject: [PATCH v6 2/2] arm64: dts: move from ARCH_VULCAN to ARCH_THUNDER2
+In-Reply-To: <1489495634-2920-3-git-send-email-jnair@caviumnetworks.com>
+References: <1489313015-4783-1-git-send-email-jnair@caviumnetworks.com>
+ <1489495634-2920-1-git-send-email-jnair@caviumnetworks.com>
+ <1489495634-2920-3-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <CAK8P3a1db5vs9MtbN2ZcKFF2=9AH+omVaGi0ndBcSEW2t0H7Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 9:11 PM, Jayachandran C
+On Tue, Mar 14, 2017 at 1:47 PM, Jayachandran C
 <jnair@caviumnetworks.com> wrote:
-> Add documentation for Cavium's ThunderX2 CN99XX ARM64 processor. This
-> SoC will use "cavium,thunderx2-cn9900" as the compatible property.
+> Move and update device tree files as part of transition from Broadcom
+> Vulcan to Cavium ThunderX2.
 >
-> Also add a documentation entry for the "cavium,thunder2" cpu core
-> present in these SoCs.
+> The changes are to:
+>  * rename dts/broadcom/vulcan.dtsi to cavium/thunder2-99xx.dtsi,
+>    update cpu cores to be "cavium,thunder2", and update SoC to be
+>    "cavium,thunderx2-cn9900"
+>  * move SoC dts/broadcom/vulcan-eval.dtsi to cavium/thunder2-99xx.dtsi
+>    and update board name string
+>  * Update dts/broadcom/Makefile not to build vulcan dtbs
+>  * Update dts/cavium/Makefile to build thunder2 dtbs
+>
+> No changes to the dts contents except the updated "compatible" and
+> "model" properties.
 >
 > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Applied on next/dt64, thanks!
+Applied to next/dt64.
 
-     Arnd
+The contents are fine, but I'd recommend using 'git format-patch -M'
+when creating a submission for easier review, in case you do another
+patch with a rename in the future.
+
+       Arnd
