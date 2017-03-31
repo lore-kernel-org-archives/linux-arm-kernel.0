@@ -1,59 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 09:25:34 +0200
-Subject: [PATCH v5 2/2] mmc: host: s3cmci: allow probing from device tree
-In-Reply-To: <1489799633-29278-3-git-send-email-sergio.prado@e-labworks.com>
-References: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
- <1489799633-29278-3-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <CAK8P3a2emCf=KtpCJMOaJnr89Gi+rCi0eun_vjb1wiYB=JR6jg@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Fri, 31 Mar 2017 09:31:31 +0200
+Subject: [PATCH V3 1/2] dt-bindings: thermal: add support for Broadcom's
+ Northstar thermal
+In-Reply-To: <20170323223045.15786-1-zajec5@gmail.com>
+References: <20170323223045.15786-1-zajec5@gmail.com>
+Message-ID: <20170331073132.21457-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 18, 2017 at 2:13 AM, Sergio Prado
-<sergio.prado@e-labworks.com> wrote:
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
->
-> +static const struct of_device_id s3cmci_dt_match[] = {
-> +       {
-> +               .compatible = "samsung,s3c2410-sdi",
-> +               .data = (void *)0,
-> +       },
-> +       {
-> +               .compatible = "samsung,s3c2412-sdi",
-> +               .data = (void *)1,
-> +       },
-> +       {
-> +               .compatible = "samsung,s3c2440-sdi",
-> +               .data = (void *)1,
-> +       },
-> +       { /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
-> +
+This commit documents binding for thermal used in Northstar family SoCs.
 
-The names don't match:
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+V3: Add thermal-zones to the example
+    Rob: Because of this update, I didn't include Acked-by I got for V2
+---
+ .../devicetree/bindings/thermal/brcm,ns-thermal    | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,ns-thermal
 
-In file included from /git/arm-soc/drivers/mmc/host/s3cmci.c:14:0:
-/git/arm-soc/drivers/mmc/host/s3cmci.c:1844:25: error:
-'sdhci_s3c_dt_match' undeclared here (not in a function); did you mean
-'s3cmci_dt_match'?
- MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
-                         ^
-/git/arm-soc/include/linux/module.h:212:21: note: in definition of
-macro 'MODULE_DEVICE_TABLE'
- extern const typeof(name) __mod_##type##__##name##_device_table  \
-                     ^~~~
-/git/arm-soc/include/linux/module.h:212:27: error:
-'__mod_of__sdhci_s3c_dt_match_device_table' aliased to undefined
-symbol 'sdhci_s3c_dt_match'
- extern const typeof(name) __mod_##type##__##name##_device_table  \
-                           ^
-/git/arm-soc/drivers/mmc/host/s3cmci.c:1844:1: note: in expansion of
-macro 'MODULE_DEVICE_TABLE'
- MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
- ^~~~~~~~~~~~~~~~~~~
-/git/arm-soc/scripts/Makefile.build:314: recipe for target
-'drivers/mmc/host/s3cmci.o' failed
-
-Can you send a fix?
-
-       Arnd
+diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+new file mode 100644
+index 000000000000..c561c7349f17
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+@@ -0,0 +1,26 @@
++* Broadcom Northstar Thermal
++
++This binding describes thermal sensor that is part of Northstar's DMU (Device
++Management Unit).
++
++Required properties:
++- compatible : Must be "brcm,ns-thermal"
++- reg : iomem address range of PVTMON registers
++- #thermal-sensor-cells : Should be <0>
++
++Example:
++
++thermal: thermal at 1800c2c0 {
++	compatible = "brcm,ns-thermal";
++	reg = <0x1800c2c0 0x10>;
++	#thermal-sensor-cells = <0>;
++};
++
++thermal-zones {
++	cpu_thermal: cpu-thermal {
++		polling-delay-passive = <0>;
++		polling-delay = <1000>;
++		coefficients = <(-556) 418000>;
++		thermal-sensors = <&thermal>;
++	};
++};
+-- 
+2.11.0
