@@ -1,26 +1,23 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Mar 2017 10:49:38 +0100
-Subject: [PATCH v2] drm: hdlcd: Fix the calculation of the scanout start
- address
-In-Reply-To: <20170308163025.31098-1-Liviu.Dudau@arm.com>
-References: <20170222153036.GI31595@intel.com>
- <20170308163025.31098-1-Liviu.Dudau@arm.com>
-Message-ID: <20170331094937.GO7909@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Mar 2017 11:51:30 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.12 (#1)
+In-Reply-To: <87h92ibnbc.fsf@free-electrons.com>
+References: <87h92ibnbc.fsf@free-electrons.com>
+Message-ID: <CAK8P3a2WHTS26JZTW8Knf9TcJd6_xawjgCtJG-HEsX+JZwNeTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 04:30:25PM +0000, Liviu Dudau wrote:
-> The calculation of the framebuffer's start address was wrongly using
-> the CRTC's x and y position rather than the one of the source
-> framebuffer. To fix that we need to update the plane_check code to
-> call drm_plane_helper_check_state() to clip the src and dst coordinates.
-> While there so some minor cleanup of redundant freeing of
-> devm_alloc-ated memory.
+On Fri, Mar 24, 2017 at 6:24 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> ----------------------------------------------------------------
+> mvebu dt64 for 4.12 (part 1)
+>
+> - Add RTC support on Armada 7k/8k
+> - Improve i2c support on Armada 37xx
+> - Add gpio expander and RTC on Armada 3720 board
+> - Improve USB3 support on Armada 37xx
+> - Add network support on Armada 7k/8k
 
-The following series is what I came up with, although I've had no time
-to test it.
+Pulled into next/dt64, thanks!
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+     Arnd
