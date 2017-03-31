@@ -1,56 +1,67 @@
 From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Fri, 31 Mar 2017 18:54:35 +0200
-Subject: [PATCH v3 2/4] dt-binding: meson_uart: add documentation for the
- UARTs of amlogic
+Date: Fri, 31 Mar 2017 18:54:37 +0200
+Subject: [PATCH v3 4/4] ARM64: dts: meson-gx: add core clock support for
+ uart_A, uart_B and uart_C
 In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com>
 References: <20170331165437.26227-1-hgkr.klein@gmail.com>
-Message-ID: <20170331165437.26227-3-hgkr.klein@gmail.com>
+Message-ID: <20170331165437.26227-5-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the documentation for the device tree binding of meson_uart
+This patch adds the core clock support for the three none AO UARTs
+of the meson gxbb & meson gxl SoCs
 
 Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
 ---
- .../bindings/serial/amlogic,meson_uart.txt         | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 15 +++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 15 +++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
-new file mode 100644
-index 000000000000..8250a191c2fc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
-@@ -0,0 +1,30 @@
-+* Amlogic Meson UART, used in multiple SoCs (e.g. S905, s905X, ...)
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 04b3324bc132..aa2f75d5cd37 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -524,3 +524,18 @@
+ &vpu {
+ 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
+ };
 +
-+Required properties:
-+- compatible	: "amlogic,meson-uart"
-+- reg		: offset and length of the register set for the device.
-+- interrupts	: device interrupt
-+- clocks	: a list of phandle + clock-specifier pairs, one for each
-+		    entry in clock names.
-+- clocks-names	: contains:
-+   * "xtal" for the baud rate clock
-+   * "core" for the core clock of none AO UARTs (optional)
-+
-+e.g.
-+uart_A: serial at 84c0 {
-+	compatible = "amlogic,meson-uart";
-+	reg = <0x0 0x84c0 0x0 0x14>;
-+	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
-+	interrupts = <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>;
++&uart_A {
 +	clocks = <&xtal>, <&clkc CLKID_UART0>;
 +	clock-names = "xtal", "core";
-+	status = "ok";
 +};
 +
-+Note: Each port should have an alias correctly numbered in "aliases" node.
++&uart_B {
++	clocks = <&xtal>, <&clkc CLKID_UART1>;
++	clock-names = "xtal", "core";
++};
 +
-+e.g.
-+aliases {
-+	serial0 = &uart_AO;
-+	serial1 = &uart_A;
++&uart_C {
++	clocks = <&xtal>, <&clkc CLKID_UART2>;
++	clock-names = "xtal", "core";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index fe11b5fc61f7..f3cc18fd624a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -381,3 +381,18 @@
+ &vpu {
+ 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
+ };
++
++&uart_A {
++	clocks = <&xtal>, <&clkc CLKID_UART0>;
++	clock-names = "xtal", "core";
++};
++
++&uart_B {
++	clocks = <&xtal>, <&clkc CLKID_UART1>;
++	clock-names = "xtal", "core";
++};
++
++&uart_C {
++	clocks = <&xtal>, <&clkc CLKID_UART2>;
++	clock-names = "xtal", "core";
 +};
 --
 2.11.0
