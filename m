@@ -1,82 +1,355 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 10:22:12 +0200
-Subject: [PATCH v9 12/12] ARM: EXYNOS: refactor of mach-exynos to use
- chipid information
-In-Reply-To: <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
-References: <CGME20170330131444epcas5p45051cf7e6ec7a993c2c9f84254b89a19@epcas5p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
- <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
- <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
-Message-ID: <CAK8P3a1GobLFjVXySXHGYBXscMaTcL8nzv183Reho87+U3Z5cA@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 31 Mar 2017 16:27:59 +0800
+Subject: [PATCH v4 4/6] arm64: dts: rockchip: add core dtsi file for
+ RK3328 SoCs
+In-Reply-To: <1490607650-18650-4-git-send-email-cl@rock-chips.com>
+References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
+ <1490607650-18650-4-git-send-email-cl@rock-chips.com>
+Message-ID: <2def4338-fe73-c0a7-62bc-d770bee22569@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 8:01 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
-> On Thursday 30 March 2017 07:31 PM, Arnd Bergmann wrote:
->> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->>
->> This seems really overcomplicated. From what I can tell, this is only needed
->> to find the SCU address, but there are better ways to do that, either by
->> looking up the SCU in the DT at the time you actually need it,
->> or by calling scu_a9_get_base().
+Hi Liang,
+
+On 2017/3/27 17:40, cl at rock-chips.com wrote:
+> From: Liang Chen <cl@rock-chips.com>
 >
-> Indeed it's complicated and ugly, for the same reason I attempted to
-> clean-up this part for Exynos SoC in patch series [1], which was
-> accepted by Samsung maintainer Krzysztof and later during pull request
-> rejected by ARM maintainers [2]
+> This patch adds core dtsi file for Rockchip RK3328 SoCs.
 >
-> [1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
-> [2]: http://lkml.iu.edu/hypermail/linux/kernel/1612.0/01508.html
+> Signed-off-by: Liang Chen <cl@rock-chips.com>
+> ---
+
+----8<------
+
+> +
+> +		sdmmc1 {
+> +			sdmmc1_clk: sdmmc1-clk {
+> +				rockchip,pins =
+> +					<1 RK_PB4 1 &pcfg_pull_none_8ma>;
+> +			};
+> +
+> +			sdmmc1_cmd: sdmmc1-cmd {
+> +				rockchip,pins = <1 RK_PB5 1 &pcfg_pull_up_8ma>;
+> +			};
+> +
+> +			sdmmc1_pwren: sdmmc1-pwren {
+> +				rockchip,pins = <1 RK_PC2 1 &pcfg_pull_up_8ma>;
+> +			};
+> +
+> +			sdmmc1_wrprt: sdmmc1-wrprt {
+> +				rockchip,pins = <1 RK_PC4 1 &pcfg_pull_up_8ma>;
+> +			};
+> +
+> +			sdmmc1_dectn: sdmmc1-dectn {
+> +				rockchip,pins = <1 RK_PC3 1 &pcfg_pull_up_8ma>;
+> +			};
+> +
+> +			sdmmc1_bus1: sdmmc1-bus1 {
+> +				rockchip,pins = <1 RK_PB6 1 &pcfg_pull_up_8ma>;
+> +			};
+> +
+> +			sdmmc1_bus4: sdmmc1-bus4 {
+> +				rockchip,pins = <1 RK_PB4 1 &pcfg_pull_up_8ma>,
+> +						<1 RK_PB5 1 &pcfg_pull_up_8ma>,
+
+
+I'm pretty sure this isn't correct as sdmmc1_bus1 even doesn't contain
+one same pinctrl(data0) as sdmmc1_bus4. So, the first two pins should be
+"1 RK_PB6" and "1 RK_PB7".....
+
+
+> +						<1 RK_PC0 1 &pcfg_pull_up_8ma>,
+> +						<1 RK_PC1 1 &pcfg_pull_up_8ma>;
+> +			};
+> +
+> +			sdmmc1_gpio: sdmmc1-gpio {
+> +				rockchip,pins =
+> +					<1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PB7 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PC0 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PC3 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
+> +					<1 RK_PC4 RK_FUNC_GPIO &pcfg_pull_up_4ma>;
+> +			};
+> +		};
+> +
+> +		emmc {
+> +			emmc_clk: emmc-clk {
+> +				rockchip,pins =
+> +					<3 RK_PC5 2 &pcfg_pull_none_12ma>;
+> +			};
+> +
+> +			emmc_cmd: emmc-cmd {
+> +				rockchip,pins =
+> +					<3 RK_PC3 2 &pcfg_pull_up_12ma>;
+> +			};
+> +
+> +			emmc_pwren: emmc-pwren {
+> +				rockchip,pins = <3 RK_PC6 2 &pcfg_pull_none>;
+> +			};
+> +
+> +			emmc_rstnout: emmc-rstnout {
+> +				rockchip,pins = <3 RK_PC4 2 &pcfg_pull_none>;
+> +			};
+> +
+> +			emmc_bus1: emmc-bus1 {
+> +				rockchip,pins =
+> +					<0 RK_PA7 2 &pcfg_pull_up_12ma>;
+> +			};
+> +
+> +			emmc_bus4: emmc-bus4 {
+> +				rockchip,pins =
+> +					<0 RK_PA7 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD4 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD5 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD6 2 &pcfg_pull_up_12ma>;
+> +			};
+> +
+> +			emmc_bus8: emmc-bus8 {
+> +				rockchip,pins =
+> +					<0 RK_PA7 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD4 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD5 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD6 2 &pcfg_pull_up_12ma>,
+> +					<2 RK_PD7 2 &pcfg_pull_up_12ma>,
+> +					<3 RK_PC0 2 &pcfg_pull_up_12ma>,
+> +					<3 RK_PC1 2 &pcfg_pull_up_12ma>,
+> +					<3 RK_PC2 2 &pcfg_pull_up_12ma>;
+> +			};
+> +		};
+> +
+> +		pwm0 {
+> +			pwm0_pin: pwm0-pin {
+> +				rockchip,pins = <2 RK_PA4 1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		pwm1 {
+> +			pwm1_pin: pwm1-pin {
+> +				rockchip,pins = <2 RK_PA5 1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		pwm2 {
+> +			pwm2_pin: pwm2-pin {
+> +				rockchip,pins = <2 RK_PA6 1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		pwmir {
+> +			pwmir_pin: pwmir-pin {
+> +				rockchip,pins = <2 RK_PA2 1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		gmac-1 {
+> +			rgmiim1_pins: rgmiim1-pins {
+> +				rockchip,pins =
+> +					/* mac_txclk */
+> +					<1 RK_PB4 2 &pcfg_pull_none_12ma>,
+> +					/* mac_rxclk */
+> +					<1 RK_PB5 2 &pcfg_pull_none_2ma>,
+> +					/* mac_mdio */
+> +					<1 RK_PC3 2 &pcfg_pull_none_2ma>,
+> +					/* mac_txen */
+> +					<1 RK_PD1 2 &pcfg_pull_none_12ma>,
+> +					/* mac_clk */
+> +					<1 RK_PC5 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxdv */
+> +					<1 RK_PC6 2 &pcfg_pull_none_2ma>,
+> +					/* mac_mdc */
+> +					<1 RK_PC7 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxd1 */
+> +					<1 RK_PB2 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxd0 */
+> +					<1 RK_PB3 2 &pcfg_pull_none_2ma>,
+> +					/* mac_txd1 */
+> +					<1 RK_PB0 2 &pcfg_pull_none_12ma>,
+> +					/* mac_txd0 */
+> +					<1 RK_PB1 2 &pcfg_pull_none_12ma>,
+> +					/* mac_rxd3 */
+> +					<1 RK_PB6 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxd2 */
+> +					<1 RK_PB7 2 &pcfg_pull_none_2ma>,
+> +					/* mac_txd3 */
+> +					<1 RK_PC0 2 &pcfg_pull_none_12ma>,
+> +					/* mac_txd2 */
+> +					<1 RK_PC1 2 &pcfg_pull_none_12ma>,
+> +
+> +					/* mac_txclk */
+> +					<0 RK_PB0 1 &pcfg_pull_none>,
+> +					/* mac_txen */
+> +					<0 RK_PB4 1 &pcfg_pull_none>,
+> +					/* mac_clk */
+> +					<0 RK_PD0 1 &pcfg_pull_none>,
+> +					/* mac_txd1 */
+> +					<0 RK_PC0 1 &pcfg_pull_none>,
+> +					/* mac_txd0 */
+> +					<0 RK_PC1 1 &pcfg_pull_none>,
+> +					/* mac_txd3 */
+> +					<0 RK_PC7 1 &pcfg_pull_none>,
+> +					/* mac_txd2 */
+> +					<0 RK_PC6 1 &pcfg_pull_none>;
+> +			};
+> +
+> +			rmiim1_pins: rmiim1-pins {
+> +				rockchip,pins =
+> +					/* mac_mdio */
+> +					<1 RK_PC3 2 &pcfg_pull_none_2ma>,
+> +					/* mac_txen */
+> +					<1 RK_PD1 2 &pcfg_pull_none_12ma>,
+> +					/* mac_clk */
+> +					<1 RK_PC5 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxer */
+> +					<1 RK_PD0 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxdv */
+> +					<1 RK_PC6 2 &pcfg_pull_none_2ma>,
+> +					/* mac_mdc */
+> +					<1 RK_PC7 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxd1 */
+> +					<1 RK_PB2 2 &pcfg_pull_none_2ma>,
+> +					/* mac_rxd0 */
+> +					<1 RK_PB3 2 &pcfg_pull_none_2ma>,
+> +					/* mac_txd1 */
+> +					<1 RK_PB0 2 &pcfg_pull_none_12ma>,
+> +					/* mac_txd0 */
+> +					<1 RK_PB1 2 &pcfg_pull_none_12ma>,
+> +
+> +					/* mac_mdio */
+> +					<0 RK_PB3 1 &pcfg_pull_none>,
+> +					/* mac_txen */
+> +					<0 RK_PB4 1 &pcfg_pull_none>,
+> +					/* mac_clk */
+> +					<0 RK_PD0 1 &pcfg_pull_none>,
+> +					/* mac_mdc */
+> +					<0 RK_PC3 1 &pcfg_pull_none>,
+> +					/* mac_txd1 */
+> +					<0 RK_PC0 1 &pcfg_pull_none>,
+> +					/* mac_txd0 */
+> +					<0 RK_PC1 1 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		gmac2phy {
+> +			fephyled_speed100: fephyled-speed100 {
+> +				rockchip,pins = <0 RK_PD7 1 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_speed10: fephyled-speed10 {
+> +				rockchip,pins = <0 RK_PD6 1 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_duplex: fephyled-duplex {
+> +				rockchip,pins = <0 RK_PD6 2 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_rxm0: fephyled-rxm0 {
+> +				rockchip,pins = <0 RK_PD5 1 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_txm0: fephyled-txm0 {
+> +				rockchip,pins = <0 RK_PD5 2 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_linkm0: fephyled-linkm0 {
+> +				rockchip,pins = <0 RK_PD4 1 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_rxm1: fephyled-rxm1 {
+> +				rockchip,pins = <2 RK_PD1 2 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_txm1: fephyled-txm1 {
+> +				rockchip,pins = <2 RK_PD1 3 &pcfg_pull_none>;
+> +			};
+> +
+> +			fephyled_linkm1: fephyled-linkm1 {
+> +				rockchip,pins = <2 RK_PD0 2 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		tsadc_pin {
+> +			tsadc_int: tsadc-int {
+> +				rockchip,pins = <2 RK_PB5 2 &pcfg_pull_none>;
+> +			};
+> +			tsadc_gpio: tsadc-gpio {
+> +				rockchip,pins =
+> +					<2 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		hdmi_pin {
+> +			hdmi_cec: hdmi-cec {
+> +				rockchip,pins = <0 RK_PA3 1 &pcfg_pull_none>;
+> +			};
+> +
+> +			hdmi_hpd: hdmi-hpd {
+> +				rockchip,pins = <0 RK_PA4 1 &pcfg_pull_down>;
+> +			};
+> +		};
+> +
+> +		cif-0 {
+> +			dvp_d2d9_m0:dvp-d2d9-m0 {
+> +				rockchip,pins =
+> +					/* cif_d0 */
+> +					<3 RK_PA4 2 &pcfg_pull_none>,
+> +					/* cif_d1 */
+> +					<3 RK_PA5 2 &pcfg_pull_none>,
+> +					/* cif_d2 */
+> +					<3 RK_PA6 2 &pcfg_pull_none>,
+> +					/* cif_d3 */
+> +					<3 RK_PA7 2 &pcfg_pull_none>,
+> +					/* cif_d4 */
+> +					<3 RK_PB0 2 &pcfg_pull_none>,
+> +					/* cif_d5m0 */
+> +					<3 RK_PB1 2 &pcfg_pull_none>,
+> +					/* cif_d6m0 */
+> +					<3 RK_PB2 2 &pcfg_pull_none>,
+> +					/* cif_d7m0 */
+> +					<3 RK_PB3 2 &pcfg_pull_none>,
+> +					/* cif_href */
+> +					<3 RK_PA1 2 &pcfg_pull_none>,
+> +					/* cif_vsync */
+> +					<3 RK_PA0 2 &pcfg_pull_none>,
+> +					/* cif_clkoutm0 */
+> +					<3 RK_PA3 2 &pcfg_pull_none>,
+> +					/* cif_clkin */
+> +					<3 RK_PA2 2 &pcfg_pull_none>;
+> +			};
+> +		};
+> +
+> +		cif-1 {
+> +			dvp_d2d9_m1:dvp-d2d9-m1 {
+> +				rockchip,pins =
+> +					/* cif_d0 */
+> +					<3 RK_PA4 2 &pcfg_pull_none>,
+> +					/* cif_d1 */
+> +					<3 RK_PA5 2 &pcfg_pull_none>,
+> +					/* cif_d2 */
+> +					<3 RK_PA6 2 &pcfg_pull_none>,
+> +					/* cif_d3 */
+> +					<3 RK_PA7 2 &pcfg_pull_none>,
+> +					/* cif_d4 */
+> +					<3 RK_PB0 2 &pcfg_pull_none>,
+> +					/* cif_d5m1 */
+> +					<2 RK_PC0 4 &pcfg_pull_none>,
+> +					/* cif_d6m1 */
+> +					<2 RK_PC1 4 &pcfg_pull_none>,
+> +					/* cif_d7m1 */
+> +					<2 RK_PC2 4 &pcfg_pull_none>,
+> +					/* cif_href */
+> +					<3 RK_PA1 2 &pcfg_pull_none>,
+> +					/* cif_vsync */
+> +					<3 RK_PA0 2 &pcfg_pull_none>,
+> +					/* cif_clkoutm1 */
+> +					<2 RK_PB7 4 &pcfg_pull_none>,
+> +					/* cif_clkin */
+> +					<3 RK_PA2 2 &pcfg_pull_none>;
+> +			};
+> +		};
+> +	};
+> +};
 >
-> Given the argument we can't adopt getting base address of SCU completely
-> via DT without breaking OLD dtbs at some point, difficult to simplify
-> these stuffs.
->
-> Please guide which is the best way to handle such stuffs.
->
-> In fact I made another attempt [3] to cleanup this SCU related stuffs
-> for other ARM based platforms, but we could not arrive on some consensus
-> at that time. I will try to attempt it again soon.
->
-> [3]: http://www.spinics.net/lists/arm-kernel/msg542351.html
-
-I very much appreciate your attempts, this is very helpful. I'm sorry
-for making it so hard for you. I had remembered your previous series,
-but did not realize that you were the author of both this patch and
-the SCU cleanup.
-
-Let me try to understand the entire problem space better. These
-are my assumptions based on what  you write:
-
-- A clean solution would be to map the SCU based on the DT as
-  you implemented in the earlier patch series, but that breaks
-  running new kernels with old DTBs, which we don't want.
-
-- Another clean solution would be to map the SCU based on
-  scu_a9_get_base(), but that doesn't work on all variants of
-  exynos4, because there is at least one (which?) that has incorrect
-  data in the register
-
-- The approach in this patch works, but is really ugly as it
-  requires parsing the fdt.
-
-Assuming that we don't want any of the approaches above,
-here are some other ideas that might be a little better:
-
-- Map the SCU later, just before we first need for calling
-  scu_enable(): exynos_smp_prepare_cpus(),
-  exynos_enter_aftr() or exynos_pm_resume(). All three
-  are late enough that we can simply call ioremap()
-  on the known physical address for the first caller,
-  and they are all guarded by a
-  ARM_CPU_PART_CORTEX_A9 check that should
-  be equivalent to the EXYNOS4 check you have.
-
-- Split the exynos4 machine descriptor from the one
-  for exynos5, and exynos3, the call the iotable_init
-  unconditionally for exynos4. The same method would
-  also let us get rid of some of the other
-  of_machine_is_compatible() checks.
-
-       Arnd
