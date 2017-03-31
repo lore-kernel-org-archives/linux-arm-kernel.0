@@ -1,76 +1,241 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 31 Mar 2017 09:41:15 +0200
-Subject: [PATCH] ARM: dts: armada-38x: label USB and SATA nodes
-Message-ID: <20170331074115.8111-1-ralph.sennhauser@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 31 Mar 2017 08:55:33 +0100
+Subject: [PATCH v2] arm64: relocation testing module
+Message-ID: <1490946933-9674-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recently most nodes got labels to make them referenceable. The USB 3.0
-nodes as well as the nodes for the SATA controllers were left out,
-rectify the omission.
+This module tests the module loader's ELF relocation processing
+routines. When loaded, it logs output like below.
 
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+    Relocation test:
+    -------------------------------------------------------
+    R_AARCH64_ABS64                 0xffff880000cccccc pass
+    R_AARCH64_ABS32                 0x00000000f800cccc pass
+    R_AARCH64_ABS16                 0x000000000000f8cc pass
+    R_AARCH64_MOVW_SABS_Gn          0xffff880000cccccc pass
+    R_AARCH64_MOVW_UABS_Gn          0xffff880000cccccc pass
+    R_AARCH64_ADR_PREL_LO21         0xffffff9cf4d1a400 pass
+    R_AARCH64_PREL64                0xffffff9cf4d1a400 pass
+    R_AARCH64_PREL32                0xffffff9cf4d1a400 pass
+    R_AARCH64_PREL16                0xffffff9cf4d1a400 pass
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
+v2: - add MODULE_LICENSE()
+    - rebase onto for-next/core
+    - add Will's ack
 
-Hi everybody
+ arch/arm64/Kconfig.debug            |  4 +
+ arch/arm64/kernel/Makefile          |  2 +
+ arch/arm64/kernel/reloc_test_core.c | 81 +++++++++++++++++++
+ arch/arm64/kernel/reloc_test_syms.S | 83 ++++++++++++++++++++
+ 4 files changed, 170 insertions(+)
 
-In preparation to add support for the Linksys WRT3200ACM (Rango) some
-rework of the "dts-stack" is highly desirable. This patch is part of the
-preparatory work but independent.
-
-The label for the USB 2.0 port is "usb0:", so using "usb1:" and "usb2:"
-would be the logical continuation. Guess you realized the catch already,
-"usb2:" for an USB 3.0 controller might be very confusing.
-
-I'm sending this patch ahead of the rest so the labels can be discussed
-and finalized.
-
-Ralph
-
----
-
- arch/arm/boot/dts/armada-38x.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index ba27ec1..78c838a 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -530,7 +530,7 @@
- 				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 			};
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index fca2f02cde68..cc6bd559af85 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -92,6 +92,10 @@ config DEBUG_EFI
+ 	  the kernel that are only useful when using a debug build of the
+ 	  UEFI firmware
  
--			sata at a8000 {
-+			satac0: sata at a8000 {
- 				compatible = "marvell,armada-380-ahci";
- 				reg = <0xa8000 0x2000>;
- 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-@@ -546,7 +546,7 @@
- 				status = "disabled";
- 			};
++config ARM64_RELOC_TEST
++	depends on m
++	tristate "Relocation testing module"
++
+ source "drivers/hwtracing/coresight/Kconfig"
  
--			sata at e0000 {
-+			satac1: sata at e0000 {
- 				compatible = "marvell,armada-380-ahci";
- 				reg = <0xe0000 0x2000>;
- 				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-@@ -590,7 +590,7 @@
- 				status = "disabled";
- 			};
+ endmenu
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 1606c6b2a280..aaaf06b117e3 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -50,6 +50,8 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
++arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
++arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
  
--			usb3 at f0000 {
-+			usb3_0: usb3 at f0000 {
- 				compatible = "marvell,armada-380-xhci";
- 				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
- 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-@@ -598,7 +598,7 @@
- 				status = "disabled";
- 			};
- 
--			usb3 at f8000 {
-+			usb3_1: usb3 at f8000 {
- 				compatible = "marvell,armada-380-xhci";
- 				reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
- 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/reloc_test_core.c b/arch/arm64/kernel/reloc_test_core.c
+new file mode 100644
+index 000000000000..c124752a8bd3
+--- /dev/null
++++ b/arch/arm64/kernel/reloc_test_core.c
+@@ -0,0 +1,81 @@
++/*
++ * Copyright (C) 2017 Linaro, Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/module.h>
++
++int sym64_rel;
++
++#define SYM64_ABS_VAL		0xffff880000cccccc
++#define SYM32_ABS_VAL		0xf800cccc
++#define SYM16_ABS_VAL		0xf8cc
++
++#define __SET_ABS(name, val)	asm(".globl " #name "; .set "#name ", " #val)
++#define SET_ABS(name, val)	__SET_ABS(name, val)
++
++SET_ABS(sym64_abs, SYM64_ABS_VAL);
++SET_ABS(sym32_abs, SYM32_ABS_VAL);
++SET_ABS(sym16_abs, SYM16_ABS_VAL);
++
++asmlinkage u64 absolute_data64(void);
++asmlinkage u64 absolute_data32(void);
++asmlinkage u64 absolute_data16(void);
++asmlinkage u64 signed_movw(void);
++asmlinkage u64 unsigned_movw(void);
++asmlinkage u64 relative_adrp(void);
++asmlinkage u64 relative_adr(void);
++asmlinkage u64 relative_data64(void);
++asmlinkage u64 relative_data32(void);
++asmlinkage u64 relative_data16(void);
++
++static struct {
++	char	name[32];
++	u64	(*f)(void);
++	u64	expect;
++} const funcs[] = {
++	{ "R_AARCH64_ABS64",		absolute_data64, UL(SYM64_ABS_VAL) },
++	{ "R_AARCH64_ABS32",		absolute_data32, UL(SYM32_ABS_VAL) },
++	{ "R_AARCH64_ABS16",		absolute_data16, UL(SYM16_ABS_VAL) },
++	{ "R_AARCH64_MOVW_SABS_Gn",	signed_movw, UL(SYM64_ABS_VAL) },
++	{ "R_AARCH64_MOVW_UABS_Gn",	unsigned_movw, UL(SYM64_ABS_VAL) },
++#ifndef CONFIG_ARM64_ERRATUM_843419
++	{ "R_AARCH64_ADR_PREL_PG_HI21",	relative_adrp, (u64)&sym64_rel },
++#endif
++	{ "R_AARCH64_ADR_PREL_LO21",	relative_adr, (u64)&sym64_rel },
++	{ "R_AARCH64_PREL64",		relative_data64, (u64)&sym64_rel },
++	{ "R_AARCH64_PREL32",		relative_data32, (u64)&sym64_rel },
++	{ "R_AARCH64_PREL16",		relative_data16, (u64)&sym64_rel },
++};
++
++static int reloc_test_init(void)
++{
++	int i;
++
++	pr_info("Relocation test:\n");
++	pr_info("-------------------------------------------------------\n");
++
++	for (i = 0; i < ARRAY_SIZE(funcs); i++) {
++		u64 ret = funcs[i].f();
++
++		pr_info("%-31s 0x%016llx %s\n", funcs[i].name, ret,
++			ret == funcs[i].expect ? "pass" : "fail");
++		if (ret != funcs[i].expect)
++			pr_err("Relocation failed, expected 0x%016llx, not 0x%016llx\n",
++			       funcs[i].expect, ret);
++	}
++	return 0;
++}
++
++static void reloc_test_exit(void)
++{
++}
++
++module_init(reloc_test_init);
++module_exit(reloc_test_exit);
++
++MODULE_LICENSE("GPL v2");
+diff --git a/arch/arm64/kernel/reloc_test_syms.S b/arch/arm64/kernel/reloc_test_syms.S
+new file mode 100644
+index 000000000000..e1edcefeb02d
+--- /dev/null
++++ b/arch/arm64/kernel/reloc_test_syms.S
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (C) 2017 Linaro, Ltd. <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/linkage.h>
++
++ENTRY(absolute_data64)
++	ldr	x0, 0f
++	ret
++0:	.quad	sym64_abs
++ENDPROC(absolute_data64)
++
++ENTRY(absolute_data32)
++	ldr	w0, 0f
++	ret
++0:	.long	sym32_abs
++ENDPROC(absolute_data32)
++
++ENTRY(absolute_data16)
++	adr	x0, 0f
++	ldrh	w0, [x0]
++	ret
++0:	.short	sym16_abs, 0
++ENDPROC(absolute_data16)
++
++ENTRY(signed_movw)
++	movz	x0, #:abs_g2_s:sym64_abs
++	movk	x0, #:abs_g1_nc:sym64_abs
++	movk	x0, #:abs_g0_nc:sym64_abs
++	ret
++ENDPROC(signed_movw)
++
++ENTRY(unsigned_movw)
++	movz	x0, #:abs_g3:sym64_abs
++	movk	x0, #:abs_g2_nc:sym64_abs
++	movk	x0, #:abs_g1_nc:sym64_abs
++	movk	x0, #:abs_g0_nc:sym64_abs
++	ret
++ENDPROC(unsigned_movw)
++
++#ifndef CONFIG_ARM64_ERRATUM_843419
++
++ENTRY(relative_adrp)
++	adrp	x0, sym64_rel
++	add	x0, x0, #:lo12:sym64_rel
++	ret
++ENDPROC(relative_adrp)
++
++#endif
++
++ENTRY(relative_adr)
++	adr	x0, sym64_rel
++	ret
++ENDPROC(relative_adr)
++
++ENTRY(relative_data64)
++	adr	x1, 0f
++	ldr	x0, [x1]
++	add	x0, x0, x1
++	ret
++0:	.quad	sym64_rel - .
++ENDPROC(relative_data64)
++
++ENTRY(relative_data32)
++	adr	x1, 0f
++	ldr	w0, [x1]
++	add	x0, x0, x1
++	ret
++0:	.long	sym64_rel - .
++ENDPROC(relative_data32)
++
++ENTRY(relative_data16)
++	adr	x1, 0f
++	ldrsh	w0, [x1]
++	add	x0, x0, x1
++	ret
++0:	.short	sym64_rel - ., 0
++ENDPROC(relative_data16)
 -- 
-2.10.2
+2.7.4
