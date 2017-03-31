@@ -1,10 +1,10 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 10:59:48 +0200
-Subject: [GIT PULL 7/7] Broadcom drivers changes for 4.12
-In-Reply-To: <20170324175807.27272-7-f.fainelli@gmail.com>
+Date: Fri, 31 Mar 2017 11:01:21 +0200
+Subject: [GIT PULL 5/7] Broadcom defconfig changes for 4.12
+In-Reply-To: <20170324175807.27272-5-f.fainelli@gmail.com>
 References: <20170324175807.27272-1-f.fainelli@gmail.com>
- <20170324175807.27272-7-f.fainelli@gmail.com>
-Message-ID: <CAK8P3a322xx0aUhxd1sNORk-M7toY9a7yoAu-8MuPEGh70BvnQ@mail.gmail.com>
+ <20170324175807.27272-5-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a3AX5YdCujC1KVrBc5n0BqtXR1EH=e3SaYg0Wzq2GQF2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,20 +15,19 @@ On Fri, Mar 24, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
 >
 > are available in the git repository at:
 >
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/drivers
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/defconfig
 >
-> for you to fetch changes up to bd0faf08dc7fcb3e555b35f556c9012b3c93de3b:
+> for you to fetch changes up to f880c8fd8cfb3bcb77a219c00de45ad0a8386d23:
 >
->   soc: bcm: brcmstb: Match additional compatible strings (2017-03-05 17:00:57 -0800)
+>   Merge tag 'bcm2835-defconfig-next-2017-03-21' into defconfig/next (2017-03-24 10:13:25 -0700)
 >
 > ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoC drivers updates for 4.12,
-> please pull the following changes:
+> This pull request contains Broadcom ARM-based SoCs defconfig updates for 4.12,
+> please pull the following:
 >
-> - Florian updates the Broadcom STB GISB arbiter driver with a bunch of
->   compatible strings for MIPS-based STBs found under arch/mips/boot/dts/brcm/ in
->   order for the SoC identification driver to recognize these chips
-
-Pulled into next/drivers, thanks!
+> - Gerd enables the BCM2835 MMC driver which yields better performance than the
+>   default one (iProc)
+>
+Pulled into next/defconfig, thanks!
 
       Arnd
