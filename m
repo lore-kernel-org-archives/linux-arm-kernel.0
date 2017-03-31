@@ -1,58 +1,56 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Fri, 31 Mar 2017 20:34:58 +0530
-Subject: [PATCH v6 07/11] drivers: perf: hisi: Add support for Hisilicon
- SoC event counters
-In-Reply-To: <20170331142351.GC6488@leverpostej>
-References: <1489127311-112778-1-git-send-email-anurup.m@huawei.com>
- <20170321165252.GA29116@leverpostej> <58DCD47C.2010501@gmail.com>
- <20170330104607.GC16211@leverpostej> <58DE6400.8030900@gmail.com>
- <20170331142351.GC6488@leverpostej>
-Message-ID: <58DE701A.2090604@gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 31 Mar 2017 17:06:44 +0200
+Subject: [PATCH 1/1] PCI: Fix for PEM-specific resource reservation for legacy
+ firmware case
+Message-ID: <1490972804-25830-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+SZ_16M PEM resource size includes PEM-specific register and its children
+resources. Reservation of the whole SZ_16M range leads to child device
+driver failure when pcieport driver is requesting resources:
+pcieport 0004:1f:00.0: can't enable device: BAR 0 [mem 0x87e0c0f00000-0x87e0c0ffffff 64bit] not claimed
+So we cannot reserve full 16M here and instead we want to reserve
+PEM-specific register only which is SZ_64K.
 
+At the end increase PEM resource to SZ_16M since this is what
+thunder_pem_init() call expects for proper initialization.
 
-On Friday 31 March 2017 07:53 PM, Mark Rutland wrote:
-> On Fri, Mar 31, 2017 at 07:43:20PM +0530, Anurup M wrote:
->> On Thursday 30 March 2017 04:16 PM, Mark Rutland wrote:
->>>>>>> +	/*
->>>>>>>>>>> +	 * We must NOT create groups containing mixed PMUs, although
->>>>>>>>>>> +	 * software events are acceptable
->>>>>>>>>>> +	 */
->>>>>>>>>>> +	if (event->group_leader->pmu != event->pmu &&
->>>>>>>>>>> +	    !is_software_event(event->group_leader))
->>>>>>>>>>> +		return -EINVAL;
->>>>>>>>>>> +
->>>>>>>>>>> +	list_for_each_entry(sibling, &event->group_leader->sibling_list,
->>>>>>>>>>> +			    group_entry)
->>>>>>>>>>> +		if (sibling->pmu != event->pmu && !is_software_event(sibling))
->>>>>>>>>>> +			return -EINVAL;
->>>>>>> Please also check the number of counters.
->>>>> Sorry, I could not follow this comment correctly. Could you please explain ?
->>>>> I check the available counters and update used mask in pmu_add -->
->>>>> get_event_index
->>> What I meant was that here we should ensure that a group does not
->>> contain more events than can fit into counters.
->>>
->>> For example, if the HW had two counters, we should reject any group with
->>> more than two events. Such groups can never be scheduled, and make no
->>> sense.
->> I have referred drivers/bus/arm-cci.c and could find validate_group
->> and validate_event functions,
->> which create a fake_pmu to check the available counters for the
->> events in the group.
->> Is that the same way which is expected here? Please comment.
-> Something like that.
->
-> I think it's simplest to have a validate_group() function, which counts
-> the number of counters used. See my suggestion in [1].
+Fixes: 9abb27c7594a ("PCI: thunder-pem: Add legacy firmware support for Cavium ThunderX host controller")
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+CC: stable at vger.kernel.org	# v4.10+
+---
+ drivers/pci/host/pci-thunder-pem.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-This looks simpler. Thanks for the suggestion.
-
-~Anurup
-
-> Thanks,
-> Mark.
->
-> [1] https://lkml.kernel.org/r/20170331135955.GB6488 at leverpostej
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+index b89c373..6e031b5 100644
+--- a/drivers/pci/host/pci-thunder-pem.c
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -375,7 +375,6 @@ static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
+ 	index -= node * PEM_MAX_DOM_IN_NODE;
+ 	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
+ 					FIELD_PREP(PEM_INDX_MASK, index);
+-	res_pem->end = res_pem->start + SZ_16M - 1;
+ 	res_pem->flags = IORESOURCE_MEM;
+ }
+ 
+@@ -399,8 +398,15 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+ 	 */
+ 	if (ret) {
+ 		thunder_pem_legacy_fw(root, res_pem);
+-		/* Reserve PEM-specific resources and PCI configuration space */
++		/*
++		 * Reserve 64K size PEM specific resources. The full 16M range
++		 * size is required for thunder_pem_init() call.
++		 */
++		res_pem->end = res_pem->start + SZ_64K - 1;
+ 		thunder_pem_reserve_range(dev, root->segment, res_pem);
++		res_pem->end = res_pem->start + SZ_16M - 1;
++
++		/* Reserve PCI configuration space as well. */
+ 		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
+ 	}
+ 
+-- 
+2.7.4
