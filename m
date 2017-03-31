@@ -1,51 +1,79 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Mar 2017 14:13:13 +0100
-Subject: [PATCH 0/3] IOVA allocation improvements for iommu-dma
-In-Reply-To: <20170331124051.GI8967@arm.com>
-References: <cover.1489581865.git.robin.murphy@arm.com>
- <20170331124051.GI8967@arm.com>
-Message-ID: <10f9621a-41ca-bb3d-0e49-a2827022f608@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 31 Mar 2017 14:13:22 +0100
+Subject: [PATCH 2/3] drm/arm: hdlcd: fix plane base address calculation
+In-Reply-To: <E1cttDe-000679-UD@rmk-PC.armlinux.org.uk>
+References: <20170331094937.GO7909@n2100.armlinux.org.uk>
+ <E1cttDe-000679-UD@rmk-PC.armlinux.org.uk>
+Message-ID: <20170331131322.GJ13355@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/17 13:40, Will Deacon wrote:
-> Hi Robin, Joerg,
+On Fri, Mar 31, 2017 at 10:51:46AM +0100, Russell King wrote:
+> The plane base address needs to be calculated using the source
+> coordinates to position the source correctly - it's possible to have
+> a larger source buffer than the CRTC size, and have several CRTCs
+> reading from different parts of the buffer.
 > 
-> On Wed, Mar 15, 2017 at 01:33:13PM +0000, Robin Murphy wrote:
->> Here's the first bit of lock contention removal to chew on - feedback
->> welcome! Note that for the current users of the io-pgtable framework,
->> this is most likely to simply push more contention onto the io-pgtable
->> lock, so may not show a great improvement alone. Will and I both have
->> rough proof-of-concept implementations of lock-free io-pgtable code
->> which we need to sit down and agree on at some point, hopefullt fairly
->> soon.
->>
->> I've taken the opportunity to do a bit of cleanup and refactoring
->> within the series to make the final state of the code nicer, but the
->> diffstat still turns out surprisingly reasonable in the end - it would
->> actually be negative but for the new comments!
->>
->> Magnus, Shimoda-san, the first two patches should be of interest as they
->> constitute the allocation rework I mentioned a while back[1] - if you
->> still need to implement that scary workaround, this should make it
->> simple to hook IPMMU-specific calls into the alloc and free paths, and
->> let the driver take care of the details internally.
+> In such a case, the pitch may be larger, and we will use the source
+> position to select an area of the buffer to scan out.
 > 
-> What's the plan for merging this? Whilst we still have the iopgtable lock
-> contention to resolve, this is a good incremental step towards improving
-> our scalability and sits nicely alongside the SMMUv2 TLB improvements I
-> just queued.
+> In order for this to work correctly, we need to also fix the atomic
+> check to do a fuller validation of the new state.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-I was assuming this would go through the IOMMU tree if there were no
-problems and the feedback was good, and that would seem to be the case.
-I'm pleasantly surprised that this series doesn't even conflict at all
-with my other iommu-dma changes already queued - I've just checked that
-it still applies cleanly to the current iommu/next as-is.
+This patch does not apply for me. You seem to be missing patch 59477fa90bfec
+("drm/arm: Add local 'fb' variables) from your tree.
 
-Robin.
+Best regards,
+Liviu
 
+> ---
+>  drivers/gpu/drm/arm/hdlcd_crtc.c | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
 > 
-> Thanks,
+> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> index ba68fa2b5701..cf70184fd028 100644
+> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> @@ -240,21 +240,19 @@ static void hdlcd_plane_atomic_update(struct drm_plane *plane,
+>  {
+>  	struct hdlcd_drm_private *hdlcd;
+>  	struct drm_gem_cma_object *gem;
+> -	u32 src_w, src_h, dest_w, dest_h;
+> +	u32 src_x, src_y, dest_h;
+>  	dma_addr_t scanout_start;
+>  
+>  	if (!plane->state->fb)
+>  		return;
+>  
+> -	src_w = plane->state->src_w >> 16;
+> -	src_h = plane->state->src_h >> 16;
+> -	dest_w = plane->state->crtc_w;
+> -	dest_h = plane->state->crtc_h;
+>  	gem = drm_fb_cma_get_gem_obj(plane->state->fb, 0);
+> +	src_x = plane->state->src_x >> 16;
+> +	src_y = plane->state->src_y >> 16;
+> +	dest_h = plane->state->crtc_h;
+>  	scanout_start = gem->paddr + plane->state->fb->offsets[0] +
+> -		plane->state->crtc_y * plane->state->fb->pitches[0] +
+> -		plane->state->crtc_x *
+> -		drm_format_plane_cpp(plane->state->fb->pixel_format, 0);
+> +		src_y * plane->state->fb->pitches[0] +
+> +		src_x * drm_format_plane_cpp(plane->state->fb->pixel_format, 0);
+>  
+>  	hdlcd = plane->dev->dev_private;
+>  	hdlcd_write(hdlcd, HDLCD_REG_FB_LINE_LENGTH, plane->state->fb->pitches[0]);
+> -- 
+> 2.7.4
 > 
-> Will
-> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
