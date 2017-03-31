@@ -1,36 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 31 Mar 2017 18:50:15 +0200
-Subject: [PATCH] ARM: dts: armada-38x: label USB and SATA nodes
-In-Reply-To: <20170331074115.8111-1-ralph.sennhauser@gmail.com>
-References: <20170331074115.8111-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170331165015.GJ12814@lunn.ch>
+From: menschel.p@posteo.de (Patrick Menschel)
+Date: Fri, 31 Mar 2017 18:51:38 +0200
+Subject: [PATCH v2 2/2] ARM: dts: sun7i: Add CAN node and can0_pins_a
+ pinctrl settings
+In-Reply-To: <20170327064625.we7ydn2oapwizncb@lukather>
+References: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
+ <1490392339-23565-3-git-send-email-menschel.p@posteo.de>
+ <20170327064625.we7ydn2oapwizncb@lukather>
+Message-ID: <91bc06e3-3173-43a1-32f2-a35d94855d46@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -			sata at a8000 {
-> +			satac0: sata at a8000 {
+Hello Maxime,
 
-Hi Ralph
+Am 27.03.2017 um 08:46 schrieb Maxime Ripard:
+>> @@ -1582,6 +1587,14 @@
+>>  			#size-cells = <0>;
+>>  		};
+>>  
+>> +		can0: can at 01c2bc00 {
+>> +			compatible = "allwinner,sun4i-a10-can";
+> 
+> Sorry for not spotting this earlier, but this would need an A20
+> compatible too, to deal with the case where it turns out not to be
+> compatible.
+> 
+> you can do something like this:
+> compatible = "allwinner,sun7i-a20-can", "allwinner,sun4i-a10-can";
 
-Why the c in satac0?
+Adding "sun7i-a20-can" to the compatible list results in a checkpatch
+warning, that the "driver" is not documented.
 
->  
-> -			usb3 at f0000 {
-> +			usb3_0: usb3 at f0000 {
->  				compatible = "marvell,armada-380-xhci";
->  				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
->  				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -598,7 +598,7 @@
->  				status = "disabled";
->  			};
->  
-> -			usb3 at f8000 {
-> +			usb3_1: usb3 at f8000 {
->  				compatible = "marvell,armada-380-xhci";
->  				reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
->  				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+ WARNING: DT compatible string "allwinner,sun7i-a20-can" appears
+un-documented -- check ./Documentation/devicetree/bindings/
+#27: FILE: arch/arm/boot/dts/sun7i-a20.dtsi:1586:
++			compatible = "allwinner,sun7i-a20-can",
 
-I can understand what you are saying. But does anybody else care? Are
-there other .dtsi files differentiating between USB 1.1, 2 and 3?
+Is it really OK to add a driver that doesn't exist yet?
 
-      Andrew
+Thanks,
+Patrick
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 3709 bytes
+Desc: S/MIME Cryptographic Signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170331/e81c8fde/attachment.p7s>
