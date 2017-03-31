@@ -1,41 +1,39 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 31 Mar 2017 08:54:20 +0800
-Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
-In-Reply-To: <f0c460e2-4e49-4f34-5288-f20a519dc182@arm.com>
-References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
- <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
- <f0c460e2-4e49-4f34-5288-f20a519dc182@arm.com>
-Message-ID: <20170331005420.GA6149@leoy-linaro>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 31 Mar 2017 09:43:40 +0800
+Subject: [arm:cec-v18 6/12] imx-ocotp.c:undefined reference to
+ `cec_get_edid_phys_addr'
+Message-ID: <201703310937.rIJjJHda%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 04:56:52PM +0100, Sudeep Holla wrote:
+Hi Russell,
 
-[...]
+It's probably a bug fix that unveils the link errors.
 
-> > +static struct pm_qos_request debug_qos_req;
-> > +static int idle_constraint = PM_QOS_DEFAULT_VALUE;
-> > +module_param(idle_constraint, int, 0600);
-> > +MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
-> > +		 "idle states (default is -1, which means have no limiation "
-> > +		 "to CPU idle states; 0 means disabling all idle states; user "
-> > +		 "can choose other platform dependent values so can disable "
-> > +		 "specific idle states for the platform)");
-> > +
-> 
-> NACK for this. Why you want the policy inside the driver. You can always
-> do that from the user-space. I have mentioned it several times now.
-> What can't you do these ?
-> 
-> 1. echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
-> 2. echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
->    (for all cpus and their states) (1) is definitely simpler way to
->     disable deeper idle if latency = 0uS
-> 
-> You can always warn user about that when it's enabled via debugfs/sysfs
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git cec-v18
+head:   803726e5c035daf0a07ecb33e9dc41c38f75d82e
+commit: 6fb5bde0721478e580e3a88d25c66b6d9a4dd79e [6/12] drm/bridge: add dw-hdmi cec driver
+config: arm-imx_v6_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6fb5bde0721478e580e3a88d25c66b6d9a4dd79e
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Thanks for suggestion, now it's clear for me.
+All errors (new ones prefixed by >>):
 
-> -- 
-> Regards,
-> Sudeep
+   drivers/built-in.o: In function `dw_hdmi_connector_get_modes':
+>> imx-ocotp.c:(.text+0xd678c): undefined reference to `cec_get_edid_phys_addr'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31045 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170331/f8ba8e73/attachment-0001.gz>
