@@ -1,22 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 12:10:57 +0200
-Subject: [GIT PULL 1/3] Rockchip dts32 updates for 4.12 part1
-In-Reply-To: <5178456.jWASpzTAdU@phil>
-References: <5178456.jWASpzTAdU@phil>
-Message-ID: <CAK8P3a1pH1=0B6GhJACiXsuSuBMPWjTiM6FC3eS5kxM4fWsTqw@mail.gmail.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Fri, 31 Mar 2017 13:11:23 +0300
+Subject: [PATCH 3/3] drm/arm: hdlcd: check for rotation
+In-Reply-To: <E1cttDk-00067G-1b@rmk-PC.armlinux.org.uk>
+References: <20170331094937.GO7909@n2100.armlinux.org.uk>
+ <E1cttDk-00067G-1b@rmk-PC.armlinux.org.uk>
+Message-ID: <20170331101123.GK30290@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 5:52 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Arnd, Kevin, Olof,
->
-> This set is the first round of devicetree updates for 4.12. It comes
-> in 3 parts, 32bit dts, general 64bit dts and the 64bit dts based on
-> Olof's shared symlink branch.
-> As always tags describe what's in there.
->
-> So if nothing stands out, please pull.
+On Fri, Mar 31, 2017 at 10:51:52AM +0100, Russell King wrote:
+> hdlcd does not support rotation - check for it and reject plane updates
+> that try to rotate a plane.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/gpu/drm/arm/hdlcd_crtc.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> index cf70184fd028..171acc842368 100644
+> --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> @@ -215,6 +215,10 @@ static int hdlcd_plane_atomic_check(struct drm_plane *plane,
+>  	if (!crtc)
+>  		return 0;
+>  
+> +	/* We do not support rotation */
+> +	if (state->rotation != DRM_ROTATE_0)
+> +		return -EINVAL;
 
-Pulled into next/dt, thanks!
+This can't happen unless you attach a rotation property with a bogus
+set of supported rotations to the plane.
 
-     Arnd
+> +
+>  	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
+>  	if (!crtc_state->enable)
+>  		return -EINVAL;
+> -- 
+> 2.7.4
+
+-- 
+Ville Syrj?l?
+Intel OTC
