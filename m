@@ -1,62 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 31 Mar 2017 10:04:51 +0200
-Subject: [PATCH v3] mtd: physmap_of: really fix the physmap add-ons
-In-Reply-To: <20170330153639.26819-1-linus.walleij@linaro.org>
-References: <20170330153639.26819-1-linus.walleij@linaro.org>
-Message-ID: <20170331100451.069a76ab@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Mar 2017 10:09:10 +0200
+Subject: [PATCH v9 04/12] soc: samsung: add exynos chipid driver support
+In-Reply-To: <a1be4b9c-0f68-dbe3-7799-d5acf4ec31e0@samsung.com>
+References: <CGME20170330131427epcas5p4c3d238022dc75694ad3baa8a1018ea04@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
+ <CAK8P3a0dq-Ve2N3yFbpZ7LHzZJ=w6-pLRTSZJZ2=rnk2gWphJw@mail.gmail.com>
+ <a1be4b9c-0f68-dbe3-7799-d5acf4ec31e0@samsung.com>
+Message-ID: <CAK8P3a0orusAVqHSiBUmcmEUrc625H9MtxkXNwrWQOHgO=7v9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Mar 2017 17:36:39 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, Mar 31, 2017 at 7:36 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+> Hi Arnd,
+>
+> On Thursday 30 March 2017 07:20 PM, Arnd Bergmann wrote:
+>> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>>>
+>>> +config EXYNOS_CHIPID
+>>> +       bool "Exynos Chipid controller driver" if COMPILE_TEST
+>>> +       depends on ARCH_EXYNOS || COMPILE_TEST
+>>> +       select SOC_BUS
+>>
+>> This lets you disable the driver when COMPILE_TEST is set on exynos,
+>> which is probably not what you wanted.
+>>
+>
+> Sorry I could not get this point. EXYNOS_CHIPID is invisible menu
+> option, when I enabled COMPILE_TEST, option is visible in make
+> menuconfig but it does not allow to disable this driver. I have adopted
+> this config same as EXYNOS_PMU in the same file.
 
-> The current way of building the of_physmap add-ons result in just
-> the add-on being in the object code, and not the actual core
-> implementation and regress the Gemini and Versatile.
-> 
-> Bake the physmap_of.o object by baking physmap_of_core.o and
-> adding the Versatile and/or Gemini add-ons to the final object.
-> Rename the source file physmap_of_core.c to get the desired
-> build components.
-> 
-> Suggested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: 4f04f68e1598 ("mtd: physmap_of: fixup gemini/versatile dependencies")
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+I wrote my comment before I saw the 'select' statement in the later
+patch. With that select, it is not a problem.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>          bool "Exynos Chipid controller driver" if COMPILE_TEST && !ARCHEXYNOS
+>>          default ARCH_EXYNOS
+>
+> I can adopt, default ARCH_EXYNOS, which will allow me to drop patch 5/12
+> and 6/12.
 
-> ---
-> ChangeLog v2->v3:
-> - Build and bake the final object in an elegant way suggested
->   by Boris.
-> ---
->  drivers/mtd/maps/Makefile                            | 10 ++++------
->  drivers/mtd/maps/{physmap_of.c => physmap_of_core.c} |  0
->  2 files changed, 4 insertions(+), 6 deletions(-)
->  rename drivers/mtd/maps/{physmap_of.c => physmap_of_core.c} (100%)
-> 
-> diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
-> index aef1846b4de2..5a09a72ab112 100644
-> --- a/drivers/mtd/maps/Makefile
-> +++ b/drivers/mtd/maps/Makefile
-> @@ -17,12 +17,10 @@ obj-$(CONFIG_MTD_CK804XROM)	+= ck804xrom.o
->  obj-$(CONFIG_MTD_TSUNAMI)	+= tsunami_flash.o
->  obj-$(CONFIG_MTD_PXA2XX)	+= pxa2xx-flash.o
->  obj-$(CONFIG_MTD_PHYSMAP)	+= physmap.o
-> -ifdef CONFIG_MTD_PHYSMAP_OF_VERSATILE
-> -physmap_of-objs += physmap_of_versatile.o
-> -endif
-> -ifdef CONFIG_MTD_PHYSMAP_OF_GEMINI
-> -physmap_of-objs += physmap_of_gemini.o
-> -endif
-> +physmap_of-objs-y		+= physmap_of_core.o
-> +physmap_of-objs-$(CONFIG_MTD_PHYSMAP_OF_VERSATILE) += physmap_of_versatile.o
-> +physmap_of-objs-$(CONFIG_MTD_PHYSMAP_OF_GEMINI) += physmap_of_gemini.o
-> +physmap_of-objs			:= $(physmap_of-objs-y)
->  obj-$(CONFIG_MTD_PHYSMAP_OF)	+= physmap_of.o
->  obj-$(CONFIG_MTD_PISMO)		+= pismo.o
->  obj-$(CONFIG_MTD_PMC_MSP_EVM)   += pmcmsp-flash.o
-> diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of_core.c
-> similarity index 100%
-> rename from drivers/mtd/maps/physmap_of.c
-> rename to drivers/mtd/maps/physmap_of_core.c
+Either way (select or default) is fine, just do the same thing for both chipid
+and pmu. If you keep the 'select' and the 'if COMPILE_TEST', you can
+drop the line 'depends on ARCH_EXYNOS || COMPILE_TEST'.
+
+      Arnd
