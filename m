@@ -1,48 +1,23 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Fri, 31 Mar 2017 08:34:14 -0700
-Subject: [PATCH v5 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <CAGXu5jKbqOvb2TtfpXhjPQFxEShaBu=RbBQORtqhcF1bD3As6w@mail.gmail.com>
-References: <20170323172515.27950-1-thgarnie@google.com>
- <CAGXu5jKbqOvb2TtfpXhjPQFxEShaBu=RbBQORtqhcF1bD3As6w@mail.gmail.com>
-Message-ID: <CAJcbSZFv3CBSR--LP=A=Yrc3NmdAZb+eYbwLR4+3PFSVXdiAHQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 31 Mar 2017 17:35:49 +0200
+Subject: [PATCH] ARM: dts: armada-385-linksys: disk-activity trigger for
+ all
+In-Reply-To: <20170330165405.14540-1-ralph.sennhauser@gmail.com>
+References: <20170330165405.14540-1-ralph.sennhauser@gmail.com>
+Message-ID: <20170331153549.GA12814@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 1:15 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Thu, Mar 23, 2017 at 10:25 AM, Thomas Garnier <thgarnie@google.com> wrote:
->> This patch ensures a syscall does not return to user-mode with a kernel
->> address limit. If that happened, a process can corrupt kernel-mode
->> memory and elevate privileges.
->>
->> For example, it would mitigation this bug:
->>
->> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->>
->> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
->> added so each architecture can optimize this change.
->>
->> Signed-off-by: Thomas Garnier <thgarnie@google.com>
->
-> Awesome. :) I've tested this on x86 and arm with the LKDTM patch I'll
-> post in a moment.
->
-> [   46.977823] lkdtm: Performing direct entry CORRUPT_USER_DS
-> [   46.978966] lkdtm: setting bad task size limit
-> [   46.980302] ------------[ cut here ]------------
-> [   46.981219] kernel BUG at ./include/linux/syscalls.h:200!
->
-> Tested-by: Kees Cook <keescook@chromium.org>
+On Thu, Mar 30, 2017 at 06:54:04PM +0200, Ralph Sennhauser wrote:
+> Commit a4ee7e18d808 ("ARM: dts: armada: Add default trigger for sata
+> led") adds the default trigger to individual boards, move it to
+> armada-385-linksys.dtsi which effectively enables the definition for
+> the WRT1900ACS (Shelby) as well as for future boards.
+> 
+> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 
-Thanks Kees. Any additional feedback? Andy?
+Centralising this makes sense.
 
->
-> (Also note, your Signed-off-by lines are missing in patches 2-4)
->
-> --
-> Kees Cook
-> Pixel Security
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-
-
--- 
-Thomas
+    Andrew
