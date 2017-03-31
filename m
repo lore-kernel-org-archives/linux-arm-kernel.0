@@ -1,67 +1,49 @@
 From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Fri, 31 Mar 2017 18:54:37 +0200
-Subject: [PATCH v3 4/4] ARM64: dts: meson-gx: add core clock support for
- uart_A, uart_B and uart_C
+Date: Fri, 31 Mar 2017 18:54:36 +0200
+Subject: [PATCH v3 3/4] tty/serial: meson_uart: add the core clock handling to
+ the driver
 In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com>
 References: <20170331165437.26227-1-hgkr.klein@gmail.com>
-Message-ID: <20170331165437.26227-5-hgkr.klein@gmail.com>
+Message-ID: <20170331165437.26227-4-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the core clock support for the three none AO UARTs
-of the meson gxbb & meson gxl SoCs
+This patch gets the core clock as provided by the DT and enables it.
+The code was taken from Amlogic's serial driver, and was tested on my
+board.
 
 Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 15 +++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 15 +++++++++++++++
- 2 files changed, 30 insertions(+)
+ drivers/tty/serial/meson_uart.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 04b3324bc132..aa2f75d5cd37 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -524,3 +524,18 @@
- &vpu {
- 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
- };
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 60f16795d16b..cb99112288eb 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
+ 	struct resource *res_mem, *res_irq;
+ 	struct uart_port *port;
+ 	struct clk *clk;
++	struct clk *core_clk;
+ 	int ret = 0;
+
+ 	if (pdev->dev.of_node)
+@@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
+ 	if (!port)
+ 		return -ENOMEM;
+
++	core_clk = devm_clk_get(&pdev->dev, "core");
++	if (!IS_ERR(core_clk)) {
++		ret = clk_prepare_enable(core_clk);
++		if (ret) {
++			dev_err(&pdev->dev, "couldn't enable clkc\n");
++			return ret;
++		}
++	}
 +
-+&uart_A {
-+	clocks = <&xtal>, <&clkc CLKID_UART0>;
-+	clock-names = "xtal", "core";
-+};
-+
-+&uart_B {
-+	clocks = <&xtal>, <&clkc CLKID_UART1>;
-+	clock-names = "xtal", "core";
-+};
-+
-+&uart_C {
-+	clocks = <&xtal>, <&clkc CLKID_UART2>;
-+	clock-names = "xtal", "core";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index fe11b5fc61f7..f3cc18fd624a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -381,3 +381,18 @@
- &vpu {
- 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
- };
-+
-+&uart_A {
-+	clocks = <&xtal>, <&clkc CLKID_UART0>;
-+	clock-names = "xtal", "core";
-+};
-+
-+&uart_B {
-+	clocks = <&xtal>, <&clkc CLKID_UART1>;
-+	clock-names = "xtal", "core";
-+};
-+
-+&uart_C {
-+	clocks = <&xtal>, <&clkc CLKID_UART2>;
-+	clock-names = "xtal", "core";
-+};
+ 	clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
 --
 2.11.0
