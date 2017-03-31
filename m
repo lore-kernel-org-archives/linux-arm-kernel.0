@@ -1,92 +1,120 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 31 Mar 2017 16:28:16 +0100
-Subject: [RFC PATCH v2 00/41] Scalable Vector Extension (SVE) core support
-In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAKv+Gu_JUqQu7nUB3MfJrpHL19NTSzGBDmZqLejBx8pNkwSq+A@mail.gmail.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Fri, 31 Mar 2017 11:33:47 -0400
+Subject: [PATCH V5] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <20170331135955.GB6488@leverpostej>
+References: <1490302997-28640-1-git-send-email-agustinv@codeaurora.org>
+ <20170331135955.GB6488@leverpostej>
+Message-ID: <f6d5d652b2123a3ad85ef2b0758e4e4a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2017 at 14:50, Dave Martin <Dave.Martin@arm.com> wrote:
+Hey Mark,
 
-Hi Dave,
+On 2017-03-31 09:59, Mark Rutland wrote:
+> Hi Agustin,
+> 
+> On Thu, Mar 23, 2017 at 05:03:17PM -0400, Agustin Vega-Frias wrote:
+>> This adds a new dynamic PMU to the Perf Events framework to program
+>> and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
+>> 
+>> The driver supports a distributed cache architecture where the overall
+>> cache for a socket is comprised of multiple slices each with its own 
+>> PMU.
+>> Access to each individual PMU is provided even though all CPUs share 
+>> all
+>> the slices. User space needs to aggregate to individual counts to 
+>> provide
+>> a global picture.
+>> 
+>> The driver exports formatting and event information to sysfs so it can
+>> be used by the perf user space tools with the syntaxes:
+>>    perf stat -a -e l3cache_0_0/read-miss/
+>>    perf stat -a -e l3cache_0_0/event=0x21/
+>> 
+>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+> 
+> Thanks for respinning this; it looks good to me.
+> 
+>> +static int qcom_l3_cache__event_init(struct perf_event *event)
+>> +{
+>> +	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct perf_event *sibling;
+> 
+>> +	/*
+>> +	 * We must NOT create groups containing mixed PMUs, although 
+>> software
+>> +	 * events are acceptable
+>> +	 */
+>> +	if (event->group_leader->pmu != event->pmu &&
+>> +			!is_software_event(event->group_leader))
+>> +		return -EINVAL;
+>> +
+>> +	list_for_each_entry(sibling, &event->group_leader->sibling_list,
+>> +			group_entry)
+>> +		if (sibling->pmu != event->pmu &&
+>> +				!is_software_event(sibling))
+>> +			return -EINVAL;
+> 
+> Sorry for spotting this so late, but I just  noticed that we don't
+> validate the group isn't too large to ever fit in the HW, which is
+> important for avoiding pointless work in perf_rotate_context() when the
+> mux hrtimer callback occurs.
+> 
+> We fail to do that in other drivers, too, so that's something we should
+> clean up more generally.
+> 
+> Here, I'd like to factor the group validation logic out into a helper:
+> 
+> #define event_num_counters(e)	(event_uses_long_counter(e) ? 2 : 1)
+> 
+> static bool qcom_l3_cache__validate_event_group(struct perf_event 
+> *event)
+> {
+> 	struct perf_event *leader = event->group_leader;
+> 	struct perf_event *sibling;
+> 	int counters = 0;
+> 
+> 	/*
+> 	 * We must NOT create groups containing mixed PMUs, although
+> 	 * software.
+> 	 */
+> 	if (leader->pmu != event->pmu && !is_software_event(leader))
+> 		return false;
+> 
+> 	counters = event_num_counters(event);
+> 	counters += event_num_counters(leader);
+> 
+> 	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
+> 		if (is_software_event(sibling))
+> 			continue;
+> 		if (sibling->pmu != event->pmu)
+> 			return false;
+> 		counters += event_num_counters(sibling);
+> 	}
+> 
+> 	/*
+> 	 * If the group requires more counters than the HW has, it
+> 	 * cannot ever be scheduled.
+> 	 */
+> 	return counters <= L3_NUM_COUNTERS;
+> }
+> 
+> ... where in qcom_l3_cache__event_init() we'd do:
+> 
+> 	if (!qcom_l3_cache__validate_event_group(event))
+> 		return -EINVAL;
+> 
+> If you're happy with that, I can make that change when applying.
 
-> The Scalable Vector Extension (SVE) [1] is an extension to AArch64 which
-> adds extra SIMD functionality and supports much larger vectors.
->
-> This series implements core Linux support for SVE.
->
-[...]
-> KERNEL_MODE_NEON (non-)support
-> ------------------------------
->
-> "arm64/sve: [BROKEN] Basic support for KERNEL_MODE_NEON" is broken.
-> There are significant design issues here that need discussion -- see the
-> commit message for details.
->
-> Options:
->
->  * Make KERNEL_MODE_NEON a runtime choice, and disable it if SVE is
->    present.
->
->  * Fully SVE-ise the KERNEL_MODE_NEON code: this will involve complexity
->    and effort, and may involve unfavourable (and VL-dependent) tradeoffs
->    compared with the no-SVE case.
->
->    We will nonetheless need something like this if there is a desire to
->    support "kernel mode SVE" in the future.  The fact that with SVE,
->    KERNEL_MODE_NEON brings the cost of kernel-mode SVE but only the
->    benefits of kernel-mode NEON argues in favour of this.
->
->  * Make KERNEL_MODE_NEON a dynamic choice, and have clients run fallback
->    C code instead if at runtime on a case-by-case basis, if SVE regs
->    would otherwise need saving.
->
->    This is an interface break, but all NEON-optimised kernel code
->    necessarily requires a fallback C implementation to exist anyway, and
->    the number of clients is not huge.
->
-> We could go for a stopgap solution that at least works but is suboptimal
-> for SVE systems (such as the first choice above), and then improve it
-> later.
->
+Sounds good. I'll also apply this change internally and test it out.
+I'll send it as V6 if I get it ready today.
 
-Without having looked at the patches in detail yet, let me reiterate
-my position after we discussed this when this series was sent out the
-first time around.
+Thanks,
+Agustin
 
-- The primary use case for kernel mode NEON is special purpose
-instructions, i.e., AES is 20x faster when using the NEON, simply
-because that is how one accesses the logic gates that implement the
-AES algorithm. There is nothing SIMD or FP in nature about AES.
-Compare the CRC extensions, which use scalar registers and
-instructions. Of course, there are a couple of exceptions in the form
-of bit-slicing algorithms, but in general, like general SIMD, I don't
-think it is highly likely that SVE in kernel mode is something we will
-have a need for in the foreseeable future.
-
-- The current way of repeatedly stacking/unstacking NEON register
-contents in interrupt context is highly inefficient, given that we are
-usually interrupting user mode, not kernel mode, and so stacking once
-and unstacking when returning from the exception (which is how we
-usually deal with it) would be much better. So changing the current
-implementation to perform the eager stack/unstack only when a kernel
-mode NEON call is already in progress is likely to improve our current
-situation already, regardless of whether such a change is needed to
-accommodate SVE. Note that to my knowledge, the only in-tree users of
-kernel mode NEON operate in process context or softirq context, never
-in hardirq context.
-
-Given the above, I think it is perfectly reasonable to conditionally
-disallow kernel mode NEON in hardirq context. The crypto routines that
-rely on it can easily be fixed up (I already wrote the patches for
-that). This would only be necessary on SVE systems, and the reason for
-doing so is that - given how preserving and restoring the NEON
-register file blows away the upper SVE part of the registers - whoever
-arrives at the SVE-aware preserve routine first should be allowed to
-run to completion. This does require disabling softirqs during the
-time the preserved NEON state is being manipulated but that does not
-strike me as a huge price to pay. Note that both restrictions
-(disallowing kernel mode NEON in hardirq context, and the need to
-disable softirqs while manipulating the state) could be made runtime
-dependent on whether we are actually running on an SVE system.
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
