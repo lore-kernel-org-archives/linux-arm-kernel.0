@@ -1,371 +1,964 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 31 Mar 2017 18:58:45 +0100
-Subject: Bad page state splats on arm64, v4.11-rc{3,4}
-Message-ID: <20170331175845.GE6488@leverpostej>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Fri, 31 Mar 2017 14:13:43 -0400
+Subject: [PATCH V6] perf: qcom: Add L3 cache PMU driver
+Message-ID: <1490984023-20437-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds a new dynamic PMU to the Perf Events framework to program
+and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
 
-I'm seeing intermittent bad page state splats on arm64 with 4.11-rc3 and
-v4.11-rc4. I have not tested earlier kernels, or other architectures.
+The driver supports a distributed cache architecture where the overall
+cache for a socket is comprised of multiple slices each with its own PMU.
+Access to each individual PMU is provided even though all CPUs share all
+the slices. User space needs to aggregate to individual counts to provide
+a global picture.
 
-So far, it looks like the flags are always bad in the same
-way:
+The driver exports formatting and event information to sysfs so it can
+be used by the perf user space tools with the syntaxes:
+   perf stat -a -e l3cache_0_0/read-miss/
+   perf stat -a -e l3cache_0_0/event=0x21/
 
-	bad because of flags: 0x80(waiters)
+Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+---
+ Documentation/perf/qcom_l3_pmu.txt |  25 ++
+ drivers/perf/Kconfig               |  10 +
+ drivers/perf/Makefile              |   1 +
+ drivers/perf/qcom_l3_pmu.c         | 850 +++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h         |   1 +
+ 5 files changed, 887 insertions(+)
+ create mode 100644 Documentation/perf/qcom_l3_pmu.txt
+ create mode 100644 drivers/perf/qcom_l3_pmu.c
 
-... though I don't know if that's definitely the case for splat 4, the
-BUG at mm/page_alloc.c:800.
-
-I see this in QEMU VMs launched by Syzkaller, triggering once every few
-hours. So far, I have not been able to reproduce the issue in any other
-way (including using syz-repro).
-
-Any ideas?
-
-Splats below.
-
-Thanks,
-Mark.
-
-Splat 1:
-----
-BUG: Bad page state in process syz-fuzzer  pfn:50200
-page:ffff7e0000408000 count:0 mapcount:0 mapping:          (null) index:0x1
-flags: 0xfffc00000000080(waiters)
-raw: 0fffc00000000080 0000000000000000 0000000000000001 00000000ffffffff
-raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
-page dumped because: PAGE_FLAGS_CHECK_AT_PREP flag set
-bad because of flags: 0x80(waiters)
-Modules linked in:
-CPU: 1 PID: 1274 Comm: syz-fuzzer Not tainted 4.11.0-rc3 #13
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffff200008094778>] dump_backtrace+0x0/0x538 arch/arm64/kernel/traps.c:73
-[<ffff200008094cd0>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
-[<ffff200008be82a8>] __dump_stack lib/dump_stack.c:16 [inline]
-[<ffff200008be82a8>] dump_stack+0x120/0x188 lib/dump_stack.c:52
-[<ffff20000842c858>] bad_page+0x1d8/0x2e8 mm/page_alloc.c:555
-[<ffff20000842cc68>] check_new_page_bad+0xf8/0x200 mm/page_alloc.c:1682
-[<ffff20000843a2a0>] check_new_pages mm/page_alloc.c:1694 [inline]
-[<ffff20000843a2a0>] rmqueue mm/page_alloc.c:2729 [inline]
-[<ffff20000843a2a0>] get_page_from_freelist+0xc58/0x2580 mm/page_alloc.c:3046
-[<ffff20000843cb80>] __alloc_pages_nodemask+0x1d0/0x1af0 mm/page_alloc.c:3965
-[<ffff200008548238>] __alloc_pages include/linux/gfp.h:426 [inline]
-[<ffff200008548238>] __alloc_pages_node include/linux/gfp.h:439 [inline]
-[<ffff200008548238>] alloc_pages_vma+0x438/0x7a8 mm/mempolicy.c:2015
-[<ffff20000858299c>] do_huge_pmd_wp_page+0x4bc/0x1630 mm/huge_memory.c:1230
-[<ffff2000084d7b80>] wp_huge_pmd mm/memory.c:3624 [inline]
-[<ffff2000084d7b80>] __handle_mm_fault+0x10a0/0x2760 mm/memory.c:3831
-[<ffff2000084d9530>] handle_mm_fault+0x2f0/0x998 mm/memory.c:3878
-[<ffff2000080bb9e4>] __do_page_fault arch/arm64/mm/fault.c:264 [inline]
-[<ffff2000080bb9e4>] do_page_fault+0x48c/0x730 arch/arm64/mm/fault.c:359
-[<ffff2000080816b8>] do_mem_abort+0xd8/0x2c8 arch/arm64/mm/fault.c:578
-Exception stack(0xffff800017fdfdb0 to 0xffff800017fdfee0)
-fda0:                                   0000000000000000 0000600015536000
-fdc0: ffffffffffffffff 00000000000fe340 0000000060000000 0000000000000024
-fde0: 000000009200004e 0000004421d722e8 00000000007ffff9 ffff800018bf1880
-fe00: 0000000041b58ab3 ffff20000a82f1f0 ffff2000080815e0 ffff20000808466c
-fe20: 0000000000000000 000000000003e3d4 0000000000000000 0000000000000024
-fe40: 000000009200004f 00000044205e5cd8 00000000011a6f80 ffff800018bf1880
-fe60: ffff800018bf1880 ffff20000a84e6f0 ffff20000ad734a0 ffff20000ad73580
-fe80: ffff800017fdfeb0 ffff2000082689c0 0000000000000000 0000600034524000
-fea0: ffffffffffffffff 000000000003e3d4 0000000000000000 ffff20000808466c
-fec0: 0000000000000000 0000000000000000 0000000000000138 0000004421d722c0
-[<ffff2000080843ac>] el0_da+0x18/0x1c
-Disabling lock debugging due to kernel taint
-----
-
-Splat 2:
-----
-BUG: Bad page state in process syz-fuzzer  pfn:51000
-page:ffff7e0000440000 count:0 mapcount:0 mapping:          (null) index:0x1
-flags: 0xfffc00000000080(waiters)
-raw: 0fffc00000000080 0000000000000000 0000000000000001 00000000ffffffff
-raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
-page dumped because: PAGE_FLAGS_CHECK_AT_PREP flag set
-bad because of flags: 0x80(waiters)
-Modules linked in:
-CPU: 0 PID: 1274 Comm: syz-fuzzer Not tainted 4.11.0-rc3 #13
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffff200008094778>] dump_backtrace+0x0/0x538 arch/arm64/kernel/traps.c:73
-[<ffff200008094cd0>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
-[<ffff200008be82a8>] __dump_stack lib/dump_stack.c:16 [inline]
-[<ffff200008be82a8>] dump_stack+0x120/0x188 lib/dump_stack.c:52
-[<ffff20000842c858>] bad_page+0x1d8/0x2e8 mm/page_alloc.c:555
-[<ffff20000842cc68>] check_new_page_bad+0xf8/0x200 mm/page_alloc.c:1682
-[<ffff2000084365b0>] check_new_page mm/page_alloc.c:1694 [inline]
-[<ffff2000084365b0>] check_pcp_refill mm/page_alloc.c:1717 [inline]
-[<ffff2000084365b0>] rmqueue_bulk.constprop.21+0x330/0x610 mm/page_alloc.c:2230
-[<ffff20000843a9a8>] __rmqueue_pcplist mm/page_alloc.c:2654 [inline]
-[<ffff20000843a9a8>] rmqueue_pcplist mm/page_alloc.c:2686 [inline]
-[<ffff20000843a9a8>] rmqueue mm/page_alloc.c:2708 [inline]
-[<ffff20000843a9a8>] get_page_from_freelist+0x1360/0x2580 mm/page_alloc.c:3046
-[<ffff20000843cb80>] __alloc_pages_nodemask+0x1d0/0x1af0 mm/page_alloc.c:3965
-[<ffff200008547ef4>] alloc_pages_vma+0xf4/0x7a8 mm/mempolicy.c:2023
-[<ffff2000084d831c>] __alloc_zeroed_user_highpage include/linux/highmem.h:161 [inline]
-[<ffff2000084d831c>] alloc_zeroed_user_highpage_movable include/linux/highmem.h:183 [inline]
-[<ffff2000084d831c>] do_anonymous_page mm/memory.c:2948 [inline]
-[<ffff2000084d831c>] handle_pte_fault mm/memory.c:3721 [inline]
-[<ffff2000084d831c>] __handle_mm_fault+0x183c/0x2760 mm/memory.c:3841
-[<ffff2000084d9530>] handle_mm_fault+0x2f0/0x998 mm/memory.c:3878
-[<ffff2000080bb9e4>] __do_page_fault arch/arm64/mm/fault.c:264 [inline]
-[<ffff2000080bb9e4>] do_page_fault+0x48c/0x730 arch/arm64/mm/fault.c:359
-[<ffff2000080816b8>] do_mem_abort+0xd8/0x2c8 arch/arm64/mm/fault.c:578
-Exception stack(0xffff800018adbdb0 to 0xffff800018adbee0)
-bda0:                                   0000000000000000 000060001551e000
-bdc0: ffffffffffffffff 0000000000ac800c 0000000080000000 0000000000000024
-bde0: 0000000092000047 0000004428f6c000 00000000011c42a8 ffff80001903b080
-be00: 0000000041b58ab3 ffff20000a82f1f0 ffff2000080815e0 ffff2000082fd1f4
-be20: 0000000000000000 ffff200008084770 0000000000000000 000060001551e000
-be40: ffffffffffffffff 0000000000060934 0000000060000000 0000000000000015
-be60: 0000000041b58ab3 ffff20000a844740 ffff2000082fd0b0 ffff20000ad73580
-be80: 000000000000003c 00000000399cfaa0 0000000000000000 000060001551e000
-bea0: ffffffffffffffff 0000000000060a40 0000000020000000 0000000000000015
-bec0: 0000004428f6c000 000000000111b360 0000000000000000 00000000000000a0
-[<ffff2000080843ac>] el0_da+0x18/0x1c
-Disabling lock debugging due to kernel taint
-----
-
-Splat 3:
-----
-BUG: Bad page state in process syz-fuzzer  pfn:55c00
-page:ffff7e0000570000 count:0 mapcount:0 mapping:          (null) index:0x1
-flags: 0xfffc00000000080(waiters)
-raw: 0fffc00000000080 0000000000000000 0000000000000001 00000000ffffffff
-raw: dead000000000100 dead000000000200 0000000000000000 0000000000000000
-page dumped because: PAGE_FLAGS_CHECK_AT_PREP flag set
-bad because of flags: 0x80(waiters)
-Modules linked in:
-CPU: 0 PID: 1277 Comm: syz-fuzzer Not tainted 4.11.0-rc4-00009-g15bc66d #1
-Hardware name: linux,dummy-virt (DT)
-Call trace:
-[<ffff200008094778>] dump_backtrace+0x0/0x538 arch/arm64/kernel/traps.c:73
-[<ffff200008094cd0>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
-[<ffff200008c1bf28>] __dump_stack lib/dump_stack.c:16 [inline]
-[<ffff200008c1bf28>] dump_stack+0x120/0x188 lib/dump_stack.c:52
-[<ffff200008433088>] bad_page+0x1d8/0x2e8 mm/page_alloc.c:555
-[<ffff200008433498>] check_new_page_bad+0xf8/0x200 mm/page_alloc.c:1682
-[<ffff20000843f930>] check_new_pcp mm/page_alloc.c:1694 [inline]
-[<ffff20000843f930>] __rmqueue_pcplist mm/page_alloc.c:2668 [inline]
-[<ffff20000843f930>] rmqueue_pcplist+0x768/0xde0 mm/page_alloc.c:2686
-[<ffff200008443f08>] rmqueue mm/page_alloc.c:2708 [inline]
-[<ffff200008443f08>] get_page_from_freelist+0xdb0/0x2298 mm/page_alloc.c:3046
-[<ffff2000084463dc>] __alloc_pages_nodemask+0x1f4/0x1b10 mm/page_alloc.c:3965
-[<ffff2000085674ac>] alloc_pages_vma+0xf4/0x848 mm/mempolicy.c:2023
-[<ffff2000084e9a84>] __alloc_zeroed_user_highpage include/linux/highmem.h:161 [inline]
-[<ffff2000084e9a84>] alloc_zeroed_user_highpage_movable include/linux/highmem.h:183 [inline]
-[<ffff2000084e9a84>] do_anonymous_page+0x55c/0x12b8 mm/memory.c:2948
-[<ffff2000084ee79c>] handle_pte_fault mm/memory.c:3721 [inline]
-[<ffff2000084ee79c>] __handle_mm_fault+0xb24/0xea0 mm/memory.c:3841
-[<ffff2000084eee08>] handle_mm_fault+0x2f0/0x9a0 mm/memory.c:3878
-[<ffff2000080bb8bc>] __do_page_fault arch/arm64/mm/fault.c:264 [inline]
-[<ffff2000080bb8bc>] do_page_fault+0x4d4/0x790 arch/arm64/mm/fault.c:359
-[<ffff2000080816b8>] do_mem_abort+0xd8/0x2c8 arch/arm64/mm/fault.c:578
-Exception stack(0xffff800018ed3db0 to 0xffff800018ed3ee0)
-3da0:                                   0000000000000000 00006000154dd000
-3dc0: ffffffffffffffff 0000000000ac800c 0000000080000000 0000000000000024
-3de0: 0000000092000047 00000044299b4000 00000000011c42a8 ffff80001815c880
-3e00: 0000000041b58ab3 ffff20000a86d938 ffff2000080815e0 ffff2000082ff66c
-3e20: 0000000000000000 ffff200008084770 0000000000000000 00006000154dd000
-3e40: ffffffffffffffff 0000000000060934 0000000060000000 0000000000000015
-3e60: 0000000041b58ab3 ffff20000a882fa8 ffff2000082ff528 ffff20000adb97a0
-3e80: 000000000000004e 000000001cdb0b18 0000000000000000 00006000154dd000
-3ea0: ffffffffffffffff 0000000000060a40 0000000020000000 0000000000000015
-3ec0: 00000044299b4000 000000000111b360 0000000000000000 00000000000000a0
-[<ffff2000080843ac>] el0_da+0x18/0x1c
-Disabling lock debugging due to kernel taint
-----
-
-Splat 4
-----
-------------[ cut here ]------------
-kernel BUG at mm/page_alloc.c:800!
-Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 2 PID: 1267 Comm: syz-fuzzer Not tainted 4.11.0-rc3 #1
-Hardware name: linux,dummy-virt (DT)
-task: ffff800018d09880 task.stack: ffff800018c0c000
-PC is at __free_one_page mm/page_alloc.c:800 [inline]
-PC is at free_one_page+0xec4/0x1c00 mm/page_alloc.c:1164
-LR is at __free_one_page mm/page_alloc.c:800 [inline]
-LR is at free_one_page+0xec4/0x1c00 mm/page_alloc.c:1164
-pc : [<ffff200008436af4>] lr : [<ffff200008436af4>] pstate: 800001c5
-sp : ffff800018c0f250
-x29: ffff800018c0f250 x28: ffff7e00003f0000 
-x27: 0000000000000009 x26: 1ffff00003fffc78 
-x25: 0000000000000000 x24: ffff80001fffe3c0 
-x23: 0000000000000200 x22: 0000000000000000 
-x21: ffff80001fffe380 x20: 000000000004fc00 
-x19: 0000000000000200 x18: ffff800018d0a038 
-x17: 0000000000000000 x16: 0000000000000000 
-x15: 1ffff000031a1407 x14: 3030303030303030 
-x13: ffff20000adb9000 x12: 3030303030303030 
-x11: ffff20000e004000 x10: 0000000000000000 
-x9 : ffff100003181d90 x8 : ffff800018d0a0b8 
-x7 : ffff20000d5ba000 x6 : 0000000000000000 
-x5 : 0000000041b58ab3 x4 : 1fffe40001c00810 
-x3 : 1fffe40001c00810 x2 : 1fffefc00007e007 
-x1 : 0000000000000001 x0 : 0000000000000000 
-
-Process syz-fuzzer (pid: 1267, stack limit = 0xffff800018c0c000)
-Stack: (0xffff800018c0f250 to 0xffff800018c10000)
-f240:                                   ffff800018c0f3c0 ffff200008437c88
-f260: ffff7e00003f0000 ffff20000ab3fbb8 1ffff00003181e8c 0000000000000000
-f280: 0000000000000009 0000000000000000 000000000004fc00 0000000000000007
-f2a0: ffff80001fffd2b8 ffff20000e037d00 ffff800018c0f2f0 ffff2000080bff58
-f2c0: 000ffff80000fe00 000ffff80000fe00 1ffff00003181e66 ffff80001fffe3f8
-f2e0: 1ffff00003181e64 ffff80001fffe900 0000000000000140 ffff2000080c0348
-f300: 1ffff00003fffc7f 0000000000000200 0000000000000001 1fffefc00007e000
-f320: 0000000041b58ab3 ffff20000a873648 ffff200008435c30 ffff20000a8704a0
-f340: ffff2000080bfe70 ffff200008437b40 ffff800018c0f390 ffff2000080c034c
-f360: ffff80000fc00000 0000000000000200 0000000000000000 ffff7e00003f0008
-f380: 0000000000000000 0000000000000000 ffff800018c0f3c0 ffff200008437cf0
-f3a0: ffff7e00003f0000 0000000000000200 ffff800018c0f3c0 ffff200008437b64
-f3c0: ffff800018c0f4c0 ffff20000843897c ffff7e00003f0000 ffff7e00003f0040
-f3e0: ffff7e00003f0088 ffff7e00003f0090 ffff80001ffffdf0 ffff80001ffffdb8
-f400: 0000000000000140 ffff80001ffffdf0 04e800004fc00f10 ffff7e0000da8020
-f420: 0000000000000000 ffff20000aff1700 ffff80001ffffdf0 ffff20000aff0e00
-f440: ffff20000a1b6720 ffff80001ffffdf0 04e800004fc00f10 ffff7e0000000001
-f460: 0000000041b58ab3 ffff20000a86c150 ffff200008437830 ffff20000adb94a0
-f480: 0000000000000000 ffff20000826a398 ffff800018c0f4c0 ffff20000a133afc
-f4a0: ffff800018d09880 ffff80001ffffdb8 ffff7e00003f0088 ffff7e00003f0090
-f4c0: ffff800018c0f4e0 ffff2000085add14 ffff7e00003f0000 1ffff00003181ea6
-f4e0: ffff800018c0f590 ffff200008460c14 ffff7e00003f0000 ffff20000a1b9460
-f500: 0000000000000003 ffff20000ab3f000 ffff7e0000da8000 ffff80001782c800
-f520: ffff7e00003f0020 ffff800018e85298 0000000041b58ab3 ffff20000a86c150
-f540: ffff2000085adb88 ffff20000847359c ffff80001ffffdf0 ffff200008460be4
-f560: ffff7e00003f0000 ffff7e00003f0040 0000000000000003 ffff7e00003f001c
-f580: ffff7e00003f0000 ffff200008460cc8 ffff800018c0f5c0 ffff200008460cd0
-f5a0: ffff7e00003f0000 ffff7e00003f001c ffff7e00003f0000 ffff7e00003f001c
-f5c0: ffff800018c0f5e0 ffff20000859bffc ffff7e00003f0000 ffff7e00003f001c
-f5e0: ffff800018c0f6c0 ffff2000085a5ac4 0000000000000001 ffff7e00003f0000
-f600: 04e800004fc00f10 ffff800018e85298 ffff800018c0f788 ffff800018c0f838
-f620: ffff800039466640 1ffff00003181f08 0000000000000000 ffff800018cd34d8
-f640: 0000000041b58ab3 ffff20000a871ec8 ffff2000082788f0 ffff2000085a59f4
-f660: ffff800039466a20 1ffff000031d0a5b 0000000000000000 ffff8000394666a8
-f680: ffff800000000001 ffff7e00003f0000 0000004420200000 1ffff0000728cd44
-f6a0: 0000000018c0f6c0 1ffff00002f05900 0000004420000000 00a8000076a00f51
-f6c0: ffff800018c0f790 ffff2000084eda88 ffff800018e85298 ffff80001782c800
-f6e0: 04e800004fc00f10 1ffff00003181f00 ffff20000a8ef000 1ffff000031d0a5d
-f700: ffff800018e852e8 0000000040000000 ffff800039f3f880 1ffff000073e7f10
-f720: 1ffff000031a1407 0008000000000000 ffff7e00003f0000 ffff800018e852d8
-f740: ffff800018c0f840 ffff800018c0f878 0000000000003fff ffff2000084eda7c
-f760: ffff7e0000000001 1ffff000031d0a5b 1ffff00003181f07 0000004420000000
-f780: ffff7e0000000000 04e800004fc00f10 ffff800018c0f8c0 ffff2000084ee1f8
-f7a0: ffff800018e85298 0000000000000015 0000004420033000 0000000000000000
-f7c0: 000000000000001d 000000000000001e 0000000000000000 ffff8000394666e0
-f7e0: 0000000000020000 ffff800018e85298 ffff800018c0f830 ffff200008c85344
-f800: 0000000041b58ab3 ffff20000a8892e0 ffff2000084ed068 0000000000000015
-f820: ffff800018e85298 014000c000000015 0000000004420033 0000004420033000
-f840: ffff80001782c800 ffff800039f3f880 0000000000000000 0000000000000000
-f860: 0000000000000000 0000000000000000 0000000000000000 ffff8000394666a8
-f880: 0000000000000000 ffff2000084ee1e8 ffff800018e85298 0000000000000015
-f8a0: 0000004420033000 1ffff000031a1407 ffff2000084ee144 0000000000000140
-f8c0: ffff800018c0f910 ffff2000080bb8bc ffff800018d09880 ffff800018c0fae0
-f8e0: ffff800039466640 0000004420033f38 0000000096000046 0000000000000015
-f900: 1ffff00003181f7d ffff8000394666e0 ffff800018c0f990 ffff2000080bbc1c
-f920: 0001000000000000 0000004420033f38 0000000096000046 ffff800018c0fae0
-f940: 0000000096000046 0000004420033f38 ffff800018c0fae0 ffff20000a157a80
-f960: ffff20000a157b10 ffff20000a157000 0000000096000046 ffff800018d0a040
-f980: ffff800018c0fbe8 0000000000000002 ffff800018c0f9c0 ffff2000080816b8
-f9a0: 0000000000000090 1ffff00003181f44 ffff20000a157a80 0000dffff5ea8588
-f9c0: ffff800018c0fc10 ffff200008083e04 1ffff00003181f8c 0001000000000000
-f9e0: ffff800018c0fc10 ffff200008c17ea4 0000000080000145 0000000000000025
-fa00: 0000000000000000 ffff800018c0fd00 0000000000000000 ffff800018d09880
-fa20: 0000000041b58ab3 ffff20000a86d438 ffff2000080815e0 ffff20000ddfede8
-fa40: ffff800018c0fa80 ffff200008c85344 0000000000000002 ffff800018d09880
-fa60: ffff800018c0faa0 ffff200008c85344 ffff800018c0faf0 ffff20000826a138
-fa80: ffff800018d09880 ffff2000082e9f30 0000000000000000 1ffff00003181f76
-faa0: ffff800018c0fae0 ffff200009ad460c 000000039d47d4fe ffff800018c0fc80
-fac0: ffff20000e028780 ffff200009ad47cc ffff20000ccad9e0 ffff800018c0fc80
-fae0: 0000004420033f38 ffff800018c0fcd0 0000000000000010 0000000000000010
-fb00: 0000000000000000 0000004420033f48 0000004420033f38 0000000000000000
-fb20: 0000000000000000 dfff200000000000 ffff100003181f99 1ffff00003181f99
-fb40: 0000000000000007 ffff20000adb9000 ffff8000398164ec 1ffff000031a1407
-fb60: 1ffff000031a1341 0000ffffd349bf68 ffff800018d0a038 1ffff00003181f8c
-fb80: 0000000000000000 ffff800018c0fcc0 ffff800018d09880 0000004420033f38
-fba0: 0000000000000000 0000000000000000 ffff800018c0fd00 0000000000000000
-fbc0: ffff800018d09880 ffff800018c0fc10 ffff2000086314d0 ffff800018c0fc10
-fbe0: ffff200008c17ea4 0000000080000145 ffff800018c0fcc0 ffff20000858b9b0
-fc00: 0001000000000000 ffff200008631488 ffff800018c0fd40 ffff200008634908
-fc20: ffff800018c0fe80 0000000000000000 1ffff00003181fb4 0000004420033f38
-fc40: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-fc60: 0000000041b58ab3 ffff20000a88d370 ffff200008631200 ffff20000863256c
-fc80: 0000000000000000 0000000000000000 0000000000000000 ffff800018c0fe80
-fca0: ffff20000e028700 ffff200009ad47cc ffff800018c0fd40 ffff200008634814
-fcc0: 0000000000000000 0000000000000000 1ffff00003181fb4 0000004420033f38
-fce0: 0000000041b58ab3 ffff20000a882350 ffff2000086324b0 ffff2000082e98ac
-fd00: ffffffffffffffff 000000003b9644f0 ffff800018c0fe80 0000000000000000
-fd20: 1ffff00003181fb4 ffff20000858b9d0 ffff800018c0fd40 ffff20000863466c
-fd40: 0000000000000000 ffff200008084770 0000000000000000 000060003429d000
-fd60: ffffffffffffffff 000000000006084c 0000000020000000 0000000000000015
-fd80: 0000000000000123 0000000000000048 ffff20000a146000 ffff800018d09880
-fda0: 0000000041b58ab3 ffff20000a88d440 ffff200008634538 ffffffffffffffea
-fdc0: ffff800018c0fe80 ffff2000082fa544 ffff800018c0fe80 ffffffffffffffea
-fde0: ffff800018c0fe20 ffff2000082fee10 1ffff00003181fcc 0000000000000000
-fe00: ffff800018c0fe80 ffff20000858b9b0 ffff800018c0fe20 ffff2000082feed4
-fe20: 0000000000000000 ffff200008084770 0000000000000000 000060003429d000
-fe40: 0000000000000000 0000000000989680 0000000020000000 0000000000000015
-fe60: 0000000041b58ab3 ffff20000a882a80 ffff2000082fed90 ffff20000adb94a0
-fe80: 000000000000003c 00000000194bd0b0 0000000000000000 000060003429d000
-fea0: ffffffffffffffff 000000000006084c 0000000000000000 ffff20000808466c
-fec0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-fee0: 0000004420033f38 0000000000000000 0000000000000000 fffffffffffffade
-ff00: 0000000000000048 000000000000064e 0000004420024000 00000044200004e0
-ff20: 000000000003ac40 00000000000000f3 0000000000000008 0000000000000000
-ff40: 0000004420033f50 0000ffffd349bf68 0000000000000000 0000000000000000
-ff60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-ff80: 0000000000000000 0000000000000000 0000000000c200b8 0000000000002710
-ffa0: 00000044200004e0 0000000000000000 000000000004144c 0000004420033f30
-ffc0: 000000000006084c 0000000020000000 0000000000000000 0000000000000048
-ffe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-Call trace:
-Exception stack(0xffff800018c0f000 to 0xffff800018c0f130)
-f000: 0000000000000200 0001000000000000 ffff800018c0f250 ffff200008436af4
-f020: 00000000800001c5 000000000000003d 0000000000000000 1ffff00003fffc78
-f040: 0000000000000009 ffff800018d09880 ffff20000829a6d0 0000004420033f38
-f060: 0000000041b58ab3 ffff20000a86d438 ffff200008081ac8 ffff20000a1c6000
-f080: 1fffefc00007e000 ffff20000a1b7000 0000000004420000 0000000000000000
-f0a0: ffff800018c0f0e0 ffff200008416cec 1ffff00003181e26 dfff200000000000
-f0c0: ffff100003181e26 ffff20000ba03f20 1ffff00003181e1e ffff20000a281740
-f0e0: ffff800018c0f1d0 ffff2000084ceb20 ffff7e00003f0000 ffff20000a1c6040
-f100: 0000000000000000 ffff20000a1c6000 ffff800018c0f1d0 ffff800018c0f1d0
-f120: 0000000000000000 0000000000000001
-[<ffff200008436af4>] __free_one_page mm/page_alloc.c:800 [inline]
-[<ffff200008436af4>] free_one_page+0xec4/0x1c00 mm/page_alloc.c:1164
-[<ffff200008437c88>] __free_pages_ok+0x458/0x10c8 mm/page_alloc.c:1250
-[<ffff20000843897c>] free_compound_page+0x84/0xd8 mm/page_alloc.c:579
-[<ffff2000085add14>] free_transhuge_page+0x18c/0x320 mm/huge_memory.c:2495
-[<ffff200008460c14>] __put_compound_page+0x94/0x110 mm/swap.c:95
-[<ffff200008460cd0>] __put_page+0x40/0xe8 mm/swap.c:101
-[<ffff20000859bffc>] put_page include/linux/mm.h:797 [inline]
-[<ffff20000859bffc>] migrate_misplaced_transhuge_page+0x19dc/0x2538 mm/migrate.c:2021
-[<ffff2000085a5ac4>] do_huge_pmd_numa_page+0x484/0x1120 mm/huge_memory.c:1483
-[<ffff2000084eda88>] __handle_mm_fault+0xa20/0xea0 mm/memory.c:3827
-[<ffff2000084ee1f8>] handle_mm_fault+0x2f0/0x9a0 mm/memory.c:3878
-[<ffff2000080bb8bc>] __do_page_fault arch/arm64/mm/fault.c:264 [inline]
-[<ffff2000080bb8bc>] do_page_fault+0x4d4/0x790 arch/arm64/mm/fault.c:359
-[<ffff2000080bbc1c>] do_translation_fault+0xa4/0xe8 arch/arm64/mm/fault.c:470
-[<ffff2000080816b8>] do_mem_abort+0xd8/0x2c8 arch/arm64/mm/fault.c:578
-Exception stack(0xffff800018c0f9d0 to 0xffff800018c0fb00)
-f9c0:                                   1ffff00003181f8c 0001000000000000
-f9e0: ffff800018c0fc10 ffff200008c17ea4 0000000080000145 0000000000000025
-fa00: 0000000000000000 ffff800018c0fd00 0000000000000000 ffff800018d09880
-fa20: 0000000041b58ab3 ffff20000a86d438 ffff2000080815e0 ffff20000ddfede8
-fa40: ffff800018c0fa80 ffff200008c85344 0000000000000002 ffff800018d09880
-fa60: ffff800018c0faa0 ffff200008c85344 ffff800018c0faf0 ffff20000826a138
-fa80: ffff800018d09880 ffff2000082e9f30 0000000000000000 1ffff00003181f76
-faa0: ffff800018c0fae0 ffff200009ad460c 000000039d47d4fe ffff800018c0fc80
-fac0: ffff20000e028780 ffff200009ad47cc ffff20000ccad9e0 ffff800018c0fc80
-fae0: 0000004420033f38 ffff800018c0fcd0 0000000000000010 0000000000000010
-[<ffff200008083e04>] el1_da+0x18/0x78
-[<ffff200008634908>] do_pselect fs/select.c:689 [inline]
-[<ffff200008634908>] SYSC_pselect6 fs/select.c:729 [inline]
-[<ffff200008634908>] SyS_pselect6+0x3d0/0x498 fs/select.c:714
-[<ffff200008084770>] el0_svc_naked+0x24/0x28
-Code: aa1c03e0 911c8021 91238021 940260a0 (d4210000) 
----[ end trace d0bbbea96ed9c1c1 ]---
-----
+diff --git a/Documentation/perf/qcom_l3_pmu.txt b/Documentation/perf/qcom_l3_pmu.txt
+new file mode 100644
+index 0000000..96b3a94
+--- /dev/null
++++ b/Documentation/perf/qcom_l3_pmu.txt
+@@ -0,0 +1,25 @@
++Qualcomm Datacenter Technologies L3 Cache Performance Monitoring Unit (PMU)
++===========================================================================
++
++This driver supports the L3 cache PMUs found in Qualcomm Datacenter Technologies
++Centriq SoCs. The L3 cache on these SOCs is composed of multiple slices, shared
++by all cores within a socket. Each slice is exposed as a separate uncore perf
++PMU with device name l3cache_<socket>_<instance>. User space is responsible
++for aggregating across slices.
++
++The driver provides a description of its available events and configuration
++options in sysfs, see /sys/devices/l3cache*. Given that these are uncore PMUs
++the driver also exposes a "cpumask" sysfs attribute which contains a mask
++consisting of one CPU per socket which will be used to handle all the PMU
++events on that socket.
++
++The hardware implements 32bit event counters and has a flat 8bit event space
++exposed via the "event" format attribute. In addition to the 32bit physical
++counters the driver supports virtual 64bit hardware counters by using hardware
++counter chaining. This feature is exposed via the "lc" (long counter) format
++flag. E.g.:
++
++  perf stat -e l3cache_0_0/read-miss,lc/
++
++Given that these are uncore PMUs the driver does not support sampling, therefore
++"perf record" will not work. Per-task perf sessions are not supported.
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 9365190..c436e0d 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -21,6 +21,16 @@ config QCOM_L2_PMU
+ 	  Adds the L2 cache PMU into the perf events subsystem for
+ 	  monitoring L2 cache events.
+ 
++config QCOM_L3_PMU
++	bool "Qualcomm Technologies L3-cache PMU"
++	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
++	select QCOM_IRQ_COMBINER
++	help
++	   Provides support for the L3 cache performance monitor unit (PMU)
++	   in Qualcomm Technologies processors.
++	   Adds the L3 cache PMU into the perf events subsystem for
++	   monitoring L3 cache events.
++
+ config XGENE_PMU
+         depends on PERF_EVENTS && ARCH_XGENE
+         bool "APM X-Gene SoC PMU"
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index ef24833..ef0c6b2 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o
+ obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
++obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+diff --git a/drivers/perf/qcom_l3_pmu.c b/drivers/perf/qcom_l3_pmu.c
+new file mode 100644
+index 0000000..0e6b2a7
+--- /dev/null
++++ b/drivers/perf/qcom_l3_pmu.c
+@@ -0,0 +1,850 @@
++/*
++ * Driver for the L3 cache PMUs in Qualcomm Technologies chips.
++ *
++ * The driver supports a distributed cache architecture where the overall
++ * cache for a socket is comprised of multiple slices each with its own PMU.
++ * Access to each individual PMU is provided even though all CPUs share all
++ * the slices. User space needs to aggregate to individual counts to provide
++ * a global picture.
++ *
++ * See Documentation/perf/qcom_l3_pmu.txt for more details.
++ *
++ * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/acpi.h>
++#include <linux/bitops.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/list.h>
++#include <linux/module.h>
++#include <linux/perf_event.h>
++#include <linux/platform_device.h>
++
++/*
++ * General constants
++ */
++
++/* Number of counters on each PMU */
++#define L3_NUM_COUNTERS  8
++/* Mask for the event type field within perf_event_attr.config and EVTYPE reg */
++#define L3_EVTYPE_MASK   0xFF
++/*
++ * Bit position of the 'long counter' flag within perf_event_attr.config.
++ * Reserve some space between the event type and this flag to allow expansion
++ * in the event type field.
++ */
++#define L3_EVENT_LC_BIT  32
++
++/*
++ * Register offsets
++ */
++
++/* Perfmon registers */
++#define L3_HML3_PM_CR       0x000
++#define L3_HML3_PM_EVCNTR(__cntr) (0x420 + ((__cntr) & 0x7) * 8)
++#define L3_HML3_PM_CNTCTL(__cntr) (0x120 + ((__cntr) & 0x7) * 8)
++#define L3_HML3_PM_EVTYPE(__cntr) (0x220 + ((__cntr) & 0x7) * 8)
++#define L3_HML3_PM_FILTRA   0x300
++#define L3_HML3_PM_FILTRB   0x308
++#define L3_HML3_PM_FILTRC   0x310
++#define L3_HML3_PM_FILTRAM  0x304
++#define L3_HML3_PM_FILTRBM  0x30C
++#define L3_HML3_PM_FILTRCM  0x314
++
++/* Basic counter registers */
++#define L3_M_BC_CR         0x500
++#define L3_M_BC_SATROLL_CR 0x504
++#define L3_M_BC_CNTENSET   0x508
++#define L3_M_BC_CNTENCLR   0x50C
++#define L3_M_BC_INTENSET   0x510
++#define L3_M_BC_INTENCLR   0x514
++#define L3_M_BC_GANG       0x718
++#define L3_M_BC_OVSR       0x740
++#define L3_M_BC_IRQCTL     0x96C
++
++/*
++ * Bit field definitions
++ */
++
++/* L3_HML3_PM_CR */
++#define PM_CR_RESET           (0)
++
++/* L3_HML3_PM_XCNTCTL/L3_HML3_PM_CNTCTLx */
++#define PMCNT_RESET           (0)
++
++/* L3_HML3_PM_EVTYPEx */
++#define EVSEL(__val)          ((__val) & L3_EVTYPE_MASK)
++
++/* Reset value for all the filter registers */
++#define PM_FLTR_RESET         (0)
++
++/* L3_M_BC_CR */
++#define BC_RESET              (1UL << 1)
++#define BC_ENABLE             (1UL << 0)
++
++/* L3_M_BC_SATROLL_CR */
++#define BC_SATROLL_CR_RESET   (0)
++
++/* L3_M_BC_CNTENSET */
++#define PMCNTENSET(__cntr)    (1UL << ((__cntr) & 0x7))
++
++/* L3_M_BC_CNTENCLR */
++#define PMCNTENCLR(__cntr)    (1UL << ((__cntr) & 0x7))
++#define BC_CNTENCLR_RESET     (0xFF)
++
++/* L3_M_BC_INTENSET */
++#define PMINTENSET(__cntr)    (1UL << ((__cntr) & 0x7))
++
++/* L3_M_BC_INTENCLR */
++#define PMINTENCLR(__cntr)    (1UL << ((__cntr) & 0x7))
++#define BC_INTENCLR_RESET     (0xFF)
++
++/* L3_M_BC_GANG */
++#define GANG_EN(__cntr)       (1UL << ((__cntr) & 0x7))
++#define BC_GANG_RESET         (0)
++
++/* L3_M_BC_OVSR */
++#define PMOVSRCLR(__cntr)     (1UL << ((__cntr) & 0x7))
++#define PMOVSRCLR_RESET       (0xFF)
++
++/* L3_M_BC_IRQCTL */
++#define PMIRQONMSBEN(__cntr)  (1UL << ((__cntr) & 0x7))
++#define BC_IRQCTL_RESET       (0x0)
++
++/*
++ * Events
++ */
++
++#define L3_EVENT_CYCLES		0x01
++#define L3_EVENT_READ_HIT		0x20
++#define L3_EVENT_READ_MISS		0x21
++#define L3_EVENT_READ_HIT_D		0x22
++#define L3_EVENT_READ_MISS_D		0x23
++#define L3_EVENT_WRITE_HIT		0x24
++#define L3_EVENT_WRITE_MISS		0x25
++
++/*
++ * Decoding of settings from perf_event_attr
++ *
++ * The config format for perf events is:
++ * - config: bits 0-7: event type
++ *           bit  32:  HW counter size requested, 0: 32 bits, 1: 64 bits
++ */
++
++static inline u32 get_event_type(struct perf_event *event)
++{
++	return (event->attr.config) & L3_EVTYPE_MASK;
++}
++
++static inline bool event_uses_long_counter(struct perf_event *event)
++{
++	return !!(event->attr.config & BIT_ULL(L3_EVENT_LC_BIT));
++}
++
++static inline int event_num_counters(struct perf_event *event)
++{
++	return event_uses_long_counter(event) ? 2 : 1;
++}
++
++/*
++ * Main PMU, inherits from the core perf PMU type
++ */
++struct l3cache_pmu {
++	struct pmu		pmu;
++	struct hlist_node	node;
++	void __iomem		*regs;
++	struct perf_event	*events[L3_NUM_COUNTERS];
++	unsigned long		used_mask[BITS_TO_LONGS(L3_NUM_COUNTERS)];
++	cpumask_t		cpumask;
++};
++
++#define to_l3cache_pmu(p) (container_of(p, struct l3cache_pmu, pmu))
++
++/*
++ * Type used to group hardware counter operations
++ *
++ * Used to implement two types of hardware counters, standard (32bits) and
++ * long (64bits). The hardware supports counter chaining which we use to
++ * implement long counters. This support is exposed via the 'lc' flag field
++ * in perf_event_attr.config.
++ */
++struct l3cache_event_ops {
++	/* Called to start event monitoring */
++	void (*start)(struct perf_event *event);
++	/* Called to stop event monitoring */
++	void (*stop)(struct perf_event *event, int flags);
++	/* Called to update the perf_event */
++	void (*update)(struct perf_event *event);
++};
++
++/*
++ * Implementation of long counter operations
++ *
++ * 64bit counters are implemented by chaining two of the 32bit physical
++ * counters. The PMU only supports chaining of adjacent even/odd pairs
++ * and for simplicity the driver always configures the odd counter to
++ * count the overflows of the lower-numbered even counter. Note that since
++ * the resulting hardware counter is 64bits no IRQs are required to maintain
++ * the software counter which is also 64bits.
++ */
++
++static void qcom_l3_cache__64bit_counter_start(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 evsel = get_event_type(event);
++	u32 gang;
++
++	/* Set the odd counter to count the overflows of the even counter */
++	gang = readl_relaxed(l3pmu->regs + L3_M_BC_GANG);
++	gang |= GANG_EN(idx + 1);
++	writel_relaxed(gang, l3pmu->regs + L3_M_BC_GANG);
++
++	/* Initialize the hardware counters and reset prev_count*/
++	local64_set(&event->hw.prev_count, 0);
++	writel_relaxed(0, l3pmu->regs + L3_HML3_PM_EVCNTR(idx + 1));
++	writel_relaxed(0, l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++
++	/*
++	 * Set the event types, the upper half must use zero and the lower
++	 * half the actual event type
++	 */
++	writel_relaxed(EVSEL(0), l3pmu->regs + L3_HML3_PM_EVTYPE(idx + 1));
++	writel_relaxed(EVSEL(evsel), l3pmu->regs + L3_HML3_PM_EVTYPE(idx));
++
++	/* Finally, enable the counters */
++	writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(idx + 1));
++	writel_relaxed(PMCNTENSET(idx + 1), l3pmu->regs + L3_M_BC_CNTENSET);
++	writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(idx));
++	writel_relaxed(PMCNTENSET(idx), l3pmu->regs + L3_M_BC_CNTENSET);
++}
++
++static void qcom_l3_cache__64bit_counter_stop(struct perf_event *event,
++					      int flags)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 gang = readl_relaxed(l3pmu->regs + L3_M_BC_GANG);
++
++	/* Disable the counters */
++	writel_relaxed(PMCNTENCLR(idx), l3pmu->regs + L3_M_BC_CNTENCLR);
++	writel_relaxed(PMCNTENCLR(idx + 1), l3pmu->regs + L3_M_BC_CNTENCLR);
++
++	/* Disable chaining */
++	writel_relaxed(gang & ~GANG_EN(idx + 1), l3pmu->regs + L3_M_BC_GANG);
++}
++
++static void qcom_l3_cache__64bit_counter_update(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 hi, lo;
++	u64 prev, new;
++
++	do {
++		prev = local64_read(&event->hw.prev_count);
++		do {
++			hi = readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx + 1));
++			lo = readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++		} while (hi != readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx + 1)));
++		new = ((u64)hi << 32) | lo;
++	} while (local64_cmpxchg(&event->hw.prev_count, prev, new) != prev);
++
++	local64_add(new - prev, &event->count);
++}
++
++static const struct l3cache_event_ops event_ops_long = {
++	.start = qcom_l3_cache__64bit_counter_start,
++	.stop = qcom_l3_cache__64bit_counter_stop,
++	.update = qcom_l3_cache__64bit_counter_update,
++};
++
++/*
++ * Implementation of standard counter operations
++ *
++ * 32bit counters use a single physical counter and a hardware feature that
++ * asserts the overflow IRQ on the toggling of the most significant bit in
++ * the counter. This feature allows the counters to be left free-running
++ * without needing the usual reprogramming required to properly handle races
++ * during concurrent calls to update.
++ */
++
++static void qcom_l3_cache__32bit_counter_start(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 evsel = get_event_type(event);
++	u32 irqctl = readl_relaxed(l3pmu->regs + L3_M_BC_IRQCTL);
++
++	/* Set the counter to assert the overflow IRQ on MSB toggling */
++	writel_relaxed(irqctl | PMIRQONMSBEN(idx), l3pmu->regs + L3_M_BC_IRQCTL);
++
++	/* Initialize the hardware counter and reset prev_count*/
++	local64_set(&event->hw.prev_count, 0);
++	writel_relaxed(0, l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++
++	/* Set the event type */
++	writel_relaxed(EVSEL(evsel), l3pmu->regs + L3_HML3_PM_EVTYPE(idx));
++
++	/* Enable interrupt generation by this counter */
++	writel_relaxed(PMINTENSET(idx), l3pmu->regs + L3_M_BC_INTENSET);
++
++	/* Finally, enable the counter */
++	writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(idx));
++	writel_relaxed(PMCNTENSET(idx), l3pmu->regs + L3_M_BC_CNTENSET);
++}
++
++static void qcom_l3_cache__32bit_counter_stop(struct perf_event *event,
++					      int flags)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 irqctl = readl_relaxed(l3pmu->regs + L3_M_BC_IRQCTL);
++
++	/* Disable the counter */
++	writel_relaxed(PMCNTENCLR(idx), l3pmu->regs + L3_M_BC_CNTENCLR);
++
++	/* Disable interrupt generation by this counter */
++	writel_relaxed(PMINTENCLR(idx), l3pmu->regs + L3_M_BC_INTENCLR);
++
++	/* Set the counter to not assert the overflow IRQ on MSB toggling */
++	writel_relaxed(irqctl & ~PMIRQONMSBEN(idx), l3pmu->regs + L3_M_BC_IRQCTL);
++}
++
++static void qcom_l3_cache__32bit_counter_update(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 prev, new;
++
++	do {
++		prev = local64_read(&event->hw.prev_count);
++		new = readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++	} while (local64_cmpxchg(&event->hw.prev_count, prev, new) != prev);
++
++	local64_add(new - prev, &event->count);
++}
++
++static const struct l3cache_event_ops event_ops_std = {
++	.start = qcom_l3_cache__32bit_counter_start,
++	.stop = qcom_l3_cache__32bit_counter_stop,
++	.update = qcom_l3_cache__32bit_counter_update,
++};
++
++/* Retrieve the appropriate operations for the given event */
++static
++const struct l3cache_event_ops *l3cache_event_get_ops(struct perf_event *event)
++{
++	if (event_uses_long_counter(event))
++		return &event_ops_long;
++	else
++		return &event_ops_std;
++}
++
++/*
++ * Top level PMU functions.
++ */
++
++static inline void qcom_l3_cache__init(struct l3cache_pmu *l3pmu)
++{
++	int i;
++
++	writel_relaxed(BC_RESET, l3pmu->regs + L3_M_BC_CR);
++
++	/*
++	 * Use writel for the first programming command to ensure the basic
++	 * counter unit is stopped before proceeding
++	 */
++	writel(BC_SATROLL_CR_RESET, l3pmu->regs + L3_M_BC_SATROLL_CR);
++
++	writel_relaxed(BC_CNTENCLR_RESET, l3pmu->regs + L3_M_BC_CNTENCLR);
++	writel_relaxed(BC_INTENCLR_RESET, l3pmu->regs + L3_M_BC_INTENCLR);
++	writel_relaxed(PMOVSRCLR_RESET, l3pmu->regs + L3_M_BC_OVSR);
++	writel_relaxed(BC_GANG_RESET, l3pmu->regs + L3_M_BC_GANG);
++	writel_relaxed(BC_IRQCTL_RESET, l3pmu->regs + L3_M_BC_IRQCTL);
++	writel_relaxed(PM_CR_RESET, l3pmu->regs + L3_HML3_PM_CR);
++
++	for (i = 0; i < L3_NUM_COUNTERS; ++i) {
++		writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(i));
++		writel_relaxed(EVSEL(0), l3pmu->regs + L3_HML3_PM_EVTYPE(i));
++	}
++
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRA);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRAM);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRB);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRBM);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRC);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRCM);
++
++	/*
++	 * Use writel here to ensure all programming commands are done
++	 *  before proceeding
++	 */
++	writel(BC_ENABLE, l3pmu->regs + L3_M_BC_CR);
++}
++
++static irqreturn_t qcom_l3_cache__handle_irq(int irq_num, void *data)
++{
++	struct l3cache_pmu *l3pmu = data;
++	/* Read the overflow status register */
++	long status = readl_relaxed(l3pmu->regs + L3_M_BC_OVSR);
++	int idx;
++
++	if (status == 0)
++		return IRQ_NONE;
++
++	/* Clear the bits we read on the overflow status register */
++	writel_relaxed(status, l3pmu->regs + L3_M_BC_OVSR);
++
++	for_each_set_bit(idx, &status, L3_NUM_COUNTERS) {
++		struct perf_event *event;
++		const struct l3cache_event_ops *ops;
++
++		event = l3pmu->events[idx];
++		if (!event)
++			continue;
++
++		/*
++		 * Since the IRQ is not enabled for events using long counters
++		 * we should never see one of those here, however, be consistent
++		 * and use the ops indirections like in the other operations.
++		 */
++
++		ops = l3cache_event_get_ops(event);
++		ops->update(event);
++	}
++
++	return IRQ_HANDLED;
++}
++
++/*
++ * Implementation of abstract pmu functionality required by
++ * the core perf events code.
++ */
++
++static void qcom_l3_cache__pmu_enable(struct pmu *pmu)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(pmu);
++
++	/* Ensure the other programming commands are observed before enabling */
++	wmb();
++
++	writel_relaxed(BC_ENABLE, l3pmu->regs + L3_M_BC_CR);
++}
++
++static void qcom_l3_cache__pmu_disable(struct pmu *pmu)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(pmu);
++
++	writel_relaxed(0, l3pmu->regs + L3_M_BC_CR);
++
++	/* Ensure the basic counter unit is stopped before proceeding */
++	wmb();
++}
++
++/*
++ * We must NOT create groups containing events from multiple hardware PMUs,
++ * although mixing different software and hardware PMUs is allowed.
++ */
++static bool qcom_l3_cache__validate_event_group(struct perf_event *event)
++{
++	struct perf_event *leader = event->group_leader;
++	struct perf_event *sibling;
++	int counters = 0;
++
++	if (leader->pmu != event->pmu && !is_software_event(leader))
++		return false;
++
++	counters = event_num_counters(event);
++	counters += event_num_counters(leader);
++
++	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
++		if (is_software_event(sibling))
++			continue;
++		if (sibling->pmu != event->pmu)
++			return false;
++		counters += event_num_counters(sibling);
++	}
++
++	/*
++	 * If the group requires more counters than the HW has, it
++	 * cannot ever be scheduled.
++	 */
++	return counters <= L3_NUM_COUNTERS;
++}
++
++static int qcom_l3_cache__event_init(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++
++	/*
++	 * Is the event for this PMU?
++	 */
++	if (event->attr.type != event->pmu->type)
++		return -ENOENT;
++
++	/*
++	 * There are no per-counter mode filters in the PMU.
++	 */
++	if (event->attr.exclude_user || event->attr.exclude_kernel ||
++	    event->attr.exclude_hv || event->attr.exclude_idle)
++		return -EINVAL;
++
++	/*
++	 * Sampling not supported since these events are not core-attributable.
++	 */
++	if (hwc->sample_period)
++		return -EINVAL;
++
++	/*
++	 * Task mode not available, we run the counters as socket counters,
++	 * not attributable to any CPU and therefore cannot attribute per-task.
++	 */
++	if (event->cpu < 0)
++		return -EINVAL;
++
++	/* Validate the group */
++	if (!qcom_l3_cache__validate_event_group(event))
++		return -EINVAL;
++
++	hwc->idx = -1;
++
++	/*
++	 * Many perf core operations (eg. events rotation) operate on a
++	 * single CPU context. This is obvious for CPU PMUs, where one
++	 * expects the same sets of events being observed on all CPUs,
++	 * but can lead to issues for off-core PMUs, like this one, where
++	 * each event could be theoretically assigned to a different CPU.
++	 * To mitigate this, we enforce CPU assignment to one designated
++	 * processor (the one described in the "cpumask" attribute exported
++	 * by the PMU device). perf user space tools honor this and avoid
++	 * opening more than one copy of the events.
++	 */
++	event->cpu = cpumask_first(&l3pmu->cpumask);
++
++	return 0;
++}
++
++static void qcom_l3_cache__event_start(struct perf_event *event, int flags)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	const struct l3cache_event_ops *ops = l3cache_event_get_ops(event);
++
++	hwc->state = 0;
++	ops->start(event);
++}
++
++static void qcom_l3_cache__event_stop(struct perf_event *event, int flags)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	const struct l3cache_event_ops *ops = l3cache_event_get_ops(event);
++
++	if (hwc->state & PERF_HES_STOPPED)
++		return;
++
++	ops->stop(event, flags);
++	if (flags & PERF_EF_UPDATE)
++		ops->update(event);
++	hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
++}
++
++static int qcom_l3_cache__event_add(struct perf_event *event, int flags)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	int order = event_uses_long_counter(event) ? 1 : 0;
++	int idx;
++
++	/*
++	 * Try to allocate a counter.
++	 */
++	idx = bitmap_find_free_region(l3pmu->used_mask, L3_NUM_COUNTERS, order);
++	if (idx < 0)
++		/* The counters are all in use. */
++		return -EAGAIN;
++
++	hwc->idx = idx;
++	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
++	l3pmu->events[idx] = event;
++
++	if (flags & PERF_EF_START)
++		qcom_l3_cache__event_start(event, 0);
++
++	/* Propagate changes to the userspace mapping. */
++	perf_event_update_userpage(event);
++
++	return 0;
++}
++
++static void qcom_l3_cache__event_del(struct perf_event *event, int flags)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	int order = event_uses_long_counter(event) ? 1 : 0;
++
++	/* Stop and clean up */
++	qcom_l3_cache__event_stop(event,  flags | PERF_EF_UPDATE);
++	l3pmu->events[hwc->idx] = NULL;
++	bitmap_release_region(l3pmu->used_mask, hwc->idx, order);
++
++	/* Propagate changes to the userspace mapping. */
++	perf_event_update_userpage(event);
++}
++
++static void qcom_l3_cache__event_read(struct perf_event *event)
++{
++	const struct l3cache_event_ops *ops = l3cache_event_get_ops(event);
++
++	ops->update(event);
++}
++
++/*
++ * Add sysfs attributes
++ *
++ * We export:
++ * - formats, used by perf user space and other tools to configure events
++ * - events, used by perf user space and other tools to create events
++ *   symbolically, e.g.:
++ *     perf stat -a -e l3cache_0_0/event=read-miss/ ls
++ *     perf stat -a -e l3cache_0_0/event=0x21/ ls
++ * - cpumask, used by perf user space and other tools to know on which CPUs
++ *   to open the events
++ */
++
++/* formats */
++
++static ssize_t l3cache_pmu_format_show(struct device *dev,
++				       struct device_attribute *attr, char *buf)
++{
++	struct dev_ext_attribute *eattr;
++
++	eattr = container_of(attr, struct dev_ext_attribute, attr);
++	return sprintf(buf, "%s\n", (char *) eattr->var);
++}
++
++#define L3CACHE_PMU_FORMAT_ATTR(_name, _config)				      \
++	(&((struct dev_ext_attribute[]) {				      \
++		{ .attr = __ATTR(_name, 0444, l3cache_pmu_format_show, NULL), \
++		  .var = (void *) _config, }				      \
++	})[0].attr.attr)
++
++static struct attribute *qcom_l3_cache_pmu_formats[] = {
++	L3CACHE_PMU_FORMAT_ATTR(event, "config:0-7"),
++	L3CACHE_PMU_FORMAT_ATTR(lc, "config:" __stringify(L3_EVENT_LC_BIT)),
++	NULL,
++};
++
++static struct attribute_group qcom_l3_cache_pmu_format_group = {
++	.name = "format",
++	.attrs = qcom_l3_cache_pmu_formats,
++};
++
++/* events */
++
++ssize_t l3cache_pmu_event_show(struct device *dev,
++				     struct device_attribute *attr, char *page)
++{
++	struct perf_pmu_events_attr *pmu_attr;
++
++	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
++	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
++}
++
++#define L3CACHE_EVENT_ATTR(_name, _id)					     \
++	(&((struct perf_pmu_events_attr[]) {				     \
++		{ .attr = __ATTR(_name, 0444, l3cache_pmu_event_show, NULL), \
++		  .id = _id, }						     \
++	})[0].attr.attr)
++
++static struct attribute *qcom_l3_cache_pmu_events[] = {
++	L3CACHE_EVENT_ATTR(cycles, L3_EVENT_CYCLES),
++	L3CACHE_EVENT_ATTR(read-hit, L3_EVENT_READ_HIT),
++	L3CACHE_EVENT_ATTR(read-miss, L3_EVENT_READ_MISS),
++	L3CACHE_EVENT_ATTR(read-hit-d-side, L3_EVENT_READ_HIT_D),
++	L3CACHE_EVENT_ATTR(read-miss-d-side, L3_EVENT_READ_MISS_D),
++	L3CACHE_EVENT_ATTR(write-hit, L3_EVENT_WRITE_HIT),
++	L3CACHE_EVENT_ATTR(write-miss, L3_EVENT_WRITE_MISS),
++	NULL
++};
++
++static struct attribute_group qcom_l3_cache_pmu_events_group = {
++	.name = "events",
++	.attrs = qcom_l3_cache_pmu_events,
++};
++
++/* cpumask */
++
++static ssize_t qcom_l3_cache_pmu_cpumask_show(struct device *dev,
++				     struct device_attribute *attr, char *buf)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(dev_get_drvdata(dev));
++
++	return cpumap_print_to_pagebuf(true, buf, &l3pmu->cpumask);
++}
++
++static DEVICE_ATTR(cpumask, 0444, qcom_l3_cache_pmu_cpumask_show, NULL);
++
++static struct attribute *qcom_l3_cache_pmu_cpumask_attrs[] = {
++	&dev_attr_cpumask.attr,
++	NULL,
++};
++
++static struct attribute_group qcom_l3_cache_pmu_cpumask_attr_group = {
++	.attrs = qcom_l3_cache_pmu_cpumask_attrs,
++};
++
++/*
++ * Per PMU device attribute groups
++ */
++static const struct attribute_group *qcom_l3_cache_pmu_attr_grps[] = {
++	&qcom_l3_cache_pmu_format_group,
++	&qcom_l3_cache_pmu_events_group,
++	&qcom_l3_cache_pmu_cpumask_attr_group,
++	NULL,
++};
++
++/*
++ * Probing functions and data.
++ */
++
++static int qcom_l3_cache_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct l3cache_pmu *l3pmu = hlist_entry_safe(node, struct l3cache_pmu, node);
++
++	/* If there is not a CPU/PMU association pick this CPU */
++	if (cpumask_empty(&l3pmu->cpumask))
++		cpumask_set_cpu(cpu, &l3pmu->cpumask);
++
++	return 0;
++}
++
++static int qcom_l3_cache_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct l3cache_pmu *l3pmu = hlist_entry_safe(node, struct l3cache_pmu, node);
++	unsigned int target;
++
++	if (!cpumask_test_and_clear_cpu(cpu, &l3pmu->cpumask))
++		return 0;
++	target = cpumask_any_but(cpu_online_mask, cpu);
++	if (target >= nr_cpu_ids)
++		return 0;
++	perf_pmu_migrate_context(&l3pmu->pmu, cpu, target);
++	cpumask_set_cpu(target, &l3pmu->cpumask);
++	return 0;
++}
++
++static int qcom_l3_cache_pmu_probe(struct platform_device *pdev)
++{
++	struct l3cache_pmu *l3pmu;
++	struct acpi_device *acpi_dev;
++	struct resource *memrc;
++	int ret;
++	char *name;
++
++	/* Initialize the PMU data structures */
++
++	acpi_dev = ACPI_COMPANION(&pdev->dev);
++	if (!acpi_dev)
++		return -ENODEV;
++
++	l3pmu = devm_kzalloc(&pdev->dev, sizeof(*l3pmu), GFP_KERNEL);
++	name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "l3cache_%s_%s",
++		      acpi_dev->parent->pnp.unique_id, acpi_dev->pnp.unique_id);
++	if (!l3pmu || !name)
++		return -ENOMEM;
++
++	l3pmu->pmu = (struct pmu) {
++		.task_ctx_nr	= perf_invalid_context,
++
++		.pmu_enable	= qcom_l3_cache__pmu_enable,
++		.pmu_disable	= qcom_l3_cache__pmu_disable,
++		.event_init	= qcom_l3_cache__event_init,
++		.add		= qcom_l3_cache__event_add,
++		.del		= qcom_l3_cache__event_del,
++		.start		= qcom_l3_cache__event_start,
++		.stop		= qcom_l3_cache__event_stop,
++		.read		= qcom_l3_cache__event_read,
++
++		.attr_groups	= qcom_l3_cache_pmu_attr_grps,
++	};
++
++	memrc = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	l3pmu->regs = devm_ioremap_resource(&pdev->dev, memrc);
++	if (IS_ERR(l3pmu->regs)) {
++		dev_err(&pdev->dev, "Can't map PMU @%pa\n", &memrc->start);
++		return PTR_ERR(l3pmu->regs);
++	}
++
++	qcom_l3_cache__init(l3pmu);
++
++	ret = platform_get_irq(pdev, 0);
++	if (ret <= 0)
++		return ret;
++
++	ret = devm_request_irq(&pdev->dev, ret, qcom_l3_cache__handle_irq, 0,
++			       name, l3pmu);
++	if (ret) {
++		dev_err(&pdev->dev, "Request for IRQ failed for slice @%pa\n",
++			&memrc->start);
++		return ret;
++	}
++
++	/* Add this instance to the list used by the offline callback */
++	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE, &l3pmu->node);
++	if (ret) {
++		dev_err(&pdev->dev, "Error %d registering hotplug", ret);
++		return ret;
++	}
++
++	ret = perf_pmu_register(&l3pmu->pmu, name, -1);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to register L3 cache PMU (%d)\n", ret);
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "Registered %s, type: %d\n", name, l3pmu->pmu.type);
++
++	return 0;
++}
++
++static const struct acpi_device_id qcom_l3_cache_pmu_acpi_match[] = {
++	{ "QCOM8081", },
++	{ }
++};
++MODULE_DEVICE_TABLE(acpi, qcom_l3_cache_pmu_acpi_match);
++
++static struct platform_driver qcom_l3_cache_pmu_driver = {
++	.driver = {
++		.name = "qcom-l3cache-pmu",
++		.owner = THIS_MODULE,
++		.acpi_match_table = ACPI_PTR(qcom_l3_cache_pmu_acpi_match),
++	},
++	.probe = qcom_l3_cache_pmu_probe,
++};
++
++static int __init register_qcom_l3_cache_pmu_driver(void)
++{
++	int ret;
++
++	/* Install a hook to update the reader CPU in case it goes offline */
++	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
++				      "perf/qcom/l3cache:online",
++				      qcom_l3_cache_pmu_online_cpu,
++				      qcom_l3_cache_pmu_offline_cpu);
++	if (ret)
++		return ret;
++
++	return platform_driver_register(&qcom_l3_cache_pmu_driver);
++}
++device_initcall(register_qcom_l3_cache_pmu_driver);
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 62d240e..cfcfab3 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -137,6 +137,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_ARM_CCN_ONLINE,
+ 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
+ 	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
++	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
+ 	CPUHP_AP_WORKQUEUE_ONLINE,
+ 	CPUHP_AP_RCUTREE_ONLINE,
+ 	CPUHP_AP_ONLINE_DYN,
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
