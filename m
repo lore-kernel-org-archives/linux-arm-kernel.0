@@ -1,24 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 11:53:17 +0200
-Subject: [GIT PULL 3/7] Broadcom devicetree-arm64 changes for 4.12
-In-Reply-To: <20170324175807.27272-3-f.fainelli@gmail.com>
-References: <20170324175807.27272-1-f.fainelli@gmail.com>
- <20170324175807.27272-3-f.fainelli@gmail.com>
-Message-ID: <CAK8P3a2_DFkmf76OmES4422sfUnti8G33dB6db4jG=X7Kv2_PQ@mail.gmail.com>
+Date: Fri, 31 Mar 2017 11:57:26 +0200
+Subject: [GIT PULL 3/3] Rockchip dts64 updates (using arm/arm64 symlinks)
+ for 4.12 part1
+In-Reply-To: <5670481.GxV7NCMtHk@phil>
+References: <5178456.jWASpzTAdU@phil> <5670481.GxV7NCMtHk@phil>
+Message-ID: <CAK8P3a2VB8bxEotEr1K6CTpj+hVnqwO8OcLSo0gAtepgDVe=Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+On Tue, Mar 28, 2017 at 5:54 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> The following changes since commit 0a6081b673bb6aaec31771b3111dd6741c94382f:
+>
+>   arm64: dts: add arm/arm64 include symlinks (2017-03-21 17:21:28 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts64-symlinks-1
+>
+> for you to fetch changes up to b9ed79fa91c5271ca166dfde99883ca3afb190fe:
+>
+>   arm64: dts: rockchip: add regulator info for Kevin digitizer (2017-03-23 00:51:58 +0100)
+>
 > ----------------------------------------------------------------
-> This pull request contains Broadcom ARM64-based SoCs Device Tree updates for
-> 4.12, please pull the following:
+> Rockchip dts changes based on the newly created arm/arm64 symlinks.
+> The core addition is the support for the rk3399-based Gru family of
+> ChromeOS devices, like the Kevin board which is the recently released
+> Samsung Chromebook Plus. Additionally the usb3 controllers are added
+> to rk3399 as they're used on Gru devices and even without full type-c
+> support they can at least drive usb2 devices already.
 >
-> - Rob enables the cryptographic block on Northstar 2 (SPU) by adding the proper
->   Device Tree nodes
->
-> - Jon replaces all occurences of: status = "ok" with status = "okay" to better
->   conform to the Device Tree specification
 
 Pulled into next/dt64, thanks!
 
-        Arnd
+      Arnd
