@@ -1,47 +1,96 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 31 Mar 2017 15:35:28 +0800
-Subject: [PATCH v5 2/9] phy: phy-mt65xx-usb3: increase LFPS filter threshold
+Date: Fri, 31 Mar 2017 15:35:30 +0800
+Subject: [PATCH v5 4/9] phy: phy-mt65xx-usb3: move clock from phy node into
+ port nodes
 In-Reply-To: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1490945735-9531-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1490945735-9531-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase LFPS filter threshold to avoid some fake remote wakeup
-signal which cause U3 link fail and link to U2 only at about
-0.01% probability.
+each port has its own reference clock, the HighSpeed port is 48M,
+and the SuperSpeed port is usually 26M, put them into port node for
+flexibility, this can close clock if the port is not used.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/phy/phy-mt65xx-usb3.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/phy/phy-mt65xx-usb3.c |   27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index fe2392a..4fd47d0 100644
+index 7fff482..3403572 100644
 --- a/drivers/phy/phy-mt65xx-usb3.c
 +++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -106,6 +106,10 @@
- #define P3A_RG_XTAL_EXT_EN_U3		GENMASK(11, 10)
- #define P3A_RG_XTAL_EXT_EN_U3_VAL(x)	((0x3 & (x)) << 10)
+@@ -153,6 +153,7 @@ struct mt65xx_phy_pdata {
+ struct mt65xx_phy_instance {
+ 	struct phy *phy;
+ 	void __iomem *port_base;
++	struct clk *ref_clk;	/* reference clock of anolog phy */
+ 	u32 index;
+ 	u8 type;
+ };
+@@ -160,6 +161,7 @@ struct mt65xx_phy_instance {
+ struct mt65xx_u3phy {
+ 	struct device *dev;
+ 	void __iomem *sif_base;	/* only shared sif */
++	/* deprecated, use @ref_clk instead in phy instance */
+ 	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
+ 	const struct mt65xx_phy_pdata *pdata;
+ 	struct mt65xx_phy_instance **phys;
+@@ -455,6 +457,12 @@ static int mt65xx_phy_init(struct phy *phy)
+ 		return ret;
+ 	}
  
-+#define U3P_U3_PHYD_LFPS1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x000c)
-+#define P3D_RG_FWAKE_TH		GENMASK(21, 16)
-+#define P3D_RG_FWAKE_TH_VAL(x)	((0x3f & (x)) << 16)
++	ret = clk_prepare_enable(instance->ref_clk);
++	if (ret) {
++		dev_err(u3phy->dev, "failed to enable ref_clk\n");
++		return ret;
++	}
 +
- #define U3P_PHYD_CDR1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x005c)
- #define P3D_RG_CDR_BIR_LTD1		GENMASK(28, 24)
- #define P3D_RG_CDR_BIR_LTD1_VAL(x)	((0x1f & (x)) << 24)
-@@ -303,6 +307,11 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
- 	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
- 	writel(tmp, port_base + U3P_PHYD_CDR1);
+ 	if (instance->type == PHY_TYPE_USB2)
+ 		phy_instance_init(u3phy, instance);
+ 	else
+@@ -494,6 +502,7 @@ static int mt65xx_phy_exit(struct phy *phy)
+ 	if (instance->type == PHY_TYPE_USB2)
+ 		phy_instance_exit(u3phy, instance);
  
-+	tmp = readl(port_base + U3P_U3_PHYD_LFPS1);
-+	tmp &= ~P3D_RG_FWAKE_TH;
-+	tmp |= P3D_RG_FWAKE_TH_VAL(0x34);
-+	writel(tmp, port_base + U3P_U3_PHYD_LFPS1);
++	clk_disable_unprepare(instance->ref_clk);
+ 	clk_disable_unprepare(u3phy->u3phya_ref);
+ 	return 0;
+ }
+@@ -594,10 +603,13 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(u3phy->sif_base);
+ 	}
+ 
++	/* it's deprecated, make it optional for backward compatibility */
+ 	u3phy->u3phya_ref = devm_clk_get(dev, "u3phya_ref");
+ 	if (IS_ERR(u3phy->u3phya_ref)) {
+-		dev_err(dev, "error to get u3phya_ref\n");
+-		return PTR_ERR(u3phy->u3phya_ref);
++		if (PTR_ERR(u3phy->u3phya_ref) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
 +
- 	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
- 	tmp &= ~P3D_RG_RXDET_STB2_SET;
- 	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
++		u3phy->u3phya_ref = NULL;
+ 	}
+ 
+ 	port = 0;
+@@ -638,6 +650,17 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 		instance->index = port;
+ 		phy_set_drvdata(phy, instance);
+ 		port++;
++
++		/* if deprecated clock is provided, ignore instance's one */
++		if (u3phy->u3phya_ref)
++			continue;
++
++		instance->ref_clk = devm_clk_get(&phy->dev, "ref");
++		if (IS_ERR(instance->ref_clk)) {
++			dev_err(dev, "failed to get ref_clk(id-%d)\n", port);
++			retval = PTR_ERR(instance->ref_clk);
++			goto put_child;
++		}
+ 	}
+ 
+ 	provider = devm_of_phy_provider_register(dev, mt65xx_phy_xlate);
 -- 
 1.7.9.5
