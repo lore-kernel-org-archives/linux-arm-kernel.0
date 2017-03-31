@@ -1,64 +1,41 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 30 Mar 2017 18:44:50 -0500
-Subject: [PATCH v4 0/7] PCI: dwc: Miscellaneous fixes and cleanups
-In-Reply-To: <20170313134328.1588-1-kishon@ti.com>
-References: <20170313134328.1588-1-kishon@ti.com>
-Message-ID: <20170330234450.GC3912@bhelgaas-glaptop.roam.corp.google.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 31 Mar 2017 08:54:20 +0800
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <f0c460e2-4e49-4f34-5288-f20a519dc182@arm.com>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+ <f0c460e2-4e49-4f34-5288-f20a519dc182@arm.com>
+Message-ID: <20170331005420.GA6149@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 07:13:21PM +0530, Kishon Vijay Abraham I wrote:
-> This should be the final set of cleanups/fixes before endpoint
-> support can be merged.
-> 
-> Keerthy's patch is a general fix in dra7xx driver and is not
-> directly related to endpoint mode.
-> 
-> This v1 of this series was previously sent with a different
-> cover letter $subject [1]
-> 
-> Changes from v3:
-> *) instead of changing all the callers of dbi accessors (taking
->    dbi_base and size), manage it using static inline as suggested
->    by Niklas (used static inline instead of macros because of
->    checkpatch error).
-> 
-> Changes from v2:
-> *) Kconfig changes that was spilled into a patch is removed.
-> *) In addition to renaming _unroll() to _ob_unroll(), all the
->    _unroll configurations is also moved a separate function.
-> 
-> Changes from v1:
-> *) included a patch to rename _unroll() to _ob_unroll() as
->    similar thing has to be done for inbound window in the case
->    of EP mode.
-> *) used 'size_t' instead of 'int' for specifying the size
->    in read_dbi/write_dbi function arguments.
-> *) Populate cpu_addr_fixup ops for artpec6 as suggested by
->    Niklas
-> 
-> This series is based on 4.11-rc1
-> 
-> [1] -> https://lkml.org/lkml/2017/2/16/270
-> 
-> Keerthy (1):
->   PCI: dwc: dra7xx: Push request_irq call to the bottom of probe
-> 
-> Kishon Vijay Abraham I (6):
->   PCI: dwc: designware: Add new *ops* for cpu addr fixup
->   PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
->   PCI: dwc: artpec6: Populate cpu_addr_fixup ops
->   PCI: dwc: all: Modify dbi accessors to take dbi_base as argument
->   PCI: dwc: all: Modify dbi accessors to access data of  4/2/1 bytes
->   PCI: dwc: designware: Move _unroll configurations to a separate
->     function
-> 
->  drivers/pci/dwc/pci-dra7xx.c      |  25 +++----
->  drivers/pci/dwc/pci-exynos.c      |  14 ++--
->  drivers/pci/dwc/pcie-artpec6.c    |  15 +++--
->  drivers/pci/dwc/pcie-designware.c | 133 ++++++++++++++++++++++++--------------
->  drivers/pci/dwc/pcie-designware.h |  23 +++++--
->  5 files changed, 135 insertions(+), 75 deletions(-)
+On Thu, Mar 30, 2017 at 04:56:52PM +0100, Sudeep Holla wrote:
 
-Applied to pci/host-designware for v4.12, with Niklas' ack on patches
-4 & 5, thanks!
+[...]
+
+> > +static struct pm_qos_request debug_qos_req;
+> > +static int idle_constraint = PM_QOS_DEFAULT_VALUE;
+> > +module_param(idle_constraint, int, 0600);
+> > +MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
+> > +		 "idle states (default is -1, which means have no limiation "
+> > +		 "to CPU idle states; 0 means disabling all idle states; user "
+> > +		 "can choose other platform dependent values so can disable "
+> > +		 "specific idle states for the platform)");
+> > +
+> 
+> NACK for this. Why you want the policy inside the driver. You can always
+> do that from the user-space. I have mentioned it several times now.
+> What can't you do these ?
+> 
+> 1. echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
+> 2. echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
+>    (for all cpus and their states) (1) is definitely simpler way to
+>     disable deeper idle if latency = 0uS
+> 
+> You can always warn user about that when it's enabled via debugfs/sysfs
+
+Thanks for suggestion, now it's clear for me.
+
+> -- 
+> Regards,
+> Sudeep
