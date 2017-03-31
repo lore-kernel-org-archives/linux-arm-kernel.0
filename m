@@ -1,31 +1,46 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 31 Mar 2017 10:47:56 +0200
-Subject: [PATCH 0/3] soc: amlogic: Add Amlogic SoC Information driver
-Message-ID: <1490950079-10145-1-git-send-email-narmstrong@baylibre.com>
+Date: Fri, 31 Mar 2017 10:47:58 +0200
+Subject: [PATCH 2/3] dt-bindings: arm: amlogic: Add SoC information bindings
+In-Reply-To: <1490950079-10145-1-git-send-email-narmstrong@baylibre.com>
+References: <1490950079-10145-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1490950079-10145-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic SoCs have a SoC information register for SoC type, package type and
-revision information.
-This patchset adds support for this register decoding and exposing with the
-SoC bus infrastructure, with dt-bindings and DT node.
+Add bindings for the SoC information register of the Amlogic SoCs.
 
-Neil Armstrong (3):
-  soc: Add Amlogic SoC Information driver
-  dt-bindings: arm: amlogic: Add SoC information bindings
-  ARM64: dts: meson-gx: Add SoC info register
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
- Documentation/devicetree/bindings/arm/amlogic.txt |  20 +++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi         |   5 +
- drivers/soc/Kconfig                               |   1 +
- drivers/soc/Makefile                              |   1 +
- drivers/soc/amlogic/Kconfig                       |  12 ++
- drivers/soc/amlogic/Makefile                      |   1 +
- drivers/soc/amlogic/meson-gx-socinfo.c            | 158 ++++++++++++++++++++++
- 7 files changed, 198 insertions(+)
- create mode 100644 drivers/soc/amlogic/Kconfig
- create mode 100644 drivers/soc/amlogic/Makefile
- create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
-
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index bfd5b55..b850985 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -52,3 +52,23 @@ Board compatible values:
+   - "amlogic,q201" (Meson gxm s912)
+   - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+   - "nexbox,a1" (Meson gxm s912)
++
++Amlogic Meson GX SoCs Information
++----------------------------------
++
++The Meson SoCs have a Product Register that allows to retrieve SoC type,
++package and revision information. If present, a device node for this register
++should be added.
++
++Required properties:
++  - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-socinfo".
++  - reg: Base address and length of the register block.
++
++Examples
++--------
++
++	chipid at 220 {
++		compatible = "amlogic,meson-gx-socinfo";
++		reg = <0x0 0x00220 0x0 0x4>;
++	};
++
 -- 
 1.9.1
