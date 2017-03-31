@@ -1,33 +1,58 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 31 Mar 2017 14:27:51 +1100
-Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
- private memory allocations
-In-Reply-To: <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
-References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
- <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
- <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
-Message-ID: <871ste5dmw.fsf@concordia.ellerman.id.au>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 31 Mar 2017 15:18:36 +1100
+Subject: linux-next: manual merge of the mux tree with the arm-soc tree
+Message-ID: <20170331151836.5d89c03a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robin Murphy <robin.murphy@arm.com> writes:
+Hi all,
 
-> Hi Roy,
->
-> On 29/03/17 22:13, Roy Pledge wrote:
->> Use the shared-memory-pool mechanism for frame queue descriptor and
->> packed frame descriptor record area allocations.
->
-> Thanks for persevering with this - in my opinion it's now looking like
-> it was worth the effort :)
->
-> AFAICS the ioremap_wc() that this leads to does appear to give back
-> something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
-> horrendously misnamed), and "no-map" should rule out any cacheable
-> linear map alias existing, so it would seem that this approach should
-> avert Scott's concerns about attribute mismatches.
+Today's linux-next merge of the mux tree got conflicts in:
 
-How does 'no-map' translate into something being excluded from the
-linear mapping?
+  drivers/Kconfig
+  drivers/Makefile
 
-cheers
+between commit:
+
+  967c9cca2cc5 ("tee: generic TEE subsystem")
+
+from the arm-soc tree and commit:
+
+  1fc1dd988186 ("mux: minimal mux subsystem and gpio-based mux controller")
+
+from the mux tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc drivers/Kconfig
+index ba2901e76769,a7ea13e1b869..000000000000
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@@ -204,6 -204,6 +204,8 @@@ source "drivers/fpga/Kconfig
+  
+  source "drivers/fsi/Kconfig"
+  
++ source "drivers/mux/Kconfig"
++ 
+ +source "drivers/tee/Kconfig"
+ +
+  endmenu
+diff --cc drivers/Makefile
+index 5db9aa6beeaf,c0436f6dd5a9..000000000000
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@@ -177,4 -177,4 +177,5 @@@ obj-$(CONFIG_ANDROID)		+= android
+  obj-$(CONFIG_NVMEM)		+= nvmem/
+  obj-$(CONFIG_FPGA)		+= fpga/
+  obj-$(CONFIG_FSI)		+= fsi/
++ obj-$(CONFIG_MULTIPLEXER)	+= mux/
+ +obj-$(CONFIG_TEE)		+= tee/
