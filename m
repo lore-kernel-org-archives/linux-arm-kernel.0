@@ -1,68 +1,43 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 31 Mar 2017 11:31:54 +0530
-Subject: [PATCH v9 12/12] ARM: EXYNOS: refactor of mach-exynos to use
- chipid information
-In-Reply-To: <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
-References: <CGME20170330131444epcas5p45051cf7e6ec7a993c2c9f84254b89a19@epcas5p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
- <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
-Message-ID: <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
+From: jerome.forissier@linaro.org (Jerome Forissier)
+Date: Fri, 31 Mar 2017 08:34:20 +0200
+Subject: [PATCH] Documentation: dt: Add binding for
+ /secure-chosen/stdout-path
+In-Reply-To: <20170330222845.ewddsnmkxwrsposl@rob-hp-laptop>
+References: <e3e007ef9ee6a622ae4ccc74fd0fca32b3c5dfb5.1488531370.git.jerome.forissier@linaro.org>
+ <20170330222845.ewddsnmkxwrsposl@rob-hp-laptop>
+Message-ID: <4099128e-16fd-6513-591e-ba59d98b8542@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Thursday 30 March 2017 07:31 PM, Arnd Bergmann wrote:
-> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+On 03/31/2017 12:28 AM, Rob Herring wrote:
+> On Fri, Mar 03, 2017 at 10:24:33AM +0100, Jerome Forissier wrote:
+>> Some platforms may use a single device tree to describe two address
+>> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
+>> for Secure-only devices"). For these platforms it makes sense to define
+>> a secure counterpart of /chosen, namely: /secure-chosen. This new node
+>> is meant to be used by the secure firmware to pass data to the secure
+>> OS. Only the stdout-path property is supported for now.
+>>
+>> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/arm/secure.txt | 19 ++++++++++++++++++-
+>>  1 file changed, 18 insertions(+), 1 deletion(-)
+>>
+>> v2
+>>
+>> - Clarify the expected behavior when /secure-chosen/stdout-path is not
+>> present (either the property or the node itself), as proposed by Peter
+>> and Robin. Note that I have made the fallback to /chosen optional.
 > 
->>   * register the standard cpu IO areas
->>   */
->> -static void __init exynos_map_io(void)
->> +static int __init exynos_fdt_map_scu(unsigned long node, const char *uname,
->> +               int depth, void *data)
->>  {
->> -       if (soc_is_exynos4())
->> -               iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
->> +       if (!of_flat_dt_is_compatible(node, "samsung,exynos4210") &&
->> +                       !of_flat_dt_is_compatible(node, "samsung,exynos4212") &&
->> +                       !of_flat_dt_is_compatible(node, "samsung,exynos4412"))
->> +               return 0;
->> +
->> +       iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
->> +       return 1;
->>  }
-> 
-> This seems really overcomplicated. From what I can tell, this is only needed
-> to find the SCU address, but there are better ways to do that, either by
-> looking up the SCU in the DT at the time you actually need it,
-> or by calling scu_a9_get_base().
+> I'm okay with this, but would like to hold off merging it until your are 
+> really using it. You did say you were "experimenting" and it doesn't 
+> sound like the DT usage in secure world is that far along. I just want 
+> to see if there are other issues that come up.
 
-Indeed it's complicated and ugly, for the same reason I attempted to
-clean-up this part for Exynos SoC in patch series [1], which was
-accepted by Samsung maintainer Krzysztof and later during pull request
-rejected by ARM maintainers [2]
-
-[1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
-[2]: http://lkml.iu.edu/hypermail/linux/kernel/1612.0/01508.html
-
-Given the argument we can't adopt getting base address of SCU completely
-via DT without breaking OLD dtbs at some point, difficult to simplify
-these stuffs.
-
-Please guide which is the best way to handle such stuffs.
-
-In fact I made another attempt [3] to cleanup this SCU related stuffs
-for other ARM based platforms, but we could not arrive on some consensus
-at that time. I will try to attempt it again soon.
-
-[3]: http://www.spinics.net/lists/arm-kernel/msg542351.html
+Fair enough.
 
 Thanks,
-Pankaj Dubey
-
-> 
->       Arnd
-> 
-> 
-> 
+-- 
+Jerome
