@@ -1,44 +1,70 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Mar 2017 18:55:57 +0100
-Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
- private memory allocations
-In-Reply-To: <871ste5dmw.fsf@concordia.ellerman.id.au>
-References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
- <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
- <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
- <871ste5dmw.fsf@concordia.ellerman.id.au>
-Message-ID: <dfaa1a28-66d8-15fb-7d2d-75e206161770@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 31 Mar 2017 19:58:07 +0200
+Subject: Prototype of find_first_zero_bit in bitops.h
+In-Reply-To: <87371ad9-012b-358d-f186-f8caa79feb0f@free.fr>
+References: <87371ad9-012b-358d-f186-f8caa79feb0f@free.fr>
+Message-ID: <c47d16a2-44dc-fb1d-af84-620278355ed0@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/17 04:27, Michael Ellerman wrote:
-> Robin Murphy <robin.murphy@arm.com> writes:
-> 
->> Hi Roy,
->>
->> On 29/03/17 22:13, Roy Pledge wrote:
->>> Use the shared-memory-pool mechanism for frame queue descriptor and
->>> packed frame descriptor record area allocations.
->>
->> Thanks for persevering with this - in my opinion it's now looking like
->> it was worth the effort :)
->>
->> AFAICS the ioremap_wc() that this leads to does appear to give back
->> something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
->> horrendously misnamed), and "no-map" should rule out any cacheable
->> linear map alias existing, so it would seem that this approach should
->> avert Scott's concerns about attribute mismatches.
-> 
-> How does 'no-map' translate into something being excluded from the
-> linear mapping?
+Top-posting to address relevance.
 
-Reserved regions marked with "no-map" get memblock_remove()d by
-early_init_dt_alloc_reserved_memory_arch(). As I understand things, the
-linear map should only cover memblock areas, and it would be explicitly
-violating the semantics of "no-map" to still cover such a region.
+Is the proposed patch acceptable, or would it break
+something I didn't foresee? Would "make allyesconfig"
+or "make allmodconfig" flag potential issues?
 
-Robin.
+Should I submit to the patch mill?
 
+Regards.
+
+
+On 29/03/2017 13:54, Mason wrote:
+
+> Hello Russell,
 > 
-> cheers
+> Just wanted to run something by you.
 > 
+> In some driver code, I was passing the address of a u32 to
+> find_first_zero_bit() and the maintainer smacked me, pointing
+> out that find_first_zero_bit only accepted (unsigned long *)
+> 
+> Would it make sense to change the prototype of
+> _find_first_zero_bit_le()
+> so that my mistake would be caught by the compiler like this:
+> 
+>   CC      drivers/pci/host/pcie-tango.o
+> In file included from ./include/linux/bitops.h:36:0,
+>                  from ./include/linux/kernel.h:10,
+>                  from ./include/linux/list.h:8,
+>                  from ./include/linux/smp.h:11,
+>                  from ./include/linux/irq.h:12,
+>                  from ./include/linux/irqchip/chained_irq.h:21,
+>                  from drivers/pci/host/pcie-tango.c:1:
+> drivers/pci/host/pcie-tango.c: In function 'tango_irq_domain_alloc':
+> drivers/pci/host/pcie-tango.c:122:28: error:
+> passing argument 1 of '_find_first_zero_bit_le' from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   pos = find_first_zero_bit(&mask, 32);
+>                             ^
+> ./arch/arm/include/asm/bitops.h:199:59: note: in definition of macro 'find_first_zero_bit'
+>  #define find_first_zero_bit(p,sz) _find_first_zero_bit_le(p,sz)
+>                                                            ^
+> ./arch/arm/include/asm/bitops.h:162:12: note: expected 'const long unsigned int *' but argument is of type 'u32 * {aka unsigned int *}'
+>  extern int _find_first_zero_bit_le(const unsigned long * p, unsigned size);
+>             ^
+> 
+> 
+> Proposed trivial patch:
+> 
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -159,8 +159,8 @@ static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned lon
+>  /*
+>   * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+>   */
+> -extern int _find_first_zero_bit_le(const void * p, unsigned size);
+> -extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+> +extern int _find_first_zero_bit_le(const unsigned long *p, unsigned size);
+> +extern int _find_next_zero_bit_le(const unsigned long *p, int size, int offset);
+>  extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+>  extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+>  
