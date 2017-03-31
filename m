@@ -1,54 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Mar 2017 12:16:24 +0100
-Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
- mmaping code
-In-Reply-To: <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
-References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
- <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <20170331111624.GR7909@n2100.armlinux.org.uk>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 31 Mar 2017 19:30:28 +0800
+Subject: [PATCH v13 01/12] dt-bindings: display: mediatek: update supported
+ chips
+In-Reply-To: <1490959839-39816-1-git-send-email-yt.shen@mediatek.com>
+References: <1490959839-39816-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1490959839-39816-2-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
-> In this version of the patch I have replaced temporal pages and
-> iommu_dma_mmap with remap_pfn_range or rather its simplified version
-> vm_iomap_memory.
-> Unfortunately I have not find nice helper for sgtable creation, so I
-> left sg allocation inside _iommu_mmap_attrs.
-> 
-> As the fixing of DMA_ATTR_FORCE_CONTIGUOUS related crashes has higher
-> priority I have focused only on it in this patch.
+Add decriptions about supported chips, including MT2701 & MT8173
 
-As I mentioned elsewhere, I don't believe that fudging around in this way
-is a proper fix.
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt | 2 ++
+ Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt  | 2 ++
+ 2 files changed, 4 insertions(+)
 
-DMA coherent memory was never, ever, intended to be passed back into the
-streaming APIs - it was designed that the two would be mutually exclusive.
-
-The problem is that we now have DMA coherent allocations being passed
-through the dma-buf API using this dma_get_sgtable() thing, which is quite
-broken.  I regard dma_get_sgtable() as very broken, and had I realised at
-the time that this was what it was trying to do, I would have NAK'd it.
-
-Rather than bodging around this brokenness, trying to get dma_get_sgtable()
-to work, I believe we need to address the root cause - which is proper
-support for passing DMA coherent allocations through dma-buf, which does
-not involve scatterlists and calling dma_map_sg() on it.
-
-That's going to need to be addressed in any case, because of the
-dma_declare_coherent_memory() issue, where we may not have struct pages
-backing a coherent allocation.  Such a case can come up on ARM64 via
-DT's "shared-dma-pool" reserved memory stuff.
-
-Right now, I have a "fix" for ARM queued which causes dma_get_sgtable()
-to fail when used with reserved memory, but we have one user who needs
-this to work.  So, dma-buf needs to be fixed for this one way or another,
-and I don't think that bending the current broken stuff to suit it by
-trying these vmalloc_to_page() hacks is acceptable.
-
-dma_get_sgtable() is fundamentally broken IMHO.
-
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+index 708f566..383183a 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+@@ -40,6 +40,7 @@ Required properties (all function blocks):
+ 	"mediatek,<chip>-dpi"        - DPI controller, see mediatek,dpi.txt
+ 	"mediatek,<chip>-disp-mutex" - display mutex
+ 	"mediatek,<chip>-disp-od"    - overdrive
++  the supported chips are mt2701 and mt8173.
+ - reg: Physical base address and length of the function block register space
+ - interrupts: The interrupt signal from the function block (required, except for
+   merge and split function blocks).
+@@ -54,6 +55,7 @@ Required properties (DMA function blocks):
+ 	"mediatek,<chip>-disp-ovl"
+ 	"mediatek,<chip>-disp-rdma"
+ 	"mediatek,<chip>-disp-wdma"
++  the supported chips are mt2701 and mt8173.
+ - larb: Should contain a phandle pointing to the local arbiter device as defined
+   in Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+ - iommus: Should point to the respective IOMMU block with master port as
+diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt
+index 2b1585a..fadf327 100644
+--- a/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt
++++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,dsi.txt
+@@ -7,6 +7,7 @@ channel output.
+ 
+ Required properties:
+ - compatible: "mediatek,<chip>-dsi"
++  the supported chips are mt2701 and mt8173.
+ - reg: Physical base address and length of the controller's registers
+ - interrupts: The interrupt signal from the function block.
+ - clocks: device clocks
+@@ -25,6 +26,7 @@ The MIPI TX configuration module controls the MIPI D-PHY.
+ 
+ Required properties:
+ - compatible: "mediatek,<chip>-mipi-tx"
++  the supported chips are mt2701 and mt8173.
+ - reg: Physical base address and length of the controller's registers
+ - clocks: PLL reference clock
+ - clock-output-names: name of the output clock line to the DSI encoder
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
