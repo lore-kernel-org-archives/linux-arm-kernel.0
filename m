@@ -1,91 +1,134 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Mar 2017 12:03:33 +0100
-Subject: [PATCH v2] iommu/arm-smmu: Add global SMR masking property
-Message-ID: <7472f6f57d04431bca5b2dba2a53918225eaf432.1490958040.git.robin.murphy@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 31 Mar 2017 12:08:13 +0100
+Subject: [PATCH v2 06/22] ARM: implement ioremap_nopost() interface
+In-Reply-To: <20170327094954.7162-7-lorenzo.pieralisi@arm.com>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-7-lorenzo.pieralisi@arm.com>
+Message-ID: <20170331110813.GA31763@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current SMR masking support using a 2-cell iommu-specifier is
-primarily intended to handle individual masters with large and/or
-complex Stream ID assignments; it quickly gets a bit clunky in other SMR
-use-cases where we just want to consistently mask out the same part of
-every Stream ID (e.g. for MMU-500 configurations where the appended TBU
-number gets in the way unnecessarily). Let's add a new property to allow
-a single global mask value to better fit the latter situation.
+Hi Russell,
 
-Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+On Mon, Mar 27, 2017 at 10:49:34AM +0100, Lorenzo Pieralisi wrote:
+> The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+> and Posting") define rules for PCI configuration space transactions
+> ordering and posting, that state that configuration writes have to
+> be non-posted transactions.
+> 
+> Current ioremap interface on ARM provides mapping functions that
+> provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
+> memory type) aka posted writes, so PCI host controller drivers have
+> no arch interface to remap PCI configuration space with memory
+> attributes that comply with the PCI specifications for configuration
+> space.
+> 
+> Implement an ARM specific ioremap_nopost() interface that allows to
+> map PCI config memory regions with MT_UNCACHED memory type (ie strongly
+> ordered - non-posted writes), providing a remap function that complies
+> with PCI specifications for config space transactions.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Russell King <linux@armlinux.org.uk>
+> ---
+>  arch/arm/include/asm/io.h | 10 ++++++++++
+>  arch/arm/mm/ioremap.c     |  7 +++++++
+>  arch/arm/mm/nommu.c       |  9 +++++++++
+>  3 files changed, 26 insertions(+)
 
-v2: Rewrite the documentation to actually make sense, and add an
-    explicit example per Mark's suggestion.
+I have not added your ACK to this patch since I slightly tweaked
+it to adapt it to ioremap_nopost() interface instead of a PCI
+specific one. Furthermore, I mechanically added a ioremap_nopost()
+version for nommu too in the process, would be good to have a look
+if I did that properly please.
 
- .../devicetree/bindings/iommu/arm,smmu.txt         | 27 ++++++++++++++++++++++
- drivers/iommu/arm-smmu.c                           |  4 +++-
- 2 files changed, 30 insertions(+), 1 deletion(-)
+Can I add your ACK on this patch ? If you spot any issues please
+do let me know.
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 6cdf32d037fc..b744b231766f 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -60,6 +60,16 @@ conditions.
-                   aliases of secure registers have to be used during
-                   SMMU configuration.
- 
-+- stream-match-mask : For SMMUs supporting stream matching and using
-+                  #iommu-cells = <1>, specifies a fixed value to set in
-+                  the SMRn.MASK field of every stream match register
-+                  used, for cases where it is desirable to ignore some
-+                  portion of every Stream ID (e.g. for certain MMU-500
-+                  configurations given globally unique input IDs). This
-+                  property is not valid for SMMUs using stream indexing,
-+                  or using stream matching with #iommu-cells = <2>, and
-+                  may be ignored if present in such cases.
-+
- ** Deprecated properties:
- 
- - mmu-masters (deprecated in favour of the generic "iommus" binding) :
-@@ -109,3 +119,20 @@ conditions.
-         master3 {
-                 iommus = <&smmu2 1 0x30>;
-         };
-+
-+
-+        /* ARM MMU-500 with 10-bit stream ID input configuration */
-+        smmu3: iommu {
-+                compatible = "arm,mmu-500", "arm,smmu-v2";
-+                ...
-+                #iommu-cells = <1>;
-+                /* always ignore appended 5-bit TBU number */
-+                stream-match-mask = 0x7c00;
-+        };
-+
-+        bus {
-+                /* bus whose child devices emit one unique 10-bit stream
-+                   ID each, but may master through multiple SMMU TBUs */
-+                iommu-map = <0 &smmu3 0 0x400>;
-+                ...
-+        };
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index abf6496843a6..e394d55146a6 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1590,13 +1590,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 
- static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- {
--	u32 fwid = 0;
-+	u32 mask, fwid = 0;
- 
- 	if (args->args_count > 0)
- 		fwid |= (u16)args->args[0];
- 
- 	if (args->args_count > 1)
- 		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
-+	else if (!of_property_read_u32(args->np, "stream-match-mask", &mask))
-+		fwid |= (u16)mask << SMR_MASK_SHIFT;
- 
- 	return iommu_fwspec_add_ids(dev, &fwid, 1);
- }
--- 
-2.11.0.dirty
+Thank you !
+Lorenzo
+
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 42871fb..49913d1 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -352,6 +352,7 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+>   * mapping has specific properties.
+>   *
+>   * Function		Memory type	Cacheability	Cache hint
+> + * ioremap_nopost()	SO		n/a		n/a
+>   * ioremap()		Device		n/a		n/a
+>   * ioremap_nocache()	Device		n/a		n/a
+>   * ioremap_cache()	Normal		Writeback	Read allocate
+> @@ -372,6 +373,12 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+>   * compiler may generate unaligned accesses - eg, via inlining its own
+>   * memcpy.
+>   *
+> + * ioremap_nopost() maps memory as strongly ordered, to be used for
+> + * specific mappings (eg PCI config space) that require non-posted
+> + * write transactions. Strongly ordered transactions are ordered wrt
+> + * device mappings, which means that ioremap_nopost() is the same
+> + * as ioremap() except for non-posted writes behaviour.
+> + *
+>   * All normal memory mappings have the following properties:
+>   * - reads can be repeated with no side effects
+>   * - repeated reads return the last value written
+> @@ -407,6 +414,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+>  #define ioremap_wc ioremap_wc
+>  #define ioremap_wt ioremap_wc
+>  
+> +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size);
+> +#define ioremap_nopost ioremap_nopost
+> +
+>  void iounmap(volatile void __iomem *iomem_cookie);
+>  #define iounmap iounmap
+>  
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index ff0eed2..4ffaf16 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -463,6 +463,13 @@ void iounmap(volatile void __iomem *cookie)
+>  }
+>  EXPORT_SYMBOL(iounmap);
+>  
+> +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size)
+> +{
+> +	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
+> +				   __builtin_return_address(0));
+> +}
+> +EXPORT_SYMBOL_GPL(ioremap_nopost);
+> +
+>  #ifdef CONFIG_PCI
+>  static int pci_ioremap_mem_type = MT_DEVICE;
+>  
+> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+> index 3b5c7aa..dfd736a 100644
+> --- a/arch/arm/mm/nommu.c
+> +++ b/arch/arm/mm/nommu.c
+> @@ -21,6 +21,8 @@
+>  #include <asm/mpu.h>
+>  #include <asm/procinfo.h>
+>  
+> +#include <asm/mach/map.h>
+> +
+>  #include "mm.h"
+>  
+>  unsigned long vectors_base;
+> @@ -433,6 +435,13 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+>  }
+>  EXPORT_SYMBOL(ioremap_wc);
+>  
+> +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size)
+> +{
+> +	return __arm_ioremap_caller(res_cookie, size, MT_UNCACHED,
+> +				    __builtin_return_address(0));
+> +}
+> +EXPORT_SYMBOL(ioremap_nopost);
+> +
+>  void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
+>  {
+>  	return (void *)phys_addr;
+> -- 
+> 2.10.0
+> 
