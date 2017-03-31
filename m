@@ -1,56 +1,44 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 31 Mar 2017 19:39:20 +0200
-Subject: [PATCH] ARM: dts: armada-38x: label USB and SATA nodes
-In-Reply-To: <20170331165015.GJ12814@lunn.ch>
-References: <20170331074115.8111-1-ralph.sennhauser@gmail.com>
- <20170331165015.GJ12814@lunn.ch>
-Message-ID: <20170331193920.030d9ca8@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 31 Mar 2017 18:55:57 +0100
+Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
+ private memory allocations
+In-Reply-To: <871ste5dmw.fsf@concordia.ellerman.id.au>
+References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
+ <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
+ <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
+ <871ste5dmw.fsf@concordia.ellerman.id.au>
+Message-ID: <dfaa1a28-66d8-15fb-7d2d-75e206161770@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Mar 2017 18:50:15 +0200
-Andrew Lunn <andrew@lunn.ch> wrote:
-
-> > -			sata at a8000 {
-> > +			satac0: sata at a8000 {  
+On 31/03/17 04:27, Michael Ellerman wrote:
+> Robin Murphy <robin.murphy@arm.com> writes:
 > 
-> Hi Ralph
+>> Hi Roy,
+>>
+>> On 29/03/17 22:13, Roy Pledge wrote:
+>>> Use the shared-memory-pool mechanism for frame queue descriptor and
+>>> packed frame descriptor record area allocations.
+>>
+>> Thanks for persevering with this - in my opinion it's now looking like
+>> it was worth the effort :)
+>>
+>> AFAICS the ioremap_wc() that this leads to does appear to give back
+>> something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
+>> horrendously misnamed), and "no-map" should rule out any cacheable
+>> linear map alias existing, so it would seem that this approach should
+>> avert Scott's concerns about attribute mismatches.
 > 
-> Why the c in satac0?
+> How does 'no-map' translate into something being excluded from the
+> linear mapping?
 
-For controller and to not conflict with a use case of sata0 for a port,
-similarly to pciec and pcie1. See armada-385-synology-ds116.dts.
+Reserved regions marked with "no-map" get memblock_remove()d by
+early_init_dt_alloc_reserved_memory_arch(). As I understand things, the
+linear map should only cover memblock areas, and it would be explicitly
+violating the semantics of "no-map" to still cover such a region.
 
-> 
-> >  
-> > -			usb3 at f0000 {
-> > +			usb3_0: usb3 at f0000 {
-> >  				compatible =
-> > "marvell,armada-380-xhci"; reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
-> >  				interrupts = <GIC_SPI 16
-> > IRQ_TYPE_LEVEL_HIGH>; @@ -598,7 +598,7 @@
-> >  				status = "disabled";
-> >  			};
-> >  
-> > -			usb3 at f8000 {
-> > +			usb3_1: usb3 at f8000 {
-> >  				compatible =
-> > "marvell,armada-380-xhci"; reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
-> >  				interrupts = <GIC_SPI 17
-> > IRQ_TYPE_LEVEL_HIGH>;  
-> 
-> I can understand what you are saying. But does anybody else care? Are
-> there other .dtsi files differentiating between USB 1.1, 2 and 3?
-
-It's handled differently where ever I looked, some do some don't. A
-case for distinguishing USB 2.0 and USB 3.0 like this is
-armada-388-gp.dts.
-
-Personally I'm only interested in there being a label, making it
-"natural" is a bonus though.
-
-Thanks
-Ralph
+Robin.
 
 > 
->       Andrew
+> cheers
+> 
