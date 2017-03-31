@@ -1,140 +1,89 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Mar 2017 15:46:06 +0100
-Subject: [PATCH RESEND 2/3] iommu/dma: Clean up MSI IOVA allocation
-In-Reply-To: <cover.1490971180.git.robin.murphy@arm.com>
-References: <cover.1490971180.git.robin.murphy@arm.com>
-Message-ID: <0d9ed41de4b88964e5bd0d653eed1094959e7276.1490971180.git.robin.murphy@arm.com>
+From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Fri, 31 Mar 2017 16:49:19 +0200
+Subject: [PATCH V2 2/2] thermal: broadcom: add Northstar thermal driver
+In-Reply-To: <CAC3K-4q=npvHBjb2YeWmyCv89r14=vXdUzRW74mcrETs+NRh1Q@mail.gmail.com>
+References: <20170318155632.18099-1-zajec5@gmail.com>
+ <20170323223045.15786-1-zajec5@gmail.com>
+ <20170323223045.15786-2-zajec5@gmail.com>
+ <20170324143535.GA31953@broadcom.com>
+ <d678d252-a95a-58c0-8098-4401c67040a1@gmail.com>
+ <CAC3K-4q=npvHBjb2YeWmyCv89r14=vXdUzRW74mcrETs+NRh1Q@mail.gmail.com>
+Message-ID: <cfbb429d-5dd9-88b4-eeae-a288def7b56f@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that allocation is suitably abstracted, our private alloc/free
-helpers can drive the trivial MSI cookie allocator directly as well,
-which lets us clean up its exposed guts from iommu_dma_map_msi_msg() and
-simplify things quite a bit.
+On 03/31/2017 04:23 PM, Jon Mason wrote:
+> On Fri, Mar 31, 2017 at 3:03 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+>> On 03/24/2017 03:35 PM, Jon Mason wrote:
+>>>
+>>> On Thu, Mar 23, 2017 at 11:30:45PM +0100, Rafa? Mi?ecki wrote:
+>>>>
+>>>> diff --git a/drivers/thermal/broadcom/ns-thermal.c
+>>>> b/drivers/thermal/broadcom/ns-thermal.c
+>>>> new file mode 100644
+>>>> index 000000000000..acf3a4de62a4
+>>>> --- /dev/null
+>>>> +++ b/drivers/thermal/broadcom/ns-thermal.c
+>>>> @@ -0,0 +1,98 @@
+>>>> +/*
+>>>> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * published by the Free Software Foundation.
+>>>> + */
+>>>> +
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/of_address.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +#include <linux/thermal.h>
+>>>> +
+>>>> +#define PVTMON_CONTROL0                                        0x00
+>>>> +#define PVTMON_CONTROL0_SEL_MASK                       0x0000000e
+>>>> +#define PVTMON_CONTROL0_SEL_TEMP_MONITOR               0x00000000
+>>>> +#define PVTMON_CONTROL0_SEL_TEST_MODE                  0x0000000e
+>>>> +#define PVTMON_STATUS                                  0x08
+>>>> +
+>>>> +struct ns_thermal {
+>>>> +       void __iomem *pvtmon;
+>>>> +};
+>>>> +
+>>>> +static int ns_thermal_get_temp(void *data, int *temp)
+>>>> +{
+>>>> +       struct ns_thermal *ns_thermal = data;
+>>>> +       u32 val;
+>>>> +
+>>>> +       val = readl(ns_thermal->pvtmon + PVTMON_CONTROL0);
+>>>> +       if ((val & PVTMON_CONTROL0_SEL_MASK) !=
+>>>> PVTMON_CONTROL0_SEL_TEMP_MONITOR) {
+>>>> +               val &= ~PVTMON_CONTROL0_SEL_MASK;
+>>>> +               val |= PVTMON_CONTROL0_SEL_TEMP_MONITOR;
+>>>
+>>>
+>>> I think this is slightly confusing here.  If this was off, ORing in 0
+>>> will not enable it.  I think we need to flip the #define to make it
+>>> PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE (or a less crappy name).
+>>> then use this line here to toggle it.  Something like
+>>>
+>>>                 val &= ~PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE;
+>>
+>>
+>> I don't understand this, can you help me further?
+>>
+>> OR-ing with 0 is only a cosmetic thing obviously - just to make it clear
+>> which
+>> value we expect to be set in bits 1:3. The important part is:
+>> val &= ~PVTMON_CONTROL0_SEL_MASK;
+>
+> You are using a side effect of the masking to clear/enable the block.
+> I'm simply saying that we should be explicit about enabling it.  My
+> concern is that using the side effect hides what is being done and
+> could result in a bug somewhere down the line.  I think this is
+> improbable based on the code, but wanted to err on the side of
+> caution.
 
-Reviewed-by: Nate Watterson <nwatters@codeaurora.org>
-Tested-by: Nate Watterson <nwatters@codeaurora.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/dma-iommu.c | 58 ++++++++++++++++++++---------------------------
- 1 file changed, 25 insertions(+), 33 deletions(-)
+Well, I'm clearing current mode selection and "selecting" the mode I want. By
+OR-ing PVTMON_CONTROL0_SEL_TEMP_MONITOR I'm clearly indicating I want temp
+monitor more.
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 8e0b684da1ba..1b94beb43036 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -61,15 +61,6 @@ static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
- 	return PAGE_SIZE;
- }
- 
--static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
--{
--	struct iommu_dma_cookie *cookie = domain->iova_cookie;
--
--	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
--		return &cookie->iovad;
--	return NULL;
--}
--
- static struct iommu_dma_cookie *cookie_alloc(enum iommu_dma_cookie_type type)
- {
- 	struct iommu_dma_cookie *cookie;
-@@ -368,11 +359,19 @@ int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
- static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
- 		size_t size, dma_addr_t dma_limit, struct device *dev)
- {
--	struct iova_domain *iovad = cookie_iovad(domain);
--	unsigned long shift = iova_shift(iovad);
--	unsigned long iova_len = size >> shift;
-+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-+	struct iova_domain *iovad = &cookie->iovad;
-+	unsigned long shift, iova_len;
- 	struct iova *iova = NULL;
- 
-+	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
-+		cookie->msi_iova += size;
-+		return cookie->msi_iova - size;
-+	}
-+
-+	shift = iova_shift(iovad);
-+	iova_len = size >> shift;
-+
- 	if (domain->geometry.force_aperture)
- 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
- 
-@@ -396,6 +395,12 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
- 	struct iova_domain *iovad = &cookie->iovad;
- 	struct iova *iova_rbnode;
- 
-+	/* The MSI case is only ever cleaning up its most recent allocation */
-+	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
-+		cookie->msi_iova -= size;
-+		return;
-+	}
-+
- 	iova_rbnode = find_iova(iovad, iova_pfn(iovad, iova));
- 	if (WARN_ON(!iova_rbnode))
- 		return;
-@@ -406,14 +411,15 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
- static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
- 		size_t size)
- {
--	struct iova_domain *iovad = cookie_iovad(domain);
-+	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-+	struct iova_domain *iovad = &cookie->iovad;
- 	size_t iova_off = iova_offset(iovad, dma_addr);
- 
- 	dma_addr -= iova_off;
- 	size = iova_align(iovad, size + iova_off);
- 
- 	WARN_ON(iommu_unmap(domain, dma_addr, size) != size);
--	iommu_dma_free_iova(domain->iova_cookie, dma_addr, size);
-+	iommu_dma_free_iova(cookie, dma_addr, size);
- }
- 
- static void __iommu_dma_free_pages(struct page **pages, int count)
-@@ -838,7 +844,6 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
- {
- 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
- 	struct iommu_dma_msi_page *msi_page;
--	struct iova_domain *iovad = cookie_iovad(domain);
- 	dma_addr_t iova;
- 	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
- 	size_t size = cookie_msi_granule(cookie);
-@@ -852,29 +857,16 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
- 	if (!msi_page)
- 		return NULL;
- 
--	msi_page->phys = msi_addr;
--	if (iovad) {
--		iova = iommu_dma_alloc_iova(domain, size, dma_get_mask(dev), dev);
--		if (!iova)
--			goto out_free_page;
--		msi_page->iova = iova;
--	} else {
--		msi_page->iova = cookie->msi_iova;
--		cookie->msi_iova += size;
--	}
--
--	if (iommu_map(domain, msi_page->iova, msi_addr, size, prot))
--		goto out_free_iova;
-+	iova = __iommu_dma_map(dev, msi_addr, size, prot);
-+	if (iommu_dma_mapping_error(dev, iova))
-+		goto out_free_page;
- 
- 	INIT_LIST_HEAD(&msi_page->list);
-+	msi_page->phys = msi_addr;
-+	msi_page->iova = iova;
- 	list_add(&msi_page->list, &cookie->msi_page_list);
- 	return msi_page;
- 
--out_free_iova:
--	if (iovad)
--		iommu_dma_free_iova(cookie, iova, size);
--	else
--		cookie->msi_iova -= size;
- out_free_page:
- 	kfree(msi_page);
- 	return NULL;
--- 
-2.11.0.dirty
+How else I could make it more obvious? Should I add some comment maybe?
