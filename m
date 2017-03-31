@@ -1,67 +1,81 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 31 Mar 2017 17:05:02 -0500
-Subject: [PATCH] tty: pl011: fix earlycon work-around for QDF2400 erratum 44
-Message-ID: <1490997902-4894-1-git-send-email-timur@codeaurora.org>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Fri, 31 Mar 2017 19:46:22 -0300
+Subject: [PATCH v5 2/2] mmc: host: s3cmci: allow probing from device tree
+In-Reply-To: <CAPDyKFquGSgK7tkYDpkJM7C7JChZMqvmHoJyiLE9_ZG4CGBOSw@mail.gmail.com>
+References: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
+ <1489799633-29278-3-git-send-email-sergio.prado@e-labworks.com>
+ <CAK8P3a2emCf=KtpCJMOaJnr89Gi+rCi0eun_vjb1wiYB=JR6jg@mail.gmail.com>
+ <CAPDyKFquGSgK7tkYDpkJM7C7JChZMqvmHoJyiLE9_ZG4CGBOSw@mail.gmail.com>
+Message-ID: <20170331224622.GA11126@sprado-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The work-around for the Qualcomm Datacenter Technologies QDF2400
-erratum 44 sets the "qdf2400_e44_present" global variable if the
-work-around is needed.  However, this check does not happen until after
-earlycon is initialized, which means the work-around is not
-used, and the console hangs as soon as it displays one character.
+On Fri, Mar 31, 2017 at 01:11:59PM +0200, Ulf Hansson wrote:
+> On 31 March 2017 at 09:25, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sat, Mar 18, 2017 at 2:13 AM, Sergio Prado
+> > <sergio.prado@e-labworks.com> wrote:
+> >
+> >>
+> >> +static const struct of_device_id s3cmci_dt_match[] = {
+> >> +       {
+> >> +               .compatible = "samsung,s3c2410-sdi",
+> >> +               .data = (void *)0,
+> >> +       },
+> >> +       {
+> >> +               .compatible = "samsung,s3c2412-sdi",
+> >> +               .data = (void *)1,
+> >> +       },
+> >> +       {
+> >> +               .compatible = "samsung,s3c2440-sdi",
+> >> +               .data = (void *)1,
+> >> +       },
+> >> +       { /* sentinel */ },
+> >> +};
+> >> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+> >> +
+> >
+> > The names don't match:
+> >
+> > In file included from /git/arm-soc/drivers/mmc/host/s3cmci.c:14:0:
+> > /git/arm-soc/drivers/mmc/host/s3cmci.c:1844:25: error:
+> > 'sdhci_s3c_dt_match' undeclared here (not in a function); did you mean
+> > 's3cmci_dt_match'?
+> >  MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+> >                          ^
+> > /git/arm-soc/include/linux/module.h:212:21: note: in definition of
+> > macro 'MODULE_DEVICE_TABLE'
+> >  extern const typeof(name) __mod_##type##__##name##_device_table  \
+> >                      ^~~~
+> > /git/arm-soc/include/linux/module.h:212:27: error:
+> > '__mod_of__sdhci_s3c_dt_match_device_table' aliased to undefined
+> > symbol 'sdhci_s3c_dt_match'
+> >  extern const typeof(name) __mod_##type##__##name##_device_table  \
+> >                            ^
+> > /git/arm-soc/drivers/mmc/host/s3cmci.c:1844:1: note: in expansion of
+> > macro 'MODULE_DEVICE_TABLE'
+> >  MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+> >  ^~~~~~~~~~~~~~~~~~~
+> > /git/arm-soc/scripts/Makefile.build:314: recipe for target
+> > 'drivers/mmc/host/s3cmci.o' failed
+> >
+> > Can you send a fix?
+> 
+> Never mind, I am dropping the patches from my next branch as those
+> clearly haven't been built/tested by Sergio properly. It's better that
+> he re-spins them.
+> 
+> Arnd, thanks for reporting and even fixing some of the problems!
+> 
+> Kind regards
+> Uffe
 
-Fixes: d8a4995bcea1 ("tty: pl011: Work around QDF2400 E44 stuck BUSY bit")
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/tty/serial/amba-pl011.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+Arnd, thanks for reporting the error.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 56f92d7..b0a3777 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2452,18 +2452,37 @@ static void pl011_early_write(struct console *con, const char *s, unsigned n)
- 	uart_console_write(&dev->port, s, n, pl011_putc);
- }
- 
-+/*
-+ * On non-ACPI systems, earlycon is enabled by specifying
-+ * "earlycon=pl011,<address>" on the kernel command line.
-+ *
-+ * On ACPI ARM64 systems, an "early" console is enabled via the SPCR table,
-+ * by specifying only "earlycon" on the command line.  Because it requires
-+ * SPCR, the console starts after ACPI is parsed, which is later than a
-+ * traditional early console.
-+ *
-+ * To get the traditional early console that starts before ACPI is parsed,
-+ * specify the full "earlycon=pl011,<address>" option.
-+ */
- static int __init pl011_early_console_setup(struct earlycon_device *device,
- 					    const char *opt)
- {
- 	if (!device->port.membase)
- 		return -ENODEV;
- 
--	device->con->write = qdf2400_e44_present ?
--				qdf2400_e44_early_write : pl011_early_write;
-+	/* On QDF2400 SOCs affected by Erratum 44, the "qdf2400_e44" must
-+	 * also be specified, e.g. "earlycon=pl011,<address>,qdf2400_e44".
-+	 */
-+	if (!strcmp(device->options, "qdf2400_e44"))
-+		device->con->write = qdf2400_e44_early_write;
-+	else
-+		device->con->write = pl011_early_write;
-+
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
- OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
-+EARLYCON_DECLARE(qdf2400_e44, pl011_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+I have built/tested the patches, but only as a built-in feature, and
+this error occurs when enabled as a module.
+
+I will re-spins them and send v6.
+
+Best regards,
+
+Sergio Prado
