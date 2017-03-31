@@ -1,36 +1,54 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 31 Mar 2017 17:22:46 +0200
-Subject: [PATCH 0/4] Introduce the Atmel PTC subsystem
-Message-ID: <20170331152250.12758-1-ludovic.desroches@microchip.com>
+Date: Fri, 31 Mar 2017 17:22:48 +0200
+Subject: [PATCH 2/4] ARM: dts: at91: sama5d2: add PTC subsystem device
+In-Reply-To: <20170331152250.12758-1-ludovic.desroches@microchip.com>
+References: <20170331152250.12758-1-ludovic.desroches@microchip.com>
+Message-ID: <20170331152250.12758-3-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-The Atmel Peripheral touch controller subsystem offers built-in hardware for
-capacitive touch measurment on sensors that function as buttons, sliders and
-wheels. It is available on SAMA5D2.
+Add the Atmel Peripheral Touch Controller subsystem.
 
-A firmware and a configuration file describing the topology and the parameters
-of the sensor are loaded when probing the driver.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Ludovic Desroches (4):
-  input: misc: introduce Atmel PTC driver
-  ARM: dts: at91: sama5d2: add PTC subsystem device
-  MAINTAINERS: add Atmel PTC entries
-  dt-bindings: input: Add Atmel PTC subsystem bindings
-
- .../devicetree/bindings/input/atmel,ptc.txt        |  67 +++
- MAINTAINERS                                        |   7 +
- arch/arm/boot/dts/sama5d2.dtsi                     |  16 +
- drivers/input/misc/Kconfig                         |  12 +
- drivers/input/misc/Makefile                        |   1 +
- drivers/input/misc/atmel_ptc.c                     | 651 +++++++++++++++++++++
- include/uapi/linux/atmel_ptc.h                     | 355 +++++++++++
- 7 files changed, 1109 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/atmel,ptc.txt
- create mode 100644 drivers/input/misc/atmel_ptc.c
- create mode 100644 include/uapi/linux/atmel_ptc.h
-
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 468ef9c..a958456 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -762,6 +762,12 @@
+ 						atmel,clk-output-range = <0 83000000>;
+ 					};
+ 
++					ptc_clk: ptc_clk {
++						#clock-cells = <0>;
++						reg = <58>;
++						atmel,clk-output-range = <0 83000000>;
++					};
++
+ 					classd_clk: classd_clk {
+ 						#clock-cells = <0>;
+ 						reg = <59>;
+@@ -1310,6 +1316,16 @@
+ 				reg = <0xfc05c000 0x20>;
+ 			};
+ 
++			ptc at fc060000 {
++				compatible = "atmel,sama5d2-ptc";
++				reg = <0x00800000 0x10000
++				       0xfc060000 0xcf>;
++				interrupts = <58 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&ptc_clk>, <&main>, <&clk32k>;
++				clock-names = "ptc_clk", "ptc_int_osc", "slow_clk";
++				status = "disabled";
++			};
++
+ 			chipid at fc069000 {
+ 				compatible = "atmel,sama5d2-chipid";
+ 				reg = <0xfc069000 0x8>;
 -- 
 2.9.0
