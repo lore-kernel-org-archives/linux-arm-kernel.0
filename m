@@ -1,225 +1,82 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Fri, 31 Mar 2017 16:10:43 +0800
-Subject: [PATCH v22 11/11] acpi/arm64: Add SBSA Generic Watchdog support
- in GTDT driver
-In-Reply-To: <20170328154111.GC18046@red-moon>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-12-fu.wei@linaro.org>
- <20170328154111.GC18046@red-moon>
-Message-ID: <CADyBb7uDyjhP2Pjtzh6pTN-0hkokB=KevY7V76G9qZOF-9-zoQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Mar 2017 10:22:12 +0200
+Subject: [PATCH v9 12/12] ARM: EXYNOS: refactor of mach-exynos to use
+ chipid information
+In-Reply-To: <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
+References: <CGME20170330131444epcas5p45051cf7e6ec7a993c2c9f84254b89a19@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
+ <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
+ <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
+Message-ID: <CAK8P3a1GobLFjVXySXHGYBXscMaTcL8nzv183Reho87+U3Z5cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 28 March 2017 at 23:41, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Mar 22, 2017 at 12:31:22AM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
+On Fri, Mar 31, 2017 at 8:01 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+> On Thursday 30 March 2017 07:31 PM, Arnd Bergmann wrote:
+>> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
 >>
->> This driver adds support for parsing SBSA Generic Watchdog timer
->> in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
->> and creating a platform device with that information.
->>
->> This allows the operating system to obtain device data from the
->> resource of platform device. The platform device named "sbsa-gwdt"
->> can be used by the ARM SBSA Generic Watchdog driver.
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
->> ---
->>  drivers/acpi/arm64/gtdt.c | 94 +++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 94 insertions(+)
->>
->> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
->> index f471873..5d167f0 100644
->> --- a/drivers/acpi/arm64/gtdt.c
->> +++ b/drivers/acpi/arm64/gtdt.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/acpi.h>
->>  #include <linux/init.h>
->>  #include <linux/kernel.h>
->> +#include <linux/platform_device.h>
->>
->>  #include <clocksource/arm_arch_timer.h>
->>
->> @@ -59,6 +60,17 @@ static inline bool is_timer_block(void *platform_timer)
->>       return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
->>  }
->>
->> +static inline bool is_non_secure_watchdog(void *platform_timer)
->> +{
->> +     struct acpi_gtdt_header *gh = platform_timer;
->> +     struct acpi_gtdt_watchdog *wd = platform_timer;
->> +
->> +     if (gh->type != ACPI_GTDT_TYPE_WATCHDOG)
->> +             return false;
->> +
->> +     return !(wd->timer_flags & ACPI_GTDT_WATCHDOG_SECURE);
->> +}
->> +
->>  static int __init map_gt_gsi(u32 interrupt, u32 flags)
->>  {
->>       int trigger, polarity;
->> @@ -285,3 +297,85 @@ int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
->>
->>       return 0;
->>  }
->> +
->> +/*
->> + * Initialize a SBSA generic Watchdog platform device info from GTDT
->> + */
->> +static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
->> +                                     int index)
->> +{
->> +     struct platform_device *pdev;
->> +     int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
->> +
->> +     /*
->> +      * According to SBSA specification the size of refresh and control
->> +      * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
->> +      */
->> +     struct resource res[] = {
->> +             DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
->> +             DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
->> +             DEFINE_RES_IRQ(irq),
->> +     };
->> +     int nr_res = ARRAY_SIZE(res);
->> +
->> +     pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
->> +              wd->refresh_frame_address, wd->control_frame_address,
->> +              wd->timer_interrupt, wd->timer_flags);
->> +
->> +     if (!(wd->refresh_frame_address && wd->control_frame_address)) {
->> +             pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-
-
-+             acpi_unregister_gsi(wd->timer_interrupt);
-
-
->> +             return -EINVAL;
+>> This seems really overcomplicated. From what I can tell, this is only needed
+>> to find the SCU address, but there are better ways to do that, either by
+>> looking up the SCU in the DT at the time you actually need it,
+>> or by calling scu_a9_get_base().
 >
-> You should unmap the gsi here.
-
-yes, you are right, fixed it.
-
+> Indeed it's complicated and ugly, for the same reason I attempted to
+> clean-up this part for Exynos SoC in patch series [1], which was
+> accepted by Samsung maintainer Krzysztof and later during pull request
+> rejected by ARM maintainers [2]
 >
->> +     }
->> +
->> +     if (irq <= 0) {
->> +             pr_warn("failed to map the Watchdog interrupt.\n");
->> +             nr_res--;
->> +     }
->> +
->> +     /*
->> +      * Add a platform device named "sbsa-gwdt" to match the platform driver.
->> +      * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
->> +      * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-
-+      * The platform driver can get device info below by matching this name.
-
+> [1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
+> [2]: http://lkml.iu.edu/hypermail/linux/kernel/1612.0/01508.html
 >
-> Nit: I would not hardcode drivers paths in comments.
-
-
-OK, deleted it
-
+> Given the argument we can't adopt getting base address of SCU completely
+> via DT without breaking OLD dtbs at some point, difficult to simplify
+> these stuffs.
 >
->> +      * info below by matching this name.
->> +      */
->> +     pdev = platform_device_register_simple("sbsa-gwdt", index, res, nr_res);
->> +     if (IS_ERR(pdev)) {
->> +             acpi_unregister_gsi(wd->timer_interrupt);
->> +             return PTR_ERR(pdev);
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +static int __init gtdt_sbsa_gwdt_init(void)
->> +{
->> +     int ret, i = 0;
->> +     void *platform_timer;
->> +     struct acpi_table_header *table;
->> +
->> +     if (acpi_disabled)
->> +             return 0;
->> +
->> +     if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
->> +             return -EINVAL;
->> +
->> +     ret = acpi_gtdt_init(table, NULL);
->> +     if (ret)
->> +             return ret;
+> Please guide which is the best way to handle such stuffs.
 >
-> Ok, I missed previous versions reviews so I miss the background
-> here and I apologise.
+> In fact I made another attempt [3] to cleanup this SCU related stuffs
+> for other ARM based platforms, but we could not arrive on some consensus
+> at that time. I will try to attempt it again soon.
 >
-> I do not understand why you call acpi_gtdt_init() again (or better,
-> why acpi_gtdt_init() does not return straight away) here if the
-> stashed pointer in acpi_gtdt_desc is already set. I am not a big fan
-> of the for_each_platform_timer macro either, here you can just read
-> the ACPI_SIG_GTDT and parse its entries, I see no point in calling
-> acpi_gtdt_init() again, there is nothing to stash for later probing,
-> is there ?
->
-> Or it is just to reuse common parsing code ? Regardless, if the
-> acpi_gtdt_desc struct is already initialized acpi_gtdt_init() should
-> just return or I am missing the point.
->
-> I would like clarifications on the acpi_gtdt_init() call above please
-> (plus GSI unmap fix), apart from that:
->
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> [3]: http://www.spinics.net/lists/arm-kernel/msg542351.html
 
-Actually, after the discussion in the 7th patch, I have tried to do
-this, see if that can make the code simpler.
-Then I found out that
-(1) If we would like to reuse "for_each_platform_timer" (and
-"next_platform_timer") to scan the GTDT for SBSA watchdog, we have to
-re-initialize acpi_gtdt_desc, too.
-     So we still need to explain that why we have to re-initialize
-acpi_gtdt_desc.
-(2) If we totally ignore acpi_gtdt_desc, and acpi_gtdt_init(), we
-can't re-use  "for_each_platform_timer" (and "next_platform_timer") .
-we have to re-write  the loop of scanning the GTDT for SBSA watchdog,
+I very much appreciate your attempts, this is very helpful. I'm sorry
+for making it so hard for you. I had remembered your previous series,
+but did not realize that you were the author of both this patch and
+the SCU cleanup.
 
-So may I suggest that maybe we can keep using acpi_gtdt_init, only add
-the comment to explain why we have to re-initialize
-acpi_gtdt_desc(Just what you have said in the 7th patch. Thanks for
-your correction for the comment, I will use that ), this way maybe can
-make the code simpler.
+Let me try to understand the entire problem space better. These
+are my assumptions based on what  you write:
 
-But If you still concern about this,  we still can discuss this at -rc1.
+- A clean solution would be to map the SCU based on the DT as
+  you implemented in the earlier patch series, but that breaks
+  running new kernels with old DTBs, which we don't want.
 
-Great thanks for your help! :-)
+- Another clean solution would be to map the SCU based on
+  scu_a9_get_base(), but that doesn't work on all variants of
+  exynos4, because there is at least one (which?) that has incorrect
+  data in the register
 
->
->> +     for_each_platform_timer(platform_timer) {
->> +             if (is_non_secure_watchdog(platform_timer)) {
->> +                     ret = gtdt_import_sbsa_gwdt(platform_timer, i);
->> +                     if (ret)
->> +                             break;
->> +                     i++;
->> +             }
->> +     }
->> +
->> +     if (i)
->> +             pr_info("found %d SBSA generic Watchdog(s).\n", i);
->> +
->> +     return ret;
->> +}
->> +
->> +device_initcall(gtdt_sbsa_gwdt_init);
->> --
->> 2.9.3
->>
+- The approach in this patch works, but is really ugly as it
+  requires parsing the fdt.
 
+Assuming that we don't want any of the approaches above,
+here are some other ideas that might be a little better:
 
+- Map the SCU later, just before we first need for calling
+  scu_enable(): exynos_smp_prepare_cpus(),
+  exynos_enter_aftr() or exynos_pm_resume(). All three
+  are late enough that we can simply call ioremap()
+  on the known physical address for the first caller,
+  and they are all guarded by a
+  ARM_CPU_PART_CORTEX_A9 check that should
+  be equivalent to the EXYNOS4 check you have.
 
--- 
-Best regards,
+- Split the exynos4 machine descriptor from the one
+  for exynos5, and exynos3, the call the iotable_init
+  unconditionally for exynos4. The same method would
+  also let us get rid of some of the other
+  of_machine_is_compatible() checks.
 
-Fu Wei
-Software Engineer
-Red Hat
+       Arnd
