@@ -1,71 +1,51 @@
 From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Fri, 31 Mar 2017 18:54:34 +0200
-Subject: [PATCH v3 1/4] dt-bindings: clock: gxbb: expose UART clocks
-In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com>
-References: <20170331165437.26227-1-hgkr.klein@gmail.com>
-Message-ID: <20170331165437.26227-2-hgkr.klein@gmail.com>
+Date: Fri, 31 Mar 2017 18:54:33 +0200
+Subject: [PATCH v3 0/4] tty/serial: meson_uart: add support for core clock
+ handling
+Message-ID: <20170331165437.26227-1-hgkr.klein@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the clock ids of the three none AO uarts to the dt-bindings
+To be able to use the three none AO uarts of the meson gx SoCs (uart_A,
+uart_B & uart_C), the core clock has to be enabled (see chapter 22.3 of
+the public s905 data sheet).
+At least the u-boot of my s905 based media player (netxeon minimx-g)
+doesn't do this. so the driver must enable the clock.
 
-Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
----
- drivers/clk/meson/gxbb.h              | 6 +++---
- include/dt-bindings/clock/gxbb-clkc.h | 3 +++
- 2 files changed, 6 insertions(+), 3 deletions(-)
+This patch set does:
+- exposes the UART clock ids to the dtb
+- adds documentation for the dt-bindings of meson_uart
+- adds the core clock handling to the driver
+- adds the core clock handling to meson-gxbb.dtsi and meson-gxl.dtsi
 
-diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-index 8ee2022ce5d5..1edfaa5fe307 100644
---- a/drivers/clk/meson/gxbb.h
-+++ b/drivers/clk/meson/gxbb.h
-@@ -194,7 +194,7 @@
- /* #define CLKID_SAR_ADC */
- #define CLKID_SMART_CARD	  24
- #define CLKID_RNG0		  25
--#define CLKID_UART0		  26
-+/* CLKID_UART0 */
- #define CLKID_SDHC		  27
- #define CLKID_STREAM		  28
- #define CLKID_ASYNC_FIFO	  29
-@@ -216,7 +216,7 @@
- #define CLKID_ADC		  45
- #define CLKID_BLKMV		  46
- #define CLKID_AIU		  47
--#define CLKID_UART1		  48
-+/* CLKID_UART1 */
- #define CLKID_G2D		  49
- /* CLKID_USB0 */
- /* CLKID_USB1 */
-@@ -236,7 +236,7 @@
- /* CLKID_USB0_DDR_BRIDGE */
- #define CLKID_MMC_PCLK		  66
- #define CLKID_DVIN		  67
--#define CLKID_UART2		  68
-+/* CLKID_UART2 */
- /* #define CLKID_SANA */
- #define CLKID_VPU_INTR		  70
- #define CLKID_SEC_AHB_AHB3_BRIDGE 71
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index 692846c7941b..7b329df47752 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -15,13 +15,16 @@
- #define CLKID_SPI		34
- #define CLKID_I2C		22
- #define CLKID_SAR_ADC		23
-+#define CLKID_UART0		26
- #define CLKID_ETH		36
-+#define CLKID_UART1		48
- #define CLKID_USB0		50
- #define CLKID_USB1		51
- #define CLKID_USB		55
- #define CLKID_HDMI_PCLK		63
- #define CLKID_USB1_DDR_BRIDGE	64
- #define CLKID_USB0_DDR_BRIDGE	65
-+#define CLKID_UART2		68
- #define CLKID_SANA		69
- #define CLKID_GCLK_VENCI_INT0	77
- #define CLKID_AO_I2C		93
+The patchset is based on the branch "master" of the repository in [1]
+
+Changes since v2
+- mail subjects reworked
+- add clocks/clock-names to the documentation
+- add core clock handling to meson-gxbb.dtsi & meson-gxl.dtsi
+
+Changes since v1
+- use git to produce the patch set
+- added the clock ids for uart_B and uart_C
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
+
+Helmut Klein (4):
+  clk: meson: gxbb: expose CLKID_UARTx
+  dt-bindings: meson_uart: add documentation for meson UARTs
+  tty/serial: meson_uart: add the core clock handling to the driver
+  ARM64: dts: meson-gx: add core clock support for uart_A, uart_B and
+    uart_C
+
+ .../bindings/serial/amlogic,meson_uart.txt         | 30 ++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 15 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 15 +++++++++++
+ drivers/clk/meson/gxbb.h                           |  6 ++---
+ drivers/tty/serial/meson_uart.c                    | 10 ++++++++
+ include/dt-bindings/clock/gxbb-clkc.h              |  3 +++
+ 6 files changed, 76 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson_uart.txt
+
 --
 2.11.0
