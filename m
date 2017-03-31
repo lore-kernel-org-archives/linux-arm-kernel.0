@@ -1,39 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 11:45:59 +0200
-Subject: [GIT PULL] (REPOST) arm64: dts: uniphier: UniPhier DT updates
- (64bit) for v4.12
-In-Reply-To: <CAK7LNAR5SZH7eR781De80SrSsfczf7vU2Ok+kybYhZ_TXQaqRg@mail.gmail.com>
-References: <CAK7LNAR5SZH7eR781De80SrSsfczf7vU2Ok+kybYhZ_TXQaqRg@mail.gmail.com>
-Message-ID: <CAK8P3a0kHBkkryXBM99Ry8TB1SV4n6tMEZJk0csMheeWrsUJoA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Mar 2017 10:49:38 +0100
+Subject: [PATCH v2] drm: hdlcd: Fix the calculation of the scanout start
+ address
+In-Reply-To: <20170308163025.31098-1-Liviu.Dudau@arm.com>
+References: <20170222153036.GI31595@intel.com>
+ <20170308163025.31098-1-Liviu.Dudau@arm.com>
+Message-ID: <20170331094937.GO7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:59 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Here are UniPhier DT (64bit) updates for the v4.12 merge window.
-> Please pull!
->
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-dt64-v4.12
->
-> for you to fetch changes up to 7a201e31422b208cfedd15c08e9b0442871e2d97:
->
->   arm64: dts: uniphier: re-order reset deassertion of USB of LD11
-> (2017-03-13 00:32:40 +0900)
->
-> ----------------------------------------------------------------
-> UniPhier ARM64 SoC DT updates for v4.12
->
-> - Fix W=* build warnings
-> - Add pinctrl properties to eMMC nodes
-> - Fix resets properties of USB nodes
+On Wed, Mar 08, 2017 at 04:30:25PM +0000, Liviu Dudau wrote:
+> The calculation of the framebuffer's start address was wrongly using
+> the CRTC's x and y position rather than the one of the source
+> framebuffer. To fix that we need to update the plane_check code to
+> call drm_plane_helper_check_state() to clip the src and dst coordinates.
+> While there so some minor cleanup of redundant freeing of
+> devm_alloc-ated memory.
 
-Pulled into next/dt64, thanks!
+The following series is what I came up with, although I've had no time
+to test it.
 
-     Arnd
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
