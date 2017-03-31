@@ -1,50 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Mar 2017 10:39:37 +0200
-Subject: [PATCH v2 0/2] base: soc: soc_device_match() improvements
-In-Reply-To: <CAK8P3a168j6BYzWkDzHDp0tBwiOj=JP-G2LXUiLiDFphbV5vdg@mail.gmail.com>
-References: <1490816334-14568-1-git-send-email-geert+renesas@glider.be>
- <CAK8P3a168j6BYzWkDzHDp0tBwiOj=JP-G2LXUiLiDFphbV5vdg@mail.gmail.com>
-Message-ID: <20170331083934.GA14676@verge.net.au>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 31 Mar 2017 09:37:27 +0200
+Subject: [PATCH] ARM: configs: stm32: Set CPU_V7M_NUM_IRQ to max value
+In-Reply-To: <CAK8P3a3VYRUvFKd1CMTE-T-FhTx1YJr18Hqatmz7YK+A+JtFeQ@mail.gmail.com>
+References: <1490263746-10512-1-git-send-email-alexandre.torgue@st.com>
+ <CAK8P3a3VYRUvFKd1CMTE-T-FhTx1YJr18Hqatmz7YK+A+JtFeQ@mail.gmail.com>
+Message-ID: <26da7d21-ee6e-e809-46b3-92f311c25a11@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 09:48:48PM +0200, Arnd Bergmann wrote:
-> On Wed, Mar 29, 2017 at 9:38 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
-> >         Hi Arnd, Greg, Kevin, Magnus, Olof, Simon,
-> >
-> > This patch series contains two improvements for the SoC bus and
-> > soc_device_match().  The second one is a dependency for handling
-> > different SoC revisions in the Renesas R-Car SYSC driver, which manages
-> > PM Domains and thus needs to be initialized from an early_initcall[*].
-> >
-> > Changes compared to v1:
-> >   - Drop RFC state,
-> >   - Add more explanation,
-> >   - Add Acked-by.
-> >
-> > Due to the dependency, and as changes for the Renesas R-Car SYSC driver
-> > typically go in through the renesas and arm-soc trees, and if you agree,
-> > I would like to send a pull request for these changes, to be pulled by
-> > all of the driver core, renesas, and arm-soc trees.  This is similar to
-> > how soc_device_match() was integrated earlier.
-> > Then the Renesas R-Car SYSC driver changes can easily be queued on top
-> > in the renesas tree afterwards.
-> >
-> > Do you agree?
-> > Thanks for your answer!
-> 
-> Merging this through arm-soc is fine with me.
+Hi Arnd
 
-Thanks, in that case I am fine with this plan.
+On 03/30/2017 05:36 PM, Arnd Bergmann wrote:
+> On Thu, Mar 23, 2017 at 11:09 AM, Alexandre TORGUE
+> <alexandre.torgue@st.com> wrote:
+>> stm32_defconfig is used for several STM32 MCU: STM32F429, STM32F469,
+>> STM32F746 and now STM32H743. Each of MCU listed have different interrupts
+>> number mapped on NVIC. STM32F429: 81, STM32F469: 92, STM32F746: 97 and
+>> STM32H743: 149. I could set CPU_V7M_NUM_IRQ to 149 but in order to avoid
+>> forgetting to update this value for next STM32 MCU I prefer to set it to
+>> max value: 240.
+>>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>
+> It's not entirely clear who you want to apply this (if any), given that you sent
+> the patch to yourself. I've applied it to next/defconfig now, hope that's
+> what you intended.
 
-> > P.S. If you think it's already too late in the cycle to queue Renesas
-> > R-Car SYSC driver changes for v4.12 on top, please say so.  Then the
-> > dependency is relaxed, and this series can just go in through the
-> > driver core tree, with the Renesas part to follow for v4.13.
-> 
-> We can take it for 4.12.
+Actually, I pushed it mainly to share the patch and check comments. I 
+planned to add it in my pull request, but no pb if you already took it :).
 
-Thanks again. My preference at this time is to deffer the DT changes to v4.13
-as it seems somewhat simpler and I'm not aware of any urgency to get them
-into v4.12.
+Regards
+Alex
+
+>
+>       Arnd
+>
