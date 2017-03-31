@@ -1,23 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 31 Mar 2017 17:35:49 +0200
-Subject: [PATCH] ARM: dts: armada-385-linksys: disk-activity trigger for
- all
-In-Reply-To: <20170330165405.14540-1-ralph.sennhauser@gmail.com>
-References: <20170330165405.14540-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170331153549.GA12814@lunn.ch>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 31 Mar 2017 17:37:37 +0200
+Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
+In-Reply-To: <m2y3vn6dhk.fsf@baylibre.com>
+References: <20170328092545.4644-1-hgkr.klein@gmail.com>
+ <20170328092545.4644-2-hgkr.klein@gmail.com>
+ <1490716277.20764.6.camel@baylibre.com>
+ <71489b62-78c8-7082-587e-8598dc43ca59@gmail.com>
+ <1490728490.20764.8.camel@baylibre.com>
+ <CAFBinCDF29+kQpedsJPqRy6fztWrj91Qi6tCno_2S6UCkhW7XQ@mail.gmail.com>
+ <m2y3vn6dhk.fsf@baylibre.com>
+Message-ID: <1490974657.12951.5.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 06:54:04PM +0200, Ralph Sennhauser wrote:
-> Commit a4ee7e18d808 ("ARM: dts: armada: Add default trigger for sata
-> led") adds the default trigger to individual boards, move it to
-> armada-385-linksys.dtsi which effectively enables the definition for
-> the WRT1900ACS (Shelby) as well as for future boards.
+On Wed, 2017-03-29 at 13:21 -0700, Kevin Hilman wrote:
+> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 > 
-> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+> [...]
+> 
+> > for Helmut this would mean that instead of dropping this patch (or
+> > dropping CLKID_UART1 and CLKID_UART2 from this patch) he would rather
+> > have to *add* another patch (for meson-gxbb.dtsi and meson-gxl.dtsi)
+> > which passes the core clocks to the corresponding UART controllers
+> > (similar to the CLKID_SD_EMMC_ clocks).
+> 
+> Yes, this is what I would like to see.
+> 
+> If a new CLKID is exposed, I want to see the users of it at the same
+> time.
 
-Centralising this makes sense.
+Helmut,
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+If you send another version of these patches, considering the feedback of Kevin
+and Martin, could you please change the subject of this patch to:
 
-    Andrew
+dt-bindings: clock: gxbb: expose?UART clocks
+
+Thx
+Jerome
+
+> 
+> Kevin
