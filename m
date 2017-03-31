@@ -1,76 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 31 Mar 2017 18:54:57 +0100
-Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
-In-Reply-To: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170331175457.GD4897@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 31 Mar 2017 13:58:52 -0500
+Subject: [PATCH v5 14/24] dt-bindings: mfd: syscon: Add documentation for
+ #syscon-cells property
+In-Reply-To: <20170327094520.3129-15-kishon@ti.com>
+References: <20170327094520.3129-1-kishon@ti.com>
+ <20170327094520.3129-15-kishon@ti.com>
+Message-ID: <20170331185852.mxa4gvjxbuxl65dq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
-> This series provides the support for turning on the arm-smmu's
-> clocks/power domains using runtime pm. This is done using the
-> recently introduced device links patches, which lets the symmu's
-> runtime to follow the master's runtime pm, so the smmu remains
-> powered only when the masters use it.
+On Mon, Mar 27, 2017 at 03:15:10PM +0530, Kishon Vijay Abraham I wrote:
+> Add documentation for the optional #syscon-cells property to determine
+> the number of cells that should be given in the phandle while
+> referencing the syscon-node.
+> 
+> Suggested-by: Rob Herring <robh@kernel.org>
 
-Do you have any numbers for the power savings you achieve with this?
-How often do we actually manage to stop the SMMU clocks on an SoC with
-a handful of masters?
+I did? When?
 
-In other words, is this too coarse-grained to be useful, or is it common
-that all the devices upstream of the SMMU are suspended?
+I'm not remembering why we need this. Generally, phandles to a syscon 
+are for a single defined purpose. When do we need a list of them?
 
-Thanks,
+Rob
 
-Will
-
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/syscon.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Took some reference from the exynos runtime patches [2].
-> Tested this with MDP, GPU, VENUS devices on apq8096-db820c board.
-> 
-> Previous version of the patchset [1].
-> 
-> [V3]
->    * Reworked the patches to keep the clocks init/enabling function
->      seperately for each compatible.
-> 
->    * Added clocks bindings for MMU40x/500.
-> 
->    * Added a new compatible for qcom,smmu-v2 implementation and
->      the clock bindings for the same.
-> 
->    * Rebased on top of 4.11-rc1
-> 
-> [V2]
->    * Split the patches little differently.
-> 
->    * Addressed comments.
-> 
->    * Removed the patch #4 [3] from previous post
->      for arm-smmu context save restore. Planning to
->      post this separately after reworking/addressing Robin's
->      feedback.
-> 
->    * Reversed the sequence to disable clocks than enabling.
->      This was required for those cases where the
->      clocks are populated in a dependent order from DT.
-> 
-> [1] https://www.spinics.net/lists/linux-arm-msm/msg23870.html
-> [2] https://lkml.org/lkml/2016/10/20/70
-> [3] https://patchwork.kernel.org/patch/9389717/
-> 
-> Sricharan R (5):
->   iommu/arm-smmu: Add pm_runtime/sleep ops
->   iommu/arm-smmu: Add support for MMU40x/500 clocks
->   drivers: arm-smmu: Add clock support for QCOM_SMMUV2
->   iommu/arm-smmu: Invoke pm_runtime during probe, add/remove device
->   iommu/arm-smmu: Add the device_link between masters and smmu
-> 
->  .../devicetree/bindings/iommu/arm,smmu.txt         |  35 +++
->  drivers/iommu/arm-smmu.c                           | 349 ++++++++++++++++++++-
->  2 files changed, 373 insertions(+), 11 deletions(-)
-> 
+> diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> index 408f768686f1..446b47e8fb71 100644
+> --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> @@ -16,6 +16,8 @@ Required properties:
+>  Optional property:
+>  - reg-io-width: the size (in bytes) of the IO accesses that should be
+>    performed on the device.
+> +- #syscon-cells: determine the number of cells that should be given in the
+> +  phandle while referencing this syscon-node.
+>  
+>  Examples:
+>  gpr: iomuxc-gpr at 020e0000 {
 > -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 2.11.0
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
