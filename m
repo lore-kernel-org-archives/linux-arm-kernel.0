@@ -1,99 +1,140 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 31 Mar 2017 15:46:07 +0100
-Subject: [PATCH RESEND 3/3] iommu/dma: Plumb in the per-CPU IOVA caches
+Date: Fri, 31 Mar 2017 15:46:06 +0100
+Subject: [PATCH RESEND 2/3] iommu/dma: Clean up MSI IOVA allocation
 In-Reply-To: <cover.1490971180.git.robin.murphy@arm.com>
 References: <cover.1490971180.git.robin.murphy@arm.com>
-Message-ID: <fcb9121e608da4f62e21538f558710fbb12d4a69.1490971180.git.robin.murphy@arm.com>
+Message-ID: <0d9ed41de4b88964e5bd0d653eed1094959e7276.1490971180.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With IOVA allocation suitably tidied up, we are finally free to opt in
-to the per-CPU caching mechanism. The caching alone can provide a modest
-improvement over walking the rbtree for weedier systems (iperf3 shows
-~10% more ethernet throughput on an ARM Juno r1 constrained to a single
-650MHz Cortex-A53), but the real gain will be in sidestepping the rbtree
-lock contention which larger ARM-based systems with lots of parallel I/O
-are starting to feel the pain of.
+Now that allocation is suitably abstracted, our private alloc/free
+helpers can drive the trivial MSI cookie allocator directly as well,
+which lets us clean up its exposed guts from iommu_dma_map_msi_msg() and
+simplify things quite a bit.
 
 Reviewed-by: Nate Watterson <nwatters@codeaurora.org>
 Tested-by: Nate Watterson <nwatters@codeaurora.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/dma-iommu.c | 39 ++++++++++++++++++---------------------
- 1 file changed, 18 insertions(+), 21 deletions(-)
+ drivers/iommu/dma-iommu.c | 58 ++++++++++++++++++++---------------------------
+ 1 file changed, 25 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 1b94beb43036..8348f366ddd1 100644
+index 8e0b684da1ba..1b94beb43036 100644
 --- a/drivers/iommu/dma-iommu.c
 +++ b/drivers/iommu/dma-iommu.c
-@@ -361,8 +361,7 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
+@@ -61,15 +61,6 @@ static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+ 	return PAGE_SIZE;
+ }
+ 
+-static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
+-{
+-	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+-
+-	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
+-		return &cookie->iovad;
+-	return NULL;
+-}
+-
+ static struct iommu_dma_cookie *cookie_alloc(enum iommu_dma_cookie_type type)
  {
- 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
- 	struct iova_domain *iovad = &cookie->iovad;
--	unsigned long shift, iova_len;
--	struct iova *iova = NULL;
-+	unsigned long shift, iova_len, iova = 0;
+ 	struct iommu_dma_cookie *cookie;
+@@ -368,11 +359,19 @@ int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
+ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
+ 		size_t size, dma_addr_t dma_limit, struct device *dev)
+ {
+-	struct iova_domain *iovad = cookie_iovad(domain);
+-	unsigned long shift = iova_shift(iovad);
+-	unsigned long iova_len = size >> shift;
++	struct iommu_dma_cookie *cookie = domain->iova_cookie;
++	struct iova_domain *iovad = &cookie->iovad;
++	unsigned long shift, iova_len;
+ 	struct iova *iova = NULL;
  
- 	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
- 		cookie->msi_iova += size;
-@@ -371,41 +370,39 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
- 
- 	shift = iova_shift(iovad);
- 	iova_len = size >> shift;
-+	/*
-+	 * Freeing non-power-of-two-sized allocations back into the IOVA caches
-+	 * will come back to bite us badly, so we have to waste a bit of space
-+	 * rounding up anything cacheable to make sure that can't happen. The
-+	 * order of the unadjusted size will still match upon freeing.
-+	 */
-+	if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
-+		iova_len = roundup_pow_of_two(iova_len);
- 
++	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
++		cookie->msi_iova += size;
++		return cookie->msi_iova - size;
++	}
++
++	shift = iova_shift(iovad);
++	iova_len = size >> shift;
++
  	if (domain->geometry.force_aperture)
  		dma_limit = min(dma_limit, domain->geometry.aperture_end);
  
- 	/* Try to get PCI devices a SAC address */
- 	if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
--		iova = alloc_iova(iovad, iova_len, DMA_BIT_MASK(32) >> shift,
--				  true);
--	/*
--	 * Enforce size-alignment to be safe - there could perhaps be an
--	 * attribute to control this per-device, or at least per-domain...
--	 */
--	if (!iova)
--		iova = alloc_iova(iovad, iova_len, dma_limit >> shift, true);
-+		iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
+@@ -396,6 +395,12 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
+ 	struct iova_domain *iovad = &cookie->iovad;
+ 	struct iova *iova_rbnode;
  
--	return (dma_addr_t)iova->pfn_lo << shift;
-+	if (!iova)
-+		iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
++	/* The MSI case is only ever cleaning up its most recent allocation */
++	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
++		cookie->msi_iova -= size;
++		return;
++	}
 +
-+	return (dma_addr_t)iova << shift;
+ 	iova_rbnode = find_iova(iovad, iova_pfn(iovad, iova));
+ 	if (WARN_ON(!iova_rbnode))
+ 		return;
+@@ -406,14 +411,15 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
+ static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
+ 		size_t size)
+ {
+-	struct iova_domain *iovad = cookie_iovad(domain);
++	struct iommu_dma_cookie *cookie = domain->iova_cookie;
++	struct iova_domain *iovad = &cookie->iovad;
+ 	size_t iova_off = iova_offset(iovad, dma_addr);
+ 
+ 	dma_addr -= iova_off;
+ 	size = iova_align(iovad, size + iova_off);
+ 
+ 	WARN_ON(iommu_unmap(domain, dma_addr, size) != size);
+-	iommu_dma_free_iova(domain->iova_cookie, dma_addr, size);
++	iommu_dma_free_iova(cookie, dma_addr, size);
  }
  
- static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
- 		dma_addr_t iova, size_t size)
+ static void __iommu_dma_free_pages(struct page **pages, int count)
+@@ -838,7 +844,6 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
  {
- 	struct iova_domain *iovad = &cookie->iovad;
--	struct iova *iova_rbnode;
-+	unsigned long shift = iova_shift(iovad);
+ 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+ 	struct iommu_dma_msi_page *msi_page;
+-	struct iova_domain *iovad = cookie_iovad(domain);
+ 	dma_addr_t iova;
+ 	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+ 	size_t size = cookie_msi_granule(cookie);
+@@ -852,29 +857,16 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 	if (!msi_page)
+ 		return NULL;
  
- 	/* The MSI case is only ever cleaning up its most recent allocation */
--	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
-+	if (cookie->type == IOMMU_DMA_MSI_COOKIE)
- 		cookie->msi_iova -= size;
--		return;
+-	msi_page->phys = msi_addr;
+-	if (iovad) {
+-		iova = iommu_dma_alloc_iova(domain, size, dma_get_mask(dev), dev);
+-		if (!iova)
+-			goto out_free_page;
+-		msi_page->iova = iova;
+-	} else {
+-		msi_page->iova = cookie->msi_iova;
+-		cookie->msi_iova += size;
 -	}
 -
--	iova_rbnode = find_iova(iovad, iova_pfn(iovad, iova));
--	if (WARN_ON(!iova_rbnode))
--		return;
--
--	__free_iova(iovad, iova_rbnode);
-+	else
-+		free_iova_fast(iovad, iova >> shift, size >> shift);
- }
+-	if (iommu_map(domain, msi_page->iova, msi_addr, size, prot))
+-		goto out_free_iova;
++	iova = __iommu_dma_map(dev, msi_addr, size, prot);
++	if (iommu_dma_mapping_error(dev, iova))
++		goto out_free_page;
  
- static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
+ 	INIT_LIST_HEAD(&msi_page->list);
++	msi_page->phys = msi_addr;
++	msi_page->iova = iova;
+ 	list_add(&msi_page->list, &cookie->msi_page_list);
+ 	return msi_page;
+ 
+-out_free_iova:
+-	if (iovad)
+-		iommu_dma_free_iova(cookie, iova, size);
+-	else
+-		cookie->msi_iova -= size;
+ out_free_page:
+ 	kfree(msi_page);
+ 	return NULL;
 -- 
 2.11.0.dirty
