@@ -1,34 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 11:04:32 +0200
-Subject: [GIT PULL 6/7] Broadcom defconfig-arm64 changes for 4.12
-In-Reply-To: <20170324175807.27272-6-f.fainelli@gmail.com>
-References: <20170324175807.27272-1-f.fainelli@gmail.com>
- <20170324175807.27272-6-f.fainelli@gmail.com>
-Message-ID: <CAK8P3a2Xkbwiesg6gHPSgubKhp6C-nHaQdgT3v7hPs2myhK-WQ@mail.gmail.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Fri, 31 Mar 2017 14:36:36 +0530
+Subject: [Patch v3 07/11] Documentation: v4l: Documentation for HEVC v4l2
+ definition
+In-Reply-To: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170331090444epcas5p43f44be426728ea22d0b13f64f5cf05bd@epcas5p4.samsung.com>
+Message-ID: <1490951200-32070-8-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 6:58 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/defconfig-arm64
->
-> for you to fetch changes up to 1aaf0f47350ef912dd65d58cd94d4976b02e78c7:
->
->   Merge tag 'bcm2835-defconfig-64-next-2017-03-21' into defconfig-arm64/next (2017-03-24 10:14:14 -0700)
->
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM64-based SoCs defconfig updates for
-> 4.12, please pull the following:
->
-> - Gerd enables the BCM2835 MMC driver which yields better performance than the
->   default one (iProc)
->
+Add V4L2 definition for HEVC compressed format
 
-Pulled into next/arm64, thanks!
+Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ Documentation/media/uapi/v4l/pixfmt-013.rst | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-      Arnd
+diff --git a/Documentation/media/uapi/v4l/pixfmt-013.rst b/Documentation/media/uapi/v4l/pixfmt-013.rst
+index 728d7ed..ff4cac2 100644
+--- a/Documentation/media/uapi/v4l/pixfmt-013.rst
++++ b/Documentation/media/uapi/v4l/pixfmt-013.rst
+@@ -90,3 +90,8 @@ Compressed Formats
+       - ``V4L2_PIX_FMT_VP9``
+       - 'VP90'
+       - VP9 video elementary stream.
++    * .. _V4L2-PIX-FMT-HEVC:
++
++      - ``V4L2_PIX_FMT_HEVC``
++      - 'HEVC'
++      - HEVC video elementary stream.
+-- 
+2.7.4
