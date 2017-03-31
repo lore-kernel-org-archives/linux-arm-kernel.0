@@ -1,170 +1,138 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 31 Mar 2017 14:28:11 +0200
-Subject: [PATCH v7 2/2] soc/imx: Add GPCv2 power gating driver
-In-Reply-To: <20170401041007.GC24882@b29396-OptiPlex-7040>
-References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
- <20170321145004.21265-3-andrew.smirnov@gmail.com>
- <20170324062451.GB12604@b29396-OptiPlex-7040>
- <1490279749.29056.33.camel@pengutronix.de>
- <20170330075111.GC29432@b29396-OptiPlex-7040>
- <1490803711.29083.25.camel@pengutronix.de>
- <20170401041007.GC24882@b29396-OptiPlex-7040>
-Message-ID: <1490963291.29083.69.camel@pengutronix.de>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 31 Mar 2017 20:25:22 +0800
+Subject: [PATCH] arm64: enable ARCH_WANT_RELAX_ORDER for aarch64
+In-Reply-To: <05adceeb-856e-ce40-c23a-0cfd309549df@arm.com>
+References: <35233df0-3406-e66f-d9d2-bf7ed7814386@huawei.com>
+ <d97d0876-3e00-1979-72de-35fd81bfedf5@arm.com>
+ <5bcff420-2ba7-7f64-9c52-41a5c60e9c31@huawei.com>
+ <05adceeb-856e-ce40-c23a-0cfd309549df@arm.com>
+Message-ID: <394a4691-4f21-448a-4616-7dd4b3e9aa9e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
 
-Am Samstag, den 01.04.2017, 12:10 +0800 schrieb Dong Aisheng:
-[...]
-> > If we need the domains to be up before the consumers, the only
-> > way to deal with that is to select CONFIG_PM and
-> > CONFIG_PM_GENERIC_DOMAINS from the platform, so we have proper probe
-> > defer handling for consumer devices of the power domains.
-> > 
-> 
-> A bit confuse about these words...
 
-If those options are selected we get proper PROBE_DEFER handling for
-consumers of the power domain, so probe order doesn't matter.
+On 2017/3/20 22:00, Robin Murphy wrote:
+> On 14/03/17 14:06, Ding Tianhong wrote:
+>> Hi Robin?
+>>
+>> On 2017/3/13 21:31, Robin Murphy wrote:
+>>> On 13/03/17 12:03, Ding Tianhong wrote:
+>>>> The ARCH_WANT_RELAX_ORDER will enable Relaxed Ordering (RO) which allows
+>>>> transactions that do not have any order of completion requirements to
+>>>> complete more efficiently compare to the Stricted Ordering (SO) for ixbge
+>>>> nic card.
+>>>
+>>> Which ixgbe NIC? As far as I can see we have an arch-level config option
+>>> here which applies to one single driver, and doesn't even cover all the
+>>> hardware supported by that driver (82598, for example, still has the
+>>> #ifndef CONFIG_SPARC in the equivalent place). Looking at the history,
+>>> I'd prefer to at least know what the "various issues with certain
+>>> chipsets" were, and why they wouldn't affect ARM systems,  before making
+>>> any judgement about whether this could be considered universally safe
+>>> for arm64.
+>>>
+>>
+>> Indeed, in fact if the chipsets didn't support RO mode or has some errata for RO mode, it may
+>> occur some issues, but it looks no such aarch64 chips, maybe I miss something.
+>>
+>> There are several intel nic card could support enable relax order, so need another patch to rename the SPARC
+>> to ARCH_WANT_RELAX_ORDER, the universal name looks more better.
+> 
+> I'm sure I'm not alone in disagreeing outright that it looks better,
+> because ARCH_ is hardly the appropriate namespace for a driver option
+> unrelated to an architecture port's interaction with core kernel code;
+> plus it's further confounded by a name which both doesn't imply any
+> relationship with said driver, and does overlap with the kind of CPU
+> memory model terminology which *is* the purview of architecture ports.
+> 
+> As an equivalent example, consider how equally misleading it would be
+> from the ARM maintainer perspective if CONFIG_IOMMU_IO_PGTABLE_LPAE was
+> just called CONFIG_ARCH_WANT_LPAE and implemented in this manner.
+> 
+> Having looked into it, I see that "Relaxed Order" does actually turn out
+> to be a specific PCIe term, but even in that context it doesn't apply at
+> the arch level - that's going to be a matter for particular endpoints
+> and particular host controllers and all the quirks in between.
+> 
+>>>> The system will see high write-to-memory performance when RO is
+>>>> enabled on the data transactions just like the SPARC did.
+>>>>
+>>>> The aarch64 pcie controller could both support Relaxed Ordering (RO)
+>>>
+>>> What is "the AArch64 PCIe controller", exactly? Disregarding that
+>>> talking of PCIe in terms of the CPU ISA makes little sense, I can barely
+>>> name two ARMv8-based systems which nominally use the same PCIe IP, and
+>>> the amount of various quirks and incompatibilities I'm aware of leaves
+>>> me with the default assumption that any such unqualified blanket
+>>> statement is probably wrong. I think we need some much more considered
+>>> reasoning here.
+>>>
+>>
+>> Agree, till now I could only test on hip06/hip07 board and get the better performance,
+>> maybe I could test on other aarch64 platform.
+>>
+>>>> and Stricted Ordering (SO), so enable ARCH_WANT_RELAX_ORDER for ixgbe
+>>>> nic card to get much more better performance, and didn't see any
+>>>> adverse effects.
+>>>>
+>>>> Nic Card(Ixgbe)			Disable RO	|	Enable RO
+>>>> Performance(Per thread)		8.4Gb/s		|	9.4Gb/s
+>>>>
+>>>> Tested by Iperf on Hip06/Hip07 Soc Board.
+>>>>
+>>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>>>> ---
+>>>>  arch/arm64/Kconfig | 1 +
+>>>>  1 file changed, 1 insertion(+)
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index 8c7c244..36249a3 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -115,6 +115,7 @@ config ARM64
+>>>>  	select SPARSE_IRQ
+>>>>  	select SYSCTL_EXCEPTION_TRACE
+>>>>  	select THREAD_INFO_IN_TASK
+>>>> +	select ARCH_WANT_RELAX_ORDER
+>>>
+>>> I'd say the first order of business is to rename this config option to
+>>> IXBGE_82599_WANT_RELAXED_ORDER so that it's not entirely misleading and
+>>
+>> not only for 82599, including 82598, 82576....
+> 
+> So why does ixgbe_start_hw_82598() still have the original #ifndef
+> CONFIG_SPARC from 887012e80aea?
+> 
+> It was pretty clear from the outset that this is one of those patches
+> for making a particular card go faster in a particular system based on
+> what's available in the test lab - there's nothing inherently wrong with
+> that, but if it were presented merely in those terms there would
+> probably be a lot less to object to.
+> 
+>>> ambiguous. At first glance it looks far more like something scary to do
+>>> with memory barriers than a network driver option. Howcome this isn't
+>>> just in drivers/net/intel/Kconfig as a "default y if SPARC" bool anyway?
+>>
+>> didn't see any essential differences, and I still need to get some Acked by arm maintainer.
+> 
+> The big difference is that had people done the sensible thing by adding,
+> say, CONFIG_IXGBE_ALLOW_RELAXED_ORDER to drivers/net/intel/... and
+> sending a self-contained patch through the net tree, architecture
+> maintainers wouldn't even need to be aware, let alone ack anything. Then
+> in future if someone sends another patch against the net tree changing
+> "y if (SPARC || ARM64)" back to "y if SPARC" because it happens to break
+> on their system, the resulting discussion and resolution can happen on
+> netdev, and architecture maintainers who aren't necessarily familiar
+> with particular ixgbe/PCIe hardware details *still* don't need to care.
+> 
+> Robin.
+> 
 
-> > > Personally i'd be more like Rockchip's power domain implementation.
-> > 
-> > Why?
-> > 
-> > > See:
-> > > arch/arm/boot/dts/rk3288.dtsi
-> > > drivers/soc/rockchip/pm_domains.c
-> > > Dcumentation/devicetree/bindings/soc/rockchip/power_domain.txt
-> > > 
-> > > How about refer to the Rockchip's way?
-> > 
-> > Why? We just changed the way how it's done for GPCv1, after more than 1
-> > year of those patches being on the list. Why should we do it differently
-> > for GPCv2?
-> > 
-> 
-> Hmm?
-> 
-> I just thought your GPCv1 change was picked a few weeks ago (Feb 17 2017)
-> and there's no current users in kernel of the new binding.
-> That's why i come out of the idea if we could improve it before any users.
-> 
-> Maybe i made mistake?
+Ok, after a period of thinking and verification, I believe it is not only affect for hisilicon,
+and will try to find a better way to fix this according to your opinions, thanks.
 
-The patches to change this have been out for over 1 year. I'm less than
-motivated to change the binding again, after it has gone through the DT
-review and has finally been picked up.
+Ding
 
-> See:
-> commit 721cabf6c6600dbe689ee2782bc087270e97e652
-> Author: Lucas Stach <l.stach@pengutronix.de>
-> Date:   Fri Feb 17 20:02:44 2017 +0100
+> .
 > 
->     soc: imx: move PGC handling to a new GPC driver
->     
->     This is an almost complete re-write of the previous GPC power gating control
->     code found in the IMX architecture code. It supports both the old and the new
->     DT binding, allowing more domains to be added later and generally makes the
->     driver easier to extend, while keeping compatibility with existing DTBs.
->     
->     As the result, all functionality regarding the power gating controller
->     gets removed from the IMX architecture GPC driver.  It keeps only the
->     IRQ controller code in the architecture, as this is closely coupled to
->     the CPU idle implementation.
->     
->     Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
->     Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> 
-> > > 
-> > > Then it could also address our issues and the binding would be
-> > > still like:
-> > > gpc: gpc at 303a0000 {
-> > >         compatible = "fsl,imx7d-gpc";
-> > >         reg = <0x303a0000 0x1000>;
-> > >         interrupt-controller;
-> > >         interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> > >         #interrupt-cells = <3>;
-> > >         interrupt-parent = <&intc>;
-> > > 
-> > >         pgc {
-> > >                 #address-cells = <1>;
-> > >                 #size-cells = <0>;
-> > > 
-> > >                 pgc_pcie_phy: power-domain at IMX7_POWER_DOMAIN_PCIE_PHY {
-> > >                         reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
-> > >                         power-supply = <&reg_1p0d>;
-> > > 			clocks = <xxx>;
-> > >                 };
-> > > 
-> > > 		....
-> > >         };
-> > > };
-> > > 
-> > > It also drops #power-domain-cells and register domain by
-> > > one provider with multi domains which is more align with HW.
-> > > 
-> > > How do you think of it?
-> > 
-> > How is this more aligned with the hardware? Both options are an
-> > arbitrary abstraction chosen in the DT binding.
-> > 
-> 
-> GPC is a Power Controller which controls multi power domains to subsystem
-> by its different registers bits.
-> e.g. PCIE/MIPI/USB HSIC PHY.
-> ? 0xC00 ~ 0xC3F: PGC for MIPI PHY
-> ? 0xC40 ~ 0xC7F: PGC for PCIE_PHY
-> ? 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
-> 
-> So i thought it looks more like GPC is a power domain provider with multi
-> domains support to different subsystems from HW point of view.
-> 
-> Isn't that true?
-
-Linux and hardware devices are not required to match 1:1. There is
-nothing that would make subdividing a single hardware device into
-multiple ones bad style.
-
-> 
-> And there's also other two concerns:
-> First, current genpd sysfs output still not include provider.
-> e.g.
-> root at imx6qdlsolo:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary 
-> domain                          status          slaves
->     /device                                             runtime status
-> ----------------------------------------------------------------------
-> PU                              off-0           
->     /devices/soc0/soc/130000.gpu                        suspended
->     /devices/soc0/soc/134000.gpu                        suspended
->     /devices/soc0/soc/2204000.gpu                       suspended
->     /devices/soc0/soc/2000000.aips-bus/2040000.vpu      suspended
-> ARM                             off-0           
-> 
-> I wonder it might be a bit mess once the provider is added while each
-> domain is registered as a virtual provider.
-
-The provider is a Linux device. Linux devices don't necessarily have to
-correspond to hardware devices. There is no such rule.
-
-> 
-> Second, it sacrifices a bit performance when look-up PM domain in
-> genpd_get_from_provider if every domain is a provider.
-> 
-The performance penalty of a list walk won't hurt us in the probe path,
-where we are (re-)probing entire devices. There is a lot more going on
-than a simple list walk.
-
-> Though it is arguable that currently only 3 domains support on MX7,
-> but who knows the future when it becomes much more.
-> 
-> However, i did see many exist users in kernel using one provider one
-> domain way. Maybe i'm over worried and it's not big deal.
-
-I see that one provider with multiple domains is used more often, that
-doesn't means it's necessarily better. At least I haven't hear a
-convincing argument on why the chosen implementation in the GPC driver
-is worse than the alternative.
-
-Regards,
-Lucas
