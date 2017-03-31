@@ -1,30 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 31 Mar 2017 09:40:52 +0200
-Subject: [PATCH 2/2] MAINTAINERS: Add sun4i-drm git repo
-In-Reply-To: <20170331074052.28878-1-maxime.ripard@free-electrons.com>
-References: <20170331074052.28878-1-maxime.ripard@free-electrons.com>
-Message-ID: <20170331074052.28878-2-maxime.ripard@free-electrons.com>
+Date: Fri, 31 Mar 2017 09:40:51 +0200
+Subject: [PATCH 1/2] MAINTAINERS: Update the Allwinner sunXi entry
+Message-ID: <20170331074052.28878-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the git tree where the sun4i-drm patches are hosted.
+Chen-Yu and I have a shared git tree to host the sunxi patches now, so
+let's document it.
+
+And while we're at it, enhance our regex and document a few directories
+that have been asked for in the past.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ MAINTAINERS | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index c18a2b89ce83..f9f5128e4177 100644
+index 4084e2fa39c9..c18a2b89ce83 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -4252,6 +4252,7 @@ L:	dri-devel at lists.freedesktop.org
- S:	Supported
- F:	drivers/gpu/drm/sun4i/
- F:	Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
+@@ -1047,8 +1047,13 @@ M:	Chen-Yu Tsai <wens@csie.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ N:	sun[x456789]i
+-F:	arch/arm/boot/dts/ntc-gr8*
++N:	sun50i
++F:	arch/arm/mach-sunxi/
+ F:	arch/arm64/boot/dts/allwinner/
++F:	drivers/clk/sunxi-ng/
++F:	drivers/pinctrl/sunxi/
++F:	drivers/soc/sunxi/
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
  
- DRM DRIVERS FOR AMLOGIC SOCS
- M:	Neil Armstrong <narmstrong@baylibre.com>
+ ARM/Allwinner SoC Clock Support
+ M:	Emilio L?pez <emilio@elopez.com.ar>
 -- 
 2.11.0
