@@ -1,43 +1,50 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 31 Mar 2017 18:02:56 +0100
-Subject: [GIT PULL] firmware: scpi: updates for v4.12
-Message-ID: <bebdfb55-7704-716a-d00e-585be848af74@arm.com>
+From: hgkr.klein@gmail.com (Helmut Klein)
+Date: Fri, 31 Mar 2017 19:03:12 +0200
+Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
+In-Reply-To: <1490974657.12951.5.camel@baylibre.com>
+References: <20170328092545.4644-1-hgkr.klein@gmail.com>
+ <20170328092545.4644-2-hgkr.klein@gmail.com>
+ <1490716277.20764.6.camel@baylibre.com>
+ <71489b62-78c8-7082-587e-8598dc43ca59@gmail.com>
+ <1490728490.20764.8.camel@baylibre.com>
+ <CAFBinCDF29+kQpedsJPqRy6fztWrj91Qi6tCno_2S6UCkhW7XQ@mail.gmail.com>
+ <m2y3vn6dhk.fsf@baylibre.com> <1490974657.12951.5.camel@baylibre.com>
+Message-ID: <26dd484d-f6fd-048d-7467-0fe9a1e6645b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
+On 31.03.2017 17:37, Jerome Brunet wrote:
+> On Wed, 2017-03-29 at 13:21 -0700, Kevin Hilman wrote:
+>> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+>>
+>> [...]
+>>
+>>> for Helmut this would mean that instead of dropping this patch (or
+>>> dropping CLKID_UART1 and CLKID_UART2 from this patch) he would rather
+>>> have to *add* another patch (for meson-gxbb.dtsi and meson-gxl.dtsi)
+>>> which passes the core clocks to the corresponding UART controllers
+>>> (similar to the CLKID_SD_EMMC_ clocks).
+>>
+>> Yes, this is what I would like to see.
+>>
+>> If a new CLKID is exposed, I want to see the users of it at the same
+>> time.
+>
+> Helmut,
+>
+> If you send another version of these patches, considering the feedback of Kevin
+> and Martin, could you please change the subject of this patch to:
+>
+> dt-bindings: clock: gxbb: expose UART clocks
+>
+> Thx
+> Jerome
+>
+i've just sent v3 of my patchset.
+(i changed the subjects of most patches in the set)
 
-Please pull !
+Helmut
 
-Regards,
-Sudeep
-
----
-
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-tags/scpi-update-4.12
-
-for you to fetch changes up to c511fa3f35e30982445fae2946f4aade3f42203d:
-
-  firmware: arm_scpi: reinit completion instead of full
-init_completion() (2017-03-31 11:00:23 +0100)
-
-----------------------------------------------------------------
-SCPI update for v4.12
-
-Single patch to optimise the completion initialisation using reinit_*
-API instead of full initialisation on each and every transfer.
-
-----------------------------------------------------------------
-Alexey Klimov (1):
-      firmware: arm_scpi: reinit completion instead of full
-init_completion()
-
- drivers/firmware/arm_scpi.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> Kevin
+>
