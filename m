@@ -1,34 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Mar 2017 12:01:05 +0200
-Subject: [GIT PULL 2/3] DaVinci DT updates for v4.12
-In-Reply-To: <20170323105106.20144-2-nsekhar@ti.com>
-References: <20170323105106.20144-1-nsekhar@ti.com>
- <20170323105106.20144-2-nsekhar@ti.com>
-Message-ID: <CAK8P3a3kP7LsJrD5v_RQir93vi5-rPRuPGkR05DSJ5p6tsEWSg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 31 Mar 2017 11:02:26 +0100
+Subject: [GIT PULL] ACPI IORT changes for v4.12
+Message-ID: <20170331100226.GA30762@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:51 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/dt
->
-> for you to fetch changes up to f8914131f7da23ab604efd8d1b95a416e5d8fc44:
->
->   ARM: dts: da850-evm: add the output port to the vpif node (2017-03-07 16:46:56 +0530)
->
-> ----------------------------------------------------------------
-> DaVinci device tree updates to enable
-> Video display on DA850 along with some
-> whitespace clean-up.
->
-> Also, enables sound and ADC support on
-> Lego EV3
+Hi Catalin, Will,
 
-Pulled into next/dt, thanks!
+I have collected the following ACPI/IORT patches for the 4.12 release:
 
-       Arnd
+- IORT interface minor clean-ups
+- IORT platform devices (IORT named components) devid mapping interface
+  implementation
+- ACPI core changes to enable platform MSIs
+
+ACPI core changes have been acknowledged by the ACPI maintainer and
+I reviewed/updated the IORT patches.
+
+This pull request provides the groundwork to implement platform MSIs
+in ACPI for ARM64, the irqchip changes enabling GIC ITS platform
+MSIs will be merged via the irqchip tree.
+
+Please consider pulling it.
+
+Thanks !
+Lorenzo
+
+The following changes since commit 97da3854c526d3a6ee05c849c96e48d21527606c:
+
+  Linux 4.11-rc3 (2017-03-19 19:09:39 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/acpi-arm64-for-v4.12
+
+for you to fetch changes up to d4f54a186667ffd19eac8e3f48c51d940a9b9784:
+
+  ACPI: platform: setup MSI domain for ACPI based platform device (2017-03-30 10:20:01 +0100)
+
+----------------------------------------------------------------
+ACPI ARM64 specific changes for v4.12.
+
+Patches contain:
+
+- IORT kernel interface misc clean-ups
+- IORT id mapping interface refactoring in preparation for platform
+  MSI (IORT named components -> GIC ITS mappings) devid mapping code
+- IORT id mapping implementation for named components nodes to ITS nodes,
+  in order to provide the kernel with a firmware interface to map
+  platform devices devids to GIC ITS components
+
+----------------------------------------------------------------
+Hanjun Guo (7):
+      ACPI/IORT: Fix the indentation in iort_scan_node()
+      ACPI/IORT: Add missing comment for iort_dev_find_its_id()
+      ACPI/IORT: Rework iort_match_node_callback() return value handling
+      ACPI/IORT: Rename iort_node_map_rid() to make it generic
+      ACPI/IORT: Introduce iort_node_map_platform_id() to retrieve dev id
+      ACPI: platform-msi: retrieve devid from IORT
+      ACPI: platform: setup MSI domain for ACPI based platform device
+
+ drivers/acpi/arm64/iort.c | 158 +++++++++++++++++++++++++++++++++++++---------
+ drivers/acpi/glue.c       |   6 ++
+ include/linux/acpi_iort.h |   3 +
+ 3 files changed, 136 insertions(+), 31 deletions(-)
