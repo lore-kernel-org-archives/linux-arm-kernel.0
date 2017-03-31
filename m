@@ -1,31 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 31 Mar 2017 14:06:27 -0500
-Subject: [PATCH v5 14/24] dt-bindings: mfd: syscon: Add documentation for
- #syscon-cells property
-In-Reply-To: <20170331185852.mxa4gvjxbuxl65dq@rob-hp-laptop>
+Date: Fri, 31 Mar 2017 14:07:34 -0500
+Subject: [PATCH v5 16/24] dt-bindings: PCI: dra7xx: Add dt bindings to
+ enable unaligned access
+In-Reply-To: <20170327094520.3129-17-kishon@ti.com>
 References: <20170327094520.3129-1-kishon@ti.com>
- <20170327094520.3129-15-kishon@ti.com>
- <20170331185852.mxa4gvjxbuxl65dq@rob-hp-laptop>
-Message-ID: <20170331190627.nucviejokdklgtk7@rob-hp-laptop>
+ <20170327094520.3129-17-kishon@ti.com>
+Message-ID: <20170331190734.n6wnd3rm73o4be5z@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 01:58:52PM -0500, Rob Herring wrote:
-> On Mon, Mar 27, 2017 at 03:15:10PM +0530, Kishon Vijay Abraham I wrote:
-> > Add documentation for the optional #syscon-cells property to determine
-> > the number of cells that should be given in the phandle while
-> > referencing the syscon-node.
-> > 
-> > Suggested-by: Rob Herring <robh@kernel.org>
+On Mon, Mar 27, 2017 at 03:15:12PM +0530, Kishon Vijay Abraham I wrote:
+> Update device tree binding documentation of TI's dra7xx PCI
+> controller to include property for enabling unaligned mem access.
 > 
-> I did? When?
-> 
-> I'm not remembering why we need this. Generally, phandles to a syscon 
-> are for a single defined purpose. When do we need a list of them?
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-Ah, I remember now the context. I suggested using standard parsing 
-function rather than open coding. I wasn't suggesting changing the 
-binding. Instead of of_parse_phandle_with_args, can't 
-of_parse_phandle_with_fixed_args work?
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
