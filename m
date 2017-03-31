@@ -1,134 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 31 Mar 2017 12:08:13 +0100
-Subject: [PATCH v2 06/22] ARM: implement ioremap_nopost() interface
-In-Reply-To: <20170327094954.7162-7-lorenzo.pieralisi@arm.com>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-7-lorenzo.pieralisi@arm.com>
-Message-ID: <20170331110813.GA31763@red-moon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 31 Mar 2017 13:11:59 +0200
+Subject: [PATCH v5 2/2] mmc: host: s3cmci: allow probing from device tree
+In-Reply-To: <CAK8P3a2emCf=KtpCJMOaJnr89Gi+rCi0eun_vjb1wiYB=JR6jg@mail.gmail.com>
+References: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
+ <1489799633-29278-3-git-send-email-sergio.prado@e-labworks.com>
+ <CAK8P3a2emCf=KtpCJMOaJnr89Gi+rCi0eun_vjb1wiYB=JR6jg@mail.gmail.com>
+Message-ID: <CAPDyKFquGSgK7tkYDpkJM7C7JChZMqvmHoJyiLE9_ZG4CGBOSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 31 March 2017 at 09:25, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sat, Mar 18, 2017 at 2:13 AM, Sergio Prado
+> <sergio.prado@e-labworks.com> wrote:
+>
+>>
+>> +static const struct of_device_id s3cmci_dt_match[] = {
+>> +       {
+>> +               .compatible = "samsung,s3c2410-sdi",
+>> +               .data = (void *)0,
+>> +       },
+>> +       {
+>> +               .compatible = "samsung,s3c2412-sdi",
+>> +               .data = (void *)1,
+>> +       },
+>> +       {
+>> +               .compatible = "samsung,s3c2440-sdi",
+>> +               .data = (void *)1,
+>> +       },
+>> +       { /* sentinel */ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+>> +
+>
+> The names don't match:
+>
+> In file included from /git/arm-soc/drivers/mmc/host/s3cmci.c:14:0:
+> /git/arm-soc/drivers/mmc/host/s3cmci.c:1844:25: error:
+> 'sdhci_s3c_dt_match' undeclared here (not in a function); did you mean
+> 's3cmci_dt_match'?
+>  MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+>                          ^
+> /git/arm-soc/include/linux/module.h:212:21: note: in definition of
+> macro 'MODULE_DEVICE_TABLE'
+>  extern const typeof(name) __mod_##type##__##name##_device_table  \
+>                      ^~~~
+> /git/arm-soc/include/linux/module.h:212:27: error:
+> '__mod_of__sdhci_s3c_dt_match_device_table' aliased to undefined
+> symbol 'sdhci_s3c_dt_match'
+>  extern const typeof(name) __mod_##type##__##name##_device_table  \
+>                            ^
+> /git/arm-soc/drivers/mmc/host/s3cmci.c:1844:1: note: in expansion of
+> macro 'MODULE_DEVICE_TABLE'
+>  MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
+>  ^~~~~~~~~~~~~~~~~~~
+> /git/arm-soc/scripts/Makefile.build:314: recipe for target
+> 'drivers/mmc/host/s3cmci.o' failed
+>
+> Can you send a fix?
 
-On Mon, Mar 27, 2017 at 10:49:34AM +0100, Lorenzo Pieralisi wrote:
-> The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
-> and Posting") define rules for PCI configuration space transactions
-> ordering and posting, that state that configuration writes have to
-> be non-posted transactions.
-> 
-> Current ioremap interface on ARM provides mapping functions that
-> provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
-> memory type) aka posted writes, so PCI host controller drivers have
-> no arch interface to remap PCI configuration space with memory
-> attributes that comply with the PCI specifications for configuration
-> space.
-> 
-> Implement an ARM specific ioremap_nopost() interface that allows to
-> map PCI config memory regions with MT_UNCACHED memory type (ie strongly
-> ordered - non-posted writes), providing a remap function that complies
-> with PCI specifications for config space transactions.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@armlinux.org.uk>
-> ---
->  arch/arm/include/asm/io.h | 10 ++++++++++
->  arch/arm/mm/ioremap.c     |  7 +++++++
->  arch/arm/mm/nommu.c       |  9 +++++++++
->  3 files changed, 26 insertions(+)
+Never mind, I am dropping the patches from my next branch as those
+clearly haven't been built/tested by Sergio properly. It's better that
+he re-spins them.
 
-I have not added your ACK to this patch since I slightly tweaked
-it to adapt it to ioremap_nopost() interface instead of a PCI
-specific one. Furthermore, I mechanically added a ioremap_nopost()
-version for nommu too in the process, would be good to have a look
-if I did that properly please.
+Arnd, thanks for reporting and even fixing some of the problems!
 
-Can I add your ACK on this patch ? If you spot any issues please
-do let me know.
-
-Thank you !
-Lorenzo
-
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index 42871fb..49913d1 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -352,6 +352,7 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
->   * mapping has specific properties.
->   *
->   * Function		Memory type	Cacheability	Cache hint
-> + * ioremap_nopost()	SO		n/a		n/a
->   * ioremap()		Device		n/a		n/a
->   * ioremap_nocache()	Device		n/a		n/a
->   * ioremap_cache()	Normal		Writeback	Read allocate
-> @@ -372,6 +373,12 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
->   * compiler may generate unaligned accesses - eg, via inlining its own
->   * memcpy.
->   *
-> + * ioremap_nopost() maps memory as strongly ordered, to be used for
-> + * specific mappings (eg PCI config space) that require non-posted
-> + * write transactions. Strongly ordered transactions are ordered wrt
-> + * device mappings, which means that ioremap_nopost() is the same
-> + * as ioremap() except for non-posted writes behaviour.
-> + *
->   * All normal memory mappings have the following properties:
->   * - reads can be repeated with no side effects
->   * - repeated reads return the last value written
-> @@ -407,6 +414,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
->  #define ioremap_wc ioremap_wc
->  #define ioremap_wt ioremap_wc
->  
-> +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size);
-> +#define ioremap_nopost ioremap_nopost
-> +
->  void iounmap(volatile void __iomem *iomem_cookie);
->  #define iounmap iounmap
->  
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index ff0eed2..4ffaf16 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -463,6 +463,13 @@ void iounmap(volatile void __iomem *cookie)
->  }
->  EXPORT_SYMBOL(iounmap);
->  
-> +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size)
-> +{
-> +	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
-> +				   __builtin_return_address(0));
-> +}
-> +EXPORT_SYMBOL_GPL(ioremap_nopost);
-> +
->  #ifdef CONFIG_PCI
->  static int pci_ioremap_mem_type = MT_DEVICE;
->  
-> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-> index 3b5c7aa..dfd736a 100644
-> --- a/arch/arm/mm/nommu.c
-> +++ b/arch/arm/mm/nommu.c
-> @@ -21,6 +21,8 @@
->  #include <asm/mpu.h>
->  #include <asm/procinfo.h>
->  
-> +#include <asm/mach/map.h>
-> +
->  #include "mm.h"
->  
->  unsigned long vectors_base;
-> @@ -433,6 +435,13 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
->  }
->  EXPORT_SYMBOL(ioremap_wc);
->  
-> +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size)
-> +{
-> +	return __arm_ioremap_caller(res_cookie, size, MT_UNCACHED,
-> +				    __builtin_return_address(0));
-> +}
-> +EXPORT_SYMBOL(ioremap_nopost);
-> +
->  void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
->  {
->  	return (void *)phys_addr;
-> -- 
-> 2.10.0
-> 
+Kind regards
+Uffe
