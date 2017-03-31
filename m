@@ -1,68 +1,54 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 31 Mar 2017 13:11:59 +0200
-Subject: [PATCH v5 2/2] mmc: host: s3cmci: allow probing from device tree
-In-Reply-To: <CAK8P3a2emCf=KtpCJMOaJnr89Gi+rCi0eun_vjb1wiYB=JR6jg@mail.gmail.com>
-References: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
- <1489799633-29278-3-git-send-email-sergio.prado@e-labworks.com>
- <CAK8P3a2emCf=KtpCJMOaJnr89Gi+rCi0eun_vjb1wiYB=JR6jg@mail.gmail.com>
-Message-ID: <CAPDyKFquGSgK7tkYDpkJM7C7JChZMqvmHoJyiLE9_ZG4CGBOSw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Mar 2017 12:16:24 +0100
+Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
+ mmaping code
+In-Reply-To: <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
+References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
+ <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <20170331111624.GR7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 March 2017 at 09:25, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sat, Mar 18, 2017 at 2:13 AM, Sergio Prado
-> <sergio.prado@e-labworks.com> wrote:
->
->>
->> +static const struct of_device_id s3cmci_dt_match[] = {
->> +       {
->> +               .compatible = "samsung,s3c2410-sdi",
->> +               .data = (void *)0,
->> +       },
->> +       {
->> +               .compatible = "samsung,s3c2412-sdi",
->> +               .data = (void *)1,
->> +       },
->> +       {
->> +               .compatible = "samsung,s3c2440-sdi",
->> +               .data = (void *)1,
->> +       },
->> +       { /* sentinel */ },
->> +};
->> +MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
->> +
->
-> The names don't match:
->
-> In file included from /git/arm-soc/drivers/mmc/host/s3cmci.c:14:0:
-> /git/arm-soc/drivers/mmc/host/s3cmci.c:1844:25: error:
-> 'sdhci_s3c_dt_match' undeclared here (not in a function); did you mean
-> 's3cmci_dt_match'?
->  MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
->                          ^
-> /git/arm-soc/include/linux/module.h:212:21: note: in definition of
-> macro 'MODULE_DEVICE_TABLE'
->  extern const typeof(name) __mod_##type##__##name##_device_table  \
->                      ^~~~
-> /git/arm-soc/include/linux/module.h:212:27: error:
-> '__mod_of__sdhci_s3c_dt_match_device_table' aliased to undefined
-> symbol 'sdhci_s3c_dt_match'
->  extern const typeof(name) __mod_##type##__##name##_device_table  \
->                            ^
-> /git/arm-soc/drivers/mmc/host/s3cmci.c:1844:1: note: in expansion of
-> macro 'MODULE_DEVICE_TABLE'
->  MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
->  ^~~~~~~~~~~~~~~~~~~
-> /git/arm-soc/scripts/Makefile.build:314: recipe for target
-> 'drivers/mmc/host/s3cmci.o' failed
->
-> Can you send a fix?
+On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
+> In this version of the patch I have replaced temporal pages and
+> iommu_dma_mmap with remap_pfn_range or rather its simplified version
+> vm_iomap_memory.
+> Unfortunately I have not find nice helper for sgtable creation, so I
+> left sg allocation inside _iommu_mmap_attrs.
+> 
+> As the fixing of DMA_ATTR_FORCE_CONTIGUOUS related crashes has higher
+> priority I have focused only on it in this patch.
 
-Never mind, I am dropping the patches from my next branch as those
-clearly haven't been built/tested by Sergio properly. It's better that
-he re-spins them.
+As I mentioned elsewhere, I don't believe that fudging around in this way
+is a proper fix.
 
-Arnd, thanks for reporting and even fixing some of the problems!
+DMA coherent memory was never, ever, intended to be passed back into the
+streaming APIs - it was designed that the two would be mutually exclusive.
 
-Kind regards
-Uffe
+The problem is that we now have DMA coherent allocations being passed
+through the dma-buf API using this dma_get_sgtable() thing, which is quite
+broken.  I regard dma_get_sgtable() as very broken, and had I realised at
+the time that this was what it was trying to do, I would have NAK'd it.
+
+Rather than bodging around this brokenness, trying to get dma_get_sgtable()
+to work, I believe we need to address the root cause - which is proper
+support for passing DMA coherent allocations through dma-buf, which does
+not involve scatterlists and calling dma_map_sg() on it.
+
+That's going to need to be addressed in any case, because of the
+dma_declare_coherent_memory() issue, where we may not have struct pages
+backing a coherent allocation.  Such a case can come up on ARM64 via
+DT's "shared-dma-pool" reserved memory stuff.
+
+Right now, I have a "fix" for ARM queued which causes dma_get_sgtable()
+to fail when used with reserved memory, but we have one user who needs
+this to work.  So, dma-buf needs to be fixed for this one way or another,
+and I don't think that bending the current broken stuff to suit it by
+trying these vmalloc_to_page() hacks is acceptable.
+
+dma_get_sgtable() is fundamentally broken IMHO.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
