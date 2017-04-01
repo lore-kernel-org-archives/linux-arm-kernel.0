@@ -1,276 +1,61 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Wed, 1 Mar 2017 15:42:33 +0800
-Subject: [PATCH V11 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <1487712121-16688-6-git-send-email-tbaicar@codeaurora.org>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-6-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58B67B69.8000702@huawei.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Sat,  1 Apr 2017 03:18:47 -0400
+Subject: [PATCH v3 0/7] mfd: Add OF device table to I2C drivers that are
+ missing it
+Message-ID: <20170401071854.23198-1-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hello,
 
-On 2017/2/22 5:21, Tyler Baicar wrote:
-> ARM APEI extension proposal added SEA (Synchronous External Abort)
-> notification type for ARMv8.
-> Add a new GHES error source handling function for SEA. If an error
-> source's notification type is SEA, then this function can be registered
-> into the SEA exception handler. That way GHES will parse and report
-> SEA exceptions when they occur.
+This series add OF device ID tables to mfd I2C drivers whose devices are
+either used in Device Tree source files or are listed in binding docs as
+a compatible string.
 
-I have a question about ghes_proc. In ghes_proc, we just parse and report
-the error information, but no one use it for error recovery now.
+That's done because the plan is to change the I2C core to report proper OF
+modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
+a device was registered via DT or using the legacy platform data mechanism.
 
-Take the SEA case for example, we get the physical address from parsing
-the GHES table. But the memory management system or other drivers/modules
-know what the really meaning of the error address/page. There is no way to
-notify them to do the recovery now.
+So these patches will make sure that mfd I2C drivers modules will continue
+to be autoloaded once the I2C core is changed to report proper OF modalias.
 
-So, could we add a notify at appropriate position. All drivers or modules
-which are interested in this error could receive and take the corresponding
-action.
+Users didn't have a vendor prefix in the used compatible strings, but since
+there wasn't a DT binding document for these drivers, it can be said that
+were working for mere luck and so this series fixes the users and add a DT
+binding doc for the drivers.
 
----
-Thanks,
-Xie XiuQi
+It's safe to apply the patches independently.
 
+Best regards,
+Javier
 
-> An SEA can interrupt code that had interrupts masked and is treated as
-> an NMI. To aid this the page of address space for mapping APEI buffers
-> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
-> changed to use the helper methods to find the prot_t to map with in
-> the same way as ghes_ioremap_pfn_irq().
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> ---
->  arch/arm64/Kconfig        |  1 +
->  arch/arm64/mm/fault.c     | 13 ++++++++
->  drivers/acpi/apei/Kconfig | 15 +++++++++
->  drivers/acpi/apei/ghes.c  | 77 +++++++++++++++++++++++++++++++++++++++++++----
->  include/acpi/ghes.h       |  7 +++++
->  5 files changed, 107 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1117421..fca4dc1 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -88,6 +88,7 @@ config ARM64
->  	select HAVE_IRQ_TIME_ACCOUNTING
->  	select HAVE_MEMBLOCK
->  	select HAVE_MEMBLOCK_NODE_MAP if NUMA
-> +	select HAVE_NMI if ACPI_APEI_SEA
->  	select HAVE_PATA_PLATFORM
->  	select HAVE_PERF_EVENTS
->  	select HAVE_PERF_REGS
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index d178dc0..b2d57fc 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -41,6 +41,8 @@
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
->  
-> +#include <acpi/ghes.h>
-> +
->  static const char *fault_name(unsigned int esr);
->  
->  #ifdef CONFIG_KPROBES
-> @@ -498,6 +500,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->  		 fault_name(esr), esr, addr);
->  
-> +	/*
-> +	 * Synchronous aborts may interrupt code which had interrupts masked.
-> +	 * Before calling out into the wider kernel tell the interested
-> +	 * subsystems.
-> +	 */
-> +	if (IS_ENABLED(ACPI_APEI_SEA)) {
-> +		nmi_enter();
-> +		ghes_notify_sea();
-> +		nmi_exit();
-> +	}
-> +
->  	info.si_signo = SIGBUS;
->  	info.si_errno = 0;
->  	info.si_code  = 0;
-> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-> index b0140c8..c545dd1 100644
-> --- a/drivers/acpi/apei/Kconfig
-> +++ b/drivers/acpi/apei/Kconfig
-> @@ -39,6 +39,21 @@ config ACPI_APEI_PCIEAER
->  	  PCIe AER errors may be reported via APEI firmware first mode.
->  	  Turn on this option to enable the corresponding support.
->  
-> +config ACPI_APEI_SEA
-> +	bool "APEI Synchronous External Abort logging/recovering support"
-> +	depends on ARM64 && ACPI_APEI && ACPI_APEI_GHES
-> +	default y
-> +	help
-> +	  This option should be enabled if the system supports
-> +	  firmware first handling of SEA (Synchronous External Abort).
-> +	  SEA happens with certain faults of data abort or instruction
-> +	  abort synchronous exceptions on ARMv8 systems. If a system
-> +	  supports firmware first handling of SEA, the platform analyzes
-> +	  and handles hardware error notifications from SEA, and it may then
-> +	  form a HW error record for the OS to parse and handle. This
-> +	  option allows the OS to look for such hardware error record, and
-> +	  take appropriate action.
-> +
->  config ACPI_APEI_MEMORY_FAILURE
->  	bool "APEI memory error recovering support"
->  	depends on ACPI_APEI && MEMORY_FAILURE
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index b25e7cf..b0596ba 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -114,11 +114,7 @@
->   * Two virtual pages are used, one for IRQ/PROCESS context, the other for
->   * NMI context (optionally).
->   */
-> -#ifdef CONFIG_HAVE_ACPI_APEI_NMI
->  #define GHES_IOREMAP_PAGES           2
-> -#else
-> -#define GHES_IOREMAP_PAGES           1
-> -#endif
->  #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
->  #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
->  
-> @@ -157,10 +153,14 @@ static void ghes_ioremap_exit(void)
->  static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
->  {
->  	unsigned long vaddr;
-> +	phys_addr_t paddr;
-> +	pgprot_t prot;
->  
->  	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
-> -	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
-> -			   pfn << PAGE_SHIFT, PAGE_KERNEL);
-> +
-> +	paddr = pfn << PAGE_SHIFT;
-> +	prot = arch_apei_get_mem_attribute(paddr);
-> +	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
->  
->  	return (void __iomem *)vaddr;
->  }
-> @@ -767,6 +767,50 @@ static int ghes_notify_sci(struct notifier_block *this,
->  	.notifier_call = ghes_notify_sci,
->  };
->  
-> +#ifdef CONFIG_ACPI_APEI_SEA
-> +static LIST_HEAD(ghes_sea);
-> +
-> +void ghes_notify_sea(void)
-> +{
-> +	struct ghes *ghes;
-> +
-> +	/*
-> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-> +	 * rcu_read_lock().
-> +	 */
-> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-> +		ghes_proc(ghes);
-> +	}
-> +}
-> +
-> +static void ghes_sea_add(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	list_add_rcu(&ghes->list, &ghes_sea);
-> +	mutex_unlock(&ghes_list_mutex);
-> +}
-> +
-> +static void ghes_sea_remove(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	list_del_rcu(&ghes->list);
-> +	mutex_unlock(&ghes_list_mutex);
-> +	synchronize_rcu();
-> +}
-> +#else /* CONFIG_ACPI_APEI_SEA */
-> +static inline void ghes_sea_add(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +}
-> +
-> +static inline void ghes_sea_remove(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +}
-> +#endif /* CONFIG_ACPI_APEI_SEA */
-> +
->  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->  /*
->   * printk is not safe in NMI context.  So in NMI handler, we allocate
-> @@ -1012,6 +1056,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  	case ACPI_HEST_NOTIFY_EXTERNAL:
->  	case ACPI_HEST_NOTIFY_SCI:
->  		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
-> +				generic->header.source_id);
-> +			rc = -ENOTSUPP;
-> +			goto err;
-> +		}
-> +		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
->  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-> @@ -1023,6 +1075,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
->  			   generic->header.source_id);
->  		goto err;
-> +	case ACPI_HEST_NOTIFY_GPIO:
-> +	case ACPI_HEST_NOTIFY_SEI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
-> +			generic->header.source_id, generic->header.source_id);
-> +		rc = -ENOTSUPP;
-> +		goto err;
->  	default:
->  		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
->  			   generic->notify.type, generic->header.source_id);
-> @@ -1077,6 +1136,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  		list_add_rcu(&ghes->list, &ghes_sci);
->  		mutex_unlock(&ghes_list_mutex);
->  		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		ghes_sea_add(ghes);
-> +		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		ghes_nmi_add(ghes);
->  		break;
-> @@ -1119,6 +1181,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
->  			unregister_acpi_hed_notifier(&ghes_notifier_sci);
->  		mutex_unlock(&ghes_list_mutex);
->  		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		ghes_sea_remove(ghes);
-> +		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		ghes_nmi_remove(ghes);
->  		break;
-> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-> index 6ae318b..18bc935 100644
-> --- a/include/acpi/ghes.h
-> +++ b/include/acpi/ghes.h
-> @@ -1,3 +1,6 @@
-> +#ifndef GHES_H
-> +#define GHES_H
-> +
->  #include <acpi/apei.h>
->  #include <acpi/hed.h>
->  
-> @@ -95,3 +98,7 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
->  		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
->  		gdata + 1;
->  }
-> +
-> +void ghes_notify_sea(void);
-> +
-> +#endif /* GHES_H */
-> 
+Changes in v3:
+- Add a vendor prefix to the compatible string (Rob Herring).
+- Add a vendor prefix to the compatible string (Rob Herring).
+
+Changes in v2:
+- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
+- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
+
+Javier Martinez Canillas (7):
+  mfd: Add Device Tree bindings document for retu/tahvo ASIC chips
+  mfd: retu: Add OF device ID table
+  i2c: i2c-cbus-gpio: Add vendor prefix to retu node in example
+  ARM: dts: n8x0: Add vendor prefix to retu node
+  mfd: Add Device Tree bindings document for TI tps6105x chip
+  mfd: tps6105x: Add OF device ID table
+  ARM: ux500: Add vendor prefix to tps61052 node
+
+ .../devicetree/bindings/i2c/i2c-cbus-gpio.txt         |  2 +-
+ Documentation/devicetree/bindings/mfd/retu.txt        | 19 +++++++++++++++++++
+ Documentation/devicetree/bindings/mfd/tps6105x.txt    | 17 +++++++++++++++++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi           |  2 +-
+ arch/arm/boot/dts/ste-hrefprev60.dtsi                 |  2 +-
+ drivers/mfd/retu-mfd.c                                |  8 ++++++++
+ drivers/mfd/tps6105x.c                                |  8 ++++++++
+ 7 files changed, 55 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/retu.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/tps6105x.txt
+
+-- 
+2.9.3
