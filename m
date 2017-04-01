@@ -1,239 +1,359 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sat, 1 Apr 2017 11:49:30 +0800
-Subject: [PATCH v23 00/11] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <8c017a47-02d5-454d-f42c-a1b5bb29df1b@huawei.com>
-References: <20170331175105.8370-1-fu.wei@linaro.org>
- <8c017a47-02d5-454d-f42c-a1b5bb29df1b@huawei.com>
-Message-ID: <CADyBb7tH_rqw5yjaqHsqAhYLQUEQxK3STKKbNLQcnOfka3deGw@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 1 Apr 2017 13:58:10 +0800
+Subject: [PATCH V8 1/6] LIBIO: Introduce a generic PIO mapping method
+In-Reply-To: <1490887619-61732-2-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <201704011328.1YdgEHnc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xiongfeng Wang,
+Hi zhichang.yuan,
 
-On 1 April 2017 at 10:14, Xiongfeng Wang <wangxiongfeng2@huawei.com> wrote:
->
->
-> On 2017/4/1 1:50, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This patchset:
->>     (1)Preparation for adding GTDT support in arm_arch_timer:
->>         1. Introduce a MMIO CNTFRQ helper.
->>         2. separate out device-tree code from arch_timer_detect_rate
->>         3. remove arch_timer_detect_rate use arch_timer_*get_cntfrq directly
->>         4. Refactor arch_timer_needs_probing, and move it into DT init call
->>         5. Introduce some new structs and refactor the MMIO timer init code
->>         for reusing some common code.
->>
->>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
->>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>     memory-mapped timer and SBSA Generic Watchdog timer.
->>     This driver can help to simplify all the relevant timer drivers,
->>     and separate all the ACPI GTDT knowledge from them.
->>
->>     (3)Simplify ACPI code for arm_arch_timer
->>
->>     (4)Add GTDT support for ARM memory-mapped timer.
->>
->> This patchset has been tested on the following platforms with ACPI enabled:
->>     (1)ARM Foundation v8 model
->>
->
-> for arm_arch_timer(not memory-mapped) and sbsa watchdog part,  Tested-by: wangxiongfeng2 at huawei.com
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.11-rc4 next-20170331]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Great thanks for your testing :-)
+url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/LIBIO-Introduce-a-generic-PIO-mapping-method/20170401-104801
+config: alpha-allyesconfig (attached as .config)
+compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=alpha 
 
->
->
->
->
->
-> Thanks,
->
-> Wang Xiongfeng
-> .
->
->> Changelog:
->> v23: https://lkml.org/lkml/2017/3/31/
->>      Rebase to git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/cleanup
->>      Improve the data struct of arch_timer_mem and arch_timer_mem_frame to
->>      improve the parser of GT blocks and arch_timer_mem initualization.
->>      Improve arch_timer_rate detection: sysreg frequency is primary in DT boot
->>      Improve some comments in GTDT parser driver.
->>      Improve acpi_gtdt_init function, and make a comment for the multiple calls.
->>      Improve the unwinding for the irq of timers, when an error occurs.
->>      Handle the case of virtual timer GSIV is 0.
->>
->> v22: https://lkml.org/lkml/2017/3/21/523
->>      Rebase to git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/cleanup
->>      Only Introduce arch_timer_mem_get_cntfrq to get the frequency from mmio.
->>      Merged patch 2,3(about arch_timer_detect_rate).
->>      Keep arch_timer_rate, do NOT split it for different types of timer.
->>      Improve  memory-mapped timer support by comments and variable name:
->>          data-->timer_mem
->>          frame-->gtdt_frame
->>      Delete zero check for SBSA watchdog irq.
->>      Skip secure SBSA watchdog in GTDT driver.
->>      Delete Kconfig modification for SBSA watchdog driver.
->>      Delete no_irq, using nr_res instead.
->>
->> v21: https://lkml.org/lkml/2017/2/6/734
->>      Introduce two functions to get the frequency from mmio and sysreg.
->>      Remove arch_timer_detect_rate use arch_timer_get_*_freq directly
->>      Split arch_timer_rate for different types of timer.
->>      Skip secure timer frame in GTDT driver.
->>      Rebase to git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/cleanup
->>      (The first 6 patches in v20 have been merged into arch-timer/cleanup branch)
->>
->> v20: https://lkml.org/lkml/2017/1/18/534
->>      Reorder the first 4 patches and split the 4th patches.
->>      Leave CNTHCTL_* as they originally were.
->>      Fix the bug in arch_timer_select_ppi.
->>      Split "Rework counter frequency detection" patch.
->>      Rework the arch_timer_detect_rate function.
->>      Improve the commit message of "Refactor MMIO timer probing".
->>      Rebase to 4.10.0-rc4
->>
->> v19: https://lkml.org/lkml/2016/12/21/25
->>      Fix a '\n' missing in a error message in arch_timer_mem_init.
->>      Add "request_mem_region" for ioremapping cntbase, according to
->>      f947ee1 clocksource/drivers/arm_arch_timer: Map frame with of_io_request_and_map()
->>      Rebase to 4.9.0-gfb779ff
->>
->> v18: https://lkml.org/lkml/2016/12/8/446
->>      Fix 8/15 patch problem of "int ret;" in arch_timer_acpi_init.
->>      Rebase to 4.9.0-rc8-g9269898
->>
->> v17: https://lkml.org/lkml/2016/11/25/140
->>      Take out some cleanups from 4/15.
->>      Merge 5/15 and 6/15, improve PPI determination code,
->>      improve commit message.
->>      Rework counter frequency detection.
->>      Move arch_timer_needs_of_probing into DT init call.
->>      Move Platform Timer scan loop back to timer init call to avoid allocating
->>      and free memory.
->>      Improve all the exported functions' comment.
->>
->> v16: https://lkml.org/lkml/2016/11/16/268
->>      Fix patchset problem about static enum ppi_nr of 01/13 in v15.
->>      Refactor arch_timer_detect_rate.
->>      Refactor arch_timer_needs_probing.
->>
->> v15: https://lkml.org/lkml/2016/11/15/366
->>      Re-order patches
->>      Add arm_arch_timer refactoring patches to prepare for GTDT:
->>          1. rename some  enums and defines, and some cleanups
->>          2. separate out arch_timer_uses_ppi init code and fix a potential bug
->>          3. Improve some new structs, refactor the timer init code.
->>      Since the some structs have been changed, GTDT parser for memory-mapped
->>      timer and SBSA Generic Watchdog timer have been update.
->>
->> v14: https://lkml.org/lkml/2016/9/28/573
->>      Separate memory-mapped timer GTDT support into two patches
->>          1. Refactor the timer init code to prepare for GTDT
->>          2. Add GTDT support for memory-mapped timer
->>
->> v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
->>      Improve arm_arch_timer code for memory-mapped
->>      timer GTDT support, refactor original memory-mapped timer
->>      dt support for reusing some common code.
->>
->> v12: https://lkml.org/lkml/2016/9/13/250
->>      Rebase to latest Linux 4.8-rc6
->>      Delete the confusing "skipping" in the error message.
->>
->> V11: https://lkml.org/lkml/2016/9/6/354
->>      Rebase to latest Linux 4.8-rc5
->>      Delete typedef (suggested by checkpatch.pl)
->>
->> V10: https://lkml.org/lkml/2016/7/26/215
->>      Drop the "readq" patch.
->>      Rebase to latest Linux 4.7.
->>
->> V9: https://lkml.org/lkml/2016/7/25/345
->>     Improve pr_err message in acpi gtdt driver.
->>     Update Commit message for 7/9
->>     shorten the irq mapping function name
->>     Improve GTDT driver for memory-mapped timer
->>
->> v8: https://lkml.org/lkml/2016/7/19/660
->>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
->>     and also improve printk message.
->>     Simplify is_timer_block and is_watchdog.
->>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
->>     Delete __init in include/linux/acpi.h for GTDT API
->>     Make ARM64 select GTDT.
->>     Delete "#include <linux/module.h>" from acpi_gtdt.c
->>     Simplify GT block parse code.
->>
->> v7: https://lkml.org/lkml/2016/7/13/769
->>     Move the GTDT driver to drivers/acpi/arm64
->>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
->>     Merge 3 patches of GTDT parser driver.
->>     Fix the for_each_platform_timer bug.
->>
->> v6: https://lkml.org/lkml/2016/6/29/580
->>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
->>     and SBSA Generic Watchdog timer
->>     Improve driver by suggestions and example code from Daniel Lezcano
->>
->> v5: https://lkml.org/lkml/2016/5/24/356
->>     Sorting out all patches, simplify the API of GTDT driver:
->>     GTDT driver just fills the data struct for arm_arch_timer driver.
->>
->> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
->>     Delete the kvm relevant patches
->>     Separate two patches for sorting out the code for arm_arch_timer.
->>     Improve irq info export code to allow missing irq info in GTDT table.
->>
->> v3: https://lkml.org/lkml/2016/2/1/658
->>     Improve GTDT driver code:
->>       (1)improve pr_* by defining pr_fmt(fmt)
->>       (2)simplify gtdt_sbsa_gwdt_init
->>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
->>       to get GTDT table.
->>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
->>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
->>
->> v2: https://lkml.org/lkml/2015/12/2/10
->>     Rebase to latest kernel version(4.4-rc3).
->>     Fix the bug about the config problem,
->>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
->>
->> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
->>
->> Fu Wei (11):
->>   clocksource: arm_arch_timer: add MMIO CNTFRQ helper
->>   clocksource: arm_arch_timer: split dt-only rate handling
->>   clocksource: arm_arch_timer: refactor arch_timer_needs_probing
->>   clocksource: arm_arch_timer: move arch_timer_needs_of_probing into DT
->>     init call
->>   clocksource: arm_arch_timer: add structs to describe MMIO timer
->>   clocksource: arm_arch_timer: refactor MMIO timer probing.
->>   acpi/arm64: Add GTDT table parse driver
->>   clocksource: arm_arch_timer: simplify ACPI support code.
->>   acpi/arm64: Add memory-mapped timer support in GTDT driver
->>   clocksource: arm_arch_timer: add GTDT support for memory-mapped timer
->>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
->>
->>  arch/arm64/Kconfig                   |   1 +
->>  drivers/acpi/arm64/Kconfig           |   3 +
->>  drivers/acpi/arm64/Makefile          |   1 +
->>  drivers/acpi/arm64/gtdt.c            | 406 +++++++++++++++++++++++++++++++++++
->>  drivers/clocksource/arm_arch_timer.c | 338 ++++++++++++++++++-----------
->>  include/clocksource/arm_arch_timer.h |  16 ++
->>  include/linux/acpi.h                 |   7 +
->>  7 files changed, 648 insertions(+), 124 deletions(-)
->>  create mode 100644 drivers/acpi/arm64/gtdt.c
->>
->
+All error/warnings (new ones prefixed by >>):
 
+>> lib/logic_pio.c:32:50: error: 'PIO_MAX_SECT' undeclared here (not in a function)
+    static struct logic_pio_root logic_pio_root_list[PIO_MAX_SECT] = {
+                                                     ^~~~~~~~~~~~
+>> lib/logic_pio.c:39:3: error: 'PIO_CPU_MMIO' undeclared here (not in a function)
+     [PIO_CPU_MMIO ... PIO_INDIRECT - 1] = {
+      ^~~~~~~~~~~~
+>> lib/logic_pio.c:39:20: error: 'PIO_INDIRECT' undeclared here (not in a function)
+     [PIO_CPU_MMIO ... PIO_INDIRECT - 1] = {
+                       ^~~~~~~~~~~~
+>> lib/logic_pio.c:39:3: error: array index in initializer not of integer type
+     [PIO_CPU_MMIO ... PIO_INDIRECT - 1] = {
+      ^~~~~~~~~~~~
+   lib/logic_pio.c:39:3: note: (near initialization for 'logic_pio_root_list')
+>> lib/logic_pio.c:40:3: error: field name not in record or union initializer
+      .sec_head = LIST_HEAD_INIT(logic_pio_root_list[PIO_CPU_MMIO].sec_head),
+      ^
+   lib/logic_pio.c:40:3: note: (near initialization for 'logic_pio_root_list')
+   lib/logic_pio.c:41:3: error: field name not in record or union initializer
+      .sec_min = PIO_SECT_MIN(PIO_CPU_MMIO),
+      ^
+   lib/logic_pio.c:41:3: note: (near initialization for 'logic_pio_root_list')
+>> lib/logic_pio.c:41:14: error: implicit declaration of function 'PIO_SECT_MIN' [-Werror=implicit-function-declaration]
+      .sec_min = PIO_SECT_MIN(PIO_CPU_MMIO),
+                 ^~~~~~~~~~~~
+   lib/logic_pio.c:42:3: error: field name not in record or union initializer
+      .sec_max = PIO_SECT_MAX(PIO_INDIRECT - 1),
+      ^
+   lib/logic_pio.c:42:3: note: (near initialization for 'logic_pio_root_list')
+>> lib/logic_pio.c:42:14: error: implicit declaration of function 'PIO_SECT_MAX' [-Werror=implicit-function-declaration]
+      .sec_max = PIO_SECT_MAX(PIO_INDIRECT - 1),
+                 ^~~~~~~~~~~~
+   lib/logic_pio.c:46:3: error: array index in initializer not of integer type
+     [PIO_INDIRECT] = {
+      ^~~~~~~~~~~~
+   lib/logic_pio.c:46:3: note: (near initialization for 'logic_pio_root_list')
+   lib/logic_pio.c:47:3: error: field name not in record or union initializer
+      .sec_head = LIST_HEAD_INIT(logic_pio_root_list[PIO_INDIRECT].sec_head),
+      ^
+   lib/logic_pio.c:47:3: note: (near initialization for 'logic_pio_root_list')
+   lib/logic_pio.c:48:3: error: field name not in record or union initializer
+      .sec_min = PIO_SECT_MIN(PIO_INDIRECT),
+      ^
+   lib/logic_pio.c:48:3: note: (near initialization for 'logic_pio_root_list')
+   lib/logic_pio.c:49:3: error: field name not in record or union initializer
+      .sec_max = PIO_SECT_MAX(PIO_INDIRECT),
+      ^
+   lib/logic_pio.c:49:3: note: (near initialization for 'logic_pio_root_list')
+   In file included from include/linux/list.h:8:0,
+                    from include/linux/kobject.h:20,
+                    from include/linux/of.h:21,
+                    from lib/logic_pio.c:18:
+   lib/logic_pio.c: In function 'logic_pio_find_range_byaddr':
+>> include/linux/rculist.h:351:49: error: dereferencing pointer to incomplete type 'struct logic_pio_hwaddr'
+     for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \
+                                                     
+   include/linux/kernel.h:852:18: note: in definition of macro 'container_of'
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                     ^~~~
+>> include/linux/rculist.h:351:13: note: in expansion of macro 'list_entry_rcu'
+     for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \
+                ^~~~~~~~~~~~~~
+>> lib/logic_pio.c:77:2: note: in expansion of macro 'list_for_each_entry_rcu'
+     list_for_each_entry_rcu(range, &io_range_list, list) {
+     ^~~~~~~~~~~~~~~~~~~~~~~
+   include/linux/kernel.h:852:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+>> include/linux/rculist.h:277:2: note: in expansion of macro 'container_of'
+     container_of(lockless_dereference(ptr), type, member)
+     ^~~~~~~~~~~~
+>> include/linux/rculist.h:351:13: note: in expansion of macro 'list_entry_rcu'
+     for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \
+                ^~~~~~~~~~~~~~
+>> lib/logic_pio.c:77:2: note: in expansion of macro 'list_for_each_entry_rcu'
+     list_for_each_entry_rcu(range, &io_range_list, list) {
+     ^~~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/kernel.h:852:48: warning: initialization makes pointer from integer without a cast [-Wint-conversion]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+>> include/linux/rculist.h:277:2: note: in expansion of macro 'container_of'
+     container_of(lockless_dereference(ptr), type, member)
+     ^~~~~~~~~~~~
+   include/linux/rculist.h:353:9: note: in expansion of macro 'list_entry_rcu'
+      pos = list_entry_rcu(pos->member.next, typeof(*pos), member))
+            ^~~~~~~~~~~~~~
+>> lib/logic_pio.c:77:2: note: in expansion of macro 'list_for_each_entry_rcu'
+     list_for_each_entry_rcu(range, &io_range_list, list) {
+     ^~~~~~~~~~~~~~~~~~~~~~~
+   lib/logic_pio.c: In function 'logic_pio_alloc_range':
+>> lib/logic_pio.c:109:19: error: dereferencing pointer to incomplete type 'struct logic_pio_root'
+     idle_start = root->sec_min;
+                      ^~
+   In file included from include/linux/list.h:8:0,
+                    from include/linux/kobject.h:20,
+                    from include/linux/of.h:21,
+                    from lib/logic_pio.c:18:
+>> include/linux/rculist.h:351:49: error: dereferencing pointer to incomplete type 'struct logic_pio_sect'
+     for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \
+                                                     
+   include/linux/kernel.h:852:18: note: in definition of macro 'container_of'
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                     ^~~~
+>> include/linux/rculist.h:351:13: note: in expansion of macro 'list_entry_rcu'
+     for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \
+                ^~~~~~~~~~~~~~
+   lib/logic_pio.c:111:2: note: in expansion of macro 'list_for_each_entry_rcu'
+     list_for_each_entry_rcu(entry, &root->sec_head, list) {
+     ^~~~~~~~~~~~~~~~~~~~~~~
+>> include/linux/kernel.h:852:48: warning: initialization makes pointer from integer without a cast [-Wint-conversion]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
 
+vim +/PIO_MAX_SECT +32 lib/logic_pio.c
 
--- 
-Best regards,
+    12	 * GNU General Public License for more details.
+    13	 *
+    14	 * You should have received a copy of the GNU General Public License
+    15	 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    16	 */
+    17	
+  > 18	#include <linux/of.h>
+    19	#include <linux/io.h>
+    20	#include <linux/mm.h>
+    21	#include <linux/rculist.h>
+    22	#include <linux/sizes.h>
+    23	#include <linux/slab.h>
+    24	
+    25	/* The unique hardware address list. */
+    26	static LIST_HEAD(io_range_list);
+    27	static DEFINE_MUTEX(io_range_mutex);
+    28	
+    29	/*
+    30	 * These are the lists for PIO. The highest PIO_SECT_BITS of PIO is the index.
+    31	 */
+  > 32	static struct logic_pio_root logic_pio_root_list[PIO_MAX_SECT] = {
+    33	#ifdef CONFIG_INDIRECT_PIO
+    34		/*
+    35		 * At this moment, assign all the other logic PIO space to MMIO.
+    36		 * If more elements added, please adjust the ending index and .sec_max;
+    37		 * Please keep MMIO element started from index ZERO.
+    38		 */
+  > 39		[PIO_CPU_MMIO ... PIO_INDIRECT - 1] = {
+  > 40			.sec_head = LIST_HEAD_INIT(logic_pio_root_list[PIO_CPU_MMIO].sec_head),
+  > 41			.sec_min = PIO_SECT_MIN(PIO_CPU_MMIO),
+  > 42			.sec_max = PIO_SECT_MAX(PIO_INDIRECT - 1),
+    43		},
+    44	
+    45		/* The last element */
+    46		[PIO_INDIRECT] = {
+    47			.sec_head = LIST_HEAD_INIT(logic_pio_root_list[PIO_INDIRECT].sec_head),
+    48			.sec_min = PIO_SECT_MIN(PIO_INDIRECT),
+    49			.sec_max = PIO_SECT_MAX(PIO_INDIRECT),
+    50		},
+    51	#else
+    52		[PIO_CPU_MMIO] = {
+    53			.sec_head = LIST_HEAD_INIT(logic_pio_root_list[PIO_CPU_MMIO].sec_head),
+    54			.sec_min = PIO_SECT_MIN(PIO_CPU_MMIO),
+    55			.sec_max = PIO_SECT_MAX(PIO_CPU_MMIO),
+    56		},
+    57	
+    58	#endif
+    59	};
+    60	
+    61	/*
+    62	 * Search a io_range registered which match the fwnode and addr.
+    63	 *
+    64	 * @fwnode: the host fwnode which must be valid;
+    65	 * @start: the start hardware address of this search;
+    66	 * @end: the end hardware address of this search. can be equal to @start;
+    67	 *
+    68	 * return NULL when there is no matched node; IS_ERR() means ERROR;
+    69	 * valid virtual address represent a matched node was found.
+    70	 */
+    71	static struct logic_pio_hwaddr *
+    72	logic_pio_find_range_byaddr(struct fwnode_handle *fwnode,
+    73				resource_size_t start, resource_size_t end)
+    74	{
+    75		struct logic_pio_hwaddr *range;
+    76	
+  > 77		list_for_each_entry_rcu(range, &io_range_list, list) {
+    78			if (!range->pio_peer) {
+    79				pr_warn("Invalid cpu addr node(%pa) in list!\n",
+    80					&range->hw_start);
+    81				continue;
+    82			}
+    83			if (range->fwnode != fwnode)
+    84				continue;
+    85			/* without any overlap with current range */
+    86			if (start >= range->hw_start + range->size ||
+    87				end < range->hw_start)
+    88				continue;
+    89			/* overlap is not supported now. */
+    90			if (start < range->hw_start ||
+    91				end >= range->hw_start + range->size)
+    92				return ERR_PTR(-EBUSY);
+    93			/* had been registered. */
+    94			return range;
+    95		}
+    96	
+    97		return NULL;
+    98	}
+    99	
+   100	
+   101	static int logic_pio_alloc_range(struct logic_pio_root *root,
+   102			resource_size_t size, unsigned long align,
+   103			struct list_head **prev, resource_size_t *pio_alloc)
+   104	{
+   105		struct logic_pio_sect *entry;
+   106		resource_size_t tmp_start;
+   107		resource_size_t idle_start, idle_end;
+   108	
+ > 109		idle_start = root->sec_min;
+   110		*prev = &root->sec_head;
+   111		list_for_each_entry_rcu(entry, &root->sec_head, list) {
+   112			if (!entry->hwpeer ||
+   113				idle_start > entry->io_start) {
+   114				WARN(1, "skip an invalid io range during traversal!\n");
+   115				goto nextentry;
+   116			}
+   117			/* set the end edge. */
+   118			if (idle_start == entry->io_start) {
+   119				struct logic_pio_sect *next;
+   120	
+   121				idle_start = entry->io_start + entry->hwpeer->size;
+ > 122				next = list_next_or_null_rcu(&root->sec_head,
+ > 123					&entry->list, struct logic_pio_sect, list);
+   124				if (next) {
+   125					entry = next;
+   126				} else {
+   127					*prev = &entry->list;
+   128					break;
+   129				}
+   130			}
+   131			idle_end = entry->io_start - 1;
+   132	
+   133			/* contiguous range... */
+   134			if (idle_start > idle_end)
+   135				goto nextentry;
+   136	
+   137			tmp_start = idle_start;
+   138			idle_start = ALIGN(idle_start, align);
+   139			if (idle_start >= tmp_start &&
+   140				idle_start + size <= idle_end) {
+   141				*prev = &entry->list;
+   142				*pio_alloc = idle_start;
+   143				return 0;
+   144			}
+   145	
+   146	nextentry:
+   147			idle_start = entry->io_start + entry->hwpeer->size;
+   148			*prev = &entry->list;
+   149		}
+   150		/* check the last free gap... */
+   151		idle_end = root->sec_max;
+   152	
+   153		tmp_start = idle_start;
+   154		idle_start = ALIGN(idle_start, align);
+   155		if (idle_start >= tmp_start &&
+   156			idle_start + size <= idle_end) {
+   157			*pio_alloc = idle_start;
+   158			return 0;
+   159		}
+   160	
+   161		return -EBUSY;
+   162	}
+   163	
+   164	/*
+   165	 * register a io range node in the io range list.
+   166	 *
+   167	 * @newrange: pointer to the io range to be registered.
+   168	 *
+   169	 * return 'newrange' when success, ERR_VALUE() is for failures.
+   170	 * specially, return a valid pointer which is not equal to 'newrange' when
+   171	 * the io range had been registered before.
+   172	 */
+   173	struct logic_pio_hwaddr
+   174	*logic_pio_register_range(struct logic_pio_hwaddr *newrange,
+   175			unsigned long align)
+   176	{
+   177		struct logic_pio_hwaddr *range;
+   178		struct logic_pio_sect *newsect;
+   179		resource_size_t pio_alloc;
+   180		struct list_head *prev, *hwprev;
+   181		unsigned long sect_id;
+   182		int err;
+   183	
+   184		if (!newrange || !newrange->fwnode || !newrange->size)
+   185			return ERR_PTR(-EINVAL);
+   186	
+   187		sect_id = newrange->flags;
+   188		if (sect_id >= PIO_MAX_SECT)
+   189			return ERR_PTR(-EINVAL);
+   190	
+   191		mutex_lock(&io_range_mutex);
+   192		range = logic_pio_find_range_byaddr(newrange->fwnode,
+   193				newrange->hw_start,
+   194				newrange->hw_start + newrange->size - 1);
+   195		if (range) {
+   196			if (!IS_ERR(range))
+   197				pr_info("the request IO range had been registered!\n");
+   198			else
+   199				pr_err("registering IO[%pa - sz%pa) got failed!\n",
+   200					&newrange->hw_start, &newrange->size);
+   201			mutex_unlock(&io_range_mutex);
+   202			return range;
+   203		}
+   204	
+   205		err = logic_pio_alloc_range(&logic_pio_root_list[sect_id],
+   206				newrange->size, align, &prev, &pio_alloc);
+   207		if (err) {
+   208			pr_err("can't find free %pa logical IO range!\n",
+   209				&newrange->size);
+   210			goto exitproc;
+   211		}
+   212	
+   213		if (prev == &logic_pio_root_list[sect_id].sec_head) {
+   214			hwprev = &io_range_list;
+   215		} else {
+ > 216			newsect = to_pio_sect(prev);
+ > 217			hwprev = &newsect->hwpeer->list;
+   218		}
+   219	
+   220		newsect = kzalloc(sizeof(*newsect), GFP_KERNEL);
 
-Fu Wei
-Software Engineer
-Red Hat
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49584 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170401/a8a24a37/attachment-0001.gz>
