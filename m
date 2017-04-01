@@ -1,101 +1,151 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat,  1 Apr 2017 18:21:14 -0400
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for embedded
- systems
-Message-ID: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+Date: Sat,  1 Apr 2017 18:21:15 -0400
+Subject: [PATCH v2 1/5] console: move console_init() out of tty_io.c
+In-Reply-To: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+Message-ID: <20170401222119.25106-2-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many embedded systems don't need the full TTY layer support. Most of the
-time, the TTY layer is only a conduit for outputting debugging messages
-over a serial port. The TTY layer also implements many features that are
-very unlikely to ever be used in such a setup. There is great potential
-for both code and dynamic memory size reduction on small systems. This is
-what this patch series is achieving.
+All the console driver handling code lives in printk.c.
+Move console_init() there as well so console support can still be used
+when the TTY code is configured out.
 
-The existing TTY code is quite large and complex. Trying to shrink it
-is risky as the potential for breakage is non negligeable, and its
-interchangeable layers impose a lower limit on the code to implement it.
-Therefore, the approach used here consists in the creation of a parallel
-implementation with the very minimal amount of code collapsed together
-that interfaces with existing UART drivers directly and provides TTY-like
-character devices to user space. When the regular TTY layer is disabled,
-then this minitty alternative layer is proposed by Kconfig.
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+---
+ drivers/tty/tty_io.c    | 24 ------------------------
+ include/linux/console.h |  2 ++
+ include/linux/tty.h     |  7 ++++---
+ init/main.c             |  2 +-
+ kernel/printk/printk.c  | 24 ++++++++++++++++++++++++
+ 5 files changed, 31 insertions(+), 28 deletions(-)
 
-For more details on the rationale and motivations driving this approach
-please see: https://lkml.org/lkml/2017/3/24/634
-
-Of course, making it "mini" means there are limitations to what it does:
-
-- This supports serial ports only. No VT's, no PTY's.
-
-- The default n_tty line discipline is hardcoded and no other line
-  discipline are supported.
-
-- The line discipline features are not all implemented. Notably, XON/XOFF
-  is currently not implemented (although this might not require a lot of
-  code to do it if someone were to need it).
-
-- Hung-up state is not implemented.
-
-- No error handling on RX bytes other than counting them.
-
-- Job control is currently not supported (this may change in the future and 
-  be configurable).
-
-But again, most small embedded systems simply don't need those things.
-
-This can be used on any architecture of course, but here's some numbers
-using a minimal ARM config.
-
-When CONFIG_TTY=y, the following files are linked into the kernel:
-
-   text	   data	    bss	    dec	    hex	filename
-   8796	    128	      0	   8924	   22dc	drivers/tty/n_tty.o
-  11809	    276	      0	  12085	   2f35	drivers/tty/serial/fulltty_serial.o
-   1376	      0	      0	   1376	    560	drivers/tty/tty_buffer.o
-  13571	    172	    132	  13875	   3633	drivers/tty/tty_io.o
-   3072	      0	      0	   3072	    c00	drivers/tty/tty_ioctl.o
-   2457	      2	    120	   2579	    a13	drivers/tty/tty_ldisc.o
-   1328	      0	      0	   1328	    530	drivers/tty/tty_ldsem.o
-    316	      0	      0	    316	    13c	drivers/tty/tty_mutex.o
-   2516	      0	      0	   2516	    9d4	drivers/tty/tty_port.o
-  45241	    578	    252	  46071	   b3f7	(TOTALS)
-
-When CONFIG_TTY=n and CONFIG_MINITTY_SERIAL=y, the above files are replaced
-by the following:
-
-   text	   data	    bss	    dec	    hex	filename
-   8063	      8	     64	   8135	   1fc7	drivers/tty/serial/minitty_serial.o
-
-That's it!  And the runtime buffer usage is much less as well. Future plans
-such as removing runtime baudrate handling for those targets with a known
-fixed baudrate will shrink the code even more.
-
-Changes from v1:
-
-- Added an entry to the MAINTAINERS file.
-- Factored out more common core code into serial_lib.c.
-- Implemented a few more TTY callback functions to be compatible with
-  more UART drivers.
-
-Overall diffstat:
-
- MAINTAINERS                                     |    8 +-
- drivers/tty/Kconfig                             |   10 +-
- drivers/tty/Makefile                            |    3 +-
- drivers/tty/serial/Kconfig                      |   12 +-
- drivers/tty/serial/Makefile                     |    7 +-
- .../serial/{serial_core.c => fulltty_serial.c}  |  419 +---
- drivers/tty/serial/minitty_serial.c             | 1793 +++++++++++++++++
- drivers/tty/serial/serial_lib.c                 |  440 ++++
- drivers/tty/tty_baudrate.c                      |  232 +++
- drivers/tty/tty_io.c                            |   24 -
- drivers/tty/tty_ioctl.c                         |  222 --
- include/linux/console.h                         |    2 +
- include/linux/serial_core.h                     |    1 +
- include/linux/tty.h                             |    7 +-
- include/linux/tty_flip.h                        |    9 +
- init/main.c                                     |    2 +-
- kernel/printk/printk.c                          |   24 +
- 17 files changed, 2538 insertions(+), 677 deletions(-)
+diff --git a/drivers/tty/tty_io.c b/drivers/tty/tty_io.c
+index e6d1a65108..2100295861 100644
+--- a/drivers/tty/tty_io.c
++++ b/drivers/tty/tty_io.c
+@@ -3578,30 +3578,6 @@ void tty_default_fops(struct file_operations *fops)
+ 	*fops = tty_fops;
+ }
+ 
+-/*
+- * Initialize the console device. This is called *early*, so
+- * we can't necessarily depend on lots of kernel help here.
+- * Just do some early initializations, and do the complex setup
+- * later.
+- */
+-void __init console_init(void)
+-{
+-	initcall_t *call;
+-
+-	/* Setup the default TTY line discipline. */
+-	n_tty_init();
+-
+-	/*
+-	 * set up the console device so that later boot sequences can
+-	 * inform about problems etc..
+-	 */
+-	call = __con_initcall_start;
+-	while (call < __con_initcall_end) {
+-		(*call)();
+-		call++;
+-	}
+-}
+-
+ static char *tty_devnode(struct device *dev, umode_t *mode)
+ {
+ 	if (!mode)
+diff --git a/include/linux/console.h b/include/linux/console.h
+index 5949d18555..b8920a031a 100644
+--- a/include/linux/console.h
++++ b/include/linux/console.h
+@@ -212,4 +212,6 @@ extern bool vgacon_text_force(void);
+ static inline bool vgacon_text_force(void) { return false; }
+ #endif
+ 
++extern void console_init(void);
++
+ #endif /* _LINUX_CONSOLE_H */
+diff --git a/include/linux/tty.h b/include/linux/tty.h
+index 1017e904c0..f1106d7c73 100644
+--- a/include/linux/tty.h
++++ b/include/linux/tty.h
+@@ -390,7 +390,6 @@ static inline bool tty_throttled(struct tty_struct *tty)
+ }
+ 
+ #ifdef CONFIG_TTY
+-extern void console_init(void);
+ extern void tty_kref_put(struct tty_struct *tty);
+ extern struct pid *tty_get_pgrp(struct tty_struct *tty);
+ extern void tty_vhangup_self(void);
+@@ -402,8 +401,6 @@ extern struct tty_struct *get_current_tty(void);
+ extern int __init tty_init(void);
+ extern const char *tty_name(const struct tty_struct *tty);
+ #else
+-static inline void console_init(void)
+-{ }
+ static inline void tty_kref_put(struct tty_struct *tty)
+ { }
+ static inline struct pid *tty_get_pgrp(struct tty_struct *tty)
+@@ -669,7 +666,11 @@ extern int tty_ldisc_receive_buf(struct tty_ldisc *ld, const unsigned char *p,
+ 
+ /* n_tty.c */
+ extern void n_tty_inherit_ops(struct tty_ldisc_ops *ops);
++#ifdef CONFIG_TTY
+ extern void __init n_tty_init(void);
++#else
++static inline void n_tty_init(void) { }
++#endif
+ 
+ /* tty_audit.c */
+ #ifdef CONFIG_AUDIT
+diff --git a/init/main.c b/init/main.c
+index f9c9d99482..b9bd0edf21 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -27,7 +27,7 @@
+ #include <linux/initrd.h>
+ #include <linux/bootmem.h>
+ #include <linux/acpi.h>
+-#include <linux/tty.h>
++#include <linux/console.h>
+ #include <linux/nmi.h>
+ #include <linux/percpu.h>
+ #include <linux/kmod.h>
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index 2984fb0f02..3a09406526 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -2611,6 +2611,30 @@ int unregister_console(struct console *console)
+ EXPORT_SYMBOL(unregister_console);
+ 
+ /*
++ * Initialize the console device. This is called *early*, so
++ * we can't necessarily depend on lots of kernel help here.
++ * Just do some early initializations, and do the complex setup
++ * later.
++ */
++void __init console_init(void)
++{
++	initcall_t *call;
++
++	/* Setup the default TTY line discipline. */
++	n_tty_init();
++
++	/*
++	 * set up the console device so that later boot sequences can
++	 * inform about problems etc..
++	 */
++	call = __con_initcall_start;
++	while (call < __con_initcall_end) {
++		(*call)();
++		call++;
++	}
++}
++
++/*
+  * Some boot consoles access data that is in the init section and which will
+  * be discarded after the initcalls have been run. To make sure that no code
+  * will access this data, unregister the boot consoles in a late initcall.
+-- 
+2.9.3
