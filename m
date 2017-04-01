@@ -1,115 +1,32 @@
-From: singhalsimran0@gmail.com (simran singhal)
-Date: Sat, 1 Apr 2017 19:36:14 +0530
-Subject: [PATCH] iio: adc: Remove unnecessary cast on void pointer
-Message-ID: <20170401140613.GA20941@singhal-Inspiron-5558>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Sat, 1 Apr 2017 09:15:12 -0700
+Subject: [PATCH RFC 2/3] thermal: dove: convert to a thermal OF sensor
+ device
+In-Reply-To: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
+References: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
+Message-ID: <20170401161510.GA18500@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following Coccinelle script was used to detect this:
-@r@
-expression x;
-void* e;
-type T;
-identifier f;
-@@
-(
-  *((T *)e)
-|
-  ((T *)x)[...]
-|
-  ((T*)x)->f
-|
-- (T*)
-  e
-)
+Russell,
 
-Signed-off-by: simran singhal <singhalsimran0@gmail.com>
----
- drivers/iio/adc/exynos_adc.c      | 2 +-
- drivers/iio/adc/imx7d_adc.c       | 2 +-
- drivers/iio/adc/max1027.c         | 2 +-
- drivers/iio/adc/rockchip_saradc.c | 2 +-
- drivers/iio/adc/sun4i-gpadc-iio.c | 2 +-
- drivers/iio/adc/vf610_adc.c       | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+On Sun, Mar 12, 2017 at 07:07:45PM +0000, Russell King wrote:
+> Convert the dove thermal infrastructure to an OF sensor device, and add
+> the thermal zones for the SoC, with a critical trip point of 120?C.
+> This allows us to specify thermal zones and couple them to cooling
+> devices in DT.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/boot/dts/dove.dtsi    | 17 +++++++++++++++++
+>  drivers/thermal/dove_thermal.c | 33 +++++++++++++++++++++++++--------
 
-diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-index ad1775b..6c5a7be 100644
---- a/drivers/iio/adc/exynos_adc.c
-+++ b/drivers/iio/adc/exynos_adc.c
-@@ -579,7 +579,7 @@ static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
- 
- static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
- {
--	struct exynos_adc *info = (struct exynos_adc *)dev_id;
-+	struct exynos_adc *info = dev_id;
- 	u32 mask = info->data->mask;
- 
- 	/* Read value */
-diff --git a/drivers/iio/adc/imx7d_adc.c b/drivers/iio/adc/imx7d_adc.c
-index e2241ee..254b29a 100644
---- a/drivers/iio/adc/imx7d_adc.c
-+++ b/drivers/iio/adc/imx7d_adc.c
-@@ -365,7 +365,7 @@ static int imx7d_adc_read_data(struct imx7d_adc *info)
- 
- static irqreturn_t imx7d_adc_isr(int irq, void *dev_id)
- {
--	struct imx7d_adc *info = (struct imx7d_adc *)dev_id;
-+	struct imx7d_adc *info = dev_id;
- 	int status;
- 
- 	status = readl(info->regs + IMX7D_REG_ADC_INT_STATUS);
-diff --git a/drivers/iio/adc/max1027.c b/drivers/iio/adc/max1027.c
-index 3b7c4f7..ebc7159 100644
---- a/drivers/iio/adc/max1027.c
-+++ b/drivers/iio/adc/max1027.c
-@@ -364,7 +364,7 @@ static int max1027_set_trigger_state(struct iio_trigger *trig, bool state)
- 
- static irqreturn_t max1027_trigger_handler(int irq, void *private)
- {
--	struct iio_poll_func *pf = (struct iio_poll_func *)private;
-+	struct iio_poll_func *pf = private;
- 	struct iio_dev *indio_dev = pf->indio_dev;
- 	struct max1027_state *st = iio_priv(indio_dev);
- 
-diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-index 85d7012..ae6d332 100644
---- a/drivers/iio/adc/rockchip_saradc.c
-+++ b/drivers/iio/adc/rockchip_saradc.c
-@@ -109,7 +109,7 @@ static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
- 
- static irqreturn_t rockchip_saradc_isr(int irq, void *dev_id)
- {
--	struct rockchip_saradc *info = (struct rockchip_saradc *)dev_id;
-+	struct rockchip_saradc *info = dev_id;
- 
- 	/* Read value */
- 	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index a8e134f..e531825 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -382,7 +382,7 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
- 
- static int sun4i_gpadc_get_temp(void *data, int *temp)
- {
--	struct sun4i_gpadc_iio *info = (struct sun4i_gpadc_iio *)data;
-+	struct sun4i_gpadc_iio *info = data;
- 	int val, scale, offset;
- 
- 	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
-diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-index 228a003..01fc76f 100644
---- a/drivers/iio/adc/vf610_adc.c
-+++ b/drivers/iio/adc/vf610_adc.c
-@@ -584,7 +584,7 @@ static int vf610_adc_read_data(struct vf610_adc *info)
- 
- static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
- {
--	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
-+	struct iio_dev *indio_dev = dev_id;
- 	struct vf610_adc *info = iio_priv(indio_dev);
- 	int coco;
- 
--- 
-2.7.4
+I have no opposition to these changes. The only request, to avoid
+conflicts, is to split the patch into driver and DTS changes. We have
+been pushing these separately. DTS changes go via the arch tree. Drivers
+changes goes via Rui/me.
+
+You can add my:
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+
+On the DTSI patch.
