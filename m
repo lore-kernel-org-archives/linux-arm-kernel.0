@@ -1,40 +1,40 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Sat,  1 Apr 2017 18:43:57 +0800
-Subject: [PATCH 4/9] drm/rockchip: cdn-dp: Don't try to release firmware when
- not loaded
+Date: Sat,  1 Apr 2017 18:43:59 +0800
+Subject: [PATCH 6/9] drm/rockchip: Reoder unload sequence
 In-Reply-To: <1491043442-20626-1-git-send-email-jeffy.chen@rock-chips.com>
 References: <1491043442-20626-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1491043442-20626-5-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1491043442-20626-7-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+We should don't cleanup iommu before cleanup other resources.
+Reorder unload sequence, follow exynos drm.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index fd79a70..a97f3f4 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -1052,6 +1052,7 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
- 	dp->connected = false;
- 	dp->active = false;
- 	dp->active_port = -1;
-+	dp->fw_loaded = false;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index b360e62..a5d83cb 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -244,11 +244,13 @@ static void rockchip_drm_unbind(struct device *dev)
+ 	struct drm_device *drm_dev = dev_get_drvdata(dev);
  
- 	INIT_WORK(&dp->event_work, cdn_dp_pd_event_work);
- 
-@@ -1132,7 +1133,8 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
- 	connector->funcs->destroy(connector);
- 
- 	pm_runtime_disable(dev);
--	release_firmware(dp->fw);
-+	if (dp->fw_loaded)
-+		release_firmware(dp->fw);
- 	kfree(dp->edid);
- 	dp->edid = NULL;
- }
+ 	rockchip_drm_fbdev_fini(drm_dev);
+-	drm_vblank_cleanup(drm_dev);
+ 	drm_kms_helper_poll_fini(drm_dev);
++
++	drm_vblank_cleanup(drm_dev);
+ 	component_unbind_all(dev, drm_dev);
+-	rockchip_iommu_cleanup(drm_dev);
+ 	drm_mode_config_cleanup(drm_dev);
++	rockchip_iommu_cleanup(drm_dev);
++
+ 	drm_dev->dev_private = NULL;
+ 	drm_dev_unregister(drm_dev);
+ 	drm_dev_unref(drm_dev);
 -- 
 2.1.4
