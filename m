@@ -1,503 +1,954 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat,  1 Apr 2017 18:21:16 -0400
-Subject: [PATCH v2 2/5] tty: move baudrate handling code to a file of its own
+Date: Sat,  1 Apr 2017 18:21:18 -0400
+Subject: [PATCH v2 4/5] serial: split generic UART driver helper functions
+ into a separate file
 In-Reply-To: <20170401222119.25106-1-nicolas.pitre@linaro.org>
 References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
-Message-ID: <20170401222119.25106-3-nicolas.pitre@linaro.org>
+Message-ID: <20170401222119.25106-5-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow reuse without the rest of the tty_ioctl code.
+This contains code that is common between serial_core.c and the
+minitty code to come. Mainly helper functions used by UART drivers.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- drivers/tty/Makefile       |   2 +-
- drivers/tty/tty_baudrate.c | 232 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/tty/tty_ioctl.c    | 222 -------------------------------------------
- 3 files changed, 233 insertions(+), 223 deletions(-)
- create mode 100644 drivers/tty/tty_baudrate.c
+ drivers/tty/serial/Makefile      |   2 +-
+ drivers/tty/serial/serial_core.c | 419 +------------------------------------
+ drivers/tty/serial/serial_lib.c  | 440 +++++++++++++++++++++++++++++++++++++++
+ include/linux/serial_core.h      |   1 +
+ 4 files changed, 443 insertions(+), 419 deletions(-)
+ create mode 100644 drivers/tty/serial/serial_lib.c
 
-diff --git a/drivers/tty/Makefile b/drivers/tty/Makefile
-index b95bed92da..1461be6b90 100644
---- a/drivers/tty/Makefile
-+++ b/drivers/tty/Makefile
-@@ -1,5 +1,5 @@
- obj-$(CONFIG_TTY)		+= tty_io.o n_tty.o tty_ioctl.o tty_ldisc.o \
--				   tty_buffer.o tty_port.o tty_mutex.o tty_ldsem.o
-+				   tty_buffer.o tty_port.o tty_mutex.o tty_ldsem.o tty_baudrate.o
- obj-$(CONFIG_LEGACY_PTYS)	+= pty.o
- obj-$(CONFIG_UNIX98_PTYS)	+= pty.o
- obj-$(CONFIG_AUDIT)		+= tty_audit.o
-diff --git a/drivers/tty/tty_baudrate.c b/drivers/tty/tty_baudrate.c
-new file mode 100644
-index 0000000000..5c33fd2567
---- /dev/null
-+++ b/drivers/tty/tty_baudrate.c
-@@ -0,0 +1,232 @@
-+/*
-+ *  Copyright (C) 1991, 1992, 1993, 1994  Linus Torvalds
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/termios.h>
-+#include <linux/tty.h>
-+#include <linux/export.h>
-+
-+
-+/*
-+ * Routine which returns the baud rate of the tty
-+ *
-+ * Note that the baud_table needs to be kept in sync with the
-+ * include/asm/termbits.h file.
-+ */
-+static const speed_t baud_table[] = {
-+	0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
-+	9600, 19200, 38400, 57600, 115200, 230400, 460800,
-+#ifdef __sparc__
-+	76800, 153600, 307200, 614400, 921600
-+#else
-+	500000, 576000, 921600, 1000000, 1152000, 1500000, 2000000,
-+	2500000, 3000000, 3500000, 4000000
-+#endif
-+};
-+
-+#ifndef __sparc__
-+static const tcflag_t baud_bits[] = {
-+	B0, B50, B75, B110, B134, B150, B200, B300, B600,
-+	B1200, B1800, B2400, B4800, B9600, B19200, B38400,
-+	B57600, B115200, B230400, B460800, B500000, B576000,
-+	B921600, B1000000, B1152000, B1500000, B2000000, B2500000,
-+	B3000000, B3500000, B4000000
-+};
-+#else
-+static const tcflag_t baud_bits[] = {
-+	B0, B50, B75, B110, B134, B150, B200, B300, B600,
-+	B1200, B1800, B2400, B4800, B9600, B19200, B38400,
-+	B57600, B115200, B230400, B460800, B76800, B153600,
-+	B307200, B614400, B921600
-+};
-+#endif
-+
-+static int n_baud_table = ARRAY_SIZE(baud_table);
-+
-+/**
-+ *	tty_termios_baud_rate
-+ *	@termios: termios structure
-+ *
-+ *	Convert termios baud rate data into a speed. This should be called
-+ *	with the termios lock held if this termios is a terminal termios
-+ *	structure. May change the termios data. Device drivers can call this
-+ *	function but should use ->c_[io]speed directly as they are updated.
-+ *
-+ *	Locking: none
-+ */
-+
-+speed_t tty_termios_baud_rate(struct ktermios *termios)
-+{
-+	unsigned int cbaud;
-+
-+	cbaud = termios->c_cflag & CBAUD;
-+
-+#ifdef BOTHER
-+	/* Magic token for arbitrary speed via c_ispeed/c_ospeed */
-+	if (cbaud == BOTHER)
-+		return termios->c_ospeed;
-+#endif
-+	if (cbaud & CBAUDEX) {
-+		cbaud &= ~CBAUDEX;
-+
-+		if (cbaud < 1 || cbaud + 15 > n_baud_table)
-+			termios->c_cflag &= ~CBAUDEX;
-+		else
-+			cbaud += 15;
-+	}
-+	return baud_table[cbaud];
-+}
-+EXPORT_SYMBOL(tty_termios_baud_rate);
-+
-+/**
-+ *	tty_termios_input_baud_rate
-+ *	@termios: termios structure
-+ *
-+ *	Convert termios baud rate data into a speed. This should be called
-+ *	with the termios lock held if this termios is a terminal termios
-+ *	structure. May change the termios data. Device drivers can call this
-+ *	function but should use ->c_[io]speed directly as they are updated.
-+ *
-+ *	Locking: none
-+ */
-+
-+speed_t tty_termios_input_baud_rate(struct ktermios *termios)
-+{
-+#ifdef IBSHIFT
-+	unsigned int cbaud = (termios->c_cflag >> IBSHIFT) & CBAUD;
-+
-+	if (cbaud == B0)
-+		return tty_termios_baud_rate(termios);
-+
-+	/* Magic token for arbitrary speed via c_ispeed*/
-+	if (cbaud == BOTHER)
-+		return termios->c_ispeed;
-+
-+	if (cbaud & CBAUDEX) {
-+		cbaud &= ~CBAUDEX;
-+
-+		if (cbaud < 1 || cbaud + 15 > n_baud_table)
-+			termios->c_cflag &= ~(CBAUDEX << IBSHIFT);
-+		else
-+			cbaud += 15;
-+	}
-+	return baud_table[cbaud];
-+#else
-+	return tty_termios_baud_rate(termios);
-+#endif
-+}
-+EXPORT_SYMBOL(tty_termios_input_baud_rate);
-+
-+/**
-+ *	tty_termios_encode_baud_rate
-+ *	@termios: ktermios structure holding user requested state
-+ *	@ispeed: input speed
-+ *	@ospeed: output speed
-+ *
-+ *	Encode the speeds set into the passed termios structure. This is
-+ *	used as a library helper for drivers so that they can report back
-+ *	the actual speed selected when it differs from the speed requested
-+ *
-+ *	For maximal back compatibility with legacy SYS5/POSIX *nix behaviour
-+ *	we need to carefully set the bits when the user does not get the
-+ *	desired speed. We allow small margins and preserve as much of possible
-+ *	of the input intent to keep compatibility.
-+ *
-+ *	Locking: Caller should hold termios lock. This is already held
-+ *	when calling this function from the driver termios handler.
-+ *
-+ *	The ifdefs deal with platforms whose owners have yet to update them
-+ *	and will all go away once this is done.
-+ */
-+
-+void tty_termios_encode_baud_rate(struct ktermios *termios,
-+				  speed_t ibaud, speed_t obaud)
-+{
-+	int i = 0;
-+	int ifound = -1, ofound = -1;
-+	int iclose = ibaud/50, oclose = obaud/50;
-+	int ibinput = 0;
-+
-+	if (obaud == 0)			/* CD dropped 		  */
-+		ibaud = 0;		/* Clear ibaud to be sure */
-+
-+	termios->c_ispeed = ibaud;
-+	termios->c_ospeed = obaud;
-+
-+#ifdef BOTHER
-+	/* If the user asked for a precise weird speed give a precise weird
-+	   answer. If they asked for a Bfoo speed they may have problems
-+	   digesting non-exact replies so fuzz a bit */
-+
-+	if ((termios->c_cflag & CBAUD) == BOTHER)
-+		oclose = 0;
-+	if (((termios->c_cflag >> IBSHIFT) & CBAUD) == BOTHER)
-+		iclose = 0;
-+	if ((termios->c_cflag >> IBSHIFT) & CBAUD)
-+		ibinput = 1;	/* An input speed was specified */
-+#endif
-+	termios->c_cflag &= ~CBAUD;
-+
-+	/*
-+	 *	Our goal is to find a close match to the standard baud rate
-+	 *	returned. Walk the baud rate table and if we get a very close
-+	 *	match then report back the speed as a POSIX Bxxxx value by
-+	 *	preference
-+	 */
-+
-+	do {
-+		if (obaud - oclose <= baud_table[i] &&
-+		    obaud + oclose >= baud_table[i]) {
-+			termios->c_cflag |= baud_bits[i];
-+			ofound = i;
-+		}
-+		if (ibaud - iclose <= baud_table[i] &&
-+		    ibaud + iclose >= baud_table[i]) {
-+			/* For the case input == output don't set IBAUD bits
-+			   if the user didn't do so */
-+			if (ofound == i && !ibinput)
-+				ifound  = i;
-+#ifdef IBSHIFT
-+			else {
-+				ifound = i;
-+				termios->c_cflag |= (baud_bits[i] << IBSHIFT);
-+			}
-+#endif
-+		}
-+	} while (++i < n_baud_table);
-+
-+	/*
-+	 *	If we found no match then use BOTHER if provided or warn
-+	 *	the user their platform maintainer needs to wake up if not.
-+	 */
-+#ifdef BOTHER
-+	if (ofound == -1)
-+		termios->c_cflag |= BOTHER;
-+	/* Set exact input bits only if the input and output differ or the
-+	   user already did */
-+	if (ifound == -1 && (ibaud != obaud || ibinput))
-+		termios->c_cflag |= (BOTHER << IBSHIFT);
-+#else
-+	if (ifound == -1 || ofound == -1)
-+		pr_warn_once("tty: Unable to return correct speed data as your architecture needs updating.\n");
-+#endif
-+}
-+EXPORT_SYMBOL_GPL(tty_termios_encode_baud_rate);
-+
-+/**
-+ *	tty_encode_baud_rate		-	set baud rate of the tty
-+ *	@ibaud: input baud rate
-+ *	@obad: output baud rate
-+ *
-+ *	Update the current termios data for the tty with the new speed
-+ *	settings. The caller must hold the termios_rwsem for the tty in
-+ *	question.
-+ */
-+
-+void tty_encode_baud_rate(struct tty_struct *tty, speed_t ibaud, speed_t obaud)
-+{
-+	tty_termios_encode_baud_rate(&tty->termios, ibaud, obaud);
-+}
-+EXPORT_SYMBOL_GPL(tty_encode_baud_rate);
-diff --git a/drivers/tty/tty_ioctl.c b/drivers/tty/tty_ioctl.c
-index a9a978731c..efa96e6c4c 100644
---- a/drivers/tty/tty_ioctl.c
-+++ b/drivers/tty/tty_ioctl.c
-@@ -258,228 +258,6 @@ static void unset_locked_termios(struct tty_struct *tty, struct ktermios *old)
- 	/* FIXME: What should we do for i/ospeed */
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 53c03e0051..073afd10c5 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the kernel serial device drivers.
+ #
+ 
+-obj-$(CONFIG_SERIAL_CORE) += serial_core.o
++obj-$(CONFIG_SERIAL_CORE) += serial_core.o serial_lib.o
+ 
+ obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
+ obj-$(CONFIG_SERIAL_EARLYCON_ARM_SEMIHOST) += earlycon-arm-semihost.o
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index 3fe5689497..20214e1d87 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -44,12 +44,6 @@
+  */
+ static DEFINE_MUTEX(port_mutex);
+ 
+-/*
+- * lockdep: port->lock is initialized in two places, but we
+- *          want only one lock-class:
+- */
+-static struct lock_class_key port_lock_key;
+-
+ #define HIGH_BITS_OFFSET	((sizeof(long)-sizeof(int))*8)
+ 
+ static void uart_change_speed(struct tty_struct *tty, struct uart_state *state,
+@@ -293,183 +287,6 @@ static void uart_shutdown(struct tty_struct *tty, struct uart_state *state)
+ 	}
+ }
+ 
+-/**
+- *	uart_update_timeout - update per-port FIFO timeout.
+- *	@port:  uart_port structure describing the port
+- *	@cflag: termios cflag value
+- *	@baud:  speed of the port
+- *
+- *	Set the port FIFO timeout value.  The @cflag value should
+- *	reflect the actual hardware settings.
+- */
+-void
+-uart_update_timeout(struct uart_port *port, unsigned int cflag,
+-		    unsigned int baud)
+-{
+-	unsigned int bits;
+-
+-	/* byte size and parity */
+-	switch (cflag & CSIZE) {
+-	case CS5:
+-		bits = 7;
+-		break;
+-	case CS6:
+-		bits = 8;
+-		break;
+-	case CS7:
+-		bits = 9;
+-		break;
+-	default:
+-		bits = 10;
+-		break; /* CS8 */
+-	}
+-
+-	if (cflag & CSTOPB)
+-		bits++;
+-	if (cflag & PARENB)
+-		bits++;
+-
+-	/*
+-	 * The total number of bits to be transmitted in the fifo.
+-	 */
+-	bits = bits * port->fifosize;
+-
+-	/*
+-	 * Figure the timeout to send the above number of bits.
+-	 * Add .02 seconds of slop
+-	 */
+-	port->timeout = (HZ * bits) / baud + HZ/50;
+-}
+-
+-EXPORT_SYMBOL(uart_update_timeout);
+-
+-/**
+- *	uart_get_baud_rate - return baud rate for a particular port
+- *	@port: uart_port structure describing the port in question.
+- *	@termios: desired termios settings.
+- *	@old: old termios (or NULL)
+- *	@min: minimum acceptable baud rate
+- *	@max: maximum acceptable baud rate
+- *
+- *	Decode the termios structure into a numeric baud rate,
+- *	taking account of the magic 38400 baud rate (with spd_*
+- *	flags), and mapping the %B0 rate to 9600 baud.
+- *
+- *	If the new baud rate is invalid, try the old termios setting.
+- *	If it's still invalid, we try 9600 baud.
+- *
+- *	Update the @termios structure to reflect the baud rate
+- *	we're actually going to be using. Don't do this for the case
+- *	where B0 is requested ("hang up").
+- */
+-unsigned int
+-uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
+-		   struct ktermios *old, unsigned int min, unsigned int max)
+-{
+-	unsigned int try;
+-	unsigned int baud;
+-	unsigned int altbaud;
+-	int hung_up = 0;
+-	upf_t flags = port->flags & UPF_SPD_MASK;
+-
+-	switch (flags) {
+-	case UPF_SPD_HI:
+-		altbaud = 57600;
+-		break;
+-	case UPF_SPD_VHI:
+-		altbaud = 115200;
+-		break;
+-	case UPF_SPD_SHI:
+-		altbaud = 230400;
+-		break;
+-	case UPF_SPD_WARP:
+-		altbaud = 460800;
+-		break;
+-	default:
+-		altbaud = 38400;
+-		break;
+-	}
+-
+-	for (try = 0; try < 2; try++) {
+-		baud = tty_termios_baud_rate(termios);
+-
+-		/*
+-		 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
+-		 * Die! Die! Die!
+-		 */
+-		if (try == 0 && baud == 38400)
+-			baud = altbaud;
+-
+-		/*
+-		 * Special case: B0 rate.
+-		 */
+-		if (baud == 0) {
+-			hung_up = 1;
+-			baud = 9600;
+-		}
+-
+-		if (baud >= min && baud <= max)
+-			return baud;
+-
+-		/*
+-		 * Oops, the quotient was zero.  Try again with
+-		 * the old baud rate if possible.
+-		 */
+-		termios->c_cflag &= ~CBAUD;
+-		if (old) {
+-			baud = tty_termios_baud_rate(old);
+-			if (!hung_up)
+-				tty_termios_encode_baud_rate(termios,
+-								baud, baud);
+-			old = NULL;
+-			continue;
+-		}
+-
+-		/*
+-		 * As a last resort, if the range cannot be met then clip to
+-		 * the nearest chip supported rate.
+-		 */
+-		if (!hung_up) {
+-			if (baud <= min)
+-				tty_termios_encode_baud_rate(termios,
+-							min + 1, min + 1);
+-			else
+-				tty_termios_encode_baud_rate(termios,
+-							max - 1, max - 1);
+-		}
+-	}
+-	/* Should never happen */
+-	WARN_ON(1);
+-	return 0;
+-}
+-
+-EXPORT_SYMBOL(uart_get_baud_rate);
+-
+-/**
+- *	uart_get_divisor - return uart clock divisor
+- *	@port: uart_port structure describing the port.
+- *	@baud: desired baud rate
+- *
+- *	Calculate the uart clock divisor for the port.
+- */
+-unsigned int
+-uart_get_divisor(struct uart_port *port, unsigned int baud)
+-{
+-	unsigned int quot;
+-
+-	/*
+-	 * Old custom speed handling.
+-	 */
+-	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
+-		quot = port->custom_divisor;
+-	else
+-		quot = DIV_ROUND_CLOSEST(port->uartclk, 16 * baud);
+-
+-	return quot;
+-}
+-
+-EXPORT_SYMBOL(uart_get_divisor);
+-
+ /* Caller holds port mutex */
+ static void uart_change_speed(struct tty_struct *tty, struct uart_state *state,
+ 					struct ktermios *old_termios)
+@@ -1837,207 +1654,6 @@ static const struct file_operations uart_proc_fops = {
+ };
+ #endif
+ 
+-#if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_CONSOLE_POLL)
+-/**
+- *	uart_console_write - write a console message to a serial port
+- *	@port: the port to write the message
+- *	@s: array of characters
+- *	@count: number of characters in string to write
+- *	@putchar: function to write character to port
+- */
+-void uart_console_write(struct uart_port *port, const char *s,
+-			unsigned int count,
+-			void (*putchar)(struct uart_port *, int))
+-{
+-	unsigned int i;
+-
+-	for (i = 0; i < count; i++, s++) {
+-		if (*s == '\n')
+-			putchar(port, '\r');
+-		putchar(port, *s);
+-	}
+-}
+-EXPORT_SYMBOL_GPL(uart_console_write);
+-
+-/*
+- *	Check whether an invalid uart number has been specified, and
+- *	if so, search for the first available port that does have
+- *	console support.
+- */
+-struct uart_port * __init
+-uart_get_console(struct uart_port *ports, int nr, struct console *co)
+-{
+-	int idx = co->index;
+-
+-	if (idx < 0 || idx >= nr || (ports[idx].iobase == 0 &&
+-				     ports[idx].membase == NULL))
+-		for (idx = 0; idx < nr; idx++)
+-			if (ports[idx].iobase != 0 ||
+-			    ports[idx].membase != NULL)
+-				break;
+-
+-	co->index = idx;
+-
+-	return ports + idx;
+-}
+-
+-/**
+- *	uart_parse_earlycon - Parse earlycon options
+- *	@p:	  ptr to 2nd field (ie., just beyond '<name>,')
+- *	@iotype:  ptr for decoded iotype (out)
+- *	@addr:    ptr for decoded mapbase/iobase (out)
+- *	@options: ptr for <options> field; NULL if not present (out)
+- *
+- *	Decodes earlycon kernel command line parameters of the form
+- *	   earlycon=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
+- *	   console=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
+- *
+- *	The optional form
+- *	   earlycon=<name>,0x<addr>,<options>
+- *	   console=<name>,0x<addr>,<options>
+- *	is also accepted; the returned @iotype will be UPIO_MEM.
+- *
+- *	Returns 0 on success or -EINVAL on failure
+- */
+-int uart_parse_earlycon(char *p, unsigned char *iotype, resource_size_t *addr,
+-			char **options)
+-{
+-	if (strncmp(p, "mmio,", 5) == 0) {
+-		*iotype = UPIO_MEM;
+-		p += 5;
+-	} else if (strncmp(p, "mmio16,", 7) == 0) {
+-		*iotype = UPIO_MEM16;
+-		p += 7;
+-	} else if (strncmp(p, "mmio32,", 7) == 0) {
+-		*iotype = UPIO_MEM32;
+-		p += 7;
+-	} else if (strncmp(p, "mmio32be,", 9) == 0) {
+-		*iotype = UPIO_MEM32BE;
+-		p += 9;
+-	} else if (strncmp(p, "mmio32native,", 13) == 0) {
+-		*iotype = IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) ?
+-			UPIO_MEM32BE : UPIO_MEM32;
+-		p += 13;
+-	} else if (strncmp(p, "io,", 3) == 0) {
+-		*iotype = UPIO_PORT;
+-		p += 3;
+-	} else if (strncmp(p, "0x", 2) == 0) {
+-		*iotype = UPIO_MEM;
+-	} else {
+-		return -EINVAL;
+-	}
+-
+-	/*
+-	 * Before you replace it with kstrtoull(), think about options separator
+-	 * (',') it will not tolerate
+-	 */
+-	*addr = simple_strtoull(p, NULL, 0);
+-	p = strchr(p, ',');
+-	if (p)
+-		p++;
+-
+-	*options = p;
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(uart_parse_earlycon);
+-
+-/**
+- *	uart_parse_options - Parse serial port baud/parity/bits/flow control.
+- *	@options: pointer to option string
+- *	@baud: pointer to an 'int' variable for the baud rate.
+- *	@parity: pointer to an 'int' variable for the parity.
+- *	@bits: pointer to an 'int' variable for the number of data bits.
+- *	@flow: pointer to an 'int' variable for the flow control character.
+- *
+- *	uart_parse_options decodes a string containing the serial console
+- *	options.  The format of the string is <baud><parity><bits><flow>,
+- *	eg: 115200n8r
+- */
+-void
+-uart_parse_options(char *options, int *baud, int *parity, int *bits, int *flow)
+-{
+-	char *s = options;
+-
+-	*baud = simple_strtoul(s, NULL, 10);
+-	while (*s >= '0' && *s <= '9')
+-		s++;
+-	if (*s)
+-		*parity = *s++;
+-	if (*s)
+-		*bits = *s++ - '0';
+-	if (*s)
+-		*flow = *s;
+-}
+-EXPORT_SYMBOL_GPL(uart_parse_options);
+-
+-/**
+- *	uart_set_options - setup the serial console parameters
+- *	@port: pointer to the serial ports uart_port structure
+- *	@co: console pointer
+- *	@baud: baud rate
+- *	@parity: parity character - 'n' (none), 'o' (odd), 'e' (even)
+- *	@bits: number of data bits
+- *	@flow: flow control character - 'r' (rts)
+- */
+-int
+-uart_set_options(struct uart_port *port, struct console *co,
+-		 int baud, int parity, int bits, int flow)
+-{
+-	struct ktermios termios;
+-	static struct ktermios dummy;
+-
+-	/*
+-	 * Ensure that the serial console lock is initialised
+-	 * early.
+-	 * If this port is a console, then the spinlock is already
+-	 * initialised.
+-	 */
+-	if (!(uart_console(port) && (port->cons->flags & CON_ENABLED))) {
+-		spin_lock_init(&port->lock);
+-		lockdep_set_class(&port->lock, &port_lock_key);
+-	}
+-
+-	memset(&termios, 0, sizeof(struct ktermios));
+-
+-	termios.c_cflag |= CREAD | HUPCL | CLOCAL;
+-	tty_termios_encode_baud_rate(&termios, baud, baud);
+-
+-	if (bits == 7)
+-		termios.c_cflag |= CS7;
+-	else
+-		termios.c_cflag |= CS8;
+-
+-	switch (parity) {
+-	case 'o': case 'O':
+-		termios.c_cflag |= PARODD;
+-		/*fall through*/
+-	case 'e': case 'E':
+-		termios.c_cflag |= PARENB;
+-		break;
+-	}
+-
+-	if (flow == 'r')
+-		termios.c_cflag |= CRTSCTS;
+-
+-	/*
+-	 * some uarts on other side don't support no flow control.
+-	 * So we set * DTR in host uart to make them happy
+-	 */
+-	port->mctrl |= TIOCM_DTR;
+-
+-	port->ops->set_termios(port, &termios, &dummy);
+-	/*
+-	 * Allow the setting of the UART parameters with a NULL console
+-	 * too:
+-	 */
+-	if (co)
+-		co->cflag = termios.c_cflag;
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(uart_set_options);
+-#endif /* CONFIG_SERIAL_CORE_CONSOLE */
+-
+ /**
+  * uart_change_pm - set power state of the port
+  *
+@@ -2751,15 +2367,8 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
+ 	state->pm_state = UART_PM_STATE_UNDEFINED;
+ 	uport->cons = drv->cons;
+ 	uport->minor = drv->tty_driver->minor_start + uport->line;
++	uart_port_lock_init(uport);
+ 
+-	/*
+-	 * If this port is a console, then the spinlock is already
+-	 * initialised.
+-	 */
+-	if (!(uart_console(uport) && (uport->cons->flags & CON_ENABLED))) {
+-		spin_lock_init(&uport->lock);
+-		lockdep_set_class(&uport->lock, &port_lock_key);
+-	}
+ 	if (uport->cons && uport->dev)
+ 		of_console_check(uport->dev->of_node, uport->cons->name, uport->line);
+ 
+@@ -2885,32 +2494,6 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
+ 	return ret;
  }
  
 -/*
-- * Routine which returns the baud rate of the tty
-- *
-- * Note that the baud_table needs to be kept in sync with the
-- * include/asm/termbits.h file.
+- *	Are the two ports equivalent?
 - */
--static const speed_t baud_table[] = {
--	0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
--	9600, 19200, 38400, 57600, 115200, 230400, 460800,
--#ifdef __sparc__
--	76800, 153600, 307200, 614400, 921600
--#else
--	500000, 576000, 921600, 1000000, 1152000, 1500000, 2000000,
--	2500000, 3000000, 3500000, 4000000
--#endif
--};
--
--#ifndef __sparc__
--static const tcflag_t baud_bits[] = {
--	B0, B50, B75, B110, B134, B150, B200, B300, B600,
--	B1200, B1800, B2400, B4800, B9600, B19200, B38400,
--	B57600, B115200, B230400, B460800, B500000, B576000,
--	B921600, B1000000, B1152000, B1500000, B2000000, B2500000,
--	B3000000, B3500000, B4000000
--};
--#else
--static const tcflag_t baud_bits[] = {
--	B0, B50, B75, B110, B134, B150, B200, B300, B600,
--	B1200, B1800, B2400, B4800, B9600, B19200, B38400,
--	B57600, B115200, B230400, B460800, B76800, B153600,
--	B307200, B614400, B921600
--};
--#endif
--
--static int n_baud_table = ARRAY_SIZE(baud_table);
--
--/**
-- *	tty_termios_baud_rate
-- *	@termios: termios structure
-- *
-- *	Convert termios baud rate data into a speed. This should be called
-- *	with the termios lock held if this termios is a terminal termios
-- *	structure. May change the termios data. Device drivers can call this
-- *	function but should use ->c_[io]speed directly as they are updated.
-- *
-- *	Locking: none
-- */
--
--speed_t tty_termios_baud_rate(struct ktermios *termios)
+-int uart_match_port(struct uart_port *port1, struct uart_port *port2)
 -{
--	unsigned int cbaud;
+-	if (port1->iotype != port2->iotype)
+-		return 0;
 -
--	cbaud = termios->c_cflag & CBAUD;
--
--#ifdef BOTHER
--	/* Magic token for arbitrary speed via c_ispeed/c_ospeed */
--	if (cbaud == BOTHER)
--		return termios->c_ospeed;
--#endif
--	if (cbaud & CBAUDEX) {
--		cbaud &= ~CBAUDEX;
--
--		if (cbaud < 1 || cbaud + 15 > n_baud_table)
--			termios->c_cflag &= ~CBAUDEX;
--		else
--			cbaud += 15;
+-	switch (port1->iotype) {
+-	case UPIO_PORT:
+-		return (port1->iobase == port2->iobase);
+-	case UPIO_HUB6:
+-		return (port1->iobase == port2->iobase) &&
+-		       (port1->hub6   == port2->hub6);
+-	case UPIO_MEM:
+-	case UPIO_MEM16:
+-	case UPIO_MEM32:
+-	case UPIO_MEM32BE:
+-	case UPIO_AU:
+-	case UPIO_TSI:
+-		return (port1->mapbase == port2->mapbase);
 -	}
--	return baud_table[cbaud];
+-	return 0;
 -}
--EXPORT_SYMBOL(tty_termios_baud_rate);
--
--/**
-- *	tty_termios_input_baud_rate
-- *	@termios: termios structure
-- *
-- *	Convert termios baud rate data into a speed. This should be called
-- *	with the termios lock held if this termios is a terminal termios
-- *	structure. May change the termios data. Device drivers can call this
-- *	function but should use ->c_[io]speed directly as they are updated.
-- *
-- *	Locking: none
-- */
--
--speed_t tty_termios_input_baud_rate(struct ktermios *termios)
--{
--#ifdef IBSHIFT
--	unsigned int cbaud = (termios->c_cflag >> IBSHIFT) & CBAUD;
--
--	if (cbaud == B0)
--		return tty_termios_baud_rate(termios);
--
--	/* Magic token for arbitrary speed via c_ispeed*/
--	if (cbaud == BOTHER)
--		return termios->c_ispeed;
--
--	if (cbaud & CBAUDEX) {
--		cbaud &= ~CBAUDEX;
--
--		if (cbaud < 1 || cbaud + 15 > n_baud_table)
--			termios->c_cflag &= ~(CBAUDEX << IBSHIFT);
--		else
--			cbaud += 15;
--	}
--	return baud_table[cbaud];
--#else
--	return tty_termios_baud_rate(termios);
--#endif
--}
--EXPORT_SYMBOL(tty_termios_input_baud_rate);
--
--/**
-- *	tty_termios_encode_baud_rate
-- *	@termios: ktermios structure holding user requested state
-- *	@ispeed: input speed
-- *	@ospeed: output speed
-- *
-- *	Encode the speeds set into the passed termios structure. This is
-- *	used as a library helper for drivers so that they can report back
-- *	the actual speed selected when it differs from the speed requested
-- *
-- *	For maximal back compatibility with legacy SYS5/POSIX *nix behaviour
-- *	we need to carefully set the bits when the user does not get the
-- *	desired speed. We allow small margins and preserve as much of possible
-- *	of the input intent to keep compatibility.
-- *
-- *	Locking: Caller should hold termios lock. This is already held
-- *	when calling this function from the driver termios handler.
-- *
-- *	The ifdefs deal with platforms whose owners have yet to update them
-- *	and will all go away once this is done.
-- */
--
--void tty_termios_encode_baud_rate(struct ktermios *termios,
--				  speed_t ibaud, speed_t obaud)
--{
--	int i = 0;
--	int ifound = -1, ofound = -1;
--	int iclose = ibaud/50, oclose = obaud/50;
--	int ibinput = 0;
--
--	if (obaud == 0)			/* CD dropped 		  */
--		ibaud = 0;		/* Clear ibaud to be sure */
--
--	termios->c_ispeed = ibaud;
--	termios->c_ospeed = obaud;
--
--#ifdef BOTHER
--	/* If the user asked for a precise weird speed give a precise weird
--	   answer. If they asked for a Bfoo speed they may have problems
--	   digesting non-exact replies so fuzz a bit */
--
--	if ((termios->c_cflag & CBAUD) == BOTHER)
--		oclose = 0;
--	if (((termios->c_cflag >> IBSHIFT) & CBAUD) == BOTHER)
--		iclose = 0;
--	if ((termios->c_cflag >> IBSHIFT) & CBAUD)
--		ibinput = 1;	/* An input speed was specified */
--#endif
--	termios->c_cflag &= ~CBAUD;
--
--	/*
--	 *	Our goal is to find a close match to the standard baud rate
--	 *	returned. Walk the baud rate table and if we get a very close
--	 *	match then report back the speed as a POSIX Bxxxx value by
--	 *	preference
--	 */
--
--	do {
--		if (obaud - oclose <= baud_table[i] &&
--		    obaud + oclose >= baud_table[i]) {
--			termios->c_cflag |= baud_bits[i];
--			ofound = i;
--		}
--		if (ibaud - iclose <= baud_table[i] &&
--		    ibaud + iclose >= baud_table[i]) {
--			/* For the case input == output don't set IBAUD bits
--			   if the user didn't do so */
--			if (ofound == i && !ibinput)
--				ifound  = i;
--#ifdef IBSHIFT
--			else {
--				ifound = i;
--				termios->c_cflag |= (baud_bits[i] << IBSHIFT);
--			}
--#endif
--		}
--	} while (++i < n_baud_table);
--
--	/*
--	 *	If we found no match then use BOTHER if provided or warn
--	 *	the user their platform maintainer needs to wake up if not.
--	 */
--#ifdef BOTHER
--	if (ofound == -1)
--		termios->c_cflag |= BOTHER;
--	/* Set exact input bits only if the input and output differ or the
--	   user already did */
--	if (ifound == -1 && (ibaud != obaud || ibinput))
--		termios->c_cflag |= (BOTHER << IBSHIFT);
--#else
--	if (ifound == -1 || ofound == -1)
--		pr_warn_once("tty: Unable to return correct speed data as your architecture needs updating.\n");
--#endif
--}
--EXPORT_SYMBOL_GPL(tty_termios_encode_baud_rate);
--
--/**
-- *	tty_encode_baud_rate		-	set baud rate of the tty
-- *	@ibaud: input baud rate
-- *	@obad: output baud rate
-- *
-- *	Update the current termios data for the tty with the new speed
-- *	settings. The caller must hold the termios_rwsem for the tty in
-- *	question.
-- */
--
--void tty_encode_baud_rate(struct tty_struct *tty, speed_t ibaud, speed_t obaud)
--{
--	tty_termios_encode_baud_rate(&tty->termios, ibaud, obaud);
--}
--EXPORT_SYMBOL_GPL(tty_encode_baud_rate);
+-EXPORT_SYMBOL(uart_match_port);
 -
  /**
-  *	tty_termios_copy_hw	-	copy hardware settings
-  *	@new: New termios
+  *	uart_handle_dcd_change - handle a change of carrier detect state
+  *	@uport: uart_port structure for the open port
+diff --git a/drivers/tty/serial/serial_lib.c b/drivers/tty/serial/serial_lib.c
+new file mode 100644
+index 0000000000..c3f521b401
+--- /dev/null
++++ b/drivers/tty/serial/serial_lib.c
+@@ -0,0 +1,440 @@
++/*
++ *  Common support functions for serial port drivers
++ *
++ *  Copyright 1999 ARM Limited
++ *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#include <linux/export.h>
++#include <linux/tty.h>
++#include <linux/console.h>
++#include <linux/serial_core.h>
++#include <linux/spinlock.h>
++
++/*
++ * lockdep: port->lock is initialized in two places, but we
++ *          want only one lock-class:
++ */
++static struct lock_class_key port_lock_key;
++
++void uart_port_lock_init(struct uart_port *port)
++{
++	/*
++	 * If this port is a console, then the spinlock is already
++	 * initialised.
++	 */
++	if (!(uart_console(port) && (port->cons->flags & CON_ENABLED))) {
++		spin_lock_init(&port->lock);
++		lockdep_set_class(&port->lock, &port_lock_key);
++	}
++}
++
++/**
++ *	uart_update_timeout - update per-port FIFO timeout.
++ *	@port:  uart_port structure describing the port
++ *	@cflag: termios cflag value
++ *	@baud:  speed of the port
++ *
++ *	Set the port FIFO timeout value.  The @cflag value should
++ *	reflect the actual hardware settings.
++ */
++void
++uart_update_timeout(struct uart_port *port, unsigned int cflag,
++		    unsigned int baud)
++{
++	unsigned int bits;
++
++	/* byte size and parity */
++	switch (cflag & CSIZE) {
++	case CS5:
++		bits = 7;
++		break;
++	case CS6:
++		bits = 8;
++		break;
++	case CS7:
++		bits = 9;
++		break;
++	default:
++		bits = 10;
++		break; /* CS8 */
++	}
++
++	if (cflag & CSTOPB)
++		bits++;
++	if (cflag & PARENB)
++		bits++;
++
++	/*
++	 * The total number of bits to be transmitted in the fifo.
++	 */
++	bits = bits * port->fifosize;
++
++	/*
++	 * Figure the timeout to send the above number of bits.
++	 * Add .02 seconds of slop
++	 */
++	port->timeout = (HZ * bits) / baud + HZ/50;
++}
++EXPORT_SYMBOL(uart_update_timeout);
++
++/**
++ *	uart_get_baud_rate - return baud rate for a particular port
++ *	@port: uart_port structure describing the port in question.
++ *	@termios: desired termios settings.
++ *	@old: old termios (or NULL)
++ *	@min: minimum acceptable baud rate
++ *	@max: maximum acceptable baud rate
++ *
++ *	Decode the termios structure into a numeric baud rate,
++ *	taking account of the magic 38400 baud rate (with spd_*
++ *	flags), and mapping the %B0 rate to 9600 baud.
++ *
++ *	If the new baud rate is invalid, try the old termios setting.
++ *	If it's still invalid, we try 9600 baud.
++ *
++ *	Update the @termios structure to reflect the baud rate
++ *	we're actually going to be using. Don't do this for the case
++ *	where B0 is requested ("hang up").
++ */
++unsigned int
++uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
++		   struct ktermios *old, unsigned int min, unsigned int max)
++{
++	unsigned int try;
++	unsigned int baud;
++	unsigned int altbaud;
++	int hung_up = 0;
++	upf_t flags = port->flags & UPF_SPD_MASK;
++
++	switch (flags) {
++	case UPF_SPD_HI:
++		altbaud = 57600;
++		break;
++	case UPF_SPD_VHI:
++		altbaud = 115200;
++		break;
++	case UPF_SPD_SHI:
++		altbaud = 230400;
++		break;
++	case UPF_SPD_WARP:
++		altbaud = 460800;
++		break;
++	default:
++		altbaud = 38400;
++		break;
++	}
++
++	for (try = 0; try < 2; try++) {
++		baud = tty_termios_baud_rate(termios);
++
++		/*
++		 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
++		 * Die! Die! Die!
++		 */
++		if (try == 0 && baud == 38400)
++			baud = altbaud;
++
++		/*
++		 * Special case: B0 rate.
++		 */
++		if (baud == 0) {
++			hung_up = 1;
++			baud = 9600;
++		}
++
++		if (baud >= min && baud <= max)
++			return baud;
++
++		/*
++		 * Oops, the quotient was zero.  Try again with
++		 * the old baud rate if possible.
++		 */
++		termios->c_cflag &= ~CBAUD;
++		if (old) {
++			baud = tty_termios_baud_rate(old);
++			if (!hung_up)
++				tty_termios_encode_baud_rate(termios,
++								baud, baud);
++			old = NULL;
++			continue;
++		}
++
++		/*
++		 * As a last resort, if the range cannot be met then clip to
++		 * the nearest chip supported rate.
++		 */
++		if (!hung_up) {
++			if (baud <= min)
++				tty_termios_encode_baud_rate(termios,
++							min + 1, min + 1);
++			else
++				tty_termios_encode_baud_rate(termios,
++							max - 1, max - 1);
++		}
++	}
++	/* Should never happen */
++	WARN_ON(1);
++	return 0;
++}
++EXPORT_SYMBOL(uart_get_baud_rate);
++
++/**
++ *	uart_get_divisor - return uart clock divisor
++ *	@port: uart_port structure describing the port.
++ *	@baud: desired baud rate
++ *
++ *	Calculate the uart clock divisor for the port.
++ */
++unsigned int
++uart_get_divisor(struct uart_port *port, unsigned int baud)
++{
++	unsigned int quot;
++
++	/*
++	 * Old custom speed handling.
++	 */
++	if (baud == 38400 && (port->flags & UPF_SPD_MASK) == UPF_SPD_CUST)
++		quot = port->custom_divisor;
++	else
++		quot = DIV_ROUND_CLOSEST(port->uartclk, 16 * baud);
++
++	return quot;
++}
++EXPORT_SYMBOL(uart_get_divisor);
++
++#if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_CONSOLE_POLL)
++/**
++ *	uart_console_write - write a console message to a serial port
++ *	@port: the port to write the message
++ *	@s: array of characters
++ *	@count: number of characters in string to write
++ *	@putchar: function to write character to port
++ */
++void uart_console_write(struct uart_port *port, const char *s,
++			unsigned int count,
++			void (*putchar)(struct uart_port *, int))
++{
++	unsigned int i;
++
++	for (i = 0; i < count; i++, s++) {
++		if (*s == '\n')
++			putchar(port, '\r');
++		putchar(port, *s);
++	}
++}
++EXPORT_SYMBOL_GPL(uart_console_write);
++
++/*
++ *	Check whether an invalid uart number has been specified, and
++ *	if so, search for the first available port that does have
++ *	console support.
++ */
++struct uart_port * __init
++uart_get_console(struct uart_port *ports, int nr, struct console *co)
++{
++	int idx = co->index;
++
++	if (idx < 0 || idx >= nr || (ports[idx].iobase == 0 &&
++				     ports[idx].membase == NULL))
++		for (idx = 0; idx < nr; idx++)
++			if (ports[idx].iobase != 0 ||
++			    ports[idx].membase != NULL)
++				break;
++
++	co->index = idx;
++
++	return ports + idx;
++}
++
++/**
++ *	uart_parse_earlycon - Parse earlycon options
++ *	@p:	  ptr to 2nd field (ie., just beyond '<name>,')
++ *	@iotype:  ptr for decoded iotype (out)
++ *	@addr:    ptr for decoded mapbase/iobase (out)
++ *	@options: ptr for <options> field; NULL if not present (out)
++ *
++ *	Decodes earlycon kernel command line parameters of the form
++ *	   earlycon=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
++ *	   console=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
++ *
++ *	The optional form
++ *	   earlycon=<name>,0x<addr>,<options>
++ *	   console=<name>,0x<addr>,<options>
++ *	is also accepted; the returned @iotype will be UPIO_MEM.
++ *
++ *	Returns 0 on success or -EINVAL on failure
++ */
++int uart_parse_earlycon(char *p, unsigned char *iotype, resource_size_t *addr,
++			char **options)
++{
++	if (strncmp(p, "mmio,", 5) == 0) {
++		*iotype = UPIO_MEM;
++		p += 5;
++	} else if (strncmp(p, "mmio16,", 7) == 0) {
++		*iotype = UPIO_MEM16;
++		p += 7;
++	} else if (strncmp(p, "mmio32,", 7) == 0) {
++		*iotype = UPIO_MEM32;
++		p += 7;
++	} else if (strncmp(p, "mmio32be,", 9) == 0) {
++		*iotype = UPIO_MEM32BE;
++		p += 9;
++	} else if (strncmp(p, "mmio32native,", 13) == 0) {
++		*iotype = IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) ?
++			UPIO_MEM32BE : UPIO_MEM32;
++		p += 13;
++	} else if (strncmp(p, "io,", 3) == 0) {
++		*iotype = UPIO_PORT;
++		p += 3;
++	} else if (strncmp(p, "0x", 2) == 0) {
++		*iotype = UPIO_MEM;
++	} else {
++		return -EINVAL;
++	}
++
++	/*
++	 * Before you replace it with kstrtoull(), think about options separator
++	 * (',') it will not tolerate
++	 */
++	*addr = simple_strtoull(p, NULL, 0);
++	p = strchr(p, ',');
++	if (p)
++		p++;
++
++	*options = p;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(uart_parse_earlycon);
++
++/**
++ *	uart_parse_options - Parse serial port baud/parity/bits/flow control.
++ *	@options: pointer to option string
++ *	@baud: pointer to an 'int' variable for the baud rate.
++ *	@parity: pointer to an 'int' variable for the parity.
++ *	@bits: pointer to an 'int' variable for the number of data bits.
++ *	@flow: pointer to an 'int' variable for the flow control character.
++ *
++ *	uart_parse_options decodes a string containing the serial console
++ *	options.  The format of the string is <baud><parity><bits><flow>,
++ *	eg: 115200n8r
++ */
++void
++uart_parse_options(char *options, int *baud, int *parity, int *bits, int *flow)
++{
++	char *s = options;
++
++	*baud = simple_strtoul(s, NULL, 10);
++	while (*s >= '0' && *s <= '9')
++		s++;
++	if (*s)
++		*parity = *s++;
++	if (*s)
++		*bits = *s++ - '0';
++	if (*s)
++		*flow = *s;
++}
++EXPORT_SYMBOL_GPL(uart_parse_options);
++
++/**
++ *	uart_set_options - setup the serial console parameters
++ *	@port: pointer to the serial ports uart_port structure
++ *	@co: console pointer
++ *	@baud: baud rate
++ *	@parity: parity character - 'n' (none), 'o' (odd), 'e' (even)
++ *	@bits: number of data bits
++ *	@flow: flow control character - 'r' (rts)
++ */
++int
++uart_set_options(struct uart_port *port, struct console *co,
++		 int baud, int parity, int bits, int flow)
++{
++	struct ktermios termios;
++	static struct ktermios dummy;
++
++	/*
++	 * Ensure that the serial console lock is initialised
++	 * early.
++	 */
++	uart_port_lock_init(port);
++
++	memset(&termios, 0, sizeof(struct ktermios));
++
++	termios.c_cflag |= CREAD | HUPCL | CLOCAL;
++	tty_termios_encode_baud_rate(&termios, baud, baud);
++
++	if (bits == 7)
++		termios.c_cflag |= CS7;
++	else
++		termios.c_cflag |= CS8;
++
++	switch (parity) {
++	case 'o': case 'O':
++		termios.c_cflag |= PARODD;
++		/*fall through*/
++	case 'e': case 'E':
++		termios.c_cflag |= PARENB;
++		break;
++	}
++
++	if (flow == 'r')
++		termios.c_cflag |= CRTSCTS;
++
++	/*
++	 * some uarts on other side don't support no flow control.
++	 * So we set * DTR in host uart to make them happy
++	 */
++	port->mctrl |= TIOCM_DTR;
++
++	port->ops->set_termios(port, &termios, &dummy);
++	/*
++	 * Allow the setting of the UART parameters with a NULL console
++	 * too:
++	 */
++	if (co)
++		co->cflag = termios.c_cflag;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(uart_set_options);
++#endif /* CONFIG_SERIAL_CORE_CONSOLE */
++
++/*
++ *	Are the two ports equivalent?
++ */
++int uart_match_port(struct uart_port *port1, struct uart_port *port2)
++{
++	if (port1->iotype != port2->iotype)
++		return 0;
++
++	switch (port1->iotype) {
++	case UPIO_PORT:
++		return (port1->iobase == port2->iobase);
++	case UPIO_HUB6:
++		return (port1->iobase == port2->iobase) &&
++		       (port1->hub6   == port2->hub6);
++	case UPIO_MEM:
++	case UPIO_MEM16:
++	case UPIO_MEM32:
++	case UPIO_MEM32BE:
++	case UPIO_AU:
++	case UPIO_TSI:
++		return (port1->mapbase == port2->mapbase);
++	}
++	return 0;
++}
++EXPORT_SYMBOL(uart_match_port);
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 58484fb35c..505b51db59 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -402,6 +402,7 @@ void uart_unregister_driver(struct uart_driver *uart);
+ int uart_add_one_port(struct uart_driver *reg, struct uart_port *port);
+ int uart_remove_one_port(struct uart_driver *reg, struct uart_port *port);
+ int uart_match_port(struct uart_port *port1, struct uart_port *port2);
++void uart_port_lock_init(struct uart_port *port);
+ 
+ /*
+  * Power Management
 -- 
 2.9.3
