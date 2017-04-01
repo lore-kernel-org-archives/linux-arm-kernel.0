@@ -1,64 +1,115 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  1 Apr 2017 15:59:22 +0200
-Subject: [PATCH v2 2/2] pinctrl: meson: meson8b: rename the NAND DQS pin
- definitions
-In-Reply-To: <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
-References: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
- <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170401135922.1288-3-martin.blumenstingl@googlemail.com>
+From: singhalsimran0@gmail.com (simran singhal)
+Date: Sat, 1 Apr 2017 19:36:14 +0530
+Subject: [PATCH] iio: adc: Remove unnecessary cast on void pointer
+Message-ID: <20170401140613.GA20941@singhal-Inspiron-5558>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND DQS pins are currently named nand_dqs_0 and nand_dqs_1.
-However, they both seem to have the same function, just exposed on
-different pins (unlike the ethernet TX pins for example, where there's
-eth_txd0..3 - all of these can be active at the same time as they are
-different data lines).
-Rename the NAND DQS pins to nand_dqs_15 and nand_dqs_18 to reflect that
-it's the same functionality just exposed on different pins (BOOT_15 and
-BOOT_18).
+The following Coccinelle script was used to detect this:
+@r@
+expression x;
+void* e;
+type T;
+identifier f;
+@@
+(
+  *((T *)e)
+|
+  ((T *)x)[...]
+|
+  ((T*)x)->f
+|
+- (T*)
+  e
+)
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Signed-off-by: simran singhal <singhalsimran0@gmail.com>
 ---
- drivers/pinctrl/meson/pinctrl-meson8b.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/iio/adc/exynos_adc.c      | 2 +-
+ drivers/iio/adc/imx7d_adc.c       | 2 +-
+ drivers/iio/adc/max1027.c         | 2 +-
+ drivers/iio/adc/rockchip_saradc.c | 2 +-
+ drivers/iio/adc/sun4i-gpadc-iio.c | 2 +-
+ drivers/iio/adc/vf610_adc.c       | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
-index f87ef5a0ee6c..bf747eb1f3f4 100644
---- a/drivers/pinctrl/meson/pinctrl-meson8b.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
-@@ -267,8 +267,8 @@ static const unsigned int nand_ale_pins[]	= { PIN(BOOT_11, 0) };
- static const unsigned int nand_cle_pins[]	= { PIN(BOOT_12, 0) };
- static const unsigned int nand_wen_clk_pins[]	= { PIN(BOOT_13, 0) };
- static const unsigned int nand_ren_clk_pins[]	= { PIN(BOOT_14, 0) };
--static const unsigned int nand_dqs_0_pins[]	= { PIN(BOOT_15, 0) };
--static const unsigned int nand_dqs_1_pins[]	= { PIN(BOOT_18, 0) };
-+static const unsigned int nand_dqs_15_pins[]	= { PIN(BOOT_15, 0) };
-+static const unsigned int nand_dqs_18_pins[]	= { PIN(BOOT_18, 0) };
+diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+index ad1775b..6c5a7be 100644
+--- a/drivers/iio/adc/exynos_adc.c
++++ b/drivers/iio/adc/exynos_adc.c
+@@ -579,7 +579,7 @@ static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
  
- static const unsigned int sdxc_d0_c_pins[]	= { PIN(BOOT_0, 0)};
- static const unsigned int sdxc_d13_c_pins[]	= { PIN(BOOT_1, 0), PIN(BOOT_2, 0),
-@@ -527,8 +527,8 @@ static struct meson_pmx_group meson8b_cbus_groups[] = {
- 	GROUP(nand_cle,		2,	20),
- 	GROUP(nand_wen_clk,	2,	19),
- 	GROUP(nand_ren_clk,	2,	18),
--	GROUP(nand_dqs_0,	2,	27),
--	GROUP(nand_dqs_1,	2,	28),
-+	GROUP(nand_dqs_15,	2,	27),
-+	GROUP(nand_dqs_18,	2,	28),
- 	GROUP(sdxc_d0_c,	4,	30),
- 	GROUP(sdxc_d13_c,	4,	29),
- 	GROUP(sdxc_d47_c,	4,	28),
-@@ -739,8 +739,8 @@ static const char * const sdxc_c_groups[] = {
- static const char * const nand_groups[] = {
- 	"nand_io", "nand_io_ce0", "nand_io_ce1",
- 	"nand_io_rb0", "nand_ale", "nand_cle",
--	"nand_wen_clk", "nand_ren_clk", "nand_dqs_0",
--	"nand_dqs_1"
-+	"nand_wen_clk", "nand_ren_clk", "nand_dqs_15",
-+	"nand_dqs_18"
- };
+ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+ {
+-	struct exynos_adc *info = (struct exynos_adc *)dev_id;
++	struct exynos_adc *info = dev_id;
+ 	u32 mask = info->data->mask;
  
- static const char * const nor_groups[] = {
+ 	/* Read value */
+diff --git a/drivers/iio/adc/imx7d_adc.c b/drivers/iio/adc/imx7d_adc.c
+index e2241ee..254b29a 100644
+--- a/drivers/iio/adc/imx7d_adc.c
++++ b/drivers/iio/adc/imx7d_adc.c
+@@ -365,7 +365,7 @@ static int imx7d_adc_read_data(struct imx7d_adc *info)
+ 
+ static irqreturn_t imx7d_adc_isr(int irq, void *dev_id)
+ {
+-	struct imx7d_adc *info = (struct imx7d_adc *)dev_id;
++	struct imx7d_adc *info = dev_id;
+ 	int status;
+ 
+ 	status = readl(info->regs + IMX7D_REG_ADC_INT_STATUS);
+diff --git a/drivers/iio/adc/max1027.c b/drivers/iio/adc/max1027.c
+index 3b7c4f7..ebc7159 100644
+--- a/drivers/iio/adc/max1027.c
++++ b/drivers/iio/adc/max1027.c
+@@ -364,7 +364,7 @@ static int max1027_set_trigger_state(struct iio_trigger *trig, bool state)
+ 
+ static irqreturn_t max1027_trigger_handler(int irq, void *private)
+ {
+-	struct iio_poll_func *pf = (struct iio_poll_func *)private;
++	struct iio_poll_func *pf = private;
+ 	struct iio_dev *indio_dev = pf->indio_dev;
+ 	struct max1027_state *st = iio_priv(indio_dev);
+ 
+diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+index 85d7012..ae6d332 100644
+--- a/drivers/iio/adc/rockchip_saradc.c
++++ b/drivers/iio/adc/rockchip_saradc.c
+@@ -109,7 +109,7 @@ static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
+ 
+ static irqreturn_t rockchip_saradc_isr(int irq, void *dev_id)
+ {
+-	struct rockchip_saradc *info = (struct rockchip_saradc *)dev_id;
++	struct rockchip_saradc *info = dev_id;
+ 
+ 	/* Read value */
+ 	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
+diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+index a8e134f..e531825 100644
+--- a/drivers/iio/adc/sun4i-gpadc-iio.c
++++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+@@ -382,7 +382,7 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+ 
+ static int sun4i_gpadc_get_temp(void *data, int *temp)
+ {
+-	struct sun4i_gpadc_iio *info = (struct sun4i_gpadc_iio *)data;
++	struct sun4i_gpadc_iio *info = data;
+ 	int val, scale, offset;
+ 
+ 	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
+diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
+index 228a003..01fc76f 100644
+--- a/drivers/iio/adc/vf610_adc.c
++++ b/drivers/iio/adc/vf610_adc.c
+@@ -584,7 +584,7 @@ static int vf610_adc_read_data(struct vf610_adc *info)
+ 
+ static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
+ {
+-	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
++	struct iio_dev *indio_dev = dev_id;
+ 	struct vf610_adc *info = iio_priv(indio_dev);
+ 	int coco;
+ 
 -- 
-2.12.1
+2.7.4
