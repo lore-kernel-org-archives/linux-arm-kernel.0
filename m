@@ -1,85 +1,44 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 3 Apr 2017 03:55:53 +0800
-Subject: [PATCH 1/4] mm/hugetlb.c: add hstate parameter to
- huge_pte_offset()
-In-Reply-To: <20170330163849.18402-2-punit.agrawal@arm.com>
-Message-ID: <201704030320.yDi5hHTR%fengguang.wu@intel.com>
+From: hsdone@ded3871.servers.dedipower.net (hsdone at ded3871.servers.dedipower.net)
+Date: Sat, 1 Apr 2017 10:36:19 +0000
+Subject: Item Delivery Notification
+Message-ID: <E1cuGOJ-0004qw-RU@ded3871.servers.dedipower.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+Dear Customer,
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.11-rc4]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Please check your package delivery details attached!
 
-url:    https://github.com/0day-ci/linux/commits/Punit-Agrawal/Add-hstate-parameter-to-huge_pte_offset/20170331-104016
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+FedEx
 
-All errors (new ones prefixed by >>):
+-----BEGIN PGP PUBLIC KEY BLOCK-----
 
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_get_and_clear':
->> arch/arm64/mm/hugetlbpage.c:200:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_set_access_flags':
-   arch/arm64/mm/hugetlbpage.c:238:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(vma->vm_mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_set_wrprotect':
-   arch/arm64/mm/hugetlbpage.c:263:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c: In function 'huge_ptep_clear_flush':
-   arch/arm64/mm/hugetlbpage.c:280:10: error: too few arguments to function 'huge_pte_offset'
-      cpte = huge_pte_offset(vma->vm_mm, addr);
-             ^~~~~~~~~~~~~~~
-   arch/arm64/mm/hugetlbpage.c:135:8: note: declared here
-    pte_t *huge_pte_offset(struct mm_struct *mm,
-           ^~~~~~~~~~~~~~~
+mpw6PSEBDuIb9MW/G7aBzGOVfZKcezF/oT3cYzf6WU9u0LIqo6OzP1JORVs0BFOBYgg6XA7fv41F
+i0JS+aReGoR5xREKGGfttkYfBCFCvjIdwXGiKoDKC4Shkxmcl8rOCv8Av7njEgSi8k8Q9OR+woAn
+LyxD89MHl7+U2F/dbY/P4vZkW+0da/VsW5G+eiNeTFXbkMwrn0XqqYRlNg5CI0RDAg7o8wcVCcON
+M+b4ZleWNSoXJodZxNZGFw4Pe9i6AIco9LueQyUJ9PtWEkv+openA+l5oSvH+Gk+QYCg4pdUbchT
+X/5dLgF9qZxmsRiAWeHfHyADmGPUUwKGSjzjNvabOX6+QHg6+Yt2Uj5VBmogtfTYIaz2ir0XFzuF
+VeuhLz2f5D6UB8EltsY1LJ6KK/QoYkEdY5ZBNOapokrDlHMS7vWg56TtYahug8Qt6MnVtRmbwz+C
+QrKN4gZj6NiOsfMBM4R+2lbAEqbuAu+1fE3dHGbLu1fyA1AkF64FzETYv2hFL+eK0pm1JgBTauvC
+ZCgALmGZXmpVSJKBMYtMfWKc1j9Ha97zEDHBiOBDeKyvtzMsmkau8WD7aY8Z/j4MN/nw1/J7UUJJ
+R73GtOlnkonq+p3loPUQ1ObDUSOn0pNGJLZ2LCUbSdVGfgE32qxquKsKITmYaQJ0zgKrNh6/zdd1
+VDP+FaWD/CQan2WsnrjhHfLjAu3P+0eYE4Q0LsIe+qDPSISOIZFqbzqBPwETjQvfo0TySjhamaDd
+AU1kcCNC9nzqdiTiJTHtl5e/ORH6taBDT8Cmly2oKTMkG5zPn1+S+972KJ447OpSo5XgaycDx9MJ
+TdSISXXlpt6QrsD2wjaySCfl5VCM2tssPGEBbYg2Is42rZ5/Xpi0qhVs4QKKRGpj3DatGmH0nq4a
+4tJSdLLbCwWx1bVM79FXZ+w6IfeF7luER/sQkqqpIy0cMhK41uxOVaLWCAjwSdJ+fAlTUawMZcCO
+e4lmoR4X4XAv56dINZJCWY1OI0R6xoQCa4xUheRPT0uRf9hrfWT/9Pg29yqbiU3Vq0e4H0lkrUO6
+zSMbYfG1Fz+DkLgl9imQAZyh9Di2GNu+Cbp6T3h9B2YzZncok19GrmXOzJu3joCqPOTXpL7+fTyb
+wPp+ISew6LMZFjFCnon24xBPEPOyPR7UpH/pZMIe9SB6A0AysLwgC8YFVEVDxsGZHsQDYfp6njea
+5+LzkXR0PU7uG+G5W5qTCNZxYG2+tcvK6DcfPalMtWlbSaqmTcouhzP9GH/mQxOTfYVTOeNIJz2V
+X+5t8a3IfPfeJRzeVCl3ZUNTgzY5ViTzqEDTzOJv0w==
 
-vim +/huge_pte_offset +200 arch/arm64/mm/hugetlbpage.c
 
-66b3923a David Woods 2015-12-17  194  	if (pte_cont(*ptep)) {
-66b3923a David Woods 2015-12-17  195  		int ncontig, i;
-66b3923a David Woods 2015-12-17  196  		size_t pgsize;
-66b3923a David Woods 2015-12-17  197  		pte_t *cpte;
-66b3923a David Woods 2015-12-17  198  		bool is_dirty = false;
-66b3923a David Woods 2015-12-17  199  
-66b3923a David Woods 2015-12-17 @200  		cpte = huge_pte_offset(mm, addr);
-66b3923a David Woods 2015-12-17  201  		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-66b3923a David Woods 2015-12-17  202  		/* save the 1st pte to return */
-66b3923a David Woods 2015-12-17  203  		pte = ptep_get_and_clear(mm, addr, cpte);
+-----END PGP PUBLIC KEY BLOCK-----
 
-:::::: The code at line 200 was first introduced by commit
-:::::: 66b3923a1a0f77a563b43f43f6ad091354abbfe9 arm64: hugetlb: add support for PTE contiguous bit
-
-:::::: TO: David Woods <dwoods@ezchip.com>
-:::::: CC: Will Deacon <will.deacon@arm.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 34627 bytes
+Name: FedEx-Package-ID-SKB4XFB0.zip
+Type: application/zip
+Size: 1072 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/8f10e4f1/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170401/599a6203/attachment.zip>
