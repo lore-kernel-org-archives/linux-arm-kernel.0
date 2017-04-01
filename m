@@ -1,35 +1,42 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Sat,  1 Apr 2017 19:35:20 +0800
-Subject: [PATCH v2 0/9] drm: rockchip: Fix rockchip drm unbind crash error
-Message-ID: <1491046529-4310-1-git-send-email-jeffy.chen@rock-chips.com>
+Date: Sat,  1 Apr 2017 19:35:24 +0800
+Subject: [PATCH v2 4/9] drm/rockchip: cdn-dp: Don't try to release firmware
+ when not loaded
+In-Reply-To: <1491046529-4310-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1491046529-4310-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1491046529-4310-5-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Verified on rk3399 chromebook kevin:
-1/ stop ui && pkill -9 frecon
-2/ unbind/bind drm
+Changes in v2: None
 
-Changes in v2:
-Fix some commit messages.
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Jeffy Chen (9):
-  drm: bridge: analogix: Detach panel when unbinding analogix dp
-  drm: bridge: analogix: Unregister dp aux when unbinding
-  drm: bridge: analogix: Destroy connector when unbinding
-  drm/rockchip: cdn-dp: Don't try to release firmware when not loaded
-  drm/rockchip: vop: Enable pm domain when resetting vop
-  drm/rockchip: Reoder unload sequence
-  drm/rockchip: Force disable all crtc when unload
-  drm/rockchip: gem: Don't alloc/free gem buf before drm dev registered
-  drm/rockchip: cdn-dp: Don't unregister audio dev when unbinding
-
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  4 +++
- drivers/gpu/drm/rockchip/cdn-dp-core.c             | 10 ++++---
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |  7 +++--
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c        |  8 ++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 31 +++++++++++++++-------
- 5 files changed, 44 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+index fd79a70..a97f3f4 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+@@ -1052,6 +1052,7 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
+ 	dp->connected = false;
+ 	dp->active = false;
+ 	dp->active_port = -1;
++	dp->fw_loaded = false;
+ 
+ 	INIT_WORK(&dp->event_work, cdn_dp_pd_event_work);
+ 
+@@ -1132,7 +1133,8 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
+ 	connector->funcs->destroy(connector);
+ 
+ 	pm_runtime_disable(dev);
+-	release_firmware(dp->fw);
++	if (dp->fw_loaded)
++		release_firmware(dp->fw);
+ 	kfree(dp->edid);
+ 	dp->edid = NULL;
+ }
 -- 
 2.1.4
