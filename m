@@ -1,65 +1,33 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sat, 1 Apr 2017 11:52:04 +0200
-Subject: [PATCH V8 5/6] ACPI: Support the probing on the devices which
- apply indirect-IO
-In-Reply-To: <bfdf2de0-c309-0139-4075-dfcd678b6d51@gmail.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
- <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
- <1908501.jAQQKvjW4f@aspire.rjw.lan> <58DDFCBE.1030705@hisilicon.com>
- <CAJZ5v0gZdghH7jjd-zMmqXNkuvVVVSPDHfBrJXx5OXR2NE0KgA@mail.gmail.com>
- <bfdf2de0-c309-0139-4075-dfcd678b6d51@gmail.com>
-Message-ID: <CAJZ5v0iYD=2HVP9D-2fBBDUzkOJLrzzH7Rwg1ALQ-kBx-iSeTg@mail.gmail.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Sat,  1 Apr 2017 18:43:53 +0800
+Subject: [PATCH 0/9] drm: rockchip: Fix rockchip drm unbind crash error
+Message-ID: <1491043442-20626-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 1, 2017 at 4:16 AM, zhichang.yuan <zhichang.yuan02@gmail.com> wrote:
->
->
-> On 04/01/2017 07:02 AM, Rafael J. Wysocki wrote:
->> On Fri, Mar 31, 2017 at 8:52 AM, zhichang.yuan
->> <yuanzhichang@hisilicon.com> wrote:
->>> Hi, Rafael,
->>>
->>> Thanks for reviewing this!
->>>
->>> On 2017/3/31 4:31, Rafael J. Wysocki wrote:
->>>> On Thursday, March 30, 2017 11:26:58 PM zhichang.yuan wrote:
->>>>> On some platforms(such as Hip06/Hip07), the legacy ISA/LPC devices access I/O
->>>>> with some special host-local I/O ports known on x86. To access the I/O
->>>>> peripherals, an indirect-IO mechanism is introduced to mapped the host-local
->>>>> I/O to system logical/fake PIO similar the PCI MMIO on architectures where no
->>>>> separate I/O space exists. Just as PCI MMIO, the host I/O range should be
->>>>> registered before probing the downstream devices and set up the I/O mapping.
->>>>> But current ACPI bus probing doesn't support these indirect-IO hosts/devices.
->>>>>
->>>>> This patch introdueces a new ACPI handler for this device category. Through the
->>>>> handler attach callback, the indirect-IO hosts I/O registration is done and
->>>>> all peripherals' I/O resources are translated into logic/fake PIO before
->>>>> starting the enumeration.
->>>>
->>>> Can you explain to me briefly what exactly this code is expected to be doing?
->>>
->>> As you know currently for ARM architecture IO space is memory mapped and
->>> is only used by pci devices. The port number is dynamically allocated
->>> converting the device IO address into a PIO token: i.e.
->>> http://lxr.free-electrons.com/source/drivers/acpi/pci_root.c#L745
->>> This patch is meant to support a new class of IO host controller
->>> that are not PCI based and that still require to have the IO addresses
->>> be translated in the same PIO token space as the PCI controller
->>
->> IOW, this is ARM-specific, right?
->
-> Yes. The current host added in this patch with _HID "HISI0191" is on ARM64.
 
-But the underlying mechanism is ARM-specific as well AFAICS.
+Verified on rk3399 chromebook kevin:
+1/ stop ui && pkill -9 frecon
+2/ unbind/bind drm
 
-> But, I think the handler driver is architecture dependent.
 
-I guess you mean "independent"?  That doesn't matter.
+Jeffy Chen (9):
+  drm: bridge: analogix: Detach panel when unbinding analogix dp
+  drm: bridge: analogix: Unregister dp aux when unbinding
+  drm: bridge: analogix: Destroy connector when unbinding
+  drm/rockchip: cdn-dp: Don't try to release firmware when not loaded
+  drm/rockchip: vop: Enable pm domain when resetting vop
+  drm/rockchip: Reoder unload sequence
+  drm/rockchip: Force disable all crtc when unload
+  drm/rockchip: gem: Don't alloc/free gem buf before drm dev registered
+  drm/rockchip: cdn-dp: Don't unregister audio dev when unbinding
 
-If ARM64 is the only architecture to use it in foreseeable future
-(which is the case for all I can say), it should go into acpi/arm64/
-and please ask the maintainers thereof to review it.
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  4 +++
+ drivers/gpu/drm/rockchip/cdn-dp-core.c             | 10 ++++---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |  7 +++--
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c        |  8 ++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 31 +++++++++++++++-------
+ 5 files changed, 44 insertions(+), 16 deletions(-)
 
-Thanks,
-Rafael
+-- 
+2.1.4
