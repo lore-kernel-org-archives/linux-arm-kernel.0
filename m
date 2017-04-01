@@ -1,42 +1,40 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  1 Apr 2017 15:59:20 +0200
-Subject: [PATCH v2 0/2] pinctrl-meson8b: fix the NAND DQS pin definitions
-In-Reply-To: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
+Date: Sat,  1 Apr 2017 15:59:21 +0200
+Subject: [PATCH v2 1/2] pinctrl: meson: meson8b: fix the NAND DQS pins
+In-Reply-To: <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
 References: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
+ <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170401135922.1288-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently do not have a NAND driver but once we have one this will
-become handy:
-The current nand_dqs_0 and nand_dqs_1 groups are not usable because the
-"nand" function only allows "nand_dqs0" and "nand_dqs1" (no underscore
-after "nand_dqs").
+The nand_groups table uses different names for the NAND DQS pins than
+the GROUP() definition in meson8b_cbus_groups (nand_dqs_0 vs nand_dqs0).
+This prevents using the NAND DQS pins in the devicetree.
 
-While here, also rename the groups to "nand_dqs_15" (uses pin 15) and
-"nand_dqs_18" (uses pin 18).
-Renaming is safe in this case as it was not possible to use these
-groups/pins before (so we can be sure that there are no "old DT
-consumers" out there).
+Fix this by ensuring that the GROUP() definition and the
+meson8b_cbus_groups use the same name for these pins.
 
-NOTE: Both patches should be applied to the same release because
-patch #2 changes the "interface" exposed to DT. however, both can be
-applied to the same release safely because the DQS pins were not
-usable (from .dts files).
+Fixes: 0fefcb6876d0 ("pinctrl: Add support for Meson8b")
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson8b.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-Changes since v1:
-- split the patch into one that makes nand_dqs_0 and nand_dqs_1
-  actually usable and a second one that renames them to nand_dqs_15
-  and nand_dqs_18
-
-
-Martin Blumenstingl (2):
-  pinctrl: meson: meson8b: fix the NAND DQS pins
-  pinctrl: meson: meson8b: rename the NAND DQS pin definitions
-
- drivers/pinctrl/meson/pinctrl-meson8b.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
+index 76f077f18193..f87ef5a0ee6c 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson8b.c
++++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
+@@ -739,8 +739,8 @@ static const char * const sdxc_c_groups[] = {
+ static const char * const nand_groups[] = {
+ 	"nand_io", "nand_io_ce0", "nand_io_ce1",
+ 	"nand_io_rb0", "nand_ale", "nand_cle",
+-	"nand_wen_clk", "nand_ren_clk", "nand_dqs0",
+-	"nand_dqs1"
++	"nand_wen_clk", "nand_ren_clk", "nand_dqs_0",
++	"nand_dqs_1"
+ };
+ 
+ static const char * const nor_groups[] = {
 -- 
 2.12.1
