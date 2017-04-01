@@ -1,30 +1,74 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 01 Apr 2017 11:26:03 -0700 (PDT)
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <1491031554-19516-2-git-send-email-dingtianhong@huawei.com>
-References: <1491031554-19516-1-git-send-email-dingtianhong@huawei.com>
- <1491031554-19516-2-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170401.112603.1991545644693496714.davem@davemloft.net>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Sat, 1 Apr 2017 12:51:38 -0700
+Subject: [PATCH V4 1/2] dt-bindings: thermal: add support for Broadcom's
+ Northstar thermal
+In-Reply-To: <20170331201124.656-1-zajec5@gmail.com>
+References: <20170331073132.21457-2-zajec5@gmail.com>
+ <20170331201124.656-1-zajec5@gmail.com>
+Message-ID: <20170401195136.GD28514@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ding Tianhong <dingtianhong@huawei.com>
-Date: Sat, 1 Apr 2017 15:25:51 +0800
+Rafal,
 
-> Till now only the Intel ixgbe could support enable
-> Relaxed ordering in the drivers for special architecture,
-> but the ARCH_WANT_RELAX_ORDER is looks like a general name
-> for all arch, so rename to a specific name for intel
-> card looks more appropriate.
+On Fri, Mar 31, 2017 at 10:11:23PM +0200, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> This commit documents binding for thermal used in Northstar family SoCs.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
+> V3: Add thermal-zones to the example
+>     Rob: Because of this update, I didn't include Acked-by I got for V2
+> ---
+>  .../devicetree/bindings/thermal/brcm,ns-thermal    | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+> new file mode 100644
+> index 000000000000..c561c7349f17
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+> @@ -0,0 +1,26 @@
+> +* Broadcom Northstar Thermal
+> +
+> +This binding describes thermal sensor that is part of Northstar's DMU (Device
+> +Management Unit).
+> +
+> +Required properties:
+> +- compatible : Must be "brcm,ns-thermal"
+> +- reg : iomem address range of PVTMON registers
+> +- #thermal-sensor-cells : Should be <0>
+> +
+> +Example:
+> +
+> +thermal: thermal at 1800c2c0 {
+> +	compatible = "brcm,ns-thermal";
+> +	reg = <0x1800c2c0 0x10>;
+> +	#thermal-sensor-cells = <0>;
+> +};
+> +
+> +thermal-zones {
+> +	cpu_thermal: cpu-thermal {
+> +		polling-delay-passive = <0>;
+> +		polling-delay = <1000>;
+> +		coefficients = <(-556) 418000>;
+> +		thermal-sensors = <&thermal>;
 
-This is not a driver specific facility.
+You need to define trips and cooling devices here. Otherwise, makes
+little sense to have this device in thermal subsystem. Here is an
+example of minimal set:
+https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/commit/?h=linus&id=1e2ac9821de6a85d3e8358f238436708d1d46869
 
-Any driver can test this symbol and act accordingly.
+The above has no passive action. It is just gonna shutdown the system if
+temperature crosses a threshold. 
 
-Just because IXGBE is the first and only user, doesn't mean
-the facility is driver specific.
+But, a typical cooling device would be CPU frequency throttling. Do you have
+that up and running in your routers?
 
-Thank you.
+> +	};
+> +};
+> -- 
+> 2.11.0
+> 
