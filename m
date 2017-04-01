@@ -1,91 +1,76 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Fri, 31 Mar 2017 22:58:16 -0400
-Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
-In-Reply-To: <20170331175457.GD4897@arm.com>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <20170331175457.GD4897@arm.com>
-Message-ID: <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 31 Mar 2017 21:15:29 -0700
+Subject: [PATCH 2/2] ARM: dts: imx7: add USDHC NAND clock to SDHC instances
+In-Reply-To: <20170401030312.GB24882@b29396-OptiPlex-7040>
+References: <20170330005029.6472-1-stefan@agner.ch>
+ <20170330005029.6472-2-stefan@agner.ch>
+ <20170401030312.GB24882@b29396-OptiPlex-7040>
+Message-ID: <5c8339900fa1bd6215fb94d4386f7e06@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 1:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
->> This series provides the support for turning on the arm-smmu's
->> clocks/power domains using runtime pm. This is done using the
->> recently introduced device links patches, which lets the symmu's
->> runtime to follow the master's runtime pm, so the smmu remains
->> powered only when the masters use it.
->
-> Do you have any numbers for the power savings you achieve with this?
-> How often do we actually manage to stop the SMMU clocks on an SoC with
-> a handful of masters?
->
-> In other words, is this too coarse-grained to be useful, or is it common
-> that all the devices upstream of the SMMU are suspended?
+On 2017-03-31 20:03, Dong Aisheng wrote:
+> On Wed, Mar 29, 2017 at 05:50:29PM -0700, Stefan Agner wrote:
+>> The USDHC instances need the USDHC NAND clock in order to operate.
+>> Add the clock as ahb bus clock.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  arch/arm/boot/dts/imx7s.dtsi | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+>> index 5d3a43b8de20..5794febb19a4 100644
+>> --- a/arch/arm/boot/dts/imx7s.dtsi
+>> +++ b/arch/arm/boot/dts/imx7s.dtsi
+>> @@ -936,7 +936,7 @@
+>>  				reg = <0x30b40000 0x10000>;
+>>  				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+>>  				clocks = <&clks IMX7D_CLK_DUMMY>,
+> 
+> Would you please change the left ipg dummy to IMX7D_IPG_ROOT_CLK as well?
 
-well, if you think about a phone/tablet with a command mode panel,
-pretty much all devices will be suspended most of the time ;-)
+IMX7D_IPG_ROOT_CLK is currently not a valid clock in upstream... So we
+would have to add it to the clock driver first.
 
-maybe it's a different case with servers.. unfortunately we have to
-share the same driver across both..
+I guess we could/should add it anyway at one point? But probably also as
+init on, just to make sure Linux does not disable it since it is
+currently used by several IPs implicitly.
 
-BR,
--R
+--
+Stefan
 
-> Thanks,
->
-> Will
->
->>
->> Took some reference from the exynos runtime patches [2].
->> Tested this with MDP, GPU, VENUS devices on apq8096-db820c board.
->>
->> Previous version of the patchset [1].
->>
->> [V3]
->>    * Reworked the patches to keep the clocks init/enabling function
->>      seperately for each compatible.
->>
->>    * Added clocks bindings for MMU40x/500.
->>
->>    * Added a new compatible for qcom,smmu-v2 implementation and
->>      the clock bindings for the same.
->>
->>    * Rebased on top of 4.11-rc1
->>
->> [V2]
->>    * Split the patches little differently.
->>
->>    * Addressed comments.
->>
->>    * Removed the patch #4 [3] from previous post
->>      for arm-smmu context save restore. Planning to
->>      post this separately after reworking/addressing Robin's
->>      feedback.
->>
->>    * Reversed the sequence to disable clocks than enabling.
->>      This was required for those cases where the
->>      clocks are populated in a dependent order from DT.
->>
->> [1] https://www.spinics.net/lists/linux-arm-msm/msg23870.html
->> [2] https://lkml.org/lkml/2016/10/20/70
->> [3] https://patchwork.kernel.org/patch/9389717/
->>
->> Sricharan R (5):
->>   iommu/arm-smmu: Add pm_runtime/sleep ops
->>   iommu/arm-smmu: Add support for MMU40x/500 clocks
->>   drivers: arm-smmu: Add clock support for QCOM_SMMUV2
->>   iommu/arm-smmu: Invoke pm_runtime during probe, add/remove device
->>   iommu/arm-smmu: Add the device_link between masters and smmu
->>
->>  .../devicetree/bindings/iommu/arm,smmu.txt         |  35 +++
->>  drivers/iommu/arm-smmu.c                           | 349 ++++++++++++++++++++-
->>  2 files changed, 373 insertions(+), 11 deletions(-)
->>
+> 
+> Otherwise,
+> 
+> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> Regards
+> Dong Aisheng
+> 
+>> -					<&clks IMX7D_CLK_DUMMY>,
+>> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+>>  					<&clks IMX7D_USDHC1_ROOT_CLK>;
+>>  				clock-names = "ipg", "ahb", "per";
+>>  				bus-width = <4>;
+>> @@ -948,7 +948,7 @@
+>>  				reg = <0x30b50000 0x10000>;
+>>  				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+>>  				clocks = <&clks IMX7D_CLK_DUMMY>,
+>> -					<&clks IMX7D_CLK_DUMMY>,
+>> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+>>  					<&clks IMX7D_USDHC2_ROOT_CLK>;
+>>  				clock-names = "ipg", "ahb", "per";
+>>  				bus-width = <4>;
+>> @@ -960,7 +960,7 @@
+>>  				reg = <0x30b60000 0x10000>;
+>>  				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+>>  				clocks = <&clks IMX7D_CLK_DUMMY>,
+>> -					<&clks IMX7D_CLK_DUMMY>,
+>> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
+>>  					<&clks IMX7D_USDHC3_ROOT_CLK>;
+>>  				clock-names = "ipg", "ahb", "per";
+>>  				bus-width = <4>;
 >> --
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>> 2.12.1
 >>
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
