@@ -1,32 +1,33 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Sun, 2 Apr 2017 10:15:42 +0300
-Subject: proper power off implementation for iMX6 with external pmic
-In-Reply-To: <d8d013f7-9417-c7c9-5f60-dd33465e9b42@pengutronix.de>
-References: <d8d013f7-9417-c7c9-5f60-dd33465e9b42@pengutronix.de>
-Message-ID: <ee04d494-4fe4-9fb2-ab47-cf46675c827e@mobi-wize.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Sun,  2 Apr 2017 08:59:47 +0100
+Subject: [PATCH v2 4/5] ARM: dts: rockchip: enable ARM Mali GPU on
+ rk3288-firefly
+In-Reply-To: <cover.1491118230.git.guillaume.tucker@collabora.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <22d0e8ec1216e09aba803d2520f6bbe34b70171b.1491118230.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/2017 14:02, Oleksij Rempel wrote:
+Add reference to the Mali GPU device tree node on rk3288-firefly.
+Tested on Firefly board.
 
-> Hallo all,
->
-> i'm looking for proper way to implement pm_power_off for IMX6 with external PMIC.
->
-> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-> page 5083
->
-> According to this documentation, there are two ways to power off, depending on board configuration. With internal and external PMIC.
->
-> Internal variant is implemented in:
-> drivers/power/reset/imx-snvs-poweroff.c
->
-Currently all the mainline DT definitions use the syscon-poweroff driver
-and not imx-snvs-poweroff.  The syscon-poweroff binding includes the
-bits to set on the "snvs_lp control register". One of those bits is
-"Dumb PMIC Enable" (DP_EN) that looks related to the external PMIC mode.
+Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+---
+ arch/arm/boot/dts/rk3288-firefly.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-I never tried to use the external PMIC mode myself. If I had to, I would
-start by clearing this bit.
-
-Guy.
+diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
+index 10793ac18599..f520589493b4 100644
+--- a/arch/arm/boot/dts/rk3288-firefly.dtsi
++++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
+@@ -594,3 +594,8 @@
+ &wdt {
+ 	status = "okay";
+ };
++
++&gpu {
++	mali-supply = <&vdd_gpu>;
++	status = "okay";
++};
+-- 
+2.11.0
