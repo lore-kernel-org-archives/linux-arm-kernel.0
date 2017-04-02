@@ -1,33 +1,60 @@
 From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Sun,  2 Apr 2017 08:59:47 +0100
-Subject: [PATCH v2 4/5] ARM: dts: rockchip: enable ARM Mali GPU on
- rk3288-firefly
+Date: Sun,  2 Apr 2017 08:59:45 +0100
+Subject: [PATCH v2 2/5] ARM: dts: rockchip: add ARM Mali GPU node for rk3288
 In-Reply-To: <cover.1491118230.git.guillaume.tucker@collabora.com>
 References: <cover.1491118230.git.guillaume.tucker@collabora.com>
-Message-ID: <22d0e8ec1216e09aba803d2520f6bbe34b70171b.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <46d14d3c969a35e800b1c06da0ddb652986e6827.1491118230.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reference to the Mali GPU device tree node on rk3288-firefly.
-Tested on Firefly board.
+Add Mali GPU device tree node for the rk3288 SoC, with devfreq
+opp table.
 
 Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
 ---
- arch/arm/boot/dts/rk3288-firefly.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index 10793ac18599..f520589493b4 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -594,3 +594,8 @@
- &wdt {
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index df8a0dbe9d91..213224ea309e 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -43,6 +43,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3288-cru.h>
++#include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/thermal/thermal.h>
+ #include <dt-bindings/power/rk3288-power.h>
+ #include <dt-bindings/soc/rockchip,boot-mode.h>
+@@ -227,6 +228,28 @@
+ 		ports = <&vopl_out>, <&vopb_out>;
+ 	};
+ 
++	gpu: mali at ffa30000 {
++		compatible = "arm,mali-midgard";
++		reg = <0xffa30000 0x10000>;
++		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "JOB", "MMU", "GPU";
++		clocks = <&cru ACLK_GPU>;
++		clock-names = "clk_mali";
++		operating-points = <
++			/* KHz uV */
++			100000 950000
++			200000 950000
++			300000 1000000
++			400000 1100000
++			500000 1200000
++			600000 1250000
++		>;
++		power-domains = <&power RK3288_PD_GPU>;
++		status = "disabled";
++	};
 +
-+&gpu {
-+	mali-supply = <&vdd_gpu>;
-+	status = "okay";
-+};
+ 	sdmmc: dwmmc at ff0c0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		max-frequency = <150000000>;
 -- 
 2.11.0
