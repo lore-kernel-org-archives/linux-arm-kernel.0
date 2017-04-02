@@ -1,115 +1,58 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Sun, 2 Apr 2017 14:58:17 +0000
-Subject: [PATCH V8 5/6] ACPI: Support the probing on the devices which
- apply indirect-IO
-In-Reply-To: <CAJZ5v0iYD=2HVP9D-2fBBDUzkOJLrzzH7Rwg1ALQ-kBx-iSeTg@mail.gmail.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
- <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
- <1908501.jAQQKvjW4f@aspire.rjw.lan> <58DDFCBE.1030705@hisilicon.com>
- <CAJZ5v0gZdghH7jjd-zMmqXNkuvVVVSPDHfBrJXx5OXR2NE0KgA@mail.gmail.com>
- <bfdf2de0-c309-0139-4075-dfcd678b6d51@gmail.com>
- <CAJZ5v0iYD=2HVP9D-2fBBDUzkOJLrzzH7Rwg1ALQ-kBx-iSeTg@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E204E0BF7@FRAEML521-MBX.china.huawei.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Sun, 02 Apr 2017 17:09:10 +0200
+Subject: [PATCH 2/2] clk: meson: mpll: use 64bit math in rate_from_params
+In-Reply-To: <20170401130225.8811-3-martin.blumenstingl@googlemail.com>
+References: <20170401130225.8811-1-martin.blumenstingl@googlemail.com>
+ <20170401130225.8811-3-martin.blumenstingl@googlemail.com>
+Message-ID: <1491145750.3480.3.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael 
-Many thanks for your reply
-
-> -----Original Message-----
-> From: rjwysocki at gmail.com [mailto:rjwysocki at gmail.com] On Behalf Of
-> Rafael J. Wysocki
-> Sent: 01 April 2017 10:52
-> To: zhichang.yuan
-> Cc: Rafael J. Wysocki; Yuanzhichang; Rafael J. Wysocki; Catalin
-> Marinas; Will Deacon; Rob Herring; Frank Rowand; Bjorn Helgaas; Arnd
-> Bergmann; linux-arm-kernel at lists.infradead.org; Mark Rutland; Brian
-> Starkey; Olof Johansson; Lorenzo Pieralisi; Benjamin Herrenschmidt;
-> Linux Kernel Mailing List; ACPI Devel Maling List; Linuxarm;
-> devicetree at vger.kernel.org; Linux PCI; Corey Minyard; Zou Rongrong;
-> John Garry; Gabriele Paoloni; kantyzc at 163.com; xuwei (O)
-> Subject: Re: [PATCH V8 5/6] ACPI: Support the probing on the devices
-> which apply indirect-IO
+On Sat, 2017-04-01 at 15:02 +0200, Martin Blumenstingl wrote:
+> On Meson8b the MPLL parent clock (fixed_pll) has a rate of 2550MHz.
+> Multiplying this with SDM_DEN results in a value greater than 32bits.
+> This is not a problem on the 64bit Meson GX SoCs, but it may result in
+> undefined behavior on the older 32bit Meson8b SoC.
 > 
-> On Sat, Apr 1, 2017 at 4:16 AM, zhichang.yuan
-> <zhichang.yuan02@gmail.com> wrote:
-> >
-> >
-> > On 04/01/2017 07:02 AM, Rafael J. Wysocki wrote:
-> >> On Fri, Mar 31, 2017 at 8:52 AM, zhichang.yuan
-> >> <yuanzhichang@hisilicon.com> wrote:
-> >>> Hi, Rafael,
-> >>>
-> >>> Thanks for reviewing this!
-> >>>
-> >>> On 2017/3/31 4:31, Rafael J. Wysocki wrote:
-> >>>> On Thursday, March 30, 2017 11:26:58 PM zhichang.yuan wrote:
-> >>>>> On some platforms(such as Hip06/Hip07), the legacy ISA/LPC
-> devices access I/O
-> >>>>> with some special host-local I/O ports known on x86. To access
-> the I/O
-> >>>>> peripherals, an indirect-IO mechanism is introduced to mapped the
-> host-local
-> >>>>> I/O to system logical/fake PIO similar the PCI MMIO on
-> architectures where no
-> >>>>> separate I/O space exists. Just as PCI MMIO, the host I/O range
-> should be
-> >>>>> registered before probing the downstream devices and set up the
-> I/O mapping.
-> >>>>> But current ACPI bus probing doesn't support these indirect-IO
-> hosts/devices.
-> >>>>>
-> >>>>> This patch introdueces a new ACPI handler for this device
-> category. Through the
-> >>>>> handler attach callback, the indirect-IO hosts I/O registration
-> is done and
-> >>>>> all peripherals' I/O resources are translated into logic/fake PIO
-> before
-> >>>>> starting the enumeration.
-> >>>>
-> >>>> Can you explain to me briefly what exactly this code is expected
-> to be doing?
-> >>>
-> >>> As you know currently for ARM architecture IO space is memory
-> mapped and
-> >>> is only used by pci devices. The port number is dynamically
-> allocated
-> >>> converting the device IO address into a PIO token: i.e.
-> >>> http://lxr.free-electrons.com/source/drivers/acpi/pci_root.c#L745
-> >>> This patch is meant to support a new class of IO host controller
-> >>> that are not PCI based and that still require to have the IO
-> addresses
-> >>> be translated in the same PIO token space as the PCI controller
-> >>
-> >> IOW, this is ARM-specific, right?
-> >
-> > Yes. The current host added in this patch with _HID "HISI0191" is on
-> ARM64.
-> 
-> But the underlying mechanism is ARM-specific as well AFAICS.
-> 
-> > But, I think the handler driver is architecture dependent.
-> 
-> I guess you mean "independent"?  That doesn't matter.
-> 
-> If ARM64 is the only architecture to use it in foreseeable future
-> (which is the case for all I can say), it should go into acpi/arm64/
-> and please ask the maintainers thereof to review it.
+> While rate_from_params was only introduced recently to make the math
+> reusable from _round_rate and _recalc_rate the original bug exists much
+> longer.
 
-I guess this is the case for the foreseeable future.
-
-So if my understanding is correct we should leave acpi_indirectio_scan_init()
-call in acpi_scan_init() and move its definition under acpi/arm64/ right?
-
-If in future other architectures needs non-pci IO controllers we may consider
-to move this to acpi/...
-
-Lorenzo what do you think? Could you have a look at the patchset?
-
-Many thanks
-
-Gab
+Again, thanks for testing and fixing this Martin !
 
 > 
-> Thanks,
-> Rafael
+> Fixes: 1c50da4f27 ("clk: meson: add mpll support")
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+> ?drivers/clk/meson/clk-mpll.c | 3 ++-
+> ?1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
+> index 551aa2a5b291..4306ad833a4f 100644
+> --- a/drivers/clk/meson/clk-mpll.c
+> +++ b/drivers/clk/meson/clk-mpll.c
+> @@ -62,6 +62,7 @@
+> ? */
+> ?
+> ?#include <linux/clk-provider.h>
+> +#include <linux/math64.h>
+> ?#include "clkc.h"
+> ?
+> ?#define SDM_DEN 16384
+> @@ -81,7 +82,7 @@ static unsigned long rate_from_params(unsigned long
+> parent_rate,
+> ?	if (divisor == 0)
+> ?		return 0;
+> ?	else
+> -		return (parent_rate * SDM_DEN) / divisor;
+> +		return mul_u64_u32_div(parent_rate, SDM_DEN, divisor);
+
+Just casting parent_rate to u64 should be enough, don't you think ?
+Actually, I was thinking of copying a pattern that is used a lot in CCF and use
+DIV_ROUND_UP_ULL((u64)foo, bar). See clk-divider.c.
+
+Would this be ok with you ?
+
+> ?}
+> ?
+> ?static void params_from_rate(unsigned long requested_rate,
