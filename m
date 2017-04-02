@@ -1,58 +1,75 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Sun, 02 Apr 2017 17:09:10 +0200
-Subject: [PATCH 2/2] clk: meson: mpll: use 64bit math in rate_from_params
-In-Reply-To: <20170401130225.8811-3-martin.blumenstingl@googlemail.com>
-References: <20170401130225.8811-1-martin.blumenstingl@googlemail.com>
- <20170401130225.8811-3-martin.blumenstingl@googlemail.com>
-Message-ID: <1491145750.3480.3.camel@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 2 Apr 2017 16:16:27 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+ <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
+ <20170323105727.GA2441@red-moon>
+ <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+ <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
+ <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
+ <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
+ <20170330100524.GA22801@red-moon>
+ <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+ <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
+ <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
+Message-ID: <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-04-01 at 15:02 +0200, Martin Blumenstingl wrote:
-> On Meson8b the MPLL parent clock (fixed_pll) has a rate of 2550MHz.
-> Multiplying this with SDM_DEN results in a value greater than 32bits.
-> This is not a problem on the 64bit Meson GX SoCs, but it may result in
-> undefined behavior on the older 32bit Meson8b SoC.
-> 
-> While rate_from_params was only introduced recently to make the math
-> reusable from _round_rate and _recalc_rate the original bug exists much
-> longer.
+On 30 March 2017 at 14:50, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 3/30/2017 9:38 AM, Ard Biesheuvel wrote:
+>> On 30 March 2017 at 11:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> On 30 March 2017 at 11:05, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>>>> On Thu, Mar 30, 2017 at 09:46:39AM +0100, Ard Biesheuvel wrote:
+>>>>
+>>>> [...]
+>>>>
+>>>>>> I'm asking why we don't fix the actual problem in PCIe ARM64 adaptation instead
+>>>>>> of working around it by quirks.
+>>>>>>
+>>>>>> I don't see any reason why ACPI ARM64 should carry the burden of legacy systems.
+>>>>>>
+>>>>>> Legacy only applies to DT based systems.
+>>>>>>
+>>>>>
+>>>>> I fully agree with this point: ACPI implies firmware, and so we should
+>>>>> be able to rely on firmware to have initialized the PCIe subsystem by
+>>>>> the time the kernel gets to access it.
+>>>>
+>>>> https://lkml.org/lkml/2016/3/3/458
+>>>>
+>>>
+>>> I don't think the fact that at least one system existed over a year
+>>> ago whose UEFI assigned resources incorrectly should prevent us from
+>>> being normative in this case.
+>>
+>> In any case, given that EFIFB is enabled by default on some distros,
+>> and the fact that DT boot is affected as well, I should get this patch
+>> in to prevent serious potential issues that could arise when someone
+>> with a graphical UEFI stack updates to such a new kernel.
+>>
+>> So I think we are in agreement that this is needed on both ARM and
+>> arm64, since their PCI configuration is usually not preserved. The
+>> open question is whether there is any harm in enabling it for x86 as
+>> well.
+>>
+>
+> Agreed, the other issue is about compatibility with UEFI and future
+> proofing Linux for other potential issues like hotplug reservation.
+>
 
-Again, thanks for testing and fixing this Martin !
+OK, given the lack of feedback regarding the suitability of this patch
+for x86, I am going to rework it as a ARM/arm64 only patch, and queue
+it as a fix for v4.11. This way, we can backport it to stable (which
+is arguably appropriate, given that upgrading to a EFIFB enabled
+kernel may cause severe breakage for existing systems that implement
+the GOP protocol), and easily change the patch to apply to x86 going
+forwards, by removing the #ifdefs
 
-> 
-> Fixes: 1c50da4f27 ("clk: meson: add mpll support")
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
-> ?drivers/clk/meson/clk-mpll.c | 3 ++-
-> ?1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
-> index 551aa2a5b291..4306ad833a4f 100644
-> --- a/drivers/clk/meson/clk-mpll.c
-> +++ b/drivers/clk/meson/clk-mpll.c
-> @@ -62,6 +62,7 @@
-> ? */
-> ?
-> ?#include <linux/clk-provider.h>
-> +#include <linux/math64.h>
-> ?#include "clkc.h"
-> ?
-> ?#define SDM_DEN 16384
-> @@ -81,7 +82,7 @@ static unsigned long rate_from_params(unsigned long
-> parent_rate,
-> ?	if (divisor == 0)
-> ?		return 0;
-> ?	else
-> -		return (parent_rate * SDM_DEN) / divisor;
-> +		return mul_u64_u32_div(parent_rate, SDM_DEN, divisor);
-
-Just casting parent_rate to u64 should be enough, don't you think ?
-Actually, I was thinking of copying a pattern that is used a lot in CCF and use
-DIV_ROUND_UP_ULL((u64)foo, bar). See clk-divider.c.
-
-Would this be ok with you ?
-
-> ?}
-> ?
-> ?static void params_from_rate(unsigned long requested_rate,
+-- 
+Ard.
