@@ -1,103 +1,58 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Sun, 2 Apr 2017 16:45:28 +0200
-Subject: [PATCH 4/5] vfio: platform: Convert to use devm_*()
-In-Reply-To: <1490539314-9681-5-git-send-email-leo.yan@linaro.org>
-References: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
- <1490539314-9681-5-git-send-email-leo.yan@linaro.org>
-Message-ID: <10625a88-3d6d-de52-8299-3ba0031317f8@redhat.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Sun, 02 Apr 2017 16:49:37 +0200
+Subject: [PATCH 1/2] clk: meson: mpll: fix division by zero in
+ rate_from_params
+In-Reply-To: <20170401130225.8811-2-martin.blumenstingl@googlemail.com>
+References: <20170401130225.8811-1-martin.blumenstingl@googlemail.com>
+ <20170401130225.8811-2-martin.blumenstingl@googlemail.com>
+Message-ID: <1491144577.3480.1.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
-
-On 26/03/2017 16:41, Leo Yan wrote:
-> Convert driver to use devm_*() APIs so rely on driver model core layer
-> to manage resources. This eliminates error path boilerplate and makes
-> code neat.
+On Sat, 2017-04-01 at 15:02 +0200, Martin Blumenstingl wrote:
+> According to the public datasheet all register bits in HHI_MPLL_CNTL7,
+> HHI_MPLL_CNTL8 and HHI_MPLL_CNTL9 default to zero. On all GX SoCs these
+> seem to be initialized by the bootloader to some default value.
+> However, on my Meson8 board they are not initialized, leading to a
+> division by zero in rate_from_params as the math is:
+> (parent_rate * SDM_DEN) / ((SDM_DEN * 0) + 0)
 > 
-> This patch also renames amba_id structure, the old code used some code
-> which directly copied from other driver.
+> Although the rate_from_params function was only introduced recently the
+> original bug has been there for much longer. It was only exposed
+> recently when the MPLL clocks were added to the Meson8b clock driver.
+
+The Documentation of the S905 also state that N2 minimal value is 4 and SDM
+minimal is 1 ... I should have been more careful ! Thanks for catching this
+Martin. We definitely need to fix this.
+
+Patch seems ok but I have one question. Is the rate actually zero when the
+divisor is zero ?
+I'll be away from my boards until Wednesday but I can check this when I get back
+if you can't.
+
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Looks good to me
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-May be interesting to go further converting as well the vfio-platform
-driver but this can be done later on.
-
-Thanks
-
-Eric
-
-
+> Fixes: 1c50da4f27 ("clk: meson: add mpll support")
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
->  drivers/vfio/platform/vfio_amba.c | 25 ++++++++-----------------
->  1 file changed, 8 insertions(+), 17 deletions(-)
+> ?drivers/clk/meson/clk-mpll.c | 7 ++++++-
+> ?1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
-> index 31372fb..433db1f 100644
-> --- a/drivers/vfio/platform/vfio_amba.c
-> +++ b/drivers/vfio/platform/vfio_amba.c
-> @@ -53,15 +53,14 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
->  	struct vfio_platform_device *vdev;
->  	int ret;
->  
-> -	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
-> +	vdev = devm_kzalloc(&adev->dev, sizeof(*vdev), GFP_KERNEL);
->  	if (!vdev)
->  		return -ENOMEM;
->  
-> -	vdev->name = kasprintf(GFP_KERNEL, "vfio-amba-%08x", adev->periphid);
-> -	if (!vdev->name) {
-> -		kfree(vdev);
-> +	vdev->name = devm_kasprintf(&adev->dev, GFP_KERNEL,
-> +				    "vfio-amba-%08x", adev->periphid);
-> +	if (!vdev->name)
->  		return -ENOMEM;
-> -	}
->  
->  	vdev->opaque = (void *) adev;
->  	vdev->flags = VFIO_DEVICE_FLAGS_AMBA;
-> @@ -71,11 +70,6 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
->  	vdev->reset_required = false;
->  
->  	ret = vfio_platform_probe_common(vdev, &adev->dev);
-> -	if (ret) {
-> -		kfree(vdev->name);
-> -		kfree(vdev);
-> -	}
-> -
->  	return ret;
->  }
->  
-> @@ -84,25 +78,22 @@ static int vfio_amba_remove(struct amba_device *adev)
->  	struct vfio_platform_device *vdev;
->  
->  	vdev = vfio_platform_remove_common(&adev->dev);
-> -	if (vdev) {
-> -		kfree(vdev->name);
-> -		kfree(vdev);
-> +	if (vdev)
->  		return 0;
-> -	}
->  
->  	return -EINVAL;
->  }
->  
-> -static struct amba_id pl330_ids[] = {
-> +static struct amba_id vfio_ids[] = {
->  	{ 0, 0 },
->  };
->  
-> -MODULE_DEVICE_TABLE(amba, pl330_ids);
-> +MODULE_DEVICE_TABLE(amba, vfio_ids);
->  
->  static struct amba_driver vfio_amba_driver = {
->  	.probe = vfio_amba_probe,
->  	.remove = vfio_amba_remove,
-> -	.id_table = pl330_ids,
-> +	.id_table = vfio_ids,
->  	.drv = {
->  		.name = "vfio-amba",
->  		.owner = THIS_MODULE,
-> 
+> diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
+> index 540dabe5adad..551aa2a5b291 100644
+> --- a/drivers/clk/meson/clk-mpll.c
+> +++ b/drivers/clk/meson/clk-mpll.c
+> @@ -76,7 +76,12 @@ static unsigned long rate_from_params(unsigned long
+> parent_rate,
+> ?				??????unsigned long sdm,
+> ?				??????unsigned long n2)
+> ?{
+> -	return (parent_rate * SDM_DEN) / ((SDM_DEN * n2) + sdm);
+> +	unsigned long divisor = (SDM_DEN * n2) + sdm;
+> +
+> +	if (divisor == 0)
+> +		return 0;
+> +	else
+> +		return (parent_rate * SDM_DEN) / divisor;
+> ?}
+> ?
+> ?static void params_from_rate(unsigned long requested_rate,
