@@ -1,129 +1,219 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 2 Apr 2017 11:55:34 -0400 (EDT)
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <CAHp75VdGm2uVPBhfAge4Wx6WW2y52oddpOSfJgdYAfTUQPN7TQ@mail.gmail.com>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <CAHp75VdGm2uVPBhfAge4Wx6WW2y52oddpOSfJgdYAfTUQPN7TQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1704021149550.1847@knanqh.ubzr>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Sun, 02 Apr 2017 17:57:45 +0200
+Subject: [PATCH 1/1] clk: meson: gxbb: remove the "cpu_clk" from the
+ GXBB and GXL driver
+In-Reply-To: <20170401125519.7339-2-martin.blumenstingl@googlemail.com>
+References: <20170401125519.7339-1-martin.blumenstingl@googlemail.com>
+ <20170401125519.7339-2-martin.blumenstingl@googlemail.com>
+Message-ID: <1491148665.3480.8.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2 Apr 2017, Andy Shevchenko wrote:
-
-> +Cc people, who have a key roles in all TTY stuff (btw, why you did
-> miss them?
-
-I used what MAINTAINERS and get_maintainer.pl gave me.
-
-> why you didn't include people who reacted on your v1
-> either?).
-> I'm pretty sure they are interested in what's going on here.
-
-The only one I missed is Ard.
-
-Thanks for pulling more people in.
-
-
+On Sat, 2017-04-01 at 14:55 +0200, Martin Blumenstingl wrote:
+> It seems that the "cpu_clk" was carried over from the meson8b clock
+> controller driver. On Meson GX (GXBB/GXL/GXM) the registers which are
+> used by the cpu_clk have a different purpose (in other words: they don't
+> control the CPU clock anymore). HHI_SYS_CPU_CLK_CNTL1 bits 31:24 are
+> reserved according to the public S905 datasheet, while bit 23 is the
+> "A53_trace_clk_DIS" gate (which according to the datasheet should only
+> be used in case a silicon bug is discovered) and bits 22:20 are a
+> divider (A53_trace_clk). The meson clk-cpu code however expects that
+> bits 28:20 are reserved for a divider (according to the public S805
+> datasheet this "SCALE_DIV: This value represents an N+1 divider of the
+> input clock.").
 > 
-> On Sun, Apr 2, 2017 at 1:21 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > Many embedded systems don't need the full TTY layer support. Most of the
-> > time, the TTY layer is only a conduit for outputting debugging messages
-> > over a serial port. The TTY layer also implements many features that are
-> > very unlikely to ever be used in such a setup. There is great potential
-> > for both code and dynamic memory size reduction on small systems. This is
-> > what this patch series is achieving.
-> >
-> > The existing TTY code is quite large and complex. Trying to shrink it
-> > is risky as the potential for breakage is non negligeable, and its
-> > interchangeable layers impose a lower limit on the code to implement it.
-> > Therefore, the approach used here consists in the creation of a parallel
-> > implementation with the very minimal amount of code collapsed together
-> > that interfaces with existing UART drivers directly and provides TTY-like
-> > character devices to user space. When the regular TTY layer is disabled,
-> > then this minitty alternative layer is proposed by Kconfig.
-> >
-> > For more details on the rationale and motivations driving this approach
-> > please see: https://lkml.org/lkml/2017/3/24/634
-> >
-> > Of course, making it "mini" means there are limitations to what it does:
-> >
-> > - This supports serial ports only. No VT's, no PTY's.
-> >
-> > - The default n_tty line discipline is hardcoded and no other line
-> >   discipline are supported.
-> >
-> > - The line discipline features are not all implemented. Notably, XON/XOFF
-> >   is currently not implemented (although this might not require a lot of
-> >   code to do it if someone were to need it).
-> >
-> > - Hung-up state is not implemented.
-> >
-> > - No error handling on RX bytes other than counting them.
-> >
-> > - Job control is currently not supported (this may change in the future and
-> >   be configurable).
-> >
-> > But again, most small embedded systems simply don't need those things.
-> >
-> > This can be used on any architecture of course, but here's some numbers
-> > using a minimal ARM config.
-> >
-> > When CONFIG_TTY=y, the following files are linked into the kernel:
-> >
-> >    text    data     bss     dec     hex filename
-> >    8796     128       0    8924    22dc drivers/tty/n_tty.o
-> >   11809     276       0   12085    2f35 drivers/tty/serial/fulltty_serial.o
-> >    1376       0       0    1376     560 drivers/tty/tty_buffer.o
-> >   13571     172     132   13875    3633 drivers/tty/tty_io.o
-> >    3072       0       0    3072     c00 drivers/tty/tty_ioctl.o
-> >    2457       2     120    2579     a13 drivers/tty/tty_ldisc.o
-> >    1328       0       0    1328     530 drivers/tty/tty_ldsem.o
-> >     316       0       0     316     13c drivers/tty/tty_mutex.o
-> >    2516       0       0    2516     9d4 drivers/tty/tty_port.o
-> >   5241     578     252   46071    b3f7 (TOTALS)
-> >
-> > When CONFIG_TTY=n and CONFIG_MINITTY_SERIAL=y, the above files are replaced
-> > by the following:
-> >
-> >    text    data     bss     dec     hex filename
-> >    8063       8      64    8135    1fc7 drivers/tty/serial/minitty_serial.o
-> >
-> > That's it!  And the runtime buffer usage is much less as well. Future plans
-> > such as removing runtime baudrate handling for those targets with a known
-> > fixed baudrate will shrink the code even more.
-> >
-> > Changes from v1:
-> >
-> > - Added an entry to the MAINTAINERS file.
-> > - Factored out more common core code into serial_lib.c.
-> > - Implemented a few more TTY callback functions to be compatible with
-> >   more UART drivers.
-> >
-> > Overall diffstat:
-> >
-> >  MAINTAINERS                                     |    8 +-
-> >  drivers/tty/Kconfig                             |   10 +-
-> >  drivers/tty/Makefile                            |    3 +-
-> >  drivers/tty/serial/Kconfig                      |   12 +-
-> >  drivers/tty/serial/Makefile                     |    7 +-
-> >  .../serial/{serial_core.c => fulltty_serial.c}  |  419 +---
-> >  drivers/tty/serial/minitty_serial.c             | 1793 +++++++++++++++++
-> >  drivers/tty/serial/serial_lib.c                 |  440 ++++
-> >  drivers/tty/tty_baudrate.c                      |  232 +++
-> >  drivers/tty/tty_io.c                            |   24 -
-> >  drivers/tty/tty_ioctl.c                         |  222 --
-> >  include/linux/console.h                         |    2 +
-> >  include/linux/serial_core.h                     |    1 +
-> >  include/linux/tty.h                             |    7 +-
-> >  include/linux/tty_flip.h                        |    9 +
-> >  init/main.c                                     |    2 +-
-> >  kernel/printk/printk.c                          |   24 +
-> >  17 files changed, 2538 insertions(+), 677 deletions(-)
+> The CPU clock on Meson GX SoCs is provided by the SCPI DVFS clock
+> driver instead. Two examples from a Meson GXL S905X SoC:
+> - vcpu (SCPI DVFS clock 0) rate: 1000000000 / cpu_clk rate: 708000000
+> - vcpu (SCPI DVFS clock 0) rate: 1512000000 / cpu_clk rate: 708000000
 > 
+> Unfortunately the CLKID_CPUCLK was already exported (but is currently
+> not used) to DT. Due to the removal of this clock definition there is
+> now a hole in the clk_hw_onecell_data (which is not a problem because
+> this case is already handled in gxbb_clkc_probe).
 > 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+
+Looks good to me.
+I'll wait for the Ack of one of the DT maintainers to apply it.
+Thx Martin
+
+Cheers
+
+> ---
+> ?drivers/clk/meson/gxbb.c??????????????| 64 ++------------------------------
+> ---
+> ?drivers/clk/meson/gxbb.h??????????????|??2 +-
+> ?include/dt-bindings/clock/gxbb-clkc.h |??1 -
+> ?3 files changed, 4 insertions(+), 63 deletions(-)
 > 
-> -- 
-> With Best Regards,
-> Andy Shevchenko
-> 
+> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+> index ad5f027af1a2..7cf88ca9bdce 100644
+> --- a/drivers/clk/meson/gxbb.c
+> +++ b/drivers/clk/meson/gxbb.c
+> @@ -278,20 +278,6 @@ static const struct pll_rate_table
+> gxl_gp0_pll_rate_table[] = {
+> ?	{ /* sentinel */ },
+> ?};
+> ?
+> -static const struct clk_div_table cpu_div_table[] = {
+> -	{ .val = 1, .div = 1 },
+> -	{ .val = 2, .div = 2 },
+> -	{ .val = 3, .div = 3 },
+> -	{ .val = 2, .div = 4 },
+> -	{ .val = 3, .div = 6 },
+> -	{ .val = 4, .div = 8 },
+> -	{ .val = 5, .div = 10 },
+> -	{ .val = 6, .div = 12 },
+> -	{ .val = 7, .div = 14 },
+> -	{ .val = 8, .div = 16 },
+> -	{ /* sentinel */ },
+> -};
+> -
+> ?static struct meson_clk_pll gxbb_fixed_pll = {
+> ?	.m = {
+> ?		.reg_off = HHI_MPLL_CNTL,
+> @@ -612,21 +598,10 @@ static struct meson_clk_mpll gxbb_mpll2 = {
+> ?};
+> ?
+> ?/*
+> - * FIXME cpu clocks and the legacy composite clocks (e.g. clk81) are both PLL
+> - * post-dividers and should be modeled with their respective PLLs via the
+> - * forthcoming coordinated clock rates feature
+> + * FIXME The legacy composite clocks (e.g. clk81) are both PLL post-dividers
+> + * and should be modeled with their respective PLLs via the forthcoming
+> + * coordinated clock rates feature
+> ? */
+> -static struct meson_clk_cpu gxbb_cpu_clk = {
+> -	.reg_off = HHI_SYS_CPU_CLK_CNTL1,
+> -	.div_table = cpu_div_table,
+> -	.clk_nb.notifier_call = meson_clk_cpu_notifier_cb,
+> -	.hw.init = &(struct clk_init_data){
+> -		.name = "cpu_clk",
+> -		.ops = &meson_clk_cpu_ops,
+> -		.parent_names = (const char *[]){ "sys_pll" },
+> -		.num_parents = 1,
+> -	},
+> -};
+> ?
+> ?static u32 mux_table_clk81[]	= { 6, 5, 7 };
+> ?
+> @@ -1045,7 +1020,6 @@ static MESON_GATE(gxbb_ao_i2c, HHI_GCLK_AO, 4);
+> ?static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
+> ?	.hws = {
+> ?		[CLKID_SYS_PLL]		????= &gxbb_sys_pll.hw,
+> -		[CLKID_CPUCLK]		????= &gxbb_cpu_clk.hw,
+> ?		[CLKID_HDMI_PLL]	????= &gxbb_hdmi_pll.hw,
+> ?		[CLKID_FIXED_PLL]	????= &gxbb_fixed_pll.hw,
+> ?		[CLKID_FCLK_DIV2]	????= &gxbb_fclk_div2.hw,
+> @@ -1165,7 +1139,6 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data =
+> {
+> ?static struct clk_hw_onecell_data gxl_hw_onecell_data = {
+> ?	.hws = {
+> ?		[CLKID_SYS_PLL]		????= &gxbb_sys_pll.hw,
+> -		[CLKID_CPUCLK]		????= &gxbb_cpu_clk.hw,
+> ?		[CLKID_HDMI_PLL]	????= &gxbb_hdmi_pll.hw,
+> ?		[CLKID_FIXED_PLL]	????= &gxbb_fixed_pll.hw,
+> ?		[CLKID_FCLK_DIV2]	????= &gxbb_fclk_div2.hw,
+> @@ -1430,7 +1403,6 @@ struct clkc_data {
+> ?	unsigned int clk_dividers_count;
+> ?	struct meson_clk_audio_divider *const *clk_audio_dividers;
+> ?	unsigned int clk_audio_dividers_count;
+> -	struct meson_clk_cpu *cpu_clk;
+> ?	struct clk_hw_onecell_data *hw_onecell_data;
+> ?};
+> ?
+> @@ -1447,7 +1419,6 @@ static const struct clkc_data gxbb_clkc_data = {
+> ?	.clk_dividers_count = ARRAY_SIZE(gxbb_clk_dividers),
+> ?	.clk_audio_dividers = gxbb_audio_dividers,
+> ?	.clk_audio_dividers_count = ARRAY_SIZE(gxbb_audio_dividers),
+> -	.cpu_clk = &gxbb_cpu_clk,
+> ?	.hw_onecell_data = &gxbb_hw_onecell_data,
+> ?};
+> ?
+> @@ -1464,7 +1435,6 @@ static const struct clkc_data gxl_clkc_data = {
+> ?	.clk_dividers_count = ARRAY_SIZE(gxbb_clk_dividers),
+> ?	.clk_audio_dividers = gxbb_audio_dividers,
+> ?	.clk_audio_dividers_count = ARRAY_SIZE(gxbb_audio_dividers),
+> -	.cpu_clk = &gxbb_cpu_clk,
+> ?	.hw_onecell_data = &gxl_hw_onecell_data,
+> ?};
+> ?
+> @@ -1479,8 +1449,6 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
+> ?	const struct clkc_data *clkc_data;
+> ?	void __iomem *clk_base;
+> ?	int ret, clkid, i;
+> -	struct clk_hw *parent_hw;
+> -	struct clk *parent_clk;
+> ?	struct device *dev = &pdev->dev;
+> ?
+> ?	clkc_data = of_device_get_match_data(&pdev->dev);
+> @@ -1502,9 +1470,6 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
+> ?	for (i = 0; i < clkc_data->clk_mplls_count; i++)
+> ?		clkc_data->clk_mplls[i]->base = clk_base;
+> ?
+> -	/* Populate the base address for CPU clk */
+> -	clkc_data->cpu_clk->base = clk_base;
+> -
+> ?	/* Populate base address for gates */
+> ?	for (i = 0; i < clkc_data->clk_gates_count; i++)
+> ?		clkc_data->clk_gates[i]->reg = clk_base +
+> @@ -1538,29 +1503,6 @@ static int gxbb_clkc_probe(struct platform_device
+> *pdev)
+> ?			goto iounmap;
+> ?	}
+> ?
+> -	/*
+> -	?* Register CPU clk notifier
+> -	?*
+> -	?* FIXME this is wrong for a lot of reasons. First, the muxes should
+> be
+> -	?* struct clk_hw objects. Second, we shouldn't program the muxes in
+> -	?* notifier handlers. The tricky programming sequence will be handled
+> -	?* by the forthcoming coordinated clock rates mechanism once that
+> -	?* feature is released.
+> -	?*
+> -	?* Furthermore, looking up the parent this way is terrible. At some
+> -	?* point we will stop allocating a default struct clk when
+> registering
+> -	?* a new clk_hw, and this hack will no longer work. Releasing the ccr
+> -	?* feature before that time solves the problem :-)
+> -	?*/
+> -	parent_hw = clk_hw_get_parent(&clkc_data->cpu_clk->hw);
+> -	parent_clk = parent_hw->clk;
+> -	ret = clk_notifier_register(parent_clk, &clkc_data->cpu_clk->clk_nb);
+> -	if (ret) {
+> -		pr_err("%s: failed to register clock notifier for cpu_clk\n",
+> -				__func__);
+> -		goto iounmap;
+> -	}
+> -
+> ?	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+> ?			clkc_data->hw_onecell_data);
+> ?
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 17c6aef033ff..36330c2d4433 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -171,7 +171,7 @@
+> ? * to be exposed to client nodes in DT: include/dt-bindings/clock/gxbb-clkc.h
+> ? */
+> ?#define CLKID_SYS_PLL		??0
+> -/* CLKID_CPUCLK */
+> +/* ID 1 is unused (it was used by the non-existing CLKID_CPUCLK before) */
+> ?/* CLKID_HDMI_PLL */
+> ?#define CLKID_FIXED_PLL		??3
+> ?/* CLKID_FCLK_DIV2 */
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-
+> bindings/clock/gxbb-clkc.h
+> index 4516bc4253b5..54faf83a4851 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -5,7 +5,6 @@
+> ?#ifndef __GXBB_CLKC_H
+> ?#define __GXBB_CLKC_H
+> ?
+> -#define CLKID_CPUCLK		1
+> ?#define CLKID_HDMI_PLL		2
+> ?#define CLKID_FCLK_DIV2		4
+> ?#define CLKID_FCLK_DIV3		5
