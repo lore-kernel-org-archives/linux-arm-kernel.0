@@ -1,331 +1,276 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 2 Apr 2017 04:48:59 -0700
-Subject: [PATCH v4 2/5] drivers: watchdog: Add STM32 IWDG driver
-In-Reply-To: <1490886926-20585-3-git-send-email-yannick.fertre@st.com>
-References: <1490886926-20585-1-git-send-email-yannick.fertre@st.com>
- <1490886926-20585-3-git-send-email-yannick.fertre@st.com>
-Message-ID: <91cacc1b-3ae7-c955-29c6-583298ee8f1a@roeck-us.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 2 Apr 2017 13:19:23 +0100
+Subject: [PATCH 4/4] iio: dac: stm32: add support for waveform generator
+In-Reply-To: <1490960707-22422-5-git-send-email-fabrice.gasnier@st.com>
+References: <1490960707-22422-1-git-send-email-fabrice.gasnier@st.com>
+ <1490960707-22422-5-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <e6a02296-fa72-50e8-d5e8-25bb5d496085@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2017 08:15 AM, Yannick Fertre wrote:
-> This patch adds IWDG (Independent WatchDoG) support for STM32 platform.
->
-> Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
+On 31/03/17 12:45, Fabrice Gasnier wrote:
+> STM32 DAC has built-in noise or triangle waveform generator.
+> Waveform generator requires trigger to be configured.
+> - "wave" extended attribute selects noise or triangle.
+> - "mamp" extended attribute selects either LFSR (linear feedback
+>   shift register) mask for noise waveform, OR triangle amplitude.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+
+Looks like AN3126 is the relevant doc.
+(a quick note from this relevant to earlier patches- doc says
+1-3 channels - perhaps build that from the start with that
+possibility in mind).
+
+As you probably know, this wanders into a large chunk of 'poorly'
+defined ABI within IIO as it stands.
+
+Note there are a number of waveform generators still in staging.
+Not a lot of movement on getting them out of staging unfortunately
+(so far!)
+
+However, let us keep those drivers in mind as we work on ABI and
+I definitely want some input from someone at Analog. 
+Lars, who is best for this? I see at least some of these were
+originally Michael's work.
+
+They do have partial docs under
+drivers/staging/iio/Documentation/sysfs-bus-iio-dds
+I'll highlight thoughts from there as I look through this...
+
+
 > ---
->  drivers/watchdog/Kconfig      |  12 ++
->  drivers/watchdog/Makefile     |   1 +
->  drivers/watchdog/stm32_iwdg.c | 260 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 273 insertions(+)
->  create mode 100644 drivers/watchdog/stm32_iwdg.c
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 52a70ee..d014deb 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -744,6 +744,18 @@ config ZX2967_WATCHDOG
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called zx2967_wdt.
->
-> +config STM32_WATCHDOG
-> +	tristate "STM32 Independent WatchDoG (IWDG) support"
-> +	depends on ARCH_STM32
-> +	select WATCHDOG_CORE
-> +	default y
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in stm32 SoCs.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called stm32_iwdg.
-> +
->  # AVR32 Architecture
->
->  config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index a2126e2..a35e423 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -84,6 +84,7 @@ obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
->  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
->  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
->  obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
-> +obj-$(CONFIG_STM32_WATCHDOG) += stm32_iwdg.o
->
->  # AVR32 Architecture
->  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
+>  Documentation/ABI/testing/sysfs-bus-iio-dac-stm32 |  32 ++++++
+>  drivers/iio/dac/stm32-dac.c                       | 124 ++++++++++++++++++++++
+>  2 files changed, 156 insertions(+)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
+> 
+> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
 > new file mode 100644
-> index 0000000..629c305
+> index 0000000..c2432e1
 > --- /dev/null
-> +++ b/drivers/watchdog/stm32_iwdg.c
-> @@ -0,0 +1,260 @@
+> +++ b/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
+> @@ -0,0 +1,32 @@
+> +What:		/sys/bus/iio/devices/iio:deviceX/wave
+> +What:		/sys/bus/iio/devices/iio:deviceX/wave_available
+Needs to be channel associated. Whilst in your case you have basically
+a pair of single channel devices, in more general case, it's not usual
+to have multiple parallel waveform generators clocked together.
+
+Old ABI is:
+What:		/sys/bus/iio/devices/.../out_altvoltageX_outY_wavetype etc
+
+
+> +KernelVersion:	4.12
+> +Contact:	fabrice.gasnier at st.com
+> +Description:
+> +		List and/or select waveform generation provided by STM32 DAC:
+> +		- "none": (default) means normal DAC operations
+none kind of hints at nothing coming out.  Perhaps 'flat' would be closer?
+i.e. only changes when someone tells it to.
+
+> +		- "noise": select noise waveform
+> +		- "triangle": select triangle waveform
+> +		Note: when waveform generator is used, writing _raw sysfs entry
+> +		adds a DC offset to generated waveform. Reading it reports
+> +		current output value.
+Interesting.  This gets fiddly but one option would be to describe the whole
+device as a dds.
+
+Then we have flat type above, combined with an _offset.
+
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/mamp
+> +What:		/sys/bus/iio/devices/iio:deviceX/mamp_available
+> +KernelVersion:	4.12
+> +Contact:	fabrice.gasnier at st.com
+> +Description:
+> +		List and select mask/amplitude used for noise/triangle waveform
+> +		generator, which are:
+> +		- "0": unmask bit 0 of LFSR / triangle amplitude equal to 1
+> +		- "1": unmask bit [1:0] of LFSR / triangle amplitude equal to 3
+> +		- "2": unmask bit [2:0] of LFSR / triangle amplitude equal to 7
+> +		- "3": unmask bit [3:0] of LFSR / triangle amplitude equal to 15
+> +		- "4": unmask bit [4:0] of LFSR / triangle amplitude equal to 31
+> +		- "5": unmask bit [5:0] of LFSR / triangle amplitude equal to 63
+> +		- "6": unmask bit [6:0] of LFSR / triangle amplitude equal to 127
+> +		- "7": unmask bit [7:0] of LFSR / triangle amplitude equal to 255
+> +		- "8": unmask bit [8:0] of LFSR / triangle amplitude equal to 511
+> +		- "9": unmask bit [9:0] of LFSR / triangle amplitude equal to 1023
+> +		- "10": unmask bit [10:0] of LFSR / triangle amplitude equal to 2047
+> +		- "11": unmask bit [11:0] of LFSR / triangle amplitude equal to 4095
+I don't fully understand what is going on here - so I'm guessing somewhat.
+
+
+Let us try describing these generically.  If we define standard 'forms' of each
+waveform type.  Say a 0 to 1 V peak to peak, then we could use _scale to control
+this nicely.
+
+> diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
+> index 62e43e9..d7dda78 100644
+> --- a/drivers/iio/dac/stm32-dac.c
+> +++ b/drivers/iio/dac/stm32-dac.c
+> @@ -41,10 +41,14 @@
+>  /**
+>   * struct stm32_dac - private data of DAC driver
+>   * @common:		reference to DAC common data
+> + * @wave:		waveform generator
+> + * @mamp:		waveform mask/amplitude
+>   * @swtrig:		Using software trigger
+>   */
+>  struct stm32_dac {
+>  	struct stm32_dac_common *common;
+> +	u32 wave;
+> +	u32 mamp;
+>  	bool swtrig;
+>  };
+>  
+> @@ -157,6 +161,24 @@ static int stm32_dac_is_enabled(struct stm32_dac *dac, int channel)
+>  	return !!en;
+>  }
+>  
+> +static int stm32_dac_wavegen(struct stm32_dac *dac, int channel)
+> +{
+> +	struct regmap *regmap = dac->common->regmap;
+> +	u32 mask, val;
+> +
+> +	if (channel == STM32_DAC_CHANNEL_1) {
+> +		val = FIELD_PREP(STM32_DAC_CR_WAVE1, dac->wave) |
+> +			FIELD_PREP(STM32_DAC_CR_MAMP1, dac->mamp);
+> +		mask = STM32_DAC_CR_WAVE1 | STM32_DAC_CR_MAMP1;
+> +	} else {
+> +		val = FIELD_PREP(STM32_DAC_CR_WAVE2, dac->wave) |
+> +			FIELD_PREP(STM32_DAC_CR_MAMP2, dac->mamp);
+> +		mask = STM32_DAC_CR_WAVE2 | STM32_DAC_CR_MAMP2;
+> +	}
+> +
+> +	return regmap_update_bits(regmap, STM32_DAC_CR, mask, val);
+> +}
+> +
+>  static int stm32_dac_enable(struct iio_dev *indio_dev, int channel)
+>  {
+>  	struct stm32_dac *dac = iio_priv(indio_dev);
+> @@ -164,6 +186,17 @@ static int stm32_dac_enable(struct iio_dev *indio_dev, int channel)
+>  		STM32_DAC_CR_EN1 : STM32_DAC_CR_EN2;
+>  	int ret;
+>  
+> +	if (dac->wave && !indio_dev->trig) {
+> +		dev_err(&indio_dev->dev, "Wavegen requires a trigger\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = stm32_dac_wavegen(dac, channel);
+> +	if (ret < 0) {
+> +		dev_err(&indio_dev->dev, "Wavegen setup failed\n");
+> +		return ret;
+> +	}
+> +
+>  	ret = stm32_dac_set_trig(dac, indio_dev->trig, channel);
+>  	if (ret < 0) {
+>  		dev_err(&indio_dev->dev, "Trigger setup failed\n");
+> @@ -291,6 +324,96 @@ static int stm32_dac_debugfs_reg_access(struct iio_dev *indio_dev,
+>  	.driver_module = THIS_MODULE,
+>  };
+>  
+> +/* waveform generator wave selection */
+> +static const char * const stm32_dac_wave_desc[] = {
+> +	"none",
+> +	"noise",
+> +	"triangle",
+> +};
+> +
+> +static int stm32_dac_set_wave(struct iio_dev *indio_dev,
+> +			      const struct iio_chan_spec *chan,
+> +			      unsigned int type)
+> +{
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
+> +
+> +	if (stm32_dac_is_enabled(dac, chan->channel))
+> +		return -EBUSY;
+> +	dac->wave = type;
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_dac_get_wave(struct iio_dev *indio_dev,
+> +			      const struct iio_chan_spec *chan)
+> +{
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
+> +
+> +	return dac->wave;
+> +}
+> +
+> +static const struct iio_enum stm32_dac_wave_enum = {
+> +	.items = stm32_dac_wave_desc,
+> +	.num_items = ARRAY_SIZE(stm32_dac_wave_desc),
+> +	.get = stm32_dac_get_wave,
+> +	.set = stm32_dac_set_wave,
+> +};
+> +
 > +/*
-> + * Driver for STM32 Independent Watchdog
-> + *
-> + * Copyright (C) Yannick Fertre 2017
-> + * Author: Yannick Fertre <yannick.fertre@st.com>
-> + *
-> + * This driver is based on tegra_wdt.c
-> + *
-> + * License terms:  GNU General Public License (GPL), version 2
+> + * waveform generator mask/amplitude selection:
+> + * - noise: LFSR mask (linear feedback shift register, umasks bit 0, [1:0]...)
+> + * - triangle: amplitude (equal to 1, 3, 5, 7... 4095)
 > + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/watchdog.h>
-> +
-> +/* watchdog trigger timeout, in seconds */
-> +#define WDT_MIN_TIMEOUT		1
-> +#define WDT_MAX_TIMEOUT		32
-> +#define WDT_DEFAULT_TIMEOUT	30
-> +
-> +/* IWDG registers */
-> +#define IWDG_KR		0x00 /* Key register */
-> +#define IWDG_PR		0x04 /* Prescaler Register */
-> +#define IWDG_RLR	0x08 /* ReLoad Register */
-> +#define IWDG_SR		0x0C /* Status Register */
-> +#define IWDG_WINR	0x10 /* Windows Register */
-> +
-> +/* IWDG_KR register bit mask */
-> +#define KR_KEY_RELOAD	0xAAAA /* reload counter enable */
-> +#define KR_KEY_ENABLE	0xCCCC /* peripheral enable */
-> +#define KR_KEY_EWA	0x5555 /* write access enable */
-> +#define KR_KEY_DWA	0x0000 /* write access disable */
-> +
-> +/* IWDG_PR register bit values */
-> +#define PR_4		0x00 /* prescaler set to 4 */
-> +#define PR_8		0x01 /* prescaler set to 8 */
-> +#define PR_16		0x02 /* prescaler set to 16 */
-> +#define PR_32		0x03 /* prescaler set to 32 */
-> +#define PR_64		0x04 /* prescaler set to 64 */
-> +#define PR_128		0x05 /* prescaler set to 128 */
-> +#define PR_256		0x06 /* prescaler set to 256 */
-> +
-> +/* IWDG_RLR register values */
-> +#define RLR_MAX		0xFFF /* max value supported by reload register */
-> +
-> +/* IWDG_SR register bit mask */
-> +#define FLAG_PVU	BIT(0) /* Watchdog prescaler value update */
-> +#define FLAG_RVU	BIT(1) /* Watchdog counter reload value update */
-> +
-> +/* set timeout to 100000 us */
-> +#define TIMEOUT_US	100000
-> +#define SLEEP_US	1000
-> +
-> +struct stm32_iwdg {
-> +	struct watchdog_device	wdd;
-> +	void __iomem		*regs;
-> +	struct clk		*clk;
-> +	unsigned int		rate;
+> +static const char * const stm32_dac_mamp_desc[] = {
+> +	"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11",
 > +};
 > +
-> +static inline u32 reg_read(void __iomem *base, u32 reg)
+> +static int stm32_dac_set_mamp(struct iio_dev *indio_dev,
+> +			      const struct iio_chan_spec *chan,
+> +			      unsigned int type)
 > +{
-> +	return readl_relaxed(base + reg);
-> +}
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
 > +
-> +static inline void reg_write(void __iomem *base, u32 reg, u32 val)
-> +{
-> +	writel_relaxed(val, base + reg);
-> +}
-> +
-> +static int stm32_iwdg_start(struct watchdog_device *wdd)
-> +{
-> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
-> +	u32 val = FLAG_PVU | FLAG_RVU;
-> +	u32 reload;
-> +	int ret;
-> +
-> +	dev_dbg(wdd->parent, "%s\n", __func__);
-> +
-> +	/* enable watchdog */
-> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_EWA);
-> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_ENABLE);
-> +
-> +	/* prescaler fixed to 256 */
-> +	reload = (wdd->timeout * wdt->rate) / 256;
-> +	if (reload > RLR_MAX + 1)
-> +		reload = RLR_MAX + 1;
-> +
-> +	/* set prescaler & reload registers */
-> +	reg_write(wdt->regs, IWDG_PR, PR_256); /* prescaler fix to 256 */
-> +	reg_write(wdt->regs, IWDG_RLR, reload - 1);
-> +
-> +	/* wait for the registers to be updated (max 100ms) */
-> +	ret = readl_relaxed_poll_timeout(wdt->regs + IWDG_SR, val,
-> +					 !(val & (FLAG_PVU | FLAG_RVU)),
-> +					 SLEEP_US, TIMEOUT_US);
-> +	if (ret) {
-> +		dev_err(wdd->parent,
-> +			"Fail to set prescaler or reload registers\n");
-> +		return ret;
-> +	}
-> +
-> +	/* reload watchdog */
-> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
+> +	if (stm32_dac_is_enabled(dac, chan->channel))
+> +		return -EBUSY;
+> +	dac->mamp = type;
 > +
 > +	return 0;
 > +}
 > +
-> +static int stm32_iwdg_ping(struct watchdog_device *wdd)
+> +static int  stm32_dac_get_mamp(struct iio_dev *indio_dev,
+> +			       const struct iio_chan_spec *chan)
 > +{
-> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
 > +
-> +	dev_dbg(wdd->parent, "%s\n", __func__);
-> +
-> +	/* reload watchdog */
-> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
-> +
-> +	return 0;
+> +	return dac->mamp;
 > +}
 > +
-> +static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	dev_dbg(wdd->parent, "%s timeout: %d sec\n", __func__, timeout);
-> +
-> +	wdd->timeout = timeout;
-> +
-> +	if (watchdog_active(wdd))
-> +		return stm32_iwdg_start(wdd);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_info stm32_iwdg_info = {
-> +	.options	= WDIOF_SETTIMEOUT |
-> +			  WDIOF_MAGICCLOSE |
-> +			  WDIOF_KEEPALIVEPING,
-> +	.identity	= "STM32 Independent Watchdog",
+> +static const struct iio_enum stm32_dac_mamp_enum = {
+> +	.items = stm32_dac_mamp_desc,
+> +	.num_items = ARRAY_SIZE(stm32_dac_mamp_desc),
+> +	.get = stm32_dac_get_mamp,
+> +	.set = stm32_dac_set_mamp,
 > +};
 > +
-> +static struct watchdog_ops stm32_iwdg_ops = {
-> +	.owner		= THIS_MODULE,
-> +	.start		= stm32_iwdg_start,
-> +	.ping		= stm32_iwdg_ping,
-> +	.set_timeout	= stm32_iwdg_set_timeout,
-> +};
-> +
-> +static int stm32_iwdg_probe(struct platform_device *pdev)
-> +{
-> +	struct watchdog_device *wdd;
-> +	struct stm32_iwdg *wdt;
-> +	struct resource *res;
-> +	void __iomem *regs;
-> +	struct clk *clk;
-> +	int ret;
-> +
-> +	/* This is the timer base. */
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(regs)) {
-> +		dev_err(&pdev->dev, "Could not get resource\n");
-> +		return PTR_ERR(regs);
-> +	}
-> +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk)) {
-> +		dev_err(&pdev->dev, "Unable to get clock\n");
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
-> +		return ret;
-> +	}
-> +
-> +	/*
-> +	 * Allocate our watchdog driver data, which has the
-> +	 * struct watchdog_device nested within it.
-> +	 */
-> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt) {
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
-> +
-> +	/* Initialize struct stm32_iwdg. */
-> +	wdt->regs = regs;
-> +	wdt->clk = clk;
-> +	wdt->rate = clk_get_rate(clk);
-> +
-> +	/* Initialize struct watchdog_device. */
-> +	wdd = &wdt->wdd;
-> +	wdd->info = &stm32_iwdg_info;
-> +	wdd->ops = &stm32_iwdg_ops;
-> +	wdd->min_timeout = WDT_MIN_TIMEOUT;
-> +	wdd->max_timeout = WDT_MAX_TIMEOUT;
-> +	wdd->max_hw_heartbeat_ms = WDT_MAX_TIMEOUT;
-
-This would have to be in milli-seconds. Also only provide max_timeout
-or max_hw_heartbeat_ms, but not both.
-
-> +	wdd->parent = &pdev->dev;
-> +
-> +	watchdog_set_drvdata(wdd, wdt);
-> +	watchdog_set_nowayout(wdd, true);
-> +
-> +	ret = watchdog_init_timeout(wdd, WDT_DEFAULT_TIMEOUT, &pdev->dev);
-
-Timeout parameter should be 0 to give the core a chance to pick up a timeout
-from fdt if specified. Otherwise the call is quite useless.
-
-> +	if (ret)
-> +		dev_warn(&pdev->dev,
-> +			 "unable to set timeout value, using default\n");
-> +
-> +	ret = watchdog_register_device(wdd);
-> +	if (ret) {
-> +		dev_err(&pdev->dev,
-> +			"failed to register watchdog device\n");
-> +		goto err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	return 0;
-> +err:
-> +	clk_disable_unprepare(clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int stm32_iwdg_remove(struct platform_device *pdev)
-> +{
-> +	struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
-> +
-> +	watchdog_unregister_device(&wdt->wdd);
-> +	clk_disable_unprepare(wdt->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id stm32_iwdg_of_match[] = {
-> +	{ .compatible = "st,stm32-iwdg" },
-> +	{ /* end node */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
-> +
-> +static struct platform_driver stm32_iwdg_driver = {
-> +	.probe		= stm32_iwdg_probe,
-> +	.remove		= stm32_iwdg_remove,
-> +	.driver = {
-> +		.name	= "iwdg",
-> +		.of_match_table = stm32_iwdg_of_match,
+> +static const struct iio_chan_spec_ext_info stm32_dac_ext_info[] = {
+> +	IIO_ENUM("wave", IIO_SHARED_BY_ALL, &stm32_dac_wave_enum),
+> +	{
+> +		.name = "wave_available",
+> +		.shared = IIO_SHARED_BY_ALL,
+> +		.read = iio_enum_available_read,
+> +		.private = (uintptr_t)&stm32_dac_wave_enum,
 > +	},
+> +	IIO_ENUM("mamp", IIO_SHARED_BY_ALL, &stm32_dac_mamp_enum),
+> +	{
+> +		.name = "mamp_available",
+> +		.shared = IIO_SHARED_BY_ALL,
+> +		.read = iio_enum_available_read,
+> +		.private = (uintptr_t)&stm32_dac_mamp_enum,
+> +	},
+> +	{},
 > +};
-> +module_platform_driver(stm32_iwdg_driver);
 > +
-> +MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
-> +MODULE_DESCRIPTION("STMicroelectronics STM32 Independent Watchdog Driver");
-> +MODULE_LICENSE("GPL v2");
->
+>  #define STM32_DAC_CHANNEL(chan, name) {		\
+>  	.type = IIO_VOLTAGE,			\
+>  	.indexed = 1,				\
+> @@ -306,6 +429,7 @@ static int stm32_dac_debugfs_reg_access(struct iio_dev *indio_dev,
+>  		.storagebits = 16,		\
+>  	},					\
+>  	.datasheet_name = name,			\
+> +	.ext_info = stm32_dac_ext_info		\
+>  }
+>  
+>  static const struct iio_chan_spec stm32_dac_channels[] = {
+> 
