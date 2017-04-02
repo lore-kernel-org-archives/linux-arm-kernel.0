@@ -1,47 +1,32 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sun, 2 Apr 2017 14:49:47 +0800
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <20170401.112603.1991545644693496714.davem@davemloft.net>
-References: <1491031554-19516-1-git-send-email-dingtianhong@huawei.com>
- <1491031554-19516-2-git-send-email-dingtianhong@huawei.com>
- <20170401.112603.1991545644693496714.davem@davemloft.net>
-Message-ID: <819bc6c1-581b-3ab9-d189-1befaaf43548@huawei.com>
+From: guy.shapiro@mobi-wize.com (Guy Shapiro)
+Date: Sun, 2 Apr 2017 10:15:42 +0300
+Subject: proper power off implementation for iMX6 with external pmic
+In-Reply-To: <d8d013f7-9417-c7c9-5f60-dd33465e9b42@pengutronix.de>
+References: <d8d013f7-9417-c7c9-5f60-dd33465e9b42@pengutronix.de>
+Message-ID: <ee04d494-4fe4-9fb2-ab47-cf46675c827e@mobi-wize.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 30/03/2017 14:02, Oleksij Rempel wrote:
 
+> Hallo all,
+>
+> i'm looking for proper way to implement pm_power_off for IMX6 with external PMIC.
+>
+> http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
+> page 5083
+>
+> According to this documentation, there are two ways to power off, depending on board configuration. With internal and external PMIC.
+>
+> Internal variant is implemented in:
+> drivers/power/reset/imx-snvs-poweroff.c
+>
+Currently all the mainline DT definitions use the syscon-poweroff driver
+and not imx-snvs-poweroff.  The syscon-poweroff binding includes the
+bits to set on the "snvs_lp control register". One of those bits is
+"Dumb PMIC Enable" (DP_EN) that looks related to the external PMIC mode.
 
-On 2017/4/2 2:26, David Miller wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
-> Date: Sat, 1 Apr 2017 15:25:51 +0800
-> 
->> Till now only the Intel ixgbe could support enable
->> Relaxed ordering in the drivers for special architecture,
->> but the ARCH_WANT_RELAX_ORDER is looks like a general name
->> for all arch, so rename to a specific name for intel
->> card looks more appropriate.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> 
-> This is not a driver specific facility.
-> 
-> Any driver can test this symbol and act accordingly.
-> 
-> Just because IXGBE is the first and only user, doesn't mean
-> the facility is driver specific.
-> 
+I never tried to use the external PMIC mode myself. If I had to, I would
+start by clearing this bit.
 
-Understand clearly?but the ARCH_WANT_RELAX_ORDER is really too generic and simple,
-cause much misleading to indicate that it looks like the hack code for some architecture.
-what do you think of the ETHERNET_ALLOW_RELAXED_ORDER in the drivers/net/ethernet/*,
-it will only affect ethernet and not only for Ixgbe.
-
-Thanks
-Ding
-
-
-> Thank you.
-> 
-> .
-> 
+Guy.
