@@ -1,71 +1,103 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Sun, 2 Apr 2017 16:34:55 +0200
-Subject: [RFC PATCH v2 4/4] ARM: sun8i: h3: add support for the thermal
- sensor in H3
-In-Reply-To: <20170402133304.56824-5-icenowy@aosc.io>
-References: <20170402133304.56824-1-icenowy@aosc.io>
- <20170402133304.56824-5-icenowy@aosc.io>
-Message-ID: <3f13c07d-be6a-0350-6d86-de1a4d4e33a8@free-electrons.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sun, 2 Apr 2017 16:45:28 +0200
+Subject: [PATCH 4/5] vfio: platform: Convert to use devm_*()
+In-Reply-To: <1490539314-9681-5-git-send-email-leo.yan@linaro.org>
+References: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
+ <1490539314-9681-5-git-send-email-leo.yan@linaro.org>
+Message-ID: <10625a88-3d6d-de52-8299-3ba0031317f8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+Hi Leo,
 
-On 02/04/2017 15:33, Icenowy Zheng wrote:
-> As we have gained the support for the thermal sensor in H3, we can now
-> add its device nodes to the device tree.
+On 26/03/2017 16:41, Leo Yan wrote:
+> Convert driver to use devm_*() APIs so rely on driver model core layer
+> to manage resources. This eliminates error path boilerplate and makes
+> code neat.
 > 
-> Add them to the H3 device tree.
+> This patch also renames amba_id structure, the old code used some code
+> which directly copied from other driver.
 > 
-> The H5 thermal sensor has some differences, and will be added furtherly.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Looks good to me
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+May be interesting to go further converting as well the vfio-platform
+driver but this can be done later on.
+
+Thanks
+
+Eric
+
+
 > ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+>  drivers/vfio/platform/vfio_amba.c | 25 ++++++++-----------------
+>  1 file changed, 8 insertions(+), 17 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index b36f9f423c39..552217bb9266 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -72,6 +72,32 @@
->  		};
->  	};
+> diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
+> index 31372fb..433db1f 100644
+> --- a/drivers/vfio/platform/vfio_amba.c
+> +++ b/drivers/vfio/platform/vfio_amba.c
+> @@ -53,15 +53,14 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
+>  	struct vfio_platform_device *vdev;
+>  	int ret;
 >  
-> +	iio-hwmon {
-> +		compatible = "iio-hwmon";
-> +		io-channels = <&ths>;
-> +	};
-> +
-> +	soc {
-> +		ths: ths at 01c25000 {
-> +			compatible = "allwinner,sun8i-h3-ths";
-> +			reg = <0x01c25000 0x100>;
-> +			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-> +			clock-names = "bus", "ths";
-> +			resets = <&ccu RST_BUS_THS>;
-> +			#thermal-sensor-cells = <0>;
-> +			#io-channel-cells = <0>;
-> +		};
-> +	};
-> +
-> +	thermal-zones {
-> +		cpu_thermal {
-> +			/* milliseconds */
-> +			polling-delay-passive = <250>;
-> +			polling-delay = <1000>;
-> +			thermal-sensors = <&ths>;
-> +		};
-
-Would it make sense to add the CPU temp trip points in this patch? Or do
-we wait to have CPU OPPs and thermal throttling to add them?
-
-I guess you can find them either in the datasheet or in vendor tree.
-
-Thanks,
-Quentin
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> -	vdev = kzalloc(sizeof(*vdev), GFP_KERNEL);
+> +	vdev = devm_kzalloc(&adev->dev, sizeof(*vdev), GFP_KERNEL);
+>  	if (!vdev)
+>  		return -ENOMEM;
+>  
+> -	vdev->name = kasprintf(GFP_KERNEL, "vfio-amba-%08x", adev->periphid);
+> -	if (!vdev->name) {
+> -		kfree(vdev);
+> +	vdev->name = devm_kasprintf(&adev->dev, GFP_KERNEL,
+> +				    "vfio-amba-%08x", adev->periphid);
+> +	if (!vdev->name)
+>  		return -ENOMEM;
+> -	}
+>  
+>  	vdev->opaque = (void *) adev;
+>  	vdev->flags = VFIO_DEVICE_FLAGS_AMBA;
+> @@ -71,11 +70,6 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
+>  	vdev->reset_required = false;
+>  
+>  	ret = vfio_platform_probe_common(vdev, &adev->dev);
+> -	if (ret) {
+> -		kfree(vdev->name);
+> -		kfree(vdev);
+> -	}
+> -
+>  	return ret;
+>  }
+>  
+> @@ -84,25 +78,22 @@ static int vfio_amba_remove(struct amba_device *adev)
+>  	struct vfio_platform_device *vdev;
+>  
+>  	vdev = vfio_platform_remove_common(&adev->dev);
+> -	if (vdev) {
+> -		kfree(vdev->name);
+> -		kfree(vdev);
+> +	if (vdev)
+>  		return 0;
+> -	}
+>  
+>  	return -EINVAL;
+>  }
+>  
+> -static struct amba_id pl330_ids[] = {
+> +static struct amba_id vfio_ids[] = {
+>  	{ 0, 0 },
+>  };
+>  
+> -MODULE_DEVICE_TABLE(amba, pl330_ids);
+> +MODULE_DEVICE_TABLE(amba, vfio_ids);
+>  
+>  static struct amba_driver vfio_amba_driver = {
+>  	.probe = vfio_amba_probe,
+>  	.remove = vfio_amba_remove,
+> -	.id_table = pl330_ids,
+> +	.id_table = vfio_ids,
+>  	.drv = {
+>  		.name = "vfio-amba",
+>  		.owner = THIS_MODULE,
+> 
