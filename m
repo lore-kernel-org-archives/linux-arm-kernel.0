@@ -1,33 +1,102 @@
 From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Sun,  2 Apr 2017 08:59:46 +0100
-Subject: [PATCH v2 3/5] ARM: dts: rockchip: enable ARM Mali GPU on
- rk3288-rock2-som
+Date: Sun,  2 Apr 2017 08:59:44 +0100
+Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
 In-Reply-To: <cover.1491118230.git.guillaume.tucker@collabora.com>
 References: <cover.1491118230.git.guillaume.tucker@collabora.com>
-Message-ID: <cc82a8f76733d0a7213c24a64061f482f5db6651.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reference to the Mali GPU device tree node on the
-rk3288-rock2-som platform.  Tested on a Radxa Rock2 Square board.
+The ARM Mali Midgard GPU family is present in a number of SoCs
+from many different vendors such as Samsung Exynos and Rockchip.
 
+Import the device tree bindings documentation from the r16p0
+release of the Mali Midgard GPU kernel driver:
+
+  https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
+
+The following optional bindings have been omitted in this initial
+version as they are only used in very specific cases:
+
+  * snoop_enable_smc
+  * snoop_disable_smc
+  * jm_config
+  * power_model
+  * system-coherency
+  * ipa-model
+
+The example has been simplified accordingly.
+
+The compatible string definition has been limited to
+"arm,mali-midgard" to avoid checkpatch.pl warnings and to match
+what the driver actually expects (as of r16p0 out-of-tree).
+
+CC: John Reitan <john.reitan@arm.com>
 Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
 ---
- arch/arm/boot/dts/rk3288-rock2-som.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53 ++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
 
-diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-index 1c0bbc9b928b..f694867fa46a 100644
---- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-+++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-@@ -301,3 +301,8 @@
- &wdt {
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+new file mode 100644
+index 000000000000..da8fc6d21bbf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+@@ -0,0 +1,53 @@
++#
++# (C) COPYRIGHT 2013-2016 ARM Limited.
++# Copyright (C) 2017 Collabora Ltd
++#
++# This program is free software and is provided to you under the terms of the
++# GNU General Public License version 2 as published by the Free Software
++# Foundation, and any use by you of this program is subject to the terms
++# of such GNU licence.
++#
 +
-+&gpu {
-+	mali-supply = <&vdd_gpu>;
-+	status = "okay";
++
++ARM Mali Midgard GPU
++====================
++
++Required properties:
++
++- compatible : Should be "arm,mali-midgard".
++- reg : Physical base address of the device and length of the register area.
++- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
++- interrupt-names : Contains the names of IRQ resources in the order they were
++  provided in the interrupts property. Must contain: "JOB, "MMU", "GPU".
++
++Optional:
++
++- clocks : Phandle to clock for the Mali Midgard device.
++- clock-names : Shall be "clk_mali".
++- mali-supply : Phandle to regulator for the Mali device. Refer to
++  Documentation/devicetree/bindings/regulator/regulator.txt for details.
++- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
++  for details.
++
++Example for a Mali-T602:
++
++gpu at 0xfc010000 {
++	compatible = "arm,mali-midgard";
++	reg = <0xfc010000 0x4000>;
++	interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
++	interrupt-names = "JOB", "MMU", "GPU";
++
++	clocks = <&pclk_mali>;
++	clock-names = "clk_mali";
++	mali-supply = <&vdd_mali>;
++	operating-points = <
++		/* KHz   uV */
++		533000 1250000,
++		450000 1150000,
++		400000 1125000,
++		350000 1075000,
++		266000 1025000,
++		160000  925000,
++		100000  912500,
++	>;
 +};
 -- 
 2.11.0
