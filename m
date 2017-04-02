@@ -1,47 +1,33 @@
 From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Sun,  2 Apr 2017 08:59:43 +0100
-Subject: [PATCH v2 0/5] Add ARM Mali Midgard device tree bindings and gpu node
- for rk3288
-Message-ID: <cover.1491118230.git.guillaume.tucker@collabora.com>
+Date: Sun,  2 Apr 2017 08:59:46 +0100
+Subject: [PATCH v2 3/5] ARM: dts: rockchip: enable ARM Mali GPU on
+ rk3288-rock2-som
+In-Reply-To: <cover.1491118230.git.guillaume.tucker@collabora.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <cc82a8f76733d0a7213c24a64061f482f5db6651.1491118230.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Mali Midgard GPU kernel driver is only available
-out-of-tree and is not going to be merged in its current form.
-However, it would be useful to have its device tree bindings
-merged.  In particular, this would enable distributions to create
-working driver packages (dkms...) without having to patch the
-kernel.
+Add reference to the Mali GPU device tree node on the
+rk3288-rock2-som platform.  Tested on a Radxa Rock2 Square board.
 
-The bindings for the earlier Mali Utgard GPU family have already
-been merged, so this is essentially the same scenario but for
-newer GPUs (Mali-T604 ~ Mali-T880).
+Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+---
+ arch/arm/boot/dts/rk3288-rock2-som.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-This series of patches first imports the bindings from the latest
-driver release with some clean-up then adds a gpu node for the
-rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
-Firefly, Veyron Minnie and Jerry boards board using Mali kernel
-driver r16p0 and r12p0 user-space binary.
-
-Changes since v1:
-- enabled gpu on rk3288-veyron boards
-
-Enric Balletbo i Serra (1):
-  ARM: dts: rockchip: enable ARM Mali GPU on rk3288-veyron
-
-Guillaume Tucker (4):
-  dt-bindings: gpu: add bindings for the ARM Mali Midgard GPU
-  ARM: dts: rockchip: add ARM Mali GPU node for rk3288
-  ARM: dts: rockchip: enable ARM Mali GPU on rk3288-rock2-som
-  ARM: dts: rockchip: enable ARM Mali GPU on rk3288-firefly
-
- .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53 ++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi              |  5 ++
- arch/arm/boot/dts/rk3288-rock2-som.dtsi            |  5 ++
- arch/arm/boot/dts/rk3288-veyron.dtsi               |  5 ++
- arch/arm/boot/dts/rk3288.dtsi                      | 23 ++++++++++
- 5 files changed, 91 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-
---
+diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+index 1c0bbc9b928b..f694867fa46a 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
++++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+@@ -301,3 +301,8 @@
+ &wdt {
+ 	status = "okay";
+ };
++
++&gpu {
++	mali-supply = <&vdd_gpu>;
++	status = "okay";
++};
+-- 
 2.11.0
