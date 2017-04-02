@@ -1,53 +1,56 @@
-From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 2 Apr 2017 23:25:09 +0200
-Subject: [PATCH] ARM: dts: BCM5301X: Specify MDIO bus in the DT
-In-Reply-To: <5a6ecda9-2cf6-2171-7210-6b3a1d4c6012@gmail.com>
-References: <20170402210840.11429-1-zajec5@gmail.com>
- <5a6ecda9-2cf6-2171-7210-6b3a1d4c6012@gmail.com>
-Message-ID: <c3a0455a-821f-d8a8-bf8a-7ad06ad0466e@milecki.pl>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 2 Apr 2017 23:30:28 +0200
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+ <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+ <20170321155054.2f4cb921@free-electrons.com>
+ <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
+Message-ID: <20170402233028.60acf612@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2017 11:14 PM, Florian Fainelli wrote:
-> Le 04/02/17 ? 14:08, Rafa? Mi?ecki a ?crit :
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> Northstar devices have MDIO bus that may contain various PHYs attached.
->> A common example is USB 3.0 PHY (that doesn't have an MDIO driver yet).
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->> ---
->>  arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
->> index acee36a61004..6a2afe7880ae 100644
->> --- a/arch/arm/boot/dts/bcm5301x.dtsi
->> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
->> @@ -320,6 +320,13 @@
->>  		};
->>  	};
->>
->> +	mdio at 18003000 {
->> +		compatible = "brcm,iproc-mdio";
->> +		reg = <0x18003000 0x8>;
->> +		#size-cells = <1>;
->> +		#address-cells = <0>;
->> +	};
->
-> This looks fine, but usually the block should be enabled on a per-board
-> basis, such that there should be a status = "disabled" property here by
-> default.
+Hello,
 
-I think we have few blocks in bcm5301x.dtsi enabled by default. I guess it's
-for stuff that is always present on every SoC family board: rng, nand, spi to
-name few.
+On Thu, 23 Mar 2017 11:33:23 +0100, Giuseppe CAVALLARO wrote:
 
-It makes some sense, consider e.g. spi. Every Northstar board has SPI
-controller so it's enabled by default. Not every board has SPI flash, so it's
-disabled by default.
+> > Further research has revealed that everything is working fine on a
+> > platform with a Gigabit PHY connected via GMII.
+> >
+> > However, on a different platform (which I'm using) with a 10/100 PHY
+> > connected via MII, DMA_RESET never clears, and networking doesn't work.
+> > The SMSC PHY LAN8700 is also supposed to be providing the clock through
+> > its TX_CLK pin. I double checked, and both the MAC and PHY are in MII
+> > mode, but still no luck so far.
+> >
+> > Of course, if you have any suggestion or hint, I'm all ears :)  
+> 
+> I can just you to keep the focus on clock configuration. I tested the 
+> SMSC PHY LAN8700
+> w/o any issues on several platform.  In MII both rx/tx_clk are provided 
+> by PHY and if you
+> have an external oscillator this should be safe enough, indeed.
+> Another check you can do is about the reset time! Maybe you need to 
+> change something
+> when reset the SMSC transceiver, try to increase the delay (if you use 
+> GPIO to reset it).
 
-It's there and it make sense to me. Is that OK or not?
+On which platform did you test with the LAN8700 PHY ? Was it on a
+SPEAr600 based platform ?
 
-I find MDIO situation quite simiar. It seems every Northstar board has MDIO bus
-just devices may differ and should not be enabled by default.
+If you tested on SPEAr600, what is the GMAC clock configuration (i.e
+the value of the GMAC_CFG_CTR and GMAC_CFG_SYNT registers) ?
+
+Regarding the PHY reset time, our PHY reset pin is not connected to a
+GPIO, but to the system reset logic, so Linux cannot reset the PHY with
+a GPIO.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
