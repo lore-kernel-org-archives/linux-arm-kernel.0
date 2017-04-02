@@ -1,113 +1,123 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Sat, 1 Apr 2017 21:13:40 -0700
-Subject: [PATCH V4 1/2] dt-bindings: thermal: add support for Broadcom's
- Northstar thermal
-In-Reply-To: <6dd907e4-c213-3174-8613-99427e6ea0e9@gmail.com>
-References: <20170331073132.21457-2-zajec5@gmail.com>
- <20170331201124.656-1-zajec5@gmail.com>
- <20170401195136.GD28514@localhost.localdomain>
- <6dd907e4-c213-3174-8613-99427e6ea0e9@gmail.com>
-Message-ID: <20170402041338.GA31441@localhost.localdomain>
+From: kevin.m.wern@gmail.com (Kevin Wern)
+Date: Sun, 2 Apr 2017 00:48:15 -0400
+Subject: [PATCH] staging: media/platform/bcm2835: remove gstreamer workaround
+Message-ID: <20170402044815.GA23614@kwern-HP-Pavilion-dv5-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+Gstreamer's v4l2src reacted poorly to certain outputs from the bcm2835
+video driver's ioctl ops function vidioc_enum_framesizes, so a
+workaround was created that could be activated by user input. This
+workaround would replace the driver's ioctl ops struct with another,
+similar struct--only with no function pointed to by
+vidioc_enum_framesizes. With no response, gstreamer would attempt to
+continue with some default settings that happened to work better.
 
-On Sat, Apr 01, 2017 at 11:50:26PM +0200, Rafa? Mi?ecki wrote:
-> On 04/01/2017 09:51 PM, Eduardo Valentin wrote:
-> >On Fri, Mar 31, 2017 at 10:11:23PM +0200, Rafa? Mi?ecki wrote:
-> >>From: Rafa? Mi?ecki <rafal@milecki.pl>
-> >>
-> >>This commit documents binding for thermal used in Northstar family SoCs.
-> >>
-> >>Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> >>---
-> >>V3: Add thermal-zones to the example
-> >>    Rob: Because of this update, I didn't include Acked-by I got for V2
-> >>---
-> >> .../devicetree/bindings/thermal/brcm,ns-thermal    | 26 ++++++++++++++++++++++
-> >> 1 file changed, 26 insertions(+)
-> >> create mode 100644 Documentation/devicetree/bindings/thermal/brcm,ns-thermal
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
-> >>new file mode 100644
-> >>index 000000000000..c561c7349f17
-> >>--- /dev/null
-> >>+++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
-> >>@@ -0,0 +1,26 @@
-> >>+* Broadcom Northstar Thermal
-> >>+
-> >>+This binding describes thermal sensor that is part of Northstar's DMU (Device
-> >>+Management Unit).
-> >>+
-> >>+Required properties:
-> >>+- compatible : Must be "brcm,ns-thermal"
-> >>+- reg : iomem address range of PVTMON registers
-> >>+- #thermal-sensor-cells : Should be <0>
-> >>+
-> >>+Example:
-> >>+
-> >>+thermal: thermal at 1800c2c0 {
-> >>+	compatible = "brcm,ns-thermal";
-> >>+	reg = <0x1800c2c0 0x10>;
-> >>+	#thermal-sensor-cells = <0>;
-> >>+};
-> >>+
-> >>+thermal-zones {
-> >>+	cpu_thermal: cpu-thermal {
-> >>+		polling-delay-passive = <0>;
-> >>+		polling-delay = <1000>;
-> >>+		coefficients = <(-556) 418000>;
-> >>+		thermal-sensors = <&thermal>;
-> >
-> >You need to define trips and cooling devices here. Otherwise, makes
-> >little sense to have this device in thermal subsystem. Here is an
-> >example of minimal set:
-> >https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/commit/?h=linus&id=1e2ac9821de6a85d3e8358f238436708d1d46869
-> >
-> >The above has no passive action. It is just gonna shutdown the system if
-> >temperature crosses a threshold.
-> >
-> >But, a typical cooling device would be CPU frequency throttling. Do you have
-> >that up and running in your routers?
-> 
-> I don't have CPU freq throttling, so shutdown will be the only solution for
-> critical temp right now.
+However, this bug has been fixed in gstreamer since 2014, so we
+shouldn't include this workaround in the stable version of the driver.
 
-OK. Is there any plans to get cpu cooling / DVFS working on your boards?
+Signed-off-by: Kevin Wern <kevin.m.wern@gmail.com>
+---
+ drivers/staging/media/platform/bcm2835/TODO        |  5 --
+ .../media/platform/bcm2835/bcm2835-camera.c        | 59 ----------------------
+ 2 files changed, 64 deletions(-)
 
-> 
-> I know I should have at least a trip for critical temperature, but the problem
-> is I don't know what value to use. There isn't any info about this in public
-
-And that is enough justification to block this to go upstream. We need
-the correct shutdown threshold value to put as example. If we don't,
-users of this drivers will be pretty much guessing.
-
-> datasheets. Broadcom's SDK doesn't mention it. Vendors share only the max
-> environment temp, not the max CPU temp.
-
-Silicon goes bad typically at 125C. But that also typically requires a
-good extrapolation of hotspot(s). Some drivers prefer to play safer and
-use lower numbers (100C).
-
-> 
-> So for now I only meant to provide user space access to reading current CPU
-> temperature. I could do some stress tests and ask other users to do it as well.
-> 
-
-I see..
-
-
-> Or maybe I could just put in Documentation some round value that makes more or
-> less sense and then work on a proper content of real DTS files?
-> 
-
-The problem with the above is that I see very commonly examples being
-copied into DTS. So, better to have a good binding
-example/documentation. That is what they are for anyway.
-
-> Unless we can get some hint from Broadcom people. Jon? Florian? Anyone?
-> 
-
-Yeah, that would be probably best.
+diff --git a/drivers/staging/media/platform/bcm2835/TODO b/drivers/staging/media/platform/bcm2835/TODO
+index 61a5099..0ab9e88 100644
+--- a/drivers/staging/media/platform/bcm2835/TODO
++++ b/drivers/staging/media/platform/bcm2835/TODO
+@@ -32,8 +32,3 @@ We should have VCHI create a platform device once it's initialized,
+ and have this driver bind to it, so that we automatically load the
+ v4l2 module after VCHI loads.
+ 
+-5) Drop the gstreamer workaround.
+-
+-This was a temporary workaround for a bug that was fixed mid-2014, and
+-we should remove it before stabilizing the driver.
+-
+diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
+index ca15a69..6a50862 100644
+--- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
++++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
+@@ -66,19 +66,6 @@ MODULE_PARM_DESC(max_video_width, "Threshold for video mode");
+ module_param(max_video_height, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+ MODULE_PARM_DESC(max_video_height, "Threshold for video mode");
+ 
+-/* Gstreamer bug https://bugzilla.gnome.org/show_bug.cgi?id=726521
+- * v4l2src does bad (and actually wrong) things when the vidioc_enum_framesizes
+- * function says type V4L2_FRMSIZE_TYPE_STEPWISE, which we do by default.
+- * It's happier if we just don't say anything at all, when it then
+- * sets up a load of defaults that it thinks might work.
+- * If gst_v4l2src_is_broken is non-zero, then we remove the function from
+- * our function table list (actually switch to an alternate set, but same
+- * result).
+- */
+-static int gst_v4l2src_is_broken;
+-module_param(gst_v4l2src_is_broken, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+-MODULE_PARM_DESC(gst_v4l2src_is_broken, "If non-zero, enable workaround for Gstreamer");
+-
+ /* global device data array */
+ static struct bm2835_mmal_dev *gdev[MAX_BCM2835_CAMERAS];
+ 
+@@ -1456,47 +1443,6 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops = {
+ 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+ };
+ 
+-static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
+-	/* overlay */
+-	.vidioc_enum_fmt_vid_overlay = vidioc_enum_fmt_vid_overlay,
+-	.vidioc_g_fmt_vid_overlay = vidioc_g_fmt_vid_overlay,
+-	.vidioc_try_fmt_vid_overlay = vidioc_try_fmt_vid_overlay,
+-	.vidioc_s_fmt_vid_overlay = vidioc_s_fmt_vid_overlay,
+-	.vidioc_overlay = vidioc_overlay,
+-	.vidioc_g_fbuf = vidioc_g_fbuf,
+-
+-	/* inputs */
+-	.vidioc_enum_input = vidioc_enum_input,
+-	.vidioc_g_input = vidioc_g_input,
+-	.vidioc_s_input = vidioc_s_input,
+-
+-	/* capture */
+-	.vidioc_querycap = vidioc_querycap,
+-	.vidioc_enum_fmt_vid_cap = vidioc_enum_fmt_vid_cap,
+-	.vidioc_g_fmt_vid_cap = vidioc_g_fmt_vid_cap,
+-	.vidioc_try_fmt_vid_cap = vidioc_try_fmt_vid_cap,
+-	.vidioc_s_fmt_vid_cap = vidioc_s_fmt_vid_cap,
+-
+-	/* buffer management */
+-	.vidioc_reqbufs = vb2_ioctl_reqbufs,
+-	.vidioc_create_bufs = vb2_ioctl_create_bufs,
+-	.vidioc_prepare_buf = vb2_ioctl_prepare_buf,
+-	.vidioc_querybuf = vb2_ioctl_querybuf,
+-	.vidioc_qbuf = vb2_ioctl_qbuf,
+-	.vidioc_dqbuf = vb2_ioctl_dqbuf,
+-	/* Remove this function ptr to fix gstreamer bug
+-	.vidioc_enum_framesizes = vidioc_enum_framesizes, */
+-	.vidioc_enum_frameintervals = vidioc_enum_frameintervals,
+-	.vidioc_g_parm        = vidioc_g_parm,
+-	.vidioc_s_parm        = vidioc_s_parm,
+-	.vidioc_streamon = vb2_ioctl_streamon,
+-	.vidioc_streamoff = vb2_ioctl_streamoff,
+-
+-	.vidioc_log_status = v4l2_ctrl_log_status,
+-	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
+-	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+-};
+-
+ /* ------------------------------------------------------------------
+ 	Driver init/finalise
+    ------------------------------------------------------------------*/
+@@ -1813,11 +1759,6 @@ static int __init bm2835_mmal_init_device(struct bm2835_mmal_dev *dev,
+ 	int ret;
+ 
+ 	*vfd = vdev_template;
+-	if (gst_v4l2src_is_broken) {
+-		v4l2_info(&dev->v4l2_dev,
+-			  "Work-around for gstreamer issue is active.\n");
+-		vfd->ioctl_ops = &camera0_ioctl_ops_gstreamer;
+-	}
+ 
+ 	vfd->v4l2_dev = &dev->v4l2_dev;
+ 
+-- 
+2.7.4
