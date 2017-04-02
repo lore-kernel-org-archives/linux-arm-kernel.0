@@ -1,75 +1,113 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 2 Apr 2017 08:21:19 +0800
-Subject: [PATCH] staging: bcm2835-audio: remove unnecessary log messages
-In-Reply-To: <20170331123123.GA31657@aishwarya>
-Message-ID: <201704020819.BIUscuOD%fengguang.wu@intel.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Sat, 1 Apr 2017 21:13:40 -0700
+Subject: [PATCH V4 1/2] dt-bindings: thermal: add support for Broadcom's
+ Northstar thermal
+In-Reply-To: <6dd907e4-c213-3174-8613-99427e6ea0e9@gmail.com>
+References: <20170331073132.21457-2-zajec5@gmail.com>
+ <20170331201124.656-1-zajec5@gmail.com>
+ <20170401195136.GD28514@localhost.localdomain>
+ <6dd907e4-c213-3174-8613-99427e6ea0e9@gmail.com>
+Message-ID: <20170402041338.GA31441@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aishwarya,
+Hey,
 
-[auto build test ERROR on next-20170330]
-[cannot apply to linux-rpi/for-rpi-next v4.9-rc8 v4.9-rc7 v4.9-rc6 v4.11-rc4]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Sat, Apr 01, 2017 at 11:50:26PM +0200, Rafa? Mi?ecki wrote:
+> On 04/01/2017 09:51 PM, Eduardo Valentin wrote:
+> >On Fri, Mar 31, 2017 at 10:11:23PM +0200, Rafa? Mi?ecki wrote:
+> >>From: Rafa? Mi?ecki <rafal@milecki.pl>
+> >>
+> >>This commit documents binding for thermal used in Northstar family SoCs.
+> >>
+> >>Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> >>---
+> >>V3: Add thermal-zones to the example
+> >>    Rob: Because of this update, I didn't include Acked-by I got for V2
+> >>---
+> >> .../devicetree/bindings/thermal/brcm,ns-thermal    | 26 ++++++++++++++++++++++
+> >> 1 file changed, 26 insertions(+)
+> >> create mode 100644 Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+> >>new file mode 100644
+> >>index 000000000000..c561c7349f17
+> >>--- /dev/null
+> >>+++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+> >>@@ -0,0 +1,26 @@
+> >>+* Broadcom Northstar Thermal
+> >>+
+> >>+This binding describes thermal sensor that is part of Northstar's DMU (Device
+> >>+Management Unit).
+> >>+
+> >>+Required properties:
+> >>+- compatible : Must be "brcm,ns-thermal"
+> >>+- reg : iomem address range of PVTMON registers
+> >>+- #thermal-sensor-cells : Should be <0>
+> >>+
+> >>+Example:
+> >>+
+> >>+thermal: thermal at 1800c2c0 {
+> >>+	compatible = "brcm,ns-thermal";
+> >>+	reg = <0x1800c2c0 0x10>;
+> >>+	#thermal-sensor-cells = <0>;
+> >>+};
+> >>+
+> >>+thermal-zones {
+> >>+	cpu_thermal: cpu-thermal {
+> >>+		polling-delay-passive = <0>;
+> >>+		polling-delay = <1000>;
+> >>+		coefficients = <(-556) 418000>;
+> >>+		thermal-sensors = <&thermal>;
+> >
+> >You need to define trips and cooling devices here. Otherwise, makes
+> >little sense to have this device in thermal subsystem. Here is an
+> >example of minimal set:
+> >https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/commit/?h=linus&id=1e2ac9821de6a85d3e8358f238436708d1d46869
+> >
+> >The above has no passive action. It is just gonna shutdown the system if
+> >temperature crosses a threshold.
+> >
+> >But, a typical cooling device would be CPU frequency throttling. Do you have
+> >that up and running in your routers?
+> 
+> I don't have CPU freq throttling, so shutdown will be the only solution for
+> critical temp right now.
 
-url:    https://github.com/0day-ci/linux/commits/Aishwarya-Pant/staging-bcm2835-audio-remove-unnecessary-log-messages/20170401-233208
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+OK. Is there any plans to get cpu cooling / DVFS working on your boards?
 
-All errors (new ones prefixed by >>):
+> 
+> I know I should have at least a trip for critical temperature, but the problem
+> is I don't know what value to use. There isn't any info about this in public
 
-   drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c: In function 'audio_vchi_callback':
-   drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:11: warning: left-hand operand of comma expression has no effect [-Wunused-value]
-      instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-              ^
-   drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:55: warning: left-hand operand of comma expression has no effect [-Wunused-value]
-      instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-                                                          ^
-   drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:96: warning: left-hand operand of comma expression has no effect [-Wunused-value]
-      instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-                                                                                                   ^
-   drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:104: warning: left-hand operand of comma expression has no effect [-Wunused-value]
-      instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-                                                                                                           ^
-   drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:3: warning: statement with no effect [-Wunused-value]
-      instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-      ^~~~~~~~
->> drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:116: error: expected ';' before ')' token
-      instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-                                                                                                                       ^
->> drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c:222:116: error: expected statement before ')' token
+And that is enough justification to block this to go upstream. We need
+the correct shutdown threshold value to put as example. If we don't,
+users of this drivers will be pretty much guessing.
 
-vim +222 drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
+> datasheets. Broadcom's SDK doesn't mention it. Vendors share only the max
+> environment temp, not the max CPU temp.
 
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  216  {
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  217  	struct bcm2835_audio_instance *instance = param;
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  218  	int status;
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  219  	int msg_len;
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  220  	struct vc_audio_msg m;
-65ab7c24 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Abhijit Naik  2017-02-14  221  
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25 @222  		instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  223  
-91001b42 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Abhijit Naik  2017-02-23  224  	if (reason != VCHI_CALLBACK_MSG_AVAILABLE)
-23b028c8 drivers/staging/bcm2835-audio/bcm2835-vchiq.c Michael Zoran 2017-01-25  225  		return;
+Silicon goes bad typically at 125C. But that also typically requires a
+good extrapolation of hotspot(s). Some drivers prefer to play safer and
+use lower numbers (100C).
 
-:::::: The code at line 222 was first introduced by commit
-:::::: 23b028c871e1131c96aa8c2bd8cc7e0d15f5efcd staging: bcm2835-audio: initial staging submission
+> 
+> So for now I only meant to provide user space access to reading current CPU
+> temperature. I could do some stress tests and ask other users to do it as well.
+> 
 
-:::::: TO: Michael Zoran <mzoran@crowfest.net>
-:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+I see..
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61756 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170402/0652df50/attachment-0001.gz>
+
+> Or maybe I could just put in Documentation some round value that makes more or
+> less sense and then work on a proper content of real DTS files?
+> 
+
+The problem with the above is that I see very commonly examples being
+copied into DTS. So, better to have a good binding
+example/documentation. That is what they are for anyway.
+
+> Unless we can get some hint from Broadcom people. Jon? Florian? Anyone?
+> 
+
+Yeah, that would be probably best.
