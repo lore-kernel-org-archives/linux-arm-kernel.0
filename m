@@ -1,277 +1,331 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 2 Apr 2017 12:45:24 +0100
-Subject: [PATCH 3/4] iio: dac: stm32: add support for trigger events
-In-Reply-To: <1490960707-22422-4-git-send-email-fabrice.gasnier@st.com>
-References: <1490960707-22422-1-git-send-email-fabrice.gasnier@st.com>
- <1490960707-22422-4-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <eb4d6292-5ae6-c52d-eeb7-2f14c3a4abef@kernel.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 2 Apr 2017 04:48:59 -0700
+Subject: [PATCH v4 2/5] drivers: watchdog: Add STM32 IWDG driver
+In-Reply-To: <1490886926-20585-3-git-send-email-yannick.fertre@st.com>
+References: <1490886926-20585-1-git-send-email-yannick.fertre@st.com>
+ <1490886926-20585-3-git-send-email-yannick.fertre@st.com>
+Message-ID: <91cacc1b-3ae7-c955-29c6-583298ee8f1a@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/17 12:45, Fabrice Gasnier wrote:
-> STM32 DAC supports triggers to synchronize conversions. When trigger
-> occurs, data is transferred from DHR (data holding register) to DOR
-> (data output register) so output voltage is updated.
-> Both hardware and software triggers are supported.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Hmm. This is a somewhat different use of triggered event from normal...
-
-What you have here is rather closer to the output buffers stuff that Analog
-have in their tree which hasn't made it upstream yet.
-To that end I'll want Lars to have a look at this...  I've completely
-lost track of where they are with this.
-Perhaps Lars can give us a quick update?
-
-If that was in place (or what I have in my head was true anyway),
-it would look like the reverse of the triggered buffer input devices.
-You'd be able to write to a software buffer and it would clock them
-out as the trigger fires (here I think it would have to keep updating
-the DHR whenever the trigger occurs).
-
-Even if it's not there, we aren't necessarily looking at terribly big job
-to implement it in the core and that would make this handling a lot more
-'standard' and consistent.
-
-Jonathan
-
+On 03/30/2017 08:15 AM, Yannick Fertre wrote:
+> This patch adds IWDG (Independent WatchDoG) support for STM32 platform.
+>
+> Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
 > ---
->  drivers/iio/dac/Kconfig          |   3 +
->  drivers/iio/dac/stm32-dac-core.h |  12 ++++
->  drivers/iio/dac/stm32-dac.c      | 124 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 136 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iio/dac/Kconfig b/drivers/iio/dac/Kconfig
-> index 7198648..786c38b 100644
-> --- a/drivers/iio/dac/Kconfig
-> +++ b/drivers/iio/dac/Kconfig
-> @@ -278,6 +278,9 @@ config STM32_DAC
->  	tristate "STMicroelectronics STM32 DAC"
->  	depends on (ARCH_STM32 && OF) || COMPILE_TEST
->  	depends on REGULATOR
-> +	select IIO_TRIGGERED_EVENT
-> +	select IIO_STM32_TIMER_TRIGGER
-> +	select MFD_STM32_TIMERS
->  	select STM32_DAC_CORE
->  	help
->  	  Say yes here to build support for STMicroelectronics STM32 Digital
-> diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
-> index d3099f7..3bf211c 100644
-> --- a/drivers/iio/dac/stm32-dac-core.h
-> +++ b/drivers/iio/dac/stm32-dac-core.h
-> @@ -26,6 +26,7 @@
->  
->  /* STM32 DAC registers */
->  #define STM32_DAC_CR		0x00
-> +#define STM32_DAC_SWTRIGR	0x04
->  #define STM32_DAC_DHR12R1	0x08
->  #define STM32_DAC_DHR12R2	0x14
->  #define STM32_DAC_DOR1		0x2C
-> @@ -33,8 +34,19 @@
->  
->  /* STM32_DAC_CR bit fields */
->  #define STM32_DAC_CR_EN1		BIT(0)
-> +#define STM32H7_DAC_CR_TEN1		BIT(1)
-> +#define STM32H7_DAC_CR_TSEL1_SHIFT	2
-> +#define STM32H7_DAC_CR_TSEL1		GENMASK(5, 2)
-> +#define STM32_DAC_CR_WAVE1		GENMASK(7, 6)
-> +#define STM32_DAC_CR_MAMP1		GENMASK(11, 8)
->  #define STM32H7_DAC_CR_HFSEL		BIT(15)
->  #define STM32_DAC_CR_EN2		BIT(16)
-> +#define STM32_DAC_CR_WAVE2		GENMASK(23, 22)
-> +#define STM32_DAC_CR_MAMP2		GENMASK(27, 24)
+>  drivers/watchdog/Kconfig      |  12 ++
+>  drivers/watchdog/Makefile     |   1 +
+>  drivers/watchdog/stm32_iwdg.c | 260 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 273 insertions(+)
+>  create mode 100644 drivers/watchdog/stm32_iwdg.c
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 52a70ee..d014deb 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -744,6 +744,18 @@ config ZX2967_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called zx2967_wdt.
+>
+> +config STM32_WATCHDOG
+> +	tristate "STM32 Independent WatchDoG (IWDG) support"
+> +	depends on ARCH_STM32
+> +	select WATCHDOG_CORE
+> +	default y
+> +	help
+> +	  Say Y here to include support for the watchdog timer
+> +	  in stm32 SoCs.
 > +
-> +/* STM32_DAC_SWTRIGR bit fields */
-> +#define STM32_DAC_SWTRIGR_SWTRIG1	BIT(0)
-> +#define STM32_DAC_SWTRIGR_SWTRIG2	BIT(1)
->  
->  /**
->   * struct stm32_dac_common - stm32 DAC driver common data (for all instances)
-> diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
-> index ee9711d..62e43e9 100644
-> --- a/drivers/iio/dac/stm32-dac.c
-> +++ b/drivers/iio/dac/stm32-dac.c
-> @@ -23,6 +23,10 @@
->  #include <linux/bitfield.h>
->  #include <linux/delay.h>
->  #include <linux/iio/iio.h>
-> +#include <linux/iio/timer/stm32-timer-trigger.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/iio/trigger_consumer.h>
-> +#include <linux/iio/triggered_event.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> @@ -31,15 +35,112 @@
->  
->  #define STM32_DAC_CHANNEL_1		1
->  #define STM32_DAC_CHANNEL_2		2
-> +/* channel2 shift */
-> +#define STM32_DAC_CHAN2_SHIFT		16
->  
->  /**
->   * struct stm32_dac - private data of DAC driver
->   * @common:		reference to DAC common data
-> + * @swtrig:		Using software trigger
->   */
->  struct stm32_dac {
->  	struct stm32_dac_common *common;
-> +	bool swtrig;
->  };
->  
-> +/**
-> + * struct stm32_dac_trig_info - DAC trigger info
-> + * @name: name of the trigger, corresponding to its source
-> + * @tsel: trigger selection, value to be configured in DAC_CR.TSELx
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called stm32_iwdg.
+> +
+>  # AVR32 Architecture
+>
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index a2126e2..a35e423 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -84,6 +84,7 @@ obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
+>  obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+> +obj-$(CONFIG_STM32_WATCHDOG) += stm32_iwdg.o
+>
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
+> new file mode 100644
+> index 0000000..629c305
+> --- /dev/null
+> +++ b/drivers/watchdog/stm32_iwdg.c
+> @@ -0,0 +1,260 @@
+> +/*
+> + * Driver for STM32 Independent Watchdog
+> + *
+> + * Copyright (C) Yannick Fertre 2017
+> + * Author: Yannick Fertre <yannick.fertre@st.com>
+> + *
+> + * This driver is based on tegra_wdt.c
+> + *
+> + * License terms:  GNU General Public License (GPL), version 2
 > + */
-> +struct stm32_dac_trig_info {
-> +	const char *name;
-> +	u32 tsel;
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/watchdog.h>
+> +
+> +/* watchdog trigger timeout, in seconds */
+> +#define WDT_MIN_TIMEOUT		1
+> +#define WDT_MAX_TIMEOUT		32
+> +#define WDT_DEFAULT_TIMEOUT	30
+> +
+> +/* IWDG registers */
+> +#define IWDG_KR		0x00 /* Key register */
+> +#define IWDG_PR		0x04 /* Prescaler Register */
+> +#define IWDG_RLR	0x08 /* ReLoad Register */
+> +#define IWDG_SR		0x0C /* Status Register */
+> +#define IWDG_WINR	0x10 /* Windows Register */
+> +
+> +/* IWDG_KR register bit mask */
+> +#define KR_KEY_RELOAD	0xAAAA /* reload counter enable */
+> +#define KR_KEY_ENABLE	0xCCCC /* peripheral enable */
+> +#define KR_KEY_EWA	0x5555 /* write access enable */
+> +#define KR_KEY_DWA	0x0000 /* write access disable */
+> +
+> +/* IWDG_PR register bit values */
+> +#define PR_4		0x00 /* prescaler set to 4 */
+> +#define PR_8		0x01 /* prescaler set to 8 */
+> +#define PR_16		0x02 /* prescaler set to 16 */
+> +#define PR_32		0x03 /* prescaler set to 32 */
+> +#define PR_64		0x04 /* prescaler set to 64 */
+> +#define PR_128		0x05 /* prescaler set to 128 */
+> +#define PR_256		0x06 /* prescaler set to 256 */
+> +
+> +/* IWDG_RLR register values */
+> +#define RLR_MAX		0xFFF /* max value supported by reload register */
+> +
+> +/* IWDG_SR register bit mask */
+> +#define FLAG_PVU	BIT(0) /* Watchdog prescaler value update */
+> +#define FLAG_RVU	BIT(1) /* Watchdog counter reload value update */
+> +
+> +/* set timeout to 100000 us */
+> +#define TIMEOUT_US	100000
+> +#define SLEEP_US	1000
+> +
+> +struct stm32_iwdg {
+> +	struct watchdog_device	wdd;
+> +	void __iomem		*regs;
+> +	struct clk		*clk;
+> +	unsigned int		rate;
 > +};
 > +
-> +static const struct stm32_dac_trig_info stm32h7_dac_trinfo[] = {
-> +	{ "swtrig", 0 },
-> +	{ TIM1_TRGO, 1 },
-> +	{ TIM2_TRGO, 2 },
-> +	{ TIM4_TRGO, 3 },
-> +	{ TIM5_TRGO, 4 },
-> +	{ TIM6_TRGO, 5 },
-> +	{ TIM7_TRGO, 6 },
-> +	{ TIM8_TRGO, 7 },
-> +	{},
+> +static inline u32 reg_read(void __iomem *base, u32 reg)
+> +{
+> +	return readl_relaxed(base + reg);
+> +}
+> +
+> +static inline void reg_write(void __iomem *base, u32 reg, u32 val)
+> +{
+> +	writel_relaxed(val, base + reg);
+> +}
+> +
+> +static int stm32_iwdg_start(struct watchdog_device *wdd)
+> +{
+> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +	u32 val = FLAG_PVU | FLAG_RVU;
+> +	u32 reload;
+> +	int ret;
+> +
+> +	dev_dbg(wdd->parent, "%s\n", __func__);
+> +
+> +	/* enable watchdog */
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_EWA);
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_ENABLE);
+> +
+> +	/* prescaler fixed to 256 */
+> +	reload = (wdd->timeout * wdt->rate) / 256;
+> +	if (reload > RLR_MAX + 1)
+> +		reload = RLR_MAX + 1;
+> +
+> +	/* set prescaler & reload registers */
+> +	reg_write(wdt->regs, IWDG_PR, PR_256); /* prescaler fix to 256 */
+> +	reg_write(wdt->regs, IWDG_RLR, reload - 1);
+> +
+> +	/* wait for the registers to be updated (max 100ms) */
+> +	ret = readl_relaxed_poll_timeout(wdt->regs + IWDG_SR, val,
+> +					 !(val & (FLAG_PVU | FLAG_RVU)),
+> +					 SLEEP_US, TIMEOUT_US);
+> +	if (ret) {
+> +		dev_err(wdd->parent,
+> +			"Fail to set prescaler or reload registers\n");
+> +		return ret;
+> +	}
+> +
+> +	/* reload watchdog */
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_iwdg_ping(struct watchdog_device *wdd)
+> +{
+> +	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	dev_dbg(wdd->parent, "%s\n", __func__);
+> +
+> +	/* reload watchdog */
+> +	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
+> +				  unsigned int timeout)
+> +{
+> +	dev_dbg(wdd->parent, "%s timeout: %d sec\n", __func__, timeout);
+> +
+> +	wdd->timeout = timeout;
+> +
+> +	if (watchdog_active(wdd))
+> +		return stm32_iwdg_start(wdd);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct watchdog_info stm32_iwdg_info = {
+> +	.options	= WDIOF_SETTIMEOUT |
+> +			  WDIOF_MAGICCLOSE |
+> +			  WDIOF_KEEPALIVEPING,
+> +	.identity	= "STM32 Independent Watchdog",
 > +};
 > +
-> +static irqreturn_t stm32_dac_trigger_handler(int irq, void *p)
+> +static struct watchdog_ops stm32_iwdg_ops = {
+> +	.owner		= THIS_MODULE,
+> +	.start		= stm32_iwdg_start,
+> +	.ping		= stm32_iwdg_ping,
+> +	.set_timeout	= stm32_iwdg_set_timeout,
+> +};
+> +
+> +static int stm32_iwdg_probe(struct platform_device *pdev)
 > +{
-> +	struct iio_poll_func *pf = p;
-> +	struct iio_dev *indio_dev = pf->indio_dev;
-> +	struct stm32_dac *dac = iio_priv(indio_dev);
-> +	int channel = indio_dev->channels[0].channel;
+> +	struct watchdog_device *wdd;
+> +	struct stm32_iwdg *wdt;
+> +	struct resource *res;
+> +	void __iomem *regs;
+> +	struct clk *clk;
+> +	int ret;
 > +
-> +	/* Using software trigger? Then, trigger it now */
-> +	if (dac->swtrig) {
-> +		u32 swtrig;
-> +
-> +		if (channel == STM32_DAC_CHANNEL_1)
-> +			swtrig = STM32_DAC_SWTRIGR_SWTRIG1;
-> +		else
-> +			swtrig = STM32_DAC_SWTRIGR_SWTRIG2;
-> +		regmap_update_bits(dac->common->regmap, STM32_DAC_SWTRIGR,
-> +				   swtrig, swtrig);
+> +	/* This is the timer base. */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(regs)) {
+> +		dev_err(&pdev->dev, "Could not get resource\n");
+> +		return PTR_ERR(regs);
 > +	}
 > +
-> +	iio_trigger_notify_done(indio_dev->trig);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static unsigned int stm32_dac_get_trig_tsel(struct stm32_dac *dac,
-> +					    struct iio_trigger *trig)
-> +{
-> +	unsigned int i;
-> +
-> +	/* skip 1st trigger that should be swtrig */
-> +	for (i = 1; stm32h7_dac_trinfo[i].name; i++) {
-> +		/*
-> +		 * Checking both stm32 timer trigger type and trig name
-> +		 * should be safe against arbitrary trigger names.
-> +		 */
-> +		if (is_stm32_timer_trigger(trig) &&
-> +		    !strcmp(stm32h7_dac_trinfo[i].name, trig->name)) {
-> +			return stm32h7_dac_trinfo[i].tsel;
-> +		}
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&pdev->dev, "Unable to get clock\n");
+> +		return PTR_ERR(clk);
 > +	}
 > +
-> +	/* When no trigger has been found, default to software trigger */
-> +	dac->swtrig = true;
-> +
-> +	return stm32h7_dac_trinfo[0].tsel;
-> +}
-> +
-> +static int stm32_dac_set_trig(struct stm32_dac *dac, struct iio_trigger *trig,
-> +			      int channel)
-> +{
-> +	struct iio_dev *indio_dev = iio_priv_to_dev(dac);
-> +	u32 shift = channel == STM32_DAC_CHANNEL_1 ? 0 : STM32_DAC_CHAN2_SHIFT;
-> +	u32 val = 0, tsel;
-> +	u32 msk = (STM32H7_DAC_CR_TEN1 | STM32H7_DAC_CR_TSEL1) << shift;
-> +
-> +	dac->swtrig = false;
-> +	if (trig) {
-> +		/* select & enable trigger (tsel / ten) */
-> +		tsel = stm32_dac_get_trig_tsel(dac, trig);
-> +		val = tsel << STM32H7_DAC_CR_TSEL1_SHIFT;
-> +		val = (val | STM32H7_DAC_CR_TEN1) << shift;
-> +	}
-> +
-> +	if (trig)
-> +		dev_dbg(&indio_dev->dev, "enable trigger: %s\n", trig->name);
-> +	else
-> +		dev_dbg(&indio_dev->dev, "disable trigger\n");
-> +
-> +	return regmap_update_bits(dac->common->regmap, STM32_DAC_CR, msk, val);
-> +}
-> +
->  static int stm32_dac_is_enabled(struct stm32_dac *dac, int channel)
->  {
->  	u32 en, val;
-> @@ -63,9 +164,16 @@ static int stm32_dac_enable(struct iio_dev *indio_dev, int channel)
->  		STM32_DAC_CR_EN1 : STM32_DAC_CR_EN2;
->  	int ret;
->  
-> +	ret = stm32_dac_set_trig(dac, indio_dev->trig, channel);
-> +	if (ret < 0) {
-> +		dev_err(&indio_dev->dev, "Trigger setup failed\n");
-> +		return ret;
-> +	}
-> +
->  	ret = regmap_update_bits(dac->common->regmap, STM32_DAC_CR, en, en);
->  	if (ret < 0) {
->  		dev_err(&indio_dev->dev, "Enable failed\n");
-> +		stm32_dac_set_trig(dac, NULL, channel);
->  		return ret;
->  	}
->  
-> @@ -88,10 +196,12 @@ static int stm32_dac_disable(struct iio_dev *indio_dev, int channel)
->  	int ret;
->  
->  	ret = regmap_update_bits(dac->common->regmap, STM32_DAC_CR, en, 0);
-> -	if (ret)
+> +	ret = clk_prepare_enable(clk);
 > +	if (ret) {
->  		dev_err(&indio_dev->dev, "Disable failed\n");
-> +		return ret;
-> +	}
->  
-> -	return ret;
-> +	return stm32_dac_set_trig(dac, NULL, channel);
->  }
->  
->  static int stm32_dac_get_value(struct stm32_dac *dac, int channel, int *val)
-> @@ -258,10 +368,17 @@ static int stm32_dac_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		return ret;
->  
-> -	ret = iio_device_register(indio_dev);
-> +	ret = iio_triggered_event_setup(indio_dev, NULL,
-> +					stm32_dac_trigger_handler);
->  	if (ret)
->  		return ret;
->  
-> +	ret = iio_device_register(indio_dev);
-> +	if (ret) {
-> +		iio_triggered_event_cleanup(indio_dev);
+> +		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
 > +		return ret;
 > +	}
 > +
->  	return 0;
->  }
->  
-> @@ -269,6 +386,7 @@ static int stm32_dac_remove(struct platform_device *pdev)
->  {
->  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->  
-> +	iio_triggered_event_cleanup(indio_dev);
->  	iio_device_unregister(indio_dev);
->  
->  	return 0;
-> 
+> +	/*
+> +	 * Allocate our watchdog driver data, which has the
+> +	 * struct watchdog_device nested within it.
+> +	 */
+> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt) {
+> +		ret = -ENOMEM;
+> +		goto err;
+> +	}
+> +
+> +	/* Initialize struct stm32_iwdg. */
+> +	wdt->regs = regs;
+> +	wdt->clk = clk;
+> +	wdt->rate = clk_get_rate(clk);
+> +
+> +	/* Initialize struct watchdog_device. */
+> +	wdd = &wdt->wdd;
+> +	wdd->info = &stm32_iwdg_info;
+> +	wdd->ops = &stm32_iwdg_ops;
+> +	wdd->min_timeout = WDT_MIN_TIMEOUT;
+> +	wdd->max_timeout = WDT_MAX_TIMEOUT;
+> +	wdd->max_hw_heartbeat_ms = WDT_MAX_TIMEOUT;
+
+This would have to be in milli-seconds. Also only provide max_timeout
+or max_hw_heartbeat_ms, but not both.
+
+> +	wdd->parent = &pdev->dev;
+> +
+> +	watchdog_set_drvdata(wdd, wdt);
+> +	watchdog_set_nowayout(wdd, true);
+> +
+> +	ret = watchdog_init_timeout(wdd, WDT_DEFAULT_TIMEOUT, &pdev->dev);
+
+Timeout parameter should be 0 to give the core a chance to pick up a timeout
+from fdt if specified. Otherwise the call is quite useless.
+
+> +	if (ret)
+> +		dev_warn(&pdev->dev,
+> +			 "unable to set timeout value, using default\n");
+> +
+> +	ret = watchdog_register_device(wdd);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"failed to register watchdog device\n");
+> +		goto err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +
+> +	return 0;
+> +err:
+> +	clk_disable_unprepare(clk);
+> +
+> +	return ret;
+> +}
+> +
+> +static int stm32_iwdg_remove(struct platform_device *pdev)
+> +{
+> +	struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdd);
+> +	clk_disable_unprepare(wdt->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id stm32_iwdg_of_match[] = {
+> +	{ .compatible = "st,stm32-iwdg" },
+> +	{ /* end node */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+> +
+> +static struct platform_driver stm32_iwdg_driver = {
+> +	.probe		= stm32_iwdg_probe,
+> +	.remove		= stm32_iwdg_remove,
+> +	.driver = {
+> +		.name	= "iwdg",
+> +		.of_match_table = stm32_iwdg_of_match,
+> +	},
+> +};
+> +module_platform_driver(stm32_iwdg_driver);
+> +
+> +MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
+> +MODULE_DESCRIPTION("STMicroelectronics STM32 Independent Watchdog Driver");
+> +MODULE_LICENSE("GPL v2");
+>
