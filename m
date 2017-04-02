@@ -1,28 +1,37 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Sun, 02 Apr 2017 13:47:42 -0700
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <20170401222119.25106-1-nicolas.pitre@linaro.org> (Nicolas
- Pitre's message of "Sat, 1 Apr 2017 18:21:14 -0400")
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
-Message-ID: <87pogur0y9.fsf@firstfloor.org>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sun,  2 Apr 2017 23:08:40 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Specify MDIO bus in the DT
+Message-ID: <20170402210840.11429-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre <nicolas.pitre@linaro.org> writes:
->
-> Of course, making it "mini" means there are limitations to what it does:
->
-> - This supports serial ports only. No VT's, no PTY's.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-No PTYs seems like a big limitation. This means no sshd?
+Northstar devices have MDIO bus that may contain various PHYs attached.
+A common example is USB 3.0 PHY (that doesn't have an MDIO driver yet).
 
-> But again, most small embedded systems simply don't need those things.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-They don't need a (debug) way to login over the network? Hard to
-believe.
-
-Most of the other stuff we could indeed do without even on larger
-systems.
-
--Andi
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index acee36a61004..6a2afe7880ae 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -320,6 +320,13 @@
+ 		};
+ 	};
+ 
++	mdio at 18003000 {
++		compatible = "brcm,iproc-mdio";
++		reg = <0x18003000 0x8>;
++		#size-cells = <1>;
++		#address-cells = <0>;
++	};
++
+ 	i2c0: i2c at 18009000 {
+ 		compatible = "brcm,iproc-i2c";
+ 		reg = <0x18009000 0x50>;
+-- 
+2.11.0
