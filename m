@@ -1,27 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 3 Apr 2017 06:35:23 -0400
-Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU
- clock input
-In-Reply-To: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
-References: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170403103522.GK31988@verge.net.au>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 3 Apr 2017 12:37:23 +0200
+Subject: [PATCH v2 2/8] [media] stm32-dcmi: STM32 DCMI camera interface
+ driver
+In-Reply-To: <1490887667-8880-3-git-send-email-hugues.fruchet@st.com>
+References: <1490887667-8880-1-git-send-email-hugues.fruchet@st.com>
+ <1490887667-8880-3-git-send-email-hugues.fruchet@st.com>
+Message-ID: <06d75af6-1d2e-8cfd-e3f6-96d36ce014f2@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 11:55:19AM +0200, Geert Uytterhoeven wrote:
-> The X2 crystal oscillator on the Koelsch development board provides a
-> 74.25 MHz clock, not a 148.5 MHz clock.
+On 03/30/2017 05:27 PM, Hugues Fruchet wrote:
+> This V4L2 subdev driver enables Digital Camera Memory Interface (DCMI)
+> of STMicroelectronics STM32 SoC series.
 > 
-> Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel clocks to DT")
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 > ---
-> Confirmed by schematics, user manual, and physical inspection of 2
-> Koelsch instances (my scope has not enough bandwidth to measure the
-> actual frequency).
-> 
-> Probably this was copied from r8a7790-lager.dts, as Lager does have two
-> identical crystal oscillators X2 and X13.
-> 
-> Note that X2 is socketed, so it can be changed.
+>  drivers/media/platform/Kconfig            |   12 +
+>  drivers/media/platform/Makefile           |    2 +
+>  drivers/media/platform/stm32/Makefile     |    1 +
+>  drivers/media/platform/stm32/stm32-dcmi.c | 1417 +++++++++++++++++++++++++++++
+>  4 files changed, 1432 insertions(+)
+>  create mode 100644 drivers/media/platform/stm32/Makefile
+>  create mode 100644 drivers/media/platform/stm32/stm32-dcmi.c
 
-Thanks, I have queued this up.
+Reviewed-by: Hans Verkuil <hans.verkuil@cisco.com>
+
+Looks good!
+
+Regards,
+
+	Hans
