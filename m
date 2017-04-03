@@ -1,17 +1,92 @@
-From: harninder.rai@nxp.com (Harninder Rai)
-Date: Mon, 3 Apr 2017 06:00:55 +0000
-Subject: NXP: LS1088 bindings patches
-Message-ID: <VI1PR0402MB2863CCF9A41902B7505AD64DE6080@VI1PR0402MB2863.eurprd04.prod.outlook.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 03 Apr 2017 11:45:47 +0530
+Subject: [Patch v3 00/11] Add MFC v10.10 support
+In-Reply-To: <6a5fa537-0977-b18b-70be-56ad771a0c03@samsung.com>
+References: <CGME20170331090425epcas1p4de8762ee73be91312a76a73638bac253@epcas1p4.samsung.com>
+ <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+ <6a5fa537-0977-b18b-70be-56ad771a0c03@samsung.com>
+Message-ID: <1491200147.24095.21.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+On Fri, 2017-03-31 at 15:29 +0200, Andrzej Hajda wrote:
+> Hi Smitha,
+> 
+> On 31.03.2017 11:06, Smitha T Murthy wrote:
+> > This patch series adds MFC v10.10 support. MFC v10.10 is used in some
+> > of Exynos7 variants.
+> 
+> Patch does not apply, please rebase on top of:
+>    
+> 
+> git://linuxtv.org/snawrocki/samsung.git for-v4.12/media/next
+> 
+> 
+I had not checked on this git. Thank you for pointing it out. I am
+downloading the code from github, will rebase on top of it and check the
+patches and push the next version correspondingly.
 
-Can you please pick/apply the following patches?
-They were ack-ed by Rob H few weeks ago
+> Additionally quick test shows you do not handle V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH in s5p_mfc_enc_s_ctrl.
+> Regards
+> Andrzej
+> 
 
-https://patchwork.kernel.org/patch/9564359/ 
-https://patchwork.kernel.org/patch/9564361/ 
+I could not sufficient details on
+V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH in the User Manual
+to implement this CID. Hence I wanted to remove it in v3 itself, I will
+take care of this in next version.
 
-Thanks and Regards
-Harry++
+Regards,
+Smitha T Murthy
+> >
+> > This adds support for following:
+> >
+> > * Add support for HEVC encoder and decoder
+> > * Add support for VP9 decoder
+> > * Update Documentation for control id definitions
+> > * Update computation of min scratch buffer size requirement for V8 onwards
+> >
+> > Changes since v2:
+> >  - Addressed review comments by Andrzej Hajda.
+> >  - Rebased on latest krzk/for-next tree.
+> >  - This patches are tested on top of Marek's patch v2 [1]
+> >  - Applied acked-by and r-o-b from Andrzej on respective patches.
+> >  - Applied acked-by from Rob Herring on respective patch.
+> >
+> > [1]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg108520.html
+> >
+> > Smitha T Murthy (11):
+> >   [media] s5p-mfc: Rename IS_MFCV8 macro
+> >   [media] s5p-mfc: Adding initial support for MFC v10.10
+> >   [media] s5p-mfc: Use min scratch buffer size as provided by F/W
+> >   [media] s5p-mfc: Support MFCv10.10 buffer requirements
+> >   [media] videodev2.h: Add v4l2 definition for HEVC
+> >   [media] s5p-mfc: Add support for HEVC decoder
+> >   Documentation: v4l: Documentation for HEVC v4l2 definition
+> >   [media] s5p-mfc: Add VP9 decoder support
+> >   [media] v4l2: Add v4l2 control IDs for HEVC encoder
+> >   [media] s5p-mfc: Add support for HEVC encoder
+> >   Documention: v4l: Documentation for HEVC CIDs
+> >
+> >  .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
+> >  Documentation/media/uapi/v4l/extended-controls.rst | 355 ++++++++++++
+> >  Documentation/media/uapi/v4l/pixfmt-013.rst        |   5 +
+> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  88 +++
+> >  drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
+> >  drivers/media/platform/s5p-mfc/s5p_mfc.c           |  33 ++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  71 ++-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  50 +-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 616 ++++++++++++++++++++-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 410 ++++++++++++--
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
+> >  drivers/media/v4l2-core/v4l2-ctrls.c               | 103 ++++
+> >  include/uapi/linux/v4l2-controls.h                 | 133 +++++
+> >  include/uapi/linux/videodev2.h                     |   1 +
+> >  17 files changed, 1835 insertions(+), 77 deletions(-)
+> >  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> >
+> 
+> 
