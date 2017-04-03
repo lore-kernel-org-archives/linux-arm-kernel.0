@@ -1,175 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  3 Apr 2017 16:19:23 +0100
-Subject: [RFC 7/9] arm64: expose PAC bit positions via ptrace
-In-Reply-To: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
-References: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491232765-32501-8-git-send-email-mark.rutland@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 03 Apr 2017 08:44:16 -0700
+Subject: [PATCH v3 0/4] tty/serial: meson_uart: add support for core clock
+ handling
+In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com> (Helmut Klein's
+ message of "Fri, 31 Mar 2017 18:54:33 +0200")
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+Message-ID: <m2lgrha433.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When pointer authentication is in use, data/instruction pointers have a
-number of PAC bits inserted into them. The number and position of these
-bits depends on the configured TCR_ELx.TxSZ and whether tagging is
-enabled. ARMv8.3 allows tagging to differ for instruction and data
-pointers.
+Helmut Klein <hgkr.klein@gmail.com> writes:
 
-For userspace debuggers to unwind the stack and/or to follow pointer
-chains, they need to be able to remove the PAC bits before attempting to
-use a pointer.
+> To be able to use the three none AO uarts of the meson gx SoCs (uart_A,
 
-This patch adds a new structure with masks describing the location of
-PAC bits in instruction and data pointers, which userspace can query via
-PTRACE_GETREGSET. By clearing these bits from pointers, userspace can
-acquire the PAC-less versions.
+s/none/non/
 
-This new regset is exposed when the kernel is built with (user) pointer
-authentication support, and the feature is enabled.  Otherwise, it is
-hidden.
+> uart_B & uart_C), the core clock has to be enabled (see chapter 22.3 of
+> the public s905 data sheet).
+> At least the u-boot of my s905 based media player (netxeon minimx-g)
+> doesn't do this. so the driver must enable the clock.
 
-Note that even if the feature is available and enabled, we cannot
-determine whether userspace is making use of the feature, so debuggers
-need to cope with this case regardless.
+FYI: even if a booloader enablesq clocks, it's important that the kernel
+enable clocks that it uses so the kernel can be independent of any
+bootloader.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Jiong Wang <jiong.wang@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pointer_auth.h |  8 +++++++
- arch/arm64/include/uapi/asm/ptrace.h  |  5 +++++
- arch/arm64/kernel/ptrace.c            | 39 +++++++++++++++++++++++++++++++++++
- include/uapi/linux/elf.h              |  1 +
- 4 files changed, 53 insertions(+)
+> This patch set does:
+> - exposes the UART clock ids to the dtb
+> - adds documentation for the dt-bindings of meson_uart
+> - adds the core clock handling to the driver
+> - adds the core clock handling to meson-gxbb.dtsi and meson-gxl.dtsi
+>
+> The patchset is based on the branch "master" of the repository in [1]
 
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-index 345df24..ed505fe 100644
---- a/arch/arm64/include/asm/pointer_auth.h
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -16,9 +16,11 @@
- #ifndef __ASM_POINTER_AUTH_H
- #define __ASM_POINTER_AUTH_H
- 
-+#include <linux/bitops.h>
- #include <linux/random.h>
- 
- #include <asm/cpufeature.h>
-+#include <asm/memory.h>
- #include <asm/sysreg.h>
- 
- #ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-@@ -70,6 +72,12 @@ static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
- 	*new = *old;
- }
- 
-+/*
-+ * The pointer bits used by a pointer authentication code.
-+ * If we were to use tagged pointers, bits 63:56 would also apply.
-+ */
-+#define ptrauth_pac_mask() 	GENMASK(54, VA_BITS)
-+
- #define mm_ctx_ptrauth_init(ctx) \
- 	ptrauth_keys_init(&(ctx)->ptrauth_keys)
- 
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index d1ff83d..5092fbf 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -90,6 +90,11 @@ struct user_hwdebug_state {
- 	}		dbg_regs[16];
- };
- 
-+struct user_pac_mask {
-+	__u64		data_mask;
-+	__u64		insn_mask;
-+};
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* _UAPI__ASM_PTRACE_H */
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index c142459..b0bcdfb 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -40,8 +40,10 @@
- #include <linux/elf.h>
- 
- #include <asm/compat.h>
-+#include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/pointer_auth.h>
- #include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
-@@ -693,6 +695,30 @@ static int system_call_set(struct task_struct *target,
- 	return ret;
- }
- 
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+static int pac_mask_get(struct task_struct *target,
-+			const struct user_regset *regset,
-+			unsigned int pos, unsigned int count,
-+			void *kbuf, void __user *ubuf)
-+{
-+	/*
-+	 * While the PAC bits are currently the same for data and instruction
-+	 * pointers, this could change if we use TCR_ELx.TBID*. So we expose
-+	 * them separately from the outset.
-+	 */
-+	unsigned long mask = ptrauth_pac_mask();
-+	struct user_pac_mask uregs = {
-+		.data_mask = mask,
-+		.insn_mask = mask,
-+	};
-+
-+	if (!cpus_have_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return -EINVAL;
-+
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
-+}
-+#endif
-+
- enum aarch64_regset {
- 	REGSET_GPR,
- 	REGSET_FPR,
-@@ -702,6 +728,9 @@ enum aarch64_regset {
- 	REGSET_HW_WATCH,
- #endif
- 	REGSET_SYSTEM_CALL,
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	REGSET_PAC_MASK,
-+#endif
- };
- 
- static const struct user_regset aarch64_regsets[] = {
-@@ -759,6 +788,16 @@ enum aarch64_regset {
- 		.get = system_call_get,
- 		.set = system_call_set,
- 	},
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	[REGSET_PAC_MASK] = {
-+		.core_note_type = NT_ARM_PAC_MASK,
-+		.n = sizeof(struct user_pac_mask) / sizeof(u64),
-+		.size = sizeof(u64),
-+		.align = sizeof(u64),
-+		.get = pac_mask_get,
-+		/* this cannot be set dynamically */
-+	},
-+#endif
- };
- 
- static const struct user_regset_view user_aarch64_view = {
-diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
-index b59ee07..cae3d1e 100644
---- a/include/uapi/linux/elf.h
-+++ b/include/uapi/linux/elf.h
-@@ -414,6 +414,7 @@
- #define NT_ARM_HW_BREAK	0x402		/* ARM hardware breakpoint registers */
- #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
- #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
-+#define NT_ARM_PAC_MASK		0x405	/* ARM pointer authentication code masks */
- #define NT_METAG_CBUF	0x500		/* Metag catch buffer registers */
- #define NT_METAG_RPIPE	0x501		/* Metag read pipeline state */
- #define NT_METAG_TLS	0x502		/* Metag TLS pointer */
--- 
-1.9.1
+The master branch in my tree just tracks mainline master branch.
+
+To avoid conflicts with other on-going DT changes, the DT patches should
+probably be based on top of my v4.12/dt64 branch.
+
+Kevin
