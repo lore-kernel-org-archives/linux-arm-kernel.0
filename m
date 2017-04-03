@@ -1,80 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 10:00:29 +0200
-Subject: [PATCH v3 03/11] dt-bindings: add bindings for DE2 on V3s SoC
-In-Reply-To: <20170329194613.55548-4-icenowy@aosc.io>
-References: <20170329194613.55548-1-icenowy@aosc.io>
- <20170329194613.55548-4-icenowy@aosc.io>
-Message-ID: <20170403080029.6goqw657ptljou3o@lukather>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 3 Apr 2017 10:10:00 +0200
+Subject: [Patch v3 07/11] Documentation: v4l: Documentation for HEVC v4l2
+ definition
+In-Reply-To: <1490951200-32070-8-git-send-email-smitha.t@samsung.com>
+References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170331090444epcas5p43f44be426728ea22d0b13f64f5cf05bd@epcas5p4.samsung.com>
+ <1490951200-32070-8-git-send-email-smitha.t@samsung.com>
+Message-ID: <3bad0b4f-0f0e-c67a-f9f7-135f5b8411c4@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 03:46:05AM +0800, Icenowy Zheng wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
+On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
+> Add V4L2 definition for HEVC compressed format
 > 
-> Allwinner V3s SoC have a display engine which have a different pipeline
-> with older SoCs.
-> 
-> Add document for it (new compatibles and the new "mixer" part).
-> 
-> The paragraph of TCON is also refactored, for furtherly add TCONs in
-> A83T/H3/A64/H5 that have only a channel 1 (used for HDMI or TV Encoder).
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 > ---
-> Changes in v3:
-> - Remove the description of having a BE directly as allwinner,pipeline.
+>  Documentation/media/uapi/v4l/pixfmt-013.rst | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
->  .../bindings/display/sunxi/sun4i-drm.txt           | 37 +++++++++++++++++++---
->  1 file changed, 33 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index b82c00449468..38de5e96f359 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -31,11 +31,11 @@ Required properties:
->     * allwinner,sun6i-a31-tcon
->     * allwinner,sun6i-a31s-tcon
->     * allwinner,sun8i-a33-tcon
-> +   * allwinner,sun8i-v3s-tcon
->   - reg: base address and size of memory-mapped region
->   - interrupts: interrupt associated to this IP
-> - - clocks: phandles to the clocks feeding the TCON. Three are needed:
-> + - clocks: phandles to the clocks feeding the TCON
->     - 'ahb': the interface clocks
-> -   - 'tcon-ch0': The clock driving the TCON channel 0
->   - resets: phandles to the reset controllers driving the encoder
->     - "lcd": the reset line for the TCON channel 0
->  
-> @@ -52,7 +52,12 @@ Required properties:
->    second the block connected to the TCON channel 1 (usually the TV
->    encoder)
->  
-> -On SoCs other than the A33, there is one more clock required:
-> +On TCONs that have a channel 0 (currently all TCONs supported), there
-> +is one more clock required:
-> +   - 'tcon-ch0': The clock driving the TCON channel 0
+> diff --git a/Documentation/media/uapi/v4l/pixfmt-013.rst b/Documentation/media/uapi/v4l/pixfmt-013.rst
+> index 728d7ed..ff4cac2 100644
+> --- a/Documentation/media/uapi/v4l/pixfmt-013.rst
+> +++ b/Documentation/media/uapi/v4l/pixfmt-013.rst
+> @@ -90,3 +90,8 @@ Compressed Formats
+>        - ``V4L2_PIX_FMT_VP9``
+>        - 'VP90'
+>        - VP9 video elementary stream.
+> +    * .. _V4L2-PIX-FMT-HEVC:
 > +
+> +      - ``V4L2_PIX_FMT_HEVC``
+> +      - 'HEVC'
+> +      - HEVC video elementary stream.
+> 
 
-Why did you change that if they all have a channel 0?
+You should mention here that HEVC == H.265.
 
-> +On TCONs that have a channel 1 (currently all TCONs except the ones in
-> +A33 and V3s), there is one more clock required:
->     - 'tcon-ch1': The clock driving the TCON channel 1
+Regards,
 
-And that can be added too just by saying "On SoCs other than the A33
-and V3".
-
-Looks good otherwise, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/90e9c978/attachment.sig>
+	Hans
