@@ -1,88 +1,63 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 3 Apr 2017 13:09:51 -0700
-Subject: [PATCH v3 05/11] Documentation: DT: bindings: input:
- touschcreen: remove sun4i documentation
-In-Reply-To: <20170329075826.4curjodxgi34tgco@dell>
-References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
- <20170321153611.16228-6-quentin.schulz@free-electrons.com>
- <20170329075826.4curjodxgi34tgco@dell>
-Message-ID: <20170403200951.GA5613@dtor-ws>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 3 Apr 2017 15:18:14 -0500
+Subject: [PATCH 1/1] PCI: Fix for PEM-specific resource reservation for
+ legacy firmware case
+In-Reply-To: <1490972804-25830-1-git-send-email-tn@semihalf.com>
+References: <1490972804-25830-1-git-send-email-tn@semihalf.com>
+Message-ID: <20170403201814.GA13232@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 08:58:26AM +0100, Lee Jones wrote:
-> On Tue, 21 Mar 2017, Quentin Schulz wrote:
+On Fri, Mar 31, 2017 at 05:06:44PM +0200, Tomasz Nowicki wrote:
+> SZ_16M PEM resource size includes PEM-specific register and its children
+> resources. Reservation of the whole SZ_16M range leads to child device
+> driver failure when pcieport driver is requesting resources:
+> pcieport 0004:1f:00.0: can't enable device: BAR 0 [mem 0x87e0c0f00000-0x87e0c0ffffff 64bit] not claimed
+> So we cannot reserve full 16M here and instead we want to reserve
+> PEM-specific register only which is SZ_64K.
 > 
-> > This patch removes the sun4i touchscreen controller binding
-> > documentation since it has been merged with the sun4i GPADC binding
-> > documentation.
-> > 
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > ---
-> > 
-> > added in v2
-> > 
-> >  .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
+> At the end increase PEM resource to SZ_16M since this is what
+> thunder_pem_init() call expects for proper initialization.
 > 
-> Just an Input Ack missing here.
+> Fixes: 9abb27c7594a ("PCI: thunder-pem: Add legacy firmware support for Cavium ThunderX host controller")
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> CC: stable at vger.kernel.org	# v4.10+
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Applied to for-linus for v4.11, thanks!
 
+> ---
+>  drivers/pci/host/pci-thunder-pem.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 > 
-> >  1 file changed, 38 deletions(-)
-> >  delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> > deleted file mode 100644
-> > index 89abecd..0000000
-> > --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> > +++ /dev/null
-> > @@ -1,38 +0,0 @@
-> > -sun4i resistive touchscreen controller
-> > ---------------------------------------
-> > -
-> > -Required properties:
-> > - - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
-> > -   "allwinner,sun6i-a31-ts"
-> > - - reg: mmio address range of the chip
-> > - - interrupts: interrupt to which the chip is connected
-> > - - #thermal-sensor-cells: shall be 0
-> > -
-> > -Optional properties:
-> > - - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
-> > -				   is attached to the controller
-> > - - allwinner,tp-sensitive-adjust : integer (4 bits)
-> > -				   adjust sensitivity of pen down detection
-> > -				   between 0 (least sensitive) and 15
-> > -				   (defaults to 15)
-> > - - allwinner,filter-type	 : integer (2 bits)
-> > -				   select median and averaging filter
-> > -				   samples used for median / averaging filter
-> > -				   0: 4/2
-> > -				   1: 5/3
-> > -				   2: 8/4
-> > -				   3: 16/8
-> > -				   (defaults to 1)
-> > -
-> > -Example:
-> > -
-> > -	rtp: rtp at 01c25000 {
-> > -		compatible = "allwinner,sun4i-a10-ts";
-> > -		reg = <0x01c25000 0x100>;
-> > -		interrupts = <29>;
-> > -		allwinner,ts-attached;
-> > -		#thermal-sensor-cells = <0>;
-> > -		/* sensitive/noisy touch panel */
-> > -		allwinner,tp-sensitive-adjust = <0>;
-> > -		allwinner,filter-type = <3>;
-> > -	};
-> 
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index b89c373..6e031b5 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -375,7 +375,6 @@ static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
+>  	index -= node * PEM_MAX_DOM_IN_NODE;
+>  	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
+>  					FIELD_PREP(PEM_INDX_MASK, index);
+> -	res_pem->end = res_pem->start + SZ_16M - 1;
+>  	res_pem->flags = IORESOURCE_MEM;
+>  }
+>  
+> @@ -399,8 +398,15 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+>  	 */
+>  	if (ret) {
+>  		thunder_pem_legacy_fw(root, res_pem);
+> -		/* Reserve PEM-specific resources and PCI configuration space */
+> +		/*
+> +		 * Reserve 64K size PEM specific resources. The full 16M range
+> +		 * size is required for thunder_pem_init() call.
+> +		 */
+> +		res_pem->end = res_pem->start + SZ_64K - 1;
+>  		thunder_pem_reserve_range(dev, root->segment, res_pem);
+> +		res_pem->end = res_pem->start + SZ_16M - 1;
+> +
+> +		/* Reserve PCI configuration space as well. */
+>  		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
+>  	}
+>  
 > -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
-
--- 
-Dmitry
+> 2.7.4
+> 
