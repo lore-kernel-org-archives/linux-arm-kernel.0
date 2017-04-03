@@ -1,75 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 13:48:19 +0200
-Subject: [PATCH] ARM: sun7i: Cubietruck: enable ACIN und USB power supply
- subnode
-In-Reply-To: <20170403091245.9766-1-alex@asyring.de>
-References: <20170403091245.9766-1-alex@asyring.de>
-Message-ID: <20170403114819.sb7pablxrb3qpsar@lukather>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 3 Apr 2017 12:56:28 +0100
+Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <CA+sq2Ccb1mUQpTvHWsEGWyc+9HjLdq8FSqBGRM7Ey932_6X5jg@mail.gmail.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-5-jean-philippe.brucker@arm.com>
+ <CA+sq2CeWpGarhT9p+iVo8nJXR=xpkj6XNMwv4LvbP0M6JxA_SA@mail.gmail.com>
+ <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
+ <CA+sq2Ccb1mUQpTvHWsEGWyc+9HjLdq8FSqBGRM7Ey932_6X5jg@mail.gmail.com>
+Message-ID: <19143d08-07ee-c2a4-eb71-e48fef0c8874@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/04/17 12:42, Sunil Kovvuri wrote:
+> On Mon, Apr 3, 2017 at 3:44 PM, Jean-Philippe Brucker
+> <jean-philippe.brucker@arm.com> wrote:
+>> On 03/04/17 09:34, Sunil Kovvuri wrote:
+>>>> +static size_t arm_smmu_atc_invalidate_domain(struct arm_smmu_domain *smmu_domain,
+>>>> +                                            unsigned long iova, size_t size)
+>>>> +{
+>>>> +       unsigned long flags;
+>>>> +       struct arm_smmu_cmdq_ent cmd = {0};
+>>>> +       struct arm_smmu_group *smmu_group;
+>>>> +       struct arm_smmu_master_data *master;
+>>>> +       struct arm_smmu_device *smmu = smmu_domain->smmu;
+>>>> +       struct arm_smmu_cmdq_ent sync_cmd = {
+>>>> +               .opcode = CMDQ_OP_CMD_SYNC,
+>>>> +       };
+>>>> +
+>>>> +       spin_lock_irqsave(&smmu_domain->groups_lock, flags);
+>>>> +
+>>>> +       list_for_each_entry(smmu_group, &smmu_domain->groups, domain_head) {
+>>>> +               if (!smmu_group->ats_enabled)
+>>>> +                       continue;
+>>>
+>>> If ATS is not supported, this seems to increase no of cycles spent in
+>>> pgtbl_lock.
+>>> Can we return from this API by checking 'ARM_SMMU_FEAT_ATS' in smmu->features ?
+>>
+>> Sure, I can add a check before taking the lock. Have you been able to
+>> observe a significant difference in cycles between checking FEAT_ATS,
+>> checking group->ats_enabled after taking the lock, and removing this
+>> function call altogether?
+>>
+>> Thanks,
+>> Jean-Philippe
+> 
+> No, I haven't verified, was just making an observation.
 
-On Mon, Apr 03, 2017 at 11:12:45AM +0200, Alexander Syring wrote:
-> The Cubietruck has an AXP209 PMIC and can be power-supplied by ACIN via
->  the CHG-IN pin or by USB.
-> 
-> This enables the ACIN and the USB power supply subnode in the DT.
-> 
-> Signed-off-by: Alexander Syring <alex@asyring.de>
-> ---
-> 
-> Send again to all relevant people
-> 
-> ---
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> index feb995d29799..98431ef15bc9 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-> @@ -267,6 +267,10 @@
-> 
->  #include "axp209.dtsi"
-> 
-> +&ac_power_supply {
-> +	status = "okay";
-> +};
-> +
->  &reg_dcdc2 {
->  	regulator-always-on;
->  	regulator-min-microvolt = <1000000>;
-> @@ -323,6 +327,10 @@
->  	status = "okay";
->  };
-> 
-> +&usb_power_supply {
-> +	status = "okay";
-> +};
-> +
->  &usbphy {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-> @@ -333,3 +341,4 @@
->  	usb2_vbus-supply = <&reg_usb2_vbus>;
->  	status = "okay";
->  };
-> +
+Fair enough, I think avoiding the lock when ATS isn't in use makes sense.
 
-You had a whitespace error here. I fixed it, and applied.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/d2682128/attachment.sig>
+Thanks,
+Jean-Philippe
