@@ -1,60 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 11:15:23 +0200
-Subject: [RFC PATCH v2 1/4] dt-bindings: update the Allwinner GPADC
- device tree binding for H3
-In-Reply-To: <20170402133304.56824-2-icenowy@aosc.io>
-References: <20170402133304.56824-1-icenowy@aosc.io>
- <20170402133304.56824-2-icenowy@aosc.io>
-Message-ID: <20170403091523.6atl7nq4m2qkpn3d@lukather>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Mon,  3 Apr 2017 11:14:25 +0200
+Subject: [PATCH v3 01/20] net: stmmac: export
+ stmmac_set_mac_addr/stmmac_get_mac_addr
+In-Reply-To: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
+References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170403091444.29876-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 02, 2017 at 09:33:01PM +0800, Icenowy Zheng wrote:
-> Allwinner H3 features a thermal sensor like the one in A33, but has its
-> register re-arranged, the clock divider moved to CCU (originally the
-> clock divider is in ADC) and added a pair of bus clock and reset.
-> 
-> Update the binding document to cover H3.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 23 ++++++++++++++++++++--
->  1 file changed, 21 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> index badff3611a98..7753133ca0ff 100644
-> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> @@ -4,12 +4,20 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
->  and sometimes as a touchscreen controller.
->  
->  Required properties:
-> -  - compatible: "allwinner,sun8i-a33-ths",
-> +  - compatible: must contain one of the following compatibles:
-> +		- "allwinner,sun8i-a33-ths"
-> +		- "allwinner,sun8i-h3-ths"
->    - reg: mmio address range of the chip,
->    - #thermal-sensor-cells: shall be 0,
->    - #io-channel-cells: shall be 0,
->  
-> -Example:
-> +Required properties for the following compatibles:
-> +		- "allwinner,sun8i-h3-ths"
-> +  - clocks: the bus clock and the input clock of the ADC,
-> +  - clock-names: should be "bus" and "ths",
+Thoses symbol will be needed for the dwmac-sun8i ethernet driver.
+For letting it to be build as module, they need to be exported.
 
-I guess mod instead of ths would be more consistent.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Maxime
-
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+index 38f9430..67af0bd 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+@@ -248,6 +248,7 @@ void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
+ 	data = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
+ 	writel(data, ioaddr + low);
+ }
++EXPORT_SYMBOL_GPL(stmmac_set_mac_addr);
+ 
+ /* Enable disable MAC RX/TX */
+ void stmmac_set_mac(void __iomem *ioaddr, bool enable)
+@@ -279,4 +280,4 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
+ 	addr[4] = hi_addr & 0xff;
+ 	addr[5] = (hi_addr >> 8) & 0xff;
+ }
+-
++EXPORT_SYMBOL_GPL(stmmac_get_mac_addr);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/e7a25c23/attachment.sig>
+2.10.2
