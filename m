@@ -1,35 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Apr 2017 18:23:07 +0100
-Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
-In-Reply-To: <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <20170331175457.GD4897@arm.com>
- <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
-Message-ID: <20170403172307.GI5706@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 3 Apr 2017 19:23:33 +0200
+Subject: [GIT PULL] STM32 SOC changes for v4.12 #1
+Message-ID: <a7b21384-ec29-c39f-97a8-579ca8d16bc2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 10:58:16PM -0400, Rob Clark wrote:
-> On Fri, Mar 31, 2017 at 1:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
-> >> This series provides the support for turning on the arm-smmu's
-> >> clocks/power domains using runtime pm. This is done using the
-> >> recently introduced device links patches, which lets the symmu's
-> >> runtime to follow the master's runtime pm, so the smmu remains
-> >> powered only when the masters use it.
-> >
-> > Do you have any numbers for the power savings you achieve with this?
-> > How often do we actually manage to stop the SMMU clocks on an SoC with
-> > a handful of masters?
-> >
-> > In other words, is this too coarse-grained to be useful, or is it common
-> > that all the devices upstream of the SMMU are suspended?
-> 
-> well, if you think about a phone/tablet with a command mode panel,
-> pretty much all devices will be suspended most of the time ;-)
+Hi Olof, Arnd and Kevin,
 
-Well, that's really what I was asking about. I assumed that periodic
-modem/radio transactions would keep the SMMU clocked, so would like to get a
-rough idea of the power savings achieved with this coarse-grained approach.
+Please consider this first round of STM32 SOC updates for v4.12:
 
-Will
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-soc-for-v4.12-1
+
+for you to fetch changes up to c6ed0f31ce3e1c5729d1c8f81a2a94ab881506a6:
+
+   ARM: stm32: Add a new SOC - STM32H743 (2017-03-24 11:37:24 +0100)
+
+----------------------------------------------------------------
+STM32 SOC updates for v4.12, round 1.
+
+Highlights:
+----------
+  - Create a dedicated Kconfig for STM32 machine
+  - Add support of STM32H743 MCU
+
+----------------------------------------------------------------
+Alexandre TORGUE (3):
+       ARM: stm32: create dedicated kconfig for STM32 machine
+       ARM: stm32: Introduce MACH_STM32H743 flag
+       ARM: stm32: Add a new SOC - STM32H743
+
+  Documentation/arm/stm32/stm32h743-overview.txt | 30 
+++++++++++++++++++++++++++
+  arch/arm/Kconfig                               | 24 ++-------------------
+  arch/arm/mach-stm32/Kconfig                    | 26 ++++++++++++++++++++++
+  arch/arm/mach-stm32/board-dt.c                 |  1 +
+  4 files changed, 59 insertions(+), 22 deletions(-)
+  create mode 100644 Documentation/arm/stm32/stm32h743-overview.txt
+  create mode 100644 arch/arm/mach-stm32/Kconfig
