@@ -1,166 +1,51 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Mon,  3 Apr 2017 11:57:43 -0700
-Subject: [PATCHv3 01/22] cma: Store a name in the cma structure
+Date: Mon,  3 Apr 2017 11:58:04 -0700
+Subject: [PATCHv3 22/22] staging/android: Update Ion TODO list
 In-Reply-To: <1491245884-15852-1-git-send-email-labbott@redhat.com>
 References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
-Message-ID: <1491245884-15852-2-git-send-email-labbott@redhat.com>
+Message-ID: <1491245884-15852-23-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frameworks that may want to enumerate CMA heaps (e.g. Ion) will find it
-useful to have an explicit name attached to each region. Store the name
-in each CMA structure.
+Most of the items have been taken care of by a clean up series. Remove
+the completed items and add a few new ones.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
-v3: Added default name suggestion per Sumit. Fixup powerpc call site.
----
- arch/powerpc/kvm/book3s_hv_builtin.c |  3 ++-
- drivers/base/dma-contiguous.c        |  5 +++--
- include/linux/cma.h                  |  4 +++-
- mm/cma.c                             | 17 +++++++++++++++--
- mm/cma.h                             |  1 +
- mm/cma_debug.c                       |  2 +-
- 6 files changed, 25 insertions(+), 7 deletions(-)
+ drivers/staging/android/TODO | 21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
 
-diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
-index 4d6c64b..b739ff8 100644
---- a/arch/powerpc/kvm/book3s_hv_builtin.c
-+++ b/arch/powerpc/kvm/book3s_hv_builtin.c
-@@ -100,7 +100,8 @@ void __init kvm_cma_reserve(void)
- 			 (unsigned long)selected_size / SZ_1M);
- 		align_size = HPT_ALIGN_PAGES << PAGE_SHIFT;
- 		cma_declare_contiguous(0, selected_size, 0, align_size,
--			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, false, &kvm_cma);
-+			KVM_CMA_CHUNK_ORDER - PAGE_SHIFT, false, "kvm_cma",
-+			&kvm_cma);
- 	}
- }
+diff --git a/drivers/staging/android/TODO b/drivers/staging/android/TODO
+index 8f3ac37..5f14247 100644
+--- a/drivers/staging/android/TODO
++++ b/drivers/staging/android/TODO
+@@ -7,23 +7,10 @@ TODO:
  
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index b55804c..ea9726e 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -165,7 +165,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- {
- 	int ret;
  
--	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed, res_cma);
-+	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed,
-+					"reserved", res_cma);
- 	if (ret)
- 		return ret;
+ ion/
+- - Remove ION_IOC_SYNC: Flushing for devices should be purely a kernel internal
+-   interface on top of dma-buf. flush_for_device needs to be added to dma-buf
+-   first.
+- - Remove ION_IOC_CUSTOM: Atm used for cache flushing for cpu access in some
+-   vendor trees. Should be replaced with an ioctl on the dma-buf to expose the
+-   begin/end_cpu_access hooks to userspace.
+- - Clarify the tricks ion plays with explicitly managing coherency behind the
+-   dma api's back (this is absolutely needed for high-perf gpu drivers): Add an
+-   explicit coherency management mode to flush_for_device to be used by drivers
+-   which want to manage caches themselves and which indicates whether cpu caches
+-   need flushing.
+- - With those removed there's probably no use for ION_IOC_IMPORT anymore either
+-   since ion would just be the central allocator for shared buffers.
+- - Add dt-binding to expose cma regions as ion heaps, with the rule that any
+-   such cma regions must already be used by some device for dma. I.e. ion only
+-   exposes existing cma regions and doesn't reserve unecessarily memory when
+-   booting a system which doesn't use ion.
++ - Add dt-bindings for remaining heaps (chunk and carveout heaps). This would
++   involve putting appropriate bindings in a memory node for Ion to find.
++ - Split /dev/ion up into multiple nodes (e.g. /dev/ion/heap0)
++ - Better test framework (integration with VGEM was suggested)
  
-@@ -258,7 +259,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
- 		return -EINVAL;
- 	}
- 
--	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
-+	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, rmem->name, &cma);
- 	if (err) {
- 		pr_err("Reserved memory: unable to setup CMA region\n");
- 		return err;
-diff --git a/include/linux/cma.h b/include/linux/cma.h
-index 03f32d0..d41d1f8 100644
---- a/include/linux/cma.h
-+++ b/include/linux/cma.h
-@@ -21,13 +21,15 @@ struct cma;
- extern unsigned long totalcma_pages;
- extern phys_addr_t cma_get_base(const struct cma *cma);
- extern unsigned long cma_get_size(const struct cma *cma);
-+extern const char *cma_get_name(const struct cma *cma);
- 
- extern int __init cma_declare_contiguous(phys_addr_t base,
- 			phys_addr_t size, phys_addr_t limit,
- 			phys_addr_t alignment, unsigned int order_per_bit,
--			bool fixed, struct cma **res_cma);
-+			bool fixed, const char *name, struct cma **res_cma);
- extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
- 					unsigned int order_per_bit,
-+					const char *name,
- 					struct cma **res_cma);
- extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
- 			      gfp_t gfp_mask);
-diff --git a/mm/cma.c b/mm/cma.c
-index a6033e3..43c1b2c 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -53,6 +53,11 @@ unsigned long cma_get_size(const struct cma *cma)
- 	return cma->count << PAGE_SHIFT;
- }
- 
-+const char *cma_get_name(const struct cma *cma)
-+{
-+	return cma->name ? cma->name : "(undefined)";
-+}
-+
- static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
- 					     int align_order)
- {
-@@ -168,6 +173,7 @@ core_initcall(cma_init_reserved_areas);
-  */
- int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
- 				 unsigned int order_per_bit,
-+				 const char *name,
- 				 struct cma **res_cma)
- {
- 	struct cma *cma;
-@@ -198,6 +204,13 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
- 	 * subsystems (like slab allocator) are available.
- 	 */
- 	cma = &cma_areas[cma_area_count];
-+	if (name) {
-+		cma->name = name;
-+	} else {
-+		cma->name = kasprintf(GFP_KERNEL, "cma%d\n", cma_area_count);
-+		if (!cma->name)
-+			return -ENOMEM;
-+	}
- 	cma->base_pfn = PFN_DOWN(base);
- 	cma->count = size >> PAGE_SHIFT;
- 	cma->order_per_bit = order_per_bit;
-@@ -229,7 +242,7 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
- int __init cma_declare_contiguous(phys_addr_t base,
- 			phys_addr_t size, phys_addr_t limit,
- 			phys_addr_t alignment, unsigned int order_per_bit,
--			bool fixed, struct cma **res_cma)
-+			bool fixed, const char *name, struct cma **res_cma)
- {
- 	phys_addr_t memblock_end = memblock_end_of_DRAM();
- 	phys_addr_t highmem_start;
-@@ -335,7 +348,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
- 		base = addr;
- 	}
- 
--	ret = cma_init_reserved_mem(base, size, order_per_bit, res_cma);
-+	ret = cma_init_reserved_mem(base, size, order_per_bit, name, res_cma);
- 	if (ret)
- 		goto err;
- 
-diff --git a/mm/cma.h b/mm/cma.h
-index 17c75a4..4986128 100644
---- a/mm/cma.h
-+++ b/mm/cma.h
-@@ -11,6 +11,7 @@ struct cma {
- 	struct hlist_head mem_head;
- 	spinlock_t mem_head_lock;
- #endif
-+	const char *name;
- };
- 
- extern struct cma cma_areas[MAX_CMA_AREAS];
-diff --git a/mm/cma_debug.c b/mm/cma_debug.c
-index ffc0c3d..595b757 100644
---- a/mm/cma_debug.c
-+++ b/mm/cma_debug.c
-@@ -167,7 +167,7 @@ static void cma_debugfs_add_one(struct cma *cma, int idx)
- 	char name[16];
- 	int u32s;
- 
--	sprintf(name, "cma-%d", idx);
-+	sprintf(name, "cma-%s", cma->name);
- 
- 	tmp = debugfs_create_dir(name, cma_debugfs_root);
- 
+ Please send patches to Greg Kroah-Hartman <greg@kroah.com> and Cc:
+ Arve Hj?nnev?g <arve@android.com> and Riley Andrews <riandrews@android.com>
 -- 
 2.7.4
