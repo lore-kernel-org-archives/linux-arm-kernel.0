@@ -1,65 +1,52 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Mon, 3 Apr 2017 09:58:34 -0700
-Subject: [PATCH v4 0/5] ARM: K2G: Add support for TI-SCI Generic PM Domains
-In-Reply-To: <58CAD9F5.7030904@ti.com>
-References: <1488882154-21485-1-git-send-email-d-gerlach@ti.com>
- <2133897.t9KqoeriS0@aspire.rjw.lan> <58CAD9F5.7030904@ti.com>
-Message-ID: <1bf8091a-76d2-1b2b-b23d-76d3493eb33c@oracle.com>
+From: huziji@marvell.com (Hu Ziji)
+Date: Tue, 4 Apr 2017 01:07:26 +0800
+Subject: [PATCH v7 06/13] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <20170403161926.wfj7foddu33gxuae@rob-hp-laptop>
+References: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
+ <ecacddaa5d38b678e1c8c95b56f65f4a39527ead.1490886907.git-series.gregory.clement@free-electrons.com>
+ <20170403161926.wfj7foddu33gxuae@rob-hp-laptop>
+Message-ID: <df6d0972-21ce-589f-d786-7334f526867a@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Rob,
 
-On 3/16/17 11:31 AM, Dave Gerlach wrote:
-> Santosh,
-> On 03/12/2017 12:02 PM, Rafael J. Wysocki wrote:
-
-[...]
-
->>> I did not update the "power-domain" binding document because in regards to
->>> #power-domain-cells it already states "can be any value as specified by device
->>> tree binding documentation of particular provider" which I think already
->>> describes the change in patch 2.
+On 2017/4/4 0:19, Rob Herring wrote:
+> ----------------------------------------------------------------------
+> On Thu, Mar 30, 2017 at 05:22:58PM +0200, Gregory CLEMENT wrote:
+>> From: Hu Ziji <huziji@marvell.com>
 >>
->> I'm assuming that this will go in through the arm-soc tree.
+>> Marvell Xenon SDHC can support eMMC/SD/SDIO.
+>> Add Xenon-specific properties.
+>> Also add properties for Xenon PHY setting.
+>>
+>> Signed-off-by: Hu Ziji <huziji@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 170 +++++++-
+>>  1 file changed, 170 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> 
+> I acked v6 and it seems like a minor change, though I had to search for 
+> both because there is no revision history nor explanation why you didn't 
+> add my ack.
 >
-> Assuming that Rob is OK with the v5 of patch 3 that I just sent in response to
-> the v4 patch email, can this series go through you? We should be good to go with
-> v4 of the series + the small v5 update to patch 3 if Rob is ok with it.
->
-Yes I can queue this up for arm-soc. Please repost the v5 with all the
-patches and acks.
 
+	Sorry for missing your ACK.
 
-Hi Arnd, Olof,
-Is it ok to send this as a single pull request ? Am asking since it
-is touching few topics which goes via different heads.
+	I add a few but important comments on common Xenon power implementations
+	in the examples. It is recorded in the cover letter.
+	v6->v7:
+	 - Add comments on vqmmc and vmmc in examples in dt binding doc.
 
-------------------------
-Dave Gerlach (5):
-   PM / Domains: Add generic data pointer to genpd data struct
-   PM / Domains: Do not check if simple providers have phandle cells
-   dt-bindings: Add TI SCI PM Domains
-   soc: ti: Add ti_sci_pm_domains driver
-   ARM: keystone: Drop PM domain support for k2g
+	I was a little unsure if we can still add your ACK after adding the comment.
+ 	We will add your ACK back if we have to release another version later.
 
-  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  59 ++++++
-  MAINTAINERS                                        |   3 +
-  arch/arm/mach-keystone/Kconfig                     |   1 +
-  arch/arm/mach-keystone/pm_domain.c                 |   4 +-
-  drivers/base/power/domain.c                        |   2 -
-  drivers/soc/ti/Kconfig                             |  12 ++
-  drivers/soc/ti/Makefile                            |   1 +
-  drivers/soc/ti/ti_sci_pm_domains.c                 | 202 
-+++++++++++++++++++++
-  include/dt-bindings/genpd/k2g.h                    |  90 +++++++++
-  include/linux/pm_domain.h                          |   1 +
-  10 files changed, 372 insertions(+), 3 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-  create mode 100644 drivers/soc/ti/ti_sci_pm_domains.c
-  create mode 100644 include/dt-bindings/genpd/k2g.h
+	Thank you.
 
+Best regards,
+Hu Ziji
 
-regards,
-Santosh
+> Acked-by: Rob Herring <robh@kernel.org> 
+> 
