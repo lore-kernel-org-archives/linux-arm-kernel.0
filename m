@@ -1,37 +1,88 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 3 Apr 2017 16:09:38 -0400 (EDT)
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <20170403195756.xitzpei2knmwt3sx@angband.pl>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
- <20170403153103.GB22592@two.firstfloor.org>
- <20170403195756.xitzpei2knmwt3sx@angband.pl>
-Message-ID: <alpine.LFD.2.20.1704031603160.1847@knanqh.ubzr>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 3 Apr 2017 13:09:51 -0700
+Subject: [PATCH v3 05/11] Documentation: DT: bindings: input:
+ touschcreen: remove sun4i documentation
+In-Reply-To: <20170329075826.4curjodxgi34tgco@dell>
+References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
+ <20170321153611.16228-6-quentin.schulz@free-electrons.com>
+ <20170329075826.4curjodxgi34tgco@dell>
+Message-ID: <20170403200951.GA5613@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Apr 2017, Adam Borowski wrote:
-
-> On Mon, Apr 03, 2017 at 08:31:03AM -0700, Andi Kleen wrote:
-> > Except for that (and possibly VT) it is unlikely that people really
-> > rely on the obsolete terminal features from the 70ies. So it's a kind
-> > of cleanup.
+On Wed, Mar 29, 2017 at 08:58:26AM +0100, Lee Jones wrote:
+> On Tue, 21 Mar 2017, Quentin Schulz wrote:
 > 
-> But... but... but what shall we do without OLCUC?!?
+> > This patch removes the sun4i touchscreen controller binding
+> > documentation since it has been merged with the sun4i GPADC binding
+> > documentation.
+> > 
+> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> > 
+> > added in v2
+> > 
+> >  .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
 > 
-> I guess sending these features to the pasture would be nice even in
-> mainstream TTY.  Probably even without a Kconfig option to restore them.
+> Just an Input Ack missing here.
 
-Thing is... those arcane features don't take much code at all:
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-		if (O_OLCUC(tty))
-			c = toupper(c);
+> 
+> >  1 file changed, 38 deletions(-)
+> >  delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> > deleted file mode 100644
+> > index 89abecd..0000000
+> > --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> > +++ /dev/null
+> > @@ -1,38 +0,0 @@
+> > -sun4i resistive touchscreen controller
+> > ---------------------------------------
+> > -
+> > -Required properties:
+> > - - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
+> > -   "allwinner,sun6i-a31-ts"
+> > - - reg: mmio address range of the chip
+> > - - interrupts: interrupt to which the chip is connected
+> > - - #thermal-sensor-cells: shall be 0
+> > -
+> > -Optional properties:
+> > - - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
+> > -				   is attached to the controller
+> > - - allwinner,tp-sensitive-adjust : integer (4 bits)
+> > -				   adjust sensitivity of pen down detection
+> > -				   between 0 (least sensitive) and 15
+> > -				   (defaults to 15)
+> > - - allwinner,filter-type	 : integer (2 bits)
+> > -				   select median and averaging filter
+> > -				   samples used for median / averaging filter
+> > -				   0: 4/2
+> > -				   1: 5/3
+> > -				   2: 8/4
+> > -				   3: 16/8
+> > -				   (defaults to 1)
+> > -
+> > -Example:
+> > -
+> > -	rtp: rtp at 01c25000 {
+> > -		compatible = "allwinner,sun4i-a10-ts";
+> > -		reg = <0x01c25000 0x100>;
+> > -		interrupts = <29>;
+> > -		allwinner,ts-attached;
+> > -		#thermal-sensor-cells = <0>;
+> > -		/* sensitive/noisy touch panel */
+> > -		allwinner,tp-sensitive-adjust = <0>;
+> > -		allwinner,filter-type = <3>;
+> > -	};
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
-That's it. I didn't make the minitty code 5x smaller just by omitting 
-those.  ;-)
-
-
-Nicolas
+-- 
+Dmitry
