@@ -1,43 +1,75 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Apr 2017 11:14:34 +0200
-Subject: [PATCH v3 10/20] ARM: dts: sun8i: Enable dwmac-sun8i on the Orange Pi
- 2
+Date: Mon,  3 Apr 2017 11:14:32 +0200
+Subject: [PATCH v3 08/20] ARM: dts: sun8i: Enable dwmac-sun8i on the Banana Pi
+ M2+
 In-Reply-To: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
 References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170403091444.29876-11-clabbe.montjoie@gmail.com>
+Message-ID: <20170403091444.29876-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i hardware is present on the Orange PI 2.
-It uses the internal PHY.
+From: LABBE Corentin <clabbe.montjoie@gmail.com>
 
-This patch create the needed emac node.
+The dwmac-sun8i hardware is present on the Banana Pi M2+
+It uses an external PHY rtl8211e via RGMII.
+
+This patch create the needed regulator, emac and phy nodes.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 38 +++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index 5b6d145..3f54b12 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -55,6 +55,7 @@
- 		serial0 = &uart0;
- 		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
- 		ethernet1 = &rtl8189;
-+		ethernet0 = &emac;
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 52acbe1..7fd7704 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -90,6 +90,18 @@
+ 		pinctrl-0 = <&wifi_en_bpi_m2p>;
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
  	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		      compatible = "regulator-fixed";
++		      pinctrl-names = "default";
++		      pinctrl-0 = <&gmac_power_pin_orangepi>;
++		      regulator-name = "gmac-3v3";
++		      regulator-min-microvolt = <3300000>;
++		      regulator-max-microvolt = <3300000>;
++		      startup-delay-us = <100000>;
++		      enable-active-high;
++		      gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
++	      };
+ };
  
- 	chosen {
-@@ -203,3 +204,10 @@
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ &ehci1 {
+@@ -186,3 +198,29 @@
+ 	/* USB VBUS is on as long as VCC-IO is on */
  	status = "okay";
  };
 +
++&pio {
++	gmac_power_pin_orangepi: gmac_power_pin at 0 {
++		 pins = "PD6";
++		 function = "gpio_out";
++		 drive-strength = <10>;
++	 };
++};
++
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++	};
++};
++
 +&emac {
-+	phy-handle = <&int_mii_phy>;
-+	phy-mode = "mii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++
 +	allwinner,leds-active-low;
 +	status = "okay";
 +};
