@@ -1,29 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Apr 2017 09:49:34 -0500
-Subject: [PATCH v3 1/5] dt-bindings: update device tree binding for
- Allwinner PRCM CCUs
-In-Reply-To: <20170329104246.34204-2-icenowy@aosc.io>
-References: <20170329104246.34204-1-icenowy@aosc.io>
- <20170329104246.34204-2-icenowy@aosc.io>
-Message-ID: <20170403144934.rnvftfuojq22aotu@rob-hp-laptop>
+Date: Mon, 3 Apr 2017 09:51:15 -0500
+Subject: [PATCH v3 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
+References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
+ <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
+Message-ID: <20170403145115.kjy46bbjt67jxa3k@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 06:42:42PM +0800, Icenowy Zheng wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
+On Wed, Mar 29, 2017 at 01:34:45PM +0200, Marc Gonzalez wrote:
+> This driver is used to work around HW bugs in the controller.
 > 
-> Many Allwinner SoCs after A31 have a CCU in PRCM block.
+> Note: the controller does NOT support the following features.
 > 
-> Give the ones on H3 and A64 compatible strings.
+>   Legacy PCI interrupts
+>   IO space
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 > ---
-> Changes in v3:
-> - Removed frequency info of iosc in this device tree binding document.
-> Changes in v2:
-> - Add iosc for R_CCU's on H3/A64.
-> 
->  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/pci/tango-pcie.txt |  33 +++++++++
 
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org> 
+
+>  drivers/pci/host/Kconfig                             |   7 ++
+>  drivers/pci/host/Makefile                            |   1 +
+>  drivers/pci/host/pcie-tango.c                        | 150 +++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 191 insertions(+)
