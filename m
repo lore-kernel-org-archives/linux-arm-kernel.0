@@ -1,77 +1,95 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Apr 2017 10:33:23 -0500
-Subject: [PATCH v3 01/11] dt-bindings: add binding for the Allwinner DE2
- CCU
-In-Reply-To: <20170329194613.55548-2-icenowy@aosc.io>
-References: <20170329194613.55548-1-icenowy@aosc.io>
- <20170329194613.55548-2-icenowy@aosc.io>
-Message-ID: <20170403153323.kmq3ku7h3sj7fp4g@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 3 Apr 2017 08:36:04 -0700
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com>
+ <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+ <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+Message-ID: <20170403153604.GI10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 03:46:03AM +0800, Icenowy Zheng wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
+* Tero Kristo <t-kristo@ti.com> [170403 07:54]:
+> On 30/03/17 19:54, Tony Lindgren wrote:
+> > * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
+> > > On 23/03/17 19:02, Tony Lindgren wrote:
+> > > > * Tony Lindgren <tony@atomide.com> [170322 18:03]:
+> > > > > * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+> > > > > > On 17/03/17 17:25, Tony Lindgren wrote:
+> > > > > > > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> > > > > > > > Any additional testing on omap4 welcome as this series basically
+> > > > > > > > tweaks every possible peripheral clock on the SoC.
+> > > > > > > 
+> > > > > > > Without the last patch in this series, booting fails for me:
+> > > > > > > 
+> > > > > > > [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+> > > > > > > [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+> > > > > > > 
+> > > > > > > Care to check that booting keeps working for each patch in the
+> > > > > > > series to avoid breaking git bisect for booting?
+> > > > > > 
+> > > > > > Hmm, I think patch 8+9 need to be squashed then. I can double check this
+> > > > > > next week though.
+> > > > > 
+> > > > > Also looks like with this set merged HDMI stops working on
+> > > > > omap4 with:
+> > > > > 
+> > > > > HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+> > > > 
+> > > > Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+> > > > encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+> > > > dmesg output in case that provides more clues:
+> > > > 
+> > > > [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+> > > > [   91.078308] [drm] Enabling DMM ywrap scrolling
+> > > > [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+> > > > [   91.107879] omapdss HDMI error: failed to power on device
+> > > > [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+> > > > [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > > > [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > > > [   91.620300] Console: switching to colour frame buffer device 128x48
+> > > > [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+> > > > [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+> > > > [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+> > > > [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > > > [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+> > > > 
+> > > > Regards,
+> > > > 
+> > > > Tony
+> > > > 
+> > > 
+> > > Can you try with this additional hwmod data tweak in place? Apply this on
+> > > top of the existing series.
+> > 
+> > Does not seem to help, still get the same errors. But maybe I'm doing
+> > something wrong as the patch did not apply and I applied it manually.
+> > 
+> > Regards,
+> > 
+> > Tony
+> > 
 > 
-> Allwinner "Display Engine 2.0" contains some clock controls in it.
-> 
-> In order to add them as clock drivers, we need a device tree binding.
-> Add the binding here.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v3:
-> - Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
+> Hmm ok, can you provide some brief instructions how to test what you are
+> doing with the HDMI? Just connect it to some external monitor? My monitor
+> has a spare HDMI connector so I could try it out.
 
-Why? You waste virtual memory space making this bigger than it needs to 
-be. Not an issue so much for 64-bit.
+Well build a kernel using omap2plus_defconfig, then with HDMI cable
+connected load the following modules:
 
-> 
->  .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> new file mode 100644
-> index 000000000000..34cf79c05f13
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> @@ -0,0 +1,31 @@
-> +Allwinner Display Engine 2.0 Clock Control Binding
-> +--------------------------------------------------
-> +
-> +Required properties :
-> +- compatible: must contain one of the following compatibles:
-> +		- "allwinner,sun8i-a83t-de2-clk"
-> +		- "allwinner,sun50i-a64-de2-clk"
-> +		- "allwinner,sun50i-h5-de2-clk"
-> +
-> +- reg: Must contain the registers base address and length
-> +- clocks: phandle to the clocks feeding the display engine subsystem.
-> +	  Three are needed:
-> +  - "mod": the display engine module clock
-> +  - "bus": the bus clock for the whole display engine subsystem
-> +- clock-names: Must contain the clock names described just above
-> +- resets: phandle to the reset control for the display engine subsystem.
-> +- #clock-cells : must contain 1
-> +- #reset-cells : must contain 1
-> +
-> +Example:
-> +de2_clocks: clock at 01000000 {
+encoder-tpd12s015 encoder-tfp410 connector-hdmi omapfb
 
-Drop the leading 0s. dtc in linux-next will now warn on this with W=1 
-compile. Looks like sunxi has a lot of them. Please fix so we don't keep 
-repeating this same copy-n-paste.
+And a console should appear on the HDMI monitor. If using omapdrm, then
+load omapdss and omapdrm instead.
 
-> +	compatible = "allwinner,sun50i-a64-de2-clk";
-> +	reg = <0x01000000 0x100000>;
-> +	clocks = <&ccu CLK_DE>,
-> +		 <&ccu CLK_BUS_DE>;
-> +	clock-names = "mod",
-> +		      "bus";
-> +	resets = <&ccu RST_BUS_DE>;
-> +	#clock-cells = <1>;
-> +	#reset-cells = <1>;
-> +};
-> -- 
-> 2.12.0
-> 
+And if using NFSroot, you need to have ehci and smsc drivers built-in
+or use an initramfs.
+
+Regards,
+
+Tony
