@@ -1,68 +1,71 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:37:42 +0100
-Subject: [PATCH v5 09/34] arm64: KVM: Allow the main HYP code to use the init
- hyp stub implementation
+Date: Mon,  3 Apr 2017 19:37:56 +0100
+Subject: [PATCH v5 23/34] ARM: KVM: Convert __cpu_reset_hyp_mode to using
+ __hyp_reset_vectors
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-10-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a full hyp-stub implementation in the KVM init code,
-but the main KVM code only supports HVC_GET_VECTORS, which is not
-enough.
+We are now able to use the hyp stub to reset HYP mode. Time to
+kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
 
-Instead of reinventing the wheel, let's reuse the init implementation
-by branching to the idmap page when called with a hyp-stub hypercall.
-
+Tested-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_asm.h  | 2 --
+ arch/arm/include/asm/kvm_host.h | 2 +-
+ arch/arm/kvm/init.S             | 2 --
+ 3 files changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index d8ef788646c6..4f34c5996f86 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -87,10 +87,24 @@ alternative_endif
- 	/* Here, we're pretty sure the host called HVC. */
- 	ldp	x0, x1, [sp], #16
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 8ef05381984b..7ccb6f1aac5b 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
--	cmp	x0, #HVC_GET_VECTORS
--	b.ne	1f
--	mrs	x0, vbar_el2
--	b	2f
-+	/* Check for a stub HVC call */
-+	cmp	x0, #HVC_STUB_HCALL_NR
-+	b.hs	1f
-+
-+	/*
-+	 * Compute the idmap address of __kvm_handle_stub_hvc and
-+	 * jump there. Since we use kimage_voffset, do not use the
-+	 * HYP VA for __kvm_handle_stub_hvc, but the kernel VA instead
-+	 * (by loading it from the constant pool).
-+	 *
-+	 * Preserve x0-x4, which may contain stub parameters.
-+	 */
-+	ldr	x5, =__kvm_handle_stub_hvc
-+	ldr_l	x6, kimage_voffset
-+
-+	/* x5 = __pa(x5) */
-+	sub	x5, x5, x6
-+	br	x5
+ extern void __init_stage2_translation(void);
  
- 1:
- 	/*
-@@ -99,7 +113,7 @@ alternative_endif
- 	kern_hyp_va	x0
- 	do_el2_call
+-extern void __kvm_hyp_reset(unsigned long);
+-
+ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+ extern void __vgic_v3_init_lrs(void);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 31ee468ce667..adea30753185 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
+ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+ 					phys_addr_t phys_idmap_start)
+ {
+-	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
++	__hyp_reset_vectors();
+ }
  
--2:	eret
-+	eret
+ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index d6b2f496fa13..fb336090ee9c 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
  
- el1_trap:
- 	/*
+ 1:	cmp	r0, #HVC_RESET_VECTORS
+ 	bne	1f
+-ENTRY(__kvm_hyp_reset)
+ 	/* We're now in idmap, disable MMU */
+ 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
+ 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
+ exit:
+ 	eret
+ ENDPROC(__kvm_handle_stub_hvc)
+-ENDPROC(__kvm_hyp_reset)
+ 
+ 	.ltorg
+ 
 -- 
 2.11.0
