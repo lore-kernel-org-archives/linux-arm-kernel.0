@@ -1,48 +1,40 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Mon, 03 Apr 2017 19:05:19 +0100
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 3 Apr 2017 20:14:08 +0200
 Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
  embedded systems
-In-Reply-To: <alpine.LFD.2.20.1704031121520.1847@knanqh.ubzr>
+In-Reply-To: <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
 References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <CAHp75VdGm2uVPBhfAge4Wx6WW2y52oddpOSfJgdYAfTUQPN7TQ@mail.gmail.com>
- <alpine.LFD.2.20.1704021149550.1847@knanqh.ubzr>
- <1491224186.3704.11.camel@linux.intel.com>
- <alpine.LFD.2.20.1704031121520.1847@knanqh.ubzr>
-Message-ID: <1491242719.3704.33.camel@linux.intel.com>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+Message-ID: <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> evertheless very convenient to be able to use a standard
-> shell?
-> with it.
+On Mon, Apr 3, 2017 at 12:44 AM, Stuart Longland
+<stuartl@longlandclan.id.au> wrote:
+> On 03/04/17 07:41, Nicolas Pitre wrote:
+>>> No PTYs seems like a big limitation. This means no sshd?
+>> Again, my ultimate system target is in the sub-megabyte of RAM.  I
+>> really doubt you'll be able to fit an SSH server in there even if PTYs
+>> were supported, unless sshd (or dropbear) can be made really tiny.
+>> Otherwise you most probably have sufficient resources to run the regular
+>> TTY code.
+>
+> Are we talking small microcontrollers here?  The smallest machine in
+> terms of RAM I ever recall running Linux on was a 386SX/25 MHz with 4MB
+> RAM, and that had a MMU.
 
-A standard shell will work over things other than a tty device. It
-really doesn't care so long as it gets a stream of data punctuated by
-end of statement symbols. It'll work over pipes, sockets, from files.
+Let's halve that. I once tried and ran Linux in 2 MiB, incl. X, twm, and xterm.
+Of course with swap enabled.  And swapping like hell.
 
-> I beg to disagree here.??First, before you call my code "totally?
-> unmaintainable" I'd politely ask you to have a look at it first.
+Gr{oetje,eeting}s,
 
-I said the combination makes it more unmaintainable. If you have two
-tty layers one of them faking the API of the other at various interface
-points then if the core tty layer wants to make a major change it no
-longer can - because it'll break the other tty layer. In addition I
-worry it won't be long before someone wants kgdb, gdbstubs and sysrq
-over the cut down console and on it will go.
+                        Geert
 
-The uart layer is also known broken as an API - it is itself bloated
-and over-locking (for example if it was being written today kfifo would
-be used). What happens if we want to abolish it or encourage people to
-move away from it (as we IMHO should be) ?
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-The serio code started with exactly the same problem, but now at least
-talks tty layer. In your case you are tying it to something we
-eventually ought to get rid of.
-
-I also find the large scale need for it hard to believe. If you are
-within 64K of running out of memory on your debug/devel device how are
-you going to have space to fix security holes and do upgrades as they
-occur in production (where presumably you don't need the tty driver) ?
-The kernel doesn't exactly get smaller each release.
-
-Alan
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
