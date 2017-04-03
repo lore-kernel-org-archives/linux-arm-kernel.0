@@ -1,58 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:38:05 +0100
-Subject: [PATCH v5 32/34] arm64: hyp-stub: Zero x0 on successful stub handling
+Date: Mon,  3 Apr 2017 19:38:07 +0100
+Subject: [PATCH v5 34/34] arm/arm64: Add hyp-stub API documentation
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-33-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-35-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now return HVC_STUB_ERR when a stub hypercall fails, but we
-leave whatever was in x0 on success. Zeroing it on return seems
-like a good idea.
+In order to help people understanding the hyp-stub API that exists
+between the host kernel and the hypervisor mode (whether a hypervisor
+has been installed or not), let's document said API.
 
+As with any form of documentation, I expect it to become obsolete
+and completely misleading within 20 minutes after having being merged.
+
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/hyp-stub.S | 4 +++-
- arch/arm64/kvm/hyp-init.S    | 6 +++---
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ Documentation/virtual/kvm/arm/hyp-abi.txt | 53 +++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index d55604d91e33..e1261fbaa374 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -73,8 +73,10 @@ el1_sync:
- 
- 	/* Someone called kvm_call_hyp() against the hyp-stub... */
- 	ldr	x0, =HVC_STUB_ERR
-+	eret
- 
--9:	eret
-+9:	mov	x0, xzr
-+	eret
- ENDPROC(el1_sync)
- 
- .macro invalid_vector	label
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3734e6315cd7..839425c24b1c 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -154,13 +154,13 @@ reset:
- 	/* Install stub vectors */
- 	adr_l	x5, __hyp_stub_vectors
- 	msr	vbar_el2, x5
--	b	exit
-+	mov	x0, xzr
-+	eret
- 
- 1:	/* Bad stub call */
- 	ldr	x0, =HVC_STUB_ERR
--
--exit:
- 	eret
+diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
+new file mode 100644
+index 000000000000..a20a0bee268d
+--- /dev/null
++++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
+@@ -0,0 +1,53 @@
++* Internal ABI between the kernel and HYP
 +
- ENDPROC(__kvm_handle_stub_hvc)
- 
- 	.ltorg
++This file documents the interaction between the Linux kernel and the
++hypervisor layer when running Linux as a hypervisor (for example
++KVM). It doesn't cover the interaction of the kernel with the
++hypervisor when running as a guest (under Xen, KVM or any other
++hypervisor), or any hypervisor-specific interaction when the kernel is
++used as a host.
++
++On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
++mode, but still needs to interact with it, allowing a built-in
++hypervisor to be either installed or torn down.
++
++In order to achieve this, the kernel must be booted at HYP (arm) or
++EL2 (arm64), allowing it to install a set of stubs before dropping to
++SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
++and only act on individual CPUs.
++
++Unless specified otherwise, any built-in hypervisor must implement
++these functions (see arch/arm{,64}/include/asm/virt.h):
++
++* r0/x0 = HVC_SET_VECTORS
++  r1/x1 = vectors
++
++  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
++  must be a physical address, and respect the alignment requirements
++  of the architecture. Only implemented by the initial stubs, not by
++  Linux hypervisors.
++
++* r0/x0 = HVC_RESET_VECTORS
++
++  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the initials
++  stubs' exception vector value. This effectively disables an existing
++  hypervisor.
++
++* r0/x0 = HVC_SOFT_RESTART
++  r1/x1 = restart address
++  x2 = x0's value when entering the next payload (arm64)
++  x3 = x1's value when entering the next payload (arm64)
++  x4 = x2's value when entering the next payload (arm64)
++
++  Mask all exceptions, disable the MMU, move the arguments into place
++  (arm64 only), and jump to the restart address while at HYP/EL2. This
++  hypercall is not expected to return to its caller.
++
++Any other value of r0/x0 triggers a hypervisor-specific handling,
++which is not documented here.
++
++The return value of a stub hypercall is held by r0/x0, and is 0 on
++success, and HVC_STUB_ERR on error. A stub hypercall is allowed to
++clobber any of the caller-saved registers (x0-x18 on arm64, r0-r3 and
++ip on arm). It is thus recommended to use a function call to perform
++the hypercall.
 -- 
 2.11.0
