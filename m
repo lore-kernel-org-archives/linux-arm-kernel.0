@@ -1,98 +1,95 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Mon,  3 Apr 2017 11:57:42 -0700
-Subject: [PATCHv3 00/22] Ion clean up in preparation in moving out of staging
-Message-ID: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+Date: Mon,  3 Apr 2017 11:58:01 -0700
+Subject: [PATCHv3 19/22] staging: android: ion: Drop ion_map_kernel interface
+In-Reply-To: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+Message-ID: <1491245884-15852-20-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Nobody uses this interface externally. Drop it.
 
-This is v3 of the series to do some serious Ion cleanup in preparation for
-moving out of staging. I didn't hear much on v2 so I'm going to assume
-people are okay with the series as is. I know there were still some open
-questions about moving away from /dev/ion but in the interest of small
-steps I'd like to go ahead and merge this series assuming there are no more
-major objections. More work can happen on top of this.
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+ drivers/staging/android/ion/ion.c | 59 ---------------------------------------
+ 1 file changed, 59 deletions(-)
 
-Changes from v2:
-- Dropped the RFC tag
-- Minor bisectability fixes
-- Sumit's comment about CMA naming
-- Updated the TODO list
-
-Thanks,
-Laura
-
-Laura Abbott (22):
-  cma: Store a name in the cma structure
-  cma: Introduce cma_for_each_area
-  staging: android: ion: Remove dmap_cnt
-  staging: android: ion: Remove alignment from allocation field
-  staging: android: ion: Duplicate sg_table
-  staging: android: ion: Call dma_map_sg for syncing and mapping
-  staging: android: ion: Remove page faulting support
-  staging: android: ion: Remove crufty cache support
-  staging: android: ion: Remove custom ioctl interface
-  staging: android: ion: Remove import interface
-  staging: android: ion: Remove duplicate ION_IOC_MAP
-  staging: android: ion: Remove old platform support
-  staging: android: ion: Use CMA APIs directly
-  staging: android: ion: Stop butchering the DMA address
-  staging: android: ion: Break the ABI in the name of forward progress
-  staging: android: ion: Get rid of ion_phys_addr_t
-  staging: android: ion: Collapse internal header files
-  staging: android: ion: Rework heap registration/enumeration
-  staging: android: ion: Drop ion_map_kernel interface
-  staging: android: ion: Remove ion_handle and ion_client
-  staging: android: ion: Set query return value
-  staging/android: Update Ion TODO list
-
- arch/powerpc/kvm/book3s_hv_builtin.c               |    3 +-
- drivers/base/dma-contiguous.c                      |    5 +-
- drivers/staging/android/TODO                       |   21 +-
- drivers/staging/android/ion/Kconfig                |   56 +-
- drivers/staging/android/ion/Makefile               |   18 +-
- drivers/staging/android/ion/compat_ion.c           |  195 ----
- drivers/staging/android/ion/compat_ion.h           |   29 -
- drivers/staging/android/ion/hisilicon/Kconfig      |    5 -
- drivers/staging/android/ion/hisilicon/Makefile     |    1 -
- drivers/staging/android/ion/hisilicon/hi6220_ion.c |  113 --
- drivers/staging/android/ion/ion-ioctl.c            |   85 +-
- drivers/staging/android/ion/ion.c                  | 1168 +++-----------------
- drivers/staging/android/ion/ion.h                  |  389 +++++--
- drivers/staging/android/ion/ion_carveout_heap.c    |   37 +-
- drivers/staging/android/ion/ion_chunk_heap.c       |   27 +-
- drivers/staging/android/ion/ion_cma_heap.c         |  125 +--
- drivers/staging/android/ion/ion_dummy_driver.c     |  155 ---
- drivers/staging/android/ion/ion_heap.c             |   68 --
- drivers/staging/android/ion/ion_of.c               |  184 ---
- drivers/staging/android/ion/ion_of.h               |   37 -
- drivers/staging/android/ion/ion_page_pool.c        |    6 +-
- drivers/staging/android/ion/ion_priv.h             |  473 --------
- drivers/staging/android/ion/ion_system_heap.c      |   53 +-
- drivers/staging/android/ion/ion_test.c             |  305 -----
- drivers/staging/android/ion/tegra/Makefile         |    1 -
- drivers/staging/android/ion/tegra/tegra_ion.c      |   80 --
- drivers/staging/android/uapi/ion.h                 |   86 +-
- drivers/staging/android/uapi/ion_test.h            |   69 --
- include/linux/cma.h                                |    6 +-
- mm/cma.c                                           |   31 +-
- mm/cma.h                                           |    1 +
- mm/cma_debug.c                                     |    2 +-
- 32 files changed, 620 insertions(+), 3214 deletions(-)
- delete mode 100644 drivers/staging/android/ion/compat_ion.c
- delete mode 100644 drivers/staging/android/ion/compat_ion.h
- delete mode 100644 drivers/staging/android/ion/hisilicon/Kconfig
- delete mode 100644 drivers/staging/android/ion/hisilicon/Makefile
- delete mode 100644 drivers/staging/android/ion/hisilicon/hi6220_ion.c
- delete mode 100644 drivers/staging/android/ion/ion_dummy_driver.c
- delete mode 100644 drivers/staging/android/ion/ion_of.c
- delete mode 100644 drivers/staging/android/ion/ion_of.h
- delete mode 100644 drivers/staging/android/ion/ion_priv.h
- delete mode 100644 drivers/staging/android/ion/ion_test.c
- delete mode 100644 drivers/staging/android/ion/tegra/Makefile
- delete mode 100644 drivers/staging/android/ion/tegra/tegra_ion.c
- delete mode 100644 drivers/staging/android/uapi/ion_test.h
-
+diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
+index 7d40233..5a82bea 100644
+--- a/drivers/staging/android/ion/ion.c
++++ b/drivers/staging/android/ion/ion.c
+@@ -424,22 +424,6 @@ static void *ion_buffer_kmap_get(struct ion_buffer *buffer)
+ 	return vaddr;
+ }
+ 
+-static void *ion_handle_kmap_get(struct ion_handle *handle)
+-{
+-	struct ion_buffer *buffer = handle->buffer;
+-	void *vaddr;
+-
+-	if (handle->kmap_cnt) {
+-		handle->kmap_cnt++;
+-		return buffer->vaddr;
+-	}
+-	vaddr = ion_buffer_kmap_get(buffer);
+-	if (IS_ERR(vaddr))
+-		return vaddr;
+-	handle->kmap_cnt++;
+-	return vaddr;
+-}
+-
+ static void ion_buffer_kmap_put(struct ion_buffer *buffer)
+ {
+ 	buffer->kmap_cnt--;
+@@ -462,49 +446,6 @@ static void ion_handle_kmap_put(struct ion_handle *handle)
+ 		ion_buffer_kmap_put(buffer);
+ }
+ 
+-void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle)
+-{
+-	struct ion_buffer *buffer;
+-	void *vaddr;
+-
+-	mutex_lock(&client->lock);
+-	if (!ion_handle_validate(client, handle)) {
+-		pr_err("%s: invalid handle passed to map_kernel.\n",
+-		       __func__);
+-		mutex_unlock(&client->lock);
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	buffer = handle->buffer;
+-
+-	if (!handle->buffer->heap->ops->map_kernel) {
+-		pr_err("%s: map_kernel is not implemented by this heap.\n",
+-		       __func__);
+-		mutex_unlock(&client->lock);
+-		return ERR_PTR(-ENODEV);
+-	}
+-
+-	mutex_lock(&buffer->lock);
+-	vaddr = ion_handle_kmap_get(handle);
+-	mutex_unlock(&buffer->lock);
+-	mutex_unlock(&client->lock);
+-	return vaddr;
+-}
+-EXPORT_SYMBOL(ion_map_kernel);
+-
+-void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle)
+-{
+-	struct ion_buffer *buffer;
+-
+-	mutex_lock(&client->lock);
+-	buffer = handle->buffer;
+-	mutex_lock(&buffer->lock);
+-	ion_handle_kmap_put(handle);
+-	mutex_unlock(&buffer->lock);
+-	mutex_unlock(&client->lock);
+-}
+-EXPORT_SYMBOL(ion_unmap_kernel);
+-
+ static struct mutex debugfs_mutex;
+ static struct rb_root *ion_root_client;
+ static int is_client_alive(struct ion_client *client)
 -- 
 2.7.4
