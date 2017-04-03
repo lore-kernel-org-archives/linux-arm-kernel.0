@@ -1,17 +1,15 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 3 Apr 2017 09:08:16 +0200
-Subject: [PATCH 2/3] ARM: dts: alpine: add spaces before the uart node
- units.
-In-Reply-To: <20170329093827.18881-2-antoine.tenart@free-electrons.com>
+Date: Mon, 3 Apr 2017 09:07:58 +0200
+Subject: [PATCH 1/3] ARM: dts: alpine: remove 0x's from the uart1 node
+ unit address
+In-Reply-To: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
 References: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
- <20170329093827.18881-2-antoine.tenart@free-electrons.com>
-Message-ID: <20170403070816.nlgoylae57gbuc6i@kwain>
+Message-ID: <20170403070758.aexdiv5pyawu7tzr@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:38:26AM +0200, Antoine Tenart wrote:
-> Cosmetic cleanup to have consistent node definitions. Add a space before
-> the node units which do not have one.
+On Wed, Mar 29, 2017 at 11:38:25AM +0200, Antoine Tenart wrote:
+> Remove 0x's from the uart1 node unit address to have consistent nodes.
 > 
 > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
@@ -19,28 +17,19 @@ Applied on alpine/dt.
 Thanks!
 
 > ---
->  arch/arm/boot/dts/alpine.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/boot/dts/alpine.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-> index 341a500c8d8a..d84bd7955b54 100644
+> index f09f9c8e178a..341a500c8d8a 100644
 > --- a/arch/arm/boot/dts/alpine.dtsi
 > +++ b/arch/arm/boot/dts/alpine.dtsi
-> @@ -120,7 +120,7 @@
->  				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
->  		};
->  
-> -		uart0:uart at fd883000 {
-> +		uart0: uart at fd883000 {
->  			compatible = "ns16550a";
->  			reg = <0x0 0xfd883000 0x0 0x1000>;
->  			clock-frequency = <0>; /* Filled by loader */
 > @@ -129,7 +129,7 @@
 >  			reg-io-width = <4>;
 >  		};
 >  
-> -		uart1:uart at fd884000 {
-> +		uart1: uart at fd884000 {
+> -		uart1:uart at 0xfd884000 {
+> +		uart1:uart at fd884000 {
 >  			compatible = "ns16550a";
 >  			reg = <0x0 0xfd884000 0x0 0x1000>;
 >  			clock-frequency = <0>; /* Filled by loader */
@@ -58,4 +47,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/ec809886/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/5846ce51/attachment.sig>
