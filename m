@@ -1,51 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Apr 2017 16:48:15 +0100
-Subject: Bad page state splats on arm64, v4.11-rc{3,4}
-In-Reply-To: <20170403113751.GD5706@arm.com>
-References: <20170331175845.GE6488@leverpostej>
- <20170403105629.GB18905@leverpostej>
- <20170403113751.GD5706@arm.com>
-Message-ID: <20170403154815.GE25550@e104818-lin.cambridge.arm.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Mon,  3 Apr 2017 17:48:28 +0200
+Subject: [PATCH V5 1/2] dt-bindings: thermal: add support for Broadcom's
+ Northstar thermal
+In-Reply-To: <20170331201124.656-1-zajec5@gmail.com>
+References: <20170331201124.656-1-zajec5@gmail.com>
+Message-ID: <20170403154829.29780-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 12:37:51PM +0100, Will Deacon wrote:
-> On Mon, Apr 03, 2017 at 11:56:29AM +0100, Mark Rutland wrote:
-> > On Fri, Mar 31, 2017 at 06:58:45PM +0100, Mark Rutland wrote:
-> > > Hi,
-> > > 
-> > > I'm seeing intermittent bad page state splats on arm64 with 4.11-rc3 and
-> > > v4.11-rc4. I have not tested earlier kernels, or other architectures.
-> > > 
-> > > So far, it looks like the flags are always bad in the same
-> > > way:
-> > > 
-> > > 	bad because of flags: 0x80(waiters)
-> > > 
-> > > ... though I don't know if that's definitely the case for splat 4, the
-> > > BUG at mm/page_alloc.c:800.
-> > > 
-> > > I see this in QEMU VMs launched by Syzkaller, triggering once every few
-> > > hours. So far, I have not been able to reproduce the issue in any other
-> > > way (including using syz-repro).
-> > 
-> > It looks like this may be an issue with the arm64 HUGETLB code.
-> > 
-> > I wasn't able to trigger the issue over the weekend on a kernel with
-> > HUGETLBFS disabled. There are known issues with our handling of
-> > contiguous entries, and this might be an artefact of that.
-> 
-> After chatting with Punit, it looks like this might be because the GUP
-> code doesn't handle huge ptes (which we create using the contiguous hint),
-> so follow_page_pte ends up with one of those and goes wrong. In particular,
-> the migration code will certainly do the wrong thing.
-> 
-> I'll probably revert the contiguous support (again) if testing indicates
-> that it makes this issue disappear.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-It might be worth checking with Punit's patches as well:
+This commit documents binding for thermal used in Northstar family SoCs.
 
-https://marc.info/?l=linux-arm-kernel&m=149089199018167&w=2
+There isn't any known Northstar device with active cooling system so DT
+example has empty cooling-maps node. There is also no support for CPU
+frequency throttling so I put only a critical trip in the example.
 
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+V3: Add thermal-zones to the example
+V5: Extend example by including trips and cooling-maps. Update commit message
+---
+ .../devicetree/bindings/thermal/brcm,ns-thermal    | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+
+diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+new file mode 100644
+index 000000000000..68e047170039
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
+@@ -0,0 +1,37 @@
++* Broadcom Northstar Thermal
++
++This binding describes thermal sensor that is part of Northstar's DMU (Device
++Management Unit).
++
++Required properties:
++- compatible : Must be "brcm,ns-thermal"
++- reg : iomem address range of PVTMON registers
++- #thermal-sensor-cells : Should be <0>
++
++Example:
++
++thermal: thermal at 1800c2c0 {
++	compatible = "brcm,ns-thermal";
++	reg = <0x1800c2c0 0x10>;
++	#thermal-sensor-cells = <0>;
++};
++
++thermal-zones {
++	cpu_thermal: cpu-thermal {
++		polling-delay-passive = <0>;
++		polling-delay = <1000>;
++		coefficients = <(-556) 418000>;
++		thermal-sensors = <&thermal>;
++
++		trips {
++			cpu-crit {
++				temperature	= <125000>;
++				hysteresis	= <0>;
++				type		= "critical";
++			};
++		};
++
++		cooling-maps {
++		};
++	};
++};
 -- 
-Catalin
+2.11.0
