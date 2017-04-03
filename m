@@ -1,276 +1,318 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 3 Apr 2017 11:28:44 +0900
-Subject: [PATCH v34 06/14] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <CAKv+Gu-7eQaceTK7q35FkTnmT2r+mLys9bWoK-aQxh_0enwLqQ@mail.gmail.com>
-References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
- <20170328065130.16019-4-takahiro.akashi@linaro.org>
- <CAKv+Gu8MFxQ8Lk2io7ywfe=em0qTm8MgCAfrFkQFtAoOaiNqkw@mail.gmail.com>
- <20170328110733.GB16309@linaro.org>
- <CAKv+Gu8_+WR3qrbxX4ZNZwnWDa=rpMgR=hsqzhtyC=n5+0zJUQ@mail.gmail.com>
- <20170330095625.GC16309@linaro.org>
- <CAKv+Gu-7eQaceTK7q35FkTnmT2r+mLys9bWoK-aQxh_0enwLqQ@mail.gmail.com>
-Message-ID: <20170403022843.GD16309@linaro.org>
+Date: Mon,  3 Apr 2017 11:24:36 +0900
+Subject: [PATCH v35 08/14] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20170403022139.12383-1-takahiro.akashi@linaro.org>
+References: <20170403022139.12383-1-takahiro.akashi@linaro.org>
+Message-ID: <20170403022440.12515-6-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 02:58:14PM +0100, Ard Biesheuvel wrote:
-> On 30 March 2017 at 10:56, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> > Date: Tue, 28 Mar 2017 15:51:24 +0900
-> > Subject: [PATCH] arm64: kdump: protect crash dump kernel memory
-> >
-> > arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
-> > are meant to be called by kexec_load() in order to protect the memory
-> > allocated for crash dump kernel once the image is loaded.
-> >
-> > The protection is implemented by unmapping the relevant segments in crash
-> > dump kernel memory, rather than making it read-only as other archs do,
-> > to prevent coherency issues due to potential cache aliasing (with
-> > mismatched attributes).
-> >
-> > Page-level mappings are consistently used here so that we can change
-> > the attributes of segments in page granularity as well as shrink the region
-> > also in page granularity through /sys/kernel/kexec_crash_size, putting
-> > the freed memory back to buddy system.
-> >
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> 
-> This looks mostly correct. One comment below.
-> 
-> > ---
-> >  arch/arm64/kernel/machine_kexec.c |  32 +++++++++---
-> >  arch/arm64/mm/mmu.c               | 103 ++++++++++++++++++++------------------
-> >  2 files changed, 80 insertions(+), 55 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index bc96c8a7fc79..b63baa749609 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -14,7 +14,9 @@
-> >
-> >  #include <asm/cacheflush.h>
-> >  #include <asm/cpu_ops.h>
-> > +#include <asm/mmu.h>
-> >  #include <asm/mmu_context.h>
-> > +#include <asm/page.h>
-> >
-> >  #include "cpu-reset.h"
-> >
-> > @@ -22,8 +24,6 @@
-> >  extern const unsigned char arm64_relocate_new_kernel[];
-> >  extern const unsigned long arm64_relocate_new_kernel_size;
-> >
-> > -static unsigned long kimage_start;
-> > -
-> >  /**
-> >   * kexec_image_info - For debugging output.
-> >   */
-> > @@ -64,8 +64,6 @@ void machine_kexec_cleanup(struct kimage *kimage)
-> >   */
-> >  int machine_kexec_prepare(struct kimage *kimage)
-> >  {
-> > -       kimage_start = kimage->start;
-> > -
-> >         kexec_image_info(kimage);
-> >
-> >         if (kimage->type != KEXEC_TYPE_CRASH && cpus_are_stuck_in_kernel()) {
-> > @@ -183,7 +181,7 @@ void machine_kexec(struct kimage *kimage)
-> >         kexec_list_flush(kimage);
-> >
-> >         /* Flush the new image if already in place. */
-> > -       if (kimage->head & IND_DONE)
-> > +       if ((kimage != kexec_crash_image) && (kimage->head & IND_DONE))
-> >                 kexec_segment_flush(kimage);
-> >
-> >         pr_info("Bye!\n");
-> > @@ -201,7 +199,7 @@ void machine_kexec(struct kimage *kimage)
-> >          */
-> >
-> >         cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
-> > -               kimage_start, 0);
-> > +               kimage->start, 0);
-> >
-> >         BUG(); /* Should never get here. */
-> >  }
-> > @@ -210,3 +208,25 @@ void machine_crash_shutdown(struct pt_regs *regs)
-> >  {
-> >         /* Empty routine needed to avoid build errors. */
-> >  }
-> > +
-> > +void arch_kexec_protect_crashkres(void)
-> > +{
-> > +       int i;
-> > +
-> > +       kexec_segment_flush(kexec_crash_image);
-> > +
-> > +       for (i = 0; i < kexec_crash_image->nr_segments; i++)
-> > +               set_memory_valid(
-> > +                       __phys_to_virt(kexec_crash_image->segment[i].mem),
-> > +                       kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 0);
-> > +}
-> > +
-> > +void arch_kexec_unprotect_crashkres(void)
-> > +{
-> > +       int i;
-> > +
-> > +       for (i = 0; i < kexec_crash_image->nr_segments; i++)
-> > +               set_memory_valid(
-> > +                       __phys_to_virt(kexec_crash_image->segment[i].mem),
-> > +                       kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 1);
-> > +}
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index 91502e36e6d9..3cde5f2d30ec 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -22,6 +22,8 @@
-> >  #include <linux/kernel.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/init.h>
-> > +#include <linux/ioport.h>
-> > +#include <linux/kexec.h>
-> >  #include <linux/libfdt.h>
-> >  #include <linux/mman.h>
-> >  #include <linux/nodemask.h>
-> > @@ -393,10 +395,28 @@ static void update_mapping_prot(phys_addr_t phys, unsigned long virt,
-> >         flush_tlb_kernel_range(virt, virt + size);
-> >  }
-> >
-> > -static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
-> > +static void __init __map_memblock(pgd_t *pgd, phys_addr_t start,
-> > +                                 phys_addr_t end, pgprot_t prot, int flags)
-> > +{
-> > +       __create_pgd_mapping(pgd, start, __phys_to_virt(start), end - start,
-> > +                            prot, early_pgtable_alloc, flags);
-> > +}
-> > +
-> > +void __init mark_linear_text_alias_ro(void)
-> > +{
-> > +       /*
-> > +        * Remove the write permissions from the linear alias of .text/.rodata
-> > +        */
-> > +       update_mapping_prot(__pa_symbol(_text), (unsigned long)lm_alias(_text),
-> > +                           (unsigned long)__init_begin - (unsigned long)_text,
-> > +                           PAGE_KERNEL_RO);
-> > +}
-> > +
-> > +static void __init map_mem(pgd_t *pgd)
-> >  {
-> >         phys_addr_t kernel_start = __pa_symbol(_text);
-> >         phys_addr_t kernel_end = __pa_symbol(__init_begin);
-> > +       struct memblock_region *reg;
-> >         int flags = 0;
-> >
-> >         if (debug_pagealloc_enabled())
-> > @@ -405,30 +425,28 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
-> >         /*
-> >          * Take care not to create a writable alias for the
-> >          * read-only text and rodata sections of the kernel image.
-> > +        * So temporarily mark them as NOMAP to skip mappings in
-> > +        * the following for-loop
-> >          */
-> > +       memblock_mark_nomap(kernel_start, kernel_end - kernel_start);
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +       if (crashk_res.end)
-> > +               memblock_mark_nomap(crashk_res.start,
-> > +                                   resource_size(&crashk_res));
-> > +#endif
-> >
-> > -       /* No overlap with the kernel text/rodata */
-> > -       if (end < kernel_start || start >= kernel_end) {
-> > -               __create_pgd_mapping(pgd, start, __phys_to_virt(start),
-> > -                                    end - start, PAGE_KERNEL,
-> > -                                    early_pgtable_alloc, flags);
-> > -               return;
-> > -       }
-> > +       /* map all the memory banks */
-> > +       for_each_memblock(memory, reg) {
-> > +               phys_addr_t start = reg->base;
-> > +               phys_addr_t end = start + reg->size;
-> >
-> > -       /*
-> > -        * This block overlaps the kernel text/rodata mappings.
-> > -        * Map the portion(s) which don't overlap.
-> > -        */
-> > -       if (start < kernel_start)
-> > -               __create_pgd_mapping(pgd, start,
-> > -                                    __phys_to_virt(start),
-> > -                                    kernel_start - start, PAGE_KERNEL,
-> > -                                    early_pgtable_alloc, flags);
-> > -       if (kernel_end < end)
-> > -               __create_pgd_mapping(pgd, kernel_end,
-> > -                                    __phys_to_virt(kernel_end),
-> > -                                    end - kernel_end, PAGE_KERNEL,
-> > -                                    early_pgtable_alloc, flags);
-> > +               if (start >= end)
-> > +                       break;
-> > +               if (memblock_is_nomap(reg))
-> > +                       continue;
-> > +
-> > +               __map_memblock(pgd, start, end, PAGE_KERNEL, flags);
-> > +       }
-> >
-> >         /*
-> >          * Map the linear alias of the [_text, __init_begin) interval
-> > @@ -440,37 +458,24 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
-> >          * Note that contiguous mappings cannot be remapped in this way,
-> >          * so we should avoid them here.
-> >          */
-> > -       __create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
-> > -                            kernel_end - kernel_start, PAGE_KERNEL,
-> > -                            early_pgtable_alloc, NO_CONT_MAPPINGS);
-> > -}
-> > +       __map_memblock(pgd, kernel_start, kernel_end,
-> > +                      PAGE_KERNEL_RO, NO_CONT_MAPPINGS);
-> 
-> This should be PAGE_KERNEL not PAGE_KERNEL_RO.
+Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+and save registers' status in per-cpu ELF notes before starting crash
+dump kernel. See kernel_kexec().
+Even if not all secondary cpus have shut down, we do kdump anyway.
 
-Ah, yes. Fixed it.
+As we don't have to make non-boot(crashed) cpus offline (to preserve
+correct status of cpus at crash dump) before shutting down, this patch
+also adds a variant of smp_send_stop().
 
-Thanks,
--Takahiro AKASHI
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: James Morse <james.morse@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/hardirq.h  |  2 +-
+ arch/arm64/include/asm/kexec.h    | 42 +++++++++++++++++++++++-
+ arch/arm64/include/asm/smp.h      |  3 ++
+ arch/arm64/kernel/machine_kexec.c | 58 ++++++++++++++++++++++++++++++---
+ arch/arm64/kernel/smp.c           | 68 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 167 insertions(+), 6 deletions(-)
 
-
-> > +       memblock_clear_nomap(kernel_start, kernel_end - kernel_start);
-> >
-> > -void __init mark_linear_text_alias_ro(void)
-> > -{
-> > +#ifdef CONFIG_KEXEC_CORE
-> >         /*
-> > -        * Remove the write permissions from the linear alias of .text/.rodata
-> > +        * Use page-level mappings here so that we can shrink the region
-> > +        * in page granularity and put back unused memory to buddy system
-> > +        * through /sys/kernel/kexec_crash_size interface.
-> >          */
-> > -       update_mapping_prot(__pa_symbol(_text), (unsigned long)lm_alias(_text),
-> > -                           (unsigned long)__init_begin - (unsigned long)_text,
-> > -                           PAGE_KERNEL_RO);
-> > -}
-> > -
-> > -static void __init map_mem(pgd_t *pgd)
-> > -{
-> > -       struct memblock_region *reg;
-> > -
-> > -       /* map all the memory banks */
-> > -       for_each_memblock(memory, reg) {
-> > -               phys_addr_t start = reg->base;
-> > -               phys_addr_t end = start + reg->size;
-> > -
-> > -               if (start >= end)
-> > -                       break;
-> > -               if (memblock_is_nomap(reg))
-> > -                       continue;
-> > -
-> > -               __map_memblock(pgd, start, end);
-> > +       if (crashk_res.end) {
-> > +               __map_memblock(pgd, crashk_res.start, crashk_res.end + 1,
-> > +                              PAGE_KERNEL,
-> > +                              NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS);
-> > +               memblock_clear_nomap(crashk_res.start,
-> > +                                    resource_size(&crashk_res));
-> >         }
-> > +#endif
-> >  }
-> >
-> >  void mark_rodata_ro(void)
-> > --
-> > 2.11.1
-> >
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 8740297dac77..1473fc2f7ab7 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	6
++#define NR_IPI	7
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index 90aabbe893b7..e17f0529a882 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -40,7 +40,47 @@
+ static inline void crash_setup_regs(struct pt_regs *newregs,
+ 				    struct pt_regs *oldregs)
+ {
+-	/* Empty routine needed to avoid build errors. */
++	if (oldregs) {
++		memcpy(newregs, oldregs, sizeof(*newregs));
++	} else {
++		u64 tmp1, tmp2;
++
++		__asm__ __volatile__ (
++			"stp	 x0,   x1, [%2, #16 *  0]\n"
++			"stp	 x2,   x3, [%2, #16 *  1]\n"
++			"stp	 x4,   x5, [%2, #16 *  2]\n"
++			"stp	 x6,   x7, [%2, #16 *  3]\n"
++			"stp	 x8,   x9, [%2, #16 *  4]\n"
++			"stp	x10,  x11, [%2, #16 *  5]\n"
++			"stp	x12,  x13, [%2, #16 *  6]\n"
++			"stp	x14,  x15, [%2, #16 *  7]\n"
++			"stp	x16,  x17, [%2, #16 *  8]\n"
++			"stp	x18,  x19, [%2, #16 *  9]\n"
++			"stp	x20,  x21, [%2, #16 * 10]\n"
++			"stp	x22,  x23, [%2, #16 * 11]\n"
++			"stp	x24,  x25, [%2, #16 * 12]\n"
++			"stp	x26,  x27, [%2, #16 * 13]\n"
++			"stp	x28,  x29, [%2, #16 * 14]\n"
++			"mov	 %0,  sp\n"
++			"stp	x30,  %0,  [%2, #16 * 15]\n"
++
++			"/* faked current PSTATE */\n"
++			"mrs	 %0, CurrentEL\n"
++			"mrs	 %1, SPSEL\n"
++			"orr	 %0, %0, %1\n"
++			"mrs	 %1, DAIF\n"
++			"orr	 %0, %0, %1\n"
++			"mrs	 %1, NZCV\n"
++			"orr	 %0, %0, %1\n"
++			/* pc */
++			"adr	 %1, 1f\n"
++		"1:\n"
++			"stp	 %1, %0,   [%2, #16 * 16]\n"
++			: "=&r" (tmp1), "=&r" (tmp2)
++			: "r" (newregs)
++			: "memory"
++		);
++	}
+ }
+ 
+ #if defined(CONFIG_KEXEC_CORE) && defined(CONFIG_HIBERNATION)
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index d050d720a1b4..55f08c5acfad 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -148,6 +148,9 @@ static inline void cpu_panic_kernel(void)
+  */
+ bool cpus_are_stuck_in_kernel(void);
+ 
++extern void smp_send_crash_stop(void);
++extern bool smp_crash_stop_failed(void);
++
+ #endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif /* ifndef __ASM_SMP_H */
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index a6d66b98d795..779a80046066 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -9,6 +9,9 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
+ #include <linux/kexec.h>
+ #include <linux/page-flags.h>
+ #include <linux/smp.h>
+@@ -143,11 +146,15 @@ void machine_kexec(struct kimage *kimage)
+ {
+ 	phys_addr_t reboot_code_buffer_phys;
+ 	void *reboot_code_buffer;
++	bool in_kexec_crash = (kimage == kexec_crash_image);
++	bool stuck_cpus = cpus_are_stuck_in_kernel();
+ 
+ 	/*
+ 	 * New cpus may have become stuck_in_kernel after we loaded the image.
+ 	 */
+-	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
++	BUG_ON(!in_kexec_crash && (stuck_cpus || (num_online_cpus() > 1)));
++	WARN(in_kexec_crash && (stuck_cpus || smp_crash_stop_failed()),
++		"Some CPUs may be stale, kdump will be unreliable.\n");
+ 
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+ 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+@@ -199,15 +206,58 @@ void machine_kexec(struct kimage *kimage)
+ 	 * relocation is complete.
+ 	 */
+ 
+-	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
+-		kimage->start, 0);
++	cpu_soft_restart(kimage != kexec_crash_image,
++		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
+ 
+ 	BUG(); /* Should never get here. */
+ }
+ 
++static void machine_kexec_mask_interrupts(void)
++{
++	unsigned int i;
++	struct irq_desc *desc;
++
++	for_each_irq_desc(i, desc) {
++		struct irq_chip *chip;
++		int ret;
++
++		chip = irq_desc_get_chip(desc);
++		if (!chip)
++			continue;
++
++		/*
++		 * First try to remove the active state. If this
++		 * fails, try to EOI the interrupt.
++		 */
++		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
++
++		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
++		    chip->irq_eoi)
++			chip->irq_eoi(&desc->irq_data);
++
++		if (chip->irq_mask)
++			chip->irq_mask(&desc->irq_data);
++
++		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
++			chip->irq_disable(&desc->irq_data);
++	}
++}
++
++/**
++ * machine_crash_shutdown - shutdown non-crashing cpus and save registers
++ */
+ void machine_crash_shutdown(struct pt_regs *regs)
+ {
+-	/* Empty routine needed to avoid build errors. */
++	local_irq_disable();
++
++	/* shutdown non-crashing cpus */
++	smp_send_crash_stop();
++
++	/* for crashing cpu */
++	crash_save_cpu(regs, smp_processor_id());
++	machine_kexec_mask_interrupts();
++
++	pr_info("Starting crashdump kernel...\n");
+ }
+ 
+ void arch_kexec_protect_crashkres(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d4739552da28..ffee4e454ac5 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -39,6 +39,7 @@
+ #include <linux/completion.h>
+ #include <linux/of.h>
+ #include <linux/irq_work.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/alternative.h>
+ #include <asm/atomic.h>
+@@ -76,6 +77,7 @@ enum ipi_msg_type {
+ 	IPI_RESCHEDULE,
+ 	IPI_CALL_FUNC,
+ 	IPI_CPU_STOP,
++	IPI_CPU_CRASH_STOP,
+ 	IPI_TIMER,
+ 	IPI_IRQ_WORK,
+ 	IPI_WAKEUP
+@@ -756,6 +758,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
++	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ 	S(IPI_WAKEUP, "CPU wake-up interrupts"),
+@@ -830,6 +833,29 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 		cpu_relax();
+ }
+ 
++#ifdef CONFIG_KEXEC_CORE
++static atomic_t waiting_for_crash_ipi = ATOMIC_INIT(0);
++#endif
++
++static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
++{
++#ifdef CONFIG_KEXEC_CORE
++	crash_save_cpu(regs, cpu);
++
++	atomic_dec(&waiting_for_crash_ipi);
++
++	local_irq_disable();
++
++#ifdef CONFIG_HOTPLUG_CPU
++	if (cpu_ops[cpu]->cpu_die)
++		cpu_ops[cpu]->cpu_die(cpu);
++#endif
++
++	/* just in case */
++	cpu_park_loop();
++#endif
++}
++
+ /*
+  * Main handler for inter-processor interrupts
+  */
+@@ -860,6 +886,15 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++	case IPI_CPU_CRASH_STOP:
++		if (IS_ENABLED(CONFIG_KEXEC_CORE)) {
++			irq_enter();
++			ipi_cpu_crash_stop(cpu, regs);
++
++			unreachable();
++		}
++		break;
++
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ 	case IPI_TIMER:
+ 		irq_enter();
+@@ -932,6 +967,39 @@ void smp_send_stop(void)
+ 			   cpumask_pr_args(cpu_online_mask));
+ }
+ 
++#ifdef CONFIG_KEXEC_CORE
++void smp_send_crash_stop(void)
++{
++	cpumask_t mask;
++	unsigned long timeout;
++
++	if (num_online_cpus() == 1)
++		return;
++
++	cpumask_copy(&mask, cpu_online_mask);
++	cpumask_clear_cpu(smp_processor_id(), &mask);
++
++	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
++
++	pr_crit("SMP: stopping secondary CPUs\n");
++	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
++
++	/* Wait up to one second for other CPUs to stop */
++	timeout = USEC_PER_SEC;
++	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
++		udelay(1);
++
++	if (atomic_read(&waiting_for_crash_ipi) > 0)
++		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
++			   cpumask_pr_args(&mask));
++}
++
++bool smp_crash_stop_failed(void)
++{
++	return (atomic_read(&waiting_for_crash_ipi) > 0);
++}
++#endif
++
+ /*
+  * not supported here
+  */
+-- 
+2.11.1
