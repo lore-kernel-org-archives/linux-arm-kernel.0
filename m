@@ -1,40 +1,43 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:37:41 +0100
-Subject: [PATCH v5 08/34] arm64: KVM: Implement HVC_GET_VECTORS in the init
- code
+Date: Mon,  3 Apr 2017 19:37:48 +0100
+Subject: [PATCH v5 15/34] ARM: Update cpu_v7_reset documentation
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-9-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have an infrastructure to handle hypercalls in the KVM
-init code, let's implement HVC_GET_VECTORS there.
+cpu_v7_reset() now takes a second parameter indicating whether
+we should reboot in HYP or not. Update the documentation to
+reflect this.
 
+Tested-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp-init.S | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/mm/proc-v7.S | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 5e39ad53bcae..fded932ede1b 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -124,7 +124,12 @@ __do_hyp_init:
- ENDPROC(__kvm_hyp_init)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 1846ca4255d0..01d64c0b2563 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -39,13 +39,14 @@ ENTRY(cpu_v7_proc_fin)
+ ENDPROC(cpu_v7_proc_fin)
  
- ENTRY(__kvm_handle_stub_hvc)
--	cmp	x0, #HVC_RESET_VECTORS
-+	cmp	x0, #HVC_GET_VECTORS
-+	b.ne	1f
-+	mrs	x0, vbar_el2
-+	b	exit
-+
-+1:	cmp	x0, #HVC_RESET_VECTORS
- 	b.ne	1f
- 	/*
- 	 * Reset kvm back to the hyp stub.
+ /*
+- *	cpu_v7_reset(loc)
++ *	cpu_v7_reset(loc, hyp)
+  *
+  *	Perform a soft reset of the system.  Put the CPU into the
+  *	same state as it would be if it had been reset, and branch
+  *	to what would be the reset vector.
+  *
+  *	- loc   - location to jump to for soft reset
++ *	- hyp   - indicate if restart occurs in HYP mode
+  *
+  *	This code must be executed using a flat identity mapping with
+  *      caches disabled.
 -- 
 2.11.0
