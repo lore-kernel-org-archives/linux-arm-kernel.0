@@ -1,220 +1,101 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Mon, 3 Apr 2017 12:19:38 +0900
-Subject: [RFCv2] arm64: support HAVE_ARCH_RARE_WRITE and
- HAVE_ARCH_RARE_WRITE_MEMCPY
-In-Reply-To: <CAGXu5jLFDGO5OfOGa7B9H6pw8ivnL9MUsPZ=fQns-fbA6R-Ljw@mail.gmail.com>
-References: <1490884982-5066-1-git-send-email-hoeun.ryu@gmail.com>
- <CAGXu5jLFDGO5OfOGa7B9H6pw8ivnL9MUsPZ=fQns-fbA6R-Ljw@mail.gmail.com>
-Message-ID: <0A044FD1-41C0-4ABB-9BFF-17D21006EE2E@gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon, 3 Apr 2017 09:01:13 +0530
+Subject: [PATCH v6 0/4] phy: USB and PCIe phy drivers for Qcom chipsets
+In-Reply-To: <1490018046-8549-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1490018046-8549-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <6c18143c-267a-7a31-501d-30b5eb5e215b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On Mar 31, 2017, at 4:38 AM, Kees Cook <keescook@chromium.org> wrote:
-> 
->> On Thu, Mar 30, 2017 at 7:39 AM, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
->> This patch might be a part of Kees Cook's rare_write infrastructure series
->> for [1] for arm64 architecture.
->> 
->> This implementation is based on Mark Rutland's suggestions [2], which is
->> that a special userspace mm that maps only __start/end_rodata as RW permi-
->> ssion is prepared during early boot time (paging_init) and __arch_rare_-
->> write_begin() switches to the mm [2].
->> 
->> rare_write_mm address space is added for the special purpose and a page
->> global directory is also prepared for it. The mm remaps __start_rodata ~
->> __end_rodata to rodata_rw_alias_start which starts from TASK_SIZE_64 / 4
->> + kaslr_offset().
->> 
->> It passes LKDTM's rare write test.
-> 
-> Great work! I think this will need some further changes, though, since
-> it doesn't look to me like this would pass LKDTM's tests if it was
-> built as a module. (This is missing from my ARM attempt too... I
-> haven't figured out how to set the domain on the kernel modules...)
-> 
 
-ah.. I understand..
-so we need to additional rw mappings for modules, right ?
+On 03/20/2017 07:24 PM, Vivek Gautam wrote:
+> This patch series adds couple of PHY drivers for Qualcomm chipsets.
+> a) qcom-qusb2 phy driver: that provides High Speed USB functionality.
+> b) qcom-qmp phy driver: that is a combo phy providing support for
+>     USB3, PCIe, UFS and few other controllers.
+>
+> The patches are based on next branch of linux-phy tree, and depends
+> on phy driver grouping series[1]:
+> [PATCH v4 0/3] phy: Group phy drivers based on vendor listing.
+>
+> These patches have been tested on Dragon board db820c hardware with
+> required set of dt patches and the patches to get rpm up on msm8996.
+> Couple of other patches [2, 3] fixing DMA config for XHCI are also
+> pulled in for testing.
+> The complete branch is available in github [4].
+>
+> Changes since v5:
+>   - Addressed review comments from Bjorn:
+>     - Removed instances of readl/wirtel_relaxed calls from the drivers.
+>       Instead, using simple readl/writel. Inserting a readl after a writel
+>       to ensure the write is through to the device.
+>     - Replaced regulator handling with regulator_bulk_** apis. This helps
+>       in cutting down a lot of regulator handling code.
+>     - Fixed minor return statements.
+>
+> Changes since v4:
+>   - Addressed comment to add child nodes for qmp phy driver. Each phy lane
+>     now has a separate child node under the main qmp node.
+>   - Modified the clock and reset initialization and enable methods.
+>     Different phys - pcie, usb and later ufs, have varying number of clocks
+>     and resets that are mandatory. So adding provision for clocks and reset
+>     lists helps in requesting all mandatory resources for individual phys
+>     and handle their failure cases accordingly.
+>
+> Changes since v3:
+>   - Addressed review comments given by Rob and Stephen for qusb2 phy
+>     and qmp phy bindings respectively.
+>   - Addressed review comments given by Stephen and Bjorn for qmp phy driver.
+>
+> Changes since v2:
+>   - Addressed review comments given by Rob and Stephen for bindings.
+>   - Addressed the review comments given by Stephen for the qusb2 and qmp
+>     phy drivers.
+>
+> Changes since v1:
+>   - Moved device tree binding documentation to separate patches, as suggested
+>     by Rob.
+>   - Addressed review comment regarding qfprom accesses by qusb2 phy driver,
+>     given by Rob.
+>   - Addressed review comments from Kishon.
+>   - Addressed review comments from Srinivas for QMP phy driver.
+>   - Addressed kbuild warning.
+>
+> Please see individual patches for detailed changelogs.
+>
+> [1] https://www.spinics.net/lists/arm-kernel/msg569990.html
+> [2] https://patchwork.kernel.org/patch/9567767/
+> [3] https://patchwork.kernel.org/patch/9567779/
+> [4] https://github.com/vivekgautam1/linux/tree/linux-phy-next-qcom-phy-db820c
+>
+> Vivek Gautam (4):
+>    dt-bindings: phy: Add support for QUSB2 phy
+>    phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips
+>    dt-bindings: phy: Add support for QMP phy
+>    phy: qcom-qmp: new qmp phy driver for qcom-chipsets
 
->> 
->> [1] : http://www.openwall.com/lists/kernel-hardening/2017/02/27/5
->> [2] : https://lkml.org/lkml/2017/3/29/704
->> 
->> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
->> ---
->> arch/arm64/Kconfig               |   2 +
->> arch/arm64/include/asm/pgtable.h |   4 ++
->> arch/arm64/mm/mmu.c              | 101 +++++++++++++++++++++++++++++++++++++++
->> 3 files changed, 107 insertions(+)
->> 
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index f2b0b52..6e2c592 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -102,6 +102,8 @@ config ARM64
->>        select HAVE_SYSCALL_TRACEPOINTS
->>        select HAVE_KPROBES
->>        select HAVE_KRETPROBES
->> +       select HAVE_ARCH_RARE_WRITE
->> +       select HAVE_ARCH_RARE_WRITE_MEMCPY
->>        select IOMMU_DMA if IOMMU_SUPPORT
->>        select IRQ_DOMAIN
->>        select IRQ_FORCED_THREADING
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index c213fdbd0..1514933 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -741,6 +741,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
->> #define kc_vaddr_to_offset(v)  ((v) & ~VA_START)
->> #define kc_offset_to_vaddr(o)  ((o) | VA_START)
->> 
->> +unsigned long __arch_rare_write_begin(void);
->> +unsigned long __arch_rare_write_end(void);
->> +void __arch_rare_write_memcpy(void *dst, const void *src, __kernel_size_t len);
->> +
->> #endif /* !__ASSEMBLY__ */
->> 
->> #endif /* __ASM_PGTABLE_H */
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 91502e3..86b25c9 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -570,6 +570,105 @@ static void __init map_kernel(pgd_t *pgd)
->>        kasan_copy_shadow(pgd);
->> }
->> 
->> +struct mm_struct rare_write_mm = {
->> +       .mm_rb          = RB_ROOT,
->> +       .mm_users       = ATOMIC_INIT(2),
->> +       .mm_count       = ATOMIC_INIT(1),
->> +       .mmap_sem       = __RWSEM_INITIALIZER(rare_write_mm.mmap_sem),
->> +       .page_table_lock= __SPIN_LOCK_UNLOCKED(rare_write_mm.page_table_lock),
->> +       .mmlist         = LIST_HEAD_INIT(rare_write_mm.mmlist),
->> +};
->> +
->> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
->> +#include <asm/ptdump.h>
->> +
->> +static struct ptdump_info rare_write_ptdump_info = {
->> +       .mm             = &rare_write_mm,
->> +       .markers        = (struct addr_marker[]){
->> +               { 0,            "rare-write start" },
->> +               { TASK_SIZE_64, "rare-write end" }
->> +       },
->> +       .base_addr      = 0,
->> +};
->> +
->> +static int __init ptdump_init(void)
->> +{
->> +       return ptdump_debugfs_register(&rare_write_ptdump_info,
->> +                                      "rare_write_page_tables");
->> +}
->> +device_initcall(ptdump_init);
->> +
->> +#endif
->> +
->> +__always_inline unsigned long __arch_rare_write_begin(void)
->> +{
->> +       struct mm_struct *mm = &rare_write_mm;
->> +
->> +       preempt_disable();
->> +
->> +       __switch_mm(mm);
-> 
-> Can you include a BUG_ON check here that rare_write_mm is not already active?
-> 
+Gentle ping!
+Any more comments on this series, or are we planning to get this in for 
+4.12 ?
 
-OK, I will find the way to do so.
+Regards
+Vivek
 
->> +
->> +       if (system_uses_ttbr0_pan()) {
->> +               update_saved_ttbr0(current, mm);
->> +               cpu_switch_mm(mm->pgd, mm);
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +__always_inline unsigned long __arch_rare_write_end(void)
->> +{
->> +       struct mm_struct *mm = current->active_mm;
->> +
->> +       __switch_mm(mm);
-> 
-> And same here (though the reverse test)?
-> 
->> +
->> +       if (system_uses_ttbr0_pan()) {
->> +               cpu_set_reserved_ttbr0();
->> +               if (mm != &init_mm)
->> +                       update_saved_ttbr0(current, mm);
->> +       }
->> +
->> +       preempt_enable_no_resched();
->> +
->> +       return 0;
->> +}
->> +
->> +static unsigned long rodata_rw_alias_start __ro_after_init = TASK_SIZE_64 / 4;
->> +
->> +__always_inline void __arch_rare_write_memcpy(void *dst, const void *src,
->> +                                             __kernel_size_t len)
->> +{
->> +       unsigned long __dst = (unsigned long)dst;
->> +
->> +       __dst -= (unsigned long)__start_rodata;
->> +       __dst += rodata_rw_alias_start;
->> +
->> +       memcpy((void *)__dst, src, len);
->> +}
->> +
->> +void __init rare_write_init(void)
->> +{
->> +       phys_addr_t pgd_phys = early_pgtable_alloc();
->> +       pgd_t *pgd = (pgd_t *)__phys_to_virt(pgd_phys);
->> +       phys_addr_t pa_start = __pa_symbol(__start_rodata);
->> +       unsigned long size = __end_rodata - __start_rodata;
->> +
->> +       BUG_ON(!PAGE_ALIGNED(pa_start));
->> +       BUG_ON(!PAGE_ALIGNED(size));
->> +
->> +       rodata_rw_alias_start += kaslr_offset();
->> +
->> +       BUG_ON(rodata_rw_alias_start + size > TASK_SIZE_64);
->> +
->> +       rare_write_mm.pgd = pgd;
->> +       init_new_context(NULL, &rare_write_mm);
->> +
->> +       __create_pgd_mapping(pgd,
->> +                            pa_start, rodata_rw_alias_start, size,
->> +                            __pgprot(pgprot_val(PAGE_KERNEL) | PTE_NG),
->> +                            early_pgtable_alloc, debug_pagealloc_enabled());
->> +}
->> +
->> /*
->>  * paging_init() sets up the page tables, initialises the zone memory
->>  * maps and sets up the zero page.
->> @@ -603,6 +702,8 @@ void __init paging_init(void)
->>         */
->>        memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
->>                      SWAPPER_DIR_SIZE - PAGE_SIZE);
->> +
->> +       rare_write_init();
->> }
->> 
->> /*
->> --
->> 2.7.4
->> 
-> 
+>
+>   .../devicetree/bindings/phy/qcom-qmp-phy.txt       |  106 ++
+>   .../devicetree/bindings/phy/qcom-qusb2-phy.txt     |   45 +
+>   drivers/phy/qualcomm/Kconfig                       |   18 +
+>   drivers/phy/qualcomm/Makefile                      |    2 +
+>   drivers/phy/qualcomm/phy-qcom-qmp.c                | 1153 ++++++++++++++++++++
+>   drivers/phy/qualcomm/phy-qcom-qusb2.c              |  491 +++++++++
+>   6 files changed, 1815 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/phy/qcom-qmp-phy.txt
+>   create mode 100644 Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+>   create mode 100644 drivers/phy/qualcomm/phy-qcom-qmp.c
+>   create mode 100644 drivers/phy/qualcomm/phy-qcom-qusb2.c
+>
 
-Thank you for the review !
-
-> Thanks!
-> 
-> -Kees
-> 
-> -- 
-> Kees Cook
-> Pixel Security
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
