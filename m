@@ -1,78 +1,62 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 03 Apr 2017 11:47:22 +0530
-Subject: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
- (fwd)
-In-Reply-To: <alpine.DEB.2.20.1704030758540.2170@hadrien>
-References: <CGME20170403060045epcas2p215a1d85248b47cc389e20ff877505b09@epcas2p2.samsung.com>
- <alpine.DEB.2.20.1704030758540.2170@hadrien>
-Message-ID: <1491200242.24095.23.camel@smitha-fedora>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 3 Apr 2017 08:16:50 +0200
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <20170402233028.60acf612@free-electrons.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+ <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+ <20170321155054.2f4cb921@free-electrons.com>
+ <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
+ <20170402233028.60acf612@free-electrons.com>
+Message-ID: <0468e2fb-5a7d-97ec-c51c-2436a13dda69@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-04-03 at 08:00 +0200, Julia Lawall wrote:
-> See line 2101
-> 
-> julia
-> 
-Thank you for bringing it to my notice, I had not checked on this git.
-I will upload the next version of patches soon corresponding to this
-git.
+Hi Thomas
 
-Thanks,
-Smitha
-> --------- Forwarded message ----------
-> Date: Mon, 3 Apr 2017 05:04:39 +0800
-> From: kbuild test robot <fengguang.wu@intel.com>
-> To: kbuild at 01.org
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> Subject: Re: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
-> 
-> Hi Smitha,
-> 
-> [auto build test WARNING on linuxtv-media/master]
-> [also build test WARNING on v4.11-rc4 next-20170331]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Smitha-T-Murthy/Add-MFC-v10-10-support/20170403-033620
-> base:   git://linuxtv.org/media_tree.git master
-> :::::: branch date: 88 minutes ago
-> :::::: commit date: 88 minutes ago
-> 
-> >> drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:2101:6-25: WARNING: Unsigned expression compared with zero: p -> codec . hevc . level < 0
-> 
-> git remote add linux-review https://github.com/0day-ci/linux
-> git remote update linux-review
-> git checkout bca072db65317d79554527391338ce8bc6fbde58
-> vim +2101 drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> 
-> bca072db Smitha T Murthy 2017-03-31  2085  		break;
-> bca072db Smitha T Murthy 2017-03-31  2086  	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:
-> bca072db Smitha T Murthy 2017-03-31  2087  		p->codec.hevc.rc_b_frame_qp = ctrl->val;
-> bca072db Smitha T Murthy 2017-03-31  2088  		break;
-> bca072db Smitha T Murthy 2017-03-31  2089  	case V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION:
-> bca072db Smitha T Murthy 2017-03-31  2090  		p->codec.hevc.rc_framerate = ctrl->val;
-> bca072db Smitha T Murthy 2017-03-31  2091  		break;
-> bca072db Smitha T Murthy 2017-03-31  2092  	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:
-> bca072db Smitha T Murthy 2017-03-31  2093  		p->codec.hevc.rc_min_qp = ctrl->val;
-> bca072db Smitha T Murthy 2017-03-31  2094  		break;
-> bca072db Smitha T Murthy 2017-03-31  2095  	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:
-> bca072db Smitha T Murthy 2017-03-31  2096  		p->codec.hevc.rc_max_qp = ctrl->val;
-> bca072db Smitha T Murthy 2017-03-31  2097  		break;
-> bca072db Smitha T Murthy 2017-03-31  2098  	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
-> bca072db Smitha T Murthy 2017-03-31  2099  		p->codec.hevc.level_v4l2 = ctrl->val;
-> bca072db Smitha T Murthy 2017-03-31  2100  		p->codec.hevc.level = hevc_level(ctrl->val);
-> bca072db Smitha T Murthy 2017-03-31 @2101  		if (p->codec.hevc.level < 0) {
-> bca072db Smitha T Murthy 2017-03-31  2102  			mfc_err("Level number is wrong\n");
-> bca072db Smitha T Murthy 2017-03-31  2103  			ret = p->codec.hevc.level;
-> bca072db Smitha T Murthy 2017-03-31  2104  		}
-> bca072db Smitha T Murthy 2017-03-31  2105  		break;
-> bca072db Smitha T Murthy 2017-03-31  2106  	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
-> bca072db Smitha T Murthy 2017-03-31  2107  		switch (ctrl->val) {
-> bca072db Smitha T Murthy 2017-03-31  2108  		case V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN:
-> bca072db Smitha T Murthy 2017-03-31  2109  			ctrl->val = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN;
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
-> 
+I tested the SMSC on other platform (+ stmmac), not on SPEAr.
+
+ok for reset, keep the radar on clock. Hmm, can you attach a piece of 
+log file to see the failure?
+
+Regards
+Peppe
+
+On 4/2/2017 11:30 PM, Thomas Petazzoni wrote:
+> Hello,
+>
+> On Thu, 23 Mar 2017 11:33:23 +0100, Giuseppe CAVALLARO wrote:
+>
+>>> Further research has revealed that everything is working fine on a
+>>> platform with a Gigabit PHY connected via GMII.
+>>>
+>>> However, on a different platform (which I'm using) with a 10/100 PHY
+>>> connected via MII, DMA_RESET never clears, and networking doesn't work.
+>>> The SMSC PHY LAN8700 is also supposed to be providing the clock through
+>>> its TX_CLK pin. I double checked, and both the MAC and PHY are in MII
+>>> mode, but still no luck so far.
+>>>
+>>> Of course, if you have any suggestion or hint, I'm all ears :)
+>> I can just you to keep the focus on clock configuration. I tested the
+>> SMSC PHY LAN8700
+>> w/o any issues on several platform.  In MII both rx/tx_clk are provided
+>> by PHY and if you
+>> have an external oscillator this should be safe enough, indeed.
+>> Another check you can do is about the reset time! Maybe you need to
+>> change something
+>> when reset the SMSC transceiver, try to increase the delay (if you use
+>> GPIO to reset it).
+> On which platform did you test with the LAN8700 PHY ? Was it on a
+> SPEAr600 based platform ?
+>
+> If you tested on SPEAr600, what is the GMAC clock configuration (i.e
+> the value of the GMAC_CFG_CTR and GMAC_CFG_SYNT registers) ?
+>
+> Regarding the PHY reset time, our PHY reset pin is not connected to a
+> GPIO, but to the system reset logic, so Linux cannot reset the PHY with
+> a GPIO.
+>
+> Thanks!
+>
+> Thomas
