@@ -1,32 +1,49 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Mon, 03 Apr 2017 14:41:08 +0300
-Subject: [PATCH 16/16] drivers, net,
- intersil: convert request_context.refcount from atomic_t to refcount_t
-In-Reply-To: <1490691403-4016-17-git-send-email-elena.reshetova@intel.com>
- (Elena Reshetova's message of "Tue, 28 Mar 2017 11:56:43 +0300")
-References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
- <1490691403-4016-17-git-send-email-elena.reshetova@intel.com>
-Message-ID: <87zifxn2gb.fsf@kamboji.qca.qualcomm.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 3 Apr 2017 17:12:46 +0530
+Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-5-jean-philippe.brucker@arm.com>
+ <CA+sq2CeWpGarhT9p+iVo8nJXR=xpkj6XNMwv4LvbP0M6JxA_SA@mail.gmail.com>
+ <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
+Message-ID: <CA+sq2Ccb1mUQpTvHWsEGWyc+9HjLdq8FSqBGRM7Ey932_6X5jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Elena Reshetova <elena.reshetova@intel.com> writes:
-
-> refcount_t type and corresponding API should be
-> used instead of atomic_t when the variable is used as
-> a reference counter. This allows to avoid accidental
-> refcounter overflows that might lead to use-after-free
-> situations.
+On Mon, Apr 3, 2017 at 3:44 PM, Jean-Philippe Brucker
+<jean-philippe.brucker@arm.com> wrote:
+> On 03/04/17 09:34, Sunil Kovvuri wrote:
+>>> +static size_t arm_smmu_atc_invalidate_domain(struct arm_smmu_domain *smmu_domain,
+>>> +                                            unsigned long iova, size_t size)
+>>> +{
+>>> +       unsigned long flags;
+>>> +       struct arm_smmu_cmdq_ent cmd = {0};
+>>> +       struct arm_smmu_group *smmu_group;
+>>> +       struct arm_smmu_master_data *master;
+>>> +       struct arm_smmu_device *smmu = smmu_domain->smmu;
+>>> +       struct arm_smmu_cmdq_ent sync_cmd = {
+>>> +               .opcode = CMDQ_OP_CMD_SYNC,
+>>> +       };
+>>> +
+>>> +       spin_lock_irqsave(&smmu_domain->groups_lock, flags);
+>>> +
+>>> +       list_for_each_entry(smmu_group, &smmu_domain->groups, domain_head) {
+>>> +               if (!smmu_group->ats_enabled)
+>>> +                       continue;
+>>
+>> If ATS is not supported, this seems to increase no of cycles spent in
+>> pgtbl_lock.
+>> Can we return from this API by checking 'ARM_SMMU_FEAT_ATS' in smmu->features ?
 >
-> Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
-> Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: David Windsor <dwindsor@gmail.com>
-> ---
->  drivers/net/wireless/intersil/orinoco/orinoco_usb.c | 15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
+> Sure, I can add a check before taking the lock. Have you been able to
+> observe a significant difference in cycles between checking FEAT_ATS,
+> checking group->ats_enabled after taking the lock, and removing this
+> function call altogether?
+>
+> Thanks,
+> Jean-Philippe
 
-The prefix should be "orinoco_usb:", I'll fix that.
+No, I haven't verified, was just making an observation.
 
--- 
-Kalle Valo
+Thanks,
+Sunil.
