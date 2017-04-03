@@ -1,103 +1,269 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 3 Apr 2017 09:08:28 +0200
-Subject: [PATCH 3/3] ARM: dts: alpine: add valid clock-frequency values
-In-Reply-To: <20170329093827.18881-3-antoine.tenart@free-electrons.com>
-References: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
- <20170329093827.18881-3-antoine.tenart@free-electrons.com>
-Message-ID: <20170403070828.27sg6nxsttgzchot@kwain>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 3 Apr 2017 08:11:10 +0100
+Subject: [RFCv2] arm64: support HAVE_ARCH_RARE_WRITE and
+ HAVE_ARCH_RARE_WRITE_MEMCPY
+In-Reply-To: <3C26172F-9A1D-44E3-BDE7-139521B66AC2@gmail.com>
+References: <1490884982-5066-1-git-send-email-hoeun.ryu@gmail.com>
+ <CAKv+Gu_752QP5HGKopic=T3MA9=Vo0wHcRWXe4mN8+jTuxbB1A@mail.gmail.com>
+ <3C26172F-9A1D-44E3-BDE7-139521B66AC2@gmail.com>
+Message-ID: <CAKv+Gu9abcOxHOf4zzeFqXbvLqTAxgEpSgidr+nPH1=+9G+HHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:38:27AM +0200, Antoine Tenart wrote:
-> Update the Alpine clock-frequency values with valid default values. The
-> bootloader can still update these values if needed, but at least we can
-> boot if it does not.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+On 3 April 2017 at 05:17, Ho-Eun Ryu <hoeun.ryu@gmail.com> wrote:
+>
+>> On 31 Mar 2017, at 6:25 PM, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>
+>> On 30 March 2017 at 15:39, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
+>>> This patch might be a part of Kees Cook's rare_write infrastructure series
+>>> for [1] for arm64 architecture.
+>>>
+>>> This implementation is based on Mark Rutland's suggestions [2], which is
+>>> that a special userspace mm that maps only __start/end_rodata as RW permi-
+>>> ssion is prepared during early boot time (paging_init) and __arch_rare_-
+>>> write_begin() switches to the mm [2].
+>>>
+>>> rare_write_mm address space is added for the special purpose and a page
+>>> global directory is also prepared for it. The mm remaps __start_rodata ~
+>>> __end_rodata to rodata_rw_alias_start which starts from TASK_SIZE_64 / 4
+>>> + kaslr_offset().
+>>>
+>>> It passes LKDTM's rare write test.
+>>>
+>>> [1] : http://www.openwall.com/lists/kernel-hardening/2017/02/27/5
+>>> [2] : https://lkml.org/lkml/2017/3/29/704
+>>>
+>>> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+>>> ---
+>>> arch/arm64/Kconfig               |   2 +
+>>> arch/arm64/include/asm/pgtable.h |   4 ++
+>>> arch/arm64/mm/mmu.c              | 101 +++++++++++++++++++++++++++++++++++++++
+>>> 3 files changed, 107 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index f2b0b52..6e2c592 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -102,6 +102,8 @@ config ARM64
+>>>        select HAVE_SYSCALL_TRACEPOINTS
+>>>        select HAVE_KPROBES
+>>>        select HAVE_KRETPROBES
+>>> +       select HAVE_ARCH_RARE_WRITE
+>>> +       select HAVE_ARCH_RARE_WRITE_MEMCPY
+>>>        select IOMMU_DMA if IOMMU_SUPPORT
+>>>        select IRQ_DOMAIN
+>>>        select IRQ_FORCED_THREADING
+>>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>>> index c213fdbd0..1514933 100644
+>>> --- a/arch/arm64/include/asm/pgtable.h
+>>> +++ b/arch/arm64/include/asm/pgtable.h
+>>> @@ -741,6 +741,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+>>> #define kc_vaddr_to_offset(v)  ((v) & ~VA_START)
+>>> #define kc_offset_to_vaddr(o)  ((o) | VA_START)
+>>>
+>>> +unsigned long __arch_rare_write_begin(void);
+>>> +unsigned long __arch_rare_write_end(void);
+>>> +void __arch_rare_write_memcpy(void *dst, const void *src, __kernel_size_t len);
+>>> +
+>>
+>> If these hook into a generic framework, shouldn't these already be
+>> declared in a generic header file?
+>
+> the generic header file doesn't declare arch-specific version of api.
+>
+>>
+>>> #endif /* !__ASSEMBLY__ */
+>>>
+>>> #endif /* __ASM_PGTABLE_H */
+>>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>>> index 91502e3..86b25c9 100644
+>>> --- a/arch/arm64/mm/mmu.c
+>>> +++ b/arch/arm64/mm/mmu.c
+>>> @@ -570,6 +570,105 @@ static void __init map_kernel(pgd_t *pgd)
+>>>        kasan_copy_shadow(pgd);
+>>> }
+>>>
+>>> +struct mm_struct rare_write_mm = {
+>>
+>> static please
+>
+> OK, add static.
+>
+>>
+>>> +       .mm_rb          = RB_ROOT,
+>>> +       .mm_users       = ATOMIC_INIT(2),
+>>> +       .mm_count       = ATOMIC_INIT(1),
+>>> +       .mmap_sem       = __RWSEM_INITIALIZER(rare_write_mm.mmap_sem),
+>>> +       .page_table_lock= __SPIN_LOCK_UNLOCKED(rare_write_mm.page_table_lock),
+>>> +       .mmlist         = LIST_HEAD_INIT(rare_write_mm.mmlist),
+>>> +};
+>>> +
+>>> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+>>> +#include <asm/ptdump.h>
+>>> +
+>>> +static struct ptdump_info rare_write_ptdump_info = {
+>>> +       .mm             = &rare_write_mm,
+>>> +       .markers        = (struct addr_marker[]){
+>>> +               { 0,            "rare-write start" },
+>>> +               { TASK_SIZE_64, "rare-write end" }
+>>> +       },
+>>> +       .base_addr      = 0,
+>>> +};
+>>> +
+>>> +static int __init ptdump_init(void)
+>>> +{
+>>> +       return ptdump_debugfs_register(&rare_write_ptdump_info,
+>>> +                                      "rare_write_page_tables");
+>>> +}
+>>> +device_initcall(ptdump_init);
+>>> +
+>>> +#endif
+>>> +
+>>> +__always_inline unsigned long __arch_rare_write_begin(void)
+>>
+>> These functions are not called from the same compilation unit, so what
+>> do you think __always_inline buys you here?
+>
+> The first patch of Kee's series ([PATCH 01/11] Introduce rare_write() infrastructure) [1] says some requirements and one of these is the arch-specific helpers should be inline to avoid making them ROP targets.
+>
+> So I'd make sure the helpers are inline.
+>
+> [1] : http://www.openwall.com/lists/kernel-hardening/2017/03/29/16
+>
 
-Applied on alpine/dt.
-Thanks!
+OK, that explains a number of issues with this patch.
 
-> ---
->  arch/arm/boot/dts/alpine.dtsi | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-> index d84bd7955b54..731df7a8c4e6 100644
-> --- a/arch/arm/boot/dts/alpine.dtsi
-> +++ b/arch/arm/boot/dts/alpine.dtsi
-> @@ -41,28 +41,28 @@
->  			compatible = "arm,cortex-a15";
->  			device_type = "cpu";
->  			reg = <0>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <1700000000>;
->  		};
->  
->  		cpu at 1 {
->  			compatible = "arm,cortex-a15";
->  			device_type = "cpu";
->  			reg = <1>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <1700000000>;
->  		};
->  
->  		cpu at 2 {
->  			compatible = "arm,cortex-a15";
->  			device_type = "cpu";
->  			reg = <2>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <1700000000>;
->  		};
->  
->  		cpu at 3 {
->  			compatible = "arm,cortex-a15";
->  			device_type = "cpu";
->  			reg = <3>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <1700000000>;
->  		};
->  	};
->  
-> @@ -81,7 +81,7 @@
->  				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->  				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->  				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <50000000>;
->  		};
->  
->  		/* Interrupt Controller */
-> @@ -123,7 +123,7 @@
->  		uart0: uart at fd883000 {
->  			compatible = "ns16550a";
->  			reg = <0x0 0xfd883000 0x0 0x1000>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <375000000>;
->  			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> @@ -132,7 +132,7 @@
->  		uart1: uart at fd884000 {
->  			compatible = "ns16550a";
->  			reg = <0x0 0xfd884000 0x0 0x1000>;
-> -			clock-frequency = <0>; /* Filled by loader */
-> +			clock-frequency = <375000000>;
->  			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -- 
-> 2.11.0
-> 
+Please understand that marking a function inline has *no* effect
+whatsoever if the C definition is not visible to the caller. This is
+why the C declarations in the header file are not made generic: these
+functions are supposed to be *defined* as static inline in header
+files.
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/c7a19edc/attachment.sig>
+So please move these implementations into the header files, and mark
+them static inline. This means the rare_write_mm structure should
+*not* be made static either.
+
+
+>>
+>>> +{
+>>> +       struct mm_struct *mm = &rare_write_mm;
+>>> +
+>>> +       preempt_disable();
+>>> +
+>>> +       __switch_mm(mm);
+>>> +
+>>> +       if (system_uses_ttbr0_pan()) {
+>>> +               update_saved_ttbr0(current, mm);
+>>> +               cpu_switch_mm(mm->pgd, mm);
+>>> +       }
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +__always_inline unsigned long __arch_rare_write_end(void)
+>>> +{
+>>> +       struct mm_struct *mm = current->active_mm;
+>>> +
+>>> +       __switch_mm(mm);
+>>> +
+>>> +       if (system_uses_ttbr0_pan()) {
+>>> +               cpu_set_reserved_ttbr0();
+>>> +               if (mm != &init_mm)
+>>> +                       update_saved_ttbr0(current, mm);
+>>> +       }
+>>> +
+>>> +       preempt_enable_no_resched();
+>>> +
+>>> +       return 0;
+>>> +}
+>>> +
+>>> +static unsigned long rodata_rw_alias_start __ro_after_init = TASK_SIZE_64 / 4;
+>>> +
+>>> +__always_inline void __arch_rare_write_memcpy(void *dst, const void *src,
+>>> +                                             __kernel_size_t len)
+>>> +{
+>>> +       unsigned long __dst = (unsigned long)dst;
+>>> +
+>>> +       __dst -= (unsigned long)__start_rodata;
+>>> +       __dst += rodata_rw_alias_start;
+>>> +
+>>> +       memcpy((void *)__dst, src, len);
+>>> +}
+>>> +
+>>> +void __init rare_write_init(void)
+>>
+>> static please
+>
+> OK, add static.
+>
+>>
+>>> +{
+>>> +       phys_addr_t pgd_phys = early_pgtable_alloc();
+>>> +       pgd_t *pgd = (pgd_t *)__phys_to_virt(pgd_phys);
+>>> +       phys_addr_t pa_start = __pa_symbol(__start_rodata);
+>>> +       unsigned long size = __end_rodata - __start_rodata;
+>>> +
+>>> +       BUG_ON(!PAGE_ALIGNED(pa_start));
+>>> +       BUG_ON(!PAGE_ALIGNED(size));
+>>> +
+>>> +       rodata_rw_alias_start += kaslr_offset();
+>>> +
+>>
+>> This places the rodata alias at a fixed offset from the original,
+>> right, even under KASLR? Given that they are completely independent, I
+>> think you can use a random offset here rather than the same offset we
+>> use for vmlinux.
+>
+> What I did here is just to randomize the base of rw alias mapping when kaslr is enabled.
+> You're right it's completely independent from kaslr though, I would like to add randomization for rw alias base address by using simple solution in early boot stage.
+>
+> I' ll think again to achieve randomization or just remove it.
+>
+>>
+>>
+>>> +       BUG_ON(rodata_rw_alias_start + size > TASK_SIZE_64);
+>>> +
+>>> +       rare_write_mm.pgd = pgd;
+>>
+>> For correctness, you should add a call to mm_init_cpumask() here,
+>> although it doesn't matter in practice on arm64.
+>
+> OK, I'll fix this.
+>
+>>
+>>> +       init_new_context(NULL, &rare_write_mm);
+>>> +
+>>> +       __create_pgd_mapping(pgd,
+>>> +                            pa_start, rodata_rw_alias_start, size,
+>>> +                            __pgprot(pgprot_val(PAGE_KERNEL) | PTE_NG),
+>>> +                            early_pgtable_alloc, debug_pagealloc_enabled());
+>>
+>> This needs to be updated after the changes that are now queued in the
+>> arm64 tree for v4.12
+>>
+>> BTW you can allow page/cont mappings in all cases, no need for the
+>> debug_pagealloc_enabled() check
+>
+> I will rebase this onto the version you mentioned later.
+>
+>>
+>>> +}
+>>> +
+>>> /*
+>>>  * paging_init() sets up the page tables, initialises the zone memory
+>>>  * maps and sets up the zero page.
+>>> @@ -603,6 +702,8 @@ void __init paging_init(void)
+>>>         */
+>>>        memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
+>>>                      SWAPPER_DIR_SIZE - PAGE_SIZE);
+>>> +
+>>> +       rare_write_init();
+>>> }
+>>>
+>>> /*
+>>> --
+>>> 2.7.4
+>>>
+>
+> Thank you very much for the review
+>
