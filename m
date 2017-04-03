@@ -1,19 +1,19 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 3 Apr 2017 19:28:30 +0200
-Subject: [PATCH v4 07/28] arm64: KVM: Allow the main HYP code to use the
+Date: Mon, 3 Apr 2017 19:32:25 +0200
+Subject: [PATCH v4 19/28] ARM: KVM: Allow the main HYP code to use the
  init hyp stub implementation
-In-Reply-To: <84dad7c7-a2fc-7b20-caeb-e3fe02c0a7ec@arm.com>
+In-Reply-To: <00380529-bee2-ba10-548d-319bc4fa5c1b@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-8-marc.zyngier@arm.com>
- <20170324143358.GC25903@cbox>
- <84dad7c7-a2fc-7b20-caeb-e3fe02c0a7ec@arm.com>
-Message-ID: <20170403172830.GC11752@cbox>
+ <20170321192058.9300-20-marc.zyngier@arm.com>
+ <20170324143432.GD25903@cbox>
+ <00380529-bee2-ba10-548d-319bc4fa5c1b@arm.com>
+Message-ID: <20170403173225.GD11752@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 02:56:51PM +0000, Marc Zyngier wrote:
-> On 24/03/17 14:33, Christoffer Dall wrote:
-> > On Tue, Mar 21, 2017 at 07:20:37PM +0000, Marc Zyngier wrote:
+On Fri, Mar 24, 2017 at 03:01:23PM +0000, Marc Zyngier wrote:
+> On 24/03/17 14:34, Christoffer Dall wrote:
+> > On Tue, Mar 21, 2017 at 07:20:49PM +0000, Marc Zyngier wrote:
 > >> We now have a full hyp-stub implementation in the KVM init code,
 > >> but the main KVM code only supports HVC_GET_VECTORS, which is not
 > >> enough.
@@ -21,66 +21,58 @@ On Fri, Mar 24, 2017 at 02:56:51PM +0000, Marc Zyngier wrote:
 > >> Instead of reinventing the wheel, let's reuse the init implementation
 > >> by branching to the idmap page when called with a hyp-stub hypercall.
 > >>
-> >> Reviewed-by: James Morse <james.morse@arm.com>
+> >> Tested-by: Keerthy <j-keerthy@ti.com>
+> >> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 > >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > >> ---
-> >>  arch/arm64/kvm/hyp/hyp-entry.S | 24 +++++++++++++++++++-----
-> >>  1 file changed, 19 insertions(+), 5 deletions(-)
+> >>  arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
+> >>  1 file changed, 24 insertions(+), 5 deletions(-)
 > >>
-> >> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> >> index d8ef788646c6..4f34c5996f86 100644
-> >> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> >> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> >> @@ -87,10 +87,24 @@ alternative_endif
-> >>  	/* Here, we're pretty sure the host called HVC. */
-> >>  	ldp	x0, x1, [sp], #16
+> >> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+> >> index 1f8db7d21fc5..a35baa81fd23 100644
+> >> --- a/arch/arm/kvm/hyp/hyp-entry.S
+> >> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+> >> @@ -126,11 +126,30 @@ hyp_hvc:
+> >>  	 */
+> >>  	pop	{r0, r1, r2}
 > >>  
-> >> -	cmp	x0, #HVC_GET_VECTORS
-> >> -	b.ne	1f
-> >> -	mrs	x0, vbar_el2
-> >> -	b	2f
-> >> +	/* Check for a stub HVC call */
-> >> +	cmp	x0, #HVC_STUB_HCALL_NR
-> >> +	b.hs	1f
-> >> +
+> >> -	/* Check for __hyp_get_vectors */
+> >> -	cmp	r0, #HVC_GET_VECTORS
+> >> -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+> >> -	beq	1f
 > >> +	/*
-> >> +	 * Compute the idmap address of __kvm_handle_stub_hvc and
-> >> +	 * jump there. Since we use kimage_voffset, do not use the
-> >> +	 * HYP VA for __kvm_handle_stub_hvc, but the kernel VA instead
-> >> +	 * (by loading it from the constant pool).
-> >> +	 *
-> >> +	 * Preserve x0-x4, which may contain stub parameters.
+> >> +	 * Check if we have a kernel function, which is guaranteed to be
+> >> +	 * bigger than the maximum hyp stub hypercall
 > >> +	 */
-> >> +	ldr	x5, =__kvm_handle_stub_hvc
-> >> +	ldr_l	x6, kimage_voffset
+> >> +	cmp	r0, #HVC_STUB_HCALL_NR
+> >> +	bhs	1f
+> >>  
+> >> +	/*
+> >> +	 * Not a kernel function, treat it as a stub hypercall.
+> >> +	 * Compute the physical address for __kvm_handle_stub_hvc
+> >> +	 * (as the code lives in the idmaped page) and branch there.
+> >> +	 * We hijack ip (r12) as a tmp register.
+> >> +	 */
 > > 
-> > Isn't it a bit dodgy to just overwrite x5 and x6 in something which is
-> > not a function?  I know that in practice this always gets called through
-> > a function call and we can rely on the calling convention, but this can
-> > break if you issue a hypercall to KVM's HVC sub implementation using
-> > inline assembly, I think.
-> > 
-> > Am I missing something here?
+> > How can we just clobber r12 and be sure we don't corrupt the caller?
 > 
-> I don't think you're missing anything. We're definitely relying on
-> getting there via a function call which is going to preserve the
-> caller-saved registers.
+> r12 (aka ip) is allowed to be clobbered by the linker (used by inserted
+> code veneers, for example). Given that this is a standalone object, we
+> can safely assume that r12 has been saved if it was used by the caller.
 > 
-> The only case where we issue a naked HVC call is when we use
-> HVC_SOFT_RESTART. At this point, corrupted registers is not much of a worry.
+> Here is what the PCS says:
 > 
-> Now, I see two ways of dealing with this:
-> - We save x5/x6 on the stack, restoring them in the stub handler , right
-> before the eret
-> - Or we simply document the behaviour in asm/virt.h so that people
-> adding new stub methods know the restrictions.
-> 
-> Thoughts?
+> "Register r12 (IP) may be used by a linker as a scratch register between
+> a routine and any subroutine it calls (for details, see
+> ?5.3.1.1, Use of IP by the linker). It can also be used within a routine
+> to hold intermediate values between subroutine calls."
 > 
 
-I'm perfectly happy with documenting the feature and documenting it
-here.  It just felt arbitrary to me when I read the code that we could
-just step on x5/x6.
+So isn't this similar to my comment on the arm64 code, which relies on
+this being called via a function call, as opposed to directly issuring
+an HVC via inline assembly?
+
+If so, documenting this limitation/restriction/feature would be nice.
 
 Thanks,
 -Christoffer
