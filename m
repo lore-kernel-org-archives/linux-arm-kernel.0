@@ -1,68 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 09:36:40 +0200
-Subject: [PATCH v3 0/5] Add support for the R_CCU on Allwinner H3/A64 SoCs
-In-Reply-To: <alpine.LNX.2.20.1704030029590.823@x220i>
-References: <20170329104246.34204-1-icenowy@aosc.io>
- <20170402160237.osgt32ugw7cz7ubg@lukather>
- <alpine.LNX.2.20.1704030029590.823@x220i>
-Message-ID: <20170403073640.7l7mar6zjcgytf6z@lukather>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 3 Apr 2017 09:41:01 +0200
+Subject: [PATCH v2 8/9] drm/rockchip: gem: Don't alloc/free gem buf
+ before drm dev registered
+In-Reply-To: <1491046529-4310-9-git-send-email-jeffy.chen@rock-chips.com>
+References: <1491046529-4310-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1491046529-4310-9-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20170403074101.f3ykqpdphklwummz@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 12:32:08AM +0800, Icenowy Zheng wrote:
+On Sat, Apr 01, 2017 at 07:35:28PM +0800, Jeffy Chen wrote:
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v2: None
+
+Wut? How is this even possible? If you haven't registered the driver yet,
+there's no way for userspace to call allocation functions. Anything else
+is a driver bug that should be handled by fixing the driver load sequence.
+The only thing I can imagine is that you init the fbdev stuff too early,
+in that case pls fix that. Not apply this duct-tape here.
+
+Thanks, Daniel
+
+> 
+>  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> index df9e570..2bf8024 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -184,6 +184,9 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
+>  	struct drm_device *drm = obj->dev;
+>  	struct rockchip_drm_private *private = drm->dev_private;
+>  
+> +	if (!drm->registered)
+> +		return -ENODEV;
+> +
+>  	if (private->domain)
+>  		return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
+>  	else
+> @@ -208,6 +211,11 @@ static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
+>  
+>  static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
+>  {
+> +	struct drm_device *drm = rk_obj->base.dev;
+> +
+> +	if (!drm->registered)
+> +		return;
+> +
+>  	if (rk_obj->pages)
+>  		rockchip_gem_free_iommu(rk_obj);
+>  	else
+> -- 
+> 2.1.4
 > 
 > 
-> On Sun, 2 Apr 2017, Maxime Ripard wrote:
-> 
-> > Hi,
-> > 
-> > On Wed, Mar 29, 2017 at 06:42:41PM +0800, Icenowy Zheng wrote:
-> > > Allwinner SoCs after sun6i-a31 nearly all have a R_CCU in PRCM part.
-> > > (V3s and R40 do not have it, as they have even no PRCM)
-> > > 
-> > > This patch adds support for the ones on H3/A64.
-> > > 
-> > > Some clock/reset values are reserved for easier extending the support to
-> > > A31/A23, but for this I think some changes to the PRCM MFD should be made,
-> > > see [1] (Although this is only a sketch).
-> > > 
-> > > The r_pio device node is also added for A64, as the driver is already
-> > > merged, and its depends (r_ccu) is now met.
-> > > 
-> > > [1] https://github.com/wens/linux/commits/sunxi-ng-prcm
-> > 
-> > It looks good now, thanks.
-> > 
-> > Beside from the minor fix you've mentionned, please don't use the
-> > defined IDs (yet) in your DT patches (3 to 5).
-> 
-> Thanks! (I think it's the same question we meet when merging V3s patchset,
-> right? :-) )
-
-Exactly. When doing that kind of conversion, in order to not break the
-compilation, we would take the DT patches through the clock
-tree.
-
-However, this doesn't work very well when we also have DT patches that
-conflicts with those clock conversion ones that would need to get
-through arm-soc.
-
-And in this case, this is even more complex since you have the H3/H5
-split patches that would need to go through yet another branch.
-
-Not using the defines for now, and sending a fix later fixes all these
-issues.
-
-Maxime
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/40c890ab/attachment-0001.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
