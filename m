@@ -1,116 +1,232 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  3 Apr 2017 11:23:55 +0900
-Subject: [PATCH v35 02/14] memblock: add memblock_cap_memory_range()
+Date: Mon,  3 Apr 2017 11:24:35 +0900
+Subject: [PATCH v35 07/14] arm64: hibernate: preserve kdump image around
+ hibernation
 In-Reply-To: <20170403022139.12383-1-takahiro.akashi@linaro.org>
 References: <20170403022139.12383-1-takahiro.akashi@linaro.org>
-Message-ID: <20170403022355.12463-2-takahiro.akashi@linaro.org>
+Message-ID: <20170403022440.12515-5-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add memblock_cap_memory_range() which will remove all the memblock regions
-except the memory range specified in the arguments. In addition, rework is
-done on memblock_mem_limit_remove_map() to re-implement it using
-memblock_cap_memory_range().
+Since arch_kexec_protect_crashkres() removes a mapping for crash dump
+kernel image, the loaded data won't be preserved around hibernation.
 
-This function, like memblock_mem_limit_remove_map(), will not remove
-memblocks with MEMMAP_NOMAP attribute as they may be mapped and accessed
-later as "device memory."
-See the commit a571d4eb55d8 ("mm/memblock.c: add new infrastructure to
-address the mem limit issue").
+In this patch, helper functions, crash_prepare_suspend()/
+crash_post_resume(), are additionally called before/after hibernation so
+that the relevant memory segments will be mapped again and preserved just
+as the others are.
 
-This function is used, in a succeeding patch in the series of arm64 kdump
-suuport, to limit the range of usable memory, or System RAM, on crash dump
-kernel.
-(Please note that "mem=" parameter is of little use for this purpose.)
+In addition, to minimize the size of hibernation image, crash_is_nosave()
+is added to pfn_is_nosave() in order to recognize only the pages that hold
+loaded crash dump kernel image as saveable. Hibernation excludes any pages
+that are marked as Reserved and yet "nosave."
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Dennis Chen <dennis.chen@arm.com>
-Cc: linux-mm at kvack.org
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
- include/linux/memblock.h |  1 +
- mm/memblock.c            | 44 +++++++++++++++++++++++++++++---------------
- 2 files changed, 30 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/kexec.h    | 10 ++++++
+ arch/arm64/kernel/hibernate.c     | 10 +++++-
+ arch/arm64/kernel/machine_kexec.c | 71 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/init.c              | 27 +++++++++++++++
+ 4 files changed, 117 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index e82daffcfc44..4ce24a376262 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -336,6 +336,7 @@ phys_addr_t memblock_mem_size(unsigned long limit_pfn);
- phys_addr_t memblock_start_of_DRAM(void);
- phys_addr_t memblock_end_of_DRAM(void);
- void memblock_enforce_memory_limit(phys_addr_t memory_limit);
-+void memblock_cap_memory_range(phys_addr_t base, phys_addr_t size);
- void memblock_mem_limit_remove_map(phys_addr_t limit);
- bool memblock_is_memory(phys_addr_t addr);
- int memblock_is_map_memory(phys_addr_t addr);
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 2f4ca8104ea4..b049c9b2dba8 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1543,11 +1543,37 @@ void __init memblock_enforce_memory_limit(phys_addr_t limit)
- 			      (phys_addr_t)ULLONG_MAX);
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index 04744dc5fb61..90aabbe893b7 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -43,6 +43,16 @@ static inline void crash_setup_regs(struct pt_regs *newregs,
+ 	/* Empty routine needed to avoid build errors. */
  }
  
-+void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
++#if defined(CONFIG_KEXEC_CORE) && defined(CONFIG_HIBERNATION)
++extern bool crash_is_nosave(unsigned long pfn);
++extern void crash_prepare_suspend(void);
++extern void crash_post_resume(void);
++#else
++static inline bool crash_is_nosave(unsigned long pfn) {return false; }
++static inline void crash_prepare_suspend(void) {}
++static inline void crash_post_resume(void) {}
++#endif
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 97a7384100f3..a44e13942d30 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -28,6 +28,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <asm/irqflags.h>
++#include <asm/kexec.h>
+ #include <asm/memory.h>
+ #include <asm/mmu_context.h>
+ #include <asm/pgalloc.h>
+@@ -102,7 +103,8 @@ int pfn_is_nosave(unsigned long pfn)
+ 	unsigned long nosave_begin_pfn = sym_to_pfn(&__nosave_begin);
+ 	unsigned long nosave_end_pfn = sym_to_pfn(&__nosave_end - 1);
+ 
+-	return (pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn);
++	return ((pfn >= nosave_begin_pfn) && (pfn <= nosave_end_pfn)) ||
++		crash_is_nosave(pfn);
+ }
+ 
+ void notrace save_processor_state(void)
+@@ -286,6 +288,9 @@ int swsusp_arch_suspend(void)
+ 	local_dbg_save(flags);
+ 
+ 	if (__cpu_suspend_enter(&state)) {
++		/* make the crash dump kernel image visible/saveable */
++		crash_prepare_suspend();
++
+ 		sleep_cpu = smp_processor_id();
+ 		ret = swsusp_save();
+ 	} else {
+@@ -297,6 +302,9 @@ int swsusp_arch_suspend(void)
+ 		if (el2_reset_needed())
+ 			dcache_clean_range(__hyp_idmap_text_start, __hyp_idmap_text_end);
+ 
++		/* make the crash dump kernel image protected again */
++		crash_post_resume();
++
+ 		/*
+ 		 * Tell the hibernation core that we've just restored
+ 		 * the memory
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index b63baa749609..a6d66b98d795 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <linux/kexec.h>
++#include <linux/page-flags.h>
+ #include <linux/smp.h>
+ 
+ #include <asm/cacheflush.h>
+@@ -230,3 +231,73 @@ void arch_kexec_unprotect_crashkres(void)
+ 			__phys_to_virt(kexec_crash_image->segment[i].mem),
+ 			kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 1);
+ }
++
++#ifdef CONFIG_HIBERNATION
++/*
++ * To preserve the crash dump kernel image, the relevant memory segments
++ * should be mapped again around the hibernation.
++ */
++void crash_prepare_suspend(void)
 +{
-+	int start_rgn, end_rgn;
-+	int i, ret;
-+
-+	if (!size)
-+		return;
-+
-+	ret = memblock_isolate_range(&memblock.memory, base, size,
-+						&start_rgn, &end_rgn);
-+	if (ret)
-+		return;
-+
-+	/* remove all the MAP regions */
-+	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
-+		if (!memblock_is_nomap(&memblock.memory.regions[i]))
-+			memblock_remove_region(&memblock.memory, i);
-+
-+	for (i = start_rgn - 1; i >= 0; i--)
-+		if (!memblock_is_nomap(&memblock.memory.regions[i]))
-+			memblock_remove_region(&memblock.memory, i);
-+
-+	/* truncate the reserved regions */
-+	memblock_remove_range(&memblock.reserved, 0, base);
-+	memblock_remove_range(&memblock.reserved,
-+			base + size, (phys_addr_t)ULLONG_MAX);
++	if (kexec_crash_image)
++		arch_kexec_unprotect_crashkres();
 +}
 +
- void __init memblock_mem_limit_remove_map(phys_addr_t limit)
- {
--	struct memblock_type *type = &memblock.memory;
- 	phys_addr_t max_addr;
--	int i, ret, start_rgn, end_rgn;
- 
- 	if (!limit)
- 		return;
-@@ -1558,19 +1584,7 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
- 	if (max_addr == (phys_addr_t)ULLONG_MAX)
- 		return;
- 
--	ret = memblock_isolate_range(type, max_addr, (phys_addr_t)ULLONG_MAX,
--				&start_rgn, &end_rgn);
--	if (ret)
--		return;
--
--	/* remove all the MAP regions above the limit */
--	for (i = end_rgn - 1; i >= start_rgn; i--) {
--		if (!memblock_is_nomap(&type->regions[i]))
--			memblock_remove_region(type, i);
--	}
--	/* truncate the reserved regions */
--	memblock_remove_range(&memblock.reserved, max_addr,
--			      (phys_addr_t)ULLONG_MAX);
-+	memblock_cap_memory_range(0, max_addr);
++void crash_post_resume(void)
++{
++	if (kexec_crash_image)
++		arch_kexec_protect_crashkres();
++}
++
++/*
++ * crash_is_nosave
++ *
++ * Return true only if a page is part of reserved memory for crash dump kernel,
++ * but does not hold any data of loaded kernel image.
++ *
++ * Note that all the pages in crash dump kernel memory have been initially
++ * marked as Reserved in kexec_reserve_crashkres_pages().
++ *
++ * In hibernation, the pages which are Reserved and yet "nosave" are excluded
++ * from the hibernation iamge. crash_is_nosave() does thich check for crash
++ * dump kernel and will reduce the total size of hibernation image.
++ */
++
++bool crash_is_nosave(unsigned long pfn)
++{
++	int i;
++	phys_addr_t addr;
++
++	if (!crashk_res.end)
++		return false;
++
++	/* in reserved memory? */
++	addr = __pfn_to_phys(pfn);
++	if ((addr < crashk_res.start) || (crashk_res.end < addr))
++		return false;
++
++	if (!kexec_crash_image)
++		return true;
++
++	/* not part of loaded kernel image? */
++	for (i = 0; i < kexec_crash_image->nr_segments; i++)
++		if (addr >= kexec_crash_image->segment[i].mem &&
++				addr < (kexec_crash_image->segment[i].mem +
++					kexec_crash_image->segment[i].memsz))
++			return false;
++
++	return true;
++}
++
++void crash_free_reserved_phys_range(unsigned long begin, unsigned long end)
++{
++	unsigned long addr;
++	struct page *page;
++
++	for (addr = begin; addr < end; addr += PAGE_SIZE) {
++		page = phys_to_page(addr);
++		ClearPageReserved(page);
++		free_reserved_page(page);
++	}
++}
++#endif /* CONFIG_HIBERNATION */
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 09d19207362d..89ba3cd0fe44 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -134,10 +134,35 @@ static void __init reserve_crashkernel(void)
+ 	crashk_res.start = crash_base;
+ 	crashk_res.end = crash_base + crash_size - 1;
  }
++
++static void __init kexec_reserve_crashkres_pages(void)
++{
++#ifdef CONFIG_HIBERNATION
++	phys_addr_t addr;
++	struct page *page;
++
++	if (!crashk_res.end)
++		return;
++
++	/*
++	 * To reduce the size of hibernation image, all the pages are
++	 * marked as Reserved initially.
++	 */
++	for (addr = crashk_res.start; addr < (crashk_res.end + 1);
++			addr += PAGE_SIZE) {
++		page = phys_to_page(addr);
++		SetPageReserved(page);
++	}
++#endif
++}
+ #else
+ static void __init reserve_crashkernel(void)
+ {
+ }
++
++static void __init kexec_reserve_crashkres_pages(void)
++{
++}
+ #endif /* CONFIG_KEXEC_CORE */
  
- static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
+ /*
+@@ -517,6 +542,8 @@ void __init mem_init(void)
+ 	/* this will put all unused low memory onto the freelists */
+ 	free_all_bootmem();
+ 
++	kexec_reserve_crashkres_pages();
++
+ 	mem_init_print_info(NULL);
+ 
+ #define MLK(b, t) b, t, ((t) - (b)) >> 10
 -- 
 2.11.1
