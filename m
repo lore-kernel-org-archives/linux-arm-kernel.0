@@ -1,72 +1,25 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  3 Apr 2017 15:12:43 +0100
-Subject: [PATCH v3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-Message-ID: <1491228763-23450-1-git-send-email-suzuki.poulose@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Apr 2017 09:14:22 -0500
+Subject: [PATCH v6 01/39] [media] dt-bindings: Add bindings for
+ video-multiplexer device
+In-Reply-To: <1490661656-10318-2-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-2-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170403141422.kxftc5v2u7gstbs5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
-unmap_stage2_range() on the entire memory range for the guest. This could
-cause problems with other callers (e.g, munmap on a memslot) trying to
-unmap a range. And since we have to unmap the entire Guest memory range
-holding a spinlock, make sure we yield the lock if necessary, after we
-unmap each PUD range.
+On Mon, Mar 27, 2017 at 05:40:18PM -0700, Steve Longerbeam wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> Add bindings documentation for the video multiplexer device.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  .../bindings/media/video-multiplexer.txt           | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
 
-Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
-Cc: stable at vger.kernel.org # v3.10+
-Cc: Paolo Bonzini <pbonzin@redhat.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-[ Avoid vCPU starvation and lockup detector warnings ]
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
----
-Changes since V2:
- - Restrict kvm->mmu_lock relaxation to bigger ranges in unmap_stage2_range(),
-   to avoid possible issues like [0]
-
- [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/498210.html
-
-Changes since V1:
- - Yield the kvm->mmu_lock if necessary in unmap_stage2_range to prevent
-   vCPU starvation and lockup detector warnings.
----
- arch/arm/kvm/mmu.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 13b9c1f..db94f3a 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -292,8 +292,15 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- 	phys_addr_t addr = start, end = start + size;
- 	phys_addr_t next;
- 
-+	assert_spin_locked(&kvm->mmu_lock);
- 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
-+		/*
-+		 * If the range is too large, release the kvm->mmu_lock
-+		 * to prevent starvation and lockup detector warnings.
-+		 */
-+		if (size > S2_PUD_SIZE)
-+			cond_resched_lock(&kvm->mmu_lock);
- 		next = stage2_pgd_addr_end(addr, end);
- 		if (!stage2_pgd_none(*pgd))
- 			unmap_stage2_puds(kvm, pgd, addr, next);
-@@ -831,7 +838,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	if (kvm->arch.pgd == NULL)
- 		return;
- 
-+	spin_lock(&kvm->mmu_lock);
- 	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-+	spin_unlock(&kvm->mmu_lock);
-+
- 	/* Free the HW pgd, one page at a time */
- 	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
- 	kvm->arch.pgd = NULL;
--- 
-2.7.4
+Acked-by: Rob Herring <robh@kernel.org>
