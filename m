@@ -1,76 +1,68 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 3 Apr 2017 16:07:53 +0100
-Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
- <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <b44e6df5-4840-ecb4-59c6-b4bc474ad28c@arm.com>
+Date: Mon, 3 Apr 2017 15:52:46 +0100
+Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
+ private memory allocations
+In-Reply-To: <1491031518.2944.62.camel@buserror.net>
+References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
+ <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
+ <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
+ <871ste5dmw.fsf@concordia.ellerman.id.au>
+ <dfaa1a28-66d8-15fb-7d2d-75e206161770@arm.com>
+ <1491031518.2944.62.camel@buserror.net>
+Message-ID: <df00c0ab-22b8-1086-def1-69baf648df72@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 14:15, Jayachandran C wrote:
-> The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
-> topology is slightly unusual. For a multi-node system, it looks like:
+On 01/04/17 08:25, Scott Wood wrote:
+> On Fri, 2017-03-31 at 18:55 +0100, Robin Murphy wrote:
+>> On 31/03/17 04:27, Michael Ellerman wrote:
+>>>
+>>> Robin Murphy <robin.murphy@arm.com> writes:
+>>>
+>>>>
+>>>> Hi Roy,
+>>>>
+>>>> On 29/03/17 22:13, Roy Pledge wrote:
+>>>>>
+>>>>> Use the shared-memory-pool mechanism for frame queue descriptor and
+>>>>> packed frame descriptor record area allocations.
+>>>> Thanks for persevering with this - in my opinion it's now looking like
+>>>> it was worth the effort :)
+>>>>
+>>>> AFAICS the ioremap_wc() that this leads to does appear to give back
+>>>> something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
+>>>> horrendously misnamed), and "no-map" should rule out any cacheable
+>>>> linear map alias existing, so it would seem that this approach should
+>>>> avert Scott's concerns about attribute mismatches.
+>>> How does 'no-map' translate into something being excluded from the
+>>> linear mapping?
+>> Reserved regions marked with "no-map" get memblock_remove()d by
+>> early_init_dt_alloc_reserved_memory_arch(). As I understand things, the
+>> linear map should only cover memblock areas, and it would be explicitly
+>> violating the semantics of "no-map" to still cover such a region.
 > 
-> [node level PCI bridges - one per node]
->     [SoC PCI devices with MSI-X but no IOMMU]
->     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
->         [PCIe real root ports associated with IOMMU and GICv3 ITS]
->             [External PCI devices connected to PCIe links]
+> Discontiguous memory isn't supported on these PPC chips.  Everything up to
+> memblock_end_of_DRAM() gets mapped -- and if that were to change, the
+> fragmentation would waste TLB1 entries.
 
-Since it's not entirely obvious, what does the actual DT - or IORT if
-you must ;) - topology for this look like? I can't help thinking that
-either it's inaccurate, or that this is going to expose a shortcoming in
-pci_dma_configure() which breaks things - unless I'm missing something,
-isn't find_pci_root_bus() going to go all the way up to the top-level
-glue bridge and pick up the wrong firmware node (if any) for the
-appropriate DMA properties?
+Ah, so the "PPC-specific angles I'm not aware of" category is indeed
+non-empty - I guess the lack of HAVE_GENERIC_DMA_COHERENT might be
+related, then.
+
+That said, though, AFAICS only certain x86 and s390 configurations ever
+call memblock_set_bottom_up(true), so we should be able to assume that
+the reserved region allocations always fall through to
+__memblock_find_range_top_down(). Thus if your DRAM is contiguous, then
+"no-map"-ing the reserved regions will simply end up pushing
+memblock_end_of_DRAM() down in a manner that would appear to still avoid
+overlaps. I can only see that going wrong if the end of DRAM wasn't at
+least 32MB aligned to begin with - is that ever likely to happen in
+practice?
 
 Robin.
 
-> The top two levels of bridges should have introduced aliases since they
-> are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
-> In the case of external PCIe devices, the "real" root ports are connected
-> to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
-> alias. The SoC PCI devices are directly connected to the GIC ITS, so the
-> node level bridges do not introduce an alias either.
+> This also breaks compatibility with existing device trees.  I suggest putting
+> an ifdef in the qbman driver to add the new scheme for non-PPC arches only.
 > 
-> To handle this quirk, we mark the real PCIe root ports and node level
-> PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
-> pci_for_each_dma_alias() works correctly for external PCIe devices and
-> SoC PCI devices.
-> 
-> For the current revision of Cavium ThunderX2, the VendorID and Device ID
-> are from Broadcom Vulcan (14e4:90XX).
-> 
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> ---
->  drivers/pci/quirks.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index 6736836..564a84a 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -3958,6 +3958,20 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2260, quirk_mic_x200_dma_alias);
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2264, quirk_mic_x200_dma_alias);
->  
->  /*
-> + * The IOMMU and interrupt controller on Broadcom Vulcan/Cavium ThunderX2 are
-> + * associated not at the root bus, but at a bridge below. This quirk flag
-> + * will ensure that the aliases are identified correctly.
-> + */
-> +static void quirk_bridge_cavm_thrx2_pcie_root(struct pci_dev *pdev)
-> +{
-> +	pdev->dev_flags |= PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT;
-> +}
-> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9000,
-> +				quirk_bridge_cavm_thrx2_pcie_root);
-> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9084,
-> +				quirk_bridge_cavm_thrx2_pcie_root);
-> +
-> +/*
->   * Intersil/Techwell TW686[4589]-based video capture cards have an empty (zero)
->   * class code.  Fix it.
->   */
+> -Scott
 > 
