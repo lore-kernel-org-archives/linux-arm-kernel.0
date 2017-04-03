@@ -1,52 +1,53 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 3 Apr 2017 09:56:12 +1000
-Subject: Updating sunxi tree in linux-next
-In-Reply-To: <20170331075729.gsfewphm3zd45vwt@lukather>
-References: <20170331075729.gsfewphm3zd45vwt@lukather>
-Message-ID: <20170403095603.43cef189@canb.auug.org.au>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 2 Apr 2017 21:01:48 -0400 (EDT)
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+Message-ID: <alpine.LFD.2.20.1704022040380.1847@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, 3 Apr 2017, Stuart Longland wrote:
 
-On Fri, 31 Mar 2017 09:57:29 +0200 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->
-> We've switched from my personal git tree for the Allwinner sunxi
-> development to a shared tree:
-> git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
+> On 03/04/17 07:41, Nicolas Pitre wrote:
+> >> No PTYs seems like a big limitation. This means no sshd?
+> > Again, my ultimate system target is in the sub-megabyte of RAM.  I 
+> > really doubt you'll be able to fit an SSH server in there even if PTYs 
+> > were supported, unless sshd (or dropbear) can be made really tiny. 
+> > Otherwise you most probably have sufficient resources to run the regular 
+> > TTY code.
 > 
-> The branch to be included in linux-next will still be called
-> sunxi/for-next as it used to be, and it will still go through the
-> arm-soc tree to reach Linux.
-> 
-> However, I'll still have the patches for our DRM drivers on my
-> personal git repo:
-> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
-> 
-> Could you add the branch sunxi-drm/for-next to the list of branches
-> you merge?
+> Are we talking small microcontrollers here?  The smallest machine in
+> terms of RAM I ever recall running Linux on was a 386SX/25 MHz with 4MB
+> RAM, and that had a MMU.
 
-OK, just so we are on the same page:
+Not to repeat what I've said already, I invite you to have a look at 
+https://lkml.org/lkml/2017/3/24/634
 
-Currently I have:
+> I recall Slackware requiring that you booted with a mounted floppy (no
+> ramdisk) and possibly even required that you had a second floppy drive
+> formatted as swap so you'd be able to get through the install without
+> oomkiller knocking on your door.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git branch sunxi/for-next
+Did the oom killer even exist in those days? I don't remember.
+All I remember is the stack of 73 flopies or so to install Slackware... 
+and of course floppy #68 would have developed a bad sector preventing 
+you from completing the installation.
 
-merged after the drm tree.
+> Sub-megabyte system support is a noble goal, but I'm wondering how
+> practical such systems would be, and whether an embedded real-time
+> kernel might be a better choice than Linux on such systems.
 
-You want:
+Obviously, you need to leave the idea of a _distribution_ behind. If you 
+think of a single user app, and a kernel that only provides those 
+syscalls used by that app, and the minimal subset of kernel services 
+that such an app require, then nothing prevents such and app/kernel from 
+using the actual Linux API. And that's where you get a big advantage 
+over other RTOSes. See the link above for the full rationale.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git branch sunxi/for-next
 
-merged after the arm-soc tree and
-
-git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git branch sunxi-drm/for-next
-
-merged after the drm tree?
-
-(I merge trees *after* the tree that is their upstream.)
-
-Do you want to be the only contact for both trees?
--- 
-Cheers,
-Stephen Rothwell
+Nicolas
