@@ -1,61 +1,42 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 03 Apr 2017 11:56:59 +0200
-Subject: [PATCH] iommu/rockchip: Make use of 'struct iommu_device'
-In-Reply-To: <1490970624-19981-1-git-send-email-joro@8bytes.org>
-References: <1490970624-19981-1-git-send-email-joro@8bytes.org>
-Message-ID: <1785458.LaVlbOJ67B@diego>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  3 Apr 2017 11:45:40 +0200
+Subject: [PATCH 0/3] ARM: dts: rcar-gen2: Correct parent of SSI[0-9] clocks
+Message-ID: <1491212743-6911-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+	Hi Simon, Magnus, Morimoto-san,
 
-Am Freitag, 31. M?rz 2017, 16:30:24 CEST schrieb Joerg Roedel:
-> From: Joerg Roedel <jroedel@suse.de>
-> 
-> Register hardware IOMMUs seperatly with the iommu-core code
-> and add a sysfs representation of the iommu topology.
-> 
-> Signed-off-by: Joerg Roedel <jroedel@suse.de>
+The SSI-ALL gate clock is located in between the P clock and the
+individual SSI[0-9] clocks, hence the former should be listed as their
+parent.
 
-In general works, and I still keep a working iommu-based display :-)
-I can also see my two vop iommus under /sys/class/iommu now.
+This patch series corrects the parents in the DTSes r8a7790, r8a7791,
+and r8a7793.  The DTS for r8a7794, and the CPG/MSSR-based clock drivers
+for r8a7743, r8a7745, and r8a7795 already describe the correct parent.
 
-Links in the devices subdirectory do not work though, see below:
+Thanks!
 
-> ---
->  drivers/iommu/rockchip-iommu.c | 30 ++++++++++++++++++++++++++++--
->  1 file changed, 28 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 9afcbf7..36d0890 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1054,6 +1056,10 @@ static int rk_iommu_add_device(struct device *dev)
->  	if (ret)
->  		goto err_remove_device;
-> 
-> +	iommu = rk_iommu_from_dev(dev);
-> +	if (iommu)
-> +		iommu_device_link(&iommu->iommu, dev);
-> +
+Geert Uytterhoeven (3):
+  ARM: dts: r8a7790: Correct parent of SSI[0-9] clocks
+  ARM: dts: r8a7791: Correct parent of SSI[0-9] clocks
+  ARM: dts: r8a7793: Correct parent of SSI[0-9] clocks
 
-It looks like the iommu association can very well run before the iommu
-actually probes, via the bus_set_iommu and which happens on my veyron-pinky
-device). Thus iommu is NULL, as platform_set_drvdata in probe hasn't run yet
-and the link is never created.
+ arch/arm/boot/dts/r8a7790.dtsi | 7 +++++--
+ arch/arm/boot/dts/r8a7791.dtsi | 7 +++++--
+ arch/arm/boot/dts/r8a7793.dtsi | 7 +++++--
+ 3 files changed, 15 insertions(+), 6 deletions(-)
 
-[    0.034180] iommu: Adding device ff930000.vop to group 0
-[    0.034198] rk_iommu_from_dev: found iommu ff930300.iommu for ff930000.vop with data at   (null)
-[    0.034209] rk_iommu_add_device: rk_iommu_from_dev returned   (null) for ff930000.vop
-[    0.034232] iommu: Adding device ff940000.vop to group 1
-[    0.034247] rk_iommu_from_dev: found iommu ff940300.iommu for ff940000.vop with data at   (null)
-[    0.034258] rk_iommu_add_device: rk_iommu_from_dev returned   (null) for ff940000.vop
-[    0.034342] rk_iommu_probe: set_drvdata for ff930300.iommu at ee2c7a10
-[    0.034411] rk_iommu_probe: set_drvdata for ff940300.iommu at ee2c7c10
-[    7.326395] rk_iommu_from_dev: found iommu ff930300.iommu for ff930000.vop with data at ee2c7a10
+-- 
+2.7.4
 
+Gr{oetje,eeting}s,
 
-Not sure what the proper solution is though.
+						Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Heiko
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
