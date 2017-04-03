@@ -1,48 +1,61 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 03 Apr 2017 17:43:19 +0530
-Subject: [Patch v3 05/11] [media] videodev2.h: Add v4l2 definition for HEVC
-In-Reply-To: <70bc6abe-b944-d2bc-5f31-af760ce44c15@xs4all.nl>
-References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
- <CGME20170331090438epcas1p4152c9aaa9ea69f30d264bcd532d79e75@epcas1p4.samsung.com>
- <1490951200-32070-6-git-send-email-smitha.t@samsung.com>
- <70bc6abe-b944-d2bc-5f31-af760ce44c15@xs4all.nl>
-Message-ID: <1491221599.8493.99.camel@smitha-fedora>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon,  3 Apr 2017 13:12:10 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Avoid shift overflow in block size
+Message-ID: <db7c46e78bae4054d22a2524095857c5eda834f7.1491221353.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-04-03 at 10:11 +0200, Hans Verkuil wrote:
-> On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
-> > Add V4L2 definition for HEVC compressed format
-> > 
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> > ---
-> >  include/uapi/linux/videodev2.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> > index 45184a2..38cf5f1 100644
-> > --- a/include/uapi/linux/videodev2.h
-> > +++ b/include/uapi/linux/videodev2.h
-> > @@ -629,6 +629,7 @@ struct v4l2_pix_format {
-> >  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
-> >  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
-> >  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
-> > +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
-> >  
-> >  /*  Vendor-specific formats   */
-> >  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
-> > 
-> 
-> You also need to update v4l2-ioctl.c, v4l_fill_fmtdesc().
-> 
-> Regards,
-> 
-> 	Hans
-> 
-Ok I will add it in the v4l_fill_fmtdesc() function.
+The recursive nature of __arm_lpae_{map,unmap}() means that
+ARM_LPAE_BLOCK_SIZE() is evaluated for every level, including those
+where block mappings aren't possible. This in itself is harmless enough,
+as we will only ever be called with valid sizes from the pgsize_bitmap,
+and thus always recurse down past any imaginary block sizes. The only
+problem is that most of those imaginary sizes overflow the type used for
+the calculation, and thus trigger warnings under UBsan:
 
-Thank you for the review.
-Regards,
-Smitha
-> 
+[   63.020939] ================================================================================
+[   63.021284] UBSAN: Undefined behaviour in drivers/iommu/io-pgtable-arm.c:312:22
+[   63.021602] shift exponent 39 is too large for 32-bit type 'int'
+[   63.021909] CPU: 0 PID: 1119 Comm: lkvm Not tainted 4.7.0-rc3+ #819
+[   63.022163] Hardware name: FVP Base (DT)
+[   63.022345] Call trace:
+[   63.022629] [<ffffff900808f258>] dump_backtrace+0x0/0x3a8
+[   63.022975] [<ffffff900808f614>] show_stack+0x14/0x20
+[   63.023294] [<ffffff90086bc9dc>] dump_stack+0x104/0x148
+[   63.023609] [<ffffff9008713ce8>] ubsan_epilogue+0x18/0x68
+[   63.023956] [<ffffff9008714410>] __ubsan_handle_shift_out_of_bounds+0x18c/0x1bc
+[   63.024365] [<ffffff900890fcb0>] __arm_lpae_map+0x720/0xae0
+[   63.024732] [<ffffff9008910170>] arm_lpae_map+0x100/0x190
+[   63.025049] [<ffffff90089183d8>] arm_smmu_map+0x78/0xc8
+[   63.025390] [<ffffff9008906c18>] iommu_map+0x130/0x230
+[   63.025763] [<ffffff9008bf7564>] vfio_iommu_type1_attach_group+0x4bc/0xa00
+[   63.026156] [<ffffff9008bf3c78>] vfio_fops_unl_ioctl+0x320/0x580
+[   63.026515] [<ffffff9008377420>] do_vfs_ioctl+0x140/0xd28
+[   63.026858] [<ffffff9008378094>] SyS_ioctl+0x8c/0xa0
+[   63.027179] [<ffffff9008086e70>] el0_svc_naked+0x24/0x28
+[   63.027412] ================================================================================
+
+Perform the shift in a 64-bit type to prevent the theoretical overflow
+and keep the peace. As it turns out, this generates identical code for
+32-bit ARM, and marginally shorter AArch64 code, so it's good all round.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/io-pgtable-arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index f9bc6ebb8140..6e5df5e0a3bd 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -74,7 +74,7 @@
+ 
+ /* Calculate the block/page mapping size at level l for pagetable in d. */
+ #define ARM_LPAE_BLOCK_SIZE(l,d)					\
+-	(1 << (ilog2(sizeof(arm_lpae_iopte)) +				\
++	(1ULL << (ilog2(sizeof(arm_lpae_iopte)) +			\
+ 		((ARM_LPAE_MAX_LEVELS - (l)) * (d)->bits_per_level)))
+ 
+ /* Page table bits */
+-- 
+2.11.0.dirty
