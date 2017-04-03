@@ -1,103 +1,220 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Sun, 2 Apr 2017 23:07:16 -0400
-Subject: [PATCH V4 1/2] dt-bindings: thermal: add support for Broadcom's
- Northstar thermal
-In-Reply-To: <6dd907e4-c213-3174-8613-99427e6ea0e9@gmail.com>
-References: <20170331073132.21457-2-zajec5@gmail.com>
- <20170331201124.656-1-zajec5@gmail.com>
- <20170401195136.GD28514@localhost.localdomain>
- <6dd907e4-c213-3174-8613-99427e6ea0e9@gmail.com>
-Message-ID: <CAC3K-4r7xGoSSBwHKZjrS27jMFr_RYp1n4nRo2aAHzVAVbVi_A@mail.gmail.com>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Mon, 3 Apr 2017 12:19:38 +0900
+Subject: [RFCv2] arm64: support HAVE_ARCH_RARE_WRITE and
+ HAVE_ARCH_RARE_WRITE_MEMCPY
+In-Reply-To: <CAGXu5jLFDGO5OfOGa7B9H6pw8ivnL9MUsPZ=fQns-fbA6R-Ljw@mail.gmail.com>
+References: <1490884982-5066-1-git-send-email-hoeun.ryu@gmail.com>
+ <CAGXu5jLFDGO5OfOGa7B9H6pw8ivnL9MUsPZ=fQns-fbA6R-Ljw@mail.gmail.com>
+Message-ID: <0A044FD1-41C0-4ABB-9BFF-17D21006EE2E@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 1, 2017 at 5:50 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 04/01/2017 09:51 PM, Eduardo Valentin wrote:
->>
->> On Fri, Mar 31, 2017 at 10:11:23PM +0200, Rafa? Mi?ecki wrote:
->>>
->>> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>>
->>> This commit documents binding for thermal used in Northstar family SoCs.
->>>
->>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->>> ---
->>> V3: Add thermal-zones to the example
->>>     Rob: Because of this update, I didn't include Acked-by I got for V2
->>> ---
->>>  .../devicetree/bindings/thermal/brcm,ns-thermal    | 26
->>> ++++++++++++++++++++++
->>>  1 file changed, 26 insertions(+)
->>>  create mode 100644
->>> Documentation/devicetree/bindings/thermal/brcm,ns-thermal
->>>
->>> diff --git a/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
->>> b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
->>> new file mode 100644
->>> index 000000000000..c561c7349f17
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/thermal/brcm,ns-thermal
->>> @@ -0,0 +1,26 @@
->>> +* Broadcom Northstar Thermal
->>> +
->>> +This binding describes thermal sensor that is part of Northstar's DMU
->>> (Device
->>> +Management Unit).
->>> +
->>> +Required properties:
->>> +- compatible : Must be "brcm,ns-thermal"
->>> +- reg : iomem address range of PVTMON registers
->>> +- #thermal-sensor-cells : Should be <0>
->>> +
->>> +Example:
->>> +
->>> +thermal: thermal at 1800c2c0 {
->>> +       compatible = "brcm,ns-thermal";
->>> +       reg = <0x1800c2c0 0x10>;
->>> +       #thermal-sensor-cells = <0>;
->>> +};
->>> +
->>> +thermal-zones {
->>> +       cpu_thermal: cpu-thermal {
->>> +               polling-delay-passive = <0>;
->>> +               polling-delay = <1000>;
->>> +               coefficients = <(-556) 418000>;
->>> +               thermal-sensors = <&thermal>;
->>
->>
->> You need to define trips and cooling devices here. Otherwise, makes
->> little sense to have this device in thermal subsystem. Here is an
->> example of minimal set:
->>
->> https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/commit/?h=linus&id=1e2ac9821de6a85d3e8358f238436708d1d46869
->>
->> The above has no passive action. It is just gonna shutdown the system if
->> temperature crosses a threshold.
->>
->> But, a typical cooling device would be CPU frequency throttling. Do you
->> have
->> that up and running in your routers?
->
->
-> I don't have CPU freq throttling, so shutdown will be the only solution for
-> critical temp right now.
->
-> I know I should have at least a trip for critical temperature, but the
-> problem
-> is I don't know what value to use. There isn't any info about this in public
-> datasheets. Broadcom's SDK doesn't mention it. Vendors share only the max
-> environment temp, not the max CPU temp.
->
-> So for now I only meant to provide user space access to reading current CPU
-> temperature. I could do some stress tests and ask other users to do it as
-> well.
->
-> Or maybe I could just put in Documentation some round value that makes more
-> or
-> less sense and then work on a proper content of real DTS files?
->
-> Unless we can get some hint from Broadcom people. Jon? Florian? Anyone?
 
-I'll poke around and see if I can find a datasheet for NS/NSP.  Worst
-case, I can ask one of the HW engineers for NSP, and we can use the
-same value for NS.
+> On Mar 31, 2017, at 4:38 AM, Kees Cook <keescook@chromium.org> wrote:
+> 
+>> On Thu, Mar 30, 2017 at 7:39 AM, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
+>> This patch might be a part of Kees Cook's rare_write infrastructure series
+>> for [1] for arm64 architecture.
+>> 
+>> This implementation is based on Mark Rutland's suggestions [2], which is
+>> that a special userspace mm that maps only __start/end_rodata as RW permi-
+>> ssion is prepared during early boot time (paging_init) and __arch_rare_-
+>> write_begin() switches to the mm [2].
+>> 
+>> rare_write_mm address space is added for the special purpose and a page
+>> global directory is also prepared for it. The mm remaps __start_rodata ~
+>> __end_rodata to rodata_rw_alias_start which starts from TASK_SIZE_64 / 4
+>> + kaslr_offset().
+>> 
+>> It passes LKDTM's rare write test.
+> 
+> Great work! I think this will need some further changes, though, since
+> it doesn't look to me like this would pass LKDTM's tests if it was
+> built as a module. (This is missing from my ARM attempt too... I
+> haven't figured out how to set the domain on the kernel modules...)
+> 
+
+ah.. I understand..
+so we need to additional rw mappings for modules, right ?
+
+>> 
+>> [1] : http://www.openwall.com/lists/kernel-hardening/2017/02/27/5
+>> [2] : https://lkml.org/lkml/2017/3/29/704
+>> 
+>> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+>> ---
+>> arch/arm64/Kconfig               |   2 +
+>> arch/arm64/include/asm/pgtable.h |   4 ++
+>> arch/arm64/mm/mmu.c              | 101 +++++++++++++++++++++++++++++++++++++++
+>> 3 files changed, 107 insertions(+)
+>> 
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index f2b0b52..6e2c592 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -102,6 +102,8 @@ config ARM64
+>>        select HAVE_SYSCALL_TRACEPOINTS
+>>        select HAVE_KPROBES
+>>        select HAVE_KRETPROBES
+>> +       select HAVE_ARCH_RARE_WRITE
+>> +       select HAVE_ARCH_RARE_WRITE_MEMCPY
+>>        select IOMMU_DMA if IOMMU_SUPPORT
+>>        select IRQ_DOMAIN
+>>        select IRQ_FORCED_THREADING
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index c213fdbd0..1514933 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -741,6 +741,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+>> #define kc_vaddr_to_offset(v)  ((v) & ~VA_START)
+>> #define kc_offset_to_vaddr(o)  ((o) | VA_START)
+>> 
+>> +unsigned long __arch_rare_write_begin(void);
+>> +unsigned long __arch_rare_write_end(void);
+>> +void __arch_rare_write_memcpy(void *dst, const void *src, __kernel_size_t len);
+>> +
+>> #endif /* !__ASSEMBLY__ */
+>> 
+>> #endif /* __ASM_PGTABLE_H */
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 91502e3..86b25c9 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -570,6 +570,105 @@ static void __init map_kernel(pgd_t *pgd)
+>>        kasan_copy_shadow(pgd);
+>> }
+>> 
+>> +struct mm_struct rare_write_mm = {
+>> +       .mm_rb          = RB_ROOT,
+>> +       .mm_users       = ATOMIC_INIT(2),
+>> +       .mm_count       = ATOMIC_INIT(1),
+>> +       .mmap_sem       = __RWSEM_INITIALIZER(rare_write_mm.mmap_sem),
+>> +       .page_table_lock= __SPIN_LOCK_UNLOCKED(rare_write_mm.page_table_lock),
+>> +       .mmlist         = LIST_HEAD_INIT(rare_write_mm.mmlist),
+>> +};
+>> +
+>> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+>> +#include <asm/ptdump.h>
+>> +
+>> +static struct ptdump_info rare_write_ptdump_info = {
+>> +       .mm             = &rare_write_mm,
+>> +       .markers        = (struct addr_marker[]){
+>> +               { 0,            "rare-write start" },
+>> +               { TASK_SIZE_64, "rare-write end" }
+>> +       },
+>> +       .base_addr      = 0,
+>> +};
+>> +
+>> +static int __init ptdump_init(void)
+>> +{
+>> +       return ptdump_debugfs_register(&rare_write_ptdump_info,
+>> +                                      "rare_write_page_tables");
+>> +}
+>> +device_initcall(ptdump_init);
+>> +
+>> +#endif
+>> +
+>> +__always_inline unsigned long __arch_rare_write_begin(void)
+>> +{
+>> +       struct mm_struct *mm = &rare_write_mm;
+>> +
+>> +       preempt_disable();
+>> +
+>> +       __switch_mm(mm);
+> 
+> Can you include a BUG_ON check here that rare_write_mm is not already active?
+> 
+
+OK, I will find the way to do so.
+
+>> +
+>> +       if (system_uses_ttbr0_pan()) {
+>> +               update_saved_ttbr0(current, mm);
+>> +               cpu_switch_mm(mm->pgd, mm);
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +__always_inline unsigned long __arch_rare_write_end(void)
+>> +{
+>> +       struct mm_struct *mm = current->active_mm;
+>> +
+>> +       __switch_mm(mm);
+> 
+> And same here (though the reverse test)?
+> 
+>> +
+>> +       if (system_uses_ttbr0_pan()) {
+>> +               cpu_set_reserved_ttbr0();
+>> +               if (mm != &init_mm)
+>> +                       update_saved_ttbr0(current, mm);
+>> +       }
+>> +
+>> +       preempt_enable_no_resched();
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static unsigned long rodata_rw_alias_start __ro_after_init = TASK_SIZE_64 / 4;
+>> +
+>> +__always_inline void __arch_rare_write_memcpy(void *dst, const void *src,
+>> +                                             __kernel_size_t len)
+>> +{
+>> +       unsigned long __dst = (unsigned long)dst;
+>> +
+>> +       __dst -= (unsigned long)__start_rodata;
+>> +       __dst += rodata_rw_alias_start;
+>> +
+>> +       memcpy((void *)__dst, src, len);
+>> +}
+>> +
+>> +void __init rare_write_init(void)
+>> +{
+>> +       phys_addr_t pgd_phys = early_pgtable_alloc();
+>> +       pgd_t *pgd = (pgd_t *)__phys_to_virt(pgd_phys);
+>> +       phys_addr_t pa_start = __pa_symbol(__start_rodata);
+>> +       unsigned long size = __end_rodata - __start_rodata;
+>> +
+>> +       BUG_ON(!PAGE_ALIGNED(pa_start));
+>> +       BUG_ON(!PAGE_ALIGNED(size));
+>> +
+>> +       rodata_rw_alias_start += kaslr_offset();
+>> +
+>> +       BUG_ON(rodata_rw_alias_start + size > TASK_SIZE_64);
+>> +
+>> +       rare_write_mm.pgd = pgd;
+>> +       init_new_context(NULL, &rare_write_mm);
+>> +
+>> +       __create_pgd_mapping(pgd,
+>> +                            pa_start, rodata_rw_alias_start, size,
+>> +                            __pgprot(pgprot_val(PAGE_KERNEL) | PTE_NG),
+>> +                            early_pgtable_alloc, debug_pagealloc_enabled());
+>> +}
+>> +
+>> /*
+>>  * paging_init() sets up the page tables, initialises the zone memory
+>>  * maps and sets up the zero page.
+>> @@ -603,6 +702,8 @@ void __init paging_init(void)
+>>         */
+>>        memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
+>>                      SWAPPER_DIR_SIZE - PAGE_SIZE);
+>> +
+>> +       rare_write_init();
+>> }
+>> 
+>> /*
+>> --
+>> 2.7.4
+>> 
+> 
+
+Thank you for the review !
+
+> Thanks!
+> 
+> -Kees
+> 
+> -- 
+> Kees Cook
+> Pixel Security
