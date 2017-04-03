@@ -1,68 +1,87 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 3 Apr 2017 12:40:00 -0400 (EDT)
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1704031208320.1847@knanqh.ubzr>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Apr 2017 11:42:40 -0500
+Subject: [PATCH 1/4] dt-bindings: iio: stm32-dac: Add support for STM32 DAC
+In-Reply-To: <1490960707-22422-2-git-send-email-fabrice.gasnier@st.com>
+References: <1490960707-22422-1-git-send-email-fabrice.gasnier@st.com>
+ <1490960707-22422-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170403164240.hw4wza7y3s5faivb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Apr 2017, Andy Shevchenko wrote:
-
-> On Mon, Apr 3, 2017 at 12:41 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Sun, 2 Apr 2017, Andi Kleen wrote:
-> >> No PTYs seems like a big limitation. This means no sshd?
+On Fri, Mar 31, 2017 at 01:45:04PM +0200, Fabrice Gasnier wrote:
+> Document STMicroelectronics STM32 DAC (digital-to-analog converter).
 > 
-> > Again, my ultimate system target is in the sub-megabyte of RAM.  I
-> > really doubt you'll be able to fit an SSH server in there even if PTYs
-> > were supported, unless sshd (or dropbear) can be made really tiny.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  .../devicetree/bindings/iio/dac/st,stm32-dac.txt   | 56 ++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
 > 
-> Are you sure you need Linux there? There is a nice Zephyr project
-> (OpenSource RTOS, POSIX compatible) exactly for microcontrollers.
+> diff --git a/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
+> new file mode 100644
+> index 0000000..1981983
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
+> @@ -0,0 +1,56 @@
+> +STMicroelectronics STM32 DAC
+> +
+> +The STM32 DAC is a 12-bit voltage output digital-to-analog converter. The DAC
+> +can be configured in 8- or 12-bit mode. In 12-bit mode, the data could be
+> +left- or right-aligned. It has two output channels, each with its own converter.
+> +It has built-in noise and triangle waveform generator and supports external
+> +triggers for conversions. The DAC's output buffer allows a high drive output
+> +current.
+> +
+> +Contents of a stm32 dac root node:
+> +-----------------------------------
+> +Required properties:
+> +- compatible: Must be "st,stm32h7-dac-core".
+> +- reg: Offset and length of the device's register set.
+> +- clocks: Must contain an entry for pclk (which feeds the peripheral bus
+> +  interface)
+> +- clock-names: Must be "pclk".
+> +- vref-supply: Phandle to the vref+ input analog reference supply.
+> +
+> +Optional properties:
+> +- resets: Must contain the phandle to the reset controller.
+> +- A pinctrl state named "default" for each DAC channel may be defined to set
+> +  DAC_OUTx pin in mode of operation for analog output on external pin.
+> +
+> +Contents of a stm32 dac child node:
+> +-----------------------------------
+> +DAC core node should contain at least one subnode, representing a
+> +DAC instance/channel available on the machine.
+> +
+> +Required properties:
+> +- compatible: Must be "st,stm32-dac".
+> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+> +  Documentation/devicetree/bindings/iio/iio-bindings.txt
+> +- st,dac-channel: Must be either 1 or 2, to define channel in use (e.g.
+> +  single channels: 1 or 2)
 
-I know that Zephyr is LF endorsed, aim to slow fragmentation in that 
-space, etc.  But it is in itself yet another RTOS. It doesn't look like 
-it is really POSIX compatible yet, and is certainly not Linux 
-compatible.
+Use "reg" instead.
 
-I don't pretend that Linux should always be preferred to Zephyr. For 
-example, I don't think Linux could ever be used with 32KB of RAM while 
-Zephyr easily can.  However, in the hundreds of KB of RAM, given the 
-choice between Linux and anything else, I can tell you that many people 
-would go with Linux.
-
-The goal is really to be able to leverage the existing Linux knowledge 
-and ecosystem. Be able to develop your application on your PC 
-workstation, singlestep it, strace it, validate the tiny version of 
-those kernel subsystems there too with existing fuzers, etc.  If a 
-security issue turns up in your product, you have plenty of people who 
-are already familiar with the Linux environment, much more than Zephyr 
-or any other RTOSes.
-
-> While I can agree on making Linux stuff less fatty, I can't agree on
-> doing this way. We have for now two subsystems to serve for serial
-> devices, you are proposing third one for only narrow class of devices.
-> From my point of view is better to achive your goal with existing
-> system (as a proof of concept maybe even with ugly #ifdef:fery).
-
-Been there already. It doesn't work. The #ifdef:fery in the existing 
-code simply doesn't cut it. Because of its flexibility, the existing 
-code constitutes a stack of many layers each with its own interface and 
-buffering. It uses much more runtime memory simply because it can afford 
-it on all existing systems supported by Linux. It can drive a large bank 
-of modems without a single hiccup if you're still into running a BBS. 
-That's why the existing code is how it is.
-
-I don't want a proof of concept. I want something that is maintainable. 
-Adding #ifdef's to the existing code will make the end result way less 
-maintainable, either for the standard or the mini use case. By being 
-really small, the maintenance cost of a parallel implementation isn't 
-very high, certainly much less than trying to maintain a single version 
-that can scale to both extremes.
-
-
-Nicolas
+> +
+> +Example:
+> +	dac: dac at 40007400 {
+> +		compatible = "st,stm32h7-dac-core";
+> +		reg = <0x40007400 0x400>;
+> +		clocks = <&clk>;
+> +		clock-names = "pclk";
+> +		vref-supply = <&reg_vref>;
+> +
+> +		dac1: dac at 1 {
+> +			compatible = "st,stm32-dac";
+> +			#io-channels-cells = <1>;
+> +			st,dac-channel = <1>;
+> +		};
+> +
+> +		dac2: dac at 2 {
+> +			compatible = "st,stm32-dac";
+> +			#io-channels-cells = <1>;
+> +			st,dac-channel = <2>;
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
