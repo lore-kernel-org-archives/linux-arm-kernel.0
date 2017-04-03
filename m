@@ -1,44 +1,54 @@
-From: menschel.p@posteo.de (Patrick Menschel)
-Date: Mon,  3 Apr 2017 19:00:13 +0200
-Subject: [PATCH v3 3/4] ARM: dts: sun7i: Add CAN node
-In-Reply-To: <1491238814-4888-1-git-send-email-menschel.p@posteo.de>
-References: <1491238814-4888-1-git-send-email-menschel.p@posteo.de>
-Message-ID: <1491238814-4888-4-git-send-email-menschel.p@posteo.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 3 Apr 2017 12:01:11 -0300
+Subject: [PATCH RFC] serial: imx: support an enable-gpio
+In-Reply-To: <1468400495-10471-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1468400495-10471-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAOMZO5A4e7H-6feNN-cTABOKv+CUCU9Em_yFMhorZwXfeA-h0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 SoC has an on-board CAN controller.
-This patch adds the device node.
+Hi Uwe,
 
-The CAN controller is inherited from the A10 SoC and uses the same driver.
+On Wed, Jul 13, 2016 at 6:01 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> A part of my machine looks as follows (simplified):
+>
+> ,------------------------.
+> | ,---------.            |
+> | |  imx25  o--RX----?---o---
+> | |         o--GPIO--'   |
+> | `---------'            |
+> `------------------------'
+>
+> that is, there is a driver on the RX line that must be enabled before
+> the UART can be used. (That is necessary because the default mux of the
+> RX pad after reset is an output.)
+>
+> To represent this in the device tree I do:
+>
+>         pinctrl_uart5: uart5 {
+>                 fsl,pins = <
+>                         ...
+>                         MX25_PAD_LBA__UART5_RXD         0x00000000
+>                         MX25_PAD_CS5__GPIO_3_21         0x00002001
+>                         ...
+>         };
+>
+>         &uart5 {
+>                 pinctrl-names = "default";
+>                 pinctrl-0 = <&pinctrl_uart5>;
+>
+>                 enable-gpio = <&gpio3 21 GPIO_ACTIVE_LOW>;
+>                 ...
+>         };
+>
+> This way it's ensured that the gpio is only enabled when the LBA pad is
+> muxed as RX (together with the bootloader that sets the GPIO high).
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-This patch is adapted from the description in
-Documentation/devicetree/bindings/net/can/sun4i_can.txt
+Since this is not imx serial specific it could be made more generic.
 
-Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 2db97fc..c637e10 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1582,6 +1582,15 @@
- 			#size-cells = <0>;
- 		};
- 
-+		can0: can at 01c2bc00 {
-+			compatible = "allwinner,sun7i-a20-can",
-+				     "allwinner,sun4i-a10-can";
-+			reg = <0x01c2bc00 0x400>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb1_gates 4>;
-+			status = "disabled";
-+		};
-+
- 		i2c4: i2c at 01c2c000 {
- 			compatible = "allwinner,sun7i-a20-i2c",
- 				     "allwinner,sun4i-a10-i2c";
--- 
-1.9.1
+What about extending
+Documentation/devicetree/bindings/serial/slave-device.txt to handle
+this GPIO, or maybe a regulator?
