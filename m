@@ -1,83 +1,83 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 3 Apr 2017 15:28:43 +0900
-Subject: [PATCH] arm64: dts: uniphier: add input-delay properties to
- Cadence eMMC node
-In-Reply-To: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNARtKO-a7tX5U2NGAw707uSLcfxABo1yt44QQfE2go7EmQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Apr 2017 08:42:08 +0200
+Subject: [RFC PATCH v2 4/4] ARM: sun8i: h3: add support for the thermal
+ sensor in H3
+In-Reply-To: <3f13c07d-be6a-0350-6d86-de1a4d4e33a8@free-electrons.com>
+References: <20170402133304.56824-1-icenowy@aosc.io>
+ <20170402133304.56824-5-icenowy@aosc.io>
+ <3f13c07d-be6a-0350-6d86-de1a4d4e33a8@free-electrons.com>
+Message-ID: <20170403064208.llk6usgtkbg5ejzw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MTD developers,
-Please ignore this patch.
+On Sun, Apr 02, 2017 at 04:34:55PM +0200, Quentin Schulz wrote:
+> Hi Icenowy,
+> 
+> On 02/04/2017 15:33, Icenowy Zheng wrote:
+> > As we have gained the support for the thermal sensor in H3, we can now
+> > add its device nodes to the device tree.
+> > 
+> > Add them to the H3 device tree.
+> > 
+> > The H5 thermal sensor has some differences, and will be added furtherly.
+> > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > ---
+> >  arch/arm/boot/dts/sun8i-h3.dtsi | 26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > index b36f9f423c39..552217bb9266 100644
+> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > @@ -72,6 +72,32 @@
+> >  		};
+> >  	};
+> >  
+> > +	iio-hwmon {
+> > +		compatible = "iio-hwmon";
+> > +		io-channels = <&ths>;
+> > +	};
+> > +
+> > +	soc {
+> > +		ths: ths at 01c25000 {
+> > +			compatible = "allwinner,sun8i-h3-ths";
+> > +			reg = <0x01c25000 0x100>;
+> > +			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
+> > +			clock-names = "bus", "ths";
+> > +			resets = <&ccu RST_BUS_THS>;
+> > +			#thermal-sensor-cells = <0>;
+> > +			#io-channel-cells = <0>;
+> > +		};
+> > +	};
+> > +
+> > +	thermal-zones {
+> > +		cpu_thermal {
+> > +			/* milliseconds */
+> > +			polling-delay-passive = <250>;
+> > +			polling-delay = <1000>;
+> > +			thermal-sensors = <&ths>;
+> > +		};
+> 
+> Would it make sense to add the CPU temp trip points in this patch?
 
-I accidentally sent this patch to a wrong ML.
-Sorry for the noise.
+No.
 
+This is a separate, unrelated, change that has nothing to do with what
+is described either in the commit title or the commit log.
 
+The thermal zone itself shouldn't even be in this patch.
 
-
-2017-03-31 13:20 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Since commit a04e2b383401 ("mmc: sdhci-cadence: Update PHY delay
-> configuration"), PHY parameters must be specified by DT.
->
-> The hard-coded settings have been converted as follows:
-> - SDHCI_CDNS_PHY_DLY_SD_DEFAULT -> cdns,phy-input-delay-legacy
-> - SDHCI_CDNS_PHY_DLY_EMMC_SDR   -> cdns,phy-input-delay-mmc-highspeed
-> - SDHCI_CDNS_PHY_DLY_EMMC_DDR   -> cdns,phy-input-delay-mmc-ddr
->
-> The following have not been moved:
-> - SDHCI_CDNS_PHY_DLY_SD_HS
->    this is unneeded in the eMMC configuration
-> - SDHCI_CDNS_PHY_DLY_EMMC_LEGACY
->    this is never enabled by the driver as it is covered by
->    SDHCI_CDNS_PHY_DLY_SD_DEFAULT
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 3 +++
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 3 +++
->  2 files changed, 6 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-> index 5dc5124..b6ebdc9 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-> @@ -310,6 +310,9 @@
->                         bus-width = <8>;
->                         mmc-ddr-1_8v;
->                         mmc-hs200-1_8v;
-> +                       cdns,phy-input-delay-legacy = <4>;
-> +                       cdns,phy-input-delay-mmc-highspeed = <2>;
-> +                       cdns,phy-input-delay-mmc-ddr = <3>;
->                 };
->
->                 usb0: usb at 5a800100 {
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> index 6c9a72d..0ab6c2e 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> @@ -394,6 +394,9 @@
->                         bus-width = <8>;
->                         mmc-ddr-1_8v;
->                         mmc-hs200-1_8v;
-> +                       cdns,phy-input-delay-legacy = <4>;
-> +                       cdns,phy-input-delay-mmc-highspeed = <2>;
-> +                       cdns,phy-input-delay-mmc-ddr = <3>;
->                 };
->
->                 sd: sdhc at 5a400000 {
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
+Maxime
 
 -- 
-Best Regards
-Masahiro Yamada
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/347b7e7e/attachment.sig>
