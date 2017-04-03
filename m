@@ -1,87 +1,67 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 3 Apr 2017 09:44:37 +0200
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <20170401222119.25106-1-nicolas.pitre@linaro.org>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
-Message-ID: <20170403074437.GA20683@kroah.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Apr 2017 09:53:53 +0200
+Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
+In-Reply-To: <CAGb2v647bc0VdYTQDyEjAerKnfjtkDYGdhnUgpTU-Tuns6FYYA@mail.gmail.com>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-5-wens@csie.org>
+ <20170214095819.utsftcvti5zdmlmi@lukather>
+ <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
+ <20170215094954.h3wyaxlqkeb342yu@lukather>
+ <CAGb2v67ey1Ppc3wf1154QKoCX-xsOjWDEsXi5gxPbL4MY37zHw@mail.gmail.com>
+ <20170326205124.vdjbmjukfysgbefc@lukather>
+ <CAGb2v647bc0VdYTQDyEjAerKnfjtkDYGdhnUgpTU-Tuns6FYYA@mail.gmail.com>
+Message-ID: <20170403075353.ep4yoadxjpw5c5vf@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 01, 2017 at 06:21:14PM -0400, Nicolas Pitre wrote:
-> Many embedded systems don't need the full TTY layer support. Most of the
-> time, the TTY layer is only a conduit for outputting debugging messages
-> over a serial port. The TTY layer also implements many features that are
-> very unlikely to ever be used in such a setup. There is great potential
-> for both code and dynamic memory size reduction on small systems. This is
-> what this patch series is achieving.
+On Mon, Mar 27, 2017 at 04:53:05PM +0800, Chen-Yu Tsai wrote:
+> >> To me it seems the "factors" bits are mostly the same. Differences
+> >> are mostly with parent-specific pre-dividers, clock post-dividers,
+> >> and non-standard factors. The first is nicely handled by the new mux
+> >> wrapper, the second is currently only used with NK types, and the
+> >> last is currently only supported by single factor divider or
+> >> multiplier clocks with tables.
+> >>
+> >> Non-standard factors are probably the trickiest one, but given we will
+> >> support full factor tables for some of the tricky CPU PLLs, this is
+> >> probably solved, even if not implemented yet.
+> >>
+> >> I'll start with the NP style clocks, which only use P when the output
+> >> is under a certain frequency.
+> >
+> > Do we need to use a P factor? I mean, we can just create a custom
+> > clock for that, I'd realy don't want to cripple the generic code for a
+> > completely non-generic problem.
 > 
-> The existing TTY code is quite large and complex. Trying to shrink it
-> is risky as the potential for breakage is non negligeable, and its
-> interchangeable layers impose a lower limit on the code to implement it.
-> Therefore, the approach used here consists in the creation of a parallel
-> implementation with the very minimal amount of code collapsed together
-> that interfaces with existing UART drivers directly and provides TTY-like
-> character devices to user space. When the regular TTY layer is disabled,
-> then this minitty alternative layer is proposed by Kconfig.
-> 
-> For more details on the rationale and motivations driving this approach
-> please see: https://lkml.org/lkml/2017/3/24/634
-> 
-> Of course, making it "mini" means there are limitations to what it does:
-> 
-> - This supports serial ports only. No VT's, no PTY's.
-> 
-> - The default n_tty line discipline is hardcoded and no other line
->   discipline are supported.
-> 
-> - The line discipline features are not all implemented. Notably, XON/XOFF
->   is currently not implemented (although this might not require a lot of
->   code to do it if someone were to need it).
-> 
-> - Hung-up state is not implemented.
-> 
-> - No error handling on RX bytes other than counting them.
-> 
-> - Job control is currently not supported (this may change in the future and 
->   be configurable).
-> 
-> But again, most small embedded systems simply don't need those things.
-> 
-> This can be used on any architecture of course, but here's some numbers
-> using a minimal ARM config.
-> 
-> When CONFIG_TTY=y, the following files are linked into the kernel:
-> 
->    text	   data	    bss	    dec	    hex	filename
->    8796	    128	      0	   8924	   22dc	drivers/tty/n_tty.o
->   11809	    276	      0	  12085	   2f35	drivers/tty/serial/fulltty_serial.o
->    1376	      0	      0	   1376	    560	drivers/tty/tty_buffer.o
->   13571	    172	    132	  13875	   3633	drivers/tty/tty_io.o
->    3072	      0	      0	   3072	    c00	drivers/tty/tty_ioctl.o
->    2457	      2	    120	   2579	    a13	drivers/tty/tty_ldisc.o
->    1328	      0	      0	   1328	    530	drivers/tty/tty_ldsem.o
->     316	      0	      0	    316	    13c	drivers/tty/tty_mutex.o
->    2516	      0	      0	   2516	    9d4	drivers/tty/tty_port.o
->   45241	    578	    252	  46071	   b3f7	(TOTALS)
-> 
-> When CONFIG_TTY=n and CONFIG_MINITTY_SERIAL=y, the above files are replaced
-> by the following:
-> 
->    text	   data	    bss	    dec	    hex	filename
->    8063	      8	     64	   8135	   1fc7	drivers/tty/serial/minitty_serial.o
-> 
-> That's it!  And the runtime buffer usage is much less as well. Future plans
-> such as removing runtime baudrate handling for those targets with a known
-> fixed baudrate will shrink the code even more.
+> I'm not sure. AFAIK the vendor BSP cpufreq doesn't use frequencies
+> low enough to require the P divider, so we could just ignore it. But
+> then we need to make sure it's set to 1 at probe time, while keeping
+> the output frequency usable, which would kind of bloat the probe
+> function. FYI I'm in favor of doing it this way.
 
-Thanks for the resend.  I agree with your goal of getting Linux running
-on these very tiny chips, I want that to happen too.  I'm traveling at
-the moment for the next 2 weeks, but will review it in detail when I get
-back.  It's in my queue, don't worry, it's not lost.
+Hmmm, I don't know why I replied that anymore, I thought you were
+still talking about MMC, while you were clearly talking about
+CPU_PLLs...
 
-Ideally others would review it as well...
+The question still remains though. If we're not using P yet, and if
+the BSP doesn't either, then we can just hardcode it.
 
-thanks,
+We can always come up with something later if we need to use it,
+either an NP-class, or a table. The only thing we need to care about
+would be to pay attention to what the P factor already is, before
+forcing it to 1. If it's set to 4, that would mean multiplying the CPU
+clock by 4, which is probably not such a great idea.
 
-greg k-h
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/59f79643/attachment-0001.sig>
