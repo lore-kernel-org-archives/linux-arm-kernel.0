@@ -1,86 +1,30 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 4 Apr 2017 00:18:08 +0800
-Subject: [PATCH v3 01/11] dt-bindings: add binding for the Allwinner DE2
- CCU
-In-Reply-To: <20170403153323.kmq3ku7h3sj7fp4g@rob-hp-laptop>
-References: <20170329194613.55548-1-icenowy@aosc.io>
- <20170329194613.55548-2-icenowy@aosc.io>
- <20170403153323.kmq3ku7h3sj7fp4g@rob-hp-laptop>
-Message-ID: <517f0d78-7b43-7e5b-5ad0-c51743639172@aosc.io>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Apr 2017 11:19:26 -0500
+Subject: [PATCH v7 06/13] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <ecacddaa5d38b678e1c8c95b56f65f4a39527ead.1490886907.git-series.gregory.clement@free-electrons.com>
+References: <cover.51071caa64e5df81264a91b9a81ed1e94f47d2c4.1490886907.git-series.gregory.clement@free-electrons.com>
+ <ecacddaa5d38b678e1c8c95b56f65f4a39527ead.1490886907.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170403161926.wfj7foddu33gxuae@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 30, 2017 at 05:22:58PM +0200, Gregory CLEMENT wrote:
+> From: Hu Ziji <huziji@marvell.com>
+> 
+> Marvell Xenon SDHC can support eMMC/SD/SDIO.
+> Add Xenon-specific properties.
+> Also add properties for Xenon PHY setting.
+> 
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 170 +++++++-
+>  1 file changed, 170 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
 
+I acked v6 and it seems like a minor change, though I had to search for 
+both because there is no revision history nor explanation why you didn't 
+add my ack.
 
-? 2017?04?03? 23:33, Rob Herring ??:
-> On Thu, Mar 30, 2017 at 03:46:03AM +0800, Icenowy Zheng wrote:
->> From: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> Allwinner "Display Engine 2.0" contains some clock controls in it.
->>
->> In order to add them as clock drivers, we need a device tree binding.
->> Add the binding here.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ---
->> Changes in v3:
->> - Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
->
-> Why? You waste virtual memory space making this bigger than it needs to
-> be. Not an issue so much for 64-bit.
->
->>
->>  .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
->>  1 file changed, 31 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
->> new file mode 100644
->> index 000000000000..34cf79c05f13
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
->> @@ -0,0 +1,31 @@
->> +Allwinner Display Engine 2.0 Clock Control Binding
->> +--------------------------------------------------
->> +
->> +Required properties :
->> +- compatible: must contain one of the following compatibles:
->> +		- "allwinner,sun8i-a83t-de2-clk"
->> +		- "allwinner,sun50i-a64-de2-clk"
->> +		- "allwinner,sun50i-h5-de2-clk"
->> +
->> +- reg: Must contain the registers base address and length
->> +- clocks: phandle to the clocks feeding the display engine subsystem.
->> +	  Three are needed:
->> +  - "mod": the display engine module clock
->> +  - "bus": the bus clock for the whole display engine subsystem
->> +- clock-names: Must contain the clock names described just above
->> +- resets: phandle to the reset control for the display engine subsystem.
->> +- #clock-cells : must contain 1
->> +- #reset-cells : must contain 1
->> +
->> +Example:
->> +de2_clocks: clock at 01000000 {
->
-> Drop the leading 0s. dtc in linux-next will now warn on this with W=1
-> compile. Looks like sunxi has a lot of them. Please fix so we don't keep
-> repeating this same copy-n-paste.
-
-Thanks ;-)
-
-I will try to kill them all ;-)
-
->
->> +	compatible = "allwinner,sun50i-a64-de2-clk";
->> +	reg = <0x01000000 0x100000>;
->> +	clocks = <&ccu CLK_DE>,
->> +		 <&ccu CLK_BUS_DE>;
->> +	clock-names = "mod",
->> +		      "bus";
->> +	resets = <&ccu RST_BUS_DE>;
->> +	#clock-cells = <1>;
->> +	#reset-cells = <1>;
->> +};
->> --
->> 2.12.0
->>
+Acked-by: Rob Herring <robh@kernel.org> 
