@@ -1,83 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 08:42:08 +0200
-Subject: [RFC PATCH v2 4/4] ARM: sun8i: h3: add support for the thermal
- sensor in H3
-In-Reply-To: <3f13c07d-be6a-0350-6d86-de1a4d4e33a8@free-electrons.com>
-References: <20170402133304.56824-1-icenowy@aosc.io>
- <20170402133304.56824-5-icenowy@aosc.io>
- <3f13c07d-be6a-0350-6d86-de1a4d4e33a8@free-electrons.com>
-Message-ID: <20170403064208.llk6usgtkbg5ejzw@lukather>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 03 Apr 2017 09:06:56 +0200
+Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
+ mmaping code
+In-Reply-To: <20170331111624.GR7909@n2100.armlinux.org.uk>
+References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
+ <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
+ <20170331111624.GR7909@n2100.armlinux.org.uk>
+Message-ID: <e08c6221-2902-f855-fd10-87f7895f8b43@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 02, 2017 at 04:34:55PM +0200, Quentin Schulz wrote:
-> Hi Icenowy,
-> 
-> On 02/04/2017 15:33, Icenowy Zheng wrote:
-> > As we have gained the support for the thermal sensor in H3, we can now
-> > add its device nodes to the device tree.
-> > 
-> > Add them to the H3 device tree.
-> > 
-> > The H5 thermal sensor has some differences, and will be added furtherly.
-> > 
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > ---
-> >  arch/arm/boot/dts/sun8i-h3.dtsi | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > index b36f9f423c39..552217bb9266 100644
-> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > @@ -72,6 +72,32 @@
-> >  		};
-> >  	};
-> >  
-> > +	iio-hwmon {
-> > +		compatible = "iio-hwmon";
-> > +		io-channels = <&ths>;
-> > +	};
-> > +
-> > +	soc {
-> > +		ths: ths at 01c25000 {
-> > +			compatible = "allwinner,sun8i-h3-ths";
-> > +			reg = <0x01c25000 0x100>;
-> > +			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-> > +			clock-names = "bus", "ths";
-> > +			resets = <&ccu RST_BUS_THS>;
-> > +			#thermal-sensor-cells = <0>;
-> > +			#io-channel-cells = <0>;
-> > +		};
-> > +	};
-> > +
-> > +	thermal-zones {
-> > +		cpu_thermal {
-> > +			/* milliseconds */
-> > +			polling-delay-passive = <250>;
-> > +			polling-delay = <1000>;
-> > +			thermal-sensors = <&ths>;
-> > +		};
-> 
-> Would it make sense to add the CPU temp trip points in this patch?
+Hi Russel,
 
-No.
 
-This is a separate, unrelated, change that has nothing to do with what
-is described either in the commit title or the commit log.
+On 31.03.2017 13:16, Russell King - ARM Linux wrote:
+> On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
+>> In this version of the patch I have replaced temporal pages and
+>> iommu_dma_mmap with remap_pfn_range or rather its simplified version
+>> vm_iomap_memory.
+>> Unfortunately I have not find nice helper for sgtable creation, so I
+>> left sg allocation inside _iommu_mmap_attrs.
+>>
+>> As the fixing of DMA_ATTR_FORCE_CONTIGUOUS related crashes has higher
+>> priority I have focused only on it in this patch.
+> As I mentioned elsewhere, I don't believe that fudging around in this way
+> is a proper fix.
+>
+> DMA coherent memory was never, ever, intended to be passed back into the
+> streaming APIs - it was designed that the two would be mutually exclusive.
+>
+> The problem is that we now have DMA coherent allocations being passed
+> through the dma-buf API using this dma_get_sgtable() thing, which is quite
+> broken.  
 
-The thermal zone itself shouldn't even be in this patch.
+This patch just fixes current implementation of the API by re-using
+existing techniques, nothing more.
+It prevents code from using some pointer (area->pages) not because of
+lack backing struct pages, but because this pointer is just not
+initialized and apparently not necessary in case of contiguous allocations.
+I think, the problem of fixing DMA-API should be addressed in separate
+set of patches, as it is a different issue and requires much more
+experience in MM and DMA-API than I have.
 
-Maxime
+Regards
+Andrzej
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/347b7e7e/attachment.sig>
+> I regard dma_get_sgtable() as very broken, and had I realised at
+> the time that this was what it was trying to do, I would have NAK'd it.
+>
+> Rather than bodging around this brokenness, trying to get dma_get_sgtable()
+> to work, I believe we need to address the root cause - which is proper
+> support for passing DMA coherent allocations through dma-buf, which does
+> not involve scatterlists and calling dma_map_sg() on it.
+>
+> That's going to need to be addressed in any case, because of the
+> dma_declare_coherent_memory() issue, where we may not have struct pages
+> backing a coherent allocation.  Such a case can come up on ARM64 via
+> DT's "shared-dma-pool" reserved memory stuff.
+>
+> Right now, I have a "fix" for ARM queued which causes dma_get_sgtable()
+> to fail when used with reserved memory, but we have one user who needs
+> this to work.  So, dma-buf needs to be fixed for this one way or another,
+> and I don't think that bending the current broken stuff to suit it by
+> trying these vmalloc_to_page() hacks is acceptable.
+>
+> dma_get_sgtable() is fundamentally broken IMHO.
+>
