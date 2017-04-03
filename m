@@ -1,7 +1,7 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  3 Apr 2017 11:54:03 +0200
+Date: Mon,  3 Apr 2017 11:54:14 +0200
 Subject: [PATCH] ARM: dts: r8a7794: Add Z2 clock
-Message-ID: <1491213243-7448-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1491213254-7532-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
