@@ -1,53 +1,30 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 3 Apr 2017 12:56:28 +0100
-Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <CA+sq2Ccb1mUQpTvHWsEGWyc+9HjLdq8FSqBGRM7Ey932_6X5jg@mail.gmail.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-5-jean-philippe.brucker@arm.com>
- <CA+sq2CeWpGarhT9p+iVo8nJXR=xpkj6XNMwv4LvbP0M6JxA_SA@mail.gmail.com>
- <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
- <CA+sq2Ccb1mUQpTvHWsEGWyc+9HjLdq8FSqBGRM7Ey932_6X5jg@mail.gmail.com>
-Message-ID: <19143d08-07ee-c2a4-eb71-e48fef0c8874@arm.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 03 Apr 2017 17:41:41 +0530
+Subject: [Patch v3 04/11] [media] s5p-mfc: Support MFCv10.10 buffer
+ requirements
+In-Reply-To: <598903bd-d798-ecc2-a1cf-4c104a091c2c@samsung.com>
+References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170331090435epcas5p4a17ab56c983cea2bc4754ceafe3e1362@epcas5p4.samsung.com>
+ <1490951200-32070-5-git-send-email-smitha.t@samsung.com>
+ <598903bd-d798-ecc2-a1cf-4c104a091c2c@samsung.com>
+Message-ID: <1491221501.8493.97.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 12:42, Sunil Kovvuri wrote:
-> On Mon, Apr 3, 2017 at 3:44 PM, Jean-Philippe Brucker
-> <jean-philippe.brucker@arm.com> wrote:
->> On 03/04/17 09:34, Sunil Kovvuri wrote:
->>>> +static size_t arm_smmu_atc_invalidate_domain(struct arm_smmu_domain *smmu_domain,
->>>> +                                            unsigned long iova, size_t size)
->>>> +{
->>>> +       unsigned long flags;
->>>> +       struct arm_smmu_cmdq_ent cmd = {0};
->>>> +       struct arm_smmu_group *smmu_group;
->>>> +       struct arm_smmu_master_data *master;
->>>> +       struct arm_smmu_device *smmu = smmu_domain->smmu;
->>>> +       struct arm_smmu_cmdq_ent sync_cmd = {
->>>> +               .opcode = CMDQ_OP_CMD_SYNC,
->>>> +       };
->>>> +
->>>> +       spin_lock_irqsave(&smmu_domain->groups_lock, flags);
->>>> +
->>>> +       list_for_each_entry(smmu_group, &smmu_domain->groups, domain_head) {
->>>> +               if (!smmu_group->ats_enabled)
->>>> +                       continue;
->>>
->>> If ATS is not supported, this seems to increase no of cycles spent in
->>> pgtbl_lock.
->>> Can we return from this API by checking 'ARM_SMMU_FEAT_ATS' in smmu->features ?
->>
->> Sure, I can add a check before taking the lock. Have you been able to
->> observe a significant difference in cycles between checking FEAT_ATS,
->> checking group->ats_enabled after taking the lock, and removing this
->> function call altogether?
->>
->> Thanks,
->> Jean-Philippe
+On Mon, 2017-04-03 at 09:41 +0200, Andrzej Hajda wrote:
+> On 31.03.2017 11:06, Smitha T Murthy wrote:
+> > Aligning the luma_dpb_size, chroma_dpb_size, mv_size and me_buffer_size
+> > for MFCv10.10.
+> >
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 > 
-> No, I haven't verified, was just making an observation.
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> --
+> Regards
+> Andrzej
+> 
+> 
+Thank you for the review.
 
-Fair enough, I think avoiding the lock when ATS isn't in use makes sense.
-
-Thanks,
-Jean-Philippe
+Regards,
+Smitha
