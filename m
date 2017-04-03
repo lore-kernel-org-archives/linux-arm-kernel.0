@@ -1,72 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:37:59 +0100
-Subject: [PATCH v5 26/34] arm/arm64: KVM: Use __hyp_reset_vectors() directly
+Date: Mon,  3 Apr 2017 19:38:05 +0100
+Subject: [PATCH v5 32/34] arm64: hyp-stub: Zero x0 on successful stub handling
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-27-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-33-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__cpu_reset_hyp_mode doesn't need to be passed any argument now,
-as the hyp-stub implementations are self-contained, and is now
-reduced to just calling __hyp_reset_vectors(). Let's drop the
-wrapper and use the stub hypercall directly.
+We now return HVC_STUB_ERR when a stub hypercall fails, but we
+leave whatever was in x0 on success. Zeroing it on return seems
+like a good idea.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   | 6 ------
- arch/arm/kvm/arm.c                | 3 +--
- arch/arm64/include/asm/kvm_host.h | 6 ------
- 3 files changed, 1 insertion(+), 14 deletions(-)
+ arch/arm64/kernel/hyp-stub.S | 4 +++-
+ arch/arm64/kvm/hyp-init.S    | 6 +++---
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index adea30753185..d488b8866bc9 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -270,12 +270,6 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index d55604d91e33..e1261fbaa374 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -73,8 +73,10 @@ el1_sync:
  
--static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
--					phys_addr_t phys_idmap_start)
--{
--	__hyp_reset_vectors();
--}
+ 	/* Someone called kvm_call_hyp() against the hyp-stub... */
+ 	ldr	x0, =HVC_STUB_ERR
++	eret
+ 
+-9:	eret
++9:	mov	x0, xzr
++	eret
+ ENDPROC(el1_sync)
+ 
+ .macro invalid_vector	label
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 3734e6315cd7..839425c24b1c 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -154,13 +154,13 @@ reset:
+ 	/* Install stub vectors */
+ 	adr_l	x5, __hyp_stub_vectors
+ 	msr	vbar_el2, x5
+-	b	exit
++	mov	x0, xzr
++	eret
+ 
+ 1:	/* Bad stub call */
+ 	ldr	x0, =HVC_STUB_ERR
 -
- static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	return 0;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 96dba7cd8be7..57dd48d61796 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1129,8 +1129,7 @@ static void cpu_hyp_reinit(void)
- static void cpu_hyp_reset(void)
- {
- 	if (!is_kernel_in_hyp_mode())
--		__cpu_reset_hyp_mode(hyp_default_vectors,
--				     kvm_get_idmap_start());
-+		__hyp_reset_vectors();
- }
+-exit:
+ 	eret
++
+ ENDPROC(__kvm_handle_stub_hvc)
  
- static void _kvm_arch_hardware_enable(void *discard)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 0355dd109956..578df18f66b7 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -362,12 +362,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
- }
- 
--static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
--					phys_addr_t phys_idmap_start)
--{
--	__hyp_reset_vectors();
--}
--
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ 	.ltorg
 -- 
 2.11.0
