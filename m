@@ -1,63 +1,71 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 3 Apr 2017 15:18:14 -0500
-Subject: [PATCH 1/1] PCI: Fix for PEM-specific resource reservation for
- legacy firmware case
-In-Reply-To: <1490972804-25830-1-git-send-email-tn@semihalf.com>
-References: <1490972804-25830-1-git-send-email-tn@semihalf.com>
-Message-ID: <20170403201814.GA13232@bhelgaas-glaptop.roam.corp.google.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon,  3 Apr 2017 15:23:49 -0500
+Subject: [PATCH 3/3] ARM: dts: da850: Add node for LEGO MINDSTORMS EV3 Battery
+In-Reply-To: <1491251029-23256-1-git-send-email-david@lechnology.com>
+References: <1491251029-23256-1-git-send-email-david@lechnology.com>
+Message-ID: <1491251029-23256-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 05:06:44PM +0200, Tomasz Nowicki wrote:
-> SZ_16M PEM resource size includes PEM-specific register and its children
-> resources. Reservation of the whole SZ_16M range leads to child device
-> driver failure when pcieport driver is requesting resources:
-> pcieport 0004:1f:00.0: can't enable device: BAR 0 [mem 0x87e0c0f00000-0x87e0c0ffffff 64bit] not claimed
-> So we cannot reserve full 16M here and instead we want to reserve
-> PEM-specific register only which is SZ_64K.
-> 
-> At the end increase PEM resource to SZ_16M since this is what
-> thunder_pem_init() call expects for proper initialization.
-> 
-> Fixes: 9abb27c7594a ("PCI: thunder-pem: Add legacy firmware support for Cavium ThunderX host controller")
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> CC: stable at vger.kernel.org	# v4.10+
+This adds a new node to the LEGO MINDSTORMS EV3 device tree for the battery.
 
-Applied to for-linus for v4.11, thanks!
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/boot/dts/da850-lego-ev3.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-> ---
->  drivers/pci/host/pci-thunder-pem.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> index b89c373..6e031b5 100644
-> --- a/drivers/pci/host/pci-thunder-pem.c
-> +++ b/drivers/pci/host/pci-thunder-pem.c
-> @@ -375,7 +375,6 @@ static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
->  	index -= node * PEM_MAX_DOM_IN_NODE;
->  	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
->  					FIELD_PREP(PEM_INDX_MASK, index);
-> -	res_pem->end = res_pem->start + SZ_16M - 1;
->  	res_pem->flags = IORESOURCE_MEM;
->  }
->  
-> @@ -399,8 +398,15 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
->  	 */
->  	if (ret) {
->  		thunder_pem_legacy_fw(root, res_pem);
-> -		/* Reserve PEM-specific resources and PCI configuration space */
-> +		/*
-> +		 * Reserve 64K size PEM specific resources. The full 16M range
-> +		 * size is required for thunder_pem_init() call.
-> +		 */
-> +		res_pem->end = res_pem->start + SZ_64K - 1;
->  		thunder_pem_reserve_range(dev, root->segment, res_pem);
-> +		res_pem->end = res_pem->start + SZ_16M - 1;
-> +
-> +		/* Reserve PCI configuration space as well. */
->  		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
->  	}
->  
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
+index c20580a..99cd561 100644
+--- a/arch/arm/boot/dts/da850-lego-ev3.dts
++++ b/arch/arm/boot/dts/da850-lego-ev3.dts
+@@ -172,6 +172,18 @@
+ 		gpio = <&gpio 111 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
++
++	/*
++	 * The EV3 can use 6-AA batteries or a rechargable Li-ion battery pack.
++	 */
++	battery {
++		pinctrl-names = "default";
++		pintctrl-0 = <&battery_pins>;
++		compatible = "lego,ev3-battery";
++		io-channels = <&adc 4>, <&adc 3>;
++		io-channel-names = "voltage", "current";
++		rechargeable-gpios = <&gpio 136 GPIO_ACTIVE_LOW>;
++	};
+ };
+ 
+ &pmx_core {
+@@ -235,6 +247,15 @@
+ 			0x34 0x00000008 0x0000000f
+ 		>;
+ 	};
++
++	battery_pins: pinmux_battery_pins {
++		pinctrl-single,bits = <
++			/* GP0[6] */
++			0x04 0x00000080 0x000000f0
++			/* GP8[8] */
++			0x4c 0x00000080 0x000000f0
++		>;
++	};
+ };
+ 
+ &pinconf {
+@@ -349,6 +370,13 @@
+ 
+ &gpio {
+ 	status = "okay";
++
++	/* Don't pull down battery voltage adc io channel */
++	batt_volt_en {
++		gpio-hog;
++		gpios = <6 GPIO_ACTIVE_HIGH>;
++		output-low;
++	};
+ };
+ 
+ &usb_phy {
+-- 
+2.7.4
