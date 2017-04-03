@@ -1,110 +1,103 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 10:14:23 +0200
-Subject: [PATCH v3 04/11] drm/sun4i: abstract the layer type
-In-Reply-To: <20170329194613.55548-5-icenowy@aosc.io>
-References: <20170329194613.55548-1-icenowy@aosc.io>
- <20170329194613.55548-5-icenowy@aosc.io>
-Message-ID: <20170403081423.p6x4ytfoga2krygv@lukather>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 3 Apr 2017 10:17:51 +0200
+Subject: [RFC PATCH] mmc: core: HS DDR switch, don't change timing before
+ checking status
+In-Reply-To: <133e7fc9-2d01-79a2-8f1e-08ce2ebf835f@microchip.com>
+References: <98664253-9a68-fa59-7f17-438b0d522fe8@microchip.com>
+ <20170310142117.6060-1-ludovic.desroches@atmel.com>
+ <133e7fc9-2d01-79a2-8f1e-08ce2ebf835f@microchip.com>
+Message-ID: <7b638940-9d79-f51c-37fc-008f17024558@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 30, 2017 at 03:46:06AM +0800, Icenowy Zheng wrote:
-> As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
-> driver, we will finally have two types of layer.
+Le 15/03/2017 ? 12:48, Nicolas Ferre a ?crit :
+> Le 10/03/2017 ? 15:21, Ludovic Desroches a ?crit :
+>> From: Ludovic Desroches <ludovic.desroches@microchip.com>
+>>
+>> The commit e173f8911f09 mmc: core: Update CMD13 polling policy when
+>> switch to HS DDR mode in addition to fix the management of CRC error,
+>> changes the place where the DDR52 timing is set.
+>>
+>> Before this commit, the sequence was:
+>> - set width to 8 with MMC_HS timing
+>> - send the switch command
+>> - check the status
+>> - set width to 8 with MMC_DDR52 timing
+>> - send the switch command
+>> - check the status
+>> Now:
+>> - set width to 8 with MMC_HS timing
+>> - send the switch command
+>> - set width to 8 with MMC_DDR52 timing
+>> - check the status
+>>
+>> It may lead to get an error when checking the status with some devices.
+>>
+>> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 > 
-> Abstract the layer type to void * and a ops struct, which contains the
-> only function used by crtc -- get the drm_plane struct of the layer.
+> Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Refactored patch in v3.
+> On sama5d2 Xplained (eMMC on sdhci).
 > 
->  drivers/gpu/drm/sun4i/sun4i_crtc.c  | 19 +++++++++++--------
->  drivers/gpu/drm/sun4i/sun4i_crtc.h  |  3 ++-
->  drivers/gpu/drm/sun4i/sun4i_layer.c | 19 ++++++++++++++++++-
->  drivers/gpu/drm/sun4i/sun4i_layer.h |  2 +-
->  drivers/gpu/drm/sun4i/sunxi_layer.h | 17 +++++++++++++++++
->  5 files changed, 49 insertions(+), 11 deletions(-)
->  create mode 100644 drivers/gpu/drm/sun4i/sunxi_layer.h
+> Note that without this patch the system is unable to boot. Even if it
+> was present on 4.10 but we didn't spot it, I see now this as a regression.
+
+Thorsten,
+
+I believe that Ludovic found the root cause of this issue that we were
+experiencing on our platform.
+
+He investigated with the help of Ulf and it is now solved by his patch
+"[PATCH] mmc: sdhci-of-at91: fix MMC_DDR_52 timing selection" already
+integrated in Linus' tree last Friday.
+
+As far as we are concerned, you can remove the mention of this
+regression from your report
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1368368.html
+
+Thanks a lot for maintaining this useful tool!
+
+Best regards,
+
+> We would also need to add the tags:
+> Cc: stable <stable@vger.kernel.org> #4.10+
+> Fixes: e173f8911f09 ("mmc: core: Update CMD13 polling policy when switch
+> to HS DDR mode")
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-> index 3c876c3a356a..33854ee7f636 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-> @@ -29,6 +29,7 @@
->  #include "sun4i_crtc.h"
->  #include "sun4i_drv.h"
->  #include "sun4i_layer.h"
-> +#include "sunxi_layer.h"
->  #include "sun4i_tcon.h"
->  
->  static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
-> @@ -149,7 +150,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
->  	scrtc->tcon = tcon;
->  
->  	/* Create our layers */
-> -	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
-> +	scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
->  	if (IS_ERR(scrtc->layers)) {
->  		dev_err(drm->dev, "Couldn't create the planes\n");
->  		return NULL;
-> @@ -157,14 +158,15 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
->  
->  	/* find primary and cursor planes for drm_crtc_init_with_planes */
->  	for (i = 0; scrtc->layers[i]; i++) {
-> -		struct sun4i_layer *layer = scrtc->layers[i];
-> +		void *layer = scrtc->layers[i];
-> +		struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
->  
-> -		switch (layer->plane.type) {
-> +		switch (plane->type) {
->  		case DRM_PLANE_TYPE_PRIMARY:
-> -			primary = &layer->plane;
-> +			primary = plane;
->  			break;
->  		case DRM_PLANE_TYPE_CURSOR:
-> -			cursor = &layer->plane;
-> +			cursor = plane;
->  			break;
->  		default:
->  			break;
-> @@ -190,10 +192,11 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
->  	/* Set possible_crtcs to this crtc for overlay planes */
->  	for (i = 0; scrtc->layers[i]; i++) {
->  		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
-> -		struct sun4i_layer *layer = scrtc->layers[i];
-> +		void *layer = scrtc->layers[i];
-> +		struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
->  
-> -		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
-> -			layer->plane.possible_crtcs = possible_crtcs;
-> +		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
-> +			plane->possible_crtcs = possible_crtcs;
+> 
+> Best regards,
+> 
+>> ---
+>>  drivers/mmc/core/mmc.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index 0fccca0..b837148 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -1062,7 +1062,7 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
+>>  			   EXT_CSD_BUS_WIDTH,
+>>  			   ext_csd_bits,
+>>  			   card->ext_csd.generic_cmd6_time,
+>> -			   MMC_TIMING_MMC_DDR52,
+>> +			   0,
+>>  			   true, true, true);
+>>  	if (err) {
+>>  		pr_err("%s: switch to bus width %d ddr failed\n",
+>> @@ -1106,6 +1106,9 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
+>>  	if (err)
+>>  		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
+>>  
+>> +	if (!err)
+>> +		mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
+>> +
+>>  	return err;
+>>  }
+>>  
+>>
+> 
+> 
 
-I think the logic should be reversed here, the CRTC shouldn't care
-(much) about the layers at all.
-
-We should modify sun4i_crtc_init to get the argument it needs (primary
-and cursor planes for example) through its parameters, and have the
-caller (which iirc is sun4i_drv) call it with the right parameters
-depending on whether you're using DE or DE2.
-
-If we're doing that, I don't think we even need the pointer to the
-array of layers in struct sun4i_crtc, which will make it easier to
-deal with.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/045d7d47/attachment.sig>
+Nicolas Ferre
