@@ -1,25 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Apr 2017 09:14:22 -0500
-Subject: [PATCH v6 01/39] [media] dt-bindings: Add bindings for
- video-multiplexer device
-In-Reply-To: <1490661656-10318-2-git-send-email-steve_longerbeam@mentor.com>
+Date: Mon, 3 Apr 2017 09:15:32 -0500
+Subject: [PATCH v6 03/39] [media] dt/bindings: Add bindings for OV5640
+In-Reply-To: <1490661656-10318-4-git-send-email-steve_longerbeam@mentor.com>
 References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-2-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170403141422.kxftc5v2u7gstbs5@rob-hp-laptop>
+ <1490661656-10318-4-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170403141532.g6lpmyh2xdlc6gjz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:40:18PM -0700, Steve Longerbeam wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+On Mon, Mar 27, 2017 at 05:40:20PM -0700, Steve Longerbeam wrote:
+> Add device tree binding documentation for the OV5640 camera sensor.
 > 
-> Add bindings documentation for the video multiplexer device.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 > ---
->  .../bindings/media/video-multiplexer.txt           | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
+>  .../devicetree/bindings/media/i2c/ov5640.txt       | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
 
-Acked-by: Rob Herring <robh@kernel.org>
+I already acked this. Please add acks when posting new versions.
+
+Rob
