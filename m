@@ -1,37 +1,65 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 3 Apr 2017 20:45:49 +0100
-Subject: [PATCH v2 1/2] dt-bindings: iio: stm32-adc: add option to set
- resolution
-In-Reply-To: <20170403164600.siab6ghtoeuxokg5@rob-hp-laptop>
-References: <1490963559-32159-1-git-send-email-fabrice.gasnier@st.com>
- <1490963559-32159-2-git-send-email-fabrice.gasnier@st.com>
- <20170403164600.siab6ghtoeuxokg5@rob-hp-laptop>
-Message-ID: <4251bdd9-48d6-9b44-ed3d-f7ec8bfee875@kernel.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 3 Apr 2017 21:46:08 +0200
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <CAL_JsqJh-X_5Dq81vwNWo5txZSC8uQETPTAPS4DPeTh2bDKkwg@mail.gmail.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+ <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
+ <CAL_JsqJh-X_5Dq81vwNWo5txZSC8uQETPTAPS4DPeTh2bDKkwg@mail.gmail.com>
+Message-ID: <CAMuHMdVowagRdRVN8eNcbb2WKCQewNxRMGd02s2YMmX0drwQGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 17:46, Rob Herring wrote:
-> On Fri, Mar 31, 2017 at 02:32:37PM +0200, Fabrice Gasnier wrote:
->> Add documentation for 'assigned-resolution-bits' dt optional property.
+On Mon, Apr 3, 2017 at 8:57 PM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Apr 3, 2017 at 1:14 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Mon, Apr 3, 2017 at 12:44 AM, Stuart Longland
+>> <stuartl@longlandclan.id.au> wrote:
+>>> On 03/04/17 07:41, Nicolas Pitre wrote:
+>>>>> No PTYs seems like a big limitation. This means no sshd?
+>>>> Again, my ultimate system target is in the sub-megabyte of RAM.  I
+>>>> really doubt you'll be able to fit an SSH server in there even if PTYs
+>>>> were supported, unless sshd (or dropbear) can be made really tiny.
+>>>> Otherwise you most probably have sufficient resources to run the regular
+>>>> TTY code.
+>>>
+>>> Are we talking small microcontrollers here?  The smallest machine in
+>>> terms of RAM I ever recall running Linux on was a 386SX/25 MHz with 4MB
+>>> RAM, and that had a MMU.
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->> Changes in v2:
->> - rename property from 'st,adc-res' to 'assigned-resolution-bits' so it
->>   is more common.
->> ---
->>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 4 ++++
->>  1 file changed, 4 insertions(+)
-> 
-> Acked-by: Rob Herring <robh@kernel.org> 
-Thanks.
+>> Let's halve that. I once tried and ran Linux in 2 MiB, incl. X, twm, and xterm.
+>> Of course with swap enabled.  And swapping like hell.
+>
+> These are different target uses. We're talking about fixed function,
+> statically linked user space at the minimum (some may want no
+> userspace even). Applications that could use an RTOS instead but
+> benefit from the Linux hardware support, features and ecosystem. It's
+> not a whole new code base or environment to learn. Maybe Zephyr will
+> have traction and improve things, but projects I've been involved with
+> using RTOSs generally have discussions around needing to re-write the
+> crappy RTOS.
 
-Applied to the togreg branch of iio.git.  Will push out as testing for
-the autobuilders to have a chance to play with it.
+Sure. I just wanted to point out that there was a time you could have
+_more_ than you need for small fixed function embedded systems in
+2 MiB of RAM.
 
-Jonathan
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> The absolute amount of RAM target is not so important. What's
+> important is getting to a size feasible for onchip RAM. That's always
+> moving (up), but has generally been out of reach for Linux.
+
+DigiKey shows 39 ARM SoCs with 1 MiB or more of RAM.
+But once you want 3 MiB or more, the lone winner is Renesas' RZ/A1 (up to
+10 MiB).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
