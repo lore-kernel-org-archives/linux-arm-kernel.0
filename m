@@ -1,64 +1,85 @@
 From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Mon, 3 Apr 2017 10:19:51 +0300
-Subject: [PATCH linux-next v3 1/4] usb: gadget: udc: atmel: Check fifo
- configuration values against device tree
+Date: Mon, 3 Apr 2017 10:19:52 +0300
+Subject: [PATCH linux-next v3 2/4] usb: gadget: udc: atmel: Minor code cleanup
 In-Reply-To: <cover.1491201365.git.cristian.birsan@microchip.com>
 References: <cover.1491201365.git.cristian.birsan@microchip.com>
-Message-ID: <003918ff1895d054603bea578bc2913bde699808.1491201365.git.cristian.birsan@microchip.com>
+Message-ID: <1be887c4aeddab99e78238282b2cdd2ebc61a595.1491201365.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cristian Birsan <cristian.birsan@microchip.com>
 
-Check fifo configuration values against device tree values for endpoint fifo
-in auto configuration mode (fifo_mode=0).
+Minor code cleanup based on feedback received on mailinglist.
 
 Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 2035906b..a98734a 100644
+index a98734a..8bc0b52a 100644
 --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
 +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -2118,14 +2118,34 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
-+		if (fifo_mode) {
-+			if (val < udc->fifo_cfg[i].fifo_size) {
-+				dev_warn(&pdev->dev,
-+					 "Using max fifo-size value from DT\n");
-+				ep->fifo_size = val;
-+			} else {
-+				ep->fifo_size = udc->fifo_cfg[i].fifo_size;
-+			}
-+		} else {
-+			ep->fifo_size = val;
-+		}
+@@ -321,7 +321,6 @@ static inline void usba_cleanup_debugfs(struct usba_udc *udc)
  
- 		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
- 		if (ret) {
- 			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->nr_banks = fifo_mode ? udc->fifo_cfg[i].nr_banks : val;
-+		if (fifo_mode) {
-+			if (val < udc->fifo_cfg[i].nr_banks) {
-+				dev_warn(&pdev->dev,
-+					 "Using max nb-banks value from DT\n");
-+				ep->nr_banks = val;
-+			} else {
-+				ep->nr_banks = udc->fifo_cfg[i].nr_banks;
-+			}
-+		} else {
-+			ep->nr_banks = val;
-+		}
+ static ushort fifo_mode;
  
- 		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
- 		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
+-/* "modprobe ... fifo_mode=1" etc */
+ module_param(fifo_mode, ushort, 0x0);
+ MODULE_PARM_DESC(fifo_mode, "Endpoint configuration mode");
+ 
+@@ -371,7 +370,7 @@ static struct usba_fifo_cfg mode_4_cfg[] = {
+ };
+ /* Add additional configurations here */
+ 
+-int usba_config_fifo_table(struct usba_udc *udc)
++static int usba_config_fifo_table(struct usba_udc *udc)
+ {
+ 	int n;
+ 
+@@ -1076,11 +1075,9 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+ 		struct usb_gadget_driver *driver);
+ static int atmel_usba_stop(struct usb_gadget *gadget);
+ 
+-static struct usb_ep *atmel_usba_match_ep(
+-		struct usb_gadget		*gadget,
+-		struct usb_endpoint_descriptor	*desc,
+-		struct usb_ss_ep_comp_descriptor *ep_comp
+-)
++static struct usb_ep *atmel_usba_match_ep(struct usb_gadget *gadget,
++				struct usb_endpoint_descriptor	*desc,
++				struct usb_ss_ep_comp_descriptor *ep_comp)
+ {
+ 	struct usb_ep	*_ep;
+ 	struct usba_ep *ep;
+@@ -1100,7 +1097,6 @@ static struct usb_ep *atmel_usba_match_ep(
+ 		ep = to_usba_ep(_ep);
+ 
+ 		switch (usb_endpoint_type(desc)) {
+-
+ 		case USB_ENDPOINT_XFER_CONTROL:
+ 			break;
+ 
+@@ -1141,7 +1137,7 @@ static struct usb_ep *atmel_usba_match_ep(
+ 		ep->udc->configured_ep++;
+ 	}
+ 
+-return _ep;
++	return _ep;
+ }
+ 
+ static const struct usb_gadget_ops usba_udc_ops = {
+@@ -2089,8 +2085,9 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 		while ((pp = of_get_next_child(np, pp)))
+ 			udc->num_ep++;
+ 		udc->configured_ep = 1;
+-	} else
++	} else {
+ 		udc->num_ep = usba_config_fifo_table(udc);
++	}
+ 
+ 	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
+ 			   GFP_KERNEL);
 -- 
 2.7.4
