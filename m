@@ -1,42 +1,39 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  3 Apr 2017 11:45:40 +0200
-Subject: [PATCH 0/3] ARM: dts: rcar-gen2: Correct parent of SSI[0-9] clocks
-Message-ID: <1491212743-6911-1-git-send-email-geert+renesas@glider.be>
+Date: Mon,  3 Apr 2017 11:45:42 +0200
+Subject: [PATCH 2/3] ARM: dts: r8a7791: Correct parent of SSI[0-9] clocks
+In-Reply-To: <1491212743-6911-1-git-send-email-geert+renesas@glider.be>
+References: <1491212743-6911-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1491212743-6911-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-	Hi Simon, Magnus, Morimoto-san,
 
 The SSI-ALL gate clock is located in between the P clock and the
 individual SSI[0-9] clocks, hence the former should be listed as their
 parent.
 
-This patch series corrects the parents in the DTSes r8a7790, r8a7791,
-and r8a7793.  The DTS for r8a7794, and the CPG/MSSR-based clock drivers
-for r8a7743, r8a7745, and r8a7795 already describe the correct parent.
-
-Thanks!
-
-Geert Uytterhoeven (3):
-  ARM: dts: r8a7790: Correct parent of SSI[0-9] clocks
-  ARM: dts: r8a7791: Correct parent of SSI[0-9] clocks
-  ARM: dts: r8a7793: Correct parent of SSI[0-9] clocks
-
- arch/arm/boot/dts/r8a7790.dtsi | 7 +++++--
+Fixes: ee9141522dcf13f8 ("ARM: shmobile: r8a7791: add MSTP10 support on DTSI")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
  arch/arm/boot/dts/r8a7791.dtsi | 7 +++++--
- arch/arm/boot/dts/r8a7793.dtsi | 7 +++++--
- 3 files changed, 15 insertions(+), 6 deletions(-)
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index b319ef4d57b0eb7a..a6478ca3f4ca7554 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1447,8 +1447,11 @@
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
+ 			clocks = <&p_clk>,
+-				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
+-				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
+ 				<&p_clk>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
 -- 
 2.7.4
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
