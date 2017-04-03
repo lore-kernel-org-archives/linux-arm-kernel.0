@@ -1,39 +1,128 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 3 Apr 2017 10:11:05 +0200
-Subject: [Patch v3 05/11] [media] videodev2.h: Add v4l2 definition for HEVC
-In-Reply-To: <1490951200-32070-6-git-send-email-smitha.t@samsung.com>
-References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
- <CGME20170331090438epcas1p4152c9aaa9ea69f30d264bcd532d79e75@epcas1p4.samsung.com>
- <1490951200-32070-6-git-send-email-smitha.t@samsung.com>
-Message-ID: <70bc6abe-b944-d2bc-5f31-af760ce44c15@xs4all.nl>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 3 Apr 2017 10:12:44 +0200
+Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+ <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <a01a50d3-bb1b-2c56-2a15-30651fa2fac9@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
-> Add V4L2 definition for HEVC compressed format
+On 04/02/2017 09:59 AM, Guillaume Tucker wrote:
+> The ARM Mali Midgard GPU family is present in a number of SoCs
+> from many different vendors such as Samsung Exynos and Rockchip.
 > 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Import the device tree bindings documentation from the r16p0
+> release of the Mali Midgard GPU kernel driver:
+> 
+>   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
+> 
+> The following optional bindings have been omitted in this initial
+> version as they are only used in very specific cases:
+> 
+>   * snoop_enable_smc
+>   * snoop_disable_smc
+>   * jm_config
+>   * power_model
+>   * system-coherency
+>   * ipa-model
+> 
+> The example has been simplified accordingly.
+> 
+> The compatible string definition has been limited to
+> "arm,mali-midgard" to avoid checkpatch.pl warnings and to match
+> what the driver actually expects (as of r16p0 out-of-tree).
+> 
+> CC: John Reitan <john.reitan@arm.com>
+> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
 > ---
->  include/uapi/linux/videodev2.h | 1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53 ++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
 > 
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 45184a2..38cf5f1 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -629,6 +629,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
->  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
->  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
-> +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
->  
->  /*  Vendor-specific formats   */
->  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> new file mode 100644
+> index 000000000000..da8fc6d21bbf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> @@ -0,0 +1,53 @@
+> +#
+> +# (C) COPYRIGHT 2013-2016 ARM Limited.
+> +# Copyright (C) 2017 Collabora Ltd
+> +#
+> +# This program is free software and is provided to you under the terms of the
+> +# GNU General Public License version 2 as published by the Free Software
+> +# Foundation, and any use by you of this program is subject to the terms
+> +# of such GNU licence.
+> +#
+Hi Guillaume,
+
+This is unnecessary, please remove.
+
+> +
+> +
+> +ARM Mali Midgard GPU
+> +====================
+> +
+> +Required properties:
+> +
+> +- compatible : Should be "arm,mali-midgard".
+> +- reg : Physical base address of the device and length of the register area.
+> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
+> +- interrupt-names : Contains the names of IRQ resources in the order they were
+> +  provided in the interrupts property. Must contain: "JOB, "MMU", "GPU".
+
+
+Please follow the bindings introduced for the utgard family :
+https://patchwork.kernel.org/patch/9553745/
+
+- an entry for each mali-midgard revision, i.e. "arm,mali-t820"
+- an entry for each vendor specific wrapping if necessary, i.e. "amlogic,meson-gxm-mali"
+- low-case for interrupt names
+
+> +
+> +Optional:
+> +
+> +- clocks : Phandle to clock for the Mali Midgard device.
+> +- clock-names : Shall be "clk_mali".
+> +- mali-supply : Phandle to regulator for the Mali device. Refer to
+> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
+> +  for details.
+
+Please add :
+   * Must be one of the following:
+      "arm,mali-t820"
+   * And, optionally, one of the vendor specific compatible:
+      "amlogic,meson-gxm-mali"
+
+with my Ack for the amlogic platform.
+
+> +
+> +Example for a Mali-T602:
+> +
+> +gpu at 0xfc010000 {
+> +	compatible = "arm,mali-midgard";
+> +	reg = <0xfc010000 0x4000>;
+> +	interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
+> +	interrupt-names = "JOB", "MMU", "GPU";
+> +
+> +	clocks = <&pclk_mali>;
+> +	clock-names = "clk_mali";
+> +	mali-supply = <&vdd_mali>;
+> +	operating-points = <
+> +		/* KHz   uV */
+> +		533000 1250000,
+> +		450000 1150000,
+> +		400000 1125000,
+> +		350000 1075000,
+> +		266000 1025000,
+> +		160000  925000,
+> +		100000  912500,
+> +	>;
+> +};
 > 
 
-You also need to update v4l2-ioctl.c, v4l_fill_fmtdesc().
-
-Regards,
-
-	Hans
+Thanks,
+Neil
