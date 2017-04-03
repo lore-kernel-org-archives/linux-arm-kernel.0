@@ -1,49 +1,72 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 3 Apr 2017 17:12:46 +0530
-Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-5-jean-philippe.brucker@arm.com>
- <CA+sq2CeWpGarhT9p+iVo8nJXR=xpkj6XNMwv4LvbP0M6JxA_SA@mail.gmail.com>
- <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
-Message-ID: <CA+sq2Ccb1mUQpTvHWsEGWyc+9HjLdq8FSqBGRM7Ey932_6X5jg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Apr 2017 13:45:50 +0200
+Subject: Updating sunxi tree in linux-next
+In-Reply-To: <20170403095603.43cef189@canb.auug.org.au>
+References: <20170331075729.gsfewphm3zd45vwt@lukather>
+ <20170403095603.43cef189@canb.auug.org.au>
+Message-ID: <20170403114550.wsubsqgacqdaaqkg@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 3, 2017 at 3:44 PM, Jean-Philippe Brucker
-<jean-philippe.brucker@arm.com> wrote:
-> On 03/04/17 09:34, Sunil Kovvuri wrote:
->>> +static size_t arm_smmu_atc_invalidate_domain(struct arm_smmu_domain *smmu_domain,
->>> +                                            unsigned long iova, size_t size)
->>> +{
->>> +       unsigned long flags;
->>> +       struct arm_smmu_cmdq_ent cmd = {0};
->>> +       struct arm_smmu_group *smmu_group;
->>> +       struct arm_smmu_master_data *master;
->>> +       struct arm_smmu_device *smmu = smmu_domain->smmu;
->>> +       struct arm_smmu_cmdq_ent sync_cmd = {
->>> +               .opcode = CMDQ_OP_CMD_SYNC,
->>> +       };
->>> +
->>> +       spin_lock_irqsave(&smmu_domain->groups_lock, flags);
->>> +
->>> +       list_for_each_entry(smmu_group, &smmu_domain->groups, domain_head) {
->>> +               if (!smmu_group->ats_enabled)
->>> +                       continue;
->>
->> If ATS is not supported, this seems to increase no of cycles spent in
->> pgtbl_lock.
->> Can we return from this API by checking 'ARM_SMMU_FEAT_ATS' in smmu->features ?
->
-> Sure, I can add a check before taking the lock. Have you been able to
-> observe a significant difference in cycles between checking FEAT_ATS,
-> checking group->ats_enabled after taking the lock, and removing this
-> function call altogether?
->
-> Thanks,
-> Jean-Philippe
+Hi Stephen,
 
-No, I haven't verified, was just making an observation.
+On Mon, Apr 03, 2017 at 09:56:12AM +1000, Stephen Rothwell wrote:
+> Hi Maxime,
+> 
+> On Fri, 31 Mar 2017 09:57:29 +0200 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >
+> > We've switched from my personal git tree for the Allwinner sunxi
+> > development to a shared tree:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
+> > 
+> > The branch to be included in linux-next will still be called
+> > sunxi/for-next as it used to be, and it will still go through the
+> > arm-soc tree to reach Linux.
+> > 
+> > However, I'll still have the patches for our DRM drivers on my
+> > personal git repo:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
+> > 
+> > Could you add the branch sunxi-drm/for-next to the list of branches
+> > you merge?
+> 
+> OK, just so we are on the same page:
+> 
+> Currently I have:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git branch sunxi/for-next
+> 
+> merged after the drm tree.
+> 
+> You want:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git branch sunxi/for-next
+> 
+> merged after the arm-soc tree and
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git branch sunxi-drm/for-next
+> 
+> merged after the drm tree?
 
-Thanks,
-Sunil.
+Yep, exactly.
+
+> (I merge trees *after* the tree that is their upstream.)
+> 
+> Do you want to be the only contact for both trees?
+
+Like Chen-Yu said, please add us both for sunxi/for-next
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/c6c0e22b/attachment.sig>
