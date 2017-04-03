@@ -1,68 +1,21 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Apr 2017 15:28:11 +0100
-Subject: [RFC PATCH v2 2/4] iio: adc: sun4i-gpadc-iio: rename
- A23/A33-specified registers to contain A23
-In-Reply-To: <20170402133304.56824-3-icenowy@aosc.io>
-References: <20170402133304.56824-1-icenowy@aosc.io>
- <20170402133304.56824-3-icenowy@aosc.io>
-Message-ID: <20170403142811.bdbc6mspwofms6uo@dell>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Apr 2017 09:29:31 -0500
+Subject: [PATCH V3 4/6] dt-bindings: tegra: Update compatible strings for
+ Tegra flowctrl
+In-Reply-To: <1490704978-22906-5-git-send-email-jonathanh@nvidia.com>
+References: <1490704978-22906-1-git-send-email-jonathanh@nvidia.com>
+ <1490704978-22906-5-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20170403142931.7qxl5kew4wibmkbp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 02 Apr 2017, Icenowy Zheng wrote:
-
-> As the H3 SoC, which is also in sun8i line, has totally different
-> register map for the thermal sensor (a cut down version of GPADC), we
-> should rename A23/A33-specified registers to contain A23, in order to
-> prevent obfuscation with H3 registers. Currently these registers are
-> only prefixed "SUN8I", not "SUN8I_A23".
+On Tue, Mar 28, 2017 at 01:42:56PM +0100, Jon Hunter wrote:
+> Update the compatible strings for Tegra Flow Control driver to match
+> the device-tree source files for Tegra.
 > 
-> Add "_A23" after "SUN8I" on the register names.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
-> Splited from RFC v1's 2/3.
-> 
->  drivers/iio/adc/sun4i-gpadc-iio.c | 2 +-
->  include/linux/mfd/sun4i-gpadc.h   | 6 +++---
->  2 files changed, 4 insertions(+), 4 deletions(-)
+>  .../devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt     | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 74705aa37982..01cf806f47f8 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -88,7 +88,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
->  static const struct gpadc_data sun8i_a33_gpadc_data = {
->  	.temp_offset = -1662,
->  	.temp_scale = 162,
-> -	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
-> +	.tp_mode_en = SUN8I_A23_GPADC_CTRL1_CHOP_TEMP_EN,
->  };
->  
->  struct sun4i_gpadc_iio {
-> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-> index 139872c2e0fe..d31d962bb7d8 100644
-> --- a/include/linux/mfd/sun4i-gpadc.h
-> +++ b/include/linux/mfd/sun4i-gpadc.h
-> @@ -38,9 +38,9 @@
->  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
->  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
->  
-> -/* TP_CTRL1 bits for sun8i SoCs */
-> -#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
-> -#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
-> +/* TP_CTRL1 bits for sun8i A23/A33 SoCs */
-> +#define SUN8I_A23_GPADC_CTRL1_CHOP_TEMP_EN		BIT(8)
-> +#define SUN8I_A23_GPADC_CTRL1_GPADC_CALI_EN		BIT(7)
->  
->  #define SUN4I_GPADC_CTRL2				0x08
->  
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Rob Herring <robh@kernel.org>
