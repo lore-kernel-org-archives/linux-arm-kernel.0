@@ -1,38 +1,73 @@
-From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Mon, 3 Apr 2017 10:19:54 +0300
-Subject: [PATCH linux-next v3 4/4] usb: gadget: udc: atmel: Update Kconfig
- help for fifo_mode = 0
-In-Reply-To: <cover.1491201365.git.cristian.birsan@microchip.com>
-References: <cover.1491201365.git.cristian.birsan@microchip.com>
-Message-ID: <6aed358848330a48a940d6f3c4399cbe984a043b.1491201365.git.cristian.birsan@microchip.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 3 Apr 2017 15:22:27 +0800
+Subject: [PATCH 8/9] drm/rockchip: gem: Don't alloc/free gem buf before
+ drm dev registered
+In-Reply-To: <1491043442-20626-9-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <201704031501.g1FZRbBJ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cristian Birsan <cristian.birsan@microchip.com>
+Hi Jeffy,
 
-Update Kconfig help for fifo_mode = 0 to explain the behavior better.
+[auto build test WARNING on rockchip/for-next]
+[also build test WARNING on v4.11-rc5 next-20170331]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+url:    https://github.com/0day-ci/linux/commits/Jeffy-Chen/drm-rockchip-Fix-rockchip-drm-unbind-crash-error/20170403-094428
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All warnings (new ones prefixed by >>):
+
+   drivers/gpu/drm/rockchip/rockchip_drm_gem.c: In function 'rockchip_gem_alloc_buf':
+>> drivers/gpu/drm/rockchip/rockchip_drm_gem.c:188:3: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
+      return;
+      ^~~~~~
+   drivers/gpu/drm/rockchip/rockchip_drm_gem.c:180:12: note: declared here
+    static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
+               ^~~~~~~~~~~~~~~~~~~~~~
+
+vim +/return +188 drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+
+   172		if (!rk_obj->kvaddr) {
+   173			DRM_ERROR("failed to allocate %zu byte dma buffer", obj->size);
+   174			return -ENOMEM;
+   175		}
+   176	
+   177		return 0;
+   178	}
+   179	
+   180	static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
+   181					  bool alloc_kmap)
+   182	{
+   183		struct drm_gem_object *obj = &rk_obj->base;
+   184		struct drm_device *drm = obj->dev;
+   185		struct rockchip_drm_private *private = drm->dev_private;
+   186	
+   187		if (!drm->registered)
+ > 188			return;
+   189	
+   190		if (private->domain)
+   191			return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
+   192		else
+   193			return rockchip_gem_alloc_dma(rk_obj, alloc_kmap);
+   194	}
+   195	
+   196	static void rockchip_gem_free_iommu(struct rockchip_gem_object *rk_obj)
+
 ---
- drivers/usb/gadget/udc/Kconfig | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
-index c6cc9d3..1fd3fe9 100644
---- a/drivers/usb/gadget/udc/Kconfig
-+++ b/drivers/usb/gadget/udc/Kconfig
-@@ -62,8 +62,9 @@ config USB_ATMEL_USBA
- 
- 	  The fifo_mode parameter is used to select endpoint allocation mode.
- 	  fifo_mode = 0 is used to let the driver autoconfigure the endpoints.
--	  In this case 2 banks are allocated for isochronous endpoints and
--	  only one bank is allocated for the rest of the endpoints.
-+	  In this case, for ep1 2 banks are allocated if it works in isochronous
-+	  mode and only 1 bank otherwise. For the rest of the endpoints
-+	  only 1 bank is allocated.
- 
- 	  fifo_mode = 1 is a generic maximum fifo size (1024 bytes) configuration
- 	  allowing the usage of ep1 - ep6
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61325 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/a92b2785/attachment-0001.gz>
