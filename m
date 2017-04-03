@@ -1,96 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 3 Apr 2017 07:16:09 -0700
-Subject: [PATCHv2 9/9] ARM: dts: omap4: convert to use the new clkctrl
- clocks for the drivers
-In-Reply-To: <87f1e815-baf6-f41a-99d2-8ba6ca6292c4@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-10-git-send-email-t-kristo@ti.com>
- <20170328001800.GR10760@atomide.com>
- <8b502a89-dcc6-1932-70cc-e887b1404dbb@ti.com>
- <20170328150316.GU10760@atomide.com>
- <87f1e815-baf6-f41a-99d2-8ba6ca6292c4@ti.com>
-Message-ID: <20170403141609.GH10760@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 3 Apr 2017 15:22:11 +0100
+Subject: [PATCH v3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+In-Reply-To: <1491228763-23450-1-git-send-email-suzuki.poulose@arm.com>
+References: <1491228763-23450-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170403142211.GE18905@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170330 00:36]:
-> On 28/03/17 18:03, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [170327 22:46]:
-> > > On 28/03/17 03:18, Tony Lindgren wrote:
-> > > > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> > > > > Convert the drivers to use the new clkctrl clocks.
-> > > > > 
-> > > > > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > > > > ---
-> > > > >  arch/arm/boot/dts/omap4.dtsi | 164 ++++++++++++++++++++++++++++++++++++++-----
-> > > > >  1 file changed, 146 insertions(+), 18 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> > > > > index 3ecf616..c39304a 100644
-> > > > > --- a/arch/arm/boot/dts/omap4.dtsi
-> > > > > +++ b/arch/arm/boot/dts/omap4.dtsi
-> > > > > @@ -94,16 +94,22 @@
-> > > > >  			compatible = "ti,omap4-mpu";
-> > > > >  			ti,hwmods = "mpu";
-> > > > >  			sram = <&ocmcram>;
-> > > > > +			clocks = <&mpuss_clkctrl OMAP4_MPU_CLKCTRL 0>;
-> > > > > +			clock-names = "clkctrl";
-> > > > >  		};
-> > > > 
-> > > > Oh one more thing. I don't think we should add the clocks
-> > > > here as they are now wrongly allocated to the device within
-> > > > the interconnect target module. These clocks really belong
-> > > > to each interconnect target module that we don't have in the
-> > > > dts yet.
-> > > > 
-> > > > So we're better off adding the clockctrl clocks and then
-> > > > changing the dts to use the interconnect target modules
-> > > > with the clockctrl clocks.
-> > > 
-> > > The problem is, you can't just add the clkctrl clock nodes themselves alone,
-> > > as this introduces the problem that any clocks with no users will get
-> > > disabled => causes a boot time hang when all the device clocks get shut
-> > > down.
-> > 
-> > Hmm yeah. I wonder how to work around that.. What if we first updated
-> > the clocks in the hwmod code? Or updated the aliases?
-> 
-> Kind of a chicken-egg problem. You could maybe probe the "ti,clkctrl" driver
-> manually to avoid the issue.
-> 
-> The core clocks get disabled when CCF notices they are not used. You can't
-> really avoid that with updating aliases / updating the clocks in hwmod code.
-> And, hwmod basically tries to still use the same registers through the
-> legacy route, which leads to conflict.
+Hi,
 
-Yeah OK. Using status = "disabled" won't help much there either as the
-amount of patching is still pretty much the same.
-
-> > > If you want to delay the usage of the clocks until you have interconnect
-> > > target modules in place, you need to introduce the clock nodes also at that
-> > > point, similar to what needs to be done now to squash patch #8 or #9.
-> > 
-> > I'd like to do this one device at a time without any large
-> > flips as we have quite a few devices with special handling for
-> > reset and idling in the hwmod code.
+On Mon, Apr 03, 2017 at 03:12:43PM +0100, Suzuki K Poulose wrote:
+> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
+> unmap_stage2_range() on the entire memory range for the guest. This could
+> cause problems with other callers (e.g, munmap on a memslot) trying to
+> unmap a range. And since we have to unmap the entire Guest memory range
+> holding a spinlock, make sure we yield the lock if necessary, after we
+> unmap each PUD range.
 > 
-> One thing that can be done also is to introduce the clkctrl clocks one at a
-> time in the data file also, but this is going to be cumbersome, as you need
-> to keep these three in sync:
+> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+> Cc: stable at vger.kernel.org # v3.10+
+> Cc: Paolo Bonzini <pbonzin@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> [ Avoid vCPU starvation and lockup detector warnings ]
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
-> - drivers/clk/ti/clk-44xx.c
-> - arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> - arch/arm/boot/dts/omap4.dtsi
+> ---
+> Changes since V2:
+>  - Restrict kvm->mmu_lock relaxation to bigger ranges in unmap_stage2_range(),
+>    to avoid possible issues like [0]
 > 
-> ... and that per SoC of course.
+>  [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/498210.html
+
+Sorry if I'm being thick, but how does restricting this to a larger
+range help with the "sleeping function called from invalid context"
+issue?
+
+Surely that just makes it rarer?
+
+Thanks,
+Mark.
+
 > 
-> With the interconnect driver introduction, you should be able to flip one
-> device at a time from hwmod to interconnect. In this case, all the clocks
-> are already there, and you just need to modify DT + hwmod data to do the
-> flip.
-
-Yes seems like that's what we should do then.
-
-Regards,
-
-Tony
+> Changes since V1:
+>  - Yield the kvm->mmu_lock if necessary in unmap_stage2_range to prevent
+>    vCPU starvation and lockup detector warnings.
+> ---
+>  arch/arm/kvm/mmu.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 13b9c1f..db94f3a 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -292,8 +292,15 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  	phys_addr_t addr = start, end = start + size;
+>  	phys_addr_t next;
+>  
+> +	assert_spin_locked(&kvm->mmu_lock);
+>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>  	do {
+> +		/*
+> +		 * If the range is too large, release the kvm->mmu_lock
+> +		 * to prevent starvation and lockup detector warnings.
+> +		 */
+> +		if (size > S2_PUD_SIZE)
+> +			cond_resched_lock(&kvm->mmu_lock);
+>  		next = stage2_pgd_addr_end(addr, end);
+>  		if (!stage2_pgd_none(*pgd))
+>  			unmap_stage2_puds(kvm, pgd, addr, next);
+> @@ -831,7 +838,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>  	if (kvm->arch.pgd == NULL)
+>  		return;
+>  
+> +	spin_lock(&kvm->mmu_lock);
+>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+> +	spin_unlock(&kvm->mmu_lock);
+> +
+>  	/* Free the HW pgd, one page at a time */
+>  	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
+>  	kvm->arch.pgd = NULL;
+> -- 
+> 2.7.4
+> 
