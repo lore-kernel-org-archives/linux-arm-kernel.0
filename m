@@ -1,33 +1,41 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  3 Apr 2017 12:08:07 +0200
-Subject: [PATCH 1/3] ARM: dts: r8a7790: Drop _clk suffix from external CAN
- clock node name
-In-Reply-To: <1491214089-14093-1-git-send-email-geert+renesas@glider.be>
-References: <1491214089-14093-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1491214089-14093-2-git-send-email-geert+renesas@glider.be>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 3 Apr 2017 11:14:17 +0100
+Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <CA+sq2CeWpGarhT9p+iVo8nJXR=xpkj6XNMwv4LvbP0M6JxA_SA@mail.gmail.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-5-jean-philippe.brucker@arm.com>
+ <CA+sq2CeWpGarhT9p+iVo8nJXR=xpkj6XNMwv4LvbP0M6JxA_SA@mail.gmail.com>
+Message-ID: <5af054c8-28cd-6719-b506-d0133c03042b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current practice is to not add _clk suffixes to clock node names in
-DT, as these names are used as the actual clock names.
+On 03/04/17 09:34, Sunil Kovvuri wrote:
+>> +static size_t arm_smmu_atc_invalidate_domain(struct arm_smmu_domain *smmu_domain,
+>> +                                            unsigned long iova, size_t size)
+>> +{
+>> +       unsigned long flags;
+>> +       struct arm_smmu_cmdq_ent cmd = {0};
+>> +       struct arm_smmu_group *smmu_group;
+>> +       struct arm_smmu_master_data *master;
+>> +       struct arm_smmu_device *smmu = smmu_domain->smmu;
+>> +       struct arm_smmu_cmdq_ent sync_cmd = {
+>> +               .opcode = CMDQ_OP_CMD_SYNC,
+>> +       };
+>> +
+>> +       spin_lock_irqsave(&smmu_domain->groups_lock, flags);
+>> +
+>> +       list_for_each_entry(smmu_group, &smmu_domain->groups, domain_head) {
+>> +               if (!smmu_group->ats_enabled)
+>> +                       continue;
+> 
+> If ATS is not supported, this seems to increase no of cycles spent in
+> pgtbl_lock.
+> Can we return from this API by checking 'ARM_SMMU_FEAT_ATS' in smmu->features ?
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7790.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Sure, I can add a check before taking the lock. Have you been able to
+observe a significant difference in cycles between checking FEAT_ATS,
+checking group->ats_enabled after taking the lock, and removing this
+function call altogether?
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index fe6b8c2a2d711536..99269aaca6fc953e 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1101,7 +1101,7 @@
- 		};
- 
- 		/* External CAN clock */
--		can_clk: can_clk {
-+		can_clk: can {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			/* This value must be overridden by the board. */
--- 
-2.7.4
+Thanks,
+Jean-Philippe
