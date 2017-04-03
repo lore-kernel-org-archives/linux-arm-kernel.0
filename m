@@ -1,40 +1,51 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 03 Apr 2017 08:44:16 -0700
-Subject: [PATCH v3 0/4] tty/serial: meson_uart: add support for core clock
- handling
-In-Reply-To: <20170331165437.26227-1-hgkr.klein@gmail.com> (Helmut Klein's
- message of "Fri, 31 Mar 2017 18:54:33 +0200")
-References: <20170331165437.26227-1-hgkr.klein@gmail.com>
-Message-ID: <m2lgrha433.fsf@baylibre.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 3 Apr 2017 16:48:15 +0100
+Subject: Bad page state splats on arm64, v4.11-rc{3,4}
+In-Reply-To: <20170403113751.GD5706@arm.com>
+References: <20170331175845.GE6488@leverpostej>
+ <20170403105629.GB18905@leverpostej>
+ <20170403113751.GD5706@arm.com>
+Message-ID: <20170403154815.GE25550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Helmut Klein <hgkr.klein@gmail.com> writes:
+On Mon, Apr 03, 2017 at 12:37:51PM +0100, Will Deacon wrote:
+> On Mon, Apr 03, 2017 at 11:56:29AM +0100, Mark Rutland wrote:
+> > On Fri, Mar 31, 2017 at 06:58:45PM +0100, Mark Rutland wrote:
+> > > Hi,
+> > > 
+> > > I'm seeing intermittent bad page state splats on arm64 with 4.11-rc3 and
+> > > v4.11-rc4. I have not tested earlier kernels, or other architectures.
+> > > 
+> > > So far, it looks like the flags are always bad in the same
+> > > way:
+> > > 
+> > > 	bad because of flags: 0x80(waiters)
+> > > 
+> > > ... though I don't know if that's definitely the case for splat 4, the
+> > > BUG at mm/page_alloc.c:800.
+> > > 
+> > > I see this in QEMU VMs launched by Syzkaller, triggering once every few
+> > > hours. So far, I have not been able to reproduce the issue in any other
+> > > way (including using syz-repro).
+> > 
+> > It looks like this may be an issue with the arm64 HUGETLB code.
+> > 
+> > I wasn't able to trigger the issue over the weekend on a kernel with
+> > HUGETLBFS disabled. There are known issues with our handling of
+> > contiguous entries, and this might be an artefact of that.
+> 
+> After chatting with Punit, it looks like this might be because the GUP
+> code doesn't handle huge ptes (which we create using the contiguous hint),
+> so follow_page_pte ends up with one of those and goes wrong. In particular,
+> the migration code will certainly do the wrong thing.
+> 
+> I'll probably revert the contiguous support (again) if testing indicates
+> that it makes this issue disappear.
 
-> To be able to use the three none AO uarts of the meson gx SoCs (uart_A,
+It might be worth checking with Punit's patches as well:
 
-s/none/non/
+https://marc.info/?l=linux-arm-kernel&m=149089199018167&w=2
 
-> uart_B & uart_C), the core clock has to be enabled (see chapter 22.3 of
-> the public s905 data sheet).
-> At least the u-boot of my s905 based media player (netxeon minimx-g)
-> doesn't do this. so the driver must enable the clock.
-
-FYI: even if a booloader enablesq clocks, it's important that the kernel
-enable clocks that it uses so the kernel can be independent of any
-bootloader.
-
-> This patch set does:
-> - exposes the UART clock ids to the dtb
-> - adds documentation for the dt-bindings of meson_uart
-> - adds the core clock handling to the driver
-> - adds the core clock handling to meson-gxbb.dtsi and meson-gxl.dtsi
->
-> The patchset is based on the branch "master" of the repository in [1]
-
-The master branch in my tree just tracks mainline master branch.
-
-To avoid conflicts with other on-going DT changes, the DT patches should
-probably be based on top of my v4.12/dt64 branch.
-
-Kevin
+-- 
+Catalin
