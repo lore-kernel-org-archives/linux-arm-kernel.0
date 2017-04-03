@@ -1,40 +1,64 @@
 From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Mon, 3 Apr 2017 10:19:50 +0300
-Subject: [PATCH linux-next v3 0/4] usb: gadget: udc: atmel: Endpoint
- allocation scheme fixes
-Message-ID: <cover.1491201365.git.cristian.birsan@microchip.com>
+Date: Mon, 3 Apr 2017 10:19:51 +0300
+Subject: [PATCH linux-next v3 1/4] usb: gadget: udc: atmel: Check fifo
+ configuration values against device tree
+In-Reply-To: <cover.1491201365.git.cristian.birsan@microchip.com>
+References: <cover.1491201365.git.cristian.birsan@microchip.com>
+Message-ID: <003918ff1895d054603bea578bc2913bde699808.1491201365.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cristian Birsan <cristian.birsan@microchip.com>
 
-This patch series provides fixes, based on the feedback received on the mailing list, for
-the following:
-	- fifo table parameters validation against device tree values
-	- coding style
-	- message display for EP configuration error
-	- Kconfig comments for fifo_mode=0
+Check fifo configuration values against device tree values for endpoint fifo
+in auto configuration mode (fifo_mode=0).
 
-Changes since v1:
-	- Removed static for usba_config_fifo_table() function from "Check fifo
-	configuration values against device tree" patch
+Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-Changes since v2:
-	- Use shorter warning message if the fifo table size is greather than device 
-	tree value
-	- replace dev_warn() with dev_err() for hardware fifo allocation error
-
-Cristian Birsan (4):
-  usb: gadget: udc: atmel: Check fifo configuration values against
-    device tree
-  usb: gadget: udc: atmel: Minor code cleanup
-  usb: gadget: udc: atmel: Use dev_err() to display EP configuration
-    error
-  usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
-
- drivers/usb/gadget/udc/Kconfig          |  5 ++--
- drivers/usb/gadget/udc/atmel_usba_udc.c | 49 ++++++++++++++++++++++-----------
- 2 files changed, 36 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 2035906b..a98734a 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -2118,14 +2118,34 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
+ 			goto err;
+ 		}
+-		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
++		if (fifo_mode) {
++			if (val < udc->fifo_cfg[i].fifo_size) {
++				dev_warn(&pdev->dev,
++					 "Using max fifo-size value from DT\n");
++				ep->fifo_size = val;
++			} else {
++				ep->fifo_size = udc->fifo_cfg[i].fifo_size;
++			}
++		} else {
++			ep->fifo_size = val;
++		}
+ 
+ 		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
+ 			goto err;
+ 		}
+-		ep->nr_banks = fifo_mode ? udc->fifo_cfg[i].nr_banks : val;
++		if (fifo_mode) {
++			if (val < udc->fifo_cfg[i].nr_banks) {
++				dev_warn(&pdev->dev,
++					 "Using max nb-banks value from DT\n");
++				ep->nr_banks = val;
++			} else {
++				ep->nr_banks = udc->fifo_cfg[i].nr_banks;
++			}
++		} else {
++			ep->nr_banks = val;
++		}
+ 
+ 		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
+ 		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
 -- 
 2.7.4
