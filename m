@@ -1,31 +1,46 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Apr 2017 11:14:44 +0200
-Subject: [PATCH v3 20/20] ARM: sunxi: Enable dwmac-sun8i driver on
- multi_v7_defconfig
+Date: Mon,  3 Apr 2017 11:14:41 +0200
+Subject: [PATCH v3 17/20] ARM: dts: sun50i-a64: enable dwmac-sun8i on pine64
+ plus
 In-Reply-To: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
 References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170403091444.29876-21-clabbe.montjoie@gmail.com>
+Message-ID: <20170403091444.29876-18-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the dwmac-sun8i driver in the multi_v7 default configuration
+The dwmac-sun8i hardware is present on the pine64 plus.
+It uses an external PHY rtl8211e via RGMII.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2196206..0af325b 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -257,6 +257,7 @@ CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
- CONFIG_STMMAC_PLATFORM=y
- CONFIG_DWMAC_DWC_QOS_ETH=y
-+CONFIG_DWMAC_SUN8I=y
- CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+index 790d14d..dea76c2 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+@@ -46,5 +46,20 @@
+ 	model = "Pine64+";
+ 	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
+ 
+-	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
++	/* TODO: Camera, touchscreen, etc. */
++};
++
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
++	phy-mode = "rgmii";
++	phy-handle = <&ext_rgmii_phy>;
++	status = "okay";
+ };
 -- 
 2.10.2
