@@ -1,41 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Apr 2017 21:00:54 +0100
-Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <CAKv+Gu-1oL_yVvo4bL52Lu=WKjxxG+YhybeTceaCH9fac656+A@mail.gmail.com>
-References: <20170321173030.7751-1-tixy@linaro.org>
- <1490117781.3136.9.camel@linaro.org>
- <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
- <CAKv+Gu-1oL_yVvo4bL52Lu=WKjxxG+YhybeTceaCH9fac656+A@mail.gmail.com>
-Message-ID: <20170403200054.GB7909@n2100.armlinux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 3 Apr 2017 16:09:38 -0400 (EDT)
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <20170403195756.xitzpei2knmwt3sx@angband.pl>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
+ <20170403153103.GB22592@two.firstfloor.org>
+ <20170403195756.xitzpei2knmwt3sx@angband.pl>
+Message-ID: <alpine.LFD.2.20.1704031603160.1847@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 06:18:47PM +0100, Ard Biesheuvel wrote:
-> Apologies, but it appears I screwed this up: earlycon does not
-> actually work, it seems, due to the fact that early_fixmap_init() is
-> now postponed to after parse_early_params(), but earlycon
-> configuration (which uses set_fixmap_io()) is triggered by the early
-> parsing of the 'earlycon' command line parameter, and so
-> early_fixmap_init() occurs to late now. I am not sure how I missed
-> this, but I obviously did.
-> 
-> Since fixmaps for I/O are not affected by the issue this patch
-> addresses, the correct way would be to call early_fixmap_init() as we
-> did before, but disallow FIXMAP_PAGE_NORMAL and FIXMAP_PAGE_RO
-> mappings until after early_mm_init has executed.
-> 
-> I'm happy to code that up as a followup patch (since I am partly to
-> blame for this patch having ended up in -next in its current shape)
-> but it will have to wait until tomorrow.
+On Mon, 3 Apr 2017, Adam Borowski wrote:
 
-Hmm, sounds like a good thing I haven't sent it to Linus yet then... I'll
-continue holding off sending that, although I would like to send what I
-have queued to Linus in the next couple of days.  So, I think I'll drop
-8667/1 out of fixes, and requeue as appropriate depending on how the
-update arrives.
+> On Mon, Apr 03, 2017 at 08:31:03AM -0700, Andi Kleen wrote:
+> > Except for that (and possibly VT) it is unlikely that people really
+> > rely on the obsolete terminal features from the 70ies. So it's a kind
+> > of cleanup.
+> 
+> But... but... but what shall we do without OLCUC?!?
+> 
+> I guess sending these features to the pasture would be nice even in
+> mainstream TTY.  Probably even without a Kconfig option to restore them.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thing is... those arcane features don't take much code at all:
+
+		if (O_OLCUC(tty))
+			c = toupper(c);
+
+That's it. I didn't make the minitty code 5x smaller just by omitting 
+those.  ;-)
+
+
+Nicolas
