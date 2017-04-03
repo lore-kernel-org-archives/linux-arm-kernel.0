@@ -1,44 +1,33 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 3 Apr 2017 19:25:40 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.12 #1
-Message-ID: <76224fca-01aa-1aa4-3d84-36cfaaa21567@st.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 3 Apr 2017 13:27:31 -0400 (EDT)
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <20170403153103.GB22592@two.firstfloor.org>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
+ <20170403153103.GB22592@two.firstfloor.org>
+Message-ID: <alpine.LFD.2.20.1704031304230.1847@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Mon, 3 Apr 2017, Andi Kleen wrote:
 
-Please consider this first round of STM32 defconfig updates for v4.12:
+> I like the idea of mintty (if it supported ptys).
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+In fact PTYs could probably be implemented like another UART driver for 
+the master side.
 
-   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+But that may come later.
 
-are available in the git repository at:
+> Except for that (and possibly VT) it is unlikely that people really
+> rely on the obsolete terminal features from the 70ies. So it's a kind
+> of cleanup.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/stm32-defconfig-for-v4.12-1
+I wouldn't push for replacing the existing code though. It is stable and 
+full featured. The mini version may well never be fully standard 
+compliant to keep the code small.
 
-for you to fetch changes up to a1365c4081ac21d2a51fcde3a9956e0e41cc2b74:
 
-   ARM: configs: Add new config fragment to change RAM start point 
-(2017-03-31 14:19:40 +0200)
-
-----------------------------------------------------------------
-STM32 defconfig updates for v4.12, round 1.
-
-Highlights:
-----------
-  - Enable I2C
-  - Add config fragment for RAM start point
-
-----------------------------------------------------------------
-Alexandre TORGUE (1):
-       ARM: configs: Add new config fragment to change RAM start point
-
-M'boumba Cedric Madianga (1):
-       ARM: configs: stm32: Add I2C support
-
-  arch/arm/configs/dram_0xd0000000.config | 1 +
-  arch/arm/configs/stm32_defconfig        | 3 +++
-  2 files changed, 4 insertions(+)
-  create mode 100644 arch/arm/configs/dram_0xd0000000.config
+Nicolas
