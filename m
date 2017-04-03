@@ -1,203 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Apr 2017 09:39:58 -0500
-Subject: [PATCH v2] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <1490778502-23651-1-git-send-email-gabriel.fernandez@st.com>
-References: <1490778502-23651-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20170403143958.gi7vyhianzetnxz2@rob-hp-laptop>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 3 Apr 2017 16:42:44 +0200
+Subject: [PATCH 0/4] Introduce STM32F7 Clocks
+In-Reply-To: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
+References: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <c7042f7e-b4eb-1fcc-200c-b76b50e82424@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:08:22AM +0200, gabriel.fernandez at st.com wrote:
+hi
+
+On 01/06/2017 02:59 PM, gabriel.fernandez at st.com wrote:
 > From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch enables clocks for STM32H743 boards.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> Just for the MFD changes:
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> v2:
->   - rename compatible string "stm32,pll" into "stm32h7-pll"
->   - suppress "st,pllrge" property
->   - suppress "st, frac-status" property
->   - change management of "st,frac"  property
-> 	0 : enable 0 pll integer mode 
-> 	other values : enable pll in fractional mode (value is
-> 	the fractional factor)
-> ---
->  .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  151 ++
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/clk-stm32h7.c                          | 1610 ++++++++++++++++++++
->  include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
->  include/dt-bindings/mfd/stm32h7-rcc.h              |  137 ++
->  5 files changed, 2064 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->  create mode 100644 drivers/clk/clk-stm32h7.c
->  create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
->  create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-> new file mode 100644
-> index 0000000..5f54f64
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
-> @@ -0,0 +1,151 @@
-> +STMicroelectronics STM32H7 Reset and Clock Controller
-> +=====================================================
-> +
-> +The RCC IP is both a reset and a clock controller.
-> +
-> +Please refer to clock-bindings.txt for common clock controller binding usage.
-> +Please also refer to reset.txt for common reset controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be:
-> +  "st,stm32h743-rcc"
-> +
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +
-> +- #reset-cells: 1, see below
-> +
-> +- #clock-cells : from common clock binding; shall be set to 1
-> +
-> +- clocks: External oscillator clock phandle
-> +  - high speed external clock signal (HSE)
-> +  - low speed external clock signal (LSE)
-> +  - external I2S clock (I2S_CKIN)
-> +
-> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
-> +  write protection (RTC clock).
-> +
-> +- pll x node: Allow to register a pll with specific parameters.
-> +  Please see PLL section below.
-> +
-> +Example:
-> +
-> +	rcc: rcc at 58024400 {
-> +		#reset-cells = <1>;
-> +		#clock-cells = <2>
-> +		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
-> +		reg = <0x58024400 0x400>;
-> +		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
-> +
-> +		st,syscfg = <&pwrcfg>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		vco1 at 0 {
-> +			#clock-cells = <0>;
-> +			compatible = "stm32h7-pll";
-> +			reg = <0>;
-> +		};
-> +
-> +		vco2 at 1 {
-> +			#clock-cells = <0>;
-> +			compatible = "stm32h7-pll";
-> +			reg = <1>;
-> +			st,clock-div = <2>;
-> +			st,clock-mult = <40>;
-> +			st,frac = <0>;
-> +			st,vcosel = <1>;
-> +		};
-> +		vco3 at 2 {
-> +			#clock-cells = <0>;
-> +			compatible = "stm32h7-pll";
-> +			reg = <2>;
-> +			st,clock-div = <2>;
-> +			st,clock-mult = <40>;
-> +			st,frac = <1024>;
-> +			st,vcosel = <1>;
-> +		};
-> +	};
-> +
-> +
-> +STM32H7 PLL
-> +-----------
-> +
-> +The VCO of STM32 PLL could be reprensented like this:
-> +
-> +  Vref    ---------       --------
-> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
-> +          ---------       --------
-> +		             ^
-> +			     |
-> +	                  -------
-> +		         | FRACN |
-> +		          -------
-> +
-> +When the PLL is configured in integer mode:
-> +- VCO = ( Vref / DIVM ) * DIVN
-> +
-> +When the PLL is configured in fractional mode:
-> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
-> +
-> +
-> +Required properties for pll node:
-> +- compatible: Should be:
-> +  "stm32h7-pll"
+>
+> This patch-set introduces STM32F7 clocks.
+> F7 Clocks are very similar as F4.
+>
+> We  have some new clocks:
+> - hdmi-cec
+> - spdif-rx
+> - lptim1
+> - sai2
+>
+> Uarts & I2cs can have different clock sources.
+>
+>
+>
+> Gabriel Fernandez (4):
+>   clk: stm32f7: Add stm32f7 clock DT bindings for STM32F746 boards
+>   clk: stm32f7: Introduce stm32f7 clocks for STM32F746 boards
+>   ARM: dts: stm32: stm32f7: Enable clocks for STM32F746 boards
+>   dt-bindings: mfd: Add STM32F7 RCC numeric constants into DT include
+>     file
+>
+>  .../devicetree/bindings/clock/st,stm32-rcc.txt     |  20 ++
+>  arch/arm/boot/dts/stm32f746.dtsi                   |  80 ++++--
+>  drivers/clk/clk-stm32f4.c                          | 277 ++++++++++++++++++++-
+>  include/dt-bindings/clock/stm32fx-clock.h          |  20 ++
+>  include/dt-bindings/mfd/stm32f7-rcc.h              | 112 +++++++++
+>  5 files changed, 476 insertions(+), 33 deletions(-)
+>  create mode 100644 include/dt-bindings/mfd/stm32f7-rcc.h
+>
 
-stm,stm32h7-pll
-
-With that,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +
-> +- #clock-cells: from common clock binding; shall be set to 0
-> +- reg: Should be the pll number.
-> +
-> +Optional properties:
-> +- st,clock-div:  DIVM division factor       : <1..63>
-> +- st,clock-mult: DIVN multiplication factor : <4..512>
-> +
-> +- st,frac:
-> +   - 0 Pll is configured in integer mode
-> +   - <1..8191> Pll is configure in fractional mode and the value is
-> +     the part of the multiplication factor.
-> +
-> +- st,vcosel: VCO selection
-> +  - 0: Wide VCO range:192 to 836 MHz
-> +  - 1: Medium VCO range:150 to 420 MHz
-> +
-> +The peripheral clock consumer should specify the desired clock by
-> +having the clock ID in its "clocks" phandle cell.
-> +
-> +All available clocks are defined as preprocessor macros in
-> +dt-bindings/clock/stm32h7-clks.h header and can be used in device
-> +tree sources.
-> +
-> +Example:
-> +
-> +		timer5: timer at 40000c00 {
-> +			compatible = "st,stm32-timer";
-> +			reg = <0x40000c00 0x400>;
-> +			interrupts = <50>;
-> +			clocks = <&rcc TIM5_CK>;
-> +
-> +		};
-> +
-> +Specifying softreset control of devices
-> +=======================================
-> +
-> +Device nodes should specify the reset channel required in their "resets"
-> +property, containing a phandle to the reset device node and an index specifying
-> +which channel to use.
-> +The index is the bit number within the RCC registers bank, starting from RCC
-> +base address.
-> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
-> +Where bit_offset is the bit offset within the register.
-> +
-> +For example, for CRC reset:
-> +  crc = AHB4RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x88 / 4 * 32 + 19 = 1107
-> +
-> +All available preprocessor macros for reset are defined dt-bindings//mfd/stm32h7-rcc.h
-> +header and can be used in device tree sources.
-> +
-> +example:
-> +
-> +	timer2 {
-> +		resets	= <&rcc STM32H7_APB1L_RESET(TIM2)>;
-> +	};
+Patchs 3 & 4 applied on stm32-dt-for-v4.12
