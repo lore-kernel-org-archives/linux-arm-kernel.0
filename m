@@ -1,49 +1,107 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Mon, 3 Apr 2017 14:39:03 +0200
-Subject: [PATCH v3 01/20] net: stmmac: export
- stmmac_set_mac_addr/stmmac_get_mac_addr
-In-Reply-To: <20170403091444.29876-2-clabbe.montjoie@gmail.com>
-References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
- <20170403091444.29876-2-clabbe.montjoie@gmail.com>
-Message-ID: <9514c077-1738-ea49-ca18-fbc46bac6144@st.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 3 Apr 2017 13:55:23 +0100
+Subject: [PATCH 1/1] arm64: tegra: fix PPI interrupt flag
+In-Reply-To: <7fad40fbcaa94c1ea46328e78b46443b@bgmail102.nvidia.com>
+References: <7fad40fbcaa94c1ea46328e78b46443b@bgmail102.nvidia.com>
+Message-ID: <6c64238f-a462-9e05-2f04-e989c16553c6@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alex
+Adding Marc ...
 
-do you can check if this has to be done for ST platforms?
-I do not remember that it was necessary when build as module so
-I cannot expect this should be only for dwmac-sun8i.
+On 03/04/17 12:19, Aniruddha Banerjee wrote:
+> The interrupt flag for PPI should not be set to any value, since the
+> register is read-only. Fix the flags for the PPI interrupts to
+> IRQ_TYPE_NONE, so that there is no write to the read-only register.
 
-Regards
-peppe
+If the below matches the h/w default, does this really cause a problem?
 
+Note, we will not attempt to write the type if it matches the current
+programmed type.
 
+I had thought that the in DT file, the type for the PPI should align
+with the h/w default in the case where it cannot be written. However, I
+guess this is not explicitly stated anywhere I have found, but at the
+same time the binding doc for the arm,gic.txt does not list
+"IRQ_TYPE_NONE" as an option.
 
-On 4/3/2017 11:14 AM, Corentin Labbe wrote:
-> Thoses symbol will be needed for the dwmac-sun8i ethernet driver.
-> For letting it to be build as module, they need to be exported.
->
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Marc, what are your thoughts?
+
+> Signed-off-by: Aniruddha Banerjee <aniruddhab@nvidia.com>
 > ---
->   drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
-> index 38f9430..67af0bd 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
-> @@ -248,6 +248,7 @@ void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
->   	data = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
->   	writel(data, ioaddr + low);
->   }
-> +EXPORT_SYMBOL_GPL(stmmac_set_mac_addr);
->   
->   /* Enable disable MAC RX/TX */
->   void stmmac_set_mac(void __iomem *ioaddr, bool enable)
-> @@ -279,4 +280,4 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
->   	addr[4] = hi_addr & 0xff;
->   	addr[5] = (hi_addr >> 8) & 0xff;
->   }
-> -
-> +EXPORT_SYMBOL_GPL(stmmac_get_mac_addr);
+>  arch/arm64/boot/dts/nvidia/tegra132.dtsi | 8 ++++----
+>  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 8 ++++----
+>  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 8 ++++----
+>  3 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra132.dtsi b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+> index 3f3a46a4bd01..219fb3c6a273 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+> @@ -1093,13 +1093,13 @@
+>  	timer {
+>  		compatible = "arm,armv7-timer";
+>  		interrupts = <GIC_PPI 13
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 14
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 11
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 10
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>;
+>  		interrupt-parent = <&gic>;
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+> index 62fa85ae0271..e602299f7694 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+> @@ -390,13 +390,13 @@
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+>  		interrupts = <GIC_PPI 13
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 14
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 11
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 10
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>;
+>  		interrupt-parent = <&gic>;
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> index 2f832df29da8..6f3060b40a40 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+> @@ -1214,13 +1214,13 @@
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+>  		interrupts = <GIC_PPI 13
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 14
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 11
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+>  			     <GIC_PPI 10
+> -				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>;
+>  		interrupt-parent = <&gic>;
+>  	};
+
+Cheers
+Jon
+
+-- 
+nvpublic
