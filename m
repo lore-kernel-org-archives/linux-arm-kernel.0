@@ -1,41 +1,38 @@
 From: menschel.p@posteo.de (Patrick Menschel)
-Date: Mon,  3 Apr 2017 19:00:11 +0200
-Subject: [PATCH v3 1/4] ARM: dts: sun4i: Add CAN node
+Date: Mon,  3 Apr 2017 19:00:14 +0200
+Subject: [PATCH v3 4/4] ARM: dts: sun7i: Add can0_pins_a pinctrl settings
 In-Reply-To: <1491238814-4888-1-git-send-email-menschel.p@posteo.de>
 References: <1491238814-4888-1-git-send-email-menschel.p@posteo.de>
-Message-ID: <1491238814-4888-2-git-send-email-menschel.p@posteo.de>
+Message-ID: <1491238814-4888-5-git-send-email-menschel.p@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10 SoC has an on-board CAN controller.
-This patch adds the device node.
+The A20 SoC has an on-board CAN controller. This patch adds
+the pinctrl settings for pins PH20 and PH21.
 
 This patch is adapted from the description in
 Documentation/devicetree/bindings/net/can/sun4i_can.txt
 
 Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index ba20b48..7c559e7 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1313,6 +1313,14 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index c637e10..8536caf 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1096,6 +1096,11 @@
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
-+		can0: can at 01c2bc00 {
-+			compatible = "allwinner,sun4i-a10-can";
-+			reg = <0x01c2bc00 0x400>;
-+			interrupts = <26>;
-+			clocks = <&apb1_gates 4>;
-+			status = "disabled";
-+		};
++			can0_pins_a: can0 at 0 {
++				pins = "PH20","PH21";
++				function = "can";
++			};
 +
- 		ps20: ps2 at 01c2a000 {
- 			compatible = "allwinner,sun4i-a10-ps2";
- 			reg = <0x01c2a000 0x400>;
+ 			clk_out_a_pins_a: clk_out_a at 0 {
+ 				pins = "PI12";
+ 				function = "clk_out_a";
 -- 
 1.9.1
