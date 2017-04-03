@@ -1,112 +1,104 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 3 Apr 2017 18:51:38 +0800
-Subject: [PATCH v3 04/11] drm/sun4i: abstract the layer type
-In-Reply-To: <20170403081423.p6x4ytfoga2krygv@lukather>
-References: <20170329194613.55548-1-icenowy@aosc.io>
- <20170329194613.55548-5-icenowy@aosc.io>
- <20170403081423.p6x4ytfoga2krygv@lukather>
-Message-ID: <CAGb2v66gej-udjXVwrRLwTmVf+G1NL2eLeyTzTq8W1z=wD8NMQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 3 Apr 2017 11:55:26 +0100
+Subject: [RFC PATCH v2 00/41] Scalable Vector Extension (SVE) core support
+In-Reply-To: <20170403105157.GP3750@e103592.cambridge.arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu_JUqQu7nUB3MfJrpHL19NTSzGBDmZqLejBx8pNkwSq+A@mail.gmail.com>
+ <20170403094501.GN3750@e103592.cambridge.arm.com>
+ <CAKv+Gu8vUq0A8BEuLHT8e3w9xJ4fbQ3j7K+mVwJafbQP3Eku5A@mail.gmail.com>
+ <20170403105157.GP3750@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu89MAwGh9t9OdZ3tisTtDM8zsNTtWiacPf7j2XEf2vRLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 3, 2017 at 4:14 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+(- list)
+
+On 3 April 2017 at 11:51, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Mon, Apr 03, 2017 at 11:01:28AM +0100, Ard Biesheuvel wrote:
+>> On 3 April 2017 at 10:45, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > On Fri, Mar 31, 2017 at 04:28:16PM +0100, Ard Biesheuvel wrote:
 >
-> On Thu, Mar 30, 2017 at 03:46:06AM +0800, Icenowy Zheng wrote:
->> As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
->> driver, we will finally have two types of layer.
->>
->> Abstract the layer type to void * and a ops struct, which contains the
->> only function used by crtc -- get the drm_plane struct of the layer.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->> Refactored patch in v3.
->>
->>  drivers/gpu/drm/sun4i/sun4i_crtc.c  | 19 +++++++++++--------
->>  drivers/gpu/drm/sun4i/sun4i_crtc.h  |  3 ++-
->>  drivers/gpu/drm/sun4i/sun4i_layer.c | 19 ++++++++++++++++++-
->>  drivers/gpu/drm/sun4i/sun4i_layer.h |  2 +-
->>  drivers/gpu/drm/sun4i/sunxi_layer.h | 17 +++++++++++++++++
->>  5 files changed, 49 insertions(+), 11 deletions(-)
->>  create mode 100644 drivers/gpu/drm/sun4i/sunxi_layer.h
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
->> index 3c876c3a356a..33854ee7f636 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
->> @@ -29,6 +29,7 @@
->>  #include "sun4i_crtc.h"
->>  #include "sun4i_drv.h"
->>  #include "sun4i_layer.h"
->> +#include "sunxi_layer.h"
->>  #include "sun4i_tcon.h"
->>
->>  static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
->> @@ -149,7 +150,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
->>       scrtc->tcon = tcon;
->>
->>       /* Create our layers */
->> -     scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
->> +     scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
->>       if (IS_ERR(scrtc->layers)) {
->>               dev_err(drm->dev, "Couldn't create the planes\n");
->>               return NULL;
->> @@ -157,14 +158,15 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
->>
->>       /* find primary and cursor planes for drm_crtc_init_with_planes */
->>       for (i = 0; scrtc->layers[i]; i++) {
->> -             struct sun4i_layer *layer = scrtc->layers[i];
->> +             void *layer = scrtc->layers[i];
->> +             struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
->>
->> -             switch (layer->plane.type) {
->> +             switch (plane->type) {
->>               case DRM_PLANE_TYPE_PRIMARY:
->> -                     primary = &layer->plane;
->> +                     primary = plane;
->>                       break;
->>               case DRM_PLANE_TYPE_CURSOR:
->> -                     cursor = &layer->plane;
->> +                     cursor = plane;
->>                       break;
->>               default:
->>                       break;
->> @@ -190,10 +192,11 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
->>       /* Set possible_crtcs to this crtc for overlay planes */
->>       for (i = 0; scrtc->layers[i]; i++) {
->>               uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
->> -             struct sun4i_layer *layer = scrtc->layers[i];
->> +             void *layer = scrtc->layers[i];
->> +             struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
->>
->> -             if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
->> -                     layer->plane.possible_crtcs = possible_crtcs;
->> +             if (plane->type == DRM_PLANE_TYPE_OVERLAY)
->> +                     plane->possible_crtcs = possible_crtcs;
+> [...]
 >
-> I think the logic should be reversed here, the CRTC shouldn't care
-> (much) about the layers at all.
-
-Correct. It shouldn't. However since the layers are tied to a specific
-crtc, they get created as part of the crtc init sequence.
-
-> We should modify sun4i_crtc_init to get the argument it needs (primary
-> and cursor planes for example) through its parameters, and have the
-> caller (which iirc is sun4i_drv) call it with the right parameters
-
-The caller is (now) sun4i_crtc_init.
-
-> depending on whether you're using DE or DE2.
-
-Ack.
-
+>> >> Given the above, I think it is perfectly reasonable to conditionally
+>> >> disallow kernel mode NEON in hardirq context. The crypto routines that
+>> >> rely on it can easily be fixed up (I already wrote the patches for
+>> >> that). This would only be necessary on SVE systems, and the reason for
+>> >> doing so is that - given how preserving and restoring the NEON
+>> >> register file blows away the upper SVE part of the registers - whoever
+>> >> arrives at the SVE-aware preserve routine first should be allowed to
+>> >> run to completion. This does require disabling softirqs during the
+>> >> time the preserved NEON state is being manipulated but that does not
+>> >> strike me as a huge price to pay. Note that both restrictions
+>> >> (disallowing kernel mode NEON in hardirq context, and the need to
+>> >> disable softirqs while manipulating the state) could be made runtime
+>> >> dependent on whether we are actually running on an SVE system.
+>> >
+>> > Given that we already bail out of kernel_neon_begin() with a WARN() if
+>> > the hardware lacks FPSIMD, I'm not sure it would be worse to do the same
+>> > if SVE is present.
+>> >
+>> > However, we should probably abstract that check: currently, drivers
+>> > seemt to be using a cocktail of Kconfig dependencies,
+>> > MODULE_DEVICE_TABLE() and runtime hwcap checks in order to deduce
+>> > whether kernel_neon_begin() is safe to use.
+>> >
+>>
+>> Not quite. The Kconfig dependencies are about
+>> CONFIG_KERNEL_MODE_NEON=y being set, without which it is pretty
+>> pointless to build the modules that depend on it.
+>>
+>> The hwcap dependencies are mostly about the actual instructions
+>> themselves, i.e., AES, PMULL, SHA1/2 etc
 >
-> If we're doing that, I don't think we even need the pointer to the
-> array of layers in struct sun4i_crtc, which will make it easier to
-> deal with.
+> Sure, there are multiple reasons why these checks are being done:
+> checking that kernel_neon_begin() is available is part of the reason,
+> but not the whole reason for some of the checks.
+>
+> Doing other checks for specific ISA extensions that the driver
+> wants to use remains perfectly appropriate.
+>
+>> > Would you be happy with a single API for checking whether
+>> > kernel_neon_begin() works?  Maintaining this check in every driver
+>> > doesn't feel very scalable.
+>> >
+>>
+>> Yes, that makes sense, but it is unrelated to hwcap. I'd like to see a
+>> kernel_neon_allowed() that would return '!IS_ENABLED(CONFIG_SVE) ||
+>> !(elf_hwcap & HWCAP_SVE) || !in_irq()' at some point, although I
+>> understand you want to remove the last part for now.
+>> To short-circuit some decisions in the driver when
+>> kernel_neon_allowed() is always true (as it would be currently),
+>> something like kernel_neon_need_fallback() comes to mind.
+>>
+>> >
+>> > This would allow SVE to disable KERNEL_MODE_NEON without having to make
+>> > them conflict in Kconfig.  This wouldn't be our end goal, but it allows
+>> > the dependency to be decoupled while we figure out a better solution.
+>> >
+>>
+>> I still don't think there is a need to disable kernel mode NEON
+>> altogether. But we can defer that decision until later, but prepare
+>> the existing code to deal with that in the mean time.
+>
+> Agreed -- given that SVE hardware won't exist in the wild for some time,
+> I prefer to at least have SVE buildable in defconfig without impacting
+> existing systems.
+>
+> This means that integrating KMN with SVE could be worked on later, and
+> also means that the improvements to KMN already discussed can be worked
+> on independently without necessarily considering SVE.
+>
+>> As I mentioned, I already looked into this a while ago, so I can
+>> quickly respin the changes to the crypto code to take this into
+>> account.
+>
+> It would be interesting to see what that looks like.
+>
 
-Ack.
+This stuff is quite stale and out of date, and overloading
+may_use_simd() is inappropriate since async crypto algorithms may
+still prefer to defer their work to process context even if crypto is
+allowed in hardirq context. But this should give you an idea
 
-ChenYu
+https://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git/log/?h=arm64-sve-crypto
