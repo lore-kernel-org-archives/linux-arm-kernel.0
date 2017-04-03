@@ -1,71 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:37:56 +0100
-Subject: [PATCH v5 23/34] ARM: KVM: Convert __cpu_reset_hyp_mode to using
- __hyp_reset_vectors
+Date: Mon,  3 Apr 2017 19:37:50 +0100
+Subject: [PATCH v5 17/34] ARM: Expose the VA/IDMAP offset
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-24-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are now able to use the hyp stub to reset HYP mode. Time to
-kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
+The KVM code needs to be able to compute the address of
+symbols in its idmap page (the equivalent of a virt_to_idmap()
+call). Unfortunately, virt_to_idmap is slightly complicated,
+depending on the use of arch_phys_to_idmap_offset or not, and
+none of that is readily available at HYP.
+
+Instead, expose a single kimage_voffset variable which contains the
+offset between a kernel VA and its idmap address, enabling the
+VA->IDMAP conversion. This allows the KVM code to behave similarily
+to its arm64 counterpart.
 
 Tested-by: Keerthy <j-keerthy@ti.com>
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  | 2 --
- arch/arm/include/asm/kvm_host.h | 2 +-
- arch/arm/kvm/init.S             | 2 --
- 3 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/mm/mmu.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef05381984b..7ccb6f1aac5b 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
- extern void __init_stage2_translation(void);
- 
--extern void __kvm_hyp_reset(unsigned long);
--
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
- extern void __vgic_v3_init_lrs(void);
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e016d7f37b3..e98a2b5c4e85 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -87,6 +87,8 @@ struct cachepolicy {
+ #define s2_policy(policy)	0
  #endif
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 31ee468ce667..adea30753185 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
- static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
- 					phys_addr_t phys_idmap_start)
- {
--	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
-+	__hyp_reset_vectors();
+ 
++unsigned long kimage_voffset __ro_after_init;
++
+ static struct cachepolicy cache_policies[] __initdata = {
+ 	{
+ 		.policy		= "uncached",
+@@ -1635,4 +1637,7 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 
+ 	empty_zero_page = virt_to_page(zero_page);
+ 	__flush_dcache_page(NULL, empty_zero_page);
++
++	/* Compute the virt/idmap offset, mostly for the sake of KVM */
++	kimage_voffset = (unsigned long)&kimage_voffset - virt_to_idmap(&kimage_voffset);
  }
- 
- static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index d6b2f496fa13..fb336090ee9c 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
- 
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
--ENTRY(__kvm_hyp_reset)
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
- exit:
- 	eret
- ENDPROC(__kvm_handle_stub_hvc)
--ENDPROC(__kvm_hyp_reset)
- 
- 	.ltorg
- 
 -- 
 2.11.0
