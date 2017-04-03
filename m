@@ -1,30 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Apr 2017 10:24:03 -0500
-Subject: [PATCH v4 12/23] drivers/fsi: Add documentation for GPIO bindings
-In-Reply-To: <20170329174340.89109-13-cbostic@linux.vnet.ibm.com>
-References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
- <20170329174340.89109-13-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170403152403.uqjtwe33s7s6l7ib@rob-hp-laptop>
+From: andi@firstfloor.org (Andi Kleen)
+Date: Mon, 3 Apr 2017 08:31:03 -0700
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
+Message-ID: <20170403153103.GB22592@two.firstfloor.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 12:43:29PM -0500, Christopher Bostic wrote:
-> From: Chris Bostic <cbostic@linux.vnet.ibm.com>
-> 
-> Add fsi master gpio device tree binding documentation
-> 
-> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->  .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+> While I can agree on making Linux stuff less fatty, I can't agree on
+> doing this way. We have for now two subsystems to serve for serial
+> devices, you are proposing third one for only narrow class of devices.
 
-Acked-by: Rob Herring <robh@kernel.org> 
+It should be actually most (all?) real serial ones.
 
-But what happened to the bus description? There's never a need to 
-describe slave devices (even discoverable buses like USB and PCI still 
-need them sometimes)? As it stands now, I have no idea what FSI is from 
-reading bindings/fsi/*.
+> From my point of view is better to achive your goal with existing
+> system (as a proof of concept maybe even with ugly #ifdef:fery).
 
-Rob
+I like the idea of mintty (if it supported ptys).
+
+Except for that (and possibly VT) it is unlikely that people really
+rely on the obsolete terminal features from the 70ies. So it's a kind
+of cleanup.
+
+-Andi
