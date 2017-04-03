@@ -1,32 +1,117 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 3 Apr 2017 19:49:03 +0000
-Subject: [RFC PATCH 4/5] dt-bindings: soc/fsl: Update reserved memory
- binding for QBMan
-References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
- <1490822037-6752-5-git-send-email-roy.pledge@nxp.com>
- <20170403154229.mf63zeiwv5naxyrr@rob-hp-laptop>
-Message-ID: <VI1PR04MB32166AA6361CD6F24DBC3AAF86080@VI1PR04MB3216.eurprd04.prod.outlook.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 3 Apr 2017 15:50:53 -0400 (EDT)
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <1491242719.3704.33.camel@linux.intel.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <CAHp75VdGm2uVPBhfAge4Wx6WW2y52oddpOSfJgdYAfTUQPN7TQ@mail.gmail.com>
+ <alpine.LFD.2.20.1704021149550.1847@knanqh.ubzr>
+ <1491224186.3704.11.camel@linux.intel.com>
+ <alpine.LFD.2.20.1704031121520.1847@knanqh.ubzr>
+ <1491242719.3704.33.camel@linux.intel.com>
+Message-ID: <alpine.LFD.2.20.1704031433480.1847@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2017 11:42 AM, Rob Herring wrote:
-> On Wed, Mar 29, 2017 at 05:13:56PM -0400, Roy Pledge wrote:
->> Updates the QMan and BMan device tree bindings for reserved memory
->> nodes. This makes the reserved memory allocation compatiable with
-> s/compatiable/compatible/
->
->> the shared-dma-pool usage.
-> This change is not backwards compatible. Please state that and explain 
-> why that is okay. If PPC needs to not change, then the old strings and 
-> properties should remain, but deprecated.
-I think I can make the old device trees compatible since the
-"compatible" string changed without too much effort or ifdefery in the
-code.  However I would like to eventually see all PPC users move to the
-new mode as I do believe it is more in alignment with the spirit of the
-reserved-memory framework that is in the kernel.  Do I need to mention
-the old mode in the binding.txt file?  I'm trying to keep things clean
-so someone reading the binding doesn't get a headache and trying to
-preserve my own sanity as we move forward with adding new features to
-this driver.
+On Mon, 3 Apr 2017, Alan Cox wrote:
 
-Roy
+> > evertheless very convenient to be able to use a standard
+> > shell?
+> > with it.
+> 
+> A standard shell will work over things other than a tty device. It
+> really doesn't care so long as it gets a stream of data punctuated by
+> end of statement symbols. It'll work over pipes, sockets, from files.
+
+But no job control. No line editing with echo when the shell is busy, 
+etc.
+
+And actually it is not the TTY support per se that takes the most code. 
+Just the chardev read/write/poll/open/release stuff is rather 
+significant. Removing canonical support makes it 7.3K down from 8K. 
+Removing echo support makes it down to 7.2K. Removing baudrate support = 
+7.0K. Copying termios to/from user space is horrid: removing that and 
+we're down to 5.6K. At which point there's only a raw device interface 
+to serial hardware.
+
+> > I beg to disagree here.??First, before you call my code "totally?
+> > unmaintainable" I'd politely ask you to have a look at it first.
+> 
+> I said the combination makes it more unmaintainable. If you have two
+> tty layers one of them faking the API of the other at various interface
+> points then if the core tty layer wants to make a major change it no
+> longer can - because it'll break the other tty layer. In addition I
+> worry it won't be long before someone wants kgdb, gdbstubs and sysrq
+> over the cut down console and on it will go.
+
+sysrq is already there. It is handled directly at the UART driver level. 
+I didn't have to do anything for it.
+
+Isn't kgdb and gdbstubs the same thing?  In any case the TTY layer is 
+also already completely bypassed in that case. Those are in fact just 
+like kernel console targets that also can read and not just write.
+
+Again, what I'm using is the same low-level UART interface as 
+drivers/tty/serial/serial_core.c is using to interact with UART drivers. 
+If someone wants to make a change to that interface, the 30 or so UART 
+drivers will have to be changed as well. I don't think that would be a 
+big deal to change the minitty code to follow suit. And I won't hide 
+under a rock while this happens.
+
+If you're making a change in any of the rest of the existing TTY stack, 
+then my code won't care as it does not interact with it. I'm not even 
+using tty_struct at all!
+
+> The uart layer is also known broken as an API - it is itself bloated
+> and over-locking (for example if it was being written today kfifo would
+> be used). What happens if we want to abolish it or encourage people to
+> move away from it (as we IMHO should be) ?
+
+Same answer as above.
+
+> The serio code started with exactly the same problem, but now at least
+> talks tty layer. In your case you are tying it to something we
+> eventually ought to get rid of.
+
+You won't get rid of UART drivers, right?
+
+> I also find the large scale need for it hard to believe. If you are
+> within 64K of running out of memory on your debug/devel device how are
+> you going to have space to fix security holes and do upgrades as they
+> occur in production (where presumably you don't need the tty driver) ?
+
+Some production devices can do it all in much less RAM than that and 
+they are being connected to the net. Don't worry, that's not where I see 
+any Linux derivative go.
+
+Some devices, though, have 256K of on-chip RAM. Those devices will make 
+it into your surrounding. Having so much more RAM (no pun intended) 
+they'll be capable of even more damage. Would you be more confident, 
+when a security issue arises (because it will), to know that some Linux 
+code base is used rather than any random RTOS out there with only one 
+hundredth of the actual Linux following? If so please indulge me a bit.
+
+> The kernel doesn't exactly get smaller each release.
+
+No kidding.
+
+This is why a slight shift in the Linux model has to be accommodated 
+for. We cannot just have a single subsystem to scale to both extremes 
+all the time anymore.  We already have different memory allocators for 
+different sizes and needs so precedents do exist.
+
+The greatest value in Linux his its interfaces. Doesn't matter if the 
+kernel internal interfaces change, the value is in having common 
+interfaces for all Linux developers available anywhere. We should allow 
+for parallel implementations of subsystems as long as they remain 
+interchangeable. Hence this mini TTY alternative, and that's only the 
+beginning.
+
+I'd invite you to read more of the rationale for that here:
+
+https://lkml.org/lkml/2017/3/24/634
+
+It's rather long and I don't want to repeat it all.
+
+
+Nicolas
