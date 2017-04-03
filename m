@@ -1,70 +1,65 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 03 Apr 2017 17:50:35 +0530
-Subject: [Patch v3 07/11] Documentation: v4l: Documentation for HEVC v4l2
- definition
-In-Reply-To: <9a2018ba-7080-4dfc-24a5-c83384bd611d@xs4all.nl>
-References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
- <CGME20170331090444epcas5p43f44be426728ea22d0b13f64f5cf05bd@epcas5p4.samsung.com>
- <1490951200-32070-8-git-send-email-smitha.t@samsung.com>
- <3bad0b4f-0f0e-c67a-f9f7-135f5b8411c4@xs4all.nl>
- <1491221557.8493.98.camel@smitha-fedora>
- <9a2018ba-7080-4dfc-24a5-c83384bd611d@xs4all.nl>
-Message-ID: <1491222035.8493.108.camel@smitha-fedora>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 3 Apr 2017 14:32:33 +0200
+Subject: [PATCH v3 02/20] net: stmmac: add optional setup function
+In-Reply-To: <20170403091444.29876-3-clabbe.montjoie@gmail.com>
+References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
+ <20170403091444.29876-3-clabbe.montjoie@gmail.com>
+Message-ID: <262f763b-d158-dd77-3dba-1d7b90a1eef9@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-04-03 at 14:12 +0200, Hans Verkuil wrote:
-> On 04/03/2017 02:12 PM, Smitha T Murthy wrote:
-> > On Mon, 2017-04-03 at 10:10 +0200, Hans Verkuil wrote:
-> >> On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
-> >>> Add V4L2 definition for HEVC compressed format
-> >>>
-> >>> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> >>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> >>> ---
-> >>>  Documentation/media/uapi/v4l/pixfmt-013.rst | 5 +++++
-> >>>  1 file changed, 5 insertions(+)
-> >>>
-> >>> diff --git a/Documentation/media/uapi/v4l/pixfmt-013.rst b/Documentation/media/uapi/v4l/pixfmt-013.rst
-> >>> index 728d7ed..ff4cac2 100644
-> >>> --- a/Documentation/media/uapi/v4l/pixfmt-013.rst
-> >>> +++ b/Documentation/media/uapi/v4l/pixfmt-013.rst
-> >>> @@ -90,3 +90,8 @@ Compressed Formats
-> >>>        - ``V4L2_PIX_FMT_VP9``
-> >>>        - 'VP90'
-> >>>        - VP9 video elementary stream.
-> >>> +    * .. _V4L2-PIX-FMT-HEVC:
-> >>> +
-> >>> +      - ``V4L2_PIX_FMT_HEVC``
-> >>> +      - 'HEVC'
-> >>> +      - HEVC video elementary stream.
-> >>>
-> >>
-> >> You should mention here that HEVC == H.265.
-> >>
-> >> Regards,
-> >>
-> >> 	Hans
-> >>
-> > Do you mean change to "HEVC/H.265 video elementary stream" ?
-> 
-> Yes, that should do it.
-> 
-> Regards,
-> 
-> 	Hans
-> 
-> > 
-> > Thank you for the review.
-> > Regards,
-> > Smitha
-> >>
-> > 
-> > 
-> 
-Ok I will change it accordingly.
+Hello Corentin
 
-Thank you,
-Smitha
-> 
-> 
+On 4/3/2017 11:14 AM, Corentin Labbe wrote:
+> Instead of adding more ifthen logic for adding a new mac_device_info
+> setup function, it is easier to add a function pointer to the function
+> needed.
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>   drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 4 +++-
+>   include/linux/stmmac.h                            | 3 +++
+>   2 files changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> index 43361f3..3beca41 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+> @@ -3508,7 +3508,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
+>   	struct mac_device_info *mac;
+>   
+>   	/* Identify the MAC HW device */
+> -	if (priv->plat->has_gmac) {
+> +	if (priv->plat->setup) {
+> +		mac = priv->plat->setup(priv);
+> +	} else if (priv->plat->has_gmac) {
+>   		priv->dev->priv_flags |= IFF_UNICAST_FLT;
+>   		mac = dwmac1000_setup(priv->ioaddr,
+>   				      priv->plat->multicast_filter_bins,
+> diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
+> index 3921cb9..dadd74b 100644
+> --- a/include/linux/stmmac.h
+> +++ b/include/linux/stmmac.h
+> @@ -144,6 +144,8 @@ struct stmmac_txq_cfg {
+>   	u32 prio;
+>   };
+>   
+> +struct stmmac_priv;
+> +
+>   struct plat_stmmacenet_data {
+>   	int bus_id;
+>   	int phy_addr;
+> @@ -177,6 +179,7 @@ struct plat_stmmacenet_data {
+>   	void (*fix_mac_speed)(void *priv, unsigned int speed);
+>   	int (*init)(struct platform_device *pdev, void *priv);
+>   	void (*exit)(struct platform_device *pdev, void *priv);
+> +	struct mac_device_info *(*setup)(struct stmmac_priv *priv);
+
+In that case  I prefer to have void *priv as done for the other callbacks.
+I mean, keep the priv struct inside the driver part.
+
+peppe
+
+>   	void *bsp_priv;
+>   	struct clk *stmmac_clk;
+>   	struct clk *pclk;
