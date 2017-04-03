@@ -1,59 +1,52 @@
 From: martin@kaiser.cx (Martin Kaiser)
-Date: Mon,  3 Apr 2017 21:47:04 +0200
-Subject: [PATCH 1/2 v4] ARM: dts: i.MX25: add AIPS control registers
-In-Reply-To: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
+Date: Mon,  3 Apr 2017 21:47:05 +0200
+Subject: [PATCH 2/2 v2] ARM: i.MX25: globally disable supervisor protect
+In-Reply-To: <1491248825-23041-1-git-send-email-martin@kaiser.cx>
 References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
-Message-ID: <1491248825-23041-1-git-send-email-martin@kaiser.cx>
+ <1491248825-23041-1-git-send-email-martin@kaiser.cx>
+Message-ID: <1491248825-23041-2-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
-control registers. Add the memory regions for the control registers to
-the Device Tree.
+The problem described in 6befda9a272b98bfb1dc772efc3564644cbfb270
+for the i.MX53 platform applies to i.MX25 as well.
+
+E.g. CSPI1+SDMA and SSI1+SDMA are not working with the default AIPS
+configuration. Modifiy the AIPS configuration to allow access to the bus
+by SDMA and peripherals.
 
 Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
-v4:
+v2:
    rebased against latest linux-next
    re-sending both patches, it seems they got lost along the way
 
-v3:
-   fixed the size of the memory regions, both are 16KBytes long
+ arch/arm/mach-imx/mach-imx25.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-v2:
-   removed the "fsl,imx53-aipstz" property as per Sascha's request
-
- arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 89c8f8f..0cdf333 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -93,6 +93,11 @@
- 			reg = <0x43f00000 0x100000>;
- 			ranges;
+diff --git a/arch/arm/mach-imx/mach-imx25.c b/arch/arm/mach-imx/mach-imx25.c
+index 32dcb5e..353b86e 100644
+--- a/arch/arm/mach-imx/mach-imx25.c
++++ b/arch/arm/mach-imx/mach-imx25.c
+@@ -23,6 +23,11 @@ static void __init imx25_init_early(void)
+ 	mxc_set_cpu_type(MXC_CPU_MX25);
+ }
  
-+			aips1: bridge at 43f00000 {
-+				compatible = "fsl,imx25-aips";
-+				reg = <0x43f00000 0x4000>;
-+			};
++static void __init imx25_dt_init(void)
++{
++	imx_aips_allow_unprivileged_access("fsl,imx25-aips");
++}
 +
- 			i2c1: i2c at 43f80000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -342,6 +347,11 @@
- 			reg = <0x53f00000 0x100000>;
- 			ranges;
+ static void __init mx25_init_irq(void)
+ {
+ 	struct device_node *np;
+@@ -41,6 +46,7 @@ static const char * const imx25_dt_board_compat[] __initconst = {
  
-+			aips2: bridge at 53f00000 {
-+				compatible = "fsl,imx25-aips";
-+				reg = <0x53f00000 0x4000>;
-+			};
-+
- 			clks: ccm at 53f80000 {
- 				compatible = "fsl,imx25-ccm";
- 				reg = <0x53f80000 0x4000>;
+ DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
+ 	.init_early	= imx25_init_early,
++	.init_machine	= imx25_dt_init,
+ 	.init_late      = imx25_pm_init,
+ 	.init_irq	= mx25_init_irq,
+ 	.dt_compat	= imx25_dt_board_compat,
 -- 
 2.1.4
