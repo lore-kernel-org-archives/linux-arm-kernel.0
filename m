@@ -1,61 +1,102 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  3 Apr 2017 13:12:10 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Avoid shift overflow in block size
-Message-ID: <db7c46e78bae4054d22a2524095857c5eda834f7.1491221353.git.robin.murphy@arm.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 03 Apr 2017 17:44:40 +0530
+Subject: [Patch v3 06/11] [media] s5p-mfc: Add support for HEVC decoder
+In-Reply-To: <ebabf38b-4da9-abf8-774a-2e63796fba19@xs4all.nl>
+References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170331090441epcas1p491fae79e00000335ea163eb4c15fc16d@epcas1p4.samsung.com>
+ <1490951200-32070-7-git-send-email-smitha.t@samsung.com>
+ <ebabf38b-4da9-abf8-774a-2e63796fba19@xs4all.nl>
+Message-ID: <1491221680.8493.101.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recursive nature of __arm_lpae_{map,unmap}() means that
-ARM_LPAE_BLOCK_SIZE() is evaluated for every level, including those
-where block mappings aren't possible. This in itself is harmless enough,
-as we will only ever be called with valid sizes from the pgsize_bitmap,
-and thus always recurse down past any imaginary block sizes. The only
-problem is that most of those imaginary sizes overflow the type used for
-the calculation, and thus trigger warnings under UBsan:
-
-[   63.020939] ================================================================================
-[   63.021284] UBSAN: Undefined behaviour in drivers/iommu/io-pgtable-arm.c:312:22
-[   63.021602] shift exponent 39 is too large for 32-bit type 'int'
-[   63.021909] CPU: 0 PID: 1119 Comm: lkvm Not tainted 4.7.0-rc3+ #819
-[   63.022163] Hardware name: FVP Base (DT)
-[   63.022345] Call trace:
-[   63.022629] [<ffffff900808f258>] dump_backtrace+0x0/0x3a8
-[   63.022975] [<ffffff900808f614>] show_stack+0x14/0x20
-[   63.023294] [<ffffff90086bc9dc>] dump_stack+0x104/0x148
-[   63.023609] [<ffffff9008713ce8>] ubsan_epilogue+0x18/0x68
-[   63.023956] [<ffffff9008714410>] __ubsan_handle_shift_out_of_bounds+0x18c/0x1bc
-[   63.024365] [<ffffff900890fcb0>] __arm_lpae_map+0x720/0xae0
-[   63.024732] [<ffffff9008910170>] arm_lpae_map+0x100/0x190
-[   63.025049] [<ffffff90089183d8>] arm_smmu_map+0x78/0xc8
-[   63.025390] [<ffffff9008906c18>] iommu_map+0x130/0x230
-[   63.025763] [<ffffff9008bf7564>] vfio_iommu_type1_attach_group+0x4bc/0xa00
-[   63.026156] [<ffffff9008bf3c78>] vfio_fops_unl_ioctl+0x320/0x580
-[   63.026515] [<ffffff9008377420>] do_vfs_ioctl+0x140/0xd28
-[   63.026858] [<ffffff9008378094>] SyS_ioctl+0x8c/0xa0
-[   63.027179] [<ffffff9008086e70>] el0_svc_naked+0x24/0x28
-[   63.027412] ================================================================================
-
-Perform the shift in a 64-bit type to prevent the theoretical overflow
-and keep the peace. As it turns out, this generates identical code for
-32-bit ARM, and marginally shorter AArch64 code, so it's good all round.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/io-pgtable-arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index f9bc6ebb8140..6e5df5e0a3bd 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -74,7 +74,7 @@
- 
- /* Calculate the block/page mapping size at level l for pagetable in d. */
- #define ARM_LPAE_BLOCK_SIZE(l,d)					\
--	(1 << (ilog2(sizeof(arm_lpae_iopte)) +				\
-+	(1ULL << (ilog2(sizeof(arm_lpae_iopte)) +			\
- 		((ARM_LPAE_MAX_LEVELS - (l)) * (d)->bits_per_level)))
- 
- /* Page table bits */
--- 
-2.11.0.dirty
+On Mon, 2017-04-03 at 10:13 +0200, Hans Verkuil wrote:
+> On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
+> > Add support for codec definition and corresponding buffer
+> > requirements for HEVC decoder.
+> > 
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> > ---
+> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  1 +
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |  3 +++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  1 +
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |  8 ++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 17 +++++++++++++++--
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |  3 +++
+> >  6 files changed, 31 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> > index 3f0dab3..953a073 100644
+> > --- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> > +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> > @@ -33,6 +33,7 @@
+> >  #define MFC_NUM_PORTS_V10	1
+> >  
+> >  /* MFCv10 codec defines*/
+> > +#define S5P_FIMV_CODEC_HEVC_DEC		17
+> >  #define S5P_FIMV_CODEC_HEVC_ENC         26
+> >  
+> >  /* Encoder buffer size for MFC v10.0 */
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+> > index b1b1491..76eca67 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+> > @@ -101,6 +101,9 @@ static int s5p_mfc_open_inst_cmd_v6(struct s5p_mfc_ctx *ctx)
+> >  	case S5P_MFC_CODEC_VP8_DEC:
+> >  		codec_type = S5P_FIMV_CODEC_VP8_DEC_V6;
+> >  		break;
+> > +	case S5P_MFC_CODEC_HEVC_DEC:
+> > +		codec_type = S5P_FIMV_CODEC_HEVC_DEC;
+> > +		break;
+> >  	case S5P_MFC_CODEC_H264_ENC:
+> >  		codec_type = S5P_FIMV_CODEC_H264_ENC_V6;
+> >  		break;
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > index 8368d5c2..f49fa34 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > @@ -79,6 +79,7 @@ static inline dma_addr_t s5p_mfc_mem_cookie(void *a, void *b)
+> >  #define S5P_MFC_CODEC_H263_DEC		5
+> >  #define S5P_MFC_CODEC_VC1RCV_DEC	6
+> >  #define S5P_MFC_CODEC_VP8_DEC		7
+> > +#define S5P_MFC_CODEC_HEVC_DEC		17
+> >  
+> >  #define S5P_MFC_CODEC_H264_ENC		20
+> >  #define S5P_MFC_CODEC_H264_MVC_ENC	21
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > index db6d9fa..4fdaec2 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > @@ -144,6 +144,14 @@ static struct s5p_mfc_fmt formats[] = {
+> >  		.num_planes	= 1,
+> >  		.versions	= MFC_V6PLUS_BITS,
+> >  	},
+> > +	{
+> > +		.name		= "HEVC Encoded Stream",
+> > +		.fourcc		= V4L2_PIX_FMT_HEVC,
+> > +		.codec_mode	= S5P_FIMV_CODEC_HEVC_DEC,
+> > +		.type		= MFC_FMT_DEC,
+> > +		.num_planes	= 1,
+> > +		.versions	= MFC_V10_BIT,
+> > +	},
+> >  };
+> 
+> The '.name' should probably be removed completely in this driver. The name is now filled
+> in by v4l_fill_fmtdesc() in v4l2-ioctl.c, so there is no longer any need to set it in a
+> driver.
+> 
+> This can be done in a separate patch before this patch is applied.
+> 
+> Doing this in v4l2-ioctl.c ensures consistent format naming across drivers.
+> 
+> Regards,
+> 
+> 	Hans
+> 
+> 
+I will remove the ".name" field in the next patch version. Also I will
+create a separate patch for adding it in v4l_fill_fmtdesc().
+Thank you for the review.
+Regards,
+Smitha
