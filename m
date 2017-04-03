@@ -1,73 +1,80 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:37:47 +0100
-Subject: [PATCH v5 14/34] ARM: KVM: Convert KVM to use HVC_GET_VECTORS
+Date: Mon,  3 Apr 2017 19:37:39 +0100
+Subject: [PATCH v5 06/34] arm64: hyp-stub: Implement HVC_RESET_VECTORS stub
+ hypercall
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-15-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion of the HYP stub ABI to something similar to arm64
-left the KVM code broken, as it doesn't know about the new
-stub numbering. Let's move the various #defines to virt.h, and
-let KVM use HVC_GET_VECTORS.
+Let's define a new stub hypercall that resets the HYP configuration
+to its default: hyp-stub vectors, and MMU disabled.
 
-Tested-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Of course, for the hyp-stub itself, this is a trivial no-op.
+Hypervisors will have a bit more work to do.
+
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h  | 8 ++++++++
- arch/arm/kernel/hyp-stub.S   | 4 ----
- arch/arm/kvm/hyp/hyp-entry.S | 2 +-
- 3 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/virt.h |  9 +++++++++
+ arch/arm64/kernel/hyp-stub.S  | 11 ++++++++++-
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 6dae1956c74d..4ea16fcaf2ed 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -94,6 +94,14 @@ extern char __hyp_text_start[];
- extern char __hyp_text_end[];
- #endif
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 1569c3a0d794..435514c52b0f 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -44,6 +44,14 @@
+  */
+ #define HVC_SOFT_RESTART 2
  
-+#else
++/*
++ * HVC_RESET_VECTORS - Restore the vectors to the original HYP stubs
++ */
++#define HVC_RESET_VECTORS 3
 +
-+/* Only assembly code should need those */
++/* Max number of HYP stub hypercalls */
++#define HVC_STUB_HCALL_NR 4
 +
-+#define HVC_GET_VECTORS 0
-+#define HVC_SET_VECTORS 1
-+#define HVC_SOFT_RESTART 2
+ /* Error returned when an invalid stub number is passed into x0 */
+ #define HVC_STUB_ERR	0xbadca11
+ 
+@@ -70,6 +78,7 @@ extern u32 __boot_cpu_mode[2];
+ 
+ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+ phys_addr_t __hyp_get_vectors(void);
++void __hyp_reset_vectors(void);
+ 
+ /* Reports the availability of HYP mode */
+ static inline bool is_hyp_mode_available(void)
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index f53e8b84cd3a..8226fd90f73c 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -73,8 +73,11 @@ el1_sync:
+ 	mov	x1, x3
+ 	br	x4				// no return
+ 
++3:	cmp	x0, #HVC_RESET_VECTORS
++	beq	9f				// Nothing to reset!
 +
- #endif /* __ASSEMBLY__ */
+ 	/* Someone called kvm_call_hyp() against the hyp-stub... */
+-3:	ldr	x0, =HVC_STUB_ERR
++	ldr	x0, =HVC_STUB_ERR
  
- #endif /* ! VIRT_H */
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 82915231c6f8..8301db963d83 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -22,10 +22,6 @@
- #include <asm/assembler.h>
- #include <asm/virt.h>
- 
--#define HVC_GET_VECTORS 0
--#define HVC_SET_VECTORS 1
--#define HVC_SOFT_RESTART 2
--
- #ifndef ZIMAGE
- /*
-  * For the kernel proper, we need to find out the CPU boot mode long after
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 96beb53934c9..1f8db7d21fc5 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -127,7 +127,7 @@ hyp_hvc:
- 	pop	{r0, r1, r2}
- 
- 	/* Check for __hyp_get_vectors */
--	cmp	r0, #-1
-+	cmp	r0, #HVC_GET_VECTORS
- 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	beq	1f
- 
+ 9:	eret
+ ENDPROC(el1_sync)
+@@ -127,3 +130,9 @@ ENTRY(__hyp_set_vectors)
+ 	hvc	#0
+ 	ret
+ ENDPROC(__hyp_set_vectors)
++
++ENTRY(__hyp_reset_vectors)
++	mov	x0, #HVC_RESET_VECTORS
++	hvc	#0
++	ret
++ENDPROC(__hyp_reset_vectors)
 -- 
 2.11.0
