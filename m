@@ -1,77 +1,43 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  3 Apr 2017 11:53:08 +0200
-Subject: [PATCH] ARM: dts: r8a7792: Correct Z clock
-Message-ID: <1491213188-7305-1-git-send-email-geert+renesas@glider.be>
+Date: Mon,  3 Apr 2017 11:54:03 +0200
+Subject: [PATCH] ARM: dts: r8a7794: Add Z2 clock
+Message-ID: <1491213243-7448-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike other R-Car Gen2 SoCs with Cortex-A15 CPU cores, R-Car V2H does
-not have a programmable Z clock (Cortex-A15 CPU core clock), but uses a
-fixed divider.
-This is similar to the Z2 clock (Cortex-A7 CPU core clock) on R-Car E2.
+Add the Z2 clock (Cortex-A7 CPU core clock), which uses a fixed divider,
+and link the first CPU node to it.
 
-Hence:
-  - Remove the Z clock output from the cpg_clocks node, as this implied
-    a programmable clock,
-  - Add the Z clock as a fixed factor clock,
-  - Let the first CPU node point to the new Z clock,
-  - Remove the Z clock index from the bindings (this definition was used
-    by r8a7792.dtsi only, and was not a contract between DT and driver).
-
-Fixes: 7c4163aae3d8e5b9 ("ARM: dts: r8a7792: initial SoC device tree")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7792.dtsi            | 11 +++++++++--
- include/dt-bindings/clock/r8a7792-clock.h |  1 -
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 6c0797ebc08f029c..0efecb232ee52ce0 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -46,7 +46,7 @@
- 			compatible = "arm,cortex-a15";
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 2f6e94fd408cc858..a19b884fb25897fc 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -43,6 +43,7 @@
+ 			compatible = "arm,cortex-a7";
  			reg = <0>;
  			clock-frequency = <1000000000>;
--			clocks = <&cpg_clocks R8A7792_CLK_Z>;
-+			clocks = <&z_clk>;
- 			power-domains = <&sysc R8A7792_PD_CA15_CPU0>;
- 			next-level-cache = <&L2_CA15>;
++			clocks = <&z2_clk>;
+ 			power-domains = <&sysc R8A7794_PD_CA7_CPU0>;
+ 			next-level-cache = <&L2_CA7>;
  		};
-@@ -766,7 +766,7 @@
- 			clocks = <&extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
--					     "lb", "qspi", "z";
-+					     "lb", "qspi";
- 			#power-domain-cells = <0>;
- 		};
- 
-@@ -778,6 +778,13 @@
+@@ -1064,6 +1065,13 @@
  			clock-div = <2>;
  			clock-mult = <1>;
  		};
-+		z_clk: z {
++		z2_clk: z2 {
 +			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL0>;
++			clocks = <&cpg_clocks R8A7794_CLK_PLL0>;
 +			#clock-cells = <0>;
 +			clock-div = <1>;
 +			clock-mult = <1>;
 +		};
- 		zx_clk: zx {
+ 		zg_clk: zg {
  			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-diff --git a/include/dt-bindings/clock/r8a7792-clock.h b/include/dt-bindings/clock/r8a7792-clock.h
-index 94dd16a1e6e6963d..5be90bc23bd79097 100644
---- a/include/dt-bindings/clock/r8a7792-clock.h
-+++ b/include/dt-bindings/clock/r8a7792-clock.h
-@@ -17,7 +17,6 @@
- #define R8A7792_CLK_PLL3		3
- #define R8A7792_CLK_LB			4
- #define R8A7792_CLK_QSPI		5
--#define R8A7792_CLK_Z			6
- 
- /* MSTP0 */
- #define R8A7792_CLK_MSIOF0		0
+ 			clocks = <&cpg_clocks R8A7794_CLK_PLL1>;
 -- 
 2.7.4
