@@ -1,40 +1,31 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Apr 2017 11:14:38 +0200
-Subject: [PATCH v3 14/20] ARM64: dts: sun50i-a64: Add dt node for the syscon
- control module
+Date: Mon,  3 Apr 2017 11:14:44 +0200
+Subject: [PATCH v3 20/20] ARM: sunxi: Enable dwmac-sun8i driver on
+ multi_v7_defconfig
 In-Reply-To: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
 References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170403091444.29876-15-clabbe.montjoie@gmail.com>
+Message-ID: <20170403091444.29876-21-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner A64.
-
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock.
+Enable the dwmac-sun8i driver in the multi_v7 default configuration
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1c64ea2..1683a1f 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -121,6 +121,12 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "allwinner,sun8i-a64-system-controller",
-+				"syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun50i-a64-mmc";
- 			reg = <0x01c0f000 0x1000>;
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2196206..0af325b 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -257,6 +257,7 @@ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_STMMAC_PLATFORM=y
+ CONFIG_DWMAC_DWC_QOS_ETH=y
++CONFIG_DWMAC_SUN8I=y
+ CONFIG_TI_CPSW=y
+ CONFIG_XILINX_EMACLITE=y
+ CONFIG_AT803X_PHY=y
 -- 
 2.10.2
