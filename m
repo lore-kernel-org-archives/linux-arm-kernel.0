@@ -1,36 +1,58 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 03 Apr 2017 13:11:01 +0200
-Subject: [PATCH] iommu/rockchip: Make use of 'struct iommu_device'
-In-Reply-To: <20170403110758.GB4683@8bytes.org>
-References: <1490970624-19981-1-git-send-email-joro@8bytes.org>
- <1785458.LaVlbOJ67B@diego> <20170403110758.GB4683@8bytes.org>
-Message-ID: <4252325.o7BCCiZe8L@diego>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 3 Apr 2017 12:12:02 +0100
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <CAFpQJXUvSqeOomMZz4=UBBrdGcoc9eSy8khohRwU0zwx8m7YUQ@mail.gmail.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <58CA8C8A.8080405@huawei.com>
+ <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+ <CAFpQJXXqU6pvjckrQ86jXPhKd9XZQ+hDHt8X19Wy31JmLJvrjw@mail.gmail.com>
+ <CAFpQJXUvSqeOomMZz4=UBBrdGcoc9eSy8khohRwU0zwx8m7YUQ@mail.gmail.com>
+Message-ID: <20170403111202.GC18905@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. April 2017, 13:07:58 CEST schrieb Joerg Roedel:
-> Hey Heiko,
-> 
-> On Mon, Apr 03, 2017 at 11:56:59AM +0200, Heiko St?bner wrote:
-> > In general works, and I still keep a working iommu-based display :-)
-> > I can also see my two vop iommus under /sys/class/iommu now.
-> 
-> Great, thanks for testing that patch!
-> 
-> > Links in the devices subdirectory do not work though, see below:
-> Okay, thats bad, but I think its nothing we should work around right
-> now. My goal with this work is to have a per-iommu check-device
-> call-back to bind devices to iommus in the core code.
-> 
-> This will also solve the probe-ordering issue and we are fine again. We
-> just call check-device then for every device on the bus that has no
-> iommu already when the iommu is registered and create the links at that
-> time.
+Hi,
 
-ok, so you can at least add my
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+On Mon, Apr 03, 2017 at 04:11:42PM +0530, Ganapatrao Kulkarni wrote:
+> On Wed, Mar 22, 2017 at 2:46 PM, Ganapatrao Kulkarni
+> <gpkulkarni@gmail.com> wrote:
+> > i am not able to run with latest perf tool, i see issue with memory
+> > corruption in malloc
+> > is this seen from anyone else too?
+> > i am not sure, is this issue with my setup?
+> >
+> > root at VAL1-13>perf>> perf stat -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+> >
+> >  Performance counter stats for 'sleep 1':
+> >
+> >             10,815      armv8_pmuv3_0/br_mis_pred/
+> >
+> >        1.001232167 seconds time elapsed
+> >
+> > root at VAL1-13>perf>> ./perf stat -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+> > *** Error in `./perf': free(): invalid next size (fast): 0x00000000086a7a00 ***
+> > Aborted (core dumped)
+> > root at VAL1-13>perf>> ./perf -v
+> > perf version 4.11.rc3.g093b99
+> > root at VAL1-13>perf>> perf -v
+> > perf version 4.8.rc6.g21c488
+> > root at VAL1-13>perf>> uname -a
+> > Linux VAL1-13 4.11.0-rc2-12139-g3804e12 #1 SMP PREEMPT Wed Mar 22
+> > 06:26:28 UTC 2017 aarch64 aarch64 aarch64 GNU/Linux
+> > root at VAL1-13>perf>>
+> 
+> i did bisect, and i see your patch,
+> 
+> 7e3fcffe955440101493cd8f32f75840ddf87b6f
+>  perf pmu: Support alternative sysfs cpumask
+> 
+> is causing this failure. if i suppress the call to function cpu_map__read
+> then memory corruption is not seen.
 
-on the patch
+Thanks for tracking this down.
 
+I can reproduce this on some machines; I'll try to see how this can be
+fixed shortly.
 
-Heiko
+Thanks,
+Mark.
