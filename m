@@ -1,78 +1,77 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 3 Apr 2017 08:31:37 -0700
-Subject: [PATCH v3 3/4] tty/serial: meson_uart: add the core clock
- handling to the driver
-In-Reply-To: <1491231478.3480.12.camel@baylibre.com>
-References: <20170331165437.26227-1-hgkr.klein@gmail.com>
- <20170331165437.26227-4-hgkr.klein@gmail.com>
- <1491231478.3480.12.camel@baylibre.com>
-Message-ID: <CAOi56cWW4CxwQ=JYaJHp_kpj=fr6Tvj5jzYKTdeGec0Drx3fLw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Apr 2017 10:33:23 -0500
+Subject: [PATCH v3 01/11] dt-bindings: add binding for the Allwinner DE2
+ CCU
+In-Reply-To: <20170329194613.55548-2-icenowy@aosc.io>
+References: <20170329194613.55548-1-icenowy@aosc.io>
+ <20170329194613.55548-2-icenowy@aosc.io>
+Message-ID: <20170403153323.kmq3ku7h3sj7fp4g@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 3, 2017 at 7:57 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On Fri, 2017-03-31 at 18:54 +0200, Helmut Klein wrote:
->> This patch gets the core clock as provided by the DT and enables it.
->> The code was taken from Amlogic's serial driver, and was tested on my
->> board.
->>
->> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
->> ---
->>  drivers/tty/serial/meson_uart.c | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
->> index 60f16795d16b..cb99112288eb 100644
->> --- a/drivers/tty/serial/meson_uart.c
->> +++ b/drivers/tty/serial/meson_uart.c
->> @@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
->>       struct resource *res_mem, *res_irq;
->>       struct uart_port *port;
->>       struct clk *clk;
->> +     struct clk *core_clk;
->>       int ret = 0;
->>
->>       if (pdev->dev.of_node)
->> @@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
->>       if (!port)
->>               return -ENOMEM;
->>
->> +     core_clk = devm_clk_get(&pdev->dev, "core");
->> +     if (!IS_ERR(core_clk)) {
->> +             ret = clk_prepare_enable(core_clk);
->
-> This needs to be balanced with a clk_disable_unprepare() in remove.
->
-> You could try play with devm_add_action_or_reset, maybe like this:
->
-> devm_add_action_or_reset(dev,
->                         (void(*)(void *))clk_disable_unprepare,
->                         core_clk);
->
-> Sorry I did not notice it on the v2.
->
->
->> +             if (ret) {
->> +                     dev_err(&pdev->dev, "couldn't enable clkc\n");
->> +                     return ret;
->> +             }
->> +     }
->> +
->>       clk = clk_get(&pdev->dev, NULL);
->
-> I still think you should name this one. Otherwise, what the non AO UART will get
-> here will depends on the order it was declared in DT.
+On Thu, Mar 30, 2017 at 03:46:03AM +0800, Icenowy Zheng wrote:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
+> 
+> Allwinner "Display Engine 2.0" contains some clock controls in it.
+> 
+> In order to add them as clock drivers, we need a device tree binding.
+> Add the binding here.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Changes in v3:
+> - Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
 
-Unfortunately, it has to be even a little more complicated.
+Why? You waste virtual memory space making this bigger than it needs to 
+be. Not an issue so much for 64-bit.
 
-This driver will need to work with current DT (no clock-names) as well
-as newer DT using clock-names for "core" and "xtal".  So, you'll have
-to first try for "xtal" here, and if it fails, then try NULL.
+> 
+>  .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+> new file mode 100644
+> index 000000000000..34cf79c05f13
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+> @@ -0,0 +1,31 @@
+> +Allwinner Display Engine 2.0 Clock Control Binding
+> +--------------------------------------------------
+> +
+> +Required properties :
+> +- compatible: must contain one of the following compatibles:
+> +		- "allwinner,sun8i-a83t-de2-clk"
+> +		- "allwinner,sun50i-a64-de2-clk"
+> +		- "allwinner,sun50i-h5-de2-clk"
+> +
+> +- reg: Must contain the registers base address and length
+> +- clocks: phandle to the clocks feeding the display engine subsystem.
+> +	  Three are needed:
+> +  - "mod": the display engine module clock
+> +  - "bus": the bus clock for the whole display engine subsystem
+> +- clock-names: Must contain the clock names described just above
+> +- resets: phandle to the reset control for the display engine subsystem.
+> +- #clock-cells : must contain 1
+> +- #reset-cells : must contain 1
+> +
+> +Example:
+> +de2_clocks: clock at 01000000 {
 
-> To answer your question from the v2, yes I think it is ok to add clock-names to
-> the AO-UART. You are doing it for non AO ones so, why not ?
+Drop the leading 0s. dtc in linux-next will now warn on this with W=1 
+compile. Looks like sunxi has a lot of them. Please fix so we don't keep 
+repeating this same copy-n-paste.
 
-Agreed.   And another good reason the driver needs to handle with and
-without clock-names.
-
-Kevin
+> +	compatible = "allwinner,sun50i-a64-de2-clk";
+> +	reg = <0x01000000 0x100000>;
+> +	clocks = <&ccu CLK_DE>,
+> +		 <&ccu CLK_BUS_DE>;
+> +	clock-names = "mod",
+> +		      "bus";
+> +	resets = <&ccu RST_BUS_DE>;
+> +	#clock-cells = <1>;
+> +	#reset-cells = <1>;
+> +};
+> -- 
+> 2.12.0
+> 
