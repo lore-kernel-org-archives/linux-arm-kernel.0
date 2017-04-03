@@ -1,63 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  3 Apr 2017 19:37:37 +0100
-Subject: [PATCH v5 04/34] arm64: hyp-stub: Define a return value for failed
- stub calls
+Date: Mon,  3 Apr 2017 19:37:38 +0100
+Subject: [PATCH v5 05/34] arm64: hyp-stub: Update documentation in asm/virt.h
 In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
 References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170403183807.1620-5-marc.zyngier@arm.com>
+Message-ID: <20170403183807.1620-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a standard return value to be returned when a hyp stub
-call fails, and make KVM use it for ARM_EXCEPTION_HYP_GONE
-(instead of using a KVM-specific value).
+Comments in asm/virt.h are slightly out of date, so let's align
+them with the new behaviour of the code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h | 2 +-
- arch/arm64/include/asm/virt.h    | 3 +++
- arch/arm64/kernel/hyp-stub.S     | 2 +-
- 3 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/virt.h | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index ec3553eb9349..1769380a8fc0 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -28,7 +28,7 @@
- #define ARM_EXCEPTION_EL1_SERROR  1
- #define ARM_EXCEPTION_TRAP	  2
- /* The hyp-stub will return this for any kvm_call_hyp() call */
--#define ARM_EXCEPTION_HYP_GONE	  3
-+#define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
- 
- #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
- #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
 diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 439f6b5d31f6..1466d14c664d 100644
+index 1466d14c664d..1569c3a0d794 100644
 --- a/arch/arm64/include/asm/virt.h
 +++ b/arch/arm64/include/asm/virt.h
-@@ -39,6 +39,9 @@
+@@ -19,9 +19,14 @@
+ #define __ASM__VIRT_H
+ 
+ /*
+- * The arm64 hcall implementation uses x0 to specify the hcall type. A value
+- * less than 0xfff indicates a special hcall, such as get/set vector.
+- * Any other value is used as a pointer to the function to call.
++ * The arm64 hcall implementation uses x0 to specify the hcall
++ * number. A value less than HVC_STUB_HCALL_NR indicates a special
++ * hcall, such as set vector. Any other value is handled in a
++ * hypervisor specific way.
++ *
++ * The hypercall is allowed to clobber any of the caller-saved
++ * registers (x0-x18), so it is advisable to use it through the
++ * indirection of a function call (as implemented in hyp-stub.S).
   */
- #define HVC_SOFT_RESTART 2
  
-+/* Error returned when an invalid stub number is passed into x0 */
-+#define HVC_STUB_ERR	0xbadca11
-+
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 193dfb25ce2f..f53e8b84cd3a 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -74,7 +74,7 @@ el1_sync:
- 	br	x4				// no return
- 
- 	/* Someone called kvm_call_hyp() against the hyp-stub... */
--3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
-+3:	ldr	x0, =HVC_STUB_ERR
- 
- 9:	eret
- ENDPROC(el1_sync)
+ /* HVC_GET_VECTORS - Return the value of the vbar_el2 register. */
 -- 
 2.11.0
