@@ -1,57 +1,31 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  3 Apr 2017 11:24:37 +0900
-Subject: [PATCH v35 09/14] arm64: kdump: add VMCOREINFO's for user-space tools
+Date: Mon,  3 Apr 2017 11:24:39 +0900
+Subject: [PATCH v35 11/14] arm64: kdump: enable kdump in defconfig
 In-Reply-To: <20170403022139.12383-1-takahiro.akashi@linaro.org>
 References: <20170403022139.12383-1-takahiro.akashi@linaro.org>
-Message-ID: <20170403022440.12515-7-takahiro.akashi@linaro.org>
+Message-ID: <20170403022440.12515-9-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to common VMCOREINFO's defined in
-crash_save_vmcoreinfo_init(), we need to know, for crash utility,
-  - kimage_voffset
-  - PHYS_OFFSET
-to examine the contents of a dump file (/proc/vmcore) correctly
-due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-
-  - VA_BITS
-is also required for makedumpfile command.
-
-arch_crash_save_vmcoreinfo() appends them to the dump file.
-More VMCOREINFO's may be added later.
+Kdump is enabled by default as kexec is.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 779a80046066..481f54a866c5 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -18,6 +18,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/cpu_ops.h>
-+#include <asm/memory.h>
- #include <asm/mmu.h>
- #include <asm/mmu_context.h>
- #include <asm/page.h>
-@@ -351,3 +352,13 @@ void crash_free_reserved_phys_range(unsigned long begin, unsigned long end)
- 	}
- }
- #endif /* CONFIG_HIBERNATION */
-+
-+void arch_crash_save_vmcoreinfo(void)
-+{
-+	VMCOREINFO_NUMBER(VA_BITS);
-+	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-+	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-+						kimage_voffset);
-+	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-+						PHYS_OFFSET);
-+}
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 7c48028ec64a..927ee18bbdf2 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -82,6 +82,7 @@ CONFIG_CMA=y
+ CONFIG_SECCOMP=y
+ CONFIG_XEN=y
+ CONFIG_KEXEC=y
++CONFIG_CRASH_DUMP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+ CONFIG_CPU_IDLE=y
 -- 
 2.11.1
