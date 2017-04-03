@@ -1,312 +1,128 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 3 Apr 2017 10:22:58 +0200
-Subject: [Patch v3 09/11] [media] v4l2: Add v4l2 control IDs for HEVC
- encoder
-In-Reply-To: <1490951200-32070-10-git-send-email-smitha.t@samsung.com>
-References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
- <CGME20170331090449epcas1p423d72119a1301e478e4b1b23d14cbac6@epcas1p4.samsung.com>
- <1490951200-32070-10-git-send-email-smitha.t@samsung.com>
-Message-ID: <a664a1d2-6690-c9df-a1f8-c60dee1bbf90@xs4all.nl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Apr 2017 10:24:49 +0200
+Subject: [PATCH v3 05/11] drm/sun4i: abstract a mixer type
+In-Reply-To: <20170329194613.55548-6-icenowy@aosc.io>
+References: <20170329194613.55548-1-icenowy@aosc.io>
+ <20170329194613.55548-6-icenowy@aosc.io>
+Message-ID: <20170403082449.kyf5dq35nkupd2r7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
-> Add v4l2 controls for HEVC encoder
-> 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
->  drivers/media/v4l2-core/v4l2-ctrls.c | 103 +++++++++++++++++++++++++++
->  include/uapi/linux/v4l2-controls.h   | 133 +++++++++++++++++++++++++++++++++++
->  2 files changed, 236 insertions(+)
-> 
-> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-> index b9e08e3..5fa763b 100644
-> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> @@ -479,6 +479,46 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
->  		NULL,
->  	};
+Hi,
+
+That's much better thanks, but I have a bunch of (minor) comments.
+
+On Thu, Mar 30, 2017 at 03:46:07AM +0800, Icenowy Zheng wrote:
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> index 33854ee7f636..938dfe7188ff 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> @@ -25,11 +25,10 @@
 >  
-> +	static const char * const hevc_profile[] = {
-> +		"Main",
-> +		"Main still picture",
+>  #include <video/videomode.h>
+>  
+> -#include "sun4i_backend.h"
+>  #include "sun4i_crtc.h"
+>  #include "sun4i_drv.h"
+> -#include "sun4i_layer.h"
+>  #include "sunxi_layer.h"
+> +#include "sunxi_mixer.h"
+>  #include "sun4i_tcon.h"
+>  
+>  static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+> @@ -57,7 +56,7 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+>  
+>  	DRM_DEBUG_DRIVER("Committing plane changes\n");
+>  
+> -	sun4i_backend_commit(scrtc->backend);
+> +	scrtc->mixer_ops->commit(scrtc->mixer);
 
-All control and control menu names should follow the english capitalization rules for
-titles. So this should become "Main Still Picture".
+The caller would also have to care about whether that pointer is NULL
+or not. This is not really a big deal in the commit case that I expect
+to always be filled, but it might be for the color correction.
 
-Please adjust this in this patch.
+How about defining some inline functions that would check the
+mixer_ops pointer and return if it's NULL?
 
-Regards,
+>  	if (event) {
+>  		crtc->state->event = NULL;
+> @@ -135,8 +134,8 @@ static const struct drm_crtc_funcs sun4i_crtc_funcs = {
+>  	.disable_vblank		= sun4i_crtc_disable_vblank,
+>  };
+>  
+> -struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+> -				   struct sun4i_backend *backend,
+> +struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm, void *mixer,
+> +				   const struct sunxi_mixer_ops *mixer_ops,
+>  				   struct sun4i_tcon *tcon)
+>  {
+>  	struct sun4i_crtc *scrtc;
+> @@ -146,11 +145,12 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+>  	scrtc = devm_kzalloc(drm->dev, sizeof(*scrtc), GFP_KERNEL);
+>  	if (!scrtc)
+>  		return ERR_PTR(-ENOMEM);
+> -	scrtc->backend = backend;
+> +	scrtc->mixer = mixer;
+> +	scrtc->mixer_ops = mixer_ops;
+>  	scrtc->tcon = tcon;
+>  
+>  	/* Create our layers */
+> -	scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
+> +	scrtc->layers = mixer_ops->layers_init(drm, scrtc);
 
-	Hans
+I don't really see why we need the mixer and ops in the CRTC, we
+already have it in sun4i_drv, don't we? Can't we just use that
+instead?
 
-> +		NULL,
-> +	};
-> +	static const char * const hevc_level[] = {
-> +		"1",
-> +		"2",
-> +		"2.1",
-> +		"3",
-> +		"3.1",
-> +		"4",
-> +		"4.1",
-> +		"5",
-> +		"5.1",
-> +		"5.2",
-> +		"6",
-> +		"6.1",
-> +		"6.2",
-> +		NULL,
-> +	};
-> +	static const char * const hevc_hierarchial_coding_type[] = {
-> +		"B",
-> +		"P",
-> +		NULL,
-> +	};
-> +	static const char * const hevc_refresh_type[] = {
-> +		"None",
-> +		"CRA",
-> +		"IDR",
-> +		NULL,
-> +	};
-> +	static const char * const hevc_size_of_length_field[] = {
-> +		"0",
-> +		"1",
-> +		"2",
-> +		"4",
-> +		NULL,
-> +	};
+That would allow just like in the previous patch to loosen the
+relationship between the CRTC and what's before it, which will make
+our life easier down the road.
+
+> diff --git a/drivers/gpu/drm/sun4i/sunxi_mixer.h b/drivers/gpu/drm/sun4i/sunxi_mixer.h
+> new file mode 100644
+> index 000000000000..11bdd20269ef
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sunxi_mixer.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
 > +
->  
->  	switch (id) {
->  	case V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ:
-> @@ -574,6 +614,16 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
->  		return dv_it_content_type;
->  	case V4L2_CID_DETECT_MD_MODE:
->  		return detect_md_mode;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
-> +		return hevc_profile;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
-> +		return hevc_level;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:
-> +		return hevc_hierarchial_coding_type;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:
-> +		return hevc_refresh_type;
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:
-> +		return hevc_size_of_length_field;
->  
->  	default:
->  		return NULL;
-> @@ -775,6 +825,54 @@ const char *v4l2_ctrl_get_name(u32 id)
->  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
->  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
->  
-> +	/* HEVC controls */
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I frame QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P frame QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:		return "HEVC B frame QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:			return "HEVC Minimum QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:			return "HEVC Maximum QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK:		return "HEVC Dark reg adaptive rc";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH:	return "HEVC Smooth reg adaptive rc";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC:	return "HEVC Static reg adaptive rc";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY:	return "HEVC activity reg adaptive rc";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:			return "HEVC Profile";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:			return "HEVC Level";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG:		return "HEVC tier_flag";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION:	return "HEVC Frame rate resolution";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH:	return "HEVC Maximum coding unit depth";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES:	return "HEVC Number of reference frames";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:		return "HEVC Refresh type";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED:		return "HEVC Constant intra prediction";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU:		return "HEVC Lossless encoding";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT:		return "HEVC Wavefront";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF:			return "HEVC Loop filter";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC LF across slice boundary or not";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP:		return "HEVC QP values";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:	return "HEVC Hierarchical Coding Type";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:return "HEVC Hierarchical Coding Layer";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:return "HEVC Hierarchical Layer QP";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER0_BITRATE:return "HEVC Hierarchical Lay 0 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER1_BITRATE:return "HEVC Hierarchical Lay 1 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER2_BITRATE:return "HEVC Hierarchical Lay 2 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER3_BITRATE:return "HEVC Hierarchical Lay 3 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER4_BITRATE:return "HEVC Hierarchical Lay 4 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER5_BITRATE:return "HEVC Hierarchical Lay 5 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER6_BITRATE:return "HEVC Hierarchical Lay 6 bit rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH:return "HEVC Hierarchical Coding Layer Change";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:		return "HEVC Sign data hiding";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB:		return "HEVC General pb";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID:		return "HEVC Temporal id";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING:		return "HEVC Strong intra smoothing";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT:		return "HEVC intra pu split";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION:		return "HEVC tmv prediction";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "HEVC Max number of candidate MVs";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE:	return "HEVC ENC without startcode";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC num of I frame b/w 2 IDR";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC Loop filter beta offset";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC Loop filter tc offset";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of length field";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR:	return "HEVC Prepend SPS/PPS to IDR";
+> +#ifndef _SUNXI_MIXER_H_
+> +#define _SUNXI_MIXER_H_
 > +
->  	/* CAMERA controls */
->  	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
->  	case V4L2_CID_CAMERA_CLASS:		return "Camera Controls";
-> @@ -1063,6 +1161,11 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
->  	case V4L2_CID_TUNE_DEEMPHASIS:
->  	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
->  	case V4L2_CID_DETECT_MD_MODE:
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:
->  		*type = V4L2_CTRL_TYPE_MENU;
->  		break;
->  	case V4L2_CID_LINK_FREQ:
-> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> index 0d2e1e0..1f6502a 100644
-> --- a/include/uapi/linux/v4l2-controls.h
-> +++ b/include/uapi/linux/v4l2-controls.h
-> @@ -579,6 +579,139 @@ enum v4l2_vp8_golden_frame_sel {
->  #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP		(V4L2_CID_MPEG_BASE+510)
->  #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE			(V4L2_CID_MPEG_BASE+511)
->  
-> +/* CIDs for HEVC encoding. Number gaps are for compatibility */
+> +struct sun4i_crtc;
 > +
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP                         \
-> +					(V4L2_CID_MPEG_BASE + 512)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP                         \
-> +					(V4L2_CID_MPEG_BASE + 513)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP                     \
-> +					(V4L2_CID_MPEG_BASE + 514)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP                     \
-> +					(V4L2_CID_MPEG_BASE + 515)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP                     \
-> +					(V4L2_CID_MPEG_BASE + 516)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP \
-> +					(V4L2_CID_MPEG_BASE + 517)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE       \
-> +					(V4L2_CID_MPEG_BASE + 518)
-> +enum v4l2_mpeg_video_hevc_hier_coding_type {
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B	= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P	= 1,
+> +struct sunxi_mixer_ops {
+> +	void **(*layers_init)(struct drm_device *drm, struct sun4i_crtc *crtc);
+> +	void (*apply_color_correction)(void *mixer);
+> +	void (*disable_color_correction)(void *mixer);
+> +	void (*commit)(void *mixer);
 > +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER      \
-> +					(V4L2_CID_MPEG_BASE + 519)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP   \
-> +					(V4L2_CID_MPEG_BASE + 520)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_PROFILE                        \
-> +					(V4L2_CID_MPEG_BASE + 521)
-> +enum v4l2_mpeg_video_hevc_profile {
-> +	V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN = 0,
-> +	V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_STILL_PICTURE = 1,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LEVEL                          \
-> +					(V4L2_CID_MPEG_BASE + 522)
-> +enum v4l2_mpeg_video_hevc_level {
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_1	= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_2	= 1,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_2_1	= 2,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_3	= 3,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_3_1	= 4,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_4	= 5,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_4_1	= 6,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_5	= 7,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1	= 8,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_5_2	= 9,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_6	= 10,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_6_1	= 11,
-> +	V4L2_MPEG_VIDEO_HEVC_LEVEL_6_2	= 12,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION    \
-> +					(V4L2_CID_MPEG_BASE + 523)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG                \
-> +					(V4L2_CID_MPEG_BASE + 524)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH      \
-> +					(V4L2_CID_MPEG_BASE + 525)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES   \
-> +					(V4L2_CID_MPEG_BASE + 526)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF		          \
-> +					(V4L2_CID_MPEG_BASE + 527)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY        \
-> +					(V4L2_CID_MPEG_BASE + 528)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2      \
-> +					(V4L2_CID_MPEG_BASE + 529)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2        \
-> +					(V4L2_CID_MPEG_BASE + 530)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE             \
-> +					(V4L2_CID_MPEG_BASE + 531)
-> +enum v4l2_cid_mpeg_video_hevc_refresh_type {
-> +	V4L2_MPEG_VIDEO_HEVC_REFRESH_NONE		= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_REFRESH_CRA		= 1,
-> +	V4L2_MPEG_VIDEO_HEVC_REFRESH_IDR		= 2,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD           \
-> +					(V4L2_CID_MPEG_BASE + 532)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU		  \
-> +					(V4L2_CID_MPEG_BASE + 533)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED	  \
-> +					(V4L2_CID_MPEG_BASE + 534)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT	          \
-> +					(V4L2_CID_MPEG_BASE + 535)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING         \
-> +					(V4L2_CID_MPEG_BASE + 536)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB	          \
-> +					(V4L2_CID_MPEG_BASE + 537)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID	          \
-> +					(V4L2_CID_MPEG_BASE + 538)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING	  \
-> +					(V4L2_CID_MPEG_BASE + 539)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1  \
-> +					(V4L2_CID_MPEG_BASE + 540)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK         \
-> +					(V4L2_CID_MPEG_BASE + 541)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH       \
-> +					(V4L2_CID_MPEG_BASE + 542)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC       \
-> +					(V4L2_CID_MPEG_BASE + 543)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY     \
-> +					(V4L2_CID_MPEG_BASE + 544)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT		  \
-> +					(V4L2_CID_MPEG_BASE + 545)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION		  \
-> +					(V4L2_CID_MPEG_BASE + 546)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE	  \
-> +					(V4L2_CID_MPEG_BASE + 547)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CR              \
-> +					(V4L2_CID_MPEG_BASE + 548)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CB              \
-> +					(V4L2_CID_MPEG_BASE + 549)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD     \
-> +					(V4L2_CID_MPEG_BASE + 550)
-> +enum v4l2_cid_mpeg_video_hevc_size_of_length_field {
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_0		= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_1		= 1,
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_2		= 2,
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_4		= 3,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR          \
-> +					(V4L2_CID_MPEG_BASE + 551)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH   \
-> +					(V4L2_CID_MPEG_BASE + 552)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER0_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 553)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER1_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 554)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER2_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 555)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER3_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 556)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER4_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 557)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER5_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 558)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER6_BITRATE \
-> +					(V4L2_CID_MPEG_BASE + 559)
 > +
->  /*  MPEG-class control IDs specific to the CX2341x driver as defined by V4L2 */
->  #define V4L2_CID_MPEG_CX2341X_BASE 				(V4L2_CTRL_CLASS_MPEG | 0x1000)
->  #define V4L2_CID_MPEG_CX2341X_VIDEO_SPATIAL_FILTER_MODE 	(V4L2_CID_MPEG_CX2341X_BASE+0)
-> 
+> +#endif /* _SUNXI_MIXER_H_ */
+
+I don't really like the "mixer" name here, and backend doesn't seem
+appropriate either.
+
+What about "engine"? It sounds more like it covers both cases.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/dfb6220d/attachment-0001.sig>
