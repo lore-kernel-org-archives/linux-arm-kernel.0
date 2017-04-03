@@ -1,34 +1,72 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 3 Apr 2017 16:55:43 +0200
-Subject: [PATCH v5 0/5] usb: dwc2: Add support for USB OTG on STM32F4x9
-In-Reply-To: <20170201012547.76158-1-bruherrera@gmail.com>
-References: <20170201012547.76158-1-bruherrera@gmail.com>
-Message-ID: <8bdaca46-c9d0-c9b8-be38-e0d89ea8dc35@st.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 03 Apr 2017 16:57:58 +0200
+Subject: [PATCH v3 3/4] tty/serial: meson_uart: add the core clock
+ handling to the driver
+In-Reply-To: <20170331165437.26227-4-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+ <20170331165437.26227-4-hgkr.klein@gmail.com>
+Message-ID: <1491231478.3480.12.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Fri, 2017-03-31 at 18:54 +0200, Helmut Klein wrote:
+> This patch gets the core clock as provided by the DT and enables it.
+> The code was taken from Amlogic's serial driver, and was tested on my
+> board.
+> 
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> ---
+> ?drivers/tty/serial/meson_uart.c | 10 ++++++++++
+> ?1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+> index 60f16795d16b..cb99112288eb 100644
+> --- a/drivers/tty/serial/meson_uart.c
+> +++ b/drivers/tty/serial/meson_uart.c
+> @@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
+> ?	struct resource *res_mem, *res_irq;
+> ?	struct uart_port *port;
+> ?	struct clk *clk;
+> +	struct clk *core_clk;
+> ?	int ret = 0;
+> 
+> ?	if (pdev->dev.of_node)
+> @@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
+> ?	if (!port)
+> ?		return -ENOMEM;
+> 
+> +	core_clk = devm_clk_get(&pdev->dev, "core");
+> +	if (!IS_ERR(core_clk)) {
+> +		ret = clk_prepare_enable(core_clk);
 
-On 02/01/2017 02:25 AM, Bruno Herrera wrote:
-> The STM32F4x9 MCU family has two DWC2 USB OTG cores on it. One core is
-> USB OTG FS and other core is USB OTG HS. The USB FS core only works with
-> its internal phy whilst the USF HS core can work in HS with external ulpi
-> phy or in FS/LS speed with the embedded FS PHY.
->
-...
->
->  Documentation/devicetree/bindings/usb/dwc2.txt |  4 ++++
->  arch/arm/boot/dts/stm32f429-disco.dts          | 16 +++++++++++++
->  arch/arm/boot/dts/stm32f429.dtsi               | 31 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/stm32f469-disco.dts          | 16 +++++++++++++
->  drivers/usb/dwc2/core.h                        |  5 +++++
->  drivers/usb/dwc2/hcd.c                         | 15 ++++++++++++-
->  drivers/usb/dwc2/hw.h                          |  2 ++
->  drivers/usb/dwc2/params.c                      | 19 ++++++++++++++++
->  8 files changed, 107 insertions(+), 1 deletion(-)
->
+This needs to be balanced with a clk_disable_unprepare() in remove.
 
-Patches 2, 3, 4 & 5 (DT + bindings) applied on stm32-dt-for-v4.12
+You could try play with devm_add_action_or_reset, maybe like this:
 
-regards
-Alex
+devm_add_action_or_reset(dev,
+			(void(*)(void *))clk_disable_unprepare,
+			core_clk);
+
+Sorry I did not notice it on the v2.
+
+
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "couldn't enable clkc\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> ?	clk = clk_get(&pdev->dev, NULL);
+
+I still think you should name this one. Otherwise, what the non AO UART will get
+here will depends on the order it was declared in DT.
+
+To answer your question from the v2, yes I think it is ok to add clock-names to
+the AO-UART. You are doing it for non AO ones so, why not ?
+
+
+> ?	if (IS_ERR(clk))
+> ?		return PTR_ERR(clk);
+> --
+> 2.11.0
+> 
