@@ -1,91 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 3 Apr 2017 18:51:02 +0100
-Subject: [PATCH v4 19/28] ARM: KVM: Allow the main HYP code to use the
- init hyp stub implementation
-In-Reply-To: <20170403173225.GD11752@cbox>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-20-marc.zyngier@arm.com> <20170324143432.GD25903@cbox>
- <00380529-bee2-ba10-548d-319bc4fa5c1b@arm.com> <20170403173225.GD11752@cbox>
-Message-ID: <77ad21b3-ede6-28a2-aebd-73364f546617@arm.com>
+From: alan@linux.intel.com (Alan Cox)
+Date: Mon, 03 Apr 2017 19:05:19 +0100
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <alpine.LFD.2.20.1704031121520.1847@knanqh.ubzr>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <CAHp75VdGm2uVPBhfAge4Wx6WW2y52oddpOSfJgdYAfTUQPN7TQ@mail.gmail.com>
+ <alpine.LFD.2.20.1704021149550.1847@knanqh.ubzr>
+ <1491224186.3704.11.camel@linux.intel.com>
+ <alpine.LFD.2.20.1704031121520.1847@knanqh.ubzr>
+Message-ID: <1491242719.3704.33.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 18:32, Christoffer Dall wrote:
-> On Fri, Mar 24, 2017 at 03:01:23PM +0000, Marc Zyngier wrote:
->> On 24/03/17 14:34, Christoffer Dall wrote:
->>> On Tue, Mar 21, 2017 at 07:20:49PM +0000, Marc Zyngier wrote:
->>>> We now have a full hyp-stub implementation in the KVM init code,
->>>> but the main KVM code only supports HVC_GET_VECTORS, which is not
->>>> enough.
->>>>
->>>> Instead of reinventing the wheel, let's reuse the init implementation
->>>> by branching to the idmap page when called with a hyp-stub hypercall.
->>>>
->>>> Tested-by: Keerthy <j-keerthy@ti.com>
->>>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
->>>>  1 file changed, 24 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
->>>> index 1f8db7d21fc5..a35baa81fd23 100644
->>>> --- a/arch/arm/kvm/hyp/hyp-entry.S
->>>> +++ b/arch/arm/kvm/hyp/hyp-entry.S
->>>> @@ -126,11 +126,30 @@ hyp_hvc:
->>>>  	 */
->>>>  	pop	{r0, r1, r2}
->>>>  
->>>> -	/* Check for __hyp_get_vectors */
->>>> -	cmp	r0, #HVC_GET_VECTORS
->>>> -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
->>>> -	beq	1f
->>>> +	/*
->>>> +	 * Check if we have a kernel function, which is guaranteed to be
->>>> +	 * bigger than the maximum hyp stub hypercall
->>>> +	 */
->>>> +	cmp	r0, #HVC_STUB_HCALL_NR
->>>> +	bhs	1f
->>>>  
->>>> +	/*
->>>> +	 * Not a kernel function, treat it as a stub hypercall.
->>>> +	 * Compute the physical address for __kvm_handle_stub_hvc
->>>> +	 * (as the code lives in the idmaped page) and branch there.
->>>> +	 * We hijack ip (r12) as a tmp register.
->>>> +	 */
->>>
->>> How can we just clobber r12 and be sure we don't corrupt the caller?
->>
->> r12 (aka ip) is allowed to be clobbered by the linker (used by inserted
->> code veneers, for example). Given that this is a standalone object, we
->> can safely assume that r12 has been saved if it was used by the caller.
->>
->> Here is what the PCS says:
->>
->> "Register r12 (IP) may be used by a linker as a scratch register between
->> a routine and any subroutine it calls (for details, see
->> ?5.3.1.1, Use of IP by the linker). It can also be used within a routine
->> to hold intermediate values between subroutine calls."
->>
-> 
-> So isn't this similar to my comment on the arm64 code, which relies on
-> this being called via a function call, as opposed to directly issuring
-> an HVC via inline assembly?
+> evertheless very convenient to be able to use a standard
+> shell?
+> with it.
 
-Indeed, this is the exact same thing.
+A standard shell will work over things other than a tty device. It
+really doesn't care so long as it gets a stream of data punctuated by
+end of statement symbols. It'll work over pipes, sockets, from files.
 
-> If so, documenting this limitation/restriction/feature would be nice.
+> I beg to disagree here.??First, before you call my code "totally?
+> unmaintainable" I'd politely ask you to have a look at it first.
 
-I've added the following to the documentation:
+I said the combination makes it more unmaintainable. If you have two
+tty layers one of them faking the API of the other at various interface
+points then if the core tty layer wants to make a major change it no
+longer can - because it'll break the other tty layer. In addition I
+worry it won't be long before someone wants kgdb, gdbstubs and sysrq
+over the cut down console and on it will go.
 
-"A stub hypercall is allowed to clobber any of the caller-saved
-registers (x0-x18 on arm64, r0-r3 and ip on arm). It is thus recommended
-to use a function call to perform the hypercall."
+The uart layer is also known broken as an API - it is itself bloated
+and over-locking (for example if it was being written today kfifo would
+be used). What happens if we want to abolish it or encourage people to
+move away from it (as we IMHO should be) ?
 
-Does this work for you?
+The serio code started with exactly the same problem, but now at least
+talks tty layer. In your case you are tying it to something we
+eventually ought to get rid of.
 
-Thanks,
+I also find the large scale need for it hard to believe. If you are
+within 64K of running out of memory on your debug/devel device how are
+you going to have space to fix security holes and do upgrades as they
+occur in production (where presumably you don't need the tty driver) ?
+The kernel doesn't exactly get smaller each release.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Alan
