@@ -1,153 +1,189 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  3 Apr 2017 11:24:32 +0900
-Subject: [PATCH v35 04/14] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20170403022139.12383-1-takahiro.akashi@linaro.org>
-References: <20170403022139.12383-1-takahiro.akashi@linaro.org>
-Message-ID: <20170403022440.12515-2-takahiro.akashi@linaro.org>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Sun, 2 Apr 2017 23:02:53 -0400
+Subject: [PATCH] phy: bcm-ns-usb3: split all writes into reg & val pairs
+In-Reply-To: <20170402165522.14058-1-zajec5@gmail.com>
+References: <20170402165522.14058-1-zajec5@gmail.com>
+Message-ID: <CAC3K-4rYH0Fg5HhVVtYEhdn1KdWoMx_JvvzPjJr5LopvVXd_JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"crashkernel=" kernel parameter specifies the size (and optionally
-the start address) of the system ram to be used by crash dump kernel.
-reserve_crashkernel() will allocate and reserve that memory at boot time
-of primary kernel.
+On Sun, Apr 2, 2017 at 12:55 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> So far all the PHY initialization was implemented using some totally
+> magic values. There was some pattern there but it wasn't clear what is
+> it about.
+>
+> Thanks to the patch submitted by Broadcom:
+> [PATCH 5/6] phy: Add USB3 PHY support for Broadcom NSP SoC
+> and the upstream "iproc-mdio" driver we now know there is a MDIO bus
+> underneath with PHY(s) and their registers.
+>
+> It allows us to clean the driver a bit by making all these values less
+> magical. The next step is switching to using a proper MDIO layer.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-The memory range will be exposed to userspace as a resource named
-"Crash kernel" in /proc/iomem.
+Looks much better to me!
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-Reviewed-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/setup.c |  7 ++++-
- arch/arm64/mm/init.c      | 66 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+), 1 deletion(-)
+Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 42274bda0ccb..28855ec1be95 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -31,7 +31,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -226,6 +225,12 @@ static void __init request_standard_resources(void)
- 		if (kernel_data.start >= res->start &&
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
-+#ifdef CONFIG_KEXEC_CORE
-+		/* Userspace will find "Crash kernel" region in /proc/iomem. */
-+		if (crashk_res.end && crashk_res.start >= res->start &&
-+		    crashk_res.end <= res->end)
-+			request_resource(res, &crashk_res);
-+#endif
- 	}
- }
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 290794b1a0f1..09d19207362d 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -30,6 +30,7 @@
- #include <linux/gfp.h>
- #include <linux/memblock.h>
- #include <linux/sort.h>
-+#include <linux/of.h>
- #include <linux/of_fdt.h>
- #include <linux/dma-mapping.h>
- #include <linux/dma-contiguous.h>
-@@ -37,6 +38,7 @@
- #include <linux/swiotlb.h>
- #include <linux/vmalloc.h>
- #include <linux/mm.h>
-+#include <linux/kexec.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -77,6 +79,67 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
- 
-+#ifdef CONFIG_KEXEC_CORE
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	unsigned long long crash_base, crash_size;
-+	int ret;
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	/* no crashkernel= or invalid value specified */
-+	if (ret || !crash_size)
-+		return;
-+
-+	crash_size = PAGE_ALIGN(crash_size);
-+
-+	if (crash_base == 0) {
-+		/* Current arm64 boot protocol requires 2MB alignment */
-+		crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
-+				crash_size, SZ_2M);
-+		if (crash_base == 0) {
-+			pr_warn("cannot allocate crashkernel (size:0x%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size)) {
-+			pr_warn("cannot reserve crashkernel: region is not memory\n");
-+			return;
-+		}
-+
-+		if (memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("cannot reserve crashkernel: region overlaps reserved memory\n");
-+			return;
-+		}
-+
-+		if (!IS_ALIGNED(crash_base, SZ_2M)) {
-+			pr_warn("cannot reserve crashkernel: base address is not 2MB aligned\n");
-+			return;
-+		}
-+	}
-+	memblock_reserve(crash_base, crash_size);
-+
-+	pr_info("crashkernel reserved: 0x%016llx - 0x%016llx (%lld MB)\n",
-+		crash_base, crash_base + crash_size, crash_size >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+}
-+#else
-+static void __init reserve_crashkernel(void)
-+{
-+}
-+#endif /* CONFIG_KEXEC_CORE */
-+
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -332,6 +395,9 @@ void __init arm64_memblock_init(void)
- 		arm64_dma_phys_limit = max_zone_dma_phys();
- 	else
- 		arm64_dma_phys_limit = PHYS_MASK + 1;
-+
-+	reserve_crashkernel();
-+
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
- 
- 	memblock_allow_resize();
--- 
-2.11.1
+> ---
+>  drivers/phy/phy-bcm-ns-usb3.c | 69 ++++++++++++++++++++++++++++++-------------
+>  1 file changed, 49 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/phy/phy-bcm-ns-usb3.c b/drivers/phy/phy-bcm-ns-usb3.c
+> index f420fa4bebfc..22b5e7047fa6 100644
+> --- a/drivers/phy/phy-bcm-ns-usb3.c
+> +++ b/drivers/phy/phy-bcm-ns-usb3.c
+> @@ -2,6 +2,7 @@
+>   * Broadcom Northstar USB 3.0 PHY Driver
+>   *
+>   * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
+> + * Copyright (C) 2016 Broadcom
+>   *
+>   * All magic values used for initialization (and related comments) were obtained
+>   * from Broadcom's SDK:
+> @@ -23,6 +24,23 @@
+>
+>  #define BCM_NS_USB3_MII_MNG_TIMEOUT_US 1000    /* usecs */
+>
+> +#define BCM_NS_USB3_PHY_BASE_ADDR_REG  0x1f
+> +#define BCM_NS_USB3_PHY_PLL30_BLOCK    0x8000
+> +#define BCM_NS_USB3_PHY_TX_PMD_BLOCK   0x8040
+> +#define BCM_NS_USB3_PHY_PIPE_BLOCK     0x8060
+> +
+> +/* Registers of PLL30 block */
+> +#define BCM_NS_USB3_PLL_CONTROL                0x01
+> +#define BCM_NS_USB3_PLLA_CONTROL0      0x0a
+> +#define BCM_NS_USB3_PLLA_CONTROL1      0x0b
+> +
+> +/* Registers of TX PMD block */
+> +#define BCM_NS_USB3_TX_PMD_CONTROL1    0x01
+> +
+> +/* Registers of PIPE block */
+> +#define BCM_NS_USB3_LFPS_CMP           0x02
+> +#define BCM_NS_USB3_LFPS_DEGLITCH      0x03
+> +
+>  enum bcm_ns_family {
+>         BCM_NS_UNKNOWN,
+>         BCM_NS_AX,
+> @@ -76,8 +94,10 @@ static inline int bcm_ns_usb3_mii_mng_wait_idle(struct bcm_ns_usb3 *usb3)
+>                                     usecs_to_jiffies(BCM_NS_USB3_MII_MNG_TIMEOUT_US));
+>  }
+>
+> -static int bcm_ns_usb3_mii_mng_write32(struct bcm_ns_usb3 *usb3, u32 value)
+> +static int bcm_ns_usb3_mdio_phy_write(struct bcm_ns_usb3 *usb3, u16 reg,
+> +                                     u16 value)
+>  {
+> +       u32 tmp = 0;
+>         int err;
+>
+>         err = bcm_ns_usb3_mii_mng_wait_idle(usb3);
+> @@ -86,7 +106,11 @@ static int bcm_ns_usb3_mii_mng_write32(struct bcm_ns_usb3 *usb3, u32 value)
+>                 return err;
+>         }
+>
+> -       writel(value, usb3->ccb_mii + BCMA_CCB_MII_MNG_CMD_DATA);
+> +       /* TODO: Use a proper MDIO bus layer */
+> +       tmp |= 0x58020000; /* Magic value for MDIO PHY write */
+> +       tmp |= reg << 18;
+> +       tmp |= value;
+> +       writel(tmp, usb3->ccb_mii + BCMA_CCB_MII_MNG_CMD_DATA);
+>
+>         return 0;
+>  }
+> @@ -102,21 +126,22 @@ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
+>         udelay(2);
+>
+>         /* USB3 PLL Block */
+> -       err = bcm_ns_usb3_mii_mng_write32(usb3, 0x587e8000);
+> +       err = bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+> +                                        BCM_NS_USB3_PHY_PLL30_BLOCK);
+>         if (err < 0)
+>                 return err;
+>
+>         /* Assert Ana_Pllseq start */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x58061000);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLL_CONTROL, 0x1000);
+>
+>         /* Assert CML Divider ratio to 26 */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x582a6400);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLLA_CONTROL0, 0x6400);
+>
+>         /* Asserting PLL Reset */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x582ec000);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLLA_CONTROL1, 0xc000);
+>
+>         /* Deaaserting PLL Reset */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x582e8000);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLLA_CONTROL1, 0x8000);
+>
+>         /* Waiting MII Mgt interface idle */
+>         bcm_ns_usb3_mii_mng_wait_idle(usb3);
+> @@ -125,22 +150,24 @@ static int bcm_ns_usb3_phy_init_ns_bx(struct bcm_ns_usb3 *usb3)
+>         writel(0, usb3->dmp + BCMA_RESET_CTL);
+>
+>         /* PLL frequency monitor enable */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x58069000);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLL_CONTROL, 0x9000);
+>
+>         /* PIPE Block */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x587e8060);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+> +                                  BCM_NS_USB3_PHY_PIPE_BLOCK);
+>
+>         /* CMPMAX & CMPMINTH setting */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x580af30d);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_LFPS_CMP, 0xf30d);
+>
+>         /* DEGLITCH MIN & MAX setting */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x580e6302);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_LFPS_DEGLITCH, 0x6302);
+>
+>         /* TXPMD block */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x587e8040);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+> +                                  BCM_NS_USB3_PHY_TX_PMD_BLOCK);
+>
+>         /* Enabling SSC */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x58061003);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_TX_PMD_CONTROL1, 0x1003);
+>
+>         /* Waiting MII Mgt interface idle */
+>         bcm_ns_usb3_mii_mng_wait_idle(usb3);
+> @@ -159,22 +186,24 @@ static int bcm_ns_usb3_phy_init_ns_ax(struct bcm_ns_usb3 *usb3)
+>         udelay(2);
+>
+>         /* PLL30 block */
+> -       err = bcm_ns_usb3_mii_mng_write32(usb3, 0x587e8000);
+> +       err = bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+> +                                        BCM_NS_USB3_PHY_PLL30_BLOCK);
+>         if (err < 0)
+>                 return err;
+>
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x582a6400);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PLLA_CONTROL0, 0x6400);
+>
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x587e80e0);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG, 0x80e0);
+>
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x580a009c);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, 0x02, 0x009c);
+>
+>         /* Enable SSC */
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x587e8040);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_PHY_BASE_ADDR_REG,
+> +                                  BCM_NS_USB3_PHY_TX_PMD_BLOCK);
+>
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x580a21d3);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, 0x02, 0x21d3);
+>
+> -       bcm_ns_usb3_mii_mng_write32(usb3, 0x58061003);
+> +       bcm_ns_usb3_mdio_phy_write(usb3, BCM_NS_USB3_TX_PMD_CONTROL1, 0x1003);
+>
+>         /* Waiting MII Mgt interface idle */
+>         bcm_ns_usb3_mii_mng_wait_idle(usb3);
+> --
+> 2.11.0
+>
