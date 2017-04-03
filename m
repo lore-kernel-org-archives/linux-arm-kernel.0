@@ -1,128 +1,93 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 3 Apr 2017 10:12:44 +0200
-Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
-In-Reply-To: <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
-References: <cover.1491118230.git.guillaume.tucker@collabora.com>
- <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
-Message-ID: <a01a50d3-bb1b-2c56-2a15-30651fa2fac9@baylibre.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 3 Apr 2017 10:13:32 +0200
+Subject: [Patch v3 06/11] [media] s5p-mfc: Add support for HEVC decoder
+In-Reply-To: <1490951200-32070-7-git-send-email-smitha.t@samsung.com>
+References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170331090441epcas1p491fae79e00000335ea163eb4c15fc16d@epcas1p4.samsung.com>
+ <1490951200-32070-7-git-send-email-smitha.t@samsung.com>
+Message-ID: <ebabf38b-4da9-abf8-774a-2e63796fba19@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2017 09:59 AM, Guillaume Tucker wrote:
-> The ARM Mali Midgard GPU family is present in a number of SoCs
-> from many different vendors such as Samsung Exynos and Rockchip.
+On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
+> Add support for codec definition and corresponding buffer
+> requirements for HEVC decoder.
 > 
-> Import the device tree bindings documentation from the r16p0
-> release of the Mali Midgard GPU kernel driver:
-> 
->   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
-> 
-> The following optional bindings have been omitted in this initial
-> version as they are only used in very specific cases:
-> 
->   * snoop_enable_smc
->   * snoop_disable_smc
->   * jm_config
->   * power_model
->   * system-coherency
->   * ipa-model
-> 
-> The example has been simplified accordingly.
-> 
-> The compatible string definition has been limited to
-> "arm,mali-midgard" to avoid checkpatch.pl warnings and to match
-> what the driver actually expects (as of r16p0 out-of-tree).
-> 
-> CC: John Reitan <john.reitan@arm.com>
-> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 > ---
->  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53 ++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  1 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |  3 +++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  1 +
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |  8 ++++++++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 17 +++++++++++++++--
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |  3 +++
+>  6 files changed, 31 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-> new file mode 100644
-> index 000000000000..da8fc6d21bbf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-> @@ -0,0 +1,53 @@
-> +#
-> +# (C) COPYRIGHT 2013-2016 ARM Limited.
-> +# Copyright (C) 2017 Collabora Ltd
-> +#
-> +# This program is free software and is provided to you under the terms of the
-> +# GNU General Public License version 2 as published by the Free Software
-> +# Foundation, and any use by you of this program is subject to the terms
-> +# of such GNU licence.
-> +#
-Hi Guillaume,
+> diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> index 3f0dab3..953a073 100644
+> --- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> @@ -33,6 +33,7 @@
+>  #define MFC_NUM_PORTS_V10	1
+>  
+>  /* MFCv10 codec defines*/
+> +#define S5P_FIMV_CODEC_HEVC_DEC		17
+>  #define S5P_FIMV_CODEC_HEVC_ENC         26
+>  
+>  /* Encoder buffer size for MFC v10.0 */
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+> index b1b1491..76eca67 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
+> @@ -101,6 +101,9 @@ static int s5p_mfc_open_inst_cmd_v6(struct s5p_mfc_ctx *ctx)
+>  	case S5P_MFC_CODEC_VP8_DEC:
+>  		codec_type = S5P_FIMV_CODEC_VP8_DEC_V6;
+>  		break;
+> +	case S5P_MFC_CODEC_HEVC_DEC:
+> +		codec_type = S5P_FIMV_CODEC_HEVC_DEC;
+> +		break;
+>  	case S5P_MFC_CODEC_H264_ENC:
+>  		codec_type = S5P_FIMV_CODEC_H264_ENC_V6;
+>  		break;
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> index 8368d5c2..f49fa34 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> @@ -79,6 +79,7 @@ static inline dma_addr_t s5p_mfc_mem_cookie(void *a, void *b)
+>  #define S5P_MFC_CODEC_H263_DEC		5
+>  #define S5P_MFC_CODEC_VC1RCV_DEC	6
+>  #define S5P_MFC_CODEC_VP8_DEC		7
+> +#define S5P_MFC_CODEC_HEVC_DEC		17
+>  
+>  #define S5P_MFC_CODEC_H264_ENC		20
+>  #define S5P_MFC_CODEC_H264_MVC_ENC	21
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index db6d9fa..4fdaec2 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -144,6 +144,14 @@ static struct s5p_mfc_fmt formats[] = {
+>  		.num_planes	= 1,
+>  		.versions	= MFC_V6PLUS_BITS,
+>  	},
+> +	{
+> +		.name		= "HEVC Encoded Stream",
+> +		.fourcc		= V4L2_PIX_FMT_HEVC,
+> +		.codec_mode	= S5P_FIMV_CODEC_HEVC_DEC,
+> +		.type		= MFC_FMT_DEC,
+> +		.num_planes	= 1,
+> +		.versions	= MFC_V10_BIT,
+> +	},
+>  };
 
-This is unnecessary, please remove.
+The '.name' should probably be removed completely in this driver. The name is now filled
+in by v4l_fill_fmtdesc() in v4l2-ioctl.c, so there is no longer any need to set it in a
+driver.
 
-> +
-> +
-> +ARM Mali Midgard GPU
-> +====================
-> +
-> +Required properties:
-> +
-> +- compatible : Should be "arm,mali-midgard".
-> +- reg : Physical base address of the device and length of the register area.
-> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
-> +- interrupt-names : Contains the names of IRQ resources in the order they were
-> +  provided in the interrupts property. Must contain: "JOB, "MMU", "GPU".
+This can be done in a separate patch before this patch is applied.
 
+Doing this in v4l2-ioctl.c ensures consistent format naming across drivers.
 
-Please follow the bindings introduced for the utgard family :
-https://patchwork.kernel.org/patch/9553745/
+Regards,
 
-- an entry for each mali-midgard revision, i.e. "arm,mali-t820"
-- an entry for each vendor specific wrapping if necessary, i.e. "amlogic,meson-gxm-mali"
-- low-case for interrupt names
-
-> +
-> +Optional:
-> +
-> +- clocks : Phandle to clock for the Mali Midgard device.
-> +- clock-names : Shall be "clk_mali".
-> +- mali-supply : Phandle to regulator for the Mali device. Refer to
-> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
-> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
-> +  for details.
-
-Please add :
-   * Must be one of the following:
-      "arm,mali-t820"
-   * And, optionally, one of the vendor specific compatible:
-      "amlogic,meson-gxm-mali"
-
-with my Ack for the amlogic platform.
-
-> +
-> +Example for a Mali-T602:
-> +
-> +gpu at 0xfc010000 {
-> +	compatible = "arm,mali-midgard";
-> +	reg = <0xfc010000 0x4000>;
-> +	interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
-> +	interrupt-names = "JOB", "MMU", "GPU";
-> +
-> +	clocks = <&pclk_mali>;
-> +	clock-names = "clk_mali";
-> +	mali-supply = <&vdd_mali>;
-> +	operating-points = <
-> +		/* KHz   uV */
-> +		533000 1250000,
-> +		450000 1150000,
-> +		400000 1125000,
-> +		350000 1075000,
-> +		266000 1025000,
-> +		160000  925000,
-> +		100000  912500,
-> +	>;
-> +};
-> 
-
-Thanks,
-Neil
+	Hans
