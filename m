@@ -1,41 +1,61 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  3 Apr 2017 11:55:19 +0200
-Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU clock
- input
-Message-ID: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 03 Apr 2017 11:56:59 +0200
+Subject: [PATCH] iommu/rockchip: Make use of 'struct iommu_device'
+In-Reply-To: <1490970624-19981-1-git-send-email-joro@8bytes.org>
+References: <1490970624-19981-1-git-send-email-joro@8bytes.org>
+Message-ID: <1785458.LaVlbOJ67B@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X2 crystal oscillator on the Koelsch development board provides a
-74.25 MHz clock, not a 148.5 MHz clock.
+Hi Joerg,
 
-Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel clocks to DT")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-Confirmed by schematics, user manual, and physical inspection of 2
-Koelsch instances (my scope has not enough bandwidth to measure the
-actual frequency).
+Am Freitag, 31. M?rz 2017, 16:30:24 CEST schrieb Joerg Roedel:
+> From: Joerg Roedel <jroedel@suse.de>
+> 
+> Register hardware IOMMUs seperatly with the iommu-core code
+> and add a sysfs representation of the iommu topology.
+> 
+> Signed-off-by: Joerg Roedel <jroedel@suse.de>
 
-Probably this was copied from r8a7790-lager.dts, as Lager does have two
-identical crystal oscillators X2 and X13.
+In general works, and I still keep a working iommu-based display :-)
+I can also see my two vop iommus under /sys/class/iommu now.
 
-Note that X2 is socketed, so it can be changed.
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Links in the devices subdirectory do not work though, see below:
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 59beb8402a36007b..001e6116c47c7c3b 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -292,7 +292,7 @@
- 	x2_clk: x2-clock {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--		clock-frequency = <148500000>;
-+		clock-frequency = <74250000>;
- 	};
- 
- 	x13_clk: x13-clock {
--- 
-2.7.4
+> ---
+>  drivers/iommu/rockchip-iommu.c | 30 ++++++++++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 9afcbf7..36d0890 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -1054,6 +1056,10 @@ static int rk_iommu_add_device(struct device *dev)
+>  	if (ret)
+>  		goto err_remove_device;
+> 
+> +	iommu = rk_iommu_from_dev(dev);
+> +	if (iommu)
+> +		iommu_device_link(&iommu->iommu, dev);
+> +
+
+It looks like the iommu association can very well run before the iommu
+actually probes, via the bus_set_iommu and which happens on my veyron-pinky
+device). Thus iommu is NULL, as platform_set_drvdata in probe hasn't run yet
+and the link is never created.
+
+[    0.034180] iommu: Adding device ff930000.vop to group 0
+[    0.034198] rk_iommu_from_dev: found iommu ff930300.iommu for ff930000.vop with data at   (null)
+[    0.034209] rk_iommu_add_device: rk_iommu_from_dev returned   (null) for ff930000.vop
+[    0.034232] iommu: Adding device ff940000.vop to group 1
+[    0.034247] rk_iommu_from_dev: found iommu ff940300.iommu for ff940000.vop with data at   (null)
+[    0.034258] rk_iommu_add_device: rk_iommu_from_dev returned   (null) for ff940000.vop
+[    0.034342] rk_iommu_probe: set_drvdata for ff930300.iommu at ee2c7a10
+[    0.034411] rk_iommu_probe: set_drvdata for ff940300.iommu at ee2c7c10
+[    7.326395] rk_iommu_from_dev: found iommu ff930300.iommu for ff930000.vop with data at ee2c7a10
+
+
+Not sure what the proper solution is though.
+
+
+Heiko
