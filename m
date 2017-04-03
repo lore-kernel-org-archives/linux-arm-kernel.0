@@ -1,58 +1,145 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 3 Apr 2017 17:31:11 +0800
-Subject: [RFC PATCH v2 1/4] dt-bindings: update the Allwinner GPADC device
- tree binding for H3
-In-Reply-To: <20170403091523.6atl7nq4m2qkpn3d@lukather>
-References: <20170402133304.56824-1-icenowy@aosc.io>
- <20170402133304.56824-2-icenowy@aosc.io>
- <20170403091523.6atl7nq4m2qkpn3d@lukather>
-Message-ID: <e4d50e78-afe7-6107-6d9a-15e4c732d79a@aosc.io>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Mon, 03 Apr 2017 15:05:16 +0530
+Subject: [PATCH v9 04/12] soc: samsung: add exynos chipid driver support
+In-Reply-To: <e054813c-7566-61cc-21cb-733aadd1a9c7@samsung.com>
+References: <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170330131427epcas5p4c3d238022dc75694ad3baa8a1018ea04@epcas5p4.samsung.com>
+ <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
+ <e054813c-7566-61cc-21cb-733aadd1a9c7@samsung.com>
+Message-ID: <f5b08b44-0bb2-e1a3-d834-1640cd37d066@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marek,
+
+On Monday 03 April 2017 01:27 PM, Marek Szyprowski wrote:
+> Hi Pankaj
+> 
+> On 2017-03-30 15:16, Pankaj Dubey wrote:
+>> Exynos SoCs have Chipid, for identification of product IDs and SoC
+>> revisions. This patch intends to provide initialization code for all
+>> these functionalities, at the same time it provides some sysfs entries
+>> for accessing these information to user-space.
+>>
+>> This driver uses existing binding for exynos-chipid.
+
+snip
+
+>> +
+>> +static const struct exynos_soc_id {
+>> +    const char *name;
+>> +    unsigned int id;
+>> +    unsigned int mask;
+>> +} soc_ids[] = {
+>> +    { "EXYNOS3250", 0xE3472000, 0xFFFFF000 },
+>> +    { "EXYNOS4210", 0x43210000, 0xFFFFF000 },
+> 
+> You have once again changed the mask for Exynos4 SoCs, so please add
+> following line to the above array:
+
+Yes, this time I cross-verified from the UM of respective SoC's and
+added it.
+
+> 
+> { "EXYNOS4210", 0x43200000, 0xFFFFF000 },       /* EVT0 revision */
+> 
+> Otherwise Exynos C210 (4210 EVT0) is not properly detected:
+> 
+> soc soc0: Exynos: CPU[UNKNOWN] PRO_ID[0x43200200] REV[0x0] Detected
+
+Thanks for testing, I will add support for this.
+
+> 
+>> +    { "EXYNOS4212", 0x43220000, 0xFFFFF000 },
+>> +    { "EXYNOS4412", 0xE4412000, 0xFFFFF000 },
+>> +    { "EXYNOS5250", 0x43520000, 0xFFFFF000 },
+>> +    { "EXYNOS5260", 0xE5260000, 0xFFFFF000 },
+>> +    { "EXYNOS5410", 0xE5410000, 0xFFFFF000 },
+>> +    { "EXYNOS5420", 0xE5420000, 0xFFFFF000 },
+>> +    { "EXYNOS5440", 0xE5440000, 0xFFFFF000 },
+>> +    { "EXYNOS5800", 0xE5422000, 0xFFFFF000 },
+>> +    { "EXYNOS7420", 0xE7420000, 0xFFFFF000 },
+>> +    { "EXYNOS5433", 0xE5433000, 0xFFFFF000 },
+>> +};
+> 
+> Now the mask is same for all revisions, so you can remove it from the above
+> array and directly use some kind of define in the code.
+
+Yes, I also observed, but somehow I missed to update this part. I will
+change this in next version.
+
+> 
+>> +
+>> +static const char * __init product_id_to_soc_id(unsigned int product_id)
+>> +{
+>> +    int i;
+>> +
+>> +    for (i = 0; i < ARRAY_SIZE(soc_ids); i++)
+>> +        if ((product_id & soc_ids[i].mask) == soc_ids[i].id)
+>> +            return soc_ids[i].name;
+>> +    return "UNKNOWN";
+>> +}
+>> +
+>> +int __init exynos_chipid_early_init(void)
+>> +{
+>> +    struct soc_device_attribute *soc_dev_attr;
+>> +    void __iomem *exynos_chipid_base;
+>> +    struct soc_device *soc_dev;
+>> +    struct device_node *root;
+>> +    struct device_node *np;
+>> +    struct device *dev;
+>> +    u32 product_id;
+>> +    u32 revision;
+>> +
+>> +    /* look up for chipid node */
+>> +    np = of_find_compatible_node(NULL, NULL,
+>> "samsung,exynos4210-chipid");
+>> +    if (!np)
+>> +        return -ENODEV;
+>> +
+>> +    exynos_chipid_base = of_iomap(np, 0);
+>> +    of_node_put(np);
+>> +
+>> +    if (!exynos_chipid_base) {
+>> +        pr_err("%s: failed to map chipid\n", np->name);
+>> +        return -ENOMEM;
+>> +    }
+>> +
+>> +    product_id = readl_relaxed(exynos_chipid_base);
+>> +    revision = product_id & EXYNOS_REV_MASK;
+>> +    iounmap(exynos_chipid_base);
+>> +
+>> +    soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+>> +    if (!soc_dev_attr)
+>> +        return -ENODEV;
+>> +
+>> +    soc_dev_attr->family = "Samsung Exynos";
+>> +
+>> +    root = of_find_node_by_path("/");
+>> +    of_property_read_string(root, "model", &soc_dev_attr->machine);
+>> +    of_node_put(root);
+>> +
+>> +    soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%x", revision);
+>> +    soc_dev_attr->soc_id = product_id_to_soc_id(product_id);
+>> +
+>> +    soc_dev = soc_device_register(soc_dev_attr);
+>> +    if (IS_ERR(soc_dev)) {
+>> +        kfree(soc_dev_attr->revision);
+>> +        kfree_const(soc_dev_attr->soc_id);
+>> +        kfree(soc_dev_attr);
+>> +        return PTR_ERR(soc_dev);
+>> +    }
+>> +    dev = soc_device_to_device(soc_dev);
+>> +
+>> +    dev_info(dev, "Exynos: CPU[%s] PRO_ID[0x%x] REV[0x%x] Detected\n",
+>> +            soc_dev_attr->soc_id, product_id, revision);
+>> +
+>> +    return 0;
+>> +}
+>> +early_initcall(exynos_chipid_early_init);
+> 
+> Best regards
 
 
-? 2017?04?03? 17:15, Maxime Ripard ??:
-> On Sun, Apr 02, 2017 at 09:33:01PM +0800, Icenowy Zheng wrote:
->> Allwinner H3 features a thermal sensor like the one in A33, but has its
->> register re-arranged, the clock divider moved to CCU (originally the
->> clock divider is in ADC) and added a pair of bus clock and reset.
->>
->> Update the binding document to cover H3.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 23 ++++++++++++++++++++--
->>  1 file changed, 21 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> index badff3611a98..7753133ca0ff 100644
->> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
->> @@ -4,12 +4,20 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
->>  and sometimes as a touchscreen controller.
->>
->>  Required properties:
->> -  - compatible: "allwinner,sun8i-a33-ths",
->> +  - compatible: must contain one of the following compatibles:
->> +		- "allwinner,sun8i-a33-ths"
->> +		- "allwinner,sun8i-h3-ths"
->>    - reg: mmio address range of the chip,
->>    - #thermal-sensor-cells: shall be 0,
->>    - #io-channel-cells: shall be 0,
->>
->> -Example:
->> +Required properties for the following compatibles:
->> +		- "allwinner,sun8i-h3-ths"
->> +  - clocks: the bus clock and the input clock of the ADC,
->> +  - clock-names: should be "bus" and "ths",
->
-> I guess mod instead of ths would be more consistent.
-
-In fact I will prefer "sample" here if not "ths", as it's used
-for the sampling, not like other mod clocks, which controls
-all the IP block's logic.
-
->
-> Maxime
->
+Thanks,
+Pankaj Dubey
