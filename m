@@ -1,252 +1,69 @@
-From: hoeun.ryu@gmail.com (Ho-Eun Ryu)
-Date: Mon, 3 Apr 2017 13:17:51 +0900
-Subject: [RFCv2] arm64: support HAVE_ARCH_RARE_WRITE and
- HAVE_ARCH_RARE_WRITE_MEMCPY
-In-Reply-To: <CAKv+Gu_752QP5HGKopic=T3MA9=Vo0wHcRWXe4mN8+jTuxbB1A@mail.gmail.com>
-References: <1490884982-5066-1-git-send-email-hoeun.ryu@gmail.com>
- <CAKv+Gu_752QP5HGKopic=T3MA9=Vo0wHcRWXe4mN8+jTuxbB1A@mail.gmail.com>
-Message-ID: <3C26172F-9A1D-44E3-BDE7-139521B66AC2@gmail.com>
+From: kamensky@cisco.com (Victor Kamensky)
+Date: Sun,  2 Apr 2017 22:45:14 -0700
+Subject: [PATCH] arm64: mm: unaligned access by user-land should be received
+ as SIGBUS
+In-Reply-To: <1491198314-17025-1-git-send-email-kamensky@cisco.com>
+References: <1491198314-17025-1-git-send-email-kamensky@cisco.com>
+Message-ID: <1491198314-17025-2-git-send-email-kamensky@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+After 52d7523 (arm64: mm: allow the kernel to handle alignment faults on
+user accesses) commit user-land accesses that produce unaligned exceptions
+like in case of aarch32 ldm/stm/ldrd/strd instructions operating on
+unaligned memory received by user-land as SIGSEGV. It is wrong, it should
+be reported as SIGBUS as it was before 52d7523 commit.
 
-> On 31 Mar 2017, at 6:25 PM, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> 
-> On 30 March 2017 at 15:39, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
->> This patch might be a part of Kees Cook's rare_write infrastructure series
->> for [1] for arm64 architecture.
->> 
->> This implementation is based on Mark Rutland's suggestions [2], which is
->> that a special userspace mm that maps only __start/end_rodata as RW permi-
->> ssion is prepared during early boot time (paging_init) and __arch_rare_-
->> write_begin() switches to the mm [2].
->> 
->> rare_write_mm address space is added for the special purpose and a page
->> global directory is also prepared for it. The mm remaps __start_rodata ~
->> __end_rodata to rodata_rw_alias_start which starts from TASK_SIZE_64 / 4
->> + kaslr_offset().
->> 
->> It passes LKDTM's rare write test.
->> 
->> [1] : http://www.openwall.com/lists/kernel-hardening/2017/02/27/5
->> [2] : https://lkml.org/lkml/2017/3/29/704
->> 
->> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
->> ---
->> arch/arm64/Kconfig               |   2 +
->> arch/arm64/include/asm/pgtable.h |   4 ++
->> arch/arm64/mm/mmu.c              | 101 +++++++++++++++++++++++++++++++++++++++
->> 3 files changed, 107 insertions(+)
->> 
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index f2b0b52..6e2c592 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -102,6 +102,8 @@ config ARM64
->>        select HAVE_SYSCALL_TRACEPOINTS
->>        select HAVE_KPROBES
->>        select HAVE_KRETPROBES
->> +       select HAVE_ARCH_RARE_WRITE
->> +       select HAVE_ARCH_RARE_WRITE_MEMCPY
->>        select IOMMU_DMA if IOMMU_SUPPORT
->>        select IRQ_DOMAIN
->>        select IRQ_FORCED_THREADING
->> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
->> index c213fdbd0..1514933 100644
->> --- a/arch/arm64/include/asm/pgtable.h
->> +++ b/arch/arm64/include/asm/pgtable.h
->> @@ -741,6 +741,10 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
->> #define kc_vaddr_to_offset(v)  ((v) & ~VA_START)
->> #define kc_offset_to_vaddr(o)  ((o) | VA_START)
->> 
->> +unsigned long __arch_rare_write_begin(void);
->> +unsigned long __arch_rare_write_end(void);
->> +void __arch_rare_write_memcpy(void *dst, const void *src, __kernel_size_t len);
->> +
-> 
-> If these hook into a generic framework, shouldn't these already be
-> declared in a generic header file?
+Changed do_bad_area function to take signal and code parameters, so caller
+can pass them down properly depending on fault type, as SIGSEGV in case of
+do_translation_fault and SIGBUS in case of do_alignment_fault.
 
-the generic header file doesn't declare arch-specific version of api.
+Signed-off-by: Victor Kamensky <kamensky@cisco.com>
+Cc: xe-linux-external at cisco.com
+Fixes: 52d7523 (arm64: mm: allow the kernel to handle alignment faults on user accesses)
+---
+ arch/arm64/mm/fault.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-> 
->> #endif /* !__ASSEMBLY__ */
->> 
->> #endif /* __ASM_PGTABLE_H */
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 91502e3..86b25c9 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -570,6 +570,105 @@ static void __init map_kernel(pgd_t *pgd)
->>        kasan_copy_shadow(pgd);
->> }
->> 
->> +struct mm_struct rare_write_mm = {
-> 
-> static please
-
-OK, add static. 
-
-> 
->> +       .mm_rb          = RB_ROOT,
->> +       .mm_users       = ATOMIC_INIT(2),
->> +       .mm_count       = ATOMIC_INIT(1),
->> +       .mmap_sem       = __RWSEM_INITIALIZER(rare_write_mm.mmap_sem),
->> +       .page_table_lock= __SPIN_LOCK_UNLOCKED(rare_write_mm.page_table_lock),
->> +       .mmlist         = LIST_HEAD_INIT(rare_write_mm.mmlist),
->> +};
->> +
->> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
->> +#include <asm/ptdump.h>
->> +
->> +static struct ptdump_info rare_write_ptdump_info = {
->> +       .mm             = &rare_write_mm,
->> +       .markers        = (struct addr_marker[]){
->> +               { 0,            "rare-write start" },
->> +               { TASK_SIZE_64, "rare-write end" }
->> +       },
->> +       .base_addr      = 0,
->> +};
->> +
->> +static int __init ptdump_init(void)
->> +{
->> +       return ptdump_debugfs_register(&rare_write_ptdump_info,
->> +                                      "rare_write_page_tables");
->> +}
->> +device_initcall(ptdump_init);
->> +
->> +#endif
->> +
->> +__always_inline unsigned long __arch_rare_write_begin(void)
-> 
-> These functions are not called from the same compilation unit, so what
-> do you think __always_inline buys you here?
-
-The first patch of Kee's series ([PATCH 01/11] Introduce rare_write() infrastructure) [1] says some requirements and one of these is the arch-specific helpers should be inline to avoid making them ROP targets.
-
-So I'd make sure the helpers are inline.
-
-[1] : http://www.openwall.com/lists/kernel-hardening/2017/03/29/16
-
-> 
->> +{
->> +       struct mm_struct *mm = &rare_write_mm;
->> +
->> +       preempt_disable();
->> +
->> +       __switch_mm(mm);
->> +
->> +       if (system_uses_ttbr0_pan()) {
->> +               update_saved_ttbr0(current, mm);
->> +               cpu_switch_mm(mm->pgd, mm);
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +__always_inline unsigned long __arch_rare_write_end(void)
->> +{
->> +       struct mm_struct *mm = current->active_mm;
->> +
->> +       __switch_mm(mm);
->> +
->> +       if (system_uses_ttbr0_pan()) {
->> +               cpu_set_reserved_ttbr0();
->> +               if (mm != &init_mm)
->> +                       update_saved_ttbr0(current, mm);
->> +       }
->> +
->> +       preempt_enable_no_resched();
->> +
->> +       return 0;
->> +}
->> +
->> +static unsigned long rodata_rw_alias_start __ro_after_init = TASK_SIZE_64 / 4;
->> +
->> +__always_inline void __arch_rare_write_memcpy(void *dst, const void *src,
->> +                                             __kernel_size_t len)
->> +{
->> +       unsigned long __dst = (unsigned long)dst;
->> +
->> +       __dst -= (unsigned long)__start_rodata;
->> +       __dst += rodata_rw_alias_start;
->> +
->> +       memcpy((void *)__dst, src, len);
->> +}
->> +
->> +void __init rare_write_init(void)
-> 
-> static please
-
-OK, add static. 
-
-> 
->> +{
->> +       phys_addr_t pgd_phys = early_pgtable_alloc();
->> +       pgd_t *pgd = (pgd_t *)__phys_to_virt(pgd_phys);
->> +       phys_addr_t pa_start = __pa_symbol(__start_rodata);
->> +       unsigned long size = __end_rodata - __start_rodata;
->> +
->> +       BUG_ON(!PAGE_ALIGNED(pa_start));
->> +       BUG_ON(!PAGE_ALIGNED(size));
->> +
->> +       rodata_rw_alias_start += kaslr_offset();
->> +
-> 
-> This places the rodata alias at a fixed offset from the original,
-> right, even under KASLR? Given that they are completely independent, I
-> think you can use a random offset here rather than the same offset we
-> use for vmlinux.
-
-What I did here is just to randomize the base of rw alias mapping when kaslr is enabled.
-You're right it's completely independent from kaslr though, I would like to add randomization for rw alias base address by using simple solution in early boot stage.
-
-I' ll think again to achieve randomization or just remove it.
-
-> 
-> 
->> +       BUG_ON(rodata_rw_alias_start + size > TASK_SIZE_64);
->> +
->> +       rare_write_mm.pgd = pgd;
-> 
-> For correctness, you should add a call to mm_init_cpumask() here,
-> although it doesn't matter in practice on arm64.
-
-OK, I'll fix this. 
-
-> 
->> +       init_new_context(NULL, &rare_write_mm);
->> +
->> +       __create_pgd_mapping(pgd,
->> +                            pa_start, rodata_rw_alias_start, size,
->> +                            __pgprot(pgprot_val(PAGE_KERNEL) | PTE_NG),
->> +                            early_pgtable_alloc, debug_pagealloc_enabled());
-> 
-> This needs to be updated after the changes that are now queued in the
-> arm64 tree for v4.12
-> 
-> BTW you can allow page/cont mappings in all cases, no need for the
-> debug_pagealloc_enabled() check
-
-I will rebase this onto the version you mentioned later.
-
-> 
->> +}
->> +
->> /*
->>  * paging_init() sets up the page tables, initialises the zone memory
->>  * maps and sets up the zero page.
->> @@ -603,6 +702,8 @@ void __init paging_init(void)
->>         */
->>        memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
->>                      SWAPPER_DIR_SIZE - PAGE_SIZE);
->> +
->> +       rare_write_init();
->> }
->> 
->> /*
->> --
->> 2.7.4
->> 
-
-Thank you very much for the review
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 4bf899f..204eb58 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -215,7 +215,8 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	force_sig_info(sig, &si, tsk);
+ }
+ 
+-static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *regs)
++static void do_bad_area(unsigned long addr, unsigned int esr,
++			struct pt_regs *regs, int sig, int code)
+ {
+ 	struct task_struct *tsk = current;
+ 	struct mm_struct *mm = tsk->active_mm;
+@@ -225,7 +226,7 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+ 	 * handle this fault with.
+ 	 */
+ 	if (user_mode(regs))
+-		__do_user_fault(tsk, addr, esr, SIGSEGV, SEGV_MAPERR, regs);
++		__do_user_fault(tsk, addr, esr, sig, code, regs);
+ 	else
+ 		__do_kernel_fault(mm, addr, esr, regs);
+ }
+@@ -469,14 +470,14 @@ static int __kprobes do_translation_fault(unsigned long addr,
+ 	if (addr < TASK_SIZE)
+ 		return do_page_fault(addr, esr, regs);
+ 
+-	do_bad_area(addr, esr, regs);
++	do_bad_area(addr, esr, regs, SIGSEGV, SEGV_MAPERR);
+ 	return 0;
+ }
+ 
+ static int do_alignment_fault(unsigned long addr, unsigned int esr,
+ 			      struct pt_regs *regs)
+ {
+-	do_bad_area(addr, esr, regs);
++	do_bad_area(addr, esr, regs, SIGBUS,  BUS_ADRALN);
+ 	return 0;
+ }
+ 
+-- 
+1.9.3
