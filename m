@@ -1,126 +1,38 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 3 Apr 2017 10:45:04 +0100
-Subject: [RFC PATCH v2 00/41] Scalable Vector Extension (SVE) core support
-In-Reply-To: <CAKv+Gu_JUqQu7nUB3MfJrpHL19NTSzGBDmZqLejBx8pNkwSq+A@mail.gmail.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu_JUqQu7nUB3MfJrpHL19NTSzGBDmZqLejBx8pNkwSq+A@mail.gmail.com>
-Message-ID: <20170403094501.GN3750@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Apr 2017 10:49:45 +0100
+Subject: [PATCH v23 09/11] acpi/arm64: Add memory-mapped timer support in
+ GTDT driver
+In-Reply-To: <20170331175105.8370-10-fu.wei@linaro.org>
+References: <20170331175105.8370-1-fu.wei@linaro.org>
+ <20170331175105.8370-10-fu.wei@linaro.org>
+Message-ID: <20170403094944.GC5706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 04:28:16PM +0100, Ard Biesheuvel wrote:
-> On 22 March 2017 at 14:50, Dave Martin <Dave.Martin@arm.com> wrote:
+On Sat, Apr 01, 2017 at 01:51:03AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> Hi Dave,
+> On platforms booting with ACPI, architected memory-mapped timers'
+> configuration data is provided by firmware through the ACPI GTDT
+> static table.
 > 
-> > The Scalable Vector Extension (SVE) [1] is an extension to AArch64 which
-> > adds extra SIMD functionality and supports much larger vectors.
-> >
-> > This series implements core Linux support for SVE.
-> >
-> [...]
-> > KERNEL_MODE_NEON (non-)support
-> > ------------------------------
-> >
-> > "arm64/sve: [BROKEN] Basic support for KERNEL_MODE_NEON" is broken.
-> > There are significant design issues here that need discussion -- see the
-> > commit message for details.
-> >
-> > Options:
-> >
-> >  * Make KERNEL_MODE_NEON a runtime choice, and disable it if SVE is
-> >    present.
-> >
-> >  * Fully SVE-ise the KERNEL_MODE_NEON code: this will involve complexity
-> >    and effort, and may involve unfavourable (and VL-dependent) tradeoffs
-> >    compared with the no-SVE case.
-> >
-> >    We will nonetheless need something like this if there is a desire to
-> >    support "kernel mode SVE" in the future.  The fact that with SVE,
-> >    KERNEL_MODE_NEON brings the cost of kernel-mode SVE but only the
-> >    benefits of kernel-mode NEON argues in favour of this.
-> >
-> >  * Make KERNEL_MODE_NEON a dynamic choice, and have clients run fallback
-> >    C code instead if at runtime on a case-by-case basis, if SVE regs
-> >    would otherwise need saving.
-> >
-> >    This is an interface break, but all NEON-optimised kernel code
-> >    necessarily requires a fallback C implementation to exist anyway, and
-> >    the number of clients is not huge.
-> >
-> > We could go for a stopgap solution that at least works but is suboptimal
-> > for SVE systems (such as the first choice above), and then improve it
-> > later.
-> >
+> The clocksource architected timer kernel driver requires a firmware
+> interface to collect timer configuration and configure its driver.
+> this infrastructure is present for device tree systems, but it is
+> missing on systems booting with ACPI.
 > 
-> Without having looked at the patches in detail yet, let me reiterate
-> my position after we discussed this when this series was sent out the
-> first time around.
+> Implement the kernel infrastructure required to parse the static
+> ACPI GTDT table so that the architected timer clocksource driver can
+> make use of it on systems booting with ACPI, therefore enabling
+> the corresponding timers configuration.
 > 
-> - The primary use case for kernel mode NEON is special purpose
-> instructions, i.e., AES is 20x faster when using the NEON, simply
-> because that is how one accesses the logic gates that implement the
-> AES algorithm. There is nothing SIMD or FP in nature about AES.
-> Compare the CRC extensions, which use scalar registers and
-> instructions. Of course, there are a couple of exceptions in the form
-> of bit-slicing algorithms, but in general, like general SIMD, I don't
-> think it is highly likely that SVE in kernel mode is something we will
-> have a need for in the foreseeable future.
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/arm64/gtdt.c | 146 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/acpi.h      |   1 +
+>  2 files changed, 147 insertions(+)
 
-Certainly there is no immediate need for this, and if we decide we never
-need it then that helps us avoid some complexity.
+We need Lorenzo's ack on this.
 
-My main concern is around the extra save/restore cost, given that if
-the SVE registers are live then save/restore of the full SVE vectors
-is needed even if only FPSIMD is used in the meantime.
-
-> - The current way of repeatedly stacking/unstacking NEON register
-> contents in interrupt context is highly inefficient, given that we are
-> usually interrupting user mode, not kernel mode, and so stacking once
-> and unstacking when returning from the exception (which is how we
-> usually deal with it) would be much better. So changing the current
-> implementation to perform the eager stack/unstack only when a kernel
-> mode NEON call is already in progress is likely to improve our current
-> situation already, regardless of whether such a change is needed to
-> accommodate SVE. Note that to my knowledge, the only in-tree users of
-> kernel mode NEON operate in process context or softirq context, never
-> in hardirq context.
-
-Reassuring.
-
-> Given the above, I think it is perfectly reasonable to conditionally
-> disallow kernel mode NEON in hardirq context. The crypto routines that
-> rely on it can easily be fixed up (I already wrote the patches for
-> that). This would only be necessary on SVE systems, and the reason for
-> doing so is that - given how preserving and restoring the NEON
-> register file blows away the upper SVE part of the registers - whoever
-> arrives at the SVE-aware preserve routine first should be allowed to
-> run to completion. This does require disabling softirqs during the
-> time the preserved NEON state is being manipulated but that does not
-> strike me as a huge price to pay. Note that both restrictions
-> (disallowing kernel mode NEON in hardirq context, and the need to
-> disable softirqs while manipulating the state) could be made runtime
-> dependent on whether we are actually running on an SVE system.
-
-Given that we already bail out of kernel_neon_begin() with a WARN() if
-the hardware lacks FPSIMD, I'm not sure it would be worse to do the same
-if SVE is present.
-
-However, we should probably abstract that check: currently, drivers
-seemt to be using a cocktail of Kconfig dependencies,
-MODULE_DEVICE_TABLE() and runtime hwcap checks in order to deduce
-whether kernel_neon_begin() is safe to use.
-
-Would you be happy with a single API for checking whether
-kernel_neon_begin() works?  Maintaining this check in every driver
-doesn't feel very scalable.
-
-
-This would allow SVE to disable KERNEL_MODE_NEON without having to make
-them conflict in Kconfig.  This wouldn't be our end goal, but it allows
-the dependency to be decoupled while we figure out a better solution.
-
-I'll try and come up with a patch.
-
-Cheers
----Dave
+Will
