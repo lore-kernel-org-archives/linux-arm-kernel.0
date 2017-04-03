@@ -1,35 +1,321 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  3 Apr 2017 12:22:12 +0200
-Subject: [PATCH] multi_v7_defconfig: make Rockchip usb2-phy built-in
-Message-ID: <20170403102212.6802-1-heiko@sntech.de>
+From: w.egorov@phytec.de (Wadim Egorov)
+Date: Mon, 3 Apr 2017 12:23:04 +0200
+Subject: [PATCH 2/3] ARM: dts: rockchip: Add support for PCM-947 carrier board
+In-Reply-To: <1491214985-18331-1-git-send-email-w.egorov@phytec.de>
+References: <1491214985-18331-1-git-send-email-w.egorov@phytec.de>
+Message-ID: <1491214985-18331-2-git-send-email-w.egorov@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy is necessary for the dwc2 controllers driving the usb ports
-on all arm32 Rockchip socs. Both the dwc2 as well as usb downstream
-drivers (mass-storage as well as usb networking) are already built-in,
-so only the phy is missing to allow booting from usb-devices without
-to much hassle.
+Add basic support for the PCM-947 carrier board, a RK3288 based development
+board made by PHYTEC. This board works in a combination with
+the phyCORE-RK3288 System on Module.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Following interfaces and devices are available on the PCM-947 carrier board:
+
+  - 2x UART
+  - micro SDMMC
+  - USB host and USB otg
+  - USB 3503 HSIC hub
+  - Ethernet
+  - 2nd alternative KSZ9031 ethernet phy
+  - Display connectors: PHYTEC LVDS, DDG LVDS, parallel signals, HDMI
+  - Parallel Camera CIF
+  - SGTL5000-32QFN audio codec
+  - 4x LEDs connected via PCA9533
+  - 2 user buttons
+  - Expansion connectors for WiFi and other modules
+  - RTC RV-4162-C7
+  - Resistive touch STMPE811
+  - EEPROM M24C32
+
+Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
 ---
-Ideally to be applied directly to some armsoc defconfig branch.
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/rk3288-phycore-rdk.dts | 263 +++++++++++++++++++++++++++++++
+ 2 files changed, 264 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3288-phycore-rdk.dts
 
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d160b1b6c677..d8812f870d23 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -884,7 +884,7 @@ CONFIG_TI_PIPE3=y
- CONFIG_PHY_BERLIN_USB=y
- CONFIG_PHY_BERLIN_SATA=y
- CONFIG_PHY_ROCKCHIP_DP=m
--CONFIG_PHY_ROCKCHIP_USB=m
-+CONFIG_PHY_ROCKCHIP_USB=y
- CONFIG_PHY_QCOM_APQ8064_SATA=m
- CONFIG_PHY_MIPHY28LP=y
- CONFIG_PHY_RCAR_GEN2=m
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 0118084..8c3cb4d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -692,6 +692,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3288-firefly.dtb \
+ 	rk3288-firefly-reload.dtb \
+ 	rk3288-miqi.dtb \
++	rk3288-phycore-rdk.dtb \
+ 	rk3288-popmetal.dtb \
+ 	rk3288-r89.dtb \
+ 	rk3288-rock2-square.dtb \
+diff --git a/arch/arm/boot/dts/rk3288-phycore-rdk.dts b/arch/arm/boot/dts/rk3288-phycore-rdk.dts
+new file mode 100644
+index 0000000..16a2b96
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-phycore-rdk.dts
+@@ -0,0 +1,263 @@
++/*
++ * Copyright (C) 2017 PHYTEC Messtechnik GmbH
++ * Author: Wadim Egorov <w.egorov@phytec.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/leds/leds-pca9532.h>
++#include "rk3288-phycore-som.dtsi"
++
++/ {
++	model = "Phytec RK3288 PCM-947";
++	compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
++
++	user_buttons: user-buttons {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&user_button_pins>;
++
++		button at 0 {
++			label = "home";
++			linux,code = <KEY_HOME>;
++			gpios = <&gpio8 0 GPIO_ACTIVE_HIGH>;
++			wakeup-source;
++		};
++
++		button at 1 {
++			label = "menu";
++			linux,code = <KEY_MENU>;
++			gpios = <&gpio8 3 GPIO_ACTIVE_HIGH>;
++			wakeup-source;
++		};
++	};
++
++	vcc_host0_5v: usb-host0-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&host0_vbus_drv>;
++		regulator-name = "vcc_host0_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&vdd_in_otg_out>;
++	};
++
++	vcc_host1_5v: usb-host1-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio2 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&host1_vbus_drv>;
++		regulator-name = "vcc_host1_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&vdd_in_otg_out>;
++	};
++
++	vcc_otg_5v: usb-otg-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&otg_vbus_drv>;
++		regulator-name = "vcc_otg_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&vdd_in_otg_out>;
++	};
++};
++
++&gmac {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++
++	stmpe at 44 {
++		compatible = "st,stmpe811";
++		reg = <0x44>;
++	};
++
++	adc at 64 {
++		compatible = "maxim,max1037";
++		reg = <0x64>;
++	};
++
++	i2c_rtc: rtc at 68 {
++		compatible = "rv4162";
++		reg = <0x68>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c_rtc_int>;
++		interrupt-parent = <&gpio5>;
++		interrupts = <10 0>;
++	};
++};
++
++&i2c3 {
++	status = "okay";
++
++	i2c_eeprom_cb: eeprom at 51 {
++		compatible = "atmel,24c32";
++		reg = <0x51>;
++		pagesize = <32>;
++	};
++};
++
++&i2c4 {
++	status = "okay";
++
++	/* PCA9533 - 4-bit LED dimmer */
++	leddim: leddimmer at 62 {
++		compatible = "nxp,pca9533";
++		reg = <0x62>;
++
++		led1 {
++			label = "red:user1";
++			linux,default-trigger = "none";
++			type = <PCA9532_TYPE_LED>;
++		};
++
++		led2 {
++			label = "green:user2";
++			linux,default-trigger = "none";
++			type = <PCA9532_TYPE_LED>;
++		};
++
++		led3 {
++			label = "blue:user3";
++			linux,default-trigger = "none";
++			type = <PCA9532_TYPE_LED>;
++		};
++
++		led4 {
++			label = "red:user4";
++			linux,default-trigger = "none";
++			type = <PCA9532_TYPE_LED>;
++		};
++	};
++};
++
++&i2c5 {
++	status = "okay";
++};
++
++&pinctrl {
++	pcfg_pull_up_drv_12ma: pcfg-pull-up-drv-12ma {
++		bias-pull-up;
++		drive-strength = <12>;
++	};
++
++	buttons {
++		user_button_pins: user-button-pins {
++			/* button 1 */
++			rockchip,pins = <8 3 RK_FUNC_GPIO &pcfg_pull_up>,
++			/* button 2 */
++					<8 0 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	rv4162 {
++		i2c_rtc_int: i2c-rtc-int {
++			rockchip,pins = <5 10 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	sdmmc {
++		/*
++		 * Default drive strength isn't enough to achieve even
++		 * high-speed mode on pcm-947 board so bump up to 12 mA.
++		 */
++		sdmmc_bus4: sdmmc-bus4 {
++			rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
++					<6 17 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
++					<6 18 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
++					<6 19 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
++		};
++
++		sdmmc_clk: sdmmc-clk {
++			rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none_12ma>;
++		};
++
++		sdmmc_cmd: sdmmc-cmd {
++			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
++		};
++
++		sdmmc_pwr: sdmmc-pwr {
++			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	touchscreen {
++		ts_irq_pin: ts-irq-pin {
++			rockchip,pins = <5 15 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb_host {
++		host0_vbus_drv: host0-vbus-drv {
++			rockchip,pins = <2 13 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		host1_vbus_drv: host1-vbus-drv {
++			rockchip,pins = <2 0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb_otg {
++		otg_vbus_drv: otg-vbus-drv {
++			rockchip,pins = <2 12 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&sdmmc {
++	bus-width = <4>;
++	cap-mmc-highspeed;
++	cap-sd-highspeed;
++	card-detect-delay = <200>;
++	disable-wp;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
++	vmmc-supply = <&vdd_io_sd>;
++	vqmmc-supply = <&vdd_io_sd>;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
++
++&usb_host0_ehci {
++	status = "okay";
++};
++
++&usb_host1 {
++	status = "okay";
++};
++
++&usb_otg {
++	status = "okay";
++};
 -- 
-2.11.0
+1.9.1
