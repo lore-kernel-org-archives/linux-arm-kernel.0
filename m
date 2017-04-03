@@ -1,56 +1,69 @@
-From: kilobyte@angband.pl (Adam Borowski)
-Date: Mon, 3 Apr 2017 22:32:04 +0200
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <alpine.LFD.2.20.1704031603160.1847@knanqh.ubzr>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <CAHp75VdgEcyXPxENS87nHLtCEHqB5Z-1_T_W1opSiKqqNpeU2A@mail.gmail.com>
- <20170403153103.GB22592@two.firstfloor.org>
- <20170403195756.xitzpei2knmwt3sx@angband.pl>
- <alpine.LFD.2.20.1704031603160.1847@knanqh.ubzr>
-Message-ID: <20170403203204.2guyy63fkqwxpq4o@angband.pl>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon,  3 Apr 2017 13:42:48 -0700
+Subject: [PATCH] ARM: dts: imx: ventana: fix DTC warnings
+Message-ID: <1491252168-7934-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 04:09:38PM -0400, Nicolas Pitre wrote:
-> On Mon, 3 Apr 2017, Adam Borowski wrote:
-> 
-> > On Mon, Apr 03, 2017 at 08:31:03AM -0700, Andi Kleen wrote:
-> > > Except for that (and possibly VT) it is unlikely that people really
-> > > rely on the obsolete terminal features from the 70ies. So it's a kind
-> > > of cleanup.
-> > 
-> > But... but... but what shall we do without OLCUC?!?
-> > 
-> > I guess sending these features to the pasture would be nice even in
-> > mainstream TTY.  Probably even without a Kconfig option to restore them.
-> 
-> Thing is... those arcane features don't take much code at all:
-> 
-> 		if (O_OLCUC(tty))
-> 			c = toupper(c);
-> 
-> That's it. I didn't make the minitty code 5x smaller just by omitting 
-> those.  ;-)
+Remove the sky2 ethernet device node from the pcie controller which was
+invalid to begin with.
 
-Except, those two lines have two bugs:
-* it mangles most non-ASCII (kernel's toupper() hard-codes ISO-8859-1
-  which no one uses anymore)
-* it mangles a number of ANSI codes, making them unusable on any vt100ish
-  terminal (ie, any post-1980)
+The original intent was to allow the bootloader to populate the MAC via
+dt but this requires the PCI bus topology to be complete in dt as well
+and as these boards have an expansion connector that topology is dynamic
+and can't be represented here.
 
-I just happened to send an April Fools pull request
-(https://github.com/kilobyte/linux.git runes) in which the first commit
-fixes these:
-https://github.com/kilobyte/linux/commit/268cde7c6dde54fcbc81df68d66b2389d77d01f2
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6q-gw5400-a.dts  | 4 ----
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 4 ----
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 4 ----
+ 3 files changed, 12 deletions(-)
 
-Even though it's a real fix (unlike the subsequent fun), guess why I'm not
-sending it to Greg and Jiri...
-
+diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+index 8e84713..5b066c0 100644
+--- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
++++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+@@ -347,10 +347,6 @@
+ &pcie {
+ 	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+-
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
+-	};
+ };
+ 
+ &ssi1 {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index a208e7e..420a2f6 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -342,10 +342,6 @@
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+-
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
+-	};
+ };
+ 
+ &pwm2 {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 968fda9..e742153 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -379,10 +379,6 @@
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+-
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
+-	};
+ };
+ 
+ &pwm1 {
 -- 
-??????? Meow!
-???????
-??????? Collisions shmolisions, let's see them find a collision or second
-??????? preimage for double rot13!
+2.7.4
