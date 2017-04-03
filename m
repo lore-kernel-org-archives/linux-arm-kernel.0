@@ -1,55 +1,68 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 3 Apr 2017 15:25:58 +0100
-Subject: [PATCH v3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-In-Reply-To: <20170403142211.GE18905@leverpostej>
-References: <1491228763-23450-1-git-send-email-suzuki.poulose@arm.com>
- <20170403142211.GE18905@leverpostej>
-Message-ID: <9b7c4903-9da1-4b08-a288-3a3bd0ae551c@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Apr 2017 15:28:11 +0100
+Subject: [RFC PATCH v2 2/4] iio: adc: sun4i-gpadc-iio: rename
+ A23/A33-specified registers to contain A23
+In-Reply-To: <20170402133304.56824-3-icenowy@aosc.io>
+References: <20170402133304.56824-1-icenowy@aosc.io>
+ <20170402133304.56824-3-icenowy@aosc.io>
+Message-ID: <20170403142811.bdbc6mspwofms6uo@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 15:22, Mark Rutland wrote:
-> Hi,
->
-> On Mon, Apr 03, 2017 at 03:12:43PM +0100, Suzuki K Poulose wrote:
->> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
->> unmap_stage2_range() on the entire memory range for the guest. This could
->> cause problems with other callers (e.g, munmap on a memslot) trying to
->> unmap a range. And since we have to unmap the entire Guest memory range
->> holding a spinlock, make sure we yield the lock if necessary, after we
->> unmap each PUD range.
->>
->> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
->> Cc: stable at vger.kernel.org # v3.10+
->> Cc: Paolo Bonzini <pbonzin@redhat.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> [ Avoid vCPU starvation and lockup detector warnings ]
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>
->> ---
->> Changes since V2:
->>  - Restrict kvm->mmu_lock relaxation to bigger ranges in unmap_stage2_range(),
->>    to avoid possible issues like [0]
->>
->>  [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/498210.html
->
-> Sorry if I'm being thick, but how does restricting this to a larger
-> range help with the "sleeping function called from invalid context"
-> issue?
->
-> Surely that just makes it rarer?
+On Sun, 02 Apr 2017, Icenowy Zheng wrote:
 
-The issue in [0] arises when we try to unmap a page at stage2, while holding a
-different spinlock and we try to do cond_resched_lock(), thinking we might
-spend too much time holding the lock. With this patch, we don't try to relax
-the lock if we are dealing with smaller sizes and hence avoids cond_resched_lock().
-So in effect it tries to avoid the cond_resched_lock() when we could finish
-the operation soon enough.
+> As the H3 SoC, which is also in sun8i line, has totally different
+> register map for the thermal sensor (a cut down version of GPADC), we
+> should rename A23/A33-specified registers to contain A23, in order to
+> prevent obfuscation with H3 registers. Currently these registers are
+> only prefixed "SUN8I", not "SUN8I_A23".
+> 
+> Add "_A23" after "SUN8I" on the register names.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Splited from RFC v1's 2/3.
+> 
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 2 +-
+>  include/linux/mfd/sun4i-gpadc.h   | 6 +++---
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 
-Hope that helps.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Suzuki
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 74705aa37982..01cf806f47f8 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -88,7 +88,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.temp_offset = -1662,
+>  	.temp_scale = 162,
+> -	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
+> +	.tp_mode_en = SUN8I_A23_GPADC_CTRL1_CHOP_TEMP_EN,
+>  };
+>  
+>  struct sun4i_gpadc_iio {
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 139872c2e0fe..d31d962bb7d8 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -38,9 +38,9 @@
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
+>  
+> -/* TP_CTRL1 bits for sun8i SoCs */
+> -#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
+> -#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
+> +/* TP_CTRL1 bits for sun8i A23/A33 SoCs */
+> +#define SUN8I_A23_GPADC_CTRL1_CHOP_TEMP_EN		BIT(8)
+> +#define SUN8I_A23_GPADC_CTRL1_GPADC_CALI_EN		BIT(7)
+>  
+>  #define SUN4I_GPADC_CTRL2				0x08
+>  
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
