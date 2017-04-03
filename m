@@ -1,62 +1,83 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Mon, 3 Apr 2017 08:16:50 +0200
-Subject: stmmac still supporting spear600 ?
-In-Reply-To: <20170402233028.60acf612@free-electrons.com>
-References: <20170309093412.33c0277d@free-electrons.com>
- <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
- <20170309103236.3e16304f@free-electrons.com>
- <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
- <20170321155054.2f4cb921@free-electrons.com>
- <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
- <20170402233028.60acf612@free-electrons.com>
-Message-ID: <0468e2fb-5a7d-97ec-c51c-2436a13dda69@st.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 3 Apr 2017 15:28:43 +0900
+Subject: [PATCH] arm64: dts: uniphier: add input-delay properties to
+ Cadence eMMC node
+In-Reply-To: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1490934045-18874-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNARtKO-a7tX5U2NGAw707uSLcfxABo1yt44QQfE2go7EmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas
+MTD developers,
+Please ignore this patch.
 
-I tested the SMSC on other platform (+ stmmac), not on SPEAr.
+I accidentally sent this patch to a wrong ML.
+Sorry for the noise.
 
-ok for reset, keep the radar on clock. Hmm, can you attach a piece of 
-log file to see the failure?
 
-Regards
-Peppe
 
-On 4/2/2017 11:30 PM, Thomas Petazzoni wrote:
-> Hello,
+
+2017-03-31 13:20 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Since commit a04e2b383401 ("mmc: sdhci-cadence: Update PHY delay
+> configuration"), PHY parameters must be specified by DT.
 >
-> On Thu, 23 Mar 2017 11:33:23 +0100, Giuseppe CAVALLARO wrote:
+> The hard-coded settings have been converted as follows:
+> - SDHCI_CDNS_PHY_DLY_SD_DEFAULT -> cdns,phy-input-delay-legacy
+> - SDHCI_CDNS_PHY_DLY_EMMC_SDR   -> cdns,phy-input-delay-mmc-highspeed
+> - SDHCI_CDNS_PHY_DLY_EMMC_DDR   -> cdns,phy-input-delay-mmc-ddr
 >
->>> Further research has revealed that everything is working fine on a
->>> platform with a Gigabit PHY connected via GMII.
->>>
->>> However, on a different platform (which I'm using) with a 10/100 PHY
->>> connected via MII, DMA_RESET never clears, and networking doesn't work.
->>> The SMSC PHY LAN8700 is also supposed to be providing the clock through
->>> its TX_CLK pin. I double checked, and both the MAC and PHY are in MII
->>> mode, but still no luck so far.
->>>
->>> Of course, if you have any suggestion or hint, I'm all ears :)
->> I can just you to keep the focus on clock configuration. I tested the
->> SMSC PHY LAN8700
->> w/o any issues on several platform.  In MII both rx/tx_clk are provided
->> by PHY and if you
->> have an external oscillator this should be safe enough, indeed.
->> Another check you can do is about the reset time! Maybe you need to
->> change something
->> when reset the SMSC transceiver, try to increase the delay (if you use
->> GPIO to reset it).
-> On which platform did you test with the LAN8700 PHY ? Was it on a
-> SPEAr600 based platform ?
+> The following have not been moved:
+> - SDHCI_CDNS_PHY_DLY_SD_HS
+>    this is unneeded in the eMMC configuration
+> - SDHCI_CDNS_PHY_DLY_EMMC_LEGACY
+>    this is never enabled by the driver as it is covered by
+>    SDHCI_CDNS_PHY_DLY_SD_DEFAULT
 >
-> If you tested on SPEAr600, what is the GMAC clock configuration (i.e
-> the value of the GMAC_CFG_CTR and GMAC_CFG_SYNT registers) ?
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 >
-> Regarding the PHY reset time, our PHY reset pin is not connected to a
-> GPIO, but to the system reset logic, so Linux cannot reset the PHY with
-> a GPIO.
+>  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 3 +++
+>  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 3 +++
+>  2 files changed, 6 insertions(+)
 >
-> Thanks!
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+> index 5dc5124..b6ebdc9 100644
+> --- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+> @@ -310,6 +310,9 @@
+>                         bus-width = <8>;
+>                         mmc-ddr-1_8v;
+>                         mmc-hs200-1_8v;
+> +                       cdns,phy-input-delay-legacy = <4>;
+> +                       cdns,phy-input-delay-mmc-highspeed = <2>;
+> +                       cdns,phy-input-delay-mmc-ddr = <3>;
+>                 };
 >
-> Thomas
+>                 usb0: usb at 5a800100 {
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+> index 6c9a72d..0ab6c2e 100644
+> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+> @@ -394,6 +394,9 @@
+>                         bus-width = <8>;
+>                         mmc-ddr-1_8v;
+>                         mmc-hs200-1_8v;
+> +                       cdns,phy-input-delay-legacy = <4>;
+> +                       cdns,phy-input-delay-mmc-highspeed = <2>;
+> +                       cdns,phy-input-delay-mmc-ddr = <3>;
+>                 };
+>
+>                 sd: sdhc at 5a400000 {
+> --
+> 2.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
