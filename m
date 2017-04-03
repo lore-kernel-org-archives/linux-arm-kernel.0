@@ -1,79 +1,48 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 3 Apr 2017 17:51:39 +0300
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <20170330165448.GF10760@atomide.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <20170317152536.GT20572@atomide.com>
- <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
- <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
- <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
- <20170330165448.GF10760@atomide.com>
-Message-ID: <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 3 Apr 2017 16:53:37 +0200
+Subject: [PATCH v2 0/7] Add support for triggered buffer mode to STM32 ADC
+In-Reply-To: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
+References: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <63602dad-7640-1112-42aa-c4219d490041@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/17 19:54, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
->> On 23/03/17 19:02, Tony Lindgren wrote:
->>> * Tony Lindgren <tony@atomide.com> [170322 18:03]:
->>>> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
->>>>> On 17/03/17 17:25, Tony Lindgren wrote:
->>>>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
->>>>>>> Any additional testing on omap4 welcome as this series basically
->>>>>>> tweaks every possible peripheral clock on the SoC.
->>>>>>
->>>>>> Without the last patch in this series, booting fails for me:
->>>>>>
->>>>>> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
->>>>>> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
->>>>>>
->>>>>> Care to check that booting keeps working for each patch in the
->>>>>> series to avoid breaking git bisect for booting?
->>>>>
->>>>> Hmm, I think patch 8+9 need to be squashed then. I can double check this
->>>>> next week though.
->>>>
->>>> Also looks like with this set merged HDMI stops working on
->>>> omap4 with:
->>>>
->>>> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
->>>
->>> Forgot to mention that's with omapdrm with encoder-tpd12s015 and
->>> encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
->>> dmesg output in case that provides more clues:
->>>
->>> [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
->>> [   91.078308] [drm] Enabling DMM ywrap scrolling
->>> [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
->>> [   91.107879] omapdss HDMI error: failed to power on device
->>> [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
->>> [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>> [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>> [   91.620300] Console: switching to colour frame buffer device 128x48
->>> [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
->>> [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
->>> [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
->>> [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>> [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>>
->>> Regards,
->>>
->>> Tony
->>>
->>
->> Can you try with this additional hwmod data tweak in place? Apply this on
->> top of the existing series.
->
-> Does not seem to help, still get the same errors. But maybe I'm doing
-> something wrong as the patch did not apply and I applied it manually.
->
-> Regards,
->
-> Tony
->
+Hi
 
-Hmm ok, can you provide some brief instructions how to test what you are 
-doing with the HDMI? Just connect it to some external monitor? My 
-monitor has a spare HDMI connector so I could try it out.
+On 01/26/2017 03:28 PM, Fabrice Gasnier wrote:
+> The following patches add support for triggered buffer mode.
+> These are based on top of "Add PWM and IIO timer drivers for STM32"
+> series. Reference:
+> https://lkml.org/lkml/2017/1/20/116
+>
+> STM32 ADC, can use either interrupts or DMA to collect data.
+> Either timer trigger output (TRGO) or PWM can be used as trigger source.
+> This patchset has been tested on STM32F429 eval board.
+>
+...
+> Fabrice Gasnier (7):
+>   iio: adc: stm32: add support for triggered buffer mode
+>   iio: adc: stm32: Enable use of stm32 timer triggers
+>   iio: adc: stm32: add trigger polarity extended attribute
+>   Documentation: dt: iio: stm32-adc: optional dma support
+>   iio: adc: stm32: add optional dma support
+>   ARM: dts: stm32: Enable dma by default on stm32f4 adc
+>   ARM: dts: stm32: Enable pwm1 and pwm3 on stm32f429i-eval
 
--Tero
+Patches 6 & 7 (DT) applied on stm32-dt-for-v4.12
+
+Regards
+Alex
+
+>
+>  Documentation/ABI/testing/sysfs-bus-iio-adc-stm32  |  18 +
+>  .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   7 +
+>  arch/arm/boot/dts/stm32429i-eval.dts               |  28 +
+>  arch/arm/boot/dts/stm32f429.dtsi                   |   6 +
+>  drivers/iio/adc/Kconfig                            |   5 +
+>  drivers/iio/adc/stm32-adc-core.c                   |   1 +
+>  drivers/iio/adc/stm32-adc-core.h                   |   2 +
+>  drivers/iio/adc/stm32-adc.c                        | 633 ++++++++++++++++++++-
+>  8 files changed, 676 insertions(+), 24 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-adc-stm32
+>
