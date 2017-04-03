@@ -1,100 +1,79 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 3 Apr 2017 16:51:24 +0200
-Subject: [PATCH RFC] serial: imx: support an enable-gpio
-In-Reply-To: <1468400495-10471-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1468400495-10471-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170403145124.mdm5bs7oggvs7xua@pengutronix.de>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 3 Apr 2017 17:51:39 +0300
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170330165448.GF10760@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+Message-ID: <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 11:01:35AM +0200, Uwe Kleine-K?nig wrote:
-> A part of my machine looks as follows (simplified):
-> 
-> ,------------------------.
-> | ,---------.            |
-> | |  imx25  o--RX----?---o---
-> | |         o--GPIO--'   |
-> | `---------'            |
-> `------------------------'
-> 
-> that is, there is a driver on the RX line that must be enabled before
-> the UART can be used. (That is necessary because the default mux of the
-> RX pad after reset is an output.)
-> 
-> To represent this in the device tree I do:
-> 
-> 	pinctrl_uart5: uart5 {
-> 		fsl,pins = <
-> 			...
-> 			MX25_PAD_LBA__UART5_RXD		0x00000000
-> 			MX25_PAD_CS5__GPIO_3_21		0x00002001
-> 			...
-> 	};
-> 
-> 	&uart5 {
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&pinctrl_uart5>;
-> 
-> 		enable-gpio = <&gpio3 21 GPIO_ACTIVE_LOW>;
-> 		...
-> 	};
-> 
-> This way it's ensured that the gpio is only enabled when the LBA pad is
-> muxed as RX (together with the bootloader that sets the GPIO high).
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> I'm not sure about the naming. Do you have a better suggestion how to handle
-> this situation?
-> 
-> Best regards
-> Uwe
-> 
->  drivers/tty/serial/imx.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 0df2b1c091ae..56eaa18aa5be 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -39,6 +39,7 @@
->  #include <linux/of_device.h>
->  #include <linux/io.h>
->  #include <linux/dma-mapping.h>
-> +#include <linux/gpio/consumer.h>
->  
->  #include <asm/irq.h>
->  #include <linux/platform_data/serial-imx.h>
-> @@ -1987,7 +1988,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
->  	if (of_get_property(np, "fsl,dte-mode", NULL))
->  		sport->dte_mode = 1;
->  
-> -	return 0;
-> +	ret = PTR_ERR_OR_ZERO(devm_gpiod_get_optional(&pdev->dev, "enable", GPIOD_OUT_HIGH));
-> +	dev_info(&pdev->dev, "Tralala: ret = %d\n", ret);
+On 30/03/17 19:54, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
+>> On 23/03/17 19:02, Tony Lindgren wrote:
+>>> * Tony Lindgren <tony@atomide.com> [170322 18:03]:
+>>>> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+>>>>> On 17/03/17 17:25, Tony Lindgren wrote:
+>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>>>>>>> Any additional testing on omap4 welcome as this series basically
+>>>>>>> tweaks every possible peripheral clock on the SoC.
+>>>>>>
+>>>>>> Without the last patch in this series, booting fails for me:
+>>>>>>
+>>>>>> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+>>>>>> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+>>>>>>
+>>>>>> Care to check that booting keeps working for each patch in the
+>>>>>> series to avoid breaking git bisect for booting?
+>>>>>
+>>>>> Hmm, I think patch 8+9 need to be squashed then. I can double check this
+>>>>> next week though.
+>>>>
+>>>> Also looks like with this set merged HDMI stops working on
+>>>> omap4 with:
+>>>>
+>>>> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>
+>>> Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+>>> encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+>>> dmesg output in case that provides more clues:
+>>>
+>>> [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+>>> [   91.078308] [drm] Enabling DMM ywrap scrolling
+>>> [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>> [   91.107879] omapdss HDMI error: failed to power on device
+>>> [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+>>> [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>> [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>> [   91.620300] Console: switching to colour frame buffer device 128x48
+>>> [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+>>> [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+>>> [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+>>> [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>> [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>
+>>> Regards,
+>>>
+>>> Tony
+>>>
+>>
+>> Can you try with this additional hwmod data tweak in place? Apply this on
+>> top of the existing series.
+>
+> Does not seem to help, still get the same errors. But maybe I'm doing
+> something wrong as the patch did not apply and I applied it manually.
+>
+> Regards,
+>
+> Tony
+>
 
-That line is a debug left over and obviously should be removed. Other
-than taht I still wonder if this patch is good enough for mainline as it
-solves a real problem.
+Hmm ok, can you provide some brief instructions how to test what you are 
+doing with the HDMI? Just connect it to some external monitor? My 
+monitor has a spare HDMI connector so I could try it out.
 
-Best regards
-Uwe
-
-> +	return ret;
->  }
->  #else
->  static inline int serial_imx_probe_dt(struct imx_port *sport,
-> -- 
-> 2.8.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Tero
