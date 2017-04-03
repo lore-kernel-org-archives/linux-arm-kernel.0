@@ -1,72 +1,32 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 3 Apr 2017 11:57:34 +0100
-Subject: Tegra baseline test results for v4.11-rc5
-Message-ID: <c48204b1-e30e-00c4-8352-ae81e0fb7219@nvidia.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 3 Apr 2017 13:07:58 +0200
+Subject: [PATCH] iommu/rockchip: Make use of 'struct iommu_device'
+In-Reply-To: <1785458.LaVlbOJ67B@diego>
+References: <1490970624-19981-1-git-send-email-joro@8bytes.org>
+ <1785458.LaVlbOJ67B@diego>
+Message-ID: <20170403110758.GB4683@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.11-rc5.
-Logs and other details at:
+Hey Heiko,
 
-    https://nvtb.github.io//linux/test_v4.11-rc5/20170402180103/
+On Mon, Apr 03, 2017 at 11:56:59AM +0200, Heiko St?bner wrote:
+> In general works, and I still keep a working iommu-based display :-)
+> I can also see my two vop iommus under /sys/class/iommu now.
 
+Great, thanks for testing that patch!
 
-Test summary
-------------
+> Links in the devices subdirectory do not work though, see below:
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Okay, thats bad, but I think its nothing we should work around right
+now. My goal with this work is to have a per-iommu check-device
+call-back to bind devices to iommus in the core code.
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+This will also solve the probe-ordering issue and we are fine again. We
+just call check-device then for every device on the bus that has no
+iommu already when the iommu is registered and create the links at that
+time.
 
 
-vmlinux object size
-(delta in bytes from test_v4.11-rc4 (c02ed2e75ef4c74e41e421acb4ef1494671585e8)):
-   text     data      bss    total  kernel
- +10624    +2080        0   +12704  defconfig
-   +488     +152        0     +640  multi_v7_defconfig
-   +100       -8        0      +92  tegra_defconfig
 
-
-Boot-time memory difference
-(delta in bytes from test_v4.11-rc4 (c02ed2e75ef4c74e41e421acb4ef1494671585e8))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
-
---
-nvpublic
+	Joerg
