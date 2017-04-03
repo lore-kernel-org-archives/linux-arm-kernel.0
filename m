@@ -1,51 +1,66 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 4 Apr 2017 07:40:58 +1000
-Subject: Updating sunxi tree in linux-next
-In-Reply-To: <20170331075729.gsfewphm3zd45vwt@lukather>
-References: <20170331075729.gsfewphm3zd45vwt@lukather>
-Message-ID: <20170404074049.542a0e9c@canb.auug.org.au>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 04 Apr 2017 00:54:43 +0200
+Subject: [PATCH v2 0/5] Add ARM Mali Midgard device tree bindings and gpu
+ node for rk3288
+In-Reply-To: <cover.1491118230.git.guillaume.tucker@collabora.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <1587425.dbD1NUOEYx@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Guillaume,
 
-On Fri, 31 Mar 2017 09:57:29 +0200 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->
-> We've switched from my personal git tree for the Allwinner sunxi
-> development to a shared tree:
-> git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
+please keep in mind to also add me (as Rockchip maintainer) as recipient in 
+further submissions - as also listed by scripts/get_maintainer.pl.
+
+
+Thanks
+Heiko
+
+Am Sonntag, 2. April 2017, 08:59:43 CEST schrieb Guillaume Tucker:
+> The ARM Mali Midgard GPU kernel driver is only available
+> out-of-tree and is not going to be merged in its current form.
+> However, it would be useful to have its device tree bindings
+> merged.  In particular, this would enable distributions to create
+> working driver packages (dkms...) without having to patch the
+> kernel.
 > 
-> The branch to be included in linux-next will still be called
-> sunxi/for-next as it used to be, and it will still go through the
-> arm-soc tree to reach Linux.
+> The bindings for the earlier Mali Utgard GPU family have already
+> been merged, so this is essentially the same scenario but for
+> newer GPUs (Mali-T604 ~ Mali-T880).
 > 
-> However, I'll still have the patches for our DRM drivers on my
-> personal git repo:
-> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
+> This series of patches first imports the bindings from the latest
+> driver release with some clean-up then adds a gpu node for the
+> rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
+> Firefly, Veyron Minnie and Jerry boards board using Mali kernel
+> driver r16p0 and r12p0 user-space binary.
 > 
-> Could you add the branch sunxi-drm/for-next to the list of branches
-> you merge?
-
-Added and changed from today.
-
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgement of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-        Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+> Changes since v1:
+> - enabled gpu on rk3288-veyron boards
+> 
+> Enric Balletbo i Serra (1):
+>   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-veyron
+> 
+> Guillaume Tucker (4):
+>   dt-bindings: gpu: add bindings for the ARM Mali Midgard GPU
+>   ARM: dts: rockchip: add ARM Mali GPU node for rk3288
+>   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-rock2-som
+>   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-firefly
+> 
+>  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53
+> ++++++++++++++++++++++ arch/arm/boot/dts/rk3288-firefly.dtsi              |
+>  5 ++
+>  arch/arm/boot/dts/rk3288-rock2-som.dtsi            |  5 ++
+>  arch/arm/boot/dts/rk3288-veyron.dtsi               |  5 ++
+>  arch/arm/boot/dts/rk3288.dtsi                      | 23 ++++++++++
+>  5 files changed, 91 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> 
+> --
+> 2.11.0
+> 
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
