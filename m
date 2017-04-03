@@ -1,58 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 13:19:54 +0200
-Subject: [PATCH v3 04/20] ARM: sun8i: dt: Add DT bindings documentation
- for Allwinner syscon
-In-Reply-To: <20170403091444.29876-5-clabbe.montjoie@gmail.com>
-References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
- <20170403091444.29876-5-clabbe.montjoie@gmail.com>
-Message-ID: <20170403111954.tolvlw7klswaxkl4@lukather>
+From: aniruddhab@nvidia.com (Aniruddha Banerjee)
+Date: Mon, 3 Apr 2017 11:19:54 +0000
+Subject: [PATCH 1/1] arm64: tegra: fix PPI interrupt flag
+Message-ID: <7fad40fbcaa94c1ea46328e78b46443b@bgmail102.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 11:14:28AM +0200, Corentin Labbe wrote:
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> new file mode 100644
-> index 0000000..9f5f1f5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> @@ -0,0 +1,19 @@
-> +* Allwinner sun8i system controller
-> +
-> +This file describes the bindings for the system controller present in
-> +Allwinner SoC H3, A83T and A64.
-> +The principal function of this syscon is to control EMAC PHY choice and
-> +config.
-> +
-> +Required properties for the system controller:
-> +- reg: address and length of the register for the device.
-> +- compatible: should be "syscon" and one of the following string:
-> +		"allwinner,sun8i-h3-system-controller"
-> +		"allwinner,sun8i-a64-system-controller"
-> +		"allwinner,sun8i-a83t-system-controller"
-> +
-> +Example:
-> +syscon: syscon at 01c00000 {
-> +	compatible = "syscon", "allwinner,sun8i-h3-system-controller";
+The interrupt flag for PPI should not be set to any value, since the
+register is read-only. Fix the flags for the PPI interrupts to
+IRQ_TYPE_NONE, so that there is no write to the read-only register.
 
-The syntax is the more specific first, so your compatibles should be
-the other way around.
+Signed-off-by: Aniruddha Banerjee <aniruddhab@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra132.dtsi | 8 ++++----
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 8 ++++----
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi | 8 ++++----
+ 3 files changed, 12 insertions(+), 12 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm64/boot/dts/nvidia/tegra132.dtsi b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+index 3f3a46a4bd01..219fb3c6a273 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+@@ -1093,13 +1093,13 @@
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 14
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 11
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 10
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>;
+ 		interrupt-parent = <&gic>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+index 62fa85ae0271..e602299f7694 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+@@ -390,13 +390,13 @@
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 14
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 11
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 10
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>;
+ 		interrupt-parent = <&gic>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+index 2f832df29da8..6f3060b40a40 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+@@ -1214,13 +1214,13 @@
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 14
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 11
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>,
+ 			     <GIC_PPI 10
+-				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_NONE)>;
+ 		interrupt-parent = <&gic>;
+ 	};
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/e7c8e1d7/attachment.sig>
+2.11.0
