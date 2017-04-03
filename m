@@ -1,60 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Apr 2017 13:45:50 +0200
-Subject: Updating sunxi tree in linux-next
-In-Reply-To: <20170403095603.43cef189@canb.auug.org.au>
-References: <20170331075729.gsfewphm3zd45vwt@lukather>
- <20170403095603.43cef189@canb.auug.org.au>
-Message-ID: <20170403114550.wsubsqgacqdaaqkg@lukather>
+Date: Mon, 3 Apr 2017 13:48:19 +0200
+Subject: [PATCH] ARM: sun7i: Cubietruck: enable ACIN und USB power supply
+ subnode
+In-Reply-To: <20170403091245.9766-1-alex@asyring.de>
+References: <20170403091245.9766-1-alex@asyring.de>
+Message-ID: <20170403114819.sb7pablxrb3qpsar@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi,
 
-On Mon, Apr 03, 2017 at 09:56:12AM +1000, Stephen Rothwell wrote:
-> Hi Maxime,
+On Mon, Apr 03, 2017 at 11:12:45AM +0200, Alexander Syring wrote:
+> The Cubietruck has an AXP209 PMIC and can be power-supplied by ACIN via
+>  the CHG-IN pin or by USB.
 > 
-> On Fri, 31 Mar 2017 09:57:29 +0200 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> >
-> > We've switched from my personal git tree for the Allwinner sunxi
-> > development to a shared tree:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
-> > 
-> > The branch to be included in linux-next will still be called
-> > sunxi/for-next as it used to be, and it will still go through the
-> > arm-soc tree to reach Linux.
-> > 
-> > However, I'll still have the patches for our DRM drivers on my
-> > personal git repo:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
-> > 
-> > Could you add the branch sunxi-drm/for-next to the list of branches
-> > you merge?
+> This enables the ACIN and the USB power supply subnode in the DT.
 > 
-> OK, just so we are on the same page:
+> Signed-off-by: Alexander Syring <alex@asyring.de>
+> ---
 > 
-> Currently I have:
+> Send again to all relevant people
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git branch sunxi/for-next
+> ---
+>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> merged after the drm tree.
+> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> index feb995d29799..98431ef15bc9 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> @@ -267,6 +267,10 @@
 > 
-> You want:
+>  #include "axp209.dtsi"
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git branch sunxi/for-next
+> +&ac_power_supply {
+> +	status = "okay";
+> +};
+> +
+>  &reg_dcdc2 {
+>  	regulator-always-on;
+>  	regulator-min-microvolt = <1000000>;
+> @@ -323,6 +327,10 @@
+>  	status = "okay";
+>  };
 > 
-> merged after the arm-soc tree and
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git branch sunxi-drm/for-next
-> 
-> merged after the drm tree?
+> +&usb_power_supply {
+> +	status = "okay";
+> +};
+> +
+>  &usbphy {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
+> @@ -333,3 +341,4 @@
+>  	usb2_vbus-supply = <&reg_usb2_vbus>;
+>  	status = "okay";
+>  };
+> +
 
-Yep, exactly.
-
-> (I merge trees *after* the tree that is their upstream.)
-> 
-> Do you want to be the only contact for both trees?
-
-Like Chen-Yu said, please add us both for sunxi/for-next
+You had a whitespace error here. I fixed it, and applied.
 
 Thanks!
 Maxime
@@ -69,4 +72,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/c6c0e22b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/d2682128/attachment.sig>
