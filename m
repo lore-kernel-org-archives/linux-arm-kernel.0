@@ -1,68 +1,61 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 03 Apr 2017 09:06:56 +0200
-Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
- mmaping code
-In-Reply-To: <20170331111624.GR7909@n2100.armlinux.org.uk>
-References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
- <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
- <20170331111624.GR7909@n2100.armlinux.org.uk>
-Message-ID: <e08c6221-2902-f855-fd10-87f7895f8b43@samsung.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 3 Apr 2017 09:08:16 +0200
+Subject: [PATCH 2/3] ARM: dts: alpine: add spaces before the uart node
+ units.
+In-Reply-To: <20170329093827.18881-2-antoine.tenart@free-electrons.com>
+References: <20170329093827.18881-1-antoine.tenart@free-electrons.com>
+ <20170329093827.18881-2-antoine.tenart@free-electrons.com>
+Message-ID: <20170403070816.nlgoylae57gbuc6i@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+On Wed, Mar 29, 2017 at 11:38:26AM +0200, Antoine Tenart wrote:
+> Cosmetic cleanup to have consistent node definitions. Add a space before
+> the node units which do not have one.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
+Applied on alpine/dt.
+Thanks!
 
-On 31.03.2017 13:16, Russell King - ARM Linux wrote:
-> On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
->> In this version of the patch I have replaced temporal pages and
->> iommu_dma_mmap with remap_pfn_range or rather its simplified version
->> vm_iomap_memory.
->> Unfortunately I have not find nice helper for sgtable creation, so I
->> left sg allocation inside _iommu_mmap_attrs.
->>
->> As the fixing of DMA_ATTR_FORCE_CONTIGUOUS related crashes has higher
->> priority I have focused only on it in this patch.
-> As I mentioned elsewhere, I don't believe that fudging around in this way
-> is a proper fix.
->
-> DMA coherent memory was never, ever, intended to be passed back into the
-> streaming APIs - it was designed that the two would be mutually exclusive.
->
-> The problem is that we now have DMA coherent allocations being passed
-> through the dma-buf API using this dma_get_sgtable() thing, which is quite
-> broken.  
+> ---
+>  arch/arm/boot/dts/alpine.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
+> index 341a500c8d8a..d84bd7955b54 100644
+> --- a/arch/arm/boot/dts/alpine.dtsi
+> +++ b/arch/arm/boot/dts/alpine.dtsi
+> @@ -120,7 +120,7 @@
+>  				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> -		uart0:uart at fd883000 {
+> +		uart0: uart at fd883000 {
+>  			compatible = "ns16550a";
+>  			reg = <0x0 0xfd883000 0x0 0x1000>;
+>  			clock-frequency = <0>; /* Filled by loader */
+> @@ -129,7 +129,7 @@
+>  			reg-io-width = <4>;
+>  		};
+>  
+> -		uart1:uart at fd884000 {
+> +		uart1: uart at fd884000 {
+>  			compatible = "ns16550a";
+>  			reg = <0x0 0xfd884000 0x0 0x1000>;
+>  			clock-frequency = <0>; /* Filled by loader */
+> -- 
+> 2.11.0
+> 
 
-This patch just fixes current implementation of the API by re-using
-existing techniques, nothing more.
-It prevents code from using some pointer (area->pages) not because of
-lack backing struct pages, but because this pointer is just not
-initialized and apparently not necessary in case of contiguous allocations.
-I think, the problem of fixing DMA-API should be addressed in separate
-set of patches, as it is a different issue and requires much more
-experience in MM and DMA-API than I have.
-
-Regards
-Andrzej
-
-> I regard dma_get_sgtable() as very broken, and had I realised at
-> the time that this was what it was trying to do, I would have NAK'd it.
->
-> Rather than bodging around this brokenness, trying to get dma_get_sgtable()
-> to work, I believe we need to address the root cause - which is proper
-> support for passing DMA coherent allocations through dma-buf, which does
-> not involve scatterlists and calling dma_map_sg() on it.
->
-> That's going to need to be addressed in any case, because of the
-> dma_declare_coherent_memory() issue, where we may not have struct pages
-> backing a coherent allocation.  Such a case can come up on ARM64 via
-> DT's "shared-dma-pool" reserved memory stuff.
->
-> Right now, I have a "fix" for ARM queued which causes dma_get_sgtable()
-> to fail when used with reserved memory, but we have one user who needs
-> this to work.  So, dma-buf needs to be fixed for this one way or another,
-> and I don't think that bending the current broken stuff to suit it by
-> trying these vmalloc_to_page() hacks is acceptable.
->
-> dma_get_sgtable() is fundamentally broken IMHO.
->
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/ec809886/attachment.sig>
