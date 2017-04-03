@@ -1,65 +1,161 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 3 Apr 2017 21:46:08 +0200
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <CAL_JsqJh-X_5Dq81vwNWo5txZSC8uQETPTAPS4DPeTh2bDKkwg@mail.gmail.com>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
- <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
- <CAL_JsqJh-X_5Dq81vwNWo5txZSC8uQETPTAPS4DPeTh2bDKkwg@mail.gmail.com>
-Message-ID: <CAMuHMdVowagRdRVN8eNcbb2WKCQewNxRMGd02s2YMmX0drwQGQ@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 3 Apr 2017 20:46:43 +0100
+Subject: [PATCH v2 2/2] iio: adc: stm32: add dt option to set resolution
+In-Reply-To: <8d440abd-3548-6aab-bba9-3f62fe27e72d@kernel.org>
+References: <1490963559-32159-1-git-send-email-fabrice.gasnier@st.com>
+ <1490963559-32159-3-git-send-email-fabrice.gasnier@st.com>
+ <8d440abd-3548-6aab-bba9-3f62fe27e72d@kernel.org>
+Message-ID: <e0979bed-603b-c84f-62f2-ee432fc021b4@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 3, 2017 at 8:57 PM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Apr 3, 2017 at 1:14 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->> On Mon, Apr 3, 2017 at 12:44 AM, Stuart Longland
->> <stuartl@longlandclan.id.au> wrote:
->>> On 03/04/17 07:41, Nicolas Pitre wrote:
->>>>> No PTYs seems like a big limitation. This means no sshd?
->>>> Again, my ultimate system target is in the sub-megabyte of RAM.  I
->>>> really doubt you'll be able to fit an SSH server in there even if PTYs
->>>> were supported, unless sshd (or dropbear) can be made really tiny.
->>>> Otherwise you most probably have sufficient resources to run the regular
->>>> TTY code.
->>>
->>> Are we talking small microcontrollers here?  The smallest machine in
->>> terms of RAM I ever recall running Linux on was a 386SX/25 MHz with 4MB
->>> RAM, and that had a MMU.
+On 02/04/17 09:54, Jonathan Cameron wrote:
+> On 31/03/17 13:32, Fabrice Gasnier wrote:
+>> stm32 adc supports several resolution. Add 'assigned-resolution-bits'
+>> dt optional property to set it. Default to maximum resolution in case
+>> it isn't set.
 >>
->> Let's halve that. I once tried and ran Linux in 2 MiB, incl. X, twm, and xterm.
->> Of course with swap enabled.  And swapping like hell.
->
-> These are different target uses. We're talking about fixed function,
-> statically linked user space at the minimum (some may want no
-> userspace even). Applications that could use an RTOS instead but
-> benefit from the Linux hardware support, features and ecosystem. It's
-> not a whole new code base or environment to learn. Maybe Zephyr will
-> have traction and improve things, but projects I've been involved with
-> using RTOSs generally have discussions around needing to re-write the
-> crappy RTOS.
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> The code is fine.  Just waiting on review of the binding.
+> 
+> Give me a poke if I seem to have dropped this in a week or two.
+Applied to the togreg branch of iio.git and pushed out as
+testing for the autobuilders to play with it.
 
-Sure. I just wanted to point out that there was a time you could have
-_more_ than you need for small fixed function embedded systems in
-2 MiB of RAM.
+Thanks,
 
-> The absolute amount of RAM target is not so important. What's
-> important is getting to a size feasible for onchip RAM. That's always
-> moving (up), but has generally been out of reach for Linux.
-
-DigiKey shows 39 ARM SoCs with 1 MiB or more of RAM.
-But once you want 3 MiB or more, the lone winner is Renesas' RZ/A1 (up to
-10 MiB).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Jonathan
+> 
+> Thanks,
+> 
+> Jonathan
+>> ---
+>> Changes in v2:
+>> - rename property from 'st,adc-res' to 'assigned-resolution-bits', so it
+>>   is more common.
+>> ---
+>>  drivers/iio/adc/stm32-adc.c | 50 ++++++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 49 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+>> index 9b49a6ad..c28e7ff 100644
+>> --- a/drivers/iio/adc/stm32-adc.c
+>> +++ b/drivers/iio/adc/stm32-adc.c
+>> @@ -60,6 +60,8 @@
+>>  #define STM32F4_EOC			BIT(1)
+>>  
+>>  /* STM32F4_ADC_CR1 - bit fields */
+>> +#define STM32F4_RES_SHIFT		24
+>> +#define STM32F4_RES_MASK		GENMASK(25, 24)
+>>  #define STM32F4_SCAN			BIT(8)
+>>  #define STM32F4_EOCIE			BIT(5)
+>>  
+>> @@ -141,6 +143,7 @@ struct stm32_adc_regs {
+>>   * @lock:		spinlock
+>>   * @bufi:		data buffer index
+>>   * @num_conv:		expected number of scan conversions
+>> + * @res:		data resolution (e.g. RES bitfield value)
+>>   * @trigger_polarity:	external trigger polarity (e.g. exten)
+>>   * @dma_chan:		dma channel
+>>   * @rx_buf:		dma rx buffer cpu address
+>> @@ -157,6 +160,7 @@ struct stm32_adc {
+>>  	spinlock_t		lock;		/* interrupt lock */
+>>  	unsigned int		bufi;
+>>  	unsigned int		num_conv;
+>> +	u32			res;
+>>  	u32			trigger_polarity;
+>>  	struct dma_chan		*dma_chan;
+>>  	u8			*rx_buf;
+>> @@ -196,6 +200,11 @@ struct stm32_adc_chan_spec {
+>>  	{ IIO_VOLTAGE, 15, "in15" },
+>>  };
+>>  
+>> +static const unsigned int stm32f4_adc_resolutions[] = {
+>> +	/* sorted values so the index matches RES[1:0] in STM32F4_ADC_CR1 */
+>> +	12, 10, 8, 6,
+>> +};
+>> +
+>>  /**
+>>   * stm32f4_sq - describe regular sequence registers
+>>   * - L: sequence len (register & bit field)
+>> @@ -302,6 +311,14 @@ static void stm32_adc_conv_irq_disable(struct stm32_adc *adc)
+>>  	stm32_adc_clr_bits(adc, STM32F4_ADC_CR1, STM32F4_EOCIE);
+>>  }
+>>  
+>> +static void stm32_adc_set_res(struct stm32_adc *adc)
+>> +{
+>> +	u32 val = stm32_adc_readl(adc, STM32F4_ADC_CR1);
+>> +
+>> +	val = (val & ~STM32F4_RES_MASK) | (adc->res << STM32F4_RES_SHIFT);
+>> +	stm32_adc_writel(adc, STM32F4_ADC_CR1, val);
+>> +}
+>> +
+>>  /**
+>>   * stm32_adc_start_conv() - Start conversions for regular channels.
+>>   * @adc: stm32 adc instance
+>> @@ -870,11 +887,37 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
+>>  	{},
+>>  };
+>>  
+>> +static int stm32_adc_of_get_resolution(struct iio_dev *indio_dev)
+>> +{
+>> +	struct device_node *node = indio_dev->dev.of_node;
+>> +	struct stm32_adc *adc = iio_priv(indio_dev);
+>> +	unsigned int i;
+>> +	u32 res;
+>> +
+>> +	if (of_property_read_u32(node, "assigned-resolution-bits", &res))
+>> +		res = stm32f4_adc_resolutions[0];
+>> +
+>> +	for (i = 0; i < ARRAY_SIZE(stm32f4_adc_resolutions); i++)
+>> +		if (res == stm32f4_adc_resolutions[i])
+>> +			break;
+>> +	if (i >= ARRAY_SIZE(stm32f4_adc_resolutions)) {
+>> +		dev_err(&indio_dev->dev, "Bad resolution: %u bits\n", res);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	dev_dbg(&indio_dev->dev, "Using %u bits resolution\n", res);
+>> +	adc->res = i;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
+>>  				    struct iio_chan_spec *chan,
+>>  				    const struct stm32_adc_chan_spec *channel,
+>>  				    int scan_index)
+>>  {
+>> +	struct stm32_adc *adc = iio_priv(indio_dev);
+>> +
+>>  	chan->type = channel->type;
+>>  	chan->channel = channel->channel;
+>>  	chan->datasheet_name = channel->name;
+>> @@ -883,7 +926,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
+>>  	chan->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
+>>  	chan->info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE);
+>>  	chan->scan_type.sign = 'u';
+>> -	chan->scan_type.realbits = 12;
+>> +	chan->scan_type.realbits = stm32f4_adc_resolutions[adc->res];
+>>  	chan->scan_type.storagebits = 16;
+>>  	chan->ext_info = stm32_adc_ext_info;
+>>  }
+>> @@ -1022,6 +1065,11 @@ static int stm32_adc_probe(struct platform_device *pdev)
+>>  		return ret;
+>>  	}
+>>  
+>> +	ret = stm32_adc_of_get_resolution(indio_dev);
+>> +	if (ret < 0)
+>> +		goto err_clk_disable;
+>> +	stm32_adc_set_res(adc);
+>> +
+>>  	ret = stm32_adc_chan_of_init(indio_dev);
+>>  	if (ret < 0)
+>>  		goto err_clk_disable;
+>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
