@@ -1,107 +1,83 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Mon, 03 Apr 2017 14:55:43 +0530
-Subject: [PATCH v9 12/12] ARM: EXYNOS: refactor of mach-exynos to use
- chipid information
-In-Reply-To: <CAK8P3a1GobLFjVXySXHGYBXscMaTcL8nzv183Reho87+U3Z5cA@mail.gmail.com>
-References: <CGME20170330131444epcas5p45051cf7e6ec7a993c2c9f84254b89a19@epcas5p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-13-git-send-email-pankaj.dubey@samsung.com>
- <CAK8P3a2oK1MvWe4B-4r2Rt7Q87juNJd3MsetN8-OeDYhBmKyUg@mail.gmail.com>
- <69ac19c2-76de-d614-492b-ccdc83d01d81@samsung.com>
- <CAK8P3a1GobLFjVXySXHGYBXscMaTcL8nzv183Reho87+U3Z5cA@mail.gmail.com>
-Message-ID: <485f9aaa-3c32-5996-e7f0-9fa1a589e39b@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Apr 2017 10:24:31 +0100
+Subject: [PATCH] arm64: mm: unaligned access by user-land should be
+ received as SIGBUS
+In-Reply-To: <1491198314-17025-2-git-send-email-kamensky@cisco.com>
+References: <1491198314-17025-1-git-send-email-kamensky@cisco.com>
+ <1491198314-17025-2-git-send-email-kamensky@cisco.com>
+Message-ID: <20170403092430.GA5706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Victor,
 
+Thanks for reporting this.
 
-On Friday 31 March 2017 01:52 PM, Arnd Bergmann wrote:
-> On Fri, Mar 31, 2017 at 8:01 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
->> On Thursday 30 March 2017 07:31 PM, Arnd Bergmann wrote:
->>> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->>>
->>> This seems really overcomplicated. From what I can tell, this is only needed
->>> to find the SCU address, but there are better ways to do that, either by
->>> looking up the SCU in the DT at the time you actually need it,
->>> or by calling scu_a9_get_base().
->>
->> Indeed it's complicated and ugly, for the same reason I attempted to
->> clean-up this part for Exynos SoC in patch series [1], which was
->> accepted by Samsung maintainer Krzysztof and later during pull request
->> rejected by ARM maintainers [2]
->>
->> [1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
->> [2]: http://lkml.iu.edu/hypermail/linux/kernel/1612.0/01508.html
->>
->> Given the argument we can't adopt getting base address of SCU completely
->> via DT without breaking OLD dtbs at some point, difficult to simplify
->> these stuffs.
->>
->> Please guide which is the best way to handle such stuffs.
->>
->> In fact I made another attempt [3] to cleanup this SCU related stuffs
->> for other ARM based platforms, but we could not arrive on some consensus
->> at that time. I will try to attempt it again soon.
->>
->> [3]: http://www.spinics.net/lists/arm-kernel/msg542351.html
+On Sun, Apr 02, 2017 at 10:45:14PM -0700, Victor Kamensky wrote:
+> After 52d7523 (arm64: mm: allow the kernel to handle alignment faults on
+> user accesses) commit user-land accesses that produce unaligned exceptions
+> like in case of aarch32 ldm/stm/ldrd/strd instructions operating on
+> unaligned memory received by user-land as SIGSEGV. It is wrong, it should
+> be reported as SIGBUS as it was before 52d7523 commit.
 > 
-> I very much appreciate your attempts, this is very helpful. I'm sorry
-> for making it so hard for you. I had remembered your previous series,
-> but did not realize that you were the author of both this patch and
-> the SCU cleanup.
+> Changed do_bad_area function to take signal and code parameters, so caller
+> can pass them down properly depending on fault type, as SIGSEGV in case of
+> do_translation_fault and SIGBUS in case of do_alignment_fault.
 > 
-> Let me try to understand the entire problem space better. These
-> are my assumptions based on what  you write:
+> Signed-off-by: Victor Kamensky <kamensky@cisco.com>
+> Cc: xe-linux-external at cisco.com
+> Fixes: 52d7523 (arm64: mm: allow the kernel to handle alignment faults on user accesses)
+> ---
+>  arch/arm64/mm/fault.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
 > 
-> - A clean solution would be to map the SCU based on the DT as
->   you implemented in the earlier patch series, but that breaks
->   running new kernels with old DTBs, which we don't want.
-> 
-> - Another clean solution would be to map the SCU based on
->   scu_a9_get_base(), but that doesn't work on all variants of
->   exynos4, because there is at least one (which?) that has incorrect
->   data in the register
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 4bf899f..204eb58 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -215,7 +215,8 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+>  	force_sig_info(sig, &si, tsk);
+>  }
+>  
+> -static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+> +static void do_bad_area(unsigned long addr, unsigned int esr,
+> +			struct pt_regs *regs, int sig, int code)
+>  {
+>  	struct task_struct *tsk = current;
+>  	struct mm_struct *mm = tsk->active_mm;
+> @@ -225,7 +226,7 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+>  	 * handle this fault with.
+>  	 */
+>  	if (user_mode(regs))
+> -		__do_user_fault(tsk, addr, esr, SIGSEGV, SEGV_MAPERR, regs);
+> +		__do_user_fault(tsk, addr, esr, sig, code, regs);
+>  	else
+>  		__do_kernel_fault(mm, addr, esr, regs);
+>  }
+> @@ -469,14 +470,14 @@ static int __kprobes do_translation_fault(unsigned long addr,
+>  	if (addr < TASK_SIZE)
+>  		return do_page_fault(addr, esr, regs);
+>  
+> -	do_bad_area(addr, esr, regs);
+> +	do_bad_area(addr, esr, regs, SIGSEGV, SEGV_MAPERR);
+>  	return 0;
+>  }
+>  
+>  static int do_alignment_fault(unsigned long addr, unsigned int esr,
+>  			      struct pt_regs *regs)
+>  {
+> -	do_bad_area(addr, esr, regs);
+> +	do_bad_area(addr, esr, regs, SIGBUS,  BUS_ADRALN);
 
-Sorry, I am also not aware which variant does not support this.
-Currently for none of exynos4 we are using scu_a9_get_base(), and due to
-unavailability of all exynos4 based board with me, I can't test it.
+Can we not just extract the signal number and code from the fault info
+table?
 
-> 
-> - The approach in this patch works, but is really ugly as it
->   requires parsing the fdt.
-> 
-> Assuming that we don't want any of the approaches above,
-> here are some other ideas that might be a little better:
-> 
-> - Map the SCU later, just before we first need for calling
->   scu_enable(): exynos_smp_prepare_cpus(),
->   exynos_enter_aftr() or exynos_pm_resume(). All three
->   are late enough that we can simply call ioremap()
->   on the known physical address for the first caller,
->   and they are all guarded by a
->   ARM_CPU_PART_CORTEX_A9 check that should
->   be equivalent to the EXYNOS4 check you have.
-> 
+E.g. leave the type signature of do_bad_area like it is, but do:
 
-OK, let me try this, I think I can shift it at a little later point of boot.
+	const struct fault_info *inf = fault_info + (esr & 63);
+	__do_user_fault(tsk, addr, esr, inf->sig, inf->code, regs);
 
-> - Split the exynos4 machine descriptor from the one
->   for exynos5, and exynos3, the call the iotable_init
->   unconditionally for exynos4. The same method would
->   also let us get rid of some of the other
->   of_machine_is_compatible() checks.
-> 
+The '& 63' is ugly as hell, so maybe wrap that up in a esr_to_fault_info
+function and kill the fault_name thing we have at the moment.
 
-Once we move SCU mapping to later point of time, iotable_init can be
-dropped. Currently only for SCU mapping it is getting called. So this
-part will become more clean.
-
-
-Thanks for suggestion. I will work on it and submit next version.
-
-Pankaj Dubey
-
->        Arnd
-> 
-> 
-> 
+Will
