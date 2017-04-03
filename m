@@ -1,93 +1,110 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 3 Apr 2017 10:13:32 +0200
-Subject: [Patch v3 06/11] [media] s5p-mfc: Add support for HEVC decoder
-In-Reply-To: <1490951200-32070-7-git-send-email-smitha.t@samsung.com>
-References: <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
- <CGME20170331090441epcas1p491fae79e00000335ea163eb4c15fc16d@epcas1p4.samsung.com>
- <1490951200-32070-7-git-send-email-smitha.t@samsung.com>
-Message-ID: <ebabf38b-4da9-abf8-774a-2e63796fba19@xs4all.nl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 3 Apr 2017 10:14:23 +0200
+Subject: [PATCH v3 04/11] drm/sun4i: abstract the layer type
+In-Reply-To: <20170329194613.55548-5-icenowy@aosc.io>
+References: <20170329194613.55548-1-icenowy@aosc.io>
+ <20170329194613.55548-5-icenowy@aosc.io>
+Message-ID: <20170403081423.p6x4ytfoga2krygv@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2017 11:06 AM, Smitha T Murthy wrote:
-> Add support for codec definition and corresponding buffer
-> requirements for HEVC decoder.
+Hi,
+
+On Thu, Mar 30, 2017 at 03:46:06AM +0800, Icenowy Zheng wrote:
+> As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
+> driver, we will finally have two types of layer.
 > 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> Abstract the layer type to void * and a ops struct, which contains the
+> only function used by crtc -- get the drm_plane struct of the layer.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |  1 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |  3 +++
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |  1 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |  8 ++++++++
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 17 +++++++++++++++--
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |  3 +++
->  6 files changed, 31 insertions(+), 2 deletions(-)
+> Refactored patch in v3.
 > 
-> diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> index 3f0dab3..953a073 100644
-> --- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> @@ -33,6 +33,7 @@
->  #define MFC_NUM_PORTS_V10	1
+>  drivers/gpu/drm/sun4i/sun4i_crtc.c  | 19 +++++++++++--------
+>  drivers/gpu/drm/sun4i/sun4i_crtc.h  |  3 ++-
+>  drivers/gpu/drm/sun4i/sun4i_layer.c | 19 ++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_layer.h |  2 +-
+>  drivers/gpu/drm/sun4i/sunxi_layer.h | 17 +++++++++++++++++
+>  5 files changed, 49 insertions(+), 11 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sunxi_layer.h
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> index 3c876c3a356a..33854ee7f636 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+> @@ -29,6 +29,7 @@
+>  #include "sun4i_crtc.h"
+>  #include "sun4i_drv.h"
+>  #include "sun4i_layer.h"
+> +#include "sunxi_layer.h"
+>  #include "sun4i_tcon.h"
 >  
->  /* MFCv10 codec defines*/
-> +#define S5P_FIMV_CODEC_HEVC_DEC		17
->  #define S5P_FIMV_CODEC_HEVC_ENC         26
+>  static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+> @@ -149,7 +150,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+>  	scrtc->tcon = tcon;
 >  
->  /* Encoder buffer size for MFC v10.0 */
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-> index b1b1491..76eca67 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-> @@ -101,6 +101,9 @@ static int s5p_mfc_open_inst_cmd_v6(struct s5p_mfc_ctx *ctx)
->  	case S5P_MFC_CODEC_VP8_DEC:
->  		codec_type = S5P_FIMV_CODEC_VP8_DEC_V6;
->  		break;
-> +	case S5P_MFC_CODEC_HEVC_DEC:
-> +		codec_type = S5P_FIMV_CODEC_HEVC_DEC;
-> +		break;
->  	case S5P_MFC_CODEC_H264_ENC:
->  		codec_type = S5P_FIMV_CODEC_H264_ENC_V6;
->  		break;
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> index 8368d5c2..f49fa34 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> @@ -79,6 +79,7 @@ static inline dma_addr_t s5p_mfc_mem_cookie(void *a, void *b)
->  #define S5P_MFC_CODEC_H263_DEC		5
->  #define S5P_MFC_CODEC_VC1RCV_DEC	6
->  #define S5P_MFC_CODEC_VP8_DEC		7
-> +#define S5P_MFC_CODEC_HEVC_DEC		17
+>  	/* Create our layers */
+> -	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+> +	scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
+>  	if (IS_ERR(scrtc->layers)) {
+>  		dev_err(drm->dev, "Couldn't create the planes\n");
+>  		return NULL;
+> @@ -157,14 +158,15 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
 >  
->  #define S5P_MFC_CODEC_H264_ENC		20
->  #define S5P_MFC_CODEC_H264_MVC_ENC	21
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index db6d9fa..4fdaec2 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -144,6 +144,14 @@ static struct s5p_mfc_fmt formats[] = {
->  		.num_planes	= 1,
->  		.versions	= MFC_V6PLUS_BITS,
->  	},
-> +	{
-> +		.name		= "HEVC Encoded Stream",
-> +		.fourcc		= V4L2_PIX_FMT_HEVC,
-> +		.codec_mode	= S5P_FIMV_CODEC_HEVC_DEC,
-> +		.type		= MFC_FMT_DEC,
-> +		.num_planes	= 1,
-> +		.versions	= MFC_V10_BIT,
-> +	},
->  };
+>  	/* find primary and cursor planes for drm_crtc_init_with_planes */
+>  	for (i = 0; scrtc->layers[i]; i++) {
+> -		struct sun4i_layer *layer = scrtc->layers[i];
+> +		void *layer = scrtc->layers[i];
+> +		struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
+>  
+> -		switch (layer->plane.type) {
+> +		switch (plane->type) {
+>  		case DRM_PLANE_TYPE_PRIMARY:
+> -			primary = &layer->plane;
+> +			primary = plane;
+>  			break;
+>  		case DRM_PLANE_TYPE_CURSOR:
+> -			cursor = &layer->plane;
+> +			cursor = plane;
+>  			break;
+>  		default:
+>  			break;
+> @@ -190,10 +192,11 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+>  	/* Set possible_crtcs to this crtc for overlay planes */
+>  	for (i = 0; scrtc->layers[i]; i++) {
+>  		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
+> -		struct sun4i_layer *layer = scrtc->layers[i];
+> +		void *layer = scrtc->layers[i];
+> +		struct drm_plane *plane = scrtc->layer_ops->get_plane(layer);
+>  
+> -		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
+> -			layer->plane.possible_crtcs = possible_crtcs;
+> +		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
+> +			plane->possible_crtcs = possible_crtcs;
 
-The '.name' should probably be removed completely in this driver. The name is now filled
-in by v4l_fill_fmtdesc() in v4l2-ioctl.c, so there is no longer any need to set it in a
-driver.
+I think the logic should be reversed here, the CRTC shouldn't care
+(much) about the layers at all.
 
-This can be done in a separate patch before this patch is applied.
+We should modify sun4i_crtc_init to get the argument it needs (primary
+and cursor planes for example) through its parameters, and have the
+caller (which iirc is sun4i_drv) call it with the right parameters
+depending on whether you're using DE or DE2.
 
-Doing this in v4l2-ioctl.c ensures consistent format naming across drivers.
+If we're doing that, I don't think we even need the pointer to the
+array of layers in struct sun4i_crtc, which will make it easier to
+deal with.
 
-Regards,
+Maxime
 
-	Hans
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/045d7d47/attachment.sig>
