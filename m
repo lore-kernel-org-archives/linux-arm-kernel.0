@@ -1,24 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Apr 2017 10:55:58 -0500
-Subject: [PATCH v2] dt-bindings: Add documentation for GP10B GPU
-In-Reply-To: <20170330092644.11890-1-acourbot@nvidia.com>
-References: <20170330091831.18322-2-acourbot@nvidia.com>
- <20170330092644.11890-1-acourbot@nvidia.com>
-Message-ID: <20170403155558.sd44ajcdppcshceo@rob-hp-laptop>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 3 Apr 2017 17:58:40 +0200
+Subject: [PATCH 1/4] input: misc: introduce Atmel PTC driver
+In-Reply-To: <20170331152250.12758-2-ludovic.desroches@microchip.com>
+References: <20170331152250.12758-1-ludovic.desroches@microchip.com>
+ <20170331152250.12758-2-ludovic.desroches@microchip.com>
+Message-ID: <20170403155840.vln4wg56iunrmdcw@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 06:26:44PM +0900, Alexandre Courbot wrote:
-> GP10B's definition is mostly similar to GK20A's and GM20B's. The only
-> noticeable difference is the use of power domains instead of a regulator
-> for power supply.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
-> Changes since v1:
-> - It's much better when it compiles.
-> 
->  .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 25 +++++++++++++++++++++-
->  1 file changed, 24 insertions(+), 1 deletion(-)
+On 31/03/2017 at 17:22:47 +0200, Ludovic Desroches wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Acked-by: Rob Herring <robh@kernel.org> 
+I think you probably want to switch to your microchip email.
+
+Also, this requires a proper commit message.
+
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> +struct atmel_ptc {
+> +	void __iomem		*ppp_regs;
+> +	void __iomem		*firmware;
+> +	int			irq;
+> +	uint8_t			imr;
+> +	volatile struct atmel_qtm_mailbox __iomem	*qtm_mb;
+> +	struct clk		*clk_per;
+> +	struct clk		*clk_int_osc;
+> +	struct clk		*clk_slow;
+> +	struct device		*dev;
+> +	struct completion	ppp_ack;
+> +	unsigned int		button_keycode[ATMEL_PTC_MAX_NODES];
+> +	struct input_dev	*buttons_input;
+> +	struct input_dev	*scroller_input[ATMEL_PTC_MAX_SCROLLERS];
+> +	bool			buttons_registered;
+> +	bool			scroller_registered[ATMEL_PTC_MAX_SCROLLERS];
+> +	uint32_t		button_event[ATMEL_PTC_MAX_NODES/32];
+> +	uint32_t		button_state[ATMEL_PTC_MAX_NODES/32];
+> +	uint32_t		scroller_event;
+> +	uint32_t		scroller_state;
+
+You should use u8, u16 and u32 instead of uint8_t, uint16_t and
+uint32_t.
+
+> diff --git a/include/uapi/linux/atmel_ptc.h b/include/uapi/linux/atmel_ptc.h
+> new file mode 100644
+> index 0000000..d15c4df
+> --- /dev/null
+> +++ b/include/uapi/linux/atmel_ptc.h
+
+
+Is there any sample application showing how to configure the PTC?
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
