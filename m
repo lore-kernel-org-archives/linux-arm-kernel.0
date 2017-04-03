@@ -1,68 +1,47 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 3 Apr 2017 06:28:31 -0400
-Subject: [git pull] base: soc: Improvements for the SoC bus and
- soc_device_match()
-In-Reply-To: <1490950460-8945-1-git-send-email-geert+renesas@glider.be>
-References: <1490950460-8945-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170403102831.GF31988@verge.net.au>
+Date: Mon, 3 Apr 2017 06:29:37 -0400
+Subject: [PATCH v2 0/3] soc: renesas: rcar-sysc: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <1490950916-9576-1-git-send-email-geert+renesas@glider.be>
+References: <1490950916-9576-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170403102936.GG31988@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 10:54:20AM +0200, Geert Uytterhoeven wrote:
-> 	Hi Greg,
-> 	Hi Arnd, Kevin, Olof,
-> 	Hi Magnus, Simon,
+On Fri, Mar 31, 2017 at 11:01:53AM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> The following changes since commit c470abd4fde40ea6a0846a2beab642a578c0b8cd:
+> This patch series adds power domain support for R-Car H3 ES2.0, which
+> differs from ES1.x in some areas.
 > 
->   Linux 4.10 (2017-02-19 14:34:00 -0800)
+> The goal is twofold:
+>   1. Support both the ES1.x and ES2.0 SoC revisions in a single binary
+>      for now,
+>   2. Make it clear which code supports ES1.x, so it can easily be
+>      identified and removed later, when production SoCs are deemed
+>      ubiquitous.
 > 
-> are available in the git repository at:
+> This is achieved by detecting the SoC revision at runtime using the
+> soc_device_match() API, and fixing up the power area table to match the
+> actual SoC revision.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git tags/soc-device-match-tag2
+> Changes compared to v1:
+>   - Minor changes to the patch descriptions.
 > 
-> for you to fetch changes up to 6e12db376b60b7158e4e6006af60566f8c68f7ab:
+> As PM Domains are initialized quite early, the Renesas SoC device must
+> be initialized earlier, and this series thus depends on the pull
+> request "[git pull] base: soc: Improvements for the SoC bus and
+> soc_device_match()" I've just sent.
 > 
->   base: soc: Allow early registration of a single SoC device (2017-03-29 21:43:26 +0200)
+> For testers, this series and its dependencies are available in the
+> topic/r8a7795es2-sysc-v2 branch of my renesas-drivers git repository at
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+> An integration branch for testing on the R-Car H3 ES2.0 based Salvator-X
+> development board is provided as topic/r8a7795es2-integration.
+> 
+> This has been tested on Salvator-X with R-Car H3 ES1.0, ES1.1, and ES2.0
+> SoCs.
+> 
+> Thanks for applying!
 
-Hi Geert,
-
-I have pulled this into the renesas tree.
-
-Hi Greg,
-
-I would be most grateful if you could pull the above tag too.
-
-> ----------------------------------------------------------------
-> base: soc: Improvements for the SoC bus and soc_device_match()
-> 
-> This is a dependency for handling different SoC revisions in the Renesas
-> R-Car SYSC driver, which manages PM Domains and thus needs to be
-> initialized from an early_initcall().
-> 
-> Hence this will serve as an immutable branch between the driver core,
-> arm-soc, and renesas trees, to allow queueing the Renesas R-Car SYSC
-> changes on top in the renesas tree.
-> 
-> All changes in this pull request have been Acked by Arnd.
-> 
-> Thanks for pulling!
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (2):
->       base: soc: Let soc_device_match() return no match when called too early
->       base: soc: Allow early registration of a single SoC device
-> 
->  drivers/base/soc.c | 52 ++++++++++++++++++++++++++++++++++------------------
->  1 file changed, 34 insertions(+), 18 deletions(-)
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
-> 
+Thanks, done.
