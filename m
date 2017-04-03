@@ -1,42 +1,59 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Mon, 03 Apr 2017 10:21:34 +0100
-Subject: [PATCH v35 08/14] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20170403022440.12515-6-takahiro.akashi@linaro.org>
-References: <20170403022139.12383-1-takahiro.akashi@linaro.org>
- <20170403022440.12515-6-takahiro.akashi@linaro.org>
-Message-ID: <1491211294.6020.21.camel@infradead.org>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Mon, 3 Apr 2017 14:51:33 +0530
+Subject: [PATCH v9 04/12] soc: samsung: add exynos chipid driver support
+In-Reply-To: <CAK8P3a0orusAVqHSiBUmcmEUrc625H9MtxkXNwrWQOHgO=7v9Q@mail.gmail.com>
+References: <CGME20170330131427epcas5p4c3d238022dc75694ad3baa8a1018ea04@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
+ <CAK8P3a0dq-Ve2N3yFbpZ7LHzZJ=w6-pLRTSZJZ2=rnk2gWphJw@mail.gmail.com>
+ <a1be4b9c-0f68-dbe3-7799-d5acf4ec31e0@samsung.com>
+ <CAK8P3a0orusAVqHSiBUmcmEUrc625H9MtxkXNwrWQOHgO=7v9Q@mail.gmail.com>
+Message-ID: <c8322e0b-7ecd-f034-85bb-5c06062e3011@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-04-03 at 11:24 +0900, AKASHI Takahiro wrote:
+
+
+On Friday 31 March 2017 01:39 PM, Arnd Bergmann wrote:
+> On Fri, Mar 31, 2017 at 7:36 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+>> Hi Arnd,
+>>
+>> On Thursday 30 March 2017 07:20 PM, Arnd Bergmann wrote:
+>>> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>>>>
+>>>> +config EXYNOS_CHIPID
+>>>> +       bool "Exynos Chipid controller driver" if COMPILE_TEST
+>>>> +       depends on ARCH_EXYNOS || COMPILE_TEST
+>>>> +       select SOC_BUS
+>>>
+>>> This lets you disable the driver when COMPILE_TEST is set on exynos,
+>>> which is probably not what you wanted.
+>>>
+>>
+>> Sorry I could not get this point. EXYNOS_CHIPID is invisible menu
+>> option, when I enabled COMPILE_TEST, option is visible in make
+>> menuconfig but it does not allow to disable this driver. I have adopted
+>> this config same as EXYNOS_PMU in the same file.
 > 
-> +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs
-> *regs)
-> +{
-> +#ifdef CONFIG_KEXEC_CORE
-> +???????crash_save_cpu(regs, cpu);
-> +
-> +???????atomic_dec(&waiting_for_crash_ipi);
-> +
-> +???????local_irq_disable();
+> I wrote my comment before I saw the 'select' statement in the later
+> patch. With that select, it is not a problem.
+> 
+>>>          bool "Exynos Chipid controller driver" if COMPILE_TEST && !ARCHEXYNOS
+>>>          default ARCH_EXYNOS
+>>
+>> I can adopt, default ARCH_EXYNOS, which will allow me to drop patch 5/12
+>> and 6/12.
+> 
+> Either way (select or default) is fine, just do the same thing for both chipid
+> and pmu. If you keep the 'select' and the 'if COMPILE_TEST', you can
+> drop the line 'depends on ARCH_EXYNOS || COMPILE_TEST'.
+> 
 
-Shouldn't the above two be the other way round? Stop handling
-interrupts *before* we tell the surviving CPU that we're done?
+OK, I understood your point. Thanks.
 
-Also, should the surviving CPU be calling __cpu_die() to attempt to
-check that the others really have died? Sure, it can't do much more
-than print a warning if the call to ->cpu_kill() times out, but that's
-still useful information. And perhaps we could allow platforms to
-register a method to shoot other CPUs down forcefully if they don't
-respond. My board could apparently support that.
+Pankaj Dubey
 
-It would certainly be useful to allow smp_send_crash_stop() to be
-overridden with a platform-specific method instead of normal IPIs. The
-platform might be able to do something... less maskable.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170403/694d66c3/attachment.bin>
+>       Arnd
+> 
+> 
+> 
