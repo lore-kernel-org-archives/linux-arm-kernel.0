@@ -1,92 +1,78 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 03 Apr 2017 11:45:47 +0530
-Subject: [Patch v3 00/11] Add MFC v10.10 support
-In-Reply-To: <6a5fa537-0977-b18b-70be-56ad771a0c03@samsung.com>
-References: <CGME20170331090425epcas1p4de8762ee73be91312a76a73638bac253@epcas1p4.samsung.com>
- <1490951200-32070-1-git-send-email-smitha.t@samsung.com>
- <6a5fa537-0977-b18b-70be-56ad771a0c03@samsung.com>
-Message-ID: <1491200147.24095.21.camel@smitha-fedora>
+Date: Mon, 03 Apr 2017 11:47:22 +0530
+Subject: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
+ (fwd)
+In-Reply-To: <alpine.DEB.2.20.1704030758540.2170@hadrien>
+References: <CGME20170403060045epcas2p215a1d85248b47cc389e20ff877505b09@epcas2p2.samsung.com>
+ <alpine.DEB.2.20.1704030758540.2170@hadrien>
+Message-ID: <1491200242.24095.23.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-31 at 15:29 +0200, Andrzej Hajda wrote:
+On Mon, 2017-04-03 at 08:00 +0200, Julia Lawall wrote:
+> See line 2101
+> 
+> julia
+> 
+Thank you for bringing it to my notice, I had not checked on this git.
+I will upload the next version of patches soon corresponding to this
+git.
+
+Thanks,
+Smitha
+> --------- Forwarded message ----------
+> Date: Mon, 3 Apr 2017 05:04:39 +0800
+> From: kbuild test robot <fengguang.wu@intel.com>
+> To: kbuild at 01.org
+> Cc: Julia Lawall <julia.lawall@lip6.fr>
+> Subject: Re: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
+> 
 > Hi Smitha,
 > 
-> On 31.03.2017 11:06, Smitha T Murthy wrote:
-> > This patch series adds MFC v10.10 support. MFC v10.10 is used in some
-> > of Exynos7 variants.
+> [auto build test WARNING on linuxtv-media/master]
+> [also build test WARNING on v4.11-rc4 next-20170331]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> Patch does not apply, please rebase on top of:
->    
+> url:    https://github.com/0day-ci/linux/commits/Smitha-T-Murthy/Add-MFC-v10-10-support/20170403-033620
+> base:   git://linuxtv.org/media_tree.git master
+> :::::: branch date: 88 minutes ago
+> :::::: commit date: 88 minutes ago
 > 
-> git://linuxtv.org/snawrocki/samsung.git for-v4.12/media/next
+> >> drivers/media/platform/s5p-mfc/s5p_mfc_enc.c:2101:6-25: WARNING: Unsigned expression compared with zero: p -> codec . hevc . level < 0
 > 
+> git remote add linux-review https://github.com/0day-ci/linux
+> git remote update linux-review
+> git checkout bca072db65317d79554527391338ce8bc6fbde58
+> vim +2101 drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
 > 
-I had not checked on this git. Thank you for pointing it out. I am
-downloading the code from github, will rebase on top of it and check the
-patches and push the next version correspondingly.
-
-> Additionally quick test shows you do not handle V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH in s5p_mfc_enc_s_ctrl.
-> Regards
-> Andrzej
+> bca072db Smitha T Murthy 2017-03-31  2085  		break;
+> bca072db Smitha T Murthy 2017-03-31  2086  	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:
+> bca072db Smitha T Murthy 2017-03-31  2087  		p->codec.hevc.rc_b_frame_qp = ctrl->val;
+> bca072db Smitha T Murthy 2017-03-31  2088  		break;
+> bca072db Smitha T Murthy 2017-03-31  2089  	case V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION:
+> bca072db Smitha T Murthy 2017-03-31  2090  		p->codec.hevc.rc_framerate = ctrl->val;
+> bca072db Smitha T Murthy 2017-03-31  2091  		break;
+> bca072db Smitha T Murthy 2017-03-31  2092  	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:
+> bca072db Smitha T Murthy 2017-03-31  2093  		p->codec.hevc.rc_min_qp = ctrl->val;
+> bca072db Smitha T Murthy 2017-03-31  2094  		break;
+> bca072db Smitha T Murthy 2017-03-31  2095  	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:
+> bca072db Smitha T Murthy 2017-03-31  2096  		p->codec.hevc.rc_max_qp = ctrl->val;
+> bca072db Smitha T Murthy 2017-03-31  2097  		break;
+> bca072db Smitha T Murthy 2017-03-31  2098  	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:
+> bca072db Smitha T Murthy 2017-03-31  2099  		p->codec.hevc.level_v4l2 = ctrl->val;
+> bca072db Smitha T Murthy 2017-03-31  2100  		p->codec.hevc.level = hevc_level(ctrl->val);
+> bca072db Smitha T Murthy 2017-03-31 @2101  		if (p->codec.hevc.level < 0) {
+> bca072db Smitha T Murthy 2017-03-31  2102  			mfc_err("Level number is wrong\n");
+> bca072db Smitha T Murthy 2017-03-31  2103  			ret = p->codec.hevc.level;
+> bca072db Smitha T Murthy 2017-03-31  2104  		}
+> bca072db Smitha T Murthy 2017-03-31  2105  		break;
+> bca072db Smitha T Murthy 2017-03-31  2106  	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:
+> bca072db Smitha T Murthy 2017-03-31  2107  		switch (ctrl->val) {
+> bca072db Smitha T Murthy 2017-03-31  2108  		case V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN:
+> bca072db Smitha T Murthy 2017-03-31  2109  			ctrl->val = V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN;
 > 
-
-I could not sufficient details on
-V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH in the User Manual
-to implement this CID. Hence I wanted to remove it in v3 itself, I will
-take care of this in next version.
-
-Regards,
-Smitha T Murthy
-> >
-> > This adds support for following:
-> >
-> > * Add support for HEVC encoder and decoder
-> > * Add support for VP9 decoder
-> > * Update Documentation for control id definitions
-> > * Update computation of min scratch buffer size requirement for V8 onwards
-> >
-> > Changes since v2:
-> >  - Addressed review comments by Andrzej Hajda.
-> >  - Rebased on latest krzk/for-next tree.
-> >  - This patches are tested on top of Marek's patch v2 [1]
-> >  - Applied acked-by and r-o-b from Andrzej on respective patches.
-> >  - Applied acked-by from Rob Herring on respective patch.
-> >
-> > [1]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg108520.html
-> >
-> > Smitha T Murthy (11):
-> >   [media] s5p-mfc: Rename IS_MFCV8 macro
-> >   [media] s5p-mfc: Adding initial support for MFC v10.10
-> >   [media] s5p-mfc: Use min scratch buffer size as provided by F/W
-> >   [media] s5p-mfc: Support MFCv10.10 buffer requirements
-> >   [media] videodev2.h: Add v4l2 definition for HEVC
-> >   [media] s5p-mfc: Add support for HEVC decoder
-> >   Documentation: v4l: Documentation for HEVC v4l2 definition
-> >   [media] s5p-mfc: Add VP9 decoder support
-> >   [media] v4l2: Add v4l2 control IDs for HEVC encoder
-> >   [media] s5p-mfc: Add support for HEVC encoder
-> >   Documention: v4l: Documentation for HEVC CIDs
-> >
-> >  .../devicetree/bindings/media/s5p-mfc.txt          |   1 +
-> >  Documentation/media/uapi/v4l/extended-controls.rst | 355 ++++++++++++
-> >  Documentation/media/uapi/v4l/pixfmt-013.rst        |   5 +
-> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |  88 +++
-> >  drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |   2 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc.c           |  33 ++
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |   9 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  71 ++-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |   6 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  50 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       | 616 ++++++++++++++++++++-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |  14 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    | 410 ++++++++++++--
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |  15 +
-> >  drivers/media/v4l2-core/v4l2-ctrls.c               | 103 ++++
-> >  include/uapi/linux/v4l2-controls.h                 | 133 +++++
-> >  include/uapi/linux/videodev2.h                     |   1 +
-> >  17 files changed, 1835 insertions(+), 77 deletions(-)
-> >  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> >
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > 
 > 
