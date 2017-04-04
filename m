@@ -1,67 +1,142 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 4 Apr 2017 11:27:07 -0700
-Subject: [PATCH v6 2/4] x86/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170404174727.35478-2-thgarnie@google.com>
-References: <20170404174727.35478-1-thgarnie@google.com>
- <20170404174727.35478-2-thgarnie@google.com>
-Message-ID: <05d9c4a7-8acb-5997-1dd6-d534398e6f54@zytor.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 04 Apr 2017 19:47:15 +0100
+Subject: [PATCH 2/4] arm64: hugetlbpages: Correctly handle swap entries in
+ huge_pte_offset()
+In-Reply-To: <20170331095155.GA31398@leverpostej> (Mark Rutland's message of
+ "Fri, 31 Mar 2017 10:52:06 +0100")
+References: <20170330163849.18402-1-punit.agrawal@arm.com>
+ <20170330163849.18402-3-punit.agrawal@arm.com>
+ <20170331095155.GA31398@leverpostej>
+Message-ID: <8760ikypqk.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/17 10:47, Thomas Garnier wrote:
-> diff --git a/arch/x86/include/asm/pgtable_64_types.h b/arch/x86/include/asm/pgtable_64_types.h
-> index 516593e66bd6..12fa851c7fa8 100644
-> --- a/arch/x86/include/asm/pgtable_64_types.h
-> +++ b/arch/x86/include/asm/pgtable_64_types.h
-> @@ -78,4 +78,15 @@ typedef struct { pteval_t pte; } pte_t;
->  
->  #define EARLY_DYNAMIC_PAGE_TABLES	64
->  
-> +/*
-> + * User space process size. 47bits minus one guard page.  The guard
-> + * page is necessary on Intel CPUs: if a SYSCALL instruction is at
-> + * the highest possible canonical userspace address, then that
-> + * syscall will enter the kernel with a non-canonical return
-> + * address, and SYSRET will explode dangerously.  We avoid this
-> + * particular problem by preventing anything from being mapped
-> + * at the maximum canonical address.
-> + */
-> +#define TASK_SIZE_MAX	((_AC(1, UL) << 47) - PAGE_SIZE)
-> +
->  #endif /* _ASM_X86_PGTABLE_64_DEFS_H */
-> diff --git a/arch/x86/include/asm/processor.h b/arch/x86/include/asm/processor.h
-> index 3cada998a402..e80822582d3e 100644
-> --- a/arch/x86/include/asm/processor.h
-> +++ b/arch/x86/include/asm/processor.h
-> @@ -825,17 +825,6 @@ static inline void spin_lock_prefetch(const void *x)
->  #define KSTK_ESP(task)		(task_pt_regs(task)->sp)
->  
->  #else
-> -/*
-> - * User space process size. 47bits minus one guard page.  The guard
-> - * page is necessary on Intel CPUs: if a SYSCALL instruction is at
-> - * the highest possible canonical userspace address, then that
-> - * syscall will enter the kernel with a non-canonical return
-> - * address, and SYSRET will explode dangerously.  We avoid this
-> - * particular problem by preventing anything from being mapped
-> - * at the maximum canonical address.
-> - */
-> -#define TASK_SIZE_MAX	((1UL << 47) - PAGE_SIZE)
-> -
->  /* This decides where the kernel will search for a free chunk of vm
->   * space during mmap's.
->   */
-> 
+Hi Mark,
 
-This should be an entirely separate patch; if nothing else you need to
-explain it in the comments.
+Mark Rutland <mark.rutland@arm.com> writes:
 
-Also, you say this is for "x86", but I still don't see any code for i386
-whatsoever.  Have you verified *all* the i386 and i386-compat paths to
-make sure they go via prepare_exit_to_usermode()?  [Cc: Andy]
+> Hi Punit,
+>
+> On Thu, Mar 30, 2017 at 05:38:47PM +0100, Punit Agrawal wrote:
+>> huge_pte_offset() does not correctly handle poisoned or migration page
+>> table entries. 
+>
+> What exactly does it do wrong?
+>
+> Judging by the patch, we return NULL in some cases we shouldn't, right?
 
-Finally, I can't really believe I'm the only person for whom "Specific
-usage of verity_pre_usermode_state" is completely opaque.
+huge_pte_offset() returns NULL when it comes across swap entries for any
+of the supported hugepage sizes.
 
-	-hpa
+>
+> What can result from this? e.g. can we see data corruption?
+
+In the tests I am running, it results in an error in the log -
+
+[  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
+
+when unmapping the page tables for the process that owns the poisoned
+page.
+
+In some instances, returning NULL instead of swap entries could lead to
+data corruption - especially when the page tables contain migration swap
+entries. But since hugepage migration is not enabled on arm64 I haven't
+seen any corruption.
+
+I've updated the commit log with more details locally.
+
+>
+>> Not knowing the size of the hugepage entry being
+>> requested only compounded the problem.
+>> 
+>> The recently added hstate parameter can be used to determine the size of
+>> hugepage being accessed. Use the size to find the correct page table
+>> entry to return when coming across a swap page table entry.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: David Woods <dwoods@mellanox.com>
+>
+> Given this is a fix for a bug, it sounds like it should have a fixes
+> tag, or a Cc stable...
+
+The problem doesn't occur until we enable memory failure handling. So
+there shouldn't be a problem on earlier kernels.
+
+Thanks,
+Punit
+
+>
+> Thanks,
+> Mark.
+>
+>> ---
+>>  arch/arm64/mm/hugetlbpage.c | 31 ++++++++++++++++---------------
+>>  1 file changed, 16 insertions(+), 15 deletions(-)
+>> 
+>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>> index 9ca742c4c1ab..44014403081f 100644
+>> --- a/arch/arm64/mm/hugetlbpage.c
+>> +++ b/arch/arm64/mm/hugetlbpage.c
+>> @@ -192,38 +192,39 @@ pte_t *huge_pte_alloc(struct mm_struct *mm,
+>>  pte_t *huge_pte_offset(struct mm_struct *mm,
+>>  		       unsigned long addr, struct hstate *h)
+>>  {
+>> +	unsigned long sz = huge_page_size(h);
+>>  	pgd_t *pgd;
+>>  	pud_t *pud;
+>> -	pmd_t *pmd = NULL;
+>> -	pte_t *pte = NULL;
+>> +	pmd_t *pmd;
+>> +	pte_t *pte;
+>>  
+>>  	pgd = pgd_offset(mm, addr);
+>>  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+>>  	if (!pgd_present(*pgd))
+>>  		return NULL;
+>> +
+>>  	pud = pud_offset(pgd, addr);
+>> -	if (!pud_present(*pud))
+>> +	if (pud_none(*pud) && sz != PUD_SIZE)
+>>  		return NULL;
+>> -
+>> -	if (pud_huge(*pud))
+>> +	else if (!pud_table(*pud))
+>>  		return (pte_t *)pud;
+>> +
+>> +	if (sz == CONT_PMD_SIZE)
+>> +		addr &= CONT_PMD_MASK;
+>> +
+>>  	pmd = pmd_offset(pud, addr);
+>> -	if (!pmd_present(*pmd))
+>> +	if (pmd_none(*pmd) &&
+>> +	    !(sz == PMD_SIZE || sz == CONT_PMD_SIZE))
+>>  		return NULL;
+>> -
+>> -	if (pte_cont(pmd_pte(*pmd))) {
+>> -		pmd = pmd_offset(
+>> -			pud, (addr & CONT_PMD_MASK));
+>> -		return (pte_t *)pmd;
+>> -	}
+>> -	if (pmd_huge(*pmd))
+>> +	else if (!pmd_table(*pmd))
+>>  		return (pte_t *)pmd;
+>> -	pte = pte_offset_kernel(pmd, addr);
+>> -	if (pte_present(*pte) && pte_cont(*pte)) {
+>> +
+>> +	if (sz == CONT_PTE_SIZE) {
+>>  		pte = pte_offset_kernel(
+>>  			pmd, (addr & CONT_PTE_MASK));
+>>  		return pte;
+>>  	}
+>> +
+>>  	return NULL;
+>>  }
+>>  
+>> -- 
+>> 2.11.0
+>> 
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
