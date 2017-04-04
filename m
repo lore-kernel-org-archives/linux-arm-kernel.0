@@ -1,344 +1,37 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 4 Apr 2017 10:10:24 +0200
-Subject: [PATCH v2 09/13] ARM64: dts: meson-gx: Add support for HDMI output
-In-Reply-To: <1490109950-21421-10-git-send-email-narmstrong@baylibre.com>
-References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
- <1490109950-21421-10-git-send-email-narmstrong@baylibre.com>
-Message-ID: <be91a6f7-19ad-5d50-4f0c-03e2821493d4@baylibre.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 4 Apr 2017 10:23:32 +0200
+Subject: [GIT PULL] mfd: exynos-lpass: Pinctrl dependency
+In-Reply-To: <20170403101824.rpvkqzyigonyi77p@dell>
+References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+ <20170328154217.5405-1-krzk@kernel.org> <20170403101824.rpvkqzyigonyi77p@dell>
+Message-ID: <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2017 04:25 PM, Neil Armstrong wrote:
-> Add HDMI output and connector nodes.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 39 ++++++++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 32 ++++++++++++++++++
->  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 23 +++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 23 +++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 12 +++++++
->  .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 23 +++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 13 ++++++++
->  .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 23 +++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |  3 ++
->  9 files changed, 191 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> index 7a078be..a84e276 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> @@ -98,6 +98,27 @@
->  		clocks = <&wifi32k>;
->  		clock-names = "ext_clock";
->  	};
-> +
-> +	cvbs-connector {
-> +		compatible = "composite-video-connector";
-> +
-> +		port {
-> +			cvbs_connector_in: endpoint {
-> +				remote-endpoint = <&cvbs_vdac_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	hdmi-connector {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_connector_in: endpoint {
-> +				remote-endpoint = <&hdmi_tx_tmds_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  /* This UART is brought out to the DB9 connector */
-> @@ -188,3 +209,21 @@
->  &ethmac {
->  	status = "okay";
->  };
-> +
-> +&cvbs_vdac_port {
-> +	cvbs_vdac_out: endpoint {
-> +		remote-endpoint = <&cvbs_connector_in>;
-> +	};
-> +};
-> +
-> +&hdmi_tx {
-> +	status = "okay";
-> +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&hdmi_tx_tmds_port {
-> +	hdmi_tx_tmds_out: endpoint {
-> +		remote-endpoint = <&hdmi_connector_in>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> index 94c6f95..0dda058 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> @@ -465,6 +465,38 @@
->  			cvbs_vdac_port: port at 0 {
->  				reg = <0>;
->  			};
-> +
-> +			/* HDMI-TX output port */
-> +			hdmi_tx_port: port at 1 {
-> +				reg = <1>;
-> +
-> +				hdmi_tx_out: endpoint {
-> +					remote-endpoint = <&hdmi_tx_in>;
-> +				};
-> +			};
-> +		};
-> +
-> +		hdmi_tx: hdmi-tx at c883a000 {
-> +			compatible = "amlogic,meson-gx-dw-hdmi";
-> +			reg = <0x0 0xc883a000 0x0 0x1c>;
-> +			interrupts = <GIC_SPI 57 IRQ_TYPE_EDGE_RISING>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +
-> +			/* VPU VENC Input */
-> +			hdmi_tx_venc_port: port at 0 {
-> +				reg = <0>;
-> +
-> +				hdmi_tx_in: endpoint {
-> +					remote-endpoint = <&hdmi_tx_out>;
-> +				};
-> +			};
-> +
-> +			/* TMDS Output */
-> +			hdmi_tx_tmds_port: port at 1 {
-> +				reg = <1>;
-> +			};
->  		};
->  	};
->  };
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> index 4cbd626..a2c999f 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-> @@ -152,6 +152,17 @@
->  			};
->  		};
->  	};
-> +
-> +	hdmi-connector {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_connector_in: endpoint {
-> +				remote-endpoint = <&hdmi_tx_tmds_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &uart_AO {
-> @@ -245,3 +256,15 @@
->  		remote-endpoint = <&cvbs_connector_in>;
->  	};
->  };
-> +
-> +&hdmi_tx {
-> +	status = "okay";
-> +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&hdmi_tx_tmds_port {
-> +	hdmi_tx_tmds_out: endpoint {
-> +		remote-endpoint = <&hdmi_connector_in>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-> index 4a96e0f..1c96fc8 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-> @@ -135,6 +135,17 @@
->  			};
->  		};
->  	};
-> +
-> +	hdmi-connector {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_connector_in: endpoint {
-> +				remote-endpoint = <&hdmi_tx_tmds_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  /* This UART is brought out to the DB9 connector */
-> @@ -250,3 +261,15 @@
->  		remote-endpoint = <&cvbs_connector_in>;
->  	};
->  };
-> +
-> +&hdmi_tx {
-> +	status = "okay";
-> +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&hdmi_tx_tmds_port {
-> +	hdmi_tx_tmds_out: endpoint {
-> +		remote-endpoint = <&hdmi_connector_in>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 04b3324..9716e65 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -524,3 +524,15 @@
->  &vpu {
->  	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
->  };
-> +
-> +&hdmi_tx {
-> +	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-> +	resets = <&reset RESET_HDMITX_CAPB3>,
-> +		 <&reset RESET_HDMI_SYSTEM_RESET>,
-> +		 <&reset RESET_HDMI_TX>;
-> +	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-> +	clocks = <&clkc CLKID_HDMI_PCLK>,
-> +		 <&clkc CLKID_CLK81>,
-> +		 <&clkc CLKID_GCLK_VENCI_INT0>;
-> +	clock-names = "isfr", "iahb", "venci";
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-> index cea4a3e..8873c05 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-> @@ -127,6 +127,17 @@
->  			};
->  		};
->  	};
-> +
-> +	hdmi-connector {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_connector_in: endpoint {
-> +				remote-endpoint = <&hdmi_tx_tmds_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &uart_AO {
-> @@ -219,3 +230,15 @@
->  		remote-endpoint = <&cvbs_connector_in>;
->  	};
->  };
-> +
-> +&hdmi_tx {
-> +	status = "okay";
-> +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&hdmi_tx_tmds_port {
-> +	hdmi_tx_tmds_out: endpoint {
-> +		remote-endpoint = <&hdmi_connector_in>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index fe11b5f..9dcac25 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -44,6 +44,7 @@
->  #include "meson-gx.dtsi"
->  #include <dt-bindings/clock/gxbb-clkc.h>
->  #include <dt-bindings/gpio/meson-gxl-gpio.h>
-> +#include <dt-bindings/reset/amlogic,meson-gxbb-reset.h>
->  
->  / {
->  	compatible = "amlogic,meson-gxl";
-> @@ -381,3 +382,15 @@
->  &vpu {
->  	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
->  };
-> +
-> +&hdmi_tx {
-> +	compatible = "amlogic,meson-gxl-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-> +	resets = <&reset RESET_HDMITX_CAPB3>,
-> +		 <&reset RESET_HDMI_SYSTEM_RESET>,
-> +		 <&reset RESET_HDMI_TX>;
-> +	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-> +	clocks = <&clkc CLKID_HDMI_PCLK>,
-> +		 <&clkc CLKID_CLK81>,
-> +		 <&clkc CLKID_GCLK_VENCI_INT0>;
-> +	clock-names = "isfr", "iahb", "venci";
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-> index 5a337d3..0e68c62e 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-> @@ -100,6 +100,17 @@
->  			};
->  		};
->  	};
-> +
-> +	hdmi-connector {
-> +		compatible = "hdmi-connector";
-> +		type = "a";
-> +
-> +		port {
-> +			hdmi_connector_in: endpoint {
-> +				remote-endpoint = <&hdmi_tx_tmds_out>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  /* This UART is brought out to the DB9 connector */
-> @@ -183,3 +194,15 @@
->  		remote-endpoint = <&cvbs_connector_in>;
->  	};
->  };
-> +
-> +&hdmi_tx {
-> +	status = "okay";
-> +	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&hdmi_tx_tmds_port {
-> +	hdmi_tx_tmds_out: endpoint {
-> +		remote-endpoint = <&hdmi_connector_in>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-> index ddea730..fe451cc 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-> @@ -130,3 +130,6 @@
->  	compatible = "amlogic,meson-gxm-vpu", "amlogic,meson-gx-vpu";
->  };
->  
-> +&hdmi_tx {
-> +	compatible = "amlogic,meson-gxm-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-> +};
-> 
+On Mon, Apr 3, 2017 at 12:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 28 Mar 2017, Krzysztof Kozlowski wrote:
+>
+>>
+>> Hi Lee,
+>>
+>>
+>> This is dependency for mfd/exynos-lpass driver changes from Marek Szyprowski.
+>> That's a material for v4.12 and I will be pushing this later to Linus Walleij.
+>
+> This does not work, and *may* still break.
+>
+> The only way to guarantee the order of the patches is to have them
+> *all* as part of the pull-request.  Not just some of them.
 
-Hi Kevin,
+What do you mean exactly? If these two patches come through my tree
+first, then everything will work fine because they do not break any
+other stuff.
 
-Please take this one for the amlogic arm-soc DT tree.
+If you pull it and apply the rest on top, then it should also work
+without problems because your history will contain everything needed
+in proper order.
 
-It may need a rebase, please tell me then I'll repost this one rebased on your 4.12/dt64 branch.
+In both cases bisectability is preserved. Did I missed something?
 
-Thanks,
-Neil
+Best regards,
+Krzysztof
