@@ -1,62 +1,72 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 4 Apr 2017 16:33:27 +0100
-Subject: [PATCH v3 0/8] arm64: efi: PE/COFF cleanup/hardening
-In-Reply-To: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
-References: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_FKeGmE9HdK1rONG1SJZgsEsm=bmCVXxJ0nKV3PwDYZA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Apr 2017 16:36:59 +0100
+Subject: [PATCH] [media] cec: Handle RC capability more elegantly
+In-Reply-To: <20170404151939.bvd252nprj6kjmdu@dell>
+References: <20170404144309.31357-1-lee.jones@linaro.org>
+ <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
+ <20170404151939.bvd252nprj6kjmdu@dell>
+Message-ID: <20170404153659.GC7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2017 at 19:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This cleans up the PE/COFF EFI header, by taking some of Mark's patches
-> and use them to replace open coded constants with symbolic ones, and
-> remove incorrect values or unused sections.
->
-> Finally, it updates the section layout so that the kernel Image can be
-> mapped in a way that does not require setting RWX permissions anywhere.
-> Note that this is currently not a huge win, given that most current UEFI
-> implementations map all of RAM RWX by default, but this is finally gaining
-> some attention in the Tianocore community, and patches have been merged into
-> EDK2 to apply strict permissions to all of memory (to the extent possible
-> without breaking loaders like GRUB that assume EFI_LOADER_DATA memory is
-> mapped executable)
->
-> Changes since v2:
-> - drop ARM patches for now
-> - rebase onto today's arm64 for-next/core
->
-> Changes since v1:
-> - added missing secondary SOB on Mark's patches
-> - leave Image header as before, only move the PE header to a separate file
-> - put PE header fixes in a separate patch
-> - add acks from Mark and Peter (#6)
-> - give ARM the same treatment as arm64 (#10 - #13)
-> - add NB10 PE debuglink entry to ARM PE/COFF header as well (#9, #14)
->
-> Ard Biesheuvel (6):
->   arm64: efi: move EFI header and related data to a separate .S file
->   arm64: efi: clean up Image header after PE header has been split off
->   arm64: efi: remove forbidden values from the PE/COFF header
->   arm64: efi: remove pointless dummy .reloc section
->   arm64: efi: replace open coded constants with symbolic ones
->   arm64: efi: split Image code and data into separate PE/COFF sections
->
-> Mark Rutland (2):
->   include: pe.h: allow for use in assembly
->   include: pe.h: add some missing definitions
->
->  arch/arm64/kernel/efi-header.S  | 155 +++++++++++++++++
->  arch/arm64/kernel/head.S        | 162 +-----------------
->  arch/arm64/kernel/vmlinux.lds.S |   2 +
->  include/linux/pe.h              | 177 ++++++++++----------
->  4 files changed, 255 insertions(+), 241 deletions(-)
->  create mode 100644 arch/arm64/kernel/efi-header.S
->
+On Tue, Apr 04, 2017 at 04:19:39PM +0100, Lee Jones wrote:
+> On Tue, 04 Apr 2017, Hans Verkuil wrote:
+> 
+> > On 04/04/2017 04:43 PM, Lee Jones wrote:
+> > > If a user specifies the use of RC as a capability, they should
+> > > really be enabling RC Core code.  If they do not we WARN() them
+> > > of this and disable the capability for them.
+> > > 
+> > > Once we know RC Core code has not been enabled, we can update
+> > > the user's capabilities and use them as a term of reference for
+> > > other RC-only calls.  This is preferable to having ugly #ifery
+> > > scattered throughout C code.
+> > > 
+> > > Most of the functions are actually safe to call, since they
+> > > sensibly check for a NULL RC pointer before they attempt to
+> > > deference it.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/media/cec/cec-core.c | 19 +++++++------------
+> > >  1 file changed, 7 insertions(+), 12 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
+> > > index cfe414a..51be8d6 100644
+> > > --- a/drivers/media/cec/cec-core.c
+> > > +++ b/drivers/media/cec/cec-core.c
+> > > @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+> > >  		return ERR_PTR(-EINVAL);
+> > >  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
+> > >  		return ERR_PTR(-EINVAL);
+> > > +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
+> > > +		caps &= ~CEC_CAP_RC;
+> > 
+> > Don't use WARN_ON, this is not an error of any kind.
+> 
+> Right, this is not an error.
+> 
+> That's why we are warning the user instead of bombing out.
 
-Catalin, Will,
+Please print warning using pr_warn() or dev_warn().  Using WARN_ON()
+because something is not configured is _really_ not nice behaviour.
+Consider how useful a stack trace is to the user for this situation -
+it's completely meaningless.
 
-Even if this is mostly EFI specific, the diffstat suggests that this
-should go through the arm64 tree, given that <linux/pe.h> does not
-appear to have an owner.
+A message that prompts the user to enable RC_CORE would make more sense,
+and be much more informative to the user.  Maybe something like this:
 
-Are you ok to take this for v4.12?
++	if (caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)) {
++		pr_warn("CEC: driver %pf requests RC, please enable CONFIG_RC_CORE\n",
++			__builtin_return_address(0));
++		caps &= ~CEC_CAP_RC;
++	}
+
+It could be much more informative by using dev_warn() if we had the
+'struct device' passed in to this function, and then we wouldn't need
+to use __builtin_return_address().
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
