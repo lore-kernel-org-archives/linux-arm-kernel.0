@@ -1,45 +1,46 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 04 Apr 2017 12:30:15 +0200
-Subject: [PATCH 1/5] ARM: imx: gpc: Do not print error message for
- EPROBE_DEFER
-In-Reply-To: <1491301683.1654.8.camel@nxp.com>
-References: <cover.1490987945.git.leonard.crestez@nxp.com>
- <ac58dbed203260f9bb93d7685c8f0e08407e0019.1490987945.git.leonard.crestez@nxp.com>
- <1491299184.2367.12.camel@pengutronix.de> <1491301683.1654.8.camel@nxp.com>
-Message-ID: <1491301815.2367.21.camel@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 4 Apr 2017 12:31:39 +0200
+Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU clock
+ input
+In-Reply-To: <2246751.IOz92zzvZ6@avalon>
+References: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
+ <2246751.IOz92zzvZ6@avalon>
+Message-ID: <CAMuHMdXqEhjzo5PH3a7JyUsuCBpnDGibGabD5k5oVhZY=FkRow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 04.04.2017, 13:28 +0300 schrieb Leonard Crestez:
-> On Tue, 2017-04-04 at 11:46 +0200, Lucas Stach wrote:
-> > Am Freitag, den 31.03.2017, 22:25 +0300 schrieb Leonard Crestez:
-> > > 
-> > > The pu regulator request will return -EPROBE_DEFER if it has a supply
-> > > from PMIC and this supply is not yet registered. This does not represent
-> > > an error since the driver will call probe again later, so only print a
-> > > warning message in this case.
-> > > 
-> > > Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
-> > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > > ---
-> > >  arch/arm/mach-imx/gpc.c | 6 +++++-
-> > The driver moved places, together with a large rewrite, to
-> > drivers/soc/imx/.
-> > 
-> > This issue isn't present in the new driver, so this patch can just be
-> > dropped.
-> 
-> Wait, I'm confused. In what tree did that happen? This patch is against
-> linus's tree as of last week and there is nothing in drivers/soc/imx.
-> 
-> I saw patches for a new gpcv2 driver but that seems to be only for
-> imx7. This patch is for imx6. Will that driver also support imx6?
+Hi Laurent,
 
-Shawns maintainer tree:
+On Tue, Apr 4, 2017 at 12:05 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Monday 03 Apr 2017 11:55:19 Geert Uytterhoeven wrote:
+>> The X2 crystal oscillator on the Koelsch development board provides a
+>> 74.25 MHz clock, not a 148.5 MHz clock.
+>>
+>> Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel
+>> clocks to DT") Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Confirmed by schematics, user manual, and physical inspection of 2
+>> Koelsch instances (my scope has not enough bandwidth to measure the
+>> actual frequency).
+>
+> Stupid question, have you tested the corresponding (HDMI) DU output ? If so,
 
-https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git/log/?h=imx/drivers
+No I haven't.
 
-This is what is staged for the next merge window.
+Niklas, can you please fire up your display? Thanks!
 
-Regards,
-Lucas
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Thanks ;-)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
