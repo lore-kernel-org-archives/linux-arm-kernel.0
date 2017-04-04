@@ -1,59 +1,135 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 4 Apr 2017 15:11:46 -0700
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities output
- video on pad 1
-In-Reply-To: <1490894749.2404.33.camel@pengutronix.de>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
-Message-ID: <9bfabc5c-d90f-6487-537d-20515ec61f9c@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 4 Apr 2017 15:19:34 -0700
+Subject: [PATCH v4 1/3] usercopy: create enum stack_type
+In-Reply-To: <20170216182917.19637-2-james.morse@arm.com>
+References: <20170216182917.19637-1-james.morse@arm.com>
+ <20170216182917.19637-2-james.morse@arm.com>
+Message-ID: <CAGXu5jLN81EhTdXT9mc=G0Ci-ib3PRc7jw=3DxOvEHzo-QaNgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/30/2017 10:25 AM, Philipp Zabel wrote:
-> The TVP5150 DT bindings specify a single output port (port 0) that
-> corresponds to the video output pad (pad 1, DEMOD_PAD_VID_OUT).
+On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
+> From: Sahara <keun-o.park@darkmatter.ae>
 >
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> I'm trying to get this to work with a TVP5150 analog TV decoder, and the
-> first problem is that this device doesn't have pad 0 as its single
-> output pad. Instead, as a MEDIA_ENT_F_ATV_DECODER entity, it has for
-> pads (input, video out, vbi out, audio out), and video out is pad 1,
-> whereas the device tree only defines a single port (0).
+> This patch creates enum stack_type which is only used in usercopy.c
+> for now. This enum type can be used for x86 and other architecture's
+> thread_info.h, which may have arch_within_stack_frames().
+>
+> Signed-off-by: Sahara <keun-o.park@darkmatter.ae>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Acked-by: Kees Cook <keescook@chromium.org>
 
-Shouldn't the DT bindings define ports for these other pads?
-I haven't seen this documented anywhere, but shouldn't there
-be a 1:1 correspondence between DT ports and media pads?
+I've adjusted this slightly and added it to my usercopy tree for -next.
 
-Steve
-
+-Kees
 
 > ---
+>  arch/x86/include/asm/thread_info.h | 19 ++++++++++---------
+>  include/linux/thread_info.h        | 13 ++++++++++---
+>  mm/usercopy.c                      |  8 +-------
+>  3 files changed, 21 insertions(+), 19 deletions(-)
 >
->  drivers/staging/media/imx/imx-media-dev.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> diff --git a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
+> index ad6f5eb07a95..7af4b8b23b8b 100644
+> --- a/arch/x86/include/asm/thread_info.h
+> +++ b/arch/x86/include/asm/thread_info.h
+> @@ -168,13 +168,13 @@ static inline unsigned long current_stack_pointer(void)
+>   * entirely contained by a single stack frame.
+>   *
+>   * Returns:
+> - *              1 if within a frame
+> - *             -1 if placed across a frame boundary (or outside stack)
+> - *              0 unable to determine (no frame pointers, etc)
+> + *     GOOD_FRAME      if within a frame
+> + *     BAD_STACK       if placed across a frame boundary (or outside stack)
+> + *     NOT_STACK       unable to determine (no frame pointers, etc)
+>   */
+> -static inline int arch_within_stack_frames(const void * const stack,
+> -                                          const void * const stackend,
+> -                                          const void *obj, unsigned long len)
+> +static inline enum stack_type arch_within_stack_frames(const void * const stack,
+> +                                       const void * const stackend,
+> +                                       const void *obj, unsigned long len)
+>  {
+>  #if defined(CONFIG_FRAME_POINTER)
+>         const void *frame = NULL;
+> @@ -197,13 +197,14 @@ static inline int arch_within_stack_frames(const void * const stack,
+>                  * the copy as invalid.
+>                  */
+>                 if (obj + len <= frame)
+> -                       return obj >= oldframe + 2 * sizeof(void *) ? 1 : -1;
+> +                       return obj >= oldframe + 2 * sizeof(void *) ?
+> +                               GOOD_FRAME : BAD_STACK;
+>                 oldframe = frame;
+>                 frame = *(const void * const *)frame;
+>         }
+> -       return -1;
+> +       return BAD_STACK;
+>  #else
+> -       return 0;
+> +       return NOT_STACK;
+>  #endif
+>  }
 >
-> diff --git a/drivers/staging/media/imx/imx-media-dev.c b/drivers/staging/media/imx/imx-media-dev.c
-> index 17e2386a3ca3a..c52d6ca797965 100644
-> --- a/drivers/staging/media/imx/imx-media-dev.c
-> +++ b/drivers/staging/media/imx/imx-media-dev.c
-> @@ -267,6 +267,15 @@ static int imx_media_create_link(struct imx_media_dev *imxmd,
->  	source_pad = link->local_pad;
->  	sink_pad = link->remote_pad;
+> diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+> index 58373875e8ee..a38b3be347df 100644
+> --- a/include/linux/thread_info.h
+> +++ b/include/linux/thread_info.h
+> @@ -22,6 +22,13 @@
+>  #endif
 >
-> +	/*
-> +	 * If the source subdev is an analog video decoder with a single source
-> +	 * port, assume that this port 0 corresponds to the DEMOD_PAD_VID_OUT
-> +	 * entity pad.
-> +	 */
-> +	if (source->entity.function == MEDIA_ENT_F_ATV_DECODER &&
-> +	    local_sd->num_sink_pads == 0 && local_sd->num_src_pads == 1)
-> +		source_pad = DEMOD_PAD_VID_OUT;
+>  #include <linux/bitops.h>
 > +
->  	v4l2_info(&imxmd->v4l2_dev, "%s: %s:%d -> %s:%d\n", __func__,
->  		  source->name, source_pad, sink->name, sink_pad);
+> +enum stack_type {
+> +       BAD_STACK = -1,
+> +       NOT_STACK = 0,
+> +       GOOD_FRAME,
+> +       GOOD_STACK,
+> +};
+>  #include <asm/thread_info.h>
 >
+>  #ifdef __KERNEL__
+> @@ -77,9 +84,9 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
+>  #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
 >
+>  #ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
+> -static inline int arch_within_stack_frames(const void * const stack,
+> -                                          const void * const stackend,
+> -                                          const void *obj, unsigned long len)
+> +static inline enum stack_type arch_within_stack_frames(const void * const stack,
+> +                                       const void * const stackend,
+> +                                       const void *obj, unsigned long len)
+>  {
+>         return 0;
+>  }
+> diff --git a/mm/usercopy.c b/mm/usercopy.c
+> index 3c8da0af9695..3531ae735d87 100644
+> --- a/mm/usercopy.c
+> +++ b/mm/usercopy.c
+> @@ -16,15 +16,9 @@
+>
+>  #include <linux/mm.h>
+>  #include <linux/slab.h>
+> +#include <linux/thread_info.h>
+>  #include <asm/sections.h>
+>
+> -enum {
+> -       BAD_STACK = -1,
+> -       NOT_STACK = 0,
+> -       GOOD_FRAME,
+> -       GOOD_STACK,
+> -};
+> -
+>  /*
+>   * Checks if a given pointer and length is contained by the current
+>   * stack frame (if possible).
+> --
+> 2.10.1
+>
+
+
+
+-- 
+Kees Cook
+Pixel Security
