@@ -1,71 +1,119 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  4 Apr 2017 18:18:13 +0100
-Subject: [PATCH v3 05/18] arm64: cpu_errata: Add capability to advertise
- Cortex-A73 erratum 858921
+Date: Tue,  4 Apr 2017 18:18:18 +0100
+Subject: [PATCH v3 10/18] arm64: arch_timer: Rework the set_next_event
+ workarounds
 In-Reply-To: <20170404171826.25030-1-marc.zyngier@arm.com>
 References: <20170404171826.25030-1-marc.zyngier@arm.com>
-Message-ID: <20170404171826.25030-6-marc.zyngier@arm.com>
+Message-ID: <20170404171826.25030-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to work around Cortex-A73 erratum 858921 in a subsequent
-patch, add the required capability that advertise the erratum.
+The way we work around errata affecting set_next_event is not very
+nice, at it imposes this workaround on errata that do not need it.
 
-As the configuration option it depends on is not present yet,
-this has no immediate effect.
+Add new workaround hooks and let the existing workarounds use them.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/arm64/silicon-errata.txt | 1 +
- arch/arm64/include/asm/cpucaps.h       | 3 ++-
- arch/arm64/kernel/cpu_errata.c         | 8 ++++++++
- 3 files changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/arch_timer.h  |  4 ++++
+ drivers/clocksource/arm_arch_timer.c | 31 ++++++++++++++++++++++++++-----
+ 2 files changed, 30 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 2f66683500b8..10f2dddbf449 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -54,6 +54,7 @@ stable kernels.
- | ARM            | Cortex-A57      | #852523         | N/A                         |
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
- | ARM            | Cortex-A72      | #853709         | N/A                         |
-+| ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
- | ARM            | MMU-500         | #841119,#826419 | N/A                         |
- |                |                 |                 |                             |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index fb78a5d3b60b..b3aab8a17868 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -37,7 +37,8 @@
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_REPEAT_TLBI		17
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
-+#define ARM64_WORKAROUND_858921			19
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 1b0d7e994e0c..cc1e08127fb4 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -42,6 +42,8 @@ enum arch_timer_erratum_match_type {
+ 	ate_match_local_cap_id,
+ };
  
--#define ARM64_NCAPS				19
-+#define ARM64_NCAPS				20
++struct clock_event_device;
++
+ struct arch_timer_erratum_workaround {
+ 	enum arch_timer_erratum_match_type match_type;
+ 	const void *id;
+@@ -49,6 +51,8 @@ struct arch_timer_erratum_workaround {
+ 	u32 (*read_cntp_tval_el0)(void);
+ 	u32 (*read_cntv_tval_el0)(void);
+ 	u64 (*read_cntvct_el0)(void);
++	int (*set_next_event_phys)(unsigned long, struct clock_event_device *);
++	int (*set_next_event_virt)(unsigned long, struct clock_event_device *);
+ };
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 2be1d1c05303..2ed2a7657711 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -158,6 +158,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 			   MIDR_CPU_VAR_REV(0, 0)),
+ extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 2c02e25d1475..a0c9ee80147e 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -282,6 +282,8 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
+ 		.read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
+ 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
++		.set_next_event_phys = erratum_set_next_event_tval_phys,
++		.set_next_event_virt = erratum_set_next_event_tval_virt,
  	},
  #endif
-+#ifdef CONFIG_ARM64_ERRATUM_858921
-+	{
-+	/* Cortex-A73 all versions */
-+		.desc = "ARM erratum 858921",
-+		.capability = ARM64_WORKAROUND_858921,
-+		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
-+	},
-+#endif
- 	{
- 	}
+ #ifdef CONFIG_HISILICON_ERRATUM_161010101
+@@ -292,6 +294,8 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+ 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
+ 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
++		.set_next_event_phys = erratum_set_next_event_tval_phys,
++		.set_next_event_virt = erratum_set_next_event_tval_virt,
+ 	},
+ #endif
  };
+@@ -377,11 +381,24 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 		local ? "local" : "global", wa->desc);
+ }
+ 
++#define erratum_handler(fn, r, ...)					\
++({									\
++	bool __val;							\
++	if (needs_unstable_timer_counter_workaround() &&		\
++	    timer_unstable_counter_workaround->fn) {			\
++		r = timer_unstable_counter_workaround->fn(__VA_ARGS__);	\
++		__val = true;						\
++	} else {							\
++		__val = false;						\
++	}								\
++	__val;								\
++})
++
+ #else
+ #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+ #define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
+ #define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
+-#define needs_unstable_timer_counter_workaround()	({false;})
++#define erratum_handler(fn, r, ...)			({false;})
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
+ static __always_inline irqreturn_t timer_handler(const int access,
+@@ -474,8 +491,10 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
+ static int arch_timer_set_next_event_virt(unsigned long evt,
+ 					  struct clock_event_device *clk)
+ {
+-	if (needs_unstable_timer_counter_workaround())
+-		return erratum_set_next_event_tval_virt(evt, clk);
++	int ret;
++
++	if (erratum_handler(set_next_event_virt, ret, evt, clk))
++		return ret;
+ 
+ 	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
+ 	return 0;
+@@ -484,8 +503,10 @@ static int arch_timer_set_next_event_virt(unsigned long evt,
+ static int arch_timer_set_next_event_phys(unsigned long evt,
+ 					  struct clock_event_device *clk)
+ {
+-	if (needs_unstable_timer_counter_workaround())
+-		return erratum_set_next_event_tval_phys(evt, clk);
++	int ret;
++
++	if (erratum_handler(set_next_event_phys, ret, evt, clk))
++		return ret;
+ 
+ 	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
+ 	return 0;
 -- 
 2.11.0
