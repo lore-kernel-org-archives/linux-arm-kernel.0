@@ -1,75 +1,100 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Tue, 4 Apr 2017 15:02:45 +0000
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
- <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 4 Apr 2017 23:02:52 +0800
+Subject: [RFC PATCH v2 1/4] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3
+In-Reply-To: <20170404144715.fa5sy427u2cz4e6z@rob-hp-laptop>
+References: <20170402133304.56824-1-icenowy@aosc.io>
+ <20170402133304.56824-2-icenowy@aosc.io>
+ <20170404144715.fa5sy427u2cz4e6z@rob-hp-laptop>
+Message-ID: <bdc43a73-a2d6-01ae-8113-277f7174697c@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan
 
->Hi Mayurkumar,
+
+? 2017?04?04? 22:47, Rob Herring ??:
+> On Sun, Apr 02, 2017 at 09:33:01PM +0800, Icenowy Zheng wrote:
+>> Allwinner H3 features a thermal sensor like the one in A33, but has its
+>> register re-arranged, the clock divider moved to CCU (originally the
+>> clock divider is in ADC) and added a pair of bus clock and reset.
+>>
+>> Update the binding document to cover H3.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 23 ++++++++++++++++++++--
+>>  1 file changed, 21 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>> index badff3611a98..7753133ca0ff 100644
+>> --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>> @@ -4,12 +4,20 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+>>  and sometimes as a touchscreen controller.
+>>
+>>  Required properties:
+>> -  - compatible: "allwinner,sun8i-a33-ths",
+>> +  - compatible: must contain one of the following compatibles:
+>> +		- "allwinner,sun8i-a33-ths"
+>> +		- "allwinner,sun8i-h3-ths"
+>>    - reg: mmio address range of the chip,
+>>    - #thermal-sensor-cells: shall be 0,
+>>    - #io-channel-cells: shall be 0,
+>>
+>> -Example:
+>> +Required properties for the following compatibles:
+>> +		- "allwinner,sun8i-h3-ths"
+>> +  - clocks: the bus clock and the input clock of the ADC,
+>> +  - clock-names: should be "bus" and "ths",
+>> +  - resets: the bus reset of the ADC,
+>> +
+>> +Example for A33:
+>>  	ths: ths at 01c25000 {
+>>  		compatible = "allwinner,sun8i-a33-ths";
+>>  		reg = <0x01c25000 0x100>;
+>> @@ -17,6 +25,17 @@ Example:
+>>  		#io-channel-cells = <0>;
+>>  	};
+>>
+>> +Example for H3:
+>> +	ths: ths at 01c25000 {
 >
->On 3/30/2017 9:30 AM, Sinan Kaya wrote:
->> When the operating system is booted with the default ASPM policy
->> (POLICY_DEFAULT), current code is querying the enable/disable
->> states from ASPM registers to determine the policy.
->>
->> For example, a BIOS could set the power saving state to performance
->> and clear all ASPM control registers. A balanced ASPM policy could
->> enable L0s and disable L1. A power conscious BIOS could enable both
->> L0s and L1 to trade off latency and performance vs. power.
->>
->> After hotplug removal, pcie_aspm_exit_link_state() function clears
->> the ASPM registers. An insertion following hotplug removal reads
->> incorrect policy as ASPM disabled even though ASPM was enabled
->> during boot.
->>
->> This is caused by the fact that same function is used for reconfiguring
->> ASPM regardless of the power on state.
->>
->> ------------------------
->> Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
->> ------------------------
->> - revert the accidental parent check in bridge remove
->>
->> Sinan Kaya (5):
->>   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
->>   PCI/ASPM: split pci_aspm_init() into two
->>   PCI/ASPM: add init hook to device_add
->>   PCI/ASPM: save power on values during bridge init
->>   PCI/ASPM: move link_state cleanup to bridge remove
->>
->>  drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
->>  drivers/pci/probe.c     |   3 ++
->>  drivers/pci/remove.c    |   3 +-
->>  include/linux/pci.h     |   2 +
->>  4 files changed, 98 insertions(+), 47 deletions(-)
->>
+> adc at ...
+
+It's a thermal sensor, so I think call it THS is more appropriate
+here. It's implemented as an ADC driver just because the internal
+code reusing of Linux. From device tree binding view I choose to
+call it ths.
+
 >
->Did you get a chance to test?
+> And drop the leading 0.
+
+OK.
+
 >
-
-Not yet. Will get back in this week sometimes to give you some feedback.
-
-
-
-Thanks
-Mayur
-
->Sinan
+>> +		compatible = "allwinner,sun8i-h3-ths";
+>> +		reg = <0x01c25000 0x100>;
+>> +		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
+>> +		clock-names = "bus", "ths";
+>> +		resets = <&ccu RST_BUS_THS>;
+>> +		#thermal-sensor-cells = <0>;
+>> +		#io-channel-cells = <0>;
+>> +	};
+>> +
+>>  sun4i, sun5i and sun6i SoCs are also supported via the older binding:
+>>
+>>  sun4i resistive touchscreen controller
+>> --
+>> 2.12.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
->--
->Sinan Kaya
->Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
