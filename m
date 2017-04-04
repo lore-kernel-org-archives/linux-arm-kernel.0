@@ -1,53 +1,50 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 04 Apr 2017 11:48:02 +0200
-Subject: [PATCH 2/5] cpufreq: imx6q: Fix handling EPROBE_DEFER from
- regulator
-In-Reply-To: <36c230773c14d37037dbe8cadf4f99b0d875e679.1490987945.git.leonard.crestez@nxp.com>
-References: <cover.1490987945.git.leonard.crestez@nxp.com>
- <36c230773c14d37037dbe8cadf4f99b0d875e679.1490987945.git.leonard.crestez@nxp.com>
-Message-ID: <1491299282.2367.13.camel@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Apr 2017 10:50:54 +0100
+Subject: [GIT PULL] mfd: exynos-lpass: Pinctrl dependency
+In-Reply-To: <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
+References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+ <20170328154217.5405-1-krzk@kernel.org>
+ <20170403101824.rpvkqzyigonyi77p@dell>
+ <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
+Message-ID: <20170404095054.7m6nf6bxweskabuu@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 31.03.2017, 22:25 +0300 schrieb Leonard Crestez:
-> From: Irina Tirdea <irina.tirdea@nxp.com>
-> 
-> If there are any errors in getting the cpu0 regulators, the driver returns
-> -ENOENT. In case the regulators are not yet available, the devm_regulator_get
-> calls will return -EPROBE_DEFER, so that the driver can be probed later.
-> If we return -ENOENT, the driver will fail its initialization and will
-> not try to probe again (when the regulators become available).
-> 
-> Return the actual error received from regulator_get in probe. Print a
-> differentiated message in case we need to probe the device later and
-> in case we actually failed. Also add a message to inform when the
-> driver has been successfully registered.
-> 
-> Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Tue, 04 Apr 2017, Krzysztof Kozlowski wrote:
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+> On Mon, Apr 3, 2017 at 12:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 28 Mar 2017, Krzysztof Kozlowski wrote:
+> >
+> >>
+> >> Hi Lee,
+> >>
+> >>
+> >> This is dependency for mfd/exynos-lpass driver changes from Marek Szyprowski.
+> >> That's a material for v4.12 and I will be pushing this later to Linus Walleij.
+> >
+> > This does not work, and *may* still break.
+> >
+> > The only way to guarantee the order of the patches is to have them
+> > *all* as part of the pull-request.  Not just some of them.
 > 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 7719b02..be90ee3 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -222,6 +222,13 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  	arm_reg = regulator_get(cpu_dev, "arm");
->  	pu_reg = regulator_get_optional(cpu_dev, "pu");
->  	soc_reg = regulator_get(cpu_dev, "soc");
-> +	if (PTR_ERR(arm_reg) == -EPROBE_DEFER ||
-> +			PTR_ERR(soc_reg) == -EPROBE_DEFER ||
-> +			PTR_ERR(pu_reg) == -EPROBE_DEFER) {
-> +		ret = -EPROBE_DEFER;
-> +		dev_dbg(cpu_dev, "regulators not ready, defer\n");
-> +		goto put_reg;
-> +	}
->  	if (IS_ERR(arm_reg) || IS_ERR(soc_reg)) {
->  		dev_err(cpu_dev, "failed to get regulators\n");
->  		ret = -ENOENT;
+> What do you mean exactly? If these two patches come through my tree
+> first, then everything will work fine because they do not break any
+> other stuff.
+> 
+> If you pull it and apply the rest on top, then it should also work
+> without problems because your history will contain everything needed
+> in proper order.
+> 
+> In both cases bisectability is preserved. Did I missed something?
+
+Okay, so you're suggesting that I rebase MFD *on-top* of your PR.  That
+does work for me because I insist on being able to re-work my tree at
+any time.  However, be aware that some Maintainers do not work this
+way, thus *normally* you will have to send PR containing all of the
+dependant patches.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
