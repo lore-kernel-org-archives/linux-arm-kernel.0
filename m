@@ -1,114 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  4 Apr 2017 17:10:05 +0100
-Subject: [PATCH 2/2] [media] cec: Handle RC capability more elegantly
-In-Reply-To: <20170404161005.20884-1-lee.jones@linaro.org>
-References: <20170404161005.20884-1-lee.jones@linaro.org>
-Message-ID: <20170404161005.20884-2-lee.jones@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Apr 2017 09:11:52 -0700
+Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170328205511.21166-3-d-gerlach@ti.com>
+References: <20170328205511.21166-1-d-gerlach@ti.com>
+ <20170328205511.21166-3-d-gerlach@ti.com>
+Message-ID: <20170404161151.GS10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a user specifies the use of RC as a capability, they should
-really be enabling RC Core code.  If they do not we WARN() them
-of this and disable the capability for them.
+Russell,
 
-Once we know RC Core code has not been enabled, we can update
-the user's capabilities and use them as a term of reference for
-other RC-only calls.  This is preferable to having ugly #ifery
-scattered throughout C code.
+* Dave Gerlach <d-gerlach@ti.com> [170328 13:57]:
+> Certain SoCs like Texas Instruments AM335x and AM437x require parts
+> of the EMIF PM code to run late in the suspend sequence from SRAM,
+> such as saving and restoring the EMIF context and placing the memory
+> into self-refresh.
+> 
+> One requirement for these SoCs to suspend and enter its lowest power
+> mode, called DeepSleep0, is that the PER power domain must be shut off.
+> Because the EMIF (DDR Controller) resides within this power domain, it
+> will lose context during a suspend operation, so we must save it so we
+> can restore once we resume. However, we cannot execute this code from
+> external memory, as it is not available at this point, so the code must
+> be executed late in the suspend path from SRAM.
+> 
+> This patch introduces a ti-emif-sram driver that includes several
+> functions written in ARM ASM that are relocatable so the PM SRAM
+> code can use them. It also allocates a region of writable SRAM to
+> be used by the code running in the executable region of SRAM to save
+> and restore the EMIF context. It can export a table containing the
+> absolute addresses of the available PM functions so that other SRAM
+> code can branch to them. This code is required for suspend/resume on
+> AM335x and AM437x to work.
+> 
+> In addition to this, to be able to share data structures between C and
+> the ti-emif-sram-pm assembly code, we can automatically generate all of
+> the C struct member offsets and sizes as macros by making use of the ARM
+> asm-offsets file. In the same header that we define our data structures
+> in we also define all the macros in an inline function and by adding a
+> call to this in the asm_offsets file all macros are properly generated
+> and available to the assembly code without cluttering up the asm-offsets
+> file.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/kernel/asm-offsets.c    |   6 +
+>  drivers/memory/Kconfig           |  10 ++
+>  drivers/memory/Makefile          |   4 +
+>  drivers/memory/emif.h            |  17 ++
+>  drivers/memory/ti-emif-pm.c      | 295 ++++++++++++++++++++++++++++++++++
+>  drivers/memory/ti-emif-sram-pm.S | 334 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/ti-emif-sram.h     | 143 +++++++++++++++++
+>  7 files changed, 809 insertions(+)
+>  create mode 100644 drivers/memory/ti-emif-pm.c
+>  create mode 100644 drivers/memory/ti-emif-sram-pm.S
+>  create mode 100644 include/linux/ti-emif-sram.h
+> 
+> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> index 608008229c7d..d728b5660e36 100644
+> --- a/arch/arm/kernel/asm-offsets.c
+> +++ b/arch/arm/kernel/asm-offsets.c
+> @@ -28,6 +28,7 @@
+>  #include <asm/vdso_datapage.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <linux/kbuild.h>
+> +#include <linux/ti-emif-sram.h>
+>  
+>  /*
+>   * Make sure that the compiler and target are compatible.
+> @@ -183,5 +184,10 @@ int main(void)
+>  #ifdef CONFIG_VDSO
+>    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
+>  #endif
+> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+> +  BLANK();
+> +  ti_emif_offsets();
+> +#endif
+> +
+>    return 0; 
+>  }
 
-Most of the functions are actually safe to call, since they
-sensibly check for a NULL RC pointer before they attempt to
-deference it.
+Does the above look OK to you?
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/media/cec/cec-core.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+Regards,
 
-diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-index cfe414a..51be8d6 100644
---- a/drivers/media/cec/cec-core.c
-+++ b/drivers/media/cec/cec-core.c
-@@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 		return ERR_PTR(-EINVAL);
- 	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
- 		return ERR_PTR(-EINVAL);
-+	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
-+		caps &= ~CEC_CAP_RC;
-+
- 	adap = kzalloc(sizeof(*adap), GFP_KERNEL);
- 	if (!adap)
- 		return ERR_PTR(-ENOMEM);
-+
- 	strlcpy(adap->name, name, sizeof(adap->name));
- 	adap->phys_addr = CEC_PHYS_ADDR_INVALID;
- 	adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
-@@ -237,7 +241,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 	if (!(caps & CEC_CAP_RC))
- 		return adap;
- 
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	/* Prepare the RC input device */
- 	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
- 	if (!adap->rc) {
-@@ -264,9 +267,7 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 	adap->rc->priv = adap;
- 	adap->rc->map_name = RC_MAP_CEC;
- 	adap->rc->timeout = MS_TO_NS(100);
--#else
--	adap->capabilities &= ~CEC_CAP_RC;
--#endif
-+
- 	return adap;
- }
- EXPORT_SYMBOL_GPL(cec_allocate_adapter);
-@@ -285,7 +286,6 @@ int cec_register_adapter(struct cec_adapter *adap,
- 	adap->owner = parent->driver->owner;
- 	adap->devnode.dev.parent = parent;
- 
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	if (adap->capabilities & CEC_CAP_RC) {
- 		adap->rc->dev.parent = parent;
- 		res = rc_register_device(adap->rc);
-@@ -298,15 +298,13 @@ int cec_register_adapter(struct cec_adapter *adap,
- 			return res;
- 		}
- 	}
--#endif
- 
- 	res = cec_devnode_register(&adap->devnode, adap->owner);
- 	if (res) {
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 		/* Note: rc_unregister also calls rc_free */
- 		rc_unregister_device(adap->rc);
- 		adap->rc = NULL;
--#endif
-+
- 		return res;
- 	}
- 
-@@ -337,11 +335,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
- 	if (IS_ERR_OR_NULL(adap))
- 		return;
- 
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	/* Note: rc_unregister also calls rc_free */
- 	rc_unregister_device(adap->rc);
- 	adap->rc = NULL;
--#endif
-+
- 	debugfs_remove_recursive(adap->cec_dir);
- 	cec_devnode_unregister(&adap->devnode);
- }
-@@ -357,9 +354,7 @@ void cec_delete_adapter(struct cec_adapter *adap)
- 	kthread_stop(adap->kthread);
- 	if (adap->kthread_config)
- 		kthread_stop(adap->kthread_config);
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	rc_free_device(adap->rc);
--#endif
- 	kfree(adap);
- }
- EXPORT_SYMBOL_GPL(cec_delete_adapter);
--- 
-2.9.3
+Tony
