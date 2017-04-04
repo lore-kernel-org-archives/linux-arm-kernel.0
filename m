@@ -1,50 +1,53 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 4 Apr 2017 20:04:55 +0300
-Subject: [PATCH 3/5] cpufreq: imx6q: Set max suspend_freq to avoid
- changes during suspend
-In-Reply-To: <1491299500.2367.16.camel@pengutronix.de>
-References: <cover.1490987945.git.leonard.crestez@nxp.com>
- <94d99b261124b813adecf11e86a0ffe05c37f276.1490987945.git.leonard.crestez@nxp.com>
- <1491299500.2367.16.camel@pengutronix.de>
-Message-ID: <1491325495.27463.7.camel@nxp.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 4 Apr 2017 20:08:47 +0300
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+ <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
+ <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
+ <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
+Message-ID: <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-04 at 11:51 +0200, Lucas Stach wrote:
-> Am Freitag, den 31.03.2017, 22:25 +0300 schrieb Leonard Crestez:
-> > 
-> > If the cpufreq driver tries to modify voltage/freq during suspend/resume
-> > it might need to control an external PMIC via I2C or SPI but those
-> > devices might be already suspended.
-> > 
-> > To avoid this scenario we just increase cpufreq to highest setpoint
-> > before suspend. This issue can easily be triggered by ldo-bypass but in
-> > theory any regulator set_voltage call can end up having to modify
-> > external supply voltages.
-> > 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> > ?drivers/cpufreq/imx6q-cpufreq.c | 2 ++
-> > ?1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> > index be90ee3..e2c1fbf 100644
-> > --- a/drivers/cpufreq/imx6q-cpufreq.c
-> > +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> > @@ -162,6 +162,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
-> > ?static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
-> > ?{
-> > ?	policy->clk = arm_clk;
-> > +	policy->suspend_freq = freq_table[soc_opp_count - 1].frequency;
-> I think soc_opp_count includes all OPPs from the DT, some of which might
-> be disabled based on the fuse settings of the SoC. So this should
-> probably not switch to the highest OPP unconditionally, but rather
-> switch to the highest _enabled_ OPP.
+On Tue, Apr 4, 2017 at 7:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
+> On Tue, 2017-04-04 at 00:05 +0300, Andy Shevchenko wrote:
 
-You're right, this does not appear to be correct. Looking at
-soc_opp_count it should probably be a local variable in the code
-initializing imx6_soc_volt. And the imx6_soc_volt array itself could
-now be replaced with opp's support for multiple supply voltages.
+> Yes, in a previous project, I had been working toward getting a < 1M
+> system to boot on Galileo hardware (which it did, but using more than
+> that - the Galileo2 has 256MB, but it was the target hardware at the
+> time, and I was hoping eventually to be able to boot out of the 512k
+> on-chip SRAM).
+>
+> I was focused at that point mainly on the kernel static size, and using
+> a combination of Josh Triplett's tinification tree, Andi Kleen's LTO and
+> net-diet patches, and my own miscellaneous patches that I was planning
+> on eventually upstreaming, I ended up with a system that I could boot to
+> shell with a 455k text size:
+>
+> Memory: 235636K/245176K available (455K kernel code, 61K rwdata,
+> 64K rodata, 132K init, 56K bss, 3056K reserved, 0K cma-reserved)
+>
+> virtual kernel memory layout:
+>     fixmap  : 0xfffe5000 - 0xfffff000   ( 104 kB)
+>     vmalloc : 0xd05f0000 - 0xfffe3000   ( 761 MB)
+>     lowmem  : 0xc0000000 - 0xcfdf0000   ( 253 MB)
+>       .init : 0xc1094000 - 0xc10b5000   ( 132 kB)
+>       .data : 0xc1071fac - 0xc1092760   ( 129 kB)
+>       .text : 0xc1000000 - 0xc1071fac   ( 455 kB)
+>
+> That was without networking.  Enabling networking added about 250k, and
+> at that point I could ssh in and run a webserver, still less than 1M as
+> far as kernel static size, which of course completely ignores the kernel
+> dynamic size and userspace.
 
-I'll post v2.
+Thanks for sharing your experience. The question closer to this
+discussion what did you do against TTY/UART/(related) layer(s)?
+
+-- 
+With Best Regards,
+Andy Shevchenko
