@@ -1,67 +1,139 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  4 Apr 2017 14:15:21 +0200
-Subject: [PATCH v3 01/11] drm/meson: Use crtc_state for hdisplay and fix
- atomic flush/enable sync for vsync commit
+Date: Tue,  4 Apr 2017 14:15:28 +0200
+Subject: [PATCH v3 08/11] dt-bindings: Add bindings for the Amlogic Meson
+ dw-hdmi extension
 In-Reply-To: <1491308131-22071-1-git-send-email-narmstrong@baylibre.com>
 References: <1491308131-22071-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1491308131-22071-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1491308131-22071-9-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean the crtc_enable by using the proper crtc_state instead of the state
-of the primary plane state data.
+This binding describes the Amlogic Meson specific extension to the
+Synopsys Designware HDMI Controller.
 
-Also fix the dependency to commit the plane changes even if enable is called
-after the flush.
-
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/meson/meson_crtc.c | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+ .../bindings/display/amlogic,meson-dw-hdmi.txt     | 111 +++++++++++++++++++++
+ 1 file changed, 111 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
 
-diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
-index 0fe49ec..c986eb0 100644
---- a/drivers/gpu/drm/meson/meson_crtc.c
-+++ b/drivers/gpu/drm/meson/meson_crtc.c
-@@ -82,11 +82,18 @@ static void meson_crtc_disable_vblank(struct drm_crtc *crtc)
- static void meson_crtc_enable(struct drm_crtc *crtc)
- {
- 	struct meson_crtc *meson_crtc = to_meson_crtc(crtc);
--	struct drm_plane *plane = meson_crtc->priv->primary_plane;
-+	struct drm_crtc_state *crtc_state = crtc->state;
- 	struct meson_drm *priv = meson_crtc->priv;
- 
-+	DRM_DEBUG_DRIVER("\n");
+diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+new file mode 100644
+index 0000000..7f040ed
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+@@ -0,0 +1,111 @@
++Amlogic specific extensions to the Synopsys Designware HDMI Controller
++======================================================================
 +
-+	if (!crtc_state) {
-+		DRM_ERROR("Invalid crtc_state\n");
-+		return;
-+	}
++The Amlogic Meson Synopsys Designware Integration is composed of :
++- A Synopsys DesignWare HDMI Controller IP
++- A TOP control block controlling the Clocks and PHY
++- A custom HDMI PHY in order to convert video to TMDS signal
++ ___________________________________
++|            HDMI TOP               |<= HPD
++|___________________________________|
++|                  |                |
++|  Synopsys HDMI   |   HDMI PHY     |=> TMDS
++|    Controller    |________________|
++|___________________________________|<=> DDC
 +
- 	/* Enable VPP Postblend */
--	writel(plane->state->crtc_w,
-+	writel(crtc_state->mode.hdisplay,
- 	       priv->io_base + _REG(VPP_POSTBLEND_H_SIZE));
- 
- 	writel_bits_relaxed(VPP_POSTBLEND_ENABLE, VPP_POSTBLEND_ENABLE,
-@@ -101,6 +108,7 @@ static void meson_crtc_disable(struct drm_crtc *crtc)
- 	struct meson_drm *priv = meson_crtc->priv;
- 
- 	priv->viu.osd1_enabled = false;
-+	priv->viu.osd1_commit = false;
- 
- 	/* Disable VPP Postblend */
- 	writel_bits_relaxed(VPP_POSTBLEND_ENABLE, 0,
-@@ -137,8 +145,7 @@ static void meson_crtc_atomic_flush(struct drm_crtc *crtc,
- 	struct meson_crtc *meson_crtc = to_meson_crtc(crtc);
- 	struct meson_drm *priv = meson_crtc->priv;
- 
--	if (priv->viu.osd1_enabled)
--		priv->viu.osd1_commit = true;
-+	priv->viu.osd1_commit = true;
- }
- 
- static const struct drm_crtc_helper_funcs meson_crtc_helper_funcs = {
++The HDMI TOP block only supports HPD sensing.
++The Synopsys HDMI Controller interrupt is routed through the
++TOP Block interrupt.
++Communication to the TOP Block and the Synopsys HDMI Controller is done
++via a pair of dedicated addr+read/write registers.
++The HDMI PHY is configured by registers in the HHI register block.
++
++Pixel data arrives in 4:4:4 format from the VENC block and the VPU HDMI mux
++selects either the ENCI encoder for the 576i or 480i formats or the ENCP
++encoder for all the other formats including interlaced HD formats.
++
++The VENC uses a DVI encoder on top of the ENCI or ENCP encoders to generate
++DVI timings for the HDMI controller.
++
++Amlogic Meson GXBB, GXL and GXM SoCs families embeds the Synopsys DesignWare
++HDMI TX IP version 2.01a with HDCP and I2C & S/PDIF
++audio source interfaces.
++
++Required properties:
++- compatible: value should be different for each SoC family as :
++	- GXBB (S905) : "amlogic,meson-gxbb-dw-hdmi"
++	- GXL (S905X, S905D) : "amlogic,meson-gxl-dw-hdmi"
++	- GXM (S912) : "amlogic,meson-gxm-dw-hdmi"
++	followed by the common "amlogic,meson-gx-dw-hdmi"
++- reg: Physical base address and length of the controller's registers.
++- interrupts: The HDMI interrupt number
++- clocks, clock-names : must have the phandles to the HDMI iahb and isfr clocks,
++  and the Amlogic Meson venci clocks as described in
++  Documentation/devicetree/bindings/clock/clock-bindings.txt,
++  the clocks are soc specific, the clock-names should be "iahb", "isfr", "venci"
++- resets, resets-names: must have the phandles to the HDMI apb, glue and phy
++  resets as described in :
++  Documentation/devicetree/bindings/reset/reset.txt,
++  the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
++
++Required nodes:
++
++The connections to the HDMI ports are modeled using the OF graph
++bindings specified in Documentation/devicetree/bindings/graph.txt.
++
++The following table lists for each supported model the port number
++corresponding to each HDMI output and input.
++
++		Port 0		Port 1
++-----------------------------------------
++ S905 (GXBB)	VENC Input	TMDS Output
++ S905X (GXL)	VENC Input	TMDS Output
++ S905D (GXL)	VENC Input	TMDS Output
++ S912 (GXM)	VENC Input	TMDS Output
++
++Example:
++
++hdmi-connector {
++	compatible = "hdmi-connector";
++	type = "a";
++
++	port {
++		hdmi_connector_in: endpoint {
++			remote-endpoint = <&hdmi_tx_tmds_out>;
++		};
++	};
++};
++
++hdmi_tx: hdmi-tx at c883a000 {
++	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
++	reg = <0x0 0xc883a000 0x0 0x1c>;
++	interrupts = <GIC_SPI 57 IRQ_TYPE_EDGE_RISING>;
++	resets = <&reset RESET_HDMITX_CAPB3>,
++		 <&reset RESET_HDMI_SYSTEM_RESET>,
++		 <&reset RESET_HDMI_TX>;
++	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
++	clocks = <&clkc CLKID_HDMI_PCLK>,
++		 <&clkc CLKID_CLK81>,
++		 <&clkc CLKID_GCLK_VENCI_INT0>;
++	clock-names = "isfr", "iahb", "venci";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	/* VPU VENC Input */
++	hdmi_tx_venc_port: port at 0 {
++		reg = <0>;
++
++		hdmi_tx_in: endpoint {
++			remote-endpoint = <&hdmi_tx_out>;
++		};
++	};
++
++	/* TMDS Output */
++	hdmi_tx_tmds_port: port at 1 {
++		reg = <1>;
++
++		hdmi_tx_tmds_out: endpoint {
++			remote-endpoint = <&hdmi_connector_in>;
++		};
++	};
++};
 -- 
 1.9.1
