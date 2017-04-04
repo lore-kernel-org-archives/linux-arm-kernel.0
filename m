@@ -1,24 +1,112 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 04 Apr 2017 18:10:03 +0200
-Subject: [PATCH v4 6/6] dt-bindings: document rockchip rk3328-evb board
-In-Reply-To: <1490607983-5599-1-git-send-email-cl@rock-chips.com>
-References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
- <1490607983-5599-1-git-send-email-cl@rock-chips.com>
-Message-ID: <1634255.6cUxPo2PCl@phil>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  4 Apr 2017 17:10:04 +0100
+Subject: [PATCH 1/2] [media] rc-core: Add inlined stubs for core rc_* functions
+Message-ID: <20170404161005.20884-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 27. M?rz 2017, 17:46:23 CEST schrieb cl at rock-chips.com:
-> From: Liang Chen <cl@rock-chips.com>
-> 
-> Use "rockchip,rk3328-evb" compatible string for Rockchip RK3328
-> evaluation board.
-> 
-> Signed-off-by: Liang Chen <cl@rock-chips.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+Currently users have to use all sorts of ugly #ifery within
+their drivers in order to avoid linking issues at build time.
+This patch allows users to safely call these functions when
+!CONFIG_RC_CORE and make decisions based on the return value
+instead.  This is a much more common and clean way of doing
+things within the Linux kernel.
 
-applied after moving the entry above the rk3399-evb.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/media/rc-core.h | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-
-Thanks
-Heiko
+diff --git a/include/media/rc-core.h b/include/media/rc-core.h
+index 73ddd721..1f2043d 100644
+--- a/include/media/rc-core.h
++++ b/include/media/rc-core.h
+@@ -209,7 +209,14 @@ struct rc_dev {
+  * @rc_driver_type: specifies the type of the RC output to be allocated
+  * returns a pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ struct rc_dev *rc_allocate_device(enum rc_driver_type);
++#else
++static inline struct rc_dev *rc_allocate_device(int unused)
++{
++	return ERR_PTR(-EOPNOTSUPP);
++}
++#endif
+ 
+ /**
+  * devm_rc_allocate_device - Managed RC device allocation
+@@ -218,21 +225,42 @@ struct rc_dev *rc_allocate_device(enum rc_driver_type);
+  * @rc_driver_type: specifies the type of the RC output to be allocated
+  * returns a pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ struct rc_dev *devm_rc_allocate_device(struct device *dev, enum rc_driver_type);
++#else
++static inline struct rc_dev *devm_rc_allocate_device(struct device *dev, int unused)
++{
++	return ERR_PTR(-EOPNOTSUPP);
++}
++#endif
+ 
+ /**
+  * rc_free_device - Frees a RC device
+  *
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ void rc_free_device(struct rc_dev *dev);
++#else
++static inline void rc_free_device(struct rc_dev *dev)
++{
++	return;
++}
++#endif
+ 
+ /**
+  * rc_register_device - Registers a RC device
+  *
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ int rc_register_device(struct rc_dev *dev);
++#else
++static inline int rc_register_device(struct rc_dev *dev)
++{
++	return -EOPNOTSUPP;
++}
++#endif
+ 
+ /**
+  * devm_rc_register_device - Manageded registering of a RC device
+@@ -240,14 +268,28 @@ int rc_register_device(struct rc_dev *dev);
+  * @parent: pointer to struct device.
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ int devm_rc_register_device(struct device *parent, struct rc_dev *dev);
++#else
++static inline int devm_rc_register_device(struct device *parent, struct rc_dev *dev)
++{
++	return -EOPNOTSUPP;
++}
++#endif
+ 
+ /**
+  * rc_unregister_device - Unregisters a RC device
+  *
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ void rc_unregister_device(struct rc_dev *dev);
++#else
++static inline void rc_unregister_device(struct rc_dev *dev)
++{
++	return;
++}
++#endif
+ 
+ /**
+  * rc_open - Opens a RC device
+-- 
+2.9.3
