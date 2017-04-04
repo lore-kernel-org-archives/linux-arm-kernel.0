@@ -1,50 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Apr 2017 10:50:54 +0100
-Subject: [GIT PULL] mfd: exynos-lpass: Pinctrl dependency
-In-Reply-To: <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
-References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <20170328154217.5405-1-krzk@kernel.org>
- <20170403101824.rpvkqzyigonyi77p@dell>
- <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
-Message-ID: <20170404095054.7m6nf6bxweskabuu@dell>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 04 Apr 2017 11:51:40 +0200
+Subject: [PATCH 3/5] cpufreq: imx6q: Set max suspend_freq to avoid
+ changes during suspend
+In-Reply-To: <94d99b261124b813adecf11e86a0ffe05c37f276.1490987945.git.leonard.crestez@nxp.com>
+References: <cover.1490987945.git.leonard.crestez@nxp.com>
+ <94d99b261124b813adecf11e86a0ffe05c37f276.1490987945.git.leonard.crestez@nxp.com>
+Message-ID: <1491299500.2367.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Apr 2017, Krzysztof Kozlowski wrote:
-
-> On Mon, Apr 3, 2017 at 12:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Tue, 28 Mar 2017, Krzysztof Kozlowski wrote:
-> >
-> >>
-> >> Hi Lee,
-> >>
-> >>
-> >> This is dependency for mfd/exynos-lpass driver changes from Marek Szyprowski.
-> >> That's a material for v4.12 and I will be pushing this later to Linus Walleij.
-> >
-> > This does not work, and *may* still break.
-> >
-> > The only way to guarantee the order of the patches is to have them
-> > *all* as part of the pull-request.  Not just some of them.
+Am Freitag, den 31.03.2017, 22:25 +0300 schrieb Leonard Crestez:
+> If the cpufreq driver tries to modify voltage/freq during suspend/resume
+> it might need to control an external PMIC via I2C or SPI but those
+> devices might be already suspended.
 > 
-> What do you mean exactly? If these two patches come through my tree
-> first, then everything will work fine because they do not break any
-> other stuff.
+> To avoid this scenario we just increase cpufreq to highest setpoint
+> before suspend. This issue can easily be triggered by ldo-bypass but in
+> theory any regulator set_voltage call can end up having to modify
+> external supply voltages.
 > 
-> If you pull it and apply the rest on top, then it should also work
-> without problems because your history will contain everything needed
-> in proper order.
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> In both cases bisectability is preserved. Did I missed something?
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index be90ee3..e2c1fbf 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -162,6 +162,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+>  {
+>  	policy->clk = arm_clk;
+> +	policy->suspend_freq = freq_table[soc_opp_count - 1].frequency;
 
-Okay, so you're suggesting that I rebase MFD *on-top* of your PR.  That
-does work for me because I insist on being able to re-work my tree at
-any time.  However, be aware that some Maintainers do not work this
-way, thus *normally* you will have to send PR containing all of the
-dependant patches.
+I think soc_opp_count includes all OPPs from the DT, some of which might
+be disabled based on the fuse settings of the SoC. So this should
+probably not switch to the highest OPP unconditionally, but rather
+switch to the highest _enabled_ OPP.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Lucas
+ 
+>  	return cpufreq_generic_init(policy, freq_table, transition_latency);
+>  }
+>  
+> @@ -173,6 +174,7 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+>  	.init = imx6q_cpufreq_init,
+>  	.name = "imx6q-cpufreq",
+>  	.attr = cpufreq_generic_attr,
+> +	.suspend = cpufreq_generic_suspend,
+>  };
+>  
+>  static int imx6q_cpufreq_probe(struct platform_device *pdev)
