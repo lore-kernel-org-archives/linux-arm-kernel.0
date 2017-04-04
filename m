@@ -1,45 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  4 Apr 2017 18:18:12 +0100
-Subject: [PATCH v3 04/18] arm64: cpu_errata: Allow an erratum to be match for
- all revisions of a core
+Date: Tue,  4 Apr 2017 18:18:11 +0100
+Subject: [PATCH v3 03/18] arm64: Define Cortex-A73 MIDR
 In-Reply-To: <20170404171826.25030-1-marc.zyngier@arm.com>
 References: <20170404171826.25030-1-marc.zyngier@arm.com>
-Message-ID: <20170404171826.25030-5-marc.zyngier@arm.com>
+Message-ID: <20170404171826.25030-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some minor erratum may not be fixed in further revisions of a core,
-leading to a situation where the workaround needs to be updated each
-time an updated core is released.
-
-Introduce a MIDR_ALL_VERSIONS match helper that will work for all
-versions of that MIDR, once and for all.
+As we're about to introduce a new workaround that is specific to
+Cortex-A73, let's define the coresponding MIDR.
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/include/asm/cputype.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index f6cc67e7626e..2be1d1c05303 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 	.midr_range_min = min, \
- 	.midr_range_max = max
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index fc502713ab37..0984d1b3a8f2 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -80,6 +80,7 @@
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
++#define ARM_CPU_PART_CORTEX_A73		0xD09
  
-+#define MIDR_ALL_VERSIONS(model) \
-+	.def_scope = SCOPE_LOCAL_CPU, \
-+	.matches = is_affected_midr_range, \
-+	.midr_model = model, \
-+	.midr_range_min = 0, \
-+	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
-+
- const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+ #define APM_CPU_PART_POTENZA		0x000
+ 
+@@ -92,6 +93,7 @@
+ 
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
 -- 
 2.11.0
