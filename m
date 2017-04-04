@@ -1,91 +1,212 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 4 Apr 2017 10:57:52 +0200
-Subject: [PATCH v2 07/13] drm/meson: Add support for HDMI encoder and
- DW-HDMI bridge + PHY
-In-Reply-To: <1490109950-21421-8-git-send-email-narmstrong@baylibre.com>
+Date: Tue, 4 Apr 2017 10:59:31 +0200
+Subject: [PATCH v2 03/13] drm/meson: Add support for components
+In-Reply-To: <1490109950-21421-4-git-send-email-narmstrong@baylibre.com>
 References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
- <1490109950-21421-8-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170404085752.jg246ilczhgmyyhy@phenom.ffwll.local>
+ <1490109950-21421-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20170404085931.7sv3k7lwgt6klu37@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 04:25:44PM +0100, Neil Armstrong wrote:
-> The Amlogic Meson GXBB/GXL/GXM SoCs embeds a Synopsys DesignWare HDMI TX
-> Controller with a custom Bridge + PHY around the Controller.
-> 
-> This driver makes uses of all the custom PHY plat data callbacks and enables
-> the compatible HDMI modes to be configured as a drm_encoder instance.
+On Tue, Mar 21, 2017 at 04:25:40PM +0100, Neil Armstrong wrote:
+> This patch adds support for optional components connected through the
+> Device Tree endpoints scheme.
 > 
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-
-[snip]
-
-> +static int meson_venc_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
-> +					struct drm_crtc_state *crtc_state,
-> +					struct drm_connector_state *conn_state)
+> ---
+>  drivers/gpu/drm/meson/meson_drv.c | 113 +++++++++++++++++++++++++++++++++-----
+>  1 file changed, 99 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index bc562a0..a2e9f56 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/component.h>
+>  #include <linux/of_graph.h>
+>  
+>  #include <drm/drmP.h>
+> @@ -150,9 +151,9 @@ static bool meson_vpu_has_available_connectors(struct device *dev)
+>  	.max_register   = 0x1000,
+>  };
+>  
+> -static int meson_drv_probe(struct platform_device *pdev)
+> +static int meson_drv_bind(struct device *dev)
+>  {
+> -	struct device *dev = &pdev->dev;
+> +	struct platform_device *pdev = to_platform_device(dev);
+>  	struct meson_drm *priv;
+>  	struct drm_device *drm;
+>  	struct resource *res;
+> @@ -215,6 +216,15 @@ static int meson_drv_probe(struct platform_device *pdev)
+>  
+>  	drm_vblank_init(drm, 1);
+>  	drm_mode_config_init(drm);
+> +	drm->mode_config.max_width = 3840;
+> +	drm->mode_config.max_height = 2160;
+> +	drm->mode_config.funcs = &meson_mode_config_funcs;
+> +
+> +	/* Hardware Initialization */
+> +
+> +	meson_venc_init(priv);
+> +	meson_vpp_init(priv);
+> +	meson_viu_init(priv);
+>  
+>  	/* Encoder Initialization */
+>  
+> @@ -222,11 +232,11 @@ static int meson_drv_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto free_drm;
+>  
+> -	/* Hardware Initialization */
+> -
+> -	meson_venc_init(priv);
+> -	meson_vpp_init(priv);
+> -	meson_viu_init(priv);
+> +	ret = component_bind_all(drm->dev, drm);
+> +	if (ret) {
+> +		dev_err(drm->dev, "Couldn't bind all components\n");
+> +		goto free_drm;
+> +	}
+>  
+>  	ret = meson_plane_create(priv);
+>  	if (ret)
+> @@ -241,9 +251,6 @@ static int meson_drv_probe(struct platform_device *pdev)
+>  		goto free_drm;
+>  
+>  	drm_mode_config_reset(drm);
+> -	drm->mode_config.max_width = 8192;
+> -	drm->mode_config.max_height = 8192;
+> -	drm->mode_config.funcs = &meson_mode_config_funcs;
+>  
+>  	priv->fbdev = drm_fbdev_cma_init(drm, 32,
+>  					 drm->mode_config.num_connector);
+> @@ -268,9 +275,9 @@ static int meson_drv_probe(struct platform_device *pdev)
+>  	return ret;
+>  }
+>  
+> -static int meson_drv_remove(struct platform_device *pdev)
+> +static void meson_drv_unbind(struct device *dev)
+>  {
+> -	struct drm_device *drm = dev_get_drvdata(&pdev->dev);
+> +	struct drm_device *drm = dev_get_drvdata(dev);
+>  	struct meson_drm *priv = drm->dev_private;
+>  
+>  	drm_dev_unregister(drm);
+> @@ -280,9 +287,88 @@ static int meson_drv_remove(struct platform_device *pdev)
+>  	drm_vblank_cleanup(drm);
+>  	drm_dev_unref(drm);
+>  
+> -	return 0;
+>  }
+>  
+> +static const struct component_master_ops meson_drv_master_ops = {
+> +	.bind	= meson_drv_bind,
+> +	.unbind	= meson_drv_unbind,
+> +};
+> +
+> +static int compare_of(struct device *dev, void *data)
 > +{
-> +	return 0;
+> +	DRM_DEBUG_DRIVER("Comparing of node %s with %s\n",
+> +			 of_node_full_name(dev->of_node),
+> +			 of_node_full_name(data));
+> +
+> +	return dev->of_node == data;
 > +}
-
-Given the over-the-top complicated mode encoding you seem to have, this
-feels like it's a bit too simply.
-
 > +
-> +static void meson_venc_hdmi_encoder_disable(struct drm_encoder *encoder)
+> +/* Possible connectors nodes to ignore */
+> +static const struct of_device_id connectors_match[] = {
+> +	{ .compatible = "composite-video-connector" },
+> +	{ .compatible = "svideo-connector" },
+> +	{ .compatible = "hdmi-connector" },
+> +	{ .compatible = "dvi-connector" },
+> +	{}
+> +};
+> +
+> +static int meson_probe_remote(struct platform_device *pdev,
+> +			      struct component_match **match,
+> +			      struct device_node *parent,
+> +			      struct device_node *remote)
 > +{
-> +	struct meson_dw_hdmi *dw_hdmi = encoder_to_meson_dw_hdmi(encoder);
-> +	struct meson_drm *priv = dw_hdmi->priv;
+> +	struct device_node *ep, *remote_node;
+> +	int count = 1;
 > +
-> +	DRM_DEBUG_DRIVER("\n");
+> +	/* If node is a connector, return and do not add to match table */
+> +	if (of_match_node(connectors_match, remote))
+> +		return 1;
 > +
-> +	writel_bits_relaxed(0x3, 0,
-> +			    priv->io_base + _REG(VPU_HDMI_SETTING));
+> +	component_match_add(&pdev->dev, match, compare_of, remote);
 > +
-> +	writel_relaxed(0, priv->io_base + _REG(ENCI_VIDEO_EN));
-> +	writel_relaxed(0, priv->io_base + _REG(ENCP_VIDEO_EN));
+> +	for_each_endpoint_of_node(remote, ep) {
+> +		remote_node = of_graph_get_remote_port_parent(ep);
+> +		if (!remote_node ||
+> +		    remote_node == parent || /* Ignore parent endpoint */
+> +		    !of_device_is_available(remote_node))
+> +			continue;
+> +
+> +		count += meson_probe_remote(pdev, match, remote, remote_node);
+> +
+> +		of_node_put(remote_node);
+> +	}
+> +
+> +	return count;
 > +}
 > +
-> +static void meson_venc_hdmi_encoder_enable(struct drm_encoder *encoder)
+> +static int meson_drv_probe(struct platform_device *pdev)
 > +{
-> +	struct meson_dw_hdmi *dw_hdmi = encoder_to_meson_dw_hdmi(encoder);
-> +	struct meson_drm *priv = dw_hdmi->priv;
+> +	struct component_match *match = NULL;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *ep, *remote;
+> +	int count = 0;
 > +
-> +	DRM_DEBUG_DRIVER("%s\n", priv->venc.hdmi_use_enci ? "VENCI" : "VENCP");
+> +	for_each_endpoint_of_node(np, ep) {
+> +		remote = of_graph_get_remote_port_parent(ep);
+> +		if (!remote || !of_device_is_available(remote))
+> +			continue;
 > +
-> +	if (priv->venc.hdmi_use_enci)
-> +		writel_relaxed(1, priv->io_base + _REG(ENCI_VIDEO_EN));
-> +	else
-> +		writel_relaxed(1, priv->io_base + _REG(ENCP_VIDEO_EN));
-> +}
+> +		count += meson_probe_remote(pdev, &match, np, remote);
+> +	}
 > +
-> +static void meson_venc_hdmi_encoder_mode_set(struct drm_encoder *encoder,
-> +				   struct drm_display_mode *mode,
-> +				   struct drm_display_mode *adjusted_mode)
-> +{
-> +	struct meson_dw_hdmi *dw_hdmi = encoder_to_meson_dw_hdmi(encoder);
-> +	struct meson_drm *priv = dw_hdmi->priv;
-> +	int vic = drm_match_cea_mode(mode);
-> +
-> +	DRM_DEBUG_DRIVER("%d:\"%s\" vic %d\n",
-> +			 mode->base.id, mode->name, vic);
-> +
-> +	/* Should have been filtered */
-> +	if (!vic)
-> +		return;
-> +
-> +	/* VENC + VENC-DVI Mode setup */
-> +	meson_venc_hdmi_mode_set(priv, vic, mode);
+> +	/* If some endpoints were found, initialize the nodes */
+> +	if (count) {
 
-So this calls a different module which export_symbol_gpls that thing. I
-have no idea why arm-soc people love modularized-to-the-function level
-drivers, but it feels over the top. amd/nouveau/i915 all smash everything
-into one driver, makes life so much easier.
-
-Note: bridge drivers as separate .ko makes sense, but separate .ko for
-every single functional unit in your vendor IP imo totally doesn't.
-
-Not going to stop you either :-)
+What if you have more than 1 endpoint described, but module load order
+conspires against you to only initialize 1 at first?
 -Daniel
+
+> +		dev_info(&pdev->dev, "Queued %d outputs on vpu\n", count);
+> +
+> +		return component_master_add_with_match(&pdev->dev,
+> +						       &meson_drv_master_ops,
+> +						       match);
+> +	}
+> +
+> +	/* If no output endpoints were available, simply bail out */
+> +	return 0;
+> +};
+> +
+>  static const struct of_device_id dt_match[] = {
+>  	{ .compatible = "amlogic,meson-gxbb-vpu" },
+>  	{ .compatible = "amlogic,meson-gxl-vpu" },
+> @@ -293,7 +379,6 @@ static int meson_drv_remove(struct platform_device *pdev)
+>  
+>  static struct platform_driver meson_drm_platform_driver = {
+>  	.probe      = meson_drv_probe,
+> -	.remove     = meson_drv_remove,
+>  	.driver     = {
+>  		.name	= "meson-drm",
+>  		.of_match_table = dt_match,
+> -- 
+> 1.9.1
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
 -- 
 Daniel Vetter
 Software Engineer, Intel Corporation
