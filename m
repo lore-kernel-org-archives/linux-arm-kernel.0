@@ -1,48 +1,76 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 4 Apr 2017 14:15:13 +0100
-Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
-In-Reply-To: <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
-References: <20170224125506.21533-1-john@metanate.com>
- <20170224125506.21533-24-john@metanate.com>
- <20170302215643.GA49163@google.com>
- <20170303113945.3bd2cbd9.john@metanate.com>
- <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
-Message-ID: <20170404141513.2bad3b1b.john@metanate.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Apr 2017 15:20:01 +0200
+Subject: [RFC PATCH v2 1/4] dt-bindings: update the Allwinner GPADC
+ device tree binding for H3
+In-Reply-To: <e4d50e78-afe7-6107-6d9a-15e4c732d79a@aosc.io>
+References: <20170402133304.56824-1-icenowy@aosc.io>
+ <20170402133304.56824-2-icenowy@aosc.io>
+ <20170403091523.6atl7nq4m2qkpn3d@lukather>
+ <e4d50e78-afe7-6107-6d9a-15e4c732d79a@aosc.io>
+Message-ID: <20170404132001.4et5yaovpnqmbe6v@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
-
-On Sun, 12 Mar 2017 07:06:59 -0500, Rob Herring wrote:
-
-> On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
-> > This reset is required in order to fully reset the internal state of the
-> > MIPI controller.
-> > 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> > On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:  
-> > > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:  
-> > > > +	/*
-> > > > +	 * Note that the reset was not defined in the initial device tree, so
-> > > > +	 * we have to be prepared for it not being found.
-> > > > +	 */
-> > > > +	apb_rst = devm_reset_control_get(dev, "apb");    
-> > > 
-> > > Did this reset ever get documented in the device tree bindings? I
-> > > couldn't find it. Perhaps a follow-up patch is in order?  
-> > 
-> > Here's a patch to do that.
-> > 
-> >  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
-> >  1 file changed, 7 insertions(+)  
+On Mon, Apr 03, 2017 at 05:31:11PM +0800, Icenowy Zheng wrote:
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> ? 2017?04?03? 17:15, Maxime Ripard ??:
+> > On Sun, Apr 02, 2017 at 09:33:01PM +0800, Icenowy Zheng wrote:
+> > > Allwinner H3 features a thermal sensor like the one in A33, but has its
+> > > register re-arranged, the clock divider moved to CCU (originally the
+> > > clock divider is in ADC) and added a pair of bus clock and reset.
+> > > 
+> > > Update the binding document to cover H3.
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > ---
+> > >  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 23 ++++++++++++++++++++--
+> > >  1 file changed, 21 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > index badff3611a98..7753133ca0ff 100644
+> > > --- a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> > > @@ -4,12 +4,20 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+> > >  and sometimes as a touchscreen controller.
+> > > 
+> > >  Required properties:
+> > > -  - compatible: "allwinner,sun8i-a33-ths",
+> > > +  - compatible: must contain one of the following compatibles:
+> > > +		- "allwinner,sun8i-a33-ths"
+> > > +		- "allwinner,sun8i-h3-ths"
+> > >    - reg: mmio address range of the chip,
+> > >    - #thermal-sensor-cells: shall be 0,
+> > >    - #io-channel-cells: shall be 0,
+> > > 
+> > > -Example:
+> > > +Required properties for the following compatibles:
+> > > +		- "allwinner,sun8i-h3-ths"
+> > > +  - clocks: the bus clock and the input clock of the ADC,
+> > > +  - clock-names: should be "bus" and "ths",
+> > 
+> > I guess mod instead of ths would be more consistent.
+> 
+> In fact I will prefer "sample" here if not "ths", as it's used
+> for the sampling, not like other mod clocks, which controls
+> all the IP block's logic.
 
-I don't see this patch in linux-next, so I guess it has fallen through
-the cracks somewhere.  Since we have Rob's ack, can you pick this via
-drm-misc?
+All the other mod clocks control some sort of sampling. The audio mod
+clocks will be used to sample data in capture, same thing for NAND,
+MMC, SPI, etc.
 
+Please remain consistent.
 
-Regards,
-John
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170404/20f20626/attachment.sig>
