@@ -1,152 +1,73 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Apr 2017 16:19:39 +0100
-Subject: [PATCH] [media] cec: Handle RC capability more elegantly
-In-Reply-To: <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
-References: <20170404144309.31357-1-lee.jones@linaro.org>
- <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
-Message-ID: <20170404151939.bvd252nprj6kjmdu@dell>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue,  4 Apr 2017 11:30:28 -0400
+Subject: [PATCH v4 0/8] mfd: Add OF device table to I2C drivers that are
+ missing it
+Message-ID: <20170404153036.6651-1-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Apr 2017, Hans Verkuil wrote:
+Hello,
 
-> On 04/04/2017 04:43 PM, Lee Jones wrote:
-> > If a user specifies the use of RC as a capability, they should
-> > really be enabling RC Core code.  If they do not we WARN() them
-> > of this and disable the capability for them.
-> > 
-> > Once we know RC Core code has not been enabled, we can update
-> > the user's capabilities and use them as a term of reference for
-> > other RC-only calls.  This is preferable to having ugly #ifery
-> > scattered throughout C code.
-> > 
-> > Most of the functions are actually safe to call, since they
-> > sensibly check for a NULL RC pointer before they attempt to
-> > deference it.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/media/cec/cec-core.c | 19 +++++++------------
-> >  1 file changed, 7 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-> > index cfe414a..51be8d6 100644
-> > --- a/drivers/media/cec/cec-core.c
-> > +++ b/drivers/media/cec/cec-core.c
-> > @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
-> >  		return ERR_PTR(-EINVAL);
-> >  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
-> >  		return ERR_PTR(-EINVAL);
-> > +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
-> > +		caps &= ~CEC_CAP_RC;
-> 
-> Don't use WARN_ON, this is not an error of any kind.
+This series add OF device ID tables to mfd I2C drivers whose devices are
+either used in Device Tree source files or are listed in binding docs as
+a compatible string.
 
-Right, this is not an error.
+That's done because the plan is to change the I2C core to report proper OF
+modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
+a device was registered via DT or using the legacy platform data mechanism.
 
-That's why we are warning the user instead of bombing out.
+So these patches will make sure that mfd I2C drivers modules will continue
+to be autoloaded once the I2C core is changed to report proper OF modalias.
 
-> Neither do you need to add the
-> 'caps & CEC_CAP_RC' test. Really, it's just simpler to do what I suggested before
-> with an #if.
+Users didn't have a vendor prefix in the used compatible strings, but since
+there wasn't a DT binding document for these drivers, it can be said that
+were working for mere luck and so this series fixes the users and add a DT
+binding doc for the drivers.
 
-This does exactly what you asked.
+Most patches can be applied independently, with the exception of patches
+2 to 4 that should be applied in the same tree to keep bisect-ability.
 
-Just to clarify, can you explain to me when asking for RC support, but
-not enabling it would ever be a valid configuration?
+Best regards,
+Javier
 
-> > +
-> >  	adap = kzalloc(sizeof(*adap), GFP_KERNEL);
-> >  	if (!adap)
-> >  		return ERR_PTR(-ENOMEM);
-> > +
-> >  	strlcpy(adap->name, name, sizeof(adap->name));
-> >  	adap->phys_addr = CEC_PHYS_ADDR_INVALID;
-> >  	adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
-> > @@ -237,7 +241,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
-> >  	if (!(caps & CEC_CAP_RC))
-> >  		return adap;
-> >  
-> > -#if IS_REACHABLE(CONFIG_RC_CORE)
-> 
-> Huh? If CONFIG_RC_CORE is undefined, all these rc_ calls will fail when linking!
+Changes in v4:
+- Use "dt-bindings: mfd:" prefix in subject line (Rob Herring).
+- Add information about what functions the device serve (Lee Jones).
+- Avoid using MFD in Device Tree (Lee Jones).
+- Drop -mfd suffix in compatible string (Lee Jones).
+- Avoid using MFD in Device Tree (Lee Jones).
+- Use "dt-bindings: mfd:" prefix in subject line (Rob Herring).
+- Add information about what functions the device serve (Lee Jones).
 
-I thought I'd tested for that, but it turns out that *my*
-CONFIG_RC_CORE=n config was being over-ridden by the build system.
+Changes in v3:
+- Add a vendor prefix to the compatible string (Rob Herring).
+- Add a vendor prefix to the compatible string (Rob Herring).
 
-If it will really fail when linking, it sounds like the RC subsystem
-is not written properly.  I guess that explains why all these drivers
-are riddled with ugly #ifery.
+Changes in v2:
+- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
+- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
 
-Will fix that too, bear with.
+Javier Martinez Canillas (8):
+  dt-bindings: mfd: Add retu/tahvo ASIC chips bindings
+  mfd: retu: Drop -mfd suffix from I2C device ID name
+  mfd: retu: Add OF device ID table
+  ARM: dts: n8x0: Add vendor prefix to retu node
+  i2c: i2c-cbus-gpio: Add vendor prefix to retu node in example
+  dt-bindings: mfd: Add TI tps6105x chip bindings
+  mfd: tps6105x: Add OF device ID table
+  ARM: ux500: Add vendor prefix to tps61052 node
 
-> >  	/* Prepare the RC input device */
-> >  	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
-> >  	if (!adap->rc) {
-> > @@ -264,9 +267,7 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
-> >  	adap->rc->priv = adap;
-> >  	adap->rc->map_name = RC_MAP_CEC;
-> >  	adap->rc->timeout = MS_TO_NS(100);
-> > -#else
-> > -	adap->capabilities &= ~CEC_CAP_RC;
-> > -#endif
-> > +
-> >  	return adap;
-> >  }
-> >  EXPORT_SYMBOL_GPL(cec_allocate_adapter);
-> > @@ -285,7 +286,6 @@ int cec_register_adapter(struct cec_adapter *adap,
-> >  	adap->owner = parent->driver->owner;
-> >  	adap->devnode.dev.parent = parent;
-> >  
-> > -#if IS_REACHABLE(CONFIG_RC_CORE)
-> >  	if (adap->capabilities & CEC_CAP_RC) {
-> >  		adap->rc->dev.parent = parent;
-> >  		res = rc_register_device(adap->rc);
-> > @@ -298,15 +298,13 @@ int cec_register_adapter(struct cec_adapter *adap,
-> >  			return res;
-> >  		}
-> >  	}
-> > -#endif
-> >  
-> >  	res = cec_devnode_register(&adap->devnode, adap->owner);
-> >  	if (res) {
-> > -#if IS_REACHABLE(CONFIG_RC_CORE)
-> >  		/* Note: rc_unregister also calls rc_free */
-> >  		rc_unregister_device(adap->rc);
-> >  		adap->rc = NULL;
-> > -#endif
-> > +
-> >  		return res;
-> >  	}
-> >  
-> > @@ -337,11 +335,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
-> >  	if (IS_ERR_OR_NULL(adap))
-> >  		return;
-> >  
-> > -#if IS_REACHABLE(CONFIG_RC_CORE)
-> >  	/* Note: rc_unregister also calls rc_free */
-> >  	rc_unregister_device(adap->rc);
-> >  	adap->rc = NULL;
-> > -#endif
-> > +
-> >  	debugfs_remove_recursive(adap->cec_dir);
-> >  	cec_devnode_unregister(&adap->devnode);
-> >  }
-> > @@ -357,9 +354,7 @@ void cec_delete_adapter(struct cec_adapter *adap)
-> >  	kthread_stop(adap->kthread);
-> >  	if (adap->kthread_config)
-> >  		kthread_stop(adap->kthread_config);
-> > -#if IS_REACHABLE(CONFIG_RC_CORE)
-> >  	rc_free_device(adap->rc);
-> > -#endif
-> >  	kfree(adap);
-> >  }
-> >  EXPORT_SYMBOL_GPL(cec_delete_adapter);
-> > 
-> 
+ .../devicetree/bindings/i2c/i2c-cbus-gpio.txt       |  4 ++--
+ Documentation/devicetree/bindings/mfd/retu.txt      | 21 +++++++++++++++++++++
+ Documentation/devicetree/bindings/mfd/tps6105x.txt  | 17 +++++++++++++++++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi         |  4 ++--
+ arch/arm/boot/dts/ste-hrefprev60.dtsi               |  2 +-
+ arch/arm/mach-omap1/board-nokia770.c                |  4 ++--
+ drivers/mfd/retu-mfd.c                              | 12 ++++++++++--
+ drivers/mfd/tps6105x.c                              |  8 ++++++++
+ 8 files changed, 63 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/retu.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/tps6105x.txt
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.3
