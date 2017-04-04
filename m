@@ -1,28 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Apr 2017 09:36:27 +0200
-Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.12
-In-Reply-To: <20170408142050.1164-2-krzk@kernel.org>
-References: <20170408142050.1164-1-krzk@kernel.org>
- <20170408142050.1164-2-krzk@kernel.org>
-Message-ID: <CACRpkdb9OJTsyLknXA-D9TZ_VHmGkaF8zbG1GQbsFgEfmqa9Uw@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 04 Apr 2017 10:40:20 +0200
+Subject: [PATCH v3 1/4] dt-bindings: clock: gxbb: expose UART clocks
+In-Reply-To: <20170331165437.26227-2-hgkr.klein@gmail.com>
+References: <20170331165437.26227-1-hgkr.klein@gmail.com>
+ <20170331165437.26227-2-hgkr.klein@gmail.com>
+Message-ID: <149129522024.91618.13395564164212234056@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 8, 2017 at 4:20 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+Quoting Helmut Klein (2017-03-31 18:54:34)
+> Expose the clock ids of the three none AO uarts to the dt-bindings
+> 
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.12
->
-> for you to fetch changes up to f69ae4f58a198ad15b0422637434d2bcf6fc2e2a:
->
->   pinctrl: samsung: Use devres version of gpiochip_add_data (2017-03-23 21:13:19 +0200)
+Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-Pulled into my devel branch for v4.12.
-
-Thanks!
-Linus Walleij
+> ---
+>  drivers/clk/meson/gxbb.h              | 6 +++---
+>  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
+>  2 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 8ee2022ce5d5..1edfaa5fe307 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -194,7 +194,7 @@
+>  /* #define CLKID_SAR_ADC */
+>  #define CLKID_SMART_CARD         24
+>  #define CLKID_RNG0               25
+> -#define CLKID_UART0              26
+> +/* CLKID_UART0 */
+>  #define CLKID_SDHC               27
+>  #define CLKID_STREAM             28
+>  #define CLKID_ASYNC_FIFO         29
+> @@ -216,7 +216,7 @@
+>  #define CLKID_ADC                45
+>  #define CLKID_BLKMV              46
+>  #define CLKID_AIU                47
+> -#define CLKID_UART1              48
+> +/* CLKID_UART1 */
+>  #define CLKID_G2D                49
+>  /* CLKID_USB0 */
+>  /* CLKID_USB1 */
+> @@ -236,7 +236,7 @@
+>  /* CLKID_USB0_DDR_BRIDGE */
+>  #define CLKID_MMC_PCLK           66
+>  #define CLKID_DVIN               67
+> -#define CLKID_UART2              68
+> +/* CLKID_UART2 */
+>  /* #define CLKID_SANA */
+>  #define CLKID_VPU_INTR           70
+>  #define CLKID_SEC_AHB_AHB3_BRIDGE 71
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+> index 692846c7941b..7b329df47752 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -15,13 +15,16 @@
+>  #define CLKID_SPI              34
+>  #define CLKID_I2C              22
+>  #define CLKID_SAR_ADC          23
+> +#define CLKID_UART0            26
+>  #define CLKID_ETH              36
+> +#define CLKID_UART1            48
+>  #define CLKID_USB0             50
+>  #define CLKID_USB1             51
+>  #define CLKID_USB              55
+>  #define CLKID_HDMI_PCLK                63
+>  #define CLKID_USB1_DDR_BRIDGE  64
+>  #define CLKID_USB0_DDR_BRIDGE  65
+> +#define CLKID_UART2            68
+>  #define CLKID_SANA             69
+>  #define CLKID_GCLK_VENCI_INT0  77
+>  #define CLKID_AO_I2C           93
+> --
+> 2.11.0
+> 
