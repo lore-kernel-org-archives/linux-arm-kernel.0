@@ -1,50 +1,44 @@
 From: menschel.p@posteo.de (Patrick Menschel)
-Date: Tue,  4 Apr 2017 20:36:26 +0200
-Subject: [PATCH v4 0/6] ARM: dts: sunxi: Add CAN node and can0_pins_a pinctrl
- settings
-Message-ID: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
+Date: Tue,  4 Apr 2017 20:36:31 +0200
+Subject: [PATCH v4 5/6] ARM: dts: sun7i: Add CAN node
+In-Reply-To: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
+References: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
+Message-ID: <1491330992-9876-6-git-send-email-menschel.p@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A10/A20 SoCs have an on-board CAN (Controller Area Network)
-controller. This patch adds the CAN core to the SoC's include files,
-sun4i-a10.dtsi and sun7i-a20.dtsi.
+The A20 SoC has an on-board CAN controller.
+This patch adds the device node.
 
-On linux-can mailing list was a discussion about updating the device tree bindings
-https://lkml.org/lkml/2015/9/17/220
-but it did not progress past writing the documentation file.
+The CAN controller is inherited from the A10 SoC and uses the same driver.
+
+This patch is adapted from the description in
 Documentation/devicetree/bindings/net/can/sun4i_can.txt
 
-The CAN controller can be enabled in a board specific dts file as
-described in the documentation file or by using a device tree overlay.
+Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-I have tested the patch on a Banana Pi (A20 SoC) with mainline kernel 4.10.5.
-
-History:
-    v4: fixed style problems,
-        changed device node position of ps20 and ps21 to fix ordering
-        by rising physical address
-
-    v3: added "allwinner,sun7i-a20-can" compatible to can0 device node contents,
-        make separate patches for device nodes and pinctrl settings
-
-    v2: changed can0_pins_a node contents to new generic binding method, 
-	changed can0_pins_a node position by alphabetical order,
-        changed can0 device node position by rising physical address order
-
-    v1: initial
-
-Patrick Menschel (6):
-  ARM: dts: sun4i: fix device node ordering
-  ARM: dts: sun4i: Add CAN node
-  ARM: dts: sun4i: Add can0_pins_a pinctrl settings
-  ARM: dts: sun7i: fix device node ordering
-  ARM: dts: sun7i: Add CAN node
-  ARM: dts: sun7i: Add can0_pins_a pinctrl settings
-
- arch/arm/boot/dts/sun4i-a10.dtsi | 38 ++++++++++++++++++++++-----------
- arch/arm/boot/dts/sun7i-a20.dtsi | 45 ++++++++++++++++++++++++++--------------
- 2 files changed, 56 insertions(+), 27 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 100b4e9..edf85ca 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1598,6 +1598,15 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		can0: can at 01c2bc00 {
++			compatible = "allwinner,sun7i-a20-can",
++				     "allwinner,sun4i-a10-can";
++			reg = <0x01c2bc00 0x400>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb1_gates 4>;
++			status = "disabled";
++		};
++
+ 		i2c4: i2c at 01c2c000 {
+ 			compatible = "allwinner,sun7i-a20-i2c",
+ 				     "allwinner,sun4i-a10-i2c";
 -- 
 2.7.4
