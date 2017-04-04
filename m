@@ -1,34 +1,98 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  4 Apr 2017 14:15:24 +0200
-Subject: [PATCH v3 04/11] drm/meson: venc_cvbs: no more return -ENODEV if CVBS
- is not available
+Date: Tue,  4 Apr 2017 14:15:30 +0200
+Subject: [PATCH v3 10/11] drm/meson: Add RST to bring together kerneldoc
 In-Reply-To: <1491308131-22071-1-git-send-email-narmstrong@baylibre.com>
 References: <1491308131-22071-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1491308131-22071-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1491308131-22071-11-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Since this is managed now by the components code, if CVBS is not available
-and HDMI neither, the drm driver won't bind anyway.
 
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/meson/meson_venc_cvbs.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/gpu/index.rst |  1 +
+ Documentation/gpu/meson.rst | 61 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+)
+ create mode 100644 Documentation/gpu/meson.rst
 
-diff --git a/drivers/gpu/drm/meson/meson_venc_cvbs.c b/drivers/gpu/drm/meson/meson_venc_cvbs.c
-index a2bcc70..a96fcb4 100644
---- a/drivers/gpu/drm/meson/meson_venc_cvbs.c
-+++ b/drivers/gpu/drm/meson/meson_venc_cvbs.c
-@@ -248,7 +248,7 @@ int meson_venc_cvbs_create(struct meson_drm *priv)
- 
- 	if (!meson_venc_cvbs_connector_is_available(priv)) {
- 		dev_info(drm->dev, "CVBS Output connector not available\n");
--		return -ENODEV;
-+		return 0;
- 	}
- 
- 	meson_venc_cvbs = devm_kzalloc(priv->dev, sizeof(*meson_venc_cvbs),
+diff --git a/Documentation/gpu/index.rst b/Documentation/gpu/index.rst
+index e998ee0..7eceb97 100644
+--- a/Documentation/gpu/index.rst
++++ b/Documentation/gpu/index.rst
+@@ -11,6 +11,7 @@ Linux GPU Driver Developer's Guide
+    drm-kms-helpers
+    drm-uapi
+    i915
++   meson
+    tinydrm
+    vc4
+    vga-switcheroo
+diff --git a/Documentation/gpu/meson.rst b/Documentation/gpu/meson.rst
+new file mode 100644
+index 0000000..479f6f5
+--- /dev/null
++++ b/Documentation/gpu/meson.rst
+@@ -0,0 +1,61 @@
++=============================================
++drm/meson AmLogic Meson Video Processing Unit
++=============================================
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_drv.c
++   :doc: Video Processing Unit
++
++Video Processing Unit
++=====================
++
++The Amlogic Meson Display controller is composed of several components
++that are going to be documented below:
++
++.. code::
++
++  DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
++     | vd1   _______     _____________    _________________     |               |
++  D  |-------|      |----|            |   |                |    |   HDMI PLL    |
++  D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
++  R  |-------|      |----| Processing |   |                |    |               |
++     | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
++  R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
++  A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
++  M  |-------|______|----|____________|   |________________|    |               |
++  ___|__________________________________________________________|_______________|
++
++Video Input Unit
++================
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_viu.c
++   :doc: Video Input Unit
++
++Video Post Processing
++=====================
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_vpp.c
++   :doc: Video Post Processing
++
++Video Encoder
++=============
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_venc.c
++   :doc: Video Encoder
++
++Video Canvas Management
++=======================
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_canvas.c
++   :doc: Canvas
++
++Video Clocks
++============
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_vclk.c
++   :doc: Video Clocks
++
++HDMI Video Output
++=================
++
++.. kernel-doc:: drivers/gpu/drm/meson/meson_dw_hdmi.c
++   :doc: HDMI Output
 -- 
 1.9.1
