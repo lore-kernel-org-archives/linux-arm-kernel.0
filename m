@@ -1,163 +1,101 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  4 Apr 2017 18:18:17 +0100
-Subject: [PATCH v3 09/18] arm64: arch_timer: Get rid of
- erratum_workaround_set_sne
+Date: Tue,  4 Apr 2017 18:18:21 +0100
+Subject: [PATCH v3 13/18] arm64: arch_timer: Move clocksource_counter and co
+ around
 In-Reply-To: <20170404171826.25030-1-marc.zyngier@arm.com>
 References: <20170404171826.25030-1-marc.zyngier@arm.com>
-Message-ID: <20170404171826.25030-10-marc.zyngier@arm.com>
+Message-ID: <20170404171826.25030-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's move the handling of workarounds affecting set_next_event
-to the affected function, instead of overriding the pointers
-as an afterthough. Yes, this is an extra indirection on the
-erratum handling path, but the HW is busted anyway.
-
-This will allow for some more flexibility later.
+In order to access clocksource_counter from the errata handling code,
+move it (together with the related structures and functions) towards
+the top of the file.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 90 ++++++++++++++++--------------------
- 1 file changed, 41 insertions(+), 49 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 62 ++++++++++++++++++------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index b5c83cc2a67a..2c02e25d1475 100644
+index 4551587bcb44..395f5d95a737 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -241,6 +241,38 @@ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
- DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
- EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
+@@ -158,6 +158,37 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
+ 	return val;
+ }
  
-+static void erratum_set_next_event_tval_generic(const int access, unsigned long evt,
-+						struct clock_event_device *clk)
++/*
++ * Default to cp15 based access because arm64 uses this function for
++ * sched_clock() before DT is probed and the cp15 method is guaranteed
++ * to exist on arm64. arm doesn't use this before DT is probed so even
++ * if we don't have the cp15 accessors we won't have a problem.
++ */
++u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++
++static u64 arch_counter_read(struct clocksource *cs)
 +{
-+	unsigned long ctrl;
-+	u64 cval = evt + arch_counter_get_cntvct();
-+
-+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
-+	ctrl |= ARCH_TIMER_CTRL_ENABLE;
-+	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
-+
-+	if (access == ARCH_TIMER_PHYS_ACCESS)
-+		write_sysreg(cval, cntp_cval_el0);
-+	else
-+		write_sysreg(cval, cntv_cval_el0);
-+
-+	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
++	return arch_timer_read_counter();
 +}
 +
-+static int erratum_set_next_event_tval_virt(unsigned long evt,
-+					    struct clock_event_device *clk)
++static u64 arch_counter_read_cc(const struct cyclecounter *cc)
 +{
-+	erratum_set_next_event_tval_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
-+	return 0;
++	return arch_timer_read_counter();
 +}
 +
-+static int erratum_set_next_event_tval_phys(unsigned long evt,
-+					    struct clock_event_device *clk)
-+{
-+	erratum_set_next_event_tval_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
-+	return 0;
-+}
++static struct clocksource clocksource_counter = {
++	.name	= "arch_sys_counter",
++	.rating	= 400,
++	.read	= arch_counter_read,
++	.mask	= CLOCKSOURCE_MASK(56),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
 +
- static const struct arch_timer_erratum_workaround ool_workarounds[] = {
++static struct cyclecounter cyclecounter __ro_after_init = {
++	.read	= arch_counter_read_cc,
++	.mask	= CLOCKSOURCE_MASK(56),
++};
++
  #ifdef CONFIG_FSL_ERRATUM_A008585
- 	{
-@@ -347,6 +379,9 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 
- #else
- #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
-+#define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
-+#define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
-+#define needs_unstable_timer_counter_workaround()	({false;})
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
- 
- static __always_inline irqreturn_t timer_handler(const int access,
-@@ -436,43 +471,12 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
- 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -742,37 +773,6 @@ static u64 arch_counter_get_cntvct_mem(void)
+ 	return ((u64) vct_hi << 32) | vct_lo;
  }
  
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--static __always_inline void erratum_set_next_event_generic(const int access,
--		unsigned long evt, struct clock_event_device *clk)
+-/*
+- * Default to cp15 based access because arm64 uses this function for
+- * sched_clock() before DT is probed and the cp15 method is guaranteed
+- * to exist on arm64. arm doesn't use this before DT is probed so even
+- * if we don't have the cp15 accessors we won't have a problem.
+- */
+-u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+-
+-static u64 arch_counter_read(struct clocksource *cs)
 -{
--	unsigned long ctrl;
--	u64 cval = evt + arch_counter_get_cntvct();
--
--	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
--	ctrl |= ARCH_TIMER_CTRL_ENABLE;
--	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
--
--	if (access == ARCH_TIMER_PHYS_ACCESS)
--		write_sysreg(cval, cntp_cval_el0);
--	else if (access == ARCH_TIMER_VIRT_ACCESS)
--		write_sysreg(cval, cntv_cval_el0);
--
--	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+-	return arch_timer_read_counter();
 -}
 -
--static int erratum_set_next_event_virt(unsigned long evt,
--					   struct clock_event_device *clk)
+-static u64 arch_counter_read_cc(const struct cyclecounter *cc)
 -{
--	erratum_set_next_event_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
--	return 0;
+-	return arch_timer_read_counter();
 -}
 -
--static int erratum_set_next_event_phys(unsigned long evt,
--					   struct clock_event_device *clk)
--{
--	erratum_set_next_event_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
--	return 0;
--}
--#endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+-static struct clocksource clocksource_counter = {
+-	.name	= "arch_sys_counter",
+-	.rating	= 400,
+-	.read	= arch_counter_read,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
 -
- static int arch_timer_set_next_event_virt(unsigned long evt,
- 					  struct clock_event_device *clk)
- {
-+	if (needs_unstable_timer_counter_workaround())
-+		return erratum_set_next_event_tval_virt(evt, clk);
-+
- 	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
- 	return 0;
- }
-@@ -480,6 +484,9 @@ static int arch_timer_set_next_event_virt(unsigned long evt,
- static int arch_timer_set_next_event_phys(unsigned long evt,
- 					  struct clock_event_device *clk)
- {
-+	if (needs_unstable_timer_counter_workaround())
-+		return erratum_set_next_event_tval_phys(evt, clk);
-+
- 	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
- 	return 0;
- }
-@@ -498,19 +505,6 @@ static int arch_timer_set_next_event_phys_mem(unsigned long evt,
- 	return 0;
- }
+-static struct cyclecounter cyclecounter __ro_after_init = {
+-	.read	= arch_counter_read_cc,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-};
+-
+ static struct arch_timer_kvm_info arch_timer_kvm_info;
  
--static void erratum_workaround_set_sne(struct clock_event_device *clk)
--{
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
--		return;
--
--	if (arch_timer_uses_ppi == VIRT_PPI)
--		clk->set_next_event = erratum_set_next_event_virt;
--	else
--		clk->set_next_event = erratum_set_next_event_phys;
--#endif
--}
--
- static void __arch_timer_setup(unsigned type,
- 			       struct clock_event_device *clk)
- {
-@@ -541,8 +535,6 @@ static void __arch_timer_setup(unsigned type,
- 		}
- 
- 		arch_timer_check_ool_workaround(ate_match_local_cap_id, NULL);
--
--		erratum_workaround_set_sne(clk);
- 	} else {
- 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
- 		clk->name = "arch_mem_timer";
+ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 -- 
 2.11.0
