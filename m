@@ -1,88 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Apr 2017 09:11:52 -0700
-Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170328205511.21166-3-d-gerlach@ti.com>
-References: <20170328205511.21166-1-d-gerlach@ti.com>
- <20170328205511.21166-3-d-gerlach@ti.com>
-Message-ID: <20170404161151.GS10760@atomide.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 04 Apr 2017 18:15:09 +0200
+Subject: [PATCH v4 5/6] arm64: dts: rockchip: add dts file for RK3328
+In-Reply-To: <1490607650-18650-5-git-send-email-cl@rock-chips.com>
+References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
+ <1490607650-18650-5-git-send-email-cl@rock-chips.com>
+Message-ID: <14347589.zfs04b466a@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Am Montag, 27. M?rz 2017, 17:40:49 CEST schrieb cl at rock-chips.com:
+> From: Liang Chen <cl@rock-chips.com>
+> 
+> This patch add rk3328-evb.dts for RK3328 evaluation board.
+> Tested on RK3328 evb.
+> 
+> Signed-off-by: Liang Chen <cl@rock-chips.com>
 
-* Dave Gerlach <d-gerlach@ti.com> [170328 13:57]:
-> Certain SoCs like Texas Instruments AM335x and AM437x require parts
-> of the EMIF PM code to run late in the suspend sequence from SRAM,
-> such as saving and restoring the EMIF context and placing the memory
-> into self-refresh.
-> 
-> One requirement for these SoCs to suspend and enter its lowest power
-> mode, called DeepSleep0, is that the PER power domain must be shut off.
-> Because the EMIF (DDR Controller) resides within this power domain, it
-> will lose context during a suspend operation, so we must save it so we
-> can restore once we resume. However, we cannot execute this code from
-> external memory, as it is not available at this point, so the code must
-> be executed late in the suspend path from SRAM.
-> 
-> This patch introduces a ti-emif-sram driver that includes several
-> functions written in ARM ASM that are relocatable so the PM SRAM
-> code can use them. It also allocates a region of writable SRAM to
-> be used by the code running in the executable region of SRAM to save
-> and restore the EMIF context. It can export a table containing the
-> absolute addresses of the available PM functions so that other SRAM
-> code can branch to them. This code is required for suspend/resume on
-> AM335x and AM437x to work.
-> 
-> In addition to this, to be able to share data structures between C and
-> the ti-emif-sram-pm assembly code, we can automatically generate all of
-> the C struct member offsets and sizes as macros by making use of the ARM
-> asm-offsets file. In the same header that we define our data structures
-> in we also define all the macros in an inline function and by adding a
-> call to this in the asm_offsets file all macros are properly generated
-> and available to the assembly code without cluttering up the asm-offsets
-> file.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/kernel/asm-offsets.c    |   6 +
->  drivers/memory/Kconfig           |  10 ++
->  drivers/memory/Makefile          |   4 +
->  drivers/memory/emif.h            |  17 ++
->  drivers/memory/ti-emif-pm.c      | 295 ++++++++++++++++++++++++++++++++++
->  drivers/memory/ti-emif-sram-pm.S | 334 +++++++++++++++++++++++++++++++++++++++
->  include/linux/ti-emif-sram.h     | 143 +++++++++++++++++
->  7 files changed, 809 insertions(+)
->  create mode 100644 drivers/memory/ti-emif-pm.c
->  create mode 100644 drivers/memory/ti-emif-sram-pm.S
->  create mode 100644 include/linux/ti-emif-sram.h
-> 
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index 608008229c7d..d728b5660e36 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -28,6 +28,7 @@
->  #include <asm/vdso_datapage.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <linux/kbuild.h>
-> +#include <linux/ti-emif-sram.h>
->  
->  /*
->   * Make sure that the compiler and target are compatible.
-> @@ -183,5 +184,10 @@ int main(void)
->  #ifdef CONFIG_VDSO
->    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
->  #endif
-> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
-> +  BLANK();
-> +  ti_emif_offsets();
-> +#endif
-> +
->    return 0; 
->  }
+applied for 4.12
 
-Does the above look OK to you?
 
-Regards,
-
-Tony
+Thanks
+Heiko
