@@ -1,126 +1,75 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 4 Apr 2017 16:51:21 +0200
-Subject: [PATCH] [media] cec: Handle RC capability more elegantly
-In-Reply-To: <20170404144309.31357-1-lee.jones@linaro.org>
-References: <20170404144309.31357-1-lee.jones@linaro.org>
-Message-ID: <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Tue, 4 Apr 2017 15:02:45 +0000
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+ <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2017 04:43 PM, Lee Jones wrote:
-> If a user specifies the use of RC as a capability, they should
-> really be enabling RC Core code.  If they do not we WARN() them
-> of this and disable the capability for them.
-> 
-> Once we know RC Core code has not been enabled, we can update
-> the user's capabilities and use them as a term of reference for
-> other RC-only calls.  This is preferable to having ugly #ifery
-> scattered throughout C code.
-> 
-> Most of the functions are actually safe to call, since they
-> sensibly check for a NULL RC pointer before they attempt to
-> deference it.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/media/cec/cec-core.c | 19 +++++++------------
->  1 file changed, 7 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-> index cfe414a..51be8d6 100644
-> --- a/drivers/media/cec/cec-core.c
-> +++ b/drivers/media/cec/cec-core.c
-> @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
->  		return ERR_PTR(-EINVAL);
->  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
->  		return ERR_PTR(-EINVAL);
-> +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
-> +		caps &= ~CEC_CAP_RC;
+Hi Sinan
 
-Don't use WARN_ON, this is not an error of any kind. Neither do you need to add the
-'caps & CEC_CAP_RC' test. Really, it's just simpler to do what I suggested before
-with an #if.
+>Hi Mayurkumar,
+>
+>On 3/30/2017 9:30 AM, Sinan Kaya wrote:
+>> When the operating system is booted with the default ASPM policy
+>> (POLICY_DEFAULT), current code is querying the enable/disable
+>> states from ASPM registers to determine the policy.
+>>
+>> For example, a BIOS could set the power saving state to performance
+>> and clear all ASPM control registers. A balanced ASPM policy could
+>> enable L0s and disable L1. A power conscious BIOS could enable both
+>> L0s and L1 to trade off latency and performance vs. power.
+>>
+>> After hotplug removal, pcie_aspm_exit_link_state() function clears
+>> the ASPM registers. An insertion following hotplug removal reads
+>> incorrect policy as ASPM disabled even though ASPM was enabled
+>> during boot.
+>>
+>> This is caused by the fact that same function is used for reconfiguring
+>> ASPM regardless of the power on state.
+>>
+>> ------------------------
+>> Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
+>> ------------------------
+>> - revert the accidental parent check in bridge remove
+>>
+>> Sinan Kaya (5):
+>>   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+>>   PCI/ASPM: split pci_aspm_init() into two
+>>   PCI/ASPM: add init hook to device_add
+>>   PCI/ASPM: save power on values during bridge init
+>>   PCI/ASPM: move link_state cleanup to bridge remove
+>>
+>>  drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
+>>  drivers/pci/probe.c     |   3 ++
+>>  drivers/pci/remove.c    |   3 +-
+>>  include/linux/pci.h     |   2 +
+>>  4 files changed, 98 insertions(+), 47 deletions(-)
+>>
+>
+>Did you get a chance to test?
+>
 
-> +
->  	adap = kzalloc(sizeof(*adap), GFP_KERNEL);
->  	if (!adap)
->  		return ERR_PTR(-ENOMEM);
-> +
->  	strlcpy(adap->name, name, sizeof(adap->name));
->  	adap->phys_addr = CEC_PHYS_ADDR_INVALID;
->  	adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
-> @@ -237,7 +241,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
->  	if (!(caps & CEC_CAP_RC))
->  		return adap;
->  
-> -#if IS_REACHABLE(CONFIG_RC_CORE)
+Not yet. Will get back in this week sometimes to give you some feedback.
 
-Huh? If CONFIG_RC_CORE is undefined, all these rc_ calls will fail when linking!
 
-Regards,
 
-	Hans
+Thanks
+Mayur
 
->  	/* Prepare the RC input device */
->  	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
->  	if (!adap->rc) {
-> @@ -264,9 +267,7 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
->  	adap->rc->priv = adap;
->  	adap->rc->map_name = RC_MAP_CEC;
->  	adap->rc->timeout = MS_TO_NS(100);
-> -#else
-> -	adap->capabilities &= ~CEC_CAP_RC;
-> -#endif
-> +
->  	return adap;
->  }
->  EXPORT_SYMBOL_GPL(cec_allocate_adapter);
-> @@ -285,7 +286,6 @@ int cec_register_adapter(struct cec_adapter *adap,
->  	adap->owner = parent->driver->owner;
->  	adap->devnode.dev.parent = parent;
->  
-> -#if IS_REACHABLE(CONFIG_RC_CORE)
->  	if (adap->capabilities & CEC_CAP_RC) {
->  		adap->rc->dev.parent = parent;
->  		res = rc_register_device(adap->rc);
-> @@ -298,15 +298,13 @@ int cec_register_adapter(struct cec_adapter *adap,
->  			return res;
->  		}
->  	}
-> -#endif
->  
->  	res = cec_devnode_register(&adap->devnode, adap->owner);
->  	if (res) {
-> -#if IS_REACHABLE(CONFIG_RC_CORE)
->  		/* Note: rc_unregister also calls rc_free */
->  		rc_unregister_device(adap->rc);
->  		adap->rc = NULL;
-> -#endif
-> +
->  		return res;
->  	}
->  
-> @@ -337,11 +335,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
->  	if (IS_ERR_OR_NULL(adap))
->  		return;
->  
-> -#if IS_REACHABLE(CONFIG_RC_CORE)
->  	/* Note: rc_unregister also calls rc_free */
->  	rc_unregister_device(adap->rc);
->  	adap->rc = NULL;
-> -#endif
-> +
->  	debugfs_remove_recursive(adap->cec_dir);
->  	cec_devnode_unregister(&adap->devnode);
->  }
-> @@ -357,9 +354,7 @@ void cec_delete_adapter(struct cec_adapter *adap)
->  	kthread_stop(adap->kthread);
->  	if (adap->kthread_config)
->  		kthread_stop(adap->kthread_config);
-> -#if IS_REACHABLE(CONFIG_RC_CORE)
->  	rc_free_device(adap->rc);
-> -#endif
->  	kfree(adap);
->  }
->  EXPORT_SYMBOL_GPL(cec_delete_adapter);
-> 
+>Sinan
+>
+>--
+>Sinan Kaya
+>Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
