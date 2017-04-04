@@ -1,9 +1,9 @@
 From: menschel.p@posteo.de (Patrick Menschel)
-Date: Tue,  4 Apr 2017 20:36:27 +0200
-Subject: [PATCH v4 1/6] ARM: dts: sun4i: fix device node ordering
+Date: Tue,  4 Apr 2017 20:36:30 +0200
+Subject: [PATCH v4 4/6] ARM: dts: sun7i: fix device node ordering
 In-Reply-To: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
 References: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
-Message-ID: <1491330992-9876-2-git-send-email-menschel.p@posteo.de>
+Message-ID: <1491330992-9876-5-git-send-email-menschel.p@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +16,11 @@ uart7: serial at 01c29c00
 i2c0: i2c at 01c2ac00
 i2c1: i2c at 01c2b000
 i2c2: i2c at 01c2b400
+i2c3: i2c at 01c2b800
+i2c4: i2c at 01c2c000
+gmac: ethernet at 01c50000
+hstimer at 01c60000
+gic: interrupt-controller at 01c81000
 ps20: ps2 at 01c2a000
 ps21: ps2 at 01c2a400
 
@@ -27,24 +32,29 @@ ps21: ps2 at 01c2a400
 i2c0: i2c at 01c2ac00
 i2c1: i2c at 01c2b000
 i2c2: i2c at 01c2b400
+i2c3: i2c at 01c2b800
+i2c4: i2c at 01c2c000
+gmac: ethernet at 01c50000
+hstimer at 01c60000
+gic: interrupt-controller at 01c81000
 
 Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 31 ++++++++++++++++---------------
+ arch/arm/boot/dts/sun7i-a20.dtsi | 31 ++++++++++++++++---------------
  1 file changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index ba20b48..498f7f2 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1283,6 +1283,22 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 2db97fc..100b4e9 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1538,6 +1538,22 @@
  			status = "disabled";
  		};
  
 +		ps20: ps2 at 01c2a000 {
 +			compatible = "allwinner,sun4i-a10-ps2";
 +			reg = <0x01c2a000 0x400>;
-+			interrupts = <62>;
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&apb1_gates 6>;
 +			status = "disabled";
 +		};
@@ -52,22 +62,22 @@ index ba20b48..498f7f2 100644
 +		ps21: ps2 at 01c2a400 {
 +			compatible = "allwinner,sun4i-a10-ps2";
 +			reg = <0x01c2a400 0x400>;
-+			interrupts = <63>;
++			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&apb1_gates 7>;
 +			status = "disabled";
 +		};
 +
  		i2c0: i2c at 01c2ac00 {
- 			compatible = "allwinner,sun4i-a10-i2c";
- 			reg = <0x01c2ac00 0x400>;
-@@ -1313,20 +1329,5 @@
- 			#size-cells = <0>;
+ 			compatible = "allwinner,sun7i-a20-i2c",
+ 				     "allwinner,sun4i-a10-i2c";
+@@ -1629,20 +1645,5 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
  		};
  
 -		ps20: ps2 at 01c2a000 {
 -			compatible = "allwinner,sun4i-a10-ps2";
 -			reg = <0x01c2a000 0x400>;
--			interrupts = <62>;
+-			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&apb1_gates 6>;
 -			status = "disabled";
 -		};
@@ -75,7 +85,7 @@ index ba20b48..498f7f2 100644
 -		ps21: ps2 at 01c2a400 {
 -			compatible = "allwinner,sun4i-a10-ps2";
 -			reg = <0x01c2a400 0x400>;
--			interrupts = <63>;
+-			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
 -			clocks = <&apb1_gates 7>;
 -			status = "disabled";
 -		};
