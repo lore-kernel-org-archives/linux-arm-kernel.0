@@ -1,45 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 4 Apr 2017 12:10:51 +0100
-Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
-In-Reply-To: <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
-Message-ID: <906032bd-8f3d-f34c-7c0f-0222c39fb552@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Apr 2017 12:18:26 +0100
+Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and
+ hyp are not excluded
+In-Reply-To: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170404111826.GD14898@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/17 11:18, Sricharan R wrote:
-> Size of the dma-range is calculated as coherent_dma_mask + 1
-> and passed to arch_setup_dma_ops further. It overflows when
-> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
-> resulting in size getting passed as 0 wrongly. Fix this by
-> passsing in max(mask, mask + 1). Note that in this case
-> when the mask is set to full 64bits, we will be passing the mask
-> itself to arch_setup_dma_ops instead of the size. The real fix
-> for this should be to make arch_setup_dma_ops receive the
-> mask and handle it, to be done in the future.
-
-Agreed; in the meantime, this fix is neat and robust enough.
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  drivers/of/device.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Tue, Apr 04, 2017 at 04:10:55PM +0530, Ganapatrao Kulkarni wrote:
+> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+> is returning error for perf syscall with mixed attribute set for exclude_kernel
+> and exlude_hv.
 > 
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index c17c19d..c2ae6bb 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->  	if (ret < 0) {
->  		dma_addr = offset = 0;
-> -		size = dev->coherent_dma_mask + 1;
-> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->  	} else {
->  		offset = PFN_DOWN(paddr - dma_addr);
->  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> This change is breaking some applications (observed with hhvm) when
+> ran with VHE enabled. Adding change to enable EL2 event counting,
+> if either of or both of exclude_kernel and exlude_hv are not set.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 19 ++++++++++++-------
+>  1 file changed, 12 insertions(+), 7 deletions(-)
+
+Hmm. When we have VHE, we can't distinguish between hypervisor and kernel,
+so this patch doesn't seem right to me. The code currently requires
+both exclude_kernel and exclude_hv to be clear before we enable profiling
+EL2, otherwise we're failing to exclude samples that were asked to be
+excluded.
+
+Will
+
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index daf95919..ea5848a 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -871,15 +871,20 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>  
+>  	if (attr->exclude_idle)
+>  		return -EPERM;
+> -	if (is_kernel_in_hyp_mode() &&
+> -	    attr->exclude_kernel != attr->exclude_hv)
+> -		return -EINVAL;
+> +	if (is_kernel_in_hyp_mode()) {
+> +		/* include EL2 events, if either of not excluded */
+> +		if ((attr->exclude_kernel != attr->exclude_hv) ||
+> +				!attr->exclude_kernel ||
+> +				!attr->exclude_hv)
+> +			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> +	} else {
+> +		if (attr->exclude_kernel)
+> +			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> +		if (!attr->exclude_hv)
+> +			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> +	}
+>  	if (attr->exclude_user)
+>  		config_base |= ARMV8_PMU_EXCLUDE_EL0;
+> -	if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
+> -		config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> -	if (!attr->exclude_hv)
+> -		config_base |= ARMV8_PMU_INCLUDE_EL2;
+>  
+>  	/*
+>  	 * Install the filter into config_base as this is used to
+> -- 
+> 1.8.1.4
 > 
