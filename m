@@ -1,58 +1,31 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  5 Apr 2017 02:01:40 +0800
-Subject: [PATCH 06/11] dt-bindings: add AXP803's regulator info
+Date: Wed,  5 Apr 2017 02:01:42 +0800
+Subject: [PATCH 08/11] mfd: axp20x: add axp20x-regulator cell for AXP803
 In-Reply-To: <20170404180145.12897-1-icenowy@aosc.io>
 References: <20170404180145.12897-1-icenowy@aosc.io>
-Message-ID: <20170404180145.12897-7-icenowy@aosc.io>
+Message-ID: <20170404180145.12897-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AXP803 have the most regulators in currently supported AXP PMICs.
-
-Add info for the regulators in the dt-bindings document.
+As axp20x-regulator now supports AXP803, add a cell for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/mfd/axp20x.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 31607631b0d8..67981bdfd782 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -138,6 +138,33 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
- RTC_LDO		: LDO		: ips-supply		: always on
- SW		: On/Off Switch : swin-supply
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index e468e08d84db..9065be056b39 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -891,6 +891,8 @@ static struct mfd_cell axp803_cells[] = {
+ 		.name			= "axp20x-pek",
+ 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+ 		.resources		= axp803_pek_resources,
++	}, {
++		.name			= "axp20x-regulator",
+ 	}
+ };
  
-+AXP803 regulators, type, and corresponding input supply names:
-+
-+Regulator	  Type		  Supply Name		  Notes
-+---------	  ----		  -----------		  -----
-+DCDC1		: DC-DC buck	: vin1-supply
-+DCDC2		: DC-DC buck	: vin2-supply		: poly-phase capable
-+DCDC3		: DC-DC	buck	: vin3-supply		: poly-phase capable
-+DCDC4		: DC-DC	buck	: vin4-supply
-+DCDC5		: DC-DC	buck	: vin5-supply		: poly-phase capable
-+DCDC6		: DC-DC	buck	: vin6-supply		: poly-phase capable
-+DC1SW		: On/Off Switch	:			: DCDC1 secondary output
-+ALDO1		: LDO		: aldoin-supply		: shared supply
-+ALDO2		: LDO		: aldoin-supply		: shared supply
-+ALDO3		: LDO		: aldoin-supply		: shared supply
-+DLDO1		: LDO		: dldoin-supply		: shared supply
-+DLDO2		: LDO		: dldoin-supply		: shared supply
-+DLDO3		: LDO		: dldoin-supply		: shared supply
-+DLDO4		: LDO		: dldoin-supply		: shared supply
-+ELDO1		: LDO		: eldoin-supply		: shared supply
-+ELDO2		: LDO		: eldoin-supply		: shared supply
-+ELDO3		: LDO		: eldoin-supply		: shared supply
-+FLDO1		: LDO		: fldoin-supply		: shared supply
-+FLDO2		: LDO		: fldoin-supply		: shared supply
-+LDO_IO0		: LDO		: ips-supply		: GPIO 0
-+LDO_IO1		: LDO		: ips-supply		: GPIO 1
-+RTC_LDO		: LDO		: ips-supply		: always on
-+
- Example:
- 
- axp209: pmic at 34 {
 -- 
 2.12.2
