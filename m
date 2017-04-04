@@ -1,153 +1,220 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 4 Apr 2017 11:04:50 +0200
-Subject: [PATCH v2 00/13] drm/meson: Initial support for HDMI Output
-In-Reply-To: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 4 Apr 2017 11:08:26 +0200
+Subject: [PATCH v2 03/13] drm/meson: Add support for components
+In-Reply-To: <20170404085931.7sv3k7lwgt6klu37@phenom.ffwll.local>
 References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170404090450.qdlecpxd6lxf7qj4@phenom.ffwll.local>
+ <1490109950-21421-4-git-send-email-narmstrong@baylibre.com>
+ <20170404085931.7sv3k7lwgt6klu37@phenom.ffwll.local>
+Message-ID: <e0a88828-3fab-1a3e-ed1e-7a91d94358d4@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 04:25:37PM +0100, Neil Armstrong wrote:
-> The Amlogic GX SoCs implements a Synopsys DesignWare HDMI TX Controller
-> in combination with a very custom PHY.
+On 04/04/2017 10:59 AM, Daniel Vetter wrote:
+> On Tue, Mar 21, 2017 at 04:25:40PM +0100, Neil Armstrong wrote:
+>> This patch adds support for optional components connected through the
+>> Device Tree endpoints scheme.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/gpu/drm/meson/meson_drv.c | 113 +++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 99 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+>> index bc562a0..a2e9f56 100644
+>> --- a/drivers/gpu/drm/meson/meson_drv.c
+>> +++ b/drivers/gpu/drm/meson/meson_drv.c
+>> @@ -24,6 +24,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/mutex.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/component.h>
+>>  #include <linux/of_graph.h>
+>>  
+>>  #include <drm/drmP.h>
+>> @@ -150,9 +151,9 @@ static bool meson_vpu_has_available_connectors(struct device *dev)
+>>  	.max_register   = 0x1000,
+>>  };
+>>  
+>> -static int meson_drv_probe(struct platform_device *pdev)
+>> +static int meson_drv_bind(struct device *dev)
+>>  {
+>> -	struct device *dev = &pdev->dev;
+>> +	struct platform_device *pdev = to_platform_device(dev);
+>>  	struct meson_drm *priv;
+>>  	struct drm_device *drm;
+>>  	struct resource *res;
+>> @@ -215,6 +216,15 @@ static int meson_drv_probe(struct platform_device *pdev)
+>>  
+>>  	drm_vblank_init(drm, 1);
+>>  	drm_mode_config_init(drm);
+>> +	drm->mode_config.max_width = 3840;
+>> +	drm->mode_config.max_height = 2160;
+>> +	drm->mode_config.funcs = &meson_mode_config_funcs;
+>> +
+>> +	/* Hardware Initialization */
+>> +
+>> +	meson_venc_init(priv);
+>> +	meson_vpp_init(priv);
+>> +	meson_viu_init(priv);
+>>  
+>>  	/* Encoder Initialization */
+>>  
+>> @@ -222,11 +232,11 @@ static int meson_drv_probe(struct platform_device *pdev)
+>>  	if (ret)
+>>  		goto free_drm;
+>>  
+>> -	/* Hardware Initialization */
+>> -
+>> -	meson_venc_init(priv);
+>> -	meson_vpp_init(priv);
+>> -	meson_viu_init(priv);
+>> +	ret = component_bind_all(drm->dev, drm);
+>> +	if (ret) {
+>> +		dev_err(drm->dev, "Couldn't bind all components\n");
+>> +		goto free_drm;
+>> +	}
+>>  
+>>  	ret = meson_plane_create(priv);
+>>  	if (ret)
+>> @@ -241,9 +251,6 @@ static int meson_drv_probe(struct platform_device *pdev)
+>>  		goto free_drm;
+>>  
+>>  	drm_mode_config_reset(drm);
+>> -	drm->mode_config.max_width = 8192;
+>> -	drm->mode_config.max_height = 8192;
+>> -	drm->mode_config.funcs = &meson_mode_config_funcs;
+>>  
+>>  	priv->fbdev = drm_fbdev_cma_init(drm, 32,
+>>  					 drm->mode_config.num_connector);
+>> @@ -268,9 +275,9 @@ static int meson_drv_probe(struct platform_device *pdev)
+>>  	return ret;
+>>  }
+>>  
+>> -static int meson_drv_remove(struct platform_device *pdev)
+>> +static void meson_drv_unbind(struct device *dev)
+>>  {
+>> -	struct drm_device *drm = dev_get_drvdata(&pdev->dev);
+>> +	struct drm_device *drm = dev_get_drvdata(dev);
+>>  	struct meson_drm *priv = drm->dev_private;
+>>  
+>>  	drm_dev_unregister(drm);
+>> @@ -280,9 +287,88 @@ static int meson_drv_remove(struct platform_device *pdev)
+>>  	drm_vblank_cleanup(drm);
+>>  	drm_dev_unref(drm);
+>>  
+>> -	return 0;
+>>  }
+>>  
+>> +static const struct component_master_ops meson_drv_master_ops = {
+>> +	.bind	= meson_drv_bind,
+>> +	.unbind	= meson_drv_unbind,
+>> +};
+>> +
+>> +static int compare_of(struct device *dev, void *data)
+>> +{
+>> +	DRM_DEBUG_DRIVER("Comparing of node %s with %s\n",
+>> +			 of_node_full_name(dev->of_node),
+>> +			 of_node_full_name(data));
+>> +
+>> +	return dev->of_node == data;
+>> +}
+>> +
+>> +/* Possible connectors nodes to ignore */
+>> +static const struct of_device_id connectors_match[] = {
+>> +	{ .compatible = "composite-video-connector" },
+>> +	{ .compatible = "svideo-connector" },
+>> +	{ .compatible = "hdmi-connector" },
+>> +	{ .compatible = "dvi-connector" },
+>> +	{}
+>> +};
+>> +
+>> +static int meson_probe_remote(struct platform_device *pdev,
+>> +			      struct component_match **match,
+>> +			      struct device_node *parent,
+>> +			      struct device_node *remote)
+>> +{
+>> +	struct device_node *ep, *remote_node;
+>> +	int count = 1;
+>> +
+>> +	/* If node is a connector, return and do not add to match table */
+>> +	if (of_match_node(connectors_match, remote))
+>> +		return 1;
+>> +
+>> +	component_match_add(&pdev->dev, match, compare_of, remote);
+>> +
+>> +	for_each_endpoint_of_node(remote, ep) {
+>> +		remote_node = of_graph_get_remote_port_parent(ep);
+>> +		if (!remote_node ||
+>> +		    remote_node == parent || /* Ignore parent endpoint */
+>> +		    !of_device_is_available(remote_node))
+>> +			continue;
+>> +
+>> +		count += meson_probe_remote(pdev, match, remote, remote_node);
+>> +
+>> +		of_node_put(remote_node);
+>> +	}
+>> +
+>> +	return count;
+>> +}
+>> +
+>> +static int meson_drv_probe(struct platform_device *pdev)
+>> +{
+>> +	struct component_match *match = NULL;
+>> +	struct device_node *np = pdev->dev.of_node;
+>> +	struct device_node *ep, *remote;
+>> +	int count = 0;
+>> +
+>> +	for_each_endpoint_of_node(np, ep) {
+>> +		remote = of_graph_get_remote_port_parent(ep);
+>> +		if (!remote || !of_device_is_available(remote))
+>> +			continue;
+>> +
+>> +		count += meson_probe_remote(pdev, &match, np, remote);
+>> +	}
+>> +
+>> +	/* If some endpoints were found, initialize the nodes */
+>> +	if (count) {
 > 
-> This patchset depends on Laurent Pinchart patchset merged in drm-misc-next
-> and my v4 patchset at [1] to permit PHY control from outside the dw-hdmi driver.
-> 
-> The Synopsys DesignWare HDMI TX Controller is integrated like :
->          ___________________________________
->         |            HDMI TOP               |<= HPD
->         |___________________________________|
->         |                  |                |
-> HDMI-TX-|  Synopsys HDMI   |   HDMI PHY     |=> TMDS
->         |    Controller    |________________|
->         |___________________________________|<=> DDC
-> 
-> And uses the following paths for Pixels Encoding :
->        _____   _____   ____________________
-> vd1---|     |-|     | | VENC     /---------|----VDAC
-> vd2---| VIU |-| VPP |-|-----ENCI/-ENCI_DVI-|\
-> osd1--|     |-|     | | \                  | X--HDMI-TX
-> osd2--|_____|-|_____| |  |\-ENCP--ENCP_DVI-|/
->                       |  |                 |
->                       |  \--ENCL-----------|----LVDS
->                       |____________________|
-> 
-> The ENCI and ENCP encoders pre-formats the data for the ENCI-DVI and
-> ENCP-DVI encoders. Those DVI encoders will format the pixels for the
-> Synopsys DesignWare HDMI TX Controller.
-> 
-> In order to support display modes, the ENCI and ENCP encoders needs very
-> specific parameters for *each* display modes, so usage of the CEA VIC
-> identifier is necessary. But the DVI timings are generated from the
-> drm_mode structure in a generic way.
-> 
-> To simplify the first push, only the main CEA modes are supported up to
-> 1920x1080p60. Supporting the 480i and 576i needs tweaking in the dw-hdmi
-> in order to support the Clock Doubling necessary for these modes.
-> 
-> Support for more traditional modes like the EDID fallback modes is planned
-> but will need tome additionnal handling along the CEA modes.
-> Support for 4k2k modes needs to be able to get the EDID HDMI modes, but
-> for now only the HDMI 1.4 modes are currently available in the drm_edid
-> implementation.
+> What if you have more than 1 endpoint described, but module load order
+> conspires against you to only initialize 1 at first?
 
-Ok I scanned throught this and applied a bunch of comments. Mostly because
-I need volunteers to review one of my own patch series that I need to
-resend after some polish.
+As I understood, the component_bind_all() will fail until all modules are loaded
+even in wrong order, no ?
+I tested with multiple combinations and it worked like a charm... maybe I missed
+something here !
 
-But I think it'd would be a _lot_ more useful if the various arm-soc
-drivers would cross-check their driver amongst themselves. Especially
-around drm bridges there's a lot of people involved, almost all hang out
-on #dri-devel, so should be very easy to coordinate some cross review.
+Thanks,
+Neil
 
-On all the patches except the dt ones: Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
--Daniel
-
+> -Daniel
 > 
-> This patchset does :
->  - Fixes the CRTC handling
->  - Fixes the registers definitions
->  - Adds support for device components registration along of-graph
->  - Adds support for HDMI clocks
->  - Adds support for HDMI VENC video modes
->  - Adds support for the Custom HDMI PHY using callbacks added in [1] and [2]
->  - Adds CMA node to reserve enougth memory for 1080p display
->  - Adds the HDMI controller et connector modes on selected boards
->  - Adds a proper dt-bindings for the HDMI controller et connector
->  - Add RST documentation for Meson DRM driver
->  - Updates the MAINTAINERS file to track the new files
+>> +		dev_info(&pdev->dev, "Queued %d outputs on vpu\n", count);
+>> +
+>> +		return component_master_add_with_match(&pdev->dev,
+>> +						       &meson_drv_master_ops,
+>> +						       match);
+>> +	}
+>> +
+>> +	/* If no output endpoints were available, simply bail out */
+>> +	return 0;
+>> +};
+>> +
+>>  static const struct of_device_id dt_match[] = {
+>>  	{ .compatible = "amlogic,meson-gxbb-vpu" },
+>>  	{ .compatible = "amlogic,meson-gxl-vpu" },
+>> @@ -293,7 +379,6 @@ static int meson_drv_remove(struct platform_device *pdev)
+>>  
+>>  static struct platform_driver meson_drm_platform_driver = {
+>>  	.probe      = meson_drv_probe,
+>> -	.remove     = meson_drv_remove,
+>>  	.driver     = {
+>>  		.name	= "meson-drm",
+>>  		.of_match_table = dt_match,
+>> -- 
+>> 1.9.1
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 > 
-> Changes since v1 patchset at [2] :
->  - Add the meson drm documentation from [3] to this patchset
->  - Update with new bus formats and HPD callbacks
->  - Drop all the of_machine_is_compatible
-> 
-> [1] http://lkml.kernel.org/r/1490109161-20529-1-git-send-email-narmstrong at baylibre.com
-> [2] http://lkml.kernel.org/r/1488469207-523-1-git-send-email-narmstrong at baylibre.com
-> [3] http://lkml.kernel.org/r/1488536068-9407-1-git-send-email-narmstrong at baylibre.com
-> 
-> Neil Armstrong (13):
->   drm/meson: Use crtc_state for hdisplay and fix atomic flush/enable
->     sync for vsync commit
->   drm/meson: Add missing HDMI register
->   drm/meson: Add support for components
->   drm/meson: venc_cvbs: no more return -ENODEV if CVBS is not available
->   drm/meson: add support for HDMI clock support
->   drm/meson: Add support for HDMI venc modes and settings
->   drm/meson: Add support for HDMI encoder and DW-HDMI bridge + PHY
->   ARM64: dts: meson-gx: Add shared CMA dma memory pool
->   ARM64: dts: meson-gx: Add support for HDMI output
->   dt-bindings: Add bindings for the Amlogic Meson dw-hdmi extension
->   drm/meson: Convert existing documentation to actual kerneldoc
->   drm/meson: Add RST to bring together kerneldoc
->   MAINTAINERS: update files for Amlogic DRM Driver
-> 
->  .../bindings/display/amlogic,meson-dw-hdmi.txt     |  111 ++
->  Documentation/gpu/index.rst                        |    1 +
->  Documentation/gpu/meson.rst                        |   61 +
->  MAINTAINERS                                        |    2 +
->  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi |   39 +
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |   40 +
->  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   12 +
->  .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |   13 +
->  .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |    3 +
->  drivers/gpu/drm/meson/Kconfig                      |    6 +
->  drivers/gpu/drm/meson/Makefile                     |    1 +
->  drivers/gpu/drm/meson/meson_canvas.c               |    4 +-
->  drivers/gpu/drm/meson/meson_crtc.c                 |   15 +-
->  drivers/gpu/drm/meson/meson_drv.c                  |  118 +-
->  drivers/gpu/drm/meson/meson_drv.h                  |    3 +
->  drivers/gpu/drm/meson/meson_dw_hdmi.c              |  919 ++++++++++++++
->  drivers/gpu/drm/meson/meson_dw_hdmi.h              |  146 +++
->  drivers/gpu/drm/meson/meson_registers.h            |    1 +
->  drivers/gpu/drm/meson/meson_vclk.c                 |  632 +++++++++-
->  drivers/gpu/drm/meson/meson_vclk.h                 |    6 +-
->  drivers/gpu/drm/meson/meson_venc.c                 | 1254 +++++++++++++++++++-
->  drivers/gpu/drm/meson/meson_venc.h                 |    7 +
->  drivers/gpu/drm/meson/meson_venc_cvbs.c            |   11 +-
->  drivers/gpu/drm/meson/meson_viu.c                  |    6 +-
->  drivers/gpu/drm/meson/meson_vpp.c                  |    8 +-
->  drivers/gpu/drm/meson/meson_vpp.h                  |    2 +
->  30 files changed, 3466 insertions(+), 47 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
->  create mode 100644 Documentation/gpu/meson.rst
->  create mode 100644 drivers/gpu/drm/meson/meson_dw_hdmi.c
->  create mode 100644 drivers/gpu/drm/meson/meson_dw_hdmi.h
-> 
-> -- 
-> 1.9.1
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
