@@ -1,57 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Apr 2017 10:26:04 +0100
-Subject: [PATCH v34 04/14] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <1491291844.6218.25.camel@infradead.org>
-References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
- <20170328065130.16019-2-takahiro.akashi@linaro.org>
- <1491207492.6020.8.camel@infradead.org>
- <20170404054144.GG16309@linaro.org>
- <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
- <20170404073504.GI16309@linaro.org>
- <1491291844.6218.25.camel@infradead.org>
-Message-ID: <20170404092604.GB14898@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 4 Apr 2017 14:55:44 +0530
+Subject: [GIT PULL 1/4] DaVinci driver updates for v4.12
+Message-ID: <20170404092547.32480-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys, we were supposed to stop discussing this three days ago.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-On Tue, Apr 04, 2017 at 09:44:04AM +0200, David Woodhouse wrote:
-> On Tue, 2017-04-04 at 16:35 +0900, AKASHI Takahiro wrote:
-> > 
-> > Because I think that people sometimes use those two interchangeably.
-> > So I said I would defer to the maintainers.
-> 
-> Sometimes they do, yes. Just as sometimes people use "their",
-> "they're", and "there" interchangeably.
-> 
-> Rarely in a professional context, though. And even more rarely when
-> their error has already been pointed out to them.
-> 
-> There are no good reasons to *deliberately* get it wrong.
-> 
-> I've heard it suggested that 'MiB' would confuse people who have never
-> seen it before. And that it was ugly. Those arguments were fairly
-> specious when they were first made, and they're even sillier now ? more
-> than 20 years since the binary prefixes were introduced.
-> 
-> The alleged confusion, and the perceived ugliness, are purely due to
-> unfamiliarity and will pass.
-> 
-> The correctness, and the lack of ambiguity, will not.
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-I think consistency comes into play here. We (arm64) and the rest of the
-kernel get this wrong all the time, so if we're going to fix it then we
-should look at the wider codebase and I'd rather not do that as part of the
-kdump series. Also, why stop at the suffixes? We don't have any occurences
-of 'mebibyte' in the kernel sources, but plenty of busted 'megabytes'. A
-patch making arm64 consistent could be discussed separately, otherwise kdump
-becomes the pedantic ISO guy trying to lead by example, but really everybody
-ignores him because it's completely inconsequential and they also know he
-went 35 versions without giving a monkey's.
+are available in the git repository at:
 
-David, since you seem to be the most outraged, fancy sending a patch? ;)
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/drivers
 
-Alternatively, who fancies burning some dictionaries?
+for you to fetch changes up to 396ff64d44dbcbd4e6c06c005c4e931bd4b35e4d:
 
-Will
+  pata_bk3710: clear status bits of BMISP on chipset initialization (2017-03-30 16:13:04 +0530)
+
+----------------------------------------------------------------
+This adds a new driver for PalmChip
+PATA controller found on DM6446 and
+DM6467 SoCs. This should eventually
+replace the driver in IDE subsystem.
+
+The patches have been acked by ATA
+maintainer.
+
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (3):
+      ata: add Palmchip BK3710 PATA controller driver
+      pata_bk3710: disable IORDY Timer on chipset initialization
+      pata_bk3710: clear status bits of BMISP on chipset initialization
+
+ drivers/ata/Kconfig       |   9 ++
+ drivers/ata/Makefile      |   1 +
+ drivers/ata/pata_bk3710.c | 382 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 392 insertions(+)
+ create mode 100644 drivers/ata/pata_bk3710.c
