@@ -1,42 +1,29 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 05 Apr 2017 08:19:20 +1000
-Subject: [PATCH v4 19/23] drivers/fsi: Add GPIO based FSI master
-In-Reply-To: <93b21624-11fc-b71b-aa78-6cb4371c87ae@linux.vnet.ibm.com>
-References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
- <20170329174340.89109-20-cbostic@linux.vnet.ibm.com>
- <CACPK8XfOSYPidHF6=psC4mP-tkRyWTu0psdcK6EwA2E6FF53Uw@mail.gmail.com>
- <0e1bcf3a-e8d7-9f50-bdf7-2a1e7466665b@linux.vnet.ibm.com>
- <1490907014.3177.207.camel@kernel.crashing.org>
- <93b21624-11fc-b71b-aa78-6cb4371c87ae@linux.vnet.ibm.com>
-Message-ID: <1491344360.4166.68.camel@kernel.crashing.org>
+From: kyle@infradead.org (Kyle McMartin)
+Date: Tue, 4 Apr 2017 15:48:27 -0700
+Subject: pull request: linux-firmware: Update Mediatek MT8173 VPU firmware
+In-Reply-To: <1490686650-43882-1-git-send-email-andrew-ct.chen@mediatek.com>
+References: <1490686650-43882-1-git-send-email-andrew-ct.chen@mediatek.com>
+Message-ID: <20170404224827.GK13400@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-04 at 12:32 -0500, Christopher Bostic wrote:
-> Agreed that there is room for improvement.?? I intend to look further?
-> into your suggestions from here and our private conversation on the?
-> matter and make changes as appropriate.? I have an open issue to track?
-> this.? As it exists in this patch reads/writes from master to slave?
-> fundamentally work.??
+On Tue, Mar 28, 2017 at 03:37:29PM +0800, Andrew-CT Chen wrote:
+> Hi linux-firmware maintainers,
+> 
+> The following changes since commit 44d8e8d4fdcdff56e9e21208d4b4aa7cd6962656:
+> 
+>   Merge branch 'master' of https://github.com/Netronome/linux-firmware (2017-03-24 09:43:35 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>   https://github.com/andrewct-chen/linux_fw_vpu_v1.0.4.git vp9_profile
+> 
+> for you to fetch changes up to 936f3e98847e89f119b24e0fa50f7028d667c744:
+> 
+>   mediatek: update MT8173 VPU firmware for unsupported VP9 profiles (2017-03-28 15:21:24 +0800)
+> 
 
-My understanding is they "seem to work if you get lucky with the timing
-and fall apart under load". Or did I hear wrong ?
+Pulled, thanks Andrew-CT.
 
->  Given the pervasiveness and time to fully evaluate?
-> and test any protocol updates I intend address this in the near future?
-> with a separate follow on patch.
-
-Please try the simple change I proposed in my email. It's a 4 or 5
-lines change max to your clock_toggle function and how it's called in
-send and receive. It should be trivial to check if things still "seem
-to work" to begin with.
-
-Do you have some kind of test mechanism that hammers the FSI
-continuously ? Such as doing a series of?putmemproc/getmemproc &
-checking the values ?
-
-Then you can run that while hammering the LPC bus and generally putting
-the BMC under load and you'll quickly see if it's reliable or not.
-
-Cheers,
-Ben.
+regards, Kyle
