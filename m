@@ -1,22 +1,17 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 4 Apr 2017 20:38:17 +0300
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Apr 2017 10:43:24 -0700
 Subject: [PATCH v4 0/8] mfd: Add OF device table to I2C drivers that are
  missing it
 In-Reply-To: <20170404153036.6651-1-javier@osg.samsung.com>
 References: <20170404153036.6651-1-javier@osg.samsung.com>
-Message-ID: <20170404173817.gizxme3fgd6nwzbp@raspberrypi-3.musicnaut.iki.fi>
+Message-ID: <20170404174323.GA13234@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Javier Martinez Canillas <javier@osg.samsung.com> [170404 08:33]:
+> Most patches can be applied independently, with the exception of patches
+> 2 to 4 that should be applied in the same tree to keep bisect-ability.
 
-On Tue, Apr 04, 2017 at 11:30:28AM -0400, Javier Martinez Canillas wrote:
-> This series add OF device ID tables to mfd I2C drivers whose devices are
-> either used in Device Tree source files or are listed in binding docs as
-> a compatible string.
+Probably best to merge this all via MFD or i2c:
 
-For patches 1-5 you can add:
-
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-
-A.
+Acked-by: Tony Lindgren <tony@atomide.com>
