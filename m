@@ -1,33 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Apr 2017 16:56:04 +0100
-Subject: [PATCH] arm64: cpufeature: Make ID reg accessor naming less
- counterintuitive
-In-Reply-To: <1490282079-2724-1-git-send-email-Dave.Martin@arm.com>
-References: <1490282079-2724-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170404155603.GC19969@e104818-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Apr 2017 17:45:44 +0200
+Subject: [PATCH v4 0/5] Add support for the R_CCU on Allwinner H3/A64 SoCs
+In-Reply-To: <20170404095100.18649-1-icenowy@aosc.io>
+References: <20170404095100.18649-1-icenowy@aosc.io>
+Message-ID: <20170404154544.ofecao56dpcvk3wc@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 03:14:39PM +0000, Dave P Martin wrote:
-> read_system_reg() can readily be confused with read_sysreg(),
-> whereas these are really quite different in their meaning.
+On Tue, Apr 04, 2017 at 05:50:55PM +0800, Icenowy Zheng wrote:
+> Allwinner SoCs after sun6i-a31 nearly all have a R_CCU in PRCM part.
+> (V3s and R40 do not have it, as they have even no PRCM)
 > 
-> This patches attempts to reduce the ambiguity be reserving "sysreg"
-> for the actual system register accessors.
+> This patch adds support for the ones on H3/A64.
 > 
-> read_system_reg() is instead renamed to read_sanitised_ftr_reg(),
-> to make it more obvious that the Linux-defined sanitised feature
-> register cache is being accessed here, not the underlying
-> architectural system registers.
+> Some clock/reset values are reserved for easier extending the support to
+> A31/A23, but for this I think some changes to the PRCM MFD should be made,
+> see [1] (Although this is only a sketch).
 > 
-> cpufeature.c's internal __raw_read_system_reg() function is renamed
-> in line with its actual purpose: a form of read_sysreg() that
-> indexes on (non-compiletime-constant) encoding rather than symbolic
-> register name.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> The r_pio device node is also added for A64, as the driver is already
+> merged, and its depends (r_ccu) is now met.
 
-Queued for 4.12
+Applied all, thanks!
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170404/bcf68c72/attachment-0001.sig>
