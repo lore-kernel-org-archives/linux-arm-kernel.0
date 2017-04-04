@@ -1,57 +1,19 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 4 Apr 2017 09:13:28 -0400
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 4 Apr 2017 21:13:29 +0800
+Subject: [PATCH 1/2 v4] ARM: dts: i.MX25: add AIPS control registers
+In-Reply-To: <1491248825-23041-1-git-send-email-martin@kaiser.cx>
+References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
+ <1491248825-23041-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20170404131328.GC3394@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mayurkumar,
+On Mon, Apr 03, 2017 at 09:47:04PM +0200, Martin Kaiser wrote:
+> The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
+> control registers. Add the memory regions for the control registers to
+> the Device Tree.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-On 3/30/2017 9:30 AM, Sinan Kaya wrote:
-> When the operating system is booted with the default ASPM policy
-> (POLICY_DEFAULT), current code is querying the enable/disable
-> states from ASPM registers to determine the policy.
-> 
-> For example, a BIOS could set the power saving state to performance
-> and clear all ASPM control registers. A balanced ASPM policy could
-> enable L0s and disable L1. A power conscious BIOS could enable both
-> L0s and L1 to trade off latency and performance vs. power.
-> 
-> After hotplug removal, pcie_aspm_exit_link_state() function clears
-> the ASPM registers. An insertion following hotplug removal reads
-> incorrect policy as ASPM disabled even though ASPM was enabled
-> during boot.
-> 
-> This is caused by the fact that same function is used for reconfiguring
-> ASPM regardless of the power on state.
-> 
-> ------------------------
-> Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
-> ------------------------
-> - revert the accidental parent check in bridge remove
-> 
-> Sinan Kaya (5):
->   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
->   PCI/ASPM: split pci_aspm_init() into two
->   PCI/ASPM: add init hook to device_add
->   PCI/ASPM: save power on values during bridge init
->   PCI/ASPM: move link_state cleanup to bridge remove
-> 
->  drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
->  drivers/pci/probe.c     |   3 ++
->  drivers/pci/remove.c    |   3 +-
->  include/linux/pci.h     |   2 +
->  4 files changed, 98 insertions(+), 47 deletions(-)
-> 
-
-Did you get a chance to test?
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Applied, thanks.
