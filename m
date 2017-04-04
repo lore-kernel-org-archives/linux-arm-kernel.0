@@ -1,135 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 4 Apr 2017 15:19:34 -0700
-Subject: [PATCH v4 1/3] usercopy: create enum stack_type
-In-Reply-To: <20170216182917.19637-2-james.morse@arm.com>
-References: <20170216182917.19637-1-james.morse@arm.com>
- <20170216182917.19637-2-james.morse@arm.com>
-Message-ID: <CAGXu5jLN81EhTdXT9mc=G0Ci-ib3PRc7jw=3DxOvEHzo-QaNgA@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 05 Apr 2017 08:19:20 +1000
+Subject: [PATCH v4 19/23] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <93b21624-11fc-b71b-aa78-6cb4371c87ae@linux.vnet.ibm.com>
+References: <20170329174340.89109-1-cbostic@linux.vnet.ibm.com>
+ <20170329174340.89109-20-cbostic@linux.vnet.ibm.com>
+ <CACPK8XfOSYPidHF6=psC4mP-tkRyWTu0psdcK6EwA2E6FF53Uw@mail.gmail.com>
+ <0e1bcf3a-e8d7-9f50-bdf7-2a1e7466665b@linux.vnet.ibm.com>
+ <1490907014.3177.207.camel@kernel.crashing.org>
+ <93b21624-11fc-b71b-aa78-6cb4371c87ae@linux.vnet.ibm.com>
+Message-ID: <1491344360.4166.68.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
-> From: Sahara <keun-o.park@darkmatter.ae>
->
-> This patch creates enum stack_type which is only used in usercopy.c
-> for now. This enum type can be used for x86 and other architecture's
-> thread_info.h, which may have arch_within_stack_frames().
->
-> Signed-off-by: Sahara <keun-o.park@darkmatter.ae>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Acked-by: Kees Cook <keescook@chromium.org>
+On Tue, 2017-04-04 at 12:32 -0500, Christopher Bostic wrote:
+> Agreed that there is room for improvement.?? I intend to look further?
+> into your suggestions from here and our private conversation on the?
+> matter and make changes as appropriate.? I have an open issue to track?
+> this.? As it exists in this patch reads/writes from master to slave?
+> fundamentally work.??
 
-I've adjusted this slightly and added it to my usercopy tree for -next.
+My understanding is they "seem to work if you get lucky with the timing
+and fall apart under load". Or did I hear wrong ?
 
--Kees
+>  Given the pervasiveness and time to fully evaluate?
+> and test any protocol updates I intend address this in the near future?
+> with a separate follow on patch.
 
-> ---
->  arch/x86/include/asm/thread_info.h | 19 ++++++++++---------
->  include/linux/thread_info.h        | 13 ++++++++++---
->  mm/usercopy.c                      |  8 +-------
->  3 files changed, 21 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
-> index ad6f5eb07a95..7af4b8b23b8b 100644
-> --- a/arch/x86/include/asm/thread_info.h
-> +++ b/arch/x86/include/asm/thread_info.h
-> @@ -168,13 +168,13 @@ static inline unsigned long current_stack_pointer(void)
->   * entirely contained by a single stack frame.
->   *
->   * Returns:
-> - *              1 if within a frame
-> - *             -1 if placed across a frame boundary (or outside stack)
-> - *              0 unable to determine (no frame pointers, etc)
-> + *     GOOD_FRAME      if within a frame
-> + *     BAD_STACK       if placed across a frame boundary (or outside stack)
-> + *     NOT_STACK       unable to determine (no frame pointers, etc)
->   */
-> -static inline int arch_within_stack_frames(const void * const stack,
-> -                                          const void * const stackend,
-> -                                          const void *obj, unsigned long len)
-> +static inline enum stack_type arch_within_stack_frames(const void * const stack,
-> +                                       const void * const stackend,
-> +                                       const void *obj, unsigned long len)
->  {
->  #if defined(CONFIG_FRAME_POINTER)
->         const void *frame = NULL;
-> @@ -197,13 +197,14 @@ static inline int arch_within_stack_frames(const void * const stack,
->                  * the copy as invalid.
->                  */
->                 if (obj + len <= frame)
-> -                       return obj >= oldframe + 2 * sizeof(void *) ? 1 : -1;
-> +                       return obj >= oldframe + 2 * sizeof(void *) ?
-> +                               GOOD_FRAME : BAD_STACK;
->                 oldframe = frame;
->                 frame = *(const void * const *)frame;
->         }
-> -       return -1;
-> +       return BAD_STACK;
->  #else
-> -       return 0;
-> +       return NOT_STACK;
->  #endif
->  }
->
-> diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-> index 58373875e8ee..a38b3be347df 100644
-> --- a/include/linux/thread_info.h
-> +++ b/include/linux/thread_info.h
-> @@ -22,6 +22,13 @@
->  #endif
->
->  #include <linux/bitops.h>
-> +
-> +enum stack_type {
-> +       BAD_STACK = -1,
-> +       NOT_STACK = 0,
-> +       GOOD_FRAME,
-> +       GOOD_STACK,
-> +};
->  #include <asm/thread_info.h>
->
->  #ifdef __KERNEL__
-> @@ -77,9 +84,9 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
->  #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
->
->  #ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
-> -static inline int arch_within_stack_frames(const void * const stack,
-> -                                          const void * const stackend,
-> -                                          const void *obj, unsigned long len)
-> +static inline enum stack_type arch_within_stack_frames(const void * const stack,
-> +                                       const void * const stackend,
-> +                                       const void *obj, unsigned long len)
->  {
->         return 0;
->  }
-> diff --git a/mm/usercopy.c b/mm/usercopy.c
-> index 3c8da0af9695..3531ae735d87 100644
-> --- a/mm/usercopy.c
-> +++ b/mm/usercopy.c
-> @@ -16,15 +16,9 @@
->
->  #include <linux/mm.h>
->  #include <linux/slab.h>
-> +#include <linux/thread_info.h>
->  #include <asm/sections.h>
->
-> -enum {
-> -       BAD_STACK = -1,
-> -       NOT_STACK = 0,
-> -       GOOD_FRAME,
-> -       GOOD_STACK,
-> -};
-> -
->  /*
->   * Checks if a given pointer and length is contained by the current
->   * stack frame (if possible).
-> --
-> 2.10.1
->
+Please try the simple change I proposed in my email. It's a 4 or 5
+lines change max to your clock_toggle function and how it's called in
+send and receive. It should be trivial to check if things still "seem
+to work" to begin with.
 
+Do you have some kind of test mechanism that hammers the FSI
+continuously ? Such as doing a series of?putmemproc/getmemproc &
+checking the values ?
 
+Then you can run that while hammering the LPC bus and generally putting
+the BMC under load and you'll quickly see if it's reliable or not.
 
--- 
-Kees Cook
-Pixel Security
+Cheers,
+Ben.
