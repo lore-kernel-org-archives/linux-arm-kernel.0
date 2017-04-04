@@ -1,51 +1,52 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 4 Apr 2017 20:04:11 +0300
-Subject: [PATCH v2 1/4] cpufreq: imx6q: Fix handling EPROBE_DEFER from
- regulator
+Date: Tue, 4 Apr 2017 20:04:12 +0300
+Subject: [PATCH v2 2/4] cpufreq: imx6q: Set max suspend_freq to avoid changes
+ during suspend
 In-Reply-To: <cover.1491324640.git.leonard.crestez@nxp.com>
 References: <cover.1491324640.git.leonard.crestez@nxp.com>
-Message-ID: <118bbfc3747dcbcd1c34da2f94732fac0a5d4793.1491324640.git.leonard.crestez@nxp.com>
+Message-ID: <5f61b819733127ddc7d41e82bf703a355c845b49.1491324640.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Irina Tirdea <irina.tirdea@nxp.com>
+If the cpufreq driver tries to modify voltage/freq during suspend/resume
+it might need to control an external PMIC via I2C or SPI but those
+devices might be already suspended. This issue is likely to happen
+whenever the LDOs have their vin-supply set.
 
-If there are any errors in getting the cpu0 regulators, the driver returns
--ENOENT. In case the regulators are not yet available, the devm_regulator_get
-calls will return -EPROBE_DEFER, so that the driver can be probed later.
-If we return -ENOENT, the driver will fail its initialization and will
-not try to probe again (when the regulators become available).
+To avoid this scenario we just increase cpufreq to the maximum before
+suspend.
 
-Return the actual error received from regulator_get in probe. Print a
-differentiated message in case we need to probe the device later and
-in case we actually failed. Also add a message to inform when the
-driver has been successfully registered.
-
-Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/cpufreq/imx6q-cpufreq.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 7719b02..be90ee3 100644
+index be90ee3..786122e 100644
 --- a/drivers/cpufreq/imx6q-cpufreq.c
 +++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -222,6 +222,13 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 	arm_reg = regulator_get(cpu_dev, "arm");
- 	pu_reg = regulator_get_optional(cpu_dev, "pu");
- 	soc_reg = regulator_get(cpu_dev, "soc");
-+	if (PTR_ERR(arm_reg) == -EPROBE_DEFER ||
-+			PTR_ERR(soc_reg) == -EPROBE_DEFER ||
-+			PTR_ERR(pu_reg) == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		dev_dbg(cpu_dev, "regulators not ready, defer\n");
-+		goto put_reg;
-+	}
- 	if (IS_ERR(arm_reg) || IS_ERR(soc_reg)) {
- 		dev_err(cpu_dev, "failed to get regulators\n");
- 		ret = -ENOENT;
+@@ -161,8 +161,13 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 
+ static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+ {
++	int ret;
++
+ 	policy->clk = arm_clk;
+-	return cpufreq_generic_init(policy, freq_table, transition_latency);
++	ret = cpufreq_generic_init(policy, freq_table, transition_latency);
++	policy->suspend_freq = policy->max;
++
++	return ret;
+ }
+ 
+ static struct cpufreq_driver imx6q_cpufreq_driver = {
+@@ -173,6 +178,7 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.init = imx6q_cpufreq_init,
+ 	.name = "imx6q-cpufreq",
+ 	.attr = cpufreq_generic_attr,
++	.suspend = cpufreq_generic_suspend,
+ };
+ 
+ static int imx6q_cpufreq_probe(struct platform_device *pdev)
 -- 
 2.7.4
