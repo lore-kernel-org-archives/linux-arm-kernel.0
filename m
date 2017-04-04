@@ -1,117 +1,45 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 4 Apr 2017 11:17:24 +0200
-Subject: [PATCH v2 12/13] drm/meson: Add RST to bring together kerneldoc
-In-Reply-To: <20170404090049.auhtxqke3l5px5a7@phenom.ffwll.local>
+Date: Tue, 4 Apr 2017 11:18:51 +0200
+Subject: [PATCH v2 13/13] MAINTAINERS: update files for Amlogic DRM Driver
+In-Reply-To: <20170404090124.vn5keeanafpwzcap@phenom.ffwll.local>
 References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
- <1490109950-21421-13-git-send-email-narmstrong@baylibre.com>
- <20170404090049.auhtxqke3l5px5a7@phenom.ffwll.local>
-Message-ID: <72fd17d0-173e-4efe-cd16-fae156a9f9f6@baylibre.com>
+ <1490109950-21421-14-git-send-email-narmstrong@baylibre.com>
+ <20170404090124.vn5keeanafpwzcap@phenom.ffwll.local>
+Message-ID: <6ea12eab-2f51-787d-74c8-ddd35f2b356f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2017 11:00 AM, Daniel Vetter wrote:
-> On Tue, Mar 21, 2017 at 04:25:49PM +0100, Neil Armstrong wrote:
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> \o/ for kerneldoc!
-> 
-> This is awesome, but I guess it's time to extract a drivers.rst sub-file
-> within Doc/gpu and put all the various driver docs in there? Would be
-> great if you could do the follow-up for that.
-
-Ok, I'll follow up on that.
-
-Thanks,
-Neil
-
-> 
-> Thanks, Daniel
-> 
->> ---
->>  Documentation/gpu/index.rst |  1 +
->>  Documentation/gpu/meson.rst | 61 +++++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 62 insertions(+)
->>  create mode 100644 Documentation/gpu/meson.rst
+On 04/04/2017 11:01 AM, Daniel Vetter wrote:
+> On Tue, Mar 21, 2017 at 04:25:50PM +0100, Neil Armstrong wrote:
+>> This patch adds the dw-hdmi bindings and RST kerneldoc to maintained files.
 >>
->> diff --git a/Documentation/gpu/index.rst b/Documentation/gpu/index.rst
->> index e998ee0..7eceb97 100644
->> --- a/Documentation/gpu/index.rst
->> +++ b/Documentation/gpu/index.rst
->> @@ -11,6 +11,7 @@ Linux GPU Driver Developer's Guide
->>     drm-kms-helpers
->>     drm-uapi
->>     i915
->> +   meson
->>     tinydrm
->>     vc4
->>     vga-switcheroo
->> diff --git a/Documentation/gpu/meson.rst b/Documentation/gpu/meson.rst
->> new file mode 100644
->> index 0000000..479f6f5
->> --- /dev/null
->> +++ b/Documentation/gpu/meson.rst
->> @@ -0,0 +1,61 @@
->> +=============================================
->> +drm/meson AmLogic Meson Video Processing Unit
->> +=============================================
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_drv.c
->> +   :doc: Video Processing Unit
->> +
->> +Video Processing Unit
->> +=====================
->> +
->> +The Amlogic Meson Display controller is composed of several components
->> +that are going to be documented below:
->> +
->> +.. code::
->> +
->> +  DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
->> +     | vd1   _______     _____________    _________________     |               |
->> +  D  |-------|      |----|            |   |                |    |   HDMI PLL    |
->> +  D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
->> +  R  |-------|      |----| Processing |   |                |    |               |
->> +     | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
->> +  R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
->> +  A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
->> +  M  |-------|______|----|____________|   |________________|    |               |
->> +  ___|__________________________________________________________|_______________|
->> +
->> +Video Input Unit
->> +================
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_viu.c
->> +   :doc: Video Input Unit
->> +
->> +Video Post Processing
->> +=====================
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_vpp.c
->> +   :doc: Video Post Processing
->> +
->> +Video Encoder
->> +=============
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_venc.c
->> +   :doc: Video Encoder
->> +
->> +Video Canvas Management
->> +=======================
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_canvas.c
->> +   :doc: Canvas
->> +
->> +Video Clocks
->> +============
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_vclk.c
->> +   :doc: Video Clocks
->> +
->> +HDMI Video Output
->> +=================
->> +
->> +.. kernel-doc:: drivers/gpu/drm/meson/meson_dw_hdmi.c
->> +   :doc: HDMI Output
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  MAINTAINERS | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index e88154f..3df68c73 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -4256,6 +4256,8 @@ W:	http://linux-meson.com/
+>>  S:	Supported
+>>  F:	drivers/gpu/drm/meson/
+>>  F:	Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
+>> +F:	Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+>> +F:	Documentation/gpu/meson.rst
+>>  T:	git git://anongit.freedesktop.org/drm/drm-meson
+> 
+> As discussed on irc, pls also remove the drm-meson git repo here (and ask
+> fdo admins to can it). To avoid confusion.
+
+Ok, I already removed the line and pushed it to drm-misc-next,
+I'll certainly need to fix a conflict here when pushing this one to drm-misc-next.
+
+> -Daniel
+> 
+>>  T:	git git://anongit.freedesktop.org/drm/drm-misc
+>>  
 >> -- 
 >> 1.9.1
 >>
