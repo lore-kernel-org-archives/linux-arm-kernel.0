@@ -1,99 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 4 Apr 2017 13:25:18 +0100
-Subject: [PATCH 2/3] perf tools arm64: implement function get_cpuid_str
-In-Reply-To: <1491291403-29893-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1491291403-29893-3-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170404122518.GA8551@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Apr 2017 13:26:32 +0100
+Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and
+ hyp are not excluded
+In-Reply-To: <CAFpQJXW_2=8Jwqrt4k6Em6B=TBh_XA2x23OTMbpzkwKZV2x4jA@mail.gmail.com>
+References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170404111826.GD14898@arm.com>
+ <CAFpQJXW_2=8Jwqrt4k6Em6B=TBh_XA2x23OTMbpzkwKZV2x4jA@mail.gmail.com>
+Message-ID: <20170404122632.GF14898@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 01:06:42PM +0530, Ganapatrao Kulkarni wrote:
-> function get_cpuid_str returns midr_el1 value from first
-> online cpu available.
-
-This isn't globally the same (e.g. in big.LITTLE systems).
-
-It would be far better to have the function take a PMU, and look at the
-first CPU in that PMU's mask.
-
-Thanks,
-Mark.
-
+On Tue, Apr 04, 2017 at 05:37:10PM +0530, Ganapatrao Kulkarni wrote:
+> On Tue, Apr 4, 2017 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Apr 04, 2017 at 04:10:55PM +0530, Ganapatrao Kulkarni wrote:
+> >> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+> >> is returning error for perf syscall with mixed attribute set for exclude_kernel
+> >> and exlude_hv.
+> >>
+> >> This change is breaking some applications (observed with hhvm) when
+> >> ran with VHE enabled. Adding change to enable EL2 event counting,
+> >> if either of or both of exclude_kernel and exlude_hv are not set.
+> >>
+> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> >> ---
+> >>  arch/arm64/kernel/perf_event.c | 19 ++++++++++++-------
+> >>  1 file changed, 12 insertions(+), 7 deletions(-)
+> >
+> > Hmm. When we have VHE, we can't distinguish between hypervisor and kernel,
+> > so this patch doesn't seem right to me. The code currently requires
+> > both exclude_kernel and exclude_hv to be clear before we enable profiling
+> > EL2, otherwise we're failing to exclude samples that were asked to be
+> > excluded.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  tools/perf/arch/arm64/util/Build    |  1 +
->  tools/perf/arch/arm64/util/header.c | 51 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 52 insertions(+)
->  create mode 100644 tools/perf/arch/arm64/util/header.c
-> 
-> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-> index cef6fb3..b1ab72d 100644
-> --- a/tools/perf/arch/arm64/util/Build
-> +++ b/tools/perf/arch/arm64/util/Build
-> @@ -1,3 +1,4 @@
-> +libperf-y += header.o
->  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
->  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
->  
-> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
-> new file mode 100644
-> index 0000000..c0468fe
-> --- /dev/null
-> +++ b/tools/perf/arch/arm64/util/header.c
-> @@ -0,0 +1,51 @@
-> +#include <fnmatch.h>
-> +#include <dirent.h>
-> +#include <unistd.h>
-> +#include <stdio.h>
-> +#include <stdlib.h>
-> +#include <string.h>
-> +#include <linux/stringify.h>
-> +#include "header.h"
-> +#include "util.h"
-> +
-> +#define LINUX_SYS_CPU_DIRECTORY "/sys/devices/system/cpu/"
-> +#define MIDR "/regs/identification/midr_el1"
-> +
-> +char *get_cpuid_str(void)
-> +{
-> +	char *buf = malloc(128);
-> +	FILE *file;
-> +	char *ret = NULL;
-> +	int cpu , nr_cpu;
-> +	char sys_file[256];
-> +
-> +	sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"kernel_max");
-> +
-> +	file = fopen(sys_file, "r");
-> +	if (!file)
-> +		return ret;
-> +
-> +	if (fscanf(file, "%d", &nr_cpu) != 1)
-> +		return ret;
-> +
-> +	/* kernel_max returns nr_cpu -1 */
-> +	nr_cpu++;
-> +
-> +	/*iterate till you read midr of first online cpu */
-> +	for(cpu = 0; cpu < nr_cpu; cpu++)
-> +	{
-> +		sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"cpu%d"MIDR, cpu);
-> +		file = fopen(sys_file, "r");
-> +		if (file) {
-> +			ret = fgets(buf, 128, file);
-> +			if (ret) {
-> +				buf[strlen(buf)-1] ='\0';
-> +				fclose(file);
-> +				return buf;
-> +			}
-> +			fclose(file);
-> +		}
-> +	}
-> +	free(buf);
-> +	return ret;
-> +}
-> -- 
-> 1.8.1.4
-> 
+> The application cant differentiate that kernel is running in EL2/VHE or in EL1
+> when VHE=1, is it makes sense to enable EL2 event counting when there
+> is request from application to either include kernel or hypervisor
+> event count, since both are same.
+
+You can make exactly the same argument against your proposal by saying that
+it makes sense to disable EL2 event counting when there is a request from
+an application to either exclude kernel or hypervisor event counting.
+
+> IMO, it is not appropriate to have different application behaviour
+> when kernel booted with VHE=0/1
+
+Then find another solution to that. How about a mechanism to advertise
+that exclude_hv is effectively always set if the kernel is running at EL2?
+
+That would mean that you would use exclude_kernel to determine the profiling
+controls for the host.
+
+Will
