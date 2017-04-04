@@ -1,46 +1,138 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 4 Apr 2017 12:31:39 +0200
-Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU clock
- input
-In-Reply-To: <2246751.IOz92zzvZ6@avalon>
-References: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
- <2246751.IOz92zzvZ6@avalon>
-Message-ID: <CAMuHMdXqEhjzo5PH3a7JyUsuCBpnDGibGabD5k5oVhZY=FkRow@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 4 Apr 2017 11:35:35 +0100
+Subject: [PATCH v3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+In-Reply-To: <20170404101316.GF11752@cbox>
+References: <1491228763-23450-1-git-send-email-suzuki.poulose@arm.com>
+ <20170404101316.GF11752@cbox>
+Message-ID: <28bece63-9917-5f00-ccdf-fe663def500f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Christoffer,
 
-On Tue, Apr 4, 2017 at 12:05 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday 03 Apr 2017 11:55:19 Geert Uytterhoeven wrote:
->> The X2 crystal oscillator on the Koelsch development board provides a
->> 74.25 MHz clock, not a 148.5 MHz clock.
->>
->> Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel
->> clocks to DT") Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> Confirmed by schematics, user manual, and physical inspection of 2
->> Koelsch instances (my scope has not enough bandwidth to measure the
->> actual frequency).
+On 04/04/17 11:13, Christoffer Dall wrote:
+> Hi Suzuki,
 >
-> Stupid question, have you tested the corresponding (HDMI) DU output ? If so,
+> On Mon, Apr 03, 2017 at 03:12:43PM +0100, Suzuki K Poulose wrote:
+>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
+>> unmap_stage2_range() on the entire memory range for the guest. This could
+>> cause problems with other callers (e.g, munmap on a memslot) trying to
+>> unmap a range. And since we have to unmap the entire Guest memory range
+>> holding a spinlock, make sure we yield the lock if necessary, after we
+>> unmap each PUD range.
+>>
+>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+>> Cc: stable at vger.kernel.org # v3.10+
+>> Cc: Paolo Bonzini <pbonzin@redhat.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> [ Avoid vCPU starvation and lockup detector warnings ]
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>
+>
+> This unfortunately fails to build on 32-bit ARM, and I also think we
+> intended to check against S2_PGDIR_SIZE, not S2_PUD_SIZE.
 
-No I haven't.
+Sorry about that, I didn't test the patch with arm32. I am fine the
+patch below. And I agree that the name change does make things more
+readable. See below for a hunk that I posted to the kbuild report.
 
-Niklas, can you please fire up your display? Thanks!
+>
+> How about adding this to your patch (which includes a rename of
+> S2_PGD_SIZE which is horribly confusing as it indicates the size of the
+> first level stage-2 table itself, where S2_PGDIR_SIZE indicates the size
+> of address space mapped by a single entry in the same table):
+>
+> diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
+> index 460d616..c997f2d 100644
+> --- a/arch/arm/include/asm/stage2_pgtable.h
+> +++ b/arch/arm/include/asm/stage2_pgtable.h
+> @@ -35,10 +35,13 @@
+>
+>  #define stage2_pud_huge(pud)			pud_huge(pud)
+>
+> +#define S2_PGDIR_SIZE				PGDIR_SIZE
+> +#define S2_PGDIR_MASK				PGDIR_MASK
+> +
+>  /* Open coded p*d_addr_end that can deal with 64bit addresses */
+>  static inline phys_addr_t stage2_pgd_addr_end(phys_addr_t addr, phys_addr_t end)
+>  {
+> -	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
+> +	phys_addr_t boundary = (addr + S2_PGDIR_SIZE) & S2_PGDIR_MASK;
+>
+>  	return (boundary - 1 < end - 1) ? boundary : end;
+>  }
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index db94f3a..6e79a4c 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -41,7 +41,7 @@ static unsigned long hyp_idmap_start;
+>  static unsigned long hyp_idmap_end;
+>  static phys_addr_t hyp_idmap_vector;
+>
+> -#define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+> +#define S2_PGD_TABLE_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+>  #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+>
+>  #define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
+> @@ -299,7 +299,7 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  		 * If the range is too large, release the kvm->mmu_lock
+>  		 * to prevent starvation and lockup detector warnings.
+>  		 */
+> -		if (size > S2_PUD_SIZE)
+> +		if (size > S2_PGDIR_SIZE)
+>  			cond_resched_lock(&kvm->mmu_lock);
+>  		next = stage2_pgd_addr_end(addr, end);
+>  		if (!stage2_pgd_none(*pgd))
+> @@ -747,7 +747,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  	}
+>
+>  	/* Allocate the HW PGD, making sure that each page gets its own refcount */
+> -	pgd = alloc_pages_exact(S2_PGD_SIZE, GFP_KERNEL | __GFP_ZERO);
+> +	pgd = alloc_pages_exact(S2_PGD_TABLE_SIZE, GFP_KERNEL | __GFP_ZERO);
+>  	if (!pgd)
+>  		return -ENOMEM;
+>
+> @@ -843,7 +843,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>  	spin_unlock(&kvm->mmu_lock);
+>
+>  	/* Free the HW pgd, one page at a time */
+> -	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
+> +	free_pages_exact(kvm->arch.pgd, S2_PGD_TABLE_SIZE);
+>  	kvm->arch.pgd = NULL;
+>  }
+>
 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Btw, I have a different hunk to solve the problem, posted to the kbuild
+report. I will post it here for the sake of capturing the discussion in
+one place. The following hunk on top of the patch, changes the lock
+release after we process one PGDIR entry. As for the first time
+we enter the loop we haven't done much with the lock held, hence it may make
+sense to do it after the first round and we have more work to do.
 
-Thanks ;-)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index db94f3a..582a972 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -295,15 +295,15 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+         assert_spin_locked(&kvm->mmu_lock);
+         pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+         do {
++               next = stage2_pgd_addr_end(addr, end);
++               if (!stage2_pgd_none(*pgd))
++                       unmap_stage2_puds(kvm, pgd, addr, next);
+                 /*
+                  * If the range is too large, release the kvm->mmu_lock
+                  * to prevent starvation and lockup detector warnings.
+                  */
+-               if (size > S2_PUD_SIZE)
++               if (next != end)
+                         cond_resched_lock(&kvm->mmu_lock);
+-               next = stage2_pgd_addr_end(addr, end);
+-               if (!stage2_pgd_none(*pgd))
+-                       unmap_stage2_puds(kvm, pgd, addr, next);
+         } while (pgd++, addr = next, addr != end);
+  }
