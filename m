@@ -1,61 +1,56 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 4 Apr 2017 11:57:51 +0200
-Subject: [GIT PULL] mfd: exynos-lpass: Pinctrl dependency
-In-Reply-To: <20170404095054.7m6nf6bxweskabuu@dell>
-References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <20170328154217.5405-1-krzk@kernel.org>
- <20170403101824.rpvkqzyigonyi77p@dell>
- <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
- <20170404095054.7m6nf6bxweskabuu@dell>
-Message-ID: <20170404095751.GA28977@kozik-book>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 04 Apr 2017 13:05:47 +0300
+Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU clock
+ input
+In-Reply-To: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
+References: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <2246751.IOz92zzvZ6@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 10:50:54AM +0100, Lee Jones wrote:
-> On Tue, 04 Apr 2017, Krzysztof Kozlowski wrote:
+Hi Geert,
+
+Thank you for the patch.
+
+On Monday 03 Apr 2017 11:55:19 Geert Uytterhoeven wrote:
+> The X2 crystal oscillator on the Koelsch development board provides a
+> 74.25 MHz clock, not a 148.5 MHz clock.
 > 
-> > On Mon, Apr 3, 2017 at 12:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > > On Tue, 28 Mar 2017, Krzysztof Kozlowski wrote:
-> > >
-> > >>
-> > >> Hi Lee,
-> > >>
-> > >>
-> > >> This is dependency for mfd/exynos-lpass driver changes from Marek Szyprowski.
-> > >> That's a material for v4.12 and I will be pushing this later to Linus Walleij.
-> > >
-> > > This does not work, and *may* still break.
-> > >
-> > > The only way to guarantee the order of the patches is to have them
-> > > *all* as part of the pull-request.  Not just some of them.
-> > 
-> > What do you mean exactly? If these two patches come through my tree
-> > first, then everything will work fine because they do not break any
-> > other stuff.
-> > 
-> > If you pull it and apply the rest on top, then it should also work
-> > without problems because your history will contain everything needed
-> > in proper order.
-> > 
-> > In both cases bisectability is preserved. Did I missed something?
+> Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel
+> clocks to DT") Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Confirmed by schematics, user manual, and physical inspection of 2
+> Koelsch instances (my scope has not enough bandwidth to measure the
+> actual frequency).
+
+Stupid question, have you tested the corresponding (HDMI) DU output ? If so,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> Probably this was copied from r8a7790-lager.dts, as Lager does have two
+> identical crystal oscillators X2 and X13.
 > 
-> Okay, so you're suggesting that I rebase MFD *on-top* of your PR.  That
-> does work for me because I insist on being able to re-work my tree at
-> any time.  However, be aware that some Maintainers do not work this
-> way, thus *normally* you will have to send PR containing all of the
-> dependant patches.
+> Note that X2 is socketed, so it can be changed.
+> ---
+>  arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> b/arch/arm/boot/dts/r8a7791-koelsch.dts index
+> 59beb8402a36007b..001e6116c47c7c3b 100644
+> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> @@ -292,7 +292,7 @@
+>  	x2_clk: x2-clock {
+>  		compatible = "fixed-clock";
+>  		#clock-cells = <0>;
+> -		clock-frequency = <148500000>;
+> +		clock-frequency = <74250000>;
+>  	};
+> 
+>  	x13_clk: x13-clock {
 
-You could either rebased on top of this PR or merge it before applying
-rest of patches. It does not matter because in both cases all dependant
-patches will be after the dependency. Also in both cases you will be
-sending them in your PR.
+-- 
+Regards,
 
-You can then rebase your stuff as well, keeping only the external
-commits untouced and merged.
-
-Really, that does not differ from all your stable immutable branches you
-have been providing for other folks.
-
-
-Best regards,
-Krzysztof
+Laurent Pinchart
