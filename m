@@ -1,94 +1,31 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Apr 2017 09:36:54 +0200
-Subject: [PATCH v4 19/28] ARM: KVM: Allow the main HYP code to use the
- init hyp stub implementation
-In-Reply-To: <77ad21b3-ede6-28a2-aebd-73364f546617@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-20-marc.zyngier@arm.com>
- <20170324143432.GD25903@cbox>
- <00380529-bee2-ba10-548d-319bc4fa5c1b@arm.com>
- <20170403173225.GD11752@cbox>
- <77ad21b3-ede6-28a2-aebd-73364f546617@arm.com>
-Message-ID: <20170404073654.GE11752@cbox>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Tue,  4 Apr 2017 13:06:40 +0530
+Subject: [PATCH 0/3] Add support for ThunderX2 pmu events using json files
+Message-ID: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 06:51:02PM +0100, Marc Zyngier wrote:
-> On 03/04/17 18:32, Christoffer Dall wrote:
-> > On Fri, Mar 24, 2017 at 03:01:23PM +0000, Marc Zyngier wrote:
-> >> On 24/03/17 14:34, Christoffer Dall wrote:
-> >>> On Tue, Mar 21, 2017 at 07:20:49PM +0000, Marc Zyngier wrote:
-> >>>> We now have a full hyp-stub implementation in the KVM init code,
-> >>>> but the main KVM code only supports HVC_GET_VECTORS, which is not
-> >>>> enough.
-> >>>>
-> >>>> Instead of reinventing the wheel, let's reuse the init implementation
-> >>>> by branching to the idmap page when called with a hyp-stub hypercall.
-> >>>>
-> >>>> Tested-by: Keerthy <j-keerthy@ti.com>
-> >>>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
-> >>>>  1 file changed, 24 insertions(+), 5 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-> >>>> index 1f8db7d21fc5..a35baa81fd23 100644
-> >>>> --- a/arch/arm/kvm/hyp/hyp-entry.S
-> >>>> +++ b/arch/arm/kvm/hyp/hyp-entry.S
-> >>>> @@ -126,11 +126,30 @@ hyp_hvc:
-> >>>>  	 */
-> >>>>  	pop	{r0, r1, r2}
-> >>>>  
-> >>>> -	/* Check for __hyp_get_vectors */
-> >>>> -	cmp	r0, #HVC_GET_VECTORS
-> >>>> -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
-> >>>> -	beq	1f
-> >>>> +	/*
-> >>>> +	 * Check if we have a kernel function, which is guaranteed to be
-> >>>> +	 * bigger than the maximum hyp stub hypercall
-> >>>> +	 */
-> >>>> +	cmp	r0, #HVC_STUB_HCALL_NR
-> >>>> +	bhs	1f
-> >>>>  
-> >>>> +	/*
-> >>>> +	 * Not a kernel function, treat it as a stub hypercall.
-> >>>> +	 * Compute the physical address for __kvm_handle_stub_hvc
-> >>>> +	 * (as the code lives in the idmaped page) and branch there.
-> >>>> +	 * We hijack ip (r12) as a tmp register.
-> >>>> +	 */
-> >>>
-> >>> How can we just clobber r12 and be sure we don't corrupt the caller?
-> >>
-> >> r12 (aka ip) is allowed to be clobbered by the linker (used by inserted
-> >> code veneers, for example). Given that this is a standalone object, we
-> >> can safely assume that r12 has been saved if it was used by the caller.
-> >>
-> >> Here is what the PCS says:
-> >>
-> >> "Register r12 (IP) may be used by a linker as a scratch register between
-> >> a routine and any subroutine it calls (for details, see
-> >> ?5.3.1.1, Use of IP by the linker). It can also be used within a routine
-> >> to hold intermediate values between subroutine calls."
-> >>
-> > 
-> > So isn't this similar to my comment on the arm64 code, which relies on
-> > this being called via a function call, as opposed to directly issuring
-> > an HVC via inline assembly?
-> 
-> Indeed, this is the exact same thing.
-> 
-> > If so, documenting this limitation/restriction/feature would be nice.
-> 
-> I've added the following to the documentation:
-> 
-> "A stub hypercall is allowed to clobber any of the caller-saved
-> registers (x0-x18 on arm64, r0-r3 and ip on arm). It is thus recommended
-> to use a function call to perform the hypercall."
-> 
-> Does this work for you?
-> 
-It very much does.
+Extending json/jevent framework for parsing arm64 event files.
+Adding jevents for ThunderX2 implementation defined PMU events.
 
-Thanks,
--Christoffer
+Ganapatrao Kulkarni (3):
+  perf jevents: Add support to use core pmu name other than cpu
+  perf tools arm64: implement function get_cpuid_str
+  perf tool, arm64, thunderx2: Add implementation defined events for
+    thunderx2
+
+ tools/perf/arch/arm64/util/Build                   |  1 +
+ tools/perf/arch/arm64/util/header.c                | 51 +++++++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       |  2 +
+ .../arm64/thunderx2/implementation-defined.json    | 72 ++++++++++++++++++++++
+ tools/perf/pmu-events/jevents.c                    | 15 +++--
+ tools/perf/pmu-events/jevents.h                    |  3 +-
+ tools/perf/pmu-events/pmu-events.h                 |  1 +
+ tools/perf/util/pmu.c                              |  2 +-
+ 8 files changed, 140 insertions(+), 7 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+
+-- 
+1.8.1.4
