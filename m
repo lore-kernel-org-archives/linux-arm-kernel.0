@@ -1,96 +1,159 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 4 Apr 2017 11:14:01 +0100
-Subject: [kvmarm:master 1/3] arch/arm/kvm/mmu.c:302:14: error:
- 'S2_PUD_SIZE' undeclared
-In-Reply-To: <201704040547.iQuSbIzK%fengguang.wu@intel.com>
-References: <201704040547.iQuSbIzK%fengguang.wu@intel.com>
-Message-ID: <cf4974ea-6cfd-331c-6a77-cf4c9f07812b@arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue,  4 Apr 2017 15:48:14 +0530
+Subject: [PATCH V10 01/12] iommu/of: Refactor of_iommu_configure() for error
+ handling
+In-Reply-To: <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1491301105-5274-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 22:15, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git master
-> head:   1f1c45c6f66a586ca420ca02cbd93a35690394f9
-> commit: f9d9eb7f7a2c7e388861fe1cdb253f63e63555fe [1/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-> config: arm-axm55xx_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout f9d9eb7f7a2c7e388861fe1cdb253f63e63555fe
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
->
-> All errors (new ones prefixed by >>):
->
->    arch/arm/kvm/mmu.c: In function 'unmap_stage2_range':
->>> arch/arm/kvm/mmu.c:302:14: error: 'S2_PUD_SIZE' undeclared (first use in this function)
->       if (size > S2_PUD_SIZE)
->                  ^~~~~~~~~~~
+From: Robin Murphy <robin.murphy@arm.com>
 
-Thanks kbuild for catching this one !
+In preparation for some upcoming cleverness, rework the control flow in
+of_iommu_configure() to minimise duplication and improve the propogation
+of errors. It's also as good a time as any to switch over from the
+now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
+IOMMU instance interface directly.
 
->    arch/arm/kvm/mmu.c:302:14: note: each undeclared identifier is reported only once for each function it appears in
->
-> vim +/S2_PUD_SIZE +302 arch/arm/kvm/mmu.c
->
->    296		pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->    297		do {
->    298			/*
->    299			 * If the range is too large, release the kvm->mmu_lock
->    300			 * to prevent starvation and lockup detector warnings.
->    301			 */
->  > 302			if (size > S2_PUD_SIZE)
->    303				cond_resched_lock(&kvm->mmu_lock);
->    304			next = stage2_pgd_addr_end(addr, end);
->    305			if (!stage2_pgd_none(*pgd))
->
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/of_iommu.c | 83 +++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 53 insertions(+), 30 deletions(-)
 
-
-Marc, Christoffer,
-
-Ah! I didn't test this on arm32. We have two options :
-
-1) Define S2_P{U,M}_SIZE for arm32 in asm/stage2_pgtable.h
-
-or,
-
-2)  use the following hunk on top of the patch, which changes the lock
-release after we process one PGDIR entry. As for the first time we enter
-the loop we haven't done much with the lock held, hence it may make
-sense to do it after the first round and we have more work to do.
-
-Let me know what you think
-
-
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index db94f3a..582a972 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -295,15 +295,15 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
-         assert_spin_locked(&kvm->mmu_lock);
-         pgd = kvm->arch.pgd + stage2_pgd_index(addr);
-         do {
-+               next = stage2_pgd_addr_end(addr, end);
-+               if (!stage2_pgd_none(*pgd))
-+                       unmap_stage2_puds(kvm, pgd, addr, next);
-                 /*
-                  * If the range is too large, release the kvm->mmu_lock
-                  * to prevent starvation and lockup detector warnings.
-                  */
--               if (size > S2_PUD_SIZE)
-+               if (next != end)
-                         cond_resched_lock(&kvm->mmu_lock);
--               next = stage2_pgd_addr_end(addr, end);
--               if (!stage2_pgd_none(*pgd))
--                       unmap_stage2_puds(kvm, pgd, addr, next);
-         } while (pgd++, addr = next, addr != end);
-  }
-  
-
-Suzuki
-
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 2683e9f..8f4e599 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ }
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
+ 
++static const struct iommu_ops
++*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
++{
++	const struct iommu_ops *ops;
++	struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
++	int err;
++
++	ops = iommu_ops_from_fwnode(fwnode);
++	if (!ops || !ops->of_xlate)
++		return NULL;
++
++	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
++	if (err)
++		return ERR_PTR(err);
++
++	err = ops->of_xlate(dev, iommu_spec);
++	if (err)
++		return ERR_PTR(err);
++
++	return ops;
++}
++
+ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+ {
+ 	struct of_phandle_args *iommu_spec = data;
+@@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+ }
+ 
+ static const struct iommu_ops
+-*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node *bridge_np)
++*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
+ {
+ 	const struct iommu_ops *ops;
+ 	struct of_phandle_args iommu_spec;
++	int err;
+ 
+ 	/*
+ 	 * Start by tracing the RID alias down the PCI topology as
+@@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+ 	 * bus into the system beyond, and which IOMMU it ends up at.
+ 	 */
+ 	iommu_spec.np = NULL;
+-	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+-			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+-		return NULL;
++	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
++			     "iommu-map-mask", &iommu_spec.np,
++			     iommu_spec.args);
++	if (err)
++		return err == -ENODEV ? NULL : ERR_PTR(err);
+ 
+-	ops = iommu_ops_from_fwnode(&iommu_spec.np->fwnode);
+-	if (!ops || !ops->of_xlate ||
+-	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+-	    ops->of_xlate(&pdev->dev, &iommu_spec))
+-		ops = NULL;
++	ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
+ 
+ 	of_node_put(iommu_spec.np);
+ 	return ops;
+ }
+ 
+-const struct iommu_ops *of_iommu_configure(struct device *dev,
+-					   struct device_node *master_np)
++static const struct iommu_ops
++*of_platform_iommu_init(struct device *dev, struct device_node *np)
+ {
+ 	struct of_phandle_args iommu_spec;
+-	struct device_node *np;
+ 	const struct iommu_ops *ops = NULL;
+ 	int idx = 0;
+ 
+-	if (dev_is_pci(dev))
+-		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
+-
+ 	/*
+ 	 * We don't currently walk up the tree looking for a parent IOMMU.
+ 	 * See the `Notes:' section of
+ 	 * Documentation/devicetree/bindings/iommu/iommu.txt
+ 	 */
+-	while (!of_parse_phandle_with_args(master_np, "iommus",
+-					   "#iommu-cells", idx,
+-					   &iommu_spec)) {
+-		np = iommu_spec.np;
+-		ops = iommu_ops_from_fwnode(&np->fwnode);
+-
+-		if (!ops || !ops->of_xlate ||
+-		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
+-		    ops->of_xlate(dev, &iommu_spec))
+-			goto err_put_node;
+-
+-		of_node_put(np);
++	while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
++					   idx, &iommu_spec)) {
++		ops = of_iommu_xlate(dev, &iommu_spec);
++		of_node_put(iommu_spec.np);
+ 		idx++;
++		if (IS_ERR_OR_NULL(ops))
++			break;
+ 	}
+ 
+ 	return ops;
++}
++
++const struct iommu_ops *of_iommu_configure(struct device *dev,
++					   struct device_node *master_np)
++{
++	const struct iommu_ops *ops;
++
++	if (!master_np)
++		return NULL;
++
++	if (dev_is_pci(dev))
++		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
++	else
++		ops = of_platform_iommu_init(dev, master_np);
+ 
+-err_put_node:
+-	of_node_put(np);
+-	return NULL;
++	return IS_ERR(ops) ? NULL : ops;
+ }
+ 
+ static int __init of_iommu_init(void)
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
