@@ -1,90 +1,222 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 4 Apr 2017 11:47:17 +0100
-Subject: [PATCH V10 04/12] of: dma: Make of_dma_deconfigure() public
-In-Reply-To: <1491301105-5274-5-git-send-email-sricharan@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue,  4 Apr 2017 15:48:24 +0530
+Subject: [PATCH V10 11/12] iommu/arm-smmu: Clean up early-probing workarounds
+In-Reply-To: <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
 References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
  <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-5-git-send-email-sricharan@codeaurora.org>
-Message-ID: <2b2b6268-ad58-4c10-8866-e44a777a4128@arm.com>
+Message-ID: <1491301105-5274-12-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/17 11:18, Sricharan R wrote:
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> As part of moving DMA initializing to probe time the
-> of_dma_deconfigure() function will need to be called from different
-> source files. Make it public and move it to drivers/of/device.c where
-> the of_dma_configure() function is.
+From: Robin Murphy <robin.murphy@arm.com>
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Now that the appropriate ordering is enforced via probe-deferral of
+masters in core code, rip it all out and bask in the simplicity.
 
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/of/device.c       | 12 ++++++++++++
->  drivers/of/platform.c     |  5 -----
->  include/linux/of_device.h |  3 +++
->  3 files changed, 15 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 09dedd0..c17c19d 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -136,6 +136,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  }
->  EXPORT_SYMBOL_GPL(of_dma_configure);
->  
-> +/**
-> + * of_dma_deconfigure - Clean up DMA configuration
-> + * @dev:	Device for which to clean up DMA configuration
-> + *
-> + * Clean up all configuration performed by of_dma_configure_ops() and free all
-> + * resources that have been allocated.
-> + */
-> +void of_dma_deconfigure(struct device *dev)
-> +{
-> +	arch_teardown_dma_ops(dev);
-> +}
-> +
->  int of_device_register(struct platform_device *pdev)
->  {
->  	device_initialize(&pdev->dev);
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 5dfcc96..5344db5 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -158,11 +158,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  }
->  EXPORT_SYMBOL(of_device_alloc);
->  
-> -static void of_dma_deconfigure(struct device *dev)
-> -{
-> -	arch_teardown_dma_ops(dev);
-> -}
-> -
->  /**
->   * of_platform_device_create_pdata - Alloc, initialize and register an of_device
->   * @np: pointer to node to create device for
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index c12dace..af98455 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -56,6 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  }
->  
->  void of_dma_configure(struct device *dev, struct device_node *np);
-> +void of_dma_deconfigure(struct device *dev);
->  #else /* CONFIG_OF */
->  
->  static inline int of_driver_match_device(struct device *dev,
-> @@ -105,6 +106,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  }
->  static inline void of_dma_configure(struct device *dev, struct device_node *np)
->  {}
-> +static inline void of_dma_deconfigure(struct device *dev)
-> +{}
->  #endif /* CONFIG_OF */
->  
->  #endif /* _LINUX_OF_DEVICE_H */
-> 
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+[Sricharan: Rebased on top of ACPI IORT SMMU series]
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/iommu/arm-smmu-v3.c |  46 +-----------------
+ drivers/iommu/arm-smmu.c    | 110 +++++++++++++++++++-------------------------
+ 2 files changed, 49 insertions(+), 107 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 591bb96..4362139 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2761,51 +2761,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	.probe	= arm_smmu_device_probe,
+ 	.remove	= arm_smmu_device_remove,
+ };
++module_platform_driver(arm_smmu_driver);
+ 
+-static int __init arm_smmu_init(void)
+-{
+-	static bool registered;
+-	int ret = 0;
+-
+-	if (!registered) {
+-		ret = platform_driver_register(&arm_smmu_driver);
+-		registered = !ret;
+-	}
+-	return ret;
+-}
+-
+-static void __exit arm_smmu_exit(void)
+-{
+-	return platform_driver_unregister(&arm_smmu_driver);
+-}
+-
+-subsys_initcall(arm_smmu_init);
+-module_exit(arm_smmu_exit);
+-
+-static int __init arm_smmu_of_init(struct device_node *np)
+-{
+-	int ret = arm_smmu_init();
+-
+-	if (ret)
+-		return ret;
+-
+-	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
+-		return -ENODEV;
+-
+-	return 0;
+-}
+-IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
+-
+-#ifdef CONFIG_ACPI
+-static int __init acpi_smmu_v3_init(struct acpi_table_header *table)
+-{
+-	if (iort_node_match(ACPI_IORT_NODE_SMMU_V3))
+-		return arm_smmu_init();
+-
+-	return 0;
+-}
+-IORT_ACPI_DECLARE(arm_smmu_v3, ACPI_SIG_IORT, acpi_smmu_v3_init);
+-#endif
++IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", NULL);
+ 
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index b493c99..792fe7d 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2075,6 +2075,23 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++static void arm_smmu_bus_init(void)
++{
++	/* Oh, for a proper bus abstraction */
++	if (!iommu_present(&platform_bus_type))
++		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
++#ifdef CONFIG_ARM_AMBA
++	if (!iommu_present(&amba_bustype))
++		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
++#endif
++#ifdef CONFIG_PCI
++	if (!iommu_present(&pci_bus_type)) {
++		pci_request_acs();
++		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
++	}
++#endif
++}
++
+ static int arm_smmu_device_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
+@@ -2180,21 +2197,30 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 	arm_smmu_device_reset(smmu);
+ 	arm_smmu_test_smr_masks(smmu);
+ 
+-	/* Oh, for a proper bus abstraction */
+-	if (!iommu_present(&platform_bus_type))
+-		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+-#ifdef CONFIG_ARM_AMBA
+-	if (!iommu_present(&amba_bustype))
+-		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+-#endif
+-#ifdef CONFIG_PCI
+-	if (!iommu_present(&pci_bus_type)) {
+-		pci_request_acs();
+-		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+-	}
+-#endif
++	/*
++	 * For ACPI and generic DT bindings, an SMMU will be probed before
++	 * any device which might need it, so we want the bus ops in place
++	 * ready to handle default domain setup as soon as any SMMU exists.
++	 */
++	if (!using_legacy_binding)
++		arm_smmu_bus_init();
++
++	return 0;
++}
++
++/*
++ * With the legacy DT binding in play, though, we have no guarantees about
++ * probe order, but then we're also not doing default domains, so we can
++ * delay setting bus ops until we're sure every possible SMMU is ready,
++ * and that way ensure that no add_device() calls get missed.
++ */
++static int arm_smmu_legacy_bus_init(void)
++{
++	if (using_legacy_binding)
++		arm_smmu_bus_init();
+ 	return 0;
+ }
++device_initcall_sync(arm_smmu_legacy_bus_init);
+ 
+ static int arm_smmu_device_remove(struct platform_device *pdev)
+ {
+@@ -2219,56 +2245,14 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	.probe	= arm_smmu_device_probe,
+ 	.remove	= arm_smmu_device_remove,
+ };
+-
+-static int __init arm_smmu_init(void)
+-{
+-	static bool registered;
+-	int ret = 0;
+-
+-	if (!registered) {
+-		ret = platform_driver_register(&arm_smmu_driver);
+-		registered = !ret;
+-	}
+-	return ret;
+-}
+-
+-static void __exit arm_smmu_exit(void)
+-{
+-	return platform_driver_unregister(&arm_smmu_driver);
+-}
+-
+-subsys_initcall(arm_smmu_init);
+-module_exit(arm_smmu_exit);
+-
+-static int __init arm_smmu_of_init(struct device_node *np)
+-{
+-	int ret = arm_smmu_init();
+-
+-	if (ret)
+-		return ret;
+-
+-	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
+-		return -ENODEV;
+-
+-	return 0;
+-}
+-IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
+-IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
+-IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", arm_smmu_of_init);
+-IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", arm_smmu_of_init);
+-IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", arm_smmu_of_init);
+-IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", arm_smmu_of_init);
+-
+-#ifdef CONFIG_ACPI
+-static int __init arm_smmu_acpi_init(struct acpi_table_header *table)
+-{
+-	if (iort_node_match(ACPI_IORT_NODE_SMMU))
+-		return arm_smmu_init();
+-
+-	return 0;
+-}
+-IORT_ACPI_DECLARE(arm_smmu, ACPI_SIG_IORT, arm_smmu_acpi_init);
+-#endif
++module_platform_driver(arm_smmu_driver);
++
++IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", NULL);
++IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", NULL);
++IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", NULL);
++IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", NULL);
++IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", NULL);
++IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", NULL);
+ 
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
