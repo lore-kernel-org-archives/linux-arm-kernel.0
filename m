@@ -1,60 +1,54 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 4 Apr 2017 17:38:44 +0200
-Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
-In-Reply-To: <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
- <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
- <93e79e92-a102-e931-8d63-843031848888@samsung.com>
- <58DA1E38.50907@samsung.com>
- <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
-Message-ID: <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Apr 2017 17:40:18 +0200
+Subject: [PATCH v3 1/4] ARM: dts: sun4i: Add CAN node
+In-Reply-To: <1491238814-4888-2-git-send-email-menschel.p@posteo.de>
+References: <1491238814-4888-1-git-send-email-menschel.p@posteo.de>
+ <1491238814-4888-2-git-send-email-menschel.p@posteo.de>
+Message-ID: <20170404154018.6phu2udfgwuzklkk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 11:38 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Tue, Mar 28, 2017 at 11:26 AM, Inki Dae <inki.dae@samsung.com> wrote:
->> Merged.
->
-> Hi,
->
-> I do not see the tag (with DT patches) merged by you which I provided
-> to you before. These are essential for bisectability. Without them,
-> kernel bisectability is broken. Did you merged the tag somewhere?
->
-> Best regards,
-> Krzysztof
->
->> Thanks,
->> Inki Dae
+On Mon, Apr 03, 2017 at 07:00:11PM +0200, Patrick Menschel wrote:
+> The A10 SoC has an on-board CAN controller.
+> This patch adds the device node.
+> 
+> This patch is adapted from the description in
+> Documentation/devicetree/bindings/net/can/sun4i_can.txt
+> 
+> Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index ba20b48..7c559e7 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -1313,6 +1313,14 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		can0: can at 01c2bc00 {
+> +			compatible = "allwinner,sun4i-a10-can";
+> +			reg = <0x01c2bc00 0x400>;
+> +			interrupts = <26>;
+> +			clocks = <&apb1_gates 4>;
+> +			status = "disabled";
+> +		};
+> +
 
-Inki,
+This wasn't ordered properly. Fixed and applied.
 
-I still do not see the DTS tag [1] merged in your tree but you applied
-patches breaking the display. I looked at exynos-drm-next branch.
+Maxime
 
-We talked already about bisectability and with Hoegeun we provided
-proper solution. Hoegeun split the patchset and I sent you a stable
-tag to merge. Be aware not to apply the DTS patch because you would
-effectively duplicate it. Instead, deal like with any pull request -
-merge the tag as dependency *before* applying DRM DSI patch.
-
-I saw also a branch like this:
-https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next-tm2
-but this is something obviously wrong. I do not know what are your
-plans to do with it, but please drop it as it brings only confusion.
-
-Best regards,
-Krzysztof
-
-[1] https://www.spinics.net/lists/arm-kernel/msg567053.html
-
->> 2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
->>> Hi inki,
->>>
->>> Could you check the this patch?
->>> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
->>>
->>> Best regards,
->>> Hoegeun
->>>
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170404/d8b959e7/attachment-0001.sig>
