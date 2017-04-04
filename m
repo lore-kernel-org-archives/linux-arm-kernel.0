@@ -1,58 +1,73 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 4 Apr 2017 14:30:47 -0400
-Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
-In-Reply-To: <20170404141513.2bad3b1b.john@metanate.com>
-References: <20170224125506.21533-1-john@metanate.com>
- <20170224125506.21533-24-john@metanate.com>
- <20170302215643.GA49163@google.com>
- <20170303113945.3bd2cbd9.john@metanate.com>
- <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
- <20170404141513.2bad3b1b.john@metanate.com>
-Message-ID: <20170404183047.s7flyjv6vfhzxzb6@art_vandelay>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 4 Apr 2017 14:31:36 -0400 (EDT)
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <CAHp75VfQVdMRZnbDFyH9m=HfSuoiUxqhf2y+H07u4u6xPd7DUA@mail.gmail.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+ <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
+ <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
+ <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
+ <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
+ <1491328749.7125.66.camel@tzanussi-mobl.amr.corp.intel.com>
+ <CAHp75VfQVdMRZnbDFyH9m=HfSuoiUxqhf2y+H07u4u6xPd7DUA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1704041411150.1847@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 02:15:13PM +0100, John Keeping wrote:
-> Hi Sean,
-> 
-> On Sun, 12 Mar 2017 07:06:59 -0500, Rob Herring wrote:
-> 
-> > On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
-> > > This reset is required in order to fully reset the internal state of the
-> > > MIPI controller.
-> > > 
-> > > Signed-off-by: John Keeping <john@metanate.com>
-> > > ---
-> > > On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:  
-> > > > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:  
-> > > > > +	/*
-> > > > > +	 * Note that the reset was not defined in the initial device tree, so
-> > > > > +	 * we have to be prepared for it not being found.
-> > > > > +	 */
-> > > > > +	apb_rst = devm_reset_control_get(dev, "apb");    
-> > > > 
-> > > > Did this reset ever get documented in the device tree bindings? I
-> > > > couldn't find it. Perhaps a follow-up patch is in order?  
-> > > 
-> > > Here's a patch to do that.
-> > > 
-> > >  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
-> > >  1 file changed, 7 insertions(+)  
-> > 
-> > Acked-by: Rob Herring <robh@kernel.org>
-> 
-> I don't see this patch in linux-next, so I guess it has fallen through
-> the cracks somewhere.  Since we have Rob's ack, can you pick this via
-> drm-misc?
-> 
+On Tue, 4 Apr 2017, Andy Shevchenko wrote:
 
-Yeah, sorry about that. Applied to misc-next
-
-Sean
-
+> On Tue, Apr 4, 2017 at 8:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
+> > On Tue, 2017-04-04 at 20:08 +0300, Andy Shevchenko wrote:
+> >> On Tue, Apr 4, 2017 at 7:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
+> >> > On Tue, 2017-04-04 at 00:05 +0300, Andy Shevchenko wrote:
 > 
-> Regards,
-> John
+> >> > I was focused at that point mainly on the kernel static size, and using
+> >> > a combination of Josh Triplett's tinification tree, Andi Kleen's LTO and
+> >> > net-diet patches, and my own miscellaneous patches that I was planning
+> >> > on eventually upstreaming, I ended up with a system that I could boot to
+> >> > shell with a 455k text size:
+> >> >
+> >> > Memory: 235636K/245176K available (455K kernel code, 61K rwdata,
+> >> > 64K rodata, 132K init, 56K bss, 3056K reserved, 0K cma-reserved)
+> 
+> >> Thanks for sharing your experience. The question closer to this
+> >> discussion what did you do against TTY/UART/(related) layer(s)?
+> >>
+> >
+> > I'd have to go back and take a look, but nothing special AFIAR.
+> >
+> > No patches or hacks along those lines, and the only related thing I see
+> > as far as config is:
+> >
+> >         cfg/pty-disable.scc \
+> >
+> > which maps to:
+> >
+> >         # CONFIG_UNIX98_PTYS is not set
+> 
+> But on your guestimation how much can we squeeze TTY/UART layer if we
+> do some compile-time configuration?
+> Does it even make sense or better to introduce something like minitty
+> special layer instead?
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+For the record I more or less came along the same path as Tom, playing 
+with LTO, gc-sections, syscall removal, module_param() removal, etc. At 
+the end of the day you still have that 45K of TTY code just to send 
+debug out, 100K of VFS even if using only ramfs, 54K of timer code even 
+if there's only one simple timer available, 28K of IRQ support code even 
+if there is only one type of interrupt used, etc. LTO / gc-section 
+cannot automatically get rid of those unused functions because they're 
+runtime selected callbacks and optimization tools no longer can do their 
+magic.
+
+At some point there is no way other than having a parallel 
+implementation specifically for a limited scope to reduce both code 
+footprint and runtime RAM consumption. Who need a multicore scalable VFS 
+cache when there's only 256K of RAM and a single user space process 
+running?
+
+
+Nicolas
