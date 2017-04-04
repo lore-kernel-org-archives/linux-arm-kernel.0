@@ -1,63 +1,73 @@
-From: tom.zanussi@linux.intel.com (Tom Zanussi)
-Date: Tue, 04 Apr 2017 12:59:09 -0500
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
- <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
- <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
- <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
- <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
-Message-ID: <1491328749.7125.66.camel@tzanussi-mobl.amr.corp.intel.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed,  5 Apr 2017 02:01:34 +0800
+Subject: [PATCH 00/11] AXP803 PMIC support for Pine64
+Message-ID: <20170404180145.12897-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-04 at 20:08 +0300, Andy Shevchenko wrote:
-> On Tue, Apr 4, 2017 at 7:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
-> > On Tue, 2017-04-04 at 00:05 +0300, Andy Shevchenko wrote:
-> 
-> > Yes, in a previous project, I had been working toward getting a < 1M
-> > system to boot on Galileo hardware (which it did, but using more than
-> > that - the Galileo2 has 256MB, but it was the target hardware at the
-> > time, and I was hoping eventually to be able to boot out of the 512k
-> > on-chip SRAM).
-> >
-> > I was focused at that point mainly on the kernel static size, and using
-> > a combination of Josh Triplett's tinification tree, Andi Kleen's LTO and
-> > net-diet patches, and my own miscellaneous patches that I was planning
-> > on eventually upstreaming, I ended up with a system that I could boot to
-> > shell with a 455k text size:
-> >
-> > Memory: 235636K/245176K available (455K kernel code, 61K rwdata,
-> > 64K rodata, 132K init, 56K bss, 3056K reserved, 0K cma-reserved)
-> >
-> > virtual kernel memory layout:
-> >     fixmap  : 0xfffe5000 - 0xfffff000   ( 104 kB)
-> >     vmalloc : 0xd05f0000 - 0xfffe3000   ( 761 MB)
-> >     lowmem  : 0xc0000000 - 0xcfdf0000   ( 253 MB)
-> >       .init : 0xc1094000 - 0xc10b5000   ( 132 kB)
-> >       .data : 0xc1071fac - 0xc1092760   ( 129 kB)
-> >       .text : 0xc1000000 - 0xc1071fac   ( 455 kB)
-> >
-> > That was without networking.  Enabling networking added about 250k, and
-> > at that point I could ssh in and run a webserver, still less than 1M as
-> > far as kernel static size, which of course completely ignores the kernel
-> > dynamic size and userspace.
-> 
-> Thanks for sharing your experience. The question closer to this
-> discussion what did you do against TTY/UART/(related) layer(s)?
-> 
+The Pine64 (including Pine64+) boards have an AXP803 PMIC, which is a PMIC
+similar to AXP288, but tweaked to use with Allwinner SoCs rather than Intel
+tablets (with DCIN and Vbus re-splitted like other AXP PMICs, and RSB bus
+support added).
 
-I'd have to go back and take a look, but nothing special AFIAR.
+This patchset adds support for it and enabled it in Pine64 device tree.
 
-No patches or hacks along those lines, and the only related thing I see
-as far as config is:
-	
-	cfg/pty-disable.scc \
+This patchset can be splitted into two big parts:
 
-which maps to:
+- Part1: PATCH 1/11 to PATCH 5/11, which are enabling the MFD (and the
+  power key functionality) of AXP803.
 
-	# CONFIG_UNIX98_PTYS is not set
+- Part2: PATCH 6/11 to PATCH 11/11, which are enabling the regulator
+  function of the AXP803 PMIC. Finally Wi-Fi function is added
+  as a usage of regulators function.
+
+PATCH 1 and 2 added RSB and NMI device nodes, which are used for the
+communication between A64 and AXP803.
+
+PATCH 3 adds basical devicetree binding for AXP803.
+
+PATCH 4 adds support for the AXP803 variant in axp20x-rsb mfd driver.
+
+PATCH 5 enabled the AXP803 MFD in Pine64 device tree.
+
+PATCH 6 adds devicetree binding for the regulators in AXP803.
+
+PATCH 7 adds support for the regulators in AXP803 in the axp20x-regulator
+driver.
+
+PATCH 8 enabled the regulator MFD cell in AXP803.
+
+PATCH 9 adds a DTSI file for AXP803, just like what have been done for other
+AXPs.
+
+PATCH 10 enabled the regulators on Pine64.
+
+PATCH 11 enabled Wi-Fi support on Pine64, which required DLDO4 and ELDO1
+regulators.
+
+Icenowy Zheng (11):
+  arm64: allwinner: a64: enable RSB on A64
+  arm64: allwinner: a64: add NMI controller on A64
+  dt-bindings: add device tree binding for X-Powers AXP803 PMIC
+  mfd: axp20x: support AXP803 variant
+  arm64: allwinner: a64: add AXP803 node to Pine64 device tree
+  dt-bindings: add AXP803's regulator info
+  regulator: axp20x-regulator: add support for AXP803
+  mfd: axp20x: add axp20x-regulator cell for AXP803
+  arm64: allwinner: a64: add DTSI file for AXP803 PMIC
+  arm64: allwinner: a64: enable AXP803 regulators for Pine64
+  arm64: allwinner: a64: enable Wi-Fi for Pine64
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt   |  30 ++++-
+ arch/arm64/boot/dts/allwinner/axp803.dtsi          | 150 +++++++++++++++++++++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 136 +++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  29 ++++
+ drivers/mfd/axp20x-rsb.c                           |   1 +
+ drivers/mfd/axp20x.c                               | 115 ++++++++++++++++
+ drivers/regulator/axp20x-regulator.c               | 135 +++++++++++++++++--
+ include/linux/mfd/axp20x.h                         |  77 ++++++++++-
+ 8 files changed, 657 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
+
+-- 
+2.12.2
