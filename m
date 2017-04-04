@@ -1,72 +1,30 @@
-From: alan@linux.intel.com (Alan Cox)
-Date: Tue, 04 Apr 2017 14:40:28 +0100
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <alpine.LFD.2.20.1704031433480.1847@knanqh.ubzr>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <CAHp75VdGm2uVPBhfAge4Wx6WW2y52oddpOSfJgdYAfTUQPN7TQ@mail.gmail.com>
- <alpine.LFD.2.20.1704021149550.1847@knanqh.ubzr>
- <1491224186.3704.11.camel@linux.intel.com>
- <alpine.LFD.2.20.1704031121520.1847@knanqh.ubzr>
- <1491242719.3704.33.camel@linux.intel.com>
- <alpine.LFD.2.20.1704031433480.1847@knanqh.ubzr>
-Message-ID: <1491313228.3704.42.camel@linux.intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 4 Apr 2017 15:41:52 +0200
+Subject: [PATCH V3 1/6] ARM: tegra: Remove unnecessary inclusion of
+ flowctrl header
+In-Reply-To: <1490704978-22906-2-git-send-email-jonathanh@nvidia.com>
+References: <1490704978-22906-1-git-send-email-jonathanh@nvidia.com>
+ <1490704978-22906-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20170404134152.GD843@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> But no job control. No line editing with echo when the shell is
-> busy,?
-> etc.
-
-This is a debug interface. If RAM is that precious do the line editing
-on the other end of the link, like normal sane RTOS people do. Most
-terminal apps support line by line modes.
-
-> we're down to 5.6K. At which point there's only a raw device
-> interface?
-> to serial hardware.
-
-Which if you did a simple plain chardev without trying to fake the
-rather out of date uart layer would come down way further still.
-
-> ?the same low-level UART interface as?
-> drivers/tty/serial/serial_core.c is using to interact with UART
-> drivers.?
-> If someone wants to make a change to that interface, the 30 or so
-> UART?
-> drivers will have to be changed as well. I don't think that would be
-> a?
-> big deal to change the minitty code to follow suit. And I won't hide?
-> under a rock while this happens.
-
-Fair enough.
-
-
-> > talks tty layer. In your case you are tying it to something we
-> > eventually ought to get rid of.
+On Tue, Mar 28, 2017 at 01:42:53PM +0100, Jon Hunter wrote:
+> The Tegra flowctrl.h header is included unnecessarily by the Tegra
+> sleep.S source file. Remove this unnecessary inclusion.
 > 
-> You won't get rid of UART drivers, right?
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/sleep.S | 2 --
+>  1 file changed, 2 deletions(-)
 
-Given infinite time the uart layer ought to go away and be replaced
-with a simple kfifo queue.
+Applied to for-4.12/arm/soc, thanks.
 
-> vices, though, have 256K of on-chip RAM. Those devices will
-> make?
-> it into your surrounding. Having so much more RAM (no pun intended)?
-> they'll be capable of even more damage. Would you be more confident,?
-> when a security issue arises (because it will), to know that some
-> Linux?
-> code base is used rather than any random RTOS out there with only
-> one?
-> hundredth of the actual Linux following? If so please indulge me a
-> bit.
-
-Actually for any safety critical system both terrify me about as much.
-None of them are generally written to any appropriate ISO safety
-standard, or in an appropriate language.
-
-I did read your rationale. I am deeply dubious that re-doing the uart
-layer is the right approach versus just doing a tiny char device, but
-I've said my piece.
-
-Alan
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170404/6bddf167/attachment.sig>
