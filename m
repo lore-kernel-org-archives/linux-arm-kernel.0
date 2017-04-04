@@ -1,39 +1,33 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 4 Apr 2017 14:55:44 +0530
-Subject: [GIT PULL 1/4] DaVinci driver updates for v4.12
-Message-ID: <20170404092547.32480-1-nsekhar@ti.com>
+Date: Tue, 4 Apr 2017 14:55:45 +0530
+Subject: [GIT PULL 2/4] DaVinci SoC support updates for v4.12 (part 2)
+In-Reply-To: <20170404092547.32480-1-nsekhar@ti.com>
+References: <20170404092547.32480-1-nsekhar@ti.com>
+Message-ID: <20170404092547.32480-2-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+The following changes since commit 99228481331cdd75981767b23b83ef0ca7aa11da:
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+  ARM: davinci: add pdata-quirks for da850-evm vpif display (2017-03-07 16:43:19 +0530)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/drivers
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/soc-2
 
-for you to fetch changes up to 396ff64d44dbcbd4e6c06c005c4e931bd4b35e4d:
+for you to fetch changes up to 28d4d1d0e49b4ac4d12861a64f45101f36fbfab8:
 
-  pata_bk3710: clear status bits of BMISP on chipset initialization (2017-03-30 16:13:04 +0530)
-
-----------------------------------------------------------------
-This adds a new driver for PalmChip
-PATA controller found on DM6446 and
-DM6467 SoCs. This should eventually
-replace the driver in IDE subsystem.
-
-The patches have been acked by ATA
-maintainer.
+  ARM: davinci: add pata_bk3710 libata driver support (2017-03-30 16:15:29 +0530)
 
 ----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (3):
-      ata: add Palmchip BK3710 PATA controller driver
-      pata_bk3710: disable IORDY Timer on chipset initialization
-      pata_bk3710: clear status bits of BMISP on chipset initialization
+Add platform support needed for the
+newly introduced PalmChip PATA driver.
 
- drivers/ata/Kconfig       |   9 ++
- drivers/ata/Makefile      |   1 +
- drivers/ata/pata_bk3710.c | 382 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 392 insertions(+)
- create mode 100644 drivers/ata/pata_bk3710.c
+----------------------------------------------------------------
+Sekhar Nori (1):
+      ARM: davinci: add pata_bk3710 libata driver support
+
+ arch/arm/mach-davinci/board-dm644x-evm.c  | 3 ++-
+ arch/arm/mach-davinci/board-dm646x-evm.c  | 3 ++-
+ arch/arm/mach-davinci/board-neuros-osd2.c | 3 ++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
