@@ -1,65 +1,45 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Tue, 4 Apr 2017 13:10:19 +0200
-Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU
- clock input
-In-Reply-To: <CAMuHMdXqEhjzo5PH3a7JyUsuCBpnDGibGabD5k5oVhZY=FkRow@mail.gmail.com>
-References: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
- <2246751.IOz92zzvZ6@avalon>
- <CAMuHMdXqEhjzo5PH3a7JyUsuCBpnDGibGabD5k5oVhZY=FkRow@mail.gmail.com>
-Message-ID: <20170404111019.GF18945@bigcity.dyn.berto.se>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 4 Apr 2017 12:10:51 +0100
+Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
+In-Reply-To: <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <906032bd-8f3d-f34c-7c0f-0222c39fb552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On 04/04/17 11:18, Sricharan R wrote:
+> Size of the dma-range is calculated as coherent_dma_mask + 1
+> and passed to arch_setup_dma_ops further. It overflows when
+> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
+> resulting in size getting passed as 0 wrongly. Fix this by
+> passsing in max(mask, mask + 1). Note that in this case
+> when the mask is set to full 64bits, we will be passing the mask
+> itself to arch_setup_dma_ops instead of the size. The real fix
+> for this should be to make arch_setup_dma_ops receive the
+> mask and handle it, to be done in the future.
 
-On 2017-04-04 12:31:39 +0200, Geert Uytterhoeven wrote:
-> Hi Laurent,
-> 
-> On Tue, Apr 4, 2017 at 12:05 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > On Monday 03 Apr 2017 11:55:19 Geert Uytterhoeven wrote:
-> >> The X2 crystal oscillator on the Koelsch development board provides a
-> >> 74.25 MHz clock, not a 148.5 MHz clock.
-> >>
-> >> Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel
-> >> clocks to DT") Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> ---
-> >> Confirmed by schematics, user manual, and physical inspection of 2
-> >> Koelsch instances (my scope has not enough bandwidth to measure the
-> >> actual frequency).
-> >
-> > Stupid question, have you tested the corresponding (HDMI) DU output ? If so,
-> 
-> No I haven't.
-> 
-> Niklas, can you please fire up your display? Thanks!
+Agreed; in the meantime, this fix is neat and robust enough.
 
-Console during boot works and
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-modetest -M rcar-du -s 46:1920x1080-60Hz
-modetest -M rcar-du -s 46:1280x720-60Hz
-modetest -M rcar-du -s 46:720x480-60Hz
-
-Produce stable test patterns.
-
-Tested-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/of/device.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index c17c19d..c2ae6bb 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>  	if (ret < 0) {
+>  		dma_addr = offset = 0;
+> -		size = dev->coherent_dma_mask + 1;
+> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>  	} else {
+>  		offset = PFN_DOWN(paddr - dma_addr);
+>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
 > 
-> Thanks ;-)
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-
--- 
-Regards,
-Niklas S?derlund
