@@ -1,289 +1,139 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  4 Apr 2017 15:48:20 +0530
-Subject: [PATCH V10 07/12] of/acpi: Configure dma operations at probe time for
- platform/amba/pci bus devices
-In-Reply-To: <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1491301105-5274-8-git-send-email-sricharan@codeaurora.org>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Tue,  4 Apr 2017 06:54:39 -0400
+Subject: [PATCH v7 0/9] perf: arm64: Support for Hisilicon SoC Hardware event
+ counters
+Message-ID: <1491303279-140208-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configuring DMA ops at probe time will allow deferring device probe when
-the IOMMU isn't available yet. The dma_configure for the device is
-now called from the generic device_attach callback just before the
-bus/driver probe is called. This way, configuring the DMA ops for the
-device would be called at the same place for all bus_types, hence the
-deferred probing mechanism should work for all buses as well.
+Provide Support for Hisilicon SoC(HiP05/06/07) Hardware event counters.
+The Hisilicon SoC HiP0x series has many uncore or non-CPU performance
+events and counters units.
 
-pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
-       |                         |
-pci_bus_add_device     (device_add/driver_register)
-       |                         |
-device_attach           device_initial_probe
-       |                         |
-__device_attach_driver    __device_attach_driver
-       |
-driver_probe_device
-       |
-really_probe
-       |
-dma_configure
+This v7 version has addressed review comments of v6 version and based on 4.11-rc1.
 
-Similarly on the device/driver_unregister path __device_release_driver is
-called which inturn calls dma_deconfigure.
+This patch series is implemented refering to arm-cci, Intel/AMD uncore and
+also the cavium thunderX and xgene uncore pmu patches.
 
-This patch changes the dma ops configuration to probe time for
-both OF and ACPI based platform/amba/pci bus devices.
+Support for Hisilicon L3 cache(L3C) and Miscellaneous nodes(MN) hardware
+events and counters are added in this implementation.
 
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com> (drivers/pci part)
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
+The uncore PMU units are registered as separate PMUs. 
+e.g. in the case of L3 cache, which consist of 4 banks/instances, each bank
+is registered with perf as separate PMU, as each bank have separate control
+registers and interrupts. These units are also not CPU affine in the current
+chip versions.
 
- [V10] Added dummy dma_(de)configure functions in case
-       of !CONFIG_HAS_DMA to avoid build breaks.
+The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+The counters are exported via sysfs in the corresponding events files
+under the PMU directory so the perf tool can list the event names.
 
- drivers/acpi/glue.c         |  5 -----
- drivers/base/dd.c           |  9 +++++++++
- drivers/base/dma-mapping.c  | 40 ++++++++++++++++++++++++++++++++++++++++
- drivers/of/platform.c       |  5 +----
- drivers/pci/probe.c         | 28 ----------------------------
- include/linux/dma-mapping.h | 12 ++++++++++++
- 6 files changed, 62 insertions(+), 37 deletions(-)
+There is no counter overflow IRQ support in hardware for these uncore PMUs.
+So the driver use poll method using hrtimer to avoid overflow.
 
-diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-index fb19e1c..c05f241 100644
---- a/drivers/acpi/glue.c
-+++ b/drivers/acpi/glue.c
-@@ -176,7 +176,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	struct list_head *physnode_list;
- 	unsigned int node_id;
- 	int retval = -EINVAL;
--	enum dev_dma_attr attr;
- 
- 	if (has_acpi_companion(dev)) {
- 		if (acpi_dev) {
-@@ -233,10 +232,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	if (!has_acpi_companion(dev))
- 		ACPI_COMPANION_SET(dev, acpi_dev);
- 
--	attr = acpi_get_dma_attr(acpi_dev);
--	if (attr != DEV_DMA_NOT_SUPPORTED)
--		acpi_dma_configure(dev, attr);
--
- 	acpi_physnode_link_name(physical_node_name, node_id);
- 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
- 				   physical_node_name);
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index a1fbf55..4882f06 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/device.h>
- #include <linux/delay.h>
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/kthread.h>
- #include <linux/wait.h>
-@@ -356,6 +357,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 	if (ret)
- 		goto pinctrl_bind_failed;
- 
-+	ret = dma_configure(dev);
-+	if (ret)
-+		goto dma_failed;
-+
- 	if (driver_sysfs_add(dev)) {
- 		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
- 			__func__, dev_name(dev));
-@@ -417,6 +422,8 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 	goto done;
- 
- probe_failed:
-+	dma_deconfigure(dev);
-+dma_failed:
- 	if (dev->bus)
- 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
- 					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
-@@ -826,6 +833,8 @@ static void __device_release_driver(struct device *dev, struct device *parent)
- 			drv->remove(dev);
- 
- 		device_links_driver_cleanup(dev);
-+		dma_deconfigure(dev);
-+
- 		devres_release_all(dev);
- 		dev->driver = NULL;
- 		dev_set_drvdata(dev, NULL);
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index efd71cf..449b948 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -7,9 +7,11 @@
-  * This file is released under the GPLv2.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/dma-mapping.h>
- #include <linux/export.h>
- #include <linux/gfp.h>
-+#include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/vmalloc.h>
- 
-@@ -341,3 +343,41 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
- 	vunmap(cpu_addr);
- }
- #endif
-+
-+/*
-+ * Common configuration to enable DMA API use for a device
-+ */
-+#include <linux/pci.h>
-+
-+int dma_configure(struct device *dev)
-+{
-+	struct device *bridge = NULL, *dma_dev = dev;
-+	enum dev_dma_attr attr;
-+
-+	if (dev_is_pci(dev)) {
-+		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
-+		dma_dev = bridge;
-+		if (IS_ENABLED(CONFIG_OF) && dma_dev->parent &&
-+		    dma_dev->parent->of_node)
-+			dma_dev = dma_dev->parent;
-+	}
-+
-+	if (dma_dev->of_node) {
-+		of_dma_configure(dev, dma_dev->of_node);
-+	} else if (has_acpi_companion(dma_dev)) {
-+		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
-+		if (attr != DEV_DMA_NOT_SUPPORTED)
-+			acpi_dma_configure(dev, attr);
-+	}
-+
-+	if (bridge)
-+		pci_put_host_bridge_device(bridge);
-+
-+	return 0;
-+}
-+
-+void dma_deconfigure(struct device *dev)
-+{
-+	of_dma_deconfigure(dev);
-+	acpi_dma_deconfigure(dev);
-+}
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 5344db5..2aa4ebb 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -22,6 +22,7 @@
- #include <linux/slab.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-@@ -186,11 +187,9 @@ static struct platform_device *of_platform_device_create_pdata(
- 
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
--	of_dma_configure(&dev->dev, dev->dev.of_node);
- 	of_msi_configure(&dev->dev, dev->dev.of_node);
- 
- 	if (of_device_add(dev) != 0) {
--		of_dma_deconfigure(&dev->dev);
- 		platform_device_put(dev);
- 		goto err_clear_flag;
- 	}
-@@ -248,7 +247,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
- 		dev_set_name(&dev->dev, "%s", bus_id);
- 	else
- 		of_device_make_bus_id(&dev->dev);
--	of_dma_configure(&dev->dev, dev->dev.of_node);
- 
- 	/* Allow the HW Peripheral ID to be overridden */
- 	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-@@ -542,7 +540,6 @@ static int of_platform_device_destroy(struct device *dev, void *data)
- 		amba_device_unregister(to_amba_device(dev));
- #endif
- 
--	of_dma_deconfigure(dev);
- 	of_node_clear_flag(dev->of_node, OF_POPULATED);
- 	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
- 	return 0;
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index dfc9a27..5a8dd43 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1893,33 +1893,6 @@ static void pci_set_msi_domain(struct pci_dev *dev)
- 	dev_set_msi_domain(&dev->dev, d);
- }
- 
--/**
-- * pci_dma_configure - Setup DMA configuration
-- * @dev: ptr to pci_dev struct of the PCI device
-- *
-- * Function to update PCI devices's DMA configuration using the same
-- * info from the OF node or ACPI node of host bridge's parent (if any).
-- */
--static void pci_dma_configure(struct pci_dev *dev)
--{
--	struct device *bridge = pci_get_host_bridge_device(dev);
--
--	if (IS_ENABLED(CONFIG_OF) &&
--		bridge->parent && bridge->parent->of_node) {
--			of_dma_configure(&dev->dev, bridge->parent->of_node);
--	} else if (has_acpi_companion(bridge)) {
--		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
--		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
--
--		if (attr == DEV_DMA_NOT_SUPPORTED)
--			dev_warn(&dev->dev, "DMA not supported.\n");
--		else
--			acpi_dma_configure(&dev->dev, attr);
--	}
--
--	pci_put_host_bridge_device(bridge);
--}
--
- void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- {
- 	int ret;
-@@ -1933,7 +1906,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	dev->dev.dma_mask = &dev->dma_mask;
- 	dev->dev.dma_parms = &dev->dma_parms;
- 	dev->dev.coherent_dma_mask = 0xffffffffull;
--	pci_dma_configure(dev);
- 
- 	pci_set_dma_max_seg_size(dev, 65536);
- 	pci_set_dma_seg_boundary(dev, 0xffffffff);
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 0977317..4f3eece 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -728,6 +728,18 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
- }
- #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
- 
-+#ifdef CONFIG_HAS_DMA
-+int dma_configure(struct device *dev);
-+void dma_deconfigure(struct device *dev);
-+#else
-+static inline int dma_configure(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static inline void dma_deconfigure(struct device *dev) {}
-+#endif
-+
- /*
-  * Managed DMA API
-  */
+ToDo:
+1) ACPI probe and reset support.
+
+Version history
+---------------
+v7
+--
+- use BUG_ON for djtag access timeout and simplified callers.
+- Split hisilicon,module-id in dt-bindings and add hisilicon,instance-id
+  property. Also describe the properties with more detail.
+- Add event group validation for available counters.
+- Fold hrtimer patches to main PMU patches of L3 cache and MN.
+- Move event used mask to hisi_pmu_hwevents struct.
+- Remove some unused #define.
+- Fix all sparse and gcc W=1 warnings.
+- Fix comments of V6 version.
+
+v6
+--
+- Rebase to 4.11-rc1
+- Modify Copyright year to 2017.
+
+v5
+--
+- Use hrtimer to avoid overflow as MN counter overflow IRQ is broken
+  in hardware.
+- Remove IRQ handling of MN in driver and update pmu dt-bindings.
+- Fix reveiw comments in v4 version.
+
+v4
+--
+- Counter overflow IRQ handling for MN PMU.
+- Use hrtimer to avoid counter overflow in L3 Cache PMU.
+- Use hisi-cpu- and hisi-io- for djtag compatible field.
+- Fix reveiw comments in v3 version.
+
+v3
+--
+- Fix review comments of v2 version.
+- Handle event groups. Do not allow group of mixed PMUs.
+- Use hip0x prefix for compatible names.
+- Fix all sparse and gcc W=1 warnings.
+
+v2
+--
+- Fix review comments of v1 version.
+- Move djtag driver to drivers/perf/hisilicon.
+- Have separate PMU instance for each L3 cache banks.
+- Modify device properties in DTS as per review comments.
+- Handle hardware version difference.
+- Change compatible names of djtag so use prefix hisi-
+  and remove chip version as driver only depend on djtag
+  hw version.
+- use devm_kzalloc.
+- Remove DDRC changes in this series. As the DDRC PMU doesnot
+  depend on djtag it will be send separately.
+
+v1
+--
+-Initial version with support for L3C, MN and DDRC event counters
+-Djtag driver is used to access registers of L3 cache and MN.
+
+Anurup M (6):
+  arm64: MAINTAINERS: hisi: Add hisilicon SoC PMU support
+  dt-bindings: perf: hisi: Add Devicetree bindings for Hisilicon SoC PMU
+  Documentation: perf: hisi: Documentation for HiP05/06/07 PMU event
+    counting.
+  drivers: perf: hisi: Update Kconfig for Hisilicon PMU support
+  drivers: perf: hisi: Add support for Hisilicon SoC event counters
+  dts: arm64: hip07: Add Hisilicon SoC PMU support
+
+Shaokun Zhang (1):
+  drivers: perf: hisi: Miscellanous node(MN) event counting in perf
+
+Tan Xiaojun (2):
+  dt-bindings: hisi: Add Hisilicon HiP05/06/07 Djtag dts bindings
+  drivers: perf: hisi: Add support for Hisilicon Djtag driver
+
+ .../devicetree/bindings/arm/hisilicon/djtag.txt    |  80 +++
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      |  93 +++
+ Documentation/perf/hisi-pmu.txt                    |  75 +++
+ MAINTAINERS                                        |  10 +
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi           |  87 +++
+ drivers/perf/Kconfig                               |   8 +
+ drivers/perf/Makefile                              |   1 +
+ drivers/perf/hisilicon/Makefile                    |   1 +
+ drivers/perf/hisilicon/djtag.c                     | 684 +++++++++++++++++++++
+ drivers/perf/hisilicon/djtag.h                     |  47 ++
+ drivers/perf/hisilicon/hisi_uncore_l3c.c           | 598 ++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_mn.c            | 478 ++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c           | 424 +++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h           | 137 +++++
+ 14 files changed, 2723 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+ create mode 100644 Documentation/perf/hisi-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/djtag.c
+ create mode 100644 drivers/perf/hisilicon/djtag.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_mn.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.1.4
