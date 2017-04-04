@@ -1,49 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Apr 2017 08:56:26 -0700
-Subject: [PATCH] ARM: dts: am57xx-idk: Add DCAN support
-In-Reply-To: <042d52f4-3148-0564-a41a-5212ede042d5@ti.com>
-References: <8981d49e7011a7246ff7dc6a9a9da0a56dfe5621.1487670384.git.nsekhar@ti.com>
- <f8862417-e9e0-e2ac-865a-9684f96a5128@ti.com>
- <20170306184113.GN20572@atomide.com>
- <042d52f4-3148-0564-a41a-5212ede042d5@ti.com>
-Message-ID: <20170404155624.GQ10760@atomide.com>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Tue, 4 Apr 2017 17:44:37 +0200
+Subject: [PATCH v3 7/8] ARM: configs: stm32: STMPE1600 GPIO expander
+In-Reply-To: <1491320678-17246-1-git-send-email-hugues.fruchet@st.com>
+References: <1491320678-17246-1-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1491320678-17246-8-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sekhar Nori <nsekhar@ti.com> [170330 07:26]:
-> Hi Tony,
-> 
-> On Tuesday 07 March 2017 12:11 AM, Tony Lindgren wrote:
-> > * Sekhar Nori <nsekhar@ti.com> [170221 02:13]:
-> >> On Tuesday 21 February 2017 03:30 PM, Sekhar Nori wrote:
-> >>> From: Schuyler Patton <spatton@ti.com>
-> >>>
-> >>> AM571x IDK and the AM572x IDK use CAN1 interface.
-> >>> This patch enables it for both boards.
-> >>>
-> >>> Tested on AM572x IDK using cansequence.
-> >>>
-> >>> Signed-off-by: Schuyler Patton <spatton@ti.com>
-> >>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> >>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> >>> [nsekhar at ti.com: move to use DRA7XX_CORE_IOPAD())
-> >>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> >>
-> >> I should have noted that although CAN does function on the IDK with this
-> >> patch, there are "omap_hwmod: dcan1: _wait_target_disable failed"
-> >> messages that come up due to lack of workaround for errata i893[1]
-> >>
-> >> Roger does have some patches to workaround that errata. If you want to
-> >> wait for those patches to be submitted and accepted first, it should be
-> >> fine as well.
-> > 
-> > OK let's wait a bit on this then to avoid introducing extra warnings.
-> 
-> Now that Roger's hwmod patches for the DCAN errata are in linux-next,
-> this patch can be applied safely. Let me know if you need me to resend it.
+Enable STMPE1600 GPIO expander.
 
-No need to resend, applying into omap-for-v4.12/dt-v2.
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+---
+ arch/arm/configs/stm32_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks,
-
-Tony
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index a9d8e3c..84adc88 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -49,6 +49,8 @@ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+ CONFIG_REGULATOR=y
++CONFIG_GPIO_STMPE=y
++CONFIG_MFD_STMPE=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+-- 
+1.9.1
