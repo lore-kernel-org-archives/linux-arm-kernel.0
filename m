@@ -1,72 +1,175 @@
-From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Tue, 4 Apr 2017 17:44:31 +0200
-Subject: [PATCH v3 1/8] dt-bindings: Document STM32 DCMI bindings
-In-Reply-To: <1491320678-17246-1-git-send-email-hugues.fruchet@st.com>
-References: <1491320678-17246-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1491320678-17246-2-git-send-email-hugues.fruchet@st.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 4 Apr 2017 17:57:22 +0200
+Subject: [PATCH] [media] cec: Handle RC capability more elegantly
+In-Reply-To: <20170404151939.bvd252nprj6kjmdu@dell>
+References: <20170404144309.31357-1-lee.jones@linaro.org>
+ <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
+ <20170404151939.bvd252nprj6kjmdu@dell>
+Message-ID: <bbe09764-a675-ae2d-88d3-7a415ae4d9c5@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the STM32 DCMI
-(Digital Camera Memory Interface).
+On 04/04/2017 05:19 PM, Lee Jones wrote:
+> On Tue, 04 Apr 2017, Hans Verkuil wrote:
+> 
+>> On 04/04/2017 04:43 PM, Lee Jones wrote:
+>>> If a user specifies the use of RC as a capability, they should
+>>> really be enabling RC Core code.  If they do not we WARN() them
+>>> of this and disable the capability for them.
+>>>
+>>> Once we know RC Core code has not been enabled, we can update
+>>> the user's capabilities and use them as a term of reference for
+>>> other RC-only calls.  This is preferable to having ugly #ifery
+>>> scattered throughout C code.
+>>>
+>>> Most of the functions are actually safe to call, since they
+>>> sensibly check for a NULL RC pointer before they attempt to
+>>> deference it.
+>>>
+>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>  drivers/media/cec/cec-core.c | 19 +++++++------------
+>>>  1 file changed, 7 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
+>>> index cfe414a..51be8d6 100644
+>>> --- a/drivers/media/cec/cec-core.c
+>>> +++ b/drivers/media/cec/cec-core.c
+>>> @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+>>>  		return ERR_PTR(-EINVAL);
+>>>  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
+>>>  		return ERR_PTR(-EINVAL);
+>>> +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
+>>> +		caps &= ~CEC_CAP_RC;
+>>
+>> Don't use WARN_ON, this is not an error of any kind.
+> 
+> Right, this is not an error.
+> 
+> That's why we are warning the user instead of bombing out.
+> 
+>> Neither do you need to add the
+>> 'caps & CEC_CAP_RC' test. Really, it's just simpler to do what I suggested before
+>> with an #if.
+> 
+> This does exactly what you asked.
+> 
+> Just to clarify, can you explain to me when asking for RC support, but
+> not enabling it would ever be a valid configuration?
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- .../devicetree/bindings/media/st,stm32-dcmi.txt    | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+Drivers can decide not to enable RC support. This is more likely to happen with
+out-of-tree drivers or when you patch the driver for an embedded system. Using
+the RC subsystem for CEC remote control may not be what you want, especially
+in an embedded system. Not all CEC RC messages can be handled by the rc subsystem,
+and you may not want to have them end up in the rc subsystem at all.
 
-diff --git a/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-new file mode 100644
-index 0000000..c0f6f4b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-@@ -0,0 +1,46 @@
-+STMicroelectronics STM32 Digital Camera Memory Interface (DCMI)
-+
-+Required properties:
-+- compatible: "st,stm32-dcmi"
-+- reg: physical base address and length of the registers set for the device
-+- interrupts: should contain IRQ line for the DCMI
-+- resets: reference to a reset controller,
-+          see Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-+- clocks: list of clock specifiers, corresponding to entries in
-+          the clock-names property
-+- clock-names: must contain "mclk", which is the DCMI peripherial clock
-+- pinctrl: the pincontrol settings to configure muxing properly
-+           for pins that connect to DCMI device.
-+           See Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt.
-+- dmas: phandle to DMA controller node,
-+        see Documentation/devicetree/bindings/dma/stm32-dma.txt
-+- dma-names: must contain "tx", which is the transmit channel from DCMI to DMA
-+
-+DCMI supports a single port node with parallel bus. It should contain one
-+'port' child node with child 'endpoint' node. Please refer to the bindings
-+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+
-+	dcmi: dcmi at 50050000 {
-+		compatible = "st,stm32-dcmi";
-+		reg = <0x50050000 0x400>;
-+		interrupts = <78>;
-+		resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
-+		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
-+		clock-names = "mclk";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dcmi_pins>;
-+		dmas = <&dma2 1 1 0x414 0x3>;
-+		dma-names = "tx";
-+		port {
-+			dcmi_0: endpoint at 0 {
-+				remote-endpoint = <...>;
-+				bus-width = <8>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				pclk-sample = <1>;
-+			};
-+		};
-+	};
-+
--- 
-1.9.1
+So I decided to make this a capability that drivers have to explicitly set when
+they create the CEC adapter. Of course, if they set it (and all in-tree drivers
+do set it) but the whole subsystem is not enabled, then that's not an error, nor
+a warning. Instead we simply drop that capability silently here.
+
+In the future I might decide to change this (e.g. have it as a CEC config option),
+but I'd like to wait and see how this works out.
+
+> 
+>>> +
+>>>  	adap = kzalloc(sizeof(*adap), GFP_KERNEL);
+>>>  	if (!adap)
+>>>  		return ERR_PTR(-ENOMEM);
+>>> +
+>>>  	strlcpy(adap->name, name, sizeof(adap->name));
+>>>  	adap->phys_addr = CEC_PHYS_ADDR_INVALID;
+>>>  	adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
+>>> @@ -237,7 +241,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+>>>  	if (!(caps & CEC_CAP_RC))
+>>>  		return adap;
+>>>  
+>>> -#if IS_REACHABLE(CONFIG_RC_CORE)
+>>
+>> Huh? If CONFIG_RC_CORE is undefined, all these rc_ calls will fail when linking!
+> 
+> I thought I'd tested for that, but it turns out that *my*
+> CONFIG_RC_CORE=n config was being over-ridden by the build system.
+> 
+> If it will really fail when linking, it sounds like the RC subsystem
+> is not written properly.  I guess that explains why all these drivers
+> are riddled with ugly #ifery.
+
+The rc subsystem doesn't provide you with empty stubs for these functions
+in the header if RC_CORE isn't defined.
+
+> 
+> Will fix that too, bear with.
+
+Please just keep this patch simple. Just clean up the confusing control flow.
+
+Anything else can be done afterwards.
+
+	Hans
+
+> 
+>>>  	/* Prepare the RC input device */
+>>>  	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
+>>>  	if (!adap->rc) {
+>>> @@ -264,9 +267,7 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+>>>  	adap->rc->priv = adap;
+>>>  	adap->rc->map_name = RC_MAP_CEC;
+>>>  	adap->rc->timeout = MS_TO_NS(100);
+>>> -#else
+>>> -	adap->capabilities &= ~CEC_CAP_RC;
+>>> -#endif
+>>> +
+>>>  	return adap;
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(cec_allocate_adapter);
+>>> @@ -285,7 +286,6 @@ int cec_register_adapter(struct cec_adapter *adap,
+>>>  	adap->owner = parent->driver->owner;
+>>>  	adap->devnode.dev.parent = parent;
+>>>  
+>>> -#if IS_REACHABLE(CONFIG_RC_CORE)
+>>>  	if (adap->capabilities & CEC_CAP_RC) {
+>>>  		adap->rc->dev.parent = parent;
+>>>  		res = rc_register_device(adap->rc);
+>>> @@ -298,15 +298,13 @@ int cec_register_adapter(struct cec_adapter *adap,
+>>>  			return res;
+>>>  		}
+>>>  	}
+>>> -#endif
+>>>  
+>>>  	res = cec_devnode_register(&adap->devnode, adap->owner);
+>>>  	if (res) {
+>>> -#if IS_REACHABLE(CONFIG_RC_CORE)
+>>>  		/* Note: rc_unregister also calls rc_free */
+>>>  		rc_unregister_device(adap->rc);
+>>>  		adap->rc = NULL;
+>>> -#endif
+>>> +
+>>>  		return res;
+>>>  	}
+>>>  
+>>> @@ -337,11 +335,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
+>>>  	if (IS_ERR_OR_NULL(adap))
+>>>  		return;
+>>>  
+>>> -#if IS_REACHABLE(CONFIG_RC_CORE)
+>>>  	/* Note: rc_unregister also calls rc_free */
+>>>  	rc_unregister_device(adap->rc);
+>>>  	adap->rc = NULL;
+>>> -#endif
+>>> +
+>>>  	debugfs_remove_recursive(adap->cec_dir);
+>>>  	cec_devnode_unregister(&adap->devnode);
+>>>  }
+>>> @@ -357,9 +354,7 @@ void cec_delete_adapter(struct cec_adapter *adap)
+>>>  	kthread_stop(adap->kthread);
+>>>  	if (adap->kthread_config)
+>>>  		kthread_stop(adap->kthread_config);
+>>> -#if IS_REACHABLE(CONFIG_RC_CORE)
+>>>  	rc_free_device(adap->rc);
+>>> -#endif
+>>>  	kfree(adap);
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(cec_delete_adapter);
+>>>
+>>
+> 
