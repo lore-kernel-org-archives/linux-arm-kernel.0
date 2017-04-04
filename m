@@ -1,67 +1,158 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Apr 2017 12:18:26 +0100
-Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and
- hyp are not excluded
-In-Reply-To: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170404111826.GD14898@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 4 Apr 2017 12:24:50 +0100
+Subject: [PATCH V10 08/12] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <1491301105-5274-9-git-send-email-sricharan@codeaurora.org>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-9-git-send-email-sricharan@codeaurora.org>
+Message-ID: <82a620b7-bcd0-3db7-dfd0-4bf6b293ba7a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 04:10:55PM +0530, Ganapatrao Kulkarni wrote:
-> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
-> is returning error for perf syscall with mixed attribute set for exclude_kernel
-> and exlude_hv.
+On 04/04/17 11:18, Sricharan R wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> This change is breaking some applications (observed with hhvm) when
-> ran with VHE enabled. Adding change to enable EL2 event counting,
-> if either of or both of exclude_kernel and exlude_hv are not set.
+> Failures to look up an IOMMU when parsing the DT iommus property need to
+> be handled separately from the .of_xlate() failures to support deferred
+> probing.
 > 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> The lack of a registered IOMMU can be caused by the lack of a driver for
+> the IOMMU, the IOMMU device probe not having been performed yet, having
+> been deferred, or having failed.
+> 
+> The first case occurs when the device tree describes the bus master and
+> IOMMU topology correctly but no device driver exists for the IOMMU yet
+> or the device driver has not been compiled in. Return NULL, the caller
+> will configure the device without an IOMMU.
+> 
+> The second and third cases are handled by deferring the probe of the bus
+> master device which will eventually get reprobed after the IOMMU.
+> 
+> The last case is currently handled by deferring the probe of the bus
+> master device as well. A mechanism to either configure the bus master
+> device without an IOMMU or to fail the bus master device probe depending
+> on whether the IOMMU is optional or mandatory would be a good
+> enhancement.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  arch/arm64/kernel/perf_event.c | 19 ++++++++++++-------
->  1 file changed, 12 insertions(+), 7 deletions(-)
-
-Hmm. When we have VHE, we can't distinguish between hypervisor and kernel,
-so this patch doesn't seem right to me. The code currently requires
-both exclude_kernel and exclude_hv to be clear before we enable profiling
-EL2, otherwise we're failing to exclude samples that were asked to be
-excluded.
-
-Will
-
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index daf95919..ea5848a 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -871,15 +871,20 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>  drivers/base/dma-mapping.c | 5 +++--
+>  drivers/iommu/of_iommu.c   | 4 ++--
+>  drivers/of/device.c        | 7 ++++++-
+>  include/linux/of_device.h  | 9 ++++++---
+>  4 files changed, 17 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+> index 449b948..82bd45c 100644
+> --- a/drivers/base/dma-mapping.c
+> +++ b/drivers/base/dma-mapping.c
+> @@ -353,6 +353,7 @@ int dma_configure(struct device *dev)
+>  {
+>  	struct device *bridge = NULL, *dma_dev = dev;
+>  	enum dev_dma_attr attr;
+> +	int ret = 0;
 >  
->  	if (attr->exclude_idle)
->  		return -EPERM;
-> -	if (is_kernel_in_hyp_mode() &&
-> -	    attr->exclude_kernel != attr->exclude_hv)
-> -		return -EINVAL;
-> +	if (is_kernel_in_hyp_mode()) {
-> +		/* include EL2 events, if either of not excluded */
-> +		if ((attr->exclude_kernel != attr->exclude_hv) ||
-> +				!attr->exclude_kernel ||
-> +				!attr->exclude_hv)
-> +			config_base |= ARMV8_PMU_INCLUDE_EL2;
-> +	} else {
-> +		if (attr->exclude_kernel)
-> +			config_base |= ARMV8_PMU_EXCLUDE_EL1;
-> +		if (!attr->exclude_hv)
-> +			config_base |= ARMV8_PMU_INCLUDE_EL2;
-> +	}
->  	if (attr->exclude_user)
->  		config_base |= ARMV8_PMU_EXCLUDE_EL0;
-> -	if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
-> -		config_base |= ARMV8_PMU_EXCLUDE_EL1;
-> -	if (!attr->exclude_hv)
-> -		config_base |= ARMV8_PMU_INCLUDE_EL2;
+>  	if (dev_is_pci(dev)) {
+>  		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
+> @@ -363,7 +364,7 @@ int dma_configure(struct device *dev)
+>  	}
 >  
->  	/*
->  	 * Install the filter into config_base as this is used to
-> -- 
-> 1.8.1.4
+>  	if (dma_dev->of_node) {
+> -		of_dma_configure(dev, dma_dev->of_node);
+> +		ret = of_dma_configure(dev, dma_dev->of_node);
+>  	} else if (has_acpi_companion(dma_dev)) {
+>  		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
+>  		if (attr != DEV_DMA_NOT_SUPPORTED)
+> @@ -373,7 +374,7 @@ int dma_configure(struct device *dev)
+>  	if (bridge)
+>  		pci_put_host_bridge_device(bridge);
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  
+>  void dma_deconfigure(struct device *dev)
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index c8be889..9f44ee8 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -236,7 +236,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  			ops = ERR_PTR(err);
+>  	}
+>  
+> -	return IS_ERR(ops) ? NULL : ops;
+> +	return ops;
+>  }
+>  
+>  static int __init of_iommu_init(void)
+> @@ -247,7 +247,7 @@ static int __init of_iommu_init(void)
+>  	for_each_matching_node_and_match(np, matches, &match) {
+>  		const of_iommu_init_fn init_fn = match->data;
+>  
+> -		if (init_fn(np))
+> +		if (init_fn && init_fn(np))
+>  			pr_err("Failed to initialise IOMMU %s\n",
+>  				of_node_full_name(np));
+>  	}
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index c2ae6bb..bea8aec 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
+>   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+>   * to fix up DMA configuration.
+>   */
+> -void of_dma_configure(struct device *dev, struct device_node *np)
+> +int of_dma_configure(struct device *dev, struct device_node *np)
+>  {
+>  	u64 dma_addr, paddr, size;
+>  	int ret;
+> @@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  		coherent ? " " : " not ");
+>  
+>  	iommu = of_iommu_configure(dev, np);
+> +	if (IS_ERR(iommu))
+> +		return PTR_ERR(iommu);
+> +
+>  	dev_dbg(dev, "device is%sbehind an iommu\n",
+>  		iommu ? " " : " not ");
+>  
+>  	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+> +
+> +	return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(of_dma_configure);
+>  
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index af98455..2cacdd8 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -55,7 +55,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>  	return of_node_get(cpu_dev->of_node);
+>  }
+>  
+> -void of_dma_configure(struct device *dev, struct device_node *np);
+> +int of_dma_configure(struct device *dev, struct device_node *np);
+>  void of_dma_deconfigure(struct device *dev);
+>  #else /* CONFIG_OF */
+>  
+> @@ -104,8 +104,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>  {
+>  	return NULL;
+>  }
+> -static inline void of_dma_configure(struct device *dev, struct device_node *np)
+> -{}
+> +
+> +static inline int of_dma_configure(struct device *dev, struct device_node *np)
+> +{
+> +	return 0;
+> +}
+>  static inline void of_dma_deconfigure(struct device *dev)
+>  {}
+>  #endif /* CONFIG_OF */
 > 
