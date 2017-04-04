@@ -1,78 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 4 Apr 2017 16:27:10 -0400 (EDT)
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <1491335924.7125.87.camel@tzanussi-mobl.amr.corp.intel.com>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
- <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
- <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
- <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
- <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
- <1491328749.7125.66.camel@tzanussi-mobl.amr.corp.intel.com>
- <CAHp75VfQVdMRZnbDFyH9m=HfSuoiUxqhf2y+H07u4u6xPd7DUA@mail.gmail.com>
- <1491335924.7125.87.camel@tzanussi-mobl.amr.corp.intel.com>
-Message-ID: <alpine.LFD.2.20.1704041607130.1847@knanqh.ubzr>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Tue, 4 Apr 2017 20:28:34 +0000
+Subject: at91: serial: Can't use DMA on 4.x kernels in RS-485 mode on
+ at91sam9x5
+Message-ID: <DM5PR05MB2954D56C2E266AF16B250ACCBB0B0@DM5PR05MB2954.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Apr 2017, Tom Zanussi wrote:
+All,
 
-> On Tue, 2017-04-04 at 21:04 +0300, Andy Shevchenko wrote:
-> > I believe you did some research during time of that project?
-> > 
-> 
-> Yes, as a matter of fact I did, and just found some notes I took at the
-> time.  I didn't dive into the code in detail - that level of analysis
-> was supposed to come later but I did have these notes mentioning that I
-> thought it would show the largest savings for a single item (outside of
-> networking) 'if we could do it':
-> 
-> "- Largest is still drivers
-> 
-> - drivers/tty and serial is the biggest obvious win if we can do it
->   - break down into granular config options
->     - leave simplest possible tty/serial functionality
->     - allow tailoring to specific hardware
->   - also helps in effort to get rid of char devices
->   - 65740/815190"
-> 
-> Basically 65k out of an 800k text size could be partially or mostly
-> saved by addressing that one item, which looks like it pretty much
-> matches Nicolas' numbers...
+I've been using the latest commit of the linux-3.10-at91 branch of Atmel's Linux fork at https://github.com/linux4sam/linux-at91 for my AT91SAM9G25.  I'm using three serial ports in RS-485 mode.  I'm working on upgrading to a more recent kernel and I'm having issues using DMA for these three serial ports.  I'm looking for some guidance as to what may be going wrong.
 
-One thing on x86 that inflates the size is the 8250 driver itself. I'm 
-looking at some ARM targets with their own UART whose driver is much 
-smaller.
+First, my board is very closely modeled after the AT91SAMG25-EK, so I'm able to use the at91sam9x5 device tree files with just a few modifications.  Here are my relevant device tree settings for the three USARTs in arch/arm/boot/dts/at91sam9x5ek.dtsi.
 
-> BTW, since I'm quoting my own notes on the subject, I thought I'd just
-> include the whole thing, which covers a bunch of other areas possibly
-> ripe for tinification, in case anyone might be interested (some of it
-> should be taken with a grain of salt though ;-)
-> 
-[...]
-> 
-> - 2nd largest is kernel
-> 
->   - should be able to cut *something* from time and sched
->     - we have a handful of processes at most
->     - we have very simple time needs
->   - say 30000/815190 savings
-> 
->  150742	   6376	   8209	 165327	  285cf	./kernel/built-in.o
-> 
->   40951	   1105	   4720	  46776	   b6b8	./kernel/time/built-in.o
+			usart0: serial at f801c000 {
+				pinctrl-0 = <&pinctrl_usart0
+					&pinctrl_usart0_rts
+					&pinctrl_usart0_cts>;
+					rs485-rts-delay = <15 1>;
+					linux,rs485-enabled-at-boot-time;
+					atmel,use-dma-rx;
+					atmel,use-dma-tx;
+				status = "okay";
+			};
 
-Commit baa73d9e47 allows for shaving off 25K here. More could probably 
-be done.
+			usart1: serial at f8020000 {
+				pinctrl-0 = <&pinctrl_usart1
+					&pinctrl_usart1_rts
+					&pinctrl_usart1_cts>;
+					rs485-rts-delay = <15 1>;
+					linux,rs485-enabled-at-boot-time;
+					atmel,use-dma-rx;
+					atmel,use-dma-tx;
+				status = "okay";
+			};
 
->   21760	   1318	    112	  23190	   5a96	./kernel/sched/built-in.o
+			usart3: serial at f8028000 {
+				pinctrl-0 = <&pinctrl_usart3
+					&pinctrl_usart3_rts
+					&pinctrl_usart3_cts>;
+					rs485-rts-delay = <15 1>;
+					linux,rs485-enabled-at-boot-time;
+					atmel,use-dma-rx;
+					atmel,use-dma-tx;
+				status = "okay";
+			};
 
-I already have an alternative scheduler implementation that weights 9K. 
-It is on the backburner for now though. But don't let the scheduler 
-guys know just yet.  ;-)
+With the 3.10 kernel, I had to use the TX DMA only.  For some reason receive wouldn't work for me with the DMA.  Now with the latest on the linux-4.4-at91 branch I can't use the TX DMA.  The data is transmitted correctly out the USART (verified on a receiving device), but then the return message is not received.  I verified the same results when both RX&TX DMA was enabled and only when the TX DMA was enabled.  If I use only the RX DMA, everything works fine if I have only one device on the RS-485 port.  As soon as I daisy chain more than one device on an RS-485 port, then I start dropping messages.  If I turn off both the RX and TX DMA, then all data transfers work just fine.
 
+I'd like to get both TX and RX DMA working for all three RS-485 ports.  Anyone have any suggestions for what to look at to get DMA working while in RS-485 mode?  I'm planning to start trying a git bisect, but given these are different branches I wasn't sure how well that was going to work.
 
-Nicolas
+Thanks,
+Bryan
