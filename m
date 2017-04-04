@@ -1,136 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 4 Apr 2017 10:10:43 +0100
-Subject: [PATCH v3] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <1491295730.2995.1.camel@linaro.org>
-References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
- <1491295730.2995.1.camel@linaro.org>
-Message-ID: <CAKv+Gu-0WU_XzLfGyf5qhkmyrxs+yCG8ot1YFrbL0A7xO1Z_0g@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 4 Apr 2017 11:16:23 +0200
+Subject: [PATCH v2 07/13] drm/meson: Add support for HDMI encoder and
+ DW-HDMI bridge + PHY
+In-Reply-To: <20170404085752.jg246ilczhgmyyhy@phenom.ffwll.local>
+References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
+ <1490109950-21421-8-git-send-email-narmstrong@baylibre.com>
+ <20170404085752.jg246ilczhgmyyhy@phenom.ffwll.local>
+Message-ID: <3b6333c4-2fe0-8331-e54b-01d956e97797@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2017 at 09:48, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Tue, 2017-04-04 at 08:31 +0100, Ard Biesheuvel wrote:
->> From: Jon Medhurst <tixy@linaro.org>
+On 04/04/2017 10:57 AM, Daniel Vetter wrote:
+> On Tue, Mar 21, 2017 at 04:25:44PM +0100, Neil Armstrong wrote:
+>> The Amlogic Meson GXBB/GXL/GXM SoCs embeds a Synopsys DesignWare HDMI TX
+>> Controller with a custom Bridge + PHY around the Controller.
 >>
->> To cope with the variety in ARM architectures and configurations, the
->> pagetable attributes for kernel memory are generated at runtime to match
->> the system the kernel finds itself on. This calculated value is stored
->> in pgprot_kernel.
+>> This driver makes uses of all the custom PHY plat data callbacks and enables
+>> the compatible HDMI modes to be configured as a drm_encoder instance.
 >>
->> However, when early fixmap support was added for ARM (commit
->> a5f4c561b3b1) the attributes used for mappings were hard coded because
->> pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
->> used after early boot this means the memory being mapped can have
->> different attributes to existing mappings, potentially leading to
->> unpredictable behaviour. A specific problem also exists due to the hard
->> coded values not include the 'shareable' attribute which means on
->> systems where this matters (e.g. those with multiple CPU clusters) the
->> cache contents for a memory location can become inconsistent between
->> CPUs.
->>
->> To resolve these issues we change fixmap to use the same memory
->> attributes (from pgprot_kernel) that the rest of the kernel uses. To
->> enable this we need to refactor the initialisation code so
->> build_mem_type_table() is called early enough. Note, that relies on early
->> param parsing for memory type overrides passed via the kernel command
->> line, so we need to make sure this call is still after
->> parse_early_params().
->>
->> Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
->> Cc: <stable@vger.kernel.org> # v4.3+
->> Signed-off-by: Jon Medhurst <tixy@linaro.org>
->> [ardb: keep early_fixmap_init() before param parsing, for earlycon]
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
-> [...]
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 4e016d7f37b3..ec81a30479aa 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -414,6 +414,11 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
->>                    FIXADDR_END);
->>       BUG_ON(idx >= __end_of_fixed_addresses);
->>
->> +     /* we only support device mappings until pgprot_kernel has been set */
->> +     if (WARN_ON(pgprot_val(prot) != pgprot_val(FIXMAP_PAGE_IO) &&
->> +                 pgprot_val(pgprot_kernel) == 0))
->> +             return;
->> +
->
-> Hmm, on return from this function, isn't the caller then going to try
-> and access the memory at the fixmap address we didn't map, and so get a
-> page fault? If so, would a BUG_ON here be better?
->
-
-Yes, and no. BUG_ON guarantees a crash, while without it, it's only
-highly likely. Since this will occur very early during boot, it is
-better to limp on if we can than crash unconditionally.
-
-
->>       if (pgprot_val(prot))
->>               set_pte_at(NULL, vaddr, pte,
->>                       pfn_pte(phys >> PAGE_SHIFT, prot));
->> @@ -1616,7 +1621,6 @@ void __init paging_init(const struct machine_desc *mdesc)
->>  {
->>       void *zero_page;
->>
->> -     build_mem_type_table();
->>       prepare_page_table();
->>       map_lowmem();
->>       memblock_set_current_limit(arm_lowmem_limit);
->> @@ -1636,3 +1640,9 @@ void __init paging_init(const struct machine_desc *mdesc)
->>       empty_zero_page = virt_to_page(zero_page);
->>       __flush_dcache_page(NULL, empty_zero_page);
->>  }
->> +
->> +void __init early_mm_init(const struct machine_desc *mdesc)
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> [snip]
+> 
+>> +static int meson_venc_hdmi_encoder_atomic_check(struct drm_encoder *encoder,
+>> +					struct drm_crtc_state *crtc_state,
+>> +					struct drm_connector_state *conn_state)
 >> +{
->> +     build_mem_type_table();
->> +     early_paging_init(mdesc);
+>> +	return 0;
 >> +}
->
-> I tested this change with kprobes tests on TC2 (the setup that showed
-> the original bug) and compile tested for a nommu device (I will boot
-> test that in a bit as that's not quick to setup).
->
-> Also, with this patch we can now make early_paging_init() static now,
-> and remove the extern...
->
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index f5db5548ad42..8ad1e4414024 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -80,7 +80,6 @@ __setup("fpe=", fpe_setup);
->
->  extern void init_default_cache_policy(unsigned long);
->  extern void paging_init(const struct machine_desc *desc);
-> -extern void early_paging_init(const struct machine_desc *);
->  extern void adjust_lowmem_bounds(void);
->  extern enum reboot_mode reboot_mode;
->  extern void setup_dma_zone(const struct machine_desc *desc);
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index ec81a30479aa..347cca965783 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1497,7 +1497,7 @@ pgtables_remap lpae_pgtables_remap_asm;
->   * early_paging_init() recreates boot time page table setup, allowing machines
->   * to switch over to a high (>4G) address space on LPAE systems
->   */
-> -void __init early_paging_init(const struct machine_desc *mdesc)
-> +static void __init early_paging_init(const struct machine_desc *mdesc)
->  {
->         pgtables_remap *lpae_pgtables_remap;
->         unsigned long pa_pgd;
-> @@ -1565,7 +1565,7 @@ void __init early_paging_init(const struct machine_desc *mdesc)
->
->  #else
->
-> -void __init early_paging_init(const struct machine_desc *mdesc)
-> +static void __init early_paging_init(const struct machine_desc *mdesc)
->  {
->         long long offset;
->
+> 
+> Given the over-the-top complicated mode encoding you seem to have, this
+> feels like it's a bit too simply.
 
-Good point. If everything checks out, we should fold that in when
-submitting it to the patch tracker.
+Indeed, but the HW is really weird, every supported modes have very specific
+timings/parameters so moving the mode validation code from the dw-hdmi mode_valid
+to here would only make sense if we need to support a different HDMI controller.
+
+But you are right, but I would have preferred to have a better HW for sure...
+
+> 
+>> +
+>> +static void meson_venc_hdmi_encoder_disable(struct drm_encoder *encoder)
+>> +{
+>> +	struct meson_dw_hdmi *dw_hdmi = encoder_to_meson_dw_hdmi(encoder);
+>> +	struct meson_drm *priv = dw_hdmi->priv;
+>> +
+>> +	DRM_DEBUG_DRIVER("\n");
+>> +
+>> +	writel_bits_relaxed(0x3, 0,
+>> +			    priv->io_base + _REG(VPU_HDMI_SETTING));
+>> +
+>> +	writel_relaxed(0, priv->io_base + _REG(ENCI_VIDEO_EN));
+>> +	writel_relaxed(0, priv->io_base + _REG(ENCP_VIDEO_EN));
+>> +}
+>> +
+>> +static void meson_venc_hdmi_encoder_enable(struct drm_encoder *encoder)
+>> +{
+>> +	struct meson_dw_hdmi *dw_hdmi = encoder_to_meson_dw_hdmi(encoder);
+>> +	struct meson_drm *priv = dw_hdmi->priv;
+>> +
+>> +	DRM_DEBUG_DRIVER("%s\n", priv->venc.hdmi_use_enci ? "VENCI" : "VENCP");
+>> +
+>> +	if (priv->venc.hdmi_use_enci)
+>> +		writel_relaxed(1, priv->io_base + _REG(ENCI_VIDEO_EN));
+>> +	else
+>> +		writel_relaxed(1, priv->io_base + _REG(ENCP_VIDEO_EN));
+>> +}
+>> +
+>> +static void meson_venc_hdmi_encoder_mode_set(struct drm_encoder *encoder,
+>> +				   struct drm_display_mode *mode,
+>> +				   struct drm_display_mode *adjusted_mode)
+>> +{
+>> +	struct meson_dw_hdmi *dw_hdmi = encoder_to_meson_dw_hdmi(encoder);
+>> +	struct meson_drm *priv = dw_hdmi->priv;
+>> +	int vic = drm_match_cea_mode(mode);
+>> +
+>> +	DRM_DEBUG_DRIVER("%d:\"%s\" vic %d\n",
+>> +			 mode->base.id, mode->name, vic);
+>> +
+>> +	/* Should have been filtered */
+>> +	if (!vic)
+>> +		return;
+>> +
+>> +	/* VENC + VENC-DVI Mode setup */
+>> +	meson_venc_hdmi_mode_set(priv, vic, mode);
+> 
+> So this calls a different module which export_symbol_gpls that thing. I
+> have no idea why arm-soc people love modularized-to-the-function level
+> drivers, but it feels over the top. amd/nouveau/i915 all smash everything
+> into one driver, makes life so much easier.
+
+I know, we are doomed on that !
+But here, since the wrapping around the dw-hdmi controller is completely custom
+if was necessary to add a separate encoder tied to HDMI and have the physical
+encoding code in the common driver.
+Note that the platform is also able to driver a LCD via LVDS, so this encoder code
+should be reusable here.
+
+> 
+> Note: bridge drivers as separate .ko makes sense, but separate .ko for
+> every single functional unit in your vendor IP imo totally doesn't.
+
+Actually I added a global ko for the "DRM" driver with crtc, planes and CVBS,
+and another ko for the HDMI bridge wrapping.
+
+> 
+> Not going to stop you either :-)
+
+I totally agree on the complexity here !
+
+> -Daniel
+> 
