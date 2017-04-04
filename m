@@ -1,73 +1,75 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue,  4 Apr 2017 11:30:28 -0400
-Subject: [PATCH v4 0/8] mfd: Add OF device table to I2C drivers that are
- missing it
-Message-ID: <20170404153036.6651-1-javier@osg.samsung.com>
+Date: Tue,  4 Apr 2017 11:30:30 -0400
+Subject: [PATCH v4 2/8] mfd: retu: Drop -mfd suffix from I2C device ID name
+In-Reply-To: <20170404153036.6651-1-javier@osg.samsung.com>
+References: <20170404153036.6651-1-javier@osg.samsung.com>
+Message-ID: <20170404153036.6651-3-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+It's not correct to encode the subsystem in the I2C device name, so
+drop the -mfd suffix. To maintain bisect-ability, change driver and
+platform code / DTS users in the same patch.
 
-This series add OF device ID tables to mfd I2C drivers whose devices are
-either used in Device Tree source files or are listed in binding docs as
-a compatible string.
+Suggested-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-That's done because the plan is to change the I2C core to report proper OF
-modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
-a device was registered via DT or using the legacy platform data mechanism.
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-So these patches will make sure that mfd I2C drivers modules will continue
-to be autoloaded once the I2C core is changed to report proper OF modalias.
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi | 4 ++--
+ arch/arm/mach-omap1/board-nokia770.c        | 4 ++--
+ drivers/mfd/retu-mfd.c                      | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-Users didn't have a vendor prefix in the used compatible strings, but since
-there wasn't a DT binding document for these drivers, it can be said that
-were working for mere luck and so this series fixes the users and add a DT
-binding doc for the drivers.
-
-Most patches can be applied independently, with the exception of patches
-2 to 4 that should be applied in the same tree to keep bisect-ability.
-
-Best regards,
-Javier
-
-Changes in v4:
-- Use "dt-bindings: mfd:" prefix in subject line (Rob Herring).
-- Add information about what functions the device serve (Lee Jones).
-- Avoid using MFD in Device Tree (Lee Jones).
-- Drop -mfd suffix in compatible string (Lee Jones).
-- Avoid using MFD in Device Tree (Lee Jones).
-- Use "dt-bindings: mfd:" prefix in subject line (Rob Herring).
-- Add information about what functions the device serve (Lee Jones).
-
-Changes in v3:
-- Add a vendor prefix to the compatible string (Rob Herring).
-- Add a vendor prefix to the compatible string (Rob Herring).
-
-Changes in v2:
-- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
-- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
-
-Javier Martinez Canillas (8):
-  dt-bindings: mfd: Add retu/tahvo ASIC chips bindings
-  mfd: retu: Drop -mfd suffix from I2C device ID name
-  mfd: retu: Add OF device ID table
-  ARM: dts: n8x0: Add vendor prefix to retu node
-  i2c: i2c-cbus-gpio: Add vendor prefix to retu node in example
-  dt-bindings: mfd: Add TI tps6105x chip bindings
-  mfd: tps6105x: Add OF device ID table
-  ARM: ux500: Add vendor prefix to tps61052 node
-
- .../devicetree/bindings/i2c/i2c-cbus-gpio.txt       |  4 ++--
- Documentation/devicetree/bindings/mfd/retu.txt      | 21 +++++++++++++++++++++
- Documentation/devicetree/bindings/mfd/tps6105x.txt  | 17 +++++++++++++++++
- arch/arm/boot/dts/omap2420-n8x0-common.dtsi         |  4 ++--
- arch/arm/boot/dts/ste-hrefprev60.dtsi               |  2 +-
- arch/arm/mach-omap1/board-nokia770.c                |  4 ++--
- drivers/mfd/retu-mfd.c                              | 12 ++++++++++--
- drivers/mfd/tps6105x.c                              |  8 ++++++++
- 8 files changed, 63 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/retu.txt
- create mode 100644 Documentation/devicetree/bindings/mfd/tps6105x.txt
-
+diff --git a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+index 7e5ffc583c90..1b06430c8013 100644
+--- a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
++++ b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
+@@ -15,8 +15,8 @@
+ 				>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			retu_mfd: retu at 1 {
+-				compatible = "retu-mfd";
++			retu: retu at 1 {
++				compatible = "retu";
+ 				interrupt-parent = <&gpio4>;
+ 				interrupts = <12 IRQ_TYPE_EDGE_RISING>;
+ 				reg = <0x1>;
+diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+index ee8d9f553db4..06243c0b12d2 100644
+--- a/arch/arm/mach-omap1/board-nokia770.c
++++ b/arch/arm/mach-omap1/board-nokia770.c
+@@ -233,10 +233,10 @@ static struct platform_device nokia770_cbus_device = {
+ 
+ static struct i2c_board_info nokia770_i2c_board_info_2[] __initdata = {
+ 	{
+-		I2C_BOARD_INFO("retu-mfd", 0x01),
++		I2C_BOARD_INFO("retu", 0x01),
+ 	},
+ 	{
+-		I2C_BOARD_INFO("tahvo-mfd", 0x02),
++		I2C_BOARD_INFO("tahvo", 0x02),
+ 	},
+ };
+ 
+diff --git a/drivers/mfd/retu-mfd.c b/drivers/mfd/retu-mfd.c
+index d4c114abeb75..53e1d386d2c0 100644
+--- a/drivers/mfd/retu-mfd.c
++++ b/drivers/mfd/retu-mfd.c
+@@ -302,8 +302,8 @@ static int retu_remove(struct i2c_client *i2c)
+ }
+ 
+ static const struct i2c_device_id retu_id[] = {
+-	{ "retu-mfd", 0 },
+-	{ "tahvo-mfd", 0 },
++	{ "retu", 0 },
++	{ "tahvo", 0 },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(i2c, retu_id);
 -- 
 2.9.3
