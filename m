@@ -1,53 +1,69 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 4 Apr 2017 20:08:47 +0300
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
- <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
- <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
- <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
-Message-ID: <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Apr 2017 18:11:33 +0100
+Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
+In-Reply-To: <20170329084146.GA15778@arm.com>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+ <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+ <20170310183555.GB6271@arm.com>
+ <20170322183512.GB27921@leverpostej>
+ <20170328184828.GF8643@leverpostej> <20170328202931.GF20211@cbox>
+ <20170329084146.GA15778@arm.com>
+Message-ID: <20170404171133.GG19969@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 4, 2017 at 7:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
-> On Tue, 2017-04-04 at 00:05 +0300, Andy Shevchenko wrote:
+On Wed, Mar 29, 2017 at 09:41:47AM +0100, Will Deacon wrote:
+> On Tue, Mar 28, 2017 at 10:29:31PM +0200, Christoffer Dall wrote:
+> > On Tue, Mar 28, 2017 at 07:48:28PM +0100, Mark Rutland wrote:
+> > > On Wed, Mar 22, 2017 at 06:35:13PM +0000, Mark Rutland wrote:
+> > > > On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
+> > > > > On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
+> > > > 
+> > > > > > The next question is how do we merge this. Obviously, we can't split it
+> > > > > > between trees, and this is very likely to clash with anything that we
+> > > > > > will merge on the KVM side (the sysreg table is a popular place).
+> > > > > > 
+> > > > > > Will, Catalin: Would it make sense to create a stable branch with these
+> > > > > > patches, and merge it into both the arm64 and KVM trees? That'd make
+> > > > > > things easier...
+> > > > > 
+> > > > > I think the scope for conflict on our side is pretty high too, so a shared
+> > > > > branch might be the best way to go. I don't want to branch just yet though,
+> > > > > so I'll probably wait a week or so before setting something in stone.
+> > > > 
+> > > > Any further thoughts on this?
+> > > > 
+> > > > Christoffer has Acked the KVM bits, so if you're happy to do so for the
+> > > > arm64 bits I can make a stable branch.
+> > > 
+> > > Looking around, it doesn't look like there's anything outside of arm64
+> > > that'll conflict on the <asm/sysreg.h> changes, and git's happy to merge
+> > > my changes with Suzuki's changes currently queued in arm64's
+> > > for-next/core branch.
+> > > 
+> > > I think it would make sense for those to be in a common branch taken by
+> > > both the arm64 and KVM trees, with the KVM-specific parts being taken by
+> > > KVM alone atop of that.
+> > > 
+> > > Would everyone be happy with that?
+> > 
+> > I'm happy with that.
+> > 
+> > > 
+> > > For reference, I've updated my branches so that arm64/common-sysreg only
+> > > contains the common parts, with the KVM parts atop of that in
+> > > kvm/common-sysreg.
+> > > 
+> > 
+> > Will, Catalin:  Let me know if you're going to pull from common-sysreg
+> > and I'll do the same and add the kvm patches above.
+> 
+> I think that's what we'll do, but Catalin's out this week (we're taking it
+> in turns to go to work). I'd say go ahead and pull it into kvm if there
+> aren't any conflicts. No need to wait for us.
 
-> Yes, in a previous project, I had been working toward getting a < 1M
-> system to boot on Galileo hardware (which it did, but using more than
-> that - the Galileo2 has 256MB, but it was the target hardware at the
-> time, and I was hoping eventually to be able to boot out of the 512k
-> on-chip SRAM).
->
-> I was focused at that point mainly on the kernel static size, and using
-> a combination of Josh Triplett's tinification tree, Andi Kleen's LTO and
-> net-diet patches, and my own miscellaneous patches that I was planning
-> on eventually upstreaming, I ended up with a system that I could boot to
-> shell with a 455k text size:
->
-> Memory: 235636K/245176K available (455K kernel code, 61K rwdata,
-> 64K rodata, 132K init, 56K bss, 3056K reserved, 0K cma-reserved)
->
-> virtual kernel memory layout:
->     fixmap  : 0xfffe5000 - 0xfffff000   ( 104 kB)
->     vmalloc : 0xd05f0000 - 0xfffe3000   ( 761 MB)
->     lowmem  : 0xc0000000 - 0xcfdf0000   ( 253 MB)
->       .init : 0xc1094000 - 0xc10b5000   ( 132 kB)
->       .data : 0xc1071fac - 0xc1092760   ( 129 kB)
->       .text : 0xc1000000 - 0xc1071fac   ( 455 kB)
->
-> That was without networking.  Enabling networking added about 250k, and
-> at that point I could ssh in and run a webserver, still less than 1M as
-> far as kernel static size, which of course completely ignores the kernel
-> dynamic size and userspace.
-
-Thanks for sharing your experience. The question closer to this
-discussion what did you do against TTY/UART/(related) layer(s)?
+I pulled it into the arm64 for-next/core as well (to be pushed out later
+today).
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Catalin
