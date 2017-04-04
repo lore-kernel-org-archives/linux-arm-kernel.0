@@ -1,78 +1,119 @@
-From: stuartl@longlandclan.id.au (Stuart Longland)
-Date: Tue, 4 Apr 2017 10:39:53 +1000
-Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
- embedded systems
-In-Reply-To: <alpine.LFD.2.20.1704022040380.1847@knanqh.ubzr>
-References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
- <87pogur0y9.fsf@firstfloor.org>
- <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
- <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
- <alpine.LFD.2.20.1704022040380.1847@knanqh.ubzr>
-Message-ID: <821bef75-3c16-a7f2-ea15-de711d1d9eb8@longlandclan.id.au>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Apr 2017 21:00:56 -0500
+Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+ <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
+Message-ID: <20170404020056.d7osj7rmog22xbjd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 11:01, Nicolas Pitre wrote:
-> On Mon, 3 Apr 2017, Stuart Longland wrote:
->> On 03/04/17 07:41, Nicolas Pitre wrote:
->>>> No PTYs seems like a big limitation. This means no sshd?
->>> Again, my ultimate system target is in the sub-megabyte of RAM.  I 
->>> really doubt you'll be able to fit an SSH server in there even if PTYs 
->>> were supported, unless sshd (or dropbear) can be made really tiny. 
->>> Otherwise you most probably have sufficient resources to run the regular 
->>> TTY code.
->>
->> Are we talking small microcontrollers here?  The smallest machine in
->> terms of RAM I ever recall running Linux on was a 386SX/25 MHz with 4MB
->> RAM, and that had a MMU.
+On Sun, Apr 02, 2017 at 08:59:44AM +0100, Guillaume Tucker wrote:
+> The ARM Mali Midgard GPU family is present in a number of SoCs
+> from many different vendors such as Samsung Exynos and Rockchip.
 > 
-> Not to repeat what I've said already, I invite you to have a look at 
-> https://lkml.org/lkml/2017/3/24/634
+> Import the device tree bindings documentation from the r16p0
+> release of the Mali Midgard GPU kernel driver:
 > 
->> I recall Slackware requiring that you booted with a mounted floppy (no
->> ramdisk) and possibly even required that you had a second floppy drive
->> formatted as swap so you'd be able to get through the install without
->> oomkiller knocking on your door.
+>   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
 > 
-> Did the oom killer even exist in those days? I don't remember.
-> All I remember is the stack of 73 flopies or so to install Slackware... 
-> and of course floppy #68 would have developed a bad sector preventing 
-> you from completing the installation.
-
-It probably didn't, my memory is a bit hazy, even though the machine in
-question was long obsolete by the time I did this experiment.  The
-version of Slackware was pretty old by that time too.
-
-Luckily for me, I had a network, I could mount the CD disk sets over NFS
-that way, and so the only floppies I had to worry about were the boot
-and root floppies.
-
-But I digress? :-)
-
->> Sub-megabyte system support is a noble goal, but I'm wondering how
->> practical such systems would be, and whether an embedded real-time
->> kernel might be a better choice than Linux on such systems.
+> The following optional bindings have been omitted in this initial
+> version as they are only used in very specific cases:
 > 
-> Obviously, you need to leave the idea of a _distribution_ behind. If you 
-> think of a single user app, and a kernel that only provides those 
-> syscalls used by that app, and the minimal subset of kernel services 
-> that such an app require, then nothing prevents such and app/kernel from 
-> using the actual Linux API. And that's where you get a big advantage 
-> over other RTOSes. See the link above for the full rationale.
+>   * snoop_enable_smc
+>   * snoop_disable_smc
+>   * jm_config
+>   * power_model
+>   * system-coherency
+>   * ipa-model
+> 
+> The example has been simplified accordingly.
+> 
+> The compatible string definition has been limited to
+> "arm,mali-midgard" to avoid checkpatch.pl warnings and to match
+> what the driver actually expects (as of r16p0 out-of-tree).
+> 
+> CC: John Reitan <john.reitan@arm.com>
+> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+> ---
+>  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53 ++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> new file mode 100644
+> index 000000000000..da8fc6d21bbf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+> @@ -0,0 +1,53 @@
+> +#
+> +# (C) COPYRIGHT 2013-2016 ARM Limited.
+> +# Copyright (C) 2017 Collabora Ltd
+> +#
+> +# This program is free software and is provided to you under the terms of the
+> +# GNU General Public License version 2 as published by the Free Software
+> +# Foundation, and any use by you of this program is subject to the terms
+> +# of such GNU licence.
+> +#
+> +
+> +
+> +ARM Mali Midgard GPU
+> +====================
+> +
+> +Required properties:
+> +
+> +- compatible : Should be "arm,mali-midgard".
 
-Fair enough? so basically using the Linux kernel in place of an embedded
-kernel like FreeRTOS or eCos.  Still, as I say a noble goal, I wish the
-project well.  I guess it can be our answer to RetroBSD. :-)
--- 
-Stuart Longland (aka Redhatter, VK4MSL)
+As Neil said...
 
-I haven't lost my mind...
-  ...it's backed up on a tape somewhere.
+> +- reg : Physical base address of the device and length of the register area.
+> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
+> +- interrupt-names : Contains the names of IRQ resources in the order they were
+> +  provided in the interrupts property. Must contain: "JOB, "MMU", "GPU".
+> +
+> +Optional:
+> +
+> +- clocks : Phandle to clock for the Mali Midgard device.
+> +- clock-names : Shall be "clk_mali".
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170404/6971d352/attachment.sig>
+"clk_" is redundant. Actually, if there is only 1 clock, then just drop 
+names. But there's not at least a core and bus clock?
+
+> +- mali-supply : Phandle to regulator for the Mali device. Refer to
+> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
+> +  for details.
+
+Is this going to be sufficient vs. operating-points-v2? Or should it be 
+a power domain with OPPs? 
+
+> +
+> +Example for a Mali-T602:
+> +
+> +gpu at 0xfc010000 {
+
+Drop the '0x'.
+
+> +	compatible = "arm,mali-midgard";
+> +	reg = <0xfc010000 0x4000>;
+> +	interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
+> +	interrupt-names = "JOB", "MMU", "GPU";
+> +
+> +	clocks = <&pclk_mali>;
+> +	clock-names = "clk_mali";
+> +	mali-supply = <&vdd_mali>;
+> +	operating-points = <
+> +		/* KHz   uV */
+> +		533000 1250000,
+> +		450000 1150000,
+> +		400000 1125000,
+> +		350000 1075000,
+> +		266000 1025000,
+> +		160000  925000,
+> +		100000  912500,
+> +	>;
+> +};
+> -- 
+> 2.11.0
+> 
