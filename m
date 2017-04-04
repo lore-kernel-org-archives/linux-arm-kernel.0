@@ -1,26 +1,57 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 4 Apr 2017 21:04:10 +0800
-Subject: NXP: LS1088 bindings patches
-In-Reply-To: <VI1PR0402MB2863CCF9A41902B7505AD64DE6080@VI1PR0402MB2863.eurprd04.prod.outlook.com>
-References: <VI1PR0402MB2863CCF9A41902B7505AD64DE6080@VI1PR0402MB2863.eurprd04.prod.outlook.com>
-Message-ID: <20170404130408.GB3394@dragon>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 4 Apr 2017 09:13:28 -0400
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 06:00:55AM +0000, Harninder Rai wrote:
-> Hello Shawn,
+Hi Mayurkumar,
+
+On 3/30/2017 9:30 AM, Sinan Kaya wrote:
+> When the operating system is booted with the default ASPM policy
+> (POLICY_DEFAULT), current code is querying the enable/disable
+> states from ASPM registers to determine the policy.
 > 
-> Can you please pick/apply the following patches?
-
-Just applied.
-
-> They were ack-ed by Rob H few weeks ago
+> For example, a BIOS could set the power saving state to performance
+> and clear all ASPM control registers. A balanced ASPM policy could
+> enable L0s and disable L1. A power conscious BIOS could enable both
+> L0s and L1 to trade off latency and performance vs. power.
 > 
-> https://patchwork.kernel.org/patch/9564359/ 
-> https://patchwork.kernel.org/patch/9564361/ 
+> After hotplug removal, pcie_aspm_exit_link_state() function clears
+> the ASPM registers. An insertion following hotplug removal reads
+> incorrect policy as ASPM disabled even though ASPM was enabled
+> during boot.
+> 
+> This is caused by the fact that same function is used for reconfiguring
+> ASPM regardless of the power on state.
+> 
+> ------------------------
+> Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
+> ------------------------
+> - revert the accidental parent check in bridge remove
+> 
+> Sinan Kaya (5):
+>   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+>   PCI/ASPM: split pci_aspm_init() into two
+>   PCI/ASPM: add init hook to device_add
+>   PCI/ASPM: save power on values during bridge init
+>   PCI/ASPM: move link_state cleanup to bridge remove
+> 
+>  drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
+>  drivers/pci/probe.c     |   3 ++
+>  drivers/pci/remove.c    |   3 +-
+>  include/linux/pci.h     |   2 +
+>  4 files changed, 98 insertions(+), 47 deletions(-)
+> 
 
-These two got lost because they were initially sent with 3/3 as a
-series, and when you resend 3/3 you should still include them until they
-got applied.
+Did you get a chance to test?
 
-Shawn
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
