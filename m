@@ -1,75 +1,63 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Tue,  4 Apr 2017 10:47:27 -0700
-Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170404174727.35478-1-thgarnie@google.com>
-References: <20170404174727.35478-1-thgarnie@google.com>
-Message-ID: <20170404174727.35478-4-thgarnie@google.com>
+From: tom.zanussi@linux.intel.com (Tom Zanussi)
+Date: Tue, 04 Apr 2017 12:59:09 -0500
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+ <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
+ <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
+ <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
+ <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
+Message-ID: <1491328749.7125.66.camel@tzanussi-mobl.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement specific usage of verify_pre_usermode_state for user-mode
-returns for arm64.
+On Tue, 2017-04-04 at 20:08 +0300, Andy Shevchenko wrote:
+> On Tue, Apr 4, 2017 at 7:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
+> > On Tue, 2017-04-04 at 00:05 +0300, Andy Shevchenko wrote:
+> 
+> > Yes, in a previous project, I had been working toward getting a < 1M
+> > system to boot on Galileo hardware (which it did, but using more than
+> > that - the Galileo2 has 256MB, but it was the target hardware at the
+> > time, and I was hoping eventually to be able to boot out of the 512k
+> > on-chip SRAM).
+> >
+> > I was focused at that point mainly on the kernel static size, and using
+> > a combination of Josh Triplett's tinification tree, Andi Kleen's LTO and
+> > net-diet patches, and my own miscellaneous patches that I was planning
+> > on eventually upstreaming, I ended up with a system that I could boot to
+> > shell with a 455k text size:
+> >
+> > Memory: 235636K/245176K available (455K kernel code, 61K rwdata,
+> > 64K rodata, 132K init, 56K bss, 3056K reserved, 0K cma-reserved)
+> >
+> > virtual kernel memory layout:
+> >     fixmap  : 0xfffe5000 - 0xfffff000   ( 104 kB)
+> >     vmalloc : 0xd05f0000 - 0xfffe3000   ( 761 MB)
+> >     lowmem  : 0xc0000000 - 0xcfdf0000   ( 253 MB)
+> >       .init : 0xc1094000 - 0xc10b5000   ( 132 kB)
+> >       .data : 0xc1071fac - 0xc1092760   ( 129 kB)
+> >       .text : 0xc1000000 - 0xc1071fac   ( 455 kB)
+> >
+> > That was without networking.  Enabling networking added about 250k, and
+> > at that point I could ssh in and run a webserver, still less than 1M as
+> > far as kernel static size, which of course completely ignores the kernel
+> > dynamic size and userspace.
+> 
+> Thanks for sharing your experience. The question closer to this
+> discussion what did you do against TTY/UART/(related) layer(s)?
+> 
 
-Signed-off-by: Thomas Garnier <thgarnie@google.com>
----
-Based on next-20170404
----
- arch/arm64/Kconfig        |  1 +
- arch/arm64/kernel/entry.S | 15 +++++++++++++++
- 2 files changed, 16 insertions(+)
+I'd have to go back and take a look, but nothing special AFIAR.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index f2b0b528037d..0e86d87259f4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -24,6 +24,7 @@ config ARM64
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
- 	select ARCH_HAS_UBSAN_SANITIZE_ALL
-+	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
- 	select ARM_GIC
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 43512d4d7df2..6d598e7051c3 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -744,6 +744,10 @@ ENDPROC(cpu_switch_to)
- ret_fast_syscall:
- 	disable_irq				// disable interrupts
- 	str	x0, [sp, #S_X0]			// returned x0
-+	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
-+	mov	x1, #TASK_SIZE_64
-+	cmp	x2, x1
-+	b.ne	addr_limit_fail
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
- 	and	x2, x1, #_TIF_SYSCALL_WORK
- 	cbnz	x2, ret_fast_syscall_trace
-@@ -771,6 +775,11 @@ work_pending:
-  */
- ret_to_user:
- 	disable_irq				// disable interrupts
-+	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
-+	mov	x1, #TASK_SIZE_64
-+	cmp	x2, x1
-+	b.ne	addr_limit_fail
-+
- 	ldr	x1, [tsk, #TSK_TI_FLAGS]
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
-@@ -779,6 +788,12 @@ finish_ret_to_user:
- 	kernel_exit 0
- ENDPROC(ret_to_user)
- 
-+addr_limit_fail:
-+	stp	x0, lr, [sp,#-16]!
-+	bl	asm_verify_pre_usermode_state
-+	ldp	x0, lr, [sp],#16
-+	ret	lr
-+
- /*
-  * This is how we return from a fork.
-  */
--- 
-2.12.2.715.g7642488e1d-goog
+No patches or hacks along those lines, and the only related thing I see
+as far as config is:
+	
+	cfg/pty-disable.scc \
+
+which maps to:
+
+	# CONFIG_UNIX98_PTYS is not set
