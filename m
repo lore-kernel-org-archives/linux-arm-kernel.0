@@ -1,52 +1,57 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  5 Apr 2017 02:01:35 +0800
-Subject: [PATCH 01/11] arm64: allwinner: a64: enable RSB on A64
-In-Reply-To: <20170404180145.12897-1-icenowy@aosc.io>
-References: <20170404180145.12897-1-icenowy@aosc.io>
-Message-ID: <20170404180145.12897-2-icenowy@aosc.io>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 4 Apr 2017 21:04:24 +0300
+Subject: [PATCH v2 0/5] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <1491328749.7125.66.camel@tzanussi-mobl.amr.corp.intel.com>
+References: <20170401222119.25106-1-nicolas.pitre@linaro.org>
+ <87pogur0y9.fsf@firstfloor.org>
+ <alpine.LFD.2.20.1704021729470.1847@knanqh.ubzr>
+ <92fb1e4a-d6df-f55b-c0a1-9c1eb78e3943@longlandclan.id.au>
+ <CAMuHMdUTW7Fh+3kWKFCToqhaz-+58--=Sx1Zv0KRnVY4bDKOGQ@mail.gmail.com>
+ <CAHp75VdCPHW-jZ7FCrEjqHQ6ULxH_U9EsBHTjb4a=Nhs_kYFGg@mail.gmail.com>
+ <1491325150.7125.62.camel@tzanussi-mobl.amr.corp.intel.com>
+ <CAHp75VcUorx5D2ive8eNWhtu2BzSbYAm+y9_KeFYdkTMgsg0SA@mail.gmail.com>
+ <1491328749.7125.66.camel@tzanussi-mobl.amr.corp.intel.com>
+Message-ID: <CAHp75VfQVdMRZnbDFyH9m=HfSuoiUxqhf2y+H07u4u6xPd7DUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
+On Tue, Apr 4, 2017 at 8:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
+> On Tue, 2017-04-04 at 20:08 +0300, Andy Shevchenko wrote:
+>> On Tue, Apr 4, 2017 at 7:59 PM, Tom Zanussi <tom.zanussi@linux.intel.com> wrote:
+>> > On Tue, 2017-04-04 at 00:05 +0300, Andy Shevchenko wrote:
 
-Add it and its pinmux.
+>> > I was focused at that point mainly on the kernel static size, and using
+>> > a combination of Josh Triplett's tinification tree, Andi Kleen's LTO and
+>> > net-diet patches, and my own miscellaneous patches that I was planning
+>> > on eventually upstreaming, I ended up with a system that I could boot to
+>> > shell with a 455k text size:
+>> >
+>> > Memory: 235636K/245176K available (455K kernel code, 61K rwdata,
+>> > 64K rodata, 132K init, 56K bss, 3056K reserved, 0K cma-reserved)
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+>> Thanks for sharing your experience. The question closer to this
+>> discussion what did you do against TTY/UART/(related) layer(s)?
+>>
+>
+> I'd have to go back and take a look, but nothing special AFIAR.
+>
+> No patches or hacks along those lines, and the only related thing I see
+> as far as config is:
+>
+>         cfg/pty-disable.scc \
+>
+> which maps to:
+>
+>         # CONFIG_UNIX98_PTYS is not set
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 6bc606b4d74d..9a75b1c7c91a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -420,6 +420,27 @@
- 			#gpio-cells = <3>;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-+
-+			r_rsb_pins: rsb at 0 {
-+				pins = "PL0", "PL1";
-+				function = "s_rsb";
-+				drive-strength = <20>;
-+				bias-pull-up;
-+			};
-+		};
-+
-+		r_rsb: rsb at 1f03400 {
-+			compatible = "allwinner,sun8i-a23-rsb";
-+			reg = <0x01f03400 0x400>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&r_ccu 6>;
-+			clock-frequency = <3000000>;
-+			resets = <&r_ccu 2>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_rsb_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 	};
- };
+But on your guestimation how much can we squeeze TTY/UART layer if we
+do some compile-time configuration?
+Does it even make sense or better to introduce something like minitty
+special layer instead?
+
+I believe you did some research during time of that project?
+
 -- 
-2.12.2
+With Best Regards,
+Andy Shevchenko
