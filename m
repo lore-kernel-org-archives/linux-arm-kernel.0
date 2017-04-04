@@ -1,32 +1,28 @@
-From: kamensky@cisco.com (Victor Kamensky)
-Date: Mon,  3 Apr 2017 22:51:00 -0700
-Subject: [PATCH v2] fix armv8 kernel generation of SIGSEGV upon unaligned
- access
-Message-ID: <1491285061-15718-1-git-send-email-kamensky@cisco.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Tue, 4 Apr 2017 06:14:55 -0000
+Subject: [PATCH v34 04/14] arm64: kdump: reserve memory for crash dump
+ kernel
+In-Reply-To: <20170404054144.GG16309@linaro.org>
+References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
+ <20170328065130.16019-2-takahiro.akashi@linaro.org>
+ <1491207492.6020.8.camel@infradead.org>
+ <20170404054144.GG16309@linaro.org>
+Message-ID: <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2: reimplemented fix according to suggestion from Will [3]. Now signal number
-and code are extracted from fault_info table by do_bad_area function based on
-esr value.
 
-v1: problem report and small test case are in [1], first version of fix proposed
-by [2].
+> On Mon, Apr 03, 2017 at 09:18:12AM +0100, David Woodhouse wrote:
+>>
+>> You still have typos here.
+>
+> I'd like to defer to the maintainers whether we prefer MiB over MB.
 
-[1] http://archive.armlinux.org.uk/lurker/message/20170403.054513.61199c78.en.html
+It is not really a matter of preference. One is correct; the other is not.
 
-[2] http://archive.armlinux.org.uk/lurker/message/20170403.054514.27358df9.en.html
+While simple errors can of course be forgiven, I cannot understand why you
+would deliberately repeat an error once it has been pointed out to you.
 
-[3] http://archive.armlinux.org.uk/lurker/message/20170403.092431.38d44b37.en.html
-
-Thanks,
-Victor
-
-Victor Kamensky (1):
-  arm64: mm: unaligned access by user-land should be received as SIGBUS
-
- arch/arm64/mm/fault.c | 42 ++++++++++++++++++++++++------------------
- 1 file changed, 24 insertions(+), 18 deletions(-)
 
 -- 
-1.9.3
+dwmw2
