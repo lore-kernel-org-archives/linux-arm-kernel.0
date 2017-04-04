@@ -1,204 +1,109 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 4 Apr 2017 10:59:31 +0200
-Subject: [PATCH v2 03/13] drm/meson: Add support for components
-In-Reply-To: <1490109950-21421-4-git-send-email-narmstrong@baylibre.com>
+Date: Tue, 4 Apr 2017 11:00:49 +0200
+Subject: [PATCH v2 12/13] drm/meson: Add RST to bring together kerneldoc
+In-Reply-To: <1490109950-21421-13-git-send-email-narmstrong@baylibre.com>
 References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
- <1490109950-21421-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170404085931.7sv3k7lwgt6klu37@phenom.ffwll.local>
+ <1490109950-21421-13-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20170404090049.auhtxqke3l5px5a7@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 04:25:40PM +0100, Neil Armstrong wrote:
-> This patch adds support for optional components connected through the
-> Device Tree endpoints scheme.
-> 
+On Tue, Mar 21, 2017 at 04:25:49PM +0100, Neil Armstrong wrote:
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+\o/ for kerneldoc!
+
+This is awesome, but I guess it's time to extract a drivers.rst sub-file
+within Doc/gpu and put all the various driver docs in there? Would be
+great if you could do the follow-up for that.
+
+Thanks, Daniel
+
 > ---
->  drivers/gpu/drm/meson/meson_drv.c | 113 +++++++++++++++++++++++++++++++++-----
->  1 file changed, 99 insertions(+), 14 deletions(-)
+>  Documentation/gpu/index.rst |  1 +
+>  Documentation/gpu/meson.rst | 61 +++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 62 insertions(+)
+>  create mode 100644 Documentation/gpu/meson.rst
 > 
-> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-> index bc562a0..a2e9f56 100644
-> --- a/drivers/gpu/drm/meson/meson_drv.c
-> +++ b/drivers/gpu/drm/meson/meson_drv.c
-> @@ -24,6 +24,7 @@
->  #include <linux/module.h>
->  #include <linux/mutex.h>
->  #include <linux/platform_device.h>
-> +#include <linux/component.h>
->  #include <linux/of_graph.h>
->  
->  #include <drm/drmP.h>
-> @@ -150,9 +151,9 @@ static bool meson_vpu_has_available_connectors(struct device *dev)
->  	.max_register   = 0x1000,
->  };
->  
-> -static int meson_drv_probe(struct platform_device *pdev)
-> +static int meson_drv_bind(struct device *dev)
->  {
-> -	struct device *dev = &pdev->dev;
-> +	struct platform_device *pdev = to_platform_device(dev);
->  	struct meson_drm *priv;
->  	struct drm_device *drm;
->  	struct resource *res;
-> @@ -215,6 +216,15 @@ static int meson_drv_probe(struct platform_device *pdev)
->  
->  	drm_vblank_init(drm, 1);
->  	drm_mode_config_init(drm);
-> +	drm->mode_config.max_width = 3840;
-> +	drm->mode_config.max_height = 2160;
-> +	drm->mode_config.funcs = &meson_mode_config_funcs;
+> diff --git a/Documentation/gpu/index.rst b/Documentation/gpu/index.rst
+> index e998ee0..7eceb97 100644
+> --- a/Documentation/gpu/index.rst
+> +++ b/Documentation/gpu/index.rst
+> @@ -11,6 +11,7 @@ Linux GPU Driver Developer's Guide
+>     drm-kms-helpers
+>     drm-uapi
+>     i915
+> +   meson
+>     tinydrm
+>     vc4
+>     vga-switcheroo
+> diff --git a/Documentation/gpu/meson.rst b/Documentation/gpu/meson.rst
+> new file mode 100644
+> index 0000000..479f6f5
+> --- /dev/null
+> +++ b/Documentation/gpu/meson.rst
+> @@ -0,0 +1,61 @@
+> +=============================================
+> +drm/meson AmLogic Meson Video Processing Unit
+> +=============================================
 > +
-> +	/* Hardware Initialization */
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_drv.c
+> +   :doc: Video Processing Unit
 > +
-> +	meson_venc_init(priv);
-> +	meson_vpp_init(priv);
-> +	meson_viu_init(priv);
->  
->  	/* Encoder Initialization */
->  
-> @@ -222,11 +232,11 @@ static int meson_drv_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto free_drm;
->  
-> -	/* Hardware Initialization */
-> -
-> -	meson_venc_init(priv);
-> -	meson_vpp_init(priv);
-> -	meson_viu_init(priv);
-> +	ret = component_bind_all(drm->dev, drm);
-> +	if (ret) {
-> +		dev_err(drm->dev, "Couldn't bind all components\n");
-> +		goto free_drm;
-> +	}
->  
->  	ret = meson_plane_create(priv);
->  	if (ret)
-> @@ -241,9 +251,6 @@ static int meson_drv_probe(struct platform_device *pdev)
->  		goto free_drm;
->  
->  	drm_mode_config_reset(drm);
-> -	drm->mode_config.max_width = 8192;
-> -	drm->mode_config.max_height = 8192;
-> -	drm->mode_config.funcs = &meson_mode_config_funcs;
->  
->  	priv->fbdev = drm_fbdev_cma_init(drm, 32,
->  					 drm->mode_config.num_connector);
-> @@ -268,9 +275,9 @@ static int meson_drv_probe(struct platform_device *pdev)
->  	return ret;
->  }
->  
-> -static int meson_drv_remove(struct platform_device *pdev)
-> +static void meson_drv_unbind(struct device *dev)
->  {
-> -	struct drm_device *drm = dev_get_drvdata(&pdev->dev);
-> +	struct drm_device *drm = dev_get_drvdata(dev);
->  	struct meson_drm *priv = drm->dev_private;
->  
->  	drm_dev_unregister(drm);
-> @@ -280,9 +287,88 @@ static int meson_drv_remove(struct platform_device *pdev)
->  	drm_vblank_cleanup(drm);
->  	drm_dev_unref(drm);
->  
-> -	return 0;
->  }
->  
-> +static const struct component_master_ops meson_drv_master_ops = {
-> +	.bind	= meson_drv_bind,
-> +	.unbind	= meson_drv_unbind,
-> +};
+> +Video Processing Unit
+> +=====================
 > +
-> +static int compare_of(struct device *dev, void *data)
-> +{
-> +	DRM_DEBUG_DRIVER("Comparing of node %s with %s\n",
-> +			 of_node_full_name(dev->of_node),
-> +			 of_node_full_name(data));
+> +The Amlogic Meson Display controller is composed of several components
+> +that are going to be documented below:
 > +
-> +	return dev->of_node == data;
-> +}
+> +.. code::
 > +
-> +/* Possible connectors nodes to ignore */
-> +static const struct of_device_id connectors_match[] = {
-> +	{ .compatible = "composite-video-connector" },
-> +	{ .compatible = "svideo-connector" },
-> +	{ .compatible = "hdmi-connector" },
-> +	{ .compatible = "dvi-connector" },
-> +	{}
-> +};
+> +  DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
+> +     | vd1   _______     _____________    _________________     |               |
+> +  D  |-------|      |----|            |   |                |    |   HDMI PLL    |
+> +  D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
+> +  R  |-------|      |----| Processing |   |                |    |               |
+> +     | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
+> +  R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
+> +  A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
+> +  M  |-------|______|----|____________|   |________________|    |               |
+> +  ___|__________________________________________________________|_______________|
 > +
-> +static int meson_probe_remote(struct platform_device *pdev,
-> +			      struct component_match **match,
-> +			      struct device_node *parent,
-> +			      struct device_node *remote)
-> +{
-> +	struct device_node *ep, *remote_node;
-> +	int count = 1;
+> +Video Input Unit
+> +================
 > +
-> +	/* If node is a connector, return and do not add to match table */
-> +	if (of_match_node(connectors_match, remote))
-> +		return 1;
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_viu.c
+> +   :doc: Video Input Unit
 > +
-> +	component_match_add(&pdev->dev, match, compare_of, remote);
+> +Video Post Processing
+> +=====================
 > +
-> +	for_each_endpoint_of_node(remote, ep) {
-> +		remote_node = of_graph_get_remote_port_parent(ep);
-> +		if (!remote_node ||
-> +		    remote_node == parent || /* Ignore parent endpoint */
-> +		    !of_device_is_available(remote_node))
-> +			continue;
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_vpp.c
+> +   :doc: Video Post Processing
 > +
-> +		count += meson_probe_remote(pdev, match, remote, remote_node);
+> +Video Encoder
+> +=============
 > +
-> +		of_node_put(remote_node);
-> +	}
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_venc.c
+> +   :doc: Video Encoder
 > +
-> +	return count;
-> +}
+> +Video Canvas Management
+> +=======================
 > +
-> +static int meson_drv_probe(struct platform_device *pdev)
-> +{
-> +	struct component_match *match = NULL;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *ep, *remote;
-> +	int count = 0;
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_canvas.c
+> +   :doc: Canvas
 > +
-> +	for_each_endpoint_of_node(np, ep) {
-> +		remote = of_graph_get_remote_port_parent(ep);
-> +		if (!remote || !of_device_is_available(remote))
-> +			continue;
+> +Video Clocks
+> +============
 > +
-> +		count += meson_probe_remote(pdev, &match, np, remote);
-> +	}
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_vclk.c
+> +   :doc: Video Clocks
 > +
-> +	/* If some endpoints were found, initialize the nodes */
-> +	if (count) {
-
-What if you have more than 1 endpoint described, but module load order
-conspires against you to only initialize 1 at first?
--Daniel
-
-> +		dev_info(&pdev->dev, "Queued %d outputs on vpu\n", count);
+> +HDMI Video Output
+> +=================
 > +
-> +		return component_master_add_with_match(&pdev->dev,
-> +						       &meson_drv_master_ops,
-> +						       match);
-> +	}
-> +
-> +	/* If no output endpoints were available, simply bail out */
-> +	return 0;
-> +};
-> +
->  static const struct of_device_id dt_match[] = {
->  	{ .compatible = "amlogic,meson-gxbb-vpu" },
->  	{ .compatible = "amlogic,meson-gxl-vpu" },
-> @@ -293,7 +379,6 @@ static int meson_drv_remove(struct platform_device *pdev)
->  
->  static struct platform_driver meson_drm_platform_driver = {
->  	.probe      = meson_drv_probe,
-> -	.remove     = meson_drv_remove,
->  	.driver     = {
->  		.name	= "meson-drm",
->  		.of_match_table = dt_match,
+> +.. kernel-doc:: drivers/gpu/drm/meson/meson_dw_hdmi.c
+> +   :doc: HDMI Output
 > -- 
 > 1.9.1
 > 
