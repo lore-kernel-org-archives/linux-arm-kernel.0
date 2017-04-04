@@ -1,66 +1,79 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 04 Apr 2017 00:54:43 +0200
-Subject: [PATCH v2 0/5] Add ARM Mali Midgard device tree bindings and gpu
- node for rk3288
-In-Reply-To: <cover.1491118230.git.guillaume.tucker@collabora.com>
-References: <cover.1491118230.git.guillaume.tucker@collabora.com>
-Message-ID: <1587425.dbD1NUOEYx@diego>
+From: oss@buserror.net (Scott Wood)
+Date: Mon, 03 Apr 2017 19:24:47 -0500
+Subject: [RFC PATCH 2/5] soc/fsl/qbman: Use shared-dma-pool for QMan
+ private memory allocations
+In-Reply-To: <df00c0ab-22b8-1086-def1-69baf648df72@arm.com>
+References: <1490822037-6752-1-git-send-email-roy.pledge@nxp.com>
+ <1490822037-6752-3-git-send-email-roy.pledge@nxp.com>
+ <b1cd8d44-8c74-ab50-5dc9-1f978cae5bdf@arm.com>
+ <871ste5dmw.fsf@concordia.ellerman.id.au>
+ <dfaa1a28-66d8-15fb-7d2d-75e206161770@arm.com>
+ <1491031518.2944.62.camel@buserror.net>
+ <df00c0ab-22b8-1086-def1-69baf648df72@arm.com>
+Message-ID: <1491265487.2944.71.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guillaume,
+On Mon, 2017-04-03 at 15:52 +0100, Robin Murphy wrote:
+> On 01/04/17 08:25, Scott Wood wrote:
+> > 
+> > On Fri, 2017-03-31 at 18:55 +0100, Robin Murphy wrote:
+> > > 
+> > > On 31/03/17 04:27, Michael Ellerman wrote:
+> > > > 
+> > > > 
+> > > > Robin Murphy <robin.murphy@arm.com> writes:
+> > > > 
+> > > > > 
+> > > > > 
+> > > > > Hi Roy,
+> > > > > 
+> > > > > On 29/03/17 22:13, Roy Pledge wrote:
+> > > > > > 
+> > > > > > 
+> > > > > > Use the shared-memory-pool mechanism for frame queue descriptor
+> > > > > > and
+> > > > > > packed frame descriptor record area allocations.
+> > > > > Thanks for persevering with this - in my opinion it's now looking
+> > > > > like
+> > > > > it was worth the effort :)
+> > > > > 
+> > > > > AFAICS the ioremap_wc() that this leads to does appear to give back
+> > > > > something non-cacheable on PPC (assuming "pgprot_noncached_wc" isn't
+> > > > > horrendously misnamed), and "no-map" should rule out any cacheable
+> > > > > linear map alias existing, so it would seem that this approach
+> > > > > should
+> > > > > avert Scott's concerns about attribute mismatches.
+> > > > How does 'no-map' translate into something being excluded from the
+> > > > linear mapping?
+> > > Reserved regions marked with "no-map" get memblock_remove()d by
+> > > early_init_dt_alloc_reserved_memory_arch(). As I understand things, the
+> > > linear map should only cover memblock areas, and it would be explicitly
+> > > violating the semantics of "no-map" to still cover such a region.
+> > Discontiguous memory isn't supported on these PPC chips.??Everything up to
+> > memblock_end_of_DRAM() gets mapped -- and if that were to change, the
+> > fragmentation would waste TLB1 entries.
+> Ah, so the "PPC-specific angles I'm not aware of" category is indeed
+> non-empty - I guess the lack of HAVE_GENERIC_DMA_COHERENT might be
+> related, then.
+> 
+> That said, though, AFAICS only certain x86 and s390 configurations ever
+> call memblock_set_bottom_up(true), so we should be able to assume that
+> the reserved region allocations always fall through to
+> __memblock_find_range_top_down(). Thus if your DRAM is contiguous, then
+> "no-map"-ing the reserved regions will simply end up pushing
+> memblock_end_of_DRAM() down in a manner that would appear to still avoid
+> overlaps.
 
-please keep in mind to also add me (as Rockchip maintainer) as recipient in 
-further submissions - as also listed by scripts/get_maintainer.pl.
+Can you guarantee it will be at the end? ?What if there were other early
+memblock allocations (e.g. other reserved-memory regions without no-map) that
+came first?
 
+>  I can only see that going wrong if the end of DRAM wasn't at
+> least 32MB aligned to begin with - is that ever likely to happen in
+> practice?
 
-Thanks
-Heiko
+Probably not, unless the user asks for an unusual memory size via mem= or
+similar.
 
-Am Sonntag, 2. April 2017, 08:59:43 CEST schrieb Guillaume Tucker:
-> The ARM Mali Midgard GPU kernel driver is only available
-> out-of-tree and is not going to be merged in its current form.
-> However, it would be useful to have its device tree bindings
-> merged.  In particular, this would enable distributions to create
-> working driver packages (dkms...) without having to patch the
-> kernel.
-> 
-> The bindings for the earlier Mali Utgard GPU family have already
-> been merged, so this is essentially the same scenario but for
-> newer GPUs (Mali-T604 ~ Mali-T880).
-> 
-> This series of patches first imports the bindings from the latest
-> driver release with some clean-up then adds a gpu node for the
-> rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
-> Firefly, Veyron Minnie and Jerry boards board using Mali kernel
-> driver r16p0 and r12p0 user-space binary.
-> 
-> Changes since v1:
-> - enabled gpu on rk3288-veyron boards
-> 
-> Enric Balletbo i Serra (1):
->   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-veyron
-> 
-> Guillaume Tucker (4):
->   dt-bindings: gpu: add bindings for the ARM Mali Midgard GPU
->   ARM: dts: rockchip: add ARM Mali GPU node for rk3288
->   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-rock2-som
->   ARM: dts: rockchip: enable ARM Mali GPU on rk3288-firefly
-> 
->  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53
-> ++++++++++++++++++++++ arch/arm/boot/dts/rk3288-firefly.dtsi              |
->  5 ++
->  arch/arm/boot/dts/rk3288-rock2-som.dtsi            |  5 ++
->  arch/arm/boot/dts/rk3288-veyron.dtsi               |  5 ++
->  arch/arm/boot/dts/rk3288.dtsi                      | 23 ++++++++++
->  5 files changed, 91 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
-> 
-> --
-> 2.11.0
-> 
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+-Scott
