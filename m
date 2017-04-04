@@ -1,71 +1,48 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 4 Apr 2017 21:14:52 +0800
-Subject: [PATCH 2/2 v2] ARM: i.MX25: globally disable supervisor protect
-In-Reply-To: <1491248825-23041-2-git-send-email-martin@kaiser.cx>
-References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
- <1491248825-23041-1-git-send-email-martin@kaiser.cx>
- <1491248825-23041-2-git-send-email-martin@kaiser.cx>
-Message-ID: <20170404131450.GD3394@dragon>
+From: john@metanate.com (John Keeping)
+Date: Tue, 4 Apr 2017 14:15:13 +0100
+Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
+In-Reply-To: <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
+References: <20170224125506.21533-1-john@metanate.com>
+ <20170224125506.21533-24-john@metanate.com>
+ <20170302215643.GA49163@google.com>
+ <20170303113945.3bd2cbd9.john@metanate.com>
+ <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
+Message-ID: <20170404141513.2bad3b1b.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 09:47:05PM +0200, Martin Kaiser wrote:
-> The problem described in 6befda9a272b98bfb1dc772efc3564644cbfb270
+Hi Sean,
 
-This causes the following checkpatch error.
+On Sun, 12 Mar 2017 07:06:59 -0500, Rob Herring wrote:
 
-ERROR: Please use git commit description style 'commit <12+ chars of
-sha1> ("<title line>")' - ie: 'commit 6befda9a272b ("ARM: i.MX53:
-globally disable supervisor protect")'
+> On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
+> > This reset is required in order to fully reset the internal state of the
+> > MIPI controller.
+> > 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> > On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:  
+> > > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:  
+> > > > +	/*
+> > > > +	 * Note that the reset was not defined in the initial device tree, so
+> > > > +	 * we have to be prepared for it not being found.
+> > > > +	 */
+> > > > +	apb_rst = devm_reset_control_get(dev, "apb");    
+> > > 
+> > > Did this reset ever get documented in the device tree bindings? I
+> > > couldn't find it. Perhaps a follow-up patch is in order?  
+> > 
+> > Here's a patch to do that.
+> > 
+> >  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
+> >  1 file changed, 7 insertions(+)  
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-I fixed it and applied the patch.
+I don't see this patch in linux-next, so I guess it has fallen through
+the cracks somewhere.  Since we have Rob's ack, can you pick this via
+drm-misc?
 
-Shawn
 
-> for the i.MX53 platform applies to i.MX25 as well.
-> 
-> E.g. CSPI1+SDMA and SSI1+SDMA are not working with the default AIPS
-> configuration. Modifiy the AIPS configuration to allow access to the bus
-> by SDMA and peripherals.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
-> v2:
->    rebased against latest linux-next
->    re-sending both patches, it seems they got lost along the way
-> 
->  arch/arm/mach-imx/mach-imx25.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx25.c b/arch/arm/mach-imx/mach-imx25.c
-> index 32dcb5e..353b86e 100644
-> --- a/arch/arm/mach-imx/mach-imx25.c
-> +++ b/arch/arm/mach-imx/mach-imx25.c
-> @@ -23,6 +23,11 @@ static void __init imx25_init_early(void)
->  	mxc_set_cpu_type(MXC_CPU_MX25);
->  }
->  
-> +static void __init imx25_dt_init(void)
-> +{
-> +	imx_aips_allow_unprivileged_access("fsl,imx25-aips");
-> +}
-> +
->  static void __init mx25_init_irq(void)
->  {
->  	struct device_node *np;
-> @@ -41,6 +46,7 @@ static const char * const imx25_dt_board_compat[] __initconst = {
->  
->  DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
->  	.init_early	= imx25_init_early,
-> +	.init_machine	= imx25_dt_init,
->  	.init_late      = imx25_pm_init,
->  	.init_irq	= mx25_init_irq,
->  	.dt_compat	= imx25_dt_board_compat,
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+John
