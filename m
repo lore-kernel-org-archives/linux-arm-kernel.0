@@ -1,74 +1,129 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Apr 2017 08:52:23 -0700
-Subject: [PATCH] ARM: OMAP2+: omap_device: Sync omap_device and
- pm_runtime after probe defer
-In-Reply-To: <20170330195818.17669-1-d-gerlach@ti.com>
-References: <20170330195818.17669-1-d-gerlach@ti.com>
-Message-ID: <20170404155222.GP10760@atomide.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 4 Apr 2017 17:55:51 +0200
+Subject: [PATCH v3 00/11] drm/meson: Initial support for HDMI Output
+In-Reply-To: <1491308131-22071-1-git-send-email-narmstrong@baylibre.com>
+References: <1491308131-22071-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <3a437424-f352-82df-0c80-8d259e43dfdd@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170330 13:01]:
-> Starting from commit 5de85b9d57ab ("PM / runtime: Re-init runtime PM
-> states at probe error and driver unbind") pm_runtime core now changes
-> device runtime_status back to after RPM_SUSPENDED after a probe defer.
-> Certain OMAP devices make use of "ti,no-idle-on-init" flag which causes
-> omap_device_enable to be called during the BUS_NOTIFY_ADD_DEVICE event
-> during probe, along with pm_runtime_set_active.
+On 04/04/2017 02:15 PM, Neil Armstrong wrote:
+> The Amlogic GX SoCs implements a Synopsys DesignWare HDMI TX Controller
+> in combination with a very custom PHY.
 > 
-> This call to pm_runtime_set_active typically will prevent a call to
-> pm_runtime_get in a driver probe function from re-enabling the
-> omap_device. However, in the case of a probe defer that happens before
-> the driver probe function is able to run, such as a missing pinctrl
-> states defer, pm_runtime_reinit will set the device as RPM_SUSPENDED and
-> then once driver probe is actually able to run, pm_runtime_get will see
-> the device as suspended and call through to the omap_device layer,
-> attempting to enable the already enabled omap_device and causing errors
-> like this:
+> This patchset depends on Laurent Pinchart patchset merged in drm-misc-next
+> and my v6 patchset at [1] to permit PHY control from outside the dw-hdmi driver.
 > 
-> omap-gpmc 50000000.gpmc: omap_device: omap_device_enable() called from invalid state 1
-> omap-gpmc 50000000.gpmc: use pm_runtime_put_sync_suspend() in driver?
+> The Synopsys DesignWare HDMI TX Controller is integrated like :
+>          ___________________________________
+>         |            HDMI TOP               |<= HPD
+>         |___________________________________|
+>         |                  |                |
+> HDMI-TX-|  Synopsys HDMI   |   HDMI PHY     |=> TMDS
+>         |    Controller    |________________|
+>         |___________________________________|<=> DDC
 > 
-> We can avoid this error by making sure the pm_runtime status of a device
-> matches the omap_device state before a probe attempt. By extending the
-> omap_device bus notifier to act on the BUS_NOTIFY_BIND_DRIVER event we
-> can check if a device is enabled in omap_device but with a pm_runtime
-> status of RPM_SUSPENDED and once again mark the device as RPM_ACTIVE to
-> avoid a second incorrect call to omap_device_enable.
+> And uses the following paths for Pixels Encoding :
+>        _____   _____   ____________________
+> vd1---|     |-|     | | VENC     /---------|----VDAC
+> vd2---| VIU |-| VPP |-|-----ENCI/-ENCI_DVI-|\
+> osd1--|     |-|     | | \                  | X--HDMI-TX
+> osd2--|_____|-|_____| |  |\-ENCP--ENCP_DVI-|/
+>                       |  |                 |
+>                       |  \--ENCL-----------|----LVDS
+>                       |____________________|
 > 
-> Tested-by: Franklin S Cooper Jr. <fcooper@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> The ENCI and ENCP encoders pre-formats the data for the ENCI-DVI and
+> ENCP-DVI encoders. Those DVI encoders will format the pixels for the
+> Synopsys DesignWare HDMI TX Controller.
+> 
+> In order to support display modes, the ENCI and ENCP encoders needs very
+> specific parameters for *each* display modes, so usage of the CEA VIC
+> identifier is necessary. But the DVI timings are generated from the
+> drm_mode structure in a generic way.
+> 
+> To simplify the first push, only the main CEA modes are supported up to
+> 1920x1080p60. Supporting the 480i and 576i needs tweaking in the dw-hdmi
+> in order to support the Clock Doubling necessary for these modes.
+> 
+> Support for more traditional modes like the EDID fallback modes is planned
+> but will need tome additionnal handling along the CEA modes.
+> Support for 4k2k modes needs to be able to get the EDID HDMI modes, but
+> for now only the HDMI 1.4 modes are currently available in the drm_edid
+> implementation.
+> 
+> This patchset does :
+>  - Fixes the CRTC handling
+>  - Fixes the registers definitions
+>  - Adds support for device components registration along of-graph
+>  - Adds support for HDMI clocks
+>  - Adds support for HDMI VENC video modes
+>  - Adds support for the Custom HDMI PHY using callbacks added in [1]
+>  - Adds CMA node to reserve enougth memory for 1080p display
+>  - Adds the HDMI controller et connector modes on selected boards
+>  - Adds a proper dt-bindings for the HDMI controller et connector
+>  - Add RST documentation for Meson DRM driver
+>  - Updates the MAINTAINERS file to track the new files
+> 
+> Changes since v2 patchset at [4] :
+>  - Dropped already merged DT patches
+>  - Added Daniel Vetter's acks
+>  - Rebased on drm-misc-next at 9c4ad466d1dd
+> 
+> Changes since v1 patchset at [2] :
+>  - Add the meson drm documentation from [3] to this patchset
+>  - Update with new bus formats and HPD callbacks
+>  - Drop all the of_machine_is_compatible
+> 
+> [1] http://lkml.kernel.org/r/1491230558-10804-1-git-send-email-narmstrong at baylibre.com
+> [2] http://lkml.kernel.org/r/1488469207-523-1-git-send-email-narmstrong at baylibre.com
+> [3] http://lkml.kernel.org/r/1488536068-9407-1-git-send-email-narmstrong at baylibre.com
+> [4] http://lkml.kernel.org/r/1490109950-21421-1-git-send-email-narmstrong at baylibre.com
+> 
+> Neil Armstrong (11):
+>   drm/meson: Use crtc_state for hdisplay and fix atomic flush/enable
+>     sync for vsync commit
+>   drm/meson: Add missing HDMI register
+>   drm/meson: Add support for components
+>   drm/meson: venc_cvbs: no more return -ENODEV if CVBS is not available
+>   drm/meson: add support for HDMI clock support
+>   drm/meson: Add support for HDMI venc modes and settings
+>   drm/meson: Add support for HDMI encoder and DW-HDMI bridge + PHY
+>   dt-bindings: Add bindings for the Amlogic Meson dw-hdmi extension
+>   drm/meson: Convert existing documentation to actual kerneldoc
+>   drm/meson: Add RST to bring together kerneldoc
+>   MAINTAINERS: update files for Amlogic DRM Driver
+> 
+>  .../bindings/display/amlogic,meson-dw-hdmi.txt     |  111 ++
+>  Documentation/gpu/index.rst                        |    1 +
+>  Documentation/gpu/meson.rst                        |   61 +
+>  MAINTAINERS                                        |    2 +
+>  drivers/gpu/drm/meson/Kconfig                      |    6 +
+>  drivers/gpu/drm/meson/Makefile                     |    1 +
+>  drivers/gpu/drm/meson/meson_canvas.c               |    4 +-
+>  drivers/gpu/drm/meson/meson_crtc.c                 |   15 +-
+>  drivers/gpu/drm/meson/meson_drv.c                  |  118 +-
+>  drivers/gpu/drm/meson/meson_drv.h                  |    3 +
+>  drivers/gpu/drm/meson/meson_dw_hdmi.c              |  919 ++++++++++++++
+>  drivers/gpu/drm/meson/meson_dw_hdmi.h              |  146 +++
+>  drivers/gpu/drm/meson/meson_registers.h            |    1 +
+>  drivers/gpu/drm/meson/meson_vclk.c                 |  632 +++++++++-
+>  drivers/gpu/drm/meson/meson_vclk.h                 |    6 +-
+>  drivers/gpu/drm/meson/meson_venc.c                 | 1254 +++++++++++++++++++-
+>  drivers/gpu/drm/meson/meson_venc.h                 |    7 +
+>  drivers/gpu/drm/meson/meson_venc_cvbs.c            |   11 +-
+>  drivers/gpu/drm/meson/meson_viu.c                  |    6 +-
+>  drivers/gpu/drm/meson/meson_vpp.c                  |    8 +-
+>  drivers/gpu/drm/meson/meson_vpp.h                  |    2 +
+>  21 files changed, 3267 insertions(+), 47 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+>  create mode 100644 Documentation/gpu/meson.rst
+>  create mode 100644 drivers/gpu/drm/meson/meson_dw_hdmi.c
+>  create mode 100644 drivers/gpu/drm/meson/meson_dw_hdmi.h
+> 
 
-Applying into omap-for-v4.11/fixes thanks. Will let this one sit
-in Linux next for a while.
 
-Regards,
+Applied to drm-misc-next
 
-Tony
-
-> ---
->  arch/arm/mach-omap2/omap_device.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index e920dd83e443..f989145480c8 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -222,6 +222,14 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
->  				dev_err(dev, "failed to idle\n");
->  		}
->  		break;
-> +	case BUS_NOTIFY_BIND_DRIVER:
-> +		od = to_omap_device(pdev);
-> +		if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED) &&
-> +		    pm_runtime_status_suspended(dev)) {
-> +			od->_driver_status = BUS_NOTIFY_BIND_DRIVER;
-> +			pm_runtime_set_active(dev);
-> +		}
-> +		break;
->  	case BUS_NOTIFY_ADD_DEVICE:
->  		if (pdev->dev.of_node)
->  			omap_device_build_from_dt(pdev);
-> -- 
-> 2.11.0
-> 
+Thanks Daniel, Sean,
+Neil
