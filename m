@@ -1,51 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 4 Apr 2017 11:46:05 +0530
-Subject: [PATCH] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
-In-Reply-To: <20170329160932.27157-1-abailon@baylibre.com>
-References: <20170329160932.27157-1-abailon@baylibre.com>
-Message-ID: <f53545e0-d009-2ef5-ab21-e9f9b3518045@ti.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 03 Apr 2017 23:28:22 -0700
+Subject: [PATCH v2] arm64: print a fault message when attempting to write
+ RO memory
+In-Reply-To: <20170323142239.GL29752@arm.com>
+References: <20170217011959.26754-1-stephen.boyd@linaro.org>
+ <58A6D7D7.1030704@arm.com>
+ <148734678579.30076.8827985106565313944@sboyd-linaro>
+ <58AACE92.4040608@arm.com>
+ <148798674891.16996.12830433270375215535@sboyd-linaro>
+ <20170323142239.GL29752@arm.com>
+Message-ID: <149128730233.11428.502726622958797119@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 March 2017 09:39 PM, Alexandre Bailon wrote:
-> The CPPI 4.1 DMA is sharing its clock with the USB OTG,
-> and most of the time, the clock will be enabled by USB.
-> But during the init of the DMA, USB is not enabled (waiting for DMA),
-> and then we must enable the clock before to do anything.
-> Add the clock for the CPPI 4.1 DMA engine.
+Quoting Will Deacon (2017-03-23 07:22:39)
+> On Fri, Feb 24, 2017 at 05:39:08PM -0800, Stephen Boyd wrote:
+> > Quoting James Morse (2017-02-20 03:10:10)
+> > > 
+> > > You're right the user-address side of things will get caught in do_page_fault().
+> > > I was trying to badly-explain 'is_permission_fault(esr)' isn't as general
+> > > purpose as its name and prototype suggest, it only gives the results that the
+> > > PAN checks expect when called with a user address.
+> > 
+> > Ok. I'd rather not change the function in this patch because I'm only
+> > moving the code around to use it higher up in the file. But if you
+> > prefer I can combine the code movement with the addition of a new 'addr'
+> > argument to this function and rework things based on that.
 > 
-> Note:
-> This patch is to apply instead of:
-> "ARM: davinci: Make the usb20 clock available to PM runtime"
-
-Okay, but I still liked the fact that that patch was using NULL as
-con_id for MUSB clock. That makes sense because MUSB gets a single clock
-input. I think you should still make that change. If not for v4.12, then
-for v4.13.
-
+> Are you planning to send a v3 of this?
 > 
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> ---
->  arch/arm/mach-davinci/da830.c    | 1 +
->  arch/arm/mach-davinci/da850.c    | 1 +
->  arch/arm/mach-davinci/da8xx-dt.c | 2 ++
->  3 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-> index 073c458..ae4a8a5 100644
-> --- a/arch/arm/mach-davinci/da830.c
-> +++ b/arch/arm/mach-davinci/da830.c
-> @@ -413,6 +413,7 @@ static struct clk_lookup da830_clks[] = {
->  	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
->  	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
->  	CLK("musb-da8xx",	"usb20",	&usb20_clk),
-> +	CLK("cppi41-dmaengine",	NULL,		&usb20_clk),
 
-Did you try reading /sys/kernel/debug/davinci_clocks after this patch?
-It will hang because of the loop created here.
-
-Looks like what you want is cppi4.1 dma clock to be a child of MUSB
-clock. That way, even if DMA is enabled before MUSB, it still works.
-
-Thanks,
-Sekhar
+Sorry for the late reply. I was hoping that James would indicate
+preference one way or the other. I suppose no reply means "yes" here, so
+I'll go ahead and fold everything together into one patch and resend.
