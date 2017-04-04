@@ -1,32 +1,65 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  5 Apr 2017 02:45:16 +0800
-Subject: [PATCH 1/3] phy: sun4i-usb: enable PHY0 dual route switching for A64
- USB PHY
-Message-ID: <20170404184518.33610-1-icenowy@aosc.io>
+Date: Wed,  5 Apr 2017 02:45:17 +0800
+Subject: [PATCH 2/3] arm64: allwinner: a64: add USB0 OHCI/EHCI related
+ devicetree parts
+In-Reply-To: <20170404184518.33610-1-icenowy@aosc.io>
+References: <20170404184518.33610-1-icenowy@aosc.io>
+Message-ID: <20170404184518.33610-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 SoC features a switchable PHY0 like the one in H3, which
-can switch between a MUSB controller and a pair of OHCI/EHCI controller.
-
-Enable PHY0 route auto switching for A64.
+As we added USB0 route auto switching support for A64, add related
+device tree parts to the A64 DTSI file (EHCI0/OHCI0 controllers and the
+pmu0 memory area for PHY).
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/phy/phy-sun4i-usb.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index f86a2574b953..bbf06cfe5898 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -858,6 +858,7 @@ static const struct sun4i_usb_phy_cfg sun50i_a64_cfg = {
- 	.phyctl_offset = REG_PHYCTL_A33,
- 	.dedicated_clocks = true,
- 	.enable_pmu_unk1 = true,
-+	.phy0_dual_route = true,
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1c64ea2d23f9..a8916df99048 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -179,8 +179,10 @@
+ 		usbphy: phy at 01c19400 {
+ 			compatible = "allwinner,sun50i-a64-usb-phy";
+ 			reg = <0x01c19400 0x14>,
++			      <0x01c1a800 0x4>,
+ 			      <0x01c1b800 0x4>;
+ 			reg-names = "phy_ctrl",
++				    "pmu0",
+ 				    "pmu1";
+ 			clocks = <&ccu CLK_USB_PHY0>,
+ 				 <&ccu CLK_USB_PHY1>;
+@@ -194,6 +196,28 @@
+ 			#phy-cells = <1>;
+ 		};
  
- static const struct of_device_id sun4i_usb_phy_of_match[] = {
++		ehci0: usb at 01c1a000 {
++			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI0>,
++				 <&ccu CLK_BUS_EHCI0>,
++				 <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_OHCI0>,
++				 <&ccu RST_BUS_EHCI0>;
++			status = "disabled";
++		};
++
++		ohci0: usb at 01c1a400 {
++			compatible = "allwinner,sun50i-a64-ohci", "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI0>,
++				 <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_OHCI0>;
++			status = "disabled";
++		};
++
+ 		ehci1: usb at 01c1b000 {
+ 			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
+ 			reg = <0x01c1b000 0x100>;
 -- 
 2.12.2
