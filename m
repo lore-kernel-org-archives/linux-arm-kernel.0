@@ -1,72 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Apr 2017 16:36:59 +0100
-Subject: [PATCH] [media] cec: Handle RC capability more elegantly
-In-Reply-To: <20170404151939.bvd252nprj6kjmdu@dell>
-References: <20170404144309.31357-1-lee.jones@linaro.org>
- <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
- <20170404151939.bvd252nprj6kjmdu@dell>
-Message-ID: <20170404153659.GC7909@n2100.armlinux.org.uk>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 4 Apr 2017 17:38:44 +0200
+Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
+In-Reply-To: <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
+ <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
+ <93e79e92-a102-e931-8d63-843031848888@samsung.com>
+ <58DA1E38.50907@samsung.com>
+ <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
+Message-ID: <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 04:19:39PM +0100, Lee Jones wrote:
-> On Tue, 04 Apr 2017, Hans Verkuil wrote:
-> 
-> > On 04/04/2017 04:43 PM, Lee Jones wrote:
-> > > If a user specifies the use of RC as a capability, they should
-> > > really be enabling RC Core code.  If they do not we WARN() them
-> > > of this and disable the capability for them.
-> > > 
-> > > Once we know RC Core code has not been enabled, we can update
-> > > the user's capabilities and use them as a term of reference for
-> > > other RC-only calls.  This is preferable to having ugly #ifery
-> > > scattered throughout C code.
-> > > 
-> > > Most of the functions are actually safe to call, since they
-> > > sensibly check for a NULL RC pointer before they attempt to
-> > > deference it.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/media/cec/cec-core.c | 19 +++++++------------
-> > >  1 file changed, 7 insertions(+), 12 deletions(-)
-> > > 
-> > > diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-> > > index cfe414a..51be8d6 100644
-> > > --- a/drivers/media/cec/cec-core.c
-> > > +++ b/drivers/media/cec/cec-core.c
-> > > @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
-> > >  		return ERR_PTR(-EINVAL);
-> > >  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
-> > >  		return ERR_PTR(-EINVAL);
-> > > +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
-> > > +		caps &= ~CEC_CAP_RC;
-> > 
-> > Don't use WARN_ON, this is not an error of any kind.
-> 
-> Right, this is not an error.
-> 
-> That's why we are warning the user instead of bombing out.
+On Tue, Mar 28, 2017 at 11:38 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Tue, Mar 28, 2017 at 11:26 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>> Merged.
+>
+> Hi,
+>
+> I do not see the tag (with DT patches) merged by you which I provided
+> to you before. These are essential for bisectability. Without them,
+> kernel bisectability is broken. Did you merged the tag somewhere?
+>
+> Best regards,
+> Krzysztof
+>
+>> Thanks,
+>> Inki Dae
 
-Please print warning using pr_warn() or dev_warn().  Using WARN_ON()
-because something is not configured is _really_ not nice behaviour.
-Consider how useful a stack trace is to the user for this situation -
-it's completely meaningless.
+Inki,
 
-A message that prompts the user to enable RC_CORE would make more sense,
-and be much more informative to the user.  Maybe something like this:
+I still do not see the DTS tag [1] merged in your tree but you applied
+patches breaking the display. I looked at exynos-drm-next branch.
 
-+	if (caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)) {
-+		pr_warn("CEC: driver %pf requests RC, please enable CONFIG_RC_CORE\n",
-+			__builtin_return_address(0));
-+		caps &= ~CEC_CAP_RC;
-+	}
+We talked already about bisectability and with Hoegeun we provided
+proper solution. Hoegeun split the patchset and I sent you a stable
+tag to merge. Be aware not to apply the DTS patch because you would
+effectively duplicate it. Instead, deal like with any pull request -
+merge the tag as dependency *before* applying DRM DSI patch.
 
-It could be much more informative by using dev_warn() if we had the
-'struct device' passed in to this function, and then we wouldn't need
-to use __builtin_return_address().
+I saw also a branch like this:
+https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next-tm2
+but this is something obviously wrong. I do not know what are your
+plans to do with it, but please drop it as it brings only confusion.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Krzysztof
+
+[1] https://www.spinics.net/lists/arm-kernel/msg567053.html
+
+>> 2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
+>>> Hi inki,
+>>>
+>>> Could you check the this patch?
+>>> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
+>>>
+>>> Best regards,
+>>> Hoegeun
+>>>
