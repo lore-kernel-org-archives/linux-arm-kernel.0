@@ -1,73 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 4 Apr 2017 18:02:31 +0100
-Subject: [PATCH v3 0/8] arm64: efi: PE/COFF cleanup/hardening
-In-Reply-To: <20170404165738.GE19969@e104818-lin.cambridge.arm.com>
-References: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
- <CAKv+Gu_FKeGmE9HdK1rONG1SJZgsEsm=bmCVXxJ0nKV3PwDYZA@mail.gmail.com>
- <20170404165738.GE19969@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_+J0bVQzNj7b37EqWz95FsFf4ZnPEqhYRyozT6RjHCFQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Apr 2017 18:04:18 +0100
+Subject: [GIT PULL] ACPI IORT changes for v4.12
+In-Reply-To: <20170331100226.GA30762@red-moon>
+References: <20170331100226.GA30762@red-moon>
+Message-ID: <20170404170418.GF19969@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2017 at 17:57, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Apr 04, 2017 at 04:33:27PM +0100, Ard Biesheuvel wrote:
->> On 23 March 2017 at 19:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > This cleans up the PE/COFF EFI header, by taking some of Mark's patches
->> > and use them to replace open coded constants with symbolic ones, and
->> > remove incorrect values or unused sections.
->> >
->> > Finally, it updates the section layout so that the kernel Image can be
->> > mapped in a way that does not require setting RWX permissions anywhere.
->> > Note that this is currently not a huge win, given that most current UEFI
->> > implementations map all of RAM RWX by default, but this is finally gaining
->> > some attention in the Tianocore community, and patches have been merged into
->> > EDK2 to apply strict permissions to all of memory (to the extent possible
->> > without breaking loaders like GRUB that assume EFI_LOADER_DATA memory is
->> > mapped executable)
->> >
->> > Changes since v2:
->> > - drop ARM patches for now
->> > - rebase onto today's arm64 for-next/core
->> >
->> > Changes since v1:
->> > - added missing secondary SOB on Mark's patches
->> > - leave Image header as before, only move the PE header to a separate file
->> > - put PE header fixes in a separate patch
->> > - add acks from Mark and Peter (#6)
->> > - give ARM the same treatment as arm64 (#10 - #13)
->> > - add NB10 PE debuglink entry to ARM PE/COFF header as well (#9, #14)
->> >
->> > Ard Biesheuvel (6):
->> >   arm64: efi: move EFI header and related data to a separate .S file
->> >   arm64: efi: clean up Image header after PE header has been split off
->> >   arm64: efi: remove forbidden values from the PE/COFF header
->> >   arm64: efi: remove pointless dummy .reloc section
->> >   arm64: efi: replace open coded constants with symbolic ones
->> >   arm64: efi: split Image code and data into separate PE/COFF sections
->> >
->> > Mark Rutland (2):
->> >   include: pe.h: allow for use in assembly
->> >   include: pe.h: add some missing definitions
->> >
->> >  arch/arm64/kernel/efi-header.S  | 155 +++++++++++++++++
->> >  arch/arm64/kernel/head.S        | 162 +-----------------
->> >  arch/arm64/kernel/vmlinux.lds.S |   2 +
->> >  include/linux/pe.h              | 177 ++++++++++----------
->> >  4 files changed, 255 insertions(+), 241 deletions(-)
->> >  create mode 100644 arch/arm64/kernel/efi-header.S
->>
->> Even if this is mostly EFI specific, the diffstat suggests that this
->> should go through the arm64 tree, given that <linux/pe.h> does not
->> appear to have an owner.
->
-> I guess David Howells is the owner given that he contributed the
-> original file though by default get_maintainer.pl doesn't list him.
-> Anyway, the changes are minor (moving code around and adding two
-> definitions), so I'm happy to take them.
->
->> Are you ok to take this for v4.12?
->
-> Queued for 4.12. Thanks.
->
+On Fri, Mar 31, 2017 at 11:02:26AM +0100, Lorenzo Pieralisi wrote:
+> ----------------------------------------------------------------
+> ACPI ARM64 specific changes for v4.12.
+> 
+> Patches contain:
+> 
+> - IORT kernel interface misc clean-ups
+> - IORT id mapping interface refactoring in preparation for platform
+>   MSI (IORT named components -> GIC ITS mappings) devid mapping code
+> - IORT id mapping implementation for named components nodes to ITS nodes,
+>   in order to provide the kernel with a firmware interface to map
+>   platform devices devids to GIC ITS components
+> 
+> ----------------------------------------------------------------
+> Hanjun Guo (7):
+>       ACPI/IORT: Fix the indentation in iort_scan_node()
+>       ACPI/IORT: Add missing comment for iort_dev_find_its_id()
+>       ACPI/IORT: Rework iort_match_node_callback() return value handling
+>       ACPI/IORT: Rename iort_node_map_rid() to make it generic
+>       ACPI/IORT: Introduce iort_node_map_platform_id() to retrieve dev id
+>       ACPI: platform-msi: retrieve devid from IORT
+>       ACPI: platform: setup MSI domain for ACPI based platform device
+> 
+>  drivers/acpi/arm64/iort.c | 158 +++++++++++++++++++++++++++++++++++++---------
+>  drivers/acpi/glue.c       |   6 ++
+>  include/linux/acpi_iort.h |   3 +
+>  3 files changed, 136 insertions(+), 31 deletions(-)
 
-Thanks!
+Pulled for 4.12. Thanks.
+
+-- 
+Catalin
