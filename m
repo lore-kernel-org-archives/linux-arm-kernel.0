@@ -1,56 +1,39 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 04 Apr 2017 13:05:47 +0300
-Subject: [PATCH] ARM: dts: koelsch: Correct clock frequency of X2 DU clock
- input
-In-Reply-To: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
-References: <1491213319-7668-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <2246751.IOz92zzvZ6@avalon>
+From: elena.reshetova@intel.com (Reshetova, Elena)
+Date: Tue, 4 Apr 2017 10:07:55 +0000
+Subject: [PATCH 16/16] drivers, net, intersil: convert
+ request_context.refcount from atomic_t to refcount_t
+In-Reply-To: <87zifxn2gb.fsf@kamboji.qca.qualcomm.com>
+References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
+ <1490691403-4016-17-git-send-email-elena.reshetova@intel.com>
+ <87zifxn2gb.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <2236FBA76BA1254E88B949DDB74E612B41C8741B@IRSMSX102.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
 
-Thank you for the patch.
-
-On Monday 03 Apr 2017 11:55:19 Geert Uytterhoeven wrote:
-> The X2 crystal oscillator on the Koelsch development board provides a
-> 74.25 MHz clock, not a 148.5 MHz clock.
+> Elena Reshetova <elena.reshetova@intel.com> writes:
 > 
-> Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel
-> clocks to DT") Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Confirmed by schematics, user manual, and physical inspection of 2
-> Koelsch instances (my scope has not enough bandwidth to measure the
-> actual frequency).
-
-Stupid question, have you tested the corresponding (HDMI) DU output ? If so,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> Probably this was copied from r8a7790-lager.dts, as Lager does have two
-> identical crystal oscillators X2 and X13.
+> > refcount_t type and corresponding API should be
+> > used instead of atomic_t when the variable is used as
+> > a reference counter. This allows to avoid accidental
+> > refcounter overflows that might lead to use-after-free
+> > situations.
+> >
+> > Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
+> > Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
+> > Signed-off-by: Kees Cook <keescook@chromium.org>
+> > Signed-off-by: David Windsor <dwindsor@gmail.com>
+> > ---
+> >  drivers/net/wireless/intersil/orinoco/orinoco_usb.c | 15 ++++++++-------
+> >  1 file changed, 8 insertions(+), 7 deletions(-)
 > 
-> Note that X2 is socketed, so it can be changed.
-> ---
->  arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> b/arch/arm/boot/dts/r8a7791-koelsch.dts index
-> 59beb8402a36007b..001e6116c47c7c3b 100644
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -292,7 +292,7 @@
->  	x2_clk: x2-clock {
->  		compatible = "fixed-clock";
->  		#clock-cells = <0>;
-> -		clock-frequency = <148500000>;
-> +		clock-frequency = <74250000>;
->  	};
-> 
->  	x13_clk: x13-clock {
+> The prefix should be "orinoco_usb:", I'll fix that.
 
--- 
-Regards,
+Thanks for both! Will you take the patches in?
 
-Laurent Pinchart
+Best Regards,
+Elena.
+
+> 
+> --
+> Kalle Valo
