@@ -1,70 +1,69 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 4 Apr 2017 07:12:06 +0200
-Subject: [PATCH 1/1] PCI: Fix for PEM-specific resource reservation for
- legacy firmware case
-In-Reply-To: <20170403201814.GA13232@bhelgaas-glaptop.roam.corp.google.com>
-References: <1490972804-25830-1-git-send-email-tn@semihalf.com>
- <20170403201814.GA13232@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <4aece958-583e-ad86-7923-87d501a4c1c7@semihalf.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 4 Apr 2017 10:45:59 +0530
+Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
+In-Reply-To: <20170403172307.GI5706@arm.com>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <20170331175457.GD4897@arm.com>
+ <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
+ <20170403172307.GI5706@arm.com>
+Message-ID: <8b5298ed-72cf-f62a-03e4-7f27d7d91a20@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.04.2017 22:18, Bjorn Helgaas wrote:
-> On Fri, Mar 31, 2017 at 05:06:44PM +0200, Tomasz Nowicki wrote:
->> SZ_16M PEM resource size includes PEM-specific register and its children
->> resources. Reservation of the whole SZ_16M range leads to child device
->> driver failure when pcieport driver is requesting resources:
->> pcieport 0004:1f:00.0: can't enable device: BAR 0 [mem 0x87e0c0f00000-0x87e0c0ffffff 64bit] not claimed
->> So we cannot reserve full 16M here and instead we want to reserve
->> PEM-specific register only which is SZ_64K.
+Hi Will,
+
+On 4/3/2017 10:53 PM, Will Deacon wrote:
+> On Fri, Mar 31, 2017 at 10:58:16PM -0400, Rob Clark wrote:
+>> On Fri, Mar 31, 2017 at 1:54 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
+>>>> This series provides the support for turning on the arm-smmu's
+>>>> clocks/power domains using runtime pm. This is done using the
+>>>> recently introduced device links patches, which lets the symmu's
+>>>> runtime to follow the master's runtime pm, so the smmu remains
+>>>> powered only when the masters use it.
+>>>
+>>> Do you have any numbers for the power savings you achieve with this?
+>>> How often do we actually manage to stop the SMMU clocks on an SoC with
+>>> a handful of masters?
+>>>
+>>> In other words, is this too coarse-grained to be useful, or is it common
+>>> that all the devices upstream of the SMMU are suspended?
 >>
->> At the end increase PEM resource to SZ_16M since this is what
->> thunder_pem_init() call expects for proper initialization.
->>
->> Fixes: 9abb27c7594a ("PCI: thunder-pem: Add legacy firmware support for Cavium ThunderX host controller")
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> CC: stable at vger.kernel.org	# v4.10+
+>> well, if you think about a phone/tablet with a command mode panel,
+>> pretty much all devices will be suspended most of the time ;-)
 >
-> Applied to for-linus for v4.11, thanks!
-
-Thanks Bjorn.
-
-Tomasz
-
+> Well, that's really what I was asking about. I assumed that periodic
+> modem/radio transactions would keep the SMMU clocked, so would like to get a
+> rough idea of the power savings achieved with this coarse-grained approach.
 >
->> ---
->>  drivers/pci/host/pci-thunder-pem.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
->> index b89c373..6e031b5 100644
->> --- a/drivers/pci/host/pci-thunder-pem.c
->> +++ b/drivers/pci/host/pci-thunder-pem.c
->> @@ -375,7 +375,6 @@ static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
->>  	index -= node * PEM_MAX_DOM_IN_NODE;
->>  	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
->>  					FIELD_PREP(PEM_INDX_MASK, index);
->> -	res_pem->end = res_pem->start + SZ_16M - 1;
->>  	res_pem->flags = IORESOURCE_MEM;
->>  }
->>
->> @@ -399,8 +398,15 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
->>  	 */
->>  	if (ret) {
->>  		thunder_pem_legacy_fw(root, res_pem);
->> -		/* Reserve PEM-specific resources and PCI configuration space */
->> +		/*
->> +		 * Reserve 64K size PEM specific resources. The full 16M range
->> +		 * size is required for thunder_pem_init() call.
->> +		 */
->> +		res_pem->end = res_pem->start + SZ_64K - 1;
->>  		thunder_pem_reserve_range(dev, root->segment, res_pem);
->> +		res_pem->end = res_pem->start + SZ_16M - 1;
->> +
->> +		/* Reserve PCI configuration space as well. */
->>  		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
->>  	}
->>
->> --
->> 2.7.4
->>
+
+One main reason for introducing this was to enable power for
+the iommus separately in those places where the iommu gets
+accessed without the context of the master, pm runtime was
+done to use the device links feature and also those iommus
+had their power-domains to be enabled (during the iommu probe,
+faults) (downstream was modelling those power-domains as
+'regulators' which was not correct) and have to be clocked
+as well.
+
+I was in the process of trying to measure the power difference
+that this would achieve. One concern here is, this series depends
+on the device link between master and iommu.
+So essentially the masters have to be pm runtime adapted fully
+to use this. For my testing i was using couple of them (mdp, gpu),
+by just enabling pm runtime for them, not full pm runtime though.
+But i will come-up with the numbers by instrumenting little more.
+The downstream code explicitly turns on the iommu clocks/regulators
+in the standalone path (called without master context and after
+that, lets the master to control the iommu clocks ( the iommu
+clocks are populated in master DT data as well), so ensures iommu
+is clocked only when really needed by the master. So number
+measured from downstream should also give the power numbers in
+another way.
+
+Regards,
+  Sricharan
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
+member of Code Aurora Forum, hosted by The Linux Foundation
