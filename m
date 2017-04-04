@@ -1,58 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 4 Apr 2017 12:39:14 -0700
-Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
-In-Reply-To: <20170403172307.GI5706@arm.com>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <20170331175457.GD4897@arm.com>
- <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
- <20170403172307.GI5706@arm.com>
-Message-ID: <20170404193914.GF18246@codeaurora.org>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Tue, 4 Apr 2017 21:41:30 +0200
+Subject: [RESEND PATCH] ARM: dts: imx6q-utilite-pro: add hpd gpio
+Message-ID: <95646809a50c48f4939b4da547f3a6f3@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03, Will Deacon wrote:
-> On Fri, Mar 31, 2017 at 10:58:16PM -0400, Rob Clark wrote:
-> > On Fri, Mar 31, 2017 at 1:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
-> > >> This series provides the support for turning on the arm-smmu's
-> > >> clocks/power domains using runtime pm. This is done using the
-> > >> recently introduced device links patches, which lets the symmu's
-> > >> runtime to follow the master's runtime pm, so the smmu remains
-> > >> powered only when the masters use it.
-> > >
-> > > Do you have any numbers for the power savings you achieve with this?
-> > > How often do we actually manage to stop the SMMU clocks on an SoC with
-> > > a handful of masters?
-> > >
-> > > In other words, is this too coarse-grained to be useful, or is it common
-> > > that all the devices upstream of the SMMU are suspended?
-> > 
-> > well, if you think about a phone/tablet with a command mode panel,
-> > pretty much all devices will be suspended most of the time ;-)
-> 
-> Well, that's really what I was asking about. I assumed that periodic
-> modem/radio transactions would keep the SMMU clocked, so would like to get a
-> rough idea of the power savings achieved with this coarse-grained approach.
+From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-Sometimes we distribute SMMUs to each IP block in the system and
-let each one of those live in their own clock + power domain. In
-these cases, the SMMU can be powered down along with the only IP
-block that uses it. Furthermore, sometimes we put the IP block
-and the SMMU inside the same power domain to really tie the two
-together, so we definitely have cases where all devices (device?)
-upstream of the SMMU are suspended. And in the case of
-multimedia, it could be very often that something like the camera
-app isn't open and thus the SMMU dedicated for the camera can be
-powered down.
+The hpd pin of the second hdmi connector of the Utilite Pro is wired
+up to a gpio pin of the SoC. Reflect this in the device tree.
 
-Other times we have two SMMUs in the system where one is
-dedicated to GPU and the other is "everything else". Even in
-these cases, we can suspend the GPU one when the GPU is inactive
-because it's the only consumer. The other SMMU might not be as
-fine grained, but I think we still power it down quite often
-because the consumers are mostly multimedia devices that aren't
-active when the display is off.
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+---
 
+Hi Shawn,
+    
+this was Patch 2/2 of a mini series [1] I sent four weeks ago. The
+drm part (Patch 1/2) has already been merged into drm-next.
+    
+Any comments?
+    
+Cheers,
+Christopher
+
+ arch/arm/boot/dts/imx6q-utilite-pro.dts | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+index 69bdd82..d900ad6 100644
+--- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
++++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+@@ -101,9 +101,11 @@
+ 
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+-
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hpd>;
+ 		type = "a";
+ 		ddc-i2c-bus = <&i2c_dvi_ddc>;
++		hpd-gpios = <&gpio1 4 GPIO_ACTIVE_HIGH>;
+ 
+ 		port {
+ 			hdmi_connector_in: endpoint {
+@@ -209,6 +211,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_hpd: hpdgrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_4__GPIO1_IO04 0x1b0b0
++		>;
++	};
++
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.10.2
