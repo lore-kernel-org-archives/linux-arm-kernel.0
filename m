@@ -1,77 +1,85 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue, 4 Apr 2017 14:10:59 -0500
-Subject: [PATCH v4 19/23] drivers/fsi: Add GPIO based FSI master (fwd)
-In-Reply-To: <alpine.DEB.2.20.1703302337590.2105@hadrien>
-References: <alpine.DEB.2.20.1703302337590.2105@hadrien>
-Message-ID: <c993bd4c-dea5-a02b-63dd-57a0d548b030@linux.vnet.ibm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Tue, 4 Apr 2017 12:21:48 -0700
+Subject: [PATCH v6 2/4] x86/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <05d9c4a7-8acb-5997-1dd6-d534398e6f54@zytor.com>
+References: <20170404174727.35478-1-thgarnie@google.com>
+ <20170404174727.35478-2-thgarnie@google.com>
+ <05d9c4a7-8acb-5997-1dd6-d534398e6f54@zytor.com>
+Message-ID: <CAJcbSZGWX23QTWmM4a_07ui-8Xyz4H2NLj1LXFFbZvnv9tc_XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 4, 2017 at 11:27 AM, H. Peter Anvin <hpa@zytor.com> wrote:
+> On 04/04/17 10:47, Thomas Garnier wrote:
+>> diff --git a/arch/x86/include/asm/pgtable_64_types.h b/arch/x86/include/asm/pgtable_64_types.h
+>> index 516593e66bd6..12fa851c7fa8 100644
+>> --- a/arch/x86/include/asm/pgtable_64_types.h
+>> +++ b/arch/x86/include/asm/pgtable_64_types.h
+>> @@ -78,4 +78,15 @@ typedef struct { pteval_t pte; } pte_t;
+>>
+>>  #define EARLY_DYNAMIC_PAGE_TABLES    64
+>>
+>> +/*
+>> + * User space process size. 47bits minus one guard page.  The guard
+>> + * page is necessary on Intel CPUs: if a SYSCALL instruction is at
+>> + * the highest possible canonical userspace address, then that
+>> + * syscall will enter the kernel with a non-canonical return
+>> + * address, and SYSRET will explode dangerously.  We avoid this
+>> + * particular problem by preventing anything from being mapped
+>> + * at the maximum canonical address.
+>> + */
+>> +#define TASK_SIZE_MAX        ((_AC(1, UL) << 47) - PAGE_SIZE)
+>> +
+>>  #endif /* _ASM_X86_PGTABLE_64_DEFS_H */
+>> diff --git a/arch/x86/include/asm/processor.h b/arch/x86/include/asm/processor.h
+>> index 3cada998a402..e80822582d3e 100644
+>> --- a/arch/x86/include/asm/processor.h
+>> +++ b/arch/x86/include/asm/processor.h
+>> @@ -825,17 +825,6 @@ static inline void spin_lock_prefetch(const void *x)
+>>  #define KSTK_ESP(task)               (task_pt_regs(task)->sp)
+>>
+>>  #else
+>> -/*
+>> - * User space process size. 47bits minus one guard page.  The guard
+>> - * page is necessary on Intel CPUs: if a SYSCALL instruction is at
+>> - * the highest possible canonical userspace address, then that
+>> - * syscall will enter the kernel with a non-canonical return
+>> - * address, and SYSRET will explode dangerously.  We avoid this
+>> - * particular problem by preventing anything from being mapped
+>> - * at the maximum canonical address.
+>> - */
+>> -#define TASK_SIZE_MAX        ((1UL << 47) - PAGE_SIZE)
+>> -
+>>  /* This decides where the kernel will search for a free chunk of vm
+>>   * space during mmap's.
+>>   */
+>>
+>
+> This should be an entirely separate patch; if nothing else you need to
+> explain it in the comments.
+
+I will explain it in the commit message, it should be easier than a
+separate patch.
+
+>
+> Also, you say this is for "x86", but I still don't see any code for i386
+> whatsoever.  Have you verified *all* the i386 and i386-compat paths to
+> make sure they go via prepare_exit_to_usermode()?  [Cc: Andy]
+
+I did but I will do it again for the next iteration.
+
+>
+> Finally, I can't really believe I'm the only person for whom "Specific
+> usage of verity_pre_usermode_state" is completely opaque.
+
+I agree, I will improve it.
+
+>
+>         -hpa
+>
 
 
-On 3/30/17 4:39 PM, Julia Lawall wrote:
-> Is master on line 514 allocated with kmalloc, or the devm call on line
-> 522?
-Hi Julia,
 
-Its allocated with the devm call on line 522.   The kfree  on line 514 
-wouldn't be necessary in that case - will remove.
-Thanks for pointing that out.
-
-Chris
-
-> julia
->
-> ---------- Forwarded message ----------
-> Date: Fri, 31 Mar 2017 00:15:09 +0800
-> From: kbuild test robot <fengguang.wu@intel.com>
-> To: kbuild at 01.org
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> Subject: Re: [PATCH v4 19/23] drivers/fsi: Add GPIO based FSI master
->
-> Hi Chris,
->
-> [auto build test WARNING on linus/master]
-> [also build test WARNING on v4.11-rc4 next-20170330]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Christopher-Bostic/FSI-device-driver-implementation/20170330-184914
-> :::::: branch date: 5 hours ago
-> :::::: commit date: 5 hours ago
->
->>> drivers/fsi/fsi-master-gpio.c:514:1-6: WARNING: invalid free of devm_ allocated data
-> git remote add linux-review https://github.com/0day-ci/linux
-> git remote update linux-review
-> git checkout f4bd3b6a41c7a59e9ce2e65947a4d3dfc2ee4a29
-> vim +514 drivers/fsi/fsi-master-gpio.c
->
-> f4bd3b6a Chris Bostic 2017-03-29  498  {
-> f4bd3b6a Chris Bostic 2017-03-29  499  	struct fsi_master_gpio *master = to_fsi_master_gpio(_master);
-> f4bd3b6a Chris Bostic 2017-03-29  500
-> f4bd3b6a Chris Bostic 2017-03-29  501  	if (link != 0)
-> f4bd3b6a Chris Bostic 2017-03-29  502  		return -ENODEV;
-> f4bd3b6a Chris Bostic 2017-03-29  503  	if (master->gpio_enable)
-> f4bd3b6a Chris Bostic 2017-03-29  504  		gpiod_set_value(master->gpio_enable, 1);
-> f4bd3b6a Chris Bostic 2017-03-29  505
-> f4bd3b6a Chris Bostic 2017-03-29  506  	return 0;
-> f4bd3b6a Chris Bostic 2017-03-29  507  }
-> f4bd3b6a Chris Bostic 2017-03-29  508
-> f4bd3b6a Chris Bostic 2017-03-29  509  static void fsi_master_gpio_release(struct device *dev)
-> f4bd3b6a Chris Bostic 2017-03-29  510  {
-> f4bd3b6a Chris Bostic 2017-03-29  511  	struct fsi_master_gpio *master = to_fsi_master_gpio(
-> f4bd3b6a Chris Bostic 2017-03-29  512  						dev_to_fsi_master(dev));
-> f4bd3b6a Chris Bostic 2017-03-29  513
-> f4bd3b6a Chris Bostic 2017-03-29 @514  	kfree(master);
-> f4bd3b6a Chris Bostic 2017-03-29  515  }
-> f4bd3b6a Chris Bostic 2017-03-29  516
-> f4bd3b6a Chris Bostic 2017-03-29  517  static int fsi_master_gpio_probe(struct platform_device *pdev)
-> f4bd3b6a Chris Bostic 2017-03-29  518  {
-> f4bd3b6a Chris Bostic 2017-03-29  519  	struct fsi_master_gpio *master;
-> f4bd3b6a Chris Bostic 2017-03-29  520  	struct gpio_desc *gpio;
-> f4bd3b6a Chris Bostic 2017-03-29  521
-> f4bd3b6a Chris Bostic 2017-03-29  522  	master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
+-- 
+Thomas
