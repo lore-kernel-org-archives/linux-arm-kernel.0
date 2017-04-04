@@ -1,32 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Apr 2017 17:03:47 +0100
-Subject: [PATCH v2] arm64: relocation testing module
-In-Reply-To: <1490946933-9674-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1490946933-9674-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170404160346.GD19969@e104818-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 04 Apr 2017 18:04:03 +0200
+Subject: [PATCH v4 4/6] arm64: dts: rockchip: add core dtsi file for
+ RK3328 SoCs
+In-Reply-To: <1490607650-18650-4-git-send-email-cl@rock-chips.com>
+References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
+ <1490607650-18650-4-git-send-email-cl@rock-chips.com>
+Message-ID: <6636047.jL6XHNkknt@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 08:55:33AM +0100, Ard Biesheuvel wrote:
-> This module tests the module loader's ELF relocation processing
-> routines. When loaded, it logs output like below.
+Am Montag, 27. M?rz 2017, 17:40:48 CEST schrieb cl at rock-chips.com:
+> From: Liang Chen <cl@rock-chips.com>
 > 
->     Relocation test:
->     -------------------------------------------------------
->     R_AARCH64_ABS64                 0xffff880000cccccc pass
->     R_AARCH64_ABS32                 0x00000000f800cccc pass
->     R_AARCH64_ABS16                 0x000000000000f8cc pass
->     R_AARCH64_MOVW_SABS_Gn          0xffff880000cccccc pass
->     R_AARCH64_MOVW_UABS_Gn          0xffff880000cccccc pass
->     R_AARCH64_ADR_PREL_LO21         0xffffff9cf4d1a400 pass
->     R_AARCH64_PREL64                0xffffff9cf4d1a400 pass
->     R_AARCH64_PREL32                0xffffff9cf4d1a400 pass
->     R_AARCH64_PREL16                0xffffff9cf4d1a400 pass
+> This patch adds core dtsi file for Rockchip RK3328 SoCs.
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Liang Chen <cl@rock-chips.com>
 
-Queued for 4.12. Thanks.
+applied for 4.12, with the following list of changes:
 
--- 
-Catalin
+- reorder some properties to bring them in alphabetical order
+- dropped the status-disabled from the power-controller
+  power-domain control is a quite essential part of the system, so if
+  boards really want to disable them, they should do it in their board file
+  Having power-domains on all the time, is also our default in all other
+  devicetrees.
+- removed #dma-cells from spi0 -> this is not a dma controller
+- reword the cru assigned-clocks comment a bit
+- fixed sdmmc1_bus4 pins, as indicated by Shawn and after looking up the
+  correct pins in the manual
+
+
+And a final question, are you sure about SCLK_PDM becoming a child of the
+APLL in your cru assigned-clocks, as the APLL will vary later on with cpufreq
+active?
+
+
+Heiko
