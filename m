@@ -1,52 +1,83 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Apr 2017 14:04:05 +0200
-Subject: [PATCH v5 00/34] arm/arm64: KVM: Rework the hyp-stub API
-In-Reply-To: <20170403183807.1620-1-marc.zyngier@arm.com>
-References: <20170403183807.1620-1-marc.zyngier@arm.com>
-Message-ID: <20170404120405.GH11752@cbox>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 4 Apr 2017 17:37:10 +0530
+Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and hyp
+ are not excluded
+In-Reply-To: <20170404111826.GD14898@arm.com>
+References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170404111826.GD14898@arm.com>
+Message-ID: <CAFpQJXW_2=8Jwqrt4k6Em6B=TBh_XA2x23OTMbpzkwKZV2x4jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Will,
 
-On Mon, Apr 03, 2017 at 07:37:33PM +0100, Marc Zyngier wrote:
-> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
-> could do with some TLC (it cannot perform a soft-restart at HYP, and
-> has holes in the hyp-stub support in a number of places). In general,
-> it would be desirable for the 32bit behaviour to align on 64bit, if
-> only to ease maintenance.
-> 
-> This series implements the following:
-> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
-> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
->   __hyp_reset_vectors
-> - Implement add the stub entry points in the KVM init code, which
->   didn't implement any so far
-> - Convert the HYP code to use the init code stubs directly
-> - Some general cleanup as a result of these changes (which includes
->   killing HVC_GET_VECTORS)
-> - Add some API documentation that covers the above
-> 
-> Patches 14 to 16 would be better squashed into 12 and 13, but I've
-> kept them separate so that I can take the blame for everything I've
-> broken.
-> 
-> I've tested this on arm (Cubietruck, Jetson TK1) and arm64 (Seattle),
-> both as host and guest. Keerthy has been kind enough to test the 32bit
-> code on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473472.html
-> 
-> * From v4:
->   - Added a standard return value on stub hypercall failure
->   - Zero r0/x0 on successful hypercall
->   - Make 32bit ARM resistant to kvm_reboot while executing a guest
->   - Update documentation to reflect the calling convention expectations
->   - Added Acks from Catalin
->   - Rebased on 4.11-rc5
+On Tue, Apr 4, 2017 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Apr 04, 2017 at 04:10:55PM +0530, Ganapatrao Kulkarni wrote:
+>> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+>> is returning error for perf syscall with mixed attribute set for exclude_kernel
+>> and exlude_hv.
+>>
+>> This change is breaking some applications (observed with hhvm) when
+>> ran with VHE enabled. Adding change to enable EL2 event counting,
+>> if either of or both of exclude_kernel and exlude_hv are not set.
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  arch/arm64/kernel/perf_event.c | 19 ++++++++++++-------
+>>  1 file changed, 12 insertions(+), 7 deletions(-)
+>
+> Hmm. When we have VHE, we can't distinguish between hypervisor and kernel,
+> so this patch doesn't seem right to me. The code currently requires
+> both exclude_kernel and exclude_hv to be clear before we enable profiling
+> EL2, otherwise we're failing to exclude samples that were asked to be
+> excluded.
 
-Thanks for doing the changes.
+The application cant differentiate that kernel is running in EL2/VHE or in EL1
+when VHE=1, is it makes sense to enable EL2 event counting when there
+is request from application to either include kernel or hypervisor
+event count, since both are same.
 
-I have applied your patches to kvmarm/queue.
+IMO, it is not appropriate to have different application behaviour
+when kernel booted with VHE=0/1
 
--Christoffer
+>
+> Will
+>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index daf95919..ea5848a 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -871,15 +871,20 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>>
+>>       if (attr->exclude_idle)
+>>               return -EPERM;
+>> -     if (is_kernel_in_hyp_mode() &&
+>> -         attr->exclude_kernel != attr->exclude_hv)
+>> -             return -EINVAL;
+>> +     if (is_kernel_in_hyp_mode()) {
+>> +             /* include EL2 events, if either of not excluded */
+>> +             if ((attr->exclude_kernel != attr->exclude_hv) ||
+>> +                             !attr->exclude_kernel ||
+>> +                             !attr->exclude_hv)
+>> +                     config_base |= ARMV8_PMU_INCLUDE_EL2;
+>> +     } else {
+>> +             if (attr->exclude_kernel)
+>> +                     config_base |= ARMV8_PMU_EXCLUDE_EL1;
+>> +             if (!attr->exclude_hv)
+>> +                     config_base |= ARMV8_PMU_INCLUDE_EL2;
+>> +     }
+>>       if (attr->exclude_user)
+>>               config_base |= ARMV8_PMU_EXCLUDE_EL0;
+>> -     if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
+>> -             config_base |= ARMV8_PMU_EXCLUDE_EL1;
+>> -     if (!attr->exclude_hv)
+>> -             config_base |= ARMV8_PMU_INCLUDE_EL2;
+>>
+>>       /*
+>>        * Install the filter into config_base as this is used to
+>> --
+>> 1.8.1.4
+>>
+
+thanks
+Ganapat
