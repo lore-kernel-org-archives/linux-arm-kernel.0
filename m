@@ -1,24 +1,75 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 4 Apr 2017 20:59:34 +0800
-Subject: [PATCH 2/3] Documentation: DT: Add entry for FSL LS1088A RDB,
- QDS boards
-In-Reply-To: <VI1PR0402MB2863D1744E831A8B300580D3E65A0@VI1PR0402MB2863.eurprd04.prod.outlook.com>
-References: <1486638251-9688-1-git-send-email-harninder.rai@nxp.com>
- <20170215233008.ii42ot6mevw2gh76@rob-hp-laptop>
- <VI1PR0402MB2863D1744E831A8B300580D3E65A0@VI1PR0402MB2863.eurprd04.prod.outlook.com>
-Message-ID: <20170404125932.GA3394@dragon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 4 Apr 2017 14:01:57 +0100
+Subject: [PATCH 1/2] [media] cec: Move capability check inside #if
+In-Reply-To: <20170404125409.ay5yszwdkdxb6nvx@dell>
+References: <20170404123219.22040-1-lee.jones@linaro.org>
+ <4920d83a-8983-36cc-936d-9e0989e833ce@xs4all.nl>
+ <20170404125409.ay5yszwdkdxb6nvx@dell>
+Message-ID: <20170404130157.cgzmuym5yixvcy22@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 07:44:51AM +0000, Harninder Rai wrote:
+On Tue, 04 Apr 2017, Lee Jones wrote:
+
+> On Tue, 04 Apr 2017, Hans Verkuil wrote:
+> 
+> > On 04/04/2017 02:32 PM, Lee Jones wrote:
+> > > If CONFIG_RC_CORE is not enabled then none of the RC code will be
+> > > executed anyway, so we're placing the capability check inside the
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/media/cec/cec-core.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
+> > > index 37217e2..06a312c 100644
+> > > --- a/drivers/media/cec/cec-core.c
+> > > +++ b/drivers/media/cec/cec-core.c
+> > > @@ -234,10 +234,10 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+> > >  		return ERR_PTR(res);
+> > >  	}
+> > >  
+> > > +#if IS_REACHABLE(CONFIG_RC_CORE)
+> > >  	if (!(caps & CEC_CAP_RC))
+> > >  		return adap;
+> > >  
+> > > -#if IS_REACHABLE(CONFIG_RC_CORE)
+> > >  	/* Prepare the RC input device */
+> > >  	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
+> > >  	if (!adap->rc) {
+> > > 
 > > 
-> > Some consistency in the subject please "dt-bindings: arm: ..."
-> Thanks Rob.
+> > Not true, there is an #else further down.
 > 
-> Hello Shawn,
+> I saw the #else.  It's inert code that becomes function-less.
 > 
-> Would you please take care of the subject line while applying the patch or should I send another revision?
+> > That said, this code is clearly a bit confusing.
+> > 
+> > It would be better if at the beginning of the function we'd have this:
+> > 
+> > #if !IS_REACHABLE(CONFIG_RC_CORE)
+> > 	caps &= ~CEC_CAP_RC;
+> > #endif
+> > 
+> > and then drop the #else bit and (as you do in this patch) move the #if up.
+> > 
+> > Can you make a new patch for this?
+> 
+> Sure.
 
-Applied 1/3 and this one with subject fixed as suggested.
+No wait, sorry!  This patch is the correct fix.
 
-Shawn
+'caps' is already indicating !CEC_CAP_RC, which is right.
+
+What we're trying to do here is only consider looking at the
+capabilities if the RC Core is enabled.  If it is not enabled, the #if
+still does the right thing and makes sure that the caps are updated.
+
+Please take another look at the semantics.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
