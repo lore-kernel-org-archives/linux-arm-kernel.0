@@ -1,38 +1,33 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue,  4 Apr 2017 11:30:36 -0400
-Subject: [PATCH v4 8/8] ARM: ux500: Add vendor prefix to tps61052 node
-In-Reply-To: <20170404153036.6651-1-javier@osg.samsung.com>
-References: <20170404153036.6651-1-javier@osg.samsung.com>
-Message-ID: <20170404153036.6651-9-javier@osg.samsung.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 4 Apr 2017 08:33:25 -0700
+Subject: [PATCH 0/2] ARM: dts: keystone: Add support for new K2G evm
+In-Reply-To: <694db3ba-cf40-790b-29e0-39f34607caf3@oracle.com>
+References: <20170330152907.12595-1-fcooper@ti.com>
+ <694db3ba-cf40-790b-29e0-39f34607caf3@oracle.com>
+Message-ID: <b3f2604f-2649-6319-3689-fbd84fa926bb@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tps61052 device node doesn't have a vendor prefix
-in its compatible string, fix it by adding one.
+On 4/3/2017 9:44 AM, santosh.shilimkar at oracle.com wrote:
+> Hi Franklin,
+>
+> On 3/30/17 8:29 AM, Franklin S Cooper Jr wrote:
+>> This patchset adds support for new K2G Industrial Communication Engine
+>> evm. For now only a bare minimal dts which will allow ram boot.
+>> Additional
+>> peripherals will be added when base K2G SoC patches are upstreamed
+>> allowing
+>> peripherals to be enabled.
+>>
+>
+>>   ARM: keystone: Create new binding for K2G ICE evm
+>>   ARM: dts: keystone: Add minimum support for K2G ICE evm
+>>
+> Can you clarify Rob's comment on second patch and re-post the updated
+> patch with his ack if you agree ? Will apply the series.
+>
+Just to be clear, you need to send v2 with Rob's comment addressed
+for me to pick it up.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-
- arch/arm/boot/dts/ste-hrefprev60.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index 5882a2606ac3..3f14b4df69b4 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -30,7 +30,7 @@
- 
- 		i2c at 80004000 {
- 			tps61052 at 33 {
--				compatible = "tps61052";
-+				compatible = "ti,tps61052";
- 				reg = <0x33>;
- 			};
- 
--- 
-2.9.3
+Regards,
+Snatosh
