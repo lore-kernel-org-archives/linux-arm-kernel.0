@@ -1,47 +1,136 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 4 Apr 2017 11:09:39 +0200
-Subject: [PATCH v2 03/13] drm/meson: Add support for components
-In-Reply-To: <e0a88828-3fab-1a3e-ed1e-7a91d94358d4@baylibre.com>
-References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
- <1490109950-21421-4-git-send-email-narmstrong@baylibre.com>
- <20170404085931.7sv3k7lwgt6klu37@phenom.ffwll.local>
- <e0a88828-3fab-1a3e-ed1e-7a91d94358d4@baylibre.com>
-Message-ID: <20170404090939.tiozilv4zigmiglu@phenom.ffwll.local>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 4 Apr 2017 10:10:43 +0100
+Subject: [PATCH v3] arm: Fix memory attribute inconsistencies when using
+ fixmap
+In-Reply-To: <1491295730.2995.1.camel@linaro.org>
+References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1491295730.2995.1.camel@linaro.org>
+Message-ID: <CAKv+Gu-0WU_XzLfGyf5qhkmyrxs+yCG8ot1YFrbL0A7xO1Z_0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 11:08:26AM +0200, Neil Armstrong wrote:
-> On 04/04/2017 10:59 AM, Daniel Vetter wrote:
-> > On Tue, Mar 21, 2017 at 04:25:40PM +0100, Neil Armstrong wrote:
-> >> +static int meson_drv_probe(struct platform_device *pdev)
-> >> +{
-> >> +	struct component_match *match = NULL;
-> >> +	struct device_node *np = pdev->dev.of_node;
-> >> +	struct device_node *ep, *remote;
-> >> +	int count = 0;
-> >> +
-> >> +	for_each_endpoint_of_node(np, ep) {
-> >> +		remote = of_graph_get_remote_port_parent(ep);
-> >> +		if (!remote || !of_device_is_available(remote))
-> >> +			continue;
-> >> +
-> >> +		count += meson_probe_remote(pdev, &match, np, remote);
-> >> +	}
-> >> +
-> >> +	/* If some endpoints were found, initialize the nodes */
-> >> +	if (count) {
-> > 
-> > What if you have more than 1 endpoint described, but module load order
-> > conspires against you to only initialize 1 at first?
-> 
-> As I understood, the component_bind_all() will fail until all modules are loaded
-> even in wrong order, no ?
-> I tested with multiple combinations and it worked like a charm... maybe I missed
-> something here !
+On 4 April 2017 at 09:48, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Tue, 2017-04-04 at 08:31 +0100, Ard Biesheuvel wrote:
+>> From: Jon Medhurst <tixy@linaro.org>
+>>
+>> To cope with the variety in ARM architectures and configurations, the
+>> pagetable attributes for kernel memory are generated at runtime to match
+>> the system the kernel finds itself on. This calculated value is stored
+>> in pgprot_kernel.
+>>
+>> However, when early fixmap support was added for ARM (commit
+>> a5f4c561b3b1) the attributes used for mappings were hard coded because
+>> pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
+>> used after early boot this means the memory being mapped can have
+>> different attributes to existing mappings, potentially leading to
+>> unpredictable behaviour. A specific problem also exists due to the hard
+>> coded values not include the 'shareable' attribute which means on
+>> systems where this matters (e.g. those with multiple CPU clusters) the
+>> cache contents for a memory location can become inconsistent between
+>> CPUs.
+>>
+>> To resolve these issues we change fixmap to use the same memory
+>> attributes (from pgprot_kernel) that the rest of the kernel uses. To
+>> enable this we need to refactor the initialisation code so
+>> build_mem_type_table() is called early enough. Note, that relies on early
+>> param parsing for memory type overrides passed via the kernel command
+>> line, so we need to make sure this call is still after
+>> parse_early_params().
+>>
+>> Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
+>> Cc: <stable@vger.kernel.org> # v4.3+
+>> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+>> [ardb: keep early_fixmap_init() before param parsing, for earlycon]
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+> [...]
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 4e016d7f37b3..ec81a30479aa 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -414,6 +414,11 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
+>>                    FIXADDR_END);
+>>       BUG_ON(idx >= __end_of_fixed_addresses);
+>>
+>> +     /* we only support device mappings until pgprot_kernel has been set */
+>> +     if (WARN_ON(pgprot_val(prot) != pgprot_val(FIXMAP_PAGE_IO) &&
+>> +                 pgprot_val(pgprot_kernel) == 0))
+>> +             return;
+>> +
+>
+> Hmm, on return from this function, isn't the caller then going to try
+> and access the memory at the fixmap address we didn't map, and so get a
+> page fault? If so, would a BUG_ON here be better?
+>
 
-I misread your code, looks all fine.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Yes, and no. BUG_ON guarantees a crash, while without it, it's only
+highly likely. Since this will occur very early during boot, it is
+better to limp on if we can than crash unconditionally.
+
+
+>>       if (pgprot_val(prot))
+>>               set_pte_at(NULL, vaddr, pte,
+>>                       pfn_pte(phys >> PAGE_SHIFT, prot));
+>> @@ -1616,7 +1621,6 @@ void __init paging_init(const struct machine_desc *mdesc)
+>>  {
+>>       void *zero_page;
+>>
+>> -     build_mem_type_table();
+>>       prepare_page_table();
+>>       map_lowmem();
+>>       memblock_set_current_limit(arm_lowmem_limit);
+>> @@ -1636,3 +1640,9 @@ void __init paging_init(const struct machine_desc *mdesc)
+>>       empty_zero_page = virt_to_page(zero_page);
+>>       __flush_dcache_page(NULL, empty_zero_page);
+>>  }
+>> +
+>> +void __init early_mm_init(const struct machine_desc *mdesc)
+>> +{
+>> +     build_mem_type_table();
+>> +     early_paging_init(mdesc);
+>> +}
+>
+> I tested this change with kprobes tests on TC2 (the setup that showed
+> the original bug) and compile tested for a nommu device (I will boot
+> test that in a bit as that's not quick to setup).
+>
+> Also, with this patch we can now make early_paging_init() static now,
+> and remove the extern...
+>
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index f5db5548ad42..8ad1e4414024 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -80,7 +80,6 @@ __setup("fpe=", fpe_setup);
+>
+>  extern void init_default_cache_policy(unsigned long);
+>  extern void paging_init(const struct machine_desc *desc);
+> -extern void early_paging_init(const struct machine_desc *);
+>  extern void adjust_lowmem_bounds(void);
+>  extern enum reboot_mode reboot_mode;
+>  extern void setup_dma_zone(const struct machine_desc *desc);
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index ec81a30479aa..347cca965783 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1497,7 +1497,7 @@ pgtables_remap lpae_pgtables_remap_asm;
+>   * early_paging_init() recreates boot time page table setup, allowing machines
+>   * to switch over to a high (>4G) address space on LPAE systems
+>   */
+> -void __init early_paging_init(const struct machine_desc *mdesc)
+> +static void __init early_paging_init(const struct machine_desc *mdesc)
+>  {
+>         pgtables_remap *lpae_pgtables_remap;
+>         unsigned long pa_pgd;
+> @@ -1565,7 +1565,7 @@ void __init early_paging_init(const struct machine_desc *mdesc)
+>
+>  #else
+>
+> -void __init early_paging_init(const struct machine_desc *mdesc)
+> +static void __init early_paging_init(const struct machine_desc *mdesc)
+>  {
+>         long long offset;
+>
+
+Good point. If everything checks out, we should fold that in when
+submitting it to the patch tracker.
