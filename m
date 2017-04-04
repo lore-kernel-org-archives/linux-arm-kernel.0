@@ -1,87 +1,41 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  4 Apr 2017 15:48:17 +0530
-Subject: [PATCH V10 04/12] of: dma: Make of_dma_deconfigure() public
-In-Reply-To: <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1491301105-5274-5-git-send-email-sricharan@codeaurora.org>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 4 Apr 2017 13:28:03 +0300
+Subject: [PATCH 1/5] ARM: imx: gpc: Do not print error message for
+ EPROBE_DEFER
+In-Reply-To: <1491299184.2367.12.camel@pengutronix.de>
+References: <cover.1490987945.git.leonard.crestez@nxp.com>
+ <ac58dbed203260f9bb93d7685c8f0e08407e0019.1490987945.git.leonard.crestez@nxp.com>
+ <1491299184.2367.12.camel@pengutronix.de>
+Message-ID: <1491301683.1654.8.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Tue, 2017-04-04 at 11:46 +0200, Lucas Stach wrote:
+> Am Freitag, den 31.03.2017, 22:25 +0300 schrieb Leonard Crestez:
+> > 
+> > The pu regulator request will return -EPROBE_DEFER if it has a supply
+> > from PMIC and this supply is not yet registered. This does not represent
+> > an error since the driver will call probe again later, so only print a
+> > warning message in this case.
+> > 
+> > Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > ---
+> > ?arch/arm/mach-imx/gpc.c | 6 +++++-
+> The driver moved places, together with a large rewrite, to
+> drivers/soc/imx/.
+> 
+> This issue isn't present in the new driver, so this patch can just be
+> dropped.
 
-As part of moving DMA initializing to probe time the
-of_dma_deconfigure() function will need to be called from different
-source files. Make it public and move it to drivers/of/device.c where
-the of_dma_configure() function is.
+Wait, I'm confused. In what tree did that happen? This patch is against
+linus's tree as of last week and there is nothing in drivers/soc/imx.
 
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- drivers/of/device.c       | 12 ++++++++++++
- drivers/of/platform.c     |  5 -----
- include/linux/of_device.h |  3 +++
- 3 files changed, 15 insertions(+), 5 deletions(-)
+I saw patches for a new gpcv2 driver but that seems to be only for
+imx7. This patch is for imx6. Will that driver also support imx6?
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 09dedd0..c17c19d 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -136,6 +136,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- }
- EXPORT_SYMBOL_GPL(of_dma_configure);
- 
-+/**
-+ * of_dma_deconfigure - Clean up DMA configuration
-+ * @dev:	Device for which to clean up DMA configuration
-+ *
-+ * Clean up all configuration performed by of_dma_configure_ops() and free all
-+ * resources that have been allocated.
-+ */
-+void of_dma_deconfigure(struct device *dev)
-+{
-+	arch_teardown_dma_ops(dev);
-+}
-+
- int of_device_register(struct platform_device *pdev)
- {
- 	device_initialize(&pdev->dev);
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 5dfcc96..5344db5 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -158,11 +158,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
- }
- EXPORT_SYMBOL(of_device_alloc);
- 
--static void of_dma_deconfigure(struct device *dev)
--{
--	arch_teardown_dma_ops(dev);
--}
--
- /**
-  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
-  * @np: pointer to node to create device for
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index c12dace..af98455 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -56,6 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- }
- 
- void of_dma_configure(struct device *dev, struct device_node *np);
-+void of_dma_deconfigure(struct device *dev);
- #else /* CONFIG_OF */
- 
- static inline int of_driver_match_device(struct device *dev,
-@@ -105,6 +106,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- }
- static inline void of_dma_configure(struct device *dev, struct device_node *np)
- {}
-+static inline void of_dma_deconfigure(struct device *dev)
-+{}
- #endif /* CONFIG_OF */
- 
- #endif /* _LINUX_OF_DEVICE_H */
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Link:?https://lkml.org/lkml/2017/3/28/834
+
+--
+Regards,
+Leonard
