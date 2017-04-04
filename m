@@ -1,41 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Apr 2017 18:04:18 +0100
-Subject: [GIT PULL] ACPI IORT changes for v4.12
-In-Reply-To: <20170331100226.GA30762@red-moon>
-References: <20170331100226.GA30762@red-moon>
-Message-ID: <20170404170418.GF19969@e104818-lin.cambridge.arm.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 4 Apr 2017 20:04:10 +0300
+Subject: [PATCH v2 0/4] ARM: imx: Set LDO regulator supply
+Message-ID: <cover.1491324640.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 11:02:26AM +0100, Lorenzo Pieralisi wrote:
-> ----------------------------------------------------------------
-> ACPI ARM64 specific changes for v4.12.
-> 
-> Patches contain:
-> 
-> - IORT kernel interface misc clean-ups
-> - IORT id mapping interface refactoring in preparation for platform
->   MSI (IORT named components -> GIC ITS mappings) devid mapping code
-> - IORT id mapping implementation for named components nodes to ITS nodes,
->   in order to provide the kernel with a firmware interface to map
->   platform devices devids to GIC ITS components
-> 
-> ----------------------------------------------------------------
-> Hanjun Guo (7):
->       ACPI/IORT: Fix the indentation in iort_scan_node()
->       ACPI/IORT: Add missing comment for iort_dev_find_its_id()
->       ACPI/IORT: Rework iort_match_node_callback() return value handling
->       ACPI/IORT: Rename iort_node_map_rid() to make it generic
->       ACPI/IORT: Introduce iort_node_map_platform_id() to retrieve dev id
->       ACPI: platform-msi: retrieve devid from IORT
->       ACPI: platform: setup MSI domain for ACPI based platform device
-> 
->  drivers/acpi/arm64/iort.c | 158 +++++++++++++++++++++++++++++++++++++---------
->  drivers/acpi/glue.c       |   6 ++
->  include/linux/acpi_iort.h |   3 +
->  3 files changed, 136 insertions(+), 31 deletions(-)
+Setting the LDO regulator parent is optional but beneficial. It will cause
+the PMIC output voltage to be dynamically set to the minimum input for the
+LDOs, this should be more efficient.
 
-Pulled for 4.12. Thanks.
+This propagation was introduced by:
+commit fc42112c0eaa ("regulator: core: Propagate voltage changes to supply
+regulators")
+
+Changes since v1:
+ * Drop patch 1 since it only avoids logging a warning and the gpc driver
+is going through more changes.
+ * Initialize cpufreq->suspend_freq based on policy->max instead.
+ * Remove reference to ldo-bypass from suspend_freq patch message.
+
+It's not clear if policy->cpuinfo.max would be preferable, at init time
+they should be identical.
+
+Link: https://lkml.org/lkml/2017/3/31/683
+
+Irina Tirdea (1):
+  cpufreq: imx6q: Fix handling EPROBE_DEFER from regulator
+
+Leonard Crestez (3):
+  cpufreq: imx6q: Set max suspend_freq to avoid changes during suspend
+  ARM: dts: imx6qdl-sabresd: Set LDO regulator supply
+  ARM: dts: imx6qp-sabresd: Set reg_arm regulator supply
+
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/imx6qp-sabresd.dts   |  4 ++--
+ drivers/cpufreq/imx6q-cpufreq.c        | 15 ++++++++++++++-
+ 3 files changed, 28 insertions(+), 3 deletions(-)
 
 -- 
-Catalin
+2.7.4
