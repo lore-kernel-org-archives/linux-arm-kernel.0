@@ -1,29 +1,90 @@
-From: kyle@infradead.org (Kyle McMartin)
-Date: Tue, 4 Apr 2017 15:48:27 -0700
-Subject: pull request: linux-firmware: Update Mediatek MT8173 VPU firmware
-In-Reply-To: <1490686650-43882-1-git-send-email-andrew-ct.chen@mediatek.com>
-References: <1490686650-43882-1-git-send-email-andrew-ct.chen@mediatek.com>
-Message-ID: <20170404224827.GK13400@bombadil.infradead.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 4 Apr 2017 17:59:35 -0500
+Subject: [PATCH v8 0/4] i.MX7 PCI support
+In-Reply-To: <20170328154252.6902-1-andrew.smirnov@gmail.com>
+References: <20170328154252.6902-1-andrew.smirnov@gmail.com>
+Message-ID: <20170404225935.GD989@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 03:37:29PM +0800, Andrew-CT Chen wrote:
-> Hi linux-firmware maintainers,
+On Tue, Mar 28, 2017 at 08:42:48AM -0700, Andrey Smirnov wrote:
+> Hello, everyone:
 > 
-> The following changes since commit 44d8e8d4fdcdff56e9e21208d4b4aa7cd6962656:
+> This is a eightth iteration of the code that adds PCI-subsystem bits
+> necessary for enabling PCI support on i.MX7.
 > 
->   Merge branch 'master' of https://github.com/Netronome/linux-firmware (2017-03-24 09:43:35 -0700)
+> NOTE: To test this patchset with real i.MX7 hardware, additional
+> patches, that are being upstreamed via different trees, are needed. Full
+> working tree is availible at:
 > 
-> are available in the git repository at:
+> 	https://github.com/ndreys/linux/tree/imx7d/pcie-support-v8
 > 
+> Changes since v7 (can be found at [version7]):
 > 
->   https://github.com/andrewct-chen/linux_fw_vpu_v1.0.4.git vp9_profile
+> 	- Collected Reviewed-by for the whole series from Lucas
 > 
-> for you to fetch changes up to 936f3e98847e89f119b24e0fa50f7028d667c744:
+> Changes since v6 (can be found at [version6]):
 > 
->   mediatek: update MT8173 VPU firmware for unsupported VP9 profiles (2017-03-28 15:21:24 +0800)
+> 	- Rebased against latest changes in 'next' of PCI subsystem
+>           git tree
 > 
+> Chagnes since v5 (can be found at [version5]):
+> 
+> 	- Collected ACKs from Lee and Rob
+> 
+> Changes since v4 (can be found at [version4]):
+> 
+> 	- Dropped typo-fix patch (originally patch #1 of the
+>           series).
+> 
+> 	- Added patch with workaround to address speed change false
+>           failures (I kept it as a separate patch to better document
+>           exchange with NXP/Freescale that lead to that patch)
+> 
+> 	- Added patch to avoid speed change on links configured Gen1
+>           only (Let me know if that is a terrible idea)
+> 
+> 	- Addressed section mismatch problem by moving call to
+>           hook_fault_code to happend before driver registration.
+> 
+> Changes since v3 (can be found at [version3]):
+> 	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
+> 	- Documented required reset and power domain DT bindings
+> 
+> Changes since v2 (can be found at [version2]):
+> 
+> 	- Collected Reviewed-by for patch #2 from Lucas
+> 	- Reset logic implementation moved out into a reset controller
+>           driver (see [reset1])
+> 	- Removed unused leftover code
+> 
+> Changes since v1 (can be found at [version1]):
+> 
+> 	- All GPC related code moved into a separate driver (see [gpc1])
+> 	- Removed GPIO probe deferral logging
+> 	- Fixed section mismatch warning
+> 	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
+>           Herring's request)
+> 
+> [version7] https://lkml.org/lkml/2017/3/21/331
+> [version6] https://lkml.org/lkml/2017/3/14/584
+> [version5] https://lkml.org/lkml/2017/2/20/376
+> [version4] https://lkml.org/lkml/2017/2/7/478
+> [version3] https://lkml.org/lkml/2017/2/6/565
+> [version2] https://lkml.org/lkml/2017/2/1/510
+> [version1] https://lkml.org/lkml/2017/1/19/488
+> [gpc1] https://lkml.org/lkml/2017/2/6/551
+> [reset1] https://lkml.org/lkml/2017/2/6/554
+> 
+> Andrey Smirnov (4):
+>   PCI: imx6: Add code to support i.MX7D
+>   PCI: imx6: Allow probe deferal by reset GPIO
+>   PCI: imx6: Do not wait for speed change on i.MX7
+>   PCI: imx6: Do not switch speed if Gen2 is disabled
+> 
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
+>  drivers/pci/dwc/pci-imx6.c                         | 198 +++++++++++++++------
+>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+>  3 files changed, 160 insertions(+), 55 deletions(-)
 
-Pulled, thanks Andrew-CT.
-
-regards, Kyle
+Applied to pci/host-imx6 for v4.12, thanks!
