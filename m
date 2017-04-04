@@ -1,324 +1,180 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 4 Apr 2017 18:00:32 +0530
-Subject: [PATCH V10 07/12] of/acpi: Configure dma operations at probe time
- for platform/amba/pci bus devices
-In-Reply-To: <1d036139-b885-bac6-01c0-78d3ac690d80@arm.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-8-git-send-email-sricharan@codeaurora.org>
- <1d036139-b885-bac6-01c0-78d3ac690d80@arm.com>
-Message-ID: <60b8502f-bdcf-713a-56ce-8f3eec5e1603@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 4 Apr 2017 07:26:08 -0500
+Subject: [PATCH 2/3] dt-bindings: arm: amlogic: Add SoC information
+ bindings
+In-Reply-To: <265460a5-9295-f58a-f149-030e5dd750a1@baylibre.com>
+References: <1490950079-10145-1-git-send-email-narmstrong@baylibre.com>
+ <1490950079-10145-3-git-send-email-narmstrong@baylibre.com>
+ <CAK8P3a199j=7mb=CMgROvaOCVU8=kYda9wkvG3O4rtqweSyC0g@mail.gmail.com>
+ <4ab7d4ee-e805-69f1-b76b-b827b46285bd@baylibre.com>
+ <20170403163448.e7uuhhebqlaf33bl@rob-hp-laptop>
+ <265460a5-9295-f58a-f149-030e5dd750a1@baylibre.com>
+Message-ID: <CAL_JsqKWi=sNgOTTw6+PAxwgFyFQMw6BiUz0uNuG4kWr+ORO_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 4/4/2017 5:47 PM, Robin Murphy wrote:
-> On 04/04/17 11:18, Sricharan R wrote:
->> Configuring DMA ops at probe time will allow deferring device probe when
->> the IOMMU isn't available yet. The dma_configure for the device is
->> now called from the generic device_attach callback just before the
->> bus/driver probe is called. This way, configuring the DMA ops for the
->> device would be called at the same place for all bus_types, hence the
->> deferred probing mechanism should work for all buses as well.
+On Tue, Apr 4, 2017 at 3:51 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 04/03/2017 06:34 PM, Rob Herring wrote:
+>> On Fri, Mar 31, 2017 at 04:10:30PM +0200, Neil Armstrong wrote:
+>>> On 03/31/2017 03:44 PM, Arnd Bergmann wrote:
+>>>> On Fri, Mar 31, 2017 at 10:47 AM, Neil Armstrong
+>>>> <narmstrong@baylibre.com> wrote:
+>>>>> Add bindings for the SoC information register of the Amlogic SoCs.
+>>>>>
+>>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>>>> ---
+>>>>>  Documentation/devicetree/bindings/arm/amlogic.txt | 20 ++++++++++++++++++++
+>>>>>  1 file changed, 20 insertions(+)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+>>>>> index bfd5b55..b850985 100644
+>>>>> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+>>>>> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+>>>>> @@ -52,3 +52,23 @@ Board compatible values:
+>>>>>    - "amlogic,q201" (Meson gxm s912)
+>>>>>    - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+>>>>>    - "nexbox,a1" (Meson gxm s912)
+>>>>> +
+>>>>> +Amlogic Meson GX SoCs Information
+>>>>> +----------------------------------
+>>>>> +
+>>>>> +The Meson SoCs have a Product Register that allows to retrieve SoC type,
+>>>>> +package and revision information. If present, a device node for this register
+>>>>> +should be added.
+>>>>> +
+>>>>> +Required properties:
+>>>>> +  - compatible: For Meson GX SoCs, must be "amlogic,meson-gx-socinfo".
+>>>>> +  - reg: Base address and length of the register block.
+>>>>> +
+>>>>> +Examples
+>>>>> +--------
+>>>>> +
+>>>>> +       chipid at 220 {
+>>>>> +               compatible = "amlogic,meson-gx-socinfo";
+>>>>> +               reg = <0x0 0x00220 0x0 0x4>;
+>>>>> +       };
+>>>>> +
+>>>>
+>>>> The register location would hint that this is in the middle of some block of
+>>>> random registers, i.e. a syscon or some unrelated device.
+>>>>
+>>>> Are you sure that "socinfo" is the actual name of the IP block and that
+>>>> it only has a single 32-bit register?
+>>>>
+>>>>      Arnd
+>>>>
+>>>
+>>> Hi Arnd,
+>>>
+>>> I'm sorry I did not find any relevant registers in the docs or source code describing
+>>> it in a specific block of registers, and no close enough register definitions either.
+>>> They may be used by the secure firmware I imagine.
+>>>
+>>> For the register name, Amlogic refers it to "cpu_version" in their code, but it really
+>>> gives some details on the whole SoC and package, and socinfo seems better.
 >>
->> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->>        |                         |
->> pci_bus_add_device     (device_add/driver_register)
->>        |                         |
->> device_attach           device_initial_probe
->>        |                         |
->> __device_attach_driver    __device_attach_driver
->>        |
->> driver_probe_device
->>        |
->> really_probe
->>        |
->> dma_configure
+>> A register at address 0x220 seems a bit strange (unless there's ranges
+>> you're not showing), but ROM code at this address would be fairly
+>> typical. And putting version information into the ROM is also common.
 >>
->> Similarly on the device/driver_unregister path __device_release_driver is
->> called which inturn calls dma_deconfigure.
->>
->> This patch changes the dma ops configuration to probe time for
->> both OF and ACPI based platform/amba/pci bus devices.
->
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->
-> It's possible we could subsume {of,acpi}_dma_deconfigure() into
-> dma_deconfigure() entirely in future if it becomes clear that neither of
-> them will ever need to do anything firmware-specific, but I think for
-> now it's probably safer to keep the current symmetry - calling
-> arch_teardown_dma_ops() twice is benign (and even if it weren't, I'd say
-> it really should be!)
->
-
-Ya, calling it twice should cause no harm. If nothing firmware specific
-gets added this could simply be put in deconfigure itself in future.
-Thanks for all the reviews !!
-
-Regards,
-  Sricharan
-
-
-
-> Robin.
->
->> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Acked-by: Bjorn Helgaas <bhelgaas@google.com> (drivers/pci part)
->> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>
->>  [V10] Added dummy dma_(de)configure functions in case
->>        of !CONFIG_HAS_DMA to avoid build breaks.
->>
->>  drivers/acpi/glue.c         |  5 -----
->>  drivers/base/dd.c           |  9 +++++++++
->>  drivers/base/dma-mapping.c  | 40 ++++++++++++++++++++++++++++++++++++++++
->>  drivers/of/platform.c       |  5 +----
->>  drivers/pci/probe.c         | 28 ----------------------------
->>  include/linux/dma-mapping.h | 12 ++++++++++++
->>  6 files changed, 62 insertions(+), 37 deletions(-)
->>
->> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
->> index fb19e1c..c05f241 100644
->> --- a/drivers/acpi/glue.c
->> +++ b/drivers/acpi/glue.c
->> @@ -176,7 +176,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
->>  	struct list_head *physnode_list;
->>  	unsigned int node_id;
->>  	int retval = -EINVAL;
->> -	enum dev_dma_attr attr;
->>
->>  	if (has_acpi_companion(dev)) {
->>  		if (acpi_dev) {
->> @@ -233,10 +232,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
->>  	if (!has_acpi_companion(dev))
->>  		ACPI_COMPANION_SET(dev, acpi_dev);
->>
->> -	attr = acpi_get_dma_attr(acpi_dev);
->> -	if (attr != DEV_DMA_NOT_SUPPORTED)
->> -		acpi_dma_configure(dev, attr);
->> -
->>  	acpi_physnode_link_name(physical_node_name, node_id);
->>  	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
->>  				   physical_node_name);
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index a1fbf55..4882f06 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -19,6 +19,7 @@
->>
->>  #include <linux/device.h>
->>  #include <linux/delay.h>
->> +#include <linux/dma-mapping.h>
->>  #include <linux/module.h>
->>  #include <linux/kthread.h>
->>  #include <linux/wait.h>
->> @@ -356,6 +357,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->>  	if (ret)
->>  		goto pinctrl_bind_failed;
->>
->> +	ret = dma_configure(dev);
->> +	if (ret)
->> +		goto dma_failed;
->> +
->>  	if (driver_sysfs_add(dev)) {
->>  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
->>  			__func__, dev_name(dev));
->> @@ -417,6 +422,8 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->>  	goto done;
->>
->>  probe_failed:
->> +	dma_deconfigure(dev);
->> +dma_failed:
->>  	if (dev->bus)
->>  		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
->>  					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
->> @@ -826,6 +833,8 @@ static void __device_release_driver(struct device *dev, struct device *parent)
->>  			drv->remove(dev);
->>
->>  		device_links_driver_cleanup(dev);
->> +		dma_deconfigure(dev);
->> +
->>  		devres_release_all(dev);
->>  		dev->driver = NULL;
->>  		dev_set_drvdata(dev, NULL);
->> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
->> index efd71cf..449b948 100644
->> --- a/drivers/base/dma-mapping.c
->> +++ b/drivers/base/dma-mapping.c
->> @@ -7,9 +7,11 @@
->>   * This file is released under the GPLv2.
->>   */
->>
->> +#include <linux/acpi.h>
->>  #include <linux/dma-mapping.h>
->>  #include <linux/export.h>
->>  #include <linux/gfp.h>
->> +#include <linux/of_device.h>
->>  #include <linux/slab.h>
->>  #include <linux/vmalloc.h>
->>
->> @@ -341,3 +343,41 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
->>  	vunmap(cpu_addr);
->>  }
->>  #endif
->> +
->> +/*
->> + * Common configuration to enable DMA API use for a device
->> + */
->> +#include <linux/pci.h>
->> +
->> +int dma_configure(struct device *dev)
->> +{
->> +	struct device *bridge = NULL, *dma_dev = dev;
->> +	enum dev_dma_attr attr;
->> +
->> +	if (dev_is_pci(dev)) {
->> +		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
->> +		dma_dev = bridge;
->> +		if (IS_ENABLED(CONFIG_OF) && dma_dev->parent &&
->> +		    dma_dev->parent->of_node)
->> +			dma_dev = dma_dev->parent;
->> +	}
->> +
->> +	if (dma_dev->of_node) {
->> +		of_dma_configure(dev, dma_dev->of_node);
->> +	} else if (has_acpi_companion(dma_dev)) {
->> +		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
->> +		if (attr != DEV_DMA_NOT_SUPPORTED)
->> +			acpi_dma_configure(dev, attr);
->> +	}
->> +
->> +	if (bridge)
->> +		pci_put_host_bridge_device(bridge);
->> +
->> +	return 0;
->> +}
->> +
->> +void dma_deconfigure(struct device *dev)
->> +{
->> +	of_dma_deconfigure(dev);
->> +	acpi_dma_deconfigure(dev);
->> +}
->> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->> index 5344db5..2aa4ebb 100644
->> --- a/drivers/of/platform.c
->> +++ b/drivers/of/platform.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/slab.h>
->>  #include <linux/of_address.h>
->>  #include <linux/of_device.h>
->> +#include <linux/of_iommu.h>
->>  #include <linux/of_irq.h>
->>  #include <linux/of_platform.h>
->>  #include <linux/platform_device.h>
->> @@ -186,11 +187,9 @@ static struct platform_device *of_platform_device_create_pdata(
->>
->>  	dev->dev.bus = &platform_bus_type;
->>  	dev->dev.platform_data = platform_data;
->> -	of_dma_configure(&dev->dev, dev->dev.of_node);
->>  	of_msi_configure(&dev->dev, dev->dev.of_node);
->>
->>  	if (of_device_add(dev) != 0) {
->> -		of_dma_deconfigure(&dev->dev);
->>  		platform_device_put(dev);
->>  		goto err_clear_flag;
->>  	}
->> @@ -248,7 +247,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->>  		dev_set_name(&dev->dev, "%s", bus_id);
->>  	else
->>  		of_device_make_bus_id(&dev->dev);
->> -	of_dma_configure(&dev->dev, dev->dev.of_node);
->>
->>  	/* Allow the HW Peripheral ID to be overridden */
->>  	prop = of_get_property(node, "arm,primecell-periphid", NULL);
->> @@ -542,7 +540,6 @@ static int of_platform_device_destroy(struct device *dev, void *data)
->>  		amba_device_unregister(to_amba_device(dev));
->>  #endif
->>
->> -	of_dma_deconfigure(dev);
->>  	of_node_clear_flag(dev->of_node, OF_POPULATED);
->>  	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
->>  	return 0;
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index dfc9a27..5a8dd43 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -1893,33 +1893,6 @@ static void pci_set_msi_domain(struct pci_dev *dev)
->>  	dev_set_msi_domain(&dev->dev, d);
->>  }
->>
->> -/**
->> - * pci_dma_configure - Setup DMA configuration
->> - * @dev: ptr to pci_dev struct of the PCI device
->> - *
->> - * Function to update PCI devices's DMA configuration using the same
->> - * info from the OF node or ACPI node of host bridge's parent (if any).
->> - */
->> -static void pci_dma_configure(struct pci_dev *dev)
->> -{
->> -	struct device *bridge = pci_get_host_bridge_device(dev);
->> -
->> -	if (IS_ENABLED(CONFIG_OF) &&
->> -		bridge->parent && bridge->parent->of_node) {
->> -			of_dma_configure(&dev->dev, bridge->parent->of_node);
->> -	} else if (has_acpi_companion(bridge)) {
->> -		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
->> -		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
->> -
->> -		if (attr == DEV_DMA_NOT_SUPPORTED)
->> -			dev_warn(&dev->dev, "DMA not supported.\n");
->> -		else
->> -			acpi_dma_configure(&dev->dev, attr);
->> -	}
->> -
->> -	pci_put_host_bridge_device(bridge);
->> -}
->> -
->>  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->>  {
->>  	int ret;
->> @@ -1933,7 +1906,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
->>  	dev->dev.dma_mask = &dev->dma_mask;
->>  	dev->dev.dma_parms = &dev->dma_parms;
->>  	dev->dev.coherent_dma_mask = 0xffffffffull;
->> -	pci_dma_configure(dev);
->>
->>  	pci_set_dma_max_seg_size(dev, 65536);
->>  	pci_set_dma_seg_boundary(dev, 0xffffffff);
->> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
->> index 0977317..4f3eece 100644
->> --- a/include/linux/dma-mapping.h
->> +++ b/include/linux/dma-mapping.h
->> @@ -728,6 +728,18 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
->>  }
->>  #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
->>
->> +#ifdef CONFIG_HAS_DMA
->> +int dma_configure(struct device *dev);
->> +void dma_deconfigure(struct device *dev);
->> +#else
->> +static inline int dma_configure(struct device *dev)
->> +{
->> +	return 0;
->> +}
->> +
->> +static inline void dma_deconfigure(struct device *dev) {}
->> +#endif
->> +
->>  /*
->>   * Managed DMA API
->>   */
+>> Rob
 >>
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Hi Rob.
 >
+> Indeed it's part of a larger range :
+>                  aobus: aobus at c8100000 {
+>                         compatible = "simple-bus";
+>                         reg = <0x0 0xc8100000 0x0 0x100000>;
+>                         #address-cells = <2>;
+>                         #size-cells = <2>;
+>                         ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
+>
+>
+> While scrubbing on the uboot source, I found a sort of block of registers dedicated to communicate with
+> the secure firmware :
+> AO_SEC_REG0                                                     0x140
+> AO_SEC_REG1                                                     0x144
+> AO_SEC_REG2                                                     0x148
+> AO_SEC_TMODE_PWD0                                               0x160
+> AO_SEC_TMODE_PWD1                                               0x164
+> AO_SEC_TMODE_PWD2                                               0x168
+> AO_SEC_TMODE_PWD3                                               0x16C
+> AO_SEC_SCRATCH                                                  0x17C
+> AO_SEC_JTAG_PWD0                                                0x180
+> AO_SEC_JTAG_PWD1                                                0x184
+> AO_SEC_JTAG_PWD2                                                0x188
+> AO_SEC_JTAG_PWD3                                                0x18C
+> AO_SEC_JTAG_SEC_CNTL                                            0x190
+> AO_SEC_JTAG_PWD_ADDR0                                           0x194
+> AO_SEC_JTAG_PWD_ADDR1                                           0x198
+> AO_SEC_JTAG_PWD_ADDR2                                           0x19C
+> AO_SEC_JTAG_PWD_ADDR3                                           0x1A0
+> AO_SEC_SHARED_AHB_SRAM_REG0_0                                   0x1C0
+> AO_SEC_SHARED_AHB_SRAM_REG0_1                                   0x1C4
+> AO_SEC_SHARED_AHB_SRAM_REG0_2                                   0x1C8
+> AO_SEC_SHARED_AHB_SRAM_REG1_0                                   0x1CC
+> AO_SEC_SHARED_AHB_SRAM_REG1_1                                   0x1D0
+> AO_SEC_SHARED_AHB_SRAM_REG1_2                                   0x1D4
+> AO_SEC_SHARED_AHB_SRAM_REG2_0                                   0x1D8
+> AO_SEC_SHARED_AHB_SRAM_REG2_1                                   0x1DC
+> AO_SEC_SHARED_AHB_SRAM_REG2_2                                   0x1E0
+> AO_SEC_SHARED_AHB_SRAM_REG3_0                                   0x1E4
+> AO_SEC_SHARED_AHB_SRAM_REG3_1                                   0x1E8
+> AO_SEC_SHARED_AHB_SRAM_REG3_2                                   0x1EC
+> AO_SEC_AO_AHB_SRAM_REG0_0                                       0x1F0
+> AO_SEC_AO_AHB_SRAM_REG0_1                                       0x1F4
+> AO_SEC_AO_AHB_SRAM_REG1_0                                       0x1F8
+> AO_SEC_AO_AHB_SRAM_REG1_1                                       0x1FC
+> AO_SEC_SD_CFG8                                                  0x220
+> AO_SEC_SD_CFG9                                                  0x224
+> AO_SEC_SD_CFG10                                                 0x228
+> AO_SEC_SD_CFG11                                                 0x22C
+> AO_SEC_SD_CFG12                                                 0x230
+> AO_SEC_SD_CFG13                                                 0x234
+> AO_SEC_SD_CFG14                                                 0x238
+> AO_SEC_SD_CFG15                                                 0x23C
+> AO_SEC_GP_CFG0                                                  0x240
+> AO_SEC_GP_CFG1                                                  0x244
+> AO_SEC_GP_CFG2                                                  0x248
+> AO_SEC_GP_CFG3                                                  0x24C
+> AO_SEC_GP_CFG4                                                  0x250
+> AO_SEC_GP_CFG5                                                  0x254
+> AO_SEC_GP_CFG6                                                  0x258
+> AO_SEC_GP_CFG7                                                  0x25C
+> AO_SEC_GP_CFG8                                                  0x260
+> AO_SEC_GP_CFG9                                                  0x264
+> AO_SEC_GP_CFG10                                                 0x268
+> AO_SEC_GP_CFG11                                                 0x26C
+> AO_SEC_GP_CFG12                                                 0x270
+> AO_SEC_GP_CFG13                                                 0x274
+> AO_SEC_GP_CFG14                                                 0x278
+> AO_SEC_GP_CFG15                                                 0x27C
+>
+>
+> As you see, the register we use here is AO_SEC_SD_CFG8...
+>
+> Should I define all this block as simple-mfd and refer to it as a regmap ?
+>
+> aobus: aobus at c8100000 {
+>         compatible = "simple-bus";
+>         reg = <0x0 0xc8100000 0x0 0x100000>;
+>         #address-cells = <2>;
+>         #size-cells = <2>;
+>         ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
+>
+>         ao_secure: ao-secure at 140 {
+>                 compatible = "amlogic,meson-gx-ao-secure", "simple-mfd";
+>                 reg = <0x0 0x140 0x0 0x140>;
+>         };
+> };
+>
+> chipid {
+>         compatible = "amlogic,meson-gx-socinfo";
+>         ao-secure = <&ao_secure>;
+>         chip-info-reg = <0xe0>;
 
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Why even divide it up further in DT? IMO, describing single
+registers/address in DT is too fine grained.
+
+Rob
