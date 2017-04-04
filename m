@@ -1,90 +1,110 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 4 Apr 2017 17:59:35 -0500
-Subject: [PATCH v8 0/4] i.MX7 PCI support
-In-Reply-To: <20170328154252.6902-1-andrew.smirnov@gmail.com>
-References: <20170328154252.6902-1-andrew.smirnov@gmail.com>
-Message-ID: <20170404225935.GD989@bhelgaas-glaptop.roam.corp.google.com>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Wed, 5 Apr 2017 07:05:45 +0800
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <20170315160727.16465-1-james.morse@arm.com>
+References: <20170315160727.16465-1-james.morse@arm.com>
+Message-ID: <CAMj-D2A2QyvjUvbEcnaPcPsgySvAguWFkZSS1WxxT+T3uNU7aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 08:42:48AM -0700, Andrey Smirnov wrote:
-> Hello, everyone:
-> 
-> This is a eightth iteration of the code that adds PCI-subsystem bits
-> necessary for enabling PCI support on i.MX7.
-> 
-> NOTE: To test this patchset with real i.MX7 hardware, additional
-> patches, that are being upstreamed via different trees, are needed. Full
-> working tree is availible at:
-> 
-> 	https://github.com/ndreys/linux/tree/imx7d/pcie-support-v8
-> 
-> Changes since v7 (can be found at [version7]):
-> 
-> 	- Collected Reviewed-by for the whole series from Lucas
-> 
-> Changes since v6 (can be found at [version6]):
-> 
-> 	- Rebased against latest changes in 'next' of PCI subsystem
->           git tree
-> 
-> Chagnes since v5 (can be found at [version5]):
-> 
-> 	- Collected ACKs from Lee and Rob
-> 
-> Changes since v4 (can be found at [version4]):
-> 
-> 	- Dropped typo-fix patch (originally patch #1 of the
->           series).
-> 
-> 	- Added patch with workaround to address speed change false
->           failures (I kept it as a separate patch to better document
->           exchange with NXP/Freescale that lead to that patch)
-> 
-> 	- Added patch to avoid speed change on links configured Gen1
->           only (Let me know if that is a terrible idea)
-> 
-> 	- Addressed section mismatch problem by moving call to
->           hook_fault_code to happend before driver registration.
-> 
-> Changes since v3 (can be found at [version3]):
-> 	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
-> 	- Documented required reset and power domain DT bindings
-> 
-> Changes since v2 (can be found at [version2]):
-> 
-> 	- Collected Reviewed-by for patch #2 from Lucas
-> 	- Reset logic implementation moved out into a reset controller
->           driver (see [reset1])
-> 	- Removed unused leftover code
-> 
-> Changes since v1 (can be found at [version1]):
-> 
-> 	- All GPC related code moved into a separate driver (see [gpc1])
-> 	- Removed GPIO probe deferral logging
-> 	- Fixed section mismatch warning
-> 	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
->           Herring's request)
-> 
-> [version7] https://lkml.org/lkml/2017/3/21/331
-> [version6] https://lkml.org/lkml/2017/3/14/584
-> [version5] https://lkml.org/lkml/2017/2/20/376
-> [version4] https://lkml.org/lkml/2017/2/7/478
-> [version3] https://lkml.org/lkml/2017/2/6/565
-> [version2] https://lkml.org/lkml/2017/2/1/510
-> [version1] https://lkml.org/lkml/2017/1/19/488
-> [gpc1] https://lkml.org/lkml/2017/2/6/551
-> [reset1] https://lkml.org/lkml/2017/2/6/554
-> 
-> Andrey Smirnov (4):
->   PCI: imx6: Add code to support i.MX7D
->   PCI: imx6: Allow probe deferal by reset GPIO
->   PCI: imx6: Do not wait for speed change on i.MX7
->   PCI: imx6: Do not switch speed if Gen2 is disabled
-> 
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
->  drivers/pci/dwc/pci-imx6.c                         | 198 +++++++++++++++------
->  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->  3 files changed, 160 insertions(+), 55 deletions(-)
+Hi James,
+   thanks for the patch, have you consider to told Qemu or KVM tools
+the reason for this bus error(SEA/SEI)?
 
-Applied to pci/host-imx6 for v4.12, thanks!
+when Qemu or KVM tools get this SIGBUS signal, it do not know receive
+this SIGBUS due to SEA or SEI.
+OR KVM only send this SIGBUS when encounter SEA? if so, for the SEI
+case, how to let Qemu simulate to generate CPER for guest OS SEI.
+
+
+2017-03-16 0:07 GMT+08:00 James Morse <james.morse@arm.com>:
+> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
+> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+> SIGBUS to any user space process using the page, and notify all the
+> in-kernel users.
+>
+> If the page corresponded with guest memory, KVM will unmap this page
+> from its stage2 page tables. The user space process that allocated
+> this memory may have never touched this page in which case it may not
+> be mapped meaning SIGBUS won't be delivered.
+>
+> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
+> comes to process the stage2 fault.
+>
+> Do as x86 does, and deliver the SIGBUS when we discover
+> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+> as this matches the user space mapping size.
+>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> CC: gengdongjiu <gengdj.1984@gmail.com>
+> ---
+>  Without this patch both kvmtool and Qemu exit as the KVM_RUN ioctl() returns
+>  EFAULT.
+>  QEMU: error: kvm run failed Bad address
+>  LVKM: KVM_RUN failed: Bad address
+>
+>  With this patch both kvmtool and Qemu receive SIGBUS ... and then exit.
+>  In the future Qemu can use this signal to notify the guest, for more details
+>  see hwpoison[1].
+>
+>  [0] https://www.spinics.net/lists/arm-kernel/msg560009.html
+>  [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vm/hwpoison.txt
+>
+>
+>  arch/arm/kvm/mmu.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 962616fd4ddd..9d1aa294e88f 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -20,8 +20,10 @@
+>  #include <linux/kvm_host.h>
+>  #include <linux/io.h>
+>  #include <linux/hugetlb.h>
+> +#include <linux/sched/signal.h>
+>  #include <trace/events/kvm.h>
+>  #include <asm/pgalloc.h>
+> +#include <asm/siginfo.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_mmu.h>
+> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+>         __coherent_cache_guest_page(vcpu, pfn, size);
+>  }
+>
+> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
+> +{
+> +       siginfo_t info;
+> +
+> +       info.si_signo   = SIGBUS;
+> +       info.si_errno   = 0;
+> +       info.si_code    = BUS_MCEERR_AR;
+> +       info.si_addr    = (void __user *)address;
+> +
+> +       if (hugetlb)
+> +               info.si_addr_lsb = PMD_SHIFT;
+> +       else
+> +               info.si_addr_lsb = PAGE_SHIFT;
+> +
+> +       send_sig_info(SIGBUS, &info, current);
+> +}
+> +
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>                           struct kvm_memory_slot *memslot, unsigned long hva,
+>                           unsigned long fault_status)
+> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>         smp_rmb();
+>
+>         pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> +       if (pfn == KVM_PFN_ERR_HWPOISON) {
+> +               kvm_send_hwpoison_signal(hva, hugetlb);
+> +               return 0;
+> +       }
+>         if (is_error_noslot_pfn(pfn))
+>                 return -EFAULT;
+>
+> --
+> 2.10.1
+>
