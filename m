@@ -1,87 +1,108 @@
 From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Tue,  4 Apr 2017 13:06:42 +0530
-Subject: [PATCH 2/3] perf tools arm64: implement function get_cpuid_str
+Date: Tue,  4 Apr 2017 13:06:43 +0530
+Subject: [PATCH 3/3] perf tool, arm64,
+ thunderx2: Add implementation defined events for ThunderX2
 In-Reply-To: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
-Message-ID: <1491291403-29893-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <1491291403-29893-4-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-function get_cpuid_str returns midr_el1 value from first
-online cpu available.
+This is not a full event list, but a short list of useful events.
 
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- tools/perf/arch/arm64/util/Build    |  1 +
- tools/perf/arch/arm64/util/header.c | 51 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
- create mode 100644 tools/perf/arch/arm64/util/header.c
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       |  2 +
+ .../arm64/thunderx2/implementation-defined.json    | 72 ++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
 
-diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-index cef6fb3..b1ab72d 100644
---- a/tools/perf/arch/arm64/util/Build
-+++ b/tools/perf/arch/arm64/util/Build
-@@ -1,3 +1,4 @@
-+libperf-y += header.o
- libperf-$(CONFIG_DWARF)     += dwarf-regs.o
- libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
- 
-diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
 new file mode 100644
-index 0000000..c0468fe
+index 0000000..ba30e43
 --- /dev/null
-+++ b/tools/perf/arch/arm64/util/header.c
-@@ -0,0 +1,51 @@
-+#include <fnmatch.h>
-+#include <dirent.h>
-+#include <unistd.h>
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <string.h>
-+#include <linux/stringify.h>
-+#include "header.h"
-+#include "util.h"
-+
-+#define LINUX_SYS_CPU_DIRECTORY "/sys/devices/system/cpu/"
-+#define MIDR "/regs/identification/midr_el1"
-+
-+char *get_cpuid_str(void)
-+{
-+	char *buf = malloc(128);
-+	FILE *file;
-+	char *ret = NULL;
-+	int cpu , nr_cpu;
-+	char sys_file[256];
-+
-+	sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"kernel_max");
-+
-+	file = fopen(sys_file, "r");
-+	if (!file)
-+		return ret;
-+
-+	if (fscanf(file, "%d", &nr_cpu) != 1)
-+		return ret;
-+
-+	/* kernel_max returns nr_cpu -1 */
-+	nr_cpu++;
-+
-+	/*iterate till you read midr of first online cpu */
-+	for(cpu = 0; cpu < nr_cpu; cpu++)
-+	{
-+		sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"cpu%d"MIDR, cpu);
-+		file = fopen(sys_file, "r");
-+		if (file) {
-+			ret = fgets(buf, 128, file);
-+			if (ret) {
-+				buf[strlen(buf)-1] ='\0';
-+				fclose(file);
-+				return buf;
-+			}
-+			fclose(file);
-+		}
-+	}
-+	free(buf);
-+	return ret;
-+}
++++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+@@ -0,0 +1,2 @@
++Family-model,Version,Filename,EventType
++0x00000000420f5161,v1,thunderx2,core
+diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+new file mode 100644
+index 0000000..360e084
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+@@ -0,0 +1,72 @@
++[
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, read",
++        "EventCode": "0x40",
++        "EventName": "l1d_cache_access_read",
++        "BriefDescription": "l1d cache access, read",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, write ",
++        "EventCode": "0x41",
++        "EventName": "l1d_cache_access_write",
++        "BriefDescription": "l1d cache access, write",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, read",
++        "EventCode": "0x42",
++        "EventName": "l1d_cache_refill_read",
++        "BriefDescription": "l1d cache refill, read",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, write",
++        "EventCode": "0x43",
++        "EventName": "l1d_cache_refill_write",
++        "BriefDescription": "l1d refill, write",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, read",
++        "EventCode": "0x4C",
++        "EventName": "l1d_tlb_refill_read",
++        "BriefDescription": "l1d tlb refill, read",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, write",
++        "EventCode": "0x4D",
++        "EventName": "l1d_tlb_refill_write",
++        "BriefDescription": "l1d tlb refill, write",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
++        "EventCode": "0x4E",
++        "EventName": "l1d_tlb_read",
++        "BriefDescription": "l1d tlb, read",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
++        "EventCode": "0x4F",
++        "EventName": "l1d_tlb_write",
++        "BriefDescription": "l1d tlb, write",
++	"CPU" :"armv8_pmuv3_0"
++    },
++    {
++        "PublicDescription": "Bus access, read",
++        "EventCode": "0x60",
++        "EventName": "bus_access_read",
++        "BriefDescription": "Bus access, read",
++	"CPU" :"armv8_pmuv3_0"
++   },
++   {
++        "PublicDescription": "Bus access, write",
++        "EventCode": "0x61",
++        "EventName": "bus_access_write",
++        "BriefDescription": "Bus access, write",
++	"CPU" :"armv8_pmuv3_0"
++   }
++]
 -- 
 1.8.1.4
