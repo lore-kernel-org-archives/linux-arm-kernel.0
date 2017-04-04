@@ -1,70 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Apr 2017 09:19:19 -0700
-Subject: [PATCH 6/8] ARM: OMAP2+: pm33xx-core: Add platform code needed
- for PM
-In-Reply-To: <20170329015801.22240-7-d-gerlach@ti.com>
-References: <20170329015801.22240-1-d-gerlach@ti.com>
- <20170329015801.22240-7-d-gerlach@ti.com>
-Message-ID: <20170404161919.GU10760@atomide.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Apr 2017 17:34:55 +0100
+Subject: [PATCH 2/2] [media] cec: Handle RC capability more elegantly
+In-Reply-To: <20170404161005.20884-2-lee.jones@linaro.org>
+References: <20170404161005.20884-1-lee.jones@linaro.org>
+ <20170404161005.20884-2-lee.jones@linaro.org>
+Message-ID: <20170404163455.GD7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-* Dave Gerlach <d-gerlach@ti.com> [170328 19:01]:
-> Most of the PM code needed for am335x and am437x can be moved into a
-> module under drivers but some core code must remain in mach-omap2 at the
-> moment. This includes some internal clockdomain APIs and low-level ARM
-> APIs which are also not exported for use by modules.
-> 
-> Implement a few functions that handle these low-level platform
-> operations can be passed to the pm33xx module through the use of
-> platform data.
-> 
-> In addition to this, to be able to share data structures between C and
-> the sleep33xx and sleep43xx assembly code, we can automatically generate
-> all of the C struct member offsets and sizes as macros by making use of
-> the ARM asm-offsets file. In the same header that we define our data
-> structures in we also define all the macros in an inline function and by
-> adding a call to this in the asm_offsets file all macros are properly
-> generated and available to the assembly code without cluttering up the
-> asm-offsets file.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/kernel/asm-offsets.c        |   2 +
->  arch/arm/mach-omap2/Kconfig          |   1 +
->  arch/arm/mach-omap2/Makefile         |   4 +
->  arch/arm/mach-omap2/pm.h             |   5 +
->  arch/arm/mach-omap2/pm33xx-core.c    | 181 +++++++++++++++++++++++++++++++++++
->  include/linux/platform_data/pm33xx.h |  69 +++++++++++++
->  6 files changed, 262 insertions(+)
->  create mode 100644 arch/arm/mach-omap2/pm33xx-core.c
->  create mode 100644 include/linux/platform_data/pm33xx.h
-> 
-> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-> index d728b5660e36..62253e7bfac4 100644
-> --- a/arch/arm/kernel/asm-offsets.c
-> +++ b/arch/arm/kernel/asm-offsets.c
-> @@ -28,6 +28,7 @@
->  #include <asm/vdso_datapage.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <linux/kbuild.h>
-> +#include <linux/platform_data/pm33xx.h>
->  #include <linux/ti-emif-sram.h>
+On Tue, Apr 04, 2017 at 05:10:05PM +0100, Lee Jones wrote:
+> @@ -237,7 +241,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+>  	if (!(caps & CEC_CAP_RC))
+>  		return adap;
 >  
->  /*
-> @@ -187,6 +188,7 @@ int main(void)
->  #if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
->    BLANK();
->    ti_emif_offsets();
-> +  amx3_pm_asm_offsets();
->  #endif
->  
->    return 0; 
+> -#if IS_REACHABLE(CONFIG_RC_CORE)
+>  	/* Prepare the RC input device */
+>  	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
+>  	if (!adap->rc) {
 
-Here too can you please check this is OK with you.
+The above, coupled with patch 1:
 
-Regards,
++#ifdef CONFIG_RC_CORE
+ struct rc_dev *rc_allocate_device(enum rc_driver_type);
++#else
++static inline struct rc_dev *rc_allocate_device(int unused)
++{
++       return ERR_PTR(-EOPNOTSUPP);
++}
++#endif
 
-Tony
+is really not nice.  You claim that this is how stuff is done elsewhere
+in the kernel, but no, it isn't.  Look at debugfs.
+
+You're right that debugfs returns an error pointer when it's not
+configured.  However, the debugfs dentry is only ever passed back into
+the debugfs APIs, it is never dereferenced by the caller.
+
+That is not the case here.  The effect if your change is that the
+following dereferences will oops the kernel.  This is unacceptable for
+a feature that is deconfigured.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
