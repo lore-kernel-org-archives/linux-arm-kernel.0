@@ -1,38 +1,42 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 3 Apr 2017 21:47:32 -0500
-Subject: [PATCH v5 5/5] ARM: keystone: Drop PM domain support for k2g
+Date: Mon, 3 Apr 2017 21:47:29 -0500
+Subject: [PATCH v5 2/5] PM / Domains: Do not check if simple providers have
+ phandle cells
 In-Reply-To: <20170404024732.32699-1-d-gerlach@ti.com>
 References: <20170404024732.32699-1-d-gerlach@ti.com>
-Message-ID: <20170404024732.32699-6-d-gerlach@ti.com>
+Message-ID: <20170404024732.32699-3-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-K2G will use a different power domain driver than the rest of the
-keystone family in order to make use of the TI SCI protocol so prevent
-the standard keystone pm_domain code from registering itself in
-preparation for a new driver.
+There is no reason that a platform genpd driver registered using
+of_genpd_add_provider_simple needs to be constrained to having no cells
+in the "power-domains" phandle. Currently the genpd framework will fail
+if any arguments are passed with for a simple provider but the framework
+does not actually care, so remove the check for phandle argument count.
 
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+This will allow greater flexibility for genpd providers to use their own
+arguments that are passed in the phandle and interpret them however they
+see fit.
+
+Acked-by: Kevin Hilman <khilman@baylibre.com>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/mach-keystone/pm_domain.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/base/power/domain.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-index 8cbb35765a19..fe57e2692629 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -32,7 +32,9 @@ static struct pm_clk_notifier_block platform_domain_notifier = {
- };
- 
- static const struct of_device_id of_keystone_table[] = {
--	{.compatible = "ti,keystone"},
-+	{.compatible = "ti,k2hk"},
-+	{.compatible = "ti,k2e"},
-+	{.compatible = "ti,k2l"},
- 	{ /* end of list */ },
- };
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e697dec9d25b..8e0550c27394 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1622,8 +1622,6 @@ static struct generic_pm_domain *genpd_xlate_simple(
+ 					struct of_phandle_args *genpdspec,
+ 					void *data)
+ {
+-	if (genpdspec->args_count != 0)
+-		return ERR_PTR(-EINVAL);
+ 	return data;
+ }
  
 -- 
 2.11.0
