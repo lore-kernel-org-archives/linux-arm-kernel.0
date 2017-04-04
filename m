@@ -1,76 +1,141 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 4 Apr 2017 08:47:16 +0200
-Subject: [PATCH 1/4] input: misc: introduce Atmel PTC driver
-In-Reply-To: <20170403155840.vln4wg56iunrmdcw@piout.net>
-References: <20170331152250.12758-1-ludovic.desroches@microchip.com>
- <20170331152250.12758-2-ludovic.desroches@microchip.com>
- <20170403155840.vln4wg56iunrmdcw@piout.net>
-Message-ID: <20170404064716.6uibtyin73otpqsd@rfolt0960.corp.atmel.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon,  3 Apr 2017 23:58:03 -0700
+Subject: [PATCH v3] arm64: print a fault message when attempting to write RO
+ memory
+Message-ID: <20170404065803.4848-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 05:58:40PM +0200, Alexandre Belloni wrote:
-> On 31/03/2017 at 17:22:47 +0200, Ludovic Desroches wrote:
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> I think you probably want to switch to your microchip email.
-> 
-> Also, this requires a proper commit message.
+If a page is marked read only we should print out that fact,
+instead of printing out that there was a page fault. Right now we
+get a cryptic error message that something went wrong with an
+unhandled fault, but we don't evaluate the esr to figure out that
+it was a read/write permission fault.
 
-I'll fix this, I'll take the cover letter as commit message and update
-the mail address.
+Instead of seeing:
 
-> 
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > +struct atmel_ptc {
-> > +	void __iomem		*ppp_regs;
-> > +	void __iomem		*firmware;
-> > +	int			irq;
-> > +	uint8_t			imr;
-> > +	volatile struct atmel_qtm_mailbox __iomem	*qtm_mb;
-> > +	struct clk		*clk_per;
-> > +	struct clk		*clk_int_osc;
-> > +	struct clk		*clk_slow;
-> > +	struct device		*dev;
-> > +	struct completion	ppp_ack;
-> > +	unsigned int		button_keycode[ATMEL_PTC_MAX_NODES];
-> > +	struct input_dev	*buttons_input;
-> > +	struct input_dev	*scroller_input[ATMEL_PTC_MAX_SCROLLERS];
-> > +	bool			buttons_registered;
-> > +	bool			scroller_registered[ATMEL_PTC_MAX_SCROLLERS];
-> > +	uint32_t		button_event[ATMEL_PTC_MAX_NODES/32];
-> > +	uint32_t		button_state[ATMEL_PTC_MAX_NODES/32];
-> > +	uint32_t		scroller_event;
-> > +	uint32_t		scroller_state;
-> 
-> You should use u8, u16 and u32 instead of uint8_t, uint16_t and
-> uint32_t.
+  Unable to handle kernel paging request at virtual address ffff000008e460d8
+  pgd = ffff800003504000
+  [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
+  Internal error: Oops: 9600004f [#1] PREEMPT SMP
 
-Do you want me to also change the atmel_ptc.h header and use __u8 and co?
-Since I share it with bare metal software, uintxx_t was more convenient.
+we'll see:
 
-> 
-> > diff --git a/include/uapi/linux/atmel_ptc.h b/include/uapi/linux/atmel_ptc.h
-> > new file mode 100644
-> > index 0000000..d15c4df
-> > --- /dev/null
-> > +++ b/include/uapi/linux/atmel_ptc.h
-> 
-> 
-> Is there any sample application showing how to configure the PTC?
-> 
+  Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
+  pgd = ffff80003d3de000
+  [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
+  Internal error: Oops: 9600004f [#1] PREEMPT SMP
 
-Tooling and examples are in development.
+We also fold the userspace address check into is_permission_fault()
+instead of at the current callsite so that the function can't be
+abused with software PAN and a kernel space address.
 
-The tool allows you to produce the atmel_ptc.conf binary or to tweak the
-configuration in real time with commands such as:
-- set node_group_conf count 10
-- get node_config 0
-- dump_conf
-- export_conf atmel_ptc.conf
+Cc: James Morse <james.morse@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
 
-The application only use input devices.
+Changes from v2:
+ * Fold addr check into is_permission_fault() (James Morse)
 
+Changes from v1:
+ * Move into __do_kernel_fault() (Mark Rutland)
 
-Ludovic
+ arch/arm64/mm/fault.c | 54 +++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 35 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 156169c6981b..c6560cb4ef50 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -160,12 +160,32 @@ static bool is_el1_instruction_abort(unsigned int esr)
+ 	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
+ }
+ 
++static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs,
++				       unsigned long addr)
++{
++	unsigned int ec       = ESR_ELx_EC(esr);
++	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
++
++	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
++		return false;
++
++	if (fsc_type == ESR_ELx_FSC_PERM)
++		return true;
++
++	if (addr < USER_DS && system_uses_ttbr0_pan())
++		return fsc_type == ESR_ELx_FSC_FAULT &&
++			(regs->pstate & PSR_PAN_BIT);
++
++	return false;
++}
++
+ /*
+  * The kernel tried to access some page that wasn't present.
+  */
+ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ 			      unsigned int esr, struct pt_regs *regs)
+ {
++	const char *msg;
+ 	/*
+ 	 * Are we prepared to handle this kernel fault?
+ 	 * We are almost certainly not prepared to handle instruction faults.
+@@ -177,9 +197,20 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ 	 * No handler, we'll have to terminate things with extreme prejudice.
+ 	 */
+ 	bust_spinlocks(1);
+-	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+-		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
+-		 "paging request", addr);
++
++	if (is_permission_fault(esr, regs, addr)) {
++		if (esr & ESR_ELx_WNR)
++			msg = "write to read-only memory";
++		else
++			msg = "read from unreadable memory";
++	} else if (addr < PAGE_SIZE) {
++		msg = "NULL pointer dereference";
++	} else {
++		msg = "paging request";
++	}
++
++	pr_alert("Unable to handle kernel %s@virtual address %08lx\n", msg,
++		 addr);
+ 
+ 	show_pte(mm, addr);
+ 	die("Oops", regs, esr);
+@@ -269,21 +300,6 @@ static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
+ 	return fault;
+ }
+ 
+-static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
+-{
+-	unsigned int ec       = ESR_ELx_EC(esr);
+-	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+-
+-	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
+-		return false;
+-
+-	if (system_uses_ttbr0_pan())
+-		return fsc_type == ESR_ELx_FSC_FAULT &&
+-			(regs->pstate & PSR_PAN_BIT);
+-	else
+-		return fsc_type == ESR_ELx_FSC_PERM;
+-}
+-
+ static bool is_el0_instruction_abort(unsigned int esr)
+ {
+ 	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_LOW;
+@@ -321,7 +337,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 		mm_flags |= FAULT_FLAG_WRITE;
+ 	}
+ 
+-	if (addr < USER_DS && is_permission_fault(esr, regs)) {
++	if (is_permission_fault(esr, regs, addr)) {
+ 		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
+ 		if (regs->orig_addr_limit == KERNEL_DS)
+ 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
+-- 
+2.10.0.297.gf6727b0
