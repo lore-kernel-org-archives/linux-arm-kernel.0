@@ -1,158 +1,77 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 4 Apr 2017 12:24:50 +0100
-Subject: [PATCH V10 08/12] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1491301105-5274-9-git-send-email-sricharan@codeaurora.org>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-9-git-send-email-sricharan@codeaurora.org>
-Message-ID: <82a620b7-bcd0-3db7-dfd0-4bf6b293ba7a@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 04 Apr 2017 12:25:21 +0100
+Subject: [PATCH v3] arm64: print a fault message when attempting to write
+ RO memory
+In-Reply-To: <20170404065803.4848-1-stephen.boyd@linaro.org>
+References: <20170404065803.4848-1-stephen.boyd@linaro.org>
+Message-ID: <58E382A1.4070607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/17 11:18, Sricharan R wrote:
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> Failures to look up an IOMMU when parsing the DT iommus property need to
-> be handled separately from the .of_xlate() failures to support deferred
-> probing.
-> 
-> The lack of a registered IOMMU can be caused by the lack of a driver for
-> the IOMMU, the IOMMU device probe not having been performed yet, having
-> been deferred, or having failed.
-> 
-> The first case occurs when the device tree describes the bus master and
-> IOMMU topology correctly but no device driver exists for the IOMMU yet
-> or the device driver has not been compiled in. Return NULL, the caller
-> will configure the device without an IOMMU.
-> 
-> The second and third cases are handled by deferring the probe of the bus
-> master device which will eventually get reprobed after the IOMMU.
-> 
-> The last case is currently handled by deferring the probe of the bus
-> master device as well. A mechanism to either configure the bus master
-> device without an IOMMU or to fail the bus master device probe depending
-> on whether the IOMMU is optional or mandatory would be a good
-> enhancement.
+Hi Stephen,
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+On 04/04/17 07:58, Stephen Boyd wrote:
+> If a page is marked read only we should print out that fact,
+> instead of printing out that there was a page fault. Right now we
+> get a cryptic error message that something went wrong with an
+> unhandled fault, but we don't evaluate the esr to figure out that
+> it was a read/write permission fault.
+> 
+> Instead of seeing:
+> 
+>   Unable to handle kernel paging request at virtual address ffff000008e460d8
+>   pgd = ffff800003504000
+>   [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
+>   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> 
+> we'll see:
+> 
+>   Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
+>   pgd = ffff80003d3de000
+>   [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
+>   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> 
+> We also fold the userspace address check into is_permission_fault()
+> instead of at the current callsite so that the function can't be
+> abused with software PAN and a kernel space address.
 
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  drivers/base/dma-mapping.c | 5 +++--
->  drivers/iommu/of_iommu.c   | 4 ++--
->  drivers/of/device.c        | 7 ++++++-
->  include/linux/of_device.h  | 9 ++++++---
->  4 files changed, 17 insertions(+), 8 deletions(-)
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 156169c6981b..c6560cb4ef50 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -321,7 +337,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+>  		mm_flags |= FAULT_FLAG_WRITE;
+>  	}
+>  
+> -	if (addr < USER_DS && is_permission_fault(esr, regs)) {
+> +	if (is_permission_fault(esr, regs, addr)) {
+>  		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
+>  		if (regs->orig_addr_limit == KERNEL_DS)
+>  			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
 > 
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index 449b948..82bd45c 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -353,6 +353,7 @@ int dma_configure(struct device *dev)
->  {
->  	struct device *bridge = NULL, *dma_dev = dev;
->  	enum dev_dma_attr attr;
-> +	int ret = 0;
->  
->  	if (dev_is_pci(dev)) {
->  		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
-> @@ -363,7 +364,7 @@ int dma_configure(struct device *dev)
->  	}
->  
->  	if (dma_dev->of_node) {
-> -		of_dma_configure(dev, dma_dev->of_node);
-> +		ret = of_dma_configure(dev, dma_dev->of_node);
->  	} else if (has_acpi_companion(dma_dev)) {
->  		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
->  		if (attr != DEV_DMA_NOT_SUPPORTED)
-> @@ -373,7 +374,7 @@ int dma_configure(struct device *dev)
->  	if (bridge)
->  		pci_put_host_bridge_device(bridge);
->  
-> -	return 0;
-> +	return ret;
->  }
->  
->  void dma_deconfigure(struct device *dev)
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index c8be889..9f44ee8 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -236,7 +236,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
->  			ops = ERR_PTR(err);
->  	}
->  
-> -	return IS_ERR(ops) ? NULL : ops;
-> +	return ops;
->  }
->  
->  static int __init of_iommu_init(void)
-> @@ -247,7 +247,7 @@ static int __init of_iommu_init(void)
->  	for_each_matching_node_and_match(np, matches, &match) {
->  		const of_iommu_init_fn init_fn = match->data;
->  
-> -		if (init_fn(np))
-> +		if (init_fn && init_fn(np))
->  			pr_err("Failed to initialise IOMMU %s\n",
->  				of_node_full_name(np));
->  	}
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index c2ae6bb..bea8aec 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
->   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
->   * to fix up DMA configuration.
->   */
-> -void of_dma_configure(struct device *dev, struct device_node *np)
-> +int of_dma_configure(struct device *dev, struct device_node *np)
->  {
->  	u64 dma_addr, paddr, size;
->  	int ret;
-> @@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  		coherent ? " " : " not ");
->  
->  	iommu = of_iommu_configure(dev, np);
-> +	if (IS_ERR(iommu))
-> +		return PTR_ERR(iommu);
-> +
->  	dev_dbg(dev, "device is%sbehind an iommu\n",
->  		iommu ? " " : " not ");
->  
->  	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-> +
-> +	return 0;
->  }
->  EXPORT_SYMBOL_GPL(of_dma_configure);
->  
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index af98455..2cacdd8 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -55,7 +55,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  	return of_node_get(cpu_dev->of_node);
->  }
->  
-> -void of_dma_configure(struct device *dev, struct device_node *np);
-> +int of_dma_configure(struct device *dev, struct device_node *np);
->  void of_dma_deconfigure(struct device *dev);
->  #else /* CONFIG_OF */
->  
-> @@ -104,8 +104,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  {
->  	return NULL;
->  }
-> -static inline void of_dma_configure(struct device *dev, struct device_node *np)
-> -{}
-> +
-> +static inline int of_dma_configure(struct device *dev, struct device_node *np)
-> +{
-> +	return 0;
-> +}
->  static inline void of_dma_deconfigure(struct device *dev)
->  {}
->  #endif /* CONFIG_OF */
-> 
+
+This change means the PAN checks claim permission faults on kernel addresses
+too, we need to keep the addr check for these. (sorry, I missed this detail
+first time round)
+
+When I tried lkdtm's 'WRITE_RO' test it gave:
+> [ 2114.718807] Internal error: Accessing user space memory outside uaccess.h
+> routines: 9600004e [#1] PREEMPT SMP
+
+With this hunk omitted I got the expected:
+> [ 1476.243296] Unable to handle kernel write to read-only memory at virtual
+> address ffff000008a11f10
+
+I also gave this a spin on software-models with PAN and PAN+UAO, and TTBR0-PAN
+on Juno.
+
+
+With that hunk omitted:
+Reviewed-by: James Morse <james.morse@arm.com>
+Tested-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
