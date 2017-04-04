@@ -1,56 +1,73 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 04 Apr 2017 11:51:40 +0200
-Subject: [PATCH 3/5] cpufreq: imx6q: Set max suspend_freq to avoid
- changes during suspend
-In-Reply-To: <94d99b261124b813adecf11e86a0ffe05c37f276.1490987945.git.leonard.crestez@nxp.com>
-References: <cover.1490987945.git.leonard.crestez@nxp.com>
- <94d99b261124b813adecf11e86a0ffe05c37f276.1490987945.git.leonard.crestez@nxp.com>
-Message-ID: <1491299500.2367.16.camel@pengutronix.de>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue,  4 Apr 2017 17:50:56 +0800
+Subject: [PATCH v4 1/5] dt-bindings: update device tree binding for Allwinner
+ PRCM CCUs
+In-Reply-To: <20170404095100.18649-1-icenowy@aosc.io>
+References: <20170404095100.18649-1-icenowy@aosc.io>
+Message-ID: <20170404095100.18649-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 31.03.2017, 22:25 +0300 schrieb Leonard Crestez:
-> If the cpufreq driver tries to modify voltage/freq during suspend/resume
-> it might need to control an external PMIC via I2C or SPI but those
-> devices might be already suspended.
-> 
-> To avoid this scenario we just increase cpufreq to highest setpoint
-> before suspend. This issue can easily be triggered by ldo-bypass but in
-> theory any regulator set_voltage call can end up having to modify
-> external supply voltages.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index be90ee3..e2c1fbf 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -162,6 +162,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
->  {
->  	policy->clk = arm_clk;
-> +	policy->suspend_freq = freq_table[soc_opp_count - 1].frequency;
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-I think soc_opp_count includes all OPPs from the DT, some of which might
-be disabled based on the fuse settings of the SoC. So this should
-probably not switch to the highest OPP unconditionally, but rather
-switch to the highest _enabled_ OPP.
+Many Allwinner SoCs after A31 have a CCU in PRCM block.
 
-Regards,
-Lucas
+Give the ones on H3 and A64 compatible strings.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes in v4:
+- Add Rob's ACK.
+Changes in v3:
+- Removed frequency info of iosc in this device tree binding document.
+Changes in v2:
+- Add iosc for R_CCU's on H3/A64.
+
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index 68512aa398a9..e9c5a1d9834a 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -7,9 +7,11 @@ Required properties :
+ 		- "allwinner,sun8i-a23-ccu"
+ 		- "allwinner,sun8i-a33-ccu"
+ 		- "allwinner,sun8i-h3-ccu"
++		- "allwinner,sun8i-h3-r-ccu"
+ 		- "allwinner,sun8i-v3s-ccu"
+ 		- "allwinner,sun9i-a80-ccu"
+ 		- "allwinner,sun50i-a64-ccu"
++		- "allwinner,sun50i-a64-r-ccu"
+ 		- "allwinner,sun50i-h5-ccu"
  
->  	return cpufreq_generic_init(policy, freq_table, transition_latency);
->  }
->  
-> @@ -173,6 +174,7 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
->  	.init = imx6q_cpufreq_init,
->  	.name = "imx6q-cpufreq",
->  	.attr = cpufreq_generic_attr,
-> +	.suspend = cpufreq_generic_suspend,
->  };
->  
->  static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ - reg: Must contain the registers base address and length
+@@ -20,7 +22,10 @@ Required properties :
+ - #clock-cells : must contain 1
+ - #reset-cells : must contain 1
+ 
+-Example:
++For the PRCM CCUs on H3/A64, one more clock is needed:
++- "iosc": the SoC's internal frequency oscillator
++
++Example for generic CCU:
+ ccu: clock at 01c20000 {
+ 	compatible = "allwinner,sun8i-h3-ccu";
+ 	reg = <0x01c20000 0x400>;
+@@ -29,3 +34,13 @@ ccu: clock at 01c20000 {
+ 	#clock-cells = <1>;
+ 	#reset-cells = <1>;
+ };
++
++Example for PRCM CCU:
++r_ccu: clock at 01f01400 {
++	compatible = "allwinner,sun50i-a64-r-ccu";
++	reg = <0x01f01400 0x100>;
++	clocks = <&osc24M>, <&osc32k>, <&iosc>;
++	clock-names = "hosc", "losc", "iosc";
++	#clock-cells = <1>;
++	#reset-cells = <1>;
++};
+-- 
+2.12.2
