@@ -1,89 +1,99 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 11:06:33 +0200
-Subject: [PATCH v4 7/8] ARM: sun8i: a33: Add devfreq-based GPU cooling
+Date: Wed,  5 Apr 2017 11:06:32 +0200
+Subject: [PATCH v4 6/8] ARM: sun8i: a33: add CPU thermal throttling
 In-Reply-To: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
 References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405090634.4649-8-quentin.schulz@free-electrons.com>
+Message-ID: <20170405090634.4649-7-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+This adds CPU thermal throttling for the Allwinner A33. It uses the
+thermal sensor present in the SoC's GPADC.
 
-This adds GPU thermal throttling for the Allwinner A33.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
 v3:
+  - switched to new phandle because of modified DT node name for the GPADC
+  (named THS),
   - got rid of cooling-min-level and cooling-max-level as it's not used in any
   code in the kernel,
 
-added in v2
- arch/arm/boot/dts/sun8i-a23-a33.dtsi |  1 +
- arch/arm/boot/dts/sun8i-a33.dtsi     | 24 ++++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+v2:
+  - updated cooling-max-level to reflect newly added OPPs,
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 5e8725d..6d81a6d 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -495,6 +495,7 @@
+ arch/arm/boot/dts/sun8i-a33.dtsi | 45 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index 9734e63..b88c107 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -43,6 +43,7 @@
+  */
  
- 			assigned-clocks = <&ccu CLK_GPU>;
- 			assigned-clock-rates = <384000000>;
+ #include "sun8i-a23-a33.dtsi"
++#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	cpu0_opp_table: opp_table0 {
+@@ -127,6 +128,7 @@
+ 			clocks = <&ccu CLK_CPUX>;
+ 			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
 +			#cooling-cells = <2>;
  		};
  
- 		gic: interrupt-controller at 01c81000 {
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index b88c107..541ca45 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -188,6 +188,16 @@
- 					trip = <&cpu_alert1>;
- 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
- 				};
-+
-+				map2 {
-+					trip = <&gpu_alert0>;
-+					cooling-device = <&mali 1 THERMAL_NO_LIMIT>;
-+				};
-+
-+				map3 {
-+					trip = <&gpu_alert1>;
-+					cooling-device = <&mali 2 THERMAL_NO_LIMIT>;
-+				};
- 			};
+ 		cpu at 1 {
+@@ -170,6 +172,49 @@
+ 		};
+ 	};
  
- 			trips {
-@@ -198,6 +208,13 @@
- 					type = "passive";
- 				};
- 
-+				gpu_alert0: gpu_alert0 {
++	thermal-zones {
++		cpu_thermal {
++			/* milliseconds */
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++			thermal-sensors = <&ths>;
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++				map1 {
++					trip = <&cpu_alert1>;
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++
++			trips {
++				cpu_alert0: cpu_alert0 {
 +					/* milliCelsius */
-+					temperature = <85000>;
++					temperature = <75000>;
 +					hysteresis = <2000>;
 +					type = "passive";
 +				};
 +
- 				cpu_alert1: cpu_alert1 {
- 					/* milliCelsius */
- 					temperature = <90000>;
-@@ -205,6 +222,13 @@
- 					type = "hot";
- 				};
- 
-+				gpu_alert1: gpu_alert1 {
++				cpu_alert1: cpu_alert1 {
 +					/* milliCelsius */
-+					temperature = <95000>;
++					temperature = <90000>;
 +					hysteresis = <2000>;
 +					type = "hot";
 +				};
 +
- 				cpu_crit: cpu_crit {
- 					/* milliCelsius */
- 					temperature = <110000>;
++				cpu_crit: cpu_crit {
++					/* milliCelsius */
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
++
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 	};
 -- 
 2.9.3
