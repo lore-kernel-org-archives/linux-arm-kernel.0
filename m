@@ -1,85 +1,69 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 5 Apr 2017 18:21:39 +0100
-Subject: [PATCH] crypto: arm64/sha: use %c constraint code in ASM_EXPORT
-In-Reply-To: <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
-References: <20170405165603.87264-1-mka@chromium.org>
- <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
-Message-ID: <e228a810-3f53-a8d6-29c5-428b9870842b@arm.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed,  5 Apr 2017 19:17:50 +0200
+Subject: [PATCH v2] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
+Message-ID: <20170405171750.16821-1-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/17 18:08, Ard Biesheuvel wrote:
-> Hoi Matthias!
-> 
-> On 5 April 2017 at 17:56, Matthias Kaehlcke <mka@chromium.org> wrote:
->> From: Greg Hackmann <ghackmann@google.com>
->>
->> The current definition of ASM_EXPORT doesn't work properly with clang,
->> according to https://bugs.llvm.org//show_bug.cgi?id=27250#c3 it relies on
->> gcc specific behavior. Change the constraint from an intermediate to an
->> output expression which works with both gcc and clang.
->>
->> From: Greg Hackmann <ghackmann@google.com>
->> Commit-message-by: Matthias Kaehlcke <mka@chromium.org>
->> Signed-off-by: Greg Hackmann <ghackmann@google.com>
->> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
->> ---
->>  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
->>  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
->> index aefda9868627..c71e94ba0e43 100644
->> --- a/arch/arm64/crypto/sha1-ce-glue.c
->> +++ b/arch/arm64/crypto/sha1-ce-glue.c
->> @@ -18,7 +18,7 @@
->>  #include <linux/module.h>
->>
->>  #define ASM_EXPORT(sym, val) \
->> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
->> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
->>
->>  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
->>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
->> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
->> index 7cd587564a41..381b5fb2dcb2 100644
->> --- a/arch/arm64/crypto/sha2-ce-glue.c
->> +++ b/arch/arm64/crypto/sha2-ce-glue.c
->> @@ -18,7 +18,7 @@
->>  #include <linux/module.h>
->>
->>  #define ASM_EXPORT(sym, val) \
->> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
->> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
->>
->>  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
->>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-> 
-> I am fine with this change, although I would really like to add a
-> better reference to the commit log. It is *very* difficult to find any
-> documentation regarding non-trivial uses of inline asm constraints,
-> and if %c0 is the correct syntax, surely we can quote something better
-> than a LLVM bugzilla entry? Also, where does the distinction between
-> 'intermediate' vs 'output' expression come from?
+The CPPI 4.1 DMA is sharing its clock with the USB OTG,
+and most of the time, the clock will be enabled by USB.
+But during the init of the DMA, USB is not enabled (waiting for DMA),
+and then we must enable the clock before doing anything.
+Add the clock for the CPPI 4.1 DMA engine.
 
-FWIW, GCC docs do say (under the helpfully-obvious "x86 operand
-modifiers" section[1]):
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+---
+ arch/arm/mach-davinci/da830.c | 6 ++++++
+ arch/arm/mach-davinci/da850.c | 6 ++++++
+ 2 files changed, 12 insertions(+)
 
-	c	Require a constant operand and print the constant
-		expression with no punctuation.
-
-Which more or less makes sense in this this context too. As an aside,
-though, since this is emitting a general integer argument to an
-assembler directive, and not an operand to an ADD instruction, how come
-we're using "I" and not "i" as the constraint in the first place?
-
-Robin.
-
-[1]:https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#x86-Operand-Modifiers
-
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 073c458..bd88470 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -304,6 +304,11 @@ static struct clk usb20_clk = {
+ 	.gpsc		= 1,
+ };
+ 
++static struct clk cppi41_clk = {
++	.name		= "cppi41",
++	.parent		= &usb20_clk,
++};
++
+ static struct clk aemif_clk = {
+ 	.name		= "aemif",
+ 	.parent		= &pll0_sysclk3,
+@@ -413,6 +418,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
+ 	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
+ 	CLK("musb-da8xx",	"usb20",	&usb20_clk),
++	CLK("cppi41-dmaengine",	NULL,		&cppi41_clk),
+ 	CLK(NULL,		"aemif",	&aemif_clk),
+ 	CLK(NULL,		"aintc",	&aintc_clk),
+ 	CLK(NULL,		"secu_mgr",	&secu_mgr_clk),
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index ccad2f9..07d6f0e 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -401,6 +401,11 @@ static struct clk usb20_clk = {
+ 	.gpsc		= 1,
+ };
+ 
++static struct clk cppi41_clk = {
++	.name		= "cppi41",
++	.parent		= &usb20_clk,
++};
++
+ static struct clk spi0_clk = {
+ 	.name		= "spi0",
+ 	.parent		= &pll0_sysclk2,
+@@ -560,6 +565,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("davinci-nand.0",	"aemif",	&aemif_nand_clk),
+ 	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
+ 	CLK("musb-da8xx",	"usb20",	&usb20_clk),
++	CLK("cppi41-dmaengine",	NULL,		&cppi41_clk),
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+-- 
+2.10.2
