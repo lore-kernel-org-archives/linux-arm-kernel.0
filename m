@@ -1,105 +1,107 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:06:07 -0500
-Subject: [PATCH v5 23/23] drivers/fsi: Use asynchronous slave mode
+Date: Tue,  4 Apr 2017 21:05:54 -0500
+Subject: [PATCH v5 10/23] drivers/fsi: Add device read/write/peek API
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-24-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-11-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-For slaves that are behind a software-clocked master, we want FSI CFAMs
-to run asynchronously to the FSI clock, so set up our slaves to be in
-async mode.
+This change introduces the fsi device API: simple read, write and peek
+accessors for the devices' address spaces.
 
+Includes contributions from Chris Bostic <cbostic@linux.vnet.ibm.com>
+and Edward A. James <eajames@us.ibm.com>.
+
+Signed-off-by: Edward A. James <eajames@us.ibm.com>
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c        | 22 +++++++++++++++++++++-
- drivers/fsi/fsi-master-gpio.c |  1 +
- drivers/fsi/fsi-master.h      |  2 ++
- 3 files changed, 24 insertions(+), 1 deletion(-)
+ drivers/fsi/fsi-core.c | 33 +++++++++++++++++++++++++++++++++
+ include/linux/fsi.h    |  7 ++++++-
+ 2 files changed, 39 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 747d0e3..a6ed34f 100644
+index a8faa89..4da0b030 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -47,6 +47,7 @@
- #define FSI_SMODE		0x0	/* R/W: Mode register */
- #define FSI_SISC		0x8	/* R/W: Interrupt condition */
- #define FSI_SSTAT		0x14	/* R  : Slave status */
-+#define FSI_LLMODE		0x100	/* R/W: Link layer mode register */
+@@ -32,6 +32,8 @@
+ #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
+ #define FSI_SLAVE_CONF_DATA_BITS	28
  
- /*
-  * SMODE fields
-@@ -62,6 +63,11 @@
- #define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
- #define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
- 
-+/*
-+ * LLMODE fields
-+ */
-+#define FSI_LLMODE_ASYNC	0x1
++#define FSI_PEEK_BASE			0x410
 +
- #define FSI_SLAVE_SIZE_23b		0x800000
+ static const int engine_page_size = 0x400;
  
- static DEFINE_IDA(master_ida);
-@@ -560,8 +566,8 @@ static void fsi_slave_release(struct device *dev)
+ #define FSI_SLAVE_BASE			0x800
+@@ -73,9 +75,40 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+ static int fsi_master_write(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
++static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++		void *val, size_t size);
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++		const void *val, size_t size);
  
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ /* FSI endpoint-device support */
+ 
++int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
++		size_t size)
++{
++	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++		return -EINVAL;
++
++	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_read);
++
++int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
++		size_t size)
++{
++	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++		return -EINVAL;
++
++	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_write);
++
++int fsi_device_peek(struct fsi_device *dev, void *val)
++{
++	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
++
++	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
++}
++
+ static void fsi_device_release(struct device *_device)
  {
-+	uint32_t chip_id, llmode;
- 	struct fsi_slave *slave;
--	uint32_t chip_id;
- 	uint8_t crc;
- 	int rc;
+ 	struct fsi_device *device = to_fsi_dev(_device);
+diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+index efa55ba..66bce48 100644
+--- a/include/linux/fsi.h
++++ b/include/linux/fsi.h
+@@ -27,6 +27,12 @@ struct fsi_device {
+ 	uint32_t		size;
+ };
  
-@@ -597,6 +603,20 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 		return -ENODEV;
- 	}
- 
-+	/* If we're behind a master that doesn't provide a self-running bus
-+	 * clock, put the slave into async mode
-+	 */
-+	if (master->flags & FSI_MASTER_FLAG_SWCLOCK) {
-+		llmode = cpu_to_be32(FSI_LLMODE_ASYNC);
-+		rc = fsi_master_write(master, link, id,
-+				FSI_SLAVE_BASE + FSI_LLMODE,
-+				&llmode, sizeof(llmode));
-+		if (rc)
-+			dev_warn(&master->dev,
-+				"can't set llmode on slave:%02x:%02x %d\n",
-+				link, id, rc);
-+	}
++extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
++		void *val, size_t size);
++extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
++		const void *val, size_t size);
++extern int fsi_device_peek(struct fsi_device *dev, void *val);
 +
- 	/* We can communicate with a slave; create the slave device and
- 	 * register.
- 	 */
-diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
-index 5d9e0b0..d5cce88 100644
---- a/drivers/fsi/fsi-master-gpio.c
-+++ b/drivers/fsi/fsi-master-gpio.c
-@@ -569,6 +569,7 @@ static int fsi_master_gpio_probe(struct platform_device *pdev)
- 	master->gpio_mux = gpio;
+ struct fsi_device_id {
+ 	u8	engine_type;
+ 	u8	version;
+@@ -40,7 +46,6 @@ struct fsi_device_id {
+ #define FSI_DEVICE_VERSIONED(t, v) \
+ 	.engine_type = (t), .version = (v),
  
- 	master->master.n_links = 1;
-+	master->master.flags = FSI_MASTER_FLAG_SWCLOCK;
- 	master->master.read = fsi_master_gpio_read;
- 	master->master.write = fsi_master_gpio_write;
- 	master->master.term = fsi_master_gpio_term;
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
-index d6a4885..fd39924 100644
---- a/drivers/fsi/fsi-master.h
-+++ b/drivers/fsi/fsi-master.h
-@@ -19,6 +19,8 @@
- 
- #include <linux/device.h>
- 
-+#define FSI_MASTER_FLAG_SWCLOCK	0x1
-+
- struct fsi_master {
- 	struct device	dev;
- 	int		idx;
+-
+ struct fsi_driver {
+ 	struct device_driver		drv;
+ 	const struct fsi_device_id	*id_table;
 -- 
 1.8.2.2
