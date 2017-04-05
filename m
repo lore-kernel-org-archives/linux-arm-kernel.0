@@ -1,84 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Apr 2017 10:57:52 +0100
-Subject: [PATCH v3 00/11] add thermal throttling to Allwinner A33 SoC
-In-Reply-To: <fcc2ec2c-cf46-0cf9-1933-53511fe77cf2@free-electrons.com>
-References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
- <20170404083133.ffrsxjsakynruwzv@dell>
- <fcc2ec2c-cf46-0cf9-1933-53511fe77cf2@free-electrons.com>
-Message-ID: <20170405095752.pji6o7u5no6svd5i@dell>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed,  5 Apr 2017 12:13:26 +0200
+Subject: [PULL 0/5] KVM/ARM Fixes for v4.11-rc6
+Message-ID: <20170405101331.23812-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Apr 2017, Quentin Schulz wrote:
-> On 04/04/2017 10:31, Lee Jones wrote:
-> > On Tue, 21 Mar 2017, Quentin Schulz wrote:
-> >> v3:
-> >>   - fixed compatible name in DT and in documentation,
-> >>   - fixed DT node name and label,
-> >>   - added explanations in commit logs,
-> >>   - moved frequencies that need overvolting to board DTS instead of A33 DTSI,
-> >>   - fixed a typo in if is_enabled condition,
-> >>   - removed all patches concerning Olimex Olinuxino (no HW to test on),
-> > 
-> > What is the plan for this series?
-> > 
-> > I'm guessing there are no hard dependencies on the ARM parts?
-> > 
-> > If not, I'm happy to take the changes to 'drivers/*'.
-> > 
-> 
-> I've sent a v4 to add some Acked-by and change a few commit "titles".
-> It's ready to be merged with only the following patch required (which
-> Jonathan asked if you could merge it through the mfd tree): "[RESEND
-> PATCH v4] iio: adc: add support for X-Powers AXP20X and AXP22X PMICs
-> ADCs" (https://patchwork.kernel.org/patch/9660879/)
+Hi Paolo and Radim,
 
-Right, but how would you like *this* patch-set applied?
+Please pull a handfull of fixes for the next -rc release of v4.11.
 
-I'm guessing the ARM patches need to go in via ARM-SoC.
+They include:
+ - Addressing a problem with GICv3 userspace save/restore
+ - Clarify GICv2 userspace save/restore ABI
+ - Be more careful in clearing GIC LRs
+ - Add missing synchronization primitive to our MMU handling code
 
-What about the drivers/{input,iio,mfd} patches?
+The following changes since commit 955a3fc6d2a1c11d6d00bce4f3816100ce0530cf:
 
-I'm guessing they're to all go in via my tree?
+  KVM: arm64: Increase number of user memslots to 512 (2017-03-09 09:13:50 +0000)
 
-> >> [1] https://lkml.org/lkml/2016/12/13/298 : "[PATCH v9] add support for Allwinner
-> >> SoCs ADC"
-> >>
-> >> Thanks,
-> >> Quentin
-> >>
-> >> Maxime Ripard (1):
-> >>   ARM: sun8i: a33: Add devfreq-based GPU cooling
-> >>
-> >> Quentin Schulz (10):
-> >>   ARM: sun8i: a33: add operating-points-v2 property to all nodes
-> >>   ARM: sun8i: a33: add all operating points
-> >>   ARM: dts: sun8i: sina33: add cpu-supply
-> >>   Documentation: DT: bindings: mfd: add A33 GPADC binding
-> >>   Documentation: DT: bindings: input: touschcreen: remove sun4i
-> >>     documentation
-> >>   iio: adc: sun4i-gpadc-iio: move code used in MFD probing to new
-> >>     function
-> >>   iio: adc: sun4i-gpadc-iio: add support for A33 thermal sensor
-> >>   ARM: dtsi: sun8i: a33: add thermal sensor
-> >>   ARM: dtsi: sun8i: a33: add CPU thermal throttling
-> >>   ARM: sun8i: sina33: add highest OPP of CPUs
-> >>
-> >>  .../touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt}  |  21 +++
-> >>  arch/arm/boot/dts/sun8i-a23-a33.dtsi               |   1 +
-> >>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  18 +++
-> >>  arch/arm/boot/dts/sun8i-a33.dtsi                   | 141 +++++++++++++++++
-> >>  drivers/iio/adc/Kconfig                            |   2 +-
-> >>  drivers/iio/adc/sun4i-gpadc-iio.c                  | 170 +++++++++++++++++----
-> >>  include/linux/mfd/sun4i-gpadc.h                    |   4 +
-> >>  7 files changed, 324 insertions(+), 33 deletions(-)
-> >>  rename Documentation/devicetree/bindings/{input/touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt} (64%)
-> >>
-> > 
-> 
+are available in the git repository at:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.11-rc6
+
+for you to fetch changes up to 6d56111c92d247bb64301029fe88365aa4caf16e:
+
+  KVM: arm/arm64: vgic: Fix GICC_PMR uaccess on GICv3 and clarify ABI (2017-04-04 14:33:59 +0200)
+
+Thanks,
+-Christoffer
+
+Christoffer Dall (2):
+      KVM: arm64: Ensure LRs are clear when they should be
+      KVM: arm/arm64: vgic: Fix GICC_PMR uaccess on GICv3 and clarify ABI
+
+Marc Zyngier (2):
+      arm/arm64: KVM: Take mmap_sem in stage2_unmap_vm
+      arm/arm64: KVM: Take mmap_sem in kvm_arch_prepare_memory_region
+
+Suzuki K Poulose (1):
+      kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  6 ++++++
+ arch/arm/kvm/arm.c                             |  3 +++
+ arch/arm/kvm/mmu.c                             | 23 ++++++++++++++++++++---
+ include/kvm/arm_vgic.h                         |  1 +
+ include/linux/irqchip/arm-gic.h                |  3 +++
+ virt/kvm/arm/vgic/vgic-init.c                  | 19 +++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio-v2.c               | 20 ++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-v2.c                    | 23 +++++++++++++++++++----
+ virt/kvm/arm/vgic/vgic.h                       | 11 ++++++++++-
+ 9 files changed, 99 insertions(+), 10 deletions(-)
