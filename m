@@ -1,24 +1,80 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 5 Apr 2017 22:09:29 +0800
-Subject: [PATCH v2 0/5] STM32 CRC crypto driver
-In-Reply-To: <1490109211-4869-1-git-send-email-fabien.dessenne@st.com>
-References: <1490109211-4869-1-git-send-email-fabien.dessenne@st.com>
-Message-ID: <20170405140929.GD27150@gondor.apana.org.au>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Wed, 5 Apr 2017 07:36:17 -0700
+Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
+References: <20170404174727.35478-1-thgarnie@google.com>
+ <20170404174727.35478-4-thgarnie@google.com>
+ <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
+Message-ID: <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 04:13:26PM +0100, Fabien Dessenne wrote:
-> This set of patches adds a new crypto driver for STMicroelectronics stm32f746.
-> The drivers uses the crypto API and provides with an HW-enabled CRC32 algorithm.
-> It was developed and tested (tcrypt / testmgr) on evaluation board stm32746g.
-> 
-> v2 changes:
-> - remove useless check of crc / crc->clk
-> - enable crypto in stm32 defconfig
-> - typo fix in dt-bindings
+On Wed, Apr 5, 2017 at 7:22 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Apr 04, 2017 at 10:47:27AM -0700, Thomas Garnier wrote:
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 43512d4d7df2..6d598e7051c3 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -744,6 +744,10 @@ ENDPROC(cpu_switch_to)
+>>  ret_fast_syscall:
+>>       disable_irq                             // disable interrupts
+>>       str     x0, [sp, #S_X0]                 // returned x0
+>> +     ldr     x2, [tsk, #TSK_TI_ADDR_LIMIT]   // check addr limit change
+>> +     mov     x1, #TASK_SIZE_64
+>> +     cmp     x2, x1
+>> +     b.ne    addr_limit_fail
+>
+> KERNEL_DS is set to the maximum address (-1UL), so it would be easier to
+> check against this here and avoid a "mov". Even simpler if you'd check
+> against bit 63 of the address for KERNEL_DS:
 
-All applied.  Thanks.
+We also want to catch corruption so checking the 63 bit make sense. I
+will look for this change in the next iteration.
+
+>
+>         ldr     x1, [tsk, TSK_TI_ADDR_LIMIT]    // check addr limit change
+>         tbnz    x1, #63, addr_limit_fail        // KERNEL_DS is -1UL
+>
+>>       ldr     x1, [tsk, #TSK_TI_FLAGS]        // re-check for syscall tracing
+>>       and     x2, x1, #_TIF_SYSCALL_WORK
+>>       cbnz    x2, ret_fast_syscall_trace
+>> @@ -771,6 +775,11 @@ work_pending:
+>>   */
+>>  ret_to_user:
+>>       disable_irq                             // disable interrupts
+>> +     ldr     x2, [tsk, #TSK_TI_ADDR_LIMIT]   // check addr limit change
+>> +     mov     x1, #TASK_SIZE_64
+>> +     cmp     x2, x1
+>> +     b.ne    addr_limit_fail
+>
+> Same here.
+>
+>> +
+>>       ldr     x1, [tsk, #TSK_TI_FLAGS]
+>>       and     x2, x1, #_TIF_WORK_MASK
+>>       cbnz    x2, work_pending
+>> @@ -779,6 +788,12 @@ finish_ret_to_user:
+>>       kernel_exit 0
+>>  ENDPROC(ret_to_user)
+>>
+>> +addr_limit_fail:
+>> +     stp     x0, lr, [sp,#-16]!
+>> +     bl      asm_verify_pre_usermode_state
+>> +     ldp     x0, lr, [sp],#16
+>> +     ret     lr
+>
+> Where is this supposed to return? What is the value of lr when branching
+> to addr_limit_fail?
+
+It is not supposed to return. Do you think I should remove stp, ldp,
+ret and jut add a brk 0x100 or jmp/call a break/bug function?
+
+>
+> --
+> Catalin
+
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Thomas
