@@ -1,36 +1,64 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed,  5 Apr 2017 13:30:05 -0500
-Subject: [PATCH 4/4] arm64: dts: hikey: add WL1835 Bluetooth device node
+Date: Wed,  5 Apr 2017 13:30:02 -0500
+Subject: [PATCH 1/4] dt-bindings: net: Add TI WiLink shared transport binding
 In-Reply-To: <20170405183005.20570-1-robh@kernel.org>
 References: <20170405183005.20570-1-robh@kernel.org>
-Message-ID: <20170405183005.20570-5-robh@kernel.org>
+Message-ID: <20170405183005.20570-2-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the serial slave device for the WL1835 Bluetooth interface.
+Add serial slave device binding for the TI WiLink series of Bluetooth/FM/GPS
+devices.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Wei Xu <xuwei5@hisilicon.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: netdev at vger.kernel.org
+Cc: devicetree at vger.kernel.org
 ---
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../devicetree/bindings/net/ti,wilink-st.txt       | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/ti,wilink-st.txt
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index dba3c131c62c..9b4ba7169210 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -98,6 +98,11 @@
- 			assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
- 			assigned-clock-rates = <150000000>;
- 			status = "ok";
+diff --git a/Documentation/devicetree/bindings/net/ti,wilink-st.txt b/Documentation/devicetree/bindings/net/ti,wilink-st.txt
+new file mode 100644
+index 000000000000..cbad73a84ac4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/ti,wilink-st.txt
+@@ -0,0 +1,35 @@
++TI WiLink 7/8 (wl12xx/wl18xx) Shared Transport BT/FM/GPS devices
 +
-+			bluetooth {
-+				compatible = "ti,wl1835-st";
-+				enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-+			};
- 		};
- 
- 		uart2: uart at f7112000 {
++TI WiLink devices have a UART interface for providing Bluetooth, FM radio,
++and GPS over what's called "shared transport". The shared transport is
++standard BT HCI protocol with additional channels for the other functions.
++
++These devices also have a separate WiFi interface as described in
++wireless/ti,wlcore.txt.
++
++This bindings follows the UART slave device binding in
++../serial/slave-device.txt.
++
++Required properties:
++ - compatible: should be one of the following:
++    "ti,wl1271-st"
++    "ti,wl1273-st"
++    "ti,wl1831-st"
++    "ti,wl1835-st"
++    "ti,wl1837-st"
++
++Optional properties:
++ - enable-gpios : GPIO signal controlling enabling of BT. Active high.
++ - vio-supply : Vio input supply (1.8V)
++ - vbat-supply : Vbat input supply (2.9-4.8V)
++
++Example:
++
++&serial0 {
++	compatible = "ns16550a";
++	...
++	bluetooth {
++		compatible = "ti,wl1835-st";
++		enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
++	};
++};
 -- 
 2.10.1
