@@ -1,72 +1,145 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 5 Apr 2017 11:48:43 +0800
-Subject: [linux-sunxi] [PATCH 01/11] arm64: allwinner: a64: enable RSB on
- A64
-In-Reply-To: <20170404180145.12897-2-icenowy@aosc.io>
-References: <20170404180145.12897-1-icenowy@aosc.io>
- <20170404180145.12897-2-icenowy@aosc.io>
-Message-ID: <CAGb2v67wo1pDbLSLZzXHd+djinthfo0xhSgThHq2qcWjSktcYQ@mail.gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Tue, 4 Apr 2017 17:40:16 -0700
+Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities output
+ video on pad 1
+In-Reply-To: <20170404231053.GE7909@n2100.armlinux.org.uk>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
+ <1490894749.2404.33.camel@pengutronix.de>
+ <20170404231053.GE7909@n2100.armlinux.org.uk>
+Message-ID: <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
+
+
+On 04/04/2017 04:10 PM, Russell King - ARM Linux wrote:
+> On Thu, Mar 30, 2017 at 07:25:49PM +0200, Philipp Zabel wrote:
+>> The TVP5150 DT bindings specify a single output port (port 0) that
+>> corresponds to the video output pad (pad 1, DEMOD_PAD_VID_OUT).
+>>
+>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> ---
+>> I'm trying to get this to work with a TVP5150 analog TV decoder, and the
+>> first problem is that this device doesn't have pad 0 as its single
+>> output pad. Instead, as a MEDIA_ENT_F_ATV_DECODER entity, it has for
+>> pads (input, video out, vbi out, audio out), and video out is pad 1,
+>> whereas the device tree only defines a single port (0).
 >
-> Add it and its pinmux.
+> Looking at the patch, it's highlighted another review point with
+> Steve's driver.
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+>> diff --git a/drivers/staging/media/imx/imx-media-dev.c b/drivers/staging/media/imx/imx-media-dev.c
+>> index 17e2386a3ca3a..c52d6ca797965 100644
+>> --- a/drivers/staging/media/imx/imx-media-dev.c
+>> +++ b/drivers/staging/media/imx/imx-media-dev.c
+>> @@ -267,6 +267,15 @@ static int imx_media_create_link(struct imx_media_dev *imxmd,
+>>  	source_pad = link->local_pad;
+>>  	sink_pad = link->remote_pad;
+>>
+>> +	/*
+>> +	 * If the source subdev is an analog video decoder with a single source
+>> +	 * port, assume that this port 0 corresponds to the DEMOD_PAD_VID_OUT
+>> +	 * entity pad.
+>> +	 */
+>> +	if (source->entity.function == MEDIA_ENT_F_ATV_DECODER &&
+>> +	    local_sd->num_sink_pads == 0 && local_sd->num_src_pads == 1)
+>> +		source_pad = DEMOD_PAD_VID_OUT;
+>> +
+>>  	v4l2_info(&imxmd->v4l2_dev, "%s: %s:%d -> %s:%d\n", __func__,
+>>  		  source->name, source_pad, sink->name, sink_pad);
 >
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 6bc606b4d74d..9a75b1c7c91a 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -420,6 +420,27 @@
->                         #gpio-cells = <3>;
->                         interrupt-controller;
->                         #interrupt-cells = <3>;
-> +
-> +                       r_rsb_pins: rsb at 0 {
-> +                               pins = "PL0", "PL1";
-> +                               function = "s_rsb";
-> +                               drive-strength = <20>;
-
-We don't need this. The hardware default should be enough.
-
-> +                               bias-pull-up;
-
-Boards should have external pull-ups for these pins, as the PMICs
-start up in I2C mode. If any board actually doesn't have them and
-needs the internal pull-ups, they should be set at the board level.
-
-Otherwise,
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-> +                       };
-> +               };
-> +
-> +               r_rsb: rsb at 1f03400 {
-> +                       compatible = "allwinner,sun8i-a23-rsb";
-> +                       reg = <0x01f03400 0x400>;
-> +                       interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&r_ccu 6>;
-> +                       clock-frequency = <3000000>;
-> +                       resets = <&r_ccu 2>;
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&r_rsb_pins>;
-> +                       status = "disabled";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
->                 };
->         };
->  };
-> --
-> 2.12.2
+> What is "local" and what is "remote" here?  It seems that, in the case of
+> a link being created with the sensor(etc), it's all back to front.
 >
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> Eg, I see locally:
+>
+> imx-media: imx_media_create_link: imx219 0-0010:0 -> imx6-mipi-csi2:0
+>
+> So here, "source" is the imx219 (the sensor), and sink is "imx6-mipi-csi2"
+> (part of the iMX6 capture.)  However, this makes "local_sd" the subdev of
+> the sensor, and "remote_sd" the subdev of the CSI2 interface - which is
+> totally back to front - this code is part of the iMX6 capture system,
+> so "local" implies that it should be part of that, and the "remote" thing
+> would be the sensor.
+>
+> Hence, this seems completely confused.  I'd suggest that:
+>
+> (a) the "pad->pad.flags & MEDIA_PAD_FL_SINK" test in imx_media_create_link()
+>     is moved into imx_media_create_links(), and placed here instead:
+>
+> 		for (j = 0; j < num_pads; j++) {
+> 			pad = &local_sd->pad[j];
+>
+> 			if (pad->pad.flags & MEDIA_PAD_FL_SINK)
+> 				continue;
+>
+> 			...
+> 		}
+>
+>     as the pad isn't going to spontaneously change this flag while we
+>     consider each individual link.
+
+
+Sure, I can do that. It would avoid iterating unnecessarily through the
+pad's links if the pad is a sink.
+
+
+>  However, maybe the test should be:
+>
+> 			if (!(pad->pad.flags & MEDIA_PAD_FL_SOURCE))
+>
+>     ?
+>
+
+maybe that is more intuitive.
+
+
+> (b) the terms "local" and "remote" in imx_media_create_link() are
+>     replaced with "source" and "sink" respectively, since this will
+>     now be called with a guaranteed source pad.
+
+Agreed. I'll change the arg and local var names.
+
+>
+> As for Philipp's solution, I'm not sure what the correct solution for
+> something like this is.  It depends how you view "hardware interface"
+> as defined by video-interfaces.txt, and whether the pads on the TVP5150
+> represent the hardware interfaces.  If we take the view that the pads
+> do represent hardware interfaces, then using the reg= property on the
+> port node will solve this problem.
+
+And the missing port nodes would have to actually be defined first.
+According to Philipp they aren't, only a single output port 0.
+
+
+>
+> If not, it would mean that we would have to have the iMX capture code
+> scan the pads on the source device, looking for outputs - but that
+> runs into a problem - if the source device has multiple outputs, does
+> the reg= property specify the output pad index or the pad number,
+
+And how do we even know the data direction of a DT port. Is it an input,
+an output, bidirectional? The OF graph parsing in imx-media-of.c can't
+determine a port's direction if it encounters a device it doesn't
+recognize that has multiple ports. For now that is not really a problem
+because upstream from the video mux and csi-2 receiver it's expected
+there will only be original sources of video with only one source port.
+But it can become a limitation later. For example a device that has
+multiple output bus interfaces, which would require multiple output
+ports.
+
+
+Steve
+
+
+
+> and what if one binding for a device specifies it one way and another
+> device's binding specifies it a different way.
+>
+> There's lots of scope for making things really painful here, and
+> ending up with needing sensor-specific code in capture drivers to
+> work around different decisions on this.
+>
+> I think someone needs to nail this down, if it's not already too late.
+>
