@@ -1,42 +1,36 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Wed, 5 Apr 2017 11:49:24 +0000
-Subject: [7/7] crypto: caam/qi - add ablkcipher and authenc algorithms
-In-Reply-To: <87lgrftbgl.fsf@concordia.ellerman.id.au>
-References: <20170317100602.2837-8-horia.geanta@nxp.com>
- <87vaqkvk6c.fsf@concordia.ellerman.id.au> <58E39F90.6050408@nxp.com>
- <87lgrftbgl.fsf@concordia.ellerman.id.au>
-Message-ID: <58E4D9C3.4070406@nxp.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 05 Apr 2017 13:58:39 +0200
+Subject: [PATCH v6 17/39] platform: add video-multiplexer subdevice driver
+In-Reply-To: <20170405111857.GA26831@amd>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
+ <20170405111857.GA26831@amd>
+Message-ID: <1491393519.2904.40.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Mittwoch, den 05.04.2017, 13:18 +0200 schrieb Pavel Machek:
+> Hi!
+> 
+> > + * video stream multiplexer controlled via gpio or syscon
+> > + *
+> > + * Copyright (C) 2013 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
+> > + * Copyright (C) 2016 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
+> 
+> This is actually quite interesting. Same email address for two
+> people...
+> 
+> Plus, I believe this wants to say that copyright is with Pengutronix,
+> not Sascha and Philipp. In that case you probably want to list
+> copyright and authors separately?
+> 
+Nope, copyright doesn't get transferred to the employer within the rules
+of the German "Urheberrecht", but stays at the original author of the
+code.
+Same email is just to ensure that any requests regarding this code get
+routed to the right people, even if someone leaves the company or is
+temporarily unavailable. kernel@ is a list for the Pengutronix kernel
+team.
 
-
-On 04/05/2017 01:06 PM, Michael Ellerman wrote:
-> Laurentiu Tudor <laurentiu.tudor@nxp.com> writes:
->
->> Hi Michael,
->>
->> Just a couple of basic things to check:
->>    - was the dtb updated to the newest?
->
-> Possibly not, it's an automated build/boot, I'll have to check what it
-> does with the dtb.
->
->>    - is the qman node present? This should be easily visible in
->> /proc/device-tree/soc at ffe000000/qman at 318000.
->
-> No it's not there.
->
-> That's running linux-next with:
->
-> CONFIG_CRYPTO_DEV_FSL_CAAM_CRYPTO_API_QI=n
->
->
-> Does that mean I didn't update the device tree?
->
-
-I think so. Also, I just checked that the node is actually there by 
-compiling p5020ds.dts and then decompiling the dtb.
-
----
-Best Regards, Laurentiu
+Regards,
+Lucas
