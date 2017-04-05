@@ -1,104 +1,218 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:59 -0500
-Subject: [PATCH v5 15/23] drivers/fsi: expose direct-access slave API
+Date: Tue,  4 Apr 2017 21:06:00 -0500
+Subject: [PATCH v5 16/23] drivers/fsi: Add tracepoints for low-level operations
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-16-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-17-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Allow drivers to access the slave address ranges.
-
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 26 ++++++++++++++++++++------
- include/linux/fsi.h    | 12 ++++++++++++
- 2 files changed, 32 insertions(+), 6 deletions(-)
+ drivers/fsi/fsi-core.c     |  27 +++++++---
+ include/trace/events/fsi.h | 127 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 148 insertions(+), 6 deletions(-)
+ create mode 100644 include/trace/events/fsi.h
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index f0f0556..f7e55e7 100644
+index f7e55e7..09becec 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -76,10 +76,6 @@ static int fsi_master_read(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+@@ -21,6 +21,9 @@
+ 
+ #include "fsi-master.h"
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/fsi.h>
++
+ #define FSI_SLAVE_CONF_NEXT_MASK	0x80000000
+ #define FSI_SLAVE_CONF_SLOTS_MASK	0x00ff0000
+ #define FSI_SLAVE_CONF_SLOTS_SHIFT	16
+@@ -541,11 +544,16 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ {
+ 	int rc;
+ 
++	trace_fsi_master_read(master, link, slave_id, addr, size);
++
+ 	rc = fsi_check_access(addr, size);
+-	if (rc)
+-		return rc;
++	if (!rc)
++		rc = master->read(master, link, slave_id, addr, val, size);
++
++	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
++			false, val, rc);
+ 
+-	return master->read(master, link, slave_id, addr, val, size);
++	return rc;
+ }
+ 
  static int fsi_master_write(struct fsi_master *master, int link,
- 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
--static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
--		void *val, size_t size);
--static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
--		const void *val, size_t size);
+@@ -553,11 +561,16 @@ static int fsi_master_write(struct fsi_master *master, int link,
+ {
+ 	int rc;
  
- /* FSI endpoint-device support */
++	trace_fsi_master_write(master, link, slave_id, addr, size, val);
++
+ 	rc = fsi_check_access(addr, size);
+-	if (rc)
+-		return rc;
++	if (!rc)
++		rc = master->write(master, link, slave_id, addr, val, size);
  
-@@ -181,7 +177,7 @@ static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
- 	return 0;
+-	return master->write(master, link, slave_id, addr, val, size);
++	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
++			true, val, rc);
++
++	return rc;
  }
  
--static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
- 			void *val, size_t size)
+ static int fsi_master_link_enable(struct fsi_master *master, int link)
+@@ -573,6 +586,8 @@ static int fsi_master_link_enable(struct fsi_master *master, int link)
+  */
+ static int fsi_master_break(struct fsi_master *master, int link)
  {
- 	uint8_t id = slave->id;
-@@ -195,7 +191,7 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
++	trace_fsi_master_break(master, link);
++
+ 	if (master->send_break)
+ 		return master->send_break(master, link);
  
--static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			const void *val, size_t size)
- {
- 	uint8_t id = slave->id;
-@@ -209,6 +205,24 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
- 
-+extern int fsi_slave_claim_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size)
-+{
-+	if (addr + size < addr)
-+		return -EINVAL;
+diff --git a/include/trace/events/fsi.h b/include/trace/events/fsi.h
+new file mode 100644
+index 0000000..ac74a30
+--- /dev/null
++++ b/include/trace/events/fsi.h
+@@ -0,0 +1,127 @@
 +
-+	if (addr + size > slave->size)
-+		return -EINVAL;
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fsi
 +
-+	/* todo: check for overlapping claims */
-+	return 0;
-+}
++#if !defined(_TRACE_FSI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FSI_H
 +
-+extern void fsi_slave_release_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size)
-+{
-+}
++#include <linux/tracepoint.h>
 +
- static int fsi_slave_scan(struct fsi_slave *slave)
- {
- 	uint32_t engine_addr;
-diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index 34f1e9a..141fd38 100644
---- a/include/linux/fsi.h
-+++ b/include/linux/fsi.h
-@@ -66,6 +66,18 @@ struct fsi_driver {
- 		module_driver(__fsi_driver, fsi_driver_register, \
- 				fsi_driver_unregister)
- 
-+/* direct slave API */
-+extern int fsi_slave_claim_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size);
-+extern void fsi_slave_release_range(struct fsi_slave *slave,
-+		uint32_t addr, uint32_t size);
-+extern int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+		void *val, size_t size);
-+extern int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+		const void *val, size_t size);
++TRACE_EVENT(fsi_master_read,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size),
++	TP_ARGS(master, link, id, addr, size),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd]",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size
++	)
++);
++
++TRACE_EVENT(fsi_master_write,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size, const void *data),
++	TP_ARGS(master, link, id, addr, size, data),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++		__field(__u32,	data)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++		__entry->data = 0;
++		memcpy(&__entry->data, data, size);
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size,
++		__entry->size, &__entry->data
++	)
++);
++
++TRACE_EVENT(fsi_master_rw_result,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size,
++			bool write, const void *data, int ret),
++	TP_ARGS(master, link, id, addr, size, write, data, ret),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++		__field(bool,	write)
++		__field(__u32,	data)
++		__field(int,	ret)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++		__entry->write = write;
++		__entry->data = 0;
++		__entry->ret = ret;
++		if (__entry->write || !__entry->ret)
++			memcpy(&__entry->data, data, size);
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size,
++		__entry->write ? "<=" : "=>",
++		__entry->size, &__entry->data,
++		__entry->ret
++	)
++);
++
++TRACE_EVENT(fsi_master_break,
++	TP_PROTO(const struct fsi_master *master, int link),
++	TP_ARGS(master, link),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++	),
++	TP_printk("fsi%d:%d",
++		__entry->master_idx,
++		__entry->link
++	)
++);
 +
 +
++#endif /* _TRACE_FSI_H */
 +
- extern struct bus_type fsi_bus_type;
- 
- #endif /* LINUX_FSI_H */
++#include <trace/define_trace.h>
 -- 
 1.8.2.2
