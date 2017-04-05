@@ -1,65 +1,33 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 5 Apr 2017 11:14:34 -0700
-Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170405174921.GB2752@e104818-lin.cambridge.arm.com>
-References: <20170404174727.35478-1-thgarnie@google.com>
- <20170404174727.35478-4-thgarnie@google.com>
- <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
- <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
- <20170405174921.GB2752@e104818-lin.cambridge.arm.com>
-Message-ID: <CAJcbSZGYC4cKqyYDXh9LvDctnrGZGxxTSTmtaxMAipQgZ8A-pQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 5 Apr 2017 14:17:55 -0400
+Subject: [PATCH 0/3] arm: dts: renesas: Drop _clk suffix from clock node
+ names
+In-Reply-To: <CAMuHMdWSLKjcyQP25mPCwn8EV1xzAyC=AipT8E0DbeVoEeemAw@mail.gmail.com>
+References: <1491214089-14093-1-git-send-email-geert+renesas@glider.be>
+ <20170405013815.GK18246@codeaurora.org>
+ <CAMuHMdWSLKjcyQP25mPCwn8EV1xzAyC=AipT8E0DbeVoEeemAw@mail.gmail.com>
+Message-ID: <20170405181755.GA31226@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 10:49 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Apr 05, 2017 at 07:36:17AM -0700, Thomas Garnier wrote:
->> On Wed, Apr 5, 2017 at 7:22 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Tue, Apr 04, 2017 at 10:47:27AM -0700, Thomas Garnier wrote:
->> >> +
->> >>       ldr     x1, [tsk, #TSK_TI_FLAGS]
->> >>       and     x2, x1, #_TIF_WORK_MASK
->> >>       cbnz    x2, work_pending
->> >> @@ -779,6 +788,12 @@ finish_ret_to_user:
->> >>       kernel_exit 0
->> >>  ENDPROC(ret_to_user)
->> >>
->> >> +addr_limit_fail:
->> >> +     stp     x0, lr, [sp,#-16]!
->> >> +     bl      asm_verify_pre_usermode_state
->> >> +     ldp     x0, lr, [sp],#16
->> >> +     ret     lr
->> >
->> > Where is this supposed to return? What is the value of lr when branching
->> > to addr_limit_fail?
->>
->> It is not supposed to return. Do you think I should remove stp, ldp,
->> ret and jut add a brk 0x100 or jmp/call a break/bug function?
->
-> Can you not just make addr_limit_fail a C function which never returns
-> (similar to what we to with bad_mode() on arm64)? Since addr_limit_fail
-> is only called when the segment is not the right one, I don't really see
-> why you need another call to asm_verify_pre_usermode_state() to do a
-> similar check again. Just panic in addr_limit_fail (unless I
-> misunderstood what you are trying to achieve).
+On Wed, Apr 05, 2017 at 09:09:20AM +0200, Geert Uytterhoeven wrote:
+> Hi Stephen,
+> 
+> On Wed, Apr 5, 2017 at 3:38 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 04/03, Geert Uytterhoeven wrote:
+> >> The current practice is to not add _clk suffixes to clock node names in
+> >> DT, as these names are used as the actual clock names.
+> >>
+> >> This patch removes the remaining offenders in the various Renesas DTSes.
+> >
+> > This changes the names in the clk framework too though? If you're
+> > ok with that I'm ok too.
+> 
+> Yes, that's my main motivation doing this: it's a bit silly to have some clocks
+> show up in /sys/kernel/debug/clk/clk_summary with a "_clk" suffix.
+> 
+> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Thanks!
 
-Calling asm_verify_pre_usermode_state has the advantage of having a
-clear BUG_ON for the error (versus a panic description).
-
-What do you think about replacing asm_verify_pre_usermode_state by a
-"address_limit_fail" function that still calls
-verify_pre_usermode_state but panic afterwards (because it should
-never return)?
-
-The assembly code would be easier to understand and in case of error
-the BUG_ON is clear for the user.
-
->
-> --
-> Catalin
-
-
-
--- 
-Thomas
+Thanks, I have queued these up.
