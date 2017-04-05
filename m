@@ -1,157 +1,119 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 5 Apr 2017 16:25:02 +0800
-Subject: [linux-sunxi] Re: [PATCH 10/11] arm64: allwinner: a64: enable
- AXP803 regulators for Pine64
-In-Reply-To: <20170405080857.hetsjgatyh6hbsoh@lukather>
-References: <20170405061552.C15201033DF@relay.mailchannels.net>
- <20170405080857.hetsjgatyh6hbsoh@lukather>
-Message-ID: <7858d4bc-aec9-e4e9-9d3c-5742267c324e@aosc.io>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 5 Apr 2017 10:12:37 +0200
+Subject: [PATCH v2 2/5] KVM: arm/arm64: Add ARM user space interrupt
+ signaling ABI
+In-Reply-To: <5fe89e77-4fcc-f2e5-a796-a1e1f38eef9f@suse.de>
+References: <20170203145655.15007-1-cdall@linaro.org>
+ <20170203145655.15007-3-cdall@linaro.org>
+ <CAFEAcA-HMZnjbnhDC-13rWuQP-X2pk-W-6DvSR8n9_f-e4R=cA@mail.gmail.com>
+ <20170221114153.GA26976@cbox>
+ <5fe89e77-4fcc-f2e5-a796-a1e1f38eef9f@suse.de>
+Message-ID: <20170405081237.GB1526@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 05, 2017 at 02:14:11AM +0200, Alexander Graf wrote:
+> 
+> 
+> On 21.02.17 12:41, Christoffer Dall wrote:
+> >Hi Alex,
+> >
+> >On Fri, Feb 03, 2017 at 05:51:18PM +0000, Peter Maydell wrote:
+> >>On 3 February 2017 at 14:56, Christoffer Dall <cdall@linaro.org> wrote:
+> >>>From: Christoffer Dall <christoffer.dall@linaro.org>
+> >>>
+> >>>We have 2 modes for dealing with interrupts in the ARM world. We can
+> >>>either handle them all using hardware acceleration through the vgic or
+> >>>we can emulate a gic in user space and only drive CPU IRQ pins from
+> >>>there.
+> >>>
+> >>>Unfortunately, when driving IRQs from user space, we never tell user
+> >>>space about events from devices emulated inside the kernel, which may
+> >>>result in interrupt line state changes, so we lose out on for example
+> >>>timer and PMU events if we run with user space gic emulation.
+> >>>
+> >>>Define an ABI to publish such device output levels to userspace.
+> >>>
+> >>>Signed-off-by: Alexander Graf <agraf@suse.de>
+> >>>Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >>
+> >>
+> >>Acked-by: Peter Maydell <peter.maydell@linaro.org>
+> >>
+> >>for the userspace ABI/docs part.
+> >>
+> >
+> >Given Peter's ack on this ABI, any chance you could take a look at
+> >fixing the userspace SMP issue and respinning the userspace patches for
+> >this series?
+> 
+> The problem with user space SMP was simply a missing lock:
+> 
+> diff --git a/target/arm/kvm.c b/target/arm/kvm.c
+> index a66845f..1b33895 100644
+> --- a/target/arm/kvm.c
+> +++ b/target/arm/kvm.c
+> @@ -548,10 +548,14 @@ MemTxAttrs kvm_arch_post_run(CPUState *cs,
+> struct kvm_run *run)
+> 
+>      /* Synchronize our internal vtimer irq line with the kvm one */
+>      if (run->s.regs.device_irq_level != cpu->device_irq_level) {
+> -        qemu_set_irq(ARM_CPU(cs)->gt_timer_outputs[GTIMER_VIRT],
+> +        qemu_mutex_lock_iothread();
+> +        qemu_set_irq(cpu->gt_timer_outputs[GTIMER_VIRT],
+>                       run->s.regs.device_irq_level &
+> KVM_ARM_DEV_EL1_VTIMER);
+> +        qemu_set_irq(cpu->gt_timer_outputs[GTIMER_PHYS],
+> +                     run->s.regs.device_irq_level &
+> KVM_ARM_DEV_EL1_PTIMER);
+>          /* TODO: Handle changes in PTIMER and PMU as well */
+>          cpu->device_irq_level = run->s.regs.device_irq_level;
+> +        qemu_mutex_unlock_iothread();
+>      }
+> 
+>      return MEMTXATTRS_UNSPECIFIED;
+> 
+> ----
+> 
+> 
+> I also wasn't able to use your series out of the box. There are
+> several places in the code that check whether a timer is enabled
+> (for register save/restore for example) and without vgic we never
+> ended up setting that to true.
+> 
+> I don't know how safe it is to set it to true regardless. It feels
+> to me like someone has to put more thought into how to switch from
+> an initialized user space timer state to a vgic one. For reference,
+> my test patch is below:
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 891a725..56a5d51 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -629,8 +629,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  		return 0;
+> 
+>  	/* Without a VGIC we do not map virtual IRQs to physical IRQs */
+> -	if (!irqchip_in_kernel(vcpu->kvm))
+> +	if (!irqchip_in_kernel(vcpu->kvm)) {
+> +		/* Enable timer for now, may be racy? */
+> +		timer->enabled = 1;
+>  		return 0;
+> +	}
+> 
+>  	if (!vgic_initialized(vcpu->kvm))
+>  		return -ENODEV;
+> 
 
+Heh, sorry about this, I accidentally pushed the wrong content to my git
+repo, so I'm guessing you pulled from there instead of applying these
+patches directly.  If you want a branch with these patches as intended,
+try this:
 
-? 2017?04?05? 16:08, Maxime Ripard ??:
-> On Wed, Apr 05, 2017 at 02:15:43PM +0800, Icenowy Zheng wrote:
->>
->> 2017?4?5? 14:13? Maxime Ripard <maxime.ripard@free-electrons.com>???
->>>
->>> On Wed, Apr 05, 2017 at 02:01:44AM +0800, Icenowy Zheng wrote:
->>>> Add support of AXP803 regulators in the Pine64 device tree, in order to
->>>> enable many future functionalities, e.g. Wi-Fi.
->>>>
->>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> ---
->>>>   .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109 +++++++++++++++++++++
->>>>   1 file changed, 109 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->>>> index 2132d8e6cb3d..7da074f95065 100644
->>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
->>>> @@ -106,6 +106,115 @@
->>>>   };
->>>>   };
->>>>
->>>> +#include "axp803.dtsi"
->>>> +
->>>> +&reg_aldo1 {
->>>> + regulator-min-microvolt = <2800000>;
->>>> + regulator-max-microvolt = <2800000>;
->>>> + regulator-name = "vcc-csi";
->>>> +};
->>>> +
->>>> +&reg_aldo2 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <1800000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "vcc-pl";
->>>> +};
->>>> +
->>>> +&reg_aldo3 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <2700000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "vcc-pll-avcc";
->>>> +};
->>>> +
->>>> +&reg_dc1sw {
->>>> + regulator-name = "vcc-phy";
->>>> +};
->>>> +
->>>> +&reg_dcdc1 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <3300000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "vcc-3v3";
->>>> +};
->>>> +
->>>> +&reg_dcdc2 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <1000000>;
->>>> + regulator-max-microvolt = <1300000>;
->>>> + regulator-name = "vdd-cpux";
->>>> +};
->>>> +
->>>> +/* DCDC3 is polyphased with DCDC2 */
->>>> +
->>>> +&reg_dcdc5 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <1500000>;
->>>> + regulator-max-microvolt = <1500000>;
->>>> + regulator-name = "vcc-dram";
->>>> +};
->>>> +
->>>> +&reg_dcdc6 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <1100000>;
->>>> + regulator-max-microvolt = <1100000>;
->>>> + regulator-name = "vdd-sys";
->>>> +};
->>>> +
->>>> +&reg_dldo1 {
->>>> + regulator-min-microvolt = <3300000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "vcc-hdmi";
->>>> +};
->>>> +
->>>> +&reg_dldo2 {
->>>> + regulator-min-microvolt = <3300000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "vcc-mipi";
->>>> +};
->>>> +
->>>> +&reg_dldo3 {
->>>> + regulator-min-microvolt = <3300000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "avdd-csi";
->>>> +};
->>>> +
->>>> +&reg_dldo4 {
->>>> + regulator-min-microvolt = <3300000>;
->>>> + regulator-max-microvolt = <3300000>;
->>>> + regulator-name = "vcc-wifi";
->>>> +};
->>>> +
->>>> +&reg_eldo1 {
->>>> + regulator-min-microvolt = <1800000>;
->>>> + regulator-max-microvolt = <1800000>;
->>>> + regulator-name = "cpvdd";
->>>> +};
->>>> +
->>>> +&reg_eldo3 {
->>>> + regulator-min-microvolt = <1800000>;
->>>> + regulator-max-microvolt = <1800000>;
->>>> + regulator-name = "vdd-1v8-csi";
->>>> +};
->>>> +
->>>> +&reg_fldo1 {
->>>> + regulator-min-microvolt = <1200000>;
->>>> + regulator-max-microvolt = <1200000>;
->>>> + regulator-name = "vcc-1v2-hsic";
->>>> +};
->>>> +
->>>> +&reg_fldo2 {
->>>> + regulator-always-on;
->>>> + regulator-min-microvolt = <1100000>;
->>>> + regulator-max-microvolt = <1100000>;
->>>> + regulator-name = "vdd-cpus";
->>>> +};
->>>
->>> Why do you need to always power the AR100 on?
->>
->> It's for CPUS power domain, not the AR100 processor.
->>
->> Kill it will lead to instantly system hang.
->
-> What are you calling CPUS then?
+git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git irqs-to-user-v2-for-real
 
-I think it's the full zone after 0x01f00000 (all R_
-peripherals)
+I have a v3 ready based on v4.11-rc1 plus other KVM fixes and I'll send
+that out later today once I've tested with your qemu fix above.
 
-In A23/A33 we also called this "vdd-cpus" and it should
-be always-on.
-
->
-> Maxime
->
+Thanks,
+-Christoffer
