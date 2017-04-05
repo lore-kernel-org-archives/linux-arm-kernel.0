@@ -1,240 +1,319 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed,  5 Apr 2017 10:02:42 -0600
-Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without struct
- page
-Message-ID: <20170405160242.14195-1-shuahkh@osg.samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 05 Apr 2017 18:03:27 +0200
+Subject: [PATCH v4 5/7] pinctrl: aramda-37xx: Add irqchip support
+In-Reply-To: <70ffe3343c13d01737bf74e5de4898d0c0be07a0.1491405475.git-series.gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Wed, 5 Apr 2017 17:18:06 +0200")
+References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+ <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+ <70ffe3343c13d01737bf74e5de4898d0c0be07a0.1491405475.git-series.gregory.clement@free-electrons.com>
+Message-ID: <87d1cq6dv4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When coherent DMA memory without struct page is shared, importer
-fails to find the page and runs into kernel page fault when it
-tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
-in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
-for more information on this problem.
 
-This solution allows coherent DMA memory without struct page to be
-shared by providing a way for the exporter to tag the DMA buffer as
-a special buffer without struct page association and passing the
-information in sg_table to the importer. This information is used
-in attach/map_sg to avoid cleaning D-cache and mapping.
+Argh, I sill have the typo in the title of this patch! :(
 
-The details of the change are:
+If you are going to apply it could you fix it, else it will be fixed in
+the next version.
 
-Framework:
-- Add a new dma_attrs field to struct scatterlist.
-- Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
-  Coherent memory without struct page.
-- Add a new dma_check_dev_coherent() interface to check if memory is
-  the device coherent area. There is no way to tell where the memory
-  returned by dma_alloc_attrs() came from.
+Sorry,
 
-Exporter logic:
-- Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
-  DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
-  done in the exporter context.
-- Add logic to arm_dma_get_sgtable() to identify memory without struct
-  page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
-  set, arm_dma_get_sgtable() will set page as the cpu_addr and update
-  dma_address and dma_attrs fields in struct scatterlist for this sgl.
-  This is done in exporter context when buffer is exported. With this
-  Note: This change is made on top of Russell King's patch that added
-  !pfn_valid(pfn) check to arm_dma_get_sgtable() to error out on invalid
-  pages. Coherent memory without struct page will trigger this error.
+Gregory
 
-Importer logic:
-- Add logic to vb2_dc_dmabuf_ops_attach() to identify memory without
-  struct page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute when it copies
-  the sg_table from the exporter. It will copy dma_attrs and dma_address
-  fields. With this logic, dmabuf_ops_attach will no longer trip on an
-  invalid page.
-- Add logic to arm_dma_map_sg() to avoid mapping the page when sg_table
-  has DMA_ATTR_DEV_COHERENT_NOPAGE buffer.
-- Add logic to arm_dma_unmap_sg() to do nothing for sg entries with
-  DMA_ATTR_DEV_COHERENT_NOPAGE attribute.
-
-Without this change the following use-case that runs into kernel
-pagefault when importer tries to attach the exported buffer.
-
-With this change it works: (what a relief after watching pagefaults for
-weeks!!)
-
-gst-launch-1.0 filesrc location=~/GH3_MOV_HD.mp4 ! qtdemux ! h264parse ! v4l2video4dec capture-io-mode=dmabuf ! v4l2video7convert output-io-mode=dmabuf-import ! kmssink force-modesetting=true
-
-I am sending RFC patch to get feedback on the approach and see if I missed
-anything.
-
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
- arch/arm/mm/dma-mapping.c                      | 34 ++++++++++++++++++++++----
- drivers/base/dma-coherent.c                    | 25 +++++++++++++++++++
- drivers/media/v4l2-core/videobuf2-dma-contig.c |  6 +++++
- include/linux/dma-mapping.h                    |  8 ++++++
- include/linux/scatterlist.h                    |  1 +
- 5 files changed, 69 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 63eabb0..75c6692 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -939,13 +939,28 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
- 		 void *cpu_addr, dma_addr_t handle, size_t size,
- 		 unsigned long attrs)
- {
--	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
-+	unsigned long pfn = dma_to_pfn(dev, handle);
-+	struct page *page;
- 	int ret;
  
-+	/* If the PFN is not valid, we do not have a struct page. */
-+	if (!pfn_valid(pfn)) {
-+		/* If memory is from per-device coherent area, use cpu_addr */
-+		if (attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
-+			page = cpu_addr;
-+		else
-+			return -ENXIO;
-+	} else
-+		page = pfn_to_page(pfn);
-+
- 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
- 	if (unlikely(ret))
- 		return ret;
- 
-+	if (attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
-+		sgt->sgl->dma_address = handle;
-+
-+	sgt->sgl->dma_attrs = attrs;
- 	sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
- 	return 0;
- }
-@@ -1080,10 +1095,17 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
- #ifdef CONFIG_NEED_SG_DMA_LENGTH
- 		s->dma_length = s->length;
- #endif
--		s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
-+		/*
-+		 * there is no struct page for this DMA buffer.
-+		 * s->dma_address is the handle
-+		 */
-+		if (!(s->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)) {
-+			s->dma_address = ops->map_page(dev, sg_page(s),
-+						s->offset,
- 						s->length, dir, attrs);
--		if (dma_mapping_error(dev, s->dma_address))
--			goto bad_mapping;
-+			if (dma_mapping_error(dev, s->dma_address))
-+				goto bad_mapping;
-+		}
- 	}
- 	return nents;
- 
-@@ -1112,7 +1134,9 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 	int i;
- 
- 	for_each_sg(sg, s, nents, i)
--		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
-+		if (!(s->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE))
-+			ops->unmap_page(dev, sg_dma_address(s),
-+					sg_dma_len(s), dir, attrs);
- }
- 
- /**
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 640a7e6..d08cf44 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -209,6 +209,31 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- EXPORT_SYMBOL(dma_alloc_from_coherent);
- 
- /**
-+ * dma_check_dev_coherent() - checks if memory is from the device coherent area
-+ *
-+ * @dev:	device whose coherent area is checked to validate memory
-+ * @dma_handle:	dma handle associated with the allocated memory
-+ * @vaddr:	the virtual address to the allocated area.
-+ *
-+ * Returns true if memory does belong to the per-device cohrent area.
-+ * false otherwise.
-+ */
-+bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
-+				void *vaddr)
-+{
-+	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
-+
-+	if (mem && vaddr >= mem->virt_base &&
-+	    vaddr < (mem->virt_base + (mem->size << PAGE_SHIFT)) &&
-+	    dma_handle >= mem->device_base &&
-+	    dma_handle < (mem->device_base + (mem->size << PAGE_SHIFT)))
-+		return true;
-+
-+	return false;
-+}
-+EXPORT_SYMBOL(dma_check_dev_coherent);
-+
-+/**
-  * dma_release_from_coherent() - try to free the memory allocated from per-device coherent memory pool
-  * @dev:	device from which the memory was allocated
-  * @order:	the order of pages allocated
-diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-index fb6a177..f7caf2b 100644
---- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
-+++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
-@@ -161,6 +161,9 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
- 	if ((buf->attrs & DMA_ATTR_NO_KERNEL_MAPPING) == 0)
- 		buf->vaddr = buf->cookie;
- 
-+	if (dma_check_dev_coherent(dev, buf->dma_addr, buf->cookie))
-+		buf->attrs |= DMA_ATTR_DEV_COHERENT_NOPAGE;
-+
- 	/* Prevent the device from being released while the buffer is used */
- 	buf->dev = get_device(dev);
- 	buf->size = size;
-@@ -248,6 +251,9 @@ static int vb2_dc_dmabuf_ops_attach(struct dma_buf *dbuf, struct device *dev,
- 	rd = buf->sgt_base->sgl;
- 	wr = sgt->sgl;
- 	for (i = 0; i < sgt->orig_nents; ++i) {
-+		if (rd->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
-+			wr->dma_address = rd->dma_address;
-+		wr->dma_attrs = rd->dma_attrs;
- 		sg_set_page(wr, sg_page(rd), rd->length, rd->offset);
- 		rd = sg_next(rd);
- 		wr = sg_next(wr);
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 0977317..9f3ec53 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -70,6 +70,12 @@
- #define DMA_ATTR_PRIVILEGED		(1UL << 9)
- 
- /*
-+ * DMA_ATTR_DEV_COHERENT_NOPAGE: This is a hint to the DMA-mapping sub-system
-+ * that this memory isn't backed by struct page.
-+ */
-+#define DMA_ATTR_DEV_COHERENT_NOPAGE	(1UL << 10)
-+
-+/*
-  * A dma_addr_t can hold any valid DMA or bus address for the platform.
-  * It can be given to a device to use as a DMA source or target.  A CPU cannot
-  * reference a dma_addr_t directly because there may be translation between
-@@ -160,6 +166,8 @@ static inline int is_device_dma_capable(struct device *dev)
-  */
- int dma_alloc_from_coherent(struct device *dev, ssize_t size,
- 				       dma_addr_t *dma_handle, void **ret);
-+bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
-+				void *vaddr);
- int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
- 
- int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
-diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
-index cb3c8fe..7da610b 100644
---- a/include/linux/scatterlist.h
-+++ b/include/linux/scatterlist.h
-@@ -18,6 +18,7 @@ struct scatterlist {
- #ifdef CONFIG_NEED_SG_DMA_LENGTH
- 	unsigned int	dma_length;
- #endif
-+	unsigned long	dma_attrs;
- };
- 
- /*
+ On mer., avril 05 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
+> only manage the edge ones.
+>
+> The way the interrupt are managed are classical so we can use the generic
+> interrupt chip model.
+>
+> The only unusual "feature" is that many interrupts are connected to the
+> parent interrupt controller. But we do not take advantage of this and use
+> the chained irq with all of them.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 221 +++++++++++++++++++++-
+>  1 file changed, 221 insertions(+)
+>
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> index 5c96f5558310..7356516e0921 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> @@ -13,7 +13,9 @@
+>  #include <linux/gpio/driver.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/pinctrl/pinconf-generic.h>
+>  #include <linux/pinctrl/pinconf.h>
+>  #include <linux/pinctrl/pinctrl.h>
+> @@ -30,6 +32,11 @@
+>  #define OUTPUT_CTL	0x20
+>  #define SELECTION	0x30
+>  
+> +#define IRQ_EN		0x0
+> +#define IRQ_POL		0x08
+> +#define IRQ_STATUS	0x10
+> +#define IRQ_WKUP	0x18
+> +
+>  #define NB_FUNCS 2
+>  #define GPIO_PER_REG	32
+>  
+> @@ -75,9 +82,12 @@ struct armada_37xx_pmx_func {
+>  
+>  struct armada_37xx_pinctrl {
+>  	struct regmap			*regmap;
+> +	void __iomem			*base;
+>  	const struct armada_37xx_pin_data	*data;
+>  	struct device			*dev;
+>  	struct gpio_chip		gpio_chip;
+> +	struct irq_chip			irq_chip;
+> +	spinlock_t			irq_lock;
+>  	struct pinctrl_desc		pctl;
+>  	struct pinctrl_dev		*pctl_dev;
+>  	struct armada_37xx_pin_group	*groups;
+> @@ -346,6 +356,14 @@ static int armada_37xx_pmx_set(struct pinctrl_dev *pctldev,
+>  	return armada_37xx_pmx_set_by_name(pctldev, name, grp);
+>  }
+>  
+> +static inline void armada_37xx_irq_update_reg(unsigned int *reg,
+> +					  struct irq_data *d)
+> +{
+> +	int offset = irqd_to_hwirq(d);
+> +
+> +	armada_37xx_update_reg(reg, offset);
+> +}
+> +
+>  static int armada_37xx_gpio_direction_input(struct gpio_chip *chip,
+>  					    unsigned int offset)
+>  {
+> @@ -468,6 +486,206 @@ static const struct gpio_chip armada_37xx_gpiolib_chip = {
+>  	.owner = THIS_MODULE,
+>  };
+>  
+> +void armada_37xx_irq_ack(struct irq_data *d)
+> +{
+> +	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> +	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +	u32 reg = IRQ_STATUS, mask = d->mask;
+> +	unsigned long flags;
+> +
+> +	armada_37xx_irq_update_reg(&reg, d);
+> +	spin_lock_irqsave(&info->irq_lock, flags);
+> +	writel(mask, info->base + reg);
+> +	spin_unlock_irqrestore(&info->irq_lock, flags);
+> +}
+> +
+> +void armada_37xx_irq_mask(struct irq_data *d)
+> +{
+> +	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> +	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +	u32 val, reg = IRQ_EN, mask = d->mask;
+> +	unsigned long flags;
+> +
+> +	armada_37xx_irq_update_reg(&reg, d);
+> +	spin_lock_irqsave(&info->irq_lock, flags);
+> +	val = readl(info->base + reg);
+> +	writel(val & ~mask, info->base + reg);
+> +	spin_unlock_irqrestore(&info->irq_lock, flags);
+> +}
+> +
+> +void armada_37xx_irq_unmask(struct irq_data *d)
+> +{
+> +	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> +	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +	u32 val, reg = IRQ_EN, mask = d->mask;
+> +	unsigned long flags;
+> +
+> +	armada_37xx_irq_update_reg(&reg, d);
+> +	spin_lock_irqsave(&info->irq_lock, flags);
+> +	val = readl(info->base + reg);
+> +	writel(val | mask, info->base + reg);
+> +	spin_unlock_irqrestore(&info->irq_lock, flags);
+> +}
+> +
+> +static int armada_37xx_irq_set_wake(struct irq_data *d, unsigned int on)
+> +{
+> +	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> +	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +	u32 val, reg = IRQ_WKUP, mask = d->mask;
+> +	unsigned long flags;
+> +
+> +	armada_37xx_irq_update_reg(&reg, d);
+> +	spin_lock_irqsave(&info->irq_lock, flags);
+> +	val = readl(info->base + reg);
+> +	if (on)
+> +		val |= mask;
+> +	else
+> +		val &= ~mask;
+> +	writel(val, info->base + reg);
+> +	spin_unlock_irqrestore(&info->irq_lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
+> +{
+> +	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> +	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+> +	u32 val, reg = IRQ_POL, mask = d->mask;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&info->irq_lock, flags);
+> +	armada_37xx_irq_update_reg(&reg, d);
+> +	val = readl(info->base + reg);
+> +	switch (type) {
+> +	case IRQ_TYPE_EDGE_RISING:
+> +		val &= ~mask;
+> +		break;
+> +	case IRQ_TYPE_EDGE_FALLING:
+> +		val |= mask;
+> +		break;
+> +	default:
+> +		spin_unlock_irqrestore(&info->irq_lock, flags);
+> +		return -EINVAL;
+> +	}
+> +	writel(val, info->base + reg);
+> +	spin_unlock_irqrestore(&info->irq_lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +
+> +static void armada_37xx_irq_handler(struct irq_desc *desc)
+> +{
+> +	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +	struct armada_37xx_pinctrl *info = gpiochip_get_data(gc);
+> +	struct irq_domain *d = gc->irqdomain;
+> +	int i;
+> +
+> +	chained_irq_enter(chip, desc);
+> +	for (i = 0; i <= d->revmap_size / GPIO_PER_REG; i++) {
+> +		u32 status;
+> +		unsigned long flags;
+> +
+> +		spin_lock_irqsave(&info->irq_lock, flags);
+> +		status = readl_relaxed(info->base + IRQ_STATUS + 4 * i);
+> +		/* Manage only the interrupt that was enabled */
+> +		status &= readl_relaxed(info->base + IRQ_EN + 4 * i);
+> +		spin_unlock_irqrestore(&info->irq_lock, flags);
+> +		while (status) {
+> +			u32 hwirq = ffs(status) - 1;
+> +			u32 virq = irq_find_mapping(d, hwirq +
+> +						     i * GPIO_PER_REG);
+> +
+> +			generic_handle_irq(virq);
+> +			status &= ~BIT(hwirq);
+> +		}
+> +	}
+> +	chained_irq_exit(chip, desc);
+> +}
+> +
+> +static int armada_37xx_irqchip_register(struct platform_device *pdev,
+> +					struct armada_37xx_pinctrl *info)
+> +{
+> +	struct device_node *np = info->dev->of_node;
+> +	int nrirqs = info->data->nr_pins;
+> +	struct gpio_chip *gc = &info->gpio_chip;
+> +	struct irq_chip *irqchip = &info->irq_chip;
+> +	struct resource res;
+> +	int ret = -ENODEV, i, nr_irq_parent;
+> +
+> +	for_each_child_of_node(info->dev->of_node, np) {
+> +		if (of_find_property(np, "gpio-controller", NULL)) {
+> +			ret = 0;
+> +			break;
+> +		}
+> +	};
+> +	if (ret)
+> +		return ret;
+> +
+> +	nr_irq_parent = of_irq_count(np);
+> +	spin_lock_init(&info->irq_lock);
+> +
+> +	if (!nr_irq_parent) {
+> +		dev_err(&pdev->dev, "Invalid or no IRQ\n");
+> +		return 0;
+> +	}
+> +
+> +	if (of_address_to_resource(info->dev->of_node, 1, &res)) {
+> +		dev_err(info->dev, "cannot find IO resource\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	info->base = devm_ioremap_resource(info->dev, &res);
+> +	if (IS_ERR(info->base))
+> +		return PTR_ERR(info->base);
+> +
+> +	irqchip->irq_ack = armada_37xx_irq_ack;
+> +	irqchip->irq_mask = armada_37xx_irq_mask;
+> +	irqchip->irq_unmask = armada_37xx_irq_unmask;
+> +	irqchip->irq_set_wake = armada_37xx_irq_set_wake;
+> +	irqchip->irq_set_type = armada_37xx_irq_set_type;
+> +	irqchip->name = info->data->name;
+> +
+> +	ret = gpiochip_irqchip_add(gc, irqchip, 0,
+> +				   handle_edge_irq, IRQ_TYPE_NONE);
+> +	if (ret) {
+> +		dev_info(&pdev->dev, "could not add irqchip\n");
+> +		return ret;
+> +	}
+> +
+> +	/*
+> +	 * Many interrupts are connected to the parent interrupt
+> +	 * controller. But we do not take advantage of this and use
+> +	 * the chained irq with all of them.
+> +	 */
+> +	for (i = 0; i < nrirqs; i++) {
+> +		struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
+> +
+> +		/*
+> +		 * The mask field is a "precomputed bitmask for
+> +		 * accessing the chip registers" which was introduced
+> +		 * for the generic irqchip framework. As we don't use
+> +		 * this framework, we can reuse this field for our own
+> +		 * usage.
+> +		 */
+> +		d->mask = BIT(i % GPIO_PER_REG);
+> +	}
+> +
+> +	for (i = 0; i < nr_irq_parent; i++) {
+> +		int irq = irq_of_parse_and_map(np, i);
+> +
+> +		if (irq < 0)
+> +			continue;
+> +
+> +		gpiochip_set_chained_irqchip(gc, irqchip, irq,
+> +					     armada_37xx_irq_handler);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int armada_37xx_gpiochip_register(struct platform_device *pdev,
+>  					struct armada_37xx_pinctrl *info)
+>  {
+> @@ -496,6 +714,9 @@ static int armada_37xx_gpiochip_register(struct platform_device *pdev,
+>  	ret = devm_gpiochip_add_data(&pdev->dev, gc, info);
+>  	if (ret)
+>  		return ret;
+> +	ret = armada_37xx_irqchip_register(pdev, info);
+> +	if (ret)
+> +		return ret;
+>  
+>  	return 0;
+>  }
+> -- 
+> git-series 0.9.1
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
