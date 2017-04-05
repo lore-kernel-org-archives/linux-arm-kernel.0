@@ -1,61 +1,84 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 05 Apr 2017 12:11:11 +0200
-Subject: [PATCH v4 4/6] arm64: dts: rockchip: add core dtsi file for
- RK3328 SoCs
-In-Reply-To: <58E4516D.4000805@rock-chips.com>
-References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
- <6636047.jL6XHNkknt@phil> <58E4516D.4000805@rock-chips.com>
-Message-ID: <4811905.ImQG7774i7@diego>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 5 Apr 2017 10:57:52 +0100
+Subject: [PATCH v3 00/11] add thermal throttling to Allwinner A33 SoC
+In-Reply-To: <fcc2ec2c-cf46-0cf9-1933-53511fe77cf2@free-electrons.com>
+References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
+ <20170404083133.ffrsxjsakynruwzv@dell>
+ <fcc2ec2c-cf46-0cf9-1933-53511fe77cf2@free-electrons.com>
+Message-ID: <20170405095752.pji6o7u5no6svd5i@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
-
-Am Mittwoch, 5. April 2017, 10:07:41 CEST schrieb Elaine Zhang:
-> On 04/05/2017 12:04 AM, Heiko Stuebner wrote:
-> > Am Montag, 27. M?rz 2017, 17:40:48 CEST schrieb cl at rock-chips.com:
-> >> From: Liang Chen <cl@rock-chips.com>
-> >> 
-> >> This patch adds core dtsi file for Rockchip RK3328 SoCs.
-> >> 
-> >> Signed-off-by: Liang Chen <cl@rock-chips.com>
+On Wed, 05 Apr 2017, Quentin Schulz wrote:
+> On 04/04/2017 10:31, Lee Jones wrote:
+> > On Tue, 21 Mar 2017, Quentin Schulz wrote:
+> >> v3:
+> >>   - fixed compatible name in DT and in documentation,
+> >>   - fixed DT node name and label,
+> >>   - added explanations in commit logs,
+> >>   - moved frequencies that need overvolting to board DTS instead of A33 DTSI,
+> >>   - fixed a typo in if is_enabled condition,
+> >>   - removed all patches concerning Olimex Olinuxino (no HW to test on),
 > > 
-> > applied for 4.12, with the following list of changes:
+> > What is the plan for this series?
 > > 
-> > - reorder some properties to bring them in alphabetical order
-> > - dropped the status-disabled from the power-controller
+> > I'm guessing there are no hard dependencies on the ARM parts?
 > > 
-> >    power-domain control is a quite essential part of the system, so if
-> >    boards really want to disable them, they should do it in their board
-> >    file
-> >    Having power-domains on all the time, is also our default in all other
-> >    devicetrees.
+> > If not, I'm happy to take the changes to 'drivers/*'.
 > > 
-> > - removed #dma-cells from spi0 -> this is not a dma controller
-> > - reword the cru assigned-clocks comment a bit
-> > - fixed sdmmc1_bus4 pins, as indicated by Shawn and after looking up the
-> > 
-> >    correct pins in the manual
-> > 
-> > And a final question, are you sure about SCLK_PDM becoming a child of the
-> > APLL in your cru assigned-clocks, as the APLL will vary later on with
-> > cpufreq active?
 > 
-> the NPLL will vary later on with cpufreq active.
+> I've sent a v4 to add some Acked-by and change a few commit "titles".
+> It's ready to be merged with only the following patch required (which
+> Jonathan asked if you could merge it through the mfd tree): "[RESEND
+> PATCH v4] iio: adc: add support for X-Powers AXP20X and AXP22X PMICs
+> ADCs" (https://patchwork.kernel.org/patch/9660879/)
+
+Right, but how would you like *this* patch-set applied?
+
+I'm guessing the ARM patches need to go in via ARM-SoC.
+
+What about the drivers/{input,iio,mfd} patches?
+
+I'm guessing they're to all go in via my tree?
+
+> >> [1] https://lkml.org/lkml/2016/12/13/298 : "[PATCH v9] add support for Allwinner
+> >> SoCs ADC"
+> >>
+> >> Thanks,
+> >> Quentin
+> >>
+> >> Maxime Ripard (1):
+> >>   ARM: sun8i: a33: Add devfreq-based GPU cooling
+> >>
+> >> Quentin Schulz (10):
+> >>   ARM: sun8i: a33: add operating-points-v2 property to all nodes
+> >>   ARM: sun8i: a33: add all operating points
+> >>   ARM: dts: sun8i: sina33: add cpu-supply
+> >>   Documentation: DT: bindings: mfd: add A33 GPADC binding
+> >>   Documentation: DT: bindings: input: touschcreen: remove sun4i
+> >>     documentation
+> >>   iio: adc: sun4i-gpadc-iio: move code used in MFD probing to new
+> >>     function
+> >>   iio: adc: sun4i-gpadc-iio: add support for A33 thermal sensor
+> >>   ARM: dtsi: sun8i: a33: add thermal sensor
+> >>   ARM: dtsi: sun8i: a33: add CPU thermal throttling
+> >>   ARM: sun8i: sina33: add highest OPP of CPUs
+> >>
+> >>  .../touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt}  |  21 +++
+> >>  arch/arm/boot/dts/sun8i-a23-a33.dtsi               |   1 +
+> >>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  18 +++
+> >>  arch/arm/boot/dts/sun8i-a33.dtsi                   | 141 +++++++++++++++++
+> >>  drivers/iio/adc/Kconfig                            |   2 +-
+> >>  drivers/iio/adc/sun4i-gpadc-iio.c                  | 170 +++++++++++++++++----
+> >>  include/linux/mfd/sun4i-gpadc.h                    |   4 +
+> >>  7 files changed, 324 insertions(+), 33 deletions(-)
+> >>  rename Documentation/devicetree/bindings/{input/touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt} (64%)
+> >>
+> > 
 > 
-> The NPLL is better than APLL, so NPLL is for clk_core,and apll is for pdm.
-> 
-> please see the TRM in CRU:
-> 1.4 Function Description
-> /........./
-> To maximize the flexibility, some of clocks can select divider source
-> from 5 PLLs. (Note: It?s
-> recommended to use NEW PLL instead of ARM PLL as arm clock source,
-> because NEW PLL is
-> near to ARM. And it?s jitter is better than ARM PLL).
 
-Thanks for the clarification - this way it definitly makes sense.
-
-
-Thanks
-Heiko
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
