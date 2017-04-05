@@ -1,36 +1,111 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  5 Apr 2017 22:30:34 +0800
-Subject: [PATCH 2/2] arm64: allwinner: a64: add pmu0 regs for USB PHY
-In-Reply-To: <20170405143034.8868-1-icenowy@aosc.io>
-References: <20170405143034.8868-1-icenowy@aosc.io>
-Message-ID: <20170405143034.8868-3-icenowy@aosc.io>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 5 Apr 2017 07:33:19 -0700
+Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170405135933.GN23750@n2100.armlinux.org.uk>
+References: <20170328205511.21166-1-d-gerlach@ti.com>
+ <20170328205511.21166-3-d-gerlach@ti.com>
+ <20170404161151.GS10760@atomide.com>
+ <20170405135933.GN23750@n2100.armlinux.org.uk>
+Message-ID: <20170405143318.GE13234@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB PHY in A64 has a "pmu0" region, which controls the EHCI/OHCI
-controller pair that can be connected to the PHY0.
+* Russell King - ARM Linux <linux@armlinux.org.uk> [170405 07:02]:
+> On Tue, Apr 04, 2017 at 09:11:52AM -0700, Tony Lindgren wrote:
+> > Russell,
+> > 
+> > * Dave Gerlach <d-gerlach@ti.com> [170328 13:57]:
+> > > Certain SoCs like Texas Instruments AM335x and AM437x require parts
+> > > of the EMIF PM code to run late in the suspend sequence from SRAM,
+> > > such as saving and restoring the EMIF context and placing the memory
+> > > into self-refresh.
+> > > 
+> > > One requirement for these SoCs to suspend and enter its lowest power
+> > > mode, called DeepSleep0, is that the PER power domain must be shut off.
+> > > Because the EMIF (DDR Controller) resides within this power domain, it
+> > > will lose context during a suspend operation, so we must save it so we
+> > > can restore once we resume. However, we cannot execute this code from
+> > > external memory, as it is not available at this point, so the code must
+> > > be executed late in the suspend path from SRAM.
+> > > 
+> > > This patch introduces a ti-emif-sram driver that includes several
+> > > functions written in ARM ASM that are relocatable so the PM SRAM
+> > > code can use them. It also allocates a region of writable SRAM to
+> > > be used by the code running in the executable region of SRAM to save
+> > > and restore the EMIF context. It can export a table containing the
+> > > absolute addresses of the available PM functions so that other SRAM
+> > > code can branch to them. This code is required for suspend/resume on
+> > > AM335x and AM437x to work.
+> > > 
+> > > In addition to this, to be able to share data structures between C and
+> > > the ti-emif-sram-pm assembly code, we can automatically generate all of
+> > > the C struct member offsets and sizes as macros by making use of the ARM
+> > > asm-offsets file. In the same header that we define our data structures
+> > > in we also define all the macros in an inline function and by adding a
+> > > call to this in the asm_offsets file all macros are properly generated
+> > > and available to the assembly code without cluttering up the asm-offsets
+> > > file.
+> > > 
+> > > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > > ---
+> > >  arch/arm/kernel/asm-offsets.c    |   6 +
+> > >  drivers/memory/Kconfig           |  10 ++
+> > >  drivers/memory/Makefile          |   4 +
+> > >  drivers/memory/emif.h            |  17 ++
+> > >  drivers/memory/ti-emif-pm.c      | 295 ++++++++++++++++++++++++++++++++++
+> > >  drivers/memory/ti-emif-sram-pm.S | 334 +++++++++++++++++++++++++++++++++++++++
+> > >  include/linux/ti-emif-sram.h     | 143 +++++++++++++++++
+> > >  7 files changed, 809 insertions(+)
+> > >  create mode 100644 drivers/memory/ti-emif-pm.c
+> > >  create mode 100644 drivers/memory/ti-emif-sram-pm.S
+> > >  create mode 100644 include/linux/ti-emif-sram.h
+> > > 
+> > > diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> > > index 608008229c7d..d728b5660e36 100644
+> > > --- a/arch/arm/kernel/asm-offsets.c
+> > > +++ b/arch/arm/kernel/asm-offsets.c
+> > > @@ -28,6 +28,7 @@
+> > >  #include <asm/vdso_datapage.h>
+> > >  #include <asm/hardware/cache-l2x0.h>
+> > >  #include <linux/kbuild.h>
+> > > +#include <linux/ti-emif-sram.h>
+> > >  
+> > >  /*
+> > >   * Make sure that the compiler and target are compatible.
+> > > @@ -183,5 +184,10 @@ int main(void)
+> > >  #ifdef CONFIG_VDSO
+> > >    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
+> > >  #endif
+> > > +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+> > > +  BLANK();
+> > > +  ti_emif_offsets();
+> > > +#endif
+> > > +
+> > >    return 0; 
+> > >  }
+> > 
+> > Does the above look OK to you?
+> 
+> I'm not going to comment on this yet, but I'll instead comment on the
+> newly appeared sram_exec_copy() stuff.
+> 
+> So, a few years ago, we went to significant effort in ARM land to come
+> up with a way to _safely_ copy assembler from the kernel into SRAM,
+> because copying code to SRAM that is compiled in thumb mode and then
+> executing it is _not_ as simple as memcpy(), cast the pointer to a
+> function pointer, and then call the function pointer.
+> 
+> The SRAM stuff throws all that out, instead preferring the dumb memcpy()
+> approach.
+> 
+> This needs resolving, and I'd like to see it resolved to the satisfaction
+> of architecture maintainers before we progress any further down this
+> route.
 
-Add the MMIO region for PHY node.
+OK thanks, will wait until that is sorted out before merging any
+of the SRAM code.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Regards,
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1c64ea2d23f9..0565779e66fa 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -179,8 +179,10 @@
- 		usbphy: phy at 01c19400 {
- 			compatible = "allwinner,sun50i-a64-usb-phy";
- 			reg = <0x01c19400 0x14>,
-+			      <0x01c1a800 0x4>,
- 			      <0x01c1b800 0x4>;
- 			reg-names = "phy_ctrl",
-+				    "pmu0",
- 				    "pmu1";
- 			clocks = <&ccu CLK_USB_PHY0>,
- 				 <&ccu CLK_USB_PHY1>;
--- 
-2.12.2
+Tony
