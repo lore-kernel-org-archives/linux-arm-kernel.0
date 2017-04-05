@@ -1,148 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Apr 2017 08:13:39 +0200
-Subject: [PATCH 10/11] arm64: allwinner: a64: enable AXP803 regulators
- for Pine64
-In-Reply-To: <20170404180145.12897-11-icenowy@aosc.io>
-References: <20170404180145.12897-1-icenowy@aosc.io>
- <20170404180145.12897-11-icenowy@aosc.io>
-Message-ID: <20170405061339.lo76zihtqmhlkpgh@lukather>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 5 Apr 2017 08:27:40 +0200
+Subject: [PATCH] net: thunderx: Switch to pci_alloc_irq_vectors
+In-Reply-To: <1491298146-13609-1-git-send-email-tsrinivasulu@cavium.com>
+References: <1491298146-13609-1-git-send-email-tsrinivasulu@cavium.com>
+Message-ID: <20170405062740.GB26470@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 02:01:44AM +0800, Icenowy Zheng wrote:
-> Add support of AXP803 regulators in the Pine64 device tree, in order to
-> enable many future functionalities, e.g. Wi-Fi.
+On Tue, Apr 04, 2017 at 02:59:06PM +0530, dev.srinivasulu at gmail.com wrote:
+> From: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109 +++++++++++++++++++++
->  1 file changed, 109 insertions(+)
+> Remove deprecated pci_enable_msix API in favour of it's
+> successor pci_alloc_irq_vectors.
 > 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> index 2132d8e6cb3d..7da074f95065 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> @@ -106,6 +106,115 @@
->  	};
->  };
->  
-> +#include "axp803.dtsi"
-> +
-> +&reg_aldo1 {
-> +	regulator-min-microvolt = <2800000>;
-> +	regulator-max-microvolt = <2800000>;
-> +	regulator-name = "vcc-csi";
-> +};
-> +
-> +&reg_aldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-pl";
-> +};
-> +
-> +&reg_aldo3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <2700000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-pll-avcc";
-> +};
-> +
-> +&reg_dc1sw {
-> +	regulator-name = "vcc-phy";
-> +};
-> +
-> +&reg_dcdc1 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-3v3";
-> +};
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1300000>;
-> +	regulator-name = "vdd-cpux";
-> +};
-> +
-> +/* DCDC3 is polyphased with DCDC2 */
-> +
-> +&reg_dcdc5 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1500000>;
-> +	regulator-max-microvolt = <1500000>;
-> +	regulator-name = "vcc-dram";
-> +};
-> +
-> +&reg_dcdc6 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1100000>;
-> +	regulator-max-microvolt = <1100000>;
-> +	regulator-name = "vdd-sys";
-> +};
-> +
-> +&reg_dldo1 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-hdmi";
-> +};
-> +
-> +&reg_dldo2 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-mipi";
-> +};
-> +
-> +&reg_dldo3 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "avdd-csi";
-> +};
-> +
-> +&reg_dldo4 {
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +	regulator-name = "vcc-wifi";
-> +};
-> +
-> +&reg_eldo1 {
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-name = "cpvdd";
-> +};
-> +
-> +&reg_eldo3 {
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +	regulator-name = "vdd-1v8-csi";
-> +};
-> +
-> +&reg_fldo1 {
-> +	regulator-min-microvolt = <1200000>;
-> +	regulator-max-microvolt = <1200000>;
-> +	regulator-name = "vcc-1v2-hsic";
-> +};
-> +
-> +&reg_fldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1100000>;
-> +	regulator-max-microvolt = <1100000>;
-> +	regulator-name = "vdd-cpus";
-> +};
+> Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 
-Why do you need to always power the AR100 on?
+Looks good.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/7638a282/attachment.sig>
+Are you fine with me queueing this up together with the other
+pci_enable_msix() removal patches?
