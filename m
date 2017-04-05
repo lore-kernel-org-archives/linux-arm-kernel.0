@@ -1,35 +1,65 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed,  5 Apr 2017 13:30:01 -0500
-Subject: [PATCH 0/4] TI Bluetooth serdev support
-Message-ID: <20170405183005.20570-1-robh@kernel.org>
+Date: Wed,  5 Apr 2017 13:30:03 -0500
+Subject: [PATCH 2/4] bluetooth: hci_uart: remove unused hci_uart_init_tty
+In-Reply-To: <20170405183005.20570-1-robh@kernel.org>
+References: <20170405183005.20570-1-robh@kernel.org>
+Message-ID: <20170405183005.20570-3-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds serdev support to the HCI LL protocol used on TI BT
-modules and enables support on HiKey board with with the WL1835 module.
-With this the custom TI UIM daemon and btattach are no longer needed.
+There are no users of hci_uart_init_tty, so remove it.
 
-The series is available on this git branch[1]. Patch 2 is just clean-up
-and can be applied independently. Patch 3 is dependent on the series
-"Nokia H4+ support". I'd suggest both series are merged thru the BT tree.
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Marcel Holtmann <marcel@holtmann.org>
+Cc: Gustavo Padovan <gustavo@padovan.org>
+Cc: Johan Hedberg <johan.hedberg@gmail.com>
+Cc: linux-bluetooth at vger.kernel.org
+---
+ drivers/bluetooth/hci_ldisc.c | 19 -------------------
+ drivers/bluetooth/hci_uart.h  |  1 -
+ 2 files changed, 20 deletions(-)
 
-Rob
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git ti-bluetooth
-
-Rob Herring (4):
-  dt-bindings: net: Add TI WiLink shared transport binding
-  bluetooth: hci_uart: remove unused hci_uart_init_tty
-  bluetooth: hci_uart: add LL protocol serdev driver support
-  arm64: dts: hikey: add WL1835 Bluetooth device node
-
- .../devicetree/bindings/net/ti,wilink-st.txt       |  35 +++
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   5 +
- drivers/bluetooth/hci_ldisc.c                      |  19 --
- drivers/bluetooth/hci_ll.c                         | 261 ++++++++++++++++++++-
- drivers/bluetooth/hci_uart.h                       |   1 -
- 5 files changed, 300 insertions(+), 21 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/ti,wilink-st.txt
-
---
+diff --git a/drivers/bluetooth/hci_ldisc.c b/drivers/bluetooth/hci_ldisc.c
+index 17bcbc13623f..cec4438ede01 100644
+--- a/drivers/bluetooth/hci_ldisc.c
++++ b/drivers/bluetooth/hci_ldisc.c
+@@ -319,25 +319,6 @@ void hci_uart_set_speeds(struct hci_uart *hu, unsigned int init_speed,
+ 	hu->oper_speed = oper_speed;
+ }
+ 
+-void hci_uart_init_tty(struct hci_uart *hu)
+-{
+-	struct tty_struct *tty = hu->tty;
+-	struct ktermios ktermios;
+-
+-	/* Bring the UART into a known 8 bits no parity hw fc state */
+-	ktermios = tty->termios;
+-	ktermios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP |
+-			      INLCR | IGNCR | ICRNL | IXON);
+-	ktermios.c_oflag &= ~OPOST;
+-	ktermios.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+-	ktermios.c_cflag &= ~(CSIZE | PARENB);
+-	ktermios.c_cflag |= CS8;
+-	ktermios.c_cflag |= CRTSCTS;
+-
+-	/* tty_set_termios() return not checked as it is always 0 */
+-	tty_set_termios(tty, &ktermios);
+-}
+-
+ void hci_uart_set_baudrate(struct hci_uart *hu, unsigned int speed)
+ {
+ 	struct tty_struct *tty = hu->tty;
+diff --git a/drivers/bluetooth/hci_uart.h b/drivers/bluetooth/hci_uart.h
+index 1b41c661bbb8..2b05e557fad0 100644
+--- a/drivers/bluetooth/hci_uart.h
++++ b/drivers/bluetooth/hci_uart.h
+@@ -114,7 +114,6 @@ int hci_uart_register_device(struct hci_uart *hu, const struct hci_uart_proto *p
+ 
+ int hci_uart_tx_wakeup(struct hci_uart *hu);
+ int hci_uart_init_ready(struct hci_uart *hu);
+-void hci_uart_init_tty(struct hci_uart *hu);
+ void hci_uart_set_baudrate(struct hci_uart *hu, unsigned int speed);
+ void hci_uart_set_flow_control(struct hci_uart *hu, bool enable);
+ void hci_uart_set_speeds(struct hci_uart *hu, unsigned int init_speed,
+-- 
 2.10.1
