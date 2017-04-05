@@ -1,38 +1,47 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 13:55:36 +0530
-Subject: [PATCH v5 14/24] dt-bindings: mfd: syscon: Add documentation for
- #syscon-cells property
-In-Reply-To: <20170331190627.nucviejokdklgtk7@rob-hp-laptop>
-References: <20170327094520.3129-1-kishon@ti.com>
- <20170327094520.3129-15-kishon@ti.com>
- <20170331185852.mxa4gvjxbuxl65dq@rob-hp-laptop>
- <20170331190627.nucviejokdklgtk7@rob-hp-laptop>
-Message-ID: <19ba5ea6-b12b-5b0f-dbbe-6bdba03120ac@ti.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed,  5 Apr 2017 16:29:18 +0800
+Subject: [PATCH v3 0/9] drm: rockchip: Fix rockchip drm unbind crash error
+Message-ID: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On Saturday 01 April 2017 12:36 AM, Rob Herring wrote:
-> On Fri, Mar 31, 2017 at 01:58:52PM -0500, Rob Herring wrote:
->> On Mon, Mar 27, 2017 at 03:15:10PM +0530, Kishon Vijay Abraham I wrote:
->>> Add documentation for the optional #syscon-cells property to determine
->>> the number of cells that should be given in the phandle while
->>> referencing the syscon-node.
->>>
->>> Suggested-by: Rob Herring <robh@kernel.org>
->>
->> I did? When?
->>
->> I'm not remembering why we need this. Generally, phandles to a syscon 
->> are for a single defined purpose. When do we need a list of them?
-> 
-> Ah, I remember now the context. I suggested using standard parsing 
-> function rather than open coding. I wasn't suggesting changing the 
-> binding. Instead of of_parse_phandle_with_args, can't 
-> of_parse_phandle_with_fixed_args work?
+Verified on rk3399 chromebook kevin:
+1/ stop ui && pkill -9 frecon
+2/ unbind/bind drm
 
-yes, it can be used. Will change it my next revision.
+Changes in v3:
+Address Sean Paul <seanpaul@chromium.org>'s comments.
+Update commit message.
+Address Sean Paul <seanpaul@chromium.org>'s comments.
+Update commit message.
+Address Daniel Vetter <daniel@ffwll.ch>'s comments.
+Update commit message.
+Address Daniel Vetter <daniel@ffwll.ch>'s comments.
+Update commit message.
+Update commit message.
 
-Thanks
-Kishon
+Changes in v2:
+Fix some commit messages.
+
+Jeffy Chen (9):
+  drm: bridge: analogix: Detach panel when unbinding analogix dp
+  drm: bridge: analogix: Unregister dp aux when unbinding
+  drm: bridge: analogix: Destroy connector when unbinding
+  drm/rockchip: cdn-dp: Don't try to release firmware when not loaded
+  drm/rockchip: vop: Enable pm domain before vop_initial
+  drm/rockchip: Reoder drm bind/unbind sequence
+  drm/rockchip: Shutdown all crtcs when unbinding drm
+  drm/rockchip: gem: Don't alloc/free gem buf when dev_private is
+    invalid
+  drm/rockchip: cdn-dp: Don't unregister audio dev when unbinding
+
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  4 ++
+ drivers/gpu/drm/rockchip/cdn-dp-core.c             | 10 +++--
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c        | 50 ++++++++++++----------
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c        |  8 ++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 29 +++++++++----
+ 5 files changed, 66 insertions(+), 35 deletions(-)
+
+-- 
+2.1.4
