@@ -1,97 +1,21 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 5 Apr 2017 16:48:20 +0200
-Subject: [PATCH 1/4] dt-bindings: iio: stm32-dac: Add support for STM32 DAC
-In-Reply-To: <20170403164240.hw4wza7y3s5faivb@rob-hp-laptop>
-References: <1490960707-22422-1-git-send-email-fabrice.gasnier@st.com>
- <1490960707-22422-2-git-send-email-fabrice.gasnier@st.com>
- <20170403164240.hw4wza7y3s5faivb@rob-hp-laptop>
-Message-ID: <94c63ce8-c48e-edbc-8e71-95b4aefd55cf@st.com>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Wed, 5 Apr 2017 16:48:13 +0200
+Subject: [PULL 0/5] KVM/ARM Fixes for v4.11-rc6
+In-Reply-To: <20170405101331.23812-1-cdall@linaro.org>
+References: <20170405101331.23812-1-cdall@linaro.org>
+Message-ID: <20170405144813.GF6369@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2017 06:42 PM, Rob Herring wrote:
-> On Fri, Mar 31, 2017 at 01:45:04PM +0200, Fabrice Gasnier wrote:
->> Document STMicroelectronics STM32 DAC (digital-to-analog converter).
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>  .../devicetree/bindings/iio/dac/st,stm32-dac.txt   | 56 ++++++++++++++++++++++
->>  1 file changed, 56 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
->> new file mode 100644
->> index 0000000..1981983
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
->> @@ -0,0 +1,56 @@
->> +STMicroelectronics STM32 DAC
->> +
->> +The STM32 DAC is a 12-bit voltage output digital-to-analog converter. The DAC
->> +can be configured in 8- or 12-bit mode. In 12-bit mode, the data could be
->> +left- or right-aligned. It has two output channels, each with its own converter.
->> +It has built-in noise and triangle waveform generator and supports external
->> +triggers for conversions. The DAC's output buffer allows a high drive output
->> +current.
->> +
->> +Contents of a stm32 dac root node:
->> +-----------------------------------
->> +Required properties:
->> +- compatible: Must be "st,stm32h7-dac-core".
->> +- reg: Offset and length of the device's register set.
->> +- clocks: Must contain an entry for pclk (which feeds the peripheral bus
->> +  interface)
->> +- clock-names: Must be "pclk".
->> +- vref-supply: Phandle to the vref+ input analog reference supply.
->> +
->> +Optional properties:
->> +- resets: Must contain the phandle to the reset controller.
->> +- A pinctrl state named "default" for each DAC channel may be defined to set
->> +  DAC_OUTx pin in mode of operation for analog output on external pin.
->> +
->> +Contents of a stm32 dac child node:
->> +-----------------------------------
->> +DAC core node should contain at least one subnode, representing a
->> +DAC instance/channel available on the machine.
->> +
->> +Required properties:
->> +- compatible: Must be "st,stm32-dac".
->> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
->> +  Documentation/devicetree/bindings/iio/iio-bindings.txt
->> +- st,dac-channel: Must be either 1 or 2, to define channel in use (e.g.
->> +  single channels: 1 or 2)
+2017-04-05 12:13+0200, Christoffer Dall:
+> Hi Paolo and Radim,
 > 
-> Use "reg" instead.
-
-Hi Rob,
-
-Thanks your reviewing. I'll update this in V2
-
-Best Regards,
-Fabrice
-
+> Please pull a handfull of fixes for the next -rc release of v4.11.
 > 
->> +
->> +Example:
->> +	dac: dac at 40007400 {
->> +		compatible = "st,stm32h7-dac-core";
->> +		reg = <0x40007400 0x400>;
->> +		clocks = <&clk>;
->> +		clock-names = "pclk";
->> +		vref-supply = <&reg_vref>;
->> +
->> +		dac1: dac at 1 {
->> +			compatible = "st,stm32-dac";
->> +			#io-channels-cells = <1>;
->> +			st,dac-channel = <1>;
->> +		};
->> +
->> +		dac2: dac at 2 {
->> +			compatible = "st,stm32-dac";
->> +			#io-channels-cells = <1>;
->> +			st,dac-channel = <2>;
->> +		};
->> +	};
->> -- 
->> 1.9.1
->>
+> They include:
+>  - Addressing a problem with GICv3 userspace save/restore
+>  - Clarify GICv2 userspace save/restore ABI
+>  - Be more careful in clearing GIC LRs
+>  - Add missing synchronization primitive to our MMU handling code
+
+Pulled, thanks.
