@@ -1,91 +1,61 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 15:40:59 +0530
-Subject: [PATCH] phy: bcm-ns-usb3: split all writes into reg & val pairs
-In-Reply-To: <20170402165522.14058-1-zajec5@gmail.com>
-References: <20170402165522.14058-1-zajec5@gmail.com>
-Message-ID: <a5216597-2256-a665-2514-26eeba145210@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 05 Apr 2017 12:11:11 +0200
+Subject: [PATCH v4 4/6] arm64: dts: rockchip: add core dtsi file for
+ RK3328 SoCs
+In-Reply-To: <58E4516D.4000805@rock-chips.com>
+References: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
+ <6636047.jL6XHNkknt@phil> <58E4516D.4000805@rock-chips.com>
+Message-ID: <4811905.ImQG7774i7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Elaine,
 
-On Sunday 02 April 2017 10:25 PM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+Am Mittwoch, 5. April 2017, 10:07:41 CEST schrieb Elaine Zhang:
+> On 04/05/2017 12:04 AM, Heiko Stuebner wrote:
+> > Am Montag, 27. M?rz 2017, 17:40:48 CEST schrieb cl at rock-chips.com:
+> >> From: Liang Chen <cl@rock-chips.com>
+> >> 
+> >> This patch adds core dtsi file for Rockchip RK3328 SoCs.
+> >> 
+> >> Signed-off-by: Liang Chen <cl@rock-chips.com>
+> > 
+> > applied for 4.12, with the following list of changes:
+> > 
+> > - reorder some properties to bring them in alphabetical order
+> > - dropped the status-disabled from the power-controller
+> > 
+> >    power-domain control is a quite essential part of the system, so if
+> >    boards really want to disable them, they should do it in their board
+> >    file
+> >    Having power-domains on all the time, is also our default in all other
+> >    devicetrees.
+> > 
+> > - removed #dma-cells from spi0 -> this is not a dma controller
+> > - reword the cru assigned-clocks comment a bit
+> > - fixed sdmmc1_bus4 pins, as indicated by Shawn and after looking up the
+> > 
+> >    correct pins in the manual
+> > 
+> > And a final question, are you sure about SCLK_PDM becoming a child of the
+> > APLL in your cru assigned-clocks, as the APLL will vary later on with
+> > cpufreq active?
 > 
-> So far all the PHY initialization was implemented using some totally
-> magic values. There was some pattern there but it wasn't clear what is
-> it about.
+> the NPLL will vary later on with cpufreq active.
 > 
-> Thanks to the patch submitted by Broadcom:
-> [PATCH 5/6] phy: Add USB3 PHY support for Broadcom NSP SoC
-> and the upstream "iproc-mdio" driver we now know there is a MDIO bus
-> underneath with PHY(s) and their registers.
+> The NPLL is better than APLL, so NPLL is for clk_core,and apll is for pdm.
 > 
-> It allows us to clean the driver a bit by making all these values less
-> magical. The next step is switching to using a proper MDIO layer.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
->  drivers/phy/phy-bcm-ns-usb3.c | 69 ++++++++++++++++++++++++++++++-------------
->  1 file changed, 49 insertions(+), 20 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-bcm-ns-usb3.c b/drivers/phy/phy-bcm-ns-usb3.c
-> index f420fa4bebfc..22b5e7047fa6 100644
-> --- a/drivers/phy/phy-bcm-ns-usb3.c
-> +++ b/drivers/phy/phy-bcm-ns-usb3.c
-> @@ -2,6 +2,7 @@
->   * Broadcom Northstar USB 3.0 PHY Driver
->   *
->   * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
-> + * Copyright (C) 2016 Broadcom
->   *
->   * All magic values used for initialization (and related comments) were obtained
->   * from Broadcom's SDK:
-> @@ -23,6 +24,23 @@
->  
->  #define BCM_NS_USB3_MII_MNG_TIMEOUT_US	1000	/* usecs */
->  
-> +#define BCM_NS_USB3_PHY_BASE_ADDR_REG	0x1f
-> +#define BCM_NS_USB3_PHY_PLL30_BLOCK	0x8000
-> +#define BCM_NS_USB3_PHY_TX_PMD_BLOCK	0x8040
-> +#define BCM_NS_USB3_PHY_PIPE_BLOCK	0x8060
-> +
-> +/* Registers of PLL30 block */
-> +#define BCM_NS_USB3_PLL_CONTROL		0x01
-> +#define BCM_NS_USB3_PLLA_CONTROL0	0x0a
-> +#define BCM_NS_USB3_PLLA_CONTROL1	0x0b
-> +
-> +/* Registers of TX PMD block */
-> +#define BCM_NS_USB3_TX_PMD_CONTROL1	0x01
-> +
-> +/* Registers of PIPE block */
-> +#define BCM_NS_USB3_LFPS_CMP		0x02
-> +#define BCM_NS_USB3_LFPS_DEGLITCH	0x03
-> +
->  enum bcm_ns_family {
->  	BCM_NS_UNKNOWN,
->  	BCM_NS_AX,
-> @@ -76,8 +94,10 @@ static inline int bcm_ns_usb3_mii_mng_wait_idle(struct bcm_ns_usb3 *usb3)
->  				    usecs_to_jiffies(BCM_NS_USB3_MII_MNG_TIMEOUT_US));
->  }
->  
-> -static int bcm_ns_usb3_mii_mng_write32(struct bcm_ns_usb3 *usb3, u32 value)
-> +static int bcm_ns_usb3_mdio_phy_write(struct bcm_ns_usb3 *usb3, u16 reg,
-> +				      u16 value)
->  {
-> +	u32 tmp = 0;
->  	int err;
->  
->  	err = bcm_ns_usb3_mii_mng_wait_idle(usb3);
-> @@ -86,7 +106,11 @@ static int bcm_ns_usb3_mii_mng_write32(struct bcm_ns_usb3 *usb3, u32 value)
->  		return err;
->  	}
->  
-> -	writel(value, usb3->ccb_mii + BCMA_CCB_MII_MNG_CMD_DATA);
-> +	/* TODO: Use a proper MDIO bus layer */
+> please see the TRM in CRU:
+> 1.4 Function Description
+> /........./
+> To maximize the flexibility, some of clocks can select divider source
+> from 5 PLLs. (Note: It?s
+> recommended to use NEW PLL instead of ARM PLL as arm clock source,
+> because NEW PLL is
+> near to ARM. And it?s jitter is better than ARM PLL).
 
-Instead of using this intermediate patch, can we directly convert this to
-mdio_driver or you see issues with converting it?
+Thanks for the clarification - this way it definitly makes sense.
+
 
 Thanks
-Kishon
+Heiko
