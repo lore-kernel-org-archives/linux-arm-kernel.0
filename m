@@ -1,33 +1,36 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 5 Apr 2017 11:27:36 -0700
-Subject: drivers/clk/bcm/clk-iproc-pll.c:280]: (style) Redundant condition
-In-Reply-To: <HE1PR0801MB186548205AD0A49B09F6A3149C330@HE1PR0801MB1865.eurprd08.prod.outlook.com>
-References: <HE1PR0801MB186548205AD0A49B09F6A3149C330@HE1PR0801MB1865.eurprd08.prod.outlook.com>
-Message-ID: <a7ed0f26-fbe6-c5d3-62d3-e940a7fec5ac@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed,  5 Apr 2017 13:30:05 -0500
+Subject: [PATCH 4/4] arm64: dts: hikey: add WL1835 Bluetooth device node
+In-Reply-To: <20170405183005.20570-1-robh@kernel.org>
+References: <20170405183005.20570-1-robh@kernel.org>
+Message-ID: <20170405183005.20570-5-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+This adds the serial slave device for the WL1835 Bluetooth interface.
 
-Thanks for reporting. I'll send out a patch to address this.
+Signed-off-by: Rob Herring <robh@kernel.org>
+Cc: Wei Xu <xuwei5@hisilicon.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Ray
-
-On 3/27/2017 3:47 AM, David Binderman wrote:
-> Hello there,
-> 
-> 
-> linux-4.11-rc4/drivers/clk/bcm/clk-iproc-pll.c:280]: (style) Redundant condition: If 'rate >= 2200000000', the comparison 'rate' is always true.
-> 
-> Source code is
-> 
->     } else if (rate >= VCO_HIGH && rate && rate < VCO_HIGH_HIGH) {
-> 
-> Suggest new code
-> 
->     } else if (rate >= VCO_HIGH  && rate < VCO_HIGH_HIGH) {
-> 
-> Regards
-> 
-> David Binderman
-> 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index dba3c131c62c..9b4ba7169210 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -98,6 +98,11 @@
+ 			assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
+ 			assigned-clock-rates = <150000000>;
+ 			status = "ok";
++
++			bluetooth {
++				compatible = "ti,wl1835-st";
++				enable-gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
++			};
+ 		};
+ 
+ 		uart2: uart at f7112000 {
+-- 
+2.10.1
