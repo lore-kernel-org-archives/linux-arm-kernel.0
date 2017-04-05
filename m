@@ -1,73 +1,45 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed, 5 Apr 2017 10:43:23 -0700
-Subject: [PATCH] crypto: arm64/sha: use %c constraint code in ASM_EXPORT
-In-Reply-To: <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
-References: <20170405165603.87264-1-mka@chromium.org>
- <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
-Message-ID: <20170405174323.GC145051@google.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Apr 2017 18:49:22 +0100
+Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
+References: <20170404174727.35478-1-thgarnie@google.com>
+ <20170404174727.35478-4-thgarnie@google.com>
+ <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
+ <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
+Message-ID: <20170405174921.GB2752@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hoi Ard!
-
-El Wed, Apr 05, 2017 at 06:08:37PM +0100 Ard Biesheuvel ha dit:
-
-> On 5 April 2017 at 17:56, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > From: Greg Hackmann <ghackmann@google.com>
+On Wed, Apr 05, 2017 at 07:36:17AM -0700, Thomas Garnier wrote:
+> On Wed, Apr 5, 2017 at 7:22 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Apr 04, 2017 at 10:47:27AM -0700, Thomas Garnier wrote:
+> >> +
+> >>       ldr     x1, [tsk, #TSK_TI_FLAGS]
+> >>       and     x2, x1, #_TIF_WORK_MASK
+> >>       cbnz    x2, work_pending
+> >> @@ -779,6 +788,12 @@ finish_ret_to_user:
+> >>       kernel_exit 0
+> >>  ENDPROC(ret_to_user)
+> >>
+> >> +addr_limit_fail:
+> >> +     stp     x0, lr, [sp,#-16]!
+> >> +     bl      asm_verify_pre_usermode_state
+> >> +     ldp     x0, lr, [sp],#16
+> >> +     ret     lr
 > >
-> > The current definition of ASM_EXPORT doesn't work properly with clang,
-> > according to https://bugs.llvm.org//show_bug.cgi?id=27250#c3 it relies on
-> > gcc specific behavior. Change the constraint from an intermediate to an
-> > output expression which works with both gcc and clang.
-> >
-> > From: Greg Hackmann <ghackmann@google.com>
-> > Commit-message-by: Matthias Kaehlcke <mka@chromium.org>
-> > Signed-off-by: Greg Hackmann <ghackmann@google.com>
-> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > ---
-> >  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
-> >  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
-> > index aefda9868627..c71e94ba0e43 100644
-> > --- a/arch/arm64/crypto/sha1-ce-glue.c
-> > +++ b/arch/arm64/crypto/sha1-ce-glue.c
-> > @@ -18,7 +18,7 @@
-> >  #include <linux/module.h>
-> >
-> >  #define ASM_EXPORT(sym, val) \
-> > -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
-> > +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
-> >
-> >  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
-> >  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-> > diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
-> > index 7cd587564a41..381b5fb2dcb2 100644
-> > --- a/arch/arm64/crypto/sha2-ce-glue.c
-> > +++ b/arch/arm64/crypto/sha2-ce-glue.c
-> > @@ -18,7 +18,7 @@
-> >  #include <linux/module.h>
-> >
-> >  #define ASM_EXPORT(sym, val) \
-> > -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
-> > +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
-> >
-> >  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
-> >  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+> > Where is this supposed to return? What is the value of lr when branching
+> > to addr_limit_fail?
 > 
-> I am fine with this change, although I would really like to add a
-> better reference to the commit log. It is *very* difficult to find any
-> documentation regarding non-trivial uses of inline asm constraints,
-> and if %c0 is the correct syntax, surely we can quote something better
-> than a LLVM bugzilla entry? Also, where does the distinction between
-> 'intermediate' vs 'output' expression come from?
+> It is not supposed to return. Do you think I should remove stp, ldp,
+> ret and jut add a brk 0x100 or jmp/call a break/bug function?
 
-To be honest assembly is not really my area of expertise and I relayed
-the information from the LLVM bug. The link to the gcc doc on
-x86(!) operand modifiers posted by Robin Murphy (thanks!) should be
-helpful to provide a more accurate commit message.
+Can you not just make addr_limit_fail a C function which never returns
+(similar to what we to with bad_mode() on arm64)? Since addr_limit_fail
+is only called when the segment is not the right one, I don't really see
+why you need another call to asm_verify_pre_usermode_state() to do a
+similar check again. Just panic in addr_limit_fail (unless I
+misunderstood what you are trying to achieve).
 
-Thanks
-
-Matthias
+-- 
+Catalin
