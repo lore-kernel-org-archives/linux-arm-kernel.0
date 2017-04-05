@@ -1,65 +1,92 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 5 Apr 2017 14:42:39 +0530
-Subject: [PATCH 3/3] perf tool, arm64, thunderx2: Add implementation
- defined events for ThunderX2
-In-Reply-To: <20170404122828.GB8551@leverpostej>
-References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1491291403-29893-4-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170404122828.GB8551@leverpostej>
-Message-ID: <CAFpQJXWTQ=gX63NHPoUST0oU9cP4xo+2fdr-p7ifhvJ6x-ih+A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 5 Apr 2017 10:12:58 +0100
+Subject: [PATCH] [media] cec: Handle RC capability more elegantly
+In-Reply-To: <fb4bce41-69ef-227f-e177-7a6db536ff64@xs4all.nl>
+References: <20170404144309.31357-1-lee.jones@linaro.org>
+ <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
+ <20170404151939.bvd252nprj6kjmdu@dell>
+ <20170404153659.GC7909@n2100.armlinux.org.uk>
+ <fb4bce41-69ef-227f-e177-7a6db536ff64@xs4all.nl>
+Message-ID: <20170405091258.zujipcybjeh37amq@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 4, 2017 at 5:58 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Apr 04, 2017 at 01:06:43PM +0530, Ganapatrao Kulkarni wrote:
->> This is not a full event list, but a short list of useful events.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  tools/perf/pmu-events/arch/arm64/mapfile.csv       |  2 +
->>  .../arm64/thunderx2/implementation-defined.json    | 72 ++++++++++++++++++++++
->>  2 files changed, 74 insertions(+)
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>
->> diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->> new file mode 100644
->> index 0000000..ba30e43
->> --- /dev/null
->> +++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
->> @@ -0,0 +1,2 @@
->> +Family-model,Version,Filename,EventType
->> +0x00000000420f5161,v1,thunderx2,core
->> diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->> new file mode 100644
->> index 0000000..360e084
->> --- /dev/null
->> +++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->> @@ -0,0 +1,72 @@
->> +[
->> +    {
->> +        "PublicDescription": "Attributable Level 1 data cache access, read",
->> +        "EventCode": "0x40",
->> +        "EventName": "l1d_cache_access_read",
->> +        "BriefDescription": "l1d cache access, read",
->> +     "CPU" :"armv8_pmuv3_0"
->
-> Please let's not hard-code the name like this. Surely we can get rid of this?
->
-> The kernel doesn't currently name PMUs as armv8_pmuv3_*, and as that can
-> differ across DT/ACPI and in big.LITTLE, I don't think it makes sense to
-> try to rely one particular string regardless.
+On Tue, 04 Apr 2017, Hans Verkuil wrote:
 
-This string/name is fixed for a platform. having name here is essential to
-know which devices among pmu (armv8_pmuv3_0, breakpoint, software)
-devices, these jevents to be added.
-also this json file is specific to a arch/soc/board, it is not a
-generic file to be common.
+> On 04/04/2017 05:36 PM, Russell King - ARM Linux wrote:
+> > On Tue, Apr 04, 2017 at 04:19:39PM +0100, Lee Jones wrote:
+> >> On Tue, 04 Apr 2017, Hans Verkuil wrote:
+> >>
+> >>> On 04/04/2017 04:43 PM, Lee Jones wrote:
+> >>>> If a user specifies the use of RC as a capability, they should
+> >>>> really be enabling RC Core code.  If they do not we WARN() them
+> >>>> of this and disable the capability for them.
+> >>>>
+> >>>> Once we know RC Core code has not been enabled, we can update
+> >>>> the user's capabilities and use them as a term of reference for
+> >>>> other RC-only calls.  This is preferable to having ugly #ifery
+> >>>> scattered throughout C code.
+> >>>>
+> >>>> Most of the functions are actually safe to call, since they
+> >>>> sensibly check for a NULL RC pointer before they attempt to
+> >>>> deference it.
+> >>>>
+> >>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>>> ---
+> >>>>  drivers/media/cec/cec-core.c | 19 +++++++------------
+> >>>>  1 file changed, 7 insertions(+), 12 deletions(-)
+> >>>>
+> >>>> diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
+> >>>> index cfe414a..51be8d6 100644
+> >>>> --- a/drivers/media/cec/cec-core.c
+> >>>> +++ b/drivers/media/cec/cec-core.c
+> >>>> @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+> >>>>  		return ERR_PTR(-EINVAL);
+> >>>>  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
+> >>>>  		return ERR_PTR(-EINVAL);
+> >>>> +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
+> >>>> +		caps &= ~CEC_CAP_RC;
+> >>>
+> >>> Don't use WARN_ON, this is not an error of any kind.
+> >>
+> >> Right, this is not an error.
+> >>
+> >> That's why we are warning the user instead of bombing out.
+> > 
+> > Please print warning using pr_warn() or dev_warn().  Using WARN_ON()
+> > because something is not configured is _really_ not nice behaviour.
+> > Consider how useful a stack trace is to the user for this situation -
+> > it's completely meaningless.
+> > 
+> > A message that prompts the user to enable RC_CORE would make more sense,
+> > and be much more informative to the user.  Maybe something like this:
+> > 
+> > +	if (caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)) {
+> > +		pr_warn("CEC: driver %pf requests RC, please enable CONFIG_RC_CORE\n",
+> > +			__builtin_return_address(0));
+> > +		caps &= ~CEC_CAP_RC;
+> > +	}
+> > 
+> > It could be much more informative by using dev_warn() if we had the
+> > 'struct device' passed in to this function, and then we wouldn't need
+> > to use __builtin_return_address().
+> > 
+> 
+> I don't want to see a message logged because of this. In the current design it
+> is perfectly valid to compile without RC_CORE.
+> 
+> I think eventually this should be redesigned a bit (a separate CEC config option
+> that enables or disables RC support), but for now I prefer to leave this as-is
+> until I have a bit more experience with this.
+> 
+> After the CEC notifier work is in I will take another look at this.
 
+Well at least I bought it to your attention.  I guess that's a 50% win.
 
->
-> Thanks,
-> Mark.
+I'll rework the patch accordingly.
 
-thanks
-Ganapat
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
