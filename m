@@ -1,92 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Apr 2017 10:12:58 +0100
-Subject: [PATCH] [media] cec: Handle RC capability more elegantly
-In-Reply-To: <fb4bce41-69ef-227f-e177-7a6db536ff64@xs4all.nl>
-References: <20170404144309.31357-1-lee.jones@linaro.org>
- <9fdac3c1-b249-839e-c2bc-f4661994eb3a@xs4all.nl>
- <20170404151939.bvd252nprj6kjmdu@dell>
- <20170404153659.GC7909@n2100.armlinux.org.uk>
- <fb4bce41-69ef-227f-e177-7a6db536ff64@xs4all.nl>
-Message-ID: <20170405091258.zujipcybjeh37amq@dell>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 5 Apr 2017 17:31:10 +0800
+Subject: [nomadik:spear-dma-cleanup 5/6] drivers/dma/amba-pl08x.c:2327:28:
+ error: 'pl080_dummy_get_signal' undeclared
+Message-ID: <201704051708.KfGV7tnl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Apr 2017, Hans Verkuil wrote:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git spear-dma-cleanup
+head:   8755e46caafbbdd4f55f6f2ac3d9a2f97c468b5d
+commit: 03207884e9edad4224f32db65f39794913cfd3a3 [5/6] ARM/dma: pl08x: Move mux handling into driver
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 03207884e9edad4224f32db65f39794913cfd3a3
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> On 04/04/2017 05:36 PM, Russell King - ARM Linux wrote:
-> > On Tue, Apr 04, 2017 at 04:19:39PM +0100, Lee Jones wrote:
-> >> On Tue, 04 Apr 2017, Hans Verkuil wrote:
-> >>
-> >>> On 04/04/2017 04:43 PM, Lee Jones wrote:
-> >>>> If a user specifies the use of RC as a capability, they should
-> >>>> really be enabling RC Core code.  If they do not we WARN() them
-> >>>> of this and disable the capability for them.
-> >>>>
-> >>>> Once we know RC Core code has not been enabled, we can update
-> >>>> the user's capabilities and use them as a term of reference for
-> >>>> other RC-only calls.  This is preferable to having ugly #ifery
-> >>>> scattered throughout C code.
-> >>>>
-> >>>> Most of the functions are actually safe to call, since they
-> >>>> sensibly check for a NULL RC pointer before they attempt to
-> >>>> deference it.
-> >>>>
-> >>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>> ---
-> >>>>  drivers/media/cec/cec-core.c | 19 +++++++------------
-> >>>>  1 file changed, 7 insertions(+), 12 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-> >>>> index cfe414a..51be8d6 100644
-> >>>> --- a/drivers/media/cec/cec-core.c
-> >>>> +++ b/drivers/media/cec/cec-core.c
-> >>>> @@ -208,9 +208,13 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
-> >>>>  		return ERR_PTR(-EINVAL);
-> >>>>  	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
-> >>>>  		return ERR_PTR(-EINVAL);
-> >>>> +	if (WARN_ON(caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)))
-> >>>> +		caps &= ~CEC_CAP_RC;
-> >>>
-> >>> Don't use WARN_ON, this is not an error of any kind.
-> >>
-> >> Right, this is not an error.
-> >>
-> >> That's why we are warning the user instead of bombing out.
-> > 
-> > Please print warning using pr_warn() or dev_warn().  Using WARN_ON()
-> > because something is not configured is _really_ not nice behaviour.
-> > Consider how useful a stack trace is to the user for this situation -
-> > it's completely meaningless.
-> > 
-> > A message that prompts the user to enable RC_CORE would make more sense,
-> > and be much more informative to the user.  Maybe something like this:
-> > 
-> > +	if (caps & CEC_CAP_RC && !IS_REACHABLE(CONFIG_RC_CORE)) {
-> > +		pr_warn("CEC: driver %pf requests RC, please enable CONFIG_RC_CORE\n",
-> > +			__builtin_return_address(0));
-> > +		caps &= ~CEC_CAP_RC;
-> > +	}
-> > 
-> > It could be much more informative by using dev_warn() if we had the
-> > 'struct device' passed in to this function, and then we wouldn't need
-> > to use __builtin_return_address().
-> > 
-> 
-> I don't want to see a message logged because of this. In the current design it
-> is perfectly valid to compile without RC_CORE.
-> 
-> I think eventually this should be redesigned a bit (a separate CEC config option
-> that enables or disables RC support), but for now I prefer to leave this as-is
-> until I have a bit more experience with this.
-> 
-> After the CEC notifier work is in I will take another look at this.
+All errors (new ones prefixed by >>):
 
-Well at least I bought it to your attention.  I guess that's a 50% win.
+   drivers/dma/amba-pl08x.c: In function 'pl08x_setup_syscon_signals':
+>> drivers/dma/amba-pl08x.c:2327:28: error: 'pl080_dummy_get_signal' undeclared (first use in this function)
+      pl08x->get_xfer_signal = pl080_dummy_get_signal;
+                               ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/dma/amba-pl08x.c:2327:28: note: each undeclared identifier is reported only once for each function it appears in
+>> drivers/dma/amba-pl08x.c:2328:28: error: 'pl080_dummy_put_signal' undeclared (first use in this function)
+      pl08x->put_xfer_signal = pl080_dummy_put_signal;
+                               ^~~~~~~~~~~~~~~~~~~~~~
+   At top level:
+   drivers/dma/amba-pl08x.c:2306:13: warning: 'pl08x_dummy_put_signal' defined but not used [-Wunused-function]
+    static void pl08x_dummy_put_signal(const struct pl08x_channel_data *cd, int ch)
+                ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/dma/amba-pl08x.c:2301:12: warning: 'pl08x_dummy_get_signal' defined but not used [-Wunused-function]
+    static int pl08x_dummy_get_signal(const struct pl08x_channel_data *cd)
+               ^~~~~~~~~~~~~~~~~~~~~~
 
-I'll rework the patch accordingly.
+vim +/pl080_dummy_get_signal +2327 drivers/dma/amba-pl08x.c
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  2321			}
+  2322			pl08x->get_xfer_signal = pl080_spear_get_signal;
+  2323			pl08x->put_xfer_signal = pl080_spear_put_signal;
+  2324		}
+  2325		if (of_device_is_compatible(np, "nxp,lpc32xx-pl080") ||
+  2326		    of_device_is_compatible(np, "samsung,s3c-pl080")) {
+> 2327			pl08x->get_xfer_signal = pl080_dummy_get_signal;
+> 2328			pl08x->put_xfer_signal = pl080_dummy_put_signal;
+  2329		}
+  2330	
+  2331		return 0;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61353 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/1adde678/attachment-0001.gz>
