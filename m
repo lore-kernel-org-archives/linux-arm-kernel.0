@@ -1,25 +1,25 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 5 Apr 2017 15:49:22 -0400
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Wed, 5 Apr 2017 14:26:22 -0700 (PDT)
 Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
 In-Reply-To: <20170405181417.15985-1-julien.grall@arm.com>
 References: <20170405181417.15985-1-julien.grall@arm.com>
-Message-ID: <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+Message-ID: <alpine.DEB.2.10.1704051426150.3188@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2017 02:14 PM, Julien Grall wrote:
+On Wed, 5 Apr 2017, Julien Grall wrote:
 > When rebooting DOM0 with ACPI, the kernel is crashing with the stack trace [1].
->
+> 
 > This is happening because when EFI runtimes are enabled, the reset code
 > (see machin_restart) will first try to use EFI restart method.
->
+> 
 > However, the EFI restart code is expecting the reset_system callback to
 > be always set. This is not the case for Xen and will lead to crash.
->
+> 
 > Looking at the reboot path, it is expected to fallback on an alternative
 > reboot method if one does not work. So implement reset_system callback
 > as a NOP for Xen.
->
+> 
 > [   36.999270] reboot: Restarting system
 > [   37.002921] Internal error: Attempting to execute userspace memory: 86000004 [#1] PREEMPT SMP
 > [   37.011460] Modules linked in:
@@ -92,33 +92,25 @@ On 04/05/2017 02:14 PM, Julien Grall wrote:
 > [   37.451337] [<ffff0000080830f0>] el0_svc_naked+0x24/0x28
 > [   37.456737] Code: bad PC value
 > [   37.459891] ---[ end trace 76e2fc17e050aecd ]---
->
+> 
 > Signed-off-by: Julien Grall <julien.grall@arm.com>
 > Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 > Cc: Juergen Gross <jgross@suse.com>
->
+
+Reviewed-by: Stefano Stabellini <sstabellini@kernel.org>
+
+
 > --
->
+> 
 > The x86 code has theoritically a similar issue, altought EFI does not
 > seem to be the preferred method. I have left it unimplemented on x86 and
 > CCed Linux Xen x86 maintainers to know their view here.
-
-(+Daniel)
-
-This could be a problem for x86 as well, at least theoretically.
-xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
-
-So I think we should have a similar routine there.
-
--boris
-
-
->
+> 
 > This should also probably be fixed in stable tree.
 > ---
 >  arch/arm/xen/efi.c | 10 +++++++++-
 >  1 file changed, 9 insertions(+), 1 deletion(-)
->
+> 
 > diff --git a/arch/arm/xen/efi.c b/arch/arm/xen/efi.c
 > index 16db419f9e90..3b29788c29e9 100644
 > --- a/arch/arm/xen/efi.c
@@ -146,3 +138,6 @@ So I think we should have a similar routine there.
 > +	efi.reset_system             = xen_efi_reset_system;
 >  }
 >  EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
+> -- 
+> 2.11.0
+> 
