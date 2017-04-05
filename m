@@ -1,136 +1,106 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  5 Apr 2017 11:28:14 +0200
-Subject: [PATCH v3 4/5] KVM: arm/arm64: Report PMU overflow interrupts to
- userspace irqchip
-In-Reply-To: <20170405092815.22503-1-cdall@linaro.org>
-References: <20170405092815.22503-1-cdall@linaro.org>
-Message-ID: <20170405092815.22503-5-cdall@linaro.org>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 5 Apr 2017 14:48:57 +0530
+Subject: [PATCH 2/3] perf tools arm64: implement function get_cpuid_str
+In-Reply-To: <20170404122518.GA8551@leverpostej>
+References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <1491291403-29893-3-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170404122518.GA8551@leverpostej>
+Message-ID: <CAFpQJXU3Gn4H2tZT3BEfEh=Q=NS_4fOgOu=21nPZUcdk6qf87w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+On Tue, Apr 4, 2017 at 5:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Apr 04, 2017 at 01:06:42PM +0530, Ganapatrao Kulkarni wrote:
+>> function get_cpuid_str returns midr_el1 value from first
+>> online cpu available.
+>
+> This isn't globally the same (e.g. in big.LITTLE systems).
+>
+> It would be far better to have the function take a PMU, and look at the
+> first CPU in that PMU's mask.
 
-When not using an in-kernel VGIC, but instead emulating an interrupt
-controller in userspace, we should report the PMU overflow status to
-that userspace interrupt controller using the KVM_CAP_ARM_USER_IRQ
-feature.
+thanks, will do.
+>
+> Thanks,
+> Mark.
+>
+>>
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> ---
+>>  tools/perf/arch/arm64/util/Build    |  1 +
+>>  tools/perf/arch/arm64/util/header.c | 51 +++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 52 insertions(+)
+>>  create mode 100644 tools/perf/arch/arm64/util/header.c
+>>
+>> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+>> index cef6fb3..b1ab72d 100644
+>> --- a/tools/perf/arch/arm64/util/Build
+>> +++ b/tools/perf/arch/arm64/util/Build
+>> @@ -1,3 +1,4 @@
+>> +libperf-y += header.o
+>>  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
+>>  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+>>
+>> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+>> new file mode 100644
+>> index 0000000..c0468fe
+>> --- /dev/null
+>> +++ b/tools/perf/arch/arm64/util/header.c
+>> @@ -0,0 +1,51 @@
+>> +#include <fnmatch.h>
+>> +#include <dirent.h>
+>> +#include <unistd.h>
+>> +#include <stdio.h>
+>> +#include <stdlib.h>
+>> +#include <string.h>
+>> +#include <linux/stringify.h>
+>> +#include "header.h"
+>> +#include "util.h"
+>> +
+>> +#define LINUX_SYS_CPU_DIRECTORY "/sys/devices/system/cpu/"
+>> +#define MIDR "/regs/identification/midr_el1"
+>> +
+>> +char *get_cpuid_str(void)
+>> +{
+>> +     char *buf = malloc(128);
+>> +     FILE *file;
+>> +     char *ret = NULL;
+>> +     int cpu , nr_cpu;
+>> +     char sys_file[256];
+>> +
+>> +     sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"kernel_max");
+>> +
+>> +     file = fopen(sys_file, "r");
+>> +     if (!file)
+>> +             return ret;
+>> +
+>> +     if (fscanf(file, "%d", &nr_cpu) != 1)
+>> +             return ret;
+>> +
+>> +     /* kernel_max returns nr_cpu -1 */
+>> +     nr_cpu++;
+>> +
+>> +     /*iterate till you read midr of first online cpu */
+>> +     for(cpu = 0; cpu < nr_cpu; cpu++)
+>> +     {
+>> +             sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"cpu%d"MIDR, cpu);
+>> +             file = fopen(sys_file, "r");
+>> +             if (file) {
+>> +                     ret = fgets(buf, 128, file);
+>> +                     if (ret) {
+>> +                             buf[strlen(buf)-1] ='\0';
+>> +                             fclose(file);
+>> +                             return buf;
+>> +                     }
+>> +                     fclose(file);
+>> +             }
+>> +     }
+>> +     free(buf);
+>> +     return ret;
+>> +}
+>> --
+>> 1.8.1.4
+>>
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c    |  9 ++++++---
- include/kvm/arm_pmu.h |  7 +++++++
- virt/kvm/arm/pmu.c    | 42 ++++++++++++++++++++++++++++++++++++++----
- 3 files changed, 51 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index efb16e5..f935383 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -635,11 +635,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		/*
- 		 * If we have a singal pending, or need to notify a userspace
--		 * irqchip about timer level changes, then we exit (and update
--		 * the timer level state in kvm_timer_update_run below).
-+		 * irqchip about timer or PMU level changes, then we exit (and
-+		 * update the timer level state in kvm_timer_update_run
-+		 * below).
- 		 */
- 		if (signal_pending(current) ||
--		    kvm_timer_should_notify_user(vcpu)) {
-+		    kvm_timer_should_notify_user(vcpu) ||
-+		    kvm_pmu_should_notify_user(vcpu)) {
- 			ret = -EINTR;
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
-@@ -713,6 +715,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 	/* Tell userspace about in-kernel device output levels */
- 	kvm_timer_update_run(vcpu);
-+	kvm_pmu_update_run(vcpu);
- 
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index 92e7e97..1ab4633 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -50,6 +50,8 @@ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
-+bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu);
-+void kvm_pmu_update_run(struct kvm_vcpu *vcpu);
- void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val);
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
-@@ -85,6 +87,11 @@ static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_overflow_set(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
-+static inline bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
-+{
-+	return false;
-+}
-+static inline void kvm_pmu_update_run(struct kvm_vcpu *vcpu) {}
- static inline void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val) {}
- static inline void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu,
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 69ccce3..51218be 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -230,13 +230,47 @@ static void kvm_pmu_update_state(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	overflow = !!kvm_pmu_overflow_status(vcpu);
--	if (pmu->irq_level != overflow) {
--		pmu->irq_level = overflow;
--		kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
--				    pmu->irq_num, overflow);
-+	if (pmu->irq_level == overflow)
-+		return;
-+
-+	pmu->irq_level = overflow;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm))) {
-+		int ret;
-+		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-+					  pmu->irq_num, overflow);
-+		WARN_ON(ret);
- 	}
- }
- 
-+bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_sync_regs *sregs = &vcpu->run->s.regs;
-+	bool run_level = sregs->device_irq_level & KVM_ARM_DEV_PMU;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm)))
-+		return false;
-+
-+	return pmu->irq_level != run_level;
-+}
-+
-+/*
-+ * Reflect the PMU overflow interrupt output level into the kvm_run structure
-+ */
-+void kvm_pmu_update_run(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm)))
-+		return;
-+
-+	/* Populate the timer bitmap for user space */
-+	regs->device_irq_level &= ~KVM_ARM_DEV_PMU;
-+	if (vcpu->arch.pmu.irq_level)
-+		regs->device_irq_level |= KVM_ARM_DEV_PMU;
-+}
-+
- /**
-  * kvm_pmu_flush_hwstate - flush pmu state to cpu
-  * @vcpu: The vcpu pointer
--- 
-2.9.0
+thanks
+Ganapat
