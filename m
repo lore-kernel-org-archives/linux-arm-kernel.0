@@ -1,71 +1,72 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:47 -0500
-Subject: [PATCH v5 03/23] drivers/fsi: Add empty master scan
-In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-4-cbostic@linux.vnet.ibm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 5 Apr 2017 11:48:43 +0800
+Subject: [linux-sunxi] [PATCH 01/11] arm64: allwinner: a64: enable RSB on
+ A64
+In-Reply-To: <20170404180145.12897-2-icenowy@aosc.io>
+References: <20170404180145.12897-1-icenowy@aosc.io>
+ <20170404180145.12897-2-icenowy@aosc.io>
+Message-ID: <CAGb2v67wo1pDbLSLZzXHd+djinthfo0xhSgThHq2qcWjSktcYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
+>
+> Add it and its pinmux.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 6bc606b4d74d..9a75b1c7c91a 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -420,6 +420,27 @@
+>                         #gpio-cells = <3>;
+>                         interrupt-controller;
+>                         #interrupt-cells = <3>;
+> +
+> +                       r_rsb_pins: rsb at 0 {
+> +                               pins = "PL0", "PL1";
+> +                               function = "s_rsb";
+> +                               drive-strength = <20>;
 
-When a new fsi master is added, we will need to scan its links, and
-slaves attached to those links. This change introduces a little shell to
-iterate the links, which we will populate with the actual slave scan in
-a later change.
+We don't need this. The hardware default should be enough.
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- drivers/fsi/fsi-core.c | 25 +++++++++++++++++++++++--
- 1 file changed, 23 insertions(+), 2 deletions(-)
+> +                               bias-pull-up;
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 2f19509..e90d45d 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -32,7 +32,25 @@ struct fsi_slave {
- 
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
- 
-+/* FSI slave support */
-+static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
-+{
-+	/* todo: initialise slave device, perform engine scan */
-+
-+	return -ENODEV;
-+}
-+
- /* FSI master support */
-+static int fsi_master_scan(struct fsi_master *master)
-+{
-+	int link;
-+
-+	for (link = 0; link < master->n_links; link++)
-+		fsi_slave_init(master, link, 0);
-+
-+	return 0;
-+}
-+
- int fsi_master_register(struct fsi_master *master)
- {
- 	int rc;
-@@ -44,10 +62,13 @@ int fsi_master_register(struct fsi_master *master)
- 	dev_set_name(&master->dev, "fsi%d", master->idx);
- 
- 	rc = device_register(&master->dev);
--	if (rc)
-+	if (rc) {
- 		ida_simple_remove(&master_ida, master->idx);
-+		return rc;
-+	}
- 
--	return rc;
-+	fsi_master_scan(master);
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(fsi_master_register);
- 
--- 
-1.8.2.2
+Boards should have external pull-ups for these pins, as the PMICs
+start up in I2C mode. If any board actually doesn't have them and
+needs the internal pull-ups, they should be set at the board level.
+
+Otherwise,
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> +                       };
+> +               };
+> +
+> +               r_rsb: rsb at 1f03400 {
+> +                       compatible = "allwinner,sun8i-a23-rsb";
+> +                       reg = <0x01f03400 0x400>;
+> +                       interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&r_ccu 6>;
+> +                       clock-frequency = <3000000>;
+> +                       resets = <&r_ccu 2>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&r_rsb_pins>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+>                 };
+>         };
+>  };
+> --
+> 2.12.2
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
