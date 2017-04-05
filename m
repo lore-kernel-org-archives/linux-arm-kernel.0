@@ -1,53 +1,74 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:56 -0500
-Subject: [PATCH v5 12/23] drivers/fsi: Add documentation for GPIO bindings
+Date: Tue,  4 Apr 2017 21:05:50 -0500
+Subject: [PATCH v5 06/23] drivers/fsi: Set up links for slave communication
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-13-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-7-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Add fsi master gpio device tree binding documentation
+Enable each link and send a break command, and try to detect a slave by
+reading from the SMODE register.
 
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+ drivers/fsi/fsi-core.c | 37 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 35 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-new file mode 100644
-index 0000000..a767259
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-@@ -0,0 +1,24 @@
-+Device-tree bindings for gpio-based FSI master driver
-+-----------------------------------------------------
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 32698ed..6e1cfdf 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -157,12 +157,45 @@ static int fsi_master_write(struct fsi_master *master, int link,
+ 	return master->write(master, link, slave_id, addr, val, size);
+ }
+ 
++static int fsi_master_link_enable(struct fsi_master *master, int link)
++{
++	if (master->link_enable)
++		return master->link_enable(master, link);
 +
-+Required properties:
-+ - compatible = "fsi-master-gpio";
-+ - clock-gpios = <gpio-descriptor>;	: GPIO for FSI clock
-+ - data-gpios = <gpio-descriptor>;	: GPIO for FSI data signal
++	return 0;
++}
 +
-+Optional properties:
-+ - enable-gpios = <gpio-descriptor>;	: GPIO for enable signal
-+ - trans-gpios = <gpio-descriptor>;	: GPIO for voltage translator enable
-+ - mux-gpios = <gpio-descriptor>;	: GPIO for pin multiplexing with other
-+                                          functions (eg, external FSI masters)
++/*
++ * Issue a break command on this link
++ */
++static int fsi_master_break(struct fsi_master *master, int link)
++{
++	if (master->send_break)
++		return master->send_break(master, link);
 +
-+Examples:
++	return 0;
++}
 +
-+    fsi-master {
-+        compatible = "fsi-master-gpio", "fsi-master";
-+        clock-gpios = <&gpio 0>;
-+        data-gpios = <&gpio 1>;
-+        enable-gpios = <&gpio 2>;
-+        trans-gpios = <&gpio 3>;
-+        mux-gpios = <&gpio 4>;
-+    }
+ static int fsi_master_scan(struct fsi_master *master)
+ {
+-	int link;
++	int link, rc;
++
++	for (link = 0; link < master->n_links; link++) {
++		rc = fsi_master_link_enable(master, link);
++		if (rc) {
++			dev_dbg(&master->dev,
++				"enable link %d failed: %d\n", link, rc);
++			continue;
++		}
++		rc = fsi_master_break(master, link);
++		if (rc) {
++			dev_dbg(&master->dev,
++				"break to link %d failed: %d\n", link, rc);
++			continue;
++		}
+ 
+-	for (link = 0; link < master->n_links; link++)
+ 		fsi_slave_init(master, link, 0);
++	}
+ 
+ 	return 0;
+ }
 -- 
 1.8.2.2
