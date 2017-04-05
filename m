@@ -1,101 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 19:08:27 +0530
-Subject: [PATCH V7 0/4] phy: USB and PCIe phy drivers for Qcom chipsets
-In-Reply-To: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <a59d6776-5855-9d04-a5be-de03456b8d2e@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 05 Apr 2017 06:43:03 -0700 (PDT)
+Subject: [PATCH net-next] macb: Add hardware PTP support.
+In-Reply-To: <1491225015-25553-1-git-send-email-rafalo@cadence.com>
+References: <20170329.093914.152103359543418375.davem@davemloft.net>
+ <1491225015-25553-1-git-send-email-rafalo@cadence.com>
+Message-ID: <20170405.064303.211440601700403108.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+From: Rafal Ozieblo <rafalo@cadence.com>
+Date: Mon, 3 Apr 2017 14:10:15 +0100
 
-On Wednesday 05 April 2017 06:02 PM, Vivek Gautam wrote:
-> This patch series adds couple of PHY drivers for Qualcomm chipsets.
-> a) qcom-qusb2 phy driver: that provides High Speed USB functionality.
-> b) qcom-qmp phy driver: that is a combo phy providing support for
->    USB3, PCIe, UFS and few other controllers.
+> This patch is based on original Harini's patch and Andrei's patch,
+> implemented in aseparate file to ease the review/maintanance
+> and integration with other platforms.
 > 
-> The patches are based on next branch of linux-phy tree.
+> In case that macb is compiled as a module, it has been renamed to
+> cadence-macb.ko to avoid naming confusion in Makefile.
 > 
-> These patches have been tested on Dragon board db820c hardware with
-> required set of dt patches and the patches to get rpm up on msm8996.
-> Couple of other patches [1, 2] fixing DMA config for XHCI are also
-> pulled in for testing.
-> A branch based on torvald's master is available in github [3].
+> This driver does support GEM-GXL:
+> - Enable HW time stamp
+> - Register ptp clock framework
+> - Initialize PTP related registers
+> - Updated dma buffer descriptor read/write mechanism
+> - HW time stamp on the PTP Ethernet packets are received using the
+>   SO_TIMESTAMPING API. Where timers are obtained from the dma buffer
+>   descriptors
+> - Added tsu_clk to device tree
+> 
+> Note: Patch on net-next, on April 3rd.
+> Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
 
-I get a bunch of checkpatch errors/warnings when I run checkpatch with --strict
-option. Those look simple enough to be fixed. Can you respin your series fixing
-those?
+This patch does too many things at one time.  Each entry in that list
+of changes above should be a separate change, all posted together as
+a group as a proper patch series.
 
-Thanks
-Kishon
-
-> 
-> Changes since v6:
->  - Rebased on phy/next and *not* including phy grouping series[4].
->  - qusb2-phy: addressed Stephen's comment.
->    - Dropped pm8994_s2 corner regulator from QUSB2 phy bindings.
->  - qmp-phy: none on functionality side.
->  
-> Changes since v5:
->  - Addressed review comments from Bjorn:
->    - Removed instances of readl/wirtel_relaxed calls from the drivers.
->      Instead, using simple readl/writel. Inserting a readl after a writel
->      to ensure the write is through to the device.
->    - Replaced regulator handling with regulator_bulk_** apis. This helps
->      in cutting down a lot of regulator handling code.
->    - Fixed minor return statements.
-> 
-> Changes since v4:
->  - Addressed comment to add child nodes for qmp phy driver. Each phy lane
->    now has a separate child node under the main qmp node.
->  - Modified the clock and reset initialization and enable methods.
->    Different phys - pcie, usb and later ufs, have varying number of clocks
->    and resets that are mandatory. So adding provision for clocks and reset
->    lists helps in requesting all mandatory resources for individual phys
->    and handle their failure cases accordingly.
-> 
-> Changes since v3:
->  - Addressed review comments given by Rob and Stephen for qusb2 phy
->    and qmp phy bindings respectively.
->  - Addressed review comments given by Stephen and Bjorn for qmp phy driver.
-> 
-> Changes since v2:
->  - Addressed review comments given by Rob and Stephen for bindings.
->  - Addressed the review comments given by Stephen for the qusb2 and qmp
->    phy drivers.
-> 
-> Changes since v1:
->  - Moved device tree binding documentation to separate patches, as suggested
->    by Rob.
->  - Addressed review comment regarding qfprom accesses by qusb2 phy driver,
->    given by Rob.
->  - Addressed review comments from Kishon.
->  - Addressed review comments from Srinivas for QMP phy driver.
->  - Addressed kbuild warning.
-> 
-> Please see individual patches for detailed changelogs.
-> 
-> [1] https://patchwork.kernel.org/patch/9567767/
-> [2] https://patchwork.kernel.org/patch/9567779/
-> [3] https://github.com/vivekgautam1/linux/tree/linux-v4.11-rc5-qmp-phy-db820c
-> [4] https://lkml.org/lkml/2017/3/20/407
-> 
-> Vivek Gautam (4):
->   dt-bindings: phy: Add support for QUSB2 phy
->   phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips
->   dt-bindings: phy: Add support for QMP phy
->   phy: qcom-qmp: new qmp phy driver for qcom-chipsets
-> 
->  .../devicetree/bindings/phy/qcom-qmp-phy.txt       |  106 ++
->  .../devicetree/bindings/phy/qcom-qusb2-phy.txt     |   43 +
->  drivers/phy/Kconfig                                |   18 +
->  drivers/phy/Makefile                               |    2 +
->  drivers/phy/phy-qcom-qmp.c                         | 1153 ++++++++++++++++++++
->  drivers/phy/phy-qcom-qusb2.c                       |  491 +++++++++
->  6 files changed, 1813 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qmp-phy.txt
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
->  create mode 100644 drivers/phy/phy-qcom-qmp.c
->  create mode 100644 drivers/phy/phy-qcom-qusb2.c
-> 
+Thank you.
