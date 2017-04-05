@@ -1,139 +1,73 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:06:04 -0500
-Subject: [PATCH v5 20/23] drivers/fsi/gpio: Add tracepoints for GPIO master
-In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-21-cbostic@linux.vnet.ibm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 04 Apr 2017 19:36:01 -0700
+Subject: [PATCH 2/2] ARM: dts: imx7: add USDHC NAND clock to SDHC instances
+In-Reply-To: <CAOMZO5A7QQEe5rgBbJBzo8GY41aYV9WA8e9teCUROyihg0kq_g@mail.gmail.com>
+References: <20170330005029.6472-1-stefan@agner.ch>
+ <20170330005029.6472-2-stefan@agner.ch>
+ <20170401030312.GB24882@b29396-OptiPlex-7040>
+ <5c8339900fa1bd6215fb94d4386f7e06@agner.ch>
+ <CAOMZO5CprxqnqRXMFJLBAgYAZGGnXNs3ZciyVz_mSLRnnSQQRQ@mail.gmail.com>
+ <CAOMZO5A7QQEe5rgBbJBzo8GY41aYV9WA8e9teCUROyihg0kq_g@mail.gmail.com>
+Message-ID: <c95a7f535296623bdd4e4a640b3c27f5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On 2017-04-04 19:15, Fabio Estevam wrote:
+> On Sun, Apr 2, 2017 at 2:02 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> On Sat, Apr 1, 2017 at 1:15 AM, Stefan Agner <stefan@agner.ch> wrote:
+>>
+>>> IMX7D_IPG_ROOT_CLK is currently not a valid clock in upstream... So we
+>>> would have to add it to the clock driver first.
+>>>
+>>> I guess we could/should add it anyway at one point? But probably also as
+>>> init on, just to make sure Linux does not disable it since it is
+>>> currently used by several IPs implicitly.
+>>
+>> Yes, I made a previous attempt do add  IMX7D_IPG_ROOT_CLK and it did
+>> not work as I did not put it in the init_on clock list.
+>>
+>> Will submit a new patch adding it to init_on, thanks.
+> 
+> I thought that adding IMX7D_IPG_ROOT_CLK would do the trick, but the
+> patch below also causes the kernel to not boot:
+> 
+> --- a/drivers/clk/imx/clk-imx7d.c
+> +++ b/drivers/clk/imx/clk-imx7d.c
+> @@ -386,7 +386,7 @@ static int const clks_init_on[] __initconst = {
+>         IMX7D_PLL_SYS_MAIN_480M_CLK, IMX7D_NAND_USDHC_BUS_ROOT_CLK,
+>         IMX7D_DRAM_PHYM_ROOT_CLK, IMX7D_DRAM_ROOT_CLK,
+>         IMX7D_DRAM_PHYM_ALT_ROOT_CLK, IMX7D_DRAM_ALT_ROOT_CLK,
+> -       IMX7D_AHB_CHANNEL_ROOT_CLK,
+> +       IMX7D_AHB_CHANNEL_ROOT_CLK, IMX7D_IPG_ROOT_CLK,
+>  };
+> 
+>  static struct clk_onecell_data clk_data;
+> @@ -788,7 +788,7 @@ static void __init imx7d_clocks_init(struct
+> device_node *ccm_node)
+>         clks[IMX7D_WRCLK_ROOT_DIV] =
+> imx_clk_divider2("wrclk_post_div", "wrclk_pre_div", base + 0xbd00, 0,
+> 6);
+>         clks[IMX7D_CLKO1_ROOT_DIV] =
+> imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0,
+> 6);
+>         clks[IMX7D_CLKO2_ROOT_DIV] =
+> imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0,
+> 6);
+> -
+> +       clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk",
+> "ahb_root_clk", base + 0x9080, 0, 2);
+>         clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk",
+> "arm_a7_div", base + 0x4000, 0);
+>         clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk",
+> "arm_m4_div", base + 0x4010, 0);
+>         clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate4("arm_m0_root_clk",
+> "arm_m0_div", base + 0x4020, 0);
 
-Add trace points for key GPIO operations of the GPIO based FSI
-master.
+Hm, imx_clk_divider2 sets CLK_SET_RATE_PARENT, maybe that influences the
+parent?
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
----
- drivers/fsi/fsi-master-gpio.c          |  9 +++++
- include/trace/events/fsi_master_gpio.h | 68 ++++++++++++++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 include/trace/events/fsi_master_gpio.h
+I guess we actually don't want the clock framework to change that clock
+rate, not sure whether we can freeze it or similar.
 
-diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
-index 9fedfaf..5d9e0b0 100644
---- a/drivers/fsi/fsi-master-gpio.c
-+++ b/drivers/fsi/fsi-master-gpio.c
-@@ -61,6 +61,9 @@ struct fsi_master_gpio {
- 	struct gpio_desc	*gpio_mux;	/* Mux control */
- };
- 
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/fsi_master_gpio.h>
-+
- #define to_fsi_master_gpio(m) container_of(m, struct fsi_master_gpio, master)
- 
- struct fsi_gpio_msg {
-@@ -128,6 +131,8 @@ static void serial_in(struct fsi_master_gpio *master, struct fsi_gpio_msg *msg,
- 		msg->msg |= ~in_bit & 0x1;	/* Data is negative active */
- 	}
- 	msg->bits += num_bits;
-+
-+	trace_fsi_master_gpio_in(master, num_bits, msg->msg);
- }
- 
- static void serial_out(struct fsi_master_gpio *master,
-@@ -139,6 +144,8 @@ static void serial_out(struct fsi_master_gpio *master,
- 	uint64_t last_bit = ~0;
- 	int next_bit;
- 
-+	trace_fsi_master_gpio_out(master, cmd->bits, cmd->msg);
-+
- 	if (!cmd->bits) {
- 		dev_warn(master->dev, "trying to output 0 bits\n");
- 		return;
-@@ -464,6 +471,8 @@ static int fsi_master_gpio_break(struct fsi_master *_master, int link)
- 	if (link != 0)
- 		return -ENODEV;
- 
-+	trace_fsi_master_gpio_break(master);
-+
- 	set_sda_output(master, 1);
- 	sda_out(master, 1);
- 	clock_toggle(master, FSI_PRE_BREAK_CLOCKS);
-diff --git a/include/trace/events/fsi_master_gpio.h b/include/trace/events/fsi_master_gpio.h
-new file mode 100644
-index 0000000..11b36c1
---- /dev/null
-+++ b/include/trace/events/fsi_master_gpio.h
-@@ -0,0 +1,68 @@
-+
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM fsi_master_gpio
-+
-+#if !defined(_TRACE_FSI_MASTER_GPIO_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_FSI_MASTER_GPIO_H
-+
-+#include <linux/tracepoint.h>
-+
-+TRACE_EVENT(fsi_master_gpio_in,
-+	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
-+	TP_ARGS(master, bits, msg),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	bits)
-+		__field(uint64_t, msg)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->master.idx;
-+		__entry->bits = bits;
-+		__entry->msg  = msg & ((1ull<<bits) - 1);
-+	),
-+	TP_printk("fsi-gpio%d => %0*llx[%d]",
-+		__entry->master_idx,
-+		(__entry->bits + 3) / 4,
-+		__entry->msg,
-+		__entry->bits
-+	)
-+);
-+
-+TRACE_EVENT(fsi_master_gpio_out,
-+	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
-+	TP_ARGS(master, bits, msg),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	bits)
-+		__field(uint64_t, msg)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->master.idx;
-+		__entry->bits = bits;
-+		__entry->msg  = msg & ((1ull<<bits) - 1);
-+	),
-+	TP_printk("fsi-gpio%d <= %0*llx[%d]",
-+		__entry->master_idx,
-+		(__entry->bits + 3) / 4,
-+		__entry->msg,
-+		__entry->bits
-+	)
-+);
-+
-+TRACE_EVENT(fsi_master_gpio_break,
-+	TP_PROTO(const struct fsi_master_gpio *master),
-+	TP_ARGS(master),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->master.idx;
-+	),
-+	TP_printk("fsi-gpio%d ----break---",
-+		__entry->master_idx
-+	)
-+);
-+
-+#endif /* _TRACE_FSI_MASTER_GPIO_H */
-+
-+#include <trace/define_trace.h>
--- 
-1.8.2.2
+--
+Stefan
