@@ -1,68 +1,57 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 5 Apr 2017 12:28:40 -0400
-Subject: [PATCH v3 8/9] drm/rockchip: gem: Don't alloc/free gem buf when
- dev_private is invalid
-In-Reply-To: <1491380967-28570-9-git-send-email-jeffy.chen@rock-chips.com>
-References: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
- <1491380967-28570-9-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170405162839.k6q4b3tpt6t2s3zm@art_vandelay>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Wed, 5 Apr 2017 09:35:40 -0700
+Subject: [PATCH v5 19/23] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <20170405020607.79939-20-cbostic@linux.vnet.ibm.com>
+References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+ <20170405020607.79939-20-cbostic@linux.vnet.ibm.com>
+Message-ID: <5d173f9c-e01c-6093-16ab-d114857009b2@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 04:29:26PM +0800, Jeffy Chen wrote:
-> After unbinding drm, the userspace may still has a chance to access
-> gem buf.
+On 04/04/17 19:06, Christopher Bostic wrote:
+> From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 > 
-> Add a sanity check for a NULL dev_private to prevent that from
-> happening.
-
-I still don't understand how this is happening. You're saying that these hooks
-can be called after rockchip_drm_unbind() has finished? 
-
-Sean
-
+> Implement a FSI master using GPIO.  Will generate FSI protocol for
+> read and write commands to particular addresses.  Sends master command
+> and waits for and decodes a slave response.
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Includes changes from Edward A. James <eajames@us.ibm.com> and Jeremy
+> Kerr <jk@ozlabs.org>.
+> 
+> Signed-off-by: Edward A. James <eajames@us.ibm.com>
+> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
 > ---
+>  drivers/fsi/Kconfig           |  11 +
+>  drivers/fsi/Makefile          |   1 +
+>  drivers/fsi/fsi-master-gpio.c | 610 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 622 insertions(+)
+>  create mode 100644 drivers/fsi/fsi-master-gpio.c
 > 
-> Changes in v3:
-> Address Daniel Vetter <daniel@ffwll.ch>'s comments.
-> Update commit message.
-> 
-> Changes in v2: None
-> 
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index df9e570..205a3dc 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -184,6 +184,9 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
->  	struct drm_device *drm = obj->dev;
->  	struct rockchip_drm_private *private = drm->dev_private;
->  
-> +	if (!private)
-> +		return -ENODEV;
+> diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+> index 04c1a0e..9cf8345 100644
+> --- a/drivers/fsi/Kconfig
+> +++ b/drivers/fsi/Kconfig
+> @@ -9,4 +9,15 @@ config FSI
+>  	---help---
+>  	  FSI - the FRU Support Interface - is a simple bus for low-level
+>  	  access to POWER-based hardware.
 > +
->  	if (private->domain)
->  		return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
->  	else
-> @@ -208,6 +211,11 @@ static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
->  
->  static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
->  {
-> +	struct drm_device *drm = rk_obj->base.dev;
+> +if FSI
 > +
-> +	if (!drm->dev_private)
-> +		return;
+> +config FSI_MASTER_GPIO
+> +	tristate "GPIO-based FSI master"
+> +	depends on FSI && GPIOLIB
+
+depends on FSI is redundant since "if FSI" does the same thing.
+
+> +	---help---
+> +	This option enables a FSI master driver using GPIO lines.
 > +
->  	if (rk_obj->pages)
->  		rockchip_gem_free_iommu(rk_obj);
->  	else
-> -- 
-> 2.1.4
-> 
+> +endif
+> +
+
 
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+~Randy
