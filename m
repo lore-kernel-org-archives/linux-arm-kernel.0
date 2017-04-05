@@ -1,37 +1,67 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  5 Apr 2017 15:19:08 +0200
-Subject: [PATCH v2 2/3] dt-bindings: imx-gpc: add i.MX6 QuadPlus compatible
-In-Reply-To: <20170405131909.16880-1-l.stach@pengutronix.de>
-References: <20170405131909.16880-1-l.stach@pengutronix.de>
-Message-ID: <20170405131909.16880-2-l.stach@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 5 Apr 2017 19:04:48 +0530
+Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
+In-Reply-To: <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
+References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
+ <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
+ <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
+Message-ID: <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the GPC on i.MX6QP is mostly comptible to the i.MX6Q one,
-the QuadPlus requires special workarounds for hardware erratum
-ERR009619.
+Hi Ravi,
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/power/fsl,imx-gpc.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
+> Hi Kishon,
+> 
+> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
+>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
+>>> SoC. The phy can be configured to be in Device mode or Host
+>>> mode based on the type of cable connected to the port. The
+>>> driver registers to  extcon framework to get appropriate
+>>> connect events for Host/Device cables connect/disconnect
+>>> states based on VBUS and ID interrupts.
+>>
+>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
+>> Northstar2.
+>>
+> 
+> Will do.
+> 
+>> Sorry for not letting you know this earlier. But I feel the design of the
+>> driver should be changed. Extcon shouldn't be used here. The extcon
+>> notifications should be sent to the consumer driver and the consumer driver
+>> should be responsible for invoking the phy ops.
+>>
+> 
+> The consumer drivers here would be a UDC driver (USB device
+> controller), EHCI and OHCI host controller drivers.
+> I was already suggested in UDC driver review to deal with extcon in Phy driver.
+> 
+> This phy connects to 2 host controllers, and one device controller.
+> That's the design in Broadcom Northstar2
+> platform. The values of the VBUS and ID pins of this port are
+> determined based on the type of the cable (device cable
+> or host cable). And. phy has to be configured accordingly.
+> 
+>> The phy ops being invoked during extcon events doesn't look right.
+> 
+> Could you please elaborate on the concern, so that we can think of
+> mitigating those issues in this driver?
+> Since we are dealing with phy init/shutdown in this driver itself, are
+> you okay with moving the extcon handling code
+> out of phy ops ?
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-index 416e12c6755a..181d2cc6f054 100644
---- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -5,7 +5,10 @@ The i.MX6 General Power Control (GPC) block contains DVFS load tracking
- counters and Power Gating Control (PGC).
- 
- Required properties:
--- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
-+- compatible: Should be one of the following:
-+  - fsl,imx6q-gpc
-+  - fsl,imx6qp-gpc
-+  - fsl,imx6sl-gpc
- - reg: should be register base and length as documented in the
-   datasheet
- - interrupts: Should contain one interrupt specifier for the GPC interrupt
--- 
-2.11.0
+yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
+extcon events too. Can a phy which is initialized by a phy consumer (say your
+UDC invokes phy_init) can be shutdown by an extcon event?
+
+Maybe a clear explanation of when phy_ops here will be invoked and when it will
+set using extcon events might help.
+
+Thanks
+Kishon
