@@ -1,80 +1,100 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 5 Apr 2017 07:36:17 -0700
-Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
-References: <20170404174727.35478-1-thgarnie@google.com>
- <20170404174727.35478-4-thgarnie@google.com>
- <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
-Message-ID: <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 5 Apr 2017 16:47:29 +0200
+Subject: [PATCH 1/4] dt-bindings: iio: stm32-dac: Add support for STM32 DAC
+In-Reply-To: <a6c51b90-c14b-412c-1006-cf0dd7abda0d@kernel.org>
+References: <1490960707-22422-1-git-send-email-fabrice.gasnier@st.com>
+ <1490960707-22422-2-git-send-email-fabrice.gasnier@st.com>
+ <a6c51b90-c14b-412c-1006-cf0dd7abda0d@kernel.org>
+Message-ID: <2386fb3e-142b-48f2-9308-9ff085aa4c4f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 7:22 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Apr 04, 2017 at 10:47:27AM -0700, Thomas Garnier wrote:
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 43512d4d7df2..6d598e7051c3 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -744,6 +744,10 @@ ENDPROC(cpu_switch_to)
->>  ret_fast_syscall:
->>       disable_irq                             // disable interrupts
->>       str     x0, [sp, #S_X0]                 // returned x0
->> +     ldr     x2, [tsk, #TSK_TI_ADDR_LIMIT]   // check addr limit change
->> +     mov     x1, #TASK_SIZE_64
->> +     cmp     x2, x1
->> +     b.ne    addr_limit_fail
->
-> KERNEL_DS is set to the maximum address (-1UL), so it would be easier to
-> check against this here and avoid a "mov". Even simpler if you'd check
-> against bit 63 of the address for KERNEL_DS:
-
-We also want to catch corruption so checking the 63 bit make sense. I
-will look for this change in the next iteration.
-
->
->         ldr     x1, [tsk, TSK_TI_ADDR_LIMIT]    // check addr limit change
->         tbnz    x1, #63, addr_limit_fail        // KERNEL_DS is -1UL
->
->>       ldr     x1, [tsk, #TSK_TI_FLAGS]        // re-check for syscall tracing
->>       and     x2, x1, #_TIF_SYSCALL_WORK
->>       cbnz    x2, ret_fast_syscall_trace
->> @@ -771,6 +775,11 @@ work_pending:
->>   */
->>  ret_to_user:
->>       disable_irq                             // disable interrupts
->> +     ldr     x2, [tsk, #TSK_TI_ADDR_LIMIT]   // check addr limit change
->> +     mov     x1, #TASK_SIZE_64
->> +     cmp     x2, x1
->> +     b.ne    addr_limit_fail
->
-> Same here.
->
->> +
->>       ldr     x1, [tsk, #TSK_TI_FLAGS]
->>       and     x2, x1, #_TIF_WORK_MASK
->>       cbnz    x2, work_pending
->> @@ -779,6 +788,12 @@ finish_ret_to_user:
->>       kernel_exit 0
->>  ENDPROC(ret_to_user)
+On 04/02/2017 01:16 PM, Jonathan Cameron wrote:
+> On 31/03/17 12:45, Fabrice Gasnier wrote:
+>> Document STMicroelectronics STM32 DAC (digital-to-analog converter).
 >>
->> +addr_limit_fail:
->> +     stp     x0, lr, [sp,#-16]!
->> +     bl      asm_verify_pre_usermode_state
->> +     ldp     x0, lr, [sp],#16
->> +     ret     lr
->
-> Where is this supposed to return? What is the value of lr when branching
-> to addr_limit_fail?
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>>  .../devicetree/bindings/iio/dac/st,stm32-dac.txt   | 56 ++++++++++++++++++++++
+>>  1 file changed, 56 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
+>> new file mode 100644
+>> index 0000000..1981983
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/iio/dac/st,stm32-dac.txt
+>> @@ -0,0 +1,56 @@
+>> +STMicroelectronics STM32 DAC
+>> +
+>> +The STM32 DAC is a 12-bit voltage output digital-to-analog converter. The DAC
+>> +can be configured in 8- or 12-bit mode. In 12-bit mode, the data could be
+>> +left- or right-aligned.
+> Whilst possibly true, do we care about the alignment?  That'll all get wrapped
+> up in the driver.
+Hi Jonathan,
 
-It is not supposed to return. Do you think I should remove stp, ldp,
-ret and jut add a brk 0x100 or jmp/call a break/bug function?
+I'll update this description in V2
 
->
-> --
-> Catalin
+> 
+>> It has two output channels, each with its own converter.
+>> +It has built-in noise and triangle waveform generator and supports external
+>> +triggers for conversions. The DAC's output buffer allows a high drive output
+>> +current.
+> Ah.. This is going to be fun :) More unusual hardware to find in an SoC.
+Yes, let's discuss this on following patches.
 
+Thanks your review,
+Best Regards,
+Fabrice
 
-
--- 
-Thomas
+>> +
+>> +Contents of a stm32 dac root node:
+>> +-----------------------------------
+>> +Required properties:
+>> +- compatible: Must be "st,stm32h7-dac-core".
+>> +- reg: Offset and length of the device's register set.
+>> +- clocks: Must contain an entry for pclk (which feeds the peripheral bus
+>> +  interface)
+>> +- clock-names: Must be "pclk".
+>> +- vref-supply: Phandle to the vref+ input analog reference supply.
+>> +
+>> +Optional properties:
+>> +- resets: Must contain the phandle to the reset controller.
+>> +- A pinctrl state named "default" for each DAC channel may be defined to set
+>> +  DAC_OUTx pin in mode of operation for analog output on external pin.
+>> +
+>> +Contents of a stm32 dac child node:
+>> +-----------------------------------
+>> +DAC core node should contain at least one subnode, representing a
+>> +DAC instance/channel available on the machine.
+>> +
+>> +Required properties:
+>> +- compatible: Must be "st,stm32-dac".
+>> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+>> +  Documentation/devicetree/bindings/iio/iio-bindings.txt
+>> +- st,dac-channel: Must be either 1 or 2, to define channel in use (e.g.
+>> +  single channels: 1 or 2)
+>> +
+>> +Example:
+>> +	dac: dac at 40007400 {
+>> +		compatible = "st,stm32h7-dac-core";
+>> +		reg = <0x40007400 0x400>;
+>> +		clocks = <&clk>;
+>> +		clock-names = "pclk";
+>> +		vref-supply = <&reg_vref>;
+>> +
+>> +		dac1: dac at 1 {
+>> +			compatible = "st,stm32-dac";
+>> +			#io-channels-cells = <1>;
+>> +			st,dac-channel = <1>;
+>> +		};
+>> +
+>> +		dac2: dac at 2 {
+>> +			compatible = "st,stm32-dac";
+>> +			#io-channels-cells = <1>;
+>> +			st,dac-channel = <2>;
+>> +		};
+>> +	};
+>>
+> 
