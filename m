@@ -1,84 +1,50 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  5 Apr 2017 14:37:18 +0100
-Subject: [PATCH v2 5/9] mm/hugetlb: Introduce set_huge_swap_pte_at() helper
+Date: Wed,  5 Apr 2017 14:37:19 +0100
+Subject: [PATCH v2 6/9] mm: rmap: Use correct helper when poisoning hugepages
 In-Reply-To: <20170405133722.6406-1-punit.agrawal@arm.com>
 References: <20170405133722.6406-1-punit.agrawal@arm.com>
-Message-ID: <20170405133722.6406-6-punit.agrawal@arm.com>
+Message-ID: <20170405133722.6406-7-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set_huge_pte_at(), an architecture callback to populate hugepage ptes,
-does not provide the range of virtual memory that is targetted. This
-leads to ambiguity when dealing with swap entries on architectures that
-support hugepages consisting of contiguous ptes.
+Using set_pte_at() does not do the right thing when putting down
+HWPOISON swap entries for hugepages on architectures that support
+contiguous ptes.
 
-Fix the problem by introducing an overridable helper that is called when
-populating the page tables with swap entries. The size of the targetted
-region is provided to the helper to help determine the number of entries
-to be updated.
-
-Provide a default implementation that maintains the current behaviour.
+Fix this problem by using set_huge_swap_pte_at() which was introduced to
+fix exactly this problem.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Mike Kravetz <mike.kravetz@oracle.com>
-Cc: "Aneesh Kumar K.V" <aneesh.kumar@linux.vnet.ibm.com>
+Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
 ---
- include/linux/hugetlb.h |  2 ++
- mm/hugetlb.c            | 14 +++++++++++---
- 2 files changed, 13 insertions(+), 3 deletions(-)
+ mm/rmap.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 23010a3b2047..fa65ad73a65f 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -127,6 +127,8 @@ int pud_huge(pud_t pud);
- unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
- 		unsigned long address, unsigned long end, pgprot_t newprot);
+diff --git a/mm/rmap.c b/mm/rmap.c
+index f6838015810f..e07c7912a166 100644
+--- a/mm/rmap.c
++++ b/mm/rmap.c
+@@ -1386,15 +1386,19 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
+ 		update_hiwater_rss(mm);
  
-+void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+			  pte_t *ptep, pte_t pte, unsigned long sz);
- #else /* !CONFIG_HUGETLB_PAGE */
+ 		if (PageHWPoison(page) && !(flags & TTU_IGNORE_HWPOISON)) {
++			pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
+ 			if (PageHuge(page)) {
+ 				int nr = 1 << compound_order(page);
+ 				hugetlb_count_sub(nr, mm);
++				set_huge_swap_pte_at(mm, address,
++						     pvmw.pte, pteval,
++						     vma_mmu_pagesize(vma));
+ 			} else {
+ 				dec_mm_counter(mm, mm_counter(page));
++				set_pte_at(mm, address, pvmw.pte, pteval);
+ 			}
  
- static inline void reset_vma_resv_huge_pages(struct vm_area_struct *vma)
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 2b0f6f96f2c1..a27e926913f4 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3211,6 +3211,12 @@ static int is_hugetlb_entry_hwpoisoned(pte_t pte)
- 		return 0;
- }
- 
-+void __weak set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+				 pte_t *ptep, pte_t pte, unsigned long sz)
-+{
-+	set_huge_pte_at(mm, addr, ptep, pte);
-+}
+-			pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
+-			set_pte_at(mm, address, pvmw.pte, pteval);
 +
- int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
- 			    struct vm_area_struct *vma)
- {
-@@ -3263,9 +3269,10 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
- 				 */
- 				make_migration_entry_read(&swp_entry);
- 				entry = swp_entry_to_pte(swp_entry);
--				set_huge_pte_at(src, addr, src_pte, entry);
-+				set_huge_swap_pte_at(src, addr, src_pte,
-+						     entry, sz);
- 			}
--			set_huge_pte_at(dst, addr, dst_pte, entry);
-+			set_huge_swap_pte_at(dst, addr, dst_pte, entry, sz);
- 		} else {
- 			if (cow) {
- 				huge_ptep_set_wrprotect(src, addr, src_pte);
-@@ -4283,7 +4290,8 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
- 
- 				make_migration_entry_read(&entry);
- 				newpte = swp_entry_to_pte(entry);
--				set_huge_pte_at(mm, address, ptep, newpte);
-+				set_huge_swap_pte_at(mm, address, ptep,
-+						     newpte, huge_page_size(h));
- 				pages++;
- 			}
- 			spin_unlock(ptl);
+ 		} else if (pte_unused(pteval)) {
+ 			/*
+ 			 * The guest indicated that the page content is of no
 -- 
 2.11.0
