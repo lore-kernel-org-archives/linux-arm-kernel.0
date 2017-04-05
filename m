@@ -1,53 +1,24 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Apr 2017 23:42:45 +0100
-Subject: [PATCH v3] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170405224245.GA17774@n2100.armlinux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 5 Apr 2017 15:48:35 -0700
+Subject: [PATCH V7 1/4] dt-bindings: phy: Add support for QUSB2 phy
+In-Reply-To: <1491395558-16902-2-git-send-email-vivek.gautam@codeaurora.org>
+References: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1491395558-16902-2-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <20170405224835.GL7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 08:31:27AM +0100, Ard Biesheuvel wrote:
-> diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
-> index a5b47421059d..80dfeb8ce8f2 100644
-> --- a/arch/arm/include/asm/mmu.h
-> +++ b/arch/arm/include/asm/mmu.h
-> @@ -1,6 +1,8 @@
->  #ifndef __ARM_MMU_H
->  #define __ARM_MMU_H
->  
-> +struct machine_desc;
-> +
->  #ifdef CONFIG_MMU
->  
->  typedef struct {
-> @@ -24,6 +26,8 @@ typedef struct {
->  #define ASID(mm)	(0)
->  #endif
->  
-> +void early_mm_init(const struct machine_desc *mdesc);
-> +
->  #else
->  
->  /*
-> @@ -35,6 +39,8 @@ typedef struct {
->  	unsigned long	end_brk;
->  } mm_context_t;
->  
-> +static inline void early_mm_init(const struct machine_desc *mdesc) { }
-> +
+On 04/05, Vivek Gautam wrote:
+> Qualcomm chipsets have QUSB2 phy controller that provides
+> HighSpeed functionality for DWC3 controller.
+> Adding dt binding information for the same.
+> 
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-Why are we stuffing this into mmu.h?  mmu.h is not the header file for
-arch/arm/mm/mmu.c - although they have the same base filename, they are
-not really related.
-
-asm/mmu.h is supposed to be a kernel-wide include file for the mm_context_t
-thing, and should not be filled with arch-private stuff.
-
-Please find a better location for this.
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
