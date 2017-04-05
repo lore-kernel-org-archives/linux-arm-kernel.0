@@ -1,111 +1,135 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 5 Apr 2017 02:14:11 +0200
-Subject: [PATCH v2 2/5] KVM: arm/arm64: Add ARM user space interrupt
- signaling ABI
-In-Reply-To: <20170221114153.GA26976@cbox>
-References: <20170203145655.15007-1-cdall@linaro.org>
- <20170203145655.15007-3-cdall@linaro.org>
- <CAFEAcA-HMZnjbnhDC-13rWuQP-X2pk-W-6DvSR8n9_f-e4R=cA@mail.gmail.com>
- <20170221114153.GA26976@cbox>
-Message-ID: <5fe89e77-4fcc-f2e5-a796-a1e1f38eef9f@suse.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 04 Apr 2017 17:31:59 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.12 (redo)
+Message-ID: <m24ly37kzk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Olof,
+
+Here's a redo of the Amlogic 64-bit DT updates for v4.12.
+
+This DT branch includes all our DT updates, plus merges in a clock
+branch that includes only clock header and binding updates which are
+dependencies.  This shared branch/tag is immutable and shared with the
+clock tree.
+
+I hope this iteration passes muster,
+
+Kevin
 
 
-On 21.02.17 12:41, Christoffer Dall wrote:
-> Hi Alex,
->
-> On Fri, Feb 03, 2017 at 05:51:18PM +0000, Peter Maydell wrote:
->> On 3 February 2017 at 14:56, Christoffer Dall <cdall@linaro.org> wrote:
->>> From: Christoffer Dall <christoffer.dall@linaro.org>
->>>
->>> We have 2 modes for dealing with interrupts in the ARM world. We can
->>> either handle them all using hardware acceleration through the vgic or
->>> we can emulate a gic in user space and only drive CPU IRQ pins from
->>> there.
->>>
->>> Unfortunately, when driving IRQs from user space, we never tell user
->>> space about events from devices emulated inside the kernel, which may
->>> result in interrupt line state changes, so we lose out on for example
->>> timer and PMU events if we run with user space gic emulation.
->>>
->>> Define an ABI to publish such device output levels to userspace.
->>>
->>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>
->>
->> Acked-by: Peter Maydell <peter.maydell@linaro.org>
->>
->> for the userspace ABI/docs part.
->>
->
-> Given Peter's ack on this ABI, any chance you could take a look at
-> fixing the userspace SMP issue and respinning the userspace patches for
-> this series?
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-The problem with user space SMP was simply a missing lock:
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-diff --git a/target/arm/kvm.c b/target/arm/kvm.c
-index a66845f..1b33895 100644
---- a/target/arm/kvm.c
-+++ b/target/arm/kvm.c
-@@ -548,10 +548,14 @@ MemTxAttrs kvm_arch_post_run(CPUState *cs, struct 
-kvm_run *run)
+are available in the git repository at:
 
-      /* Synchronize our internal vtimer irq line with the kvm one */
-      if (run->s.regs.device_irq_level != cpu->device_irq_level) {
--        qemu_set_irq(ARM_CPU(cs)->gt_timer_outputs[GTIMER_VIRT],
-+        qemu_mutex_lock_iothread();
-+        qemu_set_irq(cpu->gt_timer_outputs[GTIMER_VIRT],
-                       run->s.regs.device_irq_level & 
-KVM_ARM_DEV_EL1_VTIMER);
-+        qemu_set_irq(cpu->gt_timer_outputs[GTIMER_PHYS],
-+                     run->s.regs.device_irq_level & 
-KVM_ARM_DEV_EL1_PTIMER);
-          /* TODO: Handle changes in PTIMER and PMU as well */
-          cpu->device_irq_level = run->s.regs.device_irq_level;
-+        qemu_mutex_unlock_iothread();
-      }
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-redo
 
-      return MEMTXATTRS_UNSPECIFIED;
+for you to fetch changes up to b2121170143bf4708c657461740c922ce24bc94e:
 
-----
+  Merge tag 'amlogic-clk-headers' into v4.12/dt64 (2017-04-04 16:16:52 -0700)
 
+----------------------------------------------------------------
+Amlogic 64-bit DT updates for v4.12
+- pinctrl: new pins for audio
+- clocks: more clocks exposed for GFX, audio
+- new board: Khadas Vim (S905X)
+- new board: HwaCom AmazeTV (S905X)
+- ethernet phy: add GPIO resets
 
-I also wasn't able to use your series out of the box. There are several 
-places in the code that check whether a timer is enabled (for register 
-save/restore for example) and without vgic we never ended up setting 
-that to true.
+----------------------------------------------------------------
+Carlo Caione (3):
+      dt-bindings: Add vendor prefix for Hwacom Systems Inc.
+      dt-bindings: amlogic: Add HwaCom board
+      ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
 
-I don't know how safe it is to set it to true regardless. It feels to me 
-like someone has to put more thought into how to switch from an 
-initialized user space timer state to a vgic one. For reference, my test 
-patch is below:
+Heiner Kallweit (1):
+      ARM64: dts: meson-gxbb-odroidc2: Enable SARADC node
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 891a725..56a5d51 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -629,8 +629,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
-  		return 0;
+Jerome Brunet (1):
+      dt-bindings: clk: gxbb: expose i2s output clock gates
 
-  	/* Without a VGIC we do not map virtual IRQs to physical IRQs */
--	if (!irqchip_in_kernel(vcpu->kvm))
-+	if (!irqchip_in_kernel(vcpu->kvm)) {
-+		/* Enable timer for now, may be racy? */
-+		timer->enabled = 1;
-  		return 0;
-+	}
+Kevin Hilman (1):
+      Merge tag 'amlogic-clk-headers' into v4.12/dt64
 
-  	if (!vgic_initialized(vcpu->kvm))
-  		return -ENODEV;
+Martin Blumenstingl (14):
+      ARM64: dts: meson-gxbb-odroidc2: add the ethernet PHY's reset GPIO
+      ARM64: dts: meson-gxbb-p200: add the ethernet PHY's reset GPIO
+      ARM64: dts: meson-gxbb-vega-s95: add the ethernet PHY's reset GPIO
+      ARM64: dts: meson-gxbb-nexbox-a95x: add the ethernet PHY's reset GPIO
+      ARM64: dts: meson-gxbb-wetek-hub: add the ethernet PHY's reset GPIO
+      ARM64: dts: meson-gxbb-wetek-play2: add the ethernet PHY's reset GPIO
+      ARM64: dts: meson-gxbb-p201: fix ethernet support
+      ARM64: dts: amlogic: add the ethernet TX delay configuration
+      ARM64: dts: meson-gx: remove the phy-mode property from meson-gx
+      ARM64: dts: meson-gxl: improve support for the P212 reference design
+      ARM64: dts: amlogic: meson-gxl: add the missing PWM pins
+      devicetree: add vendor prefix for Khadas
+      dt-bindings: amlogic: add the Khadas VIM
+      ARM64: dts: meson-gxl: add support for the Khadas VIM board
 
+Neil Armstrong (18):
+      ARM64: dts: meson-gx: Add Buttons to Q200 and P230 boards
+      ARM64: dts: meson-gxbb-odroidc2: Add GPIO lines names
+      ARM64: dts: meson-gxbb-odroidc2: Fix TFLASH VDD regulator GPIO line
+      ARM64: dts: meson-gx: Finally move common nodes to GX dtsi
+      ARM64: dts: meson-gx: empty line cleanup
+      ARM64: dts: meson-gx: Prepend GX generic compatible like other nodes
+      ARM64: dts: meson-gxl: Add missing pinctrl pins groups
+      ARM64: dts: meson-gx: Add Mali nodes for GXBB and GXL
+      ARM64: dts: meson-gxbb: Add gpio-ranges properties
+      ARM64: dts: meson-gxl: Add gpio-ranges properties
+      ARM: dts: meson8: Add gpio-ranges properties
+      ARM: dts: meson8b: Add gpio-ranges properties
+      ARM64: dts: meson-gxbb: Add USB Hub GPIO hog
+      clk: meson-gxbb: Add MALI clock IDS
+      clk: meson-gxbb: Expose GP0 dt-bindings clock id
+      dt-bindings: clock: gxbb-clkc: Add GXL compatible variant
+      ARM64: dts: meson-gx: Add shared CMA dma memory pool
+      ARM64: dts: meson-gx: Add support for HDMI output
 
-----
+jbrunet (4):
+      ARM64: dts: meson-gxbb: add i2s output pins
+      ARM64: dts: meson-gxbb: add spdif output pins
+      ARM64: dts: meson-gxl: add i2s output pins
+      ARM64: dts: meson-gxl: add spdif output pins
 
-Once we solved that piece, I'll happily respin my user space patch.
-
-
-Alex
+ Documentation/devicetree/bindings/arm/amlogic.txt              |   3 +
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt  |   3 +-
+ Documentation/devicetree/bindings/vendor-prefixes.txt          |   2 +
+ arch/arm/boot/dts/meson8.dtsi                                  |   2 +
+ arch/arm/boot/dts/meson8b.dtsi                                 |   2 +
+ arch/arm64/boot/dts/amlogic/Makefile                           |   2 +
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi            |  39 ++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                      |  80 +++++++++++++++++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts         |  40 ++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts            |  80 +++++++++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts                |  25 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts                |  11 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi               |  29 ++++++--
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi           |  21 +++++-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts           |  26 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts         |  26 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                    | 172 +++++++++++++++++++++++++++++++++++--------
+ arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi                |  43 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts           |  42 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi               |   1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts | 164 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 114 +++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    |  23 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts           |  21 +++---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi          | 173 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi               |   1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                     | 194 +++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts            |  25 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts                 |  42 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                     |   3 +
+ drivers/clk/meson/gxbb.h                                       |  21 ++++--
+ include/dt-bindings/clock/gxbb-clkc.h                          |  11 +++
+ 32 files changed, 1375 insertions(+), 66 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
