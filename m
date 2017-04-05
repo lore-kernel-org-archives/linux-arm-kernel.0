@@ -1,48 +1,57 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  5 Apr 2017 20:50:53 +0800
-Subject: [PATCH 3/3] arm64: allwinner: a64: enable EHCI0/OHCI0 controller for
- Pine64
-In-Reply-To: <20170405125053.6170-1-icenowy@aosc.io>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 5 Apr 2017 18:28:20 +0530
+Subject: [PATCH 1/3] dt: bindings: add pmu0 regs for USB PHYs on Allwinner
+ H3/V3s/A64
+In-Reply-To: <20170405125053.6170-2-icenowy@aosc.io>
 References: <20170405125053.6170-1-icenowy@aosc.io>
-Message-ID: <20170405125053.6170-4-icenowy@aosc.io>
+ <20170405125053.6170-2-icenowy@aosc.io>
+Message-ID: <1524732c-b72f-61ce-8ae7-1d764f85c903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The upper USB port of Pine64 board is connected to the SoC's USB0 port,
-which can now switch from the MUSB controller to the EHCI/OHCI pair.
 
-Enable the EHCI/OHCI pair in the Pine64 device tree.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On Wednesday 05 April 2017 06:20 PM, Icenowy Zheng wrote:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
+> 
+> Allwinner H3/V3s/A64 SoCs have a special USB PHY0 that can route to two
+> controllers: one is MUSB and the other is a EHCI/OHCI pair.
+> 
+> When it's routed to EHCI/OHCI pair, it will needs a "pmu0" regs to
+> tweak, like other EHCI/OHCI pairs in Allwinner SoCs.
+> 
+> Add this to the binding of USB PHYs on Allwinner H3/V3s/A64.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> 
+> Kishon, could you push this to 4.11?
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index c680ed385da3..4782add50b94 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -66,6 +66,10 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -91,6 +95,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
--- 
-2.12.2
+Is this for the patch titled "phy: sun4i-usb: add support for V3s USB PHY" that
+was added during the last merge window.
+
+this patch looks simpler enough to be merged in this -rc cycle. However it
+depends on Greg KH.
+
+Thanks
+Kishon
+
+> 
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index e42334258185..005bc22938ff 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -15,6 +15,7 @@ Required properties:
+>  - reg : a list of offset + length pairs
+>  - reg-names :
+>    * "phy_ctrl"
+> +  * "pmu0" for H3, V3s and A64
+>    * "pmu1"
+>    * "pmu2" for sun4i, sun6i or sun7i
+>  - #phy-cells : from the generic phy bindings, must be 1
+> 
