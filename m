@@ -1,65 +1,48 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 10:10:55 +0200
-Subject: [PATCH v5 3/7] mfd: axp20x: add MFD cells for AXP20X and AXP22X
- battery driver
-In-Reply-To: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
-References: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405081059.1684-4-quentin.schulz@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Apr 2017 10:13:10 +0200
+Subject: [PATCH 2/3] arm64: allwinner: a64: add USB0 OHCI/EHCI related
+ devicetree parts
+In-Reply-To: <a4ca2175-b4df-42e4-1f85-20d34430d4dc@aosc.io>
+References: <20170404184518.33610-1-icenowy@aosc.io>
+ <20170404184518.33610-2-icenowy@aosc.io>
+ <20170405071508.yaur35xuli4jgkfb@lukather>
+ <7828ffa0-f570-9841-a9e6-fe175f8169ac@aosc.io>
+ <20170405072631.ou4e5gafvagwpykq@lukather>
+ <a4ca2175-b4df-42e4-1f85-20d34430d4dc@aosc.io>
+Message-ID: <20170405081310.fxts5ut7srtnjiiy@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
+On Wed, Apr 05, 2017 at 03:33:09PM +0800, Icenowy Zheng wrote:
+> > > P.S. to be compatible with older DTs, I think I should adjust
+> > > the phy driver, make it enable dual-route function only when
+> > > pmu0 is present.
+> > 
+> > That, or if we're quick enough, we can still add it to 4.11. There's a
+> > bit of time left.
+> 
+> Thus the device tree binding patch and the DT part of this patchset
+> should be all pushed to 4.11 .
+> 
+> The device tree binding patch is commit ee73fd7dfc86 ("dt: bindings:
+> add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64").
 
-This patch adds the AXP20X/AXP22X battery driver to the MFD cells of the
-AXP209, AXP221 and AXP223 MFD.
+It should have always been there. If there is a register for the PHY
+somewhere, it must be in the DT node. Period. There's not relation to
+whether the driver actually uses it or not.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
+Please send a patch to add that range for 4.11.
 
-v2:
- - changed DT node name from battery_power_supply to
- battery-power-supply,
- - removed io-channels and io-channel-names from DT (the IIO mapping is
- done in the IIO ADC driver now),
+Maxime
 
- drivers/mfd/axp20x.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 5ba3b04..e6f5507 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -594,6 +594,9 @@ static struct mfd_cell axp20x_cells[] = {
- 	}, {
- 		.name		= "axp20x-adc",
- 	}, {
-+		.name		= "axp20x-battery-power-supply",
-+		.of_compatible	= "x-powers,axp209-battery-power-supply",
-+	}, {
- 		.name		= "axp20x-ac-power-supply",
- 		.of_compatible	= "x-powers,axp202-ac-power-supply",
- 		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-@@ -621,6 +624,9 @@ static struct mfd_cell axp221_cells[] = {
- 		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
- 		.resources	= axp20x_ac_power_supply_resources,
- 	}, {
-+		.name		= "axp20x-battery-power-supply",
-+		.of_compatible	= "x-powers,axp221-battery-power-supply",
-+	}, {
- 		.name		= "axp20x-usb-power-supply",
- 		.of_compatible	= "x-powers,axp221-usb-power-supply",
- 		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-@@ -636,6 +642,9 @@ static struct mfd_cell axp223_cells[] = {
- 	}, {
- 		.name		= "axp22x-adc",
- 	}, {
-+		.name		= "axp20x-battery-power-supply",
-+		.of_compatible	= "x-powers,axp221-battery-power-supply",
-+	}, {
- 		.name			= "axp20x-regulator",
- 	}, {
- 		.name		= "axp20x-ac-power-supply",
 -- 
-2.9.3
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/e23ba2cf/attachment-0001.sig>
