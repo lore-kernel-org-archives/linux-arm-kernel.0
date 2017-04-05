@@ -1,50 +1,65 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  5 Apr 2017 14:37:19 +0100
-Subject: [PATCH v2 6/9] mm: rmap: Use correct helper when poisoning hugepages
-In-Reply-To: <20170405133722.6406-1-punit.agrawal@arm.com>
-References: <20170405133722.6406-1-punit.agrawal@arm.com>
-Message-ID: <20170405133722.6406-7-punit.agrawal@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Apr 2017 15:22:25 +0100
+Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <20170404174727.35478-4-thgarnie@google.com>
+References: <20170404174727.35478-1-thgarnie@google.com>
+ <20170404174727.35478-4-thgarnie@google.com>
+Message-ID: <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using set_pte_at() does not do the right thing when putting down
-HWPOISON swap entries for hugepages on architectures that support
-contiguous ptes.
+On Tue, Apr 04, 2017 at 10:47:27AM -0700, Thomas Garnier wrote:
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 43512d4d7df2..6d598e7051c3 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -744,6 +744,10 @@ ENDPROC(cpu_switch_to)
+>  ret_fast_syscall:
+>  	disable_irq				// disable interrupts
+>  	str	x0, [sp, #S_X0]			// returned x0
+> +	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
+> +	mov	x1, #TASK_SIZE_64
+> +	cmp	x2, x1
+> +	b.ne	addr_limit_fail
 
-Fix this problem by using set_huge_swap_pte_at() which was introduced to
-fix exactly this problem.
+KERNEL_DS is set to the maximum address (-1UL), so it would be easier to
+check against this here and avoid a "mov". Even simpler if you'd check
+against bit 63 of the address for KERNEL_DS:
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
----
- mm/rmap.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+	ldr	x1, [tsk, TSK_TI_ADDR_LIMIT]	// check addr limit change
+	tbnz	x1, #63, addr_limit_fail	// KERNEL_DS is -1UL
 
-diff --git a/mm/rmap.c b/mm/rmap.c
-index f6838015810f..e07c7912a166 100644
---- a/mm/rmap.c
-+++ b/mm/rmap.c
-@@ -1386,15 +1386,19 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
- 		update_hiwater_rss(mm);
- 
- 		if (PageHWPoison(page) && !(flags & TTU_IGNORE_HWPOISON)) {
-+			pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
- 			if (PageHuge(page)) {
- 				int nr = 1 << compound_order(page);
- 				hugetlb_count_sub(nr, mm);
-+				set_huge_swap_pte_at(mm, address,
-+						     pvmw.pte, pteval,
-+						     vma_mmu_pagesize(vma));
- 			} else {
- 				dec_mm_counter(mm, mm_counter(page));
-+				set_pte_at(mm, address, pvmw.pte, pteval);
- 			}
- 
--			pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
--			set_pte_at(mm, address, pvmw.pte, pteval);
-+
- 		} else if (pte_unused(pteval)) {
- 			/*
- 			 * The guest indicated that the page content is of no
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+>  	and	x2, x1, #_TIF_SYSCALL_WORK
+>  	cbnz	x2, ret_fast_syscall_trace
+> @@ -771,6 +775,11 @@ work_pending:
+>   */
+>  ret_to_user:
+>  	disable_irq				// disable interrupts
+> +	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
+> +	mov	x1, #TASK_SIZE_64
+> +	cmp	x2, x1
+> +	b.ne	addr_limit_fail
+
+Same here.
+
+> +
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]
+>  	and	x2, x1, #_TIF_WORK_MASK
+>  	cbnz	x2, work_pending
+> @@ -779,6 +788,12 @@ finish_ret_to_user:
+>  	kernel_exit 0
+>  ENDPROC(ret_to_user)
+>  
+> +addr_limit_fail:
+> +	stp	x0, lr, [sp,#-16]!
+> +	bl	asm_verify_pre_usermode_state
+> +	ldp	x0, lr, [sp],#16
+> +	ret	lr
+
+Where is this supposed to return? What is the value of lr when branching
+to addr_limit_fail?
+
 -- 
-2.11.0
+Catalin
