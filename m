@@ -1,106 +1,36 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 5 Apr 2017 14:48:57 +0530
-Subject: [PATCH 2/3] perf tools arm64: implement function get_cpuid_str
-In-Reply-To: <20170404122518.GA8551@leverpostej>
-References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1491291403-29893-3-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170404122518.GA8551@leverpostej>
-Message-ID: <CAFpQJXU3Gn4H2tZT3BEfEh=Q=NS_4fOgOu=21nPZUcdk6qf87w@mail.gmail.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Wed,  5 Apr 2017 17:33:20 +0800
+Subject: [PATCH v2 2/2] dt-bindings: document: add firefly-rk3399 board support
+In-Reply-To: <1491384800-22412-1-git-send-email-kever.yang@rock-chips.com>
+References: <1491384800-22412-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1491384800-22412-2-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 4, 2017 at 5:55 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Apr 04, 2017 at 01:06:42PM +0530, Ganapatrao Kulkarni wrote:
->> function get_cpuid_str returns midr_el1 value from first
->> online cpu available.
->
-> This isn't globally the same (e.g. in big.LITTLE systems).
->
-> It would be far better to have the function take a PMU, and look at the
-> first CPU in that PMU's mask.
+Use "firefly,firefly-rk3399" compatible string for firefly-rk3399 board.
 
-thanks, will do.
->
-> Thanks,
-> Mark.
->
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  tools/perf/arch/arm64/util/Build    |  1 +
->>  tools/perf/arch/arm64/util/header.c | 51 +++++++++++++++++++++++++++++++++++++
->>  2 files changed, 52 insertions(+)
->>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>
->> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
->> index cef6fb3..b1ab72d 100644
->> --- a/tools/perf/arch/arm64/util/Build
->> +++ b/tools/perf/arch/arm64/util/Build
->> @@ -1,3 +1,4 @@
->> +libperf-y += header.o
->>  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
->>  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
->>
->> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
->> new file mode 100644
->> index 0000000..c0468fe
->> --- /dev/null
->> +++ b/tools/perf/arch/arm64/util/header.c
->> @@ -0,0 +1,51 @@
->> +#include <fnmatch.h>
->> +#include <dirent.h>
->> +#include <unistd.h>
->> +#include <stdio.h>
->> +#include <stdlib.h>
->> +#include <string.h>
->> +#include <linux/stringify.h>
->> +#include "header.h"
->> +#include "util.h"
->> +
->> +#define LINUX_SYS_CPU_DIRECTORY "/sys/devices/system/cpu/"
->> +#define MIDR "/regs/identification/midr_el1"
->> +
->> +char *get_cpuid_str(void)
->> +{
->> +     char *buf = malloc(128);
->> +     FILE *file;
->> +     char *ret = NULL;
->> +     int cpu , nr_cpu;
->> +     char sys_file[256];
->> +
->> +     sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"kernel_max");
->> +
->> +     file = fopen(sys_file, "r");
->> +     if (!file)
->> +             return ret;
->> +
->> +     if (fscanf(file, "%d", &nr_cpu) != 1)
->> +             return ret;
->> +
->> +     /* kernel_max returns nr_cpu -1 */
->> +     nr_cpu++;
->> +
->> +     /*iterate till you read midr of first online cpu */
->> +     for(cpu = 0; cpu < nr_cpu; cpu++)
->> +     {
->> +             sprintf(sys_file, LINUX_SYS_CPU_DIRECTORY"cpu%d"MIDR, cpu);
->> +             file = fopen(sys_file, "r");
->> +             if (file) {
->> +                     ret = fgets(buf, 128, file);
->> +                     if (ret) {
->> +                             buf[strlen(buf)-1] ='\0';
->> +                             fclose(file);
->> +                             return buf;
->> +                     }
->> +                     fclose(file);
->> +             }
->> +     }
->> +     free(buf);
->> +     return ret;
->> +}
->> --
->> 1.8.1.4
->>
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
 
-thanks
-Ganapat
+Changes in v2: None
+
+ Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 250fdf0..b5201f4 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -42,6 +42,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
+ 
++- Firefly Firefly-RK3399 board:
++    Required root node properties:
++      - compatible = "firefly,firefly-rk3399", "rockchip,rk3399";
++
+ - ChipSPARK PopMetal-RK3288 board:
+     Required root node properties:
+       - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
+-- 
+1.9.1
