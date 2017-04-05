@@ -1,54 +1,105 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 5 Apr 2017 14:21:22 +0200
-Subject: [PATCH] arm: bitops: Align prototypes to generic API
-In-Reply-To: <87371ad9-012b-358d-f186-f8caa79feb0f@free.fr>
-References: <87371ad9-012b-358d-f186-f8caa79feb0f@free.fr>
-Message-ID: <b6610c43-75fe-64ee-8b22-867f970e3fe7@free.fr>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed,  5 Apr 2017 18:02:35 +0530
+Subject: [PATCH V7 1/4] dt-bindings: phy: Add support for QUSB2 phy
+In-Reply-To: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <1491395558-16902-2-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include/asm-generic/bitops/find.h declares:
+Qualcomm chipsets have QUSB2 phy controller that provides
+HighSpeed functionality for DWC3 controller.
+Adding dt binding information for the same.
 
-extern unsigned long
-find_first_zero_bit(const unsigned long *addr, unsigned long size);
-
-while arch/arm/include/asm/bitops.h declares:
-
-#define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
-extern int _find_first_zero_bit_le(const void * p, unsigned size);
-
-Align the arm prototypes to the generic API, to have gcc report
-inadequate arguments, such as pointer to u32.
-
-Signed-off-by: Mason <slash.tmp@free.fr>
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/include/asm/bitops.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
-index e943e6cee254..f308c8c40cb9 100644
---- a/arch/arm/include/asm/bitops.h
-+++ b/arch/arm/include/asm/bitops.h
-@@ -159,16 +159,16 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
- /*
-  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
-  */
--extern int _find_first_zero_bit_le(const void * p, unsigned size);
--extern int _find_next_zero_bit_le(const void * p, int size, int offset);
-+extern int _find_first_zero_bit_le(const unsigned long *p, unsigned size);
-+extern int _find_next_zero_bit_le(const unsigned long *p, int size, int offset);
- extern int _find_first_bit_le(const unsigned long *p, unsigned size);
- extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
- 
- /*
-  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
-  */
--extern int _find_first_zero_bit_be(const void * p, unsigned size);
--extern int _find_next_zero_bit_be(const void * p, int size, int offset);
-+extern int _find_first_zero_bit_be(const unsigned long *p, unsigned size);
-+extern int _find_next_zero_bit_be(const unsigned long *p, int size, int offset);
- extern int _find_first_bit_be(const unsigned long *p, unsigned size);
- extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
- 
+Changes since v6:
+ - Dropped 'vdd-phy-supply' that used pm8994_s2 regulator, from bindings.
+   As Stephen said, the pm8994_s2 is a 'corner' regulator and it shouldn't
+   be right to put it as a regulator supply.
+   Work is in progress to handle these sort of power supplies.
+
+Changes since v5:
+ - Removed leading 0 from the address in 'reg' property.
+
+Changes since v4:
+ - None.
+
+Changes since v3:
+ - Added 'Acked-by' from Rob.
+ - Removed 'reset-names' and 'nvmem-cell-names' from the bindings
+   since we use only one cell.
+
+Changes since v2:
+ - Removed binding for "ref_clk_src" since we don't request this
+   clock in the driver.
+ - Addressed s/vdda-phy-dpdm/vdda-phy-dpdm-supply.
+ - Addressed s/ref_clk/ref. Don't need to add '_clk' suffix to clock names.
+ - Addressed s/tune2_hstx_trim_efuse/tune2_hstx_trim. Don't need to add
+   'efuse' suffix to nvmem cell.
+ - Addressed s/qusb2phy/phy for the node name.
+
+Changes since v1:
+ - New patch, forked out of the original driver patch:
+   "phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips"
+ - Updated dt bindings to remove 'hstx-trim-bit-offset' and
+   'hstx-trim-bit-len' bindings.
+
+ .../devicetree/bindings/phy/qcom-qusb2-phy.txt     | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+
+diff --git a/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt b/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+new file mode 100644
+index 000000000000..aa0fcb05acb3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+@@ -0,0 +1,43 @@
++Qualcomm QUSB2 phy controller
++=============================
++
++QUSB2 controller supports LS/FS/HS usb connectivity on Qualcomm chipsets.
++
++Required properties:
++ - compatible: compatible list, contains "qcom,msm8996-qusb2-phy".
++ - reg: offset and length of the PHY register set.
++ - #phy-cells: must be 0.
++
++ - clocks: a list of phandles and clock-specifier pairs,
++	   one for each entry in clock-names.
++ - clock-names: must be "cfg_ahb" for phy config clock,
++			"ref" for 19.2 MHz ref clk,
++			"iface" for phy interface clock (Optional).
++
++ - vdda-pll-supply: Phandle to 1.8V regulator supply to PHY refclk pll block.
++ - vdda-phy-dpdm-supply: Phandle to 3.1V regulator supply to Dp/Dm port signals.
++
++ - resets: Phandle to reset to phy block.
++
++Optional properties:
++ - nvmem-cells: Phandle to nvmem cell that contains 'HS Tx trim'
++		tuning parameter value for qusb2 phy.
++
++ - qcom,tcsr-syscon: Phandle to TCSR syscon register region.
++
++Example:
++	hsusb_phy: phy at 7411000 {
++		compatible = "qcom,msm8996-qusb2-phy";
++		reg = <0x7411000 0x180>;
++		#phy-cells = <0>;
++
++		clocks = <&gcc GCC_USB_PHY_CFG_AHB2PHY_CLK>,
++			<&gcc GCC_RX1_USB2_CLKREF_CLK>,
++		clock-names = "cfg_ahb", "ref";
++
++		vdda-pll-supply = <&pm8994_l12>;
++		vdda-phy-dpdm-supply = <&pm8994_l24>;
++
++		resets = <&gcc GCC_QUSB2PHY_PRIM_BCR>;
++		nvmem-cells = <&qusb2p_hstx_trim>;
++        };
 -- 
-2.11.0
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
