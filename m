@@ -1,325 +1,319 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Wed, 5 Apr 2017 18:37:20 +0200
-Subject: No output on console despite ignore_loglevel earlyprintk
-In-Reply-To: <20170303174643.GQ21222@n2100.armlinux.org.uk>
-References: <6d16a384-1a4c-bf27-fd81-ea3caf3de6b0@sigmadesigns.com>
- <20170303165548.GO21222@n2100.armlinux.org.uk>
- <3293964b-aec2-e8b8-46f5-49b0eacc4718@suse.de>
- <20170303174643.GQ21222@n2100.armlinux.org.uk>
-Message-ID: <4c5b6e15-a64b-81ea-b2e1-494dab304c47@sigmadesigns.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 5 Apr 2017 18:44:21 +0200
+Subject: [PATCH 3/4] iio: dac: stm32: add support for trigger events
+In-Reply-To: <7dba5b17-5f82-e68d-3c06-afe4a4e478e7@kernel.org>
+References: <1490960707-22422-1-git-send-email-fabrice.gasnier@st.com>
+ <1490960707-22422-4-git-send-email-fabrice.gasnier@st.com>
+ <eb4d6292-5ae6-c52d-eeb7-2f14c3a4abef@kernel.org>
+ <7dba5b17-5f82-e68d-3c06-afe4a4e478e7@kernel.org>
+Message-ID: <ef0c3a6f-1d67-a7d7-b7ae-8b06b5e92414@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 18:46, Russell King - ARM Linux wrote:
-
-> On Fri, Mar 03, 2017 at 06:26:28PM +0100, Andreas F?rber wrote:
->
->> Am 03.03.2017 um 17:55 schrieb Russell King - ARM Linux:
->>
->>> On Fri, Mar 03, 2017 at 05:42:02PM +0100, Marc Gonzalez wrote:
+On 04/02/2017 02:21 PM, Jonathan Cameron wrote:
+> On 02/04/17 12:45, Jonathan Cameron wrote:
+>> On 31/03/17 12:45, Fabrice Gasnier wrote:
+>>> STM32 DAC supports triggers to synchronize conversions. When trigger
+>>> occurs, data is transferred from DHR (data holding register) to DOR
+>>> (data output register) so output voltage is updated.
+>>> Both hardware and software triggers are supported.
 >>>
->>>> I'm confused about early consoles and earlyprintk, and all that good stuff.
->>>> When my kernel panics, I don't get the expected output.
->>>>
->>>> Using "mem=256M ignore_loglevel earlyprintk"
->>>>
->>>> [    0.014325] Console: colour dummy device 80x30
->>>> [    0.018885] console [tty0] enabled
->>>> [    0.022396] bootconsole [earlycon0] disabled
->>>>
->>>> And it hangs there.
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> Hmm. This is a somewhat different use of triggered event from normal...
+>>
+Waveform generator in STM32 DAC requires a trigger to increment /
+decrement internal counter in case of triangle generator. Noise
+generator is a bit different, but same trigger usage applies. I agree
+this is unusual.
+Is it acceptable to use event trigger for this use ?
+
+>> What you have here is rather closer to the output buffers stuff that Analog
+>> have in their tree which hasn't made it upstream yet.
+>> To that end I'll want Lars to have a look at this...  I've completely
+>> lost track of where they are with this.
+>> Perhaps Lars can give us a quick update?
+>>
+>> If that was in place (or what I have in my head was true anyway),
+>> it would look like the reverse of the triggered buffer input devices.
+>> You'd be able to write to a software buffer and it would clock them
+>> out as the trigger fires (here I think it would have to keep updating
+>> the DHR whenever the trigger occurs).
+
+Hmm.. for waveform generator mode, there is no need for data buffer. DAC
+generate samples itself, using trigger. But, i agree it would be nice
+for playing data samples (write DHR registers, or dma), yes.
+
+>>
+>> Even if it's not there, we aren't necessarily looking at terribly big job
+>> to implement it in the core and that would make this handling a lot more
+>> 'standard' and consistent.
+> 
+> Having tracked down some limited docs (AN3126 - Audio and waveform
+> generation using the DAC in STM32 microcontrollers) the fact this
+> can also be driven by DMA definitely argues in favour of working with
+> Analog on getting the output buffers support upstream.
+> 
+> *crosses fingers people have the time!*
+
+Hopefully this can happen.
+
+For the time being, I'll propose a similar patch in V2. I found out this
+patch is missing a clear path to (re-)assign trigger, once set by
+userland. Also, driver never gets informed in case trigger gets changed
+or removed, without re-enabling it:
+e.g. like echo "" > trigger/current_trigger
+I'll propose a small change. Hope you agree with this approach.
+
+Thanks,
+Fabrice
+
+>>
+>> Jonathan
+>>
+>>> ---
+>>>  drivers/iio/dac/Kconfig          |   3 +
+>>>  drivers/iio/dac/stm32-dac-core.h |  12 ++++
+>>>  drivers/iio/dac/stm32-dac.c      | 124 ++++++++++++++++++++++++++++++++++++++-
+>>>  3 files changed, 136 insertions(+), 3 deletions(-)
 >>>
->>> tty0 is the kernel virtual terminal console, which is what appears on
->>> VGA or framebuffers.  This is the default console if nothing else is
->>> specified.
+>>> diff --git a/drivers/iio/dac/Kconfig b/drivers/iio/dac/Kconfig
+>>> index 7198648..786c38b 100644
+>>> --- a/drivers/iio/dac/Kconfig
+>>> +++ b/drivers/iio/dac/Kconfig
+>>> @@ -278,6 +278,9 @@ config STM32_DAC
+>>>  	tristate "STMicroelectronics STM32 DAC"
+>>>  	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+>>>  	depends on REGULATOR
+>>> +	select IIO_TRIGGERED_EVENT
+>>> +	select IIO_STM32_TIMER_TRIGGER
+>>> +	select MFD_STM32_TIMERS
+>>>  	select STM32_DAC_CORE
+>>>  	help
+>>>  	  Say yes here to build support for STMicroelectronics STM32 Digital
+>>> diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
+>>> index d3099f7..3bf211c 100644
+>>> --- a/drivers/iio/dac/stm32-dac-core.h
+>>> +++ b/drivers/iio/dac/stm32-dac-core.h
+>>> @@ -26,6 +26,7 @@
+>>>  
+>>>  /* STM32 DAC registers */
+>>>  #define STM32_DAC_CR		0x00
+>>> +#define STM32_DAC_SWTRIGR	0x04
+>>>  #define STM32_DAC_DHR12R1	0x08
+>>>  #define STM32_DAC_DHR12R2	0x14
+>>>  #define STM32_DAC_DOR1		0x2C
+>>> @@ -33,8 +34,19 @@
+>>>  
+>>>  /* STM32_DAC_CR bit fields */
+>>>  #define STM32_DAC_CR_EN1		BIT(0)
+>>> +#define STM32H7_DAC_CR_TEN1		BIT(1)
+>>> +#define STM32H7_DAC_CR_TSEL1_SHIFT	2
+>>> +#define STM32H7_DAC_CR_TSEL1		GENMASK(5, 2)
+>>> +#define STM32_DAC_CR_WAVE1		GENMASK(7, 6)
+>>> +#define STM32_DAC_CR_MAMP1		GENMASK(11, 8)
+>>>  #define STM32H7_DAC_CR_HFSEL		BIT(15)
+>>>  #define STM32_DAC_CR_EN2		BIT(16)
+>>> +#define STM32_DAC_CR_WAVE2		GENMASK(23, 22)
+>>> +#define STM32_DAC_CR_MAMP2		GENMASK(27, 24)
+>>> +
+>>> +/* STM32_DAC_SWTRIGR bit fields */
+>>> +#define STM32_DAC_SWTRIGR_SWTRIG1	BIT(0)
+>>> +#define STM32_DAC_SWTRIGR_SWTRIG2	BIT(1)
+>>>  
+>>>  /**
+>>>   * struct stm32_dac_common - stm32 DAC driver common data (for all instances)
+>>> diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
+>>> index ee9711d..62e43e9 100644
+>>> --- a/drivers/iio/dac/stm32-dac.c
+>>> +++ b/drivers/iio/dac/stm32-dac.c
+>>> @@ -23,6 +23,10 @@
+>>>  #include <linux/bitfield.h>
+>>>  #include <linux/delay.h>
+>>>  #include <linux/iio/iio.h>
+>>> +#include <linux/iio/timer/stm32-timer-trigger.h>
+>>> +#include <linux/iio/trigger.h>
+>>> +#include <linux/iio/trigger_consumer.h>
+>>> +#include <linux/iio/triggered_event.h>
+>>>  #include <linux/kernel.h>
+>>>  #include <linux/module.h>
+>>>  #include <linux/platform_device.h>
+>>> @@ -31,15 +35,112 @@
+>>>  
+>>>  #define STM32_DAC_CHANNEL_1		1
+>>>  #define STM32_DAC_CHANNEL_2		2
+>>> +/* channel2 shift */
+>>> +#define STM32_DAC_CHAN2_SHIFT		16
+>>>  
+>>>  /**
+>>>   * struct stm32_dac - private data of DAC driver
+>>>   * @common:		reference to DAC common data
+>>> + * @swtrig:		Using software trigger
+>>>   */
+>>>  struct stm32_dac {
+>>>  	struct stm32_dac_common *common;
+>>> +	bool swtrig;
+>>>  };
+>>>  
+>>> +/**
+>>> + * struct stm32_dac_trig_info - DAC trigger info
+>>> + * @name: name of the trigger, corresponding to its source
+>>> + * @tsel: trigger selection, value to be configured in DAC_CR.TSELx
+>>> + */
+>>> +struct stm32_dac_trig_info {
+>>> +	const char *name;
+>>> +	u32 tsel;
+>>> +};
+>>> +
+>>> +static const struct stm32_dac_trig_info stm32h7_dac_trinfo[] = {
+>>> +	{ "swtrig", 0 },
+>>> +	{ TIM1_TRGO, 1 },
+>>> +	{ TIM2_TRGO, 2 },
+>>> +	{ TIM4_TRGO, 3 },
+>>> +	{ TIM5_TRGO, 4 },
+>>> +	{ TIM6_TRGO, 5 },
+>>> +	{ TIM7_TRGO, 6 },
+>>> +	{ TIM8_TRGO, 7 },
+>>> +	{},
+>>> +};
+>>> +
+>>> +static irqreturn_t stm32_dac_trigger_handler(int irq, void *p)
+>>> +{
+>>> +	struct iio_poll_func *pf = p;
+>>> +	struct iio_dev *indio_dev = pf->indio_dev;
+>>> +	struct stm32_dac *dac = iio_priv(indio_dev);
+>>> +	int channel = indio_dev->channels[0].channel;
+>>> +
+>>> +	/* Using software trigger? Then, trigger it now */
+>>> +	if (dac->swtrig) {
+>>> +		u32 swtrig;
+>>> +
+>>> +		if (channel == STM32_DAC_CHANNEL_1)
+>>> +			swtrig = STM32_DAC_SWTRIGR_SWTRIG1;
+>>> +		else
+>>> +			swtrig = STM32_DAC_SWTRIGR_SWTRIG2;
+>>> +		regmap_update_bits(dac->common->regmap, STM32_DAC_SWTRIGR,
+>>> +				   swtrig, swtrig);
+>>> +	}
+>>> +
+>>> +	iio_trigger_notify_done(indio_dev->trig);
+>>> +
+>>> +	return IRQ_HANDLED;
+>>> +}
+>>> +
+>>> +static unsigned int stm32_dac_get_trig_tsel(struct stm32_dac *dac,
+>>> +					    struct iio_trigger *trig)
+>>> +{
+>>> +	unsigned int i;
+>>> +
+>>> +	/* skip 1st trigger that should be swtrig */
+>>> +	for (i = 1; stm32h7_dac_trinfo[i].name; i++) {
+>>> +		/*
+>>> +		 * Checking both stm32 timer trigger type and trig name
+>>> +		 * should be safe against arbitrary trigger names.
+>>> +		 */
+>>> +		if (is_stm32_timer_trigger(trig) &&
+>>> +		    !strcmp(stm32h7_dac_trinfo[i].name, trig->name)) {
+>>> +			return stm32h7_dac_trinfo[i].tsel;
+>>> +		}
+>>> +	}
+>>> +
+>>> +	/* When no trigger has been found, default to software trigger */
+>>> +	dac->swtrig = true;
+>>> +
+>>> +	return stm32h7_dac_trinfo[0].tsel;
+>>> +}
+>>> +
+>>> +static int stm32_dac_set_trig(struct stm32_dac *dac, struct iio_trigger *trig,
+>>> +			      int channel)
+>>> +{
+>>> +	struct iio_dev *indio_dev = iio_priv_to_dev(dac);
+>>> +	u32 shift = channel == STM32_DAC_CHANNEL_1 ? 0 : STM32_DAC_CHAN2_SHIFT;
+>>> +	u32 val = 0, tsel;
+>>> +	u32 msk = (STM32H7_DAC_CR_TEN1 | STM32H7_DAC_CR_TSEL1) << shift;
+>>> +
+>>> +	dac->swtrig = false;
+>>> +	if (trig) {
+>>> +		/* select & enable trigger (tsel / ten) */
+>>> +		tsel = stm32_dac_get_trig_tsel(dac, trig);
+>>> +		val = tsel << STM32H7_DAC_CR_TSEL1_SHIFT;
+>>> +		val = (val | STM32H7_DAC_CR_TEN1) << shift;
+>>> +	}
+>>> +
+>>> +	if (trig)
+>>> +		dev_dbg(&indio_dev->dev, "enable trigger: %s\n", trig->name);
+>>> +	else
+>>> +		dev_dbg(&indio_dev->dev, "disable trigger\n");
+>>> +
+>>> +	return regmap_update_bits(dac->common->regmap, STM32_DAC_CR, msk, val);
+>>> +}
+>>> +
+>>>  static int stm32_dac_is_enabled(struct stm32_dac *dac, int channel)
+>>>  {
+>>>  	u32 en, val;
+>>> @@ -63,9 +164,16 @@ static int stm32_dac_enable(struct iio_dev *indio_dev, int channel)
+>>>  		STM32_DAC_CR_EN1 : STM32_DAC_CR_EN2;
+>>>  	int ret;
+>>>  
+>>> +	ret = stm32_dac_set_trig(dac, indio_dev->trig, channel);
+>>> +	if (ret < 0) {
+>>> +		dev_err(&indio_dev->dev, "Trigger setup failed\n");
+>>> +		return ret;
+>>> +	}
+>>> +
+>>>  	ret = regmap_update_bits(dac->common->regmap, STM32_DAC_CR, en, en);
+>>>  	if (ret < 0) {
+>>>  		dev_err(&indio_dev->dev, "Enable failed\n");
+>>> +		stm32_dac_set_trig(dac, NULL, channel);
+>>>  		return ret;
+>>>  	}
+>>>  
+>>> @@ -88,10 +196,12 @@ static int stm32_dac_disable(struct iio_dev *indio_dev, int channel)
+>>>  	int ret;
+>>>  
+>>>  	ret = regmap_update_bits(dac->common->regmap, STM32_DAC_CR, en, 0);
+>>> -	if (ret)
+>>> +	if (ret) {
+>>>  		dev_err(&indio_dev->dev, "Disable failed\n");
+>>> +		return ret;
+>>> +	}
+>>>  
+>>> -	return ret;
+>>> +	return stm32_dac_set_trig(dac, NULL, channel);
+>>>  }
+>>>  
+>>>  static int stm32_dac_get_value(struct stm32_dac *dac, int channel, int *val)
+>>> @@ -258,10 +368,17 @@ static int stm32_dac_probe(struct platform_device *pdev)
+>>>  	if (ret < 0)
+>>>  		return ret;
+>>>  
+>>> -	ret = iio_device_register(indio_dev);
+>>> +	ret = iio_triggered_event_setup(indio_dev, NULL,
+>>> +					stm32_dac_trigger_handler);
+>>>  	if (ret)
+>>>  		return ret;
+>>>  
+>>> +	ret = iio_device_register(indio_dev);
+>>> +	if (ret) {
+>>> +		iio_triggered_event_cleanup(indio_dev);
+>>> +		return ret;
+>>> +	}
+>>> +
+>>>  	return 0;
+>>>  }
+>>>  
+>>> @@ -269,6 +386,7 @@ static int stm32_dac_remove(struct platform_device *pdev)
+>>>  {
+>>>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>>>  
+>>> +	iio_triggered_event_cleanup(indio_dev);
+>>>  	iio_device_unregister(indio_dev);
+>>>  
+>>>  	return 0;
 >>>
->>> What happened here is that the virtual terminal console registered, was
->>> detected to be the system console, so early console was shut down, and
->>> the boot messages logged to the virtual terminal console instead.
 >>
->> Why does passing console= make a difference though?
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >>
->> I expect stdout-path to have the same effect as the command line, and I
->> am pretty sure that that was previous behavior in, e.g., v4.4.
->>
->> Note that I am using earlycon, as opposed to earlyprintk above.
 > 
-> The property is:
-> 
-> 	stdout-path = "dt-node-name:hw-parameters";
-> 
-> and this is parsed by the code in drivers/of/fdt.c,
-> early_init_dt_scan_chosen_stdout() (briefly):
-> 
->         offset = fdt_path_offset(fdt, "/chosen");
->         p = fdt_getprop(fdt, offset, "stdout-path", &l);
-> 
->         q = strchrnul(p, ':');
->         if (*q != '\0')
->                 options = q + 1;
->         l = q - p;
-> 
->         /* Get the node specified by stdout-path */
->         offset = fdt_path_offset_namelen(fdt, p, l);
->         if (offset < 0) {
->                 pr_warn("earlycon: stdout-path %.*s not found\n", l, p);
-> 
-> So here, offset points at the node named by "dt-node-name" above.
-> 
-> This function then tries to patch the specified node's compatible with
-> the drivers in the __earlycon_table:
-> 
->         for (match = __earlycon_table; match < __earlycon_table_end; match++) {
->                 if (!match->compatible[0])
->                         continue;
-> 
->                 if (fdt_node_check_compatible(fdt, offset, match->compatible))
->                         continue;
-> 
-> and when a match is found, calls:
-> 
->                 of_setup_earlycon(match, offset, options);
-> 
-> Here, we go into the code in drivers/tty/serial/earlycon.c, which reads
-> the standard properties (like "reg", etc) filling out a uart_port
-> before calling the early console's ->setup method.  If everything goes
-> to plan, register_console() is called to register the early console.
-> 
-> So there's nothing there which changes the default system console.
-> 
-> The next place is of_alias_scan() in drivers/of/base.c.  This records
-> the device_node and options in of_stdout and of_stdout_options
-> respectively - it, again, does not change the default system console.
-> 
-> When a serial console is initialised, of_console_check() gets called by
-> serial core to check whether the DT node for it is "of_stdout", and if
-> it matches, it modifies the preferred system console.
-> 
-> This all looks good, and one might expect that it has the desired
-> effect, but this code is fatally flawed in design: the point at which
-> of_console_check() gets called is _way_ after consoles like the virtual
-> terminal console get initialised.  What this means is that, at the point
-> in time that the virtual terminal is initialised, as far as the console
-> system is concerned, the preferred console is still the virtual terminal.
-> It knows nothing about the desire for a different console.
-> 
-> Given the current console handling, it's not easy to solve without
-> overhauling the way consoles are chosen - the root problem is that the
-> Linux console system works via Linux device driver names and indexes,
-> and there's no easy way to translate a DT stdout-path property to a
-> Linux device driver name and index without the driver having been
-> initialised.
-
-Time for me to take another stab at this issue.
-
-
-Relevant parts of my DT:
-
-	aliases { serial = &uart; };
-
-	chosen { stdout-path = "serial:115200n8"; };
-
-		uart: serial at 10700 {
-			compatible = "ralink,rt2880-uart";
-			reg = <0x10700 0x30>;
-			interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
-			clock-frequency = <7372800>;
-			reg-shift = <2>;
-		};
-
-
-Relevant part of my kernel config:
-
-CONFIG_FIX_EARLYCON_MEM=y
-CONFIG_GENERIC_EARLY_IOREMAP=y
-CONFIG_OF_EARLY_FLATTREE=y
-
-#
-# Character devices
-#
-CONFIG_TTY=y
-CONFIG_VT=y
-CONFIG_CONSOLE_TRANSLATIONS=y
-CONFIG_VT_CONSOLE=y
-CONFIG_HW_CONSOLE=y
-# CONFIG_VT_HW_CONSOLE_BINDING is not set
-CONFIG_UNIX98_PTYS=y
-CONFIG_LEGACY_PTYS=y
-CONFIG_LEGACY_PTY_COUNT=256
-# CONFIG_SERIAL_NONSTANDARD is not set
-
-#
-# Serial drivers
-#
-CONFIG_SERIAL_EARLYCON=y
-CONFIG_SERIAL_8250=y
-# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-# CONFIG_SERIAL_8250_FINTEK is not set
-CONFIG_SERIAL_8250_CONSOLE=y
-CONFIG_SERIAL_8250_DMA=y
-CONFIG_SERIAL_8250_PCI=y
-CONFIG_SERIAL_8250_NR_UARTS=4
-CONFIG_SERIAL_8250_RUNTIME_UARTS=4
-# CONFIG_SERIAL_8250_EXTENDED is not set
-CONFIG_SERIAL_8250_FSL=y
-# CONFIG_SERIAL_8250_DW is not set
-# CONFIG_SERIAL_8250_EM is not set
-CONFIG_SERIAL_8250_RT288X=y
-# CONFIG_SERIAL_8250_MOXA is not set
-CONFIG_SERIAL_OF_PLATFORM=y
-
-#
-# Non-8250 serial port support
-#
-# CONFIG_SERIAL_EARLYCON_ARM_SEMIHOST is not set
-# CONFIG_SERIAL_UARTLITE is not set
-CONFIG_SERIAL_CORE=y
-CONFIG_SERIAL_CORE_CONSOLE=y
-# CONFIG_SERIAL_JSM is not set
-# CONFIG_SERIAL_SCCNXP is not set
-# CONFIG_SERIAL_SC16IS7XX is not set
-# CONFIG_SERIAL_BCM63XX is not set
-# CONFIG_SERIAL_ALTERA_JTAGUART is not set
-# CONFIG_SERIAL_ALTERA_UART is not set
-# CONFIG_SERIAL_XILINX_PS_UART is not set
-# CONFIG_SERIAL_ARC is not set
-# CONFIG_SERIAL_RP2 is not set
-# CONFIG_SERIAL_FSL_LPUART is not set
-# CONFIG_SERIAL_CONEXANT_DIGICOLOR is not set
-# CONFIG_SERIAL_ST_ASC is not set
-# CONFIG_SERIAL_STM32 is not set
-# CONFIG_HVC_DCC is not set
-# CONFIG_IPMI_HANDLER is not set
-# CONFIG_HW_RANDOM is not set
-# CONFIG_R3964 is not set
-# CONFIG_APPLICOM is not set
-# CONFIG_RAW_DRIVER is not set
-# CONFIG_TCG_TPM is not set
-CONFIG_DEVPORT=y
-# CONFIG_XILLYBUS is not set
-
-CONFIG_DEBUG_LL_INCLUDE="mach/debug-macro.S"
-# CONFIG_DEBUG_UART_8250 is not set
-CONFIG_UNCOMPRESS_INCLUDE="debug/uncompress.h"
-
-
-Booting with mem=256M console=ttyS0,115200
-
-[    0.000213] Console: colour dummy device 80x30
-[    0.418383] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[    0.419837] console [ttyS0] disabled
-[    0.419983] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
-[    1.000504] console [ttyS0] enabled
-
-
-Booting with mem=256M
-
-[    0.000212] Console: colour dummy device 80x30
-[    0.000547] console [tty0] enabled
-[    0.427260] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[    0.428970] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
-[    1.007672] console [ttyS0] enabled
-
-
-Booting with mem=256M earlycon
-
-[    0.000000] ENTER param_setup_earlycon
-[    0.000000] ENTER early_init_dt_scan_chosen_stdout
-[    0.000000] early_init_dt_scan_chosen_stdout: scan __earlycon_table
-[    0.000000] name=uart compatible=snps,dw-apb-uart setup=early_serial8250_setup
-[    0.000000] name=uart compatible=nvidia,tegra20-uart setup=early_serial8250_setup
-[    0.000000] name=ns16550a compatible=ns16550a setup=early_serial8250_setup
-[    0.000000] name=ns16550 compatible=ns16550 setup=early_serial8250_setup
-[    0.000000] early_init_dt_scan_chosen_stdout: NO MATCH, return ENODEV
-[    0.000000] Malformed early option 'earlycon'
-[    0.000215] Console: colour dummy device 80x30
-[    0.000583] console [tty0] enabled
-[    0.420043] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[    0.421945] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
-[    1.014251] console [ttyS0] enabled
-
-
-drivers/tty/serial/8250/8250_early.c
-
-int __init early_serial8250_setup(struct earlycon_device *device, const char *options)
-
-EARLYCON_DECLARE(uart8250, early_serial8250_setup);
-EARLYCON_DECLARE(uart, early_serial8250_setup);
-OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
-OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
-OF_EARLYCON_DECLARE(uart, "nvidia,tegra20-uart", early_serial8250_setup);
-OF_EARLYCON_DECLARE(uart, "snps,dw-apb-uart", early_serial8250_setup);
-
-I'm not matching anything, because my UART compatible string is:
-
-		uart: serial at 10700 {
-			compatible = "ralink,rt2880-uart";
-
-If I append "ns16550a" or "ns16550", the kernel hangs from the start:
-
-Starting kernel ...
-
-@
-
-
-But if I add DEBUG_LL support with
-
-CONFIG_DEBUG_LL=y
-CONFIG_DEBUG_LL_UART_8250=y
-CONFIG_DEBUG_UART_PHYS=0x10700
-CONFIG_DEBUG_UART_VIRT=0xf0010700
-CONFIG_DEBUG_UART_8250_WORD=y
-CONFIG_DEBUG_UART_8250_PALMCHIP=y
-
-and replace the implementation of vprintk_emit() with a very quick and dirty
-
-	char buf[400];
-	extern void printascii(const char *);
-	text_len = vsnprintf(buf, sizeof buf, fmt, args);
-	printascii(buf);
-	return text_len;
-
-then the kernel boots correctly, and I see the following relevant logs:
-
-ENTER param_setup_earlycon
-ENTER early_init_dt_scan_chosen_stdout
-early_init_dt_scan_chosen_stdout: scan __earlycon_table
-name=uart compatible=snps,dw-apb-uart setup=early_serial8250_setup
-name=uart compatible=nvidia,tegra20-uart setup=early_serial8250_setup
-name=ns16550a compatible=ns16550a setup=early_serial8250_setup
-ENTER of_setup_earlycon
-earlycon: ns16550a0 at MMIO 0x00010700 (options '115200n8')
-bootconsole [ns16550a0] enabled
-Kernel command line: mem=256M earlycon
-Console: colour dummy device 80x30
-console [tty0] enabled
-bootconsole [ns16550a0] disabled
-Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
-console [ttyS0] enabled
-
-
-I think the problem is that my UART (Palmchip BK-3103) requires
-custom accessors to read/write 16550 registers. And these accessors
-are probably ignored this early in the boot.
-
-drivers/tty/serial/8250/8250_port.c
-
-#ifdef CONFIG_SERIAL_8250_RT288X
-
-/* Au1x00/RT288x UART hardware has a weird register layout */
-static const s8 au_io_in_map[8] = {
-	 0,	/* UART_RX  */
-	 2,	/* UART_IER */
-	 3,	/* UART_IIR */
-	 5,	/* UART_LCR */
-	 6,	/* UART_MCR */
-	 7,	/* UART_LSR */
-	 8,	/* UART_MSR */
-	-1,	/* UART_SCR (unmapped) */
-};
-
-It is likely that I need to register a specific OF_EARLYCON_DECLARE,
-like OMAP did?
-
-Regards.
