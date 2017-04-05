@@ -1,70 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 6 Apr 2017 00:13:01 +0800
-Subject: [PATCH 1/3] dt: bindings: add pmu0 regs for USB PHYs on Allwinner
- H3/V3s/A64
-In-Reply-To: <1524732c-b72f-61ce-8ae7-1d764f85c903@ti.com>
-References: <20170405125053.6170-1-icenowy@aosc.io>
- <20170405125053.6170-2-icenowy@aosc.io>
- <1524732c-b72f-61ce-8ae7-1d764f85c903@ti.com>
-Message-ID: <CAGb2v64jndyO2VvkZzzgHpX9x2FB6J66it_n8smG-tT0nQFB_g@mail.gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Wed, 5 Apr 2017 13:17:25 -0300
+Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
+ output video on pad 1
+In-Reply-To: <CAGoCfizXdDV_Eo1NSOAb+-wrC7F47iFQKyP8-wiJMpb-nsYArA@mail.gmail.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
+ <1490894749.2404.33.camel@pengutronix.de>
+ <20170404231053.GE7909@n2100.armlinux.org.uk>
+ <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
+ <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
+ <20170405082134.GF7909@n2100.armlinux.org.uk>
+ <1491384859.2381.51.camel@pengutronix.de>
+ <20170405115336.7135e542@vento.lan>
+ <CAGoCfizXdDV_Eo1NSOAb+-wrC7F47iFQKyP8-wiJMpb-nsYArA@mail.gmail.com>
+Message-ID: <20170405131725.22c13a1d@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 8:58 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->
->
-> On Wednesday 05 April 2017 06:20 PM, Icenowy Zheng wrote:
->> From: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> Allwinner H3/V3s/A64 SoCs have a special USB PHY0 that can route to two
->> controllers: one is MUSB and the other is a EHCI/OHCI pair.
->>
->> When it's routed to EHCI/OHCI pair, it will needs a "pmu0" regs to
->> tweak, like other EHCI/OHCI pairs in Allwinner SoCs.
->>
->> Add this to the binding of USB PHYs on Allwinner H3/V3s/A64.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>
->> Kishon, could you push this to 4.11?
->
-> Is this for the patch titled "phy: sun4i-usb: add support for V3s USB PHY" that
-> was added during the last merge window.
+Em Wed, 5 Apr 2017 11:39:06 -0400
+Devin Heitmueller <dheitmueller@kernellabs.com> escreveu:
 
-Yes. In fact, as the description suggests, this also applies retroactively to
-H3 and A64, which were added in the following commits:
+> > Currently, the driver doesn't support (2), because, at the time
+> > I wrote the driver, I didn't find a way to read the interrupts generated
+> > by tvp5150 at em28xx[1], due to the lack of em28xx documentation,
+> > but adding support for it shoudn't be hard. I may eventually do it
+> > when I have some time to play with my ISEE hardware.  
+> 
+> For what it's worth, I doubt most of the em28xx designs have the
+> tvp5150 interrupt request line connected in any way.
 
-4.9  732e35da7b4a ("dt: bindings: add bindings for Allwinner A64 usb phy")
-4.5  626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys found
-                    on the H3 SoC")
+True. But, on embedded hardware, such line may be connected into the
+SoC. Actually, from the IGEPv3 expansion diagram:
 
-Though this was missed at the time the binding was added.
+	https://www.isee.biz/support/downloads/item/igepv2-expansion-rc-schematics
 
-ChenYu
+The INT line is connected to CAM_IRQ. That's connected to GPIO_154 pin
+at OMAP3.
 
-> this patch looks simpler enough to be merged in this -rc cycle. However it
-> depends on Greg KH.
->
-> Thanks
-> Kishon
->
->>
->>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> index e42334258185..005bc22938ff 100644
->> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> @@ -15,6 +15,7 @@ Required properties:
->>  - reg : a list of offset + length pairs
->>  - reg-names :
->>    * "phy_ctrl"
->> +  * "pmu0" for H3, V3s and A64
->>    * "pmu1"
->>    * "pmu2" for sun4i, sun6i or sun7i
->>  - #phy-cells : from the generic phy bindings, must be 1
->>
+So, on a first glance, it seems possible to use it, instead of polling.
+
+> You would likely
+> have to poll the FIFO status register via I2C,
+
+Yes, I considered this option when I wrote the driver. It could work, 
+although it would likely have some performance drawback, as the driver
+would need to poll it at least 60 times per second.
+
+> or use the feature to
+> embed the sliced data into as VANC data in the 656 output (as
+> described in sec 3.9 of the tvp5150am1 spec).
+
+True, but the bridge driver would need to handle such data. 
+
+I remember I looked on this when I wrote the driver, but I was
+unable to find a way for em28xx to parse (or forward) such
+data packets.
+
+Thanks,
+Mauro
