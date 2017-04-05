@@ -1,78 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Apr 2017 11:58:41 +0100
-Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
- interface
-In-Reply-To: <20170328144543.GA18046@red-moon>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
- <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
- <20170328144543.GA18046@red-moon>
-Message-ID: <20170405105841.GG7909@n2100.armlinux.org.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 5 Apr 2017 16:30:36 +0530
+Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
+In-Reply-To: <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
+References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
+Message-ID: <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
-> On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
-> > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
-> > > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-> > > index 7afb0e2..50b292f 100644
-> > > --- a/arch/x86/include/asm/io.h
-> > > +++ b/arch/x86/include/asm/io.h
-> > > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
-> > >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
-> > >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
-> > >  #define ioremap_uc ioremap_uc
-> > > +#define ioremap_nopost ioremap_nocache
-> > 
-> > These are all the same as the default from asm-generic.h.  Do we really
-> > need these definitions in alpha, avr32, frv, ia64, x86?
-> 
-> Those arches do not include asm-generic.h (I suppose for a good reason)
-> but a definition is needed anyway if we want code using ioremap_nopost()
-> to be unconditional. This is one way of doing it, there are others not
-> sure they are any better, I am open to suggestions.
+Hi,
 
-We do have linux/io.h, which should be included in preference to asm/io.h.
-linux/io.h has existed for years, but I still see (from time to time)
-patches adding drivers that (imho incorrectly) use asm/io.h.
+On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
+> This is driver for USB DRD Phy used in Broadcom's Northstar2
+> SoC. The phy can be configured to be in Device mode or Host
+> mode based on the type of cable connected to the port. The
+> driver registers to  extcon framework to get appropriate
+> connect events for Host/Device cables connect/disconnect
+> states based on VBUS and ID interrupts.
 
-Also, this:
+$patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
+Northstar2.
 
-> > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > > index 7ef015e..0e81938 100644
-> > > --- a/include/asm-generic/io.h
-> > > +++ b/include/asm-generic/io.h
-> > > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
-> > >  #endif /* CONFIG_GENERIC_IOMAP */
-> > >  #endif /* CONFIG_HAS_IOPORT_MAP */
-> > >  
-> > > +#ifndef ioremap_nopost
-> > > +#define ioremap_nopost ioremap_nocache
-> > > +#endif
-> > > +
-> > >  #ifndef xlate_dev_kmem_ptr
-> > >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
-> > >  static inline void *xlate_dev_kmem_ptr(void *addr)
+Sorry for not letting you know this earlier. But I feel the design of the
+driver should be changed. Extcon shouldn't be used here. The extcon
+notifications should be sent to the consumer driver and the consumer driver
+should be responsible for invoking the phy ops.
 
-could well be located in linux/io.h, which would make it available
-everywhere.
+The phy ops being invoked during extcon events doesn't look right.
 
-I'd suggest one change to this though:
-
-#ifndef ioremap_nopost
-static inline void __iomem *ioremap_nopost(resource_size_t offset,
-					   unsigned long size)
-{
-	return ioremap_nocache(offset, size);
-}
-#endif
-
-This way, if someone forgets to define ioremap_nopost() in their
-asm/io.h but provides a definition or extern prototype for
-ioremap_nopost(), we end up with a compile error to highlight the
-error, rather than the error being hidden by the preprocessor.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks
+Kishon
