@@ -1,56 +1,101 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  5 Apr 2017 14:37:22 +0100
-Subject: [PATCH v2 9/9] arm64: kconfig: allow support for memory failure
- handling
-In-Reply-To: <20170405133722.6406-1-punit.agrawal@arm.com>
-References: <20170405133722.6406-1-punit.agrawal@arm.com>
-Message-ID: <20170405133722.6406-10-punit.agrawal@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 5 Apr 2017 19:08:27 +0530
+Subject: [PATCH V7 0/4] phy: USB and PCIe phy drivers for Qcom chipsets
+In-Reply-To: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1491395558-16902-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <a59d6776-5855-9d04-a5be-de03456b8d2e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+Hi Vivek,
 
-If ACPI_APEI and MEMORY_FAILURE is configured, select
-ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
-when such memory failure is reported through ACPI APEI. APEI
-(ACPI Platform Error Interfaces) provides a means for the
-platform to convey error information to the kernel.
-APEI bits
+On Wednesday 05 April 2017 06:02 PM, Vivek Gautam wrote:
+> This patch series adds couple of PHY drivers for Qualcomm chipsets.
+> a) qcom-qusb2 phy driver: that provides High Speed USB functionality.
+> b) qcom-qmp phy driver: that is a combo phy providing support for
+>    USB3, PCIe, UFS and few other controllers.
+> 
+> The patches are based on next branch of linux-phy tree.
+> 
+> These patches have been tested on Dragon board db820c hardware with
+> required set of dt patches and the patches to get rpm up on msm8996.
+> Couple of other patches [1, 2] fixing DMA config for XHCI are also
+> pulled in for testing.
+> A branch based on torvald's master is available in github [3].
 
-Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
-memory failure recovery attempt.
+I get a bunch of checkpatch errors/warnings when I run checkpatch with --strict
+option. Those look simple enough to be fixed. Can you respin your series fixing
+those?
 
-Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- arch/arm64/Kconfig        | 1 +
- drivers/acpi/apei/Kconfig | 1 +
- 2 files changed, 2 insertions(+)
+Thanks
+Kishon
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3741859765cf..993a5fd85452 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -19,6 +19,7 @@ config ARM64
- 	select ARCH_HAS_STRICT_MODULE_RWX
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
-+	select ARCH_SUPPORTS_MEMORY_FAILURE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_SUPPORTS_NUMA_BALANCING
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index b0140c8fc733..6d9a812fd3f9 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -9,6 +9,7 @@ config ACPI_APEI
- 	select MISC_FILESYSTEMS
- 	select PSTORE
- 	select UEFI_CPER
-+	select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
- 	depends on HAVE_ACPI_APEI
- 	help
- 	  APEI allows to report errors (for example from the chipset)
--- 
-2.11.0
+> 
+> Changes since v6:
+>  - Rebased on phy/next and *not* including phy grouping series[4].
+>  - qusb2-phy: addressed Stephen's comment.
+>    - Dropped pm8994_s2 corner regulator from QUSB2 phy bindings.
+>  - qmp-phy: none on functionality side.
+>  
+> Changes since v5:
+>  - Addressed review comments from Bjorn:
+>    - Removed instances of readl/wirtel_relaxed calls from the drivers.
+>      Instead, using simple readl/writel. Inserting a readl after a writel
+>      to ensure the write is through to the device.
+>    - Replaced regulator handling with regulator_bulk_** apis. This helps
+>      in cutting down a lot of regulator handling code.
+>    - Fixed minor return statements.
+> 
+> Changes since v4:
+>  - Addressed comment to add child nodes for qmp phy driver. Each phy lane
+>    now has a separate child node under the main qmp node.
+>  - Modified the clock and reset initialization and enable methods.
+>    Different phys - pcie, usb and later ufs, have varying number of clocks
+>    and resets that are mandatory. So adding provision for clocks and reset
+>    lists helps in requesting all mandatory resources for individual phys
+>    and handle their failure cases accordingly.
+> 
+> Changes since v3:
+>  - Addressed review comments given by Rob and Stephen for qusb2 phy
+>    and qmp phy bindings respectively.
+>  - Addressed review comments given by Stephen and Bjorn for qmp phy driver.
+> 
+> Changes since v2:
+>  - Addressed review comments given by Rob and Stephen for bindings.
+>  - Addressed the review comments given by Stephen for the qusb2 and qmp
+>    phy drivers.
+> 
+> Changes since v1:
+>  - Moved device tree binding documentation to separate patches, as suggested
+>    by Rob.
+>  - Addressed review comment regarding qfprom accesses by qusb2 phy driver,
+>    given by Rob.
+>  - Addressed review comments from Kishon.
+>  - Addressed review comments from Srinivas for QMP phy driver.
+>  - Addressed kbuild warning.
+> 
+> Please see individual patches for detailed changelogs.
+> 
+> [1] https://patchwork.kernel.org/patch/9567767/
+> [2] https://patchwork.kernel.org/patch/9567779/
+> [3] https://github.com/vivekgautam1/linux/tree/linux-v4.11-rc5-qmp-phy-db820c
+> [4] https://lkml.org/lkml/2017/3/20/407
+> 
+> Vivek Gautam (4):
+>   dt-bindings: phy: Add support for QUSB2 phy
+>   phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips
+>   dt-bindings: phy: Add support for QMP phy
+>   phy: qcom-qmp: new qmp phy driver for qcom-chipsets
+> 
+>  .../devicetree/bindings/phy/qcom-qmp-phy.txt       |  106 ++
+>  .../devicetree/bindings/phy/qcom-qusb2-phy.txt     |   43 +
+>  drivers/phy/Kconfig                                |   18 +
+>  drivers/phy/Makefile                               |    2 +
+>  drivers/phy/phy-qcom-qmp.c                         | 1153 ++++++++++++++++++++
+>  drivers/phy/phy-qcom-qusb2.c                       |  491 +++++++++
+>  6 files changed, 1813 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qmp-phy.txt
+>  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+>  create mode 100644 drivers/phy/phy-qcom-qmp.c
+>  create mode 100644 drivers/phy/phy-qcom-qusb2.c
+> 
