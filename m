@@ -1,21 +1,104 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 4 Apr 2017 20:23:12 -0500
-Subject: [PATCH V10 00/12] IOMMU probe deferral support
-In-Reply-To: <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <CAL_JsqJH9C9sNGBSLH88bJ=uKF7RibHDAUZUW9M2xeO2AM-FUw@mail.gmail.com>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Tue,  4 Apr 2017 21:05:59 -0500
+Subject: [PATCH v5 15/23] drivers/fsi: expose direct-access slave API
+In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-16-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 4, 2017 at 5:18 AM, Sricharan R <sricharan@codeaurora.org> wrote:
-> This series calls the dma ops configuration for the devices
-> at a generic place so that it works for all busses.
-> The dma_configure_ops for a device is now called during
-> the device_attach callback just before the probe of the
-> bus/driver is called. Similarly dma_deconfigure is called during
-> device/driver_detach path.
+From: Jeremy Kerr <jk@ozlabs.org>
 
-For patches 3, 4, 6, 7, 8:
+Allow drivers to access the slave address ranges.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+---
+ drivers/fsi/fsi-core.c | 26 ++++++++++++++++++++------
+ include/linux/fsi.h    | 12 ++++++++++++
+ 2 files changed, 32 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index f0f0556..f7e55e7 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -76,10 +76,6 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+ static int fsi_master_write(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
+-static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+-		void *val, size_t size);
+-static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+-		const void *val, size_t size);
+ 
+ /* FSI endpoint-device support */
+ 
+@@ -181,7 +177,7 @@ static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
+ 	return 0;
+ }
+ 
+-static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			void *val, size_t size)
+ {
+ 	uint8_t id = slave->id;
+@@ -195,7 +191,7 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
+-static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			const void *val, size_t size)
+ {
+ 	uint8_t id = slave->id;
+@@ -209,6 +205,24 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
++extern int fsi_slave_claim_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size)
++{
++	if (addr + size < addr)
++		return -EINVAL;
++
++	if (addr + size > slave->size)
++		return -EINVAL;
++
++	/* todo: check for overlapping claims */
++	return 0;
++}
++
++extern void fsi_slave_release_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size)
++{
++}
++
+ static int fsi_slave_scan(struct fsi_slave *slave)
+ {
+ 	uint32_t engine_addr;
+diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+index 34f1e9a..141fd38 100644
+--- a/include/linux/fsi.h
++++ b/include/linux/fsi.h
+@@ -66,6 +66,18 @@ struct fsi_driver {
+ 		module_driver(__fsi_driver, fsi_driver_register, \
+ 				fsi_driver_unregister)
+ 
++/* direct slave API */
++extern int fsi_slave_claim_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size);
++extern void fsi_slave_release_range(struct fsi_slave *slave,
++		uint32_t addr, uint32_t size);
++extern int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++		void *val, size_t size);
++extern int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++		const void *val, size_t size);
++
++
++
+ extern struct bus_type fsi_bus_type;
+ 
+ #endif /* LINUX_FSI_H */
+-- 
+1.8.2.2
