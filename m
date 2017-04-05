@@ -1,46 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Apr 2017 18:20:43 +0100
-Subject: [PATCH v35 02/14] memblock: add memblock_cap_memory_range()
-In-Reply-To: <20170403022355.12463-2-takahiro.akashi@linaro.org>
-References: <20170403022139.12383-1-takahiro.akashi@linaro.org>
- <20170403022355.12463-2-takahiro.akashi@linaro.org>
-Message-ID: <20170405172043.GA2752@e104818-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 5 Apr 2017 18:21:39 +0100
+Subject: [PATCH] crypto: arm64/sha: use %c constraint code in ASM_EXPORT
+In-Reply-To: <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
+References: <20170405165603.87264-1-mka@chromium.org>
+ <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
+Message-ID: <e228a810-3f53-a8d6-29c5-428b9870842b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 11:23:55AM +0900, AKASHI Takahiro wrote:
-> Add memblock_cap_memory_range() which will remove all the memblock regions
-> except the memory range specified in the arguments. In addition, rework is
-> done on memblock_mem_limit_remove_map() to re-implement it using
-> memblock_cap_memory_range().
+On 05/04/17 18:08, Ard Biesheuvel wrote:
+> Hoi Matthias!
 > 
-> This function, like memblock_mem_limit_remove_map(), will not remove
-> memblocks with MEMMAP_NOMAP attribute as they may be mapped and accessed
-> later as "device memory."
-> See the commit a571d4eb55d8 ("mm/memblock.c: add new infrastructure to
-> address the mem limit issue").
+> On 5 April 2017 at 17:56, Matthias Kaehlcke <mka@chromium.org> wrote:
+>> From: Greg Hackmann <ghackmann@google.com>
+>>
+>> The current definition of ASM_EXPORT doesn't work properly with clang,
+>> according to https://bugs.llvm.org//show_bug.cgi?id=27250#c3 it relies on
+>> gcc specific behavior. Change the constraint from an intermediate to an
+>> output expression which works with both gcc and clang.
+>>
+>> From: Greg Hackmann <ghackmann@google.com>
+>> Commit-message-by: Matthias Kaehlcke <mka@chromium.org>
+>> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+>> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+>> ---
+>>  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
+>>  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
+>>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+>> index aefda9868627..c71e94ba0e43 100644
+>> --- a/arch/arm64/crypto/sha1-ce-glue.c
+>> +++ b/arch/arm64/crypto/sha1-ce-glue.c
+>> @@ -18,7 +18,7 @@
+>>  #include <linux/module.h>
+>>
+>>  #define ASM_EXPORT(sym, val) \
+>> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+>> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
+>>
+>>  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
+>>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+>> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+>> index 7cd587564a41..381b5fb2dcb2 100644
+>> --- a/arch/arm64/crypto/sha2-ce-glue.c
+>> +++ b/arch/arm64/crypto/sha2-ce-glue.c
+>> @@ -18,7 +18,7 @@
+>>  #include <linux/module.h>
+>>
+>>  #define ASM_EXPORT(sym, val) \
+>> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+>> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
+>>
+>>  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
+>>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
 > 
-> This function is used, in a succeeding patch in the series of arm64 kdump
-> suuport, to limit the range of usable memory, or System RAM, on crash dump
-> kernel.
-> (Please note that "mem=" parameter is of little use for this purpose.)
+> I am fine with this change, although I would really like to add a
+> better reference to the commit log. It is *very* difficult to find any
+> documentation regarding non-trivial uses of inline asm constraints,
+> and if %c0 is the correct syntax, surely we can quote something better
+> than a LLVM bugzilla entry? Also, where does the distinction between
+> 'intermediate' vs 'output' expression come from?
+
+FWIW, GCC docs do say (under the helpfully-obvious "x86 operand
+modifiers" section[1]):
+
+	c	Require a constant operand and print the constant
+		expression with no punctuation.
+
+Which more or less makes sense in this this context too. As an aside,
+though, since this is emitting a general integer argument to an
+assembler directive, and not an operand to an ADD instruction, how come
+we're using "I" and not "i" as the constraint in the first place?
+
+Robin.
+
+[1]:https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#x86-Operand-Modifiers
+
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Dennis Chen <dennis.chen@arm.com>
-> Cc: linux-mm at kvack.org
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  include/linux/memblock.h |  1 +
->  mm/memblock.c            | 44 +++++++++++++++++++++++++++++---------------
->  2 files changed, 30 insertions(+), 15 deletions(-)
-
-Andrew, are you ok with patches 1 and 2 in this series (touching
-mm/memblock.c and include/linux/memblock.h) to go in via the arm64 tree?
-
-Thanks.
-
--- 
-Catalin
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
