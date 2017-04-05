@@ -1,112 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Apr 2017 14:13:10 +0200
-Subject: [PATCH v4 6/8] ARM: sun8i: a33: add CPU thermal throttling
-In-Reply-To: <20170405090634.4649-7-quentin.schulz@free-electrons.com>
-References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
- <20170405090634.4649-7-quentin.schulz@free-electrons.com>
-Message-ID: <20170405121310.4lgf5st5oqc52szb@lukather>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 05 Apr 2017 14:16:11 +0200
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable PCI_MSI
+In-Reply-To: <6eb58d54-b6e8-b709-c7f9-fa19d52cd492@synopsys.com>
+References: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
+ <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
+ <CAJ+vNU2Fb7gpO0LsoVpPbUX5rSyH3yC4K30JpAf5j7aQkDH9tw@mail.gmail.com>
+ <1460708469.22710.4.camel@pengutronix.de>
+ <CAJ+vNU1-M3qSODKHMf872kfOsH0g9xFgKNEgKqiJu6A8z-ChxA@mail.gmail.com>
+ <CAJ+vNU0+ksyYCpydpmcJOO-w0v4D0axvG84wK7f09iK_1yzo_A@mail.gmail.com>
+ <001c01d2ad85$b06af1a0$1140d4e0$@gmail.com>
+ <6eb58d54-b6e8-b709-c7f9-fa19d52cd492@synopsys.com>
+Message-ID: <1491394571.2904.44.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 11:06:32AM +0200, Quentin Schulz wrote:
-> This adds CPU thermal throttling for the Allwinner A33. It uses the
-> thermal sensor present in the SoC's GPADC.
+Am Mittwoch, den 05.04.2017, 13:07 +0100 schrieb Joao Pinto:
+[...]
+> >>> Lucas,
+> >>>
+> >>> I feel a bit dumb here for forgetting about this issue and letting it
+> >>> drop, but I've just spent a day debugging an issue with the ath9k
+> >>> wireless driver only to realize it was that the ath9k card and/or
+> >>> driver doesn't support MSI interrupts and thus no longer work on
+> >>> mainline kernels that have MSI enabled. To be honest I'm not sure how
+> >>> many PCIe devices out there can't support MSI because of hardware
+> >>> limitations vs drivers that simply have not implemented it.
+> >>>
+> >>> To make matters worse 3ee803641e76bea76ec730c80dcc64739a9919ff makes
+> >>> it such that you can't disable MSI on the IMX6.
+> >>>
+> >>> Is there some fix you can think of to make the IMX6 PCIe host
+> >>> controller raise an interrupt for cards/drivers that use legacy irq's?
+> >>> If not, then we need to allow MSI to be disabled for IMX6 and default
+> >>> it to disabled for compatibility.
+> >>>
+> >>
+> >> Joao / Jingoo,
+> >>
+> >> (Adding linux-pci to the list to pick up maintainers of other DWC PCIe
+> >> core drivers)
+> >>
+> >> Is Luca's statement that 'legacy IRQs and MSIs can't be used together'
+> >> true in general for the DW PCIe core? If any of the host controllers
+> >> using this core can't support both legacy and MSI irqs together I
+> >> still believe we shouldn't enable/require MSI as it breaks any
+> >> card/driver that only supports legacy interrupts (such as ath9k).
+> > 
+> > If there are 2 DW PCIe controllers, one controller can be used for legacy
+> > and another controller can be used for MSI.
+> > 
+> > But, I am not sure that one DW PCIe controller can support both MSI device
+> > and legacy interrupt device at the same time.
+> > 
+> > To Joao Pinto,
+> > Will you confirm this?
+> > 
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
-> 
-> v3:
->   - switched to new phandle because of modified DT node name for the GPADC
->   (named THS),
->   - got rid of cooling-min-level and cooling-max-level as it's not used in any
->   code in the kernel,
-> 
-> v2:
->   - updated cooling-max-level to reflect newly added OPPs,
-> 
->  arch/arm/boot/dts/sun8i-a33.dtsi | 45 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-> index 9734e63..b88c107 100644
-> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-> @@ -43,6 +43,7 @@
->   */
->  
->  #include "sun8i-a23-a33.dtsi"
-> +#include <dt-bindings/thermal/thermal.h>
->  
->  / {
->  	cpu0_opp_table: opp_table0 {
-> @@ -127,6 +128,7 @@
->  			clocks = <&ccu CLK_CPUX>;
->  			clock-names = "cpu";
->  			operating-points-v2 = <&cpu0_opp_table>;
-> +			#cooling-cells = <2>;
->  		};
->  
->  		cpu at 1 {
-> @@ -170,6 +172,49 @@
->  		};
->  	};
->  
-> +	thermal-zones {
-> +		cpu_thermal {
-> +			/* milliseconds */
-> +			polling-delay-passive = <250>;
-> +			polling-delay = <1000>;
-> +			thermal-sensors = <&ths>;
-> +
-> +			cooling-maps {
-> +				map0 {
-> +					trip = <&cpu_alert0>;
-> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +				};
-> +				map1 {
-> +					trip = <&cpu_alert1>;
-> +					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +				};
-> +			};
-> +
-> +			trips {
-> +				cpu_alert0: cpu_alert0 {
-> +					/* milliCelsius */
-> +					temperature = <75000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				cpu_alert1: cpu_alert1 {
-> +					/* milliCelsius */
-> +					temperature = <90000>;
-> +					hysteresis = <2000>;
-> +					type = "hot";
-> +				};
-> +
-> +				cpu_crit: cpu_crit {
-> +					/* milliCelsius */
-> +					temperature = <110000>;
-> +					hysteresis = <2000>;
-> +					type = "critical";
-> +				};
-> +			};
-> +		};
-> +	};
-> +
+> Hi Jingoo,
+> I confirm that if a RC has MSI enable, it won't support legacy interrupts.
 
-This wasn't sorted properly (thermal is not between mali- and memory
-in the alphabetical order). Fixed and applied, thanks!
-Maxime
+Okay, so the only way to solve this in a generic way, that I can see at
+the moment is to defer MSI enable until the downstream device actually
+requests an MSI irq.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/6d886d1a/attachment.sig>
+Also we need to disable the MSI capability if any bridge device turns up
+during the bus topology scan, as we can have devices with conflicting
+requirements connected to the RC in that case.
+
+I'll cook up some patches to implement this.
+
+Regards,
+Lucas
