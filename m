@@ -1,89 +1,68 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:45 -0500
-Subject: [PATCH v5 01/23] drivers/fsi: Add fsi master definition
+Date: Tue,  4 Apr 2017 21:06:06 -0500
+Subject: [PATCH v5 22/23] drivers/fsi: Add hub master support
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-2-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-23-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Add a `struct fsi_master` to represent a FSI master controller.
+Add an engine driver to expose a "hub" FSI master - which has a set of
+control registers in the engine address space, and uses a chunk of the
+slave address space for actual FSI communication.
 
-FSI master drivers register one of these structs to provide
-device-specific of the standard operations: read/write/term/break and
-link control.
+Additional changes from Jeremy Kerr <jk@ozlabs.org>.
 
-Includes changes from Edward A. James <eajames@us.ibm.com> & Jeremy Kerr
-<jk@ozlabs.org>.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c   | 35 +++++++++++++++++++++++++++++++++++
- drivers/fsi/fsi-master.h | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 drivers/fsi/fsi-master.h
+ drivers/fsi/Kconfig          |   9 ++
+ drivers/fsi/Makefile         |   1 +
+ drivers/fsi/fsi-master-hub.c | 327 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 337 insertions(+)
+ create mode 100644 drivers/fsi/fsi-master-hub.c
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 3d55bd5..ca02913 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -15,8 +15,43 @@
+diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+index 0fa265c..e1156b4 100644
+--- a/drivers/fsi/Kconfig
++++ b/drivers/fsi/Kconfig
+@@ -18,6 +18,15 @@ config FSI_MASTER_GPIO
+ 	---help---
+ 	This option enables a FSI master driver using GPIO lines.
  
- #include <linux/device.h>
- #include <linux/fsi.h>
-+#include <linux/idr.h>
- #include <linux/module.h>
++config FSI_MASTER_HUB
++	tristate "FSI hub master"
++	depends on FSI
++	---help---
++	This option enables a FSI hub master driver.  Hub is a type of FSI
++	master that is connected to the upstream master via a slave.  Hubs
++	allow chaining of FSI links to an arbitrary depth.  This allows for
++	a high target device fanout.
++
+ config FSI_SCOM
+ 	tristate "SCOM FSI client device driver"
+ 	depends on FSI
+diff --git a/drivers/fsi/Makefile b/drivers/fsi/Makefile
+index 3466f08..65eb99d 100644
+--- a/drivers/fsi/Makefile
++++ b/drivers/fsi/Makefile
+@@ -1,4 +1,5 @@
  
-+#include "fsi-master.h"
-+
-+static DEFINE_IDA(master_ida);
-+
-+/* FSI master support */
-+int fsi_master_register(struct fsi_master *master)
-+{
-+	int rc;
-+
-+	if (!master)
-+		return -EINVAL;
-+
-+	master->idx = ida_simple_get(&master_ida, 0, INT_MAX, GFP_KERNEL);
-+	dev_set_name(&master->dev, "fsi%d", master->idx);
-+
-+	rc = device_register(&master->dev);
-+	if (rc)
-+		ida_simple_remove(&master_ida, master->idx);
-+
-+	return rc;
-+}
-+EXPORT_SYMBOL_GPL(fsi_master_register);
-+
-+void fsi_master_unregister(struct fsi_master *master)
-+{
-+	if (master->idx >= 0) {
-+		ida_simple_remove(&master_ida, master->idx);
-+		master->idx = -1;
-+	}
-+
-+	device_unregister(&master->dev);
-+}
-+EXPORT_SYMBOL_GPL(fsi_master_unregister);
-+
- /* FSI core & Linux bus type definitions */
- 
- static int fsi_bus_match(struct device *dev, struct device_driver *drv)
-diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+ obj-$(CONFIG_FSI) += fsi-core.o
++obj-$(CONFIG_FSI_MASTER_HUB) += fsi-master-hub.o
+ obj-$(CONFIG_FSI_MASTER_GPIO) += fsi-master-gpio.o
+ obj-$(CONFIG_FSI_SCOM) += fsi-scom.o
+diff --git a/drivers/fsi/fsi-master-hub.c b/drivers/fsi/fsi-master-hub.c
 new file mode 100644
-index 0000000..7764b00
+index 0000000..133b9bf
 --- /dev/null
-+++ b/drivers/fsi/fsi-master.h
-@@ -0,0 +1,41 @@
++++ b/drivers/fsi/fsi-master-hub.c
+@@ -0,0 +1,327 @@
 +/*
-+ * FSI master definitions. These comprise the core <--> master interface,
-+ * to allow the core to interact with the (hardware-specific) masters.
++ * FSI hub master driver
 + *
 + * Copyright (C) IBM Corporation 2016
 + *
@@ -97,30 +76,317 @@ index 0000000..7764b00
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef DRIVERS_FSI_MASTER_H
-+#define DRIVERS_FSI_MASTER_H
++#include <linux/delay.h>
++#include <linux/fsi.h>
++#include <linux/module.h>
++#include <linux/slab.h>
 +
-+#include <linux/device.h>
++#include "fsi-master.h"
 +
-+struct fsi_master {
-+	struct device	dev;
-+	int		idx;
-+	int		n_links;
-+	int		flags;
-+	int		(*read)(struct fsi_master *, int link, uint8_t id,
-+				uint32_t addr, void *val, size_t size);
-+	int		(*write)(struct fsi_master *, int link, uint8_t id,
-+				uint32_t addr, const void *val, size_t size);
-+	int		(*term)(struct fsi_master *, int link, uint8_t id);
-+	int		(*send_break)(struct fsi_master *, int link);
-+	int		(*link_enable)(struct fsi_master *, int link);
++/* Control Registers */
++#define FSI_MMODE		0x0		/* R/W: mode */
++#define FSI_MDLYR		0x4		/* R/W: delay */
++#define FSI_MCRSP		0x8		/* R/W: clock rate */
++#define FSI_MENP0		0x10		/* R/W: enable */
++#define FSI_MLEVP0		0x18		/* R: plug detect */
++#define FSI_MSENP0		0x18		/* S: Set enable */
++#define FSI_MCENP0		0x20		/* C: Clear enable */
++#define FSI_MAEB		0x70		/* R: Error address */
++#define FSI_MVER		0x74		/* R: master version/type */
++#define FSI_MRESP0		0xd0		/* W: Port reset */
++#define FSI_MESRB0		0x1d0		/* R: Master error status */
++#define FSI_MRESB0		0x1d0		/* W: Reset bridge */
++#define FSI_MECTRL		0x2e0		/* W: Error control */
++
++/* MMODE: Mode control */
++#define FSI_MMODE_EIP		0x80000000	/* Enable interrupt polling */
++#define FSI_MMODE_ECRC		0x40000000	/* Enable error recovery */
++#define FSI_MMODE_EPC		0x10000000	/* Enable parity checking */
++#define FSI_MMODE_P8_TO_LSB	0x00000010	/* Timeout value LSB */
++						/*   MSB=1, LSB=0 is 0.8 ms */
++						/*   MSB=0, LSB=1 is 0.9 ms */
++#define FSI_MMODE_CRS0SHFT	18		/* Clk rate selection 0 shift */
++#define FSI_MMODE_CRS0MASK	0x3ff		/* Clk rate selection 0 mask */
++#define FSI_MMODE_CRS1SHFT	8		/* Clk rate selection 1 shift */
++#define FSI_MMODE_CRS1MASK	0x3ff		/* Clk rate selection 1 mask */
++
++/* MRESB: Reset brindge */
++#define FSI_MRESB_RST_GEN	0x80000000	/* General reset */
++#define FSI_MRESB_RST_ERR	0x40000000	/* Error Reset */
++
++/* MRESB: Reset port */
++#define FSI_MRESP_RST_ALL_MASTER 0x20000000	/* Reset all FSI masters */
++#define FSI_MRESP_RST_ALL_LINK	0x10000000	/* Reset all FSI port contr. */
++#define FSI_MRESP_RST_MCR	0x08000000	/* Reset FSI master reg. */
++#define FSI_MRESP_RST_PYE	0x04000000	/* Reset FSI parity error */
++#define FSI_MRESP_RST_ALL	0xfc000000	/* Reset any error */
++
++/* MECTRL: Error control */
++#define FSI_MECTRL_EOAE		0x8000		/* Enable machine check when */
++						/* master 0 in error */
++#define FSI_MECTRL_P8_AUTO_TERM	0x4000		/* Auto terminate */
++
++#define FSI_ENGID_HUB_MASTER		0x1c
++#define FSI_HUB_LINK_OFFSET		0x80000
++#define FSI_HUB_LINK_SIZE		0x80000
++#define FSI_HUB_MASTER_MAX_LINKS	8
++
++#define FSI_LINK_ENABLE_SETUP_TIME	10	/* in mS */
++
++/*
++ * FSI hub master support
++ *
++ * A hub master increases the number of potential target devices that the
++ * primary FSI master can access. For each link a primary master supports,
++ * each of those links can in turn be chained to a hub master with multiple
++ * links of its own.
++ *
++ * The hub is controlled by a set of control registers exposed as a regular fsi
++ * device (the hub->upstream device), and provides access to the downstream FSI
++ * bus as through an address range on the slave itself (->addr and ->size).
++ *
++ * [This differs from "cascaded" masters, which expose the entire downstream
++ * bus entirely through the fsi device address range, and so have a smaller
++ * accessible address space.]
++ */
++struct fsi_master_hub {
++	struct fsi_master	master;
++	struct fsi_device	*upstream;
++	uint32_t		addr, size;	/* slave-relative addr of */
++						/* master address space */
 +};
 +
-+#define dev_to_fsi_master(d) container_of(d, struct fsi_master, dev)
++#define to_fsi_master_hub(m) container_of(m, struct fsi_master_hub, master)
 +
-+extern int fsi_master_register(struct fsi_master *master);
-+extern void fsi_master_unregister(struct fsi_master *master);
++static int hub_master_read(struct fsi_master *master, int link,
++			uint8_t id, uint32_t addr, void *val, size_t size)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
 +
-+#endif /* DRIVERS_FSI_MASTER_H */
++	if (id != 0)
++		return -EINVAL;
++
++	addr += hub->addr + (link * FSI_HUB_LINK_SIZE);
++	return fsi_slave_read(hub->upstream->slave, addr, val, size);
++}
++
++static int hub_master_write(struct fsi_master *master, int link,
++			uint8_t id, uint32_t addr, const void *val, size_t size)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++
++	if (id != 0)
++		return -EINVAL;
++
++	addr += hub->addr + (link * FSI_HUB_LINK_SIZE);
++	return fsi_slave_write(hub->upstream->slave, addr, val, size);
++}
++
++static int hub_master_break(struct fsi_master *master, int link)
++{
++	uint32_t addr, cmd;
++
++	addr = 0x4;
++	cmd = cpu_to_be32(0xc0de0000);
++
++	return hub_master_write(master, link, 0, addr, &cmd, sizeof(cmd));
++}
++
++static int hub_master_link_enable(struct fsi_master *master, int link)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++	int idx, bit;
++	__be32 reg;
++	int rc;
++
++	idx = link / 32;
++	bit = link % 32;
++
++	reg = cpu_to_be32(0x80000000 >> bit);
++
++	rc = fsi_device_write(hub->upstream, FSI_MSENP0 + (4 * idx), &reg, 4);
++
++	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
++
++	fsi_device_read(hub->upstream, FSI_MENP0 + (4 * idx), &reg, 4);
++
++	return rc;
++}
++
++static void hub_master_release(struct device *dev)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(dev_to_fsi_master(dev));
++
++	kfree(hub);
++}
++
++/* mmode encoders */
++static inline u32 fsi_mmode_crs0(u32 x)
++{
++	return (x & FSI_MMODE_CRS0MASK) << FSI_MMODE_CRS0SHFT;
++}
++
++static inline u32 fsi_mmode_crs1(u32 x)
++{
++	return (x & FSI_MMODE_CRS1MASK) << FSI_MMODE_CRS1SHFT;
++}
++
++static int hub_master_init(struct fsi_master_hub *hub)
++{
++	struct fsi_device *dev = hub->upstream;
++	__be32 reg;
++	int rc;
++
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK
++			| FSI_MRESP_RST_MCR | FSI_MRESP_RST_PYE);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Initialize the MFSI (hub master) engine */
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK
++			| FSI_MRESP_RST_MCR | FSI_MRESP_RST_PYE);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MECTRL_EOAE | FSI_MECTRL_P8_AUTO_TERM);
++	rc = fsi_device_write(dev, FSI_MECTRL, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MMODE_EIP | FSI_MMODE_ECRC | FSI_MMODE_EPC
++			| fsi_mmode_crs0(1) | fsi_mmode_crs1(1)
++			| FSI_MMODE_P8_TO_LSB);
++	rc = fsi_device_write(dev, FSI_MMODE, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(0xffff0000);
++	rc = fsi_device_write(dev, FSI_MDLYR, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = ~0;
++	rc = fsi_device_write(dev, FSI_MSENP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Leave enabled long enough for master logic to set up */
++	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
++
++	rc = fsi_device_write(dev, FSI_MCENP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(dev, FSI_MAEB, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(dev, FSI_MLEVP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Reset the master bridge */
++	reg = cpu_to_be32(FSI_MRESB_RST_GEN);
++	rc = fsi_device_write(dev, FSI_MRESB0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MRESB_RST_ERR);
++	return fsi_device_write(dev, FSI_MRESB0, &reg, sizeof(reg));
++}
++
++static int hub_master_probe(struct device *dev)
++{
++	struct fsi_device *fsi_dev = to_fsi_dev(dev);
++	struct fsi_master_hub *hub;
++	uint32_t reg, links;
++	__be32 __reg;
++	int rc;
++
++	rc = fsi_device_read(fsi_dev, FSI_MVER, &__reg, sizeof(__reg));
++	if (rc)
++		return rc;
++
++	reg = be32_to_cpu(__reg);
++	links = (reg >> 8) & 0xff;
++	dev_info(dev, "hub version %08x (%d links)\n", reg, links);
++
++	rc = fsi_slave_claim_range(fsi_dev->slave, FSI_HUB_LINK_OFFSET,
++			FSI_HUB_LINK_SIZE * links);
++	if (rc) {
++		dev_err(dev, "can't claim slave address range for links");
++		return rc;
++	}
++
++	hub = kzalloc(sizeof(*hub), GFP_KERNEL);
++	if (!hub) {
++		rc = -ENOMEM;
++		goto err_release;
++	}
++
++	hub->addr = FSI_HUB_LINK_OFFSET;
++	hub->size = FSI_HUB_LINK_SIZE * links;
++	hub->upstream = fsi_dev;
++
++	hub->master.dev.parent = dev;
++	hub->master.dev.release = hub_master_release;
++
++	hub->master.n_links = links;
++	hub->master.read = hub_master_read;
++	hub->master.write = hub_master_write;
++	hub->master.send_break = hub_master_break;
++	hub->master.link_enable = hub_master_link_enable;
++
++	dev_set_drvdata(dev, hub);
++
++	hub_master_init(hub);
++
++	rc = fsi_master_register(&hub->master);
++	if (!rc)
++		return 0;
++
++	kfree(hub);
++err_release:
++	fsi_slave_release_range(fsi_dev->slave, FSI_HUB_LINK_OFFSET,
++			FSI_HUB_LINK_SIZE * links);
++	return rc;
++}
++
++static int hub_master_remove(struct device *dev)
++{
++	struct fsi_master_hub *hub = dev_get_drvdata(dev);
++
++	fsi_master_unregister(&hub->master);
++	fsi_slave_release_range(hub->upstream->slave, hub->addr, hub->size);
++	return 0;
++}
++
++static struct fsi_device_id hub_master_ids[] = {
++	{
++		.engine_type = FSI_ENGID_HUB_MASTER,
++		.version = FSI_VERSION_ANY,
++	},
++	{ 0 }
++};
++
++static struct fsi_driver hub_master_driver = {
++	.id_table = hub_master_ids,
++	.drv = {
++		.name = "fsi-master-hub",
++		.bus = &fsi_bus_type,
++		.probe = hub_master_probe,
++		.remove = hub_master_remove,
++	}
++};
++
++module_fsi_driver(hub_master_driver);
++MODULE_LICENSE("GPL");
 -- 
 1.8.2.2
