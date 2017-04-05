@@ -1,110 +1,111 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Apr 2017 00:10:53 +0100
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
- output video on pad 1
-In-Reply-To: <1490894749.2404.33.camel@pengutronix.de>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
-Message-ID: <20170404231053.GE7909@n2100.armlinux.org.uk>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 5 Apr 2017 02:14:11 +0200
+Subject: [PATCH v2 2/5] KVM: arm/arm64: Add ARM user space interrupt
+ signaling ABI
+In-Reply-To: <20170221114153.GA26976@cbox>
+References: <20170203145655.15007-1-cdall@linaro.org>
+ <20170203145655.15007-3-cdall@linaro.org>
+ <CAFEAcA-HMZnjbnhDC-13rWuQP-X2pk-W-6DvSR8n9_f-e4R=cA@mail.gmail.com>
+ <20170221114153.GA26976@cbox>
+Message-ID: <5fe89e77-4fcc-f2e5-a796-a1e1f38eef9f@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 07:25:49PM +0200, Philipp Zabel wrote:
-> The TVP5150 DT bindings specify a single output port (port 0) that
-> corresponds to the video output pad (pad 1, DEMOD_PAD_VID_OUT).
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> I'm trying to get this to work with a TVP5150 analog TV decoder, and the
-> first problem is that this device doesn't have pad 0 as its single
-> output pad. Instead, as a MEDIA_ENT_F_ATV_DECODER entity, it has for
-> pads (input, video out, vbi out, audio out), and video out is pad 1,
-> whereas the device tree only defines a single port (0).
 
-Looking at the patch, it's highlighted another review point with
-Steve's driver.
 
-> diff --git a/drivers/staging/media/imx/imx-media-dev.c b/drivers/staging/media/imx/imx-media-dev.c
-> index 17e2386a3ca3a..c52d6ca797965 100644
-> --- a/drivers/staging/media/imx/imx-media-dev.c
-> +++ b/drivers/staging/media/imx/imx-media-dev.c
-> @@ -267,6 +267,15 @@ static int imx_media_create_link(struct imx_media_dev *imxmd,
->  	source_pad = link->local_pad;
->  	sink_pad = link->remote_pad;
->  
-> +	/*
-> +	 * If the source subdev is an analog video decoder with a single source
-> +	 * port, assume that this port 0 corresponds to the DEMOD_PAD_VID_OUT
-> +	 * entity pad.
-> +	 */
-> +	if (source->entity.function == MEDIA_ENT_F_ATV_DECODER &&
-> +	    local_sd->num_sink_pads == 0 && local_sd->num_src_pads == 1)
-> +		source_pad = DEMOD_PAD_VID_OUT;
-> +
->  	v4l2_info(&imxmd->v4l2_dev, "%s: %s:%d -> %s:%d\n", __func__,
->  		  source->name, source_pad, sink->name, sink_pad);
+On 21.02.17 12:41, Christoffer Dall wrote:
+> Hi Alex,
+>
+> On Fri, Feb 03, 2017 at 05:51:18PM +0000, Peter Maydell wrote:
+>> On 3 February 2017 at 14:56, Christoffer Dall <cdall@linaro.org> wrote:
+>>> From: Christoffer Dall <christoffer.dall@linaro.org>
+>>>
+>>> We have 2 modes for dealing with interrupts in the ARM world. We can
+>>> either handle them all using hardware acceleration through the vgic or
+>>> we can emulate a gic in user space and only drive CPU IRQ pins from
+>>> there.
+>>>
+>>> Unfortunately, when driving IRQs from user space, we never tell user
+>>> space about events from devices emulated inside the kernel, which may
+>>> result in interrupt line state changes, so we lose out on for example
+>>> timer and PMU events if we run with user space gic emulation.
+>>>
+>>> Define an ABI to publish such device output levels to userspace.
+>>>
+>>> Signed-off-by: Alexander Graf <agraf@suse.de>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>>
+>> Acked-by: Peter Maydell <peter.maydell@linaro.org>
+>>
+>> for the userspace ABI/docs part.
+>>
+>
+> Given Peter's ack on this ABI, any chance you could take a look at
+> fixing the userspace SMP issue and respinning the userspace patches for
+> this series?
 
-What is "local" and what is "remote" here?  It seems that, in the case of
-a link being created with the sensor(etc), it's all back to front.
+The problem with user space SMP was simply a missing lock:
 
-Eg, I see locally:
+diff --git a/target/arm/kvm.c b/target/arm/kvm.c
+index a66845f..1b33895 100644
+--- a/target/arm/kvm.c
++++ b/target/arm/kvm.c
+@@ -548,10 +548,14 @@ MemTxAttrs kvm_arch_post_run(CPUState *cs, struct 
+kvm_run *run)
 
-imx-media: imx_media_create_link: imx219 0-0010:0 -> imx6-mipi-csi2:0
+      /* Synchronize our internal vtimer irq line with the kvm one */
+      if (run->s.regs.device_irq_level != cpu->device_irq_level) {
+-        qemu_set_irq(ARM_CPU(cs)->gt_timer_outputs[GTIMER_VIRT],
++        qemu_mutex_lock_iothread();
++        qemu_set_irq(cpu->gt_timer_outputs[GTIMER_VIRT],
+                       run->s.regs.device_irq_level & 
+KVM_ARM_DEV_EL1_VTIMER);
++        qemu_set_irq(cpu->gt_timer_outputs[GTIMER_PHYS],
++                     run->s.regs.device_irq_level & 
+KVM_ARM_DEV_EL1_PTIMER);
+          /* TODO: Handle changes in PTIMER and PMU as well */
+          cpu->device_irq_level = run->s.regs.device_irq_level;
++        qemu_mutex_unlock_iothread();
+      }
 
-So here, "source" is the imx219 (the sensor), and sink is "imx6-mipi-csi2"
-(part of the iMX6 capture.)  However, this makes "local_sd" the subdev of
-the sensor, and "remote_sd" the subdev of the CSI2 interface - which is
-totally back to front - this code is part of the iMX6 capture system,
-so "local" implies that it should be part of that, and the "remote" thing
-would be the sensor.
+      return MEMTXATTRS_UNSPECIFIED;
 
-Hence, this seems completely confused.  I'd suggest that:
+----
 
-(a) the "pad->pad.flags & MEDIA_PAD_FL_SINK" test in imx_media_create_link()
-    is moved into imx_media_create_links(), and placed here instead:
 
-		for (j = 0; j < num_pads; j++) {
-			pad = &local_sd->pad[j];
+I also wasn't able to use your series out of the box. There are several 
+places in the code that check whether a timer is enabled (for register 
+save/restore for example) and without vgic we never ended up setting 
+that to true.
 
-			if (pad->pad.flags & MEDIA_PAD_FL_SINK)
-				continue;
+I don't know how safe it is to set it to true regardless. It feels to me 
+like someone has to put more thought into how to switch from an 
+initialized user space timer state to a vgic one. For reference, my test 
+patch is below:
 
-			...
-		}
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 891a725..56a5d51 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -629,8 +629,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+  		return 0;
 
-    as the pad isn't going to spontaneously change this flag while we
-    consider each individual link.  However, maybe the test should be:
+  	/* Without a VGIC we do not map virtual IRQs to physical IRQs */
+-	if (!irqchip_in_kernel(vcpu->kvm))
++	if (!irqchip_in_kernel(vcpu->kvm)) {
++		/* Enable timer for now, may be racy? */
++		timer->enabled = 1;
+  		return 0;
++	}
 
-			if (!(pad->pad.flags & MEDIA_PAD_FL_SOURCE))
+  	if (!vgic_initialized(vcpu->kvm))
+  		return -ENODEV;
 
-    ?
 
-(b) the terms "local" and "remote" in imx_media_create_link() are
-    replaced with "source" and "sink" respectively, since this will
-    now be called with a guaranteed source pad.
+----
 
-As for Philipp's solution, I'm not sure what the correct solution for
-something like this is.  It depends how you view "hardware interface"
-as defined by video-interfaces.txt, and whether the pads on the TVP5150
-represent the hardware interfaces.  If we take the view that the pads
-do represent hardware interfaces, then using the reg= property on the
-port node will solve this problem.
+Once we solved that piece, I'll happily respin my user space patch.
 
-If not, it would mean that we would have to have the iMX capture code
-scan the pads on the source device, looking for outputs - but that
-runs into a problem - if the source device has multiple outputs, does
-the reg= property specify the output pad index or the pad number, and
-what if one binding for a device specifies it one way and another
-device's binding specifies it a different way.
 
-There's lots of scope for making things really painful here, and
-ending up with needing sensor-specific code in capture drivers to
-work around different decisions on this.
-
-I think someone needs to nail this down, if it's not already too late.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Alex
