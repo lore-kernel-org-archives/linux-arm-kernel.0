@@ -1,174 +1,95 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 11:06:29 +0200
-Subject: [PATCH v4 3/8] iio: adc: sun4i-gpadc-iio: move code used in MFD
- probing to new function
+Date: Wed,  5 Apr 2017 11:06:27 +0200
+Subject: [PATCH v4 1/8] dt-bindings: mfd: add A33 GPADC binding
 In-Reply-To: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
 References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405090634.4649-4-quentin.schulz@free-electrons.com>
+Message-ID: <20170405090634.4649-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves code used in MFD probing to a new sun4i_gpadc_probe_mfd
-function.
-
-This driver was initially written for A10, A13 and A31 SoCs which
-already had a DT binding for this IP, thus we needed to use an MFD to
-probe the different drivers without changing the DT binding of these
-SoCs.
-
-For SoCs that will require to create a DT binding for this IP, we can
-avoid using an MFD, thus we need two separate functions: one for probing
-via MFD and one for probing without MFD.
-
-This split the code specific to MFD probing in a function separated from
-the driver probe function.
+This patch adds documentation for the A33 GPADC binding.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
+v4:
+  - correct patch title,
 
 v3:
-  - updated commit log,
+  - fixed missing allwinner in front of compatible,
+  - updated compatible to allwinner,sun8i-a33-ths to better reflect the
+  datasheet's name,
+  - updated example's DT node name and label to ths,
 
 added in v2
+ .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
 
- drivers/iio/adc/sun4i-gpadc-iio.c | 78 ++++++++++++++++++++++-----------------
- 1 file changed, 45 insertions(+), 33 deletions(-)
-
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index a8e134f..7cb997a 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -454,31 +454,16 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
- 	return 0;
- }
- 
--static int sun4i_gpadc_probe(struct platform_device *pdev)
-+static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
-+				 struct iio_dev *indio_dev)
- {
--	struct sun4i_gpadc_iio *info;
--	struct iio_dev *indio_dev;
-+	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
-+	struct sun4i_gpadc_dev *sun4i_gpadc_dev =
-+		dev_get_drvdata(pdev->dev.parent);
- 	int ret;
--	struct sun4i_gpadc_dev *sun4i_gpadc_dev;
--
--	sun4i_gpadc_dev = dev_get_drvdata(pdev->dev.parent);
--
--	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
--	if (!indio_dev)
--		return -ENOMEM;
- 
--	info = iio_priv(indio_dev);
--	platform_set_drvdata(pdev, indio_dev);
--
--	mutex_init(&info->mutex);
- 	info->regmap = sun4i_gpadc_dev->regmap;
--	info->indio_dev = indio_dev;
--	init_completion(&info->completion);
--	indio_dev->name = dev_name(&pdev->dev);
--	indio_dev->dev.parent = &pdev->dev;
--	indio_dev->dev.of_node = pdev->dev.of_node;
--	indio_dev->info = &sun4i_gpadc_iio_info;
--	indio_dev->modes = INDIO_DIRECT_MODE;
+diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+new file mode 100644
+index 0000000..badff36
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+@@ -0,0 +1,59 @@
++Allwinner SoCs' GPADC Device Tree bindings
++------------------------------------------
++The Allwinner SoCs all have an ADC that can also act as a thermal sensor
++and sometimes as a touchscreen controller.
 +
- 	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
- 	indio_dev->channels = sun4i_gpadc_channels;
- 
-@@ -519,8 +504,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 			dev_err(&pdev->dev,
- 				"could not register thermal sensor: %ld\n",
- 				PTR_ERR(tzd));
--			ret = PTR_ERR(tzd);
--			goto err;
-+			return PTR_ERR(tzd);
- 		}
- 	} else {
- 		indio_dev->num_channels =
-@@ -528,36 +512,65 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 		indio_dev->channels = sun4i_gpadc_channels_no_temp;
- 	}
- 
--	pm_runtime_set_autosuspend_delay(&pdev->dev,
--					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
--	pm_runtime_use_autosuspend(&pdev->dev);
--	pm_runtime_set_suspended(&pdev->dev);
--	pm_runtime_enable(&pdev->dev);
--
- 	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
- 		ret = sun4i_irq_init(pdev, "TEMP_DATA_PENDING",
- 				     sun4i_gpadc_temp_data_irq_handler,
- 				     "temp_data", &info->temp_data_irq,
- 				     &info->ignore_temp_data_irq);
- 		if (ret < 0)
--			goto err;
-+			return ret;
- 	}
- 
- 	ret = sun4i_irq_init(pdev, "FIFO_DATA_PENDING",
- 			     sun4i_gpadc_fifo_data_irq_handler, "fifo_data",
- 			     &info->fifo_data_irq, &info->ignore_fifo_data_irq);
- 	if (ret < 0)
--		goto err;
-+		return ret;
- 
- 	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
- 		ret = iio_map_array_register(indio_dev, sun4i_gpadc_hwmon_maps);
- 		if (ret < 0) {
- 			dev_err(&pdev->dev,
- 				"failed to register iio map array\n");
--			goto err;
-+			return ret;
- 		}
- 	}
- 
-+	return 0;
-+}
++Required properties:
++  - compatible: "allwinner,sun8i-a33-ths",
++  - reg: mmio address range of the chip,
++  - #thermal-sensor-cells: shall be 0,
++  - #io-channel-cells: shall be 0,
 +
-+static int sun4i_gpadc_probe(struct platform_device *pdev)
-+{
-+	struct sun4i_gpadc_iio *info;
-+	struct iio_dev *indio_dev;
-+	int ret;
++Example:
++	ths: ths at 01c25000 {
++		compatible = "allwinner,sun8i-a33-ths";
++		reg = <0x01c25000 0x100>;
++		#thermal-sensor-cells = <0>;
++		#io-channel-cells = <0>;
++	};
 +
-+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
-+	if (!indio_dev)
-+		return -ENOMEM;
++sun4i, sun5i and sun6i SoCs are also supported via the older binding:
 +
-+	info = iio_priv(indio_dev);
-+	platform_set_drvdata(pdev, indio_dev);
++sun4i resistive touchscreen controller
++--------------------------------------
 +
-+	mutex_init(&info->mutex);
-+	info->indio_dev = indio_dev;
-+	init_completion(&info->completion);
-+	indio_dev->name = dev_name(&pdev->dev);
-+	indio_dev->dev.parent = &pdev->dev;
-+	indio_dev->dev.of_node = pdev->dev.of_node;
-+	indio_dev->info = &sun4i_gpadc_iio_info;
-+	indio_dev->modes = INDIO_DIRECT_MODE;
++Required properties:
++ - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
++   "allwinner,sun6i-a31-ts"
++ - reg: mmio address range of the chip
++ - interrupts: interrupt to which the chip is connected
++ - #thermal-sensor-cells: shall be 0
 +
-+	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
-+	if (ret)
-+		return ret;
++Optional properties:
++ - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
++				   is attached to the controller
++ - allwinner,tp-sensitive-adjust : integer (4 bits)
++				   adjust sensitivity of pen down detection
++				   between 0 (least sensitive) and 15
++				   (defaults to 15)
++ - allwinner,filter-type	 : integer (2 bits)
++				   select median and averaging filter
++				   samples used for median / averaging filter
++				   0: 4/2
++				   1: 5/3
++				   2: 8/4
++				   3: 16/8
++				   (defaults to 1)
 +
-+	pm_runtime_set_autosuspend_delay(&pdev->dev,
-+					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
++Example:
 +
- 	ret = devm_iio_device_register(&pdev->dev, indio_dev);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "could not register the device\n");
-@@ -570,7 +583,6 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	if (IS_ENABLED(CONFIG_THERMAL_OF))
- 		iio_map_array_unregister(indio_dev);
- 
--err:
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 
++	rtp: rtp at 01c25000 {
++		compatible = "allwinner,sun4i-a10-ts";
++		reg = <0x01c25000 0x100>;
++		interrupts = <29>;
++		allwinner,ts-attached;
++		#thermal-sensor-cells = <0>;
++		/* sensitive/noisy touch panel */
++		allwinner,tp-sensitive-adjust = <0>;
++		allwinner,filter-type = <3>;
++	};
 -- 
 2.9.3
