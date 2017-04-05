@@ -1,79 +1,61 @@
-From: dheitmueller@kernellabs.com (Devin Heitmueller)
-Date: Wed, 5 Apr 2017 13:02:52 -0400
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities output
- video on pad 1
-In-Reply-To: <20170405131725.22c13a1d@vento.lan>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
- <20170404231053.GE7909@n2100.armlinux.org.uk>
- <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
- <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
- <20170405082134.GF7909@n2100.armlinux.org.uk>
- <1491384859.2381.51.camel@pengutronix.de>
- <20170405115336.7135e542@vento.lan>
- <CAGoCfizXdDV_Eo1NSOAb+-wrC7F47iFQKyP8-wiJMpb-nsYArA@mail.gmail.com>
- <20170405131725.22c13a1d@vento.lan>
-Message-ID: <CAGoCfiyfXc2bcTR72XwL3Vv8ny-dQUjEUk2OUuy_s4nedNJqxA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 5 Apr 2017 18:08:37 +0100
+Subject: [PATCH] crypto: arm64/sha: use %c constraint code in ASM_EXPORT
+In-Reply-To: <20170405165603.87264-1-mka@chromium.org>
+References: <20170405165603.87264-1-mka@chromium.org>
+Message-ID: <CAKv+Gu-7tX6THETVA+M0UrC6rJ4id2AsHi2XfhDEmxCJ_tdwKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> For what it's worth, I doubt most of the em28xx designs have the
->> tvp5150 interrupt request line connected in any way.
+Hoi Matthias!
+
+On 5 April 2017 at 17:56, Matthias Kaehlcke <mka@chromium.org> wrote:
+> From: Greg Hackmann <ghackmann@google.com>
 >
-> True. But, on embedded hardware, such line may be connected into the
-> SoC. Actually, from the IGEPv3 expansion diagram:
+> The current definition of ASM_EXPORT doesn't work properly with clang,
+> according to https://bugs.llvm.org//show_bug.cgi?id=27250#c3 it relies on
+> gcc specific behavior. Change the constraint from an intermediate to an
+> output expression which works with both gcc and clang.
 >
->         https://www.isee.biz/support/downloads/item/igepv2-expansion-rc-schematics
+> From: Greg Hackmann <ghackmann@google.com>
+> Commit-message-by: Matthias Kaehlcke <mka@chromium.org>
+> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> ---
+>  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
+>  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 >
-> The INT line is connected to CAM_IRQ. That's connected to GPIO_154 pin
-> at OMAP3.
+> diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+> index aefda9868627..c71e94ba0e43 100644
+> --- a/arch/arm64/crypto/sha1-ce-glue.c
+> +++ b/arch/arm64/crypto/sha1-ce-glue.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/module.h>
 >
-> So, on a first glance, it seems possible to use it, instead of polling.
-
-To be clear, I wasn't suggesting that the IRQ request line on the
-tvp5150 couldn't be supported in general (for example, for those
-embedded targets which have it wired up to a host processor).  I'm
-just saying you shouldn't expect it to work on most (perhaps all)
-em28xx designs which have the tvp5150.  In fact on some em28xx designs
-the pin is used as a GPIO output tied to a mux to control input
-selection.  Hence blindly enabling the interrupt request line by
-default would do all sorts of bad things.
-
->> You would likely
->> have to poll the FIFO status register via I2C,
+>  #define ASM_EXPORT(sym, val) \
+> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
 >
-> Yes, I considered this option when I wrote the driver. It could work,
-> although it would likely have some performance drawback, as the driver
-> would need to poll it at least 60 times per second.
+>  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
+>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+> index 7cd587564a41..381b5fb2dcb2 100644
+> --- a/arch/arm64/crypto/sha2-ce-glue.c
+> +++ b/arch/arm64/crypto/sha2-ce-glue.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/module.h>
 >
->> or use the feature to
->> embed the sliced data into as VANC data in the 656 output (as
->> described in sec 3.9 of the tvp5150am1 spec).
+>  #define ASM_EXPORT(sym, val) \
+> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
 >
-> True, but the bridge driver would need to handle such data.
+>  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
+>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
 
-Correct.
-
-> I remember I looked on this when I wrote the driver, but I was
-> unable to find a way for em28xx to parse (or forward) such
-> data packets.
-
-I'm pretty sure it's possible, but I haven't looked at the datasheets
-in a number of years and don't recall the details.
-
-Hardware VBI splicing is supported by a number of decoders but it's
-rarely used on commodity PCs (the Conexant and NXP decoders support it
-as well).  That said, I won't argue there might be some value on
-really low end platforms.  All I would ask is that if you do introduce
-any such functionality into the tvp5150 driver for some embedded
-application that you please not break support for devices such as the
-em28xx.
-
-Thanks,
-
-Devin
-
--- 
-Devin J. Heitmueller - Kernel Labs
-http://www.kernellabs.com
+I am fine with this change, although I would really like to add a
+better reference to the commit log. It is *very* difficult to find any
+documentation regarding non-trivial uses of inline asm constraints,
+and if %c0 is the correct syntax, surely we can quote something better
+than a LLVM bugzilla entry? Also, where does the distinction between
+'intermediate' vs 'output' expression come from?
