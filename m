@@ -1,51 +1,51 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 5 Apr 2017 11:52:54 -0500
-Subject: [PATCH v6 01/23] PCI: endpoint: Add EP core layer to enable EP
- controller and EP functions
-In-Reply-To: <20170405085243.18123-2-kishon@ti.com>
-References: <20170405085243.18123-1-kishon@ti.com>
- <20170405085243.18123-2-kishon@ti.com>
-Message-ID: <20170405165254.GA17066@bhelgaas-glaptop.roam.corp.google.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Wed,  5 Apr 2017 09:56:03 -0700
+Subject: [PATCH] crypto: arm64/sha: use %c constraint code in ASM_EXPORT
+Message-ID: <20170405165603.87264-1-mka@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 02:22:21PM +0530, Kishon Vijay Abraham I wrote:
-> Introduce a new EP core layer in order to support endpoint functions in
-> linux kernel. This comprises the EPC library (Endpoint Controller Library)
-> and EPF library (Endpoint Function Library). EPC library implements
-> functions specific to an endpoint controller and EPF library implements
-> functions specific to an endpoint function.
-> ...
+From: Greg Hackmann <ghackmann@google.com>
 
-> +/**
-> + * pci_epf_linkup() - Notify the function driver that EPC device has
-> + *		      established a connection with the Root Complex.
-> + * @epf: the EPF device bound to the EPC device which has established
-> + *	 the connection with the host
-> + *
-> + * Invoke to notify the function driver that EPC device has established
-> + * a connection with the Root Complex.
-> + */
-> +void pci_epf_linkup(struct pci_epf *epf)
-> +{
-> +	if (!epf->driver)
-> +		dev_WARN(&epf->dev, "epf device not bound to driver\n");
-> +
-> +	epf->driver->ops->linkup(epf);
+The current definition of ASM_EXPORT doesn't work properly with clang,
+according to https://bugs.llvm.org//show_bug.cgi?id=27250#c3 it relies on
+gcc specific behavior. Change the constraint from an intermediate to an
+output expression which works with both gcc and clang.
 
-I don't understand what's going on here.  We warn if epf->driver is
-NULL, but the next thing we do is dereference it.
+From: Greg Hackmann <ghackmann@google.com>
+Commit-message-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Greg Hackmann <ghackmann@google.com>
+Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+---
+ arch/arm64/crypto/sha1-ce-glue.c | 2 +-
+ arch/arm64/crypto/sha2-ce-glue.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-For NULL pointers that are symptoms of Linux defects, I usually prefer
-not to check at all so that a dereference generates an oops and we can
-debug the problem.  For NULL pointers caused by user error, we would
-generally return an error that percolates up to the user.
-
-I haven't competely wrapped my head around this endpoint support, but
-I assume a NULL pointer here would be caused by user error, not
-necessarily a Linux defect.  So why would we dereference a NULL
-pointer?  And what happens when we do?  Is this just going to oops an
-embedded Linux running inside the endpoint?  Is that the correct
-behavior?
-
-Bjorn
+diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+index aefda9868627..c71e94ba0e43 100644
+--- a/arch/arm64/crypto/sha1-ce-glue.c
++++ b/arch/arm64/crypto/sha1-ce-glue.c
+@@ -18,7 +18,7 @@
+ #include <linux/module.h>
+ 
+ #define ASM_EXPORT(sym, val) \
+-	asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
++	asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
+ 
+ MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
+ MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+index 7cd587564a41..381b5fb2dcb2 100644
+--- a/arch/arm64/crypto/sha2-ce-glue.c
++++ b/arch/arm64/crypto/sha2-ce-glue.c
+@@ -18,7 +18,7 @@
+ #include <linux/module.h>
+ 
+ #define ASM_EXPORT(sym, val) \
+-	asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
++	asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
+ 
+ MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
+ MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+-- 
+2.12.2.715.g7642488e1d-goog
