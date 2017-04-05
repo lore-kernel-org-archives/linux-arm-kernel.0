@@ -1,81 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Apr 2017 13:11:48 +0100
-Subject: [PATCH v4 2/8] dt-bindings: input: touschcreen: remove sun4i
- documentation
-In-Reply-To: <20170405090634.4649-3-quentin.schulz@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Apr 2017 14:12:28 +0200
+Subject: [PATCH v4 5/8] ARM: sun8i: a33: add thermal sensor
+In-Reply-To: <20170405090634.4649-6-quentin.schulz@free-electrons.com>
 References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
- <20170405090634.4649-3-quentin.schulz@free-electrons.com>
-Message-ID: <20170405121148.ktc5wlq5svljr2vn@dell>
+ <20170405090634.4649-6-quentin.schulz@free-electrons.com>
+Message-ID: <20170405121228.vhl3lien6t4s7omm@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Apr 2017, Quentin Schulz wrote:
+Hi,
 
-> This patch removes the sun4i touchscreen controller binding
-> documentation since it has been merged with the sun4i GPADC binding
-> documentation.
+On Wed, Apr 05, 2017 at 11:06:31AM +0200, Quentin Schulz wrote:
+> This adds the DT node for the thermal sensor present in the Allwinner
+> A33 GPADC.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > ---
 > 
-> v4:
->   - correct patch title,
+> v3:
+>   - switched compatible to allwinner,sun8i-a33-ths,
+>   - renamed DT node name and label to ths to better match datasheet's name,
 > 
->  .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
->  1 file changed, 38 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+>  arch/arm/boot/dts/sun8i-a33.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+> index 077db22..9734e63 100644
+> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+> @@ -266,6 +266,13 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		ths: ths at 01c25000 {
+> +			compatible = "allwinner,sun8i-a33-ths";
+> +			reg = <0x01c25000 0x100>;
+> +			#thermal-sensor-cells = <0>;
+> +			#io-channel-cells = <0>;
+> +		};
+> +
+>  		fe0: display-frontend at 01e00000 {
+>  			compatible = "allwinner,sun8i-a33-display-frontend";
+>  			reg = <0x01e00000 0x20000>;
+> @@ -376,6 +383,11 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	iio-hwmon {
+> +		compatible = "iio-hwmon";
+> +		io-channels = <&ths>;
+> +	};
 
-Applied, thanks.
-
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> deleted file mode 100644
-> index 89abecd..0000000
-> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-> +++ /dev/null
-> @@ -1,38 +0,0 @@
-> -sun4i resistive touchscreen controller
-> ---------------------------------------
-> -
-> -Required properties:
-> - - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
-> -   "allwinner,sun6i-a31-ts"
-> - - reg: mmio address range of the chip
-> - - interrupts: interrupt to which the chip is connected
-> - - #thermal-sensor-cells: shall be 0
-> -
-> -Optional properties:
-> - - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
-> -				   is attached to the controller
-> - - allwinner,tp-sensitive-adjust : integer (4 bits)
-> -				   adjust sensitivity of pen down detection
-> -				   between 0 (least sensitive) and 15
-> -				   (defaults to 15)
-> - - allwinner,filter-type	 : integer (2 bits)
-> -				   select median and averaging filter
-> -				   samples used for median / averaging filter
-> -				   0: 4/2
-> -				   1: 5/3
-> -				   2: 8/4
-> -				   3: 16/8
-> -				   (defaults to 1)
-> -
-> -Example:
-> -
-> -	rtp: rtp at 01c25000 {
-> -		compatible = "allwinner,sun4i-a10-ts";
-> -		reg = <0x01c25000 0x100>;
-> -		interrupts = <29>;
-> -		allwinner,ts-attached;
-> -		#thermal-sensor-cells = <0>;
-> -		/* sensitive/noisy touch panel */
-> -		allwinner,tp-sensitive-adjust = <0>;
-> -		allwinner,filter-type = <3>;
-> -	};
+This wasn't sorted properly (iio is before soc in the alphabetical order).
+Fixed it and applied, thanks!
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/d9ad9bfb/attachment-0001.sig>
