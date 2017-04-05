@@ -1,105 +1,203 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Apr 2017 15:41:57 +0530
-Subject: [PATCH V8 0/4] phy: USB and PCIe phy drivers for Qcom chipsets
-In-Reply-To: <1491457885-5254-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <1491457885-5254-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <9f928f13-3bee-6f36-6760-095da5a03495@ti.com>
+Date: Wed, 5 Apr 2017 16:34:18 +0530
+Subject: [PATCH v4 0/3] phy: Group phy drivers based on vendor listing
+In-Reply-To: <1490015997-12956-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1490015997-12956-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <05b651c2-a634-b092-cd40-8ba9851ca6d0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vivek,
 
+On Monday 20 March 2017 06:49 PM, Vivek Gautam wrote:
+> This is the next version to an earlier posted series [1].
+> Missed Cc'ing the first patch of the previous series [1] to lkml.
+> Posting out this series now after addressing comments
+> and after adding the received 'Acked-by' and 'Reviewed-by'
+> tags.
+> 
+> This series is based on linux-phy/next branch.
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg568370.html
+> 
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-usb at vger.kernel.org
 
-On Thursday 06 April 2017 11:21 AM, Vivek Gautam wrote:
-> Hi Kishon,
-> Here's the series with fixed checkpatch warnings/checks.
-> Please pick it for phy/next.
-> 
-> This patch series adds couple of PHY drivers for Qualcomm chipsets.
-> a) qcom-qusb2 phy driver: that provides High Speed USB functionality.
-> b) qcom-qmp phy driver: that is a combo phy providing support for
->    USB3, PCIe, UFS and few other controllers.
-> 
-> The patches are based on next branch of linux-phy tree.
-> 
-> These patches have been tested on Dragon board db820c hardware with
-> required set of dt patches.
-> The tested branch[3] is based on torvald's master with greg's usb/usb-next
-> merged. Additionally the patches to get rpm up on msm8996 are also pulled
-> in.
+The best time to merge this would be immediately after -rc1 is tagged. Can you
+resend when 4.12-rc1 is tagged?
 
-merged, thanks!
+Thanks
+Kishon
 
--Kishon
 > 
-> Changes since v7:
->  - Fixed 'checkpatch --strict' alignment warnings/checks, and
->    added Stephen's Reviewed-by tag.
+> --
+> Vivek Gautam (3):
+>   phy: qcom-usb: Remove unused ulpi phy header
+>   phy: Move ULPI phy header out of drivers to include path
+>   phy: Group vendor specific phy drivers
 > 
-> Changes since v6:
->  - Rebased on phy/next and *not* including phy grouping series[4].
->  - qusb2-phy: addressed Stephen's comment.
->    - Dropped pm8994_s2 corner regulator from QUSB2 phy bindings.
->  - qmp-phy: none on functionality side.
->  
-> Changes since v5:
->  - Addressed review comments from Bjorn:
->    - Removed instances of readl/wirtel_relaxed calls from the drivers.
->      Instead, using simple readl/writel. Inserting a readl after a writel
->      to ensure the write is through to the device.
->    - Replaced regulator handling with regulator_bulk_** apis. This helps
->      in cutting down a lot of regulator handling code.
->    - Fixed minor return statements.
-> 
-> Changes since v4:
->  - Addressed comment to add child nodes for qmp phy driver. Each phy lane
->    now has a separate child node under the main qmp node.
->  - Modified the clock and reset initialization and enable methods.
->    Different phys - pcie, usb and later ufs, have varying number of clocks
->    and resets that are mandatory. So adding provision for clocks and reset
->    lists helps in requesting all mandatory resources for individual phys
->    and handle their failure cases accordingly.
-> 
-> Changes since v3:
->  - Addressed review comments given by Rob and Stephen for qusb2 phy
->    and qmp phy bindings respectively.
->  - Addressed review comments given by Stephen and Bjorn for qmp phy driver.
-> 
-> Changes since v2:
->  - Addressed review comments given by Rob and Stephen for bindings.
->  - Addressed the review comments given by Stephen for the qusb2 and qmp
->    phy drivers.
-> 
-> Changes since v1:
->  - Moved device tree binding documentation to separate patches, as suggested
->    by Rob.
->  - Addressed review comment regarding qfprom accesses by qusb2 phy driver,
->    given by Rob.
->  - Addressed review comments from Kishon.
->  - Addressed review comments from Srinivas for QMP phy driver.
->  - Addressed kbuild warning.
-> 
-> Please see individual patches for detailed changelogs.
-> 
-> [1] https://patchwork.kernel.org/patch/9567767/
-> [2] https://patchwork.kernel.org/patch/9567779/
-> [3] https://github.com/vivekgautam1/linux/tree/linux-v4.11-rc5-qmp-phy-db820c
-> [4] https://lkml.org/lkml/2017/3/20/407
-> 
-> Vivek Gautam (4):
->   dt-bindings: phy: Add support for QUSB2 phy
->   phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips
->   dt-bindings: phy: Add support for QMP phy
->   phy: qcom-qmp: new qmp phy driver for qcom-chipsets
-> 
->  .../devicetree/bindings/phy/qcom-qmp-phy.txt       |  106 ++
->  .../devicetree/bindings/phy/qcom-qusb2-phy.txt     |   43 +
->  drivers/phy/Kconfig                                |   18 +
->  drivers/phy/Makefile                               |    2 +
->  drivers/phy/phy-qcom-qmp.c                         | 1153 ++++++++++++++++++++
->  drivers/phy/phy-qcom-qusb2.c                       |  493 +++++++++
->  6 files changed, 1815 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qmp-phy.txt
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
->  create mode 100644 drivers/phy/phy-qcom-qmp.c
->  create mode 100644 drivers/phy/phy-qcom-qusb2.c
+>  MAINTAINERS                                        |  18 +-
+>  drivers/phy/Kconfig                                | 471 +--------------------
+>  drivers/phy/Makefile                               |  67 +--
+>  drivers/phy/allwinner/Kconfig                      |  31 ++
+>  drivers/phy/allwinner/Makefile                     |   2 +
+>  drivers/phy/{ => allwinner}/phy-sun4i-usb.c        |   0
+>  drivers/phy/{ => allwinner}/phy-sun9i-usb.c        |   0
+>  drivers/phy/broadcom/Kconfig                       |  64 +++
+>  drivers/phy/broadcom/Makefile                      |   7 +
+>  drivers/phy/{ => broadcom}/phy-bcm-cygnus-pcie.c   |   0
+>  drivers/phy/{ => broadcom}/phy-bcm-kona-usb2.c     |   0
+>  drivers/phy/{ => broadcom}/phy-bcm-ns-usb2.c       |   0
+>  drivers/phy/{ => broadcom}/phy-bcm-ns-usb3.c       |   0
+>  drivers/phy/{ => broadcom}/phy-bcm-ns2-pcie.c      |   0
+>  drivers/phy/{ => broadcom}/phy-bcm-nsp-usb3.c      |   0
+>  drivers/phy/{ => broadcom}/phy-brcm-sata.c         |   0
+>  drivers/phy/hisilicon/Kconfig                      |  20 +
+>  drivers/phy/hisilicon/Makefile                     |   2 +
+>  drivers/phy/{ => hisilicon}/phy-hi6220-usb.c       |   0
+>  drivers/phy/{ => hisilicon}/phy-hix5hd2-sata.c     |   0
+>  drivers/phy/marvell/Kconfig                        |  50 +++
+>  drivers/phy/marvell/Makefile                       |   6 +
+>  drivers/phy/{ => marvell}/phy-armada375-usb2.c     |   0
+>  drivers/phy/{ => marvell}/phy-berlin-sata.c        |   0
+>  drivers/phy/{ => marvell}/phy-berlin-usb.c         |   0
+>  drivers/phy/{ => marvell}/phy-mvebu-sata.c         |   0
+>  drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c      |   0
+>  drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c      |   0
+>  drivers/phy/qualcomm/Kconfig                       |  38 ++
+>  drivers/phy/qualcomm/Makefile                      |   7 +
+>  drivers/phy/{ => qualcomm}/phy-qcom-apq8064-sata.c |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ipq806x-sata.c |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ufs-i.h        |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.c |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.h |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.c |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.h |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-ufs.c          |   0
+>  drivers/phy/{ => qualcomm}/phy-qcom-usb-hs.c       |   2 -
+>  drivers/phy/{ => qualcomm}/phy-qcom-usb-hsic.c     |   2 -
+>  drivers/phy/renesas/Kconfig                        |  17 +
+>  drivers/phy/renesas/Makefile                       |   2 +
+>  drivers/phy/{ => renesas}/phy-rcar-gen2.c          |   0
+>  drivers/phy/{ => renesas}/phy-rcar-gen3-usb2.c     |   0
+>  drivers/phy/rockchip/Kconfig                       |  51 +++
+>  drivers/phy/rockchip/Makefile                      |   6 +
+>  drivers/phy/{ => rockchip}/phy-rockchip-dp.c       |   0
+>  drivers/phy/{ => rockchip}/phy-rockchip-emmc.c     |   0
+>  .../phy/{ => rockchip}/phy-rockchip-inno-usb2.c    |   0
+>  drivers/phy/{ => rockchip}/phy-rockchip-pcie.c     |   0
+>  drivers/phy/{ => rockchip}/phy-rockchip-typec.c    |   0
+>  drivers/phy/{ => rockchip}/phy-rockchip-usb.c      |   0
+>  drivers/phy/samsung/Kconfig                        |  96 +++++
+>  drivers/phy/samsung/Makefile                       |  11 +
+>  drivers/phy/{ => samsung}/phy-exynos-dp-video.c    |   0
+>  drivers/phy/{ => samsung}/phy-exynos-mipi-video.c  |   0
+>  drivers/phy/{ => samsung}/phy-exynos-pcie.c        |   0
+>  drivers/phy/{ => samsung}/phy-exynos4210-usb2.c    |   0
+>  drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c    |   0
+>  drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c     |   0
+>  drivers/phy/{ => samsung}/phy-exynos5250-sata.c    |   0
+>  drivers/phy/{ => samsung}/phy-exynos5250-usb2.c    |   0
+>  drivers/phy/{ => samsung}/phy-s5pv210-usb2.c       |   0
+>  drivers/phy/{ => samsung}/phy-samsung-usb2.c       |   0
+>  drivers/phy/{ => samsung}/phy-samsung-usb2.h       |   0
+>  drivers/phy/st/Kconfig                             |  33 ++
+>  drivers/phy/st/Makefile                            |   4 +
+>  drivers/phy/{ => st}/phy-miphy28lp.c               |   0
+>  drivers/phy/{ => st}/phy-spear1310-miphy.c         |   0
+>  drivers/phy/{ => st}/phy-spear1340-miphy.c         |   0
+>  drivers/phy/{ => st}/phy-stih407-usb.c             |   0
+>  drivers/phy/ti/Kconfig                             |  78 ++++
+>  drivers/phy/ti/Makefile                            |   7 +
+>  drivers/phy/{ => ti}/phy-da8xx-usb.c               |   0
+>  drivers/phy/{ => ti}/phy-dm816x-usb.c              |   0
+>  drivers/phy/{ => ti}/phy-omap-control.c            |   0
+>  drivers/phy/{ => ti}/phy-omap-usb2.c               |   0
+>  drivers/phy/{ => ti}/phy-ti-pipe3.c                |   0
+>  drivers/phy/{ => ti}/phy-tusb1210.c                |   3 +-
+>  drivers/phy/{ => ti}/phy-twl4030-usb.c             |   0
+>  {drivers => include/linux}/phy/ulpi_phy.h          |   0
+>  81 files changed, 568 insertions(+), 527 deletions(-)
+>  create mode 100644 drivers/phy/allwinner/Kconfig
+>  create mode 100644 drivers/phy/allwinner/Makefile
+>  rename drivers/phy/{ => allwinner}/phy-sun4i-usb.c (100%)
+>  rename drivers/phy/{ => allwinner}/phy-sun9i-usb.c (100%)
+>  create mode 100644 drivers/phy/broadcom/Kconfig
+>  create mode 100644 drivers/phy/broadcom/Makefile
+>  rename drivers/phy/{ => broadcom}/phy-bcm-cygnus-pcie.c (100%)
+>  rename drivers/phy/{ => broadcom}/phy-bcm-kona-usb2.c (100%)
+>  rename drivers/phy/{ => broadcom}/phy-bcm-ns-usb2.c (100%)
+>  rename drivers/phy/{ => broadcom}/phy-bcm-ns-usb3.c (100%)
+>  rename drivers/phy/{ => broadcom}/phy-bcm-ns2-pcie.c (100%)
+>  rename drivers/phy/{ => broadcom}/phy-bcm-nsp-usb3.c (100%)
+>  rename drivers/phy/{ => broadcom}/phy-brcm-sata.c (100%)
+>  create mode 100644 drivers/phy/hisilicon/Kconfig
+>  create mode 100644 drivers/phy/hisilicon/Makefile
+>  rename drivers/phy/{ => hisilicon}/phy-hi6220-usb.c (100%)
+>  rename drivers/phy/{ => hisilicon}/phy-hix5hd2-sata.c (100%)
+>  create mode 100644 drivers/phy/marvell/Kconfig
+>  create mode 100644 drivers/phy/marvell/Makefile
+>  rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
+>  rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
+>  rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
+>  rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
+>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
+>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
+>  create mode 100644 drivers/phy/qualcomm/Kconfig
+>  create mode 100644 drivers/phy/qualcomm/Makefile
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-apq8064-sata.c (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ipq806x-sata.c (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-i.h (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.c (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.h (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.c (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.h (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs.c (100%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-usb-hs.c (99%)
+>  rename drivers/phy/{ => qualcomm}/phy-qcom-usb-hsic.c (99%)
+>  create mode 100644 drivers/phy/renesas/Kconfig
+>  create mode 100644 drivers/phy/renesas/Makefile
+>  rename drivers/phy/{ => renesas}/phy-rcar-gen2.c (100%)
+>  rename drivers/phy/{ => renesas}/phy-rcar-gen3-usb2.c (100%)
+>  create mode 100644 drivers/phy/rockchip/Kconfig
+>  create mode 100644 drivers/phy/rockchip/Makefile
+>  rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
+>  rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
+>  rename drivers/phy/{ => rockchip}/phy-rockchip-inno-usb2.c (100%)
+>  rename drivers/phy/{ => rockchip}/phy-rockchip-pcie.c (100%)
+>  rename drivers/phy/{ => rockchip}/phy-rockchip-typec.c (100%)
+>  rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
+>  create mode 100644 drivers/phy/samsung/Kconfig
+>  create mode 100644 drivers/phy/samsung/Makefile
+>  rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos-pcie.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
+>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
+>  create mode 100644 drivers/phy/st/Kconfig
+>  create mode 100644 drivers/phy/st/Makefile
+>  rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
+>  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
+>  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
+>  rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
+>  create mode 100644 drivers/phy/ti/Kconfig
+>  create mode 100644 drivers/phy/ti/Makefile
+>  rename drivers/phy/{ => ti}/phy-da8xx-usb.c (100%)
+>  rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
+>  rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
+>  rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
+>  rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
+>  rename drivers/phy/{ => ti}/phy-tusb1210.c (99%)
+>  rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
+>  rename {drivers => include/linux}/phy/ulpi_phy.h (100%)
 > 
