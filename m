@@ -1,37 +1,65 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 10:10:59 +0200
-Subject: [PATCH v5 7/7] ARM: sun5i: chip: enable battery power supply subnode
+Date: Wed,  5 Apr 2017 10:10:55 +0200
+Subject: [PATCH v5 3/7] mfd: axp20x: add MFD cells for AXP20X and AXP22X
+ battery driver
 In-Reply-To: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
 References: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405081059.1684-8-quentin.schulz@free-electrons.com>
+Message-ID: <20170405081059.1684-4-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NextThing Co. CHIP has an AXP209 PMIC with battery connector.
+The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
 
-This enables the battery power supply subnode.
+This patch adds the AXP20X/AXP22X battery driver to the MFD cells of the
+AXP209, AXP221 and AXP223 MFD.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun5i-r8-chip.dts | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-index d078560..879a4b0 100644
---- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -132,6 +132,10 @@
- 	status = "okay";
- };
- 
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins_a>;
+v2:
+ - changed DT node name from battery_power_supply to
+ battery-power-supply,
+ - removed io-channels and io-channel-names from DT (the IIO mapping is
+ done in the IIO ADC driver now),
+
+ drivers/mfd/axp20x.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 5ba3b04..e6f5507 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -594,6 +594,9 @@ static struct mfd_cell axp20x_cells[] = {
+ 	}, {
+ 		.name		= "axp20x-adc",
+ 	}, {
++		.name		= "axp20x-battery-power-supply",
++		.of_compatible	= "x-powers,axp209-battery-power-supply",
++	}, {
+ 		.name		= "axp20x-ac-power-supply",
+ 		.of_compatible	= "x-powers,axp202-ac-power-supply",
+ 		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+@@ -621,6 +624,9 @@ static struct mfd_cell axp221_cells[] = {
+ 		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+ 		.resources	= axp20x_ac_power_supply_resources,
+ 	}, {
++		.name		= "axp20x-battery-power-supply",
++		.of_compatible	= "x-powers,axp221-battery-power-supply",
++	}, {
+ 		.name		= "axp20x-usb-power-supply",
+ 		.of_compatible	= "x-powers,axp221-usb-power-supply",
+ 		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+@@ -636,6 +642,9 @@ static struct mfd_cell axp223_cells[] = {
+ 	}, {
+ 		.name		= "axp22x-adc",
+ 	}, {
++		.name		= "axp20x-battery-power-supply",
++		.of_compatible	= "x-powers,axp221-battery-power-supply",
++	}, {
+ 		.name			= "axp20x-regulator",
+ 	}, {
+ 		.name		= "axp20x-ac-power-supply",
 -- 
 2.9.3
