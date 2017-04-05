@@ -1,48 +1,37 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 10:10:57 +0200
-Subject: [PATCH v5 5/7] ARM: dtsi: axp22x: add battery power supply subnode
+Date: Wed,  5 Apr 2017 10:10:59 +0200
+Subject: [PATCH v5 7/7] ARM: sun5i: chip: enable battery power supply subnode
 In-Reply-To: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
 References: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405081059.1684-6-quentin.schulz@free-electrons.com>
+Message-ID: <20170405081059.1684-8-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP22X PMIC exposes battery supply various data such as
-the battery status (charging, discharging, full, dead), current max
-limit, current current, battery capacity (in percentage), voltage max
-limit, current voltage, and battery capacity (in Ah).
+The NextThing Co. CHIP has an AXP209 PMIC with battery connector.
 
-This adds the battery power supply subnode for AXP22X PMIC.
+This enables the battery power supply subnode.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-v2:
- - changed DT node name from battery_power_supply to
- battery-power-supply,
- - removed io-channels and io-channel-names from DT (the IIO mapping is
- done in the IIO ADC driver now),
-
- arch/arm/boot/dts/axp22x.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/axp22x.dtsi b/arch/arm/boot/dts/axp22x.dtsi
-index 67331c5..87fb08e 100644
---- a/arch/arm/boot/dts/axp22x.dtsi
-+++ b/arch/arm/boot/dts/axp22x.dtsi
-@@ -57,6 +57,11 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index d078560..879a4b0 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -132,6 +132,10 @@
+ 	status = "okay";
+ };
  
-+	battery_power_supply: battery-power-supply {
-+		compatible = "x-powers,axp221-battery-power-supply";
-+		status = "disabled";
-+	};
++&battery_power_supply {
++	status = "okay";
++};
 +
- 	regulators {
- 		/* Default work frequency for buck regulators */
- 		x-powers,dcdc-freq = <3000>;
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins_a>;
 -- 
 2.9.3
