@@ -1,33 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Apr 2017 14:17:55 -0400
-Subject: [PATCH 0/3] arm: dts: renesas: Drop _clk suffix from clock node
- names
-In-Reply-To: <CAMuHMdWSLKjcyQP25mPCwn8EV1xzAyC=AipT8E0DbeVoEeemAw@mail.gmail.com>
-References: <1491214089-14093-1-git-send-email-geert+renesas@glider.be>
- <20170405013815.GK18246@codeaurora.org>
- <CAMuHMdWSLKjcyQP25mPCwn8EV1xzAyC=AipT8E0DbeVoEeemAw@mail.gmail.com>
-Message-ID: <20170405181755.GA31226@verge.net.au>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 5 Apr 2017 11:27:36 -0700
+Subject: drivers/clk/bcm/clk-iproc-pll.c:280]: (style) Redundant condition
+In-Reply-To: <HE1PR0801MB186548205AD0A49B09F6A3149C330@HE1PR0801MB1865.eurprd08.prod.outlook.com>
+References: <HE1PR0801MB186548205AD0A49B09F6A3149C330@HE1PR0801MB1865.eurprd08.prod.outlook.com>
+Message-ID: <a7ed0f26-fbe6-c5d3-62d3-e940a7fec5ac@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 09:09:20AM +0200, Geert Uytterhoeven wrote:
-> Hi Stephen,
-> 
-> On Wed, Apr 5, 2017 at 3:38 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 04/03, Geert Uytterhoeven wrote:
-> >> The current practice is to not add _clk suffixes to clock node names in
-> >> DT, as these names are used as the actual clock names.
-> >>
-> >> This patch removes the remaining offenders in the various Renesas DTSes.
-> >
-> > This changes the names in the clk framework too though? If you're
-> > ok with that I'm ok too.
-> 
-> Yes, that's my main motivation doing this: it's a bit silly to have some clocks
-> show up in /sys/kernel/debug/clk/clk_summary with a "_clk" suffix.
-> 
-> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Thanks!
+Hi David,
 
-Thanks, I have queued these up.
+Thanks for reporting. I'll send out a patch to address this.
+
+Ray
+
+On 3/27/2017 3:47 AM, David Binderman wrote:
+> Hello there,
+> 
+> 
+> linux-4.11-rc4/drivers/clk/bcm/clk-iproc-pll.c:280]: (style) Redundant condition: If 'rate >= 2200000000', the comparison 'rate' is always true.
+> 
+> Source code is
+> 
+>     } else if (rate >= VCO_HIGH && rate && rate < VCO_HIGH_HIGH) {
+> 
+> Suggest new code
+> 
+>     } else if (rate >= VCO_HIGH  && rate < VCO_HIGH_HIGH) {
+> 
+> Regards
+> 
+> David Binderman
+> 
