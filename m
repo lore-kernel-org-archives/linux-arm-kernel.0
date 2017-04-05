@@ -1,218 +1,172 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:06:00 -0500
-Subject: [PATCH v5 16/23] drivers/fsi: Add tracepoints for low-level operations
+Date: Tue,  4 Apr 2017 21:05:58 -0500
+Subject: [PATCH v5 14/23] drivers/fsi: Add sysfs files for FSI master & slave
+ accesses
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-17-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-15-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
+This change adds a 'raw' file for reads & writes, and a 'term' file for
+the TERM command, and a 'break' file for issuing a BREAK.
+
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/fsi-core.c     |  27 +++++++---
- include/trace/events/fsi.h | 127 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 148 insertions(+), 6 deletions(-)
- create mode 100644 include/trace/events/fsi.h
+ drivers/fsi/fsi-core.c | 116 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index f7e55e7..09becec 100644
+index 4359e26..f0f0556 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -21,6 +21,9 @@
- 
- #include "fsi-master.h"
- 
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/fsi.h>
-+
- #define FSI_SLAVE_CONF_NEXT_MASK	0x80000000
- #define FSI_SLAVE_CONF_SLOTS_MASK	0x00ff0000
- #define FSI_SLAVE_CONF_SLOTS_SHIFT	16
-@@ -541,11 +544,16 @@ static int fsi_master_read(struct fsi_master *master, int link,
- {
- 	int rc;
- 
-+	trace_fsi_master_read(master, link, slave_id, addr, size);
-+
- 	rc = fsi_check_access(addr, size);
--	if (rc)
--		return rc;
-+	if (!rc)
-+		rc = master->read(master, link, slave_id, addr, val, size);
-+
-+	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
-+			false, val, rc);
- 
--	return master->read(master, link, slave_id, addr, val, size);
-+	return rc;
+@@ -294,6 +294,95 @@ static int fsi_slave_scan(struct fsi_slave *slave)
+ 	return 0;
  }
  
- static int fsi_master_write(struct fsi_master *master, int link,
-@@ -553,11 +561,16 @@ static int fsi_master_write(struct fsi_master *master, int link,
++static ssize_t fsi_slave_sysfs_raw_read(struct file *file,
++		struct kobject *kobj, struct bin_attribute *attr, char *buf,
++		loff_t off, size_t count)
++{
++	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
++	size_t total_len, read_len;
++	int rc;
++
++	if (off < 0)
++		return -EINVAL;
++
++	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
++		return -EINVAL;
++
++	for (total_len = 0; total_len < count; total_len += read_len) {
++		read_len = min_t(size_t, count, 4);
++		read_len -= off & 0x3;
++
++		rc = fsi_slave_read(slave, off, buf + total_len, read_len);
++		if (rc)
++			return rc;
++
++		off += read_len;
++	}
++
++	return count;
++}
++
++static ssize_t fsi_slave_sysfs_raw_write(struct file *file,
++		struct kobject *kobj, struct bin_attribute *attr,
++		char *buf, loff_t off, size_t count)
++{
++	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
++	size_t total_len, write_len;
++	int rc;
++
++	if (off < 0)
++		return -EINVAL;
++
++	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
++		return -EINVAL;
++
++	for (total_len = 0; total_len < count; total_len += write_len) {
++		write_len = min_t(size_t, count, 4);
++		write_len -= off & 0x3;
++
++		rc = fsi_slave_write(slave, off, buf + total_len, write_len);
++		if (rc)
++			return rc;
++
++		off += write_len;
++	}
++
++	return count;
++}
++
++static struct bin_attribute fsi_slave_raw_attr = {
++	.attr = {
++		.name = "raw",
++		.mode = 0600,
++	},
++	.size = 0,
++	.read = fsi_slave_sysfs_raw_read,
++	.write = fsi_slave_sysfs_raw_write,
++};
++
++static ssize_t fsi_slave_sysfs_term_write(struct file *file,
++		struct kobject *kobj, struct bin_attribute *attr,
++		char *buf, loff_t off, size_t count)
++{
++	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
++	struct fsi_master *master = slave->master;
++
++	if (!master->term)
++		return -ENODEV;
++
++	master->term(master, slave->link, slave->id);
++	return count;
++}
++
++static struct bin_attribute fsi_slave_term_attr = {
++	.attr = {
++		.name = "term",
++		.mode = 0200,
++	},
++	.size = 0,
++	.write = fsi_slave_sysfs_term_write,
++};
++
+ /* Encode slave local bus echo delay */
+ static inline uint32_t fsi_smode_echodly(int x)
+ {
+@@ -409,6 +498,14 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ 		return rc;
+ 	}
+ 
++	rc = device_create_bin_file(&slave->dev, &fsi_slave_raw_attr);
++	if (rc)
++		dev_warn(&slave->dev, "failed to create raw attr: %d\n", rc);
++
++	rc = device_create_bin_file(&slave->dev, &fsi_slave_term_attr);
++	if (rc)
++		dev_warn(&slave->dev, "failed to create term attr: %d\n", rc);
++
+ 	fsi_slave_scan(slave);
+ 	return 0;
+ }
+@@ -523,6 +620,18 @@ static ssize_t master_rescan_store(struct device *dev,
+ 
+ static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
+ 
++static ssize_t master_break_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	struct fsi_master *master = to_fsi_master(dev);
++
++	fsi_master_break(master, 0);
++
++	return count;
++}
++
++static DEVICE_ATTR(break, 0200, NULL, master_break_store);
++
+ int fsi_master_register(struct fsi_master *master)
  {
  	int rc;
+@@ -546,6 +655,13 @@ int fsi_master_register(struct fsi_master *master)
+ 		return rc;
+ 	}
  
-+	trace_fsi_master_write(master, link, slave_id, addr, size, val);
++	rc = device_create_file(&master->dev, &dev_attr_break);
++	if (rc) {
++		device_unregister(&master->dev);
++		ida_simple_remove(&master_ida, master->idx);
++		return rc;
++	}
 +
- 	rc = fsi_check_access(addr, size);
--	if (rc)
--		return rc;
-+	if (!rc)
-+		rc = master->write(master, link, slave_id, addr, val, size);
+ 	fsi_master_scan(master);
  
--	return master->write(master, link, slave_id, addr, val, size);
-+	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
-+			true, val, rc);
-+
-+	return rc;
- }
- 
- static int fsi_master_link_enable(struct fsi_master *master, int link)
-@@ -573,6 +586,8 @@ static int fsi_master_link_enable(struct fsi_master *master, int link)
-  */
- static int fsi_master_break(struct fsi_master *master, int link)
- {
-+	trace_fsi_master_break(master, link);
-+
- 	if (master->send_break)
- 		return master->send_break(master, link);
- 
-diff --git a/include/trace/events/fsi.h b/include/trace/events/fsi.h
-new file mode 100644
-index 0000000..ac74a30
---- /dev/null
-+++ b/include/trace/events/fsi.h
-@@ -0,0 +1,127 @@
-+
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM fsi
-+
-+#if !defined(_TRACE_FSI_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_FSI_H
-+
-+#include <linux/tracepoint.h>
-+
-+TRACE_EVENT(fsi_master_read,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size),
-+	TP_ARGS(master, link, id, addr, size),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
-+	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd]",
-+		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size
-+	)
-+);
-+
-+TRACE_EVENT(fsi_master_write,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size, const void *data),
-+	TP_ARGS(master, link, id, addr, size, data),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
-+		__field(__u32,	data)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
-+		__entry->data = 0;
-+		memcpy(&__entry->data, data, size);
-+	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
-+		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size,
-+		__entry->size, &__entry->data
-+	)
-+);
-+
-+TRACE_EVENT(fsi_master_rw_result,
-+	TP_PROTO(const struct fsi_master *master, int link, int id,
-+			uint32_t addr, size_t size,
-+			bool write, const void *data, int ret),
-+	TP_ARGS(master, link, id, addr, size, write, data, ret),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	link)
-+		__field(int,	id)
-+		__field(__u32,	addr)
-+		__field(size_t,	size)
-+		__field(bool,	write)
-+		__field(__u32,	data)
-+		__field(int,	ret)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+		__entry->id = id;
-+		__entry->addr = addr;
-+		__entry->size = size;
-+		__entry->write = write;
-+		__entry->data = 0;
-+		__entry->ret = ret;
-+		if (__entry->write || !__entry->ret)
-+			memcpy(&__entry->data, data, size);
-+	),
-+	TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
-+		__entry->master_idx,
-+		__entry->link,
-+		__entry->id,
-+		__entry->addr,
-+		__entry->size,
-+		__entry->write ? "<=" : "=>",
-+		__entry->size, &__entry->data,
-+		__entry->ret
-+	)
-+);
-+
-+TRACE_EVENT(fsi_master_break,
-+	TP_PROTO(const struct fsi_master *master, int link),
-+	TP_ARGS(master, link),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	link)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->idx;
-+		__entry->link = link;
-+	),
-+	TP_printk("fsi%d:%d",
-+		__entry->master_idx,
-+		__entry->link
-+	)
-+);
-+
-+
-+#endif /* _TRACE_FSI_H */
-+
-+#include <trace/define_trace.h>
+ 	return 0;
 -- 
 1.8.2.2
