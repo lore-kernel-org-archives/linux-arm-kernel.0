@@ -1,51 +1,101 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed,  5 Apr 2017 09:56:03 -0700
-Subject: [PATCH] crypto: arm64/sha: use %c constraint code in ASM_EXPORT
-Message-ID: <20170405165603.87264-1-mka@chromium.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 5 Apr 2017 19:59:38 +0300
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170403153604.GI10760@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+ <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+ <20170403153604.GI10760@atomide.com>
+Message-ID: <c396df32-fad1-72a2-f22d-034a42af4186@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Hackmann <ghackmann@google.com>
+On 03/04/17 18:36, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170403 07:54]:
+>> On 30/03/17 19:54, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
+>>>> On 23/03/17 19:02, Tony Lindgren wrote:
+>>>>> * Tony Lindgren <tony@atomide.com> [170322 18:03]:
+>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+>>>>>>> On 17/03/17 17:25, Tony Lindgren wrote:
+>>>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>>>>>>>>> Any additional testing on omap4 welcome as this series basically
+>>>>>>>>> tweaks every possible peripheral clock on the SoC.
+>>>>>>>>
+>>>>>>>> Without the last patch in this series, booting fails for me:
+>>>>>>>>
+>>>>>>>> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+>>>>>>>> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+>>>>>>>>
+>>>>>>>> Care to check that booting keeps working for each patch in the
+>>>>>>>> series to avoid breaking git bisect for booting?
+>>>>>>>
+>>>>>>> Hmm, I think patch 8+9 need to be squashed then. I can double check this
+>>>>>>> next week though.
+>>>>>>
+>>>>>> Also looks like with this set merged HDMI stops working on
+>>>>>> omap4 with:
+>>>>>>
+>>>>>> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>>>
+>>>>> Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+>>>>> encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+>>>>> dmesg output in case that provides more clues:
+>>>>>
+>>>>> [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+>>>>> [   91.078308] [drm] Enabling DMM ywrap scrolling
+>>>>> [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>>> [   91.107879] omapdss HDMI error: failed to power on device
+>>>>> [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+>>>>> [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>> [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>> [   91.620300] Console: switching to colour frame buffer device 128x48
+>>>>> [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+>>>>> [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+>>>>> [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+>>>>> [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>> [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>>
+>>>>> Regards,
+>>>>>
+>>>>> Tony
+>>>>>
+>>>>
+>>>> Can you try with this additional hwmod data tweak in place? Apply this on
+>>>> top of the existing series.
+>>>
+>>> Does not seem to help, still get the same errors. But maybe I'm doing
+>>> something wrong as the patch did not apply and I applied it manually.
+>>>
+>>> Regards,
+>>>
+>>> Tony
+>>>
+>>
+>> Hmm ok, can you provide some brief instructions how to test what you are
+>> doing with the HDMI? Just connect it to some external monitor? My monitor
+>> has a spare HDMI connector so I could try it out.
+>
+> Well build a kernel using omap2plus_defconfig, then with HDMI cable
+> connected load the following modules:
+>
+> encoder-tpd12s015 encoder-tfp410 connector-hdmi omapfb
+>
+> And a console should appear on the HDMI monitor. If using omapdrm, then
+> load omapdss and omapdrm instead.
+>
+> And if using NFSroot, you need to have ehci and smsc drivers built-in
+> or use an initramfs.
 
-The current definition of ASM_EXPORT doesn't work properly with clang,
-according to https://bugs.llvm.org//show_bug.cgi?id=27250#c3 it relies on
-gcc specific behavior. Change the constraint from an intermediate to an
-output expression which works with both gcc and clang.
+Ok I am able to reproduce the issue. Seems something weird with the hdmi 
+hwmod itself, if I revert it back to its original form (just the hdmi 
+one) then it works fine. Haven't figured out yet what is the actual 
+problem but seems something timing related, as it also starts magically 
+working with the clkctrl clock driver setup if I add enough traces to 
+some critical points.
 
-From: Greg Hackmann <ghackmann@google.com>
-Commit-message-by: Matthias Kaehlcke <mka@chromium.org>
-Signed-off-by: Greg Hackmann <ghackmann@google.com>
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
----
- arch/arm64/crypto/sha1-ce-glue.c | 2 +-
- arch/arm64/crypto/sha2-ce-glue.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
-index aefda9868627..c71e94ba0e43 100644
---- a/arch/arm64/crypto/sha1-ce-glue.c
-+++ b/arch/arm64/crypto/sha1-ce-glue.c
-@@ -18,7 +18,7 @@
- #include <linux/module.h>
- 
- #define ASM_EXPORT(sym, val) \
--	asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
-+	asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
- 
- MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
- MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
-index 7cd587564a41..381b5fb2dcb2 100644
---- a/arch/arm64/crypto/sha2-ce-glue.c
-+++ b/arch/arm64/crypto/sha2-ce-glue.c
-@@ -18,7 +18,7 @@
- #include <linux/module.h>
- 
- #define ASM_EXPORT(sym, val) \
--	asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
-+	asm(".globl " #sym "; .set " #sym ", %c0" :: "I"(val));
- 
- MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
- MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
--- 
-2.12.2.715.g7642488e1d-goog
+-Tero
