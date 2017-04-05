@@ -1,77 +1,57 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 5 Apr 2017 14:05:30 +0100
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <819bc6c1-581b-3ab9-d189-1befaaf43548@huawei.com>
-References: <1491031554-19516-1-git-send-email-dingtianhong@huawei.com>
- <1491031554-19516-2-git-send-email-dingtianhong@huawei.com>
- <20170401.112603.1991545644693496714.davem@davemloft.net>
- <819bc6c1-581b-3ab9-d189-1befaaf43548@huawei.com>
-Message-ID: <118dee30-69a8-4ee0-791d-a46d268af3b4@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 5 Apr 2017 14:17:54 +0100
+Subject: [PATCH] mm/usercopy: Drop extra is_vmalloc_or_module check
+In-Reply-To: <1491340140-18238-1-git-send-email-labbott@redhat.com>
+References: <1491340140-18238-1-git-send-email-labbott@redhat.com>
+Message-ID: <20170405131754.GB10833@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2017 07:49, Ding Tianhong wrote:
->
->
-> On 2017/4/2 2:26, David Miller wrote:
->> From: Ding Tianhong <dingtianhong@huawei.com>
->> Date: Sat, 1 Apr 2017 15:25:51 +0800
->>
->>> Till now only the Intel ixgbe could support enable
->>> Relaxed ordering in the drivers for special architecture,
->>> but the ARCH_WANT_RELAX_ORDER is looks like a general name
->>> for all arch, so rename to a specific name for intel
->>> card looks more appropriate.
->>>
->>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->>
->> This is not a driver specific facility.
->>
->> Any driver can test this symbol and act accordingly.
->>
->> Just because IXGBE is the first and only user, doesn't mean
->> the facility is driver specific.
->>
->
-> Understand clearly?but the ARCH_WANT_RELAX_ORDER is really too generic and simple,
-> cause much misleading to indicate that it looks like the hack code for some architecture.
-> what do you think of the ETHERNET_ALLOW_RELAXED_ORDER in the drivers/net/ethernet/*,
-> it will only affect ethernet and not only for Ixgbe.
->
+On Tue, Apr 04, 2017 at 02:09:00PM -0700, Laura Abbott wrote:
+> virt_addr_valid was previously insufficient to validate if virt_to_page
+> could be called on an address on arm64. This has since been fixed up
+> so there is no need for the extra check. Drop it.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> I've given this some testing on my machine and haven't seen any problems
+> (e.g. random crashes without the check) and the fix has been in for long
+> enough now. I'm in no rush to have this merged so I'm okay if this sits in
+> a tree somewhere to get more testing.
 
-Hi Ding,
+This looks good to me, given your fix for virt_add_valid() in mainline.
+FWIW:
 
-I think the actual original config ARCH_WANT_RELAX_ORDER is quite 
-dubious, and it does not really tell us which feature(s) of the 
-architecture supports this (if indeed it is arch specific).
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-According to the original commit, 1a8b6d76dc5b net:add one common config 
-ARCH_WANT_RELAX_ORDER to support relax ordering, this is specific to 
-SPARC only:
-"Currently it only supports one special cpu architecture(SPARC) in 82599 
-driver to enable RO feature, this is not very common for other cpu 
-architecture which really needs RO feature".
+Mark.
 
-This sounds wooly.
-
-So I think that we need to know which specific architecture, memory 
-model, or PCI host/port/EP features, or combination of them, allows this 
-so called relaxed ordering.
-
-And a config option is probably not even the proper check.
-
-John
-
-> Thanks
-> Ding
->
->
->> Thank you.
->>
->> .
->>
->
->
-> .
->
+> ---
+>  mm/usercopy.c | 11 -----------
+>  1 file changed, 11 deletions(-)
+> 
+> diff --git a/mm/usercopy.c b/mm/usercopy.c
+> index d155e12563b1..4d23a0e0e232 100644
+> --- a/mm/usercopy.c
+> +++ b/mm/usercopy.c
+> @@ -206,17 +206,6 @@ static inline const char *check_heap_object(const void *ptr, unsigned long n,
+>  {
+>  	struct page *page;
+>  
+> -	/*
+> -	 * Some architectures (arm64) return true for virt_addr_valid() on
+> -	 * vmalloced addresses. Work around this by checking for vmalloc
+> -	 * first.
+> -	 *
+> -	 * We also need to check for module addresses explicitly since we
+> -	 * may copy static data from modules to userspace
+> -	 */
+> -	if (is_vmalloc_or_module_addr(ptr))
+> -		return NULL;
+> -
+>  	if (!virt_addr_valid(ptr))
+>  		return NULL;
+>  
+> -- 
+> 2.12.1
+> 
