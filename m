@@ -1,33 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 5 Apr 2017 19:42:30 +0100
-Subject: [PATCH v23 06/11] clocksource: arm_arch_timer: refactor MMIO
- timer probing.
-In-Reply-To: <20170331175105.8370-7-fu.wei@linaro.org>
-References: <20170331175105.8370-1-fu.wei@linaro.org>
- <20170331175105.8370-7-fu.wei@linaro.org>
-Message-ID: <20170405184229.GA29338@leverpostej>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 5 Apr 2017 12:04:23 -0700
+Subject: [PATCH] cs-2000-cp: keep Reserved bit on each register
+In-Reply-To: <87y3vfxw3q.wl%kuninori.morimoto.gx@renesas.com>
+References: <87y3vfxw3q.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20170405190423.GL18246@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 01, 2017 at 01:51:00AM +0800, fu.wei at linaro.org wrote:
-> +	arch_timer_mem_freq = arch_timer_mem_get_cntfrq(base);
-> +	if (!arch_timer_rate && arch_timer_mem_freq) {
-> +		arch_timer_rate = arch_timer_mem_freq;
-> +	} else if (!arch_timer_rate || arch_timer_rate != arch_timer_mem_freq) {
-> +		pr_err(FW_BUG "invalid MMIO frequency.\n");
-> +		iounmap(base);
-> +		return -EINVAL;
-> +	}
+On 04/05, Kuninori Morimoto wrote:
+> 
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+> Thus CS2000 datasheet is indicating below, this patch
+> follows it.
+> 
+> WARNING: All "Reserved" registers must maintain their default
+>          state to ensure proper functional operation.
+> 
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-I thought I had previously mentioned that this last check has the
-potential to break DT systems, which may be inadvertently relying on the
-probe order.
+Is this v2? I see two of these from different days.
 
-I agree we must do this check for ACPI, but I think that for DT it needs
-to be relaxed.
-
-I'm happy to rework that locally, if you can address my comments on
-patch 9.
-
-Thanks,
-Mark.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
