@@ -1,59 +1,37 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  5 Apr 2017 15:19:07 +0200
-Subject: [PATCH v2 1/3] soc: imx: gpc: add defines for domain index
-Message-ID: <20170405131909.16880-1-l.stach@pengutronix.de>
+Date: Wed,  5 Apr 2017 15:19:08 +0200
+Subject: [PATCH v2 2/3] dt-bindings: imx-gpc: add i.MX6 QuadPlus compatible
+In-Reply-To: <20170405131909.16880-1-l.stach@pengutronix.de>
+References: <20170405131909.16880-1-l.stach@pengutronix.de>
+Message-ID: <20170405131909.16880-2-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Makes referencing a specfic domain in the driver code
-less error prone.
+While the GPC on i.MX6QP is mostly comptible to the i.MX6Q one,
+the QuadPlus requires special workarounds for hardware erratum
+ERR009619.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
-v2: new patch
----
- drivers/soc/imx/gpc.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/power/fsl,imx-gpc.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 4294287e5f6c..d4ebb325b558 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -235,6 +235,10 @@ static struct platform_driver imx_pgc_power_domain_driver = {
- };
- builtin_platform_driver(imx_pgc_power_domain_driver)
+diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+index 416e12c6755a..181d2cc6f054 100644
+--- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
++++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+@@ -5,7 +5,10 @@ The i.MX6 General Power Control (GPC) block contains DVFS load tracking
+ counters and Power Gating Control (PGC).
  
-+#define GPC_PGC_DOMAIN_ARM	0
-+#define GPC_PGC_DOMAIN_PU	1
-+#define GPC_PGC_DOMAIN_DISPLAY	2
-+
- static struct genpd_power_state imx6_pm_domain_pu_state = {
- 	.power_off_latency_ns = 25000,
- 	.power_on_latency_ns = 2000000,
-@@ -340,7 +344,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap,
- genpd_err:
- 	for (i = 0; i < num_domains; i++)
- 		pm_genpd_remove(&imx_gpc_domains[i].base);
--	imx_pgc_put_clocks(&imx_gpc_domains[1]);
-+	imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU]);
- clk_err:
- 	return ret;
- }
-@@ -441,12 +445,12 @@ static int imx_gpc_remove(struct platform_device *pdev)
- 	if (!of_get_child_by_name(pdev->dev.of_node, "pgc")) {
- 		of_genpd_del_provider(pdev->dev.of_node);
- 
--		ret = pm_genpd_remove(&imx_gpc_domains[1].base);
-+		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
- 		if (ret)
- 			return ret;
--		imx_pgc_put_clocks(&imx_gpc_domains[1]);
-+		imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU]);
- 
--		ret = pm_genpd_remove(&imx_gpc_domains[0].base);
-+		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
- 		if (ret)
- 			return ret;
- 	}
+ Required properties:
+-- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
++- compatible: Should be one of the following:
++  - fsl,imx6q-gpc
++  - fsl,imx6qp-gpc
++  - fsl,imx6sl-gpc
+ - reg: should be register base and length as documented in the
+   datasheet
+ - interrupts: Should contain one interrupt specifier for the GPC interrupt
 -- 
 2.11.0
