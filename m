@@ -1,63 +1,91 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 5 Apr 2017 14:58:13 +0100
-Subject: [Query] DT warnings with ranges and sub-nodes
-Message-ID: <5b1fc8af-b5e1-75bd-6cf3-84ea75e4987f@arm.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Wed, 5 Apr 2017 16:58:57 +0300
+Subject: [RFC PATCH 0/2] extend PWM framework to support PWM modes
+Message-ID: <1491400739-9618-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi all,
 
-I am seeing some warning in juno DTS files. I would like to get your
-feedback on how to resolve them.
+Please give feedback on these patches which extends the PWM
+framework in order to support multiple PWM signal types.
+The current patch series recognize the following PWM
+signal types:
+- PWM complementary signals
+- PWM push-pull signal
+These output signals could be configured by setting PWM mode
+(a new input in sysfs has been added in order to support this
+operation).
 
-Warning messages:
+root at sama5d2-xplained:/sys/devices/platform/ahb/ahb:apb/f802c000.pwm/pwm/pwmchip0/pwm2# ls -l
+-r--r--r--    1 root     root          4096 Feb  9 10:54 capture
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 duty_cycle
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 enable
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 mode
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 period
+-rw-r--r--    1 root     root          4096 Feb  9 10:55 polarity
+drwxr-xr-x    2 root     root             0 Feb  9 10:54 power
+-rw-r--r--    1 root     root          4096 Feb  9 10:54 uevent
 
-Warning (simple_bus_reg): Node /smb at 8000000/motherboard/flash at 0,00000000
-simple-bus unit address format error, expected "0"
-Warning (simple_bus_reg): Node
-/smb at 8000000/motherboard/ethernet at 2,00000000 simple-bus unit address
-format error, expected "200000000"
-Warning (simple_bus_reg): Node
-/smb at 8000000/motherboard/iofpga at 3,00000000 simple-bus unit address
-format error, expected "300000000"
+Definition of PWM complementary mode:
+For a PWM controllers with more than one outputs per PWM channel,
+e.g. with 2 outputs per PWM channels, the PWM complementary signals
+have opposite levels, same duration and same starting times,
+as in the following diagram:
 
-We have
+        __    __    __    __
+PWMH __|  |__|  |__|  |__|  |__
+     __    __    __    __    __
+PWML   |__|  |__|  |__|  |__|
+       <--T-->
+Where T is the signal period.
 
-        smb at 8000000 {
-                compatible = "simple-bus";
-                #address-cells = <2>;
-                #size-cells = <1>;
-                ranges = <0 0 0 0x08000000 0x04000000>,
-                         <1 0 0 0x14000000 0x04000000>,
-                         <2 0 0 0x18000000 0x04000000>,
-                         <3 0 0 0x1c000000 0x04000000>,
-                         <4 0 0 0x0c000000 0x04000000>,
-                         <5 0 0 0x10000000 0x04000000>;
-		...
-	
-		flash at 0,00000000 {
-			...
-		};
-		ethernet at 2,00000000 {
-			...
-		};
-		iofpga at 3,00000000 {
-			...
-		};
-	};
+Definition of PWM push-pull mode:
+For PWM controllers with more than one outputs per PWM channel,
+e.g. with 2 outputs per PWM channel, the PWM push-pull signals
+have same levels, same duration and are delayed until the begining
+of the next period, as in the following diagram:
 
-All of which are @offset 0x0 in their respective ranges.
+        __          __
+PWMH __|  |________|  |________
+              __          __
+PWML ________|  |________|  |__
+       <--T-->
 
-How do we specify the range as well as the offset ? Does the below
-look like correct way of fixing those warnings ?
-	flash at 0
-	ethernet at 200000000
-	iofpga at 300000000
+Where T is the signal period.
 
-Or can I ignore these warning as I see the syntax to be correct as
-provided in example in ePAPR(page 99 under Appendix B1 Ebony Device
-Tree). Sorry if I have missed to follow any other thread on the same.
+The PWM push-pull mode could be usefull in applications like
+half bridge converters.
+
+This series add support for PWM modes on atmel SAMA5D2 SoC.
+
+Please consider that this series was build on top following
+patch series:
+[PATCH v3 0/2] switch to atomic PWM
+[PATCH v3 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
+[PATCH v3 2/2] drivers: pwm: pwm-atmel: enable PWM on sama5d2
+
+This patch series is not dependent on the other patch series
+I've made for extending PWM framework with PWM dead-times:
+[RFC PATCH 0/2] extends PWM framework to support PWM dead-times
+[RFC PATCH 1/2] drivers: pwm: core: implement pwm dead-times
+[RFC PATCH 2/2] drivers: pwm: pwm-atmel: implement pwm dead-time
+but, if you consider relevant, and both patch changes are considered
+relevant for PWM subsistem, I can combine both of them, if any.
+
+Thanks you,
+Claudiu Beznea
+
+Claudiu Beznea (2):
+  drivers: pwm: core: implement pwm mode
+  drivers: pwm: pwm-atmel: add support for pwm modes
+
+ drivers/pwm/core.c            | 13 +++++-
+ drivers/pwm/pwm-atmel.c       | 94 +++++++++++++++++++++++++++++--------------
+ drivers/pwm/sysfs.c           | 52 ++++++++++++++++++++++++
+ include/dt-bindings/pwm/pwm.h |  1 +
+ include/linux/pwm.h           | 37 ++++++++++++++++-
+ 5 files changed, 162 insertions(+), 35 deletions(-)
 
 -- 
-Regards,
-Sudeep
+2.7.4
