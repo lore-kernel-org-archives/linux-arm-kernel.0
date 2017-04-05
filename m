@@ -1,297 +1,190 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  5 Apr 2017 17:18:06 +0200
-Subject: [PATCH v4 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
-References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
-Message-ID: <70ffe3343c13d01737bf74e5de4898d0c0be07a0.1491405475.git-series.gregory.clement@free-electrons.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Wed, 5 Apr 2017 17:22:24 +0200
+Subject: [PATCH 1/1] ARM: dts: armada-xp-linksys-mamba: use wan instead
+ of internet for DSA port
+In-Reply-To: <20170405142824.GB13449@lunn.ch>
+References: <20170405052847.326-1-ralph.sennhauser@gmail.com>
+ <20170405142824.GB13449@lunn.ch>
+Message-ID: <20170405172224.38c1f9fb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 37xx SoCs can handle interrupt through GPIO. However it can
-only manage the edge ones.
+On Wed, 5 Apr 2017 16:28:24 +0200
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-The way the interrupt are managed are classical so we can use the generic
-interrupt chip model.
+> On Wed, Apr 05, 2017 at 07:28:46AM +0200, Ralph Sennhauser wrote:
+> > The LEDs for the "wan" port are already labeled "mamba:amber:wan"
+> > resp. "mamba:white:wan". So besides being an outlier with regard to
+> > the rest of the product line (see table below) changing the label
+> > fixes an internal inconsistency as well.
+> > 
+> > This will be visible in user space. Given commit cb4f71c42988 ("ARM:
+> > dts: armada-38x: change order of ethernet DT nodes on Armada 38x")
+> > it's expected to happen anyway. Commit 499400c9ac20 ("ARM: dts:
+> > armada-xp-linksys-mamba: Utilize new DSA binding") switches to the
+> > new bindings, use this opportunity to do it now rather than later.
+> > 
+> > |-----------------------------------------------------------------|
+> > | Labels used for the case and those used for the DSA ports       |
+> > |-----------------------------------------------------------------|
+> > | case labels	| armada-385-linksys-*	|
+> > armada-xp-linksys-mamba |
+> > |---------------|-----------------------|-------------------------|
+> > | internet	| wan			|
+> > internet		  | | 1		|
+> > lan1			| lan1			  | |
+> > 2		| lan2			|
+> > lan2			  | | 3		|
+> > lan3			| lan3			  | |
+> > 4		| lan4			|
+> > lan4			  |
+> > |-----------------------------------------------------------------|  
+> 
+> Hi Ralph
+> 
+> I always encourage people to use the case labels as interface names.
+> So if i was going to make a change, it would be wan->internet for the 
+> armada-385-linksys-*.
 
-The only unusual "feature" is that many interrupts are connected to the
-parent interrupt controller. But we do not take advantage of this and use
-the chained irq with all of them.
+Glad Imre used lan1 instead of 1 ;) 
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 221 +++++++++++++++++++++-
- 1 file changed, 221 insertions(+)
+The reverse I have appended to this mail so people know what it would
+look like.
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 5c96f5558310..7356516e0921 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -13,7 +13,9 @@
- #include <linux/gpio/driver.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_device.h>
-+#include <linux/of_irq.h>
- #include <linux/pinctrl/pinconf-generic.h>
- #include <linux/pinctrl/pinconf.h>
- #include <linux/pinctrl/pinctrl.h>
-@@ -30,6 +32,11 @@
- #define OUTPUT_CTL	0x20
- #define SELECTION	0x30
+In fact "internet" label on the case is uppercase, would this matter
+for you for new bindings, or would you still use the lowercase version?
+It's not relevant here, just wondering.
+
+> 
+> > I underestimated the urge of people to make all the same before.
+> > While I do not particularly like this sort of change I see it
+> > coming anyway. So this patch is meant to make it a deliberate
+> > decision so it no longer is an item lurking in the shadows. Whether
+> > this patch gets taken or rejected my goal is reached.  
+> 
+> I would say, this is now too late. Changing an interface name will
+> break configuration scripts. We are stuck with it.
+> 
+
+If it weren't for commit cb4f71c42988 that would have been obvious for
+me as well.
+
+Thanks
+Ralph
+
+
+
+The inverse (following trough all the way) would look the following,
+same changes applies to Rango which is not yet supported by vanilla
+kernel.
+
+diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+index a1b6e68..3efceda 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+@@ -53,13 +53,13 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
  
-+#define IRQ_EN		0x0
-+#define IRQ_POL		0x08
-+#define IRQ_STATUS	0x10
-+#define IRQ_WKUP	0x18
-+
- #define NB_FUNCS 2
- #define GPIO_PER_REG	32
+-					wan_amber at 0 {
+-						label = "caiman:amber:wan";
++					internet_amber at 0 {
++						label = "caiman:amber:internet";
+ 						reg = <0x0>;
+ 					};
  
-@@ -75,9 +82,12 @@ struct armada_37xx_pmx_func {
+-					wan_white at 1 {
+-						label = "caiman:white:wan";
++					internet_white at 1 {
++						label = "caiman:white:internet";
+ 						reg = <0x1>;
+ 					};
  
- struct armada_37xx_pinctrl {
- 	struct regmap			*regmap;
-+	void __iomem			*base;
- 	const struct armada_37xx_pin_data	*data;
- 	struct device			*dev;
- 	struct gpio_chip		gpio_chip;
-+	struct irq_chip			irq_chip;
-+	spinlock_t			irq_lock;
- 	struct pinctrl_desc		pctl;
- 	struct pinctrl_dev		*pctl_dev;
- 	struct armada_37xx_pin_group	*groups;
-@@ -346,6 +356,14 @@ static int armada_37xx_pmx_set(struct pinctrl_dev *pctldev,
- 	return armada_37xx_pmx_set_by_name(pctldev, name, grp);
- }
+diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+index a1a75af..4f2e7f6 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+@@ -53,13 +53,13 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
  
-+static inline void armada_37xx_irq_update_reg(unsigned int *reg,
-+					  struct irq_data *d)
-+{
-+	int offset = irqd_to_hwirq(d);
-+
-+	armada_37xx_update_reg(reg, offset);
-+}
-+
- static int armada_37xx_gpio_direction_input(struct gpio_chip *chip,
- 					    unsigned int offset)
- {
-@@ -468,6 +486,206 @@ static const struct gpio_chip armada_37xx_gpiolib_chip = {
- 	.owner = THIS_MODULE,
- };
+-					wan_amber at 0 {
+-						label = "cobra:amber:wan";
++					internet_amber at 0 {
++						label = "cobra:amber:internet";
+ 						reg = <0x0>;
+ 					};
  
-+void armada_37xx_irq_ack(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 reg = IRQ_STATUS, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	writel(mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+void armada_37xx_irq_mask(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_EN, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	writel(val & ~mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+void armada_37xx_irq_unmask(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_EN, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	writel(val | mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+static int armada_37xx_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_WKUP, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	if (on)
-+		val |= mask;
-+	else
-+		val &= ~mask;
-+	writel(val, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_POL, mask = d->mask;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	armada_37xx_irq_update_reg(&reg, d);
-+	val = readl(info->base + reg);
-+	switch (type) {
-+	case IRQ_TYPE_EDGE_RISING:
-+		val &= ~mask;
-+		break;
-+	case IRQ_TYPE_EDGE_FALLING:
-+		val |= mask;
-+		break;
-+	default:
-+		spin_unlock_irqrestore(&info->irq_lock, flags);
-+		return -EINVAL;
-+	}
-+	writel(val, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+
-+	return 0;
-+}
-+
-+
-+static void armada_37xx_irq_handler(struct irq_desc *desc)
-+{
-+	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(gc);
-+	struct irq_domain *d = gc->irqdomain;
-+	int i;
-+
-+	chained_irq_enter(chip, desc);
-+	for (i = 0; i <= d->revmap_size / GPIO_PER_REG; i++) {
-+		u32 status;
-+		unsigned long flags;
-+
-+		spin_lock_irqsave(&info->irq_lock, flags);
-+		status = readl_relaxed(info->base + IRQ_STATUS + 4 * i);
-+		/* Manage only the interrupt that was enabled */
-+		status &= readl_relaxed(info->base + IRQ_EN + 4 * i);
-+		spin_unlock_irqrestore(&info->irq_lock, flags);
-+		while (status) {
-+			u32 hwirq = ffs(status) - 1;
-+			u32 virq = irq_find_mapping(d, hwirq +
-+						     i * GPIO_PER_REG);
-+
-+			generic_handle_irq(virq);
-+			status &= ~BIT(hwirq);
-+		}
-+	}
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static int armada_37xx_irqchip_register(struct platform_device *pdev,
-+					struct armada_37xx_pinctrl *info)
-+{
-+	struct device_node *np = info->dev->of_node;
-+	int nrirqs = info->data->nr_pins;
-+	struct gpio_chip *gc = &info->gpio_chip;
-+	struct irq_chip *irqchip = &info->irq_chip;
-+	struct resource res;
-+	int ret = -ENODEV, i, nr_irq_parent;
-+
-+	for_each_child_of_node(info->dev->of_node, np) {
-+		if (of_find_property(np, "gpio-controller", NULL)) {
-+			ret = 0;
-+			break;
-+		}
-+	};
-+	if (ret)
-+		return ret;
-+
-+	nr_irq_parent = of_irq_count(np);
-+	spin_lock_init(&info->irq_lock);
-+
-+	if (!nr_irq_parent) {
-+		dev_err(&pdev->dev, "Invalid or no IRQ\n");
-+		return 0;
-+	}
-+
-+	if (of_address_to_resource(info->dev->of_node, 1, &res)) {
-+		dev_err(info->dev, "cannot find IO resource\n");
-+		return -ENOENT;
-+	}
-+
-+	info->base = devm_ioremap_resource(info->dev, &res);
-+	if (IS_ERR(info->base))
-+		return PTR_ERR(info->base);
-+
-+	irqchip->irq_ack = armada_37xx_irq_ack;
-+	irqchip->irq_mask = armada_37xx_irq_mask;
-+	irqchip->irq_unmask = armada_37xx_irq_unmask;
-+	irqchip->irq_set_wake = armada_37xx_irq_set_wake;
-+	irqchip->irq_set_type = armada_37xx_irq_set_type;
-+	irqchip->name = info->data->name;
-+
-+	ret = gpiochip_irqchip_add(gc, irqchip, 0,
-+				   handle_edge_irq, IRQ_TYPE_NONE);
-+	if (ret) {
-+		dev_info(&pdev->dev, "could not add irqchip\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * Many interrupts are connected to the parent interrupt
-+	 * controller. But we do not take advantage of this and use
-+	 * the chained irq with all of them.
-+	 */
-+	for (i = 0; i < nrirqs; i++) {
-+		struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
-+
-+		/*
-+		 * The mask field is a "precomputed bitmask for
-+		 * accessing the chip registers" which was introduced
-+		 * for the generic irqchip framework. As we don't use
-+		 * this framework, we can reuse this field for our own
-+		 * usage.
-+		 */
-+		d->mask = BIT(i % GPIO_PER_REG);
-+	}
-+
-+	for (i = 0; i < nr_irq_parent; i++) {
-+		int irq = irq_of_parse_and_map(np, i);
-+
-+		if (irq < 0)
-+			continue;
-+
-+		gpiochip_set_chained_irqchip(gc, irqchip, irq,
-+					     armada_37xx_irq_handler);
-+	}
-+
-+	return 0;
-+}
-+
- static int armada_37xx_gpiochip_register(struct platform_device *pdev,
- 					struct armada_37xx_pinctrl *info)
- {
-@@ -496,6 +714,9 @@ static int armada_37xx_gpiochip_register(struct platform_device *pdev,
- 	ret = devm_gpiochip_add_data(&pdev->dev, gc, info);
- 	if (ret)
- 		return ret;
-+	ret = armada_37xx_irqchip_register(pdev, info);
-+	if (ret)
-+		return ret;
+-					wan_white at 1 {
+-						label = "cobra:white:wan";
++					internet_white at 1 {
++						label = "cobra:white:internet";
+ 						reg = <0x1>;
+ 					};
  
- 	return 0;
- }
--- 
-git-series 0.9.1
+diff --git a/arch/arm/boot/dts/armada-385-linksys-shelby.dts b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+index c7a8ddd..a7b47f7 100644
+--- a/arch/arm/boot/dts/armada-385-linksys-shelby.dts
++++ b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+@@ -53,13 +53,13 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 
+-					wan_amber at 0 {
+-						label = "shelby:amber:wan";
++					internet_amber at 0 {
++						label = "shelby:amber:internet";
+ 						reg = <0x0>;
+ 					};
+ 
+-					wan_white at 1 {
+-						label = "shelby:white:wan";
++					internet_white at 1 {
++						label = "shelby:white:internet";
+ 						reg = <0x1>;
+ 					};
+ 
+diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+index aa0d225..8460066 100644
+--- a/arch/arm/boot/dts/armada-385-linksys.dtsi
++++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+@@ -145,7 +145,7 @@
+ 
+ 						port at 4 {
+ 							reg = <4>;
+-							label = "wan";
++							label = "internet";
+ 						};
+ 
+ 						port at 5 {
+@@ -360,7 +360,7 @@
+ 
+ 			port at 4 {
+ 				reg = <4>;
+-				label = "wan";
++				label = "internet";
+ 			};
+ 
+ 			port at 5 {
+diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+index 9efcf59..ed2fe8f 100644
+--- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
++++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+@@ -140,13 +140,13 @@
+ 					compatible = "ti,tlc59116";
+ 					reg = <0x68>;
+ 
+-					wan_amber at 0 {
+-						label = "mamba:amber:wan";
++					internet_amber at 0 {
++						label = "mamba:amber:internet";
+ 						reg = <0x0>;
+ 					};
+ 
+-					wan_white at 1 {
+-						label = "mamba:white:wan";
++					internet_white at 1 {
++						label = "mamba:white:internet";
+ 						reg = <0x1>;
+ 					};
+ 
