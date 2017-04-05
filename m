@@ -1,292 +1,114 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  5 Apr 2017 11:28:13 +0200
-Subject: [PATCH v3 3/5] KVM: arm/arm64: Support arch timers with a userspace
- gic
-In-Reply-To: <20170405092815.22503-1-cdall@linaro.org>
-References: <20170405092815.22503-1-cdall@linaro.org>
-Message-ID: <20170405092815.22503-4-cdall@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 05 Apr 2017 11:34:19 +0200
+Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
+ output video on pad 1
+In-Reply-To: <20170405082134.GF7909@n2100.armlinux.org.uk>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
+ <1490894749.2404.33.camel@pengutronix.de>
+ <20170404231053.GE7909@n2100.armlinux.org.uk>
+ <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
+ <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
+ <20170405082134.GF7909@n2100.armlinux.org.uk>
+Message-ID: <1491384859.2381.51.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Graf <agraf@suse.de>
+On Wed, 2017-04-05 at 09:21 +0100, Russell King - ARM Linux wrote:
+[...]
+> > Actually what was I thinking, the TVP5150 is already an example of
+> > such a device.
+> > 
+> > All of this could be solved if there was some direction information
+> > in port nodes.
+> 
+> I disagree.
+>
+> Philipp identified that the TVP5150 has four pads:
+> 
+> * Input pad
+> * Video output pad
+> * VBI output pad
+> * Audio output pad
 
-If you're running with a userspace gic or other interrupt constroller
-(that is no vgic in the kernel), then you have so far not been able to
-use the architected timers, because the output of the architected
-timers, which are driven inside the kernel, was a kernel-only construct
-between the arch timer code and the vgic.
+I didn't think hard enough about this earlier, but there are really only
+two hardware interfaces on TVP5150. The ADC input, which can be
+connected to either of two composite input pins (AIP1A, AIP1B), or use
+both for s-video, and the digital output connected to pins (YOUT[7:0]).
 
-This patch implements the new KVM_CAP_ARM_USER_IRQ feature, where we use a
-side channel on the kvm_run structure, run->s.regs.device_irq_level, to
-always notify userspace of the timer output levels when using a userspace
-irqchip.
+VBI data can be transferred via the output pins during horizontal or
+vertical blanking, if I understand correctly, or read from a FIFO via
+I2C.
 
-This works by ensureing that before we enter the guest, if the timer
-output level has changed compared to what we last told userspace, we
-don't enter the guest, but instead return to userspace to notify it of
-the new level.  If we are exiting, because of an MMIO for example, and
-the level changed at the same time, the value is also updated and
-userspace can sample the line as it needs.  This is nicely achieved
-simply always updating the timer_irq_level field after the main run
-loop.
+There is no apparent support for audio data whatsoever, and the only
+mention of audio in the data manual is a vague reference about an "audio
+interface available on the TVP5150" providing a clock to an audio
+interface between an external audio decoder and the backend processor.
 
-Note that the kvm_timer_update_irq trace event is changed to show the
-host IRQ number for the timer instead of the guest IRQ number, because
-the kernel no longer know which IRQ userspace wires up the timer signal
-to.
+Further, commit 55606310e77f ("[media] tvp5150: create the expected
+number of pads") creates DEMOD_NUM_PADS pads, but doesn't mention or
+initialize the audio pad. It clearly expects the value of DEMOD_NUM_PADS
+to be 3. And indeed the fourth pad was added later in commit
+bddc418787cc ("[media] au0828: use standard demod pads struct").
 
-Also note that this patch implements all required functionality but does
-not yet advertise the capability.
+So to me it looks like the VBI and audio pads should be removed from
+TVP5150.
 
-Signed-off-by: Alexander Graf <agraf@suse.de>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c           |  18 +++----
- include/kvm/arm_arch_timer.h |   2 +
- virt/kvm/arm/arch_timer.c    | 122 +++++++++++++++++++++++++++++++++++--------
- 3 files changed, 110 insertions(+), 32 deletions(-)
+> So, it has one input and three outputs.  How does marking the direction
+> in the port node (which would indicate that there was a data flow out of
+> TVP5150 into the iMX6 capture) help identify which of those pads should
+> be used?
+>
+> It would eliminate the input pad, but you still have three output pads
+> to choose from.
+> 
+> So no, your idea can't work.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 7fa4898..efb16e5 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -515,13 +515,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 			return ret;
- 	}
- 
--	/*
--	 * Enable the arch timers only if we have an in-kernel VGIC
--	 * and it has been properly initialized, since we cannot handle
--	 * interrupts from the virtual timer with a userspace gic.
--	 */
--	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
--		ret = kvm_timer_enable(vcpu);
-+	ret = kvm_timer_enable(vcpu);
- 
- 	return ret;
- }
-@@ -640,9 +634,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		local_irq_disable();
- 
- 		/*
--		 * Re-check atomic conditions
-+		 * If we have a singal pending, or need to notify a userspace
-+		 * irqchip about timer level changes, then we exit (and update
-+		 * the timer level state in kvm_timer_update_run below).
- 		 */
--		if (signal_pending(current)) {
-+		if (signal_pending(current) ||
-+		    kvm_timer_should_notify_user(vcpu)) {
- 			ret = -EINTR;
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
-@@ -714,6 +711,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		ret = handle_exit(vcpu, run, ret);
- 	}
- 
-+	/* Tell userspace about in-kernel device output levels */
-+	kvm_timer_update_run(vcpu);
-+
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
- 	return ret;
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index fe797d6..295584f 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -63,6 +63,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-+bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu);
-+void kvm_timer_update_run(struct kvm_vcpu *vcpu);
- void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
- 
- u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 363f0d2..5dc2167 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -184,6 +184,27 @@ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
- 	return cval <= now;
- }
- 
-+/*
-+ * Reflect the timer output level into the kvm_run structure
-+ */
-+void kvm_timer_update_run(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm)))
-+		return;
-+
-+	/* Populate the device bitmap with the timer states */
-+	regs->device_irq_level &= ~(KVM_ARM_DEV_EL1_VTIMER |
-+				    KVM_ARM_DEV_EL1_PTIMER);
-+	if (vtimer->irq.level)
-+		regs->device_irq_level |= KVM_ARM_DEV_EL1_VTIMER;
-+	if (ptimer->irq.level)
-+		regs->device_irq_level |= KVM_ARM_DEV_EL1_PTIMER;
-+}
-+
- static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 				 struct arch_timer_context *timer_ctx)
- {
-@@ -194,9 +215,12 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
- 				   timer_ctx->irq.level);
- 
--	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, timer_ctx->irq.irq,
--				  timer_ctx->irq.level);
--	WARN_ON(ret);
-+	if (likely(irqchip_in_kernel(vcpu->kvm))) {
-+		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-+					  timer_ctx->irq.irq,
-+					  timer_ctx->irq.level);
-+		WARN_ON(ret);
-+	}
- }
- 
- /*
-@@ -215,7 +239,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	 * because the guest would never see the interrupt.  Instead wait
- 	 * until we call this function from kvm_timer_flush_hwstate.
- 	 */
--	if (!timer->enabled)
-+	if (unlikely(!timer->enabled))
- 		return;
- 
- 	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
-@@ -282,28 +306,12 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
- 	timer_disarm(timer);
- }
- 
--/**
-- * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
-- * @vcpu: The vcpu pointer
-- *
-- * Check if the virtual timer has expired while we were running in the host,
-- * and inject an interrupt if that was the case.
-- */
--void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-+static void kvm_timer_flush_hwstate_vgic(struct kvm_vcpu *vcpu)
- {
--	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	bool phys_active;
- 	int ret;
- 
--	if (unlikely(!timer->enabled))
--		return;
--
--	kvm_timer_update_state(vcpu);
--
--	/* Set the background timer for the physical timer emulation. */
--	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
--
- 	/*
- 	* If we enter the guest with the virtual input level to the VGIC
- 	* asserted, then we have already told the VGIC what we need to, and
-@@ -355,11 +363,72 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	vtimer->active_cleared_last = !phys_active;
- }
- 
-+bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	struct kvm_sync_regs *sregs = &vcpu->run->s.regs;
-+	bool vlevel, plevel;
-+
-+	if (likely(irqchip_in_kernel(vcpu->kvm)))
-+		return false;
-+
-+	vlevel = sregs->device_irq_level & KVM_ARM_DEV_EL1_VTIMER;
-+	plevel = sregs->device_irq_level & KVM_ARM_DEV_EL1_PTIMER;
-+
-+	return vtimer->irq.level != vlevel ||
-+	       ptimer->irq.level != plevel;
-+}
-+
-+static void kvm_timer_flush_hwstate_user(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+
-+	/*
-+	 * To prevent continuously exiting from the guest, we mask the
-+	 * physical interrupt such that the guest can make forward progress.
-+	 * Once we detect the output level being deasserted, we unmask the
-+	 * interrupt again so that we exit from the guest when the timer
-+	 * fires.
-+	*/
-+	if (vtimer->irq.level)
-+		disable_percpu_irq(host_vtimer_irq);
-+	else
-+		enable_percpu_irq(host_vtimer_irq, 0);
-+}
-+
-+/**
-+ * kvm_timer_flush_hwstate - prepare timers before running the vcpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Check if the virtual timer has expired while we were running in the host,
-+ * and inject an interrupt if that was the case, making sure the timer is
-+ * masked or disabled on the host so that we keep executing.  Also schedule a
-+ * software timer for the physical timer if it is enabled.
-+ */
-+void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	if (unlikely(!timer->enabled))
-+		return;
-+
-+	kvm_timer_update_state(vcpu);
-+
-+	/* Set the background timer for the physical timer emulation. */
-+	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
-+
-+	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
-+		kvm_timer_flush_hwstate_user(vcpu);
-+	else
-+		kvm_timer_flush_hwstate_vgic(vcpu);
-+}
-+
- /**
-  * kvm_timer_sync_hwstate - sync timer state from cpu
-  * @vcpu: The vcpu pointer
-  *
-- * Check if the virtual timer has expired while we were running in the guest,
-+ * Check if any of the timers have expired while we were running in the guest,
-  * and inject an interrupt if that was the case.
-  */
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
-@@ -559,6 +628,13 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (timer->enabled)
- 		return 0;
- 
-+	/* Without a VGIC we do not map virtual IRQs to physical IRQs */
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		goto no_vgic;
-+
-+	if (!vgic_initialized(vcpu->kvm))
-+		return -ENODEV;
-+
- 	/*
- 	 * Find the physical IRQ number corresponding to the host_vtimer_irq
- 	 */
-@@ -582,8 +658,8 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
-+no_vgic:
- 	timer->enabled = 1;
--
- 	return 0;
- }
- 
--- 
-2.9.0
+In this case, removal of the VBI and audio pads might make this work,
+but in general this is true. In my opinion, to make this truly generic,
+we need an interface to ask the driver which media entity pad a given
+device tree port corresponds to, as there might not even be a single
+media entity corresponding to all ports for more complex devices.
+
+> As I already stated, I believe that this case is already covered by
+> video-interfaces.txt:
+> 
+>   If more than
+>   one port is present in a device node or there is more than one endpoint at a
+>   port, or port node needs to be associated with a selected hardware interface,
+>         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>   a common scheme using '#address-cells', '#size-cells' and 'reg' properties is
+>   used.
+> 
+> So, according to that, you do not need to have more than one port node
+> to use the reg property - it's _either_ more than one port _or_ to
+> select the hardware interface.
+
+I don't think enforcing a 1:1 correspondence between device tree node
+and media entity and enforcing port reg property == entity pad index is
+a good idea in the long run. Binding errors are going to be made that
+will have to be worked around at the driver level, and more complex
+devices might have to create multiple media entities / v4l2 subdevices
+with external ports that interface with the of graph.
+
+> It all hinges on whether you consider the video output, VBI output or
+> audio output to be separate hardware interfaces that the singular
+> specified "port" node needs to select between.
+> 
+> There's another reason why the TVP5150 binding looks wrong and broken,
+> however.  How does the audio output get routed to other parts of the
+> system if you're using the video output, and how is that relationship
+> defined?  It's a v4l2 subdev pad, so it would need to be part of the
+> v4l2 subdev graph.  It sounds to me like the binding was created with
+> a narrow focused "this is the board in front of me, it only has video
+> wired up, I'm not going to consider other use cases" blinkered view.
+
+I think the output part is accurate, as the audio pad is an artifact of
+an unrelated change. I'm not so sure about the VBI pad, but I think that
+shouldn't exist either. The input pad, on the other hand, not having any
+of graph representation in the device tree seems a bit strange. There
+was a custom binding for the inputs, that got quickly reverted:
+https://patchwork.kernel.org/patch/8395521/
+
+regards
+Philipp
