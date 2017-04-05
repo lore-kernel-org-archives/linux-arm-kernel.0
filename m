@@ -1,53 +1,89 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 11:06:34 +0200
-Subject: [PATCH v4 8/8] ARM: sun8i: sina33: add highest OPP of CPUs
+Date: Wed,  5 Apr 2017 11:06:33 +0200
+Subject: [PATCH v4 7/8] ARM: sun8i: a33: Add devfreq-based GPU cooling
 In-Reply-To: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
 References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405090634.4649-9-quentin.schulz@free-electrons.com>
+Message-ID: <20170405090634.4649-8-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A33 supports 1.1GHz and 1.2GHz frequencies at 1.32V and the Sinlinx
-SinA33 has its cpu-supply property set in the cpu DT node.
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Therefore, CPUfreq knows how to handle the regulator in charge of the
-CPU and can adjust its voltage to match the OPP.
+This adds GPU thermal throttling for the Allwinner A33.
 
-Add these two CPU frequencies to the CPU OPP table of the Sinlinx
-SinA33.
-
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
-added in v3
+v3:
+  - got rid of cooling-min-level and cooling-max-level as it's not used in any
+  code in the kernel,
 
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+added in v2
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi |  1 +
+ arch/arm/boot/dts/sun8i-a33.dtsi     | 24 ++++++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index e34e092..9b620cc 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -87,6 +87,20 @@
- 	cpu-supply = <&reg_dcdc3>;
- };
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 5e8725d..6d81a6d 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -495,6 +495,7 @@
  
-+&cpu0_opp_table {
-+	opp at 1104000000 {
-+		opp-hz = /bits/ 64 <1104000000>;
-+		opp-microvolt = <1320000>;
-+		clock-latency-ns = <244144>; /* 8 32k periods */
-+	};
+ 			assigned-clocks = <&ccu CLK_GPU>;
+ 			assigned-clock-rates = <384000000>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		gic: interrupt-controller at 01c81000 {
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index b88c107..541ca45 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -188,6 +188,16 @@
+ 					trip = <&cpu_alert1>;
+ 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 				};
 +
-+	opp at 1200000000 {
-+		opp-hz = /bits/ 64 <1200000000>;
-+		opp-microvolt = <1320000>;
-+		clock-latency-ns = <244144>; /* 8 32k periods */
-+	};
-+};
++				map2 {
++					trip = <&gpu_alert0>;
++					cooling-device = <&mali 1 THERMAL_NO_LIMIT>;
++				};
 +
- &de {
- 	status = "okay";
- };
++				map3 {
++					trip = <&gpu_alert1>;
++					cooling-device = <&mali 2 THERMAL_NO_LIMIT>;
++				};
+ 			};
+ 
+ 			trips {
+@@ -198,6 +208,13 @@
+ 					type = "passive";
+ 				};
+ 
++				gpu_alert0: gpu_alert0 {
++					/* milliCelsius */
++					temperature = <85000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
+ 				cpu_alert1: cpu_alert1 {
+ 					/* milliCelsius */
+ 					temperature = <90000>;
+@@ -205,6 +222,13 @@
+ 					type = "hot";
+ 				};
+ 
++				gpu_alert1: gpu_alert1 {
++					/* milliCelsius */
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "hot";
++				};
++
+ 				cpu_crit: cpu_crit {
+ 					/* milliCelsius */
+ 					temperature = <110000>;
 -- 
 2.9.3
