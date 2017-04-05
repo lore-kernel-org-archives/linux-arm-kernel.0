@@ -1,95 +1,74 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed,  5 Apr 2017 11:06:27 +0200
-Subject: [PATCH v4 1/8] dt-bindings: mfd: add A33 GPADC binding
-In-Reply-To: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
-References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170405090634.4649-2-quentin.schulz@free-electrons.com>
+Date: Wed,  5 Apr 2017 11:06:26 +0200
+Subject: [PATCH v4 0/8] add thermal throttling to Allwinner A33 SoC
+Message-ID: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the A33 GPADC binding.
+The Allwinner SoCs all have an ADC that can also act as a touchscreen
+controller and a thermal sensor. The first four channels can be used
+either for the ADC or the touchscreen and the fifth channel is used for
+the thermal sensor. We currently have a driver for the two latter
+functions in drivers/input/touchscreen/sun4i-ts.c but we don't have
+access to the ADC feature at all. It is meant to replace the current
+driver by using MFD and subdrivers for existing bindings.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+The Allwinner A33 only has a thermal sensor present in the GPADC. In
+addition, there is not an existing DT binding for the GPADC. Thus, we do
+not need the sun4i-gpadc MFD driver which was made to keep DT compatibility
+and probe subdrivers without the need to add DT subnodes.
+
+This series of patch adds the thermal sensor for the A33 and GPU/CPU
+thermal throttling. It also adds the cpu-supply property to the CPU node
+needed by the Sinlinx SinA33 and Olinuxino A33 to adapt their CPU regulator
+voltage depending on the currently used OPP. The other A33 boards all have
+their cpu-supply property set.
+
+This series also fixes the missing operating-points-v2 property in cpu DT
+nodes. Finally, it also adds all remaining OPPs which can be found in
+Allwinner 3.4 linux and fex files of all A33 boards.
+
+This series of patch is based on this[1] series of patch.
+
 v4:
-  - correct patch title,
+  - fixing patch name for DT bindings,
 
 v3:
-  - fixed missing allwinner in front of compatible,
-  - updated compatible to allwinner,sun8i-a33-ths to better reflect the
-  datasheet's name,
-  - updated example's DT node name and label to ths,
+  - fixed compatible name in DT and in documentation,
+  - fixed DT node name and label,
+  - added explanations in commit logs,
+  - moved frequencies that need overvolting to board DTS instead of A33 DTSI,
+  - fixed a typo in if is_enabled condition,
+  - removed all patches concerning Olimex Olinuxino (no HW to test on),
 
-added in v2
- .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+[1] https://lkml.org/lkml/2016/12/13/298 : "[PATCH v9] add support for Allwinner
+SoCs ADC"
 
-diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-new file mode 100644
-index 0000000..badff36
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-@@ -0,0 +1,59 @@
-+Allwinner SoCs' GPADC Device Tree bindings
-+------------------------------------------
-+The Allwinner SoCs all have an ADC that can also act as a thermal sensor
-+and sometimes as a touchscreen controller.
-+
-+Required properties:
-+  - compatible: "allwinner,sun8i-a33-ths",
-+  - reg: mmio address range of the chip,
-+  - #thermal-sensor-cells: shall be 0,
-+  - #io-channel-cells: shall be 0,
-+
-+Example:
-+	ths: ths at 01c25000 {
-+		compatible = "allwinner,sun8i-a33-ths";
-+		reg = <0x01c25000 0x100>;
-+		#thermal-sensor-cells = <0>;
-+		#io-channel-cells = <0>;
-+	};
-+
-+sun4i, sun5i and sun6i SoCs are also supported via the older binding:
-+
-+sun4i resistive touchscreen controller
-+--------------------------------------
-+
-+Required properties:
-+ - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
-+   "allwinner,sun6i-a31-ts"
-+ - reg: mmio address range of the chip
-+ - interrupts: interrupt to which the chip is connected
-+ - #thermal-sensor-cells: shall be 0
-+
-+Optional properties:
-+ - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
-+				   is attached to the controller
-+ - allwinner,tp-sensitive-adjust : integer (4 bits)
-+				   adjust sensitivity of pen down detection
-+				   between 0 (least sensitive) and 15
-+				   (defaults to 15)
-+ - allwinner,filter-type	 : integer (2 bits)
-+				   select median and averaging filter
-+				   samples used for median / averaging filter
-+				   0: 4/2
-+				   1: 5/3
-+				   2: 8/4
-+				   3: 16/8
-+				   (defaults to 1)
-+
-+Example:
-+
-+	rtp: rtp at 01c25000 {
-+		compatible = "allwinner,sun4i-a10-ts";
-+		reg = <0x01c25000 0x100>;
-+		interrupts = <29>;
-+		allwinner,ts-attached;
-+		#thermal-sensor-cells = <0>;
-+		/* sensitive/noisy touch panel */
-+		allwinner,tp-sensitive-adjust = <0>;
-+		allwinner,filter-type = <3>;
-+	};
+Thanks,
+Quentin
+
+Maxime Ripard (1):
+  ARM: sun8i: a33: Add devfreq-based GPU cooling
+
+Quentin Schulz (7):
+  dt-bindings: mfd: add A33 GPADC binding
+  dt-bindings: input: touschcreen: remove sun4i documentation
+  iio: adc: sun4i-gpadc-iio: move code used in MFD probing to new
+    function
+  iio: adc: sun4i-gpadc-iio: add support for A33 thermal sensor
+  ARM: sun8i: a33: add thermal sensor
+  ARM: sun8i: a33: add CPU thermal throttling
+  ARM: sun8i: sina33: add highest OPP of CPUs
+
+ .../touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt}  |  21 +++
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |   1 +
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  14 ++
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |  81 ++++++++++
+ drivers/iio/adc/Kconfig                            |   2 +-
+ drivers/iio/adc/sun4i-gpadc-iio.c                  | 170 +++++++++++++++++----
+ include/linux/mfd/sun4i-gpadc.h                    |   4 +
+ 7 files changed, 260 insertions(+), 33 deletions(-)
+ rename Documentation/devicetree/bindings/{input/touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt} (64%)
+
 -- 
 2.9.3
