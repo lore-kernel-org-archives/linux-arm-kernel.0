@@ -1,43 +1,116 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Wed, 05 Apr 2017 13:33:12 +0300
-Subject: [PATCH 16/16] drivers, net,
- intersil: convert request_context.refcount from atomic_t to refcount_t
-In-Reply-To: <2236FBA76BA1254E88B949DDB74E612B41C8741B@IRSMSX102.ger.corp.intel.com>
- (Elena Reshetova's message of "Tue, 4 Apr 2017 10:07:55 +0000")
-References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
- <1490691403-4016-17-git-send-email-elena.reshetova@intel.com>
- <87zifxn2gb.fsf@kamboji.qca.qualcomm.com>
- <2236FBA76BA1254E88B949DDB74E612B41C8741B@IRSMSX102.ger.corp.intel.com>
-Message-ID: <87k26zi1p3.fsf@kamboji.qca.qualcomm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  5 Apr 2017 11:37:52 +0100
+Subject: [PATCH 2/2] [media] cec: Handle RC capability more elegantly
+In-Reply-To: <20170405103752.2057-1-lee.jones@linaro.org>
+References: <20170405103752.2057-1-lee.jones@linaro.org>
+Message-ID: <20170405103752.2057-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Reshetova, Elena" <elena.reshetova@intel.com> writes:
+If a user specifies the use of RC as a capability, they should
+really be enabling RC Core code.  If they do not we WARN() them
+of this and disable the capability for them.
 
->> Elena Reshetova <elena.reshetova@intel.com> writes:
->> 
->> > refcount_t type and corresponding API should be
->> > used instead of atomic_t when the variable is used as
->> > a reference counter. This allows to avoid accidental
->> > refcounter overflows that might lead to use-after-free
->> > situations.
->> >
->> > Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
->> > Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
->> > Signed-off-by: Kees Cook <keescook@chromium.org>
->> > Signed-off-by: David Windsor <dwindsor@gmail.com>
->> > ---
->> >  drivers/net/wireless/intersil/orinoco/orinoco_usb.c | 15 ++++++++-------
->> >  1 file changed, 8 insertions(+), 7 deletions(-)
->> 
->> The prefix should be "orinoco_usb:", I'll fix that.
->
-> Thanks for both! Will you take the patches in?
+Once we know RC Core code has not been enabled, we can update
+the user's capabilities and use them as a term of reference for
+other RC-only calls.  This is preferable to having ugly #ifery
+scattered throughout C code.
 
-You mean patches 15 and 16? I didn't even look rest of the patches.
+Most of the functions are actually safe to call, since they
+sensibly check for a NULL RC pointer before they attempt to
+deference it.
 
-But not sure yet because Dave doesn't seem to like the interface and I
-want to follow the discussion first.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/media/cec/cec-core.c | 21 +++++++++------------
+ 1 file changed, 9 insertions(+), 12 deletions(-)
 
+diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
+index cfe414a..c859dcf 100644
+--- a/drivers/media/cec/cec-core.c
++++ b/drivers/media/cec/cec-core.c
+@@ -208,9 +208,15 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+ 		return ERR_PTR(-EINVAL);
+ 	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
+ 		return ERR_PTR(-EINVAL);
++
++	/* If RC Core is not available, remove driver-level capability */
++	if (!IS_REACHABLE(CONFIG_RC_CORE))
++		caps &= ~CEC_CAP_RC;
++
+ 	adap = kzalloc(sizeof(*adap), GFP_KERNEL);
+ 	if (!adap)
+ 		return ERR_PTR(-ENOMEM);
++
+ 	strlcpy(adap->name, name, sizeof(adap->name));
+ 	adap->phys_addr = CEC_PHYS_ADDR_INVALID;
+ 	adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
+@@ -237,7 +243,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+ 	if (!(caps & CEC_CAP_RC))
+ 		return adap;
+ 
+-#if IS_REACHABLE(CONFIG_RC_CORE)
+ 	/* Prepare the RC input device */
+ 	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
+ 	if (!adap->rc) {
+@@ -264,9 +269,7 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
+ 	adap->rc->priv = adap;
+ 	adap->rc->map_name = RC_MAP_CEC;
+ 	adap->rc->timeout = MS_TO_NS(100);
+-#else
+-	adap->capabilities &= ~CEC_CAP_RC;
+-#endif
++
+ 	return adap;
+ }
+ EXPORT_SYMBOL_GPL(cec_allocate_adapter);
+@@ -285,7 +288,6 @@ int cec_register_adapter(struct cec_adapter *adap,
+ 	adap->owner = parent->driver->owner;
+ 	adap->devnode.dev.parent = parent;
+ 
+-#if IS_REACHABLE(CONFIG_RC_CORE)
+ 	if (adap->capabilities & CEC_CAP_RC) {
+ 		adap->rc->dev.parent = parent;
+ 		res = rc_register_device(adap->rc);
+@@ -298,15 +300,13 @@ int cec_register_adapter(struct cec_adapter *adap,
+ 			return res;
+ 		}
+ 	}
+-#endif
+ 
+ 	res = cec_devnode_register(&adap->devnode, adap->owner);
+ 	if (res) {
+-#if IS_REACHABLE(CONFIG_RC_CORE)
+ 		/* Note: rc_unregister also calls rc_free */
+ 		rc_unregister_device(adap->rc);
+ 		adap->rc = NULL;
+-#endif
++
+ 		return res;
+ 	}
+ 
+@@ -337,11 +337,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
+ 	if (IS_ERR_OR_NULL(adap))
+ 		return;
+ 
+-#if IS_REACHABLE(CONFIG_RC_CORE)
+ 	/* Note: rc_unregister also calls rc_free */
+ 	rc_unregister_device(adap->rc);
+ 	adap->rc = NULL;
+-#endif
++
+ 	debugfs_remove_recursive(adap->cec_dir);
+ 	cec_devnode_unregister(&adap->devnode);
+ }
+@@ -357,9 +356,7 @@ void cec_delete_adapter(struct cec_adapter *adap)
+ 	kthread_stop(adap->kthread);
+ 	if (adap->kthread_config)
+ 		kthread_stop(adap->kthread_config);
+-#if IS_REACHABLE(CONFIG_RC_CORE)
+ 	rc_free_device(adap->rc);
+-#endif
+ 	kfree(adap);
+ }
+ EXPORT_SYMBOL_GPL(cec_delete_adapter);
 -- 
-Kalle Valo
+2.9.3
