@@ -1,115 +1,23 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:51 -0500
-Subject: [PATCH v5 07/23] drivers/fsi: Implement slave initialisation
-In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-8-cbostic@linux.vnet.ibm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 5 Apr 2017 11:51:45 +0800
+Subject: [linux-sunxi] [PATCH 02/11] arm64: allwinner: a64: add NMI
+ controller on A64
+In-Reply-To: <20170404180145.12897-3-icenowy@aosc.io>
+References: <20170404180145.12897-1-icenowy@aosc.io>
+ <20170404180145.12897-3-icenowy@aosc.io>
+Message-ID: <CAGb2v67BucT8=FTgem3AmSU9XJA7OHoTCq3t3wBzDWyuwzZqaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner A64 SoC features a NMI controller, which is usually connected
+> to the AXP PMIC.
+>
+> Add support for it.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
-devices and register with the driver core.
+This might not be the best representation of the R_INTC block. Though
+we'd need to change it for all SoCs if we want to be accurate. For now,
 
-Includes changes from Chris Bostic <cbostic@linux.vnet.ibm.com>.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- drivers/fsi/fsi-core.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 64 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 6e1cfdf..c705ca2 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -17,9 +17,12 @@
- #include <linux/fsi.h>
- #include <linux/idr.h>
- #include <linux/module.h>
-+#include <linux/slab.h>
- 
- #include "fsi-master.h"
- 
-+#define FSI_SLAVE_SIZE_23b		0x800000
-+
- static DEFINE_IDA(master_ida);
- 
- struct fsi_slave {
-@@ -114,11 +117,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
- 
-+static void fsi_slave_release(struct device *dev)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(dev);
-+
-+	kfree(slave);
-+}
-+
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
--	/* todo: initialise slave device, perform engine scan */
-+	struct fsi_slave *slave;
-+	uint32_t chip_id;
-+	uint8_t crc;
-+	int rc;
-+
-+	/* Currently, we only support single slaves on a link, and use the
-+	 * full 23-bit address range
-+	 */
-+	if (id != 0)
-+		return -EINVAL;
-+
-+	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
-+	if (rc) {
-+		dev_warn(&master->dev, "can't read slave %02x:%02x %d\n",
-+				link, id, rc);
-+		return -ENODEV;
-+	}
-+	chip_id = be32_to_cpu(chip_id);
-+
-+	crc = fsi_crc4(0, chip_id, 32);
-+	if (crc) {
-+		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
-+				link, id);
-+		return -EIO;
-+	}
-+
-+	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
-+			chip_id, master->idx, link, id);
-+
-+	/* We can communicate with a slave; create the slave device and
-+	 * register.
-+	 */
-+	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
-+	if (!slave)
-+		return -ENOMEM;
-+
-+	slave->master = master;
-+	slave->dev.parent = &master->dev;
-+	slave->dev.release = fsi_slave_release;
-+	slave->link = link;
-+	slave->id = id;
-+	slave->size = FSI_SLAVE_SIZE_23b;
-+
-+	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
-+	rc = device_register(&slave->dev);
-+	if (rc < 0) {
-+		dev_warn(&master->dev, "failed to create slave device: %d\n",
-+				rc);
-+		put_device(&slave->dev);
-+		return rc;
-+	}
-+
-+	/* todo: perform engine scan */
- 
--	return -ENODEV;
-+	return rc;
- }
- 
- /* FSI master support */
--- 
-1.8.2.2
+Acked-by: Chen-Yu Tsai <wens@csie.org>
