@@ -1,77 +1,72 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 5 Apr 2017 14:39:37 +0530
-Subject: [PATCH v6 1/4] dt-bindings: phy: Add support for QUSB2 phy
-In-Reply-To: <20170404182839.GE18246@codeaurora.org>
-References: <1490018046-8549-1-git-send-email-vivek.gautam@codeaurora.org>
- <1490018046-8549-2-git-send-email-vivek.gautam@codeaurora.org>
- <20170404182839.GE18246@codeaurora.org>
-Message-ID: <1b88275d-4965-4fc3-3bc1-24f086b52bb7@codeaurora.org>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed,  5 Apr 2017 11:06:28 +0200
+Subject: [PATCH v4 2/8] dt-bindings: input: touschcreen: remove sun4i
+ documentation
+In-Reply-To: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
+References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170405090634.4649-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch removes the sun4i touchscreen controller binding
+documentation since it has been merged with the sun4i GPADC binding
+documentation.
 
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
 
-On 04/04/2017 11:58 PM, Stephen Boyd wrote:
-> On 03/20, Vivek Gautam wrote:
->> diff --git a/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt b/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
->> new file mode 100644
->> index 000000000000..a6d19acde9e0
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
->> @@ -0,0 +1,45 @@
->> +Qualcomm QUSB2 phy controller
->> +=============================
->> +
->> +QUSB2 controller supports LS/FS/HS usb connectivity on Qualcomm chipsets.
->> +
->> +Required properties:
->> + - compatible: compatible list, contains "qcom,msm8996-qusb2-phy".
->> + - reg: offset and length of the PHY register set.
->> + - #phy-cells: must be 0.
->> +
->> + - clocks: a list of phandles and clock-specifier pairs,
->> +	   one for each entry in clock-names.
->> + - clock-names: must be "cfg_ahb" for phy config clock,
->> +			"ref" for 19.2 MHz ref clk,
->> +			"iface" for phy interface clock (Optional).
->> +
->> + - vdd-phy-supply: Phandle to a regulator supply to PHY core block.
->> + - vdda-pll-supply: Phandle to 1.8V regulator supply to PHY refclk pll block.
->> + - vdda-phy-dpdm-supply: Phandle to 3.1V regulator supply to Dp/Dm port signals.
->> +
->> + - resets: Phandle to reset to phy block.
->> +
->> +Optional properties:
->> + - nvmem-cells: Phandle to nvmem cell that contains 'HS Tx trim'
->> +		tuning parameter value for qusb2 phy.
->> +
->> + - qcom,tcsr-syscon: Phandle to TCSR syscon register region.
->> +
->> +Example:
->> +	hsusb_phy: phy at 7411000 {
->> +		compatible = "qcom,msm8996-qusb2-phy";
->> +		reg = <0x7411000 0x180>;
->> +		#phy-cells = <0>;
->> +
->> +		clocks = <&gcc GCC_USB_PHY_CFG_AHB2PHY_CLK>,
->> +			<&gcc GCC_RX1_USB2_CLKREF_CLK>,
->> +		clock-names = "cfg_ahb", "ref";
->> +
->> +		vdd-phy-supply = <&pm8994_s2>;
-> pm8994_s2 is a "corner" regulator. I'm not sure how we're going
-> to have it listed here as something like a regulator supply in
-> the binding. We probably should leave it out for now and let the
-> power domain + pm_qos stuff for corners work out. From what I see
-> in the downstream driver the code is setting the corner to '4'
-> when active, and '1' when inactive.
+v4:
+  - correct patch title,
 
-Sure, let's allow power domain and corner voltage work handle
-this. I will drop this regulator entry from bindings, and the driver.
+ .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
+ 1 file changed, 38 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
 
-
-Best regards
-Vivek
-
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+deleted file mode 100644
+index 89abecd..0000000
+--- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-sun4i resistive touchscreen controller
+---------------------------------------
+-
+-Required properties:
+- - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
+-   "allwinner,sun6i-a31-ts"
+- - reg: mmio address range of the chip
+- - interrupts: interrupt to which the chip is connected
+- - #thermal-sensor-cells: shall be 0
+-
+-Optional properties:
+- - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
+-				   is attached to the controller
+- - allwinner,tp-sensitive-adjust : integer (4 bits)
+-				   adjust sensitivity of pen down detection
+-				   between 0 (least sensitive) and 15
+-				   (defaults to 15)
+- - allwinner,filter-type	 : integer (2 bits)
+-				   select median and averaging filter
+-				   samples used for median / averaging filter
+-				   0: 4/2
+-				   1: 5/3
+-				   2: 8/4
+-				   3: 16/8
+-				   (defaults to 1)
+-
+-Example:
+-
+-	rtp: rtp at 01c25000 {
+-		compatible = "allwinner,sun4i-a10-ts";
+-		reg = <0x01c25000 0x100>;
+-		interrupts = <29>;
+-		allwinner,ts-attached;
+-		#thermal-sensor-cells = <0>;
+-		/* sensitive/noisy touch panel */
+-		allwinner,tp-sensitive-adjust = <0>;
+-		allwinner,filter-type = <3>;
+-	};
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.9.3
