@@ -1,56 +1,316 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Wed, 5 Apr 2017 19:10:43 +0200
-Subject: [PATCH] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
-In-Reply-To: <f53545e0-d009-2ef5-ab21-e9f9b3518045@ti.com>
-References: <20170329160932.27157-1-abailon@baylibre.com>
- <f53545e0-d009-2ef5-ab21-e9f9b3518045@ti.com>
-Message-ID: <e2bbe80a-834e-717d-c62b-1f33efff0488@baylibre.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Thu, 06 Apr 2017 01:14:40 +0800
+Subject: [linux-sunxi] Re: [PATCH v3 04/11] drm/sun4i: abstract the layer
+ type
+In-Reply-To: <CAGb2v66vxP0c3qMTAUCseTCbpJ6gxnKfNGNcC41jPHA_Ye4ggw@mail.gmail.com>
+References: <20170329194613.55548-1-icenowy@aosc.io>
+ <20170329194613.55548-5-icenowy@aosc.io>
+ <20170404192837.pvlhwyeut45vg2wg@art_vandelay>
+ <dbf0f478-ff53-0ced-24a3-e9de7077efd9@aosc.io>
+ <CAGb2v66vxP0c3qMTAUCseTCbpJ6gxnKfNGNcC41jPHA_Ye4ggw@mail.gmail.com>
+Message-ID: <f30a838c1c044278cf2062edaf93f6b2@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+? 2017-04-05 10:27?Chen-Yu Tsai ???
+> On Wed, Apr 5, 2017 at 3:53 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> 
+>> 
+>> ? 2017?04?05? 03:28, Sean Paul ??:
+>>> 
+>>> On Thu, Mar 30, 2017 at 03:46:06AM +0800, Icenowy Zheng wrote:
+>>>> 
+>>>> As we are going to add support for the Allwinner DE2 Mixer in 
+>>>> sun4i-drm
+>>>> driver, we will finally have two types of layer.
+>>>> 
+>>>> Abstract the layer type to void * and a ops struct, which contains 
+>>>> the
+>>>> only function used by crtc -- get the drm_plane struct of the layer.
+>>>> 
+>>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>>> ---
+>>>> Refactored patch in v3.
+>>>> 
+>>>>  drivers/gpu/drm/sun4i/sun4i_crtc.c  | 19 +++++++++++--------
+>>>>  drivers/gpu/drm/sun4i/sun4i_crtc.h  |  3 ++-
+>>>>  drivers/gpu/drm/sun4i/sun4i_layer.c | 19 ++++++++++++++++++-
+>>>>  drivers/gpu/drm/sun4i/sun4i_layer.h |  2 +-
+>>>>  drivers/gpu/drm/sun4i/sunxi_layer.h | 17 +++++++++++++++++
+>>>>  5 files changed, 49 insertions(+), 11 deletions(-)
+>>>>  create mode 100644 drivers/gpu/drm/sun4i/sunxi_layer.h
+>>>> 
+>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c
+>>>> b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+>>>> index 3c876c3a356a..33854ee7f636 100644
+>>>> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
+>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+>>>> @@ -29,6 +29,7 @@
+>>>>  #include "sun4i_crtc.h"
+>>>>  #include "sun4i_drv.h"
+>>>>  #include "sun4i_layer.h"
+>>>> +#include "sunxi_layer.h"
+>>>>  #include "sun4i_tcon.h"
+>>>> 
+>>>>  static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
+>>>> @@ -149,7 +150,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct 
+>>>> drm_device
+>>>> *drm,
+>>>>         scrtc->tcon = tcon;
+>>>> 
+>>>>         /* Create our layers */
+>>>> -       scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+>>>> +       scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
+>>>>         if (IS_ERR(scrtc->layers)) {
+>>>>                 dev_err(drm->dev, "Couldn't create the planes\n");
+>>>>                 return NULL;
+>>>> @@ -157,14 +158,15 @@ struct sun4i_crtc *sun4i_crtc_init(struct
+>>>> drm_device *drm,
+>>>> 
+>>>>         /* find primary and cursor planes for 
+>>>> drm_crtc_init_with_planes
+>>>> */
+>>>>         for (i = 0; scrtc->layers[i]; i++) {
+>>>> -               struct sun4i_layer *layer = scrtc->layers[i];
+>>>> +               void *layer = scrtc->layers[i];
+>>>> +               struct drm_plane *plane =
+>>>> scrtc->layer_ops->get_plane(layer);
+>>>> 
+>>>> -               switch (layer->plane.type) {
+>>>> +               switch (plane->type) {
+>>>>                 case DRM_PLANE_TYPE_PRIMARY:
+>>>> -                       primary = &layer->plane;
+>>>> +                       primary = plane;
+>>>>                         break;
+>>>>                 case DRM_PLANE_TYPE_CURSOR:
+>>>> -                       cursor = &layer->plane;
+>>>> +                       cursor = plane;
+>>>>                         break;
+>>>>                 default:
+>>>>                         break;
+>>>> @@ -190,10 +192,11 @@ struct sun4i_crtc *sun4i_crtc_init(struct
+>>>> drm_device *drm,
+>>>>         /* Set possible_crtcs to this crtc for overlay planes */
+>>>>         for (i = 0; scrtc->layers[i]; i++) {
+>>>>                 uint32_t possible_crtcs =
+>>>> BIT(drm_crtc_index(&scrtc->crtc));
+>>>> -               struct sun4i_layer *layer = scrtc->layers[i];
+>>>> +               void *layer = scrtc->layers[i];
+>>>> +               struct drm_plane *plane =
+>>>> scrtc->layer_ops->get_plane(layer);
+>>>> 
+>>>> -               if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
+>>>> -                       layer->plane.possible_crtcs = 
+>>>> possible_crtcs;
+>>>> +               if (plane->type == DRM_PLANE_TYPE_OVERLAY)
+>>>> +                       plane->possible_crtcs = possible_crtcs;
+>>>>         }
+>>>> 
+>>>>         return scrtc;
+>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h
+>>>> b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+>>>> index 230cb8f0d601..a4036ee44cf8 100644
+>>>> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
+>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+>>>> @@ -19,7 +19,8 @@ struct sun4i_crtc {
+>>>> 
+>>>>         struct sun4i_backend            *backend;
+>>>>         struct sun4i_tcon               *tcon;
+>>>> -       struct sun4i_layer              **layers;
+>>>> +       void                            **layers;
+>>>> +       const struct sunxi_layer_ops    *layer_ops;
+>>> 
+>>> 
+>>> I think you should probably take a different approach to abstract the
+>>> layer
+>>> type. How about creating
+>>> 
+>>> struct sunxi_layer {
+>>>         struct drm_plane plane;
+>>> }
+>>> 
+>>> base and then subclassing that for sun4i and sun8i? By doing this you 
+>>> can
+>>> avoid
+>>> the nasty casting and you can also get rid of the get_plane() hook 
+>>> and
+>>> layer_ops.
+>> 
+>> 
+>> For the situation that using ** things are easily to get weird.
+> 
+> That code could be reworked, by initializing the layers directly within
+> the crtc init code. If you look at rockchip's drm driver, you'll see
+> they do this. There is a good reason to do it this way, as you need
+> to first create the primary and cursor layers, pass them in when you
+> create the crtc, then initialize any additional layers with the
+> possible_crtcs bitmap.
 
+I feel that it's still more proper to offload plane creation code
+to *_layers_init function, as:
 
-On 04/04/2017 08:16 AM, Sekhar Nori wrote:
-> On Wednesday 29 March 2017 09:39 PM, Alexandre Bailon wrote:
->> The CPPI 4.1 DMA is sharing its clock with the USB OTG,
->> and most of the time, the clock will be enabled by USB.
->> But during the init of the DMA, USB is not enabled (waiting for DMA),
->> and then we must enable the clock before to do anything.
->> Add the clock for the CPPI 4.1 DMA engine.
->>
->> Note:
->> This patch is to apply instead of:
->> "ARM: davinci: Make the usb20 clock available to PM runtime"
-> Okay, but I still liked the fact that that patch was using NULL as
-> con_id for MUSB clock. That makes sense because MUSB gets a single clock
-> input. I think you should still make that change. If not for v4.12, then
-> for v4.13.
->
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->> ---
->>   arch/arm/mach-davinci/da830.c    | 1 +
->>   arch/arm/mach-davinci/da850.c    | 1 +
->>   arch/arm/mach-davinci/da8xx-dt.c | 2 ++
->>   3 files changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
->> index 073c458..ae4a8a5 100644
->> --- a/arch/arm/mach-davinci/da830.c
->> +++ b/arch/arm/mach-davinci/da830.c
->> @@ -413,6 +413,7 @@ static struct clk_lookup da830_clks[] = {
->>   	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
->>   	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
->>   	CLK("musb-da8xx",	"usb20",	&usb20_clk),
->> +	CLK("cppi41-dmaengine",	NULL,		&usb20_clk),
-> Did you try reading /sys/kernel/debug/davinci_clocks after this patch?
-> It will hang because of the loop created here.
-I have tried and I did not get any issues.
->
-> Looks like what you want is cppi4.1 dma clock to be a child of MUSB
-> clock. That way, even if DMA is enabled before MUSB, it still works.
-OK. I will update the patch to make cppi4.1 clock a child of usb clock.
->
-> Thanks,
-> Sekhar
-Thanks,
-Alexandre
+1. We cannot assume the cursor layer's
+existance. In fact currently no code in sun4i-drm (including this
+patchset) create a cursor layer.
+
+2. The format of planes heavily depend on the engine type (
+sun4i-backend or sun8i-mixer).
+
+3. We should create planes according to the type of engine.
+Currently the *_layers_init function is part of engine code (See my
+Makefile change).
+
+4. If we do so we will have two codes for plane creating -- one for
+primary in sun4i_crtc_init, another for overlays in *_layers_init.
+
+> 
+> In our driver we are currently initializing all layers, then going
+> back and filling in possible_crtcs for the extra layers.
+> 
+> And as Maxime and I mentioned in the other thread, we don't really
+> need to keep a reference to **layers.
+
+It's correct, layers doesn't need to be kept.
+
+And the struct sunxi_layer refactor also makes sense.
+
+> 
+> Regards
+> ChenYu
+> 
+>> 
+>>> 
+>>> Sean
+>>> 
+>>> 
+>>> 
+>>>>  };
+>>>> 
+>>>>  static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct 
+>>>> drm_crtc
+>>>> *crtc)
+>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c
+>>>> b/drivers/gpu/drm/sun4i/sun4i_layer.c
+>>>> index f26bde5b9117..bc4a70d6968b 100644
+>>>> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+>>>> @@ -16,7 +16,9 @@
+>>>>  #include <drm/drmP.h>
+>>>> 
+>>>>  #include "sun4i_backend.h"
+>>>> +#include "sun4i_crtc.h"
+>>>>  #include "sun4i_layer.h"
+>>>> +#include "sunxi_layer.h"
+>>>> 
+>>>>  struct sun4i_plane_desc {
+>>>>                enum drm_plane_type     type;
+>>>> @@ -100,6 +102,17 @@ static const struct sun4i_plane_desc
+>>>> sun4i_backend_planes[] = {
+>>>>         },
+>>>>  };
+>>>> 
+>>>> +static struct drm_plane *sun4i_layer_get_plane(void *layer)
+>>>> +{
+>>>> +       struct sun4i_layer *sun4i_layer = layer;
+>>>> +
+>>>> +       return &sun4i_layer->plane;
+>>>> +}
+>>>> +
+>>>> +static const struct sunxi_layer_ops layer_ops = {
+>>>> +       .get_plane = sun4i_layer_get_plane,
+>>>> +};
+>>>> +
+>>>>  static struct sun4i_layer *sun4i_layer_init_one(struct drm_device 
+>>>> *drm,
+>>>>                                                 struct sun4i_backend
+>>>> *backend,
+>>>>                                                 const struct
+>>>> sun4i_plane_desc *plane)
+>>>> @@ -129,9 +142,10 @@ static struct sun4i_layer
+>>>> *sun4i_layer_init_one(struct drm_device *drm,
+>>>>  }
+>>>> 
+>>>>  struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+>>>> -                                      struct sun4i_backend 
+>>>> *backend)
+>>>> +                                      struct sun4i_crtc *crtc)
+>>>>  {
+>>>>         struct sun4i_layer **layers;
+>>>> +       struct sun4i_backend *backend = crtc->backend;
+>>>>         int i;
+>>>> 
+>>>>         layers = devm_kcalloc(drm->dev, 
+>>>> ARRAY_SIZE(sun4i_backend_planes)
+>>>> + 1,
+>>>> @@ -181,5 +195,8 @@ struct sun4i_layer **sun4i_layers_init(struct
+>>>> drm_device *drm,
+>>>>                 layers[i] = layer;
+>>>>         };
+>>>> 
+>>>> +       /* Assign layer ops to the CRTC */
+>>>> +       crtc->layer_ops = &layer_ops;
+>>>> +
+>>>>         return layers;
+>>>>  }
+>>>> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>>> b/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>>> index 4be1f0919df2..425eea7b9e3b 100644
+>>>> --- a/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>>> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+>>>> @@ -27,6 +27,6 @@ plane_to_sun4i_layer(struct drm_plane *plane)
+>>>>  }
+>>>> 
+>>>>  struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
+>>>> -                                      struct sun4i_backend 
+>>>> *backend);
+>>>> +                                      struct sun4i_crtc *crtc);
+>>>> 
+>>>>  #endif /* _SUN4I_LAYER_H_ */
+>>>> diff --git a/drivers/gpu/drm/sun4i/sunxi_layer.h
+>>>> b/drivers/gpu/drm/sun4i/sunxi_layer.h
+>>>> new file mode 100644
+>>>> index 000000000000..d8838ec39299
+>>>> --- /dev/null
+>>>> +++ b/drivers/gpu/drm/sun4i/sunxi_layer.h
+>>>> @@ -0,0 +1,17 @@
+>>>> +/*
+>>>> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or
+>>>> + * modify it under the terms of the GNU General Public License as
+>>>> + * published by the Free Software Foundation; either version 2 of
+>>>> + * the License, or (at your option) any later version.
+>>>> + */
+>>>> +
+>>>> +#ifndef _SUNXI_LAYER_H_
+>>>> +#define _SUNXI_LAYER_H_
+>>>> +
+>>>> +struct sunxi_layer_ops {
+>>>> +       struct drm_plane *(*get_plane)(void *layer);
+>>>> +};
+>>>> +
+>>>> +#endif /* _SUNXI_LAYER_H_ */
+>>>> --
+>>>> 2.12.0
+>>>> 
+>>>> 
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>> 
+>>> 
+>> 
+>> --
+>> You received this message because you are subscribed to the Google 
+>> Groups
+>> "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send 
+>> an
+>> email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
