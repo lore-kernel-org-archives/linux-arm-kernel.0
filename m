@@ -1,60 +1,68 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 5 Apr 2017 13:17:25 -0300
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
- output video on pad 1
-In-Reply-To: <CAGoCfizXdDV_Eo1NSOAb+-wrC7F47iFQKyP8-wiJMpb-nsYArA@mail.gmail.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
- <20170404231053.GE7909@n2100.armlinux.org.uk>
- <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
- <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
- <20170405082134.GF7909@n2100.armlinux.org.uk>
- <1491384859.2381.51.camel@pengutronix.de>
- <20170405115336.7135e542@vento.lan>
- <CAGoCfizXdDV_Eo1NSOAb+-wrC7F47iFQKyP8-wiJMpb-nsYArA@mail.gmail.com>
-Message-ID: <20170405131725.22c13a1d@vento.lan>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 5 Apr 2017 12:28:40 -0400
+Subject: [PATCH v3 8/9] drm/rockchip: gem: Don't alloc/free gem buf when
+ dev_private is invalid
+In-Reply-To: <1491380967-28570-9-git-send-email-jeffy.chen@rock-chips.com>
+References: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1491380967-28570-9-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20170405162839.k6q4b3tpt6t2s3zm@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 5 Apr 2017 11:39:06 -0400
-Devin Heitmueller <dheitmueller@kernellabs.com> escreveu:
-
-> > Currently, the driver doesn't support (2), because, at the time
-> > I wrote the driver, I didn't find a way to read the interrupts generated
-> > by tvp5150 at em28xx[1], due to the lack of em28xx documentation,
-> > but adding support for it shoudn't be hard. I may eventually do it
-> > when I have some time to play with my ISEE hardware.  
+On Wed, Apr 05, 2017 at 04:29:26PM +0800, Jeffy Chen wrote:
+> After unbinding drm, the userspace may still has a chance to access
+> gem buf.
 > 
-> For what it's worth, I doubt most of the em28xx designs have the
-> tvp5150 interrupt request line connected in any way.
+> Add a sanity check for a NULL dev_private to prevent that from
+> happening.
 
-True. But, on embedded hardware, such line may be connected into the
-SoC. Actually, from the IGEPv3 expansion diagram:
+I still don't understand how this is happening. You're saying that these hooks
+can be called after rockchip_drm_unbind() has finished? 
 
-	https://www.isee.biz/support/downloads/item/igepv2-expansion-rc-schematics
+Sean
 
-The INT line is connected to CAM_IRQ. That's connected to GPIO_154 pin
-at OMAP3.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v3:
+> Address Daniel Vetter <daniel@ffwll.ch>'s comments.
+> Update commit message.
+> 
+> Changes in v2: None
+> 
+>  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> index df9e570..205a3dc 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -184,6 +184,9 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
+>  	struct drm_device *drm = obj->dev;
+>  	struct rockchip_drm_private *private = drm->dev_private;
+>  
+> +	if (!private)
+> +		return -ENODEV;
+> +
+>  	if (private->domain)
+>  		return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
+>  	else
+> @@ -208,6 +211,11 @@ static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
+>  
+>  static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
+>  {
+> +	struct drm_device *drm = rk_obj->base.dev;
+> +
+> +	if (!drm->dev_private)
+> +		return;
+> +
+>  	if (rk_obj->pages)
+>  		rockchip_gem_free_iommu(rk_obj);
+>  	else
+> -- 
+> 2.1.4
+> 
 
-So, on a first glance, it seems possible to use it, instead of polling.
-
-> You would likely
-> have to poll the FIFO status register via I2C,
-
-Yes, I considered this option when I wrote the driver. It could work, 
-although it would likely have some performance drawback, as the driver
-would need to poll it at least 60 times per second.
-
-> or use the feature to
-> embed the sliced data into as VANC data in the 656 output (as
-> described in sec 3.9 of the tvp5150am1 spec).
-
-True, but the bridge driver would need to handle such data. 
-
-I remember I looked on this when I wrote the driver, but I was
-unable to find a way for em28xx to parse (or forward) such
-data packets.
-
-Thanks,
-Mauro
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
