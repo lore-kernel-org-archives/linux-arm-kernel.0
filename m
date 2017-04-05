@@ -1,49 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Apr 2017 15:05:17 +0200
-Subject: [PATCH 2/3] arm64: allwinner: a64: add USB0 OHCI/EHCI related
- devicetree parts
-In-Reply-To: <20170405125053.6170-3-icenowy@aosc.io>
-References: <20170405125053.6170-1-icenowy@aosc.io>
- <20170405125053.6170-3-icenowy@aosc.io>
-Message-ID: <20170405130517.vr6tanrswanangas@lukather>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 5 Apr 2017 14:05:30 +0100
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <819bc6c1-581b-3ab9-d189-1befaaf43548@huawei.com>
+References: <1491031554-19516-1-git-send-email-dingtianhong@huawei.com>
+ <1491031554-19516-2-git-send-email-dingtianhong@huawei.com>
+ <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <819bc6c1-581b-3ab9-d189-1befaaf43548@huawei.com>
+Message-ID: <118dee30-69a8-4ee0-791d-a46d268af3b4@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 08:50:52PM +0800, Icenowy Zheng wrote:
-> As we added USB0 route auto switching support for A64, add related
-> device tree parts to the A64 DTSI file (EHCI0/OHCI0 controllers and the
-> pmu0 memory area for PHY).
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 1c64ea2d23f9..a8916df99048 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -179,8 +179,10 @@
->  		usbphy: phy at 01c19400 {
->  			compatible = "allwinner,sun50i-a64-usb-phy";
->  			reg = <0x01c19400 0x14>,
-> +			      <0x01c1a800 0x4>,
->  			      <0x01c1b800 0x4>;
->  			reg-names = "phy_ctrl",
-> +				    "pmu0",
+On 02/04/2017 07:49, Ding Tianhong wrote:
+>
+>
+> On 2017/4/2 2:26, David Miller wrote:
+>> From: Ding Tianhong <dingtianhong@huawei.com>
+>> Date: Sat, 1 Apr 2017 15:25:51 +0800
+>>
+>>> Till now only the Intel ixgbe could support enable
+>>> Relaxed ordering in the drivers for special architecture,
+>>> but the ARCH_WANT_RELAX_ORDER is looks like a general name
+>>> for all arch, so rename to a specific name for intel
+>>> card looks more appropriate.
+>>>
+>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>>
+>> This is not a driver specific facility.
+>>
+>> Any driver can test this symbol and act accordingly.
+>>
+>> Just because IXGBE is the first and only user, doesn't mean
+>> the facility is driver specific.
+>>
+>
+> Understand clearly?but the ARCH_WANT_RELAX_ORDER is really too generic and simple,
+> cause much misleading to indicate that it looks like the hack code for some architecture.
+> what do you think of the ETHERNET_ALLOW_RELAXED_ORDER in the drivers/net/ethernet/*,
+> it will only affect ethernet and not only for Ixgbe.
+>
 
-Again, this needs to be split apart, and sent for 4.11.
+Hi Ding,
 
-Maxime
+I think the actual original config ARCH_WANT_RELAX_ORDER is quite 
+dubious, and it does not really tell us which feature(s) of the 
+architecture supports this (if indeed it is arch specific).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/0522e781/attachment.sig>
+According to the original commit, 1a8b6d76dc5b net:add one common config 
+ARCH_WANT_RELAX_ORDER to support relax ordering, this is specific to 
+SPARC only:
+"Currently it only supports one special cpu architecture(SPARC) in 82599 
+driver to enable RO feature, this is not very common for other cpu 
+architecture which really needs RO feature".
+
+This sounds wooly.
+
+So I think that we need to know which specific architecture, memory 
+model, or PCI host/port/EP features, or combination of them, allows this 
+so called relaxed ordering.
+
+And a config option is probably not even the proper check.
+
+John
+
+> Thanks
+> Ding
+>
+>
+>> Thank you.
+>>
+>> .
+>>
+>
+>
+> .
+>
