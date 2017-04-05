@@ -1,66 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 14:22:31 +0530
-Subject: [PATCH v6 11/23] PCI: dwc: dra7xx: Facilitate wrapper and MSI
- interrupts to be enabled independently
+Date: Wed, 5 Apr 2017 14:22:35 +0530
+Subject: [PATCH v6 15/23] dt-bindings: PCI: dra7xx: Add DT bindings to enable
+ unaligned access
 In-Reply-To: <20170405085243.18123-1-kishon@ti.com>
 References: <20170405085243.18123-1-kishon@ti.com>
-Message-ID: <20170405085243.18123-12-kishon@ti.com>
+Message-ID: <20170405085243.18123-16-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Split dra7xx_pcie_enable_interrupts() into
-dra7xx_pcie_enable_wrapper_interrupts() and
-dra7xx_pcie_enable_msi_interrupts() so that wrapper interrupts and MSI
-interrupts can be enabled independently.  This is in preparation for adding
-EP mode support to dra7xx driver since EP mode doesn't have to enable
-msi_interrupts.
+Update device tree binding documentation of TI's dra7xx PCI controller to
+include property for enabling unaligned mem access.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/dwc/pci-dra7xx.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-index 7c9ed6a6675c..d78974d20360 100644
---- a/drivers/pci/dwc/pci-dra7xx.c
-+++ b/drivers/pci/dwc/pci-dra7xx.c
-@@ -140,18 +140,30 @@ static int dra7xx_pcie_establish_link(struct dra7xx_pcie *dra7xx)
- 	return dw_pcie_wait_for_link(pci);
- }
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+index 60c3cccefabc..6a07c96227e0 100644
+--- a/Documentation/devicetree/bindings/pci/ti-pci.txt
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -39,6 +39,11 @@ DEVICE MODE
+  - interrupts : one interrupt entries must be specified for main interrupt.
+  - num-ib-windows : number of inbound address translation windows
+  - num-ob-windows : number of outbound address translation windows
++ - ti,syscon-unaligned-access: phandle to the syscon DT node. The 1st argument
++			       should contain the register offset within syscon
++			       and the 2nd argument should contain the bit field
++			       for setting the bit to enable unaligned
++			       access.
  
--static void dra7xx_pcie_enable_interrupts(struct dra7xx_pcie *dra7xx)
-+static void dra7xx_pcie_enable_msi_interrupts(struct dra7xx_pcie *dra7xx)
- {
--	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
--			   ~INTERRUPTS);
--	dra7xx_pcie_writel(dra7xx,
--			   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
- 	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
- 			   ~LEG_EP_INTERRUPTS & ~MSI);
--	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
-+
-+	dra7xx_pcie_writel(dra7xx,
-+			   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
- 			   MSI | LEG_EP_INTERRUPTS);
- }
- 
-+static void dra7xx_pcie_enable_wrapper_interrupts(struct dra7xx_pcie *dra7xx)
-+{
-+	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
-+			   ~INTERRUPTS);
-+	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN,
-+			   INTERRUPTS);
-+}
-+
-+static void dra7xx_pcie_enable_interrupts(struct dra7xx_pcie *dra7xx)
-+{
-+	dra7xx_pcie_enable_wrapper_interrupts(dra7xx);
-+	dra7xx_pcie_enable_msi_interrupts(dra7xx);
-+}
-+
- static void dra7xx_pcie_host_init(struct pcie_port *pp)
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ Optional Property:
+  - gpios : Should be added if a gpio line is required to drive PERST# line
 -- 
 2.11.0
