@@ -1,98 +1,56 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 14:22:34 +0530
-Subject: [PATCH v6 14/23] PCI: dwc: dra7xx: Workaround for errata id i870
+Date: Wed, 5 Apr 2017 14:22:28 +0530
+Subject: [PATCH v6 08/23] Documentation: PCI: Add binding documentation for
+ pci-test endpoint function
 In-Reply-To: <20170405085243.18123-1-kishon@ti.com>
 References: <20170405085243.18123-1-kishon@ti.com>
-Message-ID: <20170405085243.18123-15-kishon@ti.com>
+Message-ID: <20170405085243.18123-9-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to errata i870, access to the PCIe slave port that are not 32-bit
-aligned will result in incorrect mapping to TLP Address and Byte enable
-fields.
-
-Accessing non 32-bit aligned data causes incorrect data in the target
-buffer if memcpy is used. Implement the workaround for this errata here.
+Add binding documentation for pci-test endpoint function that helps in
+adding and configuring pci-test endpoint function.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/dwc/pci-dra7xx.c | 49 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ Documentation/PCI/00-INDEX                              |  2 ++
+ .../PCI/endpoint/function/binding/pci-test.txt          | 17 +++++++++++++++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/function/binding/pci-test.txt
 
-diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-index 35c18534469c..8decf46cf525 100644
---- a/drivers/pci/dwc/pci-dra7xx.c
-+++ b/drivers/pci/dwc/pci-dra7xx.c
-@@ -26,6 +26,8 @@
- #include <linux/pm_runtime.h>
- #include <linux/resource.h>
- #include <linux/types.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- 
- #include "pcie-designware.h"
- 
-@@ -528,6 +530,48 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
- 	{},
- };
- 
-+/*
-+ * dra7xx_pcie_ep_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
-+ * @dra7xx: the dra7xx device where the workaround should be applied
-+ *
-+ * Access to the PCIe slave port that are not 32-bit aligned will result
-+ * in incorrect mapping to TLP Address and Byte enable fields. Therefore,
-+ * byte and half-word accesses are not possible to byte offset 0x1, 0x2, or
-+ * 0x3.
-+ *
-+ * To avoid this issue set PCIE_SS1_AXI2OCP_LEGACY_MODE_ENABLE to 1.
-+ */
-+static int dra7xx_pcie_ep_unaligned_memaccess(struct device *dev)
-+{
-+	int ret;
-+	struct device_node *np = dev->of_node;
-+	struct of_phandle_args args;
-+	struct regmap *regmap;
+diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+index ab35e4bbdb1c..2fc901a1c32e 100644
+--- a/Documentation/PCI/00-INDEX
++++ b/Documentation/PCI/00-INDEX
+@@ -18,3 +18,5 @@ endpoint/pci-endpoint-cfs.txt
+ 	- guide to use configfs to configure the PCI endpoint function.
+ endpoint/pci-test-function.txt
+ 	- specification of *PCI test* function device.
++endpoint/function/binding/
++	- binding documentation for PCI endpoint function
+diff --git a/Documentation/PCI/endpoint/function/binding/pci-test.txt b/Documentation/PCI/endpoint/function/binding/pci-test.txt
+new file mode 100644
+index 000000000000..3b68b955fb50
+--- /dev/null
++++ b/Documentation/PCI/endpoint/function/binding/pci-test.txt
+@@ -0,0 +1,17 @@
++PCI TEST ENDPOINT FUNCTION
 +
-+	regmap = syscon_regmap_lookup_by_phandle(np,
-+						 "ti,syscon-unaligned-access");
-+	if (IS_ERR(regmap)) {
-+		dev_dbg(dev, "can't get ti,syscon-unaligned-access\n");
-+		return -EINVAL;
-+	}
++name: Should be "pci_epf_test" to bind to the pci_epf_test driver.
 +
-+	ret = of_parse_phandle_with_fixed_args(np, "ti,syscon-unaligned-access",
-+					       2, 0, &args);
-+	if (ret) {
-+		dev_err(dev, "failed to parse ti,syscon-unaligned-access\n");
-+		return ret;
-+	}
-+
-+	ret = regmap_update_bits(regmap, args.args[0], args.args[1],
-+				 args.args[1]);
-+	if (ret)
-+		dev_err(dev, "failed to enable unaligned access\n");
-+
-+	of_node_put(args.np);
-+
-+	return ret;
-+}
-+
- static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- {
- 	u32 reg;
-@@ -644,6 +688,11 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	case DW_PCIE_EP_TYPE:
- 		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
- 				   DEVICE_TYPE_EP);
-+
-+		ret = dra7xx_pcie_ep_unaligned_memaccess(dev);
-+		if (ret)
-+			goto err_gpio;
-+
- 		ret = dra7xx_add_pcie_ep(dra7xx, pdev);
- 		if (ret < 0)
- 			goto err_gpio;
++Configurable Fields:
++vendorid	 : should be 0x104c
++deviceid	 : should be 0xb500 for DRA74x and 0xb501 for DRA72x
++revid		 : don't care
++progif_code	 : don't care
++subclass_code	 : don't care
++baseclass_code	 : should be 0xff
++cache_line_size	 : don't care
++subsys_vendor_id : don't care
++subsys_id	 : don't care
++interrupt_pin	 : Should be 1 - INTA, 2 - INTB, 3 - INTC, 4 -INTD
++msi_interrupts	 : Should be 1 to 32 depending on the number of MSI interrupts
++		   to test
 -- 
 2.11.0
