@@ -1,45 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Apr 2017 18:49:22 +0100
-Subject: [PATCH v6 4/4] arm64/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
-References: <20170404174727.35478-1-thgarnie@google.com>
- <20170404174727.35478-4-thgarnie@google.com>
- <20170405142225.GA9072@e104818-lin.cambridge.arm.com>
- <CAJcbSZFeY-1ne1cYG0zW7ETRp1MyGkz7SSMzvWckWtUS82DMqg@mail.gmail.com>
-Message-ID: <20170405174921.GB2752@e104818-lin.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 5 Apr 2017 20:05:00 +0200
+Subject: [PATCH v6 17/39] platform: add video-multiplexer subdevice driver
+In-Reply-To: <1491393519.2904.40.camel@pengutronix.de>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
+ <20170405111857.GA26831@amd>
+ <1491393519.2904.40.camel@pengutronix.de>
+Message-ID: <20170405180500.GA30408@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 07:36:17AM -0700, Thomas Garnier wrote:
-> On Wed, Apr 5, 2017 at 7:22 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Apr 04, 2017 at 10:47:27AM -0700, Thomas Garnier wrote:
-> >> +
-> >>       ldr     x1, [tsk, #TSK_TI_FLAGS]
-> >>       and     x2, x1, #_TIF_WORK_MASK
-> >>       cbnz    x2, work_pending
-> >> @@ -779,6 +788,12 @@ finish_ret_to_user:
-> >>       kernel_exit 0
-> >>  ENDPROC(ret_to_user)
-> >>
-> >> +addr_limit_fail:
-> >> +     stp     x0, lr, [sp,#-16]!
-> >> +     bl      asm_verify_pre_usermode_state
-> >> +     ldp     x0, lr, [sp],#16
-> >> +     ret     lr
-> >
-> > Where is this supposed to return? What is the value of lr when branching
-> > to addr_limit_fail?
-> 
-> It is not supposed to return. Do you think I should remove stp, ldp,
-> ret and jut add a brk 0x100 or jmp/call a break/bug function?
+On Wed 2017-04-05 13:58:39, Lucas Stach wrote:
+> Am Mittwoch, den 05.04.2017, 13:18 +0200 schrieb Pavel Machek:
+> > Hi!
+> > 
+> > > + * video stream multiplexer controlled via gpio or syscon
+> > > + *
+> > > + * Copyright (C) 2013 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
+> > > + * Copyright (C) 2016 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
+> > 
+> > This is actually quite interesting. Same email address for two
+> > people...
+> > 
+> > Plus, I believe this wants to say that copyright is with Pengutronix,
+> > not Sascha and Philipp. In that case you probably want to list
+> > copyright and authors separately?
+> > 
+> Nope, copyright doesn't get transferred to the employer within the rules
+> of the German "Urheberrecht", but stays at the original author of the
+> code.
 
-Can you not just make addr_limit_fail a C function which never returns
-(similar to what we to with bad_mode() on arm64)? Since addr_limit_fail
-is only called when the segment is not the right one, I don't really see
-why you need another call to asm_verify_pre_usermode_state() to do a
-similar check again. Just panic in addr_limit_fail (unless I
-misunderstood what you are trying to achieve).
+Ok, then I guess it should be
 
+Copyright (C) 2013 Sascha Hauer
+Work sponsored by Pengutronix, use <kernel@pengutronix.de> as contact address
+
+or something? I know license change is not on the table, but I guess
+it is good to get legal stuff right.
+									Pavel
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/ebfb44c4/attachment.sig>
