@@ -1,53 +1,144 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  5 Apr 2017 12:13:26 +0200
-Subject: [PULL 0/5] KVM/ARM Fixes for v4.11-rc6
-Message-ID: <20170405101331.23812-1-cdall@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 5 Apr 2017 11:21:27 +0100
+Subject: [PATCH v2 06/22] ARM: implement ioremap_nopost() interface
+In-Reply-To: <20170331110813.GA31763@red-moon>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-7-lorenzo.pieralisi@arm.com>
+ <20170331110813.GA31763@red-moon>
+Message-ID: <20170405102127.GA15147@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Radim,
+On Fri, Mar 31, 2017 at 12:08:13PM +0100, Lorenzo Pieralisi wrote:
+> Hi Russell,
+> 
+> On Mon, Mar 27, 2017 at 10:49:34AM +0100, Lorenzo Pieralisi wrote:
+> > The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+> > and Posting") define rules for PCI configuration space transactions
+> > ordering and posting, that state that configuration writes have to
+> > be non-posted transactions.
+> > 
+> > Current ioremap interface on ARM provides mapping functions that
+> > provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
+> > memory type) aka posted writes, so PCI host controller drivers have
+> > no arch interface to remap PCI configuration space with memory
+> > attributes that comply with the PCI specifications for configuration
+> > space.
+> > 
+> > Implement an ARM specific ioremap_nopost() interface that allows to
+> > map PCI config memory regions with MT_UNCACHED memory type (ie strongly
+> > ordered - non-posted writes), providing a remap function that complies
+> > with PCI specifications for config space transactions.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > ---
+> >  arch/arm/include/asm/io.h | 10 ++++++++++
+> >  arch/arm/mm/ioremap.c     |  7 +++++++
+> >  arch/arm/mm/nommu.c       |  9 +++++++++
+> >  3 files changed, 26 insertions(+)
+> 
+> I have not added your ACK to this patch since I slightly tweaked
+> it to adapt it to ioremap_nopost() interface instead of a PCI
+> specific one. Furthermore, I mechanically added a ioremap_nopost()
+> version for nommu too in the process, would be good to have a look
+> if I did that properly please.
+> 
+> Can I add your ACK on this patch ? If you spot any issues please
+> do let me know.
 
-Please pull a handfull of fixes for the next -rc release of v4.11.
+Hi Russell,
 
-They include:
- - Addressing a problem with GICv3 userspace save/restore
- - Clarify GICv2 userspace save/restore ABI
- - Be more careful in clearing GIC LRs
- - Add missing synchronization primitive to our MMU handling code
+please let me know if your ACK on this patch stands as I have to respin
+it shortly for hopefully final round of review.
 
-The following changes since commit 955a3fc6d2a1c11d6d00bce4f3816100ce0530cf:
+Thanks !
+Lorenzo
 
-  KVM: arm64: Increase number of user memslots to 512 (2017-03-09 09:13:50 +0000)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm-for-v4.11-rc6
-
-for you to fetch changes up to 6d56111c92d247bb64301029fe88365aa4caf16e:
-
-  KVM: arm/arm64: vgic: Fix GICC_PMR uaccess on GICv3 and clarify ABI (2017-04-04 14:33:59 +0200)
-
-Thanks,
--Christoffer
-
-Christoffer Dall (2):
-      KVM: arm64: Ensure LRs are clear when they should be
-      KVM: arm/arm64: vgic: Fix GICC_PMR uaccess on GICv3 and clarify ABI
-
-Marc Zyngier (2):
-      arm/arm64: KVM: Take mmap_sem in stage2_unmap_vm
-      arm/arm64: KVM: Take mmap_sem in kvm_arch_prepare_memory_region
-
-Suzuki K Poulose (1):
-      kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-
- Documentation/virtual/kvm/devices/arm-vgic.txt |  6 ++++++
- arch/arm/kvm/arm.c                             |  3 +++
- arch/arm/kvm/mmu.c                             | 23 ++++++++++++++++++++---
- include/kvm/arm_vgic.h                         |  1 +
- include/linux/irqchip/arm-gic.h                |  3 +++
- virt/kvm/arm/vgic/vgic-init.c                  | 19 +++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio-v2.c               | 20 ++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-v2.c                    | 23 +++++++++++++++++++----
- virt/kvm/arm/vgic/vgic.h                       | 11 ++++++++++-
- 9 files changed, 99 insertions(+), 10 deletions(-)
+> Thank you !
+> Lorenzo
+> 
+> > diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> > index 42871fb..49913d1 100644
+> > --- a/arch/arm/include/asm/io.h
+> > +++ b/arch/arm/include/asm/io.h
+> > @@ -352,6 +352,7 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+> >   * mapping has specific properties.
+> >   *
+> >   * Function		Memory type	Cacheability	Cache hint
+> > + * ioremap_nopost()	SO		n/a		n/a
+> >   * ioremap()		Device		n/a		n/a
+> >   * ioremap_nocache()	Device		n/a		n/a
+> >   * ioremap_cache()	Normal		Writeback	Read allocate
+> > @@ -372,6 +373,12 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+> >   * compiler may generate unaligned accesses - eg, via inlining its own
+> >   * memcpy.
+> >   *
+> > + * ioremap_nopost() maps memory as strongly ordered, to be used for
+> > + * specific mappings (eg PCI config space) that require non-posted
+> > + * write transactions. Strongly ordered transactions are ordered wrt
+> > + * device mappings, which means that ioremap_nopost() is the same
+> > + * as ioremap() except for non-posted writes behaviour.
+> > + *
+> >   * All normal memory mappings have the following properties:
+> >   * - reads can be repeated with no side effects
+> >   * - repeated reads return the last value written
+> > @@ -407,6 +414,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+> >  #define ioremap_wc ioremap_wc
+> >  #define ioremap_wt ioremap_wc
+> >  
+> > +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size);
+> > +#define ioremap_nopost ioremap_nopost
+> > +
+> >  void iounmap(volatile void __iomem *iomem_cookie);
+> >  #define iounmap iounmap
+> >  
+> > diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> > index ff0eed2..4ffaf16 100644
+> > --- a/arch/arm/mm/ioremap.c
+> > +++ b/arch/arm/mm/ioremap.c
+> > @@ -463,6 +463,13 @@ void iounmap(volatile void __iomem *cookie)
+> >  }
+> >  EXPORT_SYMBOL(iounmap);
+> >  
+> > +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size)
+> > +{
+> > +	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
+> > +				   __builtin_return_address(0));
+> > +}
+> > +EXPORT_SYMBOL_GPL(ioremap_nopost);
+> > +
+> >  #ifdef CONFIG_PCI
+> >  static int pci_ioremap_mem_type = MT_DEVICE;
+> >  
+> > diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+> > index 3b5c7aa..dfd736a 100644
+> > --- a/arch/arm/mm/nommu.c
+> > +++ b/arch/arm/mm/nommu.c
+> > @@ -21,6 +21,8 @@
+> >  #include <asm/mpu.h>
+> >  #include <asm/procinfo.h>
+> >  
+> > +#include <asm/mach/map.h>
+> > +
+> >  #include "mm.h"
+> >  
+> >  unsigned long vectors_base;
+> > @@ -433,6 +435,13 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+> >  }
+> >  EXPORT_SYMBOL(ioremap_wc);
+> >  
+> > +void __iomem *ioremap_nopost(resource_size_t res_cookie, size_t size)
+> > +{
+> > +	return __arm_ioremap_caller(res_cookie, size, MT_UNCACHED,
+> > +				    __builtin_return_address(0));
+> > +}
+> > +EXPORT_SYMBOL(ioremap_nopost);
+> > +
+> >  void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
+> >  {
+> >  	return (void *)phys_addr;
+> > -- 
+> > 2.10.0
+> > 
