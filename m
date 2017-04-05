@@ -1,101 +1,78 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Apr 2017 13:11:33 +0100
-Subject: [PATCH v4 1/8] dt-bindings: mfd: add A33 GPADC binding
-In-Reply-To: <20170405090634.4649-2-quentin.schulz@free-electrons.com>
+Date: Wed, 5 Apr 2017 13:11:48 +0100
+Subject: [PATCH v4 2/8] dt-bindings: input: touschcreen: remove sun4i
+ documentation
+In-Reply-To: <20170405090634.4649-3-quentin.schulz@free-electrons.com>
 References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
- <20170405090634.4649-2-quentin.schulz@free-electrons.com>
-Message-ID: <20170405121133.olhbcyzvjojth4lw@dell>
+ <20170405090634.4649-3-quentin.schulz@free-electrons.com>
+Message-ID: <20170405121148.ktc5wlq5svljr2vn@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 05 Apr 2017, Quentin Schulz wrote:
 
-> This patch adds documentation for the A33 GPADC binding.
+> This patch removes the sun4i touchscreen controller binding
+> documentation since it has been merged with the sun4i GPADC binding
+> documentation.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > ---
+> 
 > v4:
 >   - correct patch title,
 > 
-> v3:
->   - fixed missing allwinner in front of compatible,
->   - updated compatible to allwinner,sun8i-a33-ths to better reflect the
->   datasheet's name,
->   - updated example's DT node name and label to ths,
-> 
-> added in v2
->  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>  .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
+>  1 file changed, 38 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
 
 Applied, thanks.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> new file mode 100644
-> index 0000000..badff36
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> @@ -0,0 +1,59 @@
-> +Allwinner SoCs' GPADC Device Tree bindings
-> +------------------------------------------
-> +The Allwinner SoCs all have an ADC that can also act as a thermal sensor
-> +and sometimes as a touchscreen controller.
-> +
-> +Required properties:
-> +  - compatible: "allwinner,sun8i-a33-ths",
-> +  - reg: mmio address range of the chip,
-> +  - #thermal-sensor-cells: shall be 0,
-> +  - #io-channel-cells: shall be 0,
-> +
-> +Example:
-> +	ths: ths at 01c25000 {
-> +		compatible = "allwinner,sun8i-a33-ths";
-> +		reg = <0x01c25000 0x100>;
-> +		#thermal-sensor-cells = <0>;
-> +		#io-channel-cells = <0>;
-> +	};
-> +
-> +sun4i, sun5i and sun6i SoCs are also supported via the older binding:
-> +
-> +sun4i resistive touchscreen controller
-> +--------------------------------------
-> +
-> +Required properties:
-> + - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
-> +   "allwinner,sun6i-a31-ts"
-> + - reg: mmio address range of the chip
-> + - interrupts: interrupt to which the chip is connected
-> + - #thermal-sensor-cells: shall be 0
-> +
-> +Optional properties:
-> + - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
-> +				   is attached to the controller
-> + - allwinner,tp-sensitive-adjust : integer (4 bits)
-> +				   adjust sensitivity of pen down detection
-> +				   between 0 (least sensitive) and 15
-> +				   (defaults to 15)
-> + - allwinner,filter-type	 : integer (2 bits)
-> +				   select median and averaging filter
-> +				   samples used for median / averaging filter
-> +				   0: 4/2
-> +				   1: 5/3
-> +				   2: 8/4
-> +				   3: 16/8
-> +				   (defaults to 1)
-> +
-> +Example:
-> +
-> +	rtp: rtp at 01c25000 {
-> +		compatible = "allwinner,sun4i-a10-ts";
-> +		reg = <0x01c25000 0x100>;
-> +		interrupts = <29>;
-> +		allwinner,ts-attached;
-> +		#thermal-sensor-cells = <0>;
-> +		/* sensitive/noisy touch panel */
-> +		allwinner,tp-sensitive-adjust = <0>;
-> +		allwinner,filter-type = <3>;
-> +	};
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> deleted file mode 100644
+> index 89abecd..0000000
+> --- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+> +++ /dev/null
+> @@ -1,38 +0,0 @@
+> -sun4i resistive touchscreen controller
+> ---------------------------------------
+> -
+> -Required properties:
+> - - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
+> -   "allwinner,sun6i-a31-ts"
+> - - reg: mmio address range of the chip
+> - - interrupts: interrupt to which the chip is connected
+> - - #thermal-sensor-cells: shall be 0
+> -
+> -Optional properties:
+> - - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
+> -				   is attached to the controller
+> - - allwinner,tp-sensitive-adjust : integer (4 bits)
+> -				   adjust sensitivity of pen down detection
+> -				   between 0 (least sensitive) and 15
+> -				   (defaults to 15)
+> - - allwinner,filter-type	 : integer (2 bits)
+> -				   select median and averaging filter
+> -				   samples used for median / averaging filter
+> -				   0: 4/2
+> -				   1: 5/3
+> -				   2: 8/4
+> -				   3: 16/8
+> -				   (defaults to 1)
+> -
+> -Example:
+> -
+> -	rtp: rtp at 01c25000 {
+> -		compatible = "allwinner,sun4i-a10-ts";
+> -		reg = <0x01c25000 0x100>;
+> -		interrupts = <29>;
+> -		allwinner,ts-attached;
+> -		#thermal-sensor-cells = <0>;
+> -		/* sensitive/noisy touch panel */
+> -		allwinner,tp-sensitive-adjust = <0>;
+> -		allwinner,filter-type = <3>;
+> -	};
 
 -- 
 Lee Jones
