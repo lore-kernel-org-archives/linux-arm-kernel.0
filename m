@@ -1,143 +1,139 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:49 -0500
-Subject: [PATCH v5 05/23] drivers/fsi: Add slave & master read/write APIs
+Date: Tue,  4 Apr 2017 21:06:04 -0500
+Subject: [PATCH v5 20/23] drivers/fsi/gpio: Add tracepoints for GPIO master
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-6-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-21-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Introduce functions to perform reads/writes on the slave address space;
-these simply pass the request on the slave's master with the correct
-link and slave ID.
-
-We implement these on top of similar helpers for the master.
+Add trace points for key GPIO operations of the GPIO based FSI
+master.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ drivers/fsi/fsi-master-gpio.c          |  9 +++++
+ include/trace/events/fsi_master_gpio.h | 68 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 include/trace/events/fsi_master_gpio.h
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4bbca95..32698ed 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -32,6 +32,11 @@ struct fsi_slave {
+diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
+index 9fedfaf..5d9e0b0 100644
+--- a/drivers/fsi/fsi-master-gpio.c
++++ b/drivers/fsi/fsi-master-gpio.c
+@@ -61,6 +61,9 @@ struct fsi_master_gpio {
+ 	struct gpio_desc	*gpio_mux;	/* Mux control */
+ };
  
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
++#define CREATE_TRACE_POINTS
++#include <trace/events/fsi_master_gpio.h>
++
+ #define to_fsi_master_gpio(m) container_of(m, struct fsi_master_gpio, master)
  
-+static int fsi_master_read(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, void *val, size_t size);
-+static int fsi_master_write(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
+ struct fsi_gpio_msg {
+@@ -128,6 +131,8 @@ static void serial_in(struct fsi_master_gpio *master, struct fsi_gpio_msg *msg,
+ 		msg->msg |= ~in_bit & 0x1;	/* Data is negative active */
+ 	}
+ 	msg->bits += num_bits;
 +
- /* crc helpers */
- static const uint8_t crc4_tab[] = {
- 	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
-@@ -57,6 +62,58 @@ uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
- EXPORT_SYMBOL_GPL(fsi_crc4);
- 
- /* FSI slave support */
-+static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
-+		uint8_t *idp)
-+{
-+	uint32_t addr = *addrp;
-+	uint8_t id = *idp;
-+
-+	if (addr > slave->size)
-+		return -EINVAL;
-+
-+	/* For 23 bit addressing, we encode the extra two bits in the slave
-+	 * id (and the slave's actual ID needs to be 0).
-+	 */
-+	if (addr > 0x1fffff) {
-+		if (slave->id != 0)
-+			return -EINVAL;
-+		id = (addr >> 21) & 0x3;
-+		addr &= 0x1fffff;
-+	}
-+
-+	*addrp = addr;
-+	*idp = id;
-+	return 0;
-+}
-+
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+			void *val, size_t size)
-+{
-+	uint8_t id = slave->id;
-+	int rc;
-+
-+	rc = fsi_slave_calc_addr(slave, &addr, &id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_master_read(slave->master, slave->link, id,
-+			addr, val, size);
-+}
-+
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+			const void *val, size_t size)
-+{
-+	uint8_t id = slave->id;
-+	int rc;
-+
-+	rc = fsi_slave_calc_addr(slave, &addr, &id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_master_write(slave->master, slave->link, id,
-+			addr, val, size);
-+}
-+
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
- 	/* todo: initialise slave device, perform engine scan */
-@@ -65,6 +122,41 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
++	trace_fsi_master_gpio_in(master, num_bits, msg->msg);
  }
  
- /* FSI master support */
-+static int fsi_check_access(uint32_t addr, size_t size)
-+{
-+	if (size != 1 && size != 2 && size != 4)
-+		return -EINVAL;
+ static void serial_out(struct fsi_master_gpio *master,
+@@ -139,6 +144,8 @@ static void serial_out(struct fsi_master_gpio *master,
+ 	uint64_t last_bit = ~0;
+ 	int next_bit;
+ 
++	trace_fsi_master_gpio_out(master, cmd->bits, cmd->msg);
 +
-+	if ((addr & 0x3) != (size & 0x3))
-+		return -EINVAL;
+ 	if (!cmd->bits) {
+ 		dev_warn(master->dev, "trying to output 0 bits\n");
+ 		return;
+@@ -464,6 +471,8 @@ static int fsi_master_gpio_break(struct fsi_master *_master, int link)
+ 	if (link != 0)
+ 		return -ENODEV;
+ 
++	trace_fsi_master_gpio_break(master);
 +
-+	return 0;
-+}
+ 	set_sda_output(master, 1);
+ 	sda_out(master, 1);
+ 	clock_toggle(master, FSI_PRE_BREAK_CLOCKS);
+diff --git a/include/trace/events/fsi_master_gpio.h b/include/trace/events/fsi_master_gpio.h
+new file mode 100644
+index 0000000..11b36c1
+--- /dev/null
++++ b/include/trace/events/fsi_master_gpio.h
+@@ -0,0 +1,68 @@
 +
-+static int fsi_master_read(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, void *val, size_t size)
-+{
-+	int rc;
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fsi_master_gpio
 +
-+	rc = fsi_check_access(addr, size);
-+	if (rc)
-+		return rc;
++#if !defined(_TRACE_FSI_MASTER_GPIO_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FSI_MASTER_GPIO_H
 +
-+	return master->read(master, link, slave_id, addr, val, size);
-+}
++#include <linux/tracepoint.h>
 +
-+static int fsi_master_write(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, const void *val, size_t size)
-+{
-+	int rc;
++TRACE_EVENT(fsi_master_gpio_in,
++	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
++	TP_ARGS(master, bits, msg),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	bits)
++		__field(uint64_t, msg)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->master.idx;
++		__entry->bits = bits;
++		__entry->msg  = msg & ((1ull<<bits) - 1);
++	),
++	TP_printk("fsi-gpio%d => %0*llx[%d]",
++		__entry->master_idx,
++		(__entry->bits + 3) / 4,
++		__entry->msg,
++		__entry->bits
++	)
++);
 +
-+	rc = fsi_check_access(addr, size);
-+	if (rc)
-+		return rc;
++TRACE_EVENT(fsi_master_gpio_out,
++	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
++	TP_ARGS(master, bits, msg),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	bits)
++		__field(uint64_t, msg)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->master.idx;
++		__entry->bits = bits;
++		__entry->msg  = msg & ((1ull<<bits) - 1);
++	),
++	TP_printk("fsi-gpio%d <= %0*llx[%d]",
++		__entry->master_idx,
++		(__entry->bits + 3) / 4,
++		__entry->msg,
++		__entry->bits
++	)
++);
 +
-+	return master->write(master, link, slave_id, addr, val, size);
-+}
++TRACE_EVENT(fsi_master_gpio_break,
++	TP_PROTO(const struct fsi_master_gpio *master),
++	TP_ARGS(master),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->master.idx;
++	),
++	TP_printk("fsi-gpio%d ----break---",
++		__entry->master_idx
++	)
++);
 +
- static int fsi_master_scan(struct fsi_master *master)
- {
- 	int link;
++#endif /* _TRACE_FSI_MASTER_GPIO_H */
++
++#include <trace/define_trace.h>
 -- 
 1.8.2.2
