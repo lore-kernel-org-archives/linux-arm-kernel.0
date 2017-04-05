@@ -1,73 +1,32 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 05 Apr 2017 14:16:11 +0200
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable PCI_MSI
-In-Reply-To: <6eb58d54-b6e8-b709-c7f9-fa19d52cd492@synopsys.com>
-References: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
- <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
- <CAJ+vNU2Fb7gpO0LsoVpPbUX5rSyH3yC4K30JpAf5j7aQkDH9tw@mail.gmail.com>
- <1460708469.22710.4.camel@pengutronix.de>
- <CAJ+vNU1-M3qSODKHMf872kfOsH0g9xFgKNEgKqiJu6A8z-ChxA@mail.gmail.com>
- <CAJ+vNU0+ksyYCpydpmcJOO-w0v4D0axvG84wK7f09iK_1yzo_A@mail.gmail.com>
- <001c01d2ad85$b06af1a0$1140d4e0$@gmail.com>
- <6eb58d54-b6e8-b709-c7f9-fa19d52cd492@synopsys.com>
-Message-ID: <1491394571.2904.44.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Apr 2017 14:16:31 +0200
+Subject: [PATCH v4 7/8] ARM: sun8i: a33: Add devfreq-based GPU cooling
+In-Reply-To: <20170405090634.4649-8-quentin.schulz@free-electrons.com>
+References: <20170405090634.4649-1-quentin.schulz@free-electrons.com>
+ <20170405090634.4649-8-quentin.schulz@free-electrons.com>
+Message-ID: <20170405121631.zqj3j77rvjgw6sog@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 05.04.2017, 13:07 +0100 schrieb Joao Pinto:
-[...]
-> >>> Lucas,
-> >>>
-> >>> I feel a bit dumb here for forgetting about this issue and letting it
-> >>> drop, but I've just spent a day debugging an issue with the ath9k
-> >>> wireless driver only to realize it was that the ath9k card and/or
-> >>> driver doesn't support MSI interrupts and thus no longer work on
-> >>> mainline kernels that have MSI enabled. To be honest I'm not sure how
-> >>> many PCIe devices out there can't support MSI because of hardware
-> >>> limitations vs drivers that simply have not implemented it.
-> >>>
-> >>> To make matters worse 3ee803641e76bea76ec730c80dcc64739a9919ff makes
-> >>> it such that you can't disable MSI on the IMX6.
-> >>>
-> >>> Is there some fix you can think of to make the IMX6 PCIe host
-> >>> controller raise an interrupt for cards/drivers that use legacy irq's?
-> >>> If not, then we need to allow MSI to be disabled for IMX6 and default
-> >>> it to disabled for compatibility.
-> >>>
-> >>
-> >> Joao / Jingoo,
-> >>
-> >> (Adding linux-pci to the list to pick up maintainers of other DWC PCIe
-> >> core drivers)
-> >>
-> >> Is Luca's statement that 'legacy IRQs and MSIs can't be used together'
-> >> true in general for the DW PCIe core? If any of the host controllers
-> >> using this core can't support both legacy and MSI irqs together I
-> >> still believe we shouldn't enable/require MSI as it breaks any
-> >> card/driver that only supports legacy interrupts (such as ath9k).
-> > 
-> > If there are 2 DW PCIe controllers, one controller can be used for legacy
-> > and another controller can be used for MSI.
-> > 
-> > But, I am not sure that one DW PCIe controller can support both MSI device
-> > and legacy interrupt device at the same time.
-> > 
-> > To Joao Pinto,
-> > Will you confirm this?
-> > 
+On Wed, Apr 05, 2017 at 11:06:33AM +0200, Quentin Schulz wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> Hi Jingoo,
-> I confirm that if a RC has MSI enable, it won't support legacy interrupts.
+> This adds GPU thermal throttling for the Allwinner A33.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Okay, so the only way to solve this in a generic way, that I can see at
-the moment is to defer MSI enable until the downstream device actually
-requests an MSI irq.
+Applied, thanks!
+Maxime
 
-Also we need to disable the MSI capability if any bridge device turns up
-during the bus topology scan, as we can have devices with conflicting
-requirements connected to the RC in that case.
-
-I'll cook up some patches to implement this.
-
-Regards,
-Lucas
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/c614ecf2/attachment.sig>
