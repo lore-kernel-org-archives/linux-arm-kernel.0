@@ -1,77 +1,27 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed,  5 Apr 2017 11:28:10 +0200
-Subject: [PATCH v3 0/5] Support userspace irqchip with arch timers
-Message-ID: <20170405092815.22503-1-cdall@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 5 Apr 2017 15:29:00 +0530
+Subject: [PATCH 1/3] phy: sun4i-usb: enable PHY0 dual route switching for
+ A64 USB PHY
+In-Reply-To: <20170405070351.etpupeqjeo7dhyxl@lukather>
+References: <20170404184518.33610-1-icenowy@aosc.io>
+ <20170405070351.etpupeqjeo7dhyxl@lukather>
+Message-ID: <41abab5b-1776-4cd4-f280-bfa7f69db9ad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is the second version of the rework of the patches to support
-architected timers with a userspace irqchip sent by Alexander Graf [1].
 
-We first cleanup some of the timer code to make it easier to understand
-what is being done in the later patches, and then define the ABI,
-implement timers support, implement PMU support, and finally advertise
-the features.
 
-These patches are based on the recent work from Jintack to support the
-physical timer in addition to the virtual timer.  This series including
-its dependencies can be found here:
+On Wednesday 05 April 2017 12:33 PM, Maxime Ripard wrote:
+> On Wed, Apr 05, 2017 at 02:45:16AM +0800, Icenowy Zheng wrote:
+>> Allwinner A64 SoC features a switchable PHY0 like the one in H3, which
+>> can switch between a MUSB controller and a pair of OHCI/EHCI controller.
+>>
+>> Enable PHY0 route auto switching for A64.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> 
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git irqs-to-user-v3
+merged, thanks.
 
-I tested this using Alex's QEMU patch with his fixes for SMP applied.  This
-seems to be rock-solid.  The temporary-not-for-upstream-but-for-testing patch
-can be found here (force-pushed and rebased since v2):
-
-https://git.linaro.org/people/christoffer.dall/qemu-arm.git no-kvm-irqchip
-
-I also tested it on 32-bit and it looks good there as well.
-
-Changes since v2:
- - Actually push the right content to the kernel branch, sorry.
- - Rebased on kvmarm/queue as of this morning (v4.11-rc1+ stuff)
- - Changed IOCTL numbers as needed
-
-Changes since v1:
- - Rework the ABI to support devices in general as opposed to just
-   timers
- - Support the PMU in addition to timers
- - Also support the physical timer (rebased on Jintack's work)
- - Updated some comments where I noticed things were out of date.
-
-Several changes have been made compared to v7 of the original single
-patch, including:
- - Rewording ABI documentation to be more in line with the ARM
-   architecture
- - Add an explicit check for needing to notify userspace of a level
-   change instead of propagating the value
- - Changes to commenting throughout to more accurately describe the
-   architecture concepts we try to maintain
- - Reword of functions, for example from sync to update when the date
-   only flows one direction
-
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2016-September/021867.html
-[2]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
-
-Alexander Graf (2):
-  KVM: arm/arm64: Add ARM user space interrupt signaling ABI
-  KVM: arm/arm64: Support arch timers with a userspace gic
-
-Christoffer Dall (3):
-  KVM: arm/arm64: Cleanup the arch timer code's irqchip checking
-  KVM: arm/arm64: Report PMU overflow interrupts to userspace irqchip
-  KVM: arm/arm64: Advertise support for KVM_CAP_ARM_USER_IRQ
-
- Documentation/virtual/kvm/api.txt |  42 +++++++++++++
- arch/arm/include/uapi/asm/kvm.h   |   2 +
- arch/arm/kvm/arm.c                |  28 ++++++---
- arch/arm64/include/uapi/asm/kvm.h |   2 +
- include/kvm/arm_arch_timer.h      |   2 +
- include/kvm/arm_pmu.h             |   7 +++
- include/uapi/linux/kvm.h          |   8 +++
- virt/kvm/arm/arch_timer.c         | 127 ++++++++++++++++++++++++++++++--------
- virt/kvm/arm/pmu.c                |  42 +++++++++++--
- 9 files changed, 221 insertions(+), 39 deletions(-)
-
--- 
-2.9.0
+-Kishon
