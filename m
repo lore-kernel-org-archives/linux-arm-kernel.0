@@ -1,307 +1,240 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 6 Apr 2017 00:01:33 +0800
-Subject: [linux-sunxi] [PATCH 07/11] regulator: axp20x-regulator: add
- support for AXP803
-In-Reply-To: <20170404180145.12897-8-icenowy@aosc.io>
-References: <20170404180145.12897-1-icenowy@aosc.io>
- <20170404180145.12897-8-icenowy@aosc.io>
-Message-ID: <CAGb2v678LGa9JVNeOjx8edfun-XmoYxRhj3=gtxHd1HjY=LS-A@mail.gmail.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed,  5 Apr 2017 10:02:42 -0600
+Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without struct
+ page
+Message-ID: <20170405160242.14195-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When coherent DMA memory without struct page is shared, importer
+fails to find the page and runs into kernel page fault when it
+tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
+in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
+for more information on this problem.
 
-On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> AXP803 PMIC also have a series of regulators (DCDCs and LDOs)
-> controllable via I2C/RSB bus.
->
-> Add support for them.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/regulator/axp20x-regulator.c | 135 +++++++++++++++++++++++++++++++----
->  include/linux/mfd/axp20x.h           |  37 ++++++++++
->  2 files changed, 158 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index 0b9d4e3e52c7..219a731df392 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -355,6 +355,81 @@ static const struct regulator_desc axp809_regulators[] = {
->         AXP_DESC_SW(AXP809, SW, "sw", "swin", AXP22X_PWR_OUT_CTRL2, BIT(6)),
->  };
->
-> +static const struct regulator_linear_range axp803_dcdc234_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE(500000, 0x0, 0x46, 10000),
-> +       REGULATOR_LINEAR_RANGE(1200000, 0x47, 0x4b, 20000),
-> +};
+This solution allows coherent DMA memory without struct page to be
+shared by providing a way for the exporter to tag the DMA buffer as
+a special buffer without struct page association and passing the
+information in sg_table to the importer. This information is used
+in attach/map_sg to avoid cleaning D-cache and mapping.
 
-Can you keep the ranges the datasheet uses? It makes it easier to compare.
+The details of the change are:
 
-> +
-> +static const struct regulator_linear_range axp803_dcdc5_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE(800000, 0x0, 0x20, 10000),
-> +       REGULATOR_LINEAR_RANGE(1140000, 0x21, 0x43, 20000),
+Framework:
+- Add a new dma_attrs field to struct scatterlist.
+- Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
+  Coherent memory without struct page.
+- Add a new dma_check_dev_coherent() interface to check if memory is
+  the device coherent area. There is no way to tell where the memory
+  returned by dma_alloc_attrs() came from.
 
-1.14 ~ 1.84 / 0.02 = 36 steps. This would end at 0x44.
+Exporter logic:
+- Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
+  DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
+  done in the exporter context.
+- Add logic to arm_dma_get_sgtable() to identify memory without struct
+  page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
+  set, arm_dma_get_sgtable() will set page as the cpu_addr and update
+  dma_address and dma_attrs fields in struct scatterlist for this sgl.
+  This is done in exporter context when buffer is exported. With this
+  Note: This change is made on top of Russell King's patch that added
+  !pfn_valid(pfn) check to arm_dma_get_sgtable() to error out on invalid
+  pages. Coherent memory without struct page will trigger this error.
 
-> +};
-> +
-> +static const struct regulator_linear_range axp803_dcdc6_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE(600000, 0x0, 0x32, 10000),
-> +       REGULATOR_LINEAR_RANGE(1120000, 0x33, 0x47, 20000),
-> +};
-> +
-> +static const struct regulator_linear_range axp803_dldo2_ranges[] = {
-> +       REGULATOR_LINEAR_RANGE(700000, 0x0, 0x1a, 100000),
-> +       REGULATOR_LINEAR_RANGE(3400000, 0x1b, 0x1f, 200000),
-> +};
+Importer logic:
+- Add logic to vb2_dc_dmabuf_ops_attach() to identify memory without
+  struct page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute when it copies
+  the sg_table from the exporter. It will copy dma_attrs and dma_address
+  fields. With this logic, dmabuf_ops_attach will no longer trip on an
+  invalid page.
+- Add logic to arm_dma_map_sg() to avoid mapping the page when sg_table
+  has DMA_ATTR_DEV_COHERENT_NOPAGE buffer.
+- Add logic to arm_dma_unmap_sg() to do nothing for sg entries with
+  DMA_ATTR_DEV_COHERENT_NOPAGE attribute.
 
-This is the same as axp806_cldo2_ranges. To keep the variants sorted
-in ascending order, you could keep this version but replace references
-to axp806_cldo2_ranges with this one.
+Without this change the following use-case that runs into kernel
+pagefault when importer tries to attach the exported buffer.
 
-> +
-> +static const struct regulator_desc axp803_regulators[] = {
-> +       AXP_DESC(AXP803, DCDC1, "dcdc1", "vin1", 1600, 3400, 100,
-> +                AXP803_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(0)),
-> +       AXP_DESC_RANGES(AXP803, DCDC2, "dcdc2", "vin2", axp803_dcdc234_ranges,
-> +                       76, AXP803_DCDC2_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
-> +                       BIT(1)),
-> +       AXP_DESC_RANGES(AXP803, DCDC3, "dcdc3", "vin3", axp803_dcdc234_ranges,
-> +                       76, AXP803_DCDC3_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
-> +                       BIT(2)),
-> +       AXP_DESC_RANGES(AXP803, DCDC4, "dcdc4", "vin4", axp803_dcdc234_ranges,
-> +                       76, AXP803_DCDC4_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
-> +                       BIT(3)),
-> +       AXP_DESC_RANGES(AXP803, DCDC5, "dcdc5", "vin5", axp803_dcdc5_ranges,
-> +                       68, AXP803_DCDC5_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
-> +                       BIT(4)),
-> +       AXP_DESC_RANGES(AXP803, DCDC6, "dcdc6", "vin6", axp803_dcdc6_ranges,
-> +                       72, AXP803_DCDC6_V_OUT, 0x7f, AXP22X_PWR_OUT_CTRL1,
-> +                       BIT(5)),
-> +       /* secondary switchable output of DCDC1 */
-> +       AXP_DESC_SW(AXP803, DC1SW, "dc1sw", NULL, AXP22X_PWR_OUT_CTRL2,
-> +                   BIT(7)),
-> +       AXP_DESC(AXP803, ALDO1, "aldo1", "aldoin", 700, 3300, 100,
-> +                AXP22X_ALDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(5)),
-> +       AXP_DESC(AXP803, ALDO2, "aldo2", "aldoin", 700, 3300, 100,
-> +                AXP22X_ALDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(6)),
-> +       AXP_DESC(AXP803, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
-> +                AXP22X_ALDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(7)),
-> +       AXP_DESC(AXP803, DLDO1, "dldo1", "dldoin", 700, 3300, 100,
-> +                AXP22X_DLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(3)),
-> +       AXP_DESC_RANGES(AXP803, DLDO2, "dldo2", "dldoin", axp803_dldo2_ranges,
-> +                       32, AXP22X_DLDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2,
-> +                       BIT(4)),
-> +       AXP_DESC(AXP803, DLDO3, "dldo3", "dldoin", 700, 3300, 100,
-> +                AXP22X_DLDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(5)),
-> +       AXP_DESC(AXP803, DLDO4, "dldo4", "dldoin", 700, 3300, 100,
-> +                AXP22X_DLDO4_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(6)),
+With this change it works: (what a relief after watching pagefaults for
+weeks!!)
 
-dldo3 and dldo4 are controlled from AXP22X_PWR_OUT_CTRL2.
+gst-launch-1.0 filesrc location=~/GH3_MOV_HD.mp4 ! qtdemux ! h264parse ! v4l2video4dec capture-io-mode=dmabuf ! v4l2video7convert output-io-mode=dmabuf-import ! kmssink force-modesetting=true
 
-> +       AXP_DESC(AXP803, ELDO1, "eldo1", "eldoin", 700, 1900, 50,
-> +                AXP22X_ELDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(0)),
-> +       AXP_DESC(AXP803, ELDO2, "eldo2", "eldoin", 700, 1900, 50,
-> +                AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
-> +       AXP_DESC(AXP803, ELDO3, "eldo3", "eldoin", 700, 1900, 50,
-> +                AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
-> +       AXP_DESC(AXP803, FLDO1, "fldo1", "fldoin", 700, 1450, 50,
-> +                AXP803_FLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(2)),
-> +       AXP_DESC(AXP803, FLDO2, "fldo2", "fldoin", 700, 1450, 50,
-> +                AXP803_FLDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(3)),
+I am sending RFC patch to get feedback on the approach and see if I missed
+anything.
 
-The fields for fldo* are only four bits wide.
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+ arch/arm/mm/dma-mapping.c                      | 34 ++++++++++++++++++++++----
+ drivers/base/dma-coherent.c                    | 25 +++++++++++++++++++
+ drivers/media/v4l2-core/videobuf2-dma-contig.c |  6 +++++
+ include/linux/dma-mapping.h                    |  8 ++++++
+ include/linux/scatterlist.h                    |  1 +
+ 5 files changed, 69 insertions(+), 5 deletions(-)
 
-> +       AXP_DESC_IO(AXP803, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
-> +                   AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
-> +                   AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
-> +       AXP_DESC_IO(AXP803, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
-> +                   AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
-> +                   AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
-> +       AXP_DESC_FIXED(AXP803, RTC_LDO, "rtc_ldo", "ips", 3000),
-> +};
-> +
->  static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
->  {
->         struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-> @@ -377,6 +452,13 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
->                  * (See include/linux/mfd/axp20x.h)
->                  */
->                 reg = AXP806_DCDC_FREQ_CTRL;
-> +       case AXP803_ID:
-
-AXP803 should come before AXP806.
-
-> +               /*
-> +                * AXP803 also have DCDC work frequency setting register at a
-> +                * different position.
-> +                */
-> +               if (axp20x->variant == AXP803_ID)
-> +                       reg = AXP803_DCDC_FREQ_CTRL;
->         case AXP221_ID:
->         case AXP223_ID:
->         case AXP809_ID:
-> @@ -474,7 +556,13 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
->                 mask = AXP22X_WORKMODE_DCDCX_MASK(id - AXP22X_DCDC1);
->                 workmode <<= id - AXP22X_DCDC1;
->                 break;
-> +       case AXP803_ID:
-
-Same here. Also this switch block has empty lines separating each case.
-
-> +               if (id < AXP803_DCDC1 || id > AXP803_DCDC6)
-> +                       return -EINVAL;
->
-> +               mask = AXP22X_WORKMODE_DCDCX_MASK(id - AXP803_DCDC1);
-> +               workmode <<= id - AXP803_DCDC1;
-> +               break;
->         default:
->                 /* should not happen */
->                 WARN_ON(1);
-> @@ -492,20 +580,34 @@ static bool axp20x_is_polyphase_slave(struct axp20x_dev *axp20x, int id)
->  {
->         u32 reg = 0;
->
-> -       /* Only AXP806 has poly-phase outputs */
-> -       if (axp20x->variant != AXP806_ID)
-> +       /*
-> +        * Currently in our supported AXP variants, only AXP806 and AXP803
-> +        * have polyphase regulators.
-> +        */
-> +       switch (axp20x->variant) {
-> +       case AXP806_ID:
-> +               regmap_read(axp20x->regmap, AXP806_DCDC_MODE_CTRL2, &reg);
-> +
-> +               switch (id) {
-> +               case AXP806_DCDCB:
-> +                       return (((reg & GENMASK(7, 6)) == BIT(6)) ||
-> +                               ((reg & GENMASK(7, 6)) == BIT(7)));
-> +               case AXP806_DCDCC:
-> +                       return ((reg & GENMASK(7, 6)) == BIT(7));
-> +               case AXP806_DCDCE:
-> +                       return !!(reg & BIT(5));
-> +               }
-> +       case AXP803_ID:
-
-803 before 806.
-
-> +               regmap_read(axp20x->regmap, AXP803_POLYPHASE_CTRL, &reg);
-> +
-> +               switch (id) {
-> +               case AXP803_DCDC3:
-> +                       return !!(reg & BIT(6));
-> +               case AXP803_DCDC6:
-> +                       return !!(reg & BIT(7));
-> +               }
-> +       default:
->                 return false;
-> -
-> -       regmap_read(axp20x->regmap, AXP806_DCDC_MODE_CTRL2, &reg);
-> -
-> -       switch (id) {
-> -       case AXP806_DCDCB:
-> -               return (((reg & GENMASK(7, 6)) == BIT(6)) ||
-> -                       ((reg & GENMASK(7, 6)) == BIT(7)));
-> -       case AXP806_DCDCC:
-> -               return ((reg & GENMASK(7, 6)) == BIT(7));
-> -       case AXP806_DCDCE:
-> -               return !!(reg & BIT(5));
->         }
->
->         return false;
-> @@ -548,6 +650,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                 regulators = axp809_regulators;
->                 nregulators = AXP809_REG_ID_MAX;
->                 break;
-> +       case AXP803_ID:
-> +               regulators = axp803_regulators;
-> +               nregulators = AXP803_REG_ID_MAX;
-> +               break;
-
-Ascending order.
-
->         default:
->                 dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
->                         axp20x->variant);
-> @@ -579,7 +685,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                  * name.
->                  */
->                 if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
-> -                   (regulators == axp809_regulators && i == AXP809_DC1SW)) {
-> +                   (regulators == axp809_regulators && i == AXP809_DC1SW) ||
-> +                   (regulators == axp803_regulators && i == AXP803_DC1SW)) {
-
-803 before 809.
-
-So, mostly ordering issues, and a few minor errors.
-
-Regards
-ChenYu
-
->                         new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
->                                                 GFP_KERNEL);
->                         *new_desc = regulators[i];
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index b3220ef374d3..858d5b1b43b9 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -119,6 +119,17 @@ enum axp20x_variants {
->  #define AXP806_BUS_ADDR_EXT            0xfe
->  #define AXP806_REG_ADDR_EXT            0xff
->
-> +#define AXP803_POLYPHASE_CTRL          0x14
-> +#define AXP803_FLDO1_V_OUT             0x1c
-> +#define AXP803_FLDO2_V_OUT             0x1d
-> +#define AXP803_DCDC1_V_OUT             0x20
-> +#define AXP803_DCDC2_V_OUT             0x21
-> +#define AXP803_DCDC3_V_OUT             0x22
-> +#define AXP803_DCDC4_V_OUT             0x23
-> +#define AXP803_DCDC5_V_OUT             0x24
-> +#define AXP803_DCDC6_V_OUT             0x25
-> +#define AXP803_DCDC_FREQ_CTRL          0x3b
-> +
->  /* Interrupt */
->  #define AXP152_IRQ1_EN                 0x40
->  #define AXP152_IRQ2_EN                 0x41
-> @@ -350,6 +361,32 @@ enum {
->         AXP809_REG_ID_MAX,
->  };
->
-> +enum {
-> +       AXP803_DCDC1 = 0,
-> +       AXP803_DCDC2,
-> +       AXP803_DCDC3,
-> +       AXP803_DCDC4,
-> +       AXP803_DCDC5,
-> +       AXP803_DCDC6,
-> +       AXP803_DC1SW,
-> +       AXP803_ALDO1,
-> +       AXP803_ALDO2,
-> +       AXP803_ALDO3,
-> +       AXP803_DLDO1,
-> +       AXP803_DLDO2,
-> +       AXP803_DLDO3,
-> +       AXP803_DLDO4,
-> +       AXP803_ELDO1,
-> +       AXP803_ELDO2,
-> +       AXP803_ELDO3,
-> +       AXP803_FLDO1,
-> +       AXP803_FLDO2,
-> +       AXP803_RTC_LDO,
-> +       AXP803_LDO_IO0,
-> +       AXP803_LDO_IO1,
-> +       AXP803_REG_ID_MAX,
-> +};
-> +
->  /* IRQs */
->  enum {
->         AXP152_IRQ_LDO0IN_CONNECT = 1,
-> --
-> 2.12.2
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 63eabb0..75c6692 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -939,13 +939,28 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 		 void *cpu_addr, dma_addr_t handle, size_t size,
+ 		 unsigned long attrs)
+ {
+-	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
++	unsigned long pfn = dma_to_pfn(dev, handle);
++	struct page *page;
+ 	int ret;
+ 
++	/* If the PFN is not valid, we do not have a struct page. */
++	if (!pfn_valid(pfn)) {
++		/* If memory is from per-device coherent area, use cpu_addr */
++		if (attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
++			page = cpu_addr;
++		else
++			return -ENXIO;
++	} else
++		page = pfn_to_page(pfn);
++
+ 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+ 	if (unlikely(ret))
+ 		return ret;
+ 
++	if (attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
++		sgt->sgl->dma_address = handle;
++
++	sgt->sgl->dma_attrs = attrs;
+ 	sg_set_page(sgt->sgl, page, PAGE_ALIGN(size), 0);
+ 	return 0;
+ }
+@@ -1080,10 +1095,17 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+ #ifdef CONFIG_NEED_SG_DMA_LENGTH
+ 		s->dma_length = s->length;
+ #endif
+-		s->dma_address = ops->map_page(dev, sg_page(s), s->offset,
++		/*
++		 * there is no struct page for this DMA buffer.
++		 * s->dma_address is the handle
++		 */
++		if (!(s->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)) {
++			s->dma_address = ops->map_page(dev, sg_page(s),
++						s->offset,
+ 						s->length, dir, attrs);
+-		if (dma_mapping_error(dev, s->dma_address))
+-			goto bad_mapping;
++			if (dma_mapping_error(dev, s->dma_address))
++				goto bad_mapping;
++		}
+ 	}
+ 	return nents;
+ 
+@@ -1112,7 +1134,9 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 	int i;
+ 
+ 	for_each_sg(sg, s, nents, i)
+-		ops->unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir, attrs);
++		if (!(s->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE))
++			ops->unmap_page(dev, sg_dma_address(s),
++					sg_dma_len(s), dir, attrs);
+ }
+ 
+ /**
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 640a7e6..d08cf44 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -209,6 +209,31 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ EXPORT_SYMBOL(dma_alloc_from_coherent);
+ 
+ /**
++ * dma_check_dev_coherent() - checks if memory is from the device coherent area
++ *
++ * @dev:	device whose coherent area is checked to validate memory
++ * @dma_handle:	dma handle associated with the allocated memory
++ * @vaddr:	the virtual address to the allocated area.
++ *
++ * Returns true if memory does belong to the per-device cohrent area.
++ * false otherwise.
++ */
++bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
++				void *vaddr)
++{
++	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
++
++	if (mem && vaddr >= mem->virt_base &&
++	    vaddr < (mem->virt_base + (mem->size << PAGE_SHIFT)) &&
++	    dma_handle >= mem->device_base &&
++	    dma_handle < (mem->device_base + (mem->size << PAGE_SHIFT)))
++		return true;
++
++	return false;
++}
++EXPORT_SYMBOL(dma_check_dev_coherent);
++
++/**
+  * dma_release_from_coherent() - try to free the memory allocated from per-device coherent memory pool
+  * @dev:	device from which the memory was allocated
+  * @order:	the order of pages allocated
+diff --git a/drivers/media/v4l2-core/videobuf2-dma-contig.c b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+index fb6a177..f7caf2b 100644
+--- a/drivers/media/v4l2-core/videobuf2-dma-contig.c
++++ b/drivers/media/v4l2-core/videobuf2-dma-contig.c
+@@ -161,6 +161,9 @@ static void *vb2_dc_alloc(struct device *dev, unsigned long attrs,
+ 	if ((buf->attrs & DMA_ATTR_NO_KERNEL_MAPPING) == 0)
+ 		buf->vaddr = buf->cookie;
+ 
++	if (dma_check_dev_coherent(dev, buf->dma_addr, buf->cookie))
++		buf->attrs |= DMA_ATTR_DEV_COHERENT_NOPAGE;
++
+ 	/* Prevent the device from being released while the buffer is used */
+ 	buf->dev = get_device(dev);
+ 	buf->size = size;
+@@ -248,6 +251,9 @@ static int vb2_dc_dmabuf_ops_attach(struct dma_buf *dbuf, struct device *dev,
+ 	rd = buf->sgt_base->sgl;
+ 	wr = sgt->sgl;
+ 	for (i = 0; i < sgt->orig_nents; ++i) {
++		if (rd->dma_attrs & DMA_ATTR_DEV_COHERENT_NOPAGE)
++			wr->dma_address = rd->dma_address;
++		wr->dma_attrs = rd->dma_attrs;
+ 		sg_set_page(wr, sg_page(rd), rd->length, rd->offset);
+ 		rd = sg_next(rd);
+ 		wr = sg_next(wr);
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 0977317..9f3ec53 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -70,6 +70,12 @@
+ #define DMA_ATTR_PRIVILEGED		(1UL << 9)
+ 
+ /*
++ * DMA_ATTR_DEV_COHERENT_NOPAGE: This is a hint to the DMA-mapping sub-system
++ * that this memory isn't backed by struct page.
++ */
++#define DMA_ATTR_DEV_COHERENT_NOPAGE	(1UL << 10)
++
++/*
+  * A dma_addr_t can hold any valid DMA or bus address for the platform.
+  * It can be given to a device to use as a DMA source or target.  A CPU cannot
+  * reference a dma_addr_t directly because there may be translation between
+@@ -160,6 +166,8 @@ static inline int is_device_dma_capable(struct device *dev)
+  */
+ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 				       dma_addr_t *dma_handle, void **ret);
++bool dma_check_dev_coherent(struct device *dev, dma_addr_t dma_handle,
++				void *vaddr);
+ int dma_release_from_coherent(struct device *dev, int order, void *vaddr);
+ 
+ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
+index cb3c8fe..7da610b 100644
+--- a/include/linux/scatterlist.h
++++ b/include/linux/scatterlist.h
+@@ -18,6 +18,7 @@ struct scatterlist {
+ #ifdef CONFIG_NEED_SG_DMA_LENGTH
+ 	unsigned int	dma_length;
+ #endif
++	unsigned long	dma_attrs;
+ };
+ 
+ /*
+-- 
+2.7.4
