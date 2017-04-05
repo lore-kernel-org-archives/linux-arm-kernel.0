@@ -1,145 +1,70 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 4 Apr 2017 17:40:16 -0700
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities output
- video on pad 1
-In-Reply-To: <20170404231053.GE7909@n2100.armlinux.org.uk>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
- <20170404231053.GE7909@n2100.armlinux.org.uk>
-Message-ID: <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 5 Apr 2017 09:29:32 +0530
+Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and hyp
+ are not excluded
+In-Reply-To: <20170404122632.GF14898@arm.com>
+References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170404111826.GD14898@arm.com>
+ <CAFpQJXW_2=8Jwqrt4k6Em6B=TBh_XA2x23OTMbpzkwKZV2x4jA@mail.gmail.com>
+ <20170404122632.GF14898@arm.com>
+Message-ID: <CAFpQJXWwRFTPP6BixZAfJ_cRrGqrHEbOas_X+T_R+mDH7u0Aew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/04/2017 04:10 PM, Russell King - ARM Linux wrote:
-> On Thu, Mar 30, 2017 at 07:25:49PM +0200, Philipp Zabel wrote:
->> The TVP5150 DT bindings specify a single output port (port 0) that
->> corresponds to the video output pad (pad 1, DEMOD_PAD_VID_OUT).
+On Tue, Apr 4, 2017 at 5:56 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Apr 04, 2017 at 05:37:10PM +0530, Ganapatrao Kulkarni wrote:
+>> On Tue, Apr 4, 2017 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Apr 04, 2017 at 04:10:55PM +0530, Ganapatrao Kulkarni wrote:
+>> >> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+>> >> is returning error for perf syscall with mixed attribute set for exclude_kernel
+>> >> and exlude_hv.
+>> >>
+>> >> This change is breaking some applications (observed with hhvm) when
+>> >> ran with VHE enabled. Adding change to enable EL2 event counting,
+>> >> if either of or both of exclude_kernel and exlude_hv are not set.
+>> >>
+>> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> >> ---
+>> >>  arch/arm64/kernel/perf_event.c | 19 ++++++++++++-------
+>> >>  1 file changed, 12 insertions(+), 7 deletions(-)
+>> >
+>> > Hmm. When we have VHE, we can't distinguish between hypervisor and kernel,
+>> > so this patch doesn't seem right to me. The code currently requires
+>> > both exclude_kernel and exclude_hv to be clear before we enable profiling
+>> > EL2, otherwise we're failing to exclude samples that were asked to be
+>> > excluded.
 >>
->> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->> ---
->> I'm trying to get this to work with a TVP5150 analog TV decoder, and the
->> first problem is that this device doesn't have pad 0 as its single
->> output pad. Instead, as a MEDIA_ENT_F_ATV_DECODER entity, it has for
->> pads (input, video out, vbi out, audio out), and video out is pad 1,
->> whereas the device tree only defines a single port (0).
+>> The application cant differentiate that kernel is running in EL2/VHE or in EL1
+>> when VHE=1, is it makes sense to enable EL2 event counting when there
+>> is request from application to either include kernel or hypervisor
+>> event count, since both are same.
 >
-> Looking at the patch, it's highlighted another review point with
-> Steve's driver.
->
->> diff --git a/drivers/staging/media/imx/imx-media-dev.c b/drivers/staging/media/imx/imx-media-dev.c
->> index 17e2386a3ca3a..c52d6ca797965 100644
->> --- a/drivers/staging/media/imx/imx-media-dev.c
->> +++ b/drivers/staging/media/imx/imx-media-dev.c
->> @@ -267,6 +267,15 @@ static int imx_media_create_link(struct imx_media_dev *imxmd,
->>  	source_pad = link->local_pad;
->>  	sink_pad = link->remote_pad;
->>
->> +	/*
->> +	 * If the source subdev is an analog video decoder with a single source
->> +	 * port, assume that this port 0 corresponds to the DEMOD_PAD_VID_OUT
->> +	 * entity pad.
->> +	 */
->> +	if (source->entity.function == MEDIA_ENT_F_ATV_DECODER &&
->> +	    local_sd->num_sink_pads == 0 && local_sd->num_src_pads == 1)
->> +		source_pad = DEMOD_PAD_VID_OUT;
->> +
->>  	v4l2_info(&imxmd->v4l2_dev, "%s: %s:%d -> %s:%d\n", __func__,
->>  		  source->name, source_pad, sink->name, sink_pad);
->
-> What is "local" and what is "remote" here?  It seems that, in the case of
-> a link being created with the sensor(etc), it's all back to front.
->
-> Eg, I see locally:
->
-> imx-media: imx_media_create_link: imx219 0-0010:0 -> imx6-mipi-csi2:0
->
-> So here, "source" is the imx219 (the sensor), and sink is "imx6-mipi-csi2"
-> (part of the iMX6 capture.)  However, this makes "local_sd" the subdev of
-> the sensor, and "remote_sd" the subdev of the CSI2 interface - which is
-> totally back to front - this code is part of the iMX6 capture system,
-> so "local" implies that it should be part of that, and the "remote" thing
-> would be the sensor.
->
-> Hence, this seems completely confused.  I'd suggest that:
->
-> (a) the "pad->pad.flags & MEDIA_PAD_FL_SINK" test in imx_media_create_link()
->     is moved into imx_media_create_links(), and placed here instead:
->
-> 		for (j = 0; j < num_pads; j++) {
-> 			pad = &local_sd->pad[j];
->
-> 			if (pad->pad.flags & MEDIA_PAD_FL_SINK)
-> 				continue;
->
-> 			...
-> 		}
->
->     as the pad isn't going to spontaneously change this flag while we
->     consider each individual link.
+> You can make exactly the same argument against your proposal by saying that
+> it makes sense to disable EL2 event counting when there is a request from
+> an application to either exclude kernel or hypervisor event counting.
 
-
-Sure, I can do that. It would avoid iterating unnecessarily through the
-pad's links if the pad is a sink.
-
-
->  However, maybe the test should be:
->
-> 			if (!(pad->pad.flags & MEDIA_PAD_FL_SOURCE))
->
->     ?
->
-
-maybe that is more intuitive.
-
-
-> (b) the terms "local" and "remote" in imx_media_create_link() are
->     replaced with "source" and "sink" respectively, since this will
->     now be called with a guaranteed source pad.
-
-Agreed. I'll change the arg and local var names.
+yes, the argument is equally valid on either side.
 
 >
-> As for Philipp's solution, I'm not sure what the correct solution for
-> something like this is.  It depends how you view "hardware interface"
-> as defined by video-interfaces.txt, and whether the pads on the TVP5150
-> represent the hardware interfaces.  If we take the view that the pads
-> do represent hardware interfaces, then using the reg= property on the
-> port node will solve this problem.
+>> IMO, it is not appropriate to have different application behaviour
+>> when kernel booted with VHE=0/1
+>
+> Then find another solution to that. How about a mechanism to advertise
+> that exclude_hv is effectively always set if the kernel is running at EL2?
 
-And the missing port nodes would have to actually be defined first.
-According to Philipp they aren't, only a single output port 0.
-
+I am not sure, how we can advertise to user that kernel is running at EL2.
+we may add a note to man page of perf_event_open?
+"exclude_hv is always set, if host kernel and hypervisor are running
+at same privilege level",
 
 >
-> If not, it would mean that we would have to have the iMX capture code
-> scan the pads on the source device, looking for outputs - but that
-> runs into a problem - if the source device has multiple outputs, does
-> the reg= property specify the output pad index or the pad number,
+> That would mean that you would use exclude_kernel to determine the profiling
+> controls for the host.
 
-And how do we even know the data direction of a DT port. Is it an input,
-an output, bidirectional? The OF graph parsing in imx-media-of.c can't
-determine a port's direction if it encounters a device it doesn't
-recognize that has multiple ports. For now that is not really a problem
-because upstream from the video mux and csi-2 receiver it's expected
-there will only be original sources of video with only one source port.
-But it can become a limitation later. For example a device that has
-multiple output bus interfaces, which would require multiple output
-ports.
+yes, this seems to be more appropriate.
 
-
-Steve
-
-
-
-> and what if one binding for a device specifies it one way and another
-> device's binding specifies it a different way.
 >
-> There's lots of scope for making things really painful here, and
-> ending up with needing sensor-specific code in capture drivers to
-> work around different decisions on this.
->
-> I think someone needs to nail this down, if it's not already too late.
->
+> Will
+
+thanks
+Ganapat
