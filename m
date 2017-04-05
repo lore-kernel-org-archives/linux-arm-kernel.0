@@ -1,101 +1,79 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 5 Apr 2017 19:59:38 +0300
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <20170403153604.GI10760@atomide.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <20170317152536.GT20572@atomide.com>
- <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
- <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
- <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
- <20170330165448.GF10760@atomide.com>
- <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
- <20170403153604.GI10760@atomide.com>
-Message-ID: <c396df32-fad1-72a2-f22d-034a42af4186@ti.com>
+From: dheitmueller@kernellabs.com (Devin Heitmueller)
+Date: Wed, 5 Apr 2017 13:02:52 -0400
+Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities output
+ video on pad 1
+In-Reply-To: <20170405131725.22c13a1d@vento.lan>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
+ <1490894749.2404.33.camel@pengutronix.de>
+ <20170404231053.GE7909@n2100.armlinux.org.uk>
+ <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
+ <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
+ <20170405082134.GF7909@n2100.armlinux.org.uk>
+ <1491384859.2381.51.camel@pengutronix.de>
+ <20170405115336.7135e542@vento.lan>
+ <CAGoCfizXdDV_Eo1NSOAb+-wrC7F47iFQKyP8-wiJMpb-nsYArA@mail.gmail.com>
+ <20170405131725.22c13a1d@vento.lan>
+Message-ID: <CAGoCfiyfXc2bcTR72XwL3Vv8ny-dQUjEUk2OUuy_s4nedNJqxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 18:36, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [170403 07:54]:
->> On 30/03/17 19:54, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
->>>> On 23/03/17 19:02, Tony Lindgren wrote:
->>>>> * Tony Lindgren <tony@atomide.com> [170322 18:03]:
->>>>>> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
->>>>>>> On 17/03/17 17:25, Tony Lindgren wrote:
->>>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
->>>>>>>>> Any additional testing on omap4 welcome as this series basically
->>>>>>>>> tweaks every possible peripheral clock on the SoC.
->>>>>>>>
->>>>>>>> Without the last patch in this series, booting fails for me:
->>>>>>>>
->>>>>>>> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
->>>>>>>> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
->>>>>>>>
->>>>>>>> Care to check that booting keeps working for each patch in the
->>>>>>>> series to avoid breaking git bisect for booting?
->>>>>>>
->>>>>>> Hmm, I think patch 8+9 need to be squashed then. I can double check this
->>>>>>> next week though.
->>>>>>
->>>>>> Also looks like with this set merged HDMI stops working on
->>>>>> omap4 with:
->>>>>>
->>>>>> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
->>>>>
->>>>> Forgot to mention that's with omapdrm with encoder-tpd12s015 and
->>>>> encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
->>>>> dmesg output in case that provides more clues:
->>>>>
->>>>> [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
->>>>> [   91.078308] [drm] Enabling DMM ywrap scrolling
->>>>> [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
->>>>> [   91.107879] omapdss HDMI error: failed to power on device
->>>>> [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
->>>>> [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>>>> [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>>>> [   91.620300] Console: switching to colour frame buffer device 128x48
->>>>> [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
->>>>> [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
->>>>> [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
->>>>> [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>>>> [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
->>>>>
->>>>> Regards,
->>>>>
->>>>> Tony
->>>>>
->>>>
->>>> Can you try with this additional hwmod data tweak in place? Apply this on
->>>> top of the existing series.
->>>
->>> Does not seem to help, still get the same errors. But maybe I'm doing
->>> something wrong as the patch did not apply and I applied it manually.
->>>
->>> Regards,
->>>
->>> Tony
->>>
->>
->> Hmm ok, can you provide some brief instructions how to test what you are
->> doing with the HDMI? Just connect it to some external monitor? My monitor
->> has a spare HDMI connector so I could try it out.
+>> For what it's worth, I doubt most of the em28xx designs have the
+>> tvp5150 interrupt request line connected in any way.
 >
-> Well build a kernel using omap2plus_defconfig, then with HDMI cable
-> connected load the following modules:
+> True. But, on embedded hardware, such line may be connected into the
+> SoC. Actually, from the IGEPv3 expansion diagram:
 >
-> encoder-tpd12s015 encoder-tfp410 connector-hdmi omapfb
+>         https://www.isee.biz/support/downloads/item/igepv2-expansion-rc-schematics
 >
-> And a console should appear on the HDMI monitor. If using omapdrm, then
-> load omapdss and omapdrm instead.
+> The INT line is connected to CAM_IRQ. That's connected to GPIO_154 pin
+> at OMAP3.
 >
-> And if using NFSroot, you need to have ehci and smsc drivers built-in
-> or use an initramfs.
+> So, on a first glance, it seems possible to use it, instead of polling.
 
-Ok I am able to reproduce the issue. Seems something weird with the hdmi 
-hwmod itself, if I revert it back to its original form (just the hdmi 
-one) then it works fine. Haven't figured out yet what is the actual 
-problem but seems something timing related, as it also starts magically 
-working with the clkctrl clock driver setup if I add enough traces to 
-some critical points.
+To be clear, I wasn't suggesting that the IRQ request line on the
+tvp5150 couldn't be supported in general (for example, for those
+embedded targets which have it wired up to a host processor).  I'm
+just saying you shouldn't expect it to work on most (perhaps all)
+em28xx designs which have the tvp5150.  In fact on some em28xx designs
+the pin is used as a GPIO output tied to a mux to control input
+selection.  Hence blindly enabling the interrupt request line by
+default would do all sorts of bad things.
 
--Tero
+>> You would likely
+>> have to poll the FIFO status register via I2C,
+>
+> Yes, I considered this option when I wrote the driver. It could work,
+> although it would likely have some performance drawback, as the driver
+> would need to poll it at least 60 times per second.
+>
+>> or use the feature to
+>> embed the sliced data into as VANC data in the 656 output (as
+>> described in sec 3.9 of the tvp5150am1 spec).
+>
+> True, but the bridge driver would need to handle such data.
+
+Correct.
+
+> I remember I looked on this when I wrote the driver, but I was
+> unable to find a way for em28xx to parse (or forward) such
+> data packets.
+
+I'm pretty sure it's possible, but I haven't looked at the datasheets
+in a number of years and don't recall the details.
+
+Hardware VBI splicing is supported by a number of decoders but it's
+rarely used on commodity PCs (the Conexant and NXP decoders support it
+as well).  That said, I won't argue there might be some value on
+really low end platforms.  All I would ask is that if you do introduce
+any such functionality into the tvp5150 driver for some embedded
+application that you please not break support for devices such as the
+em28xx.
+
+Thanks,
+
+Devin
+
+-- 
+Devin J. Heitmueller - Kernel Labs
+http://www.kernellabs.com
