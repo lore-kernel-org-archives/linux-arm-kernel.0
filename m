@@ -1,34 +1,78 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Wed, 5 Apr 2017 18:54:29 +0800
-Subject: [PATCH] media: mtk-vcodec: remove informative log
-Message-ID: <1491389669-32737-1-git-send-email-minghsiu.tsai@mediatek.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Apr 2017 11:58:41 +0100
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
+ interface
+In-Reply-To: <20170328144543.GA18046@red-moon>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
+ <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
+ <20170328144543.GA18046@red-moon>
+Message-ID: <20170405105841.GG7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver is stable. Remove DEBUG definition from driver.
+On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
+> On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
+> > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
+> > > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+> > > index 7afb0e2..50b292f 100644
+> > > --- a/arch/x86/include/asm/io.h
+> > > +++ b/arch/x86/include/asm/io.h
+> > > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
+> > >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+> > >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
+> > >  #define ioremap_uc ioremap_uc
+> > > +#define ioremap_nopost ioremap_nocache
+> > 
+> > These are all the same as the default from asm-generic.h.  Do we really
+> > need these definitions in alpha, avr32, frv, ia64, x86?
+> 
+> Those arches do not include asm-generic.h (I suppose for a good reason)
+> but a definition is needed anyway if we want code using ioremap_nopost()
+> to be unconditional. This is one way of doing it, there are others not
+> sure they are any better, I am open to suggestions.
 
-There are debug message in /var/log/messages if DEBUG is defined,
-such as:
-[MTK_V4L2] level=0 fops_vcodec_open(),170: decoder capability 0
-[MTK_V4L2] level=0 fops_vcodec_open(),177: 16000000.vcodec decoder [0]
-[MTK_V4L2] level=0 fops_vcodec_release(),200: [0] decoder
+We do have linux/io.h, which should be included in preference to asm/io.h.
+linux/io.h has existed for years, but I still see (from time to time)
+patches adding drivers that (imho incorrectly) use asm/io.h.
 
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 1 -
- 1 file changed, 1 deletion(-)
+Also, this:
 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-index 7d55975..1248083 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-@@ -31,7 +31,6 @@ struct mtk_vcodec_mem {
- extern int mtk_v4l2_dbg_level;
- extern bool mtk_vcodec_dbg;
- 
--#define DEBUG	1
- 
- #if defined(DEBUG)
- 
+> > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> > > index 7ef015e..0e81938 100644
+> > > --- a/include/asm-generic/io.h
+> > > +++ b/include/asm-generic/io.h
+> > > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
+> > >  #endif /* CONFIG_GENERIC_IOMAP */
+> > >  #endif /* CONFIG_HAS_IOPORT_MAP */
+> > >  
+> > > +#ifndef ioremap_nopost
+> > > +#define ioremap_nopost ioremap_nocache
+> > > +#endif
+> > > +
+> > >  #ifndef xlate_dev_kmem_ptr
+> > >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
+> > >  static inline void *xlate_dev_kmem_ptr(void *addr)
+
+could well be located in linux/io.h, which would make it available
+everywhere.
+
+I'd suggest one change to this though:
+
+#ifndef ioremap_nopost
+static inline void __iomem *ioremap_nopost(resource_size_t offset,
+					   unsigned long size)
+{
+	return ioremap_nocache(offset, size);
+}
+#endif
+
+This way, if someone forgets to define ioremap_nopost() in their
+asm/io.h but provides a definition or extern prototype for
+ioremap_nopost(), we end up with a compile error to highlight the
+error, rather than the error being hidden by the preprocessor.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
