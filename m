@@ -1,42 +1,78 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 05 Apr 2017 11:43:47 +0200
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
- output video on pad 1
-In-Reply-To: <9bfabc5c-d90f-6487-537d-20515ec61f9c@gmail.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
- <9bfabc5c-d90f-6487-537d-20515ec61f9c@gmail.com>
-Message-ID: <1491385427.2381.58.camel@pengutronix.de>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 5 Apr 2017 15:16:19 +0530
+Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and hyp
+ are not excluded
+In-Reply-To: <20170405083155.GA18287@arm.com>
+References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+ <20170404111826.GD14898@arm.com>
+ <CAFpQJXW_2=8Jwqrt4k6Em6B=TBh_XA2x23OTMbpzkwKZV2x4jA@mail.gmail.com>
+ <20170404122632.GF14898@arm.com>
+ <CAFpQJXWwRFTPP6BixZAfJ_cRrGqrHEbOas_X+T_R+mDH7u0Aew@mail.gmail.com>
+ <20170405083155.GA18287@arm.com>
+Message-ID: <CAFpQJXVRa_hO9Nd2iQ4Qsj-GAHBkJzFxDPJ1VjCeJPg1-iZ7Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-04 at 15:11 -0700, Steve Longerbeam wrote:
-> 
-> On 03/30/2017 10:25 AM, Philipp Zabel wrote:
-> > The TVP5150 DT bindings specify a single output port (port 0) that
-> > corresponds to the video output pad (pad 1, DEMOD_PAD_VID_OUT).
-> >
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> > I'm trying to get this to work with a TVP5150 analog TV decoder, and the
-> > first problem is that this device doesn't have pad 0 as its single
-> > output pad. Instead, as a MEDIA_ENT_F_ATV_DECODER entity, it has for
-> > pads (input, video out, vbi out, audio out), and video out is pad 1,
-> > whereas the device tree only defines a single port (0).
-> 
-> Shouldn't the DT bindings define ports for these other pads?
+Hi Perf Maintainers,
 
-In this case, probably yes for the input pad, certainly no for the
-VBI/audio pads. See the other mail.
+your suggestion on below discussion is much appreciated!
 
-> I haven't seen this documented anywhere, but shouldn't there
-> be a 1:1 correspondence between DT ports and media pads?
+On Wed, Apr 5, 2017 at 2:01 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Apr 05, 2017 at 09:29:32AM +0530, Ganapatrao Kulkarni wrote:
+>> On Tue, Apr 4, 2017 at 5:56 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Apr 04, 2017 at 05:37:10PM +0530, Ganapatrao Kulkarni wrote:
+>> >> On Tue, Apr 4, 2017 at 4:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> >> > On Tue, Apr 04, 2017 at 04:10:55PM +0530, Ganapatrao Kulkarni wrote:
+>> >> >> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+>> >> >> is returning error for perf syscall with mixed attribute set for exclude_kernel
+>> >> >> and exlude_hv.
+>> >> >>
+>> >> >> This change is breaking some applications (observed with hhvm) when
+>> >> >> ran with VHE enabled. Adding change to enable EL2 event counting,
+>> >> >> if either of or both of exclude_kernel and exlude_hv are not set.
+>> >> >>
+>> >> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>> >> >> ---
+>> >> >>  arch/arm64/kernel/perf_event.c | 19 ++++++++++++-------
+>> >> >>  1 file changed, 12 insertions(+), 7 deletions(-)
+>> >> >
+>> >> > Hmm. When we have VHE, we can't distinguish between hypervisor and kernel,
+>> >> > so this patch doesn't seem right to me. The code currently requires
+>> >> > both exclude_kernel and exclude_hv to be clear before we enable profiling
+>> >> > EL2, otherwise we're failing to exclude samples that were asked to be
+>> >> > excluded.
+>> >>
+>> >> The application cant differentiate that kernel is running in EL2/VHE or in EL1
+>> >> when VHE=1, is it makes sense to enable EL2 event counting when there
+>> >> is request from application to either include kernel or hypervisor
+>> >> event count, since both are same.
+>> >
+>> > You can make exactly the same argument against your proposal by saying that
+>> > it makes sense to disable EL2 event counting when there is a request from
+>> > an application to either exclude kernel or hypervisor event counting.
+>>
+>> yes, the argument is equally valid on either side.
+>>
+>> >
+>> >> IMO, it is not appropriate to have different application behaviour
+>> >> when kernel booted with VHE=0/1
+>> >
+>> > Then find another solution to that. How about a mechanism to advertise
+>> > that exclude_hv is effectively always set if the kernel is running at EL2?
+>>
+>> I am not sure, how we can advertise to user that kernel is running at EL2.
+>> we may add a note to man page of perf_event_open?
+>> "exclude_hv is always set, if host kernel and hypervisor are running
+>> at same privilege level",
+>
+> I was thinking of putting something into sysfs, alongside the other things
+> we have in there. For example, a file that describes whether any of the
+> perf_event_attr behave as though they are fixed to a certain value. We
+> should involve the perf maintainers (and perf tool developers) in this,
+> but perhaps something like an attr directory, where we could have a file
+> called exclude_hv that contains the value 1.
+>
+> Will
 
-Not in general. But imagine a dual HDMI->CSI2 converter, for example. We
-don't support this yet, but that might reasonably be described in the
-device tree as a single device with two output ports. But the internal
-representation would be two completely separate v4l2 subdevices.
-
-regards
-Philipp
+thanks
+Ganapat
