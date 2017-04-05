@@ -1,67 +1,109 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 19:04:48 +0530
-Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
-References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
- <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
- <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
- <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
-Message-ID: <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed,  5 Apr 2017 14:37:13 +0100
+Subject: [PATCH v2 0/9] Support swap entries for contiguous pte hugepages
+Message-ID: <20170405133722.6406-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
+While trying to enable memory failure handling on arm64 I ran into few
+issues resulting from the incorrect handling of contiguous pte
+hugepages. When contiguous pte hugepage size is enabled, in certain
+instances the architecture code does not have the necessary size
+information required to manipulate the page table entries leaving the
+page tables in an inconsistent state.
 
-On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
-> Hi Kishon,
-> 
-> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi,
->>
->> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
->>> This is driver for USB DRD Phy used in Broadcom's Northstar2
->>> SoC. The phy can be configured to be in Device mode or Host
->>> mode based on the type of cable connected to the port. The
->>> driver registers to  extcon framework to get appropriate
->>> connect events for Host/Device cables connect/disconnect
->>> states based on VBUS and ID interrupts.
->>
->> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
->> Northstar2.
->>
-> 
-> Will do.
-> 
->> Sorry for not letting you know this earlier. But I feel the design of the
->> driver should be changed. Extcon shouldn't be used here. The extcon
->> notifications should be sent to the consumer driver and the consumer driver
->> should be responsible for invoking the phy ops.
->>
-> 
-> The consumer drivers here would be a UDC driver (USB device
-> controller), EHCI and OHCI host controller drivers.
-> I was already suggested in UDC driver review to deal with extcon in Phy driver.
-> 
-> This phy connects to 2 host controllers, and one device controller.
-> That's the design in Broadcom Northstar2
-> platform. The values of the VBUS and ID pins of this port are
-> determined based on the type of the cable (device cable
-> or host cable). And. phy has to be configured accordingly.
-> 
->> The phy ops being invoked during extcon events doesn't look right.
-> 
-> Could you please elaborate on the concern, so that we can think of
-> mitigating those issues in this driver?
-> Since we are dealing with phy init/shutdown in this driver itself, are
-> you okay with moving the extcon handling code
-> out of phy ops ?
+Since the previous postings[0][1], I've discovered a few more helpers
+that need updating. The patchset can be grouped by related changes as-
 
-yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
-extcon events too. Can a phy which is initialized by a phy consumer (say your
-UDC invokes phy_init) can be shutdown by an extcon event?
+* huge_pte_offset() - Patches 1-2
+  - patch 1 adds a hugepage size parameter to huge_pte_offset() and
+    updates callsites
+  - patch 2 uses the hugepage size to find appropriate page table
+    offset on arm64 (even if the pte contains a swap entry)
+* huge_pte_clear() - Patches 3-4
+  - patch 3 adds a size parameter to huge_pte_clear() and makes it a
+    weak function to allow overriding by architecture *
+    set_huge_pte_at()
+  - override huge_pte_clear() for arm64 to clear multiple ptes for
+    contiguous hugepages
+* set_huge_pte_at() - Patches 5-7
+  - introduces an alternate helper set_huge_swap_pte_at() which is to
+    be used to put down swap huge ptes. Default implementation
+    defaults to calling set_huge_pte_at()
+  - update try_to_unmap_one() to use set_huge_swap_pte_at() when
+    poisoning hugepages
+  - override the set_huge_swap_pte_at() for arm64 to correctly deal
+    with contiguous pte hugepages
+* enable memory corruption - Patches 8-9
+  - these patches enable memory corruption handling for arm64 and are
+    included for completeness.
+  
+The patchset depends on a cleanup/fix series for contiguous pte
+hugepages from Steve[2]. I've been using hwpoison testsuite from
+mce-test[3] on arm64 hardware. Compile tested on s390 and x86.
 
-Maybe a clear explanation of when phy_ops here will be invoked and when it will
-set using extcon events might help.
+All feedback welcome. As well, I'd appreciate input on structuring the
+patchset to make it easier for merging.
 
-Thanks
-Kishon
+Thanks,
+Punit
+
+
+v1 -> v2
+
+* switch huge_pte_offset() to use size instead of hstate for
+  consistency with the rest of the api
+* Expand the series to address huge_pte_clear() and set_huge_pte_at()
+
+RFC -> v1
+
+* Fixed a missing conversion of huge_pte_offset() prototype to add
+  hstate parameter. Reported by 0-day.
+
+[0] https://lkml.org/lkml/2017/3/23/293
+[1] https://lkml.org/lkml/2017/3/30/770
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/497027.html
+[3] https://git.kernel.org/pub/scm/utils/cpu/mce/mce-test.git
+
+Jonathan (Zhixiong) Zhang (2):
+  arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+  arm64: kconfig: allow support for memory failure handling
+
+Punit Agrawal (7):
+  mm/hugetlb: add size parameter to huge_pte_offset()
+  arm64: hugetlbpages: Support handling swap entries in
+    huge_pte_offset()
+  mm/hugetlb: Allow architectures to override huge_pte_clear()
+  arm64: hugetlb: Override huge_pte_clear() to support contiguous
+    hugepages
+  mm/hugetlb: Introduce set_huge_swap_pte_at() helper
+  arm64: hugetlb: Override set_huge_swap_pte_at() to support contiguous
+    hugepages
+  mm: rmap: Use correct helper when poisoning hugepages
+
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/mm/fault.c           | 22 ++++++++++++--
+ arch/arm64/mm/hugetlbpage.c     | 66 +++++++++++++++++++++++++++++++----------
+ arch/ia64/mm/hugetlbpage.c      |  4 +--
+ arch/metag/mm/hugetlbpage.c     |  3 +-
+ arch/mips/mm/hugetlbpage.c      |  3 +-
+ arch/parisc/mm/hugetlbpage.c    |  3 +-
+ arch/powerpc/mm/hugetlbpage.c   |  2 +-
+ arch/s390/include/asm/hugetlb.h | 10 ++-----
+ arch/s390/mm/hugetlbpage.c      | 12 +++++++-
+ arch/sh/mm/hugetlbpage.c        |  3 +-
+ arch/sparc/mm/hugetlbpage.c     |  3 +-
+ arch/tile/mm/hugetlbpage.c      |  3 +-
+ arch/x86/mm/hugetlbpage.c       |  2 +-
+ drivers/acpi/apei/Kconfig       |  1 +
+ fs/userfaultfd.c                |  7 +++--
+ include/asm-generic/hugetlb.h   |  7 ++---
+ include/linux/hugetlb.h         |  7 +++--
+ mm/hugetlb.c                    | 45 ++++++++++++++++++++--------
+ mm/page_vma_mapped.c            |  3 +-
+ mm/pagewalk.c                   |  3 +-
+ mm/rmap.c                       |  8 +++--
+ 22 files changed, 154 insertions(+), 64 deletions(-)
+
+-- 
+2.11.0
