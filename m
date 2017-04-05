@@ -1,110 +1,83 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  5 Apr 2017 17:18:01 +0200
-Subject: [PATCH v4 0/7] Add support for pinctrl/gpio on Armada 37xx
-Message-ID: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+Date: Wed,  5 Apr 2017 17:18:07 +0200
+Subject: [PATCH v4 6/7] ARM64: dts: marvell: Add pinctrl nodes for Armada 3700
+In-Reply-To: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+Message-ID: <1defc5c1925e819b28f2b3802aadc9a8e7be224a.1491405475.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add the nodes for the two pin controller present in the Armada 37xx SoCs.
 
-In this forth version I improved the driver based on the review from
-Linus Walleij and I fixed a configuration issue with uart2. For the
-record, this series adds support for the pin and gpio controllers
-present on the Armada 37xx SoCs.
+Initially the node was named gpio1 using the same name that for the
+register range in the datasheet. However renaming it pinctr_nb (nb for
+North Bridge) makes more sens.
 
-Each Armada 37xx SoC comes with 2 pin controllers: one on the south
-bridge (managing 28 pins) and one on the north bridge (managing 36 pins).
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 42 +++++++++++++++++++--
+ 1 file changed, 39 insertions(+), 3 deletions(-)
 
-At the hardware level the controller configure the pins by group and not
-pin by pin.
-
-The gpio controller is also capable to handle interrupt from gpio.
-
-Changelog
-
-v3 -> v4
-- Some group are configured by several bits in the register:
-  extend the armada_37xx_pin_group struct to manage it.
-
-- Fix the uart2 and cspi2/3 configuration
-
-- Document the armada_37xx_add_function(), armada_37xx_fill_group()
-  and armada_37xx_fill_funcs().
-
-- Use devm_gpiochip_add_data()
-
-- Use irq_find_mapping instead of irq_linear_revmap
-
-- Use handle_edge_irq instead of the wrong handle_level_irq
-
-- Add comment about the fact the we have multiple parent interrupt
-
-- Add comment about the mask usage of the irq_data struct
-
-- Use BIT() macro when possible
-
-- Select more CONFIG symbol needed for GPIO and interrupt support
-
-v2 -> v3
- - use gpio-ranges (patch 4)
-
- - Document gpio-ranges usage (patch 1)
-
- - do not use anymore a global pin index (patch 3)
-
-v1 -> v2:
-- Update binding documentation making clear that mfd and syscon must
-  be used (patch 1).
-
-- Split the fist patch adding pin controller support for Armada 37xx
-  in arm64 part (for kconfig) and pinctrl part (patch 2 and 3)
-
-- Add MFD_SYSCON dependency (patch 3)
-
-- Add kerneldoc for the armada_37xx_pin_group struct (patch 3)
-
-- Rename _add_function() to armada_37xx_add_function() (patch 3)
-
-- Use an inline function to update the reg offset (patch 4)
-
-- Rename gpiolib_register to gpiochip_register (patch 4)
-
-- Add a comment about the two registers limit (patch 4)
-
-- Add explicit gpio node in the device tree (patch 4)
-
-- Convert the driver to use GPIOLIB_IRQCHIP (patch 5)
-
-- Add a critical section when accessing the hardware registers (patch 5)
-
-- Use the gpio subnode (patch 5)
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (7):
-  pinctrl: dt-bindings: Add documentation for Armada 37xx pin controllers
-  arm64: marvell: enable the Armada 37xx pinctrl driver
-  pinctrl: armada-37xx: Add pin controller support for Armada 37xx
-  pinctrl: armada-37xx: Add gpio support
-  pinctrl: aramda-37xx: Add irqchip support
-  ARM64: dts: marvell: Add pinctrl nodes for Armada 3700
-  ARM64: dts: marvell: armada37xx: add pinctrl definition
-
- Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +-
- Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 183 ++++++++++++++-
- arch/arm64/Kconfig.platforms                                              |   5 +-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts                            |   8 +-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi                              |  73 ++++-
- drivers/pinctrl/Makefile                                                  |   2 +-
- drivers/pinctrl/mvebu/Kconfig                                             |   7 +-
- drivers/pinctrl/mvebu/Makefile                                            |   3 +-
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c                               | 969 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 9 files changed, 1249 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-
-base-commit: c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index b48d668a6ab6..c02b13479458 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -157,10 +157,29 @@
+ 				#clock-cells = <1>;
+ 			};
+ 
+-			gpio1: gpio at 13800 {
+-				compatible = "marvell,mvebu-gpio-3700",
++			pinctrl_nb: pinctrl-nb at 13800 {
++				compatible = "marvell,armada3710-nb-pinctrl",
+ 				"syscon", "simple-mfd";
+-				reg = <0x13800 0x500>;
++				reg = <0x13800 0x100>, <0x13C00 0x20>;
++				gpionb: gpionb {
++					#gpio-cells = <2>;
++					gpio-ranges = <&pinctrl_nb 0 0 36>;
++					gpio-controller;
++					interrupts =
++					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
++
++				};
+ 
+ 				xtalclk: xtal-clk {
+ 					compatible = "marvell,armada-3700-xtal-clock";
+@@ -169,6 +188,23 @@
+ 				};
+ 			};
+ 
++			pinctrl_sb: pinctrl-sb at 18800 {
++				compatible = "marvell,armada3710-sb-pinctrl",
++				"syscon", "simple-mfd";
++				reg = <0x18800 0x100>, <0x18C00 0x20>;
++				gpiosb: gpiosb {
++					#gpio-cells = <2>;
++					gpio-ranges = <&pinctrl_sb 0 0 29>;
++					gpio-controller;
++					interrupts =
++					<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
++				};
++			};
++
+ 			eth0: ethernet at 30000 {
+ 				   compatible = "marvell,armada-3700-neta";
+ 				   reg = <0x30000 0x4000>;
 -- 
 git-series 0.9.1
