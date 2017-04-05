@@ -1,28 +1,137 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 5 Apr 2017 08:11:37 +0200
-Subject: [linux-sunxi] [PATCH 02/11] arm64: allwinner: a64: add NMI
- controller on A64
-In-Reply-To: <CAGb2v67BucT8=FTgem3AmSU9XJA7OHoTCq3t3wBzDWyuwzZqaA@mail.gmail.com>
+Date: Wed, 5 Apr 2017 08:13:39 +0200
+Subject: [PATCH 10/11] arm64: allwinner: a64: enable AXP803 regulators
+ for Pine64
+In-Reply-To: <20170404180145.12897-11-icenowy@aosc.io>
 References: <20170404180145.12897-1-icenowy@aosc.io>
- <20170404180145.12897-3-icenowy@aosc.io>
- <CAGb2v67BucT8=FTgem3AmSU9XJA7OHoTCq3t3wBzDWyuwzZqaA@mail.gmail.com>
-Message-ID: <20170405061137.n66ectbkl7a2fv5f@lukather>
+ <20170404180145.12897-11-icenowy@aosc.io>
+Message-ID: <20170405061339.lo76zihtqmhlkpgh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 11:51:45AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> > Allwinner A64 SoC features a NMI controller, which is usually connected
-> > to the AXP PMIC.
-> >
-> > Add support for it.
-> >
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+On Wed, Apr 05, 2017 at 02:01:44AM +0800, Icenowy Zheng wrote:
+> Add support of AXP803 regulators in the Pine64 device tree, in order to
+> enable many future functionalities, e.g. Wi-Fi.
 > 
-> This might not be the best representation of the R_INTC block. Though
-> we'd need to change it for all SoCs if we want to be accurate. For now,
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 109 +++++++++++++++++++++
+>  1 file changed, 109 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> index 2132d8e6cb3d..7da074f95065 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> @@ -106,6 +106,115 @@
+>  	};
+>  };
+>  
+> +#include "axp803.dtsi"
+> +
+> +&reg_aldo1 {
+> +	regulator-min-microvolt = <2800000>;
+> +	regulator-max-microvolt = <2800000>;
+> +	regulator-name = "vcc-csi";
+> +};
+> +
+> +&reg_aldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-pl";
+> +};
+> +
+> +&reg_aldo3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <2700000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-pll-avcc";
+> +};
+> +
+> +&reg_dc1sw {
+> +	regulator-name = "vcc-phy";
+> +};
+> +
+> +&reg_dcdc1 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-3v3";
+> +};
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1300000>;
+> +	regulator-name = "vdd-cpux";
+> +};
+> +
+> +/* DCDC3 is polyphased with DCDC2 */
+> +
+> +&reg_dcdc5 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1500000>;
+> +	regulator-max-microvolt = <1500000>;
+> +	regulator-name = "vcc-dram";
+> +};
+> +
+> +&reg_dcdc6 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1100000>;
+> +	regulator-max-microvolt = <1100000>;
+> +	regulator-name = "vdd-sys";
+> +};
+> +
+> +&reg_dldo1 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-hdmi";
+> +};
+> +
+> +&reg_dldo2 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-mipi";
+> +};
+> +
+> +&reg_dldo3 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "avdd-csi";
+> +};
+> +
+> +&reg_dldo4 {
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vcc-wifi";
+> +};
+> +
+> +&reg_eldo1 {
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +	regulator-name = "cpvdd";
+> +};
+> +
+> +&reg_eldo3 {
+> +	regulator-min-microvolt = <1800000>;
+> +	regulator-max-microvolt = <1800000>;
+> +	regulator-name = "vdd-1v8-csi";
+> +};
+> +
+> +&reg_fldo1 {
+> +	regulator-min-microvolt = <1200000>;
+> +	regulator-max-microvolt = <1200000>;
+> +	regulator-name = "vcc-1v2-hsic";
+> +};
+> +
+> +&reg_fldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1100000>;
+> +	regulator-max-microvolt = <1100000>;
+> +	regulator-name = "vdd-cpus";
+> +};
 
-What do you think would be a good representation?
+Why do you need to always power the AR100 on?
 
 Maxime
 
@@ -36,4 +145,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/610753c0/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/7638a282/attachment.sig>
