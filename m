@@ -1,146 +1,53 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  5 Apr 2017 12:18:31 -0700
-Subject: [PATCH v4] arm64: print a fault message when attempting to write RO
- memory
-Message-ID: <20170405191831.8246-1-stephen.boyd@linaro.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 5 Apr 2017 14:21:20 -0500
+Subject: [PATCH] misc: sram-exec: Use aligned fncpy instead of memcpy
+Message-ID: <20170405192120.1009-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a page is marked read only we should print out that fact,
-instead of printing out that there was a page fault. Right now we
-get a cryptic error message that something went wrong with an
-unhandled fault, but we don't evaluate the esr to figure out that
-it was a read/write permission fault.
+Currently the sram-exec functionality, which allows allocation of
+executable memory and provides an API to move code to it, is only
+selected in configs for the ARM architecture. Based on commit
+5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+function body copying") simply copying a C function pointer address
+using memcpy without consideration of alignment and Thumb is unsafe on
+ARM platforms.
 
-Instead of seeing:
+The aforementioned patch introduces the fncpy macro which is a safe way
+to copy executable code on ARM platforms, so let's make use of that here
+rather than the unsafe plain memcpy that was previously used by
+sram_exec_copy.
 
-  Unable to handle kernel paging request at virtual address ffff000008e460d8
-  pgd = ffff800003504000
-  [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
-  Internal error: Oops: 9600004f [#1] PREEMPT SMP
+In the future, architectures hoping to make use of the sram-exec
+functionality must define an fncpy macro just as ARM has done to
+guarantee or check for safe copying to executable memory before allowing
+the arch to select CONFIG_SRAM_EXEC.
 
-we'll see:
-
-  Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
-  pgd = ffff80003d3de000
-  [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
-  Internal error: Oops: 9600004f [#1] PREEMPT SMP
-
-We also add a userspace address check into is_permission_fault()
-so that the function doesn't return true for ttbr0 PAN faults
-when it shouldn't.
-
-Reviewed-by: James Morse <james.morse@arm.com>
-Tested-by: James Morse <james.morse@arm.com>
-Acked-by: Laura Abbott <labbott@redhat.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
+ drivers/misc/sram-exec.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Changes from v3:
- * Don't drop addr check in do_page_fault() (James Morse)
-
-Changes from v2:
- * Fold addr check into is_permission_fault() (James Morse)
-
-Changes from v1:
- * Move into __do_kernel_fault() (Mark Rutland)
-
- arch/arm64/mm/fault.c | 55 +++++++++++++++++++++++++++++++++------------------
- 1 file changed, 36 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 156169c6981b..3bde99769679 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -160,12 +160,33 @@ static bool is_el1_instruction_abort(unsigned int esr)
- 	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
- }
+diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+index ac522417c462..0057eabe5c03 100644
+--- a/drivers/misc/sram-exec.c
++++ b/drivers/misc/sram-exec.c
+@@ -19,6 +19,7 @@
+ #include <linux/sram.h>
  
-+static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs,
-+				       unsigned long addr)
-+{
-+	unsigned int ec       = ESR_ELx_EC(esr);
-+	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
-+
-+	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
-+		return false;
-+
-+	if (fsc_type == ESR_ELx_FSC_PERM)
-+		return true;
-+
-+	if (addr < USER_DS && system_uses_ttbr0_pan())
-+		return fsc_type == ESR_ELx_FSC_FAULT &&
-+			(regs->pstate & PSR_PAN_BIT);
-+
-+	return false;
-+}
-+
- /*
-  * The kernel tried to access some page that wasn't present.
-  */
- static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
- 			      unsigned int esr, struct pt_regs *regs)
- {
-+	const char *msg;
-+
- 	/*
- 	 * Are we prepared to handle this kernel fault?
- 	 * We are almost certainly not prepared to handle instruction faults.
-@@ -177,9 +198,20 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
- 	 * No handler, we'll have to terminate things with extreme prejudice.
- 	 */
- 	bust_spinlocks(1);
--	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
--		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
--		 "paging request", addr);
-+
-+	if (is_permission_fault(esr, regs, addr)) {
-+		if (esr & ESR_ELx_WNR)
-+			msg = "write to read-only memory";
-+		else
-+			msg = "read from unreadable memory";
-+	} else if (addr < PAGE_SIZE) {
-+		msg = "NULL pointer dereference";
-+	} else {
-+		msg = "paging request";
-+	}
-+
-+	pr_alert("Unable to handle kernel %s@virtual address %08lx\n", msg,
-+		 addr);
+ #include <asm/cacheflush.h>
++#include <asm/fncpy.h>
  
- 	show_pte(mm, addr);
- 	die("Oops", regs, esr);
-@@ -269,21 +301,6 @@ static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
- 	return fault;
- }
+ #include "sram.h"
  
--static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
--{
--	unsigned int ec       = ESR_ELx_EC(esr);
--	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
--
--	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
--		return false;
--
--	if (system_uses_ttbr0_pan())
--		return fsc_type == ESR_ELx_FSC_FAULT &&
--			(regs->pstate & PSR_PAN_BIT);
--	else
--		return fsc_type == ESR_ELx_FSC_PERM;
--}
--
- static bool is_el0_instruction_abort(unsigned int esr)
- {
- 	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_LOW;
-@@ -321,7 +338,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		mm_flags |= FAULT_FLAG_WRITE;
- 	}
+@@ -93,7 +94,7 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+ 	set_memory_nx((unsigned long)base, pages);
+ 	set_memory_rw((unsigned long)base, pages);
  
--	if (addr < USER_DS && is_permission_fault(esr, regs)) {
-+	if (addr < USER_DS && is_permission_fault(esr, regs, addr)) {
- 		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
- 		if (regs->orig_addr_limit == KERNEL_DS)
- 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
+-	memcpy(dst, src, size);
++	fncpy(dst, src, size);
+ 
+ 	set_memory_ro((unsigned long)base, pages);
+ 	set_memory_x((unsigned long)base, pages);
 -- 
-2.10.0.297.gf6727b0
+2.11.0
