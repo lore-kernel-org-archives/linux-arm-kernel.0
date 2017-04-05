@@ -1,5 +1,5 @@
 From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 5 Apr 2017 15:16:19 +0530
+Date: Wed, 5 Apr 2017 15:18:17 +0530
 Subject: [PATCH] arm64: perf: Count EL2 events if either of kernel and hyp
  are not excluded
 In-Reply-To: <20170405083155.GA18287@arm.com>
@@ -9,13 +9,11 @@ References: <1491302455-5939-1-git-send-email-ganapatrao.kulkarni@cavium.com>
  <20170404122632.GF14898@arm.com>
  <CAFpQJXWwRFTPP6BixZAfJ_cRrGqrHEbOas_X+T_R+mDH7u0Aew@mail.gmail.com>
  <20170405083155.GA18287@arm.com>
-Message-ID: <CAFpQJXVRa_hO9Nd2iQ4Qsj-GAHBkJzFxDPJ1VjCeJPg1-iZ7Zw@mail.gmail.com>
+Message-ID: <CAFpQJXXi8BZAjooUtk9F1Xgzns6EBFOCB9AS8yVm3hGv5Ah93Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Perf Maintainers,
-
-your suggestion on below discussion is much appreciated!
+[Adding maintainers]
 
 On Wed, Apr 5, 2017 at 2:01 PM, Will Deacon <will.deacon@arm.com> wrote:
 > On Wed, Apr 05, 2017 at 09:29:32AM +0530, Ganapatrao Kulkarni wrote:
@@ -73,6 +71,3 @@ On Wed, Apr 5, 2017 at 2:01 PM, Will Deacon <will.deacon@arm.com> wrote:
 > called exclude_hv that contains the value 1.
 >
 > Will
-
-thanks
-Ganapat
