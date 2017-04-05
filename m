@@ -1,44 +1,115 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:46 -0500
-Subject: [PATCH v5 02/23] drivers/fsi: Add slave definition
+Date: Tue,  4 Apr 2017 21:05:51 -0500
+Subject: [PATCH v5 07/23] drivers/fsi: Implement slave initialisation
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-3-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-8-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-Add the initial fsi slave device, which is private to the core code.
-This will be a child of the master, and parent to endpoint devices.
+Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
+devices and register with the driver core.
+
+Includes changes from Chris Bostic <cbostic@linux.vnet.ibm.com>.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/fsi/fsi-core.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 64 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index ca02913..2f19509 100644
+index 6e1cfdf..c705ca2 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -22,6 +22,16 @@
+@@ -17,9 +17,12 @@
+ #include <linux/fsi.h>
+ #include <linux/idr.h>
+ #include <linux/module.h>
++#include <linux/slab.h>
  
+ #include "fsi-master.h"
+ 
++#define FSI_SLAVE_SIZE_23b		0x800000
++
  static DEFINE_IDA(master_ida);
  
-+struct fsi_slave {
-+	struct device		dev;
-+	struct fsi_master	*master;
-+	int			id;
-+	int			link;
-+	uint32_t		size;	/* size of slave address space */
-+};
+ struct fsi_slave {
+@@ -114,11 +117,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
++static void fsi_slave_release(struct device *dev)
++{
++	struct fsi_slave *slave = to_fsi_slave(dev);
 +
-+#define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
++	kfree(slave);
++}
 +
- /* FSI master support */
- int fsi_master_register(struct fsi_master *master)
+ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
  {
+-	/* todo: initialise slave device, perform engine scan */
++	struct fsi_slave *slave;
++	uint32_t chip_id;
++	uint8_t crc;
++	int rc;
++
++	/* Currently, we only support single slaves on a link, and use the
++	 * full 23-bit address range
++	 */
++	if (id != 0)
++		return -EINVAL;
++
++	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
++	if (rc) {
++		dev_warn(&master->dev, "can't read slave %02x:%02x %d\n",
++				link, id, rc);
++		return -ENODEV;
++	}
++	chip_id = be32_to_cpu(chip_id);
++
++	crc = fsi_crc4(0, chip_id, 32);
++	if (crc) {
++		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
++				link, id);
++		return -EIO;
++	}
++
++	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
++			chip_id, master->idx, link, id);
++
++	/* We can communicate with a slave; create the slave device and
++	 * register.
++	 */
++	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
++	if (!slave)
++		return -ENOMEM;
++
++	slave->master = master;
++	slave->dev.parent = &master->dev;
++	slave->dev.release = fsi_slave_release;
++	slave->link = link;
++	slave->id = id;
++	slave->size = FSI_SLAVE_SIZE_23b;
++
++	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
++	rc = device_register(&slave->dev);
++	if (rc < 0) {
++		dev_warn(&master->dev, "failed to create slave device: %d\n",
++				rc);
++		put_device(&slave->dev);
++		return rc;
++	}
++
++	/* todo: perform engine scan */
+ 
+-	return -ENODEV;
++	return rc;
+ }
+ 
+ /* FSI master support */
 -- 
 1.8.2.2
