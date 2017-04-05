@@ -1,57 +1,59 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 5 Apr 2017 18:28:20 +0530
-Subject: [PATCH 1/3] dt: bindings: add pmu0 regs for USB PHYs on Allwinner
- H3/V3s/A64
-In-Reply-To: <20170405125053.6170-2-icenowy@aosc.io>
-References: <20170405125053.6170-1-icenowy@aosc.io>
- <20170405125053.6170-2-icenowy@aosc.io>
-Message-ID: <1524732c-b72f-61ce-8ae7-1d764f85c903@ti.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Wed, 5 Apr 2017 18:30:45 +0530
+Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
+In-Reply-To: <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
+References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
+ <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
+Message-ID: <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kishon,
 
+On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
+>> This is driver for USB DRD Phy used in Broadcom's Northstar2
+>> SoC. The phy can be configured to be in Device mode or Host
+>> mode based on the type of cable connected to the port. The
+>> driver registers to  extcon framework to get appropriate
+>> connect events for Host/Device cables connect/disconnect
+>> states based on VBUS and ID interrupts.
+>
+> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
+> Northstar2.
+>
 
-On Wednesday 05 April 2017 06:20 PM, Icenowy Zheng wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
-> 
-> Allwinner H3/V3s/A64 SoCs have a special USB PHY0 that can route to two
-> controllers: one is MUSB and the other is a EHCI/OHCI pair.
-> 
-> When it's routed to EHCI/OHCI pair, it will needs a "pmu0" regs to
-> tweak, like other EHCI/OHCI pairs in Allwinner SoCs.
-> 
-> Add this to the binding of USB PHYs on Allwinner H3/V3s/A64.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> 
-> Kishon, could you push this to 4.11?
+Will do.
 
-Is this for the patch titled "phy: sun4i-usb: add support for V3s USB PHY" that
-was added during the last merge window.
+> Sorry for not letting you know this earlier. But I feel the design of the
+> driver should be changed. Extcon shouldn't be used here. The extcon
+> notifications should be sent to the consumer driver and the consumer driver
+> should be responsible for invoking the phy ops.
+>
 
-this patch looks simpler enough to be merged in this -rc cycle. However it
-depends on Greg KH.
+The consumer drivers here would be a UDC driver (USB device
+controller), EHCI and OHCI host controller drivers.
+I was already suggested in UDC driver review to deal with extcon in Phy driver.
 
-Thanks
-Kishon
+This phy connects to 2 host controllers, and one device controller.
+That's the design in Broadcom Northstar2
+platform. The values of the VBUS and ID pins of this port are
+determined based on the type of the cable (device cable
+or host cable). And. phy has to be configured accordingly.
 
-> 
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index e42334258185..005bc22938ff 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -15,6 +15,7 @@ Required properties:
->  - reg : a list of offset + length pairs
->  - reg-names :
->    * "phy_ctrl"
-> +  * "pmu0" for H3, V3s and A64
->    * "pmu1"
->    * "pmu2" for sun4i, sun6i or sun7i
->  - #phy-cells : from the generic phy bindings, must be 1
-> 
+> The phy ops being invoked during extcon events doesn't look right.
+
+Could you please elaborate on the concern, so that we can think of
+mitigating those issues in this driver?
+Since we are dealing with phy init/shutdown in this driver itself, are
+you okay with moving the extcon handling code
+out of phy ops ?
+
+Thanks,
+Ravi
+>
+> Thanks
+> Kishon
