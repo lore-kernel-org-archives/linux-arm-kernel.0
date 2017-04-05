@@ -1,272 +1,125 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 5 Apr 2017 10:27:41 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 04/11] drm/sun4i: abstract the layer
- type
-In-Reply-To: <dbf0f478-ff53-0ced-24a3-e9de7077efd9@aosc.io>
-References: <20170329194613.55548-1-icenowy@aosc.io>
- <20170329194613.55548-5-icenowy@aosc.io>
- <20170404192837.pvlhwyeut45vg2wg@art_vandelay>
- <dbf0f478-ff53-0ced-24a3-e9de7077efd9@aosc.io>
-Message-ID: <CAGb2v66vxP0c3qMTAUCseTCbpJ6gxnKfNGNcC41jPHA_Ye4ggw@mail.gmail.com>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Tue,  4 Apr 2017 21:05:52 -0500
+Subject: [PATCH v5 08/23] drivers/fsi: Set slave SMODE to init communication
+In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-9-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 3:53 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> ? 2017?04?05? 03:28, Sean Paul ??:
->>
->> On Thu, Mar 30, 2017 at 03:46:06AM +0800, Icenowy Zheng wrote:
->>>
->>> As we are going to add support for the Allwinner DE2 Mixer in sun4i-drm
->>> driver, we will finally have two types of layer.
->>>
->>> Abstract the layer type to void * and a ops struct, which contains the
->>> only function used by crtc -- get the drm_plane struct of the layer.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>> Refactored patch in v3.
->>>
->>>  drivers/gpu/drm/sun4i/sun4i_crtc.c  | 19 +++++++++++--------
->>>  drivers/gpu/drm/sun4i/sun4i_crtc.h  |  3 ++-
->>>  drivers/gpu/drm/sun4i/sun4i_layer.c | 19 ++++++++++++++++++-
->>>  drivers/gpu/drm/sun4i/sun4i_layer.h |  2 +-
->>>  drivers/gpu/drm/sun4i/sunxi_layer.h | 17 +++++++++++++++++
->>>  5 files changed, 49 insertions(+), 11 deletions(-)
->>>  create mode 100644 drivers/gpu/drm/sun4i/sunxi_layer.h
->>>
->>> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c
->>> b/drivers/gpu/drm/sun4i/sun4i_crtc.c
->>> index 3c876c3a356a..33854ee7f636 100644
->>> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
->>> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
->>> @@ -29,6 +29,7 @@
->>>  #include "sun4i_crtc.h"
->>>  #include "sun4i_drv.h"
->>>  #include "sun4i_layer.h"
->>> +#include "sunxi_layer.h"
->>>  #include "sun4i_tcon.h"
->>>
->>>  static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
->>> @@ -149,7 +150,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device
->>> *drm,
->>>         scrtc->tcon = tcon;
->>>
->>>         /* Create our layers */
->>> -       scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
->>> +       scrtc->layers = (void **)sun4i_layers_init(drm, scrtc);
->>>         if (IS_ERR(scrtc->layers)) {
->>>                 dev_err(drm->dev, "Couldn't create the planes\n");
->>>                 return NULL;
->>> @@ -157,14 +158,15 @@ struct sun4i_crtc *sun4i_crtc_init(struct
->>> drm_device *drm,
->>>
->>>         /* find primary and cursor planes for drm_crtc_init_with_planes
->>> */
->>>         for (i = 0; scrtc->layers[i]; i++) {
->>> -               struct sun4i_layer *layer = scrtc->layers[i];
->>> +               void *layer = scrtc->layers[i];
->>> +               struct drm_plane *plane =
->>> scrtc->layer_ops->get_plane(layer);
->>>
->>> -               switch (layer->plane.type) {
->>> +               switch (plane->type) {
->>>                 case DRM_PLANE_TYPE_PRIMARY:
->>> -                       primary = &layer->plane;
->>> +                       primary = plane;
->>>                         break;
->>>                 case DRM_PLANE_TYPE_CURSOR:
->>> -                       cursor = &layer->plane;
->>> +                       cursor = plane;
->>>                         break;
->>>                 default:
->>>                         break;
->>> @@ -190,10 +192,11 @@ struct sun4i_crtc *sun4i_crtc_init(struct
->>> drm_device *drm,
->>>         /* Set possible_crtcs to this crtc for overlay planes */
->>>         for (i = 0; scrtc->layers[i]; i++) {
->>>                 uint32_t possible_crtcs =
->>> BIT(drm_crtc_index(&scrtc->crtc));
->>> -               struct sun4i_layer *layer = scrtc->layers[i];
->>> +               void *layer = scrtc->layers[i];
->>> +               struct drm_plane *plane =
->>> scrtc->layer_ops->get_plane(layer);
->>>
->>> -               if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
->>> -                       layer->plane.possible_crtcs = possible_crtcs;
->>> +               if (plane->type == DRM_PLANE_TYPE_OVERLAY)
->>> +                       plane->possible_crtcs = possible_crtcs;
->>>         }
->>>
->>>         return scrtc;
->>> diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h
->>> b/drivers/gpu/drm/sun4i/sun4i_crtc.h
->>> index 230cb8f0d601..a4036ee44cf8 100644
->>> --- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
->>> +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
->>> @@ -19,7 +19,8 @@ struct sun4i_crtc {
->>>
->>>         struct sun4i_backend            *backend;
->>>         struct sun4i_tcon               *tcon;
->>> -       struct sun4i_layer              **layers;
->>> +       void                            **layers;
->>> +       const struct sunxi_layer_ops    *layer_ops;
->>
->>
->> I think you should probably take a different approach to abstract the
->> layer
->> type. How about creating
->>
->> struct sunxi_layer {
->>         struct drm_plane plane;
->> }
->>
->> base and then subclassing that for sun4i and sun8i? By doing this you can
->> avoid
->> the nasty casting and you can also get rid of the get_plane() hook and
->> layer_ops.
->
->
-> For the situation that using ** things are easily to get weird.
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-That code could be reworked, by initializing the layers directly within
-the crtc init code. If you look at rockchip's drm driver, you'll see
-they do this. There is a good reason to do it this way, as you need
-to first create the primary and cursor layers, pass them in when you
-create the crtc, then initialize any additional layers with the
-possible_crtcs bitmap.
+Set CFAM to appropriate ID so that the controlling master can manage
+link memory ranges.  Add slave engine register definitions.
 
-In our driver we are currently initializing all layers, then going
-back and filling in possible_crtcs for the extra layers.
+Includes changes from Jeremy Kerr <jk@ozlabs.org>.
 
-And as Maxime and I mentioned in the other thread, we don't really
-need to keep a reference to **layers.
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ drivers/fsi/fsi-core.c | 75 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
-Regards
-ChenYu
-
->
->>
->> Sean
->>
->>
->>
->>>  };
->>>
->>>  static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc
->>> *crtc)
->>> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c
->>> b/drivers/gpu/drm/sun4i/sun4i_layer.c
->>> index f26bde5b9117..bc4a70d6968b 100644
->>> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
->>> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
->>> @@ -16,7 +16,9 @@
->>>  #include <drm/drmP.h>
->>>
->>>  #include "sun4i_backend.h"
->>> +#include "sun4i_crtc.h"
->>>  #include "sun4i_layer.h"
->>> +#include "sunxi_layer.h"
->>>
->>>  struct sun4i_plane_desc {
->>>                enum drm_plane_type     type;
->>> @@ -100,6 +102,17 @@ static const struct sun4i_plane_desc
->>> sun4i_backend_planes[] = {
->>>         },
->>>  };
->>>
->>> +static struct drm_plane *sun4i_layer_get_plane(void *layer)
->>> +{
->>> +       struct sun4i_layer *sun4i_layer = layer;
->>> +
->>> +       return &sun4i_layer->plane;
->>> +}
->>> +
->>> +static const struct sunxi_layer_ops layer_ops = {
->>> +       .get_plane = sun4i_layer_get_plane,
->>> +};
->>> +
->>>  static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
->>>                                                 struct sun4i_backend
->>> *backend,
->>>                                                 const struct
->>> sun4i_plane_desc *plane)
->>> @@ -129,9 +142,10 @@ static struct sun4i_layer
->>> *sun4i_layer_init_one(struct drm_device *drm,
->>>  }
->>>
->>>  struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
->>> -                                      struct sun4i_backend *backend)
->>> +                                      struct sun4i_crtc *crtc)
->>>  {
->>>         struct sun4i_layer **layers;
->>> +       struct sun4i_backend *backend = crtc->backend;
->>>         int i;
->>>
->>>         layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes)
->>> + 1,
->>> @@ -181,5 +195,8 @@ struct sun4i_layer **sun4i_layers_init(struct
->>> drm_device *drm,
->>>                 layers[i] = layer;
->>>         };
->>>
->>> +       /* Assign layer ops to the CRTC */
->>> +       crtc->layer_ops = &layer_ops;
->>> +
->>>         return layers;
->>>  }
->>> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h
->>> b/drivers/gpu/drm/sun4i/sun4i_layer.h
->>> index 4be1f0919df2..425eea7b9e3b 100644
->>> --- a/drivers/gpu/drm/sun4i/sun4i_layer.h
->>> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
->>> @@ -27,6 +27,6 @@ plane_to_sun4i_layer(struct drm_plane *plane)
->>>  }
->>>
->>>  struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
->>> -                                      struct sun4i_backend *backend);
->>> +                                      struct sun4i_crtc *crtc);
->>>
->>>  #endif /* _SUN4I_LAYER_H_ */
->>> diff --git a/drivers/gpu/drm/sun4i/sunxi_layer.h
->>> b/drivers/gpu/drm/sun4i/sunxi_layer.h
->>> new file mode 100644
->>> index 000000000000..d8838ec39299
->>> --- /dev/null
->>> +++ b/drivers/gpu/drm/sun4i/sunxi_layer.h
->>> @@ -0,0 +1,17 @@
->>> +/*
->>> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> + * modify it under the terms of the GNU General Public License as
->>> + * published by the Free Software Foundation; either version 2 of
->>> + * the License, or (at your option) any later version.
->>> + */
->>> +
->>> +#ifndef _SUNXI_LAYER_H_
->>> +#define _SUNXI_LAYER_H_
->>> +
->>> +struct sunxi_layer_ops {
->>> +       struct drm_plane *(*get_plane)(void *layer);
->>> +};
->>> +
->>> +#endif /* _SUNXI_LAYER_H_ */
->>> --
->>> 2.12.0
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an
-> email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index c705ca2..b7b138b 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -21,6 +21,27 @@
+ 
+ #include "fsi-master.h"
+ 
++#define FSI_SLAVE_BASE			0x800
++
++/*
++ * FSI slave engine control register offsets
++ */
++#define FSI_SMODE			0x0	/* R/W: Mode register */
++
++/*
++ * SMODE fields
++ */
++#define FSI_SMODE_WSC		0x80000000	/* Warm start done */
++#define FSI_SMODE_ECRC		0x20000000	/* Hw CRC check */
++#define FSI_SMODE_SID_SHIFT	24		/* ID shift */
++#define FSI_SMODE_SID_MASK	3		/* ID Mask */
++#define FSI_SMODE_ED_SHIFT	20		/* Echo delay shift */
++#define FSI_SMODE_ED_MASK	0xf		/* Echo delay mask */
++#define FSI_SMODE_SD_SHIFT	16		/* Send delay shift */
++#define FSI_SMODE_SD_MASK	0xf		/* Send delay mask */
++#define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
++#define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
++
+ #define FSI_SLAVE_SIZE_23b		0x800000
+ 
+ static DEFINE_IDA(master_ida);
+@@ -117,6 +138,52 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
++/* Encode slave local bus echo delay */
++static inline uint32_t fsi_smode_echodly(int x)
++{
++	return (x & FSI_SMODE_ED_MASK) << FSI_SMODE_ED_SHIFT;
++}
++
++/* Encode slave local bus send delay */
++static inline uint32_t fsi_smode_senddly(int x)
++{
++	return (x & FSI_SMODE_SD_MASK) << FSI_SMODE_SD_SHIFT;
++}
++
++/* Encode slave local bus clock rate ratio */
++static inline uint32_t fsi_smode_lbcrr(int x)
++{
++	return (x & FSI_SMODE_LBCRR_MASK) << FSI_SMODE_LBCRR_SHIFT;
++}
++
++/* Encode slave ID */
++static inline uint32_t fsi_smode_sid(int x)
++{
++	return (x & FSI_SMODE_SID_MASK) << FSI_SMODE_SID_SHIFT;
++}
++
++static const uint32_t fsi_slave_smode(int id)
++{
++	return FSI_SMODE_WSC | FSI_SMODE_ECRC
++		| fsi_smode_sid(id)
++		| fsi_smode_echodly(0xf) | fsi_smode_senddly(0xf)
++		| fsi_smode_lbcrr(0x8);
++}
++
++static int fsi_slave_set_smode(struct fsi_master *master, int link, int id)
++{
++	uint32_t smode;
++
++	/* set our smode register with the slave ID field to 0; this enables
++	 * extended slave addressing
++	 */
++	smode = fsi_slave_smode(id);
++	smode = cpu_to_be32(smode);
++
++	return fsi_master_write(master, link, id, FSI_SLAVE_BASE + FSI_SMODE,
++			&smode, sizeof(smode));
++}
++
+ static void fsi_slave_release(struct device *dev)
+ {
+ 	struct fsi_slave *slave = to_fsi_slave(dev);
+@@ -155,6 +222,14 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ 	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
+ 			chip_id, master->idx, link, id);
+ 
++	rc = fsi_slave_set_smode(master, link, id);
++	if (rc) {
++		dev_warn(&master->dev,
++				"can't set smode on slave:%02x:%02x %d\n",
++				link, id, rc);
++		return -ENODEV;
++	}
++
+ 	/* We can communicate with a slave; create the slave device and
+ 	 * register.
+ 	 */
+-- 
+1.8.2.2
