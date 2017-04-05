@@ -1,32 +1,51 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Wed,  5 Apr 2017 19:52:27 +0300
-Subject: [PATCH] clk: sunxi-ng: Display index when clock registration fails
-Message-ID: <20170405165227.6985-1-plaes@plaes.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 5 Apr 2017 11:52:54 -0500
+Subject: [PATCH v6 01/23] PCI: endpoint: Add EP core layer to enable EP
+ controller and EP functions
+In-Reply-To: <20170405085243.18123-2-kishon@ti.com>
+References: <20170405085243.18123-1-kishon@ti.com>
+ <20170405085243.18123-2-kishon@ti.com>
+Message-ID: <20170405165254.GA17066@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock index to clock registration failure message. Clock name
-is sometimes not available, when things go really wrong.
+On Wed, Apr 05, 2017 at 02:22:21PM +0530, Kishon Vijay Abraham I wrote:
+> Introduce a new EP core layer in order to support endpoint functions in
+> linux kernel. This comprises the EPC library (Endpoint Controller Library)
+> and EPF library (Endpoint Function Library). EPC library implements
+> functions specific to an endpoint controller and EPF library implements
+> functions specific to an endpoint function.
+> ...
 
-Signed-off-by: Priit Laes <plaes@plaes.org>
----
- drivers/clk/sunxi-ng/ccu_common.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> +/**
+> + * pci_epf_linkup() - Notify the function driver that EPC device has
+> + *		      established a connection with the Root Complex.
+> + * @epf: the EPF device bound to the EPC device which has established
+> + *	 the connection with the host
+> + *
+> + * Invoke to notify the function driver that EPC device has established
+> + * a connection with the Root Complex.
+> + */
+> +void pci_epf_linkup(struct pci_epf *epf)
+> +{
+> +	if (!epf->driver)
+> +		dev_WARN(&epf->dev, "epf device not bound to driver\n");
+> +
+> +	epf->driver->ops->linkup(epf);
 
-diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
-index 8a47baf..188fa50 100644
---- a/drivers/clk/sunxi-ng/ccu_common.c
-+++ b/drivers/clk/sunxi-ng/ccu_common.c
-@@ -63,8 +63,8 @@ int sunxi_ccu_probe(struct device_node *node, void __iomem *reg,
- 
- 		ret = clk_hw_register(NULL, hw);
- 		if (ret) {
--			pr_err("Couldn't register clock %s\n",
--			       clk_hw_get_name(hw));
-+			pr_err("Couldn't register clock %d - %s\n",
-+			       i, clk_hw_get_name(hw));
- 			goto err_clk_unreg;
- 		}
- 	}
--- 
-2.9.3
+I don't understand what's going on here.  We warn if epf->driver is
+NULL, but the next thing we do is dereference it.
+
+For NULL pointers that are symptoms of Linux defects, I usually prefer
+not to check at all so that a dereference generates an oops and we can
+debug the problem.  For NULL pointers caused by user error, we would
+generally return an error that percolates up to the user.
+
+I haven't competely wrapped my head around this endpoint support, but
+I assume a NULL pointer here would be caused by user error, not
+necessarily a Linux defect.  So why would we dereference a NULL
+pointer?  And what happens when we do?  Is this just going to oops an
+embedded Linux running inside the endpoint?  Is that the correct
+behavior?
+
+Bjorn
