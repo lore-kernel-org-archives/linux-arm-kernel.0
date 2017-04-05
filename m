@@ -1,172 +1,95 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Tue,  4 Apr 2017 21:05:58 -0500
-Subject: [PATCH v5 14/23] drivers/fsi: Add sysfs files for FSI master & slave
- accesses
+Date: Tue,  4 Apr 2017 21:05:48 -0500
+Subject: [PATCH v5 04/23] drivers/fsi: Add crc4 helpers
 In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170405020607.79939-15-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-5-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jk@ozlabs.org>
 
-This change adds a 'raw' file for reads & writes, and a 'term' file for
-the TERM command, and a 'break' file for issuing a BREAK.
+Add some helpers for the crc checks for the slave configuration table.
+This works 4-bits-at-a-time, using a simple table approach.
+
+We will need this in the FSI core code, as well as any master
+implementations that need to calculate CRCs in software.
+
+We add this to the fsi code (rather than lib/), as we need a specific
+polynomial for FSI CRCs.
 
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 116 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 116 insertions(+)
+ drivers/fsi/fsi-core.c   | 24 ++++++++++++++++++++++++
+ drivers/fsi/fsi-master.h | 21 +++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4359e26..f0f0556 100644
+index e90d45d..4bbca95 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -294,6 +294,95 @@ static int fsi_slave_scan(struct fsi_slave *slave)
- 	return 0;
- }
+@@ -32,6 +32,30 @@ struct fsi_slave {
  
-+static ssize_t fsi_slave_sysfs_raw_read(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr, char *buf,
-+		loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	size_t total_len, read_len;
-+	int rc;
-+
-+	if (off < 0)
-+		return -EINVAL;
-+
-+	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
-+		return -EINVAL;
-+
-+	for (total_len = 0; total_len < count; total_len += read_len) {
-+		read_len = min_t(size_t, count, 4);
-+		read_len -= off & 0x3;
-+
-+		rc = fsi_slave_read(slave, off, buf + total_len, read_len);
-+		if (rc)
-+			return rc;
-+
-+		off += read_len;
-+	}
-+
-+	return count;
-+}
-+
-+static ssize_t fsi_slave_sysfs_raw_write(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr,
-+		char *buf, loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	size_t total_len, write_len;
-+	int rc;
-+
-+	if (off < 0)
-+		return -EINVAL;
-+
-+	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
-+		return -EINVAL;
-+
-+	for (total_len = 0; total_len < count; total_len += write_len) {
-+		write_len = min_t(size_t, count, 4);
-+		write_len -= off & 0x3;
-+
-+		rc = fsi_slave_write(slave, off, buf + total_len, write_len);
-+		if (rc)
-+			return rc;
-+
-+		off += write_len;
-+	}
-+
-+	return count;
-+}
-+
-+static struct bin_attribute fsi_slave_raw_attr = {
-+	.attr = {
-+		.name = "raw",
-+		.mode = 0600,
-+	},
-+	.size = 0,
-+	.read = fsi_slave_sysfs_raw_read,
-+	.write = fsi_slave_sysfs_raw_write,
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ 
++/* crc helpers */
++static const uint8_t crc4_tab[] = {
++	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
++	0x1, 0x6, 0xf, 0x8, 0xa, 0xd, 0x4, 0x3,
 +};
 +
-+static ssize_t fsi_slave_sysfs_term_write(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr,
-+		char *buf, loff_t off, size_t count)
++uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
 +{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	struct fsi_master *master = slave->master;
++	int i;
 +
-+	if (!master->term)
-+		return -ENODEV;
++	/* Align to 4-bits */
++	bits = (bits + 3) & ~0x3;
 +
-+	master->term(master, slave->link, slave->id);
-+	return count;
++	/* mask off anything above the top bit */
++	x &= (1ull << bits) - 1;
++
++	/* Calculate crc4 over four-bit nibbles, starting@the MSbit */
++	for (i = bits - 4; i >= 0; i -= 4)
++		c = crc4_tab[c ^ ((x >> i) & 0xf)];
++
++	return c;
 +}
++EXPORT_SYMBOL_GPL(fsi_crc4);
 +
-+static struct bin_attribute fsi_slave_term_attr = {
-+	.attr = {
-+		.name = "term",
-+		.mode = 0200,
-+	},
-+	.size = 0,
-+	.write = fsi_slave_sysfs_term_write,
-+};
-+
- /* Encode slave local bus echo delay */
- static inline uint32_t fsi_smode_echodly(int x)
+ /* FSI slave support */
+ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
  {
-@@ -409,6 +498,14 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 		return rc;
- 	}
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+index 7764b00..d6a4885 100644
+--- a/drivers/fsi/fsi-master.h
++++ b/drivers/fsi/fsi-master.h
+@@ -38,4 +38,25 @@ struct fsi_master {
+ extern int fsi_master_register(struct fsi_master *master);
+ extern void fsi_master_unregister(struct fsi_master *master);
  
-+	rc = device_create_bin_file(&slave->dev, &fsi_slave_raw_attr);
-+	if (rc)
-+		dev_warn(&slave->dev, "failed to create raw attr: %d\n", rc);
++/**
++ * crc4 helper: Given a starting crc4 state @c, calculate the crc4 vaue of @x,
++ * which is @bits in length. This may be required by master implementations
++ * that do not provide their own hardware checksums.
++ *
++ * The crc4 is performed on 4-bit chunks (which is all we need for FSI
++ * calculations). Typically, we'll want a starting state of 0:
++ *
++ *  c = fsi_crc4(0, msg, len);
++ *
++ * To crc4 a message that includes a single start bit, initialise crc4 state
++ * with:
++ *
++ *  c = fsi_crc4(0, 1, 1);
++ *
++ * Then update with message data:
++ *
++ *  c = fsi_crc4(c, msg, len);
++ */
++uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits);
 +
-+	rc = device_create_bin_file(&slave->dev, &fsi_slave_term_attr);
-+	if (rc)
-+		dev_warn(&slave->dev, "failed to create term attr: %d\n", rc);
-+
- 	fsi_slave_scan(slave);
- 	return 0;
- }
-@@ -523,6 +620,18 @@ static ssize_t master_rescan_store(struct device *dev,
- 
- static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
- 
-+static ssize_t master_break_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	struct fsi_master *master = to_fsi_master(dev);
-+
-+	fsi_master_break(master, 0);
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(break, 0200, NULL, master_break_store);
-+
- int fsi_master_register(struct fsi_master *master)
- {
- 	int rc;
-@@ -546,6 +655,13 @@ int fsi_master_register(struct fsi_master *master)
- 		return rc;
- 	}
- 
-+	rc = device_create_file(&master->dev, &dev_attr_break);
-+	if (rc) {
-+		device_unregister(&master->dev);
-+		ida_simple_remove(&master_ida, master->idx);
-+		return rc;
-+	}
-+
- 	fsi_master_scan(master);
- 
- 	return 0;
+ #endif /* DRIVERS_FSI_MASTER_H */
 -- 
 1.8.2.2
