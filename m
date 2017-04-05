@@ -1,131 +1,74 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Wed,  5 Apr 2017 16:29:24 +0800
-Subject: [PATCH v3 6/9] drm/rockchip: Reoder drm bind/unbind sequence
-In-Reply-To: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1491380967-28570-7-git-send-email-jeffy.chen@rock-chips.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 5 Apr 2017 09:59:52 +0100
+Subject: [PATCH v5 3/7] mfd: axp20x: add MFD cells for AXP20X and AXP22X
+ battery driver
+In-Reply-To: <20170405081059.1684-4-quentin.schulz@free-electrons.com>
+References: <20170405081059.1684-1-quentin.schulz@free-electrons.com>
+ <20170405081059.1684-4-quentin.schulz@free-electrons.com>
+Message-ID: <20170405085952.sfsqmew2d37jr6ql@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current drm bind/unbind sequence would cause some memory issues.
-For example we should not cleanup iommu before cleanup mode config.
+On Wed, 05 Apr 2017, Quentin Schulz wrote:
 
-Reorder bind/unbind sequence, follow exynos drm.
+> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
+> 
+> This patch adds the AXP20X/AXP22X battery driver to the MFD cells of the
+> AXP209, AXP221 and AXP223 MFD.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> v2:
+>  - changed DT node name from battery_power_supply to
+>  battery-power-supply,
+>  - removed io-channels and io-channel-names from DT (the IIO mapping is
+>  done in the IIO ADC driver now),
+> 
+>  drivers/mfd/axp20x.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Applied, thanks.
 
-Changes in v3:
-Address Sean Paul <seanpaul@chromium.org>'s comments.
-Update commit message.
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 5ba3b04..e6f5507 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -594,6 +594,9 @@ static struct mfd_cell axp20x_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-adc",
+>  	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp209-battery-power-supply",
+> +	}, {
+>  		.name		= "axp20x-ac-power-supply",
+>  		.of_compatible	= "x-powers,axp202-ac-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> @@ -621,6 +624,9 @@ static struct mfd_cell axp221_cells[] = {
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+>  		.resources	= axp20x_ac_power_supply_resources,
+>  	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp221-battery-power-supply",
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -636,6 +642,9 @@ static struct mfd_cell axp223_cells[] = {
+>  	}, {
+>  		.name		= "axp22x-adc",
+>  	}, {
+> +		.name		= "axp20x-battery-power-supply",
+> +		.of_compatible	= "x-powers,axp221-battery-power-supply",
+> +	}, {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+>  		.name		= "axp20x-ac-power-supply",
 
-Changes in v2: None
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 49 +++++++++++++++--------------
- 1 file changed, 26 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index cd7d02e1..f24968f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -136,21 +136,24 @@ static int rockchip_drm_bind(struct device *dev)
- 	INIT_LIST_HEAD(&private->psr_list);
- 	spin_lock_init(&private->psr_list_lock);
- 
-+	ret = rockchip_drm_init_iommu(drm_dev);
-+	if (ret)
-+		goto err_free;
-+
- 	drm_mode_config_init(drm_dev);
- 
- 	rockchip_drm_mode_config_init(drm_dev);
- 
--	ret = rockchip_drm_init_iommu(drm_dev);
--	if (ret)
--		goto err_config_cleanup;
--
- 	/* Try to bind all sub drivers. */
- 	ret = component_bind_all(dev, drm_dev);
- 	if (ret)
--		goto err_iommu_cleanup;
-+		goto err_mode_config_cleanup;
- 
--	/* init kms poll for handling hpd */
--	drm_kms_helper_poll_init(drm_dev);
-+	ret = drm_vblank_init(drm_dev, drm_dev->mode_config.num_crtc);
-+	if (ret)
-+		goto err_unbind_all;
-+
-+	drm_mode_config_reset(drm_dev);
- 
- 	/*
- 	 * enable drm irq mode.
-@@ -158,15 +161,12 @@ static int rockchip_drm_bind(struct device *dev)
- 	 */
- 	drm_dev->irq_enabled = true;
- 
--	ret = drm_vblank_init(drm_dev, ROCKCHIP_MAX_CRTC);
--	if (ret)
--		goto err_kms_helper_poll_fini;
--
--	drm_mode_config_reset(drm_dev);
-+	/* init kms poll for handling hpd */
-+	drm_kms_helper_poll_init(drm_dev);
- 
- 	ret = rockchip_drm_fbdev_init(drm_dev);
- 	if (ret)
--		goto err_vblank_cleanup;
-+		goto err_kms_helper_poll_fini;
- 
- 	ret = drm_dev_register(drm_dev, 0);
- 	if (ret)
-@@ -175,17 +175,17 @@ static int rockchip_drm_bind(struct device *dev)
- 	return 0;
- err_fbdev_fini:
- 	rockchip_drm_fbdev_fini(drm_dev);
--err_vblank_cleanup:
--	drm_vblank_cleanup(drm_dev);
- err_kms_helper_poll_fini:
- 	drm_kms_helper_poll_fini(drm_dev);
-+	drm_vblank_cleanup(drm_dev);
-+err_unbind_all:
- 	component_unbind_all(dev, drm_dev);
--err_iommu_cleanup:
--	rockchip_iommu_cleanup(drm_dev);
--err_config_cleanup:
-+err_mode_config_cleanup:
- 	drm_mode_config_cleanup(drm_dev);
--	drm_dev->dev_private = NULL;
-+	rockchip_iommu_cleanup(drm_dev);
- err_free:
-+	drm_dev->dev_private = NULL;
-+	dev_set_drvdata(dev, NULL);
- 	drm_dev_unref(drm_dev);
- 	return ret;
- }
-@@ -194,16 +194,19 @@ static void rockchip_drm_unbind(struct device *dev)
- {
- 	struct drm_device *drm_dev = dev_get_drvdata(dev);
- 
-+	drm_dev_unregister(drm_dev);
-+
- 	rockchip_drm_fbdev_fini(drm_dev);
--	drm_vblank_cleanup(drm_dev);
- 	drm_kms_helper_poll_fini(drm_dev);
-+
-+	drm_vblank_cleanup(drm_dev);
- 	component_unbind_all(dev, drm_dev);
--	rockchip_iommu_cleanup(drm_dev);
- 	drm_mode_config_cleanup(drm_dev);
-+	rockchip_iommu_cleanup(drm_dev);
-+
- 	drm_dev->dev_private = NULL;
--	drm_dev_unregister(drm_dev);
--	drm_dev_unref(drm_dev);
- 	dev_set_drvdata(dev, NULL);
-+	drm_dev_unref(drm_dev);
- }
- 
- static void rockchip_drm_lastclose(struct drm_device *dev)
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
