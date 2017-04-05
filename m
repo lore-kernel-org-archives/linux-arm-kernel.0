@@ -1,39 +1,37 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed,  5 Apr 2017 10:01:29 -0500
-Subject: [GIT PULL 2/2] SoCFPGA defconfig update for v4.12
-In-Reply-To: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
-References: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <1491404489-10411-2-git-send-email-dinguyen@kernel.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed,  5 Apr 2017 17:18:03 +0200
+Subject: [PATCH v4 2/7] arm64: marvell: enable the Armada 37xx pinctrl driver
+In-Reply-To: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+Message-ID: <d5015ded3a76ae4b1d2d1ef43ab4cc2e51050a03.1491405475.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+This commit makes sure the driver for the Armada 37xx pin controller is
+enabled.
 
-Please pull in this defconfig update for v4.12.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/Kconfig.platforms | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks,
-Dinh
-
-
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_defconfig_updates_for_v4.12
-
-for you to fetch changes up to b685b264636b4f3f3eaa0b62fee674a45f2b1679:
-
-  ARM: socfpga: updates for socfpga_defconfig (2017-03-16 08:05:46 -0500)
-
-----------------------------------------------------------------
-SoCFPGA defconfig updates for v4.12
-- enables TSE(Triple-Speed-Ethernet) support
-
-----------------------------------------------------------------
-Jia Jie Ho (1):
-      ARM: socfpga: updates for socfpga_defconfig
-
- arch/arm/configs/socfpga_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 129cc5ae4091..9aa71a3f3f50 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -103,8 +103,13 @@ config ARCH_MVEBU
+ 	select ARMADA_AP806_SYSCON
+ 	select ARMADA_CP110_SYSCON
+ 	select ARMADA_37XX_CLK
++	select GPIOLIB
++	select GPIOLIB_IRQCHIP
+ 	select MVEBU_ODMI
+ 	select MVEBU_PIC
++	select OF_GPIO
++	select PINCTRL
++	select PINCTRL_ARMADA_37XX
+ 	help
+ 	  This enables support for Marvell EBU familly, including:
+ 	   - Armada 3700 SoC Family
+-- 
+git-series 0.9.1
