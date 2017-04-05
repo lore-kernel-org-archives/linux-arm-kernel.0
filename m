@@ -1,149 +1,105 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 4 Apr 2017 17:44:05 -0700
-Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities output
- video on pad 1
-In-Reply-To: <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1490894749.2404.33.camel@pengutronix.de>
- <20170404231053.GE7909@n2100.armlinux.org.uk>
- <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
-Message-ID: <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Tue,  4 Apr 2017 21:06:07 -0500
+Subject: [PATCH v5 23/23] drivers/fsi: Use asynchronous slave mode
+In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-24-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jeremy Kerr <jk@ozlabs.org>
 
+For slaves that are behind a software-clocked master, we want FSI CFAMs
+to run asynchronously to the FSI clock, so set up our slaves to be in
+async mode.
 
-On 04/04/2017 05:40 PM, Steve Longerbeam wrote:
->
->
-> On 04/04/2017 04:10 PM, Russell King - ARM Linux wrote:
->> On Thu, Mar 30, 2017 at 07:25:49PM +0200, Philipp Zabel wrote:
->>> The TVP5150 DT bindings specify a single output port (port 0) that
->>> corresponds to the video output pad (pad 1, DEMOD_PAD_VID_OUT).
->>>
->>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->>> ---
->>> I'm trying to get this to work with a TVP5150 analog TV decoder, and the
->>> first problem is that this device doesn't have pad 0 as its single
->>> output pad. Instead, as a MEDIA_ENT_F_ATV_DECODER entity, it has for
->>> pads (input, video out, vbi out, audio out), and video out is pad 1,
->>> whereas the device tree only defines a single port (0).
->>
->> Looking at the patch, it's highlighted another review point with
->> Steve's driver.
->>
->>> diff --git a/drivers/staging/media/imx/imx-media-dev.c
->>> b/drivers/staging/media/imx/imx-media-dev.c
->>> index 17e2386a3ca3a..c52d6ca797965 100644
->>> --- a/drivers/staging/media/imx/imx-media-dev.c
->>> +++ b/drivers/staging/media/imx/imx-media-dev.c
->>> @@ -267,6 +267,15 @@ static int imx_media_create_link(struct
->>> imx_media_dev *imxmd,
->>>      source_pad = link->local_pad;
->>>      sink_pad = link->remote_pad;
->>>
->>> +    /*
->>> +     * If the source subdev is an analog video decoder with a single
->>> source
->>> +     * port, assume that this port 0 corresponds to the
->>> DEMOD_PAD_VID_OUT
->>> +     * entity pad.
->>> +     */
->>> +    if (source->entity.function == MEDIA_ENT_F_ATV_DECODER &&
->>> +        local_sd->num_sink_pads == 0 && local_sd->num_src_pads == 1)
->>> +        source_pad = DEMOD_PAD_VID_OUT;
->>> +
->>>      v4l2_info(&imxmd->v4l2_dev, "%s: %s:%d -> %s:%d\n", __func__,
->>>            source->name, source_pad, sink->name, sink_pad);
->>
->> What is "local" and what is "remote" here?  It seems that, in the case of
->> a link being created with the sensor(etc), it's all back to front.
->>
->> Eg, I see locally:
->>
->> imx-media: imx_media_create_link: imx219 0-0010:0 -> imx6-mipi-csi2:0
->>
->> So here, "source" is the imx219 (the sensor), and sink is
->> "imx6-mipi-csi2"
->> (part of the iMX6 capture.)  However, this makes "local_sd" the subdev of
->> the sensor, and "remote_sd" the subdev of the CSI2 interface - which is
->> totally back to front - this code is part of the iMX6 capture system,
->> so "local" implies that it should be part of that, and the "remote" thing
->> would be the sensor.
->>
->> Hence, this seems completely confused.  I'd suggest that:
->>
->> (a) the "pad->pad.flags & MEDIA_PAD_FL_SINK" test in
->> imx_media_create_link()
->>     is moved into imx_media_create_links(), and placed here instead:
->>
->>         for (j = 0; j < num_pads; j++) {
->>             pad = &local_sd->pad[j];
->>
->>             if (pad->pad.flags & MEDIA_PAD_FL_SINK)
->>                 continue;
->>
->>             ...
->>         }
->>
->>     as the pad isn't going to spontaneously change this flag while we
->>     consider each individual link.
->
->
-> Sure, I can do that. It would avoid iterating unnecessarily through the
-> pad's links if the pad is a sink.
->
->
->>  However, maybe the test should be:
->>
->>             if (!(pad->pad.flags & MEDIA_PAD_FL_SOURCE))
->>
->>     ?
->>
->
-> maybe that is more intuitive.
->
->
->> (b) the terms "local" and "remote" in imx_media_create_link() are
->>     replaced with "source" and "sink" respectively, since this will
->>     now be called with a guaranteed source pad.
->
-> Agreed. I'll change the arg and local var names.
->
->>
->> As for Philipp's solution, I'm not sure what the correct solution for
->> something like this is.  It depends how you view "hardware interface"
->> as defined by video-interfaces.txt, and whether the pads on the TVP5150
->> represent the hardware interfaces.  If we take the view that the pads
->> do represent hardware interfaces, then using the reg= property on the
->> port node will solve this problem.
->
-> And the missing port nodes would have to actually be defined first.
-> According to Philipp they aren't, only a single output port 0.
->
->
->>
->> If not, it would mean that we would have to have the iMX capture code
->> scan the pads on the source device, looking for outputs - but that
->> runs into a problem - if the source device has multiple outputs, does
->> the reg= property specify the output pad index or the pad number,
->
-> And how do we even know the data direction of a DT port. Is it an input,
-> an output, bidirectional? The OF graph parsing in imx-media-of.c can't
-> determine a port's direction if it encounters a device it doesn't
-> recognize that has multiple ports. For now that is not really a problem
-> because upstream from the video mux and csi-2 receiver it's expected
-> there will only be original sources of video with only one source port.
-> But it can become a limitation later. For example a device that has
-> multiple output bus interfaces, which would require multiple output
-> ports.
->
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+---
+ drivers/fsi/fsi-core.c        | 22 +++++++++++++++++++++-
+ drivers/fsi/fsi-master-gpio.c |  1 +
+ drivers/fsi/fsi-master.h      |  2 ++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
 
-Actually what was I thinking, the TVP5150 is already an example of
-such a device.
-
-All of this could be solved if there was some direction information
-in port nodes.
-
-Steve
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 747d0e3..a6ed34f 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -47,6 +47,7 @@
+ #define FSI_SMODE		0x0	/* R/W: Mode register */
+ #define FSI_SISC		0x8	/* R/W: Interrupt condition */
+ #define FSI_SSTAT		0x14	/* R  : Slave status */
++#define FSI_LLMODE		0x100	/* R/W: Link layer mode register */
+ 
+ /*
+  * SMODE fields
+@@ -62,6 +63,11 @@
+ #define FSI_SMODE_LBCRR_SHIFT	8		/* Clk ratio shift */
+ #define FSI_SMODE_LBCRR_MASK	0xf		/* Clk ratio mask */
+ 
++/*
++ * LLMODE fields
++ */
++#define FSI_LLMODE_ASYNC	0x1
++
+ #define FSI_SLAVE_SIZE_23b		0x800000
+ 
+ static DEFINE_IDA(master_ida);
+@@ -560,8 +566,8 @@ static void fsi_slave_release(struct device *dev)
+ 
+ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ {
++	uint32_t chip_id, llmode;
+ 	struct fsi_slave *slave;
+-	uint32_t chip_id;
+ 	uint8_t crc;
+ 	int rc;
+ 
+@@ -597,6 +603,20 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ 		return -ENODEV;
+ 	}
+ 
++	/* If we're behind a master that doesn't provide a self-running bus
++	 * clock, put the slave into async mode
++	 */
++	if (master->flags & FSI_MASTER_FLAG_SWCLOCK) {
++		llmode = cpu_to_be32(FSI_LLMODE_ASYNC);
++		rc = fsi_master_write(master, link, id,
++				FSI_SLAVE_BASE + FSI_LLMODE,
++				&llmode, sizeof(llmode));
++		if (rc)
++			dev_warn(&master->dev,
++				"can't set llmode on slave:%02x:%02x %d\n",
++				link, id, rc);
++	}
++
+ 	/* We can communicate with a slave; create the slave device and
+ 	 * register.
+ 	 */
+diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
+index 5d9e0b0..d5cce88 100644
+--- a/drivers/fsi/fsi-master-gpio.c
++++ b/drivers/fsi/fsi-master-gpio.c
+@@ -569,6 +569,7 @@ static int fsi_master_gpio_probe(struct platform_device *pdev)
+ 	master->gpio_mux = gpio;
+ 
+ 	master->master.n_links = 1;
++	master->master.flags = FSI_MASTER_FLAG_SWCLOCK;
+ 	master->master.read = fsi_master_gpio_read;
+ 	master->master.write = fsi_master_gpio_write;
+ 	master->master.term = fsi_master_gpio_term;
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+index d6a4885..fd39924 100644
+--- a/drivers/fsi/fsi-master.h
++++ b/drivers/fsi/fsi-master.h
+@@ -19,6 +19,8 @@
+ 
+ #include <linux/device.h>
+ 
++#define FSI_MASTER_FLAG_SWCLOCK	0x1
++
+ struct fsi_master {
+ 	struct device	dev;
+ 	int		idx;
+-- 
+1.8.2.2
