@@ -1,123 +1,169 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 5 Apr 2017 09:48:26 -0500
-Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <20170405143318.GE13234@atomide.com>
-References: <20170328205511.21166-1-d-gerlach@ti.com>
- <20170328205511.21166-3-d-gerlach@ti.com>
- <20170404161151.GS10760@atomide.com>
- <20170405135933.GN23750@n2100.armlinux.org.uk>
- <20170405143318.GE13234@atomide.com>
-Message-ID: <5cd63e14-52df-6010-4193-c926cdd76839@ti.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Wed, 5 Apr 2017 11:53:36 -0300
+Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
+ output video on pad 1
+In-Reply-To: <1491384859.2381.51.camel@pengutronix.de>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
+ <1490894749.2404.33.camel@pengutronix.de>
+ <20170404231053.GE7909@n2100.armlinux.org.uk>
+ <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
+ <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
+ <20170405082134.GF7909@n2100.armlinux.org.uk>
+ <1491384859.2381.51.camel@pengutronix.de>
+Message-ID: <20170405115336.7135e542@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-On 04/05/2017 09:33 AM, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@armlinux.org.uk> [170405 07:02]:
->> On Tue, Apr 04, 2017 at 09:11:52AM -0700, Tony Lindgren wrote:
->>> Russell,
->>>
->>> * Dave Gerlach <d-gerlach@ti.com> [170328 13:57]:
->>>> Certain SoCs like Texas Instruments AM335x and AM437x require parts
->>>> of the EMIF PM code to run late in the suspend sequence from SRAM,
->>>> such as saving and restoring the EMIF context and placing the memory
->>>> into self-refresh.
->>>>
->>>> One requirement for these SoCs to suspend and enter its lowest power
->>>> mode, called DeepSleep0, is that the PER power domain must be shut off.
->>>> Because the EMIF (DDR Controller) resides within this power domain, it
->>>> will lose context during a suspend operation, so we must save it so we
->>>> can restore once we resume. However, we cannot execute this code from
->>>> external memory, as it is not available at this point, so the code must
->>>> be executed late in the suspend path from SRAM.
->>>>
->>>> This patch introduces a ti-emif-sram driver that includes several
->>>> functions written in ARM ASM that are relocatable so the PM SRAM
->>>> code can use them. It also allocates a region of writable SRAM to
->>>> be used by the code running in the executable region of SRAM to save
->>>> and restore the EMIF context. It can export a table containing the
->>>> absolute addresses of the available PM functions so that other SRAM
->>>> code can branch to them. This code is required for suspend/resume on
->>>> AM335x and AM437x to work.
->>>>
->>>> In addition to this, to be able to share data structures between C and
->>>> the ti-emif-sram-pm assembly code, we can automatically generate all of
->>>> the C struct member offsets and sizes as macros by making use of the ARM
->>>> asm-offsets file. In the same header that we define our data structures
->>>> in we also define all the macros in an inline function and by adding a
->>>> call to this in the asm_offsets file all macros are properly generated
->>>> and available to the assembly code without cluttering up the asm-offsets
->>>> file.
->>>>
->>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>> ---
->>>>  arch/arm/kernel/asm-offsets.c    |   6 +
->>>>  drivers/memory/Kconfig           |  10 ++
->>>>  drivers/memory/Makefile          |   4 +
->>>>  drivers/memory/emif.h            |  17 ++
->>>>  drivers/memory/ti-emif-pm.c      | 295 ++++++++++++++++++++++++++++++++++
->>>>  drivers/memory/ti-emif-sram-pm.S | 334 +++++++++++++++++++++++++++++++++++++++
->>>>  include/linux/ti-emif-sram.h     | 143 +++++++++++++++++
->>>>  7 files changed, 809 insertions(+)
->>>>  create mode 100644 drivers/memory/ti-emif-pm.c
->>>>  create mode 100644 drivers/memory/ti-emif-sram-pm.S
->>>>  create mode 100644 include/linux/ti-emif-sram.h
->>>>
->>>> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->>>> index 608008229c7d..d728b5660e36 100644
->>>> --- a/arch/arm/kernel/asm-offsets.c
->>>> +++ b/arch/arm/kernel/asm-offsets.c
->>>> @@ -28,6 +28,7 @@
->>>>  #include <asm/vdso_datapage.h>
->>>>  #include <asm/hardware/cache-l2x0.h>
->>>>  #include <linux/kbuild.h>
->>>> +#include <linux/ti-emif-sram.h>
->>>>
->>>>  /*
->>>>   * Make sure that the compiler and target are compatible.
->>>> @@ -183,5 +184,10 @@ int main(void)
->>>>  #ifdef CONFIG_VDSO
->>>>    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
->>>>  #endif
->>>> +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
->>>> +  BLANK();
->>>> +  ti_emif_offsets();
->>>> +#endif
->>>> +
->>>>    return 0;
->>>>  }
->>>
->>> Does the above look OK to you?
->>
->> I'm not going to comment on this yet, but I'll instead comment on the
->> newly appeared sram_exec_copy() stuff.
->>
->> So, a few years ago, we went to significant effort in ARM land to come
->> up with a way to _safely_ copy assembler from the kernel into SRAM,
->> because copying code to SRAM that is compiled in thumb mode and then
->> executing it is _not_ as simple as memcpy(), cast the pointer to a
->> function pointer, and then call the function pointer.
->>
->> The SRAM stuff throws all that out, instead preferring the dumb memcpy()
->> approach.
->>
->> This needs resolving, and I'd like to see it resolved to the satisfaction
->> of architecture maintainers before we progress any further down this
->> route.
+Em Wed, 05 Apr 2017 11:34:19 +0200
+Philipp Zabel <p.zabel@pengutronix.de> escreveu:
 
-I'm sure you are referring to fncpy, correct? This is what we used before with 
-ARM specific code to do the copy, but we've moved into drivers now. What are 
-your thoughts on exposing fncpy outside of arch/arm?
+> On Wed, 2017-04-05 at 09:21 +0100, Russell King - ARM Linux wrote:
+> [...]
+> > > Actually what was I thinking, the TVP5150 is already an example of
+> > > such a device.
+> > > 
+> > > All of this could be solved if there was some direction information
+> > > in port nodes.  
+> > 
+> > I disagree.
+> >
+> > Philipp identified that the TVP5150 has four pads:
+> > 
+> > * Input pad
+> > * Video output pad
+> > * VBI output pad
+> > * Audio output pad  
+> 
+> I didn't think hard enough about this earlier, but there are really only
+> two hardware interfaces on TVP5150. The ADC input, which can be
+> connected to either of two composite input pins (AIP1A, AIP1B), or use
+> both for s-video, and the digital output connected to pins (YOUT[7:0]).
+> 
+> VBI data can be transferred via the output pins during horizontal or
+> vertical blanking, if I understand correctly, or read from a FIFO via
+> I2C.
+> 
+> There is no apparent support for audio data whatsoever, and the only
+> mention of audio in the data manual is a vague reference about an "audio
+> interface available on the TVP5150" providing a clock to an audio
+> interface between an external audio decoder and the backend processor.
+> 
+> Further, commit 55606310e77f ("[media] tvp5150: create the expected
+> number of pads") creates DEMOD_NUM_PADS pads, but doesn't mention or
+> initialize the audio pad. It clearly expects the value of DEMOD_NUM_PADS
+> to be 3. And indeed the fourth pad was added later in commit
+> bddc418787cc ("[media] au0828: use standard demod pads struct").
+> 
+> So to me it looks like the VBI and audio pads should be removed from
+> TVP5150.
 
-Regards,
-Dave
+There are a number of drivers that can work with different
+types of TV demodulators. Typical examples of such hardware can be
+found at em28xx, saa7134, cx88 drivers (among lots of other drivers).
+Those drivers don't use the subdev API. Instead, they use a generic
+helper function with sets the pipelines, based on the pad number.
 
->
-> OK thanks, will wait until that is sorted out before merging any
-> of the SRAM code.
->
-> Regards,
->
-> Tony
->
+The problem here is that, currently, both MC API and MC core
+lacks a way to identify PAD ports per type, as the only information
+that a bridge driver has is a pad number. So, in order for a
+generic helper function to work, we had to hardcode pad numbers,
+in a way that it would work for all possible types of demods.
+
+It shouldn't be hard to add a "pad_type" information at media_pad
+struct, but passing such info to userspace requires a new API
+(we're calling it as "properties API"). Sakari was meant to send
+us an updated RFC for it[1] with a patchset, back in 2015, but
+this never happened.
+
+[1] https://linuxtv.org/news.php?entry=2015-08-17.mchehab
+
+Each vendor chooses the demod using some random criteria 
+(usually, they use whatever costs less by the time they create a
+hardware model). Newer versions of the same hardware frequently
+has a different model.
+
+For example, in the case of em28xx driver, there are currently
+several types of demods supported there, like (among other options):
+
+- demods with tda9887, with is actually part of a tuner that has 
+  an outputs for IF luminance, IF chrominance and IF audio;
+
+- demods with xc3028, with is an integrated tuner + audio demod,
+  with outputs both video as a baseband signal and audio data via IF,
+  (or outputs a single IF signal, for Digital TV);
+
+- demods with both xc3028 and msp3400. The last one transforms
+  audio IF into I2S;
+
+- demods with saa711x (supported by saa7115 driver), with may or may 
+  not have raw VBI and/or sliced VBI, depending on the specific model,
+  with is detected during driver's probe.
+
+The generic function should be robust enough to handle all above
+cases.
+
+Without a way to report the PAD type to userspace, applications
+that need to setup or recognize such pipelines need to hardcode the
+pad numbers on userspace. That's, by the way, one of the issues why
+it is currently impossible to write a full generic MC plugin at libv4l:
+there's currently no way for userspace to recognize what type of
+signals each PAD input or output carries.
+
+So, in short, the tvp5150 demod doesn't decode audio, but there
+are other demods that do it.
+
+In the case of VBI, tvp5150 has actually two ways of reporting
+it:
+
+1) via YOUT[7:0] pins. VBI information is transmitted as a
+   set of raw samples, via an ancillary data block, during
+   vertical/horizontal blanking intervals. So, yes, it shares
+   the same hardware output, although the VBI contents are
+   actually multiplexed there. Please notice that not all
+   video out PADS encapsulate raw VBI the same way as tvp5150
+   (and some devices even don't support raw VBI, like saa7110 and
+   some models supported by saa7115 driver).
+
+2) via an interrupt that indicates that it decoded VBI data. The
+   VBI information itself is there on FIFO, accessible via a set of
+   registers (see "VBI Data processor" chapter at the datasheet).
+
+Currently, the driver doesn't support (2), because, at the time
+I wrote the driver, I didn't find a way to read the interrupts generated
+by tvp5150 at em28xx[1], due to the lack of em28xx documentation,
+but adding support for it shoudn't be hard. I may eventually do it
+when I have some time to play with my ISEE hardware.
+
+So, in the case of tvp5150 hardware, have those PADS:
+
+- Input baseband;
+- Video + raw VBI output;
+- sliced VBI output.
+
+Yet, we need an always unconnected audio output, in order to support
+different demods out there.
+
+[1] tvp5150 was written to support some em28xx-based devices
+
+> 
+> > So, it has one input and three outputs.  How does marking the direction
+> > in the port node (which would indicate that there was a data flow out of
+> > TVP5150 into the iMX6 capture) help identify which of those pads should
+> > be used?
+> >
+> > It would eliminate the input pad, but you still have three output pads
+> > to choose from.
+> > 
+> > So no, your idea can't work.  
+> 
+> In this case, removal of the VBI and audio pads might make this work,
+> but in general this is true. In my opinion, to make this truly generic,
+> we need an interface to ask the driver which media entity pad a given
+> device tree port corresponds to, as there might not even be a single
+> media entity corresponding to all ports for more complex devices.
+
+Yes. We also need something like that at the userspace API.
+
+Thanks,
+Mauro
