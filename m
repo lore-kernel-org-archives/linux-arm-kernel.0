@@ -1,230 +1,107 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Wed, 5 Apr 2017 16:58:59 +0300
-Subject: [RFC PATCH 2/2] drivers: pwm: pwm-atmel: add support for pwm modes
-In-Reply-To: <1491400739-9618-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1491400739-9618-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1491400739-9618-3-git-send-email-claudiu.beznea@microchip.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Apr 2017 14:59:34 +0100
+Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <20170404161151.GS10760@atomide.com>
+References: <20170328205511.21166-1-d-gerlach@ti.com>
+ <20170328205511.21166-3-d-gerlach@ti.com>
+ <20170404161151.GS10760@atomide.com>
+Message-ID: <20170405135933.GN23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement pwm modes by adding PWM controller specific
-configuration. Since this driver is used by controllers
-which supports PWM push-pull mode and controllers which
-doesn't, a new field was added in driver private data
-structure. Also, the driver private data structure was
-changed to adapt the new feature.
+On Tue, Apr 04, 2017 at 09:11:52AM -0700, Tony Lindgren wrote:
+> Russell,
+> 
+> * Dave Gerlach <d-gerlach@ti.com> [170328 13:57]:
+> > Certain SoCs like Texas Instruments AM335x and AM437x require parts
+> > of the EMIF PM code to run late in the suspend sequence from SRAM,
+> > such as saving and restoring the EMIF context and placing the memory
+> > into self-refresh.
+> > 
+> > One requirement for these SoCs to suspend and enter its lowest power
+> > mode, called DeepSleep0, is that the PER power domain must be shut off.
+> > Because the EMIF (DDR Controller) resides within this power domain, it
+> > will lose context during a suspend operation, so we must save it so we
+> > can restore once we resume. However, we cannot execute this code from
+> > external memory, as it is not available at this point, so the code must
+> > be executed late in the suspend path from SRAM.
+> > 
+> > This patch introduces a ti-emif-sram driver that includes several
+> > functions written in ARM ASM that are relocatable so the PM SRAM
+> > code can use them. It also allocates a region of writable SRAM to
+> > be used by the code running in the executable region of SRAM to save
+> > and restore the EMIF context. It can export a table containing the
+> > absolute addresses of the available PM functions so that other SRAM
+> > code can branch to them. This code is required for suspend/resume on
+> > AM335x and AM437x to work.
+> > 
+> > In addition to this, to be able to share data structures between C and
+> > the ti-emif-sram-pm assembly code, we can automatically generate all of
+> > the C struct member offsets and sizes as macros by making use of the ARM
+> > asm-offsets file. In the same header that we define our data structures
+> > in we also define all the macros in an inline function and by adding a
+> > call to this in the asm_offsets file all macros are properly generated
+> > and available to the assembly code without cluttering up the asm-offsets
+> > file.
+> > 
+> > Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> > ---
+> >  arch/arm/kernel/asm-offsets.c    |   6 +
+> >  drivers/memory/Kconfig           |  10 ++
+> >  drivers/memory/Makefile          |   4 +
+> >  drivers/memory/emif.h            |  17 ++
+> >  drivers/memory/ti-emif-pm.c      | 295 ++++++++++++++++++++++++++++++++++
+> >  drivers/memory/ti-emif-sram-pm.S | 334 +++++++++++++++++++++++++++++++++++++++
+> >  include/linux/ti-emif-sram.h     | 143 +++++++++++++++++
+> >  7 files changed, 809 insertions(+)
+> >  create mode 100644 drivers/memory/ti-emif-pm.c
+> >  create mode 100644 drivers/memory/ti-emif-sram-pm.S
+> >  create mode 100644 include/linux/ti-emif-sram.h
+> > 
+> > diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+> > index 608008229c7d..d728b5660e36 100644
+> > --- a/arch/arm/kernel/asm-offsets.c
+> > +++ b/arch/arm/kernel/asm-offsets.c
+> > @@ -28,6 +28,7 @@
+> >  #include <asm/vdso_datapage.h>
+> >  #include <asm/hardware/cache-l2x0.h>
+> >  #include <linux/kbuild.h>
+> > +#include <linux/ti-emif-sram.h>
+> >  
+> >  /*
+> >   * Make sure that the compiler and target are compatible.
+> > @@ -183,5 +184,10 @@ int main(void)
+> >  #ifdef CONFIG_VDSO
+> >    DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
+> >  #endif
+> > +#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+> > +  BLANK();
+> > +  ti_emif_offsets();
+> > +#endif
+> > +
+> >    return 0; 
+> >  }
+> 
+> Does the above look OK to you?
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/pwm/pwm-atmel.c | 94 +++++++++++++++++++++++++++++++++----------------
- 1 file changed, 63 insertions(+), 31 deletions(-)
+I'm not going to comment on this yet, but I'll instead comment on the
+newly appeared sram_exec_copy() stuff.
 
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 530d7dc..9e812ce 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -33,8 +33,11 @@
- 
- #define PWM_CMR			0x0
- /* Bit field in CMR */
--#define PWM_CMR_CPOL		(1 << 9)
--#define PWM_CMR_UPD_CDTY	(1 << 10)
-+#define PWM_CMR_CPOL		BIT(9)
-+#define PWM_CMR_UPD_CDTY	BIT(10)
-+#define PWM_CMR_DTHI		BIT(17)
-+#define PWM_CMR_DTLI		BIT(18)
-+#define PWM_CMR_PPM		BIT(19)
- #define PWM_CMR_CPRE_MSK	0xF
- 
- /* The following registers for PWM v1 */
-@@ -65,11 +68,16 @@ struct atmel_pwm_registers {
- 	u8 duty_upd;
- };
- 
-+struct atmel_pwm_data {
-+	struct atmel_pwm_registers regs;
-+	bool ppm_supported;
-+};
-+
- struct atmel_pwm_chip {
- 	struct pwm_chip chip;
- 	struct clk *clk;
- 	void __iomem *base;
--	const struct atmel_pwm_registers *regs;
-+	const struct atmel_pwm_data *data;
- 
- 	unsigned int updated_pwms;
- 	/* ISR is cleared when read, ensure only one thread does that */
-@@ -150,15 +158,15 @@ static void atmel_pwm_update_cdty(struct pwm_chip *chip, struct pwm_device *pwm,
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 	u32 val;
- 
--	if (atmel_pwm->regs->duty_upd ==
--	    atmel_pwm->regs->period_upd) {
-+	if (atmel_pwm->data->regs.duty_upd ==
-+	    atmel_pwm->data->regs.period_upd) {
- 		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
- 		val &= ~PWM_CMR_UPD_CDTY;
- 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
- 	}
- 
- 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
--			    atmel_pwm->regs->duty_upd, cdty);
-+			    atmel_pwm->data->regs.duty_upd, cdty);
- }
- 
- static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
-@@ -168,9 +176,9 @@ static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
- 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
- 
- 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
--			    atmel_pwm->regs->duty, cdty);
-+			    atmel_pwm->data->regs.duty, cdty);
- 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
--			    atmel_pwm->regs->period, cprd);
-+			    atmel_pwm->data->regs.period, cprd);
- }
- 
- static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm,
-@@ -223,9 +231,10 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 	if (state->enabled) {
- 		if (cstate.enabled &&
- 		    cstate.polarity == state->polarity &&
--		    cstate.period == state->period) {
-+		    cstate.period == state->period &&
-+		    cstate.mode == state->mode) {
- 			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
--						  atmel_pwm->regs->period);
-+						  atmel_pwm->data->regs.period);
- 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
- 			atmel_pwm_update_cdty(chip, pwm, cdty);
- 			return 0;
-@@ -258,6 +267,23 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			val &= ~PWM_CMR_CPOL;
- 		else
- 			val |= PWM_CMR_CPOL;
-+
-+		/* PWM mode. */
-+		if (atmel_pwm->data->ppm_supported) {
-+			if (state->mode == PWM_MODE_PUSH_PULL) {
-+				val |= PWM_CMR_PPM;
-+				if (state->polarity == PWM_POLARITY_NORMAL)
-+					val = (val & ~PWM_CMR_DTHI) |
-+					      PWM_CMR_DTLI;
-+				else
-+					val = (val & ~PWM_CMR_DTLI) |
-+					      PWM_CMR_DTHI;
-+			} else {
-+				val &= ~(PWM_CMR_PPM | PWM_CMR_DTLI |
-+					 PWM_CMR_DTHI);
-+			}
-+		}
-+
- 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
- 		atmel_pwm_set_cprd_cdty(chip, pwm, cprd, cdty);
- 		mutex_lock(&atmel_pwm->isr_lock);
-@@ -277,27 +303,33 @@ static const struct pwm_ops atmel_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
--static const struct atmel_pwm_registers atmel_pwm_regs_v1 = {
--	.period		= PWMV1_CPRD,
--	.period_upd	= PWMV1_CUPD,
--	.duty		= PWMV1_CDTY,
--	.duty_upd	= PWMV1_CUPD,
-+static const struct atmel_pwm_data atmel_pwm_data_v1 = {
-+	.regs = {
-+		.period		= PWMV1_CPRD,
-+		.period_upd	= PWMV1_CUPD,
-+		.duty		= PWMV1_CDTY,
-+		.duty_upd	= PWMV1_CUPD,
-+	},
-+	.ppm_supported = false,
- };
- 
--static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
--	.period		= PWMV2_CPRD,
--	.period_upd	= PWMV2_CPRDUPD,
--	.duty		= PWMV2_CDTY,
--	.duty_upd	= PWMV2_CDTYUPD,
-+static const struct atmel_pwm_data atmel_pwm_data_v2 = {
-+	.regs = {
-+		.period		= PWMV2_CPRD,
-+		.period_upd	= PWMV2_CPRDUPD,
-+		.duty		= PWMV2_CDTY,
-+		.duty_upd	= PWMV2_CDTYUPD,
-+	},
-+	.ppm_supported = true,
- };
- 
- static const struct platform_device_id atmel_pwm_devtypes[] = {
- 	{
- 		.name = "at91sam9rl-pwm",
--		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v1,
-+		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
- 	}, {
- 		.name = "sama5d3-pwm",
--		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v2,
-+		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
- 	}, {
- 		/* sentinel */
- 	},
-@@ -307,20 +339,20 @@ MODULE_DEVICE_TABLE(platform, atmel_pwm_devtypes);
- static const struct of_device_id atmel_pwm_dt_ids[] = {
- 	{
- 		.compatible = "atmel,at91sam9rl-pwm",
--		.data = &atmel_pwm_regs_v1,
-+		.data = &atmel_pwm_data_v1,
- 	}, {
- 		.compatible = "atmel,sama5d3-pwm",
--		.data = &atmel_pwm_regs_v2,
-+		.data = &atmel_pwm_data_v2,
- 	}, {
- 		.compatible = "atmel,sama5d2-pwm",
--		.data = &atmel_pwm_regs_v2,
-+		.data = &atmel_pwm_data_v2,
- 	}, {
- 		/* sentinel */
- 	},
- };
- MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
- 
--static inline const struct atmel_pwm_registers *
-+static inline const struct atmel_pwm_data*
- atmel_pwm_get_driver_data(struct platform_device *pdev)
- {
- 	const struct platform_device_id *id;
-@@ -330,18 +362,18 @@ atmel_pwm_get_driver_data(struct platform_device *pdev)
- 
- 	id = platform_get_device_id(pdev);
- 
--	return (struct atmel_pwm_registers *)id->driver_data;
-+	return (struct atmel_pwm_data *)id->driver_data;
- }
- 
- static int atmel_pwm_probe(struct platform_device *pdev)
- {
--	const struct atmel_pwm_registers *regs;
-+	const struct atmel_pwm_data *data;
- 	struct atmel_pwm_chip *atmel_pwm;
- 	struct resource *res;
- 	int ret;
- 
--	regs = atmel_pwm_get_driver_data(pdev);
--	if (!regs)
-+	data = atmel_pwm_get_driver_data(pdev);
-+	if (!data)
- 		return -ENODEV;
- 
- 	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
-@@ -373,7 +405,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
- 
- 	atmel_pwm->chip.base = -1;
- 	atmel_pwm->chip.npwm = 4;
--	atmel_pwm->regs = regs;
-+	atmel_pwm->data = data;
- 	atmel_pwm->updated_pwms = 0;
- 	mutex_init(&atmel_pwm->isr_lock);
- 
+So, a few years ago, we went to significant effort in ARM land to come
+up with a way to _safely_ copy assembler from the kernel into SRAM,
+because copying code to SRAM that is compiled in thumb mode and then
+executing it is _not_ as simple as memcpy(), cast the pointer to a
+function pointer, and then call the function pointer.
+
+The SRAM stuff throws all that out, instead preferring the dumb memcpy()
+approach.
+
+This needs resolving, and I'd like to see it resolved to the satisfaction
+of architecture maintainers before we progress any further down this
+route.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
