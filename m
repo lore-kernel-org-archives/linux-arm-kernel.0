@@ -1,26 +1,34 @@
-From: dev.srinivasulu@gmail.com (Thanneeru Srinivasulu)
-Date: Wed, 5 Apr 2017 12:07:24 +0530
-Subject: [PATCH] net: thunderx: Switch to pci_alloc_irq_vectors
-In-Reply-To: <20170405062740.GB26470@lst.de>
-References: <1491298146-13609-1-git-send-email-tsrinivasulu@cavium.com>
- <20170405062740.GB26470@lst.de>
-Message-ID: <CAMtOeK+nuY0KVbNutPgR9mpkfqpWB3g75evAQNECvG8OxRfGNA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Apr 2017 09:03:51 +0200
+Subject: [PATCH 1/3] phy: sun4i-usb: enable PHY0 dual route switching for
+ A64 USB PHY
+In-Reply-To: <20170404184518.33610-1-icenowy@aosc.io>
+References: <20170404184518.33610-1-icenowy@aosc.io>
+Message-ID: <20170405070351.etpupeqjeo7dhyxl@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 11:57 AM, Christoph Hellwig <hch@lst.de> wrote:
-> On Tue, Apr 04, 2017 at 02:59:06PM +0530, dev.srinivasulu at gmail.com wrote:
->> From: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
->>
->> Remove deprecated pci_enable_msix API in favour of it's
->> successor pci_alloc_irq_vectors.
->>
->> Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
->> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->
-> Looks good.
->
-> Are you fine with me queueing this up together with the other
-> pci_enable_msix() removal patches?
+On Wed, Apr 05, 2017 at 02:45:16AM +0800, Icenowy Zheng wrote:
+> Allwinner A64 SoC features a switchable PHY0 like the one in H3, which
+> can switch between a MUSB controller and a pair of OHCI/EHCI controller.
+> 
+> Enable PHY0 route auto switching for A64.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-No issues, thanks.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/8945baea/attachment.sig>
