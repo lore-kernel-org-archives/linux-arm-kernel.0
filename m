@@ -1,34 +1,39 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 5 Apr 2017 14:20:31 +0800
-Subject: [linux-sunxi] [PATCH 02/11] arm64: allwinner: a64: add NMI
- controller on A64
-In-Reply-To: <20170405061137.n66ectbkl7a2fv5f@lukather>
-References: <20170404180145.12897-1-icenowy@aosc.io>
- <20170404180145.12897-3-icenowy@aosc.io>
- <CAGb2v67BucT8=FTgem3AmSU9XJA7OHoTCq3t3wBzDWyuwzZqaA@mail.gmail.com>
- <20170405061137.n66ectbkl7a2fv5f@lukather>
-Message-ID: <CAGb2v672Z2JedGF3n+8Hi78QG_hAxz0ZYXaCkw0GAkA3xEdKrA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Apr 2017 08:22:14 +0200
+Subject: [PATCH v4 0/6] ARM: dts: sunxi: Add CAN node and can0_pins_a
+ pinctrl settings
+In-Reply-To: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
+References: <1491330992-9876-1-git-send-email-menschel.p@posteo.de>
+Message-ID: <20170405062214.ejc4irrypxjoqufu@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 2:11 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Apr 05, 2017 at 11:51:45AM +0800, Chen-Yu Tsai wrote:
->> On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> > Allwinner A64 SoC features a NMI controller, which is usually connected
->> > to the AXP PMIC.
->> >
->> > Add support for it.
->> >
->> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>
->> This might not be the best representation of the R_INTC block. Though
->> we'd need to change it for all SoCs if we want to be accurate. For now,
->
-> What do you think would be a good representation?
+On Tue, Apr 04, 2017 at 08:36:26PM +0200, Patrick Menschel wrote:
+> The Allwinner A10/A20 SoCs have an on-board CAN (Controller Area Network)
+> controller. This patch adds the CAN core to the SoC's include files,
+> sun4i-a10.dtsi and sun7i-a20.dtsi.
+> 
+> On linux-can mailing list was a discussion about updating the device tree bindings
+> https://lkml.org/lkml/2015/9/17/220
+> but it did not progress past writing the documentation file.
+> Documentation/devicetree/bindings/net/can/sun4i_can.txt
+> 
+> The CAN controller can be enabled in a board specific dts file as
+> described in the documentation file or by using a device tree overlay.
 
-My gut feeling is that this is the old INTC from sun4/5i. It's supposed
-to be the interrupt controller for the embedded low power core. I've not
-done a thorough comparison though.
+Applied 1 and 4. The others were already merged.
 
-ChenYu
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/71ee61ec/attachment.sig>
