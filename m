@@ -1,85 +1,46 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed,  5 Apr 2017 16:06:10 +0200
-Subject: [PATCH 1/3] phy: rockchip-usb: Add vbus regulator support.
+Date: Wed,  5 Apr 2017 16:06:11 +0200
+Subject: [PATCH 2/3] ARM: dts: rockchip: rock2: Setup usb vbus-supply
 In-Reply-To: <20170405140613.4444-1-sjoerd.simons@collabora.co.uk>
 References: <20170405140613.4444-1-sjoerd.simons@collabora.co.uk>
-Message-ID: <20170405140613.4444-2-sjoerd.simons@collabora.co.uk>
+Message-ID: <20170405140613.4444-3-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On rockchip devices vbus is supplied by a separate power supply, often
-through a regulator. Add support for describing the the regulator in
-device-tree following the same convention as several other usb phy's.
+Now that the rockchip usb phy has a vbus-supply property use that to
+control the vbus regulator on rock2.
 
 Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 ---
 
- .../devicetree/bindings/phy/rockchip-usb-phy.txt      |  1 +
- drivers/phy/phy-rockchip-usb.c                        | 19 +++++++++++++++++++
- 2 files changed, 20 insertions(+)
+ arch/arm/boot/dts/rk3288-rock2-square.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-index 57dc388e2fa2..4ed569046daf 100644
---- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-@@ -30,6 +30,7 @@ Optional Properties:
- - reset-names: Only allow the following entries:
-  - phy-reset
- - resets: Must contain an entry for each entry in reset-names.
-+- vbus-supply: power-supply phandle for vbus power source
+diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
+index a23a94811be8..8ed25e9f60bc 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-square.dts
++++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+@@ -125,10 +125,6 @@
+ 		gpio = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&host_vbus_drv>;
+-		/* Always on as the rockchip usb phy doesn't have a vbus-supply
+-		 * property
+-		 */
+-		regulator-always-on;
+ 		regulator-name = "vcc_host";
+ 	};
  
- Example:
- 
-diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-index 734987fa0ad7..3378eeb7a562 100644
---- a/drivers/phy/phy-rockchip-usb.c
-+++ b/drivers/phy/phy-rockchip-usb.c
-@@ -66,6 +66,7 @@ struct rockchip_usb_phy {
- 	struct phy	*phy;
- 	bool		uart_enabled;
- 	struct reset_control *reset;
-+	struct regulator *vbus;
+@@ -279,6 +275,10 @@
+ 	status = "okay";
  };
  
- static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
-@@ -88,6 +89,9 @@ static void rockchip_usb_phy480m_disable(struct clk_hw *hw)
- 						    struct rockchip_usb_phy,
- 						    clk480m_hw);
- 
-+	if (phy->vbus)
-+		regulator_disable(phy->vbus);
++&usbphy1 {
++	vbus-supply = <&vcc_usb_host>;
++};
 +
- 	/* Power down usb phy analog blocks by set siddq 1 */
- 	rockchip_usb_phy_power(phy, 1);
- }
-@@ -143,6 +147,14 @@ static int rockchip_usb_phy_power_on(struct phy *_phy)
- 	if (phy->uart_enabled)
- 		return -EBUSY;
- 
-+	if (phy->vbus) {
-+		int ret;
-+
-+		ret = regulator_enable(phy->vbus);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	return clk_prepare_enable(phy->clk480m);
- }
- 
-@@ -268,6 +280,13 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
- 	}
- 	phy_set_drvdata(rk_phy->phy, rk_phy);
- 
-+	rk_phy->vbus = devm_regulator_get_optional(&rk_phy->phy->dev, "vbus");
-+	if (IS_ERR(rk_phy->vbus)) {
-+		if (PTR_ERR(rk_phy->vbus) == -EPROBE_DEFER)
-+			return PTR_ERR(rk_phy->vbus);
-+		rk_phy->vbus = NULL;
-+	}
-+
- 	/*
- 	 * When acting as uart-pipe, just keep clock on otherwise
- 	 * only power up usb phy when it use, so disable it when init
+ &usb_host0_ehci {
+ 	status = "okay";
+ };
 -- 
 2.11.0
