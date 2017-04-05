@@ -1,52 +1,89 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 5 Apr 2017 11:52:35 +0800
-Subject: [linux-sunxi] [PATCH 03/11] dt-bindings: add device tree binding
- for X-Powers AXP803 PMIC
-In-Reply-To: <20170404180145.12897-4-icenowy@aosc.io>
-References: <20170404180145.12897-1-icenowy@aosc.io>
- <20170404180145.12897-4-icenowy@aosc.io>
-Message-ID: <CAGb2v66sjjn5NxZ0KJ2Q396307rURV1MAj9EfbyWah3w9RSqRA@mail.gmail.com>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Tue,  4 Apr 2017 21:05:55 -0500
+Subject: [PATCH v5 11/23] drivers/fsi: Add master unscan
+In-Reply-To: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170405020607.79939-12-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 2:01 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> AXP803 is a PMIC produced by Shenzhen X-Powers, with either I2C or RSB
-> bus.
->
-> Add a compatible for it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index b41d2601c6ba..31607631b0d8 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -7,11 +7,12 @@ axp209 (X-Powers)
->  axp221 (X-Powers)
->  axp223 (X-Powers)
->  axp809 (X-Powers)
-> +axp803 (X-Powers)
->
->  Required properties:
->  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
->               "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
-> -             "x-powers,axp809"
-> +             "x-powers,axp809", "x-powers,axp803"
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Please sort them in ascending order. Otherwise,
+Allow a master to undo a previous scan.  Should a master scan a bus
+twice it will need to ensure it doesn't double register any
+previously detected device.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ drivers/fsi/fsi-core.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
->  - reg: The I2C slave address or RSB hardware address for the AXP chip
->  - interrupt-parent: The parent interrupt controller
->  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-> --
-> 2.12.2
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 4da0b030..75d2a88 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -69,6 +69,7 @@ struct fsi_slave {
+ 	uint32_t		size;	/* size of slave address space */
+ };
+ 
++#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ 
+ static int fsi_master_read(struct fsi_master *master, int link,
+@@ -491,6 +492,37 @@ static int fsi_master_scan(struct fsi_master *master)
+ 	return 0;
+ }
+ 
++static int __fsi_slave_remove_device(struct device *dev, void *arg)
++{
++	device_unregister(dev);
++	return 0;
++}
++
++static int __fsi_master_remove_slave(struct device *dev, void *arg)
++{
++	device_for_each_child(dev, NULL, __fsi_slave_remove_device);
++	device_unregister(dev);
++	return 0;
++}
++
++static void fsi_master_unscan(struct fsi_master *master)
++{
++	device_for_each_child(&master->dev, NULL, __fsi_master_remove_slave);
++}
++
++static ssize_t master_rescan_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	struct fsi_master *master = to_fsi_master(dev);
++
++	fsi_master_unscan(master);
++	fsi_master_scan(master);
++
++	return count;
++}
++
++static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
++
+ int fsi_master_register(struct fsi_master *master)
+ {
+ 	int rc;
+@@ -507,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
+ 		return rc;
+ 	}
+ 
++	rc = device_create_file(&master->dev, &dev_attr_rescan);
++	if (rc) {
++		device_unregister(&master->dev);
++		ida_simple_remove(&master_ida, master->idx);
++		return rc;
++	}
++
+ 	fsi_master_scan(master);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(fsi_master_register);
+-- 
+1.8.2.2
