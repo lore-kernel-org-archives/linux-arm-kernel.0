@@ -1,59 +1,49 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Wed, 5 Apr 2017 18:30:45 +0530
-Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
-References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
- <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
- <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
-Message-ID: <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Apr 2017 15:05:17 +0200
+Subject: [PATCH 2/3] arm64: allwinner: a64: add USB0 OHCI/EHCI related
+ devicetree parts
+In-Reply-To: <20170405125053.6170-3-icenowy@aosc.io>
+References: <20170405125053.6170-1-icenowy@aosc.io>
+ <20170405125053.6170-3-icenowy@aosc.io>
+Message-ID: <20170405130517.vr6tanrswanangas@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Wed, Apr 05, 2017 at 08:50:52PM +0800, Icenowy Zheng wrote:
+> As we added USB0 route auto switching support for A64, add related
+> device tree parts to the A64 DTSI file (EHCI0/OHCI0 controllers and the
+> pmu0 memory area for PHY).
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1c64ea2d23f9..a8916df99048 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -179,8 +179,10 @@
+>  		usbphy: phy at 01c19400 {
+>  			compatible = "allwinner,sun50i-a64-usb-phy";
+>  			reg = <0x01c19400 0x14>,
+> +			      <0x01c1a800 0x4>,
+>  			      <0x01c1b800 0x4>;
+>  			reg-names = "phy_ctrl",
+> +				    "pmu0",
 
-On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
->> This is driver for USB DRD Phy used in Broadcom's Northstar2
->> SoC. The phy can be configured to be in Device mode or Host
->> mode based on the type of cable connected to the port. The
->> driver registers to  extcon framework to get appropriate
->> connect events for Host/Device cables connect/disconnect
->> states based on VBUS and ID interrupts.
->
-> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
-> Northstar2.
->
+Again, this needs to be split apart, and sent for 4.11.
 
-Will do.
+Maxime
 
-> Sorry for not letting you know this earlier. But I feel the design of the
-> driver should be changed. Extcon shouldn't be used here. The extcon
-> notifications should be sent to the consumer driver and the consumer driver
-> should be responsible for invoking the phy ops.
->
-
-The consumer drivers here would be a UDC driver (USB device
-controller), EHCI and OHCI host controller drivers.
-I was already suggested in UDC driver review to deal with extcon in Phy driver.
-
-This phy connects to 2 host controllers, and one device controller.
-That's the design in Broadcom Northstar2
-platform. The values of the VBUS and ID pins of this port are
-determined based on the type of the cable (device cable
-or host cable). And. phy has to be configured accordingly.
-
-> The phy ops being invoked during extcon events doesn't look right.
-
-Could you please elaborate on the concern, so that we can think of
-mitigating those issues in this driver?
-Since we are dealing with phy init/shutdown in this driver itself, are
-you okay with moving the extcon handling code
-out of phy ops ?
-
-Thanks,
-Ravi
->
-> Thanks
-> Kishon
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/0522e781/attachment.sig>
