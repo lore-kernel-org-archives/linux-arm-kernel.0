@@ -1,37 +1,34 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Wed, 5 Apr 2017 19:09:59 +0800
-Subject: [PATCH] media: mtk-vcodec: remove informative log
-In-Reply-To: <1491389669-32737-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1491389669-32737-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <1491390599.32502.1.camel@mtksdaap41>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 5 Apr 2017 13:18:57 +0200
+Subject: [PATCH v6 17/39] platform: add video-multiplexer subdevice driver
+In-Reply-To: <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170405111857.GA26831@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-05 at 18:54 +0800, Minghsiu Tsai wrote:
-> Driver is stable. Remove DEBUG definition from driver.
-> 
-> There are debug message in /var/log/messages if DEBUG is defined,
-> such as:
-> [MTK_V4L2] level=0 fops_vcodec_open(),170: decoder capability 0
-> [MTK_V4L2] level=0 fops_vcodec_open(),177: 16000000.vcodec decoder [0]
-> [MTK_V4L2] level=0 fops_vcodec_release(),200: [0] decoder
-> 
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Acked-by:Tiffany Lin <Tiffany.lin@mediatek.com>
+Hi!
 
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-> index 7d55975..1248083 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-> @@ -31,7 +31,6 @@ struct mtk_vcodec_mem {
->  extern int mtk_v4l2_dbg_level;
->  extern bool mtk_vcodec_dbg;
->  
-> -#define DEBUG	1
->  
->  #if defined(DEBUG)
->  
+> + * video stream multiplexer controlled via gpio or syscon
+> + *
+> + * Copyright (C) 2013 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
+> + * Copyright (C) 2016 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
+
+This is actually quite interesting. Same email address for two
+people...
+
+Plus, I believe this wants to say that copyright is with Pengutronix,
+not Sascha and Philipp. In that case you probably want to list
+copyright and authors separately?
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170405/09cc8ef6/attachment.sig>
