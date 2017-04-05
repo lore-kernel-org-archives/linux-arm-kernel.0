@@ -1,52 +1,70 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Wed, 5 Apr 2017 18:08:08 +0200
-Subject: [PATCH 1/1] ARM: dts: armada-xp-linksys-mamba: use wan instead
- of internet for DSA port
-In-Reply-To: <20170405155032.GL13449@lunn.ch>
-References: <20170405052847.326-1-ralph.sennhauser@gmail.com>
- <20170405142824.GB13449@lunn.ch>
- <20170405172224.38c1f9fb@gmail.com>
- <20170405155032.GL13449@lunn.ch>
-Message-ID: <20170405180808.4f8924cb@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 6 Apr 2017 00:13:01 +0800
+Subject: [PATCH 1/3] dt: bindings: add pmu0 regs for USB PHYs on Allwinner
+ H3/V3s/A64
+In-Reply-To: <1524732c-b72f-61ce-8ae7-1d764f85c903@ti.com>
+References: <20170405125053.6170-1-icenowy@aosc.io>
+ <20170405125053.6170-2-icenowy@aosc.io>
+ <1524732c-b72f-61ce-8ae7-1d764f85c903@ti.com>
+Message-ID: <CAGb2v64jndyO2VvkZzzgHpX9x2FB6J66it_n8smG-tT0nQFB_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Wed, Apr 5, 2017 at 8:58 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>
+>
+> On Wednesday 05 April 2017 06:20 PM, Icenowy Zheng wrote:
+>> From: Icenowy Zheng <icenowy@aosc.xyz>
+>>
+>> Allwinner H3/V3s/A64 SoCs have a special USB PHY0 that can route to two
+>> controllers: one is MUSB and the other is a EHCI/OHCI pair.
+>>
+>> When it's routed to EHCI/OHCI pair, it will needs a "pmu0" regs to
+>> tweak, like other EHCI/OHCI pairs in Allwinner SoCs.
+>>
+>> Add this to the binding of USB PHYs on Allwinner H3/V3s/A64.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>
+>> Kishon, could you push this to 4.11?
+>
+> Is this for the patch titled "phy: sun4i-usb: add support for V3s USB PHY" that
+> was added during the last merge window.
 
-On Wed, 5 Apr 2017 17:50:32 +0200
-Andrew Lunn <andrew@lunn.ch> wrote:
+Yes. In fact, as the description suggests, this also applies retroactively to
+H3 and A64, which were added in the following commits:
 
-> > In fact "internet" label on the case is uppercase, would this matter
-> > for you for new bindings, or would you still use the lowercase
-> > version?  
-> 
-> I would use lower case, just to fix with the general convention that
-> interface names are lower case.
+4.9  732e35da7b4a ("dt: bindings: add bindings for Allwinner A64 usb phy")
+4.5  626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys found
+                    on the H3 SoC")
 
-Thanks
+Though this was missed at the time the binding was added.
 
-> 
-> > > I would say, this is now too late. Changing an interface name will
-> > > break configuration scripts. We are stuck with it.
-> > >   
-> > 
-> > If it weren't for commit cb4f71c42988 that would have been obvious
-> > for me as well.  
-> 
-> Yes, that was not nice. But it was also very earlier in the life of
-> 38x, so it just affected a few developers with reference boards, not
-> real products out in the wild, as far as i remember.
-> 
->      Andrew
+ChenYu
 
-The mentioned commit bit me amongst others, see
-https://lkml.org/lkml/2016/8/21/62
-
-In fact I expect the impact to be much lower this time around, before
-4.10 DSA was no contender for swconfig (out of tree switch driver as
-used by OpenWrt and others). On Mamba ~200Mbit was top speed. Now they
-perform roughly the same.
-
-
-Thanks
-Ralph
+> this patch looks simpler enough to be merged in this -rc cycle. However it
+> depends on Greg KH.
+>
+> Thanks
+> Kishon
+>
+>>
+>>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> index e42334258185..005bc22938ff 100644
+>> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> @@ -15,6 +15,7 @@ Required properties:
+>>  - reg : a list of offset + length pairs
+>>  - reg-names :
+>>    * "phy_ctrl"
+>> +  * "pmu0" for H3, V3s and A64
+>>    * "pmu1"
+>>    * "pmu2" for sun4i, sun6i or sun7i
+>>  - #phy-cells : from the generic phy bindings, must be 1
+>>
