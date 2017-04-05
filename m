@@ -1,109 +1,154 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Wed, 5 Apr 2017 17:02:28 +0300
-Subject: [RFC PATCH 0/2] extends PWM framework to support PWM dead-times
-Message-ID: <1491400950-9857-1-git-send-email-claudiu.beznea@microchip.com>
+Date: Wed, 5 Apr 2017 17:02:30 +0300
+Subject: [RFC PATCH 2/2] drivers: pwm: pwm-atmel: implement pwm dead-time
+In-Reply-To: <1491400950-9857-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1491400950-9857-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1491400950-9857-3-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Implement PWM dead-times for atmel PWM controllers.
+Since this driver is used by PWM controllers which
+supports dead-times and PWM controllers which doesn't,
+add specific input for dead-time register in atmel
+register private data structure.
 
-Please give feedback on these patches which extends PWM framework
-in order to support PWM dead-times.
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ drivers/pwm/pwm-atmel.c | 56 +++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 52 insertions(+), 4 deletions(-)
 
-For a PWM controller with more than one output signals per PWM channel
-dead-times are the delays introduced between the edges of the output
-signals and the original signal introduced in dead-time generator
-engine.
-E.g. consider a PWM controller with with the following diagram:
-
-                        -----------------
-                       |                 |---> PWMH
-        PWM signal --->| Dead-time engine|
-                       |                 |---> PWML
-                        -----------------
-
-With no dead-time configured, the PWMH and PWML signals will be
-complementary signals (rising and falling edges of PWMH and PWML
-have opposite leves, same duration and same starting time) as
-follows:
-
-                      ____0    D____P     ____      ____      ____
-        PWM signal __|    |____|    |____|    |____|    |____|    |___
-                      ____      ____      ____      ____      ____
-              PWMH __|    |____|    |____|    |____|    |____|    |___
-                   __      ____      ____      ____      ____      ___
-              PWML   |____|    |____|    |____|    |____|    |____|
-
-Where - 0 is the starting point of the signal
-      - D is the starting point of the duty-cycle
-      - P is the signal period
-
-Based on the above diagram:
-- rising edge dead-time - is the delay introduced in one of the
-dead-time engine output signal; the delay is introduced after
-rising edge of PWM signal
-- falling edge dead-time - is the delay introduced in one of the
-dead-time engine output signal; the delay is introduced after
-the end of falling edge of the PWM signal
-The following diagram explain how PWM dead-times falls on some signals:
-
-                      ____0    D____P     ____      ____      ____
-        PWM signal __|    |____|    |____|    |____|    |____|    |___
-                        __        __        __        __        __
-              PWMH ____|  |____re|  |______|  |______|  |______|  |___
-                   __        __        __        __        __        __
-              PWML   |______|  |____fe|  |______|  |______|  |______|
-
-In the upper diagram:
-- re = rising edge = the delay between D point of PWM signal
-(rising edge) and the starting point of the next edge
-- fe = falling edge = the delay between P point of PWM signal
-(falling edge) and the starting point of the next edge
-
-To configure the PWM dead-times new inputs were added to sysfs,
-in PWM subsystem, one for rising edge dead-time, one for falling
-edge deadtime.
-
-root at sama5d2-xplained:/sys/devices/platform/ahb/ahb:apb/f802c000.pwm/pwm/pwmchip0/pwm2# ls -l
--r--r--r--    1 root     root          4096 Feb 10 10:00 capture
--rw-r--r--    1 root     root          4096 Feb 10 10:01 deadtime_fe
--rw-r--r--    1 root     root          4096 Feb 10 10:02 deadtime_re
--rw-r--r--    1 root     root          4096 Feb 10 10:00 duty_cycle
--rw-r--r--    1 root     root          4096 Feb 10 10:00 enable
--rw-r--r--    1 root     root          4096 Feb 10 10:00 period
--rw-r--r--    1 root     root          4096 Feb 10 10:00 polarity
-drwxr-xr-x    2 root     root             0 Feb 10 10:00 power
--rw-r--r--    1 root     root          4096 Feb 10 10:00 uevent
-
-The PWM dead-times are used in half bridge converters applications.
-
-Please consider that this series was build on top of following
-patch series:
-[PATCH v3 0/2] switch to atomic PWM
-[PATCH v3 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
-[PATCH v3 2/2] drivers: pwm: pwm-atmel: enable PWM on sama5d2
-
-This patch series is not dependent on the other patch series
-I've made for extending PWM framework with PWM mode:
-[RFC PATCH 0/2] extend PWM framework to support PWM modes
-[RFC PATCH 1/2] drivers: pwm: core: implement pwm mode
-[RFC PATCH 2/2] drivers: pwm: pwm-atmel: add support for pwm modes
-but, if you consider relevant, and both patch changes are considered
-relevant for PWM subsistem, I can combine both of them, if any.
-
-Thanks you,
-Claudiu Beznea
-
-Claudiu Beznea (2):
-  drivers: pwm: core: implement pwm dead-times
-  drivers: pwm: pwm-atmel: implement pwm dead-time
-
- Documentation/pwm.txt   | 52 ++++++++++++++++++++++++++++++++++
- drivers/pwm/core.c      | 10 ++++++-
- drivers/pwm/pwm-atmel.c | 56 ++++++++++++++++++++++++++++++++++---
- drivers/pwm/sysfs.c     | 74 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pwm.h     | 36 ++++++++++++++++++++++++
- 5 files changed, 223 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 530d7dc..0e69319 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -33,8 +33,9 @@
+ 
+ #define PWM_CMR			0x0
+ /* Bit field in CMR */
+-#define PWM_CMR_CPOL		(1 << 9)
+-#define PWM_CMR_UPD_CDTY	(1 << 10)
++#define PWM_CMR_CPOL		BIT(9)
++#define PWM_CMR_UPD_CDTY	BIT(10)
++#define PWM_CMR_DTE		BIT(16)
+ #define PWM_CMR_CPRE_MSK	0xF
+ 
+ /* The following registers for PWM v1 */
+@@ -47,6 +48,7 @@
+ #define PWMV2_CDTYUPD		0x08
+ #define PWMV2_CPRD		0x0C
+ #define PWMV2_CPRDUPD		0x10
++#define PWMV2_DT		0x18
+ 
+ /*
+  * Max value for duty and period
+@@ -63,6 +65,7 @@ struct atmel_pwm_registers {
+ 	u8 period_upd;
+ 	u8 duty;
+ 	u8 duty_upd;
++	u8 dt;
+ };
+ 
+ struct atmel_pwm_chip {
+@@ -161,6 +164,32 @@ static void atmel_pwm_update_cdty(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			    atmel_pwm->regs->duty_upd, cdty);
+ }
+ 
++static int atmel_pwm_calculate_deadtime(struct pwm_chip *chip,
++					struct pwm_state *state,
++					unsigned long cprd, unsigned long *dt)
++{
++	unsigned long long cycles;
++
++	if (state->deadtime_fe > state->duty_cycle ||
++	    state->deadtime_re > state->period - state->duty_cycle)
++		return -EINVAL;
++
++	*dt = 0;
++	if (state->deadtime_fe) {
++		cycles = (unsigned long long)state->deadtime_fe * cprd;
++		do_div(cycles, state->period);
++		*dt = (cycles << 16);
++	}
++
++	if (state->deadtime_re) {
++		cycles = (unsigned long long)state->deadtime_re * cprd;
++		do_div(cycles, state->period);
++		*dt |= cycles;
++	}
++
++	return 0;
++}
++
+ static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
+ 				    struct pwm_device *pwm,
+ 				    unsigned long cprd, unsigned long cdty)
+@@ -214,7 +243,7 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ {
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 	struct pwm_state cstate;
+-	unsigned long cprd, cdty;
++	unsigned long cprd, cdty, dt;
+ 	u32 pres, val;
+ 	int ret;
+ 
+@@ -223,7 +252,9 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	if (state->enabled) {
+ 		if (cstate.enabled &&
+ 		    cstate.polarity == state->polarity &&
+-		    cstate.period == state->period) {
++		    cstate.period == state->period &&
++		    cstate.deadtime_re == state->deadtime_re &&
++		    cstate.deadtime_fe == state->deadtime_fe) {
+ 			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
+ 						  atmel_pwm->regs->period);
+ 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+@@ -239,6 +270,12 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			return ret;
+ 		}
+ 
++		ret = atmel_pwm_calculate_deadtime(chip, state, cprd, &dt);
++		if (ret) {
++			dev_err(chip->dev, "failed to calculate dead-time\n");
++			return ret;
++		}
++
+ 		atmel_pwm_calculate_cdty(state, cprd, &cdty);
+ 
+ 		if (cstate.enabled) {
+@@ -258,8 +295,17 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			val &= ~PWM_CMR_CPOL;
+ 		else
+ 			val |= PWM_CMR_CPOL;
++
++		if (dt)
++			val |= PWM_CMR_DTE;
++		else
++			val &= ~PWM_CMR_DTE;
++
+ 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+ 		atmel_pwm_set_cprd_cdty(chip, pwm, cprd, cdty);
++		if (atmel_pwm->regs->dt)
++			atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
++					    atmel_pwm->regs->dt, dt);
+ 		mutex_lock(&atmel_pwm->isr_lock);
+ 		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
+ 		atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
+@@ -282,6 +328,7 @@ static const struct atmel_pwm_registers atmel_pwm_regs_v1 = {
+ 	.period_upd	= PWMV1_CUPD,
+ 	.duty		= PWMV1_CDTY,
+ 	.duty_upd	= PWMV1_CUPD,
++	.dt		= 0,
+ };
+ 
+ static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
+@@ -289,6 +336,7 @@ static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
+ 	.period_upd	= PWMV2_CPRDUPD,
+ 	.duty		= PWMV2_CDTY,
+ 	.duty_upd	= PWMV2_CDTYUPD,
++	.dt		= PWMV2_DT,
+ };
+ 
+ static const struct platform_device_id atmel_pwm_devtypes[] = {
 -- 
 2.7.4
