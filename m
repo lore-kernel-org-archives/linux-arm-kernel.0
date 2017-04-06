@@ -1,93 +1,96 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 6 Apr 2017 16:55:11 +0100
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
- <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
- <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
- <20170406142710.GE4372@olila.local.net-space.pl>
- <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
- <20170406152040.GH4372@olila.local.net-space.pl>
- <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
-Message-ID: <20170406155453.GA3966@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Apr 2017 16:58:25 +0100
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
+ <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
+ <CAPub14-sFgx=oCHzJPb9h9b_V0rbn5UAMDNJ-yTkjhz38JPqMQ@mail.gmail.com>
+ <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
+ <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
+Message-ID: <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding the EFI maintainers]
-
-Tl;DR: Xen's EFI wrappery doesn't implement reset_system, so when
-invoked on arm64 we get a NULL dereference.
-
-On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
-> On 06/04/17 16:20, Daniel Kiper wrote:
-> >On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
-> >>On 06/04/17 16:27, Daniel Kiper wrote:
-> >>>On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
-> >>>>Hi Juergen,
-> >>>>
-> >>>>On 06/04/17 07:23, Juergen Gross wrote:
-> >>>>>On 05/04/17 21:49, Boris Ostrovsky wrote:
-> >>>>>>On 04/05/2017 02:14 PM, Julien Grall wrote:
-> >>>>>>>The x86 code has theoritically a similar issue, altought EFI does not
-> >>>>>>>seem to be the preferred method. I have left it unimplemented on x86 and
-> >>>>>>>CCed Linux Xen x86 maintainers to know their view here.
-> >>>>>>
-> >>>>>>(+Daniel)
-> >>>>>>
-> >>>>>>This could be a problem for x86 as well, at least theoretically.
-> >>>>>>xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
-> >>>>>>
-> >>>>>>So I think we should have a similar routine there.
-> >>>>>
-> >>>>>+1
-> >>>>>
-> >>>>>I don't see any problem with such a routine added, in contrast to
-> >>>>>potential "reboots" instead of power off without it.
-> >>>>>
-> >>>>>So I think this dummy xen_efi_reset_system() should be added to
-> >>>>>drivers/xen/efi.c instead.
-> >>>>
-> >>>>I will resend the patch during day with xen_efi_reset_system moved
-> >>>>to common code and implement the x86 counterpart (thought, I will
-> >>>>not be able to test it).
-> >>>
-> >>>I think that this is ARM specific issue. On x86 machine_restart() calls
-> >>>xen_restart(). Hence, everything works. So, I think that it should be
-> >>>fixed only for ARM. Anyway, please CC me when you send a patch.
+On Thu, Apr 06, 2017 at 12:52:13PM +0530, Imran Khan wrote:
+> On 4/5/2017 10:13 AM, Imran Khan wrote:
+> >> We may have to revisit this logic and consider L1_CACHE_BYTES the
+> >> _minimum_ of cache line sizes in arm64 systems supported by the kernel.
+> >> Do you have any benchmarks on Cavium boards that would show significant
+> >> degradation with 64-byte L1_CACHE_BYTES vs 128?
 > >>
-> >>What about xen_machine_power_off() (as stated in Boris' mail)?
-> >
-> >Guys what do you think about that:
-> >
-> >--- a/drivers/firmware/efi/reboot.c
-> >+++ b/drivers/firmware/efi/reboot.c
-> >@@ -55,7 +55,7 @@ static void efi_power_off(void)
-> >
-> > static int __init efi_shutdown_init(void)
-> > {
-> >-       if (!efi_enabled(EFI_RUNTIME_SERVICES))
-> >+       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
-> >                return -ENODEV;
-> >
-> >        if (efi_poweroff_required())
-> >
-> >
-> >Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
-> >
-> >I hope that tweaks for both files should solve our problem.
+> >> For non-coherent DMA, the simplest is to make ARCH_DMA_MINALIGN the
+> >> _maximum_ of the supported systems:
+> >>
+> >> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+> >> index 5082b30bc2c0..4b5d7b27edaf 100644
+> >> --- a/arch/arm64/include/asm/cache.h
+> >> +++ b/arch/arm64/include/asm/cache.h
+> >> @@ -18,17 +18,17 @@
+> >>
+> >>  #include <asm/cachetype.h>
+> >>
+> >> -#define L1_CACHE_SHIFT         7
+> >> +#define L1_CACHE_SHIFT         6
+> >>  #define L1_CACHE_BYTES         (1 << L1_CACHE_SHIFT)
+> >>
+> >>  /*
+> >>   * Memory returned by kmalloc() may be used for DMA, so we must make
+> >> - * sure that all such allocations are cache aligned. Otherwise,
+> >> - * unrelated code may cause parts of the buffer to be read into the
+> >> - * cache before the transfer is done, causing old data to be seen by
+> >> - * the CPU.
+> >> + * sure that all such allocations are aligned to the maximum *known*
+> >> + * cache line size on ARMv8 systems. Otherwise, unrelated code may cause
+> >> + * parts of the buffer to be read into the cache before the transfer is
+> >> + * done, causing old data to be seen by the CPU.
+> >>   */
+> >> -#define ARCH_DMA_MINALIGN      L1_CACHE_BYTES
+> >> +#define ARCH_DMA_MINALIGN      (128)
+> >>
+> >>  #ifndef __ASSEMBLY__
+> >>
+> >> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> >> index 392c67eb9fa6..30bafca1aebf 100644
+> >> --- a/arch/arm64/kernel/cpufeature.c
+> >> +++ b/arch/arm64/kernel/cpufeature.c
+> >> @@ -976,9 +976,9 @@ void __init setup_cpu_features(void)
+> >>         if (!cwg)
+> >>                 pr_warn("No Cache Writeback Granule information, assuming
+> >> cache line size %d\n",
+> >>                         cls);
+> >> -       if (L1_CACHE_BYTES < cls)
+> >> -               pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
+> >> -                       L1_CACHE_BYTES, cls);
+> >> +       if (ARCH_DMA_MINALIGN < cls)
+> >> +               pr_warn("ARCH_DMA_MINALIGN smaller than the Cache Writeback Granule (%d < %d)\n",
+> >> +                       ARCH_DMA_MINALIGN, cls);
+> >>  }
+> >>
+> >>  static bool __maybe_unused
+> > 
+> > This change was discussed at: [1] but was not concluded as apparently no one
+> > came back with test report and numbers. After including this change in our 
+> > local kernel we are seeing significant throughput improvement. For example with:
+> > 
+> > iperf -c 192.168.1.181 -i 1 -w 128K -t 60
+> > 
+> > The average throughput is improving by about 30% (230Mbps from 180Mbps).
+> > Could you please let us know if this change can be included in upstream kernel.
+> > 
+> > [1]: https://groups.google.com/forum/#!topic/linux.kernel/P40yDB90ePs
 > 
-> This sounds good for power off (I haven't tried to power off DOM0
-> yet).
+> Could you please provide some feedback about the above mentioned query ?
 
-Please, let's keep the Xen knowledge constrained to the Xen EFI wrapper,
-rather than spreading it further.
+Do you have an explanation on the performance variation when
+L1_CACHE_BYTES is changed? We'd need to understand how the network stack
+is affected by L1_CACHE_BYTES, in which context it uses it (is it for
+non-coherent DMA?).
 
-IMO, given reset_system is a *mandatory* function, the Xen wrapper
-should provide an implementation.
+The Cavium guys haven't shown any numbers (IIUC) to back the
+L1_CACHE_BYTES performance improvement but I would not revert the
+original commit since ARCH_DMA_MINALIGN definitely needs to cover the
+maximum available cache line size, which is 128 for them.
 
-I don't see why you can't implement a wrapper that calls the usual Xen
-poweroff/reset functions.
-
-Thanks,
-Mark.
+-- 
+Catalin
