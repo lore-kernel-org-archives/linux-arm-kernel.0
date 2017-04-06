@@ -1,369 +1,143 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Thu, 6 Apr 2017 20:55:34 +0200
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <7c5c8ab7-8fcc-1c98-0bc1-cccb66c4c84d@huawei.com>
-References: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
- <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
- <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
- <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
- <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
- <20170329103658.GQ23682@e104320-lin>
- <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
- <7c5c8ab7-8fcc-1c98-0bc1-cccb66c4c84d@huawei.com>
-Message-ID: <6ac1597a-2ed5-36b2-848d-5fd048b16d66@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 6 Apr 2017 19:56:16 +0100
+Subject: [RESEND,3/3] iommu/dma: Plumb in the per-CPU IOVA caches
+In-Reply-To: <alpine.DEB.2.20.1704061315040.4602@lazy>
+References: <fcb9121e608da4f62e21538f558710fbb12d4a69.1490971180.git.robin.murphy@arm.com>
+ <alpine.DEB.2.20.1704061315040.4602@lazy>
+Message-ID: <c43b1f8f-02fd-978c-0dee-cc3f76a9924b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/17 14:35, gengdongjiu wrote:
-> Dear, Laszlo
->    Thanks for your detailed explanation.
+On 06/04/17 19:15, Manoj Iyer wrote:
+> On Fri, 31 Mar 2017, Robin Murphy wrote:
 > 
-> On 2017/3/29 19:58, Laszlo Ersek wrote:
->> (This ought to be one of the longest address lists I've ever seen :)
->> Thanks for the CC. I'm glad Shannon is already on the CC list. For good
->> measure, I'm adding MST and Igor.)
+>> With IOVA allocation suitably tidied up, we are finally free to opt in
+>> to the per-CPU caching mechanism. The caching alone can provide a modest
+>> improvement over walking the rbtree for weedier systems (iperf3 shows
+>> ~10% more ethernet throughput on an ARM Juno r1 constrained to a single
+>> 650MHz Cortex-A53), but the real gain will be in sidestepping the rbtree
+>> lock contention which larger ARM-based systems with lots of parallel I/O
+>> are starting to feel the pain of.
 >>
->> On 03/29/17 12:36, Achin Gupta wrote:
->>> Hi gengdongjiu,
->>>
->>> On Wed, Mar 29, 2017 at 05:36:37PM +0800, gengdongjiu wrote:
->>>>
->>>> Hi Laszlo/Biesheuvel/Qemu developer,
->>>>
->>>>    Now I encounter a issue and want to consult with you in ARM64 platform? as described below:
->>>>
->>>> when guest OS happen synchronous or asynchronous abort, kvm needs
->>>> to send the error address to Qemu or UEFI through sigbus to
->>>> dynamically generate APEI table. from my investigation, there are
->>>> two ways:
->>>>
->>>> (1) Qemu get the error address, and generate the APEI table, then
->>>> notify UEFI to know this generation, then inject abort error to
->>>> guest OS, guest OS read the APEI table.
->>>> (2) Qemu get the error address, and let UEFI to generate the APEI
->>>> table, then inject abort error to guest OS, guest OS read the APEI
->>>> table.
->>>
->>> Just being pedantic! I don't think we are talking about creating the APEI table
->>> dynamically here. The issue is: Once KVM has received an error that is destined
->>> for a guest it will raise a SIGBUS to Qemu. Now before Qemu can inject the error
->>> into the guest OS, a CPER (Common Platform Error Record) has to be generated
->>> corresponding to the error source (GHES corresponding to memory subsystem,
->>> processor etc) to allow the guest OS to do anything meaningful with the
->>> error. So who should create the CPER is the question.
->>>
->>> At the EL3/EL2 interface (Secure Firmware and OS/Hypervisor), an error arrives
->>> at EL3 and secure firmware (at EL3 or a lower secure exception level) is
->>> responsible for creating the CPER. ARM is experimenting with using a Standalone
->>> MM EDK2 image in the secure world to do the CPER creation. This will avoid
->>> adding the same code in ARM TF in EL3 (better for security). The error will then
->>> be injected into the OS/Hypervisor (through SEA/SEI/SDEI) through ARM Trusted
->>> Firmware.
->>>
->>> Qemu is essentially fulfilling the role of secure firmware at the EL2/EL1
->>> interface (as discussed with Christoffer below). So it should generate the CPER
->>> before injecting the error.
->>>
->>> This is corresponds to (1) above apart from notifying UEFI (I am assuming you
->>> mean guest UEFI). At this time, the guest OS already knows where to pick up the
->>> CPER from through the HEST. Qemu has to create the CPER and populate its address
->>> at the address exported in the HEST. Guest UEFI should not be involved in this
->>> flow. Its job was to create the HEST at boot and that has been done by this
->>> stage.
->>>
->>> Qemu folk will be able to add but it looks like support for CPER generation will
->>> need to be added to Qemu. We need to resolve this.
->>>
->>> Do shout if I am missing anything above.
+>> Reviewed-by: Nate Watterson <nwatters@codeaurora.org>
+>> Tested-by: Nate Watterson <nwatters@codeaurora.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>> drivers/iommu/dma-iommu.c | 39 ++++++++++++++++++---------------------
+>> 1 file changed, 18 insertions(+), 21 deletions(-)
 >>
->> After reading this email, the use case looks *very* similar to what
->> we've just done with VMGENID for QEMU 2.9.
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 1b94beb43036..8348f366ddd1 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -361,8 +361,7 @@ static dma_addr_t iommu_dma_alloc_iova(struct
+>> iommu_domain *domain,
+>> {
+>>     struct iommu_dma_cookie *cookie = domain->iova_cookie;
+>>     struct iova_domain *iovad = &cookie->iovad;
+>> -    unsigned long shift, iova_len;
+>> -    struct iova *iova = NULL;
+>> +    unsigned long shift, iova_len, iova = 0;
 >>
->> We have a facility between QEMU and the guest firmware, called "ACPI
->> linker/loader", with which QEMU instructs the firmware to
+>>     if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
+>>         cookie->msi_iova += size;
+>> @@ -371,41 +370,39 @@ static dma_addr_t iommu_dma_alloc_iova(struct
+>> iommu_domain *domain,
 >>
->> - allocate and download blobs into guest RAM (AcpiNVS type memory) --
->> ALLOCATE command,
+>>     shift = iova_shift(iovad);
+>>     iova_len = size >> shift;
+>> +    /*
+>> +     * Freeing non-power-of-two-sized allocations back into the IOVA
+>> caches
+>> +     * will come back to bite us badly, so we have to waste a bit of
+>> space
+>> +     * rounding up anything cacheable to make sure that can't happen.
+>> The
+>> +     * order of the unadjusted size will still match upon freeing.
+>> +     */
+>> +    if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
+>> +        iova_len = roundup_pow_of_two(iova_len);
 >>
->> - relocate pointers in those blobs, to fields in other (or the same)
->> blobs -- ADD_POINTER command,
+>>     if (domain->geometry.force_aperture)
+>>         dma_limit = min(dma_limit, domain->geometry.aperture_end);
 >>
->> - set ACPI table checksums -- ADD_CHECKSUM command,
+>>     /* Try to get PCI devices a SAC address */
+>>     if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
+>> -        iova = alloc_iova(iovad, iova_len, DMA_BIT_MASK(32) >> shift,
+>> -                  true);
+>> -    /*
+>> -     * Enforce size-alignment to be safe - there could perhaps be an
+>> -     * attribute to control this per-device, or at least per-domain...
+>> -     */
+>> -    if (!iova)
+>> -        iova = alloc_iova(iovad, iova_len, dma_limit >> shift, true);
+>> +        iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >>
+>> shift);
 >>
->> - and send GPAs of fields within such blobs back to QEMU --
->> WRITE_POINTER command.
+>> -    return (dma_addr_t)iova->pfn_lo << shift;
+>> +    if (!iova)
+>> +        iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
+>> +
+>> +    return (dma_addr_t)iova << shift;
+>> }
 >>
->> This is how I imagine we can map the facility to the current use case
->> (note that this is the first time I read about HEST / GHES / CPER):
+>> static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
+>>         dma_addr_t iova, size_t size)
+>> {
+>>     struct iova_domain *iovad = &cookie->iovad;
+>> -    struct iova *iova_rbnode;
+>> +    unsigned long shift = iova_shift(iovad);
 >>
->>     etc/acpi/tables                 etc/hardware_errors
->>     ================     ==========================================
->>                          +-----------+
->>     +--------------+     | address   |         +-> +--------------+
->>     |    HEST      +     | registers |         |   | Error Status |
->>     + +------------+     | +---------+         |   | Data Block 1 |
->>     | | GHES       | --> | | address | --------+   | +------------+
->>     | | GHES       | --> | | address | ------+     | |  CPER      |
->>     | | GHES       | --> | | address | ----+ |     | |  CPER      |
->>     | | GHES       | --> | | address | -+  | |     | |  CPER      |
->>     +-+------------+     +-+---------+  |  | |     +-+------------+
->>                                         |  | |
->>                                         |  | +---> +--------------+
->>                                         |  |       | Error Status |
->>                                         |  |       | Data Block 2 |
->>                                         |  |       | +------------+
->>                                         |  |       | |  CPER      |
->>                                         |  |       | |  CPER      |
->>                                         |  |       +-+------------+
->>                                         |  |
->>                                         |  +-----> +--------------+
->>                                         |          | Error Status |
->>                                         |          | Data Block 3 |
->>                                         |          | +------------+
->>                                         |          | |  CPER      |
->>                                         |          +-+------------+
->>                                         |
->>                                         +--------> +--------------+
->>                                                    | Error Status |
->>                                                    | Data Block 4 |
->>                                                    | +------------+
->>                                                    | |  CPER      |
->>                                                    | |  CPER      |
->>                                                    | |  CPER      |
->>                                                    +-+------------+
+>>     /* The MSI case is only ever cleaning up its most recent
+>> allocation */
+>> -    if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
+>> +    if (cookie->type == IOMMU_DMA_MSI_COOKIE)
+>>         cookie->msi_iova -= size;
+>> -        return;
+>> -    }
+>> -
+>> -    iova_rbnode = find_iova(iovad, iova_pfn(iovad, iova));
+>> -    if (WARN_ON(!iova_rbnode))
+>> -        return;
+>> -
+>> -    __free_iova(iovad, iova_rbnode);
+>> +    else
+>> +        free_iova_fast(iovad, iova >> shift, size >> shift);
+>> }
 >>
->> (1) QEMU generates the HEST ACPI table. This table goes in the current
->> "etc/acpi/tables" fw_cfg blob. Given N error sources, there will be N
->> GHES objects in the HEST.
+>> static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t
+>> dma_addr,
 >>
->> (2) We introduce a new fw_cfg blob called "etc/hardware_errors". QEMU
->> also populates this blob.
->>
->> (2a) Given N error sources, the (unnamed) table of address registers
->> will contain N address registers.
->>
->> (2b) Given N error sources, the "etc/hardwre_errors" fw_cfg blob will
->> also contain N Error Status Data Blocks.
->>
->> I don't know about the sizing (number of CPERs) each Error Status Data
->> Block has to contain, but I understand it is all pre-allocated as far as
->> the OS is concerned, which matches our capabilities well.
-> here I have a question. as you comment: " 'etc/hardwre_errors' fw_cfg blob will also contain N Error Status Data Blocks",
-> Because the CPER numbers is not fixed, how to assign each "Error Status Data Block" size using one "etc/hardwre_errors" fw_cfg blob.
-> when use one etc/hardwre_errors, will the N Error Status Data Block use one continuous buffer? as shown below. if so, maybe it not convenient for each data block size extension.
-> I see the bios_linker_loader_alloc will allocate one continuous buffer for a blob(such as VMGENID_GUID_FW_CFG_FILE)
 > 
->     /* Allocate guest memory for the Data fw_cfg blob */
->     bios_linker_loader_alloc(linker, VMGENID_GUID_FW_CFG_FILE, guid, 4096,
->                              false /* page boundary, high memory */);
-> 
-> 
-> 
-> -> +--------------+
->      |    HEST      +     | registers |             | Error Status |
->      + +------------+     | +---------+             | Data Block  |
->      | | GHES       | --> | | address | --------+-->| +------------+
->      | | GHES       | --> | | address | ------+     | |  CPER      |
->      | | GHES       | --> | | address | ----+ |     | |  CPER      |
->      | | GHES       | --> | | address | -+  | |     | |  CPER      |
->      +-+------------+     +-+---------+  |  | +---> +--------------+
->                                          |  |       | |  CPER      |
->                                          |  |       | |  CPER      |
->                                          |  +-----> +--------------+
->                                          |          | |  CPER      |
->                                          +--------> +--------------+
->                                                     | |  CPER      |
->                                                     | |  CPER      |
->                                                     | |  CPER      |
->                                                     +-+------------+
-> 
-> 
-> 
-> so how about we use separate etc/hardwre_errorsN for each Error Status status Block? then
-> 
-> etc/hardwre_errors0
-> etc/hardwre_errors1
-> ...................
-> etc/hardwre_errors10
-> (the max N is 10)
-> 
-> 
-> the N can be one of below values, according to ACPI spec "Table 18-345 Hardware Error Notification Structure"
-> 0 ? Polled
-> 1 ? External Interrupt
-> 2 ? Local Interrupt
-> 3 ? SCI
-> 4 ? NMI
-> 5 - CMCI
-> 6 - MCE
-> 7 - GPIO-Signal
-> 8 - ARMv8 SEA
-> 9 - ARMv8 SEI
-> 10 - External Interrupt - GSIV
+> This patch series helps to resolve the Ubuntu bug, where we see the
+> Ubuntu Zesty (4.10 based) kernel reporting multi cpu soft lockups on
+> QDF2400 SDP. https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1680549
 
-I'm unsure if, by "not fixed", you are saying
+Wow, how many separate buffers does that driver have mapped at once to
+spend 22 seconds walking the rbtree for a single allocation!? I'd almost
+expect that to indicate a deadlock.
 
-  the number of CPER entries that fits in Error Status Data Block N is
-  not *uniform* across 0 <= N <= 10 [1]
+I'm guessing you wouldn't have seen this on older kernels, since I
+assume that particular platform is booting via ACPI, so wouldn't have
+had the SMMU enabled without the IORT support which landed in 4.10.
 
-or
-
-  the number of CPER entries that fits in Error Status Data Block N is
-  not *known* in advance, for all of 0 <= N <= 10 [2]
-
-Which one is your point?
-
-If [1], that's no problem; you can simply sum the individual error
-status data block sizes in advance, and allocate "etc/hardware_errors"
-accordingly, using the total size.
-
-(Allocating one shared fw_cfg blob for all status data blocks is more
-memory efficient, as each ALLOCATE command will allocate whole pages
-(rounded up from the actual blob size).)
-
-If your point is [2], then splitting the error status data blocks to
-separate fw_cfg blobs makes no difference: regardless of whether we try
-to place all the error status data blocks in a single fw_cfg blob, or in
-separate fw_cfg blobs, the individual data block cannot be resized@OS
-runtime, so there's no way to make it work.
+> This patch series along with the following cherry-picks from Linus's tree
+> dddd632b072f iommu/dma: Implement PCI allocation optimisation
+> de84f5f049d9 iommu/dma: Stop getting dma_32bit_pfn wrong
+> 
+> were applied to Ubuntu Zesty 4.10 kernel (Ubuntu-4.10.0-18.20) and
+> tested on a QDF2400 SDP.
+> 
+> Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
 
 Thanks,
-Laszlo
+Robin.
 
 > 
 > 
-> 
-> 
->>
->> (3) QEMU generates the ACPI linker/loader script for the firmware, as
->> always.
->>
->> (3a) The HEST table is part of "etc/acpi/tables", which the firmware
->> already allocates memory for, and downloads (because QEMU already
->> generates an ALLOCATE linker/loader command for it already).
->>
->> (3b) QEMU will have to create another ALLOCATE command for the
->> "etc/hardware_errors" blob. The firmware allocates memory for this blob,
->> and downloads it.
->>
->> (4) QEMU generates, in the ACPI linker/loader script for the firwmare, N
->> ADD_POINTER commands, which point the GHES."Error Status
->> Address" fields in the HEST table, to the corresponding address
->> registers in the downloaded "etc/hardware_errors" blob.
->>
->> (5) QEMU generates an ADD_CHECKSUM command for the firmware, so that the
->> HEST table is correctly checksummed after executing the N ADD_POINTER
->> commands from (4).
->>
->> (6) QEMU generates N ADD_POINTER commands for the firmware, pointing the
->> address registers (located in guest memory, in the downloaded
->> "etc/hardware_errors" blob) to the respective Error Status Data Blocks.
->>
->> (7) (This is the trick.) For this step, we need a third, write-only
->> fw_cfg blob, called "etc/hardware_errors_addr". Through that blob, the
->> firmware can send back the guest-side allocation addresses to QEMU.
->>
->> Namely, the "etc/hardware_errors_addr" blob contains N 8-byte entries.
->> QEMU generates N WRITE_POINTER commands for the firmware.
->>
->> For error source K (0 <= K < N), QEMU instructs the firmware to
->> calculate the guest address of Error Status Data Block K, from the
->> QEMU-dictated offset within "etc/hardware_errors", and from the
->> guest-determined allocation base address for "etc/hardware_errors". The
->> firmware then writes the calculated address back to fw_cfg file
->> "etc/hardware_errors_addr", at offset K*8, according to the
->> WRITE_POINTER command.
->>
->> This way QEMU will know the GPA of each Error Status Data Block.
->>
->> (In fact this can be simplified to a single WRITE_POINTER command: the
->> address of the "address register table" can be sent back to QEMU as
->> well, which already contains all Error Status Data Block addresses.)
->>
->> (8) When QEMU gets SIGBUS from the kernel -- I hope that's going to come
->> through a signalfd -- QEMU can format the CPER right into guest memory,
->> and then inject whatever interrupt (or assert whatever GPIO line) is
->> necessary for notifying the guest.
->>
->> (9) This notification (in virtual hardware) can either be handled by the
->> guest kernel stand-alone, or else the guest kernel can invoke an ACPI
->> event handler method with it (which would be in the DSDT or one of the
->> SSDTs, also generated by QEMU). The ACPI event handler method could
->> invoke the specific guest kernel driver for errror handling via a
->> Notify() operation.
->>
->> I'm attracted to the above design because:
->> - it would leave the firmware alone after OS boot, and
->> - it would leave the firmware blissfully ignorant about HEST, GHES,
->> CPER, and the like. (That's why QEMU's ACPI linker/loader was invented
->> in the first place.)
->>
->> Thanks
->> Laszlo
->>
->>>>    Do you think which modules generates the APEI table is better? UEFI or Qemu?
->>>>
->>>>
->>>>
->>>>
->>>> On 2017/3/28 21:40, James Morse wrote:
->>>>> Hi gengdongjiu,
->>>>>
->>>>> On 28/03/17 13:16, gengdongjiu wrote:
->>>>>> On 2017/3/28 19:54, Achin Gupta wrote:
->>>>>>> On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
->>>>>>>> On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
->>>>>>>>> On the host, part of UEFI is involved to generate the CPER records.
->>>>>>>>> In a guest?, I don't know.
->>>>>>>>> Qemu could generate the records, or drive some other component to do it.
->>>>>>>>
->>>>>>>> I think I am beginning to understand this a bit.  Since the guet UEFI
->>>>>>>> instance is specifically built for the machine it runs on, QEMU's virt
->>>>>>>> machine in this case, they could simply agree (by some contract) to
->>>>>>>> place the records at some specific location in memory, and if the guest
->>>>>>>> kernel asks its guest UEFI for that location, things should just work by
->>>>>>>> having logic in QEMU to process error reports and populate guest memory.
->>>>>>>>
->>>>>>>> Is this how others see the world too?
->>>>>>>
->>>>>>> I think so!
->>>>>>>
->>>>>>> AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
->>>>>>> the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
->>>>>>> HEST for the guest Kernel?
->>>>>>>
->>>>>>> If so, then the question is how the guest UEFI finds out where QEMU (acting as
->>>>>>> EL3 firmware) will populate the CPERs. This could either be a contract between
->>>>>>> the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
->>>>>>> where the memory is.
->>>>>>
->>>>>> whether invoke the guest UEFI will be complex? not see the advantage. it seems x86 Qemu
->>>>>> directly generate the ACPI table, but I am not sure, we are checking the qemu
->>>>> logical.
->>>>>> let Qemu generate CPER record may be clear.
->>>>>
->>>>> At boot UEFI in the guest will need to make sure the areas of memory that may be
->>>>> used for CPER records are reserved. Whether UEFI or Qemu decides where these are
->>>>> needs deciding, (but probably not here)...
->>>>>
->>>>> At runtime, when an error has occurred, I agree it would be simpler (fewer
->>>>> components involved) if Qemu generates the CPER records. But if UEFI made the
->>>>> memory choice above they need to interact and it gets complicated again. The
->>>>> CPER records are defined in the UEFI spec, so I would expect UEFI to contain
->>>>> code to generate/parse them.
->>>>>
->>>>>
->>>>> Thanks,
->>>>>
->>>>> James
->>>>>
->>>>>
->>>>> .
->>>>>
->>>>
->>
->>
->> .
->>
-> 
+> -- 
+> ============================
+> Manoj Iyer
+> Ubuntu/Canonical
+> ARM Servers - Cloud
+> ============================
