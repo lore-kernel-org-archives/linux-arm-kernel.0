@@ -1,19 +1,17 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Thu,  6 Apr 2017 23:32:10 +0530
-Subject: [PATCH v3 4/9] ARM: dts: imx6dl-icore-rqs: Add sgtl5000 codec node
+Date: Thu,  6 Apr 2017 23:32:11 +0530
+Subject: [PATCH v3 5/9] ARM: dts: imx6qdl-icore-rqs: Replace to use
+ simple-audio-card
 In-Reply-To: <1491501735-1649-1-git-send-email-jagan@openedev.com>
 References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
-Message-ID: <1491501735-1649-5-git-send-email-jagan@openedev.com>
+Message-ID: <1491501735-1649-6-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-- Moved sound card node to imx6qdl-icore-rqs.dtsi
-- Added codec node in imx6dl-icore-rqs
-- Replace codec: sgtl5000 at 0a => sgtl5000: codec at a
-  on imx6q-icore-rqs.dts to [label:] node-name[@unit-address]
-  according to devicetree specification from ePAPER v1.1
+This patch replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+for Engicam i.CoreM6 RQS QDL platform boards.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
@@ -21,86 +19,50 @@ Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v3:
-- squash previous [PATCH v2 10/15] and [PATCH v2 11/15]
-Changes for v2:
 - Newly added patch
 
- arch/arm/boot/dts/imx6dl-icore-rqs.dts   | 11 +++++++++++
- arch/arm/boot/dts/imx6q-icore-rqs.dts    | 15 +--------------
- arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 13 +++++++++++++
- 3 files changed, 25 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-index cf42c2f..053e7cb 100644
---- a/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-+++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-@@ -49,3 +49,14 @@
- 	model = "Engicam i.CoreM6 DualLite/Solo RQS Starter Kit";
- 	compatible = "engicam,imx6-icore-rqs", "fsl,imx6dl";
- };
-+
-+&i2c3 {
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		VDDA-supply = <&reg_2p5v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p8v>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-index e451b4c..d45e4f5 100644
---- a/arch/arm/boot/dts/imx6q-icore-rqs.dts
-+++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-@@ -47,23 +47,10 @@
- / {
- 	model = "Engicam i.CoreM6 Quad/Dual RQS Starter Kit";
- 	compatible = "engicam,imx6-icore-rqs", "fsl,imx6q";
--
--	sound {
+diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+index d24e531..0e79a5b 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+@@ -120,16 +120,28 @@
+ 	};
+ 
+ 	sound {
 -		compatible = "fsl,imx-audio-sgtl5000";
 -		model = "imx-audio-sgtl5000";
 -		ssi-controller = <&ssi1>;
--		audio-codec = <&codec>;
+-		audio-codec = <&sgtl5000>;
 -		audio-routing =
--			"MIC_IN", "Mic Jack",
--			"Mic Jack", "Mic Bias",
--			"Headphone Jack", "HP_OUT";
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "imx6qdl-icore-sgtl5000";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Line", "Line In",
++			"Line", "Line Out",
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
+ 			"MIC_IN", "Mic Jack",
+ 			"Mic Jack", "Mic Bias",
+ 			"Headphone Jack", "HP_OUT";
 -		mux-int-port = <1>;
 -		mux-ext-port = <4>;
--	};
- };
- 
- &i2c3 {
--	codec: sgtl5000 at 0a {
-+	sgtl5000: codec at a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
-diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-index 5fab5be..d24e531 100644
---- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-@@ -118,6 +118,19 @@
- 		clocks = <&clks IMX6QDL_CLK_LVDS2_GATE>;
- 		clock-names = "refclk";
- 	};
 +
-+	sound {
-+		compatible = "fsl,imx-audio-sgtl5000";
-+		model = "imx-audio-sgtl5000";
-+		ssi-controller = <&ssi1>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <1>;
-+		mux-ext-port = <4>;
-+	};
++		simple-audio-card,cpu {
++			sound-dai = <&ssi1>;
++		};
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
+ 	};
  };
  
- &clks {
 -- 
 1.9.1
