@@ -1,136 +1,104 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Fri, 7 Apr 2017 01:39:09 +0800
-Subject: [PATCH v23 09/11] acpi/arm64: Add memory-mapped timer support in
- GTDT driver
-In-Reply-To: <20170406172410.GA11871@leverpostej>
-References: <20170331175105.8370-1-fu.wei@linaro.org>
- <20170331175105.8370-10-fu.wei@linaro.org>
- <20170405183808.GB27550@leverpostej>
- <CADyBb7sz6ongbyqR0FzBZybJBYwnLvqV+NsX1+W=6tv0_vLt1g@mail.gmail.com>
- <20170406172410.GA11871@leverpostej>
-Message-ID: <CADyBb7vEHQCpMoXhtBMGf_iou1qxsvVSJfxcYy5W33SNFyCwwA@mail.gmail.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Thu, 6 Apr 2017 19:39:18 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <20170406164309.GM4372@olila.local.net-space.pl>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+ <20170406142710.GE4372@olila.local.net-space.pl>
+ <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
+ <20170406152040.GH4372@olila.local.net-space.pl>
+ <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+ <20170406160653.GJ4372@olila.local.net-space.pl>
+ <c23a6d11-cde8-7690-9676-537b5f17b967@suse.com>
+ <20170406164309.GM4372@olila.local.net-space.pl>
+Message-ID: <b6cd0d59-9569-2958-9cc7-c971139881f4@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark
-
-On 7 April 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Apr 07, 2017 at 12:47:47AM +0800, Fu Wei wrote:
->> On 6 April 2017 at 02:38, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Sat, Apr 01, 2017 at 01:51:03AM +0800, fu.wei at linaro.org wrote:
->> >> +     /*
->> >> +      * Get the GT timer Frame data for every GT Block Timer
->> >> +      */
->> >> +     for (i = 0; i < block->timer_count; i++, gtdt_frame++) {
->> >> +             if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
->> >> +                     continue;
->> >> +
->> >> +             if (!gtdt_frame->base_address || !gtdt_frame->timer_interrupt)
->> >> +                     goto error;
->> >> +
->> >> +             frame = &timer_mem->frame[gtdt_frame->frame_number];
->> >> +             frame->phys_irq = map_gt_gsi(gtdt_frame->timer_interrupt,
->> >> +                                          gtdt_frame->timer_flags);
->> >> +             if (frame->phys_irq <= 0) {
->> >> +                     pr_warn("failed to map physical timer irq in frame %d.\n",
->> >> +                             gtdt_frame->frame_number);
->> >> +                     goto error;
->> >> +             }
->> >> +
->> >> +             if (gtdt_frame->virtual_timer_interrupt) {
->> >> +                     frame->virt_irq =
->> >> +                             map_gt_gsi(gtdt_frame->virtual_timer_interrupt,
->> >> +                                        gtdt_frame->virtual_timer_flags);
->> >> +                     if (frame->virt_irq <= 0) {
->> >> +                             pr_warn("failed to map virtual timer irq in frame %d.\n",
->> >> +                                     gtdt_frame->frame_number);
->> >> +                             acpi_unregister_gsi(gtdt_frame->timer_interrupt);
->> >> +                             goto error;
->> >> +                     }
->> >> +             } else {
->> >> +                     frame->virt_irq = 0;
->> >> +                     pr_debug("virtual timer in frame %d not implemented.\n",
->> >> +                              gtdt_frame->frame_number);
->> >> +             }
->> >> +
->> >> +             frame->cntbase = gtdt_frame->base_address;
->> >> +             /*
->> >> +              * The CNTBaseN frame is 4KB (register offsets 0x000 - 0xFFC).
->> >> +              * See ARM DDI 0487A.k_iss10775, page I1-5130, Table I1-4
->> >> +              * "CNTBaseN memory map".
->> >> +              */
->> >> +             frame->size = SZ_4K;
->> >> +             frame->valid = true;
->> >> +     }
->> >> +
->> >> +     return 0;
->> >> +
->> >> +error:
->> >> +     for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
->> >> +             frame = &timer_mem->frame[i];
->> >> +             if (!frame->valid)
->> >> +                     continue;
->> >> +             irq_dispose_mapping(frame->phys_irq);
->> >> +             if (frame->virt_irq)
->> >> +                     irq_dispose_mapping(frame->virt_irq);
->> >> +     }
->> >
->> > We assign interrupts and may goto error before setting valid, so here we
+On 06/04/17 18:43, Daniel Kiper wrote:
+> On Thu, Apr 06, 2017 at 06:22:44PM +0200, Juergen Gross wrote:
+>> On 06/04/17 18:06, Daniel Kiper wrote:
+>>> Hi Julien,
+>>>
+>>> On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
+>>>> Hi Daniel,
+>>>>
+>>>> On 06/04/17 16:20, Daniel Kiper wrote:
+>>>>> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
+>>>>>> On 06/04/17 16:27, Daniel Kiper wrote:
+>>>>>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+>>>>>>>> Hi Juergen,
+>>>>>>>>
+>>>>>>>> On 06/04/17 07:23, Juergen Gross wrote:
+>>>>>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
+>>>>>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
+>>>>>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
+>>>>>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
+>>>>>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
+>>>>>>>>>>
+>>>>>>>>>> (+Daniel)
+>>>>>>>>>>
+>>>>>>>>>> This could be a problem for x86 as well, at least theoretically.
+>>>>>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+>>>>>>>>>>
+>>>>>>>>>> So I think we should have a similar routine there.
+>>>>>>>>>
+>>>>>>>>> +1
+>>>>>>>>>
+>>>>>>>>> I don't see any problem with such a routine added, in contrast to
+>>>>>>>>> potential "reboots" instead of power off without it.
+>>>>>>>>>
+>>>>>>>>> So I think this dummy xen_efi_reset_system() should be added to
+>>>>>>>>> drivers/xen/efi.c instead.
+>>>>>>>>
+>>>>>>>> I will resend the patch during day with xen_efi_reset_system moved
+>>>>>>>> to common code and implement the x86 counterpart (thought, I will
+>>>>>>>> not be able to test it).
+>>>>>>>
+>>>>>>> I think that this is ARM specific issue. On x86 machine_restart() calls
+>>>>>>> xen_restart(). Hence, everything works. So, I think that it should be
+>>>>>>> fixed only for ARM. Anyway, please CC me when you send a patch.
+>>>>>>
+>>>>>> What about xen_machine_power_off() (as stated in Boris' mail)?
+>>>>>
+>>>>> Guys what do you think about that:
+>>>>>
+>>>>> --- a/drivers/firmware/efi/reboot.c
+>>>>> +++ b/drivers/firmware/efi/reboot.c
+>>>>> @@ -55,7 +55,7 @@ static void efi_power_off(void)
+>>>>>
+>>>>> static int __init efi_shutdown_init(void)
+>>>>> {
+>>>>> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
+>>>>> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
+>>>>>                return -ENODEV;
+>>>>>
+>>>>>        if (efi_poweroff_required())
+>>>>>
+>>>>>
+>>>>> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
+>>>>>
+>>>>> I hope that tweaks for both files should solve our problem.
+>>>>
+>>>> This sounds good for power off (I haven't tried to power off DOM0
+>>>> yet). But this will not solve the restart problem (see
+>>>> machine_restart in arch/arm64/kernel/process.c) which call directly
+>>>> efi_reboot.
+>>>
+>>> Hmmm... It seems to me that efi.reset_system override with empty function
+>>> in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
+>>> One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
+>>> for arch/arm64/kernel/efi.c. Does it make sense?
 >>
->> yes, I mean to do it.(setting valid at the end of loop)
->>
->> > won't free the interrupts of the last frame we parsed.
->>
->> that won't  be a problem, we may assign two interrupts in a round:
->> First of all, if  the assignment goes  wrong, that means the current
->> interrupt haven't been successfully assigned.
->> (1)if the first goes wrong, the we goto error to unwind  the irqs
->> assigned in previous rounds.
->> (2)if the second one goes wrong , we acpi_unregister_gsi the first one
->> and then  goto error to unwind  the irqs assigned in previous rounds.
->> (3)If the two assignments are successful, set up valid flag
->>
->> So we won't miss freeing the interrupts of the last frame we parsed.
->>
->> Did I miss something?
->
-> No; you are correct, and I was mistaken.
->
-> However, I would prefer to simplify this such that we only free the
-> IRQs in the error path.
->
-> We should be able to iterate over all freams, freeing any non-zero
-> interrupt, since !valid frames shouldn't have non-zero interrupts.
+>> I still think the empty function should be in drivers/xen/efi.c and we
+>> should use it in arch/x86/xen/efi.c, too.
+> 
+> If you wish we can go that way too. Though I thing that we should fix
+> drivers/firmware/efi/reboot.c:efi_shutdown_init() too. Just in case.
 
-Yes, that is what I am doing :
-
- if (!frame->valid)
-          continue;
-
-phys_irq must be non-zero, otherwise it was registered incorrectly (an error)
-but we need to check virt_irq, it maybe 0 because, this timer frame
-may not implement virt timer.
-Can we simplify it? any idear?
-
-Lorenzo addressed the API issue, we may can fix it by getting GSI info
-from DT, then register it until we figure the best frame.
-It may need some big change in DT code
-
-I can do it in V24 , any thought?
-
-Great thanks for your review and help! :-)
-
->
-> I can make that update locally; no need to respin.
->
-> Thanks,
-> Mark.
+Sure, go ahead. I won't object.
 
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Juergen
