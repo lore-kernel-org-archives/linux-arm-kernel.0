@@ -1,96 +1,78 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 6 Apr 2017 17:25:32 +0800
-Subject: [PATCH v3 4/8] APEI: GHES: reserve a virtual page for SEI context
-In-Reply-To: <58DE8252.7070709@arm.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-5-git-send-email-xiexiuqi@huawei.com>
- <58DE8252.7070709@arm.com>
-Message-ID: <9feb4506-5038-ce43-f0e5-0c5c279abc41@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 6 Apr 2017 11:31:06 +0200
+Subject: [GIT PULL] Allwinner H3 DT changes for 4.12
+Message-ID: <20170406093106.hcjthwt5vemw4xnw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Arnd, Olof,
 
-Thanks for your comments.
+Here is a serie of patches a bit unusual for the next merge window.
 
-On 2017/4/1 0:22, James Morse wrote:
-> Hi Xie XiuQi,
-> 
-> On 30/03/17 11:31, Xie XiuQi wrote:
->> On arm64 platform, SEI may interrupt code which had interrupts masked.
->> But SEI could be masked, so it's not treated as NMI, however SEA is
->> treated as NMI.
->>
->> So, the  memory area used to transfer hardware error information from
->> BIOS to Linux can be determined only in NMI, SEI(arm64), IRQ or timer
->> handler.
->>
->> In this patch, we add a virtual page for SEI context.
-> 
-> I don't think this is the best way of solving the interaction problem. If we
-> ever need to add another notification method this gets even more complicated,
-> and the ioremap code has to know how these methods can interact.
-> 
-> 
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 045d101..b1f9b1f 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -155,54 +162,55 @@ static void ghes_ioremap_exit(void)
-> 
->> -static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
->> -{
->> -	unsigned long vaddr, paddr;
->> -	pgprot_t prot;
->> -
->> -	vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
->> +	if (in_nmi()) {
->> +		raw_spin_lock(&ghes_ioremap_lock_nmi);
->> +		vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
->> +	} else if (this_cpu_read(sei_in_process)) {
-> 
->> +		spin_lock_irqsave(&ghes_ioremap_lock_sei, flags);
-> 
-> I think this one should be a raw_spin_lock. I'm pretty sure this is for RT-linux
-> where spin_lock() on a contented lock will call schedule() in the same way
-> mutex_lock() does. If interrupts were masked by arch code then you need to use
-> raw_spin_lock.
-> So now we need to know how we got in here, we interrupted the SError handler so
-> this should only be Synchronous External Abort. Having to know how we got here
-> is another problem with this approach.
-> 
-> 
-> As suggested earlier[0], I think the best way is to allocate one page of virtual
-> address space per struct ghes, and move the locks out to the notify calls, which
-> can know how they are called.
-> 
-> I've pushed a branch to:
-> http://www.linux-arm.org/git?p=linux-jm.git;a=commit;h=refs/heads/apei_ioremap_rework/v1
-> 
+Allwinner released a new SoC, the H5, that is basically an H3 with
+arm64 CPU cores (A53 instead of A7).
 
-Good! I could rebase on your patch next time.
+In order to support it properly, we've created a common DTSI, and
+built on top. Since that DTSI is spread across arm and arm64, it took
+a bit of rework (all the patches in that PR until commit da89e1d5cbaf
+("ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5"))
+that is shared with the next PR I'm about to send with the H5-only patches.
 
-> I intend to post those patches as an RFC series later in the cycle, I've only
-> build tested it so far.
-> 
-> 
-> Thanks,
-> 
-> James
-> 
->> +		vaddr = (unsigned long)GHES_IOREMAP_SEI_PAGE(ghes_ioremap_area->addr);
->> +	} else {
->> +		spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
->> +		vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
->> +	}
-> 
-> 
-> [0] https://lkml.org/lkml/2017/3/20/434
-> 
-> 
-> .
-> 
+The patches on top of that commit are H3-specific commits and should
+be merged through your arm DT branch.
+
+Let me know if you have any questions,
+Maxime
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-h3-for-4.12
+
+for you to fetch changes up to 72897fa31fcf6222a11c6ebb0bcca25628bb1f7c:
+
+  ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero board (2017-03-27 13:45:32 +0200)
+
+----------------------------------------------------------------
+Allwinner H3 DT changes for 4.12
+
+H3 patches for 4.12, which are mostly related to reworking the H3 DTSI to
+be usable on the arm64 H5 DTSI, that shares almost everything with the H3
+but the CPU cores.
+
+We also have some new device addition (USB, mostly) that would conflict
+otherwise.
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      arm: sun8i: h3: split Allwinner H3 .dtsi
+
+Icenowy Zheng (6):
+      arm: sun8i: h3: drop skeleton.dtsi inclusion in H3 DTSI
+      arm: sun8i: h3: drop pinctrl-a10.h inclusion for H3 DTSI
+      arm: sun8i: h3: correct the GIC compatible in H3 to gic-400
+      ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5
+      ARM: sun8i: h3: enable USB OTG on Orange Pi One
+      ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts |  20 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts       |  22 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi                   | 602 ++-------------------
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                | 618 ++++++++++++++++++++++
+ 4 files changed, 698 insertions(+), 564 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sunxi-h3-h5.dtsi
 
 -- 
-Thanks,
-Xie XiuQi
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/16f61670/attachment.sig>
