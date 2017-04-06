@@ -1,65 +1,122 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 06 Apr 2017 15:14:51 +0200
-Subject: [Patch v4 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
- encoder
-In-Reply-To: <1491459105-16641-11-git-send-email-smitha.t@samsung.com>
-References: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
- <CGME20170406061023epcas5p2a3fa65c4254e17a58f71c68d413e6bfd@epcas5p2.samsung.com>
- <1491459105-16641-11-git-send-email-smitha.t@samsung.com>
-Message-ID: <374939c7-241a-fcca-c87e-5c4290bdb6aa@samsung.com>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Thu, 6 Apr 2017 13:23:23 +0000
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+ <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2017 08:11 AM, Smitha T Murthy wrote:
-> @@ -775,6 +832,47 @@ const char *v4l2_ctrl_get_name(u32 id)
->  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
->  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
->  
-> +	/* HEVC controls */
-[...]
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC LF Across Slice Boundary or Not";
+Hi Sinan, Bjorn,
 
-Please make sure the names are no longer than 31 characters to avoid
-truncation during control enumeration in user space.
-Data structures like struct v4l2_queryctrl, struct v4l2_query_ext_ctrl
-have only 32 bytes long array dedicated for the control name.
+>
+>Hi Sinan
+>
+>>Hi Mayurkumar,
+>>
+>>On 3/30/2017 9:30 AM, Sinan Kaya wrote:
+>>> When the operating system is booted with the default ASPM policy
+>>> (POLICY_DEFAULT), current code is querying the enable/disable
+>>> states from ASPM registers to determine the policy.
+>>>
+>>> For example, a BIOS could set the power saving state to performance
+>>> and clear all ASPM control registers. A balanced ASPM policy could
+>>> enable L0s and disable L1. A power conscious BIOS could enable both
+>>> L0s and L1 to trade off latency and performance vs. power.
+>>>
+>>> After hotplug removal, pcie_aspm_exit_link_state() function clears
+>>> the ASPM registers. An insertion following hotplug removal reads
+>>> incorrect policy as ASPM disabled even though ASPM was enabled
+>>> during boot.
+>>>
+>>> This is caused by the fact that same function is used for reconfiguring
+>>> ASPM regardless of the power on state.
+>>>
+>>> ------------------------
+>>> Changes from v6 (https://www.spinics.net/lists/arm-kernel/msg572876.html)
+>>> ------------------------
+>>> - revert the accidental parent check in bridge remove
+>>>
+>>> Sinan Kaya (5):
+>>>   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+>>>   PCI/ASPM: split pci_aspm_init() into two
+>>>   PCI/ASPM: add init hook to device_add
+>>>   PCI/ASPM: save power on values during bridge init
+>>>   PCI/ASPM: move link_state cleanup to bridge remove
+>>>
+>>>  drivers/pci/pcie/aspm.c | 137 ++++++++++++++++++++++++++++++++----------------
+>>>  drivers/pci/probe.c     |   3 ++
+>>>  drivers/pci/remove.c    |   3 +-
+>>>  include/linux/pci.h     |   2 +
+>>>  4 files changed, 98 insertions(+), 47 deletions(-)
+>>>
+>>
+>>Did you get a chance to test?
+>>
+>
+>Not yet. Will get back in this week sometimes to give you some feedback.
+>
 
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP:		return "HEVC QP Values";
+The patch seems to be working for ASPM L1 so far. I am seeing a problem now with your patches for L1.2 as following:
 
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:	return "HEVC Hierarchical Coding Type";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:return "HEVC Hierarchical Coding Layer";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:return "HEVC Hierarchical Layer QP";
+ASPM L1.2 does not get enabled on the Upstream as well as downstream port due to following reasons.
+In the case, I see now, if the EP is not connected while reboot of the Machine, Root Port does not configure
+It's own L1.2 also from the BIOS. (I am not sure whether it's even advisable to enable L1.2 on root
+Port when no downstream device is not connected to it as it may have an impact on CLKREQ# and device is connected
+At later stage may have a problem with it)
 
-How about s/HIERARCHICAL_/HIER_ for the above 3 control IDs?
+Later when the Device get connected, BIOS configures L1.2 for Root port and EP but due to policy set to incorrect,
+Kernel disables ASPM L1.2.
 
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER0_BITRATE:return "HEVC Hierarchical Lay 0 Bit Rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER1_BITRATE:return "HEVC Hierarchical Lay 1 Bit Rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER2_BITRATE:return "HEVC Hierarchical Lay 2 Bit Rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER3_BITRATE:return "HEVC Hierarchical Lay 3 Bit Rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER4_BITRATE:return "HEVC Hierarchical Lay 4 Bit Rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER5_BITRATE:return "HEVC Hierarchical Lay 5 Bit Rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER6_BITRATE:return "HEVC Hierarchical Lay 6 Bit Rate";
+Actually, The enabling/configuring of ASPM L1.2 is opposite then ASPM L1.
+In case of L1, Upstream must configure first L1 and then downstream according to PCIe spec.
+In case of L1.2, Downstream must configure L1.2 and then upstream according (to L1.2 ECN spec. -> 5.5.4. L1 PM
+substates Configuration).  
 
-Using single letter L instead of LAYER would make the control ID shorter
-and more consistent with existing controls, e.g. 
-V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BITRATE.
+@Bjorn:
+I even found that programming of pcie_config_aspm_l1ss() sub-states is done in the opposite way than described in
+the spec.,
 
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:		return "HEVC Sign Data Hiding";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB:		return "HEVC General PB";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID:		return "HEVC Temporal ID";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING:		return "HEVC Strong Intra Smoothing";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT:		return "HEVC Intra PU Split";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION:		return "HEVC TMV Prediction";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "HEVC Max Number of Candidate MVs";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE:	return "HEVC ENC Without Startcode";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC Num of I Frame b/w 2 IDR";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC Loop Filter Beta Offset";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC Loop Filter tc Offset";
+The spec. says following and correct me If I am wrong or I misinterpret the spec. :
 
-s/tc/Tc or s/tc/TC ?
+5.5.4. L1 PM Substates Configuration
 
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of Length Field";
+The Setting of any enable bit must be performed at the Downstream Port before the
+corresponding bit is permitted to be Set at the Upstream Port. If any L1 PM Substates enable
+bit is at a later time to be cleared, the enable bit(s) must be cleared in the Upstream Port
+before the corresponding enable bit(s) are permitted to be cleared in the Downstream Port.
 
---
-Thanks,
-Sylwester
+
+
+Thanks
+Mayur
+
+>
+>
+>Thanks
+>Mayur
+>
+>>Sinan
+>>
+>>--
+>>Sinan Kaya
+>>Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>>Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>Intel Deutschland GmbH
+>Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+>Tel: +49 89 99 8853-0, www.intel.de
+>Managing Directors: Christin Eisenschmid, Christian Lamprechter
+>Chairperson of the Supervisory Board: Nicole Lau
+>Registered Office: Munich
+>Commercial Register: Amtsgericht Muenchen HRB 186928
+
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
