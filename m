@@ -1,48 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 6 Apr 2017 18:13:32 +0100
-Subject: [PATCH v3 5/5] KVM: arm/arm64: Advertise support for
- KVM_CAP_ARM_USER_IRQ
-In-Reply-To: <20170405092815.22503-6-cdall@linaro.org>
-References: <20170405092815.22503-1-cdall@linaro.org>
- <20170405092815.22503-6-cdall@linaro.org>
-Message-ID: <918dbb1b-088a-dab5-e14b-914e0e879ec0@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Apr 2017 18:19:19 +0100
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
+ interface
+In-Reply-To: <20170406170951.GA10520@red-moon>
+References: <20170405105841.GG7909@n2100.armlinux.org.uk>
+ <20170405113238.GA2465@red-moon> <20170406102636.GA9623@red-moon>
+ <20170406105312.GE28800@wotan.suse.de>
+ <20170406113845.GA10013@red-moon>
+ <20170406115906.GF28800@wotan.suse.de>
+ <20170406130727.GE17774@n2100.armlinux.org.uk>
+ <20170406162156.GA10134@red-moon>
+ <20170406164015.GI17774@n2100.armlinux.org.uk>
+ <20170406170951.GA10520@red-moon>
+Message-ID: <20170406171919.GJ17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/17 10:28, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On Thu, Apr 06, 2017 at 06:09:51PM +0100, Lorenzo Pieralisi wrote:
+> On Thu, Apr 06, 2017 at 05:40:16PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Apr 06, 2017 at 05:21:56PM +0100, Lorenzo Pieralisi wrote:
+> > > Ok, so:
+> > > 
+> > > (1) I can do asm-generic/ioremap-nopost.h, which I assume you want to
+> > >     contain something like
+> > > 
+> > > static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
+> > > {
+> > > 	return ioremap_nocache(offset, size);
+> > > }
+> > > 
+> > > Funny bit is that it has to be included by asm*/io.h files _after_
+> > > ioremap_nocache has been #defined (that's the reason my approach was
+> > > failing miserably even on arches like eg powerpc (see [1] below) that
+> > > does have ioremap_nocache),
+> > 
+> > PowerPC does have ioremap_nocache() though:
+> > 
+> > /**
+> >  * ioremap     -   map bus memory into CPU space
+> > ...
+> >  * * ioremap_nocache is identical to ioremap
+> > extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
+> > #define ioremap_nocache(addr, size)     ioremap((addr), (size))
+> > 
+> > and this include file is included very early on in linux/io.h.  I don't
+> > see anything that conditionalises it on anything except __KERNEL__.  So,
+> > the report from 0-day really doesn't make any sense to me.
+> > 
+> > Do we know how we're ending up in linux/io.h line 169 without having
+> > picked up the ioremap_nocache() definition provided by PowerPC's
+> > asm/io.h ?
 > 
-> Now when we support both the virtual timer and PMU reporting interrupts
+> I will debug it further but I *think* it is because:
+> 
+> eg arch/powerpc/oprofile/op_model_cell.c includes <asm/io.h>
+> 
+> and <asm/io.h> includes <linux/io.h> before ioremap_nocache is defined
 
-Now that... both timers...
-
-> to userspace, we can advertise this support.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/kvm/arm.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index f935383..b420aa9 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -229,6 +229,13 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  		else
->  			r = kvm->arch.vgic.msis_require_devid;
->  		break;
-> +	case KVM_CAP_ARM_USER_IRQ:
-> +		/*
-> +		 * 1: EL1_VTIMER, EL1_PTIMER, and PMU.
-> +		 * (bump this number if adding more devices)
-> +		 */
-> +		r = 1;
-> +		break;
->  	default:
->  		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
->  		break;
-> 
-
+Oh, that's just very wrong.  asm/foo.h should never include linux/foo.h
+especially when linux/foo.h already includes asm/foo.h.  I think we
+need PowerPC folk to fix this.
 
 -- 
-Jazz is not dead. It just smells funny...
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
