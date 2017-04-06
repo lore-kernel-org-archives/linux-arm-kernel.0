@@ -1,79 +1,60 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Thu,  6 Apr 2017 23:32:15 +0530
-Subject: [PATCH v3 9/9] ARM: dts: imx6ul-isiot: Add FEC node support
-In-Reply-To: <1491501735-1649-1-git-send-email-jagan@openedev.com>
-References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
-Message-ID: <1491501735-1649-10-git-send-email-jagan@openedev.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 6 Apr 2017 23:15:00 +0200
+Subject: [PATCH v3 00/18] clocksource/arch_timer: Errata workaround
+ infrastructure rework
+In-Reply-To: <20170406162714.GC7705@e104818-lin.cambridge.arm.com>
+References: <20170404171826.25030-1-marc.zyngier@arm.com>
+ <20170406162714.GC7705@e104818-lin.cambridge.arm.com>
+Message-ID: <e89c2826-85e1-74f4-de73-e4c18b2e7ec9@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On 06/04/2017 18:27, Catalin Marinas wrote:
+> Hi Daniel,
+> 
+> On Tue, Apr 04, 2017 at 06:18:08PM +0100, Marc Zyngier wrote:
+>> Marc Zyngier (18):
+>>   arm64: Allow checking of a CPU-local erratum
+>>   arm64: Add CNTVCT_EL0 trap handler
+>>   arm64: Define Cortex-A73 MIDR
+>>   arm64: cpu_errata: Allow an erratum to be match for all revisions of a
+>>     core
+>>   arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum
+>>     858921
+>>   arm64: arch_timer: Add infrastructure for multiple erratum detection
+>>     methods
+>>   arm64: arch_timer: Add erratum handler for CPU-specific capability
+>>   arm64: arch_timer: Move arch_timer_reg_read/write around
+>>   arm64: arch_timer: Get rid of erratum_workaround_set_sne
+>>   arm64: arch_timer: Rework the set_next_event workarounds
+>>   arm64: arch_timer: Make workaround methods optional
+>>   arm64: arch_timer: Allows a CPU-specific erratum to only affect a
+>>     subset of CPUs
+>>   arm64: arch_timer: Move clocksource_counter and co around
+>>   arm64: arch_timer: Save cntkctl_el1 as a per-cpu variable
+>>   arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled
+>>   arm64: arch_timer: Workaround for Cortex-A73 erratum 858921
+>>   arm64: arch_timer: Allow erratum matching with ACPI OEM information
+>>   arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data
+> 
+> Are you happy to take the arch_timer patches above? If yes, Marc can
+> create a common branch with the first 5 patches which I will merge in
+> the arm64 tree. You can then pull the whole series into your tree.
 
-Add support for fec1 node on Engicam Is.IoT variant boards.
+Hi Catalin,
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v3:
-- none
-Changes for v2:
-- Newly added patch
+I'm fine with the merge process you are proposing. But before going
+forward, I would like to wait a bit in order to give the opportunity to
+Thomas to review the patchset.
 
- arch/arm/boot/dts/imx6ul-isiot.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index 7e947e5..ccc5477 100644
---- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -129,6 +129,24 @@
- 	status = "okay";
- };
- 
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy0>;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			reg = <0>;
-+		};
-+	};
-+};
-+
- &pwm8 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm8>;
-@@ -159,6 +177,21 @@
- };
- 
- &iomuxc {
-+	pinctrl_enet1: enet1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET2_RX_DATA0__ENET1_MDIO	0x1b0b0
-+			MX6UL_PAD_ENET2_RX_DATA1__ENET1_MDC	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
-+			MX6UL_PAD_ENET2_RX_EN__GPIO2_IO10	0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_i2c1: i2c1grp {
- 		fsl,pins = <
- 			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
+  -- Daniel
+
+
 -- 
-1.9.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
