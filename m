@@ -1,75 +1,57 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 6 Apr 2017 16:31:30 +0530
-Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
-In-Reply-To: <58E5E7B7.1050400@gmail.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
- <58E5E7B7.1050400@gmail.com>
-Message-ID: <b77e3405-f060-bcd5-99f6-7d76f9edf08a@codeaurora.org>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Thu, 6 Apr 2017 16:35:17 +0530
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAHgaXdKfbob3WHMho32JSh_dmfp2A=cjcePqk+NfajVpShPE6Q@mail.gmail.com>
+References: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
+ <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
+ <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
+ <20170315.145512.1542025976162251828.davem@davemloft.net>
+ <CAHgaXd+4QkFxnt-_iCqH8AyCN_Y8gXwr+y=iugz38NKSWspsbA@mail.gmail.com>
+ <58DAF908.8010404@iogearbox.net>
+ <CAHgaXdKfbob3WHMho32JSh_dmfp2A=cjcePqk+NfajVpShPE6Q@mail.gmail.com>
+Message-ID: <CAHgaXdJ1M4W3p9=B2hJmtxByPsA5-XHae8U6YtDH_2r_XMaR5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+Gentle Reminder.
 
-On 4/6/2017 12:31 PM, Frank Rowand wrote:
-> On 04/04/17 03:18, Sricharan R wrote:
->> Size of the dma-range is calculated as coherent_dma_mask + 1
->> and passed to arch_setup_dma_ops further. It overflows when
->> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
->> resulting in size getting passed as 0 wrongly. Fix this by
->> passsing in max(mask, mask + 1). Note that in this case
->> when the mask is set to full 64bits, we will be passing the mask
->> itself to arch_setup_dma_ops instead of the size. The real fix
->> for this should be to make arch_setup_dma_ops receive the
->> mask and handle it, to be done in the future.
+Anybody can tell me how to test the JIT compiler ?
+Best,
+Shubham Bansal
+
+
+On Thu, Mar 30, 2017 at 7:34 PM, Shubham Bansal
+<illusionist.neo@gmail.com> wrote:
+> Thanks Daniel.
+>
+> Can you tell me how to test the eBPF JIT compiler? It would be great
+> if you could tell me starting from compiling to proper testing.
+> Best,
+> Shubham Bansal
+>
+>
+> On Wed, Mar 29, 2017 at 5:30 AM, Daniel Borkmann <daniel@iogearbox.net> wrote:
+>> Hi Shubham,
 >>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/of/device.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> On 03/28/2017 10:49 PM, Shubham Bansal wrote:
+>> [...]
+>>>
+>>> Do you have any document to understand the working of tail calls? I
+>>> looked at your presentations but it seemed confusing to me. Anything
+>>> simple would be great, just about the tail calls. I don't think I need
+>>> examples, I can get them from your presentations. I just need a very
+>>> general idea. May be you know the code in kernel where it is
+>>> implemented.
 >>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index c17c19d..c2ae6bb 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->>  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->>  	if (ret < 0) {
->>  		dma_addr = offset = 0;
->> -		size = dev->coherent_dma_mask + 1;
->> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>  	} else {
->>  		offset = PFN_DOWN(paddr - dma_addr);
->>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
 >>
->
-> NACK.
->
-> Passing an invalid size to arch_setup_dma_ops() is only part of the problem.
-> size is also used in of_dma_configure() before calling arch_setup_dma_ops():
->
->         dev->coherent_dma_mask = min(dev->coherent_dma_mask,
->                                      DMA_BIT_MASK(ilog2(dma_addr + size)));
->         *dev->dma_mask = min((*dev->dma_mask),
->                              DMA_BIT_MASK(ilog2(dma_addr + size)));
->
-> which would be incorrect for size == 0xffffffffffffffffULL when
-> dma_addr != 0.  So the proposed fix really is not papering over
-> the base problem very well.
->
-
-Ok, but with your fix for of_dma_get_range and the above fix,
-dma_addr will be '0' when size = 0xffffffffffffffffULL,
-but DMA_BIT_MASK(ilog2(dma_addr + size)) would be wrong though,
-making coherent_dma_mask to be smaller 0x7fffffffffffffffULL.
-
-Regards,
-  Sricharan
-
-> I agree that the proper solution involves passing a mask instead
-> of a size to arch_setup_dma_ops().
->
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>> Sure, it's in __bpf_prog_run(), see the JMP_TAIL_CALL (kernel/bpf/core.c
+>> +1019).
+>> That's effectively what JITs implement. [1] page 3 has a high-level
+>> description
+>> as well, hope that helps.
+>>
+>> Thanks,
+>> Daniel
+>>
+>>   [1]
+>> http://www.netdevconf.org/1.1/proceedings/papers/On-getting-tc-classifier-fully-programmable-with-cls-bpf.pdf
