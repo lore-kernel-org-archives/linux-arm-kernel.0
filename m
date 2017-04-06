@@ -1,50 +1,52 @@
 From: andy.tang@nxp.com (Yuantian Tang)
-Date: Thu, 6 Apr 2017 10:21:22 +0800
-Subject: [PATCH 1/2] clk: qoriq: add clock configuration for ls1088a soc
-Message-ID: <1491445283-13053-1-git-send-email-andy.tang@nxp.com>
+Date: Thu, 6 Apr 2017 10:21:23 +0800
+Subject: [PATCH 2/2] clk: qoriq: add pll clock to clock lookup table
+In-Reply-To: <1491445283-13053-1-git-send-email-andy.tang@nxp.com>
+References: <1491445283-13053-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <1491445283-13053-2-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock on ls1088a chip takes primary clocking input from the external
-SYSCLK signal. The SYSCLK input (frequency) is multiplied using
-multiple phase locked loops (PLL) to create a variety of frequencies
-which can then be passed to a variety of internal logic, including
-cores and peripheral IP modules.
+Register each PLL and its division clocks to clock
+lookup table to facilitate the clock look up for
+clock consumer.
 
 Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 ---
- drivers/clk/clk-qoriq.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/clk/clk-qoriq.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index f3931e3..62cf32f 100644
+index 62cf32f..1bb691a 100644
 --- a/drivers/clk/clk-qoriq.c
 +++ b/drivers/clk/clk-qoriq.c
-@@ -537,6 +537,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
- 		.flags = CG_PLL_8BIT,
- 	},
- 	{
-+		.compat = "fsl,ls1088a-clockgen",
-+		.cmux_groups = {
-+			&clockgen2_cmux_cga12
-+		},
-+		.cmux_to_group = {
-+			0, 0, -1
-+		},
-+		.pll_mask = 0x07,
-+		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-+	},
-+	{
- 		.compat = "fsl,ls1012a-clockgen",
- 		.cmux_groups = {
- 			&ls1012a_cmux
-@@ -1398,6 +1409,7 @@ CLK_OF_DECLARE(qoriq_clockgen_ls1012a, "fsl,ls1012a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1021a, "fsl,ls1021a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen", clockgen_init);
-+CLK_OF_DECLARE(qoriq_clockgen_ls1088a, "fsl,ls1088a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
+@@ -12,6 +12,7 @@
  
- /* Legacy nodes */
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
++#include <linux/clkdev.h>
+ #include <linux/fsl/guts.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+@@ -1124,6 +1125,7 @@ static void __init create_one_pll(struct clockgen *cg, int idx)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(pll->div); i++) {
+ 		struct clk *clk;
++		int ret;
+ 
+ 		snprintf(pll->div[i].name, sizeof(pll->div[i].name),
+ 			 "cg-pll%d-div%d", idx, i + 1);
+@@ -1137,6 +1139,11 @@ static void __init create_one_pll(struct clockgen *cg, int idx)
+ 		}
+ 
+ 		pll->div[i].clk = clk;
++		ret = clk_register_clkdev(clk, pll->div[i].name, NULL);
++		if (ret != 0)
++			pr_err("%s: %s: register to lookup table failed %ld\n",
++			       __func__, pll->div[i].name, PTR_ERR(clk));
++
+ 	}
+ }
+ 
 -- 
 2.1.0.27.g96db324
