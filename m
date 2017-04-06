@@ -1,39 +1,108 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Thu,  6 Apr 2017 23:32:06 +0530
-Subject: [PATCH v3 0/9] ARM: dts: i.MX6: Add lcdif/sound nodes on Engicam SOMs
-Message-ID: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+Date: Thu,  6 Apr 2017 23:32:07 +0530
+Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec node
+In-Reply-To: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+Message-ID: <1491501735-1649-2-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-This patchset, add support for LVDS, touchscreen, sound card and related codec
-and can nodes all Engicam SOM's which are supporting mainline as of now.
+Add support for Sound card and related codec(via i2c1) nodes
+on Engicam Is.IoT MX6UL variant module boards.
 
-Jagan Teki (9):
-  ARM: dts: imx6ul-isiot: Add Sound card with codec node
-  ARM: dts: imx6ul-geam: Add Sound card with codec node
-  ARM: dts: imx6qdl-icore: Add Sound card with codec node
-  ARM: dts: imx6dl-icore-rqs: Add sgtl5000 codec node
-  ARM: dts: imx6qdl-icore-rqs: Replace to use simple-audio-card
-  ARM: dts: imx6dl-icore: Add LVDS support
-  ARM: dts: imx6dl-icore: Add touchscreen node
-  ARM: dts: imx6qdl-icore-rqs: Add CAN nodes
-  ARM: dts: imx6ul-isiot: Add FEC node support
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+Changes for v2:
+- Use proper [label:] node-name[@unit-address] for codec
+- Remove incorrect codec property 'wlf,shared-lrclk'
+- Remove 'gpr' from sound card node
 
- arch/arm/boot/dts/imx6dl-icore-rqs.dts     | 19 ++++++++
- arch/arm/boot/dts/imx6dl-icore.dts         | 45 +++++++++++++++++
- arch/arm/boot/dts/imx6q-icore-ofcap10.dts  | 11 +++++
- arch/arm/boot/dts/imx6q-icore-ofcap12.dts  | 11 +++++
- arch/arm/boot/dts/imx6q-icore-rqs.dts      | 21 ++++----
- arch/arm/boot/dts/imx6q-icore.dts          | 11 +++++
- arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi   | 51 ++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-icore.dtsi       | 48 +++++++++++++++++++
- arch/arm/boot/dts/imx6ul-geam-kit.dts      | 12 +++++
- arch/arm/boot/dts/imx6ul-geam.dtsi         | 26 ++++++++++
- arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 ++++
- arch/arm/boot/dts/imx6ul-isiot.dtsi        | 77 ++++++++++++++++++++++++++++++
- 12 files changed, 329 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
+ arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+index 2beaab6..d456080 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+@@ -41,6 +41,16 @@
+  */
+ 
+ &i2c1 {
++	sgtl5000: codec at a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks IMX6UL_CLK_OSC>;
++		clock-names = "mclk";
++		VDDA-supply = <&reg_3p3v>;
++		VDDIO-supply = <&reg_3p3v>;
++		VDDD-supply = <&reg_1p8v>;
++	};
++
+ 	stmpe811: gpio-expander at 44 {
+ 		compatible = "st,stmpe811";
+ 		reg = <0x44>;
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+index ea30380..7e947e5 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+@@ -69,6 +69,50 @@
+ 				    100>;
+ 		default-brightness-level = <100>;
+ 	};
++
++	reg_1p8v: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "imx6ul-isiot-sgtl5000";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&dailink_master>;
++		simple-audio-card,frame-master = <&dailink_master>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Line", "Line In",
++			"Line", "Line Out",
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++		};
++
++		dailink_master: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++			clocks = <&clks IMX6UL_CLK_SAI2>;
++		};
++	};
+ };
+ 
+ &i2c1 {
 -- 
 1.9.1
