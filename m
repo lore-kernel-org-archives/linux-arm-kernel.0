@@ -1,38 +1,64 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Apr 2017 15:56:40 +0530
-Subject: [PATCH 0/2] pmu0 MMIO region for A64 USB PHY
-In-Reply-To: <20170405143034.8868-1-icenowy@aosc.io>
-References: <20170405143034.8868-1-icenowy@aosc.io>
-Message-ID: <dbc88959-57f2-5e6b-0e3d-972dee9e1340@ti.com>
+Date: Thu, 6 Apr 2017 15:58:45 +0530
+Subject: [PATCH v5 1/9] phy: phy-mt65xx-usb3: improve RX detection stable
+ time
+In-Reply-To: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <de1b9870-d325-e97a-a2f0-bd355c70356c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wednesday 05 April 2017 08:00 PM, Icenowy Zheng wrote:
-> The USB PHY of A64 contains a "pmu0" MMIO region, which contains some control
-> registers for the EHCI0/OHCI0 pair on A64 SoC.
+
+On Friday 31 March 2017 01:05 PM, Chunfeng Yun wrote:
+> The default value of RX detection stable time is 10us, and this
+> margin is too big for some critical cases which cause U3 link fail
+> and link to U2(probability is about 1%). So change it to 5us.
 > 
-> This pair is not used currently in 4.11, but when enabling it in 4.12, the
-> MMIO region is needed.
-> 
-> In order to prevent device tree compatibility breakage, add this region in
-> 4.11.
-
-I feel the binding documentation can go along with the dt changes. Moreover I
-have no plans of sending another pull request for this -rc cycle.
-
-FWIW:
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+merged all the phy patches in this series to linux-phy -next.
 
 Thanks
 Kishon
+
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/phy/phy-mt65xx-usb3.c |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
-> Icenowy Zheng (2):
->   dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
->   arm64: allwinner: a64: add pmu0 regs for USB PHY
-> 
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi           | 2 ++
->  2 files changed, 3 insertions(+)
+> diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
+> index d972067..fe2392a 100644
+> --- a/drivers/phy/phy-mt65xx-usb3.c
+> +++ b/drivers/phy/phy-mt65xx-usb3.c
+> @@ -112,6 +112,14 @@
+>  #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
+>  #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
+>  
+> +#define U3P_U3_PHYD_RXDET1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x128)
+> +#define P3D_RG_RXDET_STB2_SET		GENMASK(17, 9)
+> +#define P3D_RG_RXDET_STB2_SET_VAL(x)	((0x1ff & (x)) << 9)
+> +
+> +#define U3P_U3_PHYD_RXDET2		(SSUSB_SIFSLV_U3PHYD_BASE + 0x12c)
+> +#define P3D_RG_RXDET_STB2_SET_P3	GENMASK(8, 0)
+> +#define P3D_RG_RXDET_STB2_SET_P3_VAL(x)	(0x1ff & (x))
+> +
+>  #define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
+>  #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
+>  #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
+> @@ -295,6 +303,16 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
+>  	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
+>  	writel(tmp, port_base + U3P_PHYD_CDR1);
+>  
+> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
+> +	tmp &= ~P3D_RG_RXDET_STB2_SET;
+> +	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
+> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET1);
+> +
+> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET2);
+> +	tmp &= ~P3D_RG_RXDET_STB2_SET_P3;
+> +	tmp |= P3D_RG_RXDET_STB2_SET_P3_VAL(0x10);
+> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET2);
+> +
+>  	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
+>  }
+>  
 > 
