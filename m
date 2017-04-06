@@ -1,45 +1,45 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Apr 2017 17:27:14 +0100
-Subject: [PATCH v3 00/18] clocksource/arch_timer: Errata workaround
- infrastructure rework
-In-Reply-To: <20170404171826.25030-1-marc.zyngier@arm.com>
-References: <20170404171826.25030-1-marc.zyngier@arm.com>
-Message-ID: <20170406162714.GC7705@e104818-lin.cambridge.arm.com>
+Date: Thu, 6 Apr 2017 17:36:25 +0100
+Subject: [PATCH v4] arm64: print a fault message when attempting to write
+ RO memory
+In-Reply-To: <20170405191831.8246-1-stephen.boyd@linaro.org>
+References: <20170405191831.8246-1-stephen.boyd@linaro.org>
+Message-ID: <20170406163625.GD7705@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wed, Apr 05, 2017 at 12:18:31PM -0700, Stephen Boyd wrote:
+> If a page is marked read only we should print out that fact,
+> instead of printing out that there was a page fault. Right now we
+> get a cryptic error message that something went wrong with an
+> unhandled fault, but we don't evaluate the esr to figure out that
+> it was a read/write permission fault.
+> 
+> Instead of seeing:
+> 
+>   Unable to handle kernel paging request at virtual address ffff000008e460d8
+>   pgd = ffff800003504000
+>   [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
+>   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> 
+> we'll see:
+> 
+>   Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
+>   pgd = ffff80003d3de000
+>   [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
+>   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> 
+> We also add a userspace address check into is_permission_fault()
+> so that the function doesn't return true for ttbr0 PAN faults
+> when it shouldn't.
+> 
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Tested-by: James Morse <james.morse@arm.com>
+> Acked-by: Laura Abbott <labbott@redhat.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 
-On Tue, Apr 04, 2017 at 06:18:08PM +0100, Marc Zyngier wrote:
-> Marc Zyngier (18):
->   arm64: Allow checking of a CPU-local erratum
->   arm64: Add CNTVCT_EL0 trap handler
->   arm64: Define Cortex-A73 MIDR
->   arm64: cpu_errata: Allow an erratum to be match for all revisions of a
->     core
->   arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum
->     858921
->   arm64: arch_timer: Add infrastructure for multiple erratum detection
->     methods
->   arm64: arch_timer: Add erratum handler for CPU-specific capability
->   arm64: arch_timer: Move arch_timer_reg_read/write around
->   arm64: arch_timer: Get rid of erratum_workaround_set_sne
->   arm64: arch_timer: Rework the set_next_event workarounds
->   arm64: arch_timer: Make workaround methods optional
->   arm64: arch_timer: Allows a CPU-specific erratum to only affect a
->     subset of CPUs
->   arm64: arch_timer: Move clocksource_counter and co around
->   arm64: arch_timer: Save cntkctl_el1 as a per-cpu variable
->   arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled
->   arm64: arch_timer: Workaround for Cortex-A73 erratum 858921
->   arm64: arch_timer: Allow erratum matching with ACPI OEM information
->   arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data
-
-Are you happy to take the arch_timer patches above? If yes, Marc can
-create a common branch with the first 5 patches which I will merge in
-the arm64 tree. You can then pull the whole series into your tree.
-
-Thanks.
+Queued for 4.12. Thanks.
 
 -- 
 Catalin
