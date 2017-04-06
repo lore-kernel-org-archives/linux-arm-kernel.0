@@ -1,19 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 6 Apr 2017 09:10:52 +0200
-Subject: [PATCH] clk: sunxi-ng: Display index when clock registration fails
-In-Reply-To: <20170405165227.6985-1-plaes@plaes.org>
-References: <20170405165227.6985-1-plaes@plaes.org>
-Message-ID: <20170406071052.t342oowda5yu5bdw@lukather>
+Date: Thu, 6 Apr 2017 09:13:23 +0200
+Subject: [PATCH 2/2] arm64: allwinner: a64: add pmu0 regs for USB PHY
+In-Reply-To: <20170405143034.8868-3-icenowy@aosc.io>
+References: <20170405143034.8868-1-icenowy@aosc.io>
+ <20170405143034.8868-3-icenowy@aosc.io>
+Message-ID: <20170406071323.isaowk3qh3rdu7lh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 07:52:27PM +0300, Priit Laes wrote:
-> Add clock index to clock registration failure message. Clock name
-> is sometimes not available, when things go really wrong.
+On Wed, Apr 05, 2017 at 10:30:34PM +0800, Icenowy Zheng wrote:
+> The USB PHY in A64 has a "pmu0" region, which controls the EHCI/OHCI
+> controller pair that can be connected to the PHY0.
 > 
-> Signed-off-by: Priit Laes <plaes@plaes.org>
+> Add the MMIO region for PHY node.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Applied, thanks!
+Applied, thanks
 Maxime
 
 -- 
@@ -26,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/77046f9f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/72ad759f/attachment.sig>
