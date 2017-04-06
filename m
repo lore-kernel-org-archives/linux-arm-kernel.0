@@ -1,75 +1,76 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu,  6 Apr 2017 20:07:25 +0100
-Subject: [RFC kvm-unit-tests PATCH 6/8] Makefiles: handle linking of scripts
- into build-tree
+Date: Thu,  6 Apr 2017 20:07:26 +0100
+Subject: [RFC kvm-unit-tests PATCH 7/8] Makefiles: fix up the x86 build
+ include and link paths
 In-Reply-To: <20170406190727.5624-1-alex.bennee@linaro.org>
 References: <20170406190727.5624-1-alex.bennee@linaro.org>
-Message-ID: <20170406190727.5624-7-alex.bennee@linaro.org>
+Message-ID: <20170406190727.5624-8-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing an out-of-src-tree build we still want access to the
-various bits of common script machinery to run. This is handled by the
-scripts-common list which sub-builds can add explicit extra stuff to.
+We still need to tell the compiler the correct search path for finding
+headers and the like. This is slightly complicated by the "dynamic"
+asm search path which is in our build tree but (may be) symlinked to
+the right architectures headers.
 
-The final rule is conditional so we don't attempt to link files when
-we are doing an in-src-tree build.
+Also we explicitly include SRCDIR for the linking scripts as VPATH
+doesn't seem to find them well enough.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- Makefile            | 13 +++++++++++++
- x86/Makefile.common |  4 ++++
- 2 files changed, 17 insertions(+)
+ Makefile            |  2 +-
+ x86/Makefile.common | 10 +++++-----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 56598df..c9fea88 100644
+index c9fea88..22da887 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -31,6 +31,10 @@ cflatobjs := \
- 	lib/report.o \
- 	lib/stack.o
+@@ -78,7 +78,7 @@ $(libcflat): $(cflatobjs)
+ 	$(AR) rcs $@ $^
  
-+# These are scripts we want linked from the source tree
-+scripts-common := run_tests.sh \
-+	scripts
-+
- # libfdt paths
- LIBFDT_objdir = $(SRCDIR)/lib/libfdt
- LIBFDT_srcdir = $(SRCDIR)/lib/libfdt
-@@ -86,8 +90,17 @@ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
- 	mkdir -p $(dir $@)
- 	$(CC) $(CFLAGS) -c -o $@ $<
+ include $(LIBFDT_srcdir)/Makefile.libfdt
+-$(LIBFDT_archive): CFLAGS += -ffreestanding -I lib -I lib/libfdt -Wno-sign-compare
++$(LIBFDT_archive): CFLAGS += -ffreestanding -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -Wno-sign-compare
+ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
+ 	$(AR) rcs $@ $^
  
-+$(scripts-common): $(SRCDIR)/$@
-+	ln -sf $<$@ $@
-+
- -include */.*.d */*/.*.d
- 
-+
-+# We only need to link common scripts for out-of-src-tree builds
-+ifneq ($(CURDIR), $(SRCDIR))
-+all: $(scripts-common)
-+endif
-+
- all: $(shell git -C $(SRCDIR) rev-parse --verify --short=8 HEAD >build-head 2>/dev/null)
- 
- standalone: all
 diff --git a/x86/Makefile.common b/x86/Makefile.common
-index fbab82c..ef6e543 100644
+index ef6e543..032ed19 100644
 --- a/x86/Makefile.common
 +++ b/x86/Makefile.common
-@@ -54,8 +54,12 @@ tests-common += api/dirty-log
- tests-common += api/dirty-log-perf
- endif
+@@ -17,7 +17,7 @@ cflatobjs += lib/x86/acpi.o
+ cflatobjs += lib/x86/stack.o
  
-+scripts-common += $(TEST_DIR)/run
-+scripts-common += $(TEST_DIR)/unittests.cfg
-+
+ $(libcflat): LDFLAGS += -nostdlib
+-$(libcflat): CFLAGS += -ffreestanding -I lib
++$(libcflat): CFLAGS += -ffreestanding -I $(SRCDIR)/lib -I lib
+ 
+ CFLAGS += -m$(bits)
+ CFLAGS += -O1
+@@ -31,8 +31,8 @@ libgcc := $(shell $(CC) -m$(bits) --print-libgcc-file-name)
+ .PRECIOUS: %.elf %.o
+ 
+ FLATLIBS = lib/libcflat.a $(libgcc)
+-%.elf: %.o $(FLATLIBS) x86/flat.lds $(cstart.o)
+-	$(CC) $(CFLAGS) -nostdlib -o $@ -Wl,-T,x86/flat.lds \
++%.elf: %.o $(FLATLIBS) $(SRCDIR)/x86/flat.lds $(cstart.o)
++	$(CC) $(CFLAGS) -nostdlib -o $@ -Wl,-T,$(SRCDIR)/x86/flat.lds \
+ 		$(filter %.o, $^) $(FLATLIBS)
+ 
+ %.flat: %.elf
+@@ -60,10 +60,10 @@ scripts-common += $(TEST_DIR)/unittests.cfg
  test_cases: $(tests-common) $(tests)
  
-+
- $(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I lib -I lib/x86
+ 
+-$(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I lib -I lib/x86
++$(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I $(SRCDIR)/lib -I $(SRCDIR)/lib/x86 -I lib
  
  $(TEST_DIR)/realmode.elf: $(TEST_DIR)/realmode.o
+-	$(CC) -m32 -nostdlib -o $@ -Wl,-T,$(TEST_DIR)/realmode.lds $^
++	$(CC) -m32 -nostdlib -o $@ -Wl,-T,$(SRCDIR)/$(TEST_DIR)/realmode.lds $^
+ 
+ $(TEST_DIR)/realmode.o: bits = 32
+ 
 -- 
 2.11.0
