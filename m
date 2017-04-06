@@ -1,57 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:09 +0100
-Subject: [PATCHv2 02/16] drivers/perf: arm_pmu: define armpmu_init_fn
+Date: Thu,  6 Apr 2017 19:29:13 +0100
+Subject: [PATCHv2 06/16] drivers/perf: arm_pmu: handle no platform_device
 In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We expect an ARM PMU's init function to have a particular prototype,
-which we open-code in a few places. This is less than ideal, considering
-that we cast a void value to this type in one location, and a mismatch
-could easily be missed.
+In armpmu_dispatch_irq() we look at arm_pmu::plat_device to acquire
+platdata, so that we can defer to platform-specific IRQ handling,
+required on some 32-bit parts. With the advent of ACPI we won't always
+have a platform_device, and so we must avoid trying to dereference
+fields from it.
 
-Add a typedef so that we can ensure this is consistent.
+This patch fixes up armpmu_dispatch_irq() to avoid doing so, introducing
+a new armpmu_get_platdata() helper.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c       | 2 +-
- include/linux/perf/arm_pmu.h | 4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/perf/arm_pmu.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 316c4dc..71a825d 100644
+index 183c6fd..2442038 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -989,7 +989,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct pmu_probe_info *probe_table)
- {
- 	const struct of_device_id *of_id;
--	const int (*init_fn)(struct arm_pmu *);
-+	armpmu_init_fn init_fn;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct arm_pmu *pmu;
- 	int ret = -ENODEV;
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 44f43fc..4249914 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -132,10 +132,12 @@ int armpmu_map_event(struct perf_event *event,
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX],
- 		     u32 raw_event_mask);
+@@ -316,10 +316,16 @@ static void armpmu_start(struct perf_event *event, int flags)
+ 	return 0;
+ }
  
-+typedef int (*armpmu_init_fn)(struct arm_pmu *);
++static struct arm_pmu_platdata *armpmu_get_platdata(struct arm_pmu *armpmu)
++{
++	struct platform_device *pdev = armpmu->plat_device;
 +
- struct pmu_probe_info {
- 	unsigned int cpuid;
- 	unsigned int mask;
--	int (*init)(struct arm_pmu *);
-+	armpmu_init_fn init;
- };
++	return pdev ? dev_get_platdata(&pdev->dev) : NULL;
++}
++
+ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ {
+ 	struct arm_pmu *armpmu;
+-	struct platform_device *plat_device;
+ 	struct arm_pmu_platdata *plat;
+ 	int ret;
+ 	u64 start_clock, finish_clock;
+@@ -331,8 +337,8 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ 	 * dereference.
+ 	 */
+ 	armpmu = *(void **)dev;
+-	plat_device = armpmu->plat_device;
+-	plat = dev_get_platdata(&plat_device->dev);
++
++	plat = armpmu_get_platdata(armpmu);
  
- #define PMU_PROBE(_cpuid, _mask, _fn)	\
+ 	start_clock = sched_clock();
+ 	if (plat && plat->handle_irq)
 -- 
 1.9.1
