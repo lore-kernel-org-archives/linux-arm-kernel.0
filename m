@@ -1,64 +1,91 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Apr 2017 15:58:45 +0530
-Subject: [PATCH v5 1/9] phy: phy-mt65xx-usb3: improve RX detection stable
- time
-In-Reply-To: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1490945735-9531-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <de1b9870-d325-e97a-a2f0-bd355c70356c@ti.com>
+Date: Thu, 6 Apr 2017 16:07:55 +0530
+Subject: [PATCH 1/3] phy: rockchip-usb: Add vbus regulator support.
+In-Reply-To: <20170405140613.4444-2-sjoerd.simons@collabora.co.uk>
+References: <20170405140613.4444-1-sjoerd.simons@collabora.co.uk>
+ <20170405140613.4444-2-sjoerd.simons@collabora.co.uk>
+Message-ID: <59ed8834-75d4-2001-73d4-6081d42d2aeb@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Friday 31 March 2017 01:05 PM, Chunfeng Yun wrote:
-> The default value of RX detection stable time is 10us, and this
-> margin is too big for some critical cases which cause U3 link fail
-> and link to U2(probability is about 1%). So change it to 5us.
+On Wednesday 05 April 2017 07:36 PM, Sjoerd Simons wrote:
+> On rockchip devices vbus is supplied by a separate power supply, often
+> through a regulator. Add support for describing the the regulator in
+> device-tree following the same convention as several other usb phy's.
 > 
-merged all the phy patches in this series to linux-phy -next.
+merged, thanks.
 
-Thanks
-Kishon
-
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+-Kishon
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 > ---
->  drivers/phy/phy-mt65xx-usb3.c |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
 > 
-> diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-> index d972067..fe2392a 100644
-> --- a/drivers/phy/phy-mt65xx-usb3.c
-> +++ b/drivers/phy/phy-mt65xx-usb3.c
-> @@ -112,6 +112,14 @@
->  #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
->  #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
+>  .../devicetree/bindings/phy/rockchip-usb-phy.txt      |  1 +
+>  drivers/phy/phy-rockchip-usb.c                        | 19 +++++++++++++++++++
+>  2 files changed, 20 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> index 57dc388e2fa2..4ed569046daf 100644
+> --- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
+> @@ -30,6 +30,7 @@ Optional Properties:
+>  - reset-names: Only allow the following entries:
+>   - phy-reset
+>  - resets: Must contain an entry for each entry in reset-names.
+> +- vbus-supply: power-supply phandle for vbus power source
 >  
-> +#define U3P_U3_PHYD_RXDET1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x128)
-> +#define P3D_RG_RXDET_STB2_SET		GENMASK(17, 9)
-> +#define P3D_RG_RXDET_STB2_SET_VAL(x)	((0x1ff & (x)) << 9)
-> +
-> +#define U3P_U3_PHYD_RXDET2		(SSUSB_SIFSLV_U3PHYD_BASE + 0x12c)
-> +#define P3D_RG_RXDET_STB2_SET_P3	GENMASK(8, 0)
-> +#define P3D_RG_RXDET_STB2_SET_P3_VAL(x)	(0x1ff & (x))
-> +
->  #define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
->  #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
->  #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
-> @@ -295,6 +303,16 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
->  	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
->  	writel(tmp, port_base + U3P_PHYD_CDR1);
+>  Example:
 >  
-> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
-> +	tmp &= ~P3D_RG_RXDET_STB2_SET;
-> +	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
-> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET1);
+> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> index 734987fa0ad7..3378eeb7a562 100644
+> --- a/drivers/phy/phy-rockchip-usb.c
+> +++ b/drivers/phy/phy-rockchip-usb.c
+> @@ -66,6 +66,7 @@ struct rockchip_usb_phy {
+>  	struct phy	*phy;
+>  	bool		uart_enabled;
+>  	struct reset_control *reset;
+> +	struct regulator *vbus;
+>  };
+>  
+>  static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
+> @@ -88,6 +89,9 @@ static void rockchip_usb_phy480m_disable(struct clk_hw *hw)
+>  						    struct rockchip_usb_phy,
+>  						    clk480m_hw);
+>  
+> +	if (phy->vbus)
+> +		regulator_disable(phy->vbus);
 > +
-> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET2);
-> +	tmp &= ~P3D_RG_RXDET_STB2_SET_P3;
-> +	tmp |= P3D_RG_RXDET_STB2_SET_P3_VAL(0x10);
-> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET2);
+>  	/* Power down usb phy analog blocks by set siddq 1 */
+>  	rockchip_usb_phy_power(phy, 1);
+>  }
+> @@ -143,6 +147,14 @@ static int rockchip_usb_phy_power_on(struct phy *_phy)
+>  	if (phy->uart_enabled)
+>  		return -EBUSY;
+>  
+> +	if (phy->vbus) {
+> +		int ret;
 > +
->  	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
+> +		ret = regulator_enable(phy->vbus);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	return clk_prepare_enable(phy->clk480m);
 >  }
 >  
+> @@ -268,6 +280,13 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
+>  	}
+>  	phy_set_drvdata(rk_phy->phy, rk_phy);
+>  
+> +	rk_phy->vbus = devm_regulator_get_optional(&rk_phy->phy->dev, "vbus");
+> +	if (IS_ERR(rk_phy->vbus)) {
+> +		if (PTR_ERR(rk_phy->vbus) == -EPROBE_DEFER)
+> +			return PTR_ERR(rk_phy->vbus);
+> +		rk_phy->vbus = NULL;
+> +	}
+> +
+>  	/*
+>  	 * When acting as uart-pipe, just keep clock on otherwise
+>  	 * only power up usb phy when it use, so disable it when init
 > 
