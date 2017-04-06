@@ -1,62 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 6 Apr 2017 14:49:03 +0100
-Subject: [PATCH v3] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <1491486403.2950.3.camel@linaro.org>
-References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170405224245.GA17774@n2100.armlinux.org.uk>
- <1491486403.2950.3.camel@linaro.org>
-Message-ID: <CAKv+Gu_EVqqQGXauWmfhhmJZEyrPDEHDiN2T23XVPy_eR99Lsg@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 06 Apr 2017 15:55:29 +0200
+Subject: [PATCH] [media] imx: csi: retain current field order and
+ colorimetry setting as default
+In-Reply-To: <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1491486929.2392.29.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 April 2017 at 14:46, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Wed, 2017-04-05 at 23:42 +0100, Russell King - ARM Linux wrote:
->> On Tue, Apr 04, 2017 at 08:31:27AM +0100, Ard Biesheuvel wrote:
->> > diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
->> > index a5b47421059d..80dfeb8ce8f2 100644
->> > --- a/arch/arm/include/asm/mmu.h
->> > +++ b/arch/arm/include/asm/mmu.h
->> > @@ -1,6 +1,8 @@
->> >  #ifndef __ARM_MMU_H
->> >  #define __ARM_MMU_H
->> >
->> > +struct machine_desc;
->> > +
->> >  #ifdef CONFIG_MMU
->> >
->> >  typedef struct {
->> > @@ -24,6 +26,8 @@ typedef struct {
->> >  #define ASID(mm)   (0)
->> >  #endif
->> >
->> > +void early_mm_init(const struct machine_desc *mdesc);
->> > +
->> >  #else
->> >
->> >  /*
->> > @@ -35,6 +39,8 @@ typedef struct {
->> >     unsigned long   end_brk;
->> >  } mm_context_t;
->> >
->> > +static inline void early_mm_init(const struct machine_desc *mdesc) { }
->> > +
->>
->> Why are we stuffing this into mmu.h?  mmu.h is not the header file for
->> arch/arm/mm/mmu.c - although they have the same base filename, they are
->> not really related.
->>
->> asm/mmu.h is supposed to be a kernel-wide include file for the mm_context_t
->> thing, and should not be filled with arch-private stuff.
->>
->> Please find a better location for this.
->
-> In arch/arm/mm/mm.h ?
->
-> Or as early_mm_init() is replacing early_paging_init() in setup.c, and
-> that is currently handled by a local extern statement, keeping doing the
-> same? That keeps the diff neater which is a plus for a patch that should
-> be backported to stable kernels.
->
+If the the field order is set to ANY in set_fmt, choose the currently
+set field order. If the colorspace is set to DEFAULT, choose the current
+colorspace.  If any of xfer_func, ycbcr_enc or quantization are set to
+DEFAULT, either choose the current setting, or the default setting for the
+new colorspace, if non-DEFAULT colorspace was given.
 
-Yes, the latter sounds like the least intrusive approach.
+This allows to let field order and colorimetry settings be propagated
+from upstream by calling media-ctl on the upstream entity source pad,
+and then call media-ctl on the sink pad to manually set the input frame
+interval, without changing the already set field order and colorimetry
+information.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+This is based on imx-media-staging-md-v14, and it is supposed to allow
+configuring the pipeline with media-ctl like this:
+
+1) media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY8_1X16/1920x1080]"
+2) media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY8_1X16/1920x108]"
+3) media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY8_1X16/1920x1080]"
+4) media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60]"
+5) media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080 at 1/30]"
+
+Without having step 4) overwrite the colorspace and field order set on
+'ipu1_csi0':0 by the propagation in step 3).
+---
+ drivers/staging/media/imx/imx-media-csi.c | 34 +++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 64dc454f6b371..d94ce1de2bf05 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -1325,6 +1325,40 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
+ 
+ 	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
++
++	/* Retain current field setting as default */
++	if (sdformat->format.field == V4L2_FIELD_ANY)
++		sdformat->format.field = fmt->field;
++
++	/* Retain current colorspace setting as default */
++	if (sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT) {
++		sdformat->format.colorspace = fmt->colorspace;
++		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT)
++			sdformat->format.xfer_func = fmt->xfer_func;
++		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT)
++			sdformat->format.ycbcr_enc = fmt->ycbcr_enc;
++		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT)
++			sdformat->format.quantization = fmt->quantization;
++	} else {
++		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT) {
++			sdformat->format.xfer_func =
++				V4L2_MAP_XFER_FUNC_DEFAULT(
++						sdformat->format.colorspace);
++		}
++		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT) {
++			sdformat->format.ycbcr_enc =
++				V4L2_MAP_YCBCR_ENC_DEFAULT(
++						sdformat->format.colorspace);
++		}
++		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT) {
++			sdformat->format.quantization =
++				V4L2_MAP_QUANTIZATION_DEFAULT(
++						cc->cs != IPUV3_COLORSPACE_YUV,
++						sdformat->format.colorspace,
++						sdformat->format.ycbcr_enc);
++		}
++	}
++
+ 	*fmt = sdformat->format;
+ 
+ 	if (sdformat->pad == CSI_SINK_PAD) {
+-- 
+2.11.0
