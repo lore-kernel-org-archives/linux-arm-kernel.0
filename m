@@ -1,91 +1,68 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Apr 2017 16:07:55 +0530
-Subject: [PATCH 1/3] phy: rockchip-usb: Add vbus regulator support.
-In-Reply-To: <20170405140613.4444-2-sjoerd.simons@collabora.co.uk>
-References: <20170405140613.4444-1-sjoerd.simons@collabora.co.uk>
- <20170405140613.4444-2-sjoerd.simons@collabora.co.uk>
-Message-ID: <59ed8834-75d4-2001-73d4-6081d42d2aeb@ti.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 6 Apr 2017 18:45:06 +0800
+Subject: [PATCH v23 06/11] clocksource: arm_arch_timer: refactor MMIO
+ timer probing.
+In-Reply-To: <20170405184229.GA29338@leverpostej>
+References: <20170331175105.8370-1-fu.wei@linaro.org>
+ <20170331175105.8370-7-fu.wei@linaro.org>
+ <20170405184229.GA29338@leverpostej>
+Message-ID: <CADyBb7tjLRYHsrB3V579RGxGS0jM51x628AqKomV_VFm+0b0ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
+
+On 6 April 2017 at 02:42, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Sat, Apr 01, 2017 at 01:51:00AM +0800, fu.wei at linaro.org wrote:
+>> +     arch_timer_mem_freq = arch_timer_mem_get_cntfrq(base);
+>> +     if (!arch_timer_rate && arch_timer_mem_freq) {
+>> +             arch_timer_rate = arch_timer_mem_freq;
+>> +     } else if (!arch_timer_rate || arch_timer_rate != arch_timer_mem_freq) {
+>> +             pr_err(FW_BUG "invalid MMIO frequency.\n");
+>> +             iounmap(base);
+>> +             return -EINVAL;
+>> +     }
+>
+> I thought I had previously mentioned that this last check has the
+> potential to break DT systems, which may be inadvertently relying on the
+> probe order.
+>
+> I agree we must do this check for ACPI, but I think that for DT it needs
+> to be relaxed.
+>
+> I'm happy to rework that locally, if you can address my comments on
+> patch 9.
+
+yes, you suggested that we keep the current frequency probing approach for DT,
+and use the new approach for ACPI.
+
+Because we try to merge the common code for MMIO timer. this become a little
+problem, sorry for that.
+
+I thinks for this code, maybe we can do :
+
+arch_timer_mem_freq = arch_timer_mem_get_cntfrq(base);
+if (!arch_timer_rate && arch_timer_mem_freq) {
+arch_timer_rate = arch_timer_mem_freq;
+} else if (!acpi_disabled && arch_timer_rate != arch_timer_mem_freq) {
+pr_err(FW_BUG "invalid MMIO frequency.\n");
+iounmap(base);
+return -EINVAL;
+}
+
+Please correct me, if I miss something.
+
+Thanks :-)
+
+>
+> Thanks,
+> Mark.
 
 
-On Wednesday 05 April 2017 07:36 PM, Sjoerd Simons wrote:
-> On rockchip devices vbus is supplied by a separate power supply, often
-> through a regulator. Add support for describing the the regulator in
-> device-tree following the same convention as several other usb phy's.
-> 
-merged, thanks.
 
--Kishon
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
-> 
->  .../devicetree/bindings/phy/rockchip-usb-phy.txt      |  1 +
->  drivers/phy/phy-rockchip-usb.c                        | 19 +++++++++++++++++++
->  2 files changed, 20 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-> index 57dc388e2fa2..4ed569046daf 100644
-> --- a/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/rockchip-usb-phy.txt
-> @@ -30,6 +30,7 @@ Optional Properties:
->  - reset-names: Only allow the following entries:
->   - phy-reset
->  - resets: Must contain an entry for each entry in reset-names.
-> +- vbus-supply: power-supply phandle for vbus power source
->  
->  Example:
->  
-> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-> index 734987fa0ad7..3378eeb7a562 100644
-> --- a/drivers/phy/phy-rockchip-usb.c
-> +++ b/drivers/phy/phy-rockchip-usb.c
-> @@ -66,6 +66,7 @@ struct rockchip_usb_phy {
->  	struct phy	*phy;
->  	bool		uart_enabled;
->  	struct reset_control *reset;
-> +	struct regulator *vbus;
->  };
->  
->  static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
-> @@ -88,6 +89,9 @@ static void rockchip_usb_phy480m_disable(struct clk_hw *hw)
->  						    struct rockchip_usb_phy,
->  						    clk480m_hw);
->  
-> +	if (phy->vbus)
-> +		regulator_disable(phy->vbus);
-> +
->  	/* Power down usb phy analog blocks by set siddq 1 */
->  	rockchip_usb_phy_power(phy, 1);
->  }
-> @@ -143,6 +147,14 @@ static int rockchip_usb_phy_power_on(struct phy *_phy)
->  	if (phy->uart_enabled)
->  		return -EBUSY;
->  
-> +	if (phy->vbus) {
-> +		int ret;
-> +
-> +		ret = regulator_enable(phy->vbus);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	return clk_prepare_enable(phy->clk480m);
->  }
->  
-> @@ -268,6 +280,13 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
->  	}
->  	phy_set_drvdata(rk_phy->phy, rk_phy);
->  
-> +	rk_phy->vbus = devm_regulator_get_optional(&rk_phy->phy->dev, "vbus");
-> +	if (IS_ERR(rk_phy->vbus)) {
-> +		if (PTR_ERR(rk_phy->vbus) == -EPROBE_DEFER)
-> +			return PTR_ERR(rk_phy->vbus);
-> +		rk_phy->vbus = NULL;
-> +	}
-> +
->  	/*
->  	 * When acting as uart-pipe, just keep clock on otherwise
->  	 * only power up usb phy when it use, so disable it when init
-> 
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
