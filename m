@@ -1,32 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Apr 2017 18:12:00 +0100
-Subject: [PATCH V14 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
- ARM64
-In-Reply-To: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170406171200.GE7705@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 6 Apr 2017 18:13:32 +0100
+Subject: [PATCH v3 5/5] KVM: arm/arm64: Advertise support for
+ KVM_CAP_ARM_USER_IRQ
+In-Reply-To: <20170405092815.22503-6-cdall@linaro.org>
+References: <20170405092815.22503-1-cdall@linaro.org>
+ <20170405092815.22503-6-cdall@linaro.org>
+Message-ID: <918dbb1b-088a-dab5-e14b-914e0e879ec0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On 05/04/17 10:28, Christoffer Dall wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Now when we support both the virtual timer and PMU reporting interrupts
 
-On Tue, Mar 28, 2017 at 01:30:30PM -0600, Tyler Baicar wrote:
-> Tyler Baicar (9):
->   acpi: apei: read ack upon ghes record consumption
->   ras: acpi/apei: cper: generic error data entry v3 per ACPI 6.1
->   efi: parse ARM processor error
->   arm64: exception: handle Synchronous External Abort
->   acpi: apei: handle SEA notification type for ARMv8
->   efi: print unrecognized CPER section
->   ras: acpi / apei: generate trace event for unrecognized CPER section
->   trace, ras: add ARM processor error trace event
->   arm/arm64: KVM: add guest SEA support
+Now that... both timers...
 
-It looks like the KVM parts are getting acked and the arm64 and efi bits
-have been acked as well. Are you ok to take this series through the ACPI
-tree?
+> to userspace, we can advertise this support.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index f935383..b420aa9 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -229,6 +229,13 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  		else
+>  			r = kvm->arch.vgic.msis_require_devid;
+>  		break;
+> +	case KVM_CAP_ARM_USER_IRQ:
+> +		/*
+> +		 * 1: EL1_VTIMER, EL1_PTIMER, and PMU.
+> +		 * (bump this number if adding more devices)
+> +		 */
+> +		r = 1;
+> +		break;
+>  	default:
+>  		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
+>  		break;
+> 
 
-Thanks.
 
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
