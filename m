@@ -1,38 +1,35 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 6 Apr 2017 10:28:11 +0200
-Subject: [PATCH v3 0/5] Support userspace irqchip with arch timers
-In-Reply-To: <20170405092815.22503-1-cdall@linaro.org>
-References: <20170405092815.22503-1-cdall@linaro.org>
-Message-ID: <6e406e74-5047-1bc1-d25f-3984d3da81f1@suse.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 06 Apr 2017 10:30:46 +0200
+Subject: [PATCH 1/3] ARM: dts: rockchip: Add support for phyCORE-RK3288 SoM
+In-Reply-To: <1491214985-18331-1-git-send-email-w.egorov@phytec.de>
+References: <1491214985-18331-1-git-send-email-w.egorov@phytec.de>
+Message-ID: <1872284.4EEa8KbvLF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Montag, 3. April 2017, 12:23:03 CEST schrieb Wadim Egorov:
+> The phyCORE-RK3288 is a SoM (System on Module) containing a RK3288 SoC.
+> The module can be connected to different carrier boards.
+> It can be also equipped with different RAM, SPI flash and eMMC variants.
+> The Rapid Development Kit option is using the following setup:
+> 
+>   - 1 GB DDR3 RAM (2 Banks)
+>   - 1x 4 KB EEPROM
+>   - DP83867 Gigabit Ethernet PHY
+>   - 16 MB SPI Flash
+>   - 4 GB eMMC Flash
+> 
+> Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
 
+applied for 4.12 with the following minor changes:
 
-On 05.04.17 11:28, Christoffer Dall wrote:
-> This series is the second version of the rework of the patches to support
-> architected timers with a userspace irqchip sent by Alexander Graf [1].
->
-> We first cleanup some of the timer code to make it easier to understand
-> what is being done in the later patches, and then define the ABI,
-> implement timers support, implement PMU support, and finally advertise
-> the features.
->
-> These patches are based on the recent work from Jintack to support the
-> physical timer in addition to the virtual timer.  This series including
-> its dependencies can be found here:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git irqs-to-user-v3
->
-> I tested this using Alex's QEMU patch with his fixes for SMP applied.  This
-> seems to be rock-solid.  The temporary-not-for-upstream-but-for-testing patch
-> can be found here (force-pushed and rebased since v2):
->
-> https://git.linaro.org/people/christoffer.dall/qemu-arm.git no-kvm-irqchip
->
-> I also tested it on 32-bit and it looks good there as well.
+- moved phy-handle property up a bit
+- switches compatible and #address+#size-cells in mdio0
+- dropped rockchip,grf from &io_domains (grf is a simple-mfd and can
+  get the grf syscon on its own via its parent)
+- vdd_cpu: regulator at 60 (from fan53555 at 60)
+- serial_flash: flash at 0 (from m25p80 at 0)
+  Nodes should be named after their "category" not the actual device
 
-Reviewed-by: Alexander Graf <agraf@suse.de>
-
-
-Alex
+Thanks
+Heiko
