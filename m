@@ -1,16 +1,16 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Thu,  6 Apr 2017 23:32:13 +0530
-Subject: [PATCH v3 7/9] ARM: dts: imx6dl-icore: Add touchscreen node
+Date: Thu,  6 Apr 2017 23:32:12 +0530
+Subject: [PATCH v3 6/9] ARM: dts: imx6dl-icore: Add LVDS support
 In-Reply-To: <1491501735-1649-1-git-send-email-jagan@openedev.com>
 References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
-Message-ID: <1491501735-1649-8-git-send-email-jagan@openedev.com>
+Message-ID: <1491501735-1649-7-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-max11801 touchscreen on Engicam iCoreM6 DualLite/Solo module is
-connected via i2c1, so add max11801: touchscreen at 48 on i2c1.
+Add LVDS display support for OpenFrame Capacitive touch 7 inc
+display which is supported by Engicam i.CoreM6 DualLite/Solo Starter Kit.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
@@ -20,28 +20,41 @@ Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Changes for v3,v2:
 - none
 
- arch/arm/boot/dts/imx6dl-icore.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/imx6dl-icore.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
-index ea9ab05..27f37cd 100644
+index 0562ce4..ea9ab05 100644
 --- a/arch/arm/boot/dts/imx6dl-icore.dts
 +++ b/arch/arm/boot/dts/imx6dl-icore.dts
-@@ -58,6 +58,15 @@
- 	status = "okay";
+@@ -68,3 +68,28 @@
+ 		VDDD-supply = <&reg_1p8v>;
+ 	};
  };
- 
-+&i2c1 {
-+	max11801: touchscreen at 48 {
-+		compatible = "maxim,max11801";
-+		reg = <0x48>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
++
++&ldb {
++	status = "okay";
++
++	lvds-channel at 0 {
++		fsl,data-mapping = "spwg";
++		fsl,data-width = <18>;
++		status = "okay";
++
++		display-timings {
++			native-mode = <&timing0>;
++			timing0: timing0 {
++				clock-frequency = <60000000>;
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <30>;
++				hfront-porch = <30>;
++				vback-porch = <5>;
++				vfront-porch = <5>;
++				hsync-len = <64>;
++				vsync-len = <20>;
++			};
++		};
 +	};
 +};
-+
- &i2c3 {
- 	sgtl5000: codec at a {
- 		compatible = "fsl,sgtl5000";
 -- 
 1.9.1
