@@ -1,56 +1,151 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 6 Apr 2017 17:49:05 +0100
-Subject: [PATCH v3 3/5] KVM: arm/arm64: Support arch timers with a
- userspace gic
-In-Reply-To: <20170405092815.22503-4-cdall@linaro.org>
-References: <20170405092815.22503-1-cdall@linaro.org>
- <20170405092815.22503-4-cdall@linaro.org>
-Message-ID: <baaf0d40-222b-633e-77b6-75fc61f3e0ed@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 6 Apr 2017 19:49:02 +0300
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170403153604.GI10760@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+ <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+ <20170403153604.GI10760@atomide.com>
+Message-ID: <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/17 10:28, Christoffer Dall wrote:
-> From: Alexander Graf <agraf@suse.de>
-> 
-> If you're running with a userspace gic or other interrupt constroller
+On 03/04/17 18:36, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170403 07:54]:
+>> On 30/03/17 19:54, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
+>>>> On 23/03/17 19:02, Tony Lindgren wrote:
+>>>>> * Tony Lindgren <tony@atomide.com> [170322 18:03]:
+>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+>>>>>>> On 17/03/17 17:25, Tony Lindgren wrote:
+>>>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>>>>>>>>> Any additional testing on omap4 welcome as this series basically
+>>>>>>>>> tweaks every possible peripheral clock on the SoC.
+>>>>>>>>
+>>>>>>>> Without the last patch in this series, booting fails for me:
+>>>>>>>>
+>>>>>>>> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+>>>>>>>> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+>>>>>>>>
+>>>>>>>> Care to check that booting keeps working for each patch in the
+>>>>>>>> series to avoid breaking git bisect for booting?
+>>>>>>>
+>>>>>>> Hmm, I think patch 8+9 need to be squashed then. I can double check this
+>>>>>>> next week though.
+>>>>>>
+>>>>>> Also looks like with this set merged HDMI stops working on
+>>>>>> omap4 with:
+>>>>>>
+>>>>>> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>>>
+>>>>> Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+>>>>> encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+>>>>> dmesg output in case that provides more clues:
+>>>>>
+>>>>> [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+>>>>> [   91.078308] [drm] Enabling DMM ywrap scrolling
+>>>>> [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>>> [   91.107879] omapdss HDMI error: failed to power on device
+>>>>> [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+>>>>> [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>> [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>> [   91.620300] Console: switching to colour frame buffer device 128x48
+>>>>> [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+>>>>> [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+>>>>> [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+>>>>> [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>> [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>>
+>>>>> Regards,
+>>>>>
+>>>>> Tony
+>>>>>
+>>>>
+>>>> Can you try with this additional hwmod data tweak in place? Apply this on
+>>>> top of the existing series.
+>>>
+>>> Does not seem to help, still get the same errors. But maybe I'm doing
+>>> something wrong as the patch did not apply and I applied it manually.
+>>>
+>>> Regards,
+>>>
+>>> Tony
+>>>
+>>
+>> Hmm ok, can you provide some brief instructions how to test what you are
+>> doing with the HDMI? Just connect it to some external monitor? My monitor
+>> has a spare HDMI connector so I could try it out.
+>
+> Well build a kernel using omap2plus_defconfig, then with HDMI cable
+> connected load the following modules:
+>
+> encoder-tpd12s015 encoder-tfp410 connector-hdmi omapfb
+>
+> And a console should appear on the HDMI monitor. If using omapdrm, then
+> load omapdss and omapdrm instead.
+>
+> And if using NFSroot, you need to have ehci and smsc drivers built-in
+> or use an initramfs.
 
-controller
+Ok, I have a solution to the issue.
 
-> (that is no vgic in the kernel), then you have so far not been able to
-> use the architected timers, because the output of the architected
-> timers, which are driven inside the kernel, was a kernel-only construct
-> between the arch timer code and the vgic.
-> 
-> This patch implements the new KVM_CAP_ARM_USER_IRQ feature, where we use a
-> side channel on the kvm_run structure, run->s.regs.device_irq_level, to
-> always notify userspace of the timer output levels when using a userspace
-> irqchip.
-> 
-> This works by ensureing that before we enter the guest, if the timer
+Try the slightly modified patch below. It just required a couple of 
+hwmod flags applied in addition to the patch I sent before.
 
-ensuring
+I also pushed a branch named "4.11-rc1-clkctrl-wip" as a reference, 
+where also the hdmi works fine on omap4.
 
-> output level has changed compared to what we last told userspace, we
-> don't enter the guest, but instead return to userspace to notify it of
-> the new level.  If we are exiting, because of an MMIO for example, and
-> the level changed at the same time, the value is also updated and
-> userspace can sample the line as it needs.  This is nicely achieved
-> simply always updating the timer_irq_level field after the main run
-> loop.
-> 
-> Note that the kvm_timer_update_irq trace event is changed to show the
-> host IRQ number for the timer instead of the guest IRQ number, because
-> the kernel no longer know which IRQ userspace wires up the timer signal
-> to.
-> 
-> Also note that this patch implements all required functionality but does
-> not yet advertise the capability.
-> 
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+===================================
 
-Otherwise looks good.
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c 
+b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index dad871a..43163b5 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -775,6 +775,7 @@
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+  static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
+  	{ .role = "sys_clk", .clk = "dss_sys_clk" },
++	{ .role = "hdmi_clk", .clk = "dss_48mhz_clk" },
+  };
+
+  static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
+@@ -785,7 +786,7 @@
+  	 * HDMI audio requires to use no-idle mode. Hence,
+  	 * set idle mode by software.
+  	 */
+-	.flags		= HWMOD_SWSUP_SIDLE,
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_OPT_CLKS_NEEDED,
+  	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
+  	.xlate_irq	= omap4_xlate_irq,
+  	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
+@@ -858,11 +859,16 @@
+  };
+
+  /* dss_venc */
++static struct omap_hwmod_opt_clk dss_venc_opt_clks[] = {
++	{ .role = "tv_clk", .clk = "dss_tv_clk" },
++};
++
+  static struct omap_hwmod omap44xx_dss_venc_hwmod = {
+  	.name		= "dss_venc",
+  	.class		= &omap44xx_venc_hwmod_class,
+  	.clkdm_name	= "l3_dss_clkdm",
+  	.main_clk	= "dss_tv_clk",
++	.flags		= HWMOD_OPT_CLKS_NEEDED,
+  	.prcm = {
+  		.omap4 = {
+  			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
+@@ -870,6 +876,8 @@
+  		},
+  	},
+  	.parent_hwmod	= &omap44xx_dss_hwmod,
++	.opt_clks	= dss_venc_opt_clks,
++	.opt_clks_cnt	= ARRAY_SIZE(dss_venc_opt_clks),
+  };
+
+  /*
