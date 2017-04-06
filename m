@@ -1,45 +1,86 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Apr 2017 17:36:25 +0100
-Subject: [PATCH v4] arm64: print a fault message when attempting to write
- RO memory
-In-Reply-To: <20170405191831.8246-1-stephen.boyd@linaro.org>
-References: <20170405191831.8246-1-stephen.boyd@linaro.org>
-Message-ID: <20170406163625.GD7705@e104818-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Apr 2017 17:40:16 +0100
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
+ interface
+In-Reply-To: <20170406162156.GA10134@red-moon>
+References: <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
+ <20170328144543.GA18046@red-moon>
+ <20170405105841.GG7909@n2100.armlinux.org.uk>
+ <20170405113238.GA2465@red-moon> <20170406102636.GA9623@red-moon>
+ <20170406105312.GE28800@wotan.suse.de>
+ <20170406113845.GA10013@red-moon>
+ <20170406115906.GF28800@wotan.suse.de>
+ <20170406130727.GE17774@n2100.armlinux.org.uk>
+ <20170406162156.GA10134@red-moon>
+Message-ID: <20170406164015.GI17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 12:18:31PM -0700, Stephen Boyd wrote:
-> If a page is marked read only we should print out that fact,
-> instead of printing out that there was a page fault. Right now we
-> get a cryptic error message that something went wrong with an
-> unhandled fault, but we don't evaluate the esr to figure out that
-> it was a read/write permission fault.
+On Thu, Apr 06, 2017 at 05:21:56PM +0100, Lorenzo Pieralisi wrote:
+> Ok, so:
 > 
-> Instead of seeing:
+> (1) I can do asm-generic/ioremap-nopost.h, which I assume you want to
+>     contain something like
 > 
->   Unable to handle kernel paging request at virtual address ffff000008e460d8
->   pgd = ffff800003504000
->   [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
->   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
+> {
+> 	return ioremap_nocache(offset, size);
+> }
 > 
-> we'll see:
-> 
->   Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
->   pgd = ffff80003d3de000
->   [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
->   Internal error: Oops: 9600004f [#1] PREEMPT SMP
-> 
-> We also add a userspace address check into is_permission_fault()
-> so that the function doesn't return true for ttbr0 PAN faults
-> when it shouldn't.
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-> Tested-by: James Morse <james.morse@arm.com>
-> Acked-by: Laura Abbott <labbott@redhat.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> Funny bit is that it has to be included by asm*/io.h files _after_
+> ioremap_nocache has been #defined (that's the reason my approach was
+> failing miserably even on arches like eg powerpc (see [1] below) that
+> does have ioremap_nocache),
 
-Queued for 4.12. Thanks.
+PowerPC does have ioremap_nocache() though:
+
+/**
+ * ioremap     -   map bus memory into CPU space
+...
+ * * ioremap_nocache is identical to ioremap
+extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
+#define ioremap_nocache(addr, size)     ioremap((addr), (size))
+
+and this include file is included very early on in linux/io.h.  I don't
+see anything that conditionalises it on anything except __KERNEL__.  So,
+the report from 0-day really doesn't make any sense to me.
+
+Do we know how we're ending up in linux/io.h line 169 without having
+picked up the ioremap_nocache() definition provided by PowerPC's
+asm/io.h ?
+
+> not sure it is going to be very nice to have
+> an include in the middle of asm*/io.h include files (and I have to patch
+> all arches which I can do).
+
+You mean like we already have to do with this asm-generic/io.h thing in
+the ARM io.h header file, because we need to define all the accessors
+first, to prevent the asm-generic/io.h thing defining them for us?
+Given how asm-generic has headed in this regard, having include files
+at all sorts of strange locations within the architecture asm/*.h
+header files has become quite normal, unfortunately.
+
+> (2) I add:
+> 
+> #ifndef ioremap_nopost
+> static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
+> {
+> 	return NULL; <-(making it return ioremap_nocache() does not
+> 			work, see [1] for the reason)
+> }
+> #endif
+> 
+> in linux/io.h
+
+... which breaks the kernel if ioremap_nopost is missing from the arch
+header, and one of the drivers that you're modifying to use this new
+ioremap variant happens to be built and used on such an architecture.
+
+> (3) ioremap_nopost follows Luis' ioremap_uc approach
+
+Same problem as (2), as I understand correctly.
 
 -- 
-Catalin
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
