@@ -1,59 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 6 Apr 2017 18:52:52 +0100
-Subject: [PATCH v23 09/11] acpi/arm64: Add memory-mapped timer support in
- GTDT driver
-In-Reply-To: <CADyBb7vEHQCpMoXhtBMGf_iou1qxsvVSJfxcYy5W33SNFyCwwA@mail.gmail.com>
-References: <20170331175105.8370-1-fu.wei@linaro.org>
- <20170331175105.8370-10-fu.wei@linaro.org>
- <20170405183808.GB27550@leverpostej>
- <CADyBb7sz6ongbyqR0FzBZybJBYwnLvqV+NsX1+W=6tv0_vLt1g@mail.gmail.com>
- <20170406172410.GA11871@leverpostej>
- <CADyBb7vEHQCpMoXhtBMGf_iou1qxsvVSJfxcYy5W33SNFyCwwA@mail.gmail.com>
-Message-ID: <20170406175252.GB11871@leverpostej>
+From: jagan@openedev.com (Jagan Teki)
+Date: Thu,  6 Apr 2017 23:32:06 +0530
+Subject: [PATCH v3 0/9] ARM: dts: i.MX6: Add lcdif/sound nodes on Engicam SOMs
+Message-ID: <1491501735-1649-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 01:39:09AM +0800, Fu Wei wrote:
-> On 7 April 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Apr 07, 2017 at 12:47:47AM +0800, Fu Wei wrote:
-> >> On 6 April 2017 at 02:38, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Sat, Apr 01, 2017 at 01:51:03AM +0800, fu.wei at linaro.org wrote:
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-> > However, I would prefer to simplify this such that we only free the
-> > IRQs in the error path.
-> >
-> > We should be able to iterate over all freams, freeing any non-zero
-> > interrupt, since !valid frames shouldn't have non-zero interrupts.
-> 
-> Yes, that is what I am doing :
-> 
->  if (!frame->valid)
->           continue;
+This patchset, add support for LVDS, touchscreen, sound card and related codec
+and can nodes all Engicam SOM's which are supporting mainline as of now.
 
-What I meant was that we won't look at the frame->valid flag at all;
-only the interrupts. e.g.
+Jagan Teki (9):
+  ARM: dts: imx6ul-isiot: Add Sound card with codec node
+  ARM: dts: imx6ul-geam: Add Sound card with codec node
+  ARM: dts: imx6qdl-icore: Add Sound card with codec node
+  ARM: dts: imx6dl-icore-rqs: Add sgtl5000 codec node
+  ARM: dts: imx6qdl-icore-rqs: Replace to use simple-audio-card
+  ARM: dts: imx6dl-icore: Add LVDS support
+  ARM: dts: imx6dl-icore: Add touchscreen node
+  ARM: dts: imx6qdl-icore-rqs: Add CAN nodes
+  ARM: dts: imx6ul-isiot: Add FEC node support
 
-for (int i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
-	if (frame->phys_irq > 0)
-		free_the_phys_irq_somehow();
-	if (frame->virt_irq > 0)
-		free_the_virt_irq_somehow();
-}
+ arch/arm/boot/dts/imx6dl-icore-rqs.dts     | 19 ++++++++
+ arch/arm/boot/dts/imx6dl-icore.dts         | 45 +++++++++++++++++
+ arch/arm/boot/dts/imx6q-icore-ofcap10.dts  | 11 +++++
+ arch/arm/boot/dts/imx6q-icore-ofcap12.dts  | 11 +++++
+ arch/arm/boot/dts/imx6q-icore-rqs.dts      | 21 ++++----
+ arch/arm/boot/dts/imx6q-icore.dts          | 11 +++++
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi   | 51 ++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-icore.dtsi       | 48 +++++++++++++++++++
+ arch/arm/boot/dts/imx6ul-geam-kit.dts      | 12 +++++
+ arch/arm/boot/dts/imx6ul-geam.dtsi         | 26 ++++++++++
+ arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 ++++
+ arch/arm/boot/dts/imx6ul-isiot.dtsi        | 77 ++++++++++++++++++++++++++++++
+ 12 files changed, 329 insertions(+), 13 deletions(-)
 
-... where we somehow figure out the GSI, or we introduce an api like
-unregister_gsi_for_irq(irq).
-
-Since the !valid frames should all have zero for their interrupt fields,
-no special handling is necessary.
-
-That way, we only free the IRQs in one place, it's obvious that we
-consistently free all of them, etc.
-
-> Lorenzo addressed the API issue, we may can fix it by getting GSI info
-> from DT, then register it until we figure the best frame.
-> It may need some big change in DT code
-
-I'd prefer to keep this constrained to the ACPI code. ;)
-
-Thanks,
-Mark.
+-- 
+1.9.1
