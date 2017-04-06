@@ -1,81 +1,60 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 06 Apr 2017 15:48:37 +0900
-Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
-In-Reply-To: <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
- <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
- <93e79e92-a102-e931-8d63-843031848888@samsung.com>
- <58DA1E38.50907@samsung.com>
- <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
- <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
-Message-ID: <58E5E4C5.5090107@samsung.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 6 Apr 2017 00:01:11 -0700
+Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
+In-Reply-To: <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <58E5E7B7.1050400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/04/17 03:18, Sricharan R wrote:
+> Size of the dma-range is calculated as coherent_dma_mask + 1
+> and passed to arch_setup_dma_ops further. It overflows when
+> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
+> resulting in size getting passed as 0 wrongly. Fix this by
+> passsing in max(mask, mask + 1). Note that in this case
+> when the mask is set to full 64bits, we will be passing the mask
+> itself to arch_setup_dma_ops instead of the size. The real fix
+> for this should be to make arch_setup_dma_ops receive the
+> mask and handle it, to be done in the future.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/of/device.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index c17c19d..c2ae6bb 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>  	if (ret < 0) {
+>  		dma_addr = offset = 0;
+> -		size = dev->coherent_dma_mask + 1;
+> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>  	} else {
+>  		offset = PFN_DOWN(paddr - dma_addr);
+>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> 
 
+NACK.
 
-2017? 04? 05? 00:38? Krzysztof Kozlowski ?(?) ? ?:
-> On Tue, Mar 28, 2017 at 11:38 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Tue, Mar 28, 2017 at 11:26 AM, Inki Dae <inki.dae@samsung.com> wrote:
->>> Merged.
->>
->> Hi,
->>
->> I do not see the tag (with DT patches) merged by you which I provided
->> to you before. These are essential for bisectability. Without them,
->> kernel bisectability is broken. Did you merged the tag somewhere?
->>
->> Best regards,
->> Krzysztof
->>
->>> Thanks,
->>> Inki Dae
-> 
-> Inki,
-> 
-> I still do not see the DTS tag [1] merged in your tree but you applied
-> patches breaking the display. I looked at exynos-drm-next branch.
-> 
-> We talked already about bisectability and with Hoegeun we provided
-> proper solution. Hoegeun split the patchset and I sent you a stable
-> tag to merge. Be aware not to apply the DTS patch because you would
-> effectively duplicate it. Instead, deal like with any pull request -
-> merge the tag as dependency *before* applying DRM DSI patch.
-> 
-> I saw also a branch like this:
-> https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next-tm2
-> but this is something obviously wrong. I do not know what are your
-> plans to do with it, but please drop it as it brings only confusion.
+Passing an invalid size to arch_setup_dma_ops() is only part of the problem.
+size is also used in of_dma_configure() before calling arch_setup_dma_ops():
 
-Krzysztof,
+        dev->coherent_dma_mask = min(dev->coherent_dma_mask,
+                                     DMA_BIT_MASK(ilog2(dma_addr + size)));
+        *dev->dma_mask = min((*dev->dma_mask),
+                             DMA_BIT_MASK(ilog2(dma_addr + size)));
 
-Do not make you confusing with above branch which is used just for internal test so never go -next maybe you know.
-Why are you suffering from this?
+which would be incorrect for size == 0xffffffffffffffffULL when
+dma_addr != 0.  So the proposed fix really is not papering over
+the base problem very well.
 
+I agree that the proper solution involves passing a mask instead
+of a size to arch_setup_dma_ops().
 
-Thanks,
-Inki Dae
-
-> 
-> Best regards,
-> Krzysztof
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg567053.html
-> 
->>> 2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
->>>> Hi inki,
->>>>
->>>> Could you check the this patch?
->>>> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
->>>>
->>>> Best regards,
->>>> Hoegeun
->>>>
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+-Frank
