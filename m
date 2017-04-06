@@ -1,49 +1,92 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Thu, 06 Apr 2017 14:07:44 +0300
-Subject: [PATCH v2] drm: hdlcd: Fix the calculation of the scanout start
- address
-In-Reply-To: <20170403131348.GY7909@n2100.armlinux.org.uk>
-References: <20170222153036.GI31595@intel.com>
- <20170308163025.31098-1-Liviu.Dudau@arm.com>
- <20170331094937.GO7909@n2100.armlinux.org.uk>
- <20170331131830.GK13355@e110455-lin.cambridge.arm.com>
- <20170331134810.GA25244@n2100.armlinux.org.uk>
- <20170403103133.GL13355@e110455-lin.cambridge.arm.com>
- <20170403131348.GY7909@n2100.armlinux.org.uk>
-Message-ID: <87h921ztdr.fsf@intel.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Thu, 06 Apr 2017 19:09:11 +0800
+Subject: [PATCH v3 8/9] drm/rockchip: gem: Don't alloc/free gem buf when
+ dev_private is invalid
+In-Reply-To: <20170406082612.qmwyfjr5uwcp3arr@phenom.ffwll.local>
+References: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1491380967-28570-9-git-send-email-jeffy.chen@rock-chips.com>
+ <20170405162839.k6q4b3tpt6t2s3zm@art_vandelay>
+ <20170406082612.qmwyfjr5uwcp3arr@phenom.ffwll.local>
+Message-ID: <58E621D7.3030205@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 03 Apr 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> So what the _hell_ do you think _this_ sentence means?  It _was_ shared
-> with you.
+Hi Daniel,
+
+On 04/06/2017 04:26 PM, Daniel Vetter wrote:
+> On Wed, Apr 05, 2017 at 12:28:40PM -0400, Sean Paul wrote:
+>> On Wed, Apr 05, 2017 at 04:29:26PM +0800, Jeffy Chen wrote:
+>>> After unbinding drm, the userspace may still has a chance to access
+>>> gem buf.
+>>>
+>>> Add a sanity check for a NULL dev_private to prevent that from
+>>> happening.
+>>
+>> I still don't understand how this is happening. You're saying that these hooks
+>> can be called after rockchip_drm_unbind() has finished?
 >
->   The following series is what I came up with, although I've had no time
->   to test it.
+> Yeah this is supposed to be impossible. If it isn't, we need to debug and
+> fix this properly. This smells like pretty bad duct-tape ...
+
+it looks like after unbind, the user space may still own drm dev fd, and 
+could be able to call ioctl:
+lrwx------. 1 chronos chronos 64 Mar 15 12:53 28 -> /dev/dri/card1 (deleted)
+
+and the drm_unplug_dev may help it, maybe we should call it in unbind? 
+or just break drm_ioctl when drm_dev not registered?
+
+> -Daniel
 >
-> which was in the mail which was the parent to the series?  Does it
-> mean I'm bouncing a ball around the back yard maybe?
+>>
+>> Sean
+>>
+>>>
+>>> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+>>> ---
+>>>
+>>> Changes in v3:
+>>> Address Daniel Vetter <daniel@ffwll.ch>'s comments.
+>>> Update commit message.
+>>>
+>>> Changes in v2: None
+>>>
+>>>   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 8 ++++++++
+>>>   1 file changed, 8 insertions(+)
+>>>
+>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+>>> index df9e570..205a3dc 100644
+>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+>>> @@ -184,6 +184,9 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
+>>>   	struct drm_device *drm = obj->dev;
+>>>   	struct rockchip_drm_private *private = drm->dev_private;
+>>>
+>>> +	if (!private)
+>>> +		return -ENODEV;
+>>> +
+>>>   	if (private->domain)
+>>>   		return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
+>>>   	else
+>>> @@ -208,6 +211,11 @@ static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
+>>>
+>>>   static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
+>>>   {
+>>> +	struct drm_device *drm = rk_obj->base.dev;
+>>> +
+>>> +	if (!drm->dev_private)
+>>> +		return;
+>>> +
+>>>   	if (rk_obj->pages)
+>>>   		rockchip_gem_free_iommu(rk_obj);
+>>>   	else
+>>> --
+>>> 2.1.4
+>>>
+>>
+>> --
+>> Sean Paul, Software Engineer, Google / Chromium OS
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 >
-> No, the information was there, you chose not to read it, and *you*
-> fucked up.  Notice that it is PAST TENSE, which means it HAPPENED IN
-> THE PAST.  NOT PRESENT.  This is basic english comprehension.
-
-[...]
-
-> For christ sake, I sent the patches out because I thought it would be
-> useful to show what I had come up with, because I believed it to be of
-> use.
->
-> I won't make that mistake again, I'll just delete such work, because
-> it's obviously far too much hassle to work with other people, because
-> they don't READ.
-
-Please keep the discussion civil. We try to maintain a friendly
-collaborative atmosphere on dri-devel, and this kind of interaction is
-not welcome in our community. Thanks for your understanding.
-
-BR,
-Jani.
-
--- 
-Jani Nikula, Intel Open Source Technology Center
