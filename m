@@ -1,204 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:22 +0100
-Subject: [PATCHv2 15/16] arm64: pmuv3: handle !PMUv3 when probing
-In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Thu,  6 Apr 2017 23:32:15 +0530
+Subject: [PATCH v3 9/9] ARM: dts: imx6ul-isiot: Add FEC node support
+In-Reply-To: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+Message-ID: <1491501735-1649-10-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
-compatible PMU. Thus we need to consult ID registers during probe time.
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-This patch updates our PMUv3 probing code to test for the presence of
-PMUv3 functionality before touching an PMUv3-specific registers, and
-before updating the struct arm_pmu with PMUv3 data.
+Add support for fec1 node on Engicam Is.IoT variant boards.
 
-When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm64/kernel/perf_event.c | 85 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 69 insertions(+), 16 deletions(-)
+Changes for v3:
+- none
+Changes for v2:
+- Newly added patch
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 57ae9d9..50790d7 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -957,11 +957,24 @@ static int armv8_vulcan_map_event(struct perf_event *event)
- 				ARMV8_PMU_EVTYPE_EVENT);
- }
+ arch/arm/boot/dts/imx6ul-isiot.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+index 7e947e5..ccc5477 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+@@ -129,6 +129,24 @@
+ 	status = "okay";
+ };
  
-+struct armv8pmu_probe_info {
-+	struct arm_pmu *pmu;
-+	bool present;
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	phy-mode = "rmii";
++	phy-handle = <&ethphy0>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
 +};
 +
- static void __armv8pmu_probe_pmu(void *info)
- {
--	struct arm_pmu *cpu_pmu = info;
-+	struct armv8pmu_probe_info *probe = info;
-+	struct arm_pmu *cpu_pmu = probe->pmu;
-+	u64 dfr0;
- 	u32 pmceid[2];
+ &pwm8 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm8>;
+@@ -159,6 +177,21 @@
+ };
  
-+	dfr0 = read_sysreg(id_aa64dfr0_el1);
-+	if (((dfr0 >> ID_AA64DFR0_PMUVER_SHIFT) & 0xf) != 1)
-+		return;
-+
-+	probe->present = true;
-+
- 	/* Read the nb of CNTx counters supported from PMNC */
- 	cpu_pmu->num_events = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT)
- 		& ARMV8_PMU_PMCR_N_MASK;
-@@ -979,13 +992,27 @@ static void __armv8pmu_probe_pmu(void *info)
- 
- static int armv8pmu_probe_pmu(struct arm_pmu *cpu_pmu)
- {
--	return smp_call_function_any(&cpu_pmu->supported_cpus,
-+	struct armv8pmu_probe_info probe = {
-+		.pmu = cpu_pmu,
-+		.present = false,
+ &iomuxc {
++	pinctrl_enet1: enet1grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET2_RX_DATA0__ENET1_MDIO	0x1b0b0
++			MX6UL_PAD_ENET2_RX_DATA1__ENET1_MDC	0x1b0b0
++			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
++			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
++			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
++			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
++			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
++			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
++			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
++			MX6UL_PAD_ENET2_RX_EN__GPIO2_IO10	0x1b0b0
++		>;
 +	};
-+	int ret;
 +
-+	ret = smp_call_function_any(&cpu_pmu->supported_cpus,
- 				    __armv8pmu_probe_pmu,
--				    cpu_pmu, 1);
-+				    &probe, 1);
-+	if (ret)
-+		return ret;
-+
-+	return probe.present ? 0 : -ENODEV;
- }
- 
--static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
-+static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
- {
-+	int ret = armv8pmu_probe_pmu(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
- 	cpu_pmu->enable			= armv8pmu_enable_event,
- 	cpu_pmu->disable		= armv8pmu_disable_event,
-@@ -997,78 +1024,104 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->reset			= armv8pmu_reset,
- 	cpu_pmu->max_period		= (1LLU << 32) - 1,
- 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
-+
-+	return 0;
- }
- 
- static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_pmuv3";
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cortex_a53";
- 	cpu_pmu->map_event		= armv8_a53_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cortex_a57";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cortex_a72";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cavium_thunder";
- 	cpu_pmu->map_event		= armv8_thunder_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_brcm_vulcan";
- 	cpu_pmu->map_event		= armv8_vulcan_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
 -- 
 1.9.1
