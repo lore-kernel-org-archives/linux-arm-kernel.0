@@ -1,47 +1,82 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 6 Apr 2017 11:36:06 -0400
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
- <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
-Message-ID: <5a4b37c7-0319-2fa5-cd3e-93261cf45b99@codeaurora.org>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 6 Apr 2017 16:39:13 +0100
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <20170406152040.GH4372@olila.local.net-space.pl>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+ <20170406142710.GE4372@olila.local.net-space.pl>
+ <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
+ <20170406152040.GH4372@olila.local.net-space.pl>
+Message-ID: <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mayurkumar,
+Hi Daniel,
 
-On 4/6/2017 9:23 AM, Patel, Mayurkumar wrote:
-> The patch seems to be working for ASPM L1 so far. I am seeing a problem now with your patches for L1.2 as following:
-> 
-> ASPM L1.2 does not get enabled on the Upstream as well as downstream port due to following reasons.
-> In the case, I see now, if the EP is not connected while reboot of the Machine, Root Port does not configure
-> It's own L1.2 also from the BIOS. (I am not sure whether it's even advisable to enable L1.2 on root
-> Port when no downstream device is not connected to it as it may have an impact on CLKREQ# and device is connected
-> At later stage may have a problem with it)
-> 
+On 06/04/17 16:20, Daniel Kiper wrote:
+> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
+>> On 06/04/17 16:27, Daniel Kiper wrote:
+>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+>>>> Hi Juergen,
+>>>>
+>>>> On 06/04/17 07:23, Juergen Gross wrote:
+>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
+>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
+>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
+>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
+>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
+>>>>>>
+>>>>>> (+Daniel)
+>>>>>>
+>>>>>> This could be a problem for x86 as well, at least theoretically.
+>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+>>>>>>
+>>>>>> So I think we should have a similar routine there.
+>>>>>
+>>>>> +1
+>>>>>
+>>>>> I don't see any problem with such a routine added, in contrast to
+>>>>> potential "reboots" instead of power off without it.
+>>>>>
+>>>>> So I think this dummy xen_efi_reset_system() should be added to
+>>>>> drivers/xen/efi.c instead.
+>>>>
+>>>> I will resend the patch during day with xen_efi_reset_system moved
+>>>> to common code and implement the x86 counterpart (thought, I will
+>>>> not be able to test it).
+>>>
+>>> I think that this is ARM specific issue. On x86 machine_restart() calls
+>>> xen_restart(). Hence, everything works. So, I think that it should be
+>>> fixed only for ARM. Anyway, please CC me when you send a patch.
+>>
+>> What about xen_machine_power_off() (as stated in Boris' mail)?
+>
+> Guys what do you think about that:
+>
+> --- a/drivers/firmware/efi/reboot.c
+> +++ b/drivers/firmware/efi/reboot.c
+> @@ -55,7 +55,7 @@ static void efi_power_off(void)
+>
+>  static int __init efi_shutdown_init(void)
+>  {
+> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
+> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
+>                 return -ENODEV;
+>
+>         if (efi_poweroff_required())
+>
+>
+> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
+>
+> I hope that tweaks for both files should solve our problem.
 
-I have two questions:
+This sounds good for power off (I haven't tried to power off DOM0 yet). 
+But this will not solve the restart problem (see machine_restart in 
+arch/arm64/kernel/process.c) which call directly efi_reboot.
 
-1. if the endpoint is connected during boot and have ASPM L1.2 enabled during boot,
-do you see that L1.2 gets re-enabled following a hotplug remove and then insert. 
-This is the goal of this patch. If yes, we achieved our goal. This is working on
-my platform but I do not have L1SS support on my platform.
-
-2. if you do not connect any endpoint during boot and insert the card, do you
-see any ASPM enabled at all with and without my patch using the default policy? 
-I think this is the part you are describing above. I'll confirm this on my platform
-too. I think this one will require another patch/discussion unless I broke something.
-
-
-> Later when the Device get connected, BIOS configures L1.2 for Root port and EP but due to policy set to incorrect,
-> Kernel disables ASPM L1.2.
-
-Sinan
+Cheers,
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Julien Grall
