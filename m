@@ -1,104 +1,62 @@
-From: rajatja@google.com (Rajat Jain)
-Date: Thu, 6 Apr 2017 10:10:58 -0700
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
- <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
- <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
-Message-ID: <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 6 Apr 2017 18:12:10 +0100
+Subject: [PATCH v3 4/5] KVM: arm/arm64: Report PMU overflow interrupts to
+ userspace irqchip
+In-Reply-To: <20170405092815.22503-5-cdall@linaro.org>
+References: <20170405092815.22503-1-cdall@linaro.org>
+ <20170405092815.22503-5-cdall@linaro.org>
+Message-ID: <6c476719-8fb3-27b6-c7f6-84088443dcd4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 05/04/17 10:28, Christoffer Dall wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> When not using an in-kernel VGIC, but instead emulating an interrupt
+> controller in userspace, we should report the PMU overflow status to
+> that userspace interrupt controller using the KVM_CAP_ARM_USER_IRQ
+> feature.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c    |  9 ++++++---
+>  include/kvm/arm_pmu.h |  7 +++++++
+>  virt/kvm/arm/pmu.c    | 42 ++++++++++++++++++++++++++++++++++++++----
+>  3 files changed, 51 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index efb16e5..f935383 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -635,11 +635,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  		/*
+>  		 * If we have a singal pending, or need to notify a userspace
+> -		 * irqchip about timer level changes, then we exit (and update
+> -		 * the timer level state in kvm_timer_update_run below).
+> +		 * irqchip about timer or PMU level changes, then we exit (and
+> +		 * update the timer level state in kvm_timer_update_run
+> +		 * below).
+>  		 */
+>  		if (signal_pending(current) ||
+> -		    kvm_timer_should_notify_user(vcpu)) {
+> +		    kvm_timer_should_notify_user(vcpu) ||
+> +		    kvm_pmu_should_notify_user(vcpu)) {
+>  			ret = -EINTR;
+>  			run->exit_reason = KVM_EXIT_INTR;
+>  		}
+> @@ -713,6 +715,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  	/* Tell userspace about in-kernel device output levels */
+>  	kvm_timer_update_run(vcpu);
+> +	kvm_pmu_update_run(vcpu);
 
-On Thu, Apr 6, 2017 at 8:19 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->
-> On 4/6/2017 9:23 AM, Patel, Mayurkumar wrote:
-> > Actually, The enabling/configuring of ASPM L1.2 is opposite then ASPM L1.
-> > In case of L1, Upstream must configure first L1 and then downstream according to PCIe spec.
-> > In case of L1.2, Downstream must configure L1.2 and then upstream according (to L1.2 ECN spec. -> 5.5.4. L1 PM
-> > substates Configuration).
-> >
-> > @Bjorn:
-> > I even found that programming of pcie_config_aspm_l1ss() sub-states is done in the opposite way than described in
-> > the spec.,
-> >
-> > The spec. says following and correct me If I am wrong or I misinterpret the spec. :
-> >
-> > 5.5.4. L1 PM Substates Configuration
-> >
-> > The Setting of any enable bit must be performed at the Downstream Port before the
-> > corresponding bit is permitted to be Set at the Upstream Port. If any L1 PM Substates enable
-> > bit is at a later time to be cleared, the enable bit(s) must be cleared in the Upstream Port
-> > before the corresponding enable bit(s) are permitted to be cleared in the Downstream Port.
-> >
+Very minor nit: as we now have a couple of functions that are going to
+check the same thing (irqchip_in_kernel), we could consider moving the
+test here.  I don't have strong feelings about it though.
 
-Thanks for bringing to attention. My understanding / interpretation of
-"Downstream port" was the port pointing downwards (from the "Upstream"
-component). E.g. when an EP connects to a hub port, PCIe text refers
-to the hub port as the "downstream port". Similarly "upstream port" is
-used for referring to a switch's port that "points" upwards towards
-the root port. Thus, I interpreted the text to mean that I need to
-enable it in the "downstream port" (in the root port / switch port)
-followed by the "upstream port" (in the device).
+Thanks,
 
-It would have been great if the PCIe spec was as clear for L1
-substates as it was for L1:
-----------------------------
-ASPM L1 must be enabled by software in the Upstream
-component on a Link prior to enabling ASPM L1 in the
-Downstream component on that Link.
------------------------------
-For ASPM L1, the spec clearly says "Upstream component" which can only
-mean the switch's "downstream" port. I'm open to changing it if there
-is consensus that my interpretation is wrong.
-
-I'm actually not sure if I understood what is the problem that is
-being seen with L1 PM substates. Can you please elaborate?
-
-
->
->
-> Thanks for testing.
->
-> commit a142f4d3e5c54db5e942fa6ee5f3dc0e8c83207b
-> Author: Rajat Jain <rajatja@google.com>
-> Date:   Mon Jan 2 22:34:15 2017 -0800
->
->     PCI/ASPM: Add comment about L1 substate latency
->
->     Since the exit latencies for L1 substates are not advertised by a device,
->     it is not clear in spec how to do a L1 substate exit latency check.  We
->     assume that the L1 exit latencies advertised by a device include L1
->     substate latencies (and hence do not do any check).  If that is not true,
->     we should do some sort of check here.
->
->     (I'm not clear about what that check should like currently. I'd be glad to
->     take up any suggestions).
->
->     Signed-off-by: Rajat Jain <rajatja@google.com>
->     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->
-> I added Rajat for discussion on L1SS. I think this deserves its own discussion.
-
-Thanks, The above commit specifically adds a comment to
-pcie_aspm_check_latency(), because I wanted to leave a note
-highlighting that potentially, we could add a more stringent check for
-exit latency for L1SS. But that has nothing to do with how we are
-configuring or enabling / disabling the L1 substates.
-
-Thanks & Best Regards,
-
-Rajat
-
-> I'll look at the other part of your email and move things around a little bit
-> less aggressively for the aspm_default.
->
->
-> --
-> Sinan Kaya
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
