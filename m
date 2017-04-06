@@ -1,110 +1,204 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 6 Apr 2017 14:35:29 -0500
-Subject: [PATCH] misc: sram-exec: Use aligned fncpy instead of memcpy
-In-Reply-To: <20170406192954.GQ23750@n2100.armlinux.org.uk>
-References: <20170405192120.1009-1-d-gerlach@ti.com>
- <ab1583fc-0560-b4d2-851b-4be6201edf8b@ti.com>
- <20170406190747.GP23750@n2100.armlinux.org.uk>
- <9a970ac7-cb8f-28f4-3b84-ad8bedf1242c@ti.com>
- <20170406192954.GQ23750@n2100.armlinux.org.uk>
-Message-ID: <67706a7c-506f-a56a-9f57-874d97961fa0@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  6 Apr 2017 19:29:22 +0100
+Subject: [PATCHv2 15/16] arm64: pmuv3: handle !PMUv3 when probing
+In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2017 02:29 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 06, 2017 at 02:14:12PM -0500, Dave Gerlach wrote:
->> On 04/06/2017 02:07 PM, Russell King - ARM Linux wrote:
->>> On Wed, Apr 05, 2017 at 02:22:33PM -0500, Dave Gerlach wrote:
->>>> Russell,
->>>> On 04/05/2017 02:21 PM, Dave Gerlach wrote:
->>>>> Currently the sram-exec functionality, which allows allocation of
->>>>> executable memory and provides an API to move code to it, is only
->>>>> selected in configs for the ARM architecture. Based on commit
->>>>> 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
->>>>> function body copying") simply copying a C function pointer address
->>>>> using memcpy without consideration of alignment and Thumb is unsafe on
->>>>> ARM platforms.
->>>>>
->>>>> The aforementioned patch introduces the fncpy macro which is a safe way
->>>>> to copy executable code on ARM platforms, so let's make use of that here
->>>>> rather than the unsafe plain memcpy that was previously used by
->>>>> sram_exec_copy.
->>>>>
->>>>> In the future, architectures hoping to make use of the sram-exec
->>>>> functionality must define an fncpy macro just as ARM has done to
->>>>> guarantee or check for safe copying to executable memory before allowing
->>>>> the arch to select CONFIG_SRAM_EXEC.
->>>>>
->>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>>> ---
->>>>> drivers/misc/sram-exec.c | 3 ++-
->>>>> 1 file changed, 2 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
->>>>> index ac522417c462..0057eabe5c03 100644
->>>>> --- a/drivers/misc/sram-exec.c
->>>>> +++ b/drivers/misc/sram-exec.c
->>>>> @@ -19,6 +19,7 @@
->>>>> #include <linux/sram.h>
->>>>>
->>>>> #include <asm/cacheflush.h>
->>>>> +#include <asm/fncpy.h>
->>>>>
->>>>> #include "sram.h"
->>>>>
->>>>> @@ -93,7 +94,7 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
->>>>> 	set_memory_nx((unsigned long)base, pages);
->>>>> 	set_memory_rw((unsigned long)base, pages);
->>>>>
->>>>> -	memcpy(dst, src, size);
->>>>> +	fncpy(dst, src, size);
->>>>>
->>>>> 	set_memory_ro((unsigned long)base, pages);
->>>>> 	set_memory_x((unsigned long)base, pages);
->>>>>
->>>>
->>>> Does this address your concerns from here [1]? Because the only user of this
->>>> code is ARM right now I already only build the sram-exec code in if
->>>> CONFIG_ARM is selected.
->>>
->>> Sorry, it does not.  Please read the comments in asm/fncpy.h.
->>>
->>> Deviating from the proscribed usage means your code is, quite simply,
->>> buggy.  There's no two ways about that.
->>>
->>
->> I understand there are many constraints to using fncpy, as this is what we
->> used before to copy our executable code. Apart from users being aware of
->> what these constraints are (8-byte aligned, position independent) and making
->> sure the code they are moving meets them, are you saying we need some sort
->> of additional strict enforcement of them? Because fncpy today will throw a
->> bug if you fail to align src and dst properly, so adding another check will
->> just double the messages to the user.
->
-> Yes, fncpy() will throw a bug, but as I've already explained:
->
-> 	sram = alloc();
->
-> 	sram_func = fncpy(sram, func, func_size);
->
-> 	sram_func();
->
-> is the _only_ valid usage.
->
-> You must not do:
->
-> 	sram = alloc();
->
-> 	fncpy(sram, func, func_size);
->
-> 	sram();
->
-> because that will not work with Thumb code.  The only permitted usage
-> is as per the first example above, everything else is buggy.
->
+When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
+compatible PMU. Thus we need to consult ID registers during probe time.
 
-I see exactly what you mean now. I missed that before, thank you for clarifying. 
-Will update this patch and send a new version.
+This patch updates our PMUv3 probing code to test for the presence of
+PMUv3 functionality before touching an PMUv3-specific registers, and
+before updating the struct arm_pmu with PMUv3 data.
 
-Regards,
-Dave
+When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/perf_event.c | 85 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 69 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 57ae9d9..50790d7 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -957,11 +957,24 @@ static int armv8_vulcan_map_event(struct perf_event *event)
+ 				ARMV8_PMU_EVTYPE_EVENT);
+ }
+ 
++struct armv8pmu_probe_info {
++	struct arm_pmu *pmu;
++	bool present;
++};
++
+ static void __armv8pmu_probe_pmu(void *info)
+ {
+-	struct arm_pmu *cpu_pmu = info;
++	struct armv8pmu_probe_info *probe = info;
++	struct arm_pmu *cpu_pmu = probe->pmu;
++	u64 dfr0;
+ 	u32 pmceid[2];
+ 
++	dfr0 = read_sysreg(id_aa64dfr0_el1);
++	if (((dfr0 >> ID_AA64DFR0_PMUVER_SHIFT) & 0xf) != 1)
++		return;
++
++	probe->present = true;
++
+ 	/* Read the nb of CNTx counters supported from PMNC */
+ 	cpu_pmu->num_events = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT)
+ 		& ARMV8_PMU_PMCR_N_MASK;
+@@ -979,13 +992,27 @@ static void __armv8pmu_probe_pmu(void *info)
+ 
+ static int armv8pmu_probe_pmu(struct arm_pmu *cpu_pmu)
+ {
+-	return smp_call_function_any(&cpu_pmu->supported_cpus,
++	struct armv8pmu_probe_info probe = {
++		.pmu = cpu_pmu,
++		.present = false,
++	};
++	int ret;
++
++	ret = smp_call_function_any(&cpu_pmu->supported_cpus,
+ 				    __armv8pmu_probe_pmu,
+-				    cpu_pmu, 1);
++				    &probe, 1);
++	if (ret)
++		return ret;
++
++	return probe.present ? 0 : -ENODEV;
+ }
+ 
+-static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
++static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
+ {
++	int ret = armv8pmu_probe_pmu(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
+ 	cpu_pmu->enable			= armv8pmu_enable_event,
+ 	cpu_pmu->disable		= armv8pmu_disable_event,
+@@ -997,78 +1024,104 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->reset			= armv8pmu_reset,
+ 	cpu_pmu->max_period		= (1LLU << 32) - 1,
+ 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
++
++	return 0;
+ }
+ 
+ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_pmuv3";
+ 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cortex_a53";
+ 	cpu_pmu->map_event		= armv8_a53_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cortex_a57";
+ 	cpu_pmu->map_event		= armv8_a57_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cortex_a72";
+ 	cpu_pmu->map_event		= armv8_a57_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cavium_thunder";
+ 	cpu_pmu->map_event		= armv8_thunder_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_brcm_vulcan";
+ 	cpu_pmu->map_event		= armv8_vulcan_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static const struct of_device_id armv8_pmu_of_device_ids[] = {
+-- 
+1.9.1
