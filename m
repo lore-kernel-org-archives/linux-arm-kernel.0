@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  7 Apr 2017 01:10:18 +0200
-Subject: [GIT PULL 2/4] ARM: tegra: Maintainer changes for v4.12-rc1
+Date: Fri,  7 Apr 2017 01:10:19 +0200
+Subject: [GIT PULL 3/4] soc/tegra: Core SoC changes for v4.12-rc1
 In-Reply-To: <20170406231020.32048-1-thierry.reding@gmail.com>
 References: <20170406231020.32048-1-thierry.reding@gmail.com>
-Message-ID: <20170406231020.32048-2-thierry.reding@gmail.com>
+Message-ID: <20170406231020.32048-3-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,31 +15,57 @@ The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.12-misc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.12-soc
 
-for you to fetch changes up to 89d39a63b2c25c8da1a038fdb208bfed041c889c:
+for you to fetch changes up to 1fd09e5d884a5ff4060948e0cf8f5d7eed16e936:
 
-  MAINTAINERS: tegra: Remove self as maintainer (2017-03-08 14:54:14 +0100)
+  soc/tegra: Add initial flowctrl support for Tegra132/210 (2017-04-04 15:52:31 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Maintainer changes for v4.12-rc1
+soc/tegra: Core SoC changes for v4.12-rc1
 
-Stephen has been focussing on other areas of the open source community
-within NVIDIA, but Jon has been helping out with the kernel development
-for a while now. Replace Stephen's entry with one from Jon.
-
-Secondly, Alex has unfortunately left the company and therefore won't
-be serving as a Tegra maintainer any longer.
+This contains PMC support for Tegra186 as well as a proper driver for
+the flow controller found on SoCs up to Tegra210. This also turns the
+fuse driver into an explicitly non-modular driver.
 
 ----------------------------------------------------------------
-Alexandre Courbot (1):
-      MAINTAINERS: tegra: Remove self as maintainer
+Arnd Bergmann (1):
+      soc/tegra: Fix link errors with PMC disabled
+
+Jon Hunter (4):
+      ARM: tegra: Remove unnecessary inclusion of flowctrl header
+      soc/tegra: Move Tegra flowctrl driver
+      soc/tegra: flowctrl: Add basic platform driver
+      soc/tegra: Add initial flowctrl support for Tegra132/210
+
+Paul Gortmaker (1):
+      soc: tegra: make fuse-tegra explicitly non-modular
 
 Thierry Reding (1):
-      MAINTAINERS: tegra: Replace Stephen with Jon
+      soc/tegra: Implement Tegra186 PMC support
 
- MAINTAINERS | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ .../bindings/arm/tegra/nvidia,tegra186-pmc.txt     |  34 +++++
+ arch/arm/mach-tegra/Makefile                       |   1 -
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |   3 +-
+ arch/arm/mach-tegra/platsmp.c                      |   2 +-
+ arch/arm/mach-tegra/pm.c                           |   2 +-
+ arch/arm/mach-tegra/reset-handler.S                |   2 +-
+ arch/arm/mach-tegra/sleep-tegra20.S                |   3 +-
+ arch/arm/mach-tegra/sleep-tegra30.S                |   2 +-
+ arch/arm/mach-tegra/sleep.S                        |   2 -
+ arch/arm/mach-tegra/tegra.c                        |   2 -
+ drivers/soc/tegra/Kconfig                          |  22 +++
+ drivers/soc/tegra/Makefile                         |   4 +-
+ .../mach-tegra => drivers/soc/tegra}/flowctrl.c    |  87 ++++++++---
+ drivers/soc/tegra/fuse/fuse-tegra.c                |   4 +-
+ drivers/soc/tegra/pmc-tegra186.c                   | 169 +++++++++++++++++++++
+ .../mach-tegra => include/soc/tegra}/flowctrl.h    |  32 +++-
+ include/soc/tegra/pmc.h                            |  29 +++-
+ 17 files changed, 353 insertions(+), 47 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra186-pmc.txt
+ rename {arch/arm/mach-tegra => drivers/soc/tegra}/flowctrl.c (67%)
+ create mode 100644 drivers/soc/tegra/pmc-tegra186.c
+ rename {arch/arm/mach-tegra => include/soc/tegra}/flowctrl.h (77%)
