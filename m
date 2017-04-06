@@ -1,117 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 6 Apr 2017 11:26:36 +0100
-Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
- interface
-In-Reply-To: <20170405113238.GA2465@red-moon>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
- <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
- <20170328144543.GA18046@red-moon>
- <20170405105841.GG7909@n2100.armlinux.org.uk>
- <20170405113238.GA2465@red-moon>
-Message-ID: <20170406102636.GA9623@red-moon>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 6 Apr 2017 15:56:40 +0530
+Subject: [PATCH 0/2] pmu0 MMIO region for A64 USB PHY
+In-Reply-To: <20170405143034.8868-1-icenowy@aosc.io>
+References: <20170405143034.8868-1-icenowy@aosc.io>
+Message-ID: <dbc88959-57f2-5e6b-0e3d-972dee9e1340@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 01:38:12PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Apr 05, 2017 at 11:58:41AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
-> > > On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
-> > > > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
-> > > > > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-> > > > > index 7afb0e2..50b292f 100644
-> > > > > --- a/arch/x86/include/asm/io.h
-> > > > > +++ b/arch/x86/include/asm/io.h
-> > > > > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
-> > > > >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
-> > > > >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
-> > > > >  #define ioremap_uc ioremap_uc
-> > > > > +#define ioremap_nopost ioremap_nocache
-> > > > 
-> > > > These are all the same as the default from asm-generic.h.  Do we really
-> > > > need these definitions in alpha, avr32, frv, ia64, x86?
-> > > 
-> > > Those arches do not include asm-generic.h (I suppose for a good reason)
-> > > but a definition is needed anyway if we want code using ioremap_nopost()
-> > > to be unconditional. This is one way of doing it, there are others not
-> > > sure they are any better, I am open to suggestions.
-> > 
-> > We do have linux/io.h, which should be included in preference to asm/io.h.
-> > linux/io.h has existed for years, but I still see (from time to time)
-> > patches adding drivers that (imho incorrectly) use asm/io.h.
-> > 
-> > Also, this:
-> > 
-> > > > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > > > > index 7ef015e..0e81938 100644
-> > > > > --- a/include/asm-generic/io.h
-> > > > > +++ b/include/asm-generic/io.h
-> > > > > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
-> > > > >  #endif /* CONFIG_GENERIC_IOMAP */
-> > > > >  #endif /* CONFIG_HAS_IOPORT_MAP */
-> > > > >  
-> > > > > +#ifndef ioremap_nopost
-> > > > > +#define ioremap_nopost ioremap_nocache
-> > > > > +#endif
-> > > > > +
-> > > > >  #ifndef xlate_dev_kmem_ptr
-> > > > >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
-> > > > >  static inline void *xlate_dev_kmem_ptr(void *addr)
-> > 
-> > could well be located in linux/io.h, which would make it available
-> > everywhere.
-> > 
-> > I'd suggest one change to this though:
-> > 
-> > #ifndef ioremap_nopost
-> > static inline void __iomem *ioremap_nopost(resource_size_t offset,
-> > 					   unsigned long size)
-> > {
-> > 	return ioremap_nocache(offset, size);
-> > }
-> > #endif
-> > 
-> > This way, if someone forgets to define ioremap_nopost() in their
-> > asm/io.h but provides a definition or extern prototype for
-> > ioremap_nopost(), we end up with a compile error to highlight the
-> > error, rather than the error being hidden by the preprocessor.
+Hi,
+
+On Wednesday 05 April 2017 08:00 PM, Icenowy Zheng wrote:
+> The USB PHY of A64 contains a "pmu0" MMIO region, which contains some control
+> registers for the EHCI0/OHCI0 pair on A64 SoC.
 > 
-> Yes, I could add ioremap_nopost() to linux/io.h I did not do it because
-> linux/io.h, for whatever reason, does not seem to contain ioremap_*
-> prototypes; this does not mean we should not add it there but that
-> would look odd (with all others ioremap_* in asm/io.h), all I am
-> saying. This stuff requires some clean-up regardless, for the records.
+> This pair is not used currently in 4.11, but when enabling it in 4.12, the
+> MMIO region is needed.
 > 
-> As for the static inline, I did that and that did not make the
-> kbuild robot happy at all on some arches:
+> In order to prevent device tree compatibility breakage, add this region in
+> 4.11.
+
+I feel the binding documentation can go along with the dt changes. Moreover I
+have no plans of sending another pull request for this -rc cycle.
+
+FWIW:
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+
+Thanks
+Kishon
 > 
-> eg: openrisc
+> Icenowy Zheng (2):
+>   dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+>   arm64: allwinner: a64: add pmu0 regs for USB PHY
 > 
-> >> include/asm-generic/io.h:922:9: error: implicit declaration of
-> >> function 'ioremap_nocache' [-Werror=implicit-function-declaration]
->      return ioremap_nocache(offset, size);
-
-Indeed, the static inline ioremap_nocache() fallback does not work
-on all arches (whether I add the fallback in linux/io.h or
-asm-generic/io.h is irrelevant), I bump into issues such as the one
-reported above.
-
-I could make it:
-
-#ifndef ioremap_nopost
-static inline void __iomem *ioremap_nopost(resource_size_t offset,
-					   unsigned long size)
-{
-	return NULL;
-}
-#endif
-
-which would force arches to define ioremap_nopost() (if they need it).
-
-This is what I *assume* was done for ioremap_uc() in asm-generic/io.h,
-but honestly history is hard to follow here.
-
-Thoughts ?
-
-Thanks,
-Lorenzo
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi           | 2 ++
+>  2 files changed, 3 insertions(+)
+> 
