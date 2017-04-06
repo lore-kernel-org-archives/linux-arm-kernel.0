@@ -1,17 +1,23 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  6 Apr 2017 20:31:19 +0800
-Subject: [PATCH v5 06/12] drm/rockchip: cdn-dp: Don't unregister audio dev
- when unbinding
+Date: Thu,  6 Apr 2017 20:31:20 +0800
+Subject: [PATCH v5 07/12] drm/rockchip: vop: Enable pm domain before
+ vop_initial
 In-Reply-To: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
 References: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1491481885-13775-7-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1491481885-13775-8-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After snd_soc_unregister_codec, the dai link would remain bound to
-the invalid codec. That would cause crashes after unbind dp driver.
+We're trying to access vop registers here, so need to make sure
+the pm domain is on.
 
-Let's unregister audio codec when removing dp driver to prevent that.
+Normally it should be enabled by the bootloader, but there's no
+guarantee of it. And if we wanna do unbind/bind, it would also
+cause the device to hang.
+
+And this patch also does these:
+1/ move vop_initial to the end of vop_bind for eaiser error handling.
+2/ correct the err_put_pm_runtime of vop_enable.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
@@ -19,50 +25,93 @@ Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 Changes in v5: None
 Changes in v4: None
 Changes in v3:
+Address Sean Paul <seanpaul@chromium.org>'s comments.
 Update commit message.
 
 Changes in v2: None
 
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 29 +++++++++++++++++++++--------
+ 1 file changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index ee4195d..a2169dd 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -1092,8 +1092,6 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
- 		goto err_free_connector;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 2151e1c..b65b296 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -506,7 +506,7 @@ static int vop_enable(struct drm_crtc *crtc)
+ 	ret = pm_runtime_get_sync(vop->dev);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
+-		goto err_put_pm_runtime;
++		return ret;
  	}
  
--	cdn_dp_audio_codec_init(dp, dev);
--
- 	for (i = 0; i < dp->ports; i++) {
- 		port = dp->port[i];
+ 	ret = clk_enable(vop->hclk);
+@@ -1405,10 +1405,16 @@ static int vop_initial(struct vop *vop)
+ 		return PTR_ERR(vop->dclk);
+ 	}
  
-@@ -1128,7 +1126,6 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
- 	struct drm_connector *connector = &dp->connector;
- 
- 	cancel_work_sync(&dp->event_work);
--	platform_device_unregister(dp->audio_pdev);
- 	cdn_dp_encoder_disable(encoder);
- 	encoder->funcs->destroy(encoder);
- 	connector->funcs->destroy(connector);
-@@ -1221,6 +1218,8 @@ static int cdn_dp_probe(struct platform_device *pdev)
- 	mutex_init(&dp->lock);
- 	dev_set_drvdata(dev, dp);
- 
-+	cdn_dp_audio_codec_init(dp, dev);
++	ret = pm_runtime_get_sync(vop->dev);
++	if (ret < 0) {
++		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
++		return ret;
++	}
 +
- 	return component_add(dev, &cdn_dp_component_ops);
+ 	ret = clk_prepare(vop->dclk);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to prepare dclk\n");
+-		return ret;
++		goto err_put_pm_runtime;
+ 	}
+ 
+ 	/* Enable both the hclk and aclk to setup the vop */
+@@ -1468,6 +1474,8 @@ static int vop_initial(struct vop *vop)
+ 
+ 	vop->is_enabled = false;
+ 
++	pm_runtime_put_sync(vop->dev);
++
+ 	return 0;
+ 
+ err_disable_aclk:
+@@ -1476,6 +1484,8 @@ static int vop_initial(struct vop *vop)
+ 	clk_disable_unprepare(vop->hclk);
+ err_unprepare_dclk:
+ 	clk_unprepare(vop->dclk);
++err_put_pm_runtime:
++	pm_runtime_put_sync(vop->dev);
+ 	return ret;
  }
  
-@@ -1228,6 +1227,7 @@ static int cdn_dp_remove(struct platform_device *pdev)
- {
- 	struct cdn_dp_device *dp = platform_get_drvdata(pdev);
+@@ -1576,12 +1586,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 	if (!vop->regsbak)
+ 		return -ENOMEM;
  
-+	platform_device_unregister(dp->audio_pdev);
- 	cdn_dp_suspend(dp->dev);
- 	component_del(&pdev->dev, &cdn_dp_component_ops);
+-	ret = vop_initial(vop);
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "cannot initial vop dev - err %d\n", ret);
+-		return ret;
+-	}
+-
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(dev, "cannot find irq for vop\n");
+@@ -1608,8 +1612,17 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
  
+ 	pm_runtime_enable(&pdev->dev);
+ 
++	ret = vop_initial(vop);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "cannot initial vop dev - err %d\n", ret);
++		goto err_disable_pm_runtime;
++	}
++
+ 	return 0;
+ 
++err_disable_pm_runtime:
++	pm_runtime_disable(&pdev->dev);
++	vop_destroy_crtc(vop);
+ err_enable_irq:
+ 	enable_irq(vop->irq); /* To balance out the disable_irq above */
+ 	return ret;
 -- 
 2.1.4
