@@ -1,60 +1,81 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 06 Apr 2017 08:42:18 +0200
-Subject: [BUG] dmaengine: pxa_dma: + mmc: pxamci: race condition with DMA
- error on tx channel
-In-Reply-To: <ab2c9dcb-1718-46da-2f31-1f4721719b01@tul.cz> (Petr Cvek's
- message of "Sun, 26 Mar 2017 04:43:18 +0200")
-References: <e749aff1-0ffc-c9ed-42b2-82397b4e8ba2@tul.cz>
- <877f3zwwgo.fsf@belgarion.home>
- <feb39d00-d40d-f935-751c-8119f40b4df4@tul.cz>
- <871stzh8bx.fsf@belgarion.home>
- <ab2c9dcb-1718-46da-2f31-1f4721719b01@tul.cz>
-Message-ID: <87shlmf35h.fsf@belgarion.home>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 06 Apr 2017 15:48:37 +0900
+Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
+In-Reply-To: <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
+ <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
+ <93e79e92-a102-e931-8d63-843031848888@samsung.com>
+ <58DA1E38.50907@samsung.com>
+ <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
+ <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
+Message-ID: <58E5E4C5.5090107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
 
-Hi Petr,
 
-Sorry I was on holidays away from computers.
+2017? 04? 05? 00:38? Krzysztof Kozlowski ?(?) ? ?:
+> On Tue, Mar 28, 2017 at 11:38 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Tue, Mar 28, 2017 at 11:26 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>>> Merged.
+>>
+>> Hi,
+>>
+>> I do not see the tag (with DT patches) merged by you which I provided
+>> to you before. These are essential for bisectability. Without them,
+>> kernel bisectability is broken. Did you merged the tag somewhere?
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>> Thanks,
+>>> Inki Dae
+> 
+> Inki,
+> 
+> I still do not see the DTS tag [1] merged in your tree but you applied
+> patches breaking the display. I looked at exynos-drm-next branch.
+> 
+> We talked already about bisectability and with Hoegeun we provided
+> proper solution. Hoegeun split the patchset and I sent you a stable
+> tag to merge. Be aware not to apply the DTS patch because you would
+> effectively duplicate it. Instead, deal like with any pull request -
+> merge the tag as dependency *before* applying DRM DSI patch.
+> 
+> I saw also a branch like this:
+> https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next-tm2
+> but this is something obviously wrong. I do not know what are your
+> plans to do with it, but please drop it as it brings only confusion.
 
-> I think I was able to finally find the problem with the PXA MCI and DMA. It
-> seems to be a problem with a race condition with vchan_complete() tasklet.
-I completely agree with this analysis.
+Krzysztof,
 
-... zip the analysis, good catch ...
+Do not make you confusing with above branch which is used just for internal test so never go -next maybe you know.
+Why are you suffering from this?
 
-> Solution:
->
-> I commented the error handling parts of the callback function and the driver
-> works, but it is only for the testing purposes, there can be a partially
-> filled FIFO (BUF_PART_FULL) which will not be handled. Problem is the driver
-> won't wait on the completion before starting a new transmission. But this
-> waiting on completion will probably slow down the MMC communication :-/.
-I has to, the PXA can handle only one request at a time.
 
-> The best thing would be to handle the partial buffer somewhere else and get
-> rid of the callback completely. If it is possible, probably not as I assume
-> the partially filled buffer will not create pxamci interrupt? In the other
-> case then maybe in pxamci_data_done()?
-That looks a bit over complicated, but you can try to send a patch for this.
-I would try a simpler road if I were you :
- - in pxamci_irq()
- - call pxamci_data_done() _only_ in the error case or if host->data = NULL,
- ie. if "stat" states that the transfer was in error or the transfer is without
- data.
+Thanks,
+Inki Dae
 
-Either way you choose, pxamci_data_done() should only be called once per
-transfer, and this is the fix you're aiming at.
-
-Actually the title might be amended, as the bug is not as much in the dmaengine
-driver as in the pxamci driver. I was thinking that 6464b7140951 ("mmc: pxamci:
-switch over to dmaengine use") had broken it, but it looks to me the same
-pattern was there, but without a tasklet, and the bug didn't occurr because of
-the fast dma interrupt handling.
-
-Cheers.
-
--- 
-Robert
+> 
+> Best regards,
+> Krzysztof
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg567053.html
+> 
+>>> 2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
+>>>> Hi inki,
+>>>>
+>>>> Could you check the this patch?
+>>>> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
+>>>>
+>>>> Best regards,
+>>>> Hoegeun
+>>>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
