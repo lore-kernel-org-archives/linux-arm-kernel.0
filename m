@@ -1,56 +1,101 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 6 Apr 2017 15:32:41 +0100
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <20170406142710.GE4372@olila.local.net-space.pl>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
- <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
- <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
- <20170406142710.GE4372@olila.local.net-space.pl>
-Message-ID: <557da0c0-233b-1f56-242e-e8bc90892827@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 6 Apr 2017 16:33:19 +0200
+Subject: [PATCH v3 0/2] switch to atomic PWM
+In-Reply-To: <1490189375-20384-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1490189375-20384-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20170406143319.GD8438@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Wed, Mar 22, 2017 at 03:29:33PM +0200, Claudiu Beznea wrote:
+> Changes in v3:
+> - since v2 introduced per-IP register layout there is no need
+> to keep update_cdty and set_cprd_cdty members in atmel_pwm_data
+> data structure used in v2; doing in this way the atmel_pwm_data
+> data structure will remain with only one member, regs. To avoid
+> another level of indirection, the atmel_pwm_data has been removed
+> and only atmel_pwm_registers data structure has been keept. In
+> this way, "data" member of atmel_pwm_chip data structure was
+> replaced by "regs" member; due to these changes prototype of
+> atmel_pwm_get_driver_data() function was also changed;
+> also, driver private data variables were renamed in the following
+> format "atmel_pwm_regs_v*"
+> - there is no need for the following checks at the begining
+> of atmel_pwm_apply() which were present in v2:
+> 
+> 	if (cstate.enabled &&
+> 	    (cstate.polarity != state->polarity ||
+> 	     cstate.period != state->period))
+> 		pwm_reset = true;
+> 
+> it is enough to add:
+> 
+> 	if (state->enabled) {
+> 		if (cstate.enabled &&
+> 		    cstate.polarity == state->polarity &&
+> 		    cstate.period == state->period) {
+> 
+> inside "if (state->enabled)" block and also to check cstate.enabled
+> instead of checking pwm_reset variable introduced in v2:
+> 
+> 		if (cstate.enabled) {
+> 			atmel_pwm_disable(chip, pwm, false);
+> 		} else {
+> 			ret = clk_enable(atmel_pwm->clk);
+> 			if (ret) {
+> 				dev_err(chip->dev, "failed to enable clock\n");
+> 				return ret;
+> 			}
+> 		}
+> 
+> Changes in v2:
+> - update only duty factor without disabling the PWM channel
+> - if PWM channel is enabled, period, as signal polarity, is
+> updated by disabling + enabling the PWM channel
+> - atmel_pwm_config_prepare() function has been removed and
+> added instead two functions, one to compute the CPRD+Prescaler
+> (atmel_pwm_calculate_cprd_and_pres()), one to compute CRDY
+> (atmel_pwm_calculate_cdty())
+> - atmel_pwm_config_set() body was directly moved to atmel_pwm_apply()
+> - add 3 new members to atmel_pwm_data: update_cdty, set_cprd_cdty and
+> regs:
+> 	- update_cdty is called to configure duty factor without
+> 	disabling PWM channel, when necessary
+> 	- set_cprd_cdty is called to configure both period and
+> 	duty factor parameters
+> 	- regs keeps the period and duty registers and was added to
+> 	have common functions for update_cdty and set_cprd_cdty
+> 	members of atmel_pwm_data for all boards;
+> - add a new parameter to atmel_pwm_disable(); this will be used in
+> updating period + signal polarity by disabling + enabling the
+> PWM channel. In this case, there is no need to disable PWM clock
+> since new configuration will be imediately applied.
+> - adapted the other reviewer comments excepts the one regarding
+> "cdty = cprd - cycles;" from atmel_pwm_calculate_cdty() since
+> in atmel_pwm_apply(), selecting polarity in the other way arround
+> than is currently done in this commit will need the changing of DPOLI
+> bit from Channel Mode Register, in order to keep the initial
+> output level of PWM channel after disable operation; this works
+> for sama5d2 but not for sam9rl which hasn't document the DPOLI
+> bit in datasheet; sama5d3 also hasn't document the DPOLI bit in
+> datasheet; one option was to have different aproach for different
+> boards but the code becomes messy.
+> 
+> Claudiu Beznea (2):
+>   drivers: pwm: pwm-atmel: switch to atomic PWM
+>   drivers: pwm: pwm-atmel: enable PWM on sama5d2
+> 
+>  .../devicetree/bindings/pwm/atmel-pwm.txt          |   1 +
+>  drivers/pwm/pwm-atmel.c                            | 276 ++++++++++-----------
+>  2 files changed, 133 insertions(+), 144 deletions(-)
 
-On 06/04/17 15:27, Daniel Kiper wrote:
-> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
->> Hi Juergen,
->>
->> On 06/04/17 07:23, Juergen Gross wrote:
->>> On 05/04/17 21:49, Boris Ostrovsky wrote:
->>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
->>>>> The x86 code has theoritically a similar issue, altought EFI does not
->>>>> seem to be the preferred method. I have left it unimplemented on x86 and
->>>>> CCed Linux Xen x86 maintainers to know their view here.
->>>>
->>>> (+Daniel)
->>>>
->>>> This could be a problem for x86 as well, at least theoretically.
->>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
->>>>
->>>> So I think we should have a similar routine there.
->>>
->>> +1
->>>
->>> I don't see any problem with such a routine added, in contrast to
->>> potential "reboots" instead of power off without it.
->>>
->>> So I think this dummy xen_efi_reset_system() should be added to
->>> drivers/xen/efi.c instead.
->>
->> I will resend the patch during day with xen_efi_reset_system moved
->> to common code and implement the x86 counterpart (thought, I will
->> not be able to test it).
->
-> I think that this is ARM specific issue. On x86 machine_restart() calls
-> xen_restart(). Hence, everything works. So, I think that it should be
-> fixed only for ARM. Anyway, please CC me when you send a patch.
+Applied, thanks.
 
-This thread already a fix for ARM64. So do I need to resend a patch with 
-x86 fixed or not?
-
-Cheers,
-
--- 
-Julien Grall
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/c4c72364/attachment.sig>
