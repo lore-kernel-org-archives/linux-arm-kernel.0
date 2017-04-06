@@ -1,53 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 6 Apr 2017 10:35:39 +0200
-Subject: [GIT PULL] Allwinner defconfig changes for 4.12
-Message-ID: <20170406083539.qhowtju6helnxm7v@lukather>
+From: jgross@suse.com (Juergen Gross)
+Date: Thu, 6 Apr 2017 10:37:25 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+Message-ID: <e0ee37da-923f-aa17-ad8d-acb25d277fce@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 06/04/17 10:32, Julien Grall wrote:
+> Hi Juergen,
+> 
+> On 06/04/17 07:23, Juergen Gross wrote:
+>> On 05/04/17 21:49, Boris Ostrovsky wrote:
+>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
+>>>> The x86 code has theoritically a similar issue, altought EFI does not
+>>>> seem to be the preferred method. I have left it unimplemented on x86
+>>>> and
+>>>> CCed Linux Xen x86 maintainers to know their view here.
+>>>
+>>> (+Daniel)
+>>>
+>>> This could be a problem for x86 as well, at least theoretically.
+>>> xen_machine_power_off() may call pm_power_off(), which is
+>>> efi.reset_system.
+>>>
+>>> So I think we should have a similar routine there.
+>>
+>> +1
+>>
+>> I don't see any problem with such a routine added, in contrast to
+>> potential "reboots" instead of power off without it.
+>>
+>> So I think this dummy xen_efi_reset_system() should be added to
+>> drivers/xen/efi.c instead.
+> 
+> I will resend the patch during day with xen_efi_reset_system moved to
+> common code and implement the x86 counterpart (thought, I will not be
+> able to test it).
 
-Here are some defconfig changes for the next merge window.
+I'm rather sure it isn't hit very often. Otherwise there would be more
+complaints about crashes during power off (in fact I do remember several
+occasions where somebody claimed power off seemed to do a reboot only).
 
-Thanks!
-Maxime
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+Juergen
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-defconfig-for-4.12
-
-for you to fetch changes up to 7cae7ef89e360cd3dc139eaac2f480c25bc7bfa1:
-
-  ARM: multi_v7_defconfig: Switch AXP20x driver from module to built-in (2017-03-06 07:38:15 +0100)
-
-----------------------------------------------------------------
-Allwinner defconfig changes for 4.12
-
-Some patches to enable new modules in the defconfig.
-
-----------------------------------------------------------------
-Rask Ingemann Lambertsen (4):
-      ARM: sunxi_defconfig: Enable AC100 RTC driver
-      ARM: multi_v7_defconfig: Switch sunxi RSB driver from module to built-in
-      ARM: multi_v7_defconfig: Enable AC100 RTC driver
-      ARM: multi_v7_defconfig: Switch AXP20x driver from module to built-in
-
- arch/arm/configs/multi_v7_defconfig | 10 ++++++----
- arch/arm/configs/sunxi_defconfig    |  2 ++
- 2 files changed, 8 insertions(+), 4 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/5bb46250/attachment.sig>
+>>
+>>>> This should also probably be fixed in stable tree.
+>>
+>> Yes.
+> 
+> I will CC stable.
+> 
+> Thank you,
+> 
