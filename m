@@ -1,87 +1,153 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:18 +0100
-Subject: [PATCHv2 11/16] arm64: add function to get a cpu's MADT GICC table
+Date: Thu,  6 Apr 2017 19:29:15 +0100
+Subject: [PATCHv2 08/16] drivers/perf: arm_pmu: split cpu-local irq
+ request/free
 In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ACPI parking protocol code needs to parse each CPU's MADT
-GICC table to extract the mailbox address and so on. Each time we parse
-a GICC table, we call back to the parking protocol code to parse it.
+Currently we have functions to request/free all IRQs for a given PMU.
+While this works today, this won't work for ACPI, where we don't know
+the full set of IRQs up front, and need to request them separately.
 
-This has been fine so far, but we're about to have more code that needs
-to extract data from the GICC tables, and adding a callback for each
-user is going to get unwieldy.
+To enable supporting ACPI, this patch splits out the cpu-local
+request/free into new functions, allowing us to request/free individual
+IRQs.
 
-Instead, this patch ensures that we stash a copy of each CPU's GICC
-table at boot time, such that anything needing to parse it can later
-request it. This will allow for other parsers of GICC, and for
-simplification to the ACPI parking protocol code. Note that we must
-store a copy, rather than a pointer, since the core ACPI code
-temporarily maps/unmaps tables while iterating over them.
-
-Since we parse the MADT before we know how many CPUs we have (and hence
-before we setup the percpu areas), we must use an NR_CPUS sized array.
+As this makes it possible/necessary to request a PPI once per cpu, an
+additional check is added to detect mismatched PPIs. This shouldn't
+matter for the DT / platform case, as we check this when parsing.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/acpi.h |  2 ++
- arch/arm64/kernel/smp.c       | 10 ++++++++++
- 2 files changed, 12 insertions(+)
+ drivers/perf/arm_pmu.c | 88 +++++++++++++++++++++++++++++---------------------
+ 1 file changed, 52 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index c1976c0..0e99978 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -85,6 +85,8 @@ static inline bool acpi_has_cpu_in_madt(void)
- 	return true;
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 3c4e97d..c09c379 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -527,65 +527,81 @@ int perf_num_counters(void)
+ }
+ EXPORT_SYMBOL_GPL(perf_num_counters);
+ 
+-static void armpmu_free_irqs(struct arm_pmu *armpmu)
++static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ {
+-	int cpu;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
++	int irq = per_cpu(hw_events->irq, cpu);
+ 
+-	for_each_cpu(cpu, &armpmu->supported_cpus) {
+-		int irq = per_cpu(hw_events->irq, cpu);
+-		if (!irq)
+-			continue;
++	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
++		return;
+ 
+-		if (irq_is_percpu(irq)) {
+-			free_percpu_irq(irq, &hw_events->percpu_pmu);
+-			break;
+-		}
++	if (irq_is_percpu(irq)) {
++		free_percpu_irq(irq, &hw_events->percpu_pmu);
++		cpumask_clear(&armpmu->active_irqs);
++		return;
++	}
+ 
+-		if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
+-			continue;
++	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++}
+ 
+-		free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+-	}
++static void armpmu_free_irqs(struct arm_pmu *armpmu)
++{
++	int cpu;
++
++	for_each_cpu(cpu, &armpmu->supported_cpus)
++		armpmu_free_irq(armpmu, cpu);
  }
  
-+struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
-+
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- void __init acpi_init_cpus(void);
+-static int armpmu_request_irqs(struct arm_pmu *armpmu)
++static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ {
+-	int cpu, err;
++	int err = 0;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+ 	const irq_handler_t handler = armpmu_dispatch_irq;
++	int irq = per_cpu(hw_events->irq, cpu);
++	if (!irq)
++		return 0;
  
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index ef1caae..390c277 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -518,6 +518,13 @@ static int __init smp_cpu_setup(int cpu)
- static unsigned int cpu_count = 1;
+-	for_each_cpu(cpu, &armpmu->supported_cpus) {
+-		int irq = per_cpu(hw_events->irq, cpu);
+-		if (!irq)
+-			continue;
++	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
++		err = request_percpu_irq(irq, handler, "arm-pmu",
++					 &hw_events->percpu_pmu);
++	} else if (irq_is_percpu(irq)) {
++		int other_cpu = cpumask_first(&armpmu->active_irqs);
++		int other_irq = per_cpu(hw_events->irq, other_cpu);
  
- #ifdef CONFIG_ACPI
-+static struct acpi_madt_generic_interrupt cpu_madt_gicc[NR_CPUS];
+-		if (irq_is_percpu(irq)) {
+-			err = request_percpu_irq(irq, handler, "arm-pmu",
+-						 &hw_events->percpu_pmu);
+-			if (err) {
+-				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-					irq);
+-			}
+-
+-			return err;
++		if (irq != other_irq) {
++			pr_warn("mismatched PPIs detected.\n");
++			err = -EINVAL;
+ 		}
+-
++	} else {
+ 		err = request_irq(irq, handler,
+ 				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+ 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+-		if (err) {
+-			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-				irq);
+-			return err;
+-		}
++	}
+ 
+-		cpumask_set_cpu(cpu, &armpmu->active_irqs);
++	if (err) {
++		pr_err("unable to request IRQ%d for ARM PMU counters\n",
++			irq);
++		return err;
+ 	}
+ 
++	cpumask_set_cpu(cpu, &armpmu->active_irqs);
 +
-+struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
+ 	return 0;
+ }
+ 
++static int armpmu_request_irqs(struct arm_pmu *armpmu)
 +{
-+	return &cpu_madt_gicc[cpu];
++	int cpu, err;
++
++	for_each_cpu(cpu, &armpmu->supported_cpus) {
++		err = armpmu_request_irq(armpmu, cpu);
++		if (err)
++			break;
++	}
++
++	return err;
 +}
 +
- /*
-  * acpi_map_gic_cpu_interface - parse processor MADT entry
-  *
-@@ -552,6 +559,7 @@ static int __init smp_cpu_setup(int cpu)
- 			return;
- 		}
- 		bootcpu_valid = true;
-+		cpu_madt_gicc[0] = *processor;
- 		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
- 		return;
- 	}
-@@ -562,6 +570,8 @@ static int __init smp_cpu_setup(int cpu)
- 	/* map the logical cpu id to cpu MPIDR */
- 	cpu_logical_map(cpu_count) = hwid;
- 
-+	cpu_madt_gicc[cpu_count] = *processor;
-+
- 	/*
- 	 * Set-up the ACPI parking protocol cpu entries
- 	 * while initializing the cpu_logical_map to
+ static int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
+ {
+ 	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
 -- 
 1.9.1
