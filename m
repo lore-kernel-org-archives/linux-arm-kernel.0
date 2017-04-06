@@ -1,162 +1,103 @@
-From: jgross@suse.com (Juergen Gross)
-Date: Thu, 6 Apr 2017 08:23:10 +0200
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
-Message-ID: <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 5 Apr 2017 23:24:19 -0700
+Subject: [PATCH V10 03/12] of: dma: Move range size workaround to
+ of_dma_get_range()
+In-Reply-To: <1491301105-5274-4-git-send-email-sricharan@codeaurora.org>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
+ <1491301105-5274-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <58E5DF13.2020700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/17 21:49, Boris Ostrovsky wrote:
-> On 04/05/2017 02:14 PM, Julien Grall wrote:
->> When rebooting DOM0 with ACPI, the kernel is crashing with the stack trace [1].
->>
->> This is happening because when EFI runtimes are enabled, the reset code
->> (see machin_restart) will first try to use EFI restart method.
->>
->> However, the EFI restart code is expecting the reset_system callback to
->> be always set. This is not the case for Xen and will lead to crash.
->>
->> Looking at the reboot path, it is expected to fallback on an alternative
->> reboot method if one does not work. So implement reset_system callback
->> as a NOP for Xen.
->>
->> [   36.999270] reboot: Restarting system
->> [   37.002921] Internal error: Attempting to execute userspace memory: 86000004 [#1] PREEMPT SMP
->> [   37.011460] Modules linked in:
->> [   37.014598] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 4.11.0-rc1-00003-g1e248b60a39b-dirty #506
->> [   37.023903] Hardware name: (null) (DT)
->> [   37.027734] task: ffff800902068000 task.stack: ffff800902064000
->> [   37.033739] PC is at 0x0
->> [   37.036359] LR is at efi_reboot+0x94/0xd0
->> [   37.040438] pc : [<0000000000000000>] lr : [<ffff00000880f2c4>] pstate: 404001c5
->> [   37.047920] sp : ffff800902067cf0
->> [   37.051314] x29: ffff800902067cf0 x28: ffff800902068000
->> [   37.056709] x27: ffff000008992000 x26: 000000000000008e
->> [   37.062104] x25: 0000000000000123 x24: 0000000000000015
->> [   37.067499] x23: 0000000000000000 x22: ffff000008e6e250
->> [   37.072894] x21: ffff000008e6e000 x20: 0000000000000000
->> [   37.078289] x19: ffff000008e5d4c8 x18: 0000000000000010
->> [   37.083684] x17: 0000ffffa7c27470 x16: 00000000deadbeef
->> [   37.089079] x15: 0000000000000006 x14: ffff000088f42bef
->> [   37.094474] x13: ffff000008f42bfd x12: ffff000008e706c0
->> [   37.099870] x11: ffff000008e70000 x10: 0000000005f5e0ff
->> [   37.105265] x9 : ffff800902067a50 x8 : 6974726174736552
->> [   37.110660] x7 : ffff000008cc6fb8 x6 : ffff000008cc6fb0
->> [   37.116055] x5 : ffff000008c97dd8 x4 : 0000000000000000
->> [   37.121453] x3 : 0000000000000000 x2 : 0000000000000000
->> [   37.126845] x1 : 0000000000000000 x0 : 0000000000000000
->> [   37.132239]
->> [   37.133808] Process systemd-shutdow (pid: 1, stack limit = 0xffff800902064000)
->> [   37.141118] Stack: (0xffff800902067cf0 to 0xffff800902068000)
->> [   37.146949] 7ce0:                                   ffff800902067d40 ffff000008085334
->> [   37.154869] 7d00: 0000000000000000 ffff000008f3b000 ffff800902067d40 ffff0000080852e0
->> [   37.162787] 7d20: ffff000008cc6fb0 ffff000008cc6fb8 ffff000008c7f580 ffff000008c97dd8
->> [   37.170706] 7d40: ffff800902067d60 ffff0000080e2c2c 0000000000000000 0000000001234567
->> [   37.178624] 7d60: ffff800902067d80 ffff0000080e2ee8 0000000000000000 ffff0000080e2df4
->> [   37.186544] 7d80: 0000000000000000 ffff0000080830f0 0000000000000000 00008008ff1c1000
->> [   37.194462] 7da0: ffffffffffffffff 0000ffffa7c4b1cc 0000000000000000 0000000000000024
->> [   37.202380] 7dc0: ffff800902067dd0 0000000000000005 0000fffff24743c8 0000000000000004
->> [   37.210299] 7de0: 0000fffff2475f03 0000000000000010 0000fffff2474418 0000000000000005
->> [   37.218218] 7e00: 0000fffff2474578 000000000000000a 0000aaaad6b722c0 0000000000000001
->> [   37.226136] 7e20: 0000000000000123 0000000000000038 ffff800902067e50 ffff0000081e7294
->> [   37.234055] 7e40: ffff800902067e60 ffff0000081e935c ffff800902067e60 ffff0000081e9388
->> [   37.241973] 7e60: ffff800902067eb0 ffff0000081ea388 0000000000000000 00008008ff1c1000
->> [   37.249892] 7e80: ffffffffffffffff 0000ffffa7c4a79c 0000000000000000 ffff000000020000
->> [   37.257810] 7ea0: 0000010000000004 0000000000000000 0000000000000000 ffff0000080830f0
->> [   37.265729] 7ec0: fffffffffee1dead 0000000028121969 0000000001234567 0000000000000000
->> [   37.273651] 7ee0: ffffffffffffffff 8080000000800000 0000800000008080 feffa9a9d4ff2d66
->> [   37.281567] 7f00: 000000000000008e feffa9a9d5b60e0f 7f7fffffffff7f7f 0101010101010101
->> [   37.289485] 7f20: 0000000000000010 0000000000000008 000000000000003a 0000ffffa7ccf588
->> [   37.297404] 7f40: 0000aaaad6b87d00 0000ffffa7c4b1b0 0000fffff2474be0 0000aaaad6b88000
->> [   37.305326] 7f60: 0000fffff2474fb0 0000000001234567 0000000000000000 0000000000000000
->> [   37.313240] 7f80: 0000000000000000 0000000000000001 0000aaaad6b70d4d 0000000000000000
->> [   37.321159] 7fa0: 0000000000000001 0000fffff2474ea0 0000aaaad6b5e2e0 0000fffff2474e80
->> [   37.329078] 7fc0: 0000ffffa7c4b1cc 0000000000000000 fffffffffee1dead 000000000000008e
->> [   37.336997] 7fe0: 0000000000000000 0000000000000000 9ce839cffee77eab fafdbf9f7ed57f2f
->> [   37.344911] Call trace:
->> [   37.347437] Exception stack(0xffff800902067b20 to 0xffff800902067c50)
->> [   37.353970] 7b20: ffff000008e5d4c8 0001000000000000 0000000080f82000 0000000000000000
->> [   37.361883] 7b40: ffff800902067b60 ffff000008e17000 ffff000008f44c68 00000001081081b4
->> [   37.369802] 7b60: ffff800902067bf0 ffff000008108478 0000000000000000 ffff000008c235b0
->> [   37.377721] 7b80: ffff800902067ce0 0000000000000000 0000000000000000 0000000000000015
->> [   37.385643] 7ba0: 0000000000000123 000000000000008e ffff000008992000 ffff800902068000
->> [   37.393557] 7bc0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
->> [   37.401477] 7be0: 0000000000000000 ffff000008c97dd8 ffff000008cc6fb0 ffff000008cc6fb8
->> [   37.409396] 7c00: 6974726174736552 ffff800902067a50 0000000005f5e0ff ffff000008e70000
->> [   37.417318] 7c20: ffff000008e706c0 ffff000008f42bfd ffff000088f42bef 0000000000000006
->> [   37.425234] 7c40: 00000000deadbeef 0000ffffa7c27470
->> [   37.430190] [<          (null)>]           (null)
->> [   37.434982] [<ffff000008085334>] machine_restart+0x6c/0x70
->> [   37.440550] [<ffff0000080e2c2c>] kernel_restart+0x6c/0x78
->> [   37.446030] [<ffff0000080e2ee8>] SyS_reboot+0x130/0x228
->> [   37.451337] [<ffff0000080830f0>] el0_svc_naked+0x24/0x28
->> [   37.456737] Code: bad PC value
->> [   37.459891] ---[ end trace 76e2fc17e050aecd ]---
->>
->> Signed-off-by: Julien Grall <julien.grall@arm.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: Juergen Gross <jgross@suse.com>
->>
->> --
->>
->> The x86 code has theoritically a similar issue, altought EFI does not
->> seem to be the preferred method. I have left it unimplemented on x86 and
->> CCed Linux Xen x86 maintainers to know their view here.
+On 04/04/17 03:18, Sricharan R wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> (+Daniel)
+> Invalid dma-ranges values should be worked around when retrieving the
+> DMA range in of_dma_get_range(), not by all callers of the function.
+> This isn't much of a problem now that we have a single caller, but that
+> situation will change when moving DMA configuration to device probe
+> time.
+
+Please drop this patch from the series.  I just now sent Rob an
+alternative that reflects other changes that have occurred since
+this patch series was first created many, many moons ago
+(https://lkml.org/lkml/2017/4/6/53).
+
+Thanks,
+
+Frank
+
 > 
-> This could be a problem for x86 as well, at least theoretically.
-> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/of/address.c | 20 ++++++++++++++++++--
+>  drivers/of/device.c  | 15 ---------------
+>  2 files changed, 18 insertions(+), 17 deletions(-)
 > 
-> So I think we should have a similar routine there.
-
-+1
-
-I don't see any problem with such a routine added, in contrast to
-potential "reboots" instead of power off without it.
-
-So I think this dummy xen_efi_reset_system() should be added to
-drivers/xen/efi.c instead.
-
->> This should also probably be fixed in stable tree.
-
-Yes.
-
-
-Juergen
-
->> ---
->>  arch/arm/xen/efi.c | 10 +++++++++-
->>  1 file changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/xen/efi.c b/arch/arm/xen/efi.c
->> index 16db419f9e90..3b29788c29e9 100644
->> --- a/arch/arm/xen/efi.c
->> +++ b/arch/arm/xen/efi.c
->> @@ -19,6 +19,14 @@
->>  #include <xen/xen-ops.h>
->>  #include <asm/xen/xen-ops.h>
->>  
->> +static void xen_efi_reset_system(int reset_type,
->> +				 efi_status_t status,
->> +				 unsigned long data_size,
->> +				 efi_char16_t *data)
->> +{
->> +	/* NOP implementation, reset will fallback on an alternative method */
->> +}
->> +
->>  /* Set XEN EFI runtime services function pointers. Other fields of struct efi,
->>   * e.g. efi.systab, will be set like normal EFI.
->>   */
->> @@ -35,6 +43,6 @@ void __init xen_efi_runtime_setup(void)
->>  	efi.update_capsule           = xen_efi_update_capsule;
->>  	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
->>  	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
->> -	efi.reset_system             = NULL; /* Functionality provided by Xen. */
->> +	efi.reset_system             = xen_efi_reset_system;
->>  }
->>  EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
-> 
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 02b2903..6aeb816 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -819,8 +819,8 @@ void __iomem *of_io_request_and_map(struct device_node *np, int index,
+>   *	CPU addr (phys_addr_t)	: pna cells
+>   *	size			: nsize cells
+>   *
+> - * It returns -ENODEV if "dma-ranges" property was not found
+> - * for this device in DT.
+> + * Return 0 on success, -ENODEV if the "dma-ranges" property was not found for
+> + * this device in DT, or -EINVAL if the CPU address or size is invalid.
+>   */
+>  int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
+>  {
+> @@ -880,6 +880,22 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
+>  	*dma_addr = dmaaddr;
+>  
+>  	*size = of_read_number(ranges + naddr + pna, nsize);
+> +	/*
+> +	 * DT nodes sometimes incorrectly set the size as a mask. Work around
+> +	 * those incorrect DT by computing the size as mask + 1.
+> +	 */
+> +	if (*size & 1) {
+> +		pr_warn("%s: size 0x%llx for dma-range in node(%s) set as mask\n",
+> +			__func__, *size, np->full_name);
+> +		*size = *size + 1;
+> +	}
+> +
+> +	if (!*size) {
+> +		pr_err("%s: invalid size zero for dma-range in node(%s)\n",
+> +		       __func__, np->full_name);
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+>  
+>  	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
+>  		 *dma_addr, *paddr, *size);
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index b1e6beb..09dedd0 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -110,21 +110,6 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  		size = dev->coherent_dma_mask + 1;
+>  	} else {
+>  		offset = PFN_DOWN(paddr - dma_addr);
+> -
+> -		/*
+> -		 * Add a work around to treat the size as mask + 1 in case
+> -		 * it is defined in DT as a mask.
+> -		 */
+> -		if (size & 1) {
+> -			dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
+> -				 size);
+> -			size = size + 1;
+> -		}
+> -
+> -		if (!size) {
+> -			dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
+> -			return;
+> -		}
+>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>  	}
+>  
 > 
