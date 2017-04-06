@@ -1,37 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 6 Apr 2017 23:33:20 +0200
-Subject: [PATCH v11 1/3] dt-bindings: Add support for samsung s6e3ha2
- panel binding
-In-Reply-To: <1488937357-5623-2-git-send-email-hoegeun.kwon@samsung.com>
-References: <1488937357-5623-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308014258epcas5p3f1ae559dedf1d7561d2690d7777437db@epcas5p3.samsung.com>
- <1488937357-5623-2-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <20170406213320.GD27728@ulmo.ba.sec>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 07 Apr 2017 00:21:43 +0200
+Subject: [PATCH v2 1/3] ARM: dts: rockchip: Add support for phyCORE-RK3288
+ SoM
+In-Reply-To: <1491483866-18368-1-git-send-email-w.egorov@phytec.de>
+References: <1491483866-18368-1-git-send-email-w.egorov@phytec.de>
+Message-ID: <2316800.SYqXzj6arr@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 10:42:35AM +0900, Hoegeun Kwon wrote:
-> The Samsung s6e3ha2 is a 5.7" 1440x2560 AMOLED panel connected
-> using MIPI-DSI interfaces.
+Am Donnerstag, 6. April 2017, 15:04:24 CEST schrieb Wadim Egorov:
+> The phyCORE-RK3288 is a SoM (System on Module) containing a RK3288 SoC.
+> The module can be connected to different carrier boards.
+> It can be also equipped with different RAM, SPI flash and eMMC variants.
+> The Rapid Development Kit option is using the following setup:
 > 
-> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../bindings/display/panel/samsung,s6e3ha2.txt     | 28 ++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
+>   - 1 GB DDR3 RAM (2 Banks)
+>   - 1x 4 KB EEPROM
+>   - DP83867 Gigabit Ethernet PHY
+>   - 16 MB SPI Flash
+>   - 4 GB eMMC Flash
+> 
+> Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
 
-Applied, thanks.
+applied all 3 for 4.12 .
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/94cd9122/attachment.sig>
+One minor change was making the touchscreen node name in patch2 read
+	touchscreen at 44
+
+Same rationale as before, nodes should be named after the device-category
+
+
+Heiko
