@@ -1,88 +1,110 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Apr 2017 20:00:09 +0100
-Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <5cd63e14-52df-6010-4193-c926cdd76839@ti.com>
-References: <20170328205511.21166-1-d-gerlach@ti.com>
- <20170328205511.21166-3-d-gerlach@ti.com>
- <20170404161151.GS10760@atomide.com>
- <20170405135933.GN23750@n2100.armlinux.org.uk>
- <20170405143318.GE13234@atomide.com>
- <5cd63e14-52df-6010-4193-c926cdd76839@ti.com>
-Message-ID: <20170406190008.GO23750@n2100.armlinux.org.uk>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 6 Apr 2017 21:04:13 +0200
+Subject: [PATCH v3 4/5] KVM: arm/arm64: Report PMU overflow interrupts to
+ userspace irqchip
+In-Reply-To: <6c476719-8fb3-27b6-c7f6-84088443dcd4@arm.com>
+References: <20170405092815.22503-1-cdall@linaro.org>
+ <20170405092815.22503-5-cdall@linaro.org>
+ <6c476719-8fb3-27b6-c7f6-84088443dcd4@arm.com>
+Message-ID: <20170406190413.GH27123@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 09:48:26AM -0500, Dave Gerlach wrote:
-> Russell,
-> On 04/05/2017 09:33 AM, Tony Lindgren wrote:
-> >* Russell King - ARM Linux <linux@armlinux.org.uk> [170405 07:02]:
-> >>I'm not going to comment on this yet, but I'll instead comment on the
-> >>newly appeared sram_exec_copy() stuff.
-> >>
-> >>So, a few years ago, we went to significant effort in ARM land to come
-> >>up with a way to _safely_ copy assembler from the kernel into SRAM,
-> >>because copying code to SRAM that is compiled in thumb mode and then
-> >>executing it is _not_ as simple as memcpy(), cast the pointer to a
-> >>function pointer, and then call the function pointer.
-> >>
-> >>The SRAM stuff throws all that out, instead preferring the dumb memcpy()
-> >>approach.
-> >>
-> >>This needs resolving, and I'd like to see it resolved to the satisfaction
-> >>of architecture maintainers before we progress any further down this
-> >>route.
+On Thu, Apr 06, 2017 at 06:12:10PM +0100, Marc Zyngier wrote:
+> On 05/04/17 10:28, Christoffer Dall wrote:
+> > From: Christoffer Dall <christoffer.dall@linaro.org>
+> > 
+> > When not using an in-kernel VGIC, but instead emulating an interrupt
+> > controller in userspace, we should report the PMU overflow status to
+> > that userspace interrupt controller using the KVM_CAP_ARM_USER_IRQ
+> > feature.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm/kvm/arm.c    |  9 ++++++---
+> >  include/kvm/arm_pmu.h |  7 +++++++
+> >  virt/kvm/arm/pmu.c    | 42 ++++++++++++++++++++++++++++++++++++++----
+> >  3 files changed, 51 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> > index efb16e5..f935383 100644
+> > --- a/arch/arm/kvm/arm.c
+> > +++ b/arch/arm/kvm/arm.c
+> > @@ -635,11 +635,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  
+> >  		/*
+> >  		 * If we have a singal pending, or need to notify a userspace
+> > -		 * irqchip about timer level changes, then we exit (and update
+> > -		 * the timer level state in kvm_timer_update_run below).
+> > +		 * irqchip about timer or PMU level changes, then we exit (and
+> > +		 * update the timer level state in kvm_timer_update_run
+> > +		 * below).
+> >  		 */
+> >  		if (signal_pending(current) ||
+> > -		    kvm_timer_should_notify_user(vcpu)) {
+> > +		    kvm_timer_should_notify_user(vcpu) ||
+> > +		    kvm_pmu_should_notify_user(vcpu)) {
+> >  			ret = -EINTR;
+> >  			run->exit_reason = KVM_EXIT_INTR;
+> >  		}
+> > @@ -713,6 +715,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  
+> >  	/* Tell userspace about in-kernel device output levels */
+> >  	kvm_timer_update_run(vcpu);
+> > +	kvm_pmu_update_run(vcpu);
 > 
-> I'm sure you are referring to fncpy, correct? This is what we used before
-> with ARM specific code to do the copy, but we've moved into drivers now.
+> Very minor nit: as we now have a couple of functions that are going to
+> check the same thing (irqchip_in_kernel), we could consider moving the
+> test here.  I don't have strong feelings about it though.
 
-Right, and as I explained above, fncpy() exists with very good reason.
-The following does not work on ARM:
+I like it:
 
-	sram = alloc(function_size);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f935383..4263785 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -714,8 +714,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	}
+ 
+ 	/* Tell userspace about in-kernel device output levels */
+-	kvm_timer_update_run(vcpu);
+-	kvm_pmu_update_run(vcpu);
++	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
++		kvm_timer_update_run(vcpu);
++		kvm_pmu_update_run(vcpu);
++	}
+ 
+ 	if (vcpu->sigset_active)
+ 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 5dc2167..5976609 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -193,9 +193,6 @@ void kvm_timer_update_run(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
+ 
+-	if (likely(irqchip_in_kernel(vcpu->kvm)))
+-		return;
+-
+ 	/* Populate the device bitmap with the timer states */
+ 	regs->device_irq_level &= ~(KVM_ARM_DEV_EL1_VTIMER |
+ 				    KVM_ARM_DEV_EL1_PTIMER);
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 51218be..4b43e7f 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -262,9 +262,6 @@ void kvm_pmu_update_run(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
+ 
+-	if (likely(irqchip_in_kernel(vcpu->kvm)))
+-		return;
+-
+ 	/* Populate the timer bitmap for user space */
+ 	regs->device_irq_level &= ~KVM_ARM_DEV_PMU;
+ 	if (vcpu->arch.pmu.irq_level)
 
-	memcpy(sram, function, function_size);
 
-	sram_ptr = (function_cast_t)sram;
-
-	sram_ptr(args);
-
-when the function is Thumb.  There are two problems with the above code
-that fncpy() solves, both stemming from the same root cause:
-
-1. The address of "function" will be offset by one byte, so the memcpy()
-   will miss copying the first byte of the function.
-
-2. sram_ptr will not be offset by one byte.
-
-This is because, with Thumb functions, the "address" of the function is
-offset by one byte - by the architecture requirements - to indicate that
-it is to be called in Thumb mode.
-
-> What are your thoughts on exposing fncpy outside of arch/arm?
-
-You may use it by including asm/fncpy.h, but you may not move it out of
-that file.  fncpy() is there exactly because it's _architecture_ specific.
-
-If you're looking to make this generic, then we need cross-arch agreement
-on how we can copy functions, and I'd recommend that fncpy() becomes that
-generic copy function.  fncpy() has advantages over memcpy() besides
-encoding the architecture specific knowledge - the biggest one is that
-it guarantees type safety as well.  It ensures that the function pointer
-that it's returning conforms with the function it's being asked to copy.
-
-It strikes me, looking at the SRAM stuff, that the baby has been
-completely thrown out with the bath water...
-
-And really, this SRAM stuff _should_ have been through architecture
-maintainer review before being merged into mainline so that these issues
-could have been highlighted before hand.
-
-This looks to me like yet another huge big review failure in kernel land,
-because people are insistant on continually dividing stuff up by
-sub-directory.  This has got to stop.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+-Christoffer
