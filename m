@@ -1,68 +1,81 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 6 Apr 2017 21:13:20 +0200
-Subject: [PATCH v3 0/5] Support userspace irqchip with arch timers
-In-Reply-To: <a41d1e18-dea7-5cfa-5783-09f02d9ce194@arm.com>
-References: <20170405092815.22503-1-cdall@linaro.org>
- <a41d1e18-dea7-5cfa-5783-09f02d9ce194@arm.com>
-Message-ID: <20170406191320.GI27123@cbox>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 6 Apr 2017 14:14:12 -0500
+Subject: [PATCH] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <20170406190747.GP23750@n2100.armlinux.org.uk>
+References: <20170405192120.1009-1-d-gerlach@ti.com>
+ <ab1583fc-0560-b4d2-851b-4be6201edf8b@ti.com>
+ <20170406190747.GP23750@n2100.armlinux.org.uk>
+Message-ID: <9a970ac7-cb8f-28f4-3b84-ad8bedf1242c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 06:31:59PM +0100, Marc Zyngier wrote:
-> On 05/04/17 10:28, Christoffer Dall wrote:
-> > This series is the second version of the rework of the patches to support
-> > architected timers with a userspace irqchip sent by Alexander Graf [1].
-> > 
-> > We first cleanup some of the timer code to make it easier to understand
-> > what is being done in the later patches, and then define the ABI,
-> > implement timers support, implement PMU support, and finally advertise
-> > the features.
-> > 
-> > These patches are based on the recent work from Jintack to support the
-> > physical timer in addition to the virtual timer.  This series including
-> > its dependencies can be found here:
-> > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git irqs-to-user-v3
-> > 
-> > I tested this using Alex's QEMU patch with his fixes for SMP applied.  This
-> > seems to be rock-solid.  The temporary-not-for-upstream-but-for-testing patch
-> > can be found here (force-pushed and rebased since v2):
-> > 
-> > https://git.linaro.org/people/christoffer.dall/qemu-arm.git no-kvm-irqchip
-> > 
-> > I also tested it on 32-bit and it looks good there as well.
-> > 
-> > Changes since v2:
-> >  - Actually push the right content to the kernel branch, sorry.
-> >  - Rebased on kvmarm/queue as of this morning (v4.11-rc1+ stuff)
-> >  - Changed IOCTL numbers as needed
-> > 
-> > Changes since v1:
-> >  - Rework the ABI to support devices in general as opposed to just
-> >    timers
-> >  - Support the PMU in addition to timers
-> >  - Also support the physical timer (rebased on Jintack's work)
-> >  - Updated some comments where I noticed things were out of date.
-> > 
-> > Several changes have been made compared to v7 of the original single
-> > patch, including:
-> >  - Rewording ABI documentation to be more in line with the ARM
-> >    architecture
-> >  - Add an explicit check for needing to notify userspace of a level
-> >    change instead of propagating the value
-> >  - Changes to commenting throughout to more accurately describe the
-> >    architecture concepts we try to maintain
-> >  - Reword of functions, for example from sync to update when the date
-> >    only flows one direction
-> > 
-> > [1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2016-September/021867.html
-> > [2]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
-> 
-> The couple of nits I mentioned notwithstanding, for the whole series:
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
+On 04/06/2017 02:07 PM, Russell King - ARM Linux wrote:
+> On Wed, Apr 05, 2017 at 02:22:33PM -0500, Dave Gerlach wrote:
+>> Russell,
+>> On 04/05/2017 02:21 PM, Dave Gerlach wrote:
+>>> Currently the sram-exec functionality, which allows allocation of
+>>> executable memory and provides an API to move code to it, is only
+>>> selected in configs for the ARM architecture. Based on commit
+>>> 5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+>>> function body copying") simply copying a C function pointer address
+>>> using memcpy without consideration of alignment and Thumb is unsafe on
+>>> ARM platforms.
+>>>
+>>> The aforementioned patch introduces the fncpy macro which is a safe way
+>>> to copy executable code on ARM platforms, so let's make use of that here
+>>> rather than the unsafe plain memcpy that was previously used by
+>>> sram_exec_copy.
+>>>
+>>> In the future, architectures hoping to make use of the sram-exec
+>>> functionality must define an fncpy macro just as ARM has done to
+>>> guarantee or check for safe copying to executable memory before allowing
+>>> the arch to select CONFIG_SRAM_EXEC.
+>>>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>> ---
+>>> drivers/misc/sram-exec.c | 3 ++-
+>>> 1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+>>> index ac522417c462..0057eabe5c03 100644
+>>> --- a/drivers/misc/sram-exec.c
+>>> +++ b/drivers/misc/sram-exec.c
+>>> @@ -19,6 +19,7 @@
+>>> #include <linux/sram.h>
+>>>
+>>> #include <asm/cacheflush.h>
+>>> +#include <asm/fncpy.h>
+>>>
+>>> #include "sram.h"
+>>>
+>>> @@ -93,7 +94,7 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+>>> 	set_memory_nx((unsigned long)base, pages);
+>>> 	set_memory_rw((unsigned long)base, pages);
+>>>
+>>> -	memcpy(dst, src, size);
+>>> +	fncpy(dst, src, size);
+>>>
+>>> 	set_memory_ro((unsigned long)base, pages);
+>>> 	set_memory_x((unsigned long)base, pages);
+>>>
+>>
+>> Does this address your concerns from here [1]? Because the only user of this
+>> code is ARM right now I already only build the sram-exec code in if
+>> CONFIG_ARM is selected.
+>
+> Sorry, it does not.  Please read the comments in asm/fncpy.h.
+>
+> Deviating from the proscribed usage means your code is, quite simply,
+> buggy.  There's no two ways about that.
+>
 
-Thanks.   I have applied this to kvmarm/queue.
+I understand there are many constraints to using fncpy, as this is what we used 
+before to copy our executable code. Apart from users being aware of what these 
+constraints are (8-byte aligned, position independent) and making sure the code 
+they are moving meets them, are you saying we need some sort of additional 
+strict enforcement of them? Because fncpy today will throw a bug if you fail to 
+align src and dst properly, so adding another check will just double the 
+messages to the user.
 
--Christoffer
+Regards,
+Dave
