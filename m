@@ -1,53 +1,93 @@
-From: olivier.moysan@st.com (olivier moysan)
-Date: Thu, 6 Apr 2017 17:40:34 +0200
-Subject: [PATCH 0/2] ASoC: stm32: Add I2S driver
-Message-ID: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 6 Apr 2017 16:55:11 +0100
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+ <20170406142710.GE4372@olila.local.net-space.pl>
+ <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
+ <20170406152040.GH4372@olila.local.net-space.pl>
+ <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+Message-ID: <20170406155453.GA3966@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set handles the SPI/I2S IP on STM32 platforms.
+[Adding the EFI maintainers]
 
-It applies to STM32 platforms implementing version 2 of SPI/I2S IP like STM32H7 series.
+Tl;DR: Xen's EFI wrappery doesn't implement reset_system, so when
+invoked on arm64 we get a NULL dereference.
 
-The SPI/I2S block is a serial peripheral interface (SPI), 
-which can also be configured to work on I2S/PCM mode.
-ASoC STM32 I2S driver only supports this I2S/PCM mode.
+On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
+> On 06/04/17 16:20, Daniel Kiper wrote:
+> >On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
+> >>On 06/04/17 16:27, Daniel Kiper wrote:
+> >>>On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+> >>>>Hi Juergen,
+> >>>>
+> >>>>On 06/04/17 07:23, Juergen Gross wrote:
+> >>>>>On 05/04/17 21:49, Boris Ostrovsky wrote:
+> >>>>>>On 04/05/2017 02:14 PM, Julien Grall wrote:
+> >>>>>>>The x86 code has theoritically a similar issue, altought EFI does not
+> >>>>>>>seem to be the preferred method. I have left it unimplemented on x86 and
+> >>>>>>>CCed Linux Xen x86 maintainers to know their view here.
+> >>>>>>
+> >>>>>>(+Daniel)
+> >>>>>>
+> >>>>>>This could be a problem for x86 as well, at least theoretically.
+> >>>>>>xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+> >>>>>>
+> >>>>>>So I think we should have a similar routine there.
+> >>>>>
+> >>>>>+1
+> >>>>>
+> >>>>>I don't see any problem with such a routine added, in contrast to
+> >>>>>potential "reboots" instead of power off without it.
+> >>>>>
+> >>>>>So I think this dummy xen_efi_reset_system() should be added to
+> >>>>>drivers/xen/efi.c instead.
+> >>>>
+> >>>>I will resend the patch during day with xen_efi_reset_system moved
+> >>>>to common code and implement the x86 counterpart (thought, I will
+> >>>>not be able to test it).
+> >>>
+> >>>I think that this is ARM specific issue. On x86 machine_restart() calls
+> >>>xen_restart(). Hence, everything works. So, I think that it should be
+> >>>fixed only for ARM. Anyway, please CC me when you send a patch.
+> >>
+> >>What about xen_machine_power_off() (as stated in Boris' mail)?
+> >
+> >Guys what do you think about that:
+> >
+> >--- a/drivers/firmware/efi/reboot.c
+> >+++ b/drivers/firmware/efi/reboot.c
+> >@@ -55,7 +55,7 @@ static void efi_power_off(void)
+> >
+> > static int __init efi_shutdown_init(void)
+> > {
+> >-       if (!efi_enabled(EFI_RUNTIME_SERVICES))
+> >+       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
+> >                return -ENODEV;
+> >
+> >        if (efi_poweroff_required())
+> >
+> >
+> >Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
+> >
+> >I hope that tweaks for both files should solve our problem.
+> 
+> This sounds good for power off (I haven't tried to power off DOM0
+> yet).
 
-The I2S/PCM interface can either support full duplex or half-duplex communication
-(transmitter or receiver only).
+Please, let's keep the Xen knowledge constrained to the Xen EFI wrapper,
+rather than spreading it further.
 
-I2S driver exhibits 3 DAIs corresponding to a playback, capture or full duplex PCM device.
-When the interface is configured as full duplex, the related PCM device must be opened twice. 
-The PCM streams are started when both playback and capture devices are opened.
-The relevant DAI can be selected through Device Tree using sound-dai-cells parameter.
+IMO, given reset_system is a *mandatory* function, the Xen wrapper
+should provide an implementation.
 
-The I2S/PCM interface supports four audio standards:
-I2S Philips standard, MSB justified standard, LSB justified standard, PCM standard
-PCM standard is declined in two versions, PCM short and long,
-according frame synchronization duration.
+I don't see why you can't implement a wrapper that calls the usual Xen
+poweroff/reset functions.
 
-These standards can be mapped to ASoC standards as follows:
-	- I2S: i2s
-	- MSB justified standard: left_j
-	- LSB justified standard: right_j
-	- PCM short: dsp_a
-PCM long format is not exposed as it does not match supported ASoC standards.
-
-olivier moysan (2):
-  dt-bindings: Document STM32 I2S bindings
-  ASoC: stm32: Add I2S driver
-
- .../devicetree/bindings/sound/st,stm32h7-i2s.txt   |   71 ++
- sound/soc/Kconfig                                  |    1 +
- sound/soc/Makefile                                 |    1 +
- sound/soc/stm/Kconfig                              |    8 +
- sound/soc/stm/Makefile                             |    2 +
- sound/soc/stm/stm32_i2s.c                          | 1069 ++++++++++++++++++++
- 6 files changed, 1152 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
- create mode 100644 sound/soc/stm/Kconfig
- create mode 100644 sound/soc/stm/Makefile
- create mode 100644 sound/soc/stm/stm32_i2s.c
-
--- 
-1.9.1
+Thanks,
+Mark.
