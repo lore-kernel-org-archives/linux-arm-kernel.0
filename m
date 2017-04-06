@@ -1,10 +1,10 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu,  6 Apr 2017 20:07:26 +0100
-Subject: [RFC kvm-unit-tests PATCH 7/8] Makefiles: fix up the x86 build
+Date: Thu,  6 Apr 2017 20:07:27 +0100
+Subject: [RFC kvm-unit-tests PATCH 8/8] Makefiles: fix up the arm build
  include and link paths
 In-Reply-To: <20170406190727.5624-1-alex.bennee@linaro.org>
 References: <20170406190727.5624-1-alex.bennee@linaro.org>
-Message-ID: <20170406190727.5624-8-alex.bennee@linaro.org>
+Message-ID: <20170406190727.5624-9-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,59 +18,75 @@ doesn't seem to find them well enough.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- Makefile            |  2 +-
- x86/Makefile.common | 10 +++++-----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arm/Makefile.common     | 15 +++++++++------
+ scripts/asm-offsets.mak |  4 +++-
+ 2 files changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index c9fea88..22da887 100644
---- a/Makefile
-+++ b/Makefile
-@@ -78,7 +78,7 @@ $(libcflat): $(cflatobjs)
- 	$(AR) rcs $@ $^
+diff --git a/arm/Makefile.common b/arm/Makefile.common
+index 74c7394..b1fead1 100644
+--- a/arm/Makefile.common
++++ b/arm/Makefile.common
+@@ -16,7 +16,10 @@ tests-common += $(TEST_DIR)/pmu.flat
+ tests-common += $(TEST_DIR)/gic.flat
+ tests-common += $(TEST_DIR)/psci.flat
  
- include $(LIBFDT_srcdir)/Makefile.libfdt
--$(LIBFDT_archive): CFLAGS += -ffreestanding -I lib -I lib/libfdt -Wno-sign-compare
-+$(LIBFDT_archive): CFLAGS += -ffreestanding -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -Wno-sign-compare
- $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
- 	$(AR) rcs $@ $^
+-tests-all = $(tests-common) $(tests)
++scripts-common += $(TEST_DIR)/run
++scripts-common += $(TEST_DIR)/unittests.cfg
++
++tests-all = $(tests-common) $(tests) $(scripts_common)
+ all: $(tests-all)
  
-diff --git a/x86/Makefile.common b/x86/Makefile.common
-index ef6e543..032ed19 100644
---- a/x86/Makefile.common
-+++ b/x86/Makefile.common
-@@ -17,7 +17,7 @@ cflatobjs += lib/x86/acpi.o
- cflatobjs += lib/x86/stack.o
+ ##################################################################
+@@ -26,13 +29,13 @@ CFLAGS += -std=gnu99
+ CFLAGS += -ffreestanding
+ CFLAGS += -Wextra
+ CFLAGS += -O2
+-CFLAGS += -I lib -I lib/libfdt
++CFLAGS += -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -I lib
  
- $(libcflat): LDFLAGS += -nostdlib
--$(libcflat): CFLAGS += -ffreestanding -I lib
-+$(libcflat): CFLAGS += -ffreestanding -I $(SRCDIR)/lib -I lib
- 
- CFLAGS += -m$(bits)
- CFLAGS += -O1
-@@ -31,8 +31,8 @@ libgcc := $(shell $(CC) -m$(bits) --print-libgcc-file-name)
+ # We want to keep intermediate files
  .PRECIOUS: %.elf %.o
  
- FLATLIBS = lib/libcflat.a $(libgcc)
--%.elf: %.o $(FLATLIBS) x86/flat.lds $(cstart.o)
--	$(CC) $(CFLAGS) -nostdlib -o $@ -Wl,-T,x86/flat.lds \
-+%.elf: %.o $(FLATLIBS) $(SRCDIR)/x86/flat.lds $(cstart.o)
-+	$(CC) $(CFLAGS) -nostdlib -o $@ -Wl,-T,$(SRCDIR)/x86/flat.lds \
- 		$(filter %.o, $^) $(FLATLIBS)
+ asm-offsets = lib/$(ARCH)/asm-offsets.h
+-include scripts/asm-offsets.mak
++include $(SRCDIR)/scripts/asm-offsets.mak
+ 
+ cflatobjs += lib/util.o
+ cflatobjs += lib/alloc.o
+@@ -60,11 +63,11 @@ start_addr := $(shell printf "%x\n" $$(( $(phys_base) + $(kernel_offset) )))
+ 
+ FLATLIBS = $(libcflat) $(LIBFDT_archive) $(libgcc) $(libeabi)
+ %.elf: LDFLAGS = $(CFLAGS) -nostdlib
+-%.elf: %.o $(FLATLIBS) arm/flat.lds $(cstart.o)
++%.elf: %.o $(FLATLIBS) $(SRCDIR)/arm/flat.lds $(cstart.o)
+ 	$(CC) $(LDFLAGS) -o $@ \
+-		-Wl,-T,arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
++		-Wl,-T,$(SRCDIR)/arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
+ 		$(filter %.o, $^) $(FLATLIBS) \
+-		lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
++		$(SRCDIR)/lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
  
  %.flat: %.elf
-@@ -60,10 +60,10 @@ scripts-common += $(TEST_DIR)/unittests.cfg
- test_cases: $(tests-common) $(tests)
+ 	$(OBJCOPY) -O binary $^ $@
+diff --git a/scripts/asm-offsets.mak b/scripts/asm-offsets.mak
+index b2578a6..ecf583f 100644
+--- a/scripts/asm-offsets.mak
++++ b/scripts/asm-offsets.mak
+@@ -29,11 +29,13 @@ define make_asm_offsets
+ endef
  
+ $(asm-offsets:.h=.s): $(asm-offsets:.h=.c)
++	mkdir -p $(dir $@)
+ 	$(CC) $(CFLAGS) -fverbose-asm -S -o $@ $<
  
--$(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I lib -I lib/x86
-+$(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I $(SRCDIR)/lib -I $(SRCDIR)/lib/x86 -I lib
+ $(asm-offsets): $(asm-offsets:.h=.s)
+ 	$(call make_asm_offsets)
+-	cp -f $(asm-offsets) lib/generated
++	mkdir -p lib/generated
++	cp -f $(asm-offsets) lib/generated/
  
- $(TEST_DIR)/realmode.elf: $(TEST_DIR)/realmode.o
--	$(CC) -m32 -nostdlib -o $@ -Wl,-T,$(TEST_DIR)/realmode.lds $^
-+	$(CC) -m32 -nostdlib -o $@ -Wl,-T,$(SRCDIR)/$(TEST_DIR)/realmode.lds $^
- 
- $(TEST_DIR)/realmode.o: bits = 32
- 
+ asm_offsets_clean:
+ 	$(RM) $(asm-offsets) $(asm-offsets:.h=.s) \
 -- 
 2.11.0
