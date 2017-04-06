@@ -1,62 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 6 Apr 2017 18:12:10 +0100
-Subject: [PATCH v3 4/5] KVM: arm/arm64: Report PMU overflow interrupts to
- userspace irqchip
-In-Reply-To: <20170405092815.22503-5-cdall@linaro.org>
-References: <20170405092815.22503-1-cdall@linaro.org>
- <20170405092815.22503-5-cdall@linaro.org>
-Message-ID: <6c476719-8fb3-27b6-c7f6-84088443dcd4@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Apr 2017 18:12:00 +0100
+Subject: [PATCH V14 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
+ ARM64
+In-Reply-To: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
+References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170406171200.GE7705@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/17 10:28, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> When not using an in-kernel VGIC, but instead emulating an interrupt
-> controller in userspace, we should report the PMU overflow status to
-> that userspace interrupt controller using the KVM_CAP_ARM_USER_IRQ
-> feature.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm/kvm/arm.c    |  9 ++++++---
->  include/kvm/arm_pmu.h |  7 +++++++
->  virt/kvm/arm/pmu.c    | 42 ++++++++++++++++++++++++++++++++++++++----
->  3 files changed, 51 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index efb16e5..f935383 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -635,11 +635,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		/*
->  		 * If we have a singal pending, or need to notify a userspace
-> -		 * irqchip about timer level changes, then we exit (and update
-> -		 * the timer level state in kvm_timer_update_run below).
-> +		 * irqchip about timer or PMU level changes, then we exit (and
-> +		 * update the timer level state in kvm_timer_update_run
-> +		 * below).
->  		 */
->  		if (signal_pending(current) ||
-> -		    kvm_timer_should_notify_user(vcpu)) {
-> +		    kvm_timer_should_notify_user(vcpu) ||
-> +		    kvm_pmu_should_notify_user(vcpu)) {
->  			ret = -EINTR;
->  			run->exit_reason = KVM_EXIT_INTR;
->  		}
-> @@ -713,6 +715,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  	/* Tell userspace about in-kernel device output levels */
->  	kvm_timer_update_run(vcpu);
-> +	kvm_pmu_update_run(vcpu);
+Hi Rafael,
 
-Very minor nit: as we now have a couple of functions that are going to
-check the same thing (irqchip_in_kernel), we could consider moving the
-test here.  I don't have strong feelings about it though.
+On Tue, Mar 28, 2017 at 01:30:30PM -0600, Tyler Baicar wrote:
+> Tyler Baicar (9):
+>   acpi: apei: read ack upon ghes record consumption
+>   ras: acpi/apei: cper: generic error data entry v3 per ACPI 6.1
+>   efi: parse ARM processor error
+>   arm64: exception: handle Synchronous External Abort
+>   acpi: apei: handle SEA notification type for ARMv8
+>   efi: print unrecognized CPER section
+>   ras: acpi / apei: generate trace event for unrecognized CPER section
+>   trace, ras: add ARM processor error trace event
+>   arm/arm64: KVM: add guest SEA support
 
-Thanks,
+It looks like the KVM parts are getting acked and the arm64 and efi bits
+have been acked as well. Are you ok to take this series through the ACPI
+tree?
 
-	M.
+Thanks.
+
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
