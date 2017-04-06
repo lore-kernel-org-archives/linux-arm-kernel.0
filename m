@@ -1,67 +1,104 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Apr 2017 18:19:19 +0100
-Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
- interface
-In-Reply-To: <20170406170951.GA10520@red-moon>
-References: <20170405105841.GG7909@n2100.armlinux.org.uk>
- <20170405113238.GA2465@red-moon> <20170406102636.GA9623@red-moon>
- <20170406105312.GE28800@wotan.suse.de>
- <20170406113845.GA10013@red-moon>
- <20170406115906.GF28800@wotan.suse.de>
- <20170406130727.GE17774@n2100.armlinux.org.uk>
- <20170406162156.GA10134@red-moon>
- <20170406164015.GI17774@n2100.armlinux.org.uk>
- <20170406170951.GA10520@red-moon>
-Message-ID: <20170406171919.GJ17774@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 6 Apr 2017 18:24:10 +0100
+Subject: [PATCH v23 09/11] acpi/arm64: Add memory-mapped timer support in
+ GTDT driver
+In-Reply-To: <CADyBb7sz6ongbyqR0FzBZybJBYwnLvqV+NsX1+W=6tv0_vLt1g@mail.gmail.com>
+References: <20170331175105.8370-1-fu.wei@linaro.org>
+ <20170331175105.8370-10-fu.wei@linaro.org>
+ <20170405183808.GB27550@leverpostej>
+ <CADyBb7sz6ongbyqR0FzBZybJBYwnLvqV+NsX1+W=6tv0_vLt1g@mail.gmail.com>
+Message-ID: <20170406172410.GA11871@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 06:09:51PM +0100, Lorenzo Pieralisi wrote:
-> On Thu, Apr 06, 2017 at 05:40:16PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 06, 2017 at 05:21:56PM +0100, Lorenzo Pieralisi wrote:
-> > > Ok, so:
-> > > 
-> > > (1) I can do asm-generic/ioremap-nopost.h, which I assume you want to
-> > >     contain something like
-> > > 
-> > > static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
-> > > {
-> > > 	return ioremap_nocache(offset, size);
-> > > }
-> > > 
-> > > Funny bit is that it has to be included by asm*/io.h files _after_
-> > > ioremap_nocache has been #defined (that's the reason my approach was
-> > > failing miserably even on arches like eg powerpc (see [1] below) that
-> > > does have ioremap_nocache),
-> > 
-> > PowerPC does have ioremap_nocache() though:
-> > 
-> > /**
-> >  * ioremap     -   map bus memory into CPU space
-> > ...
-> >  * * ioremap_nocache is identical to ioremap
-> > extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
-> > #define ioremap_nocache(addr, size)     ioremap((addr), (size))
-> > 
-> > and this include file is included very early on in linux/io.h.  I don't
-> > see anything that conditionalises it on anything except __KERNEL__.  So,
-> > the report from 0-day really doesn't make any sense to me.
-> > 
-> > Do we know how we're ending up in linux/io.h line 169 without having
-> > picked up the ioremap_nocache() definition provided by PowerPC's
-> > asm/io.h ?
+On Fri, Apr 07, 2017 at 12:47:47AM +0800, Fu Wei wrote:
+> On 6 April 2017 at 02:38, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Sat, Apr 01, 2017 at 01:51:03AM +0800, fu.wei at linaro.org wrote:
+> >> +     /*
+> >> +      * Get the GT timer Frame data for every GT Block Timer
+> >> +      */
+> >> +     for (i = 0; i < block->timer_count; i++, gtdt_frame++) {
+> >> +             if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
+> >> +                     continue;
+> >> +
+> >> +             if (!gtdt_frame->base_address || !gtdt_frame->timer_interrupt)
+> >> +                     goto error;
+> >> +
+> >> +             frame = &timer_mem->frame[gtdt_frame->frame_number];
+> >> +             frame->phys_irq = map_gt_gsi(gtdt_frame->timer_interrupt,
+> >> +                                          gtdt_frame->timer_flags);
+> >> +             if (frame->phys_irq <= 0) {
+> >> +                     pr_warn("failed to map physical timer irq in frame %d.\n",
+> >> +                             gtdt_frame->frame_number);
+> >> +                     goto error;
+> >> +             }
+> >> +
+> >> +             if (gtdt_frame->virtual_timer_interrupt) {
+> >> +                     frame->virt_irq =
+> >> +                             map_gt_gsi(gtdt_frame->virtual_timer_interrupt,
+> >> +                                        gtdt_frame->virtual_timer_flags);
+> >> +                     if (frame->virt_irq <= 0) {
+> >> +                             pr_warn("failed to map virtual timer irq in frame %d.\n",
+> >> +                                     gtdt_frame->frame_number);
+> >> +                             acpi_unregister_gsi(gtdt_frame->timer_interrupt);
+> >> +                             goto error;
+> >> +                     }
+> >> +             } else {
+> >> +                     frame->virt_irq = 0;
+> >> +                     pr_debug("virtual timer in frame %d not implemented.\n",
+> >> +                              gtdt_frame->frame_number);
+> >> +             }
+> >> +
+> >> +             frame->cntbase = gtdt_frame->base_address;
+> >> +             /*
+> >> +              * The CNTBaseN frame is 4KB (register offsets 0x000 - 0xFFC).
+> >> +              * See ARM DDI 0487A.k_iss10775, page I1-5130, Table I1-4
+> >> +              * "CNTBaseN memory map".
+> >> +              */
+> >> +             frame->size = SZ_4K;
+> >> +             frame->valid = true;
+> >> +     }
+> >> +
+> >> +     return 0;
+> >> +
+> >> +error:
+> >> +     for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
+> >> +             frame = &timer_mem->frame[i];
+> >> +             if (!frame->valid)
+> >> +                     continue;
+> >> +             irq_dispose_mapping(frame->phys_irq);
+> >> +             if (frame->virt_irq)
+> >> +                     irq_dispose_mapping(frame->virt_irq);
+> >> +     }
+> >
+> > We assign interrupts and may goto error before setting valid, so here we
 > 
-> I will debug it further but I *think* it is because:
+> yes, I mean to do it.(setting valid at the end of loop)
 > 
-> eg arch/powerpc/oprofile/op_model_cell.c includes <asm/io.h>
+> > won't free the interrupts of the last frame we parsed.
 > 
-> and <asm/io.h> includes <linux/io.h> before ioremap_nocache is defined
+> that won't  be a problem, we may assign two interrupts in a round:
+> First of all, if  the assignment goes  wrong, that means the current
+> interrupt haven't been successfully assigned.
+> (1)if the first goes wrong, the we goto error to unwind  the irqs
+> assigned in previous rounds.
+> (2)if the second one goes wrong , we acpi_unregister_gsi the first one
+> and then  goto error to unwind  the irqs assigned in previous rounds.
+> (3)If the two assignments are successful, set up valid flag
+> 
+> So we won't miss freeing the interrupts of the last frame we parsed.
+> 
+> Did I miss something?
 
-Oh, that's just very wrong.  asm/foo.h should never include linux/foo.h
-especially when linux/foo.h already includes asm/foo.h.  I think we
-need PowerPC folk to fix this.
+No; you are correct, and I was mistaken.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+However, I would prefer to simplify this such that we only free the
+IRQs in the error path.
+
+We should be able to iterate over all freams, freeing any non-zero
+interrupt, since !valid frames shouldn't have non-zero interrupts.
+
+I can make that update locally; no need to respin.
+
+Thanks,
+Mark.
