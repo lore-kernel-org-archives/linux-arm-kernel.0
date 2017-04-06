@@ -1,57 +1,49 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Thu, 6 Apr 2017 16:35:17 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdKfbob3WHMho32JSh_dmfp2A=cjcePqk+NfajVpShPE6Q@mail.gmail.com>
-References: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
- <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
- <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
- <20170315.145512.1542025976162251828.davem@davemloft.net>
- <CAHgaXd+4QkFxnt-_iCqH8AyCN_Y8gXwr+y=iugz38NKSWspsbA@mail.gmail.com>
- <58DAF908.8010404@iogearbox.net>
- <CAHgaXdKfbob3WHMho32JSh_dmfp2A=cjcePqk+NfajVpShPE6Q@mail.gmail.com>
-Message-ID: <CAHgaXdJ1M4W3p9=B2hJmtxByPsA5-XHae8U6YtDH_2r_XMaR5A@mail.gmail.com>
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Thu, 06 Apr 2017 14:07:44 +0300
+Subject: [PATCH v2] drm: hdlcd: Fix the calculation of the scanout start
+ address
+In-Reply-To: <20170403131348.GY7909@n2100.armlinux.org.uk>
+References: <20170222153036.GI31595@intel.com>
+ <20170308163025.31098-1-Liviu.Dudau@arm.com>
+ <20170331094937.GO7909@n2100.armlinux.org.uk>
+ <20170331131830.GK13355@e110455-lin.cambridge.arm.com>
+ <20170331134810.GA25244@n2100.armlinux.org.uk>
+ <20170403103133.GL13355@e110455-lin.cambridge.arm.com>
+ <20170403131348.GY7909@n2100.armlinux.org.uk>
+Message-ID: <87h921ztdr.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle Reminder.
-
-Anybody can tell me how to test the JIT compiler ?
-Best,
-Shubham Bansal
-
-
-On Thu, Mar 30, 2017 at 7:34 PM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> Thanks Daniel.
+On Mon, 03 Apr 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> So what the _hell_ do you think _this_ sentence means?  It _was_ shared
+> with you.
 >
-> Can you tell me how to test the eBPF JIT compiler? It would be great
-> if you could tell me starting from compiling to proper testing.
-> Best,
-> Shubham Bansal
+>   The following series is what I came up with, although I've had no time
+>   to test it.
 >
+> which was in the mail which was the parent to the series?  Does it
+> mean I'm bouncing a ball around the back yard maybe?
 >
-> On Wed, Mar 29, 2017 at 5:30 AM, Daniel Borkmann <daniel@iogearbox.net> wrote:
->> Hi Shubham,
->>
->> On 03/28/2017 10:49 PM, Shubham Bansal wrote:
->> [...]
->>>
->>> Do you have any document to understand the working of tail calls? I
->>> looked at your presentations but it seemed confusing to me. Anything
->>> simple would be great, just about the tail calls. I don't think I need
->>> examples, I can get them from your presentations. I just need a very
->>> general idea. May be you know the code in kernel where it is
->>> implemented.
->>
->>
->> Sure, it's in __bpf_prog_run(), see the JMP_TAIL_CALL (kernel/bpf/core.c
->> +1019).
->> That's effectively what JITs implement. [1] page 3 has a high-level
->> description
->> as well, hope that helps.
->>
->> Thanks,
->> Daniel
->>
->>   [1]
->> http://www.netdevconf.org/1.1/proceedings/papers/On-getting-tc-classifier-fully-programmable-with-cls-bpf.pdf
+> No, the information was there, you chose not to read it, and *you*
+> fucked up.  Notice that it is PAST TENSE, which means it HAPPENED IN
+> THE PAST.  NOT PRESENT.  This is basic english comprehension.
+
+[...]
+
+> For christ sake, I sent the patches out because I thought it would be
+> useful to show what I had come up with, because I believed it to be of
+> use.
+>
+> I won't make that mistake again, I'll just delete such work, because
+> it's obviously far too much hassle to work with other people, because
+> they don't READ.
+
+Please keep the discussion civil. We try to maintain a friendly
+collaborative atmosphere on dri-devel, and this kind of interaction is
+not welcome in our community. Thanks for your understanding.
+
+BR,
+Jani.
+
+-- 
+Jani Nikula, Intel Open Source Technology Center
