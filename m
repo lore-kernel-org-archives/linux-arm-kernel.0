@@ -1,53 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Apr 2017 15:05:33 +0100
-Subject: [PATCH] [media] imx: csi: retain current field order and
- colorimetry setting as default
-In-Reply-To: <1491486929.2392.29.camel@pengutronix.de>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
- <1491486929.2392.29.camel@pengutronix.de>
-Message-ID: <20170406140533.GF17774@n2100.armlinux.org.uk>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 6 Apr 2017 15:14:02 +0100
+Subject: [PATCH v3 0/9] Fix issues and factorize arm/arm64 capacity
+ information code
+In-Reply-To: <20170327131825.32134-1-juri.lelli@arm.com>
+References: <20170327131825.32134-1-juri.lelli@arm.com>
+Message-ID: <20170406141402.GJ9429@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 03:55:29PM +0200, Philipp Zabel wrote:
-> +
-> +	/* Retain current field setting as default */
-> +	if (sdformat->format.field == V4L2_FIELD_ANY)
-> +		sdformat->format.field = fmt->field;
-> +
-> +	/* Retain current colorspace setting as default */
-> +	if (sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT) {
-> +		sdformat->format.colorspace = fmt->colorspace;
-> +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT)
-> +			sdformat->format.xfer_func = fmt->xfer_func;
-> +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT)
-> +			sdformat->format.ycbcr_enc = fmt->ycbcr_enc;
-> +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT)
-> +			sdformat->format.quantization = fmt->quantization;
-> +	} else {
-> +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT) {
-> +			sdformat->format.xfer_func =
-> +				V4L2_MAP_XFER_FUNC_DEFAULT(
-> +						sdformat->format.colorspace);
-> +		}
-> +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT) {
-> +			sdformat->format.ycbcr_enc =
-> +				V4L2_MAP_YCBCR_ENC_DEFAULT(
-> +						sdformat->format.colorspace);
-> +		}
-> +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT) {
-> +			sdformat->format.quantization =
-> +				V4L2_MAP_QUANTIZATION_DEFAULT(
-> +						cc->cs != IPUV3_COLORSPACE_YUV,
-> +						sdformat->format.colorspace,
-> +						sdformat->format.ycbcr_enc);
-> +		}
-> +	}
+Hi,
 
-Would it make sense for this to be a helper function?
+On 27/03/17 14:18, Juri Lelli wrote:
+> Hi,
+> 
+> arm and arm64 topology.c share a lot of code related to parsing of capacity
+> information. This is v3 of a solution [1] (based on Will's, Catalin's and
+> Mark's off-line suggestions) to move such common code in a single place:
+> drivers/base/arch_topology.c (by creating such file and conditionally compiling
+> it for arm and arm64 only).
+> 
+> First 4 patches are actually fixes for the current code.
+> 
+> Patch 5 is the actual refactoring.
+> 
+> Patch 6 is a minor change suggested by Greg and can be squashed as needed.
+> 
+> Patch 7 removes one of the extern symbols by changing a bit the now common
+> code.
+> 
+> Patch 8 removes the remaining externs (as required by Russell during v1 review)
+> by creating a new header file include/linux/arch_topology.h and including that
+> from arm, arm64 and drivers.
+> 
+> Last patch addresses Dietmar's comments to v1 and adds a 'atd_' prefix to
+> interfaces exported by drivers code and used by arch (and potentially others in
+> the future).
+> 
+> Changes from v2:
+> 
+>  - rebase on top of 4.11-rc4
+>  - fix various problems pointed out by Greg, thanks for the review!
+>    (see patch 5 for details)
+> 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks Vincent for your comments.
+
+Everybody else, ping?
+
+Thanks,
+
+- Juri
