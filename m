@@ -1,143 +1,88 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 6 Apr 2017 19:56:16 +0100
-Subject: [RESEND,3/3] iommu/dma: Plumb in the per-CPU IOVA caches
-In-Reply-To: <alpine.DEB.2.20.1704061315040.4602@lazy>
-References: <fcb9121e608da4f62e21538f558710fbb12d4a69.1490971180.git.robin.murphy@arm.com>
- <alpine.DEB.2.20.1704061315040.4602@lazy>
-Message-ID: <c43b1f8f-02fd-978c-0dee-cc3f76a9924b@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Apr 2017 20:00:09 +0100
+Subject: [PATCH 2/2] memory: ti-emif-sram: introduce relocatable
+ suspend/resume handlers
+In-Reply-To: <5cd63e14-52df-6010-4193-c926cdd76839@ti.com>
+References: <20170328205511.21166-1-d-gerlach@ti.com>
+ <20170328205511.21166-3-d-gerlach@ti.com>
+ <20170404161151.GS10760@atomide.com>
+ <20170405135933.GN23750@n2100.armlinux.org.uk>
+ <20170405143318.GE13234@atomide.com>
+ <5cd63e14-52df-6010-4193-c926cdd76839@ti.com>
+Message-ID: <20170406190008.GO23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/17 19:15, Manoj Iyer wrote:
-> On Fri, 31 Mar 2017, Robin Murphy wrote:
+On Wed, Apr 05, 2017 at 09:48:26AM -0500, Dave Gerlach wrote:
+> Russell,
+> On 04/05/2017 09:33 AM, Tony Lindgren wrote:
+> >* Russell King - ARM Linux <linux@armlinux.org.uk> [170405 07:02]:
+> >>I'm not going to comment on this yet, but I'll instead comment on the
+> >>newly appeared sram_exec_copy() stuff.
+> >>
+> >>So, a few years ago, we went to significant effort in ARM land to come
+> >>up with a way to _safely_ copy assembler from the kernel into SRAM,
+> >>because copying code to SRAM that is compiled in thumb mode and then
+> >>executing it is _not_ as simple as memcpy(), cast the pointer to a
+> >>function pointer, and then call the function pointer.
+> >>
+> >>The SRAM stuff throws all that out, instead preferring the dumb memcpy()
+> >>approach.
+> >>
+> >>This needs resolving, and I'd like to see it resolved to the satisfaction
+> >>of architecture maintainers before we progress any further down this
+> >>route.
 > 
->> With IOVA allocation suitably tidied up, we are finally free to opt in
->> to the per-CPU caching mechanism. The caching alone can provide a modest
->> improvement over walking the rbtree for weedier systems (iperf3 shows
->> ~10% more ethernet throughput on an ARM Juno r1 constrained to a single
->> 650MHz Cortex-A53), but the real gain will be in sidestepping the rbtree
->> lock contention which larger ARM-based systems with lots of parallel I/O
->> are starting to feel the pain of.
->>
->> Reviewed-by: Nate Watterson <nwatters@codeaurora.org>
->> Tested-by: Nate Watterson <nwatters@codeaurora.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->> drivers/iommu/dma-iommu.c | 39 ++++++++++++++++++---------------------
->> 1 file changed, 18 insertions(+), 21 deletions(-)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 1b94beb43036..8348f366ddd1 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -361,8 +361,7 @@ static dma_addr_t iommu_dma_alloc_iova(struct
->> iommu_domain *domain,
->> {
->>     struct iommu_dma_cookie *cookie = domain->iova_cookie;
->>     struct iova_domain *iovad = &cookie->iovad;
->> -    unsigned long shift, iova_len;
->> -    struct iova *iova = NULL;
->> +    unsigned long shift, iova_len, iova = 0;
->>
->>     if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
->>         cookie->msi_iova += size;
->> @@ -371,41 +370,39 @@ static dma_addr_t iommu_dma_alloc_iova(struct
->> iommu_domain *domain,
->>
->>     shift = iova_shift(iovad);
->>     iova_len = size >> shift;
->> +    /*
->> +     * Freeing non-power-of-two-sized allocations back into the IOVA
->> caches
->> +     * will come back to bite us badly, so we have to waste a bit of
->> space
->> +     * rounding up anything cacheable to make sure that can't happen.
->> The
->> +     * order of the unadjusted size will still match upon freeing.
->> +     */
->> +    if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
->> +        iova_len = roundup_pow_of_two(iova_len);
->>
->>     if (domain->geometry.force_aperture)
->>         dma_limit = min(dma_limit, domain->geometry.aperture_end);
->>
->>     /* Try to get PCI devices a SAC address */
->>     if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
->> -        iova = alloc_iova(iovad, iova_len, DMA_BIT_MASK(32) >> shift,
->> -                  true);
->> -    /*
->> -     * Enforce size-alignment to be safe - there could perhaps be an
->> -     * attribute to control this per-device, or at least per-domain...
->> -     */
->> -    if (!iova)
->> -        iova = alloc_iova(iovad, iova_len, dma_limit >> shift, true);
->> +        iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >>
->> shift);
->>
->> -    return (dma_addr_t)iova->pfn_lo << shift;
->> +    if (!iova)
->> +        iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
->> +
->> +    return (dma_addr_t)iova << shift;
->> }
->>
->> static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
->>         dma_addr_t iova, size_t size)
->> {
->>     struct iova_domain *iovad = &cookie->iovad;
->> -    struct iova *iova_rbnode;
->> +    unsigned long shift = iova_shift(iovad);
->>
->>     /* The MSI case is only ever cleaning up its most recent
->> allocation */
->> -    if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
->> +    if (cookie->type == IOMMU_DMA_MSI_COOKIE)
->>         cookie->msi_iova -= size;
->> -        return;
->> -    }
->> -
->> -    iova_rbnode = find_iova(iovad, iova_pfn(iovad, iova));
->> -    if (WARN_ON(!iova_rbnode))
->> -        return;
->> -
->> -    __free_iova(iovad, iova_rbnode);
->> +    else
->> +        free_iova_fast(iovad, iova >> shift, size >> shift);
->> }
->>
->> static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t
->> dma_addr,
->>
-> 
-> This patch series helps to resolve the Ubuntu bug, where we see the
-> Ubuntu Zesty (4.10 based) kernel reporting multi cpu soft lockups on
-> QDF2400 SDP. https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1680549
+> I'm sure you are referring to fncpy, correct? This is what we used before
+> with ARM specific code to do the copy, but we've moved into drivers now.
 
-Wow, how many separate buffers does that driver have mapped at once to
-spend 22 seconds walking the rbtree for a single allocation!? I'd almost
-expect that to indicate a deadlock.
+Right, and as I explained above, fncpy() exists with very good reason.
+The following does not work on ARM:
 
-I'm guessing you wouldn't have seen this on older kernels, since I
-assume that particular platform is booting via ACPI, so wouldn't have
-had the SMMU enabled without the IORT support which landed in 4.10.
+	sram = alloc(function_size);
 
-> This patch series along with the following cherry-picks from Linus's tree
-> dddd632b072f iommu/dma: Implement PCI allocation optimisation
-> de84f5f049d9 iommu/dma: Stop getting dma_32bit_pfn wrong
-> 
-> were applied to Ubuntu Zesty 4.10 kernel (Ubuntu-4.10.0-18.20) and
-> tested on a QDF2400 SDP.
-> 
-> Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+	memcpy(sram, function, function_size);
 
-Thanks,
-Robin.
+	sram_ptr = (function_cast_t)sram;
 
-> 
-> 
-> -- 
-> ============================
-> Manoj Iyer
-> Ubuntu/Canonical
-> ARM Servers - Cloud
-> ============================
+	sram_ptr(args);
+
+when the function is Thumb.  There are two problems with the above code
+that fncpy() solves, both stemming from the same root cause:
+
+1. The address of "function" will be offset by one byte, so the memcpy()
+   will miss copying the first byte of the function.
+
+2. sram_ptr will not be offset by one byte.
+
+This is because, with Thumb functions, the "address" of the function is
+offset by one byte - by the architecture requirements - to indicate that
+it is to be called in Thumb mode.
+
+> What are your thoughts on exposing fncpy outside of arch/arm?
+
+You may use it by including asm/fncpy.h, but you may not move it out of
+that file.  fncpy() is there exactly because it's _architecture_ specific.
+
+If you're looking to make this generic, then we need cross-arch agreement
+on how we can copy functions, and I'd recommend that fncpy() becomes that
+generic copy function.  fncpy() has advantages over memcpy() besides
+encoding the architecture specific knowledge - the biggest one is that
+it guarantees type safety as well.  It ensures that the function pointer
+that it's returning conforms with the function it's being asked to copy.
+
+It strikes me, looking at the SRAM stuff, that the baby has been
+completely thrown out with the bath water...
+
+And really, this SRAM stuff _should_ have been through architecture
+maintainer review before being merged into mainline so that these issues
+could have been highlighted before hand.
+
+This looks to me like yet another huge big review failure in kernel land,
+because people are insistant on continually dividing stuff up by
+sub-directory.  This has got to stop.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
