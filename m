@@ -1,37 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Apr 2017 17:18:14 +0100
-Subject: [PATCH v2 4/6] perf/core: Add PERF_AUX_FLAG_COLLISION to report
- colliding samples
+Date: Thu,  6 Apr 2017 17:18:13 +0100
+Subject: [PATCH v2 3/6] perf/core: Export AUX buffer helpers to modules
 In-Reply-To: <1491495496-1524-1-git-send-email-will.deacon@arm.com>
 References: <1491495496-1524-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1491495496-1524-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1491495496-1524-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM SPE architecture permits an implementation to ignore a sample
-if the sample is due to be taken whilst another sample is already being
-produced. In this case, it is desirable to report the collision to
-userspace, as they may want to lower the sample period.
+Perf PMU drivers using AUX buffers cannot be built as modules unless
+the AUX helpers are exported.
 
-This patch adds a PERF_AUX_FLAG_COLLISION flag, so that such events can
-be relayed to userspace.
+This patch exports perf_aux_output_{begin,end,skip} and perf_get_aux to
+modules.
 
+Cc: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/uapi/linux/perf_event.h | 1 +
- 1 file changed, 1 insertion(+)
+ kernel/events/ring_buffer.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index c66a485a24ac..f4e3a21cade5 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -885,6 +885,7 @@ enum perf_callchain_context {
-  */
- #define PERF_AUX_FLAG_TRUNCATED		0x01	/* record was truncated to fit */
- #define PERF_AUX_FLAG_OVERWRITE		0x02	/* snapshot from overwrite mode */
-+#define PERF_AUX_FLAG_COLLISION		0x08	/* sample collided with another */
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index 9654e55c38d6..f3ebafe06099 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -411,6 +411,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
  
- #define PERF_FLAG_FD_NO_GROUP		(1UL << 0)
- #define PERF_FLAG_FD_OUTPUT		(1UL << 1)
+ 	return NULL;
+ }
++EXPORT_SYMBOL_GPL(perf_aux_output_begin);
+ 
+ /*
+  * Commit the data written by hardware into the ring buffer by adjusting
+@@ -470,6 +471,7 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
+ 	rb_free_aux(rb);
+ 	ring_buffer_put(rb);
+ }
++EXPORT_SYMBOL_GPL(perf_aux_output_end);
+ 
+ /*
+  * Skip over a given number of bytes in the AUX buffer, due to, for example,
+@@ -498,6 +500,7 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(perf_aux_output_skip);
+ 
+ void *perf_get_aux(struct perf_output_handle *handle)
+ {
+@@ -507,6 +510,7 @@ void *perf_get_aux(struct perf_output_handle *handle)
+ 
+ 	return handle->rb->aux_priv;
+ }
++EXPORT_SYMBOL_GPL(perf_get_aux);
+ 
+ #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
+ 
 -- 
 2.1.4
