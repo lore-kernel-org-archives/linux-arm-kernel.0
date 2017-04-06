@@ -1,37 +1,336 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu,  6 Apr 2017 20:31:24 +0800
-Subject: [PATCH v5 11/12] drm/rockchip: Shutdown all crtcs when unbinding drm
-In-Reply-To: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1491481885-13775-12-git-send-email-jeffy.chen@rock-chips.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Thu, 6 Apr 2017 20:35:26 +0800
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
+References: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+ <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
+ <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
+ <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
+ <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
+ <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
+ <20170329103658.GQ23682@e104320-lin>
+ <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
+Message-ID: <7c5c8ab7-8fcc-1c98-0bc1-cccb66c4c84d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+Dear, Laszlo
+   Thanks for your detailed explanation.
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-Address Daniel Vetter <daniel@ffwll.ch>'s comments.
-Update commit message.
+On 2017/3/29 19:58, Laszlo Ersek wrote:
+> (This ought to be one of the longest address lists I've ever seen :)
+> Thanks for the CC. I'm glad Shannon is already on the CC list. For good
+> measure, I'm adding MST and Igor.)
+> 
+> On 03/29/17 12:36, Achin Gupta wrote:
+>> Hi gengdongjiu,
+>>
+>> On Wed, Mar 29, 2017 at 05:36:37PM +0800, gengdongjiu wrote:
+>>>
+>>> Hi Laszlo/Biesheuvel/Qemu developer,
+>>>
+>>>    Now I encounter a issue and want to consult with you in ARM64 platform? as described below:
+>>>
+>>> when guest OS happen synchronous or asynchronous abort, kvm needs
+>>> to send the error address to Qemu or UEFI through sigbus to
+>>> dynamically generate APEI table. from my investigation, there are
+>>> two ways:
+>>>
+>>> (1) Qemu get the error address, and generate the APEI table, then
+>>> notify UEFI to know this generation, then inject abort error to
+>>> guest OS, guest OS read the APEI table.
+>>> (2) Qemu get the error address, and let UEFI to generate the APEI
+>>> table, then inject abort error to guest OS, guest OS read the APEI
+>>> table.
+>>
+>> Just being pedantic! I don't think we are talking about creating the APEI table
+>> dynamically here. The issue is: Once KVM has received an error that is destined
+>> for a guest it will raise a SIGBUS to Qemu. Now before Qemu can inject the error
+>> into the guest OS, a CPER (Common Platform Error Record) has to be generated
+>> corresponding to the error source (GHES corresponding to memory subsystem,
+>> processor etc) to allow the guest OS to do anything meaningful with the
+>> error. So who should create the CPER is the question.
+>>
+>> At the EL3/EL2 interface (Secure Firmware and OS/Hypervisor), an error arrives
+>> at EL3 and secure firmware (at EL3 or a lower secure exception level) is
+>> responsible for creating the CPER. ARM is experimenting with using a Standalone
+>> MM EDK2 image in the secure world to do the CPER creation. This will avoid
+>> adding the same code in ARM TF in EL3 (better for security). The error will then
+>> be injected into the OS/Hypervisor (through SEA/SEI/SDEI) through ARM Trusted
+>> Firmware.
+>>
+>> Qemu is essentially fulfilling the role of secure firmware at the EL2/EL1
+>> interface (as discussed with Christoffer below). So it should generate the CPER
+>> before injecting the error.
+>>
+>> This is corresponds to (1) above apart from notifying UEFI (I am assuming you
+>> mean guest UEFI). At this time, the guest OS already knows where to pick up the
+>> CPER from through the HEST. Qemu has to create the CPER and populate its address
+>> at the address exported in the HEST. Guest UEFI should not be involved in this
+>> flow. Its job was to create the HEST at boot and that has been done by this
+>> stage.
+>>
+>> Qemu folk will be able to add but it looks like support for CPER generation will
+>> need to be added to Qemu. We need to resolve this.
+>>
+>> Do shout if I am missing anything above.
+> 
+> After reading this email, the use case looks *very* similar to what
+> we've just done with VMGENID for QEMU 2.9.
+> 
+> We have a facility between QEMU and the guest firmware, called "ACPI
+> linker/loader", with which QEMU instructs the firmware to
+> 
+> - allocate and download blobs into guest RAM (AcpiNVS type memory) --
+> ALLOCATE command,
+> 
+> - relocate pointers in those blobs, to fields in other (or the same)
+> blobs -- ADD_POINTER command,
+> 
+> - set ACPI table checksums -- ADD_CHECKSUM command,
+> 
+> - and send GPAs of fields within such blobs back to QEMU --
+> WRITE_POINTER command.
+> 
+> This is how I imagine we can map the facility to the current use case
+> (note that this is the first time I read about HEST / GHES / CPER):
+> 
+>     etc/acpi/tables                 etc/hardware_errors
+>     ================     ==========================================
+>                          +-----------+
+>     +--------------+     | address   |         +-> +--------------+
+>     |    HEST      +     | registers |         |   | Error Status |
+>     + +------------+     | +---------+         |   | Data Block 1 |
+>     | | GHES       | --> | | address | --------+   | +------------+
+>     | | GHES       | --> | | address | ------+     | |  CPER      |
+>     | | GHES       | --> | | address | ----+ |     | |  CPER      |
+>     | | GHES       | --> | | address | -+  | |     | |  CPER      |
+>     +-+------------+     +-+---------+  |  | |     +-+------------+
+>                                         |  | |
+>                                         |  | +---> +--------------+
+>                                         |  |       | Error Status |
+>                                         |  |       | Data Block 2 |
+>                                         |  |       | +------------+
+>                                         |  |       | |  CPER      |
+>                                         |  |       | |  CPER      |
+>                                         |  |       +-+------------+
+>                                         |  |
+>                                         |  +-----> +--------------+
+>                                         |          | Error Status |
+>                                         |          | Data Block 3 |
+>                                         |          | +------------+
+>                                         |          | |  CPER      |
+>                                         |          +-+------------+
+>                                         |
+>                                         +--------> +--------------+
+>                                                    | Error Status |
+>                                                    | Data Block 4 |
+>                                                    | +------------+
+>                                                    | |  CPER      |
+>                                                    | |  CPER      |
+>                                                    | |  CPER      |
+>                                                    +-+------------+
+> 
+> (1) QEMU generates the HEST ACPI table. This table goes in the current
+> "etc/acpi/tables" fw_cfg blob. Given N error sources, there will be N
+> GHES objects in the HEST.
+> 
+> (2) We introduce a new fw_cfg blob called "etc/hardware_errors". QEMU
+> also populates this blob.
+> 
+> (2a) Given N error sources, the (unnamed) table of address registers
+> will contain N address registers.
+> 
+> (2b) Given N error sources, the "etc/hardwre_errors" fw_cfg blob will
+> also contain N Error Status Data Blocks.
+> 
+> I don't know about the sizing (number of CPERs) each Error Status Data
+> Block has to contain, but I understand it is all pre-allocated as far as
+> the OS is concerned, which matches our capabilities well.
+here I have a question. as you comment: " 'etc/hardwre_errors' fw_cfg blob will also contain N Error Status Data Blocks",
+Because the CPER numbers is not fixed, how to assign each "Error Status Data Block" size using one "etc/hardwre_errors" fw_cfg blob.
+when use one etc/hardwre_errors, will the N Error Status Data Block use one continuous buffer? as shown below. if so, maybe it not convenient for each data block size extension.
+I see the bios_linker_loader_alloc will allocate one continuous buffer for a blob(such as VMGENID_GUID_FW_CFG_FILE)
 
-Changes in v2: None
+    /* Allocate guest memory for the Data fw_cfg blob */
+    bios_linker_loader_alloc(linker, VMGENID_GUID_FW_CFG_FILE, guid, 4096,
+                             false /* page boundary, high memory */);
 
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f24968f..c6b1b7f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -199,6 +199,7 @@ static void rockchip_drm_unbind(struct device *dev)
- 	rockchip_drm_fbdev_fini(drm_dev);
- 	drm_kms_helper_poll_fini(drm_dev);
- 
-+	drm_atomic_helper_shutdown(drm_dev);
- 	drm_vblank_cleanup(drm_dev);
- 	component_unbind_all(dev, drm_dev);
- 	drm_mode_config_cleanup(drm_dev);
--- 
-2.1.4
+
+-> +--------------+
+     |    HEST      +     | registers |             | Error Status |
+     + +------------+     | +---------+             | Data Block  |
+     | | GHES       | --> | | address | --------+-->| +------------+
+     | | GHES       | --> | | address | ------+     | |  CPER      |
+     | | GHES       | --> | | address | ----+ |     | |  CPER      |
+     | | GHES       | --> | | address | -+  | |     | |  CPER      |
+     +-+------------+     +-+---------+  |  | +---> +--------------+
+                                         |  |       | |  CPER      |
+                                         |  |       | |  CPER      |
+                                         |  +-----> +--------------+
+                                         |          | |  CPER      |
+                                         +--------> +--------------+
+                                                    | |  CPER      |
+                                                    | |  CPER      |
+                                                    | |  CPER      |
+                                                    +-+------------+
+
+
+
+so how about we use separate etc/hardwre_errorsN for each Error Status status Block? then
+
+etc/hardwre_errors0
+etc/hardwre_errors1
+...................
+etc/hardwre_errors10
+(the max N is 10)
+
+
+the N can be one of below values, according to ACPI spec "Table 18-345 Hardware Error Notification Structure"
+0 ? Polled
+1 ? External Interrupt
+2 ? Local Interrupt
+3 ? SCI
+4 ? NMI
+5 - CMCI
+6 - MCE
+7 - GPIO-Signal
+8 - ARMv8 SEA
+9 - ARMv8 SEI
+10 - External Interrupt - GSIV
+
+
+
+
+> 
+> (3) QEMU generates the ACPI linker/loader script for the firmware, as
+> always.
+> 
+> (3a) The HEST table is part of "etc/acpi/tables", which the firmware
+> already allocates memory for, and downloads (because QEMU already
+> generates an ALLOCATE linker/loader command for it already).
+> 
+> (3b) QEMU will have to create another ALLOCATE command for the
+> "etc/hardware_errors" blob. The firmware allocates memory for this blob,
+> and downloads it.
+> 
+> (4) QEMU generates, in the ACPI linker/loader script for the firwmare, N
+> ADD_POINTER commands, which point the GHES."Error Status
+> Address" fields in the HEST table, to the corresponding address
+> registers in the downloaded "etc/hardware_errors" blob.
+> 
+> (5) QEMU generates an ADD_CHECKSUM command for the firmware, so that the
+> HEST table is correctly checksummed after executing the N ADD_POINTER
+> commands from (4).
+> 
+> (6) QEMU generates N ADD_POINTER commands for the firmware, pointing the
+> address registers (located in guest memory, in the downloaded
+> "etc/hardware_errors" blob) to the respective Error Status Data Blocks.
+> 
+> (7) (This is the trick.) For this step, we need a third, write-only
+> fw_cfg blob, called "etc/hardware_errors_addr". Through that blob, the
+> firmware can send back the guest-side allocation addresses to QEMU.
+> 
+> Namely, the "etc/hardware_errors_addr" blob contains N 8-byte entries.
+> QEMU generates N WRITE_POINTER commands for the firmware.
+> 
+> For error source K (0 <= K < N), QEMU instructs the firmware to
+> calculate the guest address of Error Status Data Block K, from the
+> QEMU-dictated offset within "etc/hardware_errors", and from the
+> guest-determined allocation base address for "etc/hardware_errors". The
+> firmware then writes the calculated address back to fw_cfg file
+> "etc/hardware_errors_addr", at offset K*8, according to the
+> WRITE_POINTER command.
+> 
+> This way QEMU will know the GPA of each Error Status Data Block.
+> 
+> (In fact this can be simplified to a single WRITE_POINTER command: the
+> address of the "address register table" can be sent back to QEMU as
+> well, which already contains all Error Status Data Block addresses.)
+> 
+> (8) When QEMU gets SIGBUS from the kernel -- I hope that's going to come
+> through a signalfd -- QEMU can format the CPER right into guest memory,
+> and then inject whatever interrupt (or assert whatever GPIO line) is
+> necessary for notifying the guest.
+> 
+> (9) This notification (in virtual hardware) can either be handled by the
+> guest kernel stand-alone, or else the guest kernel can invoke an ACPI
+> event handler method with it (which would be in the DSDT or one of the
+> SSDTs, also generated by QEMU). The ACPI event handler method could
+> invoke the specific guest kernel driver for errror handling via a
+> Notify() operation.
+> 
+> I'm attracted to the above design because:
+> - it would leave the firmware alone after OS boot, and
+> - it would leave the firmware blissfully ignorant about HEST, GHES,
+> CPER, and the like. (That's why QEMU's ACPI linker/loader was invented
+> in the first place.)
+> 
+> Thanks
+> Laszlo
+> 
+>>>    Do you think which modules generates the APEI table is better? UEFI or Qemu?
+>>>
+>>>
+>>>
+>>>
+>>> On 2017/3/28 21:40, James Morse wrote:
+>>>> Hi gengdongjiu,
+>>>>
+>>>> On 28/03/17 13:16, gengdongjiu wrote:
+>>>>> On 2017/3/28 19:54, Achin Gupta wrote:
+>>>>>> On Tue, Mar 28, 2017 at 01:23:28PM +0200, Christoffer Dall wrote:
+>>>>>>> On Tue, Mar 28, 2017 at 11:48:08AM +0100, James Morse wrote:
+>>>>>>>> On the host, part of UEFI is involved to generate the CPER records.
+>>>>>>>> In a guest?, I don't know.
+>>>>>>>> Qemu could generate the records, or drive some other component to do it.
+>>>>>>>
+>>>>>>> I think I am beginning to understand this a bit.  Since the guet UEFI
+>>>>>>> instance is specifically built for the machine it runs on, QEMU's virt
+>>>>>>> machine in this case, they could simply agree (by some contract) to
+>>>>>>> place the records at some specific location in memory, and if the guest
+>>>>>>> kernel asks its guest UEFI for that location, things should just work by
+>>>>>>> having logic in QEMU to process error reports and populate guest memory.
+>>>>>>>
+>>>>>>> Is this how others see the world too?
+>>>>>>
+>>>>>> I think so!
+>>>>>>
+>>>>>> AFAIU, the memory where CPERs will reside should be specified in a GHES entry in
+>>>>>> the HEST. Is this not the case with a guest kernel i.e. the guest UEFI creates a
+>>>>>> HEST for the guest Kernel?
+>>>>>>
+>>>>>> If so, then the question is how the guest UEFI finds out where QEMU (acting as
+>>>>>> EL3 firmware) will populate the CPERs. This could either be a contract between
+>>>>>> the two or a guest DXE driver uses the MM_COMMUNICATE call (see [1]) to ask QEMU
+>>>>>> where the memory is.
+>>>>>
+>>>>> whether invoke the guest UEFI will be complex? not see the advantage. it seems x86 Qemu
+>>>>> directly generate the ACPI table, but I am not sure, we are checking the qemu
+>>>> logical.
+>>>>> let Qemu generate CPER record may be clear.
+>>>>
+>>>> At boot UEFI in the guest will need to make sure the areas of memory that may be
+>>>> used for CPER records are reserved. Whether UEFI or Qemu decides where these are
+>>>> needs deciding, (but probably not here)...
+>>>>
+>>>> At runtime, when an error has occurred, I agree it would be simpler (fewer
+>>>> components involved) if Qemu generates the CPER records. But if UEFI made the
+>>>> memory choice above they need to interact and it gets complicated again. The
+>>>> CPER records are defined in the UEFI spec, so I would expect UEFI to contain
+>>>> code to generate/parse them.
+>>>>
+>>>>
+>>>> Thanks,
+>>>>
+>>>> James
+>>>>
+>>>>
+>>>> .
+>>>>
+>>>
+> 
+> 
+> .
+> 
