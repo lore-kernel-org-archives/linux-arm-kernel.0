@@ -1,95 +1,117 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 6 Apr 2017 11:24:31 +0100
-Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
-In-Reply-To: <58E5E7B7.1050400@gmail.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
- <58E5E7B7.1050400@gmail.com>
-Message-ID: <b081f333-084d-ffa5-635f-f7f1c0232ac3@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 6 Apr 2017 11:26:36 +0100
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
+ interface
+In-Reply-To: <20170405113238.GA2465@red-moon>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
+ <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
+ <20170328144543.GA18046@red-moon>
+ <20170405105841.GG7909@n2100.armlinux.org.uk>
+ <20170405113238.GA2465@red-moon>
+Message-ID: <20170406102636.GA9623@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/17 08:01, Frank Rowand wrote:
-> On 04/04/17 03:18, Sricharan R wrote:
->> Size of the dma-range is calculated as coherent_dma_mask + 1
->> and passed to arch_setup_dma_ops further. It overflows when
->> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
->> resulting in size getting passed as 0 wrongly. Fix this by
->> passsing in max(mask, mask + 1). Note that in this case
->> when the mask is set to full 64bits, we will be passing the mask
->> itself to arch_setup_dma_ops instead of the size. The real fix
->> for this should be to make arch_setup_dma_ops receive the
->> mask and handle it, to be done in the future.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/of/device.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index c17c19d..c2ae6bb 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->>  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->>  	if (ret < 0) {
->>  		dma_addr = offset = 0;
->> -		size = dev->coherent_dma_mask + 1;
->> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>  	} else {
->>  		offset = PFN_DOWN(paddr - dma_addr);
->>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->>
+On Wed, Apr 05, 2017 at 01:38:12PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Apr 05, 2017 at 11:58:41AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
+> > > On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
+> > > > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
+> > > > > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+> > > > > index 7afb0e2..50b292f 100644
+> > > > > --- a/arch/x86/include/asm/io.h
+> > > > > +++ b/arch/x86/include/asm/io.h
+> > > > > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
+> > > > >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+> > > > >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
+> > > > >  #define ioremap_uc ioremap_uc
+> > > > > +#define ioremap_nopost ioremap_nocache
+> > > > 
+> > > > These are all the same as the default from asm-generic.h.  Do we really
+> > > > need these definitions in alpha, avr32, frv, ia64, x86?
+> > > 
+> > > Those arches do not include asm-generic.h (I suppose for a good reason)
+> > > but a definition is needed anyway if we want code using ioremap_nopost()
+> > > to be unconditional. This is one way of doing it, there are others not
+> > > sure they are any better, I am open to suggestions.
+> > 
+> > We do have linux/io.h, which should be included in preference to asm/io.h.
+> > linux/io.h has existed for years, but I still see (from time to time)
+> > patches adding drivers that (imho incorrectly) use asm/io.h.
+> > 
+> > Also, this:
+> > 
+> > > > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> > > > > index 7ef015e..0e81938 100644
+> > > > > --- a/include/asm-generic/io.h
+> > > > > +++ b/include/asm-generic/io.h
+> > > > > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
+> > > > >  #endif /* CONFIG_GENERIC_IOMAP */
+> > > > >  #endif /* CONFIG_HAS_IOPORT_MAP */
+> > > > >  
+> > > > > +#ifndef ioremap_nopost
+> > > > > +#define ioremap_nopost ioremap_nocache
+> > > > > +#endif
+> > > > > +
+> > > > >  #ifndef xlate_dev_kmem_ptr
+> > > > >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
+> > > > >  static inline void *xlate_dev_kmem_ptr(void *addr)
+> > 
+> > could well be located in linux/io.h, which would make it available
+> > everywhere.
+> > 
+> > I'd suggest one change to this though:
+> > 
+> > #ifndef ioremap_nopost
+> > static inline void __iomem *ioremap_nopost(resource_size_t offset,
+> > 					   unsigned long size)
+> > {
+> > 	return ioremap_nocache(offset, size);
+> > }
+> > #endif
+> > 
+> > This way, if someone forgets to define ioremap_nopost() in their
+> > asm/io.h but provides a definition or extern prototype for
+> > ioremap_nopost(), we end up with a compile error to highlight the
+> > error, rather than the error being hidden by the preprocessor.
 > 
-> NACK.
+> Yes, I could add ioremap_nopost() to linux/io.h I did not do it because
+> linux/io.h, for whatever reason, does not seem to contain ioremap_*
+> prototypes; this does not mean we should not add it there but that
+> would look odd (with all others ioremap_* in asm/io.h), all I am
+> saying. This stuff requires some clean-up regardless, for the records.
 > 
-> Passing an invalid size to arch_setup_dma_ops() is only part of the problem.
-> size is also used in of_dma_configure() before calling arch_setup_dma_ops():
+> As for the static inline, I did that and that did not make the
+> kbuild robot happy at all on some arches:
 > 
->         dev->coherent_dma_mask = min(dev->coherent_dma_mask,
->                                      DMA_BIT_MASK(ilog2(dma_addr + size)));
->         *dev->dma_mask = min((*dev->dma_mask),
->                              DMA_BIT_MASK(ilog2(dma_addr + size)));
+> eg: openrisc
 > 
-> which would be incorrect for size == 0xffffffffffffffffULL when
-> dma_addr != 0.  So the proposed fix really is not papering over
-> the base problem very well.
+> >> include/asm-generic/io.h:922:9: error: implicit declaration of
+> >> function 'ioremap_nocache' [-Werror=implicit-function-declaration]
+>      return ioremap_nocache(offset, size);
 
-I'm not sure I agree there. Granted, there exist many more problematic
-aspects than are dealt with here (I've got more patches cooking to sort
-out some of the other issues we have with dma-ranges), but considering
-size specifically:
+Indeed, the static inline ioremap_nocache() fallback does not work
+on all arches (whether I add the fallback in linux/io.h or
+asm-generic/io.h is irrelevant), I bump into issues such as the one
+reported above.
 
-- It is not possible to explicitly specify a range with a size of 2^64
-in DT. If someone does specify a size of 0, they've done a silly thing
-and should not be surprised that it ends badly.
+I could make it:
 
-- It *is* perfectly legitimate for bus code (or a previous device
-driver, once we start coming here at probe time) to have set a device's
-DMA mask to 0xffffffffffffffffULL. If this code then blindly overflows
-and infers an invalid size of 0 from that, breaking things in the
-process, that is this code's fault alone. It just so happens that
-nothing managed to trigger the latent problem until patch #7 here shakes
-up the callsites.
+#ifndef ioremap_nopost
+static inline void __iomem *ioremap_nopost(resource_size_t offset,
+					   unsigned long size)
+{
+	return NULL;
+}
+#endif
 
-Yes, wacky impossible base + size combinations in DT were a theoretical
-problem before, and remain a theoretical problem, but also fall into the
-"how did you ever expect this to work?" category. There's certainly
-plenty more we can do to improve the DT parsing/validation, but that
-still doesn't apply to this path where the information is *not* coming
-from the DT at all.
+which would force arches to define ioremap_nopost() (if they need it).
 
-> I agree that the proper solution involves passing a mask instead
-> of a size to arch_setup_dma_ops().
+This is what I *assume* was done for ioremap_uc() in asm-generic/io.h,
+but honestly history is hard to follow here.
 
-Having started writing that patch too, I can tell you it's a big bugger
-touching multiple architectures and fixing up various drivers doing
-stupid things, hence why I'm happy with this point fix being the lesser
-of two evils in terms of not holding up this mostly-orthogonal series.
+Thoughts ?
 
-Robin.
-
-> 
-> -Frank
-> 
+Thanks,
+Lorenzo
