@@ -1,111 +1,106 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 6 Apr 2017 12:24:12 -0700
-Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
-In-Reply-To: <b081f333-084d-ffa5-635f-f7f1c0232ac3@arm.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
- <58E5E7B7.1050400@gmail.com> <b081f333-084d-ffa5-635f-f7f1c0232ac3@arm.com>
-Message-ID: <58E695DC.7010808@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Apr 2017 20:29:54 +0100
+Subject: [PATCH] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <9a970ac7-cb8f-28f4-3b84-ad8bedf1242c@ti.com>
+References: <20170405192120.1009-1-d-gerlach@ti.com>
+ <ab1583fc-0560-b4d2-851b-4be6201edf8b@ti.com>
+ <20170406190747.GP23750@n2100.armlinux.org.uk>
+ <9a970ac7-cb8f-28f4-3b84-ad8bedf1242c@ti.com>
+Message-ID: <20170406192954.GQ23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/17 03:24, Robin Murphy wrote:
-> On 06/04/17 08:01, Frank Rowand wrote:
->> On 04/04/17 03:18, Sricharan R wrote:
->>> Size of the dma-range is calculated as coherent_dma_mask + 1
->>> and passed to arch_setup_dma_ops further. It overflows when
->>> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
->>> resulting in size getting passed as 0 wrongly. Fix this by
->>> passsing in max(mask, mask + 1). Note that in this case
->>> when the mask is set to full 64bits, we will be passing the mask
->>> itself to arch_setup_dma_ops instead of the size. The real fix
->>> for this should be to make arch_setup_dma_ops receive the
->>> mask and handle it, to be done in the future.
->>>
->>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->>> ---
->>>  drivers/of/device.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/of/device.c b/drivers/of/device.c
->>> index c17c19d..c2ae6bb 100644
->>> --- a/drivers/of/device.c
->>> +++ b/drivers/of/device.c
->>> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->>>  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->>>  	if (ret < 0) {
->>>  		dma_addr = offset = 0;
->>> -		size = dev->coherent_dma_mask + 1;
->>> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>>  	} else {
->>>  		offset = PFN_DOWN(paddr - dma_addr);
->>>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->>>
->>
->> NACK.
->>
->> Passing an invalid size to arch_setup_dma_ops() is only part of the problem.
->> size is also used in of_dma_configure() before calling arch_setup_dma_ops():
->>
->>         dev->coherent_dma_mask = min(dev->coherent_dma_mask,
->>                                      DMA_BIT_MASK(ilog2(dma_addr + size)));
->>         *dev->dma_mask = min((*dev->dma_mask),
->>                              DMA_BIT_MASK(ilog2(dma_addr + size)));
->>
->> which would be incorrect for size == 0xffffffffffffffffULL when
->> dma_addr != 0.  So the proposed fix really is not papering over
->> the base problem very well.
+On Thu, Apr 06, 2017 at 02:14:12PM -0500, Dave Gerlach wrote:
+> On 04/06/2017 02:07 PM, Russell King - ARM Linux wrote:
+> >On Wed, Apr 05, 2017 at 02:22:33PM -0500, Dave Gerlach wrote:
+> >>Russell,
+> >>On 04/05/2017 02:21 PM, Dave Gerlach wrote:
+> >>>Currently the sram-exec functionality, which allows allocation of
+> >>>executable memory and provides an API to move code to it, is only
+> >>>selected in configs for the ARM architecture. Based on commit
+> >>>5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+> >>>function body copying") simply copying a C function pointer address
+> >>>using memcpy without consideration of alignment and Thumb is unsafe on
+> >>>ARM platforms.
+> >>>
+> >>>The aforementioned patch introduces the fncpy macro which is a safe way
+> >>>to copy executable code on ARM platforms, so let's make use of that here
+> >>>rather than the unsafe plain memcpy that was previously used by
+> >>>sram_exec_copy.
+> >>>
+> >>>In the future, architectures hoping to make use of the sram-exec
+> >>>functionality must define an fncpy macro just as ARM has done to
+> >>>guarantee or check for safe copying to executable memory before allowing
+> >>>the arch to select CONFIG_SRAM_EXEC.
+> >>>
+> >>>Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> >>>---
+> >>>drivers/misc/sram-exec.c | 3 ++-
+> >>>1 file changed, 2 insertions(+), 1 deletion(-)
+> >>>
+> >>>diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+> >>>index ac522417c462..0057eabe5c03 100644
+> >>>--- a/drivers/misc/sram-exec.c
+> >>>+++ b/drivers/misc/sram-exec.c
+> >>>@@ -19,6 +19,7 @@
+> >>>#include <linux/sram.h>
+> >>>
+> >>>#include <asm/cacheflush.h>
+> >>>+#include <asm/fncpy.h>
+> >>>
+> >>>#include "sram.h"
+> >>>
+> >>>@@ -93,7 +94,7 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> >>>	set_memory_nx((unsigned long)base, pages);
+> >>>	set_memory_rw((unsigned long)base, pages);
+> >>>
+> >>>-	memcpy(dst, src, size);
+> >>>+	fncpy(dst, src, size);
+> >>>
+> >>>	set_memory_ro((unsigned long)base, pages);
+> >>>	set_memory_x((unsigned long)base, pages);
+> >>>
+> >>
+> >>Does this address your concerns from here [1]? Because the only user of this
+> >>code is ARM right now I already only build the sram-exec code in if
+> >>CONFIG_ARM is selected.
+> >
+> >Sorry, it does not.  Please read the comments in asm/fncpy.h.
+> >
+> >Deviating from the proscribed usage means your code is, quite simply,
+> >buggy.  There's no two ways about that.
+> >
 > 
-> I'm not sure I agree there. Granted, there exist many more problematic
-> aspects than are dealt with here (I've got more patches cooking to sort
-> out some of the other issues we have with dma-ranges), but considering
-> size specifically:
-> 
-> - It is not possible to explicitly specify a range with a size of 2^64
-> in DT. If someone does specify a size of 0, they've done a silly thing
-> and should not be surprised that it ends badly.
-> 
-> - It *is* perfectly legitimate for bus code (or a previous device
-> driver, once we start coming here at probe time) to have set a device's
-> DMA mask to 0xffffffffffffffffULL. If this code then blindly overflows
-> and infers an invalid size of 0 from that, breaking things in the
-> process, that is this code's fault alone. It just so happens that
-> nothing managed to trigger the latent problem until patch #7 here shakes
-> up the callsites.
+> I understand there are many constraints to using fncpy, as this is what we
+> used before to copy our executable code. Apart from users being aware of
+> what these constraints are (8-byte aligned, position independent) and making
+> sure the code they are moving meets them, are you saying we need some sort
+> of additional strict enforcement of them? Because fncpy today will throw a
+> bug if you fail to align src and dst properly, so adding another check will
+> just double the messages to the user.
 
-The existing code that uses size does not appear capable of dealing with
-the case of DMA mask of 0xffffffffffffffffULL since 2^64 does not fit
-into size.
+Yes, fncpy() will throw a bug, but as I've already explained:
 
-The code affected by the DMA mask is not within my area of knowledge, so
-take the following with a grain of salt.  If a DMA mask of
-0xffffffffffffffffULL is provided, would the code still work without error
-(though with reduced capability) if the mask was changed to
-0xefffffffffffffffULL?  I would guess that the location to do so would
-be where dev->coherent_dma_mask is set, or some other location that
-is not of_dma_configure().  This would just be a temporary workaround.
+	sram = alloc();
 
+	sram_func = fncpy(sram, func, func_size);
 
-> Yes, wacky impossible base + size combinations in DT were a theoretical
-> problem before, and remain a theoretical problem, but also fall into the
-> "how did you ever expect this to work?" category. There's certainly
-> plenty more we can do to improve the DT parsing/validation, but that
-> still doesn't apply to this path where the information is *not* coming
-> from the DT at all.
-> 
->> I agree that the proper solution involves passing a mask instead
->> of a size to arch_setup_dma_ops().
-> 
-> Having started writing that patch too, I can tell you it's a big bugger
-> touching multiple architectures and fixing up various drivers doing
-> stupid things, hence why I'm happy with this point fix being the lesser
-> of two evils in terms of not holding up this mostly-orthogonal series.
-> 
-> Robin.
-> 
->>
->> -Frank
->>
-> 
-> 
+	sram_func();
+
+is the _only_ valid usage.
+
+You must not do:
+
+	sram = alloc();
+
+	fncpy(sram, func, func_size);
+
+	sram();
+
+because that will not work with Thumb code.  The only permitted usage
+is as per the first example above, everything else is buggy.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
