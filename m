@@ -1,165 +1,373 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:19 +0100
-Subject: [PATCHv2 12/16] arm64: parking: kill acpi_set_mailbox_entry()
+Date: Thu,  6 Apr 2017 19:29:21 +0100
+Subject: [PATCHv2 14/16] drivers/perf: arm_pmu: add ACPI framework
 In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-15-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have acpi_cpu_get_madt_gicc(), we can use values from the
-MADT GICC table directly, and no longer need to stash a copy in our own
-datastructure.
+This patch adds framework code to handle parsing PMU data out of the
+MADT, sanity checking this, and managing the association of CPUs (and
+their interrupts) with appropriate logical PMUs.
 
-This allows us to kill off the acpi_set_mailbox_entry() callback, too.
+For the time being, we expect that only one PMU driver (PMUv3) will make
+use of this, and we simply pass in a single probe function.
+
+This is based on an earlier patch from Jeremy Linton.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/acpi.h             |  5 ----
- arch/arm64/kernel/acpi_parking_protocol.c | 40 ++++++++++---------------------
- arch/arm64/kernel/smp.c                   | 11 ---------
- 3 files changed, 13 insertions(+), 43 deletions(-)
+ drivers/perf/Kconfig         |   4 +
+ drivers/perf/Makefile        |   1 +
+ drivers/perf/arm_pmu.c       |   4 +-
+ drivers/perf/arm_pmu_acpi.c  | 240 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h   |   1 +
+ include/linux/perf/arm_pmu.h |  11 ++
+ 6 files changed, 259 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/perf/arm_pmu_acpi.c
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 0e99978..ebf88e3 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -96,13 +96,8 @@ static inline void acpi_init_cpus(void) { }
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index c436e0d..aa587ed 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -12,6 +12,10 @@ config ARM_PMU
+ 	  Say y if you want to use CPU performance monitors on ARM-based
+ 	  systems.
  
- #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
- bool acpi_parking_protocol_valid(int cpu);
--void __init
--acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor);
- #else
- static inline bool acpi_parking_protocol_valid(int cpu) { return false; }
--static inline void
--acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor)
--{}
- #endif
++config ARM_PMU_ACPI
++	depends on ARM_PMU && ACPI
++	def_bool y
++
+ config QCOM_L2_PMU
+ 	bool "Qualcomm Technologies L2-cache PMU"
+ 	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index 925cd39..6420bd4 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
++obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+ obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
+ obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index b3bedfa..dc459eb 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -525,7 +525,7 @@ int perf_num_counters(void)
+ }
+ EXPORT_SYMBOL_GPL(perf_num_counters);
  
- static inline const char *acpi_get_enable_method(int cpu)
-diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
-index 1f5655c..e2c7399 100644
---- a/arch/arm64/kernel/acpi_parking_protocol.c
-+++ b/arch/arm64/kernel/acpi_parking_protocol.c
-@@ -28,36 +28,21 @@ struct parking_protocol_mailbox {
- 	__le64 entry_point;
+-static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
++void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ {
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+ 	int irq = per_cpu(hw_events->irq, cpu);
+@@ -550,7 +550,7 @@ void armpmu_free_irqs(struct arm_pmu *armpmu)
+ 		armpmu_free_irq(armpmu, cpu);
+ }
+ 
+-static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
++int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ {
+ 	int err = 0;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+new file mode 100644
+index 0000000..5cacd7b
+--- /dev/null
++++ b/drivers/perf/arm_pmu_acpi.c
+@@ -0,0 +1,240 @@
++/*
++ * ACPI probing code for ARM performance counters.
++ *
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/acpi.h>
++#include <linux/cpumask.h>
++#include <linux/init.h>
++#include <linux/percpu.h>
++#include <linux/perf/arm_pmu.h>
++
++#include <asm/cputype.h>
++
++static DEFINE_PER_CPU(struct arm_pmu *, probed_pmus);
++static DEFINE_PER_CPU(int, pmu_irqs);
++
++static int arm_pmu_acpi_parse_irq(int cpu)
++{
++	struct acpi_madt_generic_interrupt *gicc;
++	int gsi, trigger;
++
++	gicc = acpi_cpu_get_madt_gicc(cpu);
++	if (WARN_ON(!gicc))
++		return -EINVAL;
++
++	gsi = gicc->performance_interrupt;
++	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
++		trigger = ACPI_EDGE_SENSITIVE;
++	else
++		trigger = ACPI_LEVEL_SENSITIVE;
++
++	/*
++	 * Helpfully, the MADT GICC doesn't have a polarity flag for the
++	 * "performance interrupt". Luckily, on compliant GICs the polarity is
++	 * fixed in HW (for both SPIs and PPIs), and thus we don't care. Other
++	 * interrupt controllers are not supported with ACPI.
++	 *
++	 * Here we pass in ACPI_ACTIVE_HIGH to keep the core code happy.
++	 */
++	return acpi_register_gsi(NULL, gsi, trigger, ACPI_ACTIVE_HIGH);
++}
++
++static void arm_pmu_acpi_unparse_irq(int cpu)
++{
++	struct acpi_madt_generic_interrupt *gicc;
++	int gsi;
++
++	gicc = acpi_cpu_get_madt_gicc(cpu);
++	if (!gicc)
++		return;
++
++	gsi = gicc->performance_interrupt;
++	acpi_unregister_gsi(gsi);
++}
++
++static int arm_pmu_acpi_parse_irqs(void)
++{
++	int cpu, irq;
++
++	for_each_possible_cpu(cpu) {
++		int irq = arm_pmu_acpi_parse_irq(cpu);
++		if (irq < 0) {
++			pr_warn("Unable to parse ACPI PMU IRQ for CPU%d: %d\n",
++				cpu, irq);
++			goto out_err;
++		} else if (irq == 0) {
++			pr_warn("No ACPI PMU IRQ for CPU%d\n", cpu);
++		}
++
++		per_cpu(pmu_irqs, cpu) = irq;
++	}
++
++	return 0;
++
++out_err:
++	for_each_possible_cpu(cpu) {
++		arm_pmu_acpi_unparse_irq(cpu);
++		per_cpu(pmu_irqs, cpu) = 0;
++	}
++
++	return irq;
++}
++
++static struct arm_pmu *arm_pmu_acpi_find_alloc_pmu(void)
++{
++	unsigned long cpuid = read_cpuid_id();
++	struct arm_pmu *pmu;
++	int cpu;
++
++	for_each_possible_cpu(cpu) {
++		pmu = per_cpu(probed_pmus, cpu);
++		if (!pmu || pmu->acpi_cpuid != cpuid)
++			continue;
++
++		return pmu;
++	}
++
++	pmu = armpmu_alloc();
++	if (!pmu) {
++		pr_warn("Unable to allocate PMU for CPU%d\n",
++			smp_processor_id());
++		return NULL;
++	}
++
++	pmu->acpi_cpuid = cpuid;
++
++	return pmu;
++}
++
++/*
++ * This must run before the common arm_pmu hotplug logic, so that we can
++ * associate a CPU and its interrupt before the common code tries to manage the
++ * affinity and so on.
++ *
++ * Note that hotplug events are serialized, so we cannot race with another CPU
++ * coming up. The perf core won't open events while a hotplug event is in
++ * progress.
++ */
++static int arm_pmu_acpi_cpu_starting(unsigned int cpu)
++{
++	struct arm_pmu *pmu;
++	struct pmu_hw_events __percpu *hw_events;
++	int irq;
++
++	/* If we've already probed this CPU, we have nothing to do */
++	if (per_cpu(probed_pmus, cpu))
++		return 0;
++
++	irq = per_cpu(pmu_irqs, cpu);
++
++	pmu = arm_pmu_acpi_find_alloc_pmu();
++	if (!pmu)
++		return -ENOMEM;
++
++	cpumask_set_cpu(cpu, &pmu->supported_cpus);
++
++	per_cpu(probed_pmus, cpu) = pmu;
++
++	/*
++	 * Log and request the IRQ so the core arm_pmu code can manage it.  In
++	 * some situations (e.g. mismatched PPIs), we may fail to request the
++	 * IRQ. However, it may be too late for us to do anything about it.
++	 * The common ARM PMU code will log a warning in this case.
++	 */
++	hw_events = pmu->hw_events;
++	per_cpu(hw_events->irq, cpu) = irq;
++	armpmu_request_irq(pmu, cpu);
++
++	/*
++	 * Ideally, we'd probe the PMU here when we find the first matching
++	 * CPU. We can't do that for several reasons; see the comment in
++	 * arm_pmu_acpi_init().
++	 *
++	 * So for the time being, we're done.
++	 */
++	return 0;
++}
++
++int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
++{
++	int pmu_idx = 0;
++	int cpu, ret;
++
++	if (acpi_disabled)
++		return 0;
++
++	/*
++	 * Initialise and register the set of PMUs which we know about right
++	 * now. Ideally we'd do this in arm_pmu_acpi_cpu_starting() so that we
++	 * could handle late hotplug, but this may lead to deadlock since we
++	 * might try to register a hotplug notifier instance from within a
++	 * hotplug notifier.
++	 *
++	 * There's also the problem of having access to the right init_fn,
++	 * without tying this too deeply into the "real" PMU driver.
++	 *
++	 * For the moment, as with the platform/DT case, we need at least one
++	 * of a PMU's CPUs to be online at probe time.
++	 */
++	for_each_possible_cpu(cpu) {
++		struct arm_pmu *pmu = per_cpu(probed_pmus, cpu);
++		char *base_name;
++
++		if (!pmu || pmu->name)
++			continue;
++
++		ret = init_fn(pmu);
++		if (ret == -ENODEV) {
++			/* PMU not handled by this driver, or not present */
++			continue;
++		} else if (ret) {
++			pr_warn("Unable to initialise PMU for CPU%d\n", cpu);
++			return ret;
++		}
++
++		base_name = pmu->name;
++		pmu->name = kasprintf(GFP_KERNEL, "%s_%d", base_name, pmu_idx++);
++		if (!pmu->name) {
++			pr_warn("Unable to allocate PMU name for CPU%d\n", cpu);
++			return -ENOMEM;
++		}
++
++		ret = armpmu_register(pmu);
++		if (ret) {
++			pr_warn("Failed to register PMU for CPU%d\n", cpu);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int arm_pmu_acpi_init(void)
++{
++	int ret;
++
++	if (acpi_disabled)
++		return 0;
++
++	/*
++	 * We can't request IRQs yet, since we don't know the cookie value
++	 * until we know which CPUs share the same logical PMU. We'll handle
++	 * that in arm_pmu_acpi_cpu_starting().
++	 */
++	ret = arm_pmu_acpi_parse_irqs();
++	if (ret)
++		return ret;
++
++	ret = cpuhp_setup_state(CPUHP_AP_PERF_ARM_ACPI_STARTING,
++				"perf/arm/pmu_acpi:starting",
++				arm_pmu_acpi_cpu_starting, NULL);
++
++	return ret;
++}
++subsys_initcall(arm_pmu_acpi_init)
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index cfcfab3..0f2a803 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -94,6 +94,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_ARM_VFP_STARTING,
+ 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
+ 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
++	CPUHP_AP_PERF_ARM_ACPI_STARTING,
+ 	CPUHP_AP_PERF_ARM_STARTING,
+ 	CPUHP_AP_ARM_L2X0_STARTING,
+ 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 25556eb..1360dd6 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -117,6 +117,9 @@ struct arm_pmu {
+ 	struct notifier_block	cpu_pm_nb;
+ 	/* the attr_groups array must be NULL-terminated */
+ 	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
++
++	/* Only to be used by ACPI probing code */
++	unsigned long acpi_cpuid;
  };
  
--struct cpu_mailbox_entry {
--	struct parking_protocol_mailbox __iomem *mailbox;
--	phys_addr_t mailbox_addr;
--	u8 version;
--	u8 gic_cpu_id;
--};
--
--static struct cpu_mailbox_entry cpu_mailbox_entries[NR_CPUS];
--
--void __init acpi_set_mailbox_entry(int cpu,
--				   struct acpi_madt_generic_interrupt *p)
--{
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
--
--	cpu_entry->mailbox_addr = p->parked_address;
--	cpu_entry->version = p->parking_version;
--	cpu_entry->gic_cpu_id = p->cpu_interface_number;
--}
-+static DEFINE_PER_CPU(struct parking_protocol_mailbox __iomem * , mailboxes);
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+@@ -159,12 +162,20 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table);
  
- bool acpi_parking_protocol_valid(int cpu)
- {
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-+	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
- 
--	return cpu_entry->mailbox_addr && cpu_entry->version;
-+	return p->parked_address && p->parking_version;
- }
- 
- static int acpi_parking_protocol_cpu_init(unsigned int cpu)
- {
-+	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
++#ifdef CONFIG_ACPI
++int arm_pmu_acpi_probe(armpmu_init_fn init_fn);
++#else
++static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
++#endif
 +
- 	pr_debug("%s: ACPI parked addr=%llx\n", __func__,
--		  cpu_mailbox_entries[cpu].mailbox_addr);
-+		 p->parked_address);
+ /* Internal functions only for core arm_pmu code */
+ struct arm_pmu *armpmu_alloc(void);
+ void armpmu_free(struct arm_pmu *pmu);
+ int armpmu_register(struct arm_pmu *pmu);
+ int armpmu_request_irqs(struct arm_pmu *armpmu);
+ void armpmu_free_irqs(struct arm_pmu *armpmu);
++int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
++void armpmu_free_irq(struct arm_pmu *armpmu, int cpu);
  
- 	return 0;
- }
-@@ -69,7 +54,7 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
+ #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
  
- static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- {
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-+	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
- 	struct parking_protocol_mailbox __iomem *mailbox;
- 	__le32 cpu_id;
- 
-@@ -84,7 +69,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	 * by the kernel (it clashes with the linear mapping attributes
- 	 * specifications).
- 	 */
--	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
-+	mailbox = ioremap(p->parked_address, sizeof(*mailbox));
- 	if (!mailbox)
- 		return -EIO;
- 
-@@ -102,7 +87,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	 * stash the mailbox address mapping to use it for further FW
- 	 * checks in the postboot method
- 	 */
--	cpu_entry->mailbox = mailbox;
-+	per_cpu(mailboxes, cpu) = mailbox;
- 
- 	/*
- 	 * We write the entry point and cpu id as LE regardless of the
-@@ -111,7 +96,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	 * Boot-Loader's endianness before jumping.
- 	 */
- 	writeq_relaxed(__pa_symbol(secondary_entry), &mailbox->entry_point);
--	writel_relaxed(cpu_entry->gic_cpu_id, &mailbox->cpu_id);
-+	writel_relaxed(p->cpu_interface_number, &mailbox->cpu_id);
- 
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
-@@ -121,10 +106,11 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- static void acpi_parking_protocol_cpu_postboot(void)
- {
- 	int cpu = smp_processor_id();
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
--	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
-+	struct parking_protocol_mailbox __iomem *mailbox;
- 	__le64 entry_point;
- 
-+	mailbox = per_cpu(mailboxes, cpu);
-+
- 	entry_point = readl_relaxed(&mailbox->entry_point);
- 	/*
- 	 * Check if firmware has cleared the entry_point as expected
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 390c277..b37dd83 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -572,17 +572,6 @@ struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
- 
- 	cpu_madt_gicc[cpu_count] = *processor;
- 
--	/*
--	 * Set-up the ACPI parking protocol cpu entries
--	 * while initializing the cpu_logical_map to
--	 * avoid parsing MADT entries multiple times for
--	 * nothing (ie a valid cpu_logical_map entry should
--	 * contain a valid parking protocol data set to
--	 * initialize the cpu if the parking protocol is
--	 * the only available enable method).
--	 */
--	acpi_set_mailbox_entry(cpu_count, processor);
--
- 	early_map_cpu_to_node(cpu_count, acpi_numa_get_nid(cpu_count, hwid));
- 
- 	cpu_count++;
 -- 
 1.9.1
