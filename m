@@ -1,16 +1,16 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Thu,  6 Apr 2017 23:32:07 +0530
-Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec node
+Date: Thu,  6 Apr 2017 23:32:08 +0530
+Subject: [PATCH v3 2/9] ARM: dts: imx6ul-geam: Add Sound card with codec node
 In-Reply-To: <1491501735-1649-1-git-send-email-jagan@openedev.com>
 References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
-Message-ID: <1491501735-1649-2-git-send-email-jagan@openedev.com>
+Message-ID: <1491501735-1649-3-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
 Add support for Sound card and related codec(via i2c1) nodes
-on Engicam Is.IoT MX6UL variant module boards.
+on Engicam GEAM6UL variant module boards.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
@@ -24,18 +24,19 @@ Changes for v2:
 - Remove incorrect codec property 'wlf,shared-lrclk'
 - Remove 'gpr' from sound card node
 
- arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
- arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
+ arch/arm/boot/dts/imx6ul-geam-kit.dts | 12 ++++++++++++
+ arch/arm/boot/dts/imx6ul-geam.dtsi    | 26 ++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-index 2beaab6..d456080 100644
---- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-@@ -41,6 +41,16 @@
-  */
+diff --git a/arch/arm/boot/dts/imx6ul-geam-kit.dts b/arch/arm/boot/dts/imx6ul-geam-kit.dts
+index 142e60c..02edcba 100644
+--- a/arch/arm/boot/dts/imx6ul-geam-kit.dts
++++ b/arch/arm/boot/dts/imx6ul-geam-kit.dts
+@@ -58,6 +58,18 @@
+ 	status = "okay";
+ };
  
- &i2c1 {
++&i2c1 {
 +	sgtl5000: codec at a {
 +		compatible = "fsl,sgtl5000";
 +		reg = <0x0a>;
@@ -45,40 +46,23 @@ index 2beaab6..d456080 100644
 +		VDDIO-supply = <&reg_3p3v>;
 +		VDDD-supply = <&reg_1p8v>;
 +	};
++};
 +
- 	stmpe811: gpio-expander at 44 {
- 		compatible = "st,stmpe811";
- 		reg = <0x44>;
-diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index ea30380..7e947e5 100644
---- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -69,6 +69,50 @@
- 				    100>;
- 		default-brightness-level = <100>;
+ &lcdif {
+ 	display = <&display0>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6ul-geam.dtsi b/arch/arm/boot/dts/imx6ul-geam.dtsi
+index eb94d95..3bc3238 100644
+--- a/arch/arm/boot/dts/imx6ul-geam.dtsi
++++ b/arch/arm/boot/dts/imx6ul-geam.dtsi
+@@ -87,6 +87,32 @@
+ 		regulator-always-on;
+ 		regulator-boot-on;
  	};
-+
-+	reg_1p8v: regulator-1p8v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1P8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
 +
 +	sound {
 +		compatible = "simple-audio-card";
-+		simple-audio-card,name = "imx6ul-isiot-sgtl5000";
++		simple-audio-card,name = "imx6ul-geam-sgtl5000";
 +		simple-audio-card,format = "i2s";
 +		simple-audio-card,bitclock-master = <&dailink_master>;
 +		simple-audio-card,frame-master = <&dailink_master>;
@@ -103,6 +87,6 @@ index ea30380..7e947e5 100644
 +	};
  };
  
- &i2c1 {
+ &can1 {
 -- 
 1.9.1
