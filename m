@@ -1,112 +1,46 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 6 Apr 2017 16:20:21 +0200
-Subject: [PATCH] [media] imx: csi: retain current field order and
- colorimetry setting as default
-In-Reply-To: <1491486929.2392.29.camel@pengutronix.de>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
- <1491486929.2392.29.camel@pengutronix.de>
-Message-ID: <0f9690f8-c7f6-59ff-9e3e-123af9972d4b@xs4all.nl>
+From: daniel.kiper@oracle.com (Daniel Kiper)
+Date: Thu, 6 Apr 2017 16:27:10 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+Message-ID: <20170406142710.GE4372@olila.local.net-space.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2017 03:55 PM, Philipp Zabel wrote:
-> If the the field order is set to ANY in set_fmt, choose the currently
-> set field order. If the colorspace is set to DEFAULT, choose the current
-> colorspace.  If any of xfer_func, ycbcr_enc or quantization are set to
-> DEFAULT, either choose the current setting, or the default setting for the
-> new colorspace, if non-DEFAULT colorspace was given.
-> 
-> This allows to let field order and colorimetry settings be propagated
-> from upstream by calling media-ctl on the upstream entity source pad,
-> and then call media-ctl on the sink pad to manually set the input frame
-> interval, without changing the already set field order and colorimetry
-> information.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
-> This is based on imx-media-staging-md-v14, and it is supposed to allow
-> configuring the pipeline with media-ctl like this:
-> 
-> 1) media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY8_1X16/1920x1080]"
-> 2) media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY8_1X16/1920x108]"
-> 3) media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY8_1X16/1920x1080]"
-> 4) media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60]"
-> 5) media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080 at 1/30]"
-> 
-> Without having step 4) overwrite the colorspace and field order set on
-> 'ipu1_csi0':0 by the propagation in step 3).
-> ---
->  drivers/staging/media/imx/imx-media-csi.c | 34 +++++++++++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
-> 
-> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-> index 64dc454f6b371..d94ce1de2bf05 100644
-> --- a/drivers/staging/media/imx/imx-media-csi.c
-> +++ b/drivers/staging/media/imx/imx-media-csi.c
-> @@ -1325,6 +1325,40 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
->  	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
->  
->  	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
-> +
-> +	/* Retain current field setting as default */
-> +	if (sdformat->format.field == V4L2_FIELD_ANY)
-> +		sdformat->format.field = fmt->field;
+On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+> Hi Juergen,
+>
+> On 06/04/17 07:23, Juergen Gross wrote:
+> >On 05/04/17 21:49, Boris Ostrovsky wrote:
+> >>On 04/05/2017 02:14 PM, Julien Grall wrote:
+> >>>The x86 code has theoritically a similar issue, altought EFI does not
+> >>>seem to be the preferred method. I have left it unimplemented on x86 and
+> >>>CCed Linux Xen x86 maintainers to know their view here.
+> >>
+> >>(+Daniel)
+> >>
+> >>This could be a problem for x86 as well, at least theoretically.
+> >>xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+> >>
+> >>So I think we should have a similar routine there.
+> >
+> >+1
+> >
+> >I don't see any problem with such a routine added, in contrast to
+> >potential "reboots" instead of power off without it.
+> >
+> >So I think this dummy xen_efi_reset_system() should be added to
+> >drivers/xen/efi.c instead.
+>
+> I will resend the patch during day with xen_efi_reset_system moved
+> to common code and implement the x86 counterpart (thought, I will
+> not be able to test it).
 
-sdformat->format.field should never be FIELD_ANY. If it is, then that's a
-subdev bug and I'm pretty sure FIELD_NONE was intended.
+I think that this is ARM specific issue. On x86 machine_restart() calls
+xen_restart(). Hence, everything works. So, I think that it should be
+fixed only for ARM. Anyway, please CC me when you send a patch.
 
-> +
-> +	/* Retain current colorspace setting as default */
-> +	if (sdformat->format.colorspace == V4L2_COLORSPACE_DEFAULT) {
-> +		sdformat->format.colorspace = fmt->colorspace;
-
-No! Subdevs should never return COLORSPACE_DEFAULT. If they do, then fix
-them. If this happens a lot (I'm not sure how reliably subdevs fill this
-in) you could set it to COLORSPACE_RAW. Perhaps with a WARN_ON_ONCE.
-
-> +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT)
-> +			sdformat->format.xfer_func = fmt->xfer_func;
-> +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT)
-> +			sdformat->format.ycbcr_enc = fmt->ycbcr_enc;
-> +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT)
-> +			sdformat->format.quantization = fmt->quantization;
-
-Nack. This is meaningless.
-
-> +	} else {
-> +		if (sdformat->format.xfer_func == V4L2_XFER_FUNC_DEFAULT) {
-> +			sdformat->format.xfer_func =
-> +				V4L2_MAP_XFER_FUNC_DEFAULT(
-> +						sdformat->format.colorspace);
-> +		}
-> +		if (sdformat->format.ycbcr_enc == V4L2_YCBCR_ENC_DEFAULT) {
-> +			sdformat->format.ycbcr_enc =
-> +				V4L2_MAP_YCBCR_ENC_DEFAULT(
-> +						sdformat->format.colorspace);
-> +		}
-> +		if (sdformat->format.quantization == V4L2_QUANTIZATION_DEFAULT) {
-> +			sdformat->format.quantization =
-> +				V4L2_MAP_QUANTIZATION_DEFAULT(
-> +						cc->cs != IPUV3_COLORSPACE_YUV,
-> +						sdformat->format.colorspace,
-> +						sdformat->format.ycbcr_enc);
-> +		}
-
-This isn't wrong, but it is perfectly fine to keep the DEFAULT here and let
-the application call V4L2_MAP_.
-
-I get the feeling this patch is a workaround for subdev errors. Either that,
-or the commit log doesn't give me enough information to really understand the
-problem that's being addressed here.
-
-Regards,
-
-	Hans
-
-> +	}
-> +
->  	*fmt = sdformat->format;
->  
->  	if (sdformat->pad == CSI_SINK_PAD) {
-> 
+Daniel
