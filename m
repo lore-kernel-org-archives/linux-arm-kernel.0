@@ -1,60 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 6 Apr 2017 09:41:21 +0200
-Subject: [GIT PULL] Allwinner clock fixes for 4.11, bis
-Message-ID: <20170406074121.tkivdvghbr27tr54@lukather>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Thu, 6 Apr 2017 08:02:24 +0000
+Subject: [v3, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
+In-Reply-To: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
+References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <DB6PR0401MB2536D6053D42A86F62FE02B9F80D0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi all,
 
-Please pull the following changes for one of the 4.11-rc's
+Any comments? Thanks.
 
-Thanks!
-Maxime
 
-The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
+Best regards,
+Yangbo Lu
 
-  clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.11-2
-
-for you to fetch changes up to d054a839a0986136374d49f9f9fbc264abae9c4c:
-
-  clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER (2017-03-27 13:37:05 +0200)
-
-----------------------------------------------------------------
-Allwinner clock fixes for 4.11, bis
-
-A few patches to fix a build error and a few minor typos and bugs in the
-sunxi-ng code
-
-----------------------------------------------------------------
-Chen-Yu Tsai (3):
-      clk: sunxi-ng: use 1 as fallback for minimum multiplier
-      clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
-      clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
-
-Tobias Regnery (1):
-      clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
-
- drivers/clk/sunxi-ng/Kconfig         | 1 +
- drivers/clk/sunxi-ng/ccu-sun9i-a80.c | 3 +--
- drivers/clk/sunxi-ng/ccu_nk.c        | 8 ++++----
- drivers/clk/sunxi-ng/ccu_nkm.c       | 8 ++++----
- drivers/clk/sunxi-ng/ccu_nkmp.c      | 8 ++++----
- drivers/clk/sunxi-ng/ccu_nm.c        | 4 ++--
- 6 files changed, 16 insertions(+), 16 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/a5ee35fa/attachment-0001.sig>
+> -----Original Message-----
+> From: Yangbo Lu [mailto:yangbo.lu at nxp.com]
+> Sent: Monday, March 27, 2017 3:50 PM
+> To: linux-mmc at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; ulf.hansson at linaro.org; Adrian Hunter; Rob
+> Herring; Mark Rutland; Catalin Marinas; Will Deacon
+> Cc: Xiaobo Xie; Y.B. Lu
+> Subject: [v3, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
+> 
+> It's complicated to support SD UHS-I and eMMC HS200 for eSDHC because
+> there're many differences between eSDHC and SD/eMMC spec. Several
+> differences as below must be considered:
+> 1. Peripheral clock must be used instead of platform clock.
+>     - eSDHC could select peripheral clock or platform clock as its clock
+>       source. According to RM, UHS-I/HS200 must use peripheral clock
+> since
+>       it supports higher frequency than platform clock.
+>     - Patch 1 and patch 6 is to support this.
+> 2. Signal voltage switching requires a control circuit out of eSDHC.
+>     - eSDHC supports signal voltage switch from 3.3v to 1.8v by
+>       eSDHC_PROCTL[VOLT_SEL] bit. This bit changes the value of output
+>       signal SDHC_VS, and there must be a control circuit out of eSDHC
+>       to change the signal voltage according to SDHC_VS output signal.
+>     - Patch 2 is to support this.
+> 3. eSDHC uses tuning block for tuning procedure.
+>     - Tuning clock control register must be configured before tuning.
+>     - Patch 3 is to support this.
+> 4. Delay is needed between tuning cycles for HS200 tuning.
+>     - Once a patch removed mdelay between tuning cycles.
+>       But eSDHC needs it.
+>     - Patch 4 and patch 5 is to support this.
+> 5. UHS-I/HS200 modes could be enabled in dts node.
+>     - Patch 7 is to support this.
+> 
+> Please review and merge these patches on mmc git tree if no changes are
+> required.
+> 
+> Adrian Hunter (1):
+>   mmc: sdhci: Control the delay between tuning commands
+> 
+> Yangbo Lu (6):
+>   mmc: sdhci-of-esdhc: add peripheral clock support
+>   mmc: sdhci-of-esdhc: add support for signal voltage switch
+>   mmc: sdhci-of-esdhc: add tuning support
+>   mmc: sdhci-of-esdhc: add delay between tuning cycles
+>   arm64: dts: ls1046a: add clocks property and compatible for eSDHC node
+>   arm64: dts: ls1046ardb: add MMC HS200/UHS-1 modes support
+> 
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts |   8 ++
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    |   3 +-
+>  drivers/mmc/host/sdhci-esdhc.h                    |   7 +
+>  drivers/mmc/host/sdhci-of-esdhc.c                 | 165
+> +++++++++++++++++++++-
+>  drivers/mmc/host/sdhci.c                          |  11 +-
+>  drivers/mmc/host/sdhci.h                          |   2 +
+>  6 files changed, 190 insertions(+), 6 deletions(-)
+> 
+> --
+> 2.1.0.27.g96db324
