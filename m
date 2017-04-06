@@ -1,121 +1,86 @@
-From: manoj.iyer@canonical.com (Manoj Iyer)
-Date: Thu, 6 Apr 2017 13:15:37 -0500 (CDT)
-Subject: [RESEND,3/3] iommu/dma: Plumb in the per-CPU IOVA caches
-In-Reply-To: <fcb9121e608da4f62e21538f558710fbb12d4a69.1490971180.git.robin.murphy@arm.com>
-References: <fcb9121e608da4f62e21538f558710fbb12d4a69.1490971180.git.robin.murphy@arm.com>
-Message-ID: <alpine.DEB.2.20.1704061315040.4602@lazy>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  6 Apr 2017 19:29:07 +0100
+Subject: [PATCHv2 00/16] arm_pmu: ACPI support
+Message-ID: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Mar 2017, Robin Murphy wrote:
+Hi,
 
-> With IOVA allocation suitably tidied up, we are finally free to opt in
-> to the per-CPU caching mechanism. The caching alone can provide a modest
-> improvement over walking the rbtree for weedier systems (iperf3 shows
-> ~10% more ethernet throughput on an ARM Juno r1 constrained to a single
-> 650MHz Cortex-A53), but the real gain will be in sidestepping the rbtree
-> lock contention which larger ARM-based systems with lots of parallel I/O
-> are starting to feel the pain of.
->
-> Reviewed-by: Nate Watterson <nwatters@codeaurora.org>
-> Tested-by: Nate Watterson <nwatters@codeaurora.org>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> drivers/iommu/dma-iommu.c | 39 ++++++++++++++++++---------------------
-> 1 file changed, 18 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 1b94beb43036..8348f366ddd1 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -361,8 +361,7 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
-> {
-> 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-> 	struct iova_domain *iovad = &cookie->iovad;
-> -	unsigned long shift, iova_len;
-> -	struct iova *iova = NULL;
-> +	unsigned long shift, iova_len, iova = 0;
->
-> 	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
-> 		cookie->msi_iova += size;
-> @@ -371,41 +370,39 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
->
-> 	shift = iova_shift(iovad);
-> 	iova_len = size >> shift;
-> +	/*
-> +	 * Freeing non-power-of-two-sized allocations back into the IOVA caches
-> +	 * will come back to bite us badly, so we have to waste a bit of space
-> +	 * rounding up anything cacheable to make sure that can't happen. The
-> +	 * order of the unadjusted size will still match upon freeing.
-> +	 */
-> +	if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
-> +		iova_len = roundup_pow_of_two(iova_len);
->
-> 	if (domain->geometry.force_aperture)
-> 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
->
-> 	/* Try to get PCI devices a SAC address */
-> 	if (dma_limit > DMA_BIT_MASK(32) && dev_is_pci(dev))
-> -		iova = alloc_iova(iovad, iova_len, DMA_BIT_MASK(32) >> shift,
-> -				  true);
-> -	/*
-> -	 * Enforce size-alignment to be safe - there could perhaps be an
-> -	 * attribute to control this per-device, or at least per-domain...
-> -	 */
-> -	if (!iova)
-> -		iova = alloc_iova(iovad, iova_len, dma_limit >> shift, true);
-> +		iova = alloc_iova_fast(iovad, iova_len, DMA_BIT_MASK(32) >> shift);
->
-> -	return (dma_addr_t)iova->pfn_lo << shift;
-> +	if (!iova)
-> +		iova = alloc_iova_fast(iovad, iova_len, dma_limit >> shift);
-> +
-> +	return (dma_addr_t)iova << shift;
-> }
->
-> static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
-> 		dma_addr_t iova, size_t size)
-> {
-> 	struct iova_domain *iovad = &cookie->iovad;
-> -	struct iova *iova_rbnode;
-> +	unsigned long shift = iova_shift(iovad);
->
-> 	/* The MSI case is only ever cleaning up its most recent allocation */
-> -	if (cookie->type == IOMMU_DMA_MSI_COOKIE) {
-> +	if (cookie->type == IOMMU_DMA_MSI_COOKIE)
-> 		cookie->msi_iova -= size;
-> -		return;
-> -	}
-> -
-> -	iova_rbnode = find_iova(iovad, iova_pfn(iovad, iova));
-> -	if (WARN_ON(!iova_rbnode))
-> -		return;
-> -
-> -	__free_iova(iovad, iova_rbnode);
-> +	else
-> +		free_iova_fast(iovad, iova >> shift, size >> shift);
-> }
->
-> static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
->
+This series implements ACPI support in the ARM PMU code. It borrows some code
+from Jeremy's series [1], but takes a different approach to probing and
+association, using the usual hotplug state machine, minimising external changes
+required, and simplifying the relationship with the common arm_pmu code.
 
-This patch series helps to resolve the Ubuntu bug, where we see the Ubuntu 
-Zesty (4.10 based) kernel reporting multi cpu soft lockups on QDF2400 SDP. 
-https://bugs.launchpad.net/ubuntu/+source/linux/+bug/1680549
+The first few patches are preparatory cleanup/refactoring, with the latter half
+of the series being specific to ACPI support.
 
-This patch series along with the following cherry-picks from Linus's tree
-dddd632b072f iommu/dma: Implement PCI allocation optimisation
-de84f5f049d9 iommu/dma: Stop getting dma_32bit_pfn wrong
+The series is based on Will's perf/updates branch [2]. I've pushed the whole
+series out to the arm/perf/acpi branch [3] of my kernel.org repo.
 
-were applied to Ubuntu Zesty 4.10 kernel (Ubuntu-4.10.0-18.20) and tested 
-on a QDF2400 SDP.
+Due to the innards of the hotplug callback framework, it's not entirely
+safe to register a PMU in a hotplug callback. Due to this, we can only
+associated hotplugged CPUs with a PMU if a matching CPU was around at
+probe time. A similar restriction already applies to DT systems. We may
+be able to relax this with some future work.
 
-Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+are correctly associated, I've tested with the following:
 
+  $ taskset -c ${SOME_CPU_HERE} perf record \
+    -e armv8_pmuv3_0/cpu_cycles/ \
+    -e armv8_pmuv3_1/cpu_cycles/ \
+    cat /proc/interrupts
+ 
+I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+association logic. This has also been tested in a VM using PPIs; I do not have
+access to a host machine which itself uses PPIs.
 
---
-============================
-Manoj Iyer
-Ubuntu/Canonical
-ARM Servers - Cloud
-============================
+Since v1 [4]:
+* Fix up ACPI bits per Lorenzo's request
+* Accumulate tags
+* Check presence of PMUv3
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/482397.html
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/updates
+[3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/acpi
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492897.html
+
+Mark Rutland (16):
+  drivers/perf: arm_pmu: remove pointless PMU disabling
+  drivers/perf: arm_pmu: define armpmu_init_fn
+  drivers/perf: arm_pmu: fold init into alloc
+  drivers/perf: arm_pmu: factor out pmu registration
+  drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
+  drivers/perf: arm_pmu: handle no platform_device
+  drivers/perf: arm_pmu: rename irq request/free functions
+  drivers/perf: arm_pmu: split cpu-local irq request/free
+  drivers/perf: arm_pmu: move irq request/free into probe
+  drivers/perf: arm_pmu: split out platform device probe logic
+  arm64: add function to get a cpu's MADT GICC table
+  arm64: parking: kill acpi_set_mailbox_entry()
+  arm64: parking: fix type endianness
+  drivers/perf: arm_pmu: add ACPI framework
+  arm64: pmuv3: handle !PMUv3 when probing
+  arm64: pmuv3: use arm_pmu ACPI framework
+
+ arch/arm64/include/asm/acpi.h             |   7 +-
+ arch/arm64/kernel/acpi_parking_protocol.c |  44 ++--
+ arch/arm64/kernel/perf_event.c            | 111 ++++++---
+ arch/arm64/kernel/smp.c                   |  19 +-
+ drivers/perf/Kconfig                      |   4 +
+ drivers/perf/Makefile                     |   3 +-
+ drivers/perf/arm_pmu.c                    | 387 ++++++++----------------------
+ drivers/perf/arm_pmu_acpi.c               | 240 ++++++++++++++++++
+ drivers/perf/arm_pmu_platform.c           | 235 ++++++++++++++++++
+ include/linux/cpuhotplug.h                |   1 +
+ include/linux/perf/arm_pmu.h              |  22 +-
+ 11 files changed, 704 insertions(+), 369 deletions(-)
+ create mode 100644 drivers/perf/arm_pmu_acpi.c
+ create mode 100644 drivers/perf/arm_pmu_platform.c
+
+-- 
+1.9.1
