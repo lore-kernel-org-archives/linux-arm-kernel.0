@@ -1,92 +1,72 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu,  6 Apr 2017 20:07:27 +0100
-Subject: [RFC kvm-unit-tests PATCH 8/8] Makefiles: fix up the arm build
- include and link paths
-In-Reply-To: <20170406190727.5624-1-alex.bennee@linaro.org>
-References: <20170406190727.5624-1-alex.bennee@linaro.org>
-Message-ID: <20170406190727.5624-9-alex.bennee@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Apr 2017 20:07:47 +0100
+Subject: [PATCH] misc: sram-exec: Use aligned fncpy instead of memcpy
+In-Reply-To: <ab1583fc-0560-b4d2-851b-4be6201edf8b@ti.com>
+References: <20170405192120.1009-1-d-gerlach@ti.com>
+ <ab1583fc-0560-b4d2-851b-4be6201edf8b@ti.com>
+Message-ID: <20170406190747.GP23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We still need to tell the compiler the correct search path for finding
-headers and the like. This is slightly complicated by the "dynamic"
-asm search path which is in our build tree but (may be) symlinked to
-the right architectures headers.
+On Wed, Apr 05, 2017 at 02:22:33PM -0500, Dave Gerlach wrote:
+> Russell,
+> On 04/05/2017 02:21 PM, Dave Gerlach wrote:
+> >Currently the sram-exec functionality, which allows allocation of
+> >executable memory and provides an API to move code to it, is only
+> >selected in configs for the ARM architecture. Based on commit
+> >5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+> >function body copying") simply copying a C function pointer address
+> >using memcpy without consideration of alignment and Thumb is unsafe on
+> >ARM platforms.
+> >
+> >The aforementioned patch introduces the fncpy macro which is a safe way
+> >to copy executable code on ARM platforms, so let's make use of that here
+> >rather than the unsafe plain memcpy that was previously used by
+> >sram_exec_copy.
+> >
+> >In the future, architectures hoping to make use of the sram-exec
+> >functionality must define an fncpy macro just as ARM has done to
+> >guarantee or check for safe copying to executable memory before allowing
+> >the arch to select CONFIG_SRAM_EXEC.
+> >
+> >Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> >---
+> > drivers/misc/sram-exec.c | 3 ++-
+> > 1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+> >index ac522417c462..0057eabe5c03 100644
+> >--- a/drivers/misc/sram-exec.c
+> >+++ b/drivers/misc/sram-exec.c
+> >@@ -19,6 +19,7 @@
+> > #include <linux/sram.h>
+> >
+> > #include <asm/cacheflush.h>
+> >+#include <asm/fncpy.h>
+> >
+> > #include "sram.h"
+> >
+> >@@ -93,7 +94,7 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+> > 	set_memory_nx((unsigned long)base, pages);
+> > 	set_memory_rw((unsigned long)base, pages);
+> >
+> >-	memcpy(dst, src, size);
+> >+	fncpy(dst, src, size);
+> >
+> > 	set_memory_ro((unsigned long)base, pages);
+> > 	set_memory_x((unsigned long)base, pages);
+> >
+> 
+> Does this address your concerns from here [1]? Because the only user of this
+> code is ARM right now I already only build the sram-exec code in if
+> CONFIG_ARM is selected.
 
-Also we explicitly include SRCDIR for the linking scripts as VPATH
-doesn't seem to find them well enough.
+Sorry, it does not.  Please read the comments in asm/fncpy.h.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arm/Makefile.common     | 15 +++++++++------
- scripts/asm-offsets.mak |  4 +++-
- 2 files changed, 12 insertions(+), 7 deletions(-)
+Deviating from the proscribed usage means your code is, quite simply,
+buggy.  There's no two ways about that.
 
-diff --git a/arm/Makefile.common b/arm/Makefile.common
-index 74c7394..b1fead1 100644
---- a/arm/Makefile.common
-+++ b/arm/Makefile.common
-@@ -16,7 +16,10 @@ tests-common += $(TEST_DIR)/pmu.flat
- tests-common += $(TEST_DIR)/gic.flat
- tests-common += $(TEST_DIR)/psci.flat
- 
--tests-all = $(tests-common) $(tests)
-+scripts-common += $(TEST_DIR)/run
-+scripts-common += $(TEST_DIR)/unittests.cfg
-+
-+tests-all = $(tests-common) $(tests) $(scripts_common)
- all: $(tests-all)
- 
- ##################################################################
-@@ -26,13 +29,13 @@ CFLAGS += -std=gnu99
- CFLAGS += -ffreestanding
- CFLAGS += -Wextra
- CFLAGS += -O2
--CFLAGS += -I lib -I lib/libfdt
-+CFLAGS += -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -I lib
- 
- # We want to keep intermediate files
- .PRECIOUS: %.elf %.o
- 
- asm-offsets = lib/$(ARCH)/asm-offsets.h
--include scripts/asm-offsets.mak
-+include $(SRCDIR)/scripts/asm-offsets.mak
- 
- cflatobjs += lib/util.o
- cflatobjs += lib/alloc.o
-@@ -60,11 +63,11 @@ start_addr := $(shell printf "%x\n" $$(( $(phys_base) + $(kernel_offset) )))
- 
- FLATLIBS = $(libcflat) $(LIBFDT_archive) $(libgcc) $(libeabi)
- %.elf: LDFLAGS = $(CFLAGS) -nostdlib
--%.elf: %.o $(FLATLIBS) arm/flat.lds $(cstart.o)
-+%.elf: %.o $(FLATLIBS) $(SRCDIR)/arm/flat.lds $(cstart.o)
- 	$(CC) $(LDFLAGS) -o $@ \
--		-Wl,-T,arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
-+		-Wl,-T,$(SRCDIR)/arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
- 		$(filter %.o, $^) $(FLATLIBS) \
--		lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
-+		$(SRCDIR)/lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
- 
- %.flat: %.elf
- 	$(OBJCOPY) -O binary $^ $@
-diff --git a/scripts/asm-offsets.mak b/scripts/asm-offsets.mak
-index b2578a6..ecf583f 100644
---- a/scripts/asm-offsets.mak
-+++ b/scripts/asm-offsets.mak
-@@ -29,11 +29,13 @@ define make_asm_offsets
- endef
- 
- $(asm-offsets:.h=.s): $(asm-offsets:.h=.c)
-+	mkdir -p $(dir $@)
- 	$(CC) $(CFLAGS) -fverbose-asm -S -o $@ $<
- 
- $(asm-offsets): $(asm-offsets:.h=.s)
- 	$(call make_asm_offsets)
--	cp -f $(asm-offsets) lib/generated
-+	mkdir -p lib/generated
-+	cp -f $(asm-offsets) lib/generated/
- 
- asm_offsets_clean:
- 	$(RM) $(asm-offsets) $(asm-offsets:.h=.s) \
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
