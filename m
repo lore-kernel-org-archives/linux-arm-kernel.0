@@ -1,106 +1,57 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:10 +0100
-Subject: [PATCHv2 03/16] drivers/perf: arm_pmu: fold init into alloc
+Date: Thu,  6 Apr 2017 19:29:09 +0100
+Subject: [PATCHv2 02/16] drivers/perf: arm_pmu: define armpmu_init_fn
 In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given we always want to initialise common fields on an allocated PMU,
-this patch folds this common initialisation into armpmu_alloc(). This
-will make it simpler to reuse this code for an ACPI-specific probe path.
+We expect an ARM PMU's init function to have a particular prototype,
+which we open-code in a few places. This is less than ideal, considering
+that we cast a void value to this type in one location, and a mismatch
+could easily be missed.
+
+Add a typedef so that we can ensure this is consistent.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 52 +++++++++++++++++++++++---------------------------
- 1 file changed, 24 insertions(+), 28 deletions(-)
+ drivers/perf/arm_pmu.c       | 2 +-
+ include/linux/perf/arm_pmu.h | 4 +++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 71a825d..1cb8b1a 100644
+index 316c4dc..71a825d 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -494,24 +494,6 @@ static ssize_t armpmu_cpumask_show(struct device *dev,
- 	.attrs = armpmu_common_attrs,
+@@ -989,7 +989,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct pmu_probe_info *probe_table)
+ {
+ 	const struct of_device_id *of_id;
+-	const int (*init_fn)(struct arm_pmu *);
++	armpmu_init_fn init_fn;
+ 	struct device_node *node = pdev->dev.of_node;
+ 	struct arm_pmu *pmu;
+ 	int ret = -ENODEV;
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 44f43fc..4249914 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -132,10 +132,12 @@ int armpmu_map_event(struct perf_event *event,
+ 						[PERF_COUNT_HW_CACHE_RESULT_MAX],
+ 		     u32 raw_event_mask);
+ 
++typedef int (*armpmu_init_fn)(struct arm_pmu *);
++
+ struct pmu_probe_info {
+ 	unsigned int cpuid;
+ 	unsigned int mask;
+-	int (*init)(struct arm_pmu *);
++	armpmu_init_fn init;
  };
  
--static void armpmu_init(struct arm_pmu *armpmu)
--{
--	armpmu->pmu = (struct pmu) {
--		.pmu_enable	= armpmu_enable,
--		.pmu_disable	= armpmu_disable,
--		.event_init	= armpmu_event_init,
--		.add		= armpmu_add,
--		.del		= armpmu_del,
--		.start		= armpmu_start,
--		.stop		= armpmu_stop,
--		.read		= armpmu_read,
--		.filter_match	= armpmu_filter_match,
--		.attr_groups	= armpmu->attr_groups,
--	};
--	armpmu->attr_groups[ARMPMU_ATTR_GROUP_COMMON] =
--		&armpmu_common_attr_group;
--}
--
- /* Set at runtime when we know what CPU type we are. */
- static struct arm_pmu *__oprofile_cpu_pmu;
- 
-@@ -766,14 +748,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (err)
- 		goto out_unregister;
- 
--	/*
--	 * This is a CPU PMU potentially in a heterogeneous configuration (e.g.
--	 * big.LITTLE). This is not an uncore PMU, and we have taken ctx
--	 * sharing into account (e.g. with our pmu::filter_match callback and
--	 * pmu::event_init group validation).
--	 */
--	cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_HETEROGENEOUS_CPUS;
--
- 	return 0;
- 
- out_unregister:
-@@ -962,6 +936,30 @@ static struct arm_pmu *armpmu_alloc(void)
- 		goto out_free_pmu;
- 	}
- 
-+	pmu->pmu = (struct pmu) {
-+		.pmu_enable	= armpmu_enable,
-+		.pmu_disable	= armpmu_disable,
-+		.event_init	= armpmu_event_init,
-+		.add		= armpmu_add,
-+		.del		= armpmu_del,
-+		.start		= armpmu_start,
-+		.stop		= armpmu_stop,
-+		.read		= armpmu_read,
-+		.filter_match	= armpmu_filter_match,
-+		.attr_groups	= pmu->attr_groups,
-+		/*
-+		 * This is a CPU PMU potentially in a heterogeneous
-+		 * configuration (e.g. big.LITTLE). This is not an uncore PMU,
-+		 * and we have taken ctx sharing into account (e.g. with our
-+		 * pmu::filter_match callback and pmu::event_init group
-+		 * validation).
-+		 */
-+		.capabilities	= PERF_PMU_CAP_HETEROGENEOUS_CPUS,
-+	};
-+
-+	pmu->attr_groups[ARMPMU_ATTR_GROUP_COMMON] =
-+		&armpmu_common_attr_group;
-+
- 	for_each_possible_cpu(cpu) {
- 		struct pmu_hw_events *events;
- 
-@@ -998,8 +996,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	if (!pmu)
- 		return -ENOMEM;
- 
--	armpmu_init(pmu);
--
- 	pmu->plat_device = pdev;
- 
- 	ret = pmu_parse_irqs(pmu);
+ #define PMU_PROBE(_cpuid, _mask, _fn)	\
 -- 
 1.9.1
