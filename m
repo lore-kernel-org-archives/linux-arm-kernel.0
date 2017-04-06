@@ -1,68 +1,112 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 6 Apr 2017 10:55:33 +0100
-Subject: [PATCH 3/3] perf tool, arm64, thunderx2: Add implementation
- defined events for ThunderX2
-In-Reply-To: <CAFpQJXX9pt2R8TrLv0z=JT2VJxQROCn3cxPbaYiOEOFAT=Fg2Q@mail.gmail.com>
-References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1491291403-29893-4-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170404122828.GB8551@leverpostej>
- <CAFpQJXWTQ=gX63NHPoUST0oU9cP4xo+2fdr-p7ifhvJ6x-ih+A@mail.gmail.com>
- <20170405100548.GA10833@leverpostej>
- <CAFpQJXX9pt2R8TrLv0z=JT2VJxQROCn3cxPbaYiOEOFAT=Fg2Q@mail.gmail.com>
-Message-ID: <20170406095533.GB29947@leverpostej>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 06 Apr 2017 11:57:26 +0200
+Subject: [RFC] [media] imx: assume MEDIA_ENT_F_ATV_DECODER entities
+ output video on pad 1
+In-Reply-To: <20170405115336.7135e542@vento.lan>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
+ <1490894749.2404.33.camel@pengutronix.de>
+ <20170404231053.GE7909@n2100.armlinux.org.uk>
+ <19f0ce92-cad6-8950-8018-e3224e2bf266@gmail.com>
+ <7235285c-f39a-64bc-195a-11cfde9e67c5@gmail.com>
+ <20170405082134.GF7909@n2100.armlinux.org.uk>
+ <1491384859.2381.51.camel@pengutronix.de>
+ <20170405115336.7135e542@vento.lan>
+Message-ID: <1491472646.2392.23.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 09:50:33AM +0530, Ganapatrao Kulkarni wrote:
-> On Wed, Apr 5, 2017 at 3:35 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Apr 05, 2017 at 02:42:39PM +0530, Ganapatrao Kulkarni wrote:
-> >> On Tue, Apr 4, 2017 at 5:58 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Tue, Apr 04, 2017 at 01:06:43PM +0530, Ganapatrao Kulkarni wrote:
-
-> >> >> +     "CPU" :"armv8_pmuv3_0"
-> >> >
-> >> > Please let's not hard-code the name like this. Surely we can get rid of this?
-> >> >
-> >> > The kernel doesn't currently name PMUs as armv8_pmuv3_*, and as that can
-> >> > differ across DT/ACPI and in big.LITTLE, I don't think it makes sense to
-> >> > try to rely one particular string regardless.
-> >>
-> >> This string/name is fixed for a platform. having name here is essential to
-> >> know which devices among pmu (armv8_pmuv3_0, breakpoint, software)
-> >> devices, these jevents to be added.
-> >> also this json file is specific to a arch/soc/board, it is not a
-> >> generic file to be common.
-> >
-> > This file describe the events of a CPU PMU, and CPUs are not specific to
-> > a platform in general. There are many systems using Cortex-A57, for
-> > example.
-> >
-> > Across big.LITTLE SoCs with Cortex-A57, there's no guarantee as to
-> > whether the Cortex-A57 cores would be named armv8_pmuv3_0, or
-> > armv8_pmuv3_1, etc. This would depend on the boot CPU, probe order of
-> > secondaries, etc.
+On Wed, 2017-04-05 at 11:53 -0300, Mauro Carvalho Chehab wrote:
+[...]
+> There are a number of drivers that can work with different
+> types of TV demodulators. Typical examples of such hardware can be
+> found at em28xx, saa7134, cx88 drivers (among lots of other drivers).
+> Those drivers don't use the subdev API. Instead, they use a generic
+> helper function with sets the pipelines, based on the pad number.
 > 
-> OK, we may not have complete name however, common part can be used to recognize
-> the PMU CORE devices from /sys/bus/event_source/devices
-> i.e we can have CPU id as "armv8_pmuv3".
+> The problem here is that, currently, both MC API and MC core
+> lacks a way to identify PAD ports per type, as the only information
+> that a bridge driver has is a pad number. So, in order for a
+> generic helper function to work, we had to hardcode pad numbers,
+> in a way that it would work for all possible types of demods.
+> 
+> It shouldn't be hard to add a "pad_type" information at media_pad
+> struct, but passing such info to userspace requires a new API
+> (we're calling it as "properties API"). Sakari was meant to send
+> us an updated RFC for it[1] with a patchset, back in 2015, but
+> this never happened.
+> 
+> [1] https://linuxtv.org/news.php?entry=2015-08-17.mchehab
+[...]
 
-For better or worse, that's not the case on DT systems.
+That would be most useful.
 
-I'd much rather that we identified the CPU PMUs without requiring
-particular names (e.g by looking for a "cpus" attribute).
+> So, in short, the tvp5150 demod doesn't decode audio, but there
+> are other demods that do it.
+> 
+> In the case of VBI, tvp5150 has actually two ways of reporting
+> it:
+> 
+> 1) via YOUT[7:0] pins. VBI information is transmitted as a
+>    set of raw samples, via an ancillary data block, during
+>    vertical/horizontal blanking intervals. So, yes, it shares
+>    the same hardware output, although the VBI contents are
+>    actually multiplexed there. Please notice that not all
+>    video out PADS encapsulate raw VBI the same way as tvp5150
+>    (and some devices even don't support raw VBI, like saa7110 and
+>    some models supported by saa7115 driver).
 
-> same is extended to UNCORE as well.
+This is the physical interface that corresponds to the output port
+(should be port at 1) in the device tree. It should correspond to the video
+output media entity pad.
+What is unclear to is me whether the VBI media entity pad also should
+correspond to the same physical interface / DT port.
 
-Could you elaborate on that? I'm not sure I follow.
+> 2) via an interrupt that indicates that it decoded VBI data. The
+>    VBI information itself is there on FIFO, accessible via a set of
+>    registers (see "VBI Data processor" chapter at the datasheet).
+>
+> Currently, the driver doesn't support (2), because, at the time
+> I wrote the driver, I didn't find a way to read the interrupts generated
+> by tvp5150 at em28xx[1], due to the lack of em28xx documentation,
+> but adding support for it shoudn't be hard. I may eventually do it
+> when I have some time to play with my ISEE hardware.
+> 
+> So, in the case of tvp5150 hardware, have those PADS:
+> 
+> - Input baseband;
+> - Video + raw VBI output;
+> - sliced VBI output.
 
-> mapfile.csv file will have entry for both BIG and LITTLE processors event files.
-> the jevents creates table of pmu_events_map for all entries present in
-> mapfile.csv file
-> while lookup, which ever pmu matches the cpuid of pmu_events_map
-> then corresponding table created from json file is used to add the
-> jevents to that PMU.
+This DEMOD_PAD_VBI_OUT, does it correspond to 1) or 2) above?
 
-Sorry, but I don't follow how that's related to the above.
+> Yet, we need an always unconnected audio output, in order to support
+> different demods out there.
 
-Thanks,
-Mark.
+Are you saying we have to keep pad[DEMOD_PAD_AUDIO_OUT] in tvp5150 even
+though it doesn't exist because the framework can't cope with an
+audio-less ATV_DECODER that only has three pads?
+
+> [1] tvp5150 was written to support some em28xx-based devices
+> 
+> > 
+> > > So, it has one input and three outputs.  How does marking the direction
+> > > in the port node (which would indicate that there was a data flow out of
+> > > TVP5150 into the iMX6 capture) help identify which of those pads should
+> > > be used?
+> > >
+> > > It would eliminate the input pad, but you still have three output pads
+> > > to choose from.
+> > > 
+> > > So no, your idea can't work.  
+> > 
+> > In this case, removal of the VBI and audio pads might make this work,
+> > but in general this is true. In my opinion, to make this truly generic,
+> > we need an interface to ask the driver which media entity pad a given
+> > device tree port corresponds to, as there might not even be a single
+> > media entity corresponding to all ports for more complex devices.
+> 
+> Yes. We also need something like that at the userspace API.
+
+thanks
+Philipp
