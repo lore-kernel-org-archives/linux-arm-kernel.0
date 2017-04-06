@@ -1,87 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  6 Apr 2017 15:36:23 +0200
-Subject: [PATCH] pinctrl: at91-pio4: handle suspend to ram
-Message-ID: <20170406133623.19160-1-alexandre.belloni@free-electrons.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 06 Apr 2017 14:46:43 +0100
+Subject: [PATCH v3] arm: Fix memory attribute inconsistencies when using
+ fixmap
+In-Reply-To: <20170405224245.GA17774@n2100.armlinux.org.uk>
+References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170405224245.GA17774@n2100.armlinux.org.uk>
+Message-ID: <1491486403.2950.3.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When suspending to RAM, the power to the core is cut and the register
-values are lost. Save and restore more registers than just IMR.
+On Wed, 2017-04-05 at 23:42 +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 04, 2017 at 08:31:27AM +0100, Ard Biesheuvel wrote:
+> > diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
+> > index a5b47421059d..80dfeb8ce8f2 100644
+> > --- a/arch/arm/include/asm/mmu.h
+> > +++ b/arch/arm/include/asm/mmu.h
+> > @@ -1,6 +1,8 @@
+> >  #ifndef __ARM_MMU_H
+> >  #define __ARM_MMU_H
+> >  
+> > +struct machine_desc;
+> > +
+> >  #ifdef CONFIG_MMU
+> >  
+> >  typedef struct {
+> > @@ -24,6 +26,8 @@ typedef struct {
+> >  #define ASID(mm)	(0)
+> >  #endif
+> >  
+> > +void early_mm_init(const struct machine_desc *mdesc);
+> > +
+> >  #else
+> >  
+> >  /*
+> > @@ -35,6 +39,8 @@ typedef struct {
+> >  	unsigned long	end_brk;
+> >  } mm_context_t;
+> >  
+> > +static inline void early_mm_init(const struct machine_desc *mdesc) { }
+> > +
+> 
+> Why are we stuffing this into mmu.h?  mmu.h is not the header file for
+> arch/arm/mm/mmu.c - although they have the same base filename, they are
+> not really related.
+> 
+> asm/mmu.h is supposed to be a kernel-wide include file for the mm_context_t
+> thing, and should not be filled with arch-private stuff.
+> 
+> Please find a better location for this.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/pinctrl/pinctrl-at91-pio4.c | 34 ++++++++++++++++++++++++++++------
- 1 file changed, 28 insertions(+), 6 deletions(-)
+In arch/arm/mm/mm.h ?
 
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index 28bbc1bb9e6c..dc8591543dee 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -126,7 +126,11 @@ struct atmel_pioctrl {
- 	struct irq_domain	*irq_domain;
- 	int			*irqs;
- 	unsigned		*pm_wakeup_sources;
--	unsigned		*pm_suspend_backup;
-+	struct {
-+		u32		imr;
-+		u32		odsr;
-+		u32		cfgr[ATMEL_PIO_NPINS_PER_BANK];
-+	} *pm_suspend_backup;
- 	struct device		*dev;
- 	struct device_node	*node;
- };
-@@ -830,17 +834,26 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
--	int i;
-+	int i, j;
- 
- 	/*
- 	 * For each bank, save IMR to restore it later and disable all GPIO
- 	 * interrupts excepting the ones marked as wakeup sources.
- 	 */
- 	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
--		atmel_pioctrl->pm_suspend_backup[i] =
-+		atmel_pioctrl->pm_suspend_backup[i].imr =
- 			atmel_gpio_read(atmel_pioctrl, i, ATMEL_PIO_IMR);
- 		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IDR,
- 				 ~atmel_pioctrl->pm_wakeup_sources[i]);
-+		atmel_pioctrl->pm_suspend_backup[i].odsr =
-+			atmel_gpio_read(atmel_pioctrl, i, ATMEL_PIO_ODSR);
-+		for (j = 0; j < ATMEL_PIO_NPINS_PER_BANK; j++) {
-+			atmel_gpio_write(atmel_pioctrl, i,
-+					 ATMEL_PIO_MSKR, BIT(j));
-+			atmel_pioctrl->pm_suspend_backup[i].cfgr[j] =
-+				atmel_gpio_read(atmel_pioctrl, i,
-+						ATMEL_PIO_CFGR);
-+		}
- 	}
- 
- 	return 0;
-@@ -850,11 +863,20 @@ static int __maybe_unused atmel_pctrl_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
--	int i;
-+	int i, j;
- 
--	for (i = 0; i < atmel_pioctrl->nbanks; i++)
-+	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
- 		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IER,
--				 atmel_pioctrl->pm_suspend_backup[i]);
-+				 atmel_pioctrl->pm_suspend_backup[i].imr);
-+		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_SODR,
-+				 atmel_pioctrl->pm_suspend_backup[i].odsr);
-+		for (j = 0; j < ATMEL_PIO_NPINS_PER_BANK; j++) {
-+			atmel_gpio_write(atmel_pioctrl, i,
-+					 ATMEL_PIO_MSKR, BIT(j));
-+			atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_CFGR,
-+					 atmel_pioctrl->pm_suspend_backup[i].cfgr[j]);
-+		}
-+	}
- 
- 	return 0;
- }
+Or as early_mm_init() is replacing early_paging_init()?in setup.c, and
+that is currently handled by a local extern statement, keeping doing the
+same? That keeps the diff neater which is a plus for a patch that should
+be backported to stable kernels.
+
 -- 
-2.11.0
+Tixy
