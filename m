@@ -1,167 +1,108 @@
-From: mcgrof@kernel.org (Luis R. Rodriguez)
-Date: Thu, 6 Apr 2017 13:59:07 +0200
-Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
- interface
-In-Reply-To: <20170406113845.GA10013@red-moon>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
- <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
- <20170328144543.GA18046@red-moon>
- <20170405105841.GG7909@n2100.armlinux.org.uk>
- <20170405113238.GA2465@red-moon> <20170406102636.GA9623@red-moon>
- <20170406105312.GE28800@wotan.suse.de>
- <20170406113845.GA10013@red-moon>
-Message-ID: <20170406115906.GF28800@wotan.suse.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 06 Apr 2017 14:01:23 +0200
+Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without
+ struct page
+In-Reply-To: <20170405160242.14195-1-shuahkh@osg.samsung.com>
+References: <CGME20170405160251epcas4p14cc5d5f6064c84b133b9e280ac987a93@epcas4p1.samsung.com>
+ <20170405160242.14195-1-shuahkh@osg.samsung.com>
+Message-ID: <e49715a3-b925-79ad-7d1d-ce2cb5673a97@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 12:38:45PM +0100, Lorenzo Pieralisi wrote:
-> On Thu, Apr 06, 2017 at 12:53:12PM +0200, Luis R. Rodriguez wrote:
-> > On Thu, Apr 06, 2017 at 11:26:36AM +0100, Lorenzo Pieralisi wrote:
-> > > On Wed, Apr 05, 2017 at 01:38:12PM +0100, Lorenzo Pieralisi wrote:
-> > > > On Wed, Apr 05, 2017 at 11:58:41AM +0100, Russell King - ARM Linux wrote:
-> > > > > On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
-> > > > > > On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
-> > > > > > > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
-> > > > > > > > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-> > > > > > > > index 7afb0e2..50b292f 100644
-> > > > > > > > --- a/arch/x86/include/asm/io.h
-> > > > > > > > +++ b/arch/x86/include/asm/io.h
-> > > > > > > > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
-> > > > > > > >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
-> > > > > > > >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
-> > > > > > > >  #define ioremap_uc ioremap_uc
-> > > > > > > > +#define ioremap_nopost ioremap_nocache
-> > > > > > > 
-> > > > > > > These are all the same as the default from asm-generic.h.  Do we really
-> > > > > > > need these definitions in alpha, avr32, frv, ia64, x86?
-> > > > > > 
-> > > > > > Those arches do not include asm-generic.h (I suppose for a good reason)
-> > > > > > but a definition is needed anyway if we want code using ioremap_nopost()
-> > > > > > to be unconditional. This is one way of doing it, there are others not
-> > > > > > sure they are any better, I am open to suggestions.
-> > > > > 
-> > > > > We do have linux/io.h, which should be included in preference to asm/io.h.
-> > > > > linux/io.h has existed for years, but I still see (from time to time)
-> > > > > patches adding drivers that (imho incorrectly) use asm/io.h.
-> > > > > 
-> > > > > Also, this:
-> > > > > 
-> > > > > > > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > > > > > > > index 7ef015e..0e81938 100644
-> > > > > > > > --- a/include/asm-generic/io.h
-> > > > > > > > +++ b/include/asm-generic/io.h
-> > > > > > > > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
-> > > > > > > >  #endif /* CONFIG_GENERIC_IOMAP */
-> > > > > > > >  #endif /* CONFIG_HAS_IOPORT_MAP */
-> > > > > > > >  
-> > > > > > > > +#ifndef ioremap_nopost
-> > > > > > > > +#define ioremap_nopost ioremap_nocache
-> > > > > > > > +#endif
-> > > > > > > > +
-> > > > > > > >  #ifndef xlate_dev_kmem_ptr
-> > > > > > > >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
-> > > > > > > >  static inline void *xlate_dev_kmem_ptr(void *addr)
-> > > > > 
-> > > > > could well be located in linux/io.h, which would make it available
-> > > > > everywhere.
-> > > > > 
-> > > > > I'd suggest one change to this though:
-> > > > > 
-> > > > > #ifndef ioremap_nopost
-> > > > > static inline void __iomem *ioremap_nopost(resource_size_t offset,
-> > > > > 					   unsigned long size)
-> > > > > {
-> > > > > 	return ioremap_nocache(offset, size);
-> > > > > }
-> > > > > #endif
-> > > > > 
-> > > > > This way, if someone forgets to define ioremap_nopost() in their
-> > > > > asm/io.h but provides a definition or extern prototype for
-> > > > > ioremap_nopost(), we end up with a compile error to highlight the
-> > > > > error, rather than the error being hidden by the preprocessor.
-> > > > 
-> > > > Yes, I could add ioremap_nopost() to linux/io.h I did not do it because
-> > > > linux/io.h, for whatever reason, does not seem to contain ioremap_*
-> > > > prototypes; this does not mean we should not add it there but that
-> > > > would look odd (with all others ioremap_* in asm/io.h), all I am
-> > > > saying. This stuff requires some clean-up regardless, for the records.
-> > > > 
-> > > > As for the static inline, I did that and that did not make the
-> > > > kbuild robot happy at all on some arches:
-> > > > 
-> > > > eg: openrisc
-> > > > 
-> > > > >> include/asm-generic/io.h:922:9: error: implicit declaration of
-> > > > >> function 'ioremap_nocache' [-Werror=implicit-function-declaration]
-> > > >      return ioremap_nocache(offset, size);
-> > > 
-> > > Indeed, the static inline ioremap_nocache() fallback does not work
-> > > on all arches (whether I add the fallback in linux/io.h or
-> > > asm-generic/io.h is irrelevant), I bump into issues such as the one
-> > > reported above.
-> > 
-> > Its also not *safe* to assume on behalf of all architectures a new ioremap
-> > call is both a good idea and proper.
-> > 
-> > > I could make it:
-> > > 
-> > > #ifndef ioremap_nopost
-> > > static inline void __iomem *ioremap_nopost(resource_size_t offset,
-> > > 					   unsigned long size)
-> > > {
-> > > 	return NULL;
-> > > }
-> > > #endif
-> > > 
-> > > which would force arches to define ioremap_nopost() (if they need it).
-> > 
-> > Yes, please do this.
-> 
-> Ok but where ? linux/io.h or asm-generic/io.h ? As I replied to Russell,
-> having it in linux/io.h is a bit odd given that it would be the only
-> ioremap_* implementation declared there, I think we need more
-> consistency here instead of deviating again from what you did.
+Hi Shuah,
 
-asm-generic/io.h is the right place for generics which let you override.
+On 2017-04-05 18:02, Shuah Khan wrote:
+> When coherent DMA memory without struct page is shared, importer
+> fails to find the page and runs into kernel page fault when it
+> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
+> in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
+> for more information on this problem.
+>
+> This solution allows coherent DMA memory without struct page to be
+> shared by providing a way for the exporter to tag the DMA buffer as
+> a special buffer without struct page association and passing the
+> information in sg_table to the importer. This information is used
+> in attach/map_sg to avoid cleaning D-cache and mapping.
+>
+> The details of the change are:
+>
+> Framework:
+> - Add a new dma_attrs field to struct scatterlist.
+> - Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
+>    Coherent memory without struct page.
+> - Add a new dma_check_dev_coherent() interface to check if memory is
+>    the device coherent area. There is no way to tell where the memory
+>    returned by dma_alloc_attrs() came from.
+>
+> Exporter logic:
+> - Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
+>    DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
+>    done in the exporter context.
+> - Add logic to arm_dma_get_sgtable() to identify memory without struct
+>    page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
+>    set, arm_dma_get_sgtable() will set page as the cpu_addr and update
+>    dma_address and dma_attrs fields in struct scatterlist for this sgl.
+>    This is done in exporter context when buffer is exported. With this
+>    Note: This change is made on top of Russell King's patch that added
+>    !pfn_valid(pfn) check to arm_dma_get_sgtable() to error out on invalid
+>    pages. Coherent memory without struct page will trigger this error.
+>
+> Importer logic:
+> - Add logic to vb2_dc_dmabuf_ops_attach() to identify memory without
+>    struct page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute when it copies
+>    the sg_table from the exporter. It will copy dma_attrs and dma_address
+>    fields. With this logic, dmabuf_ops_attach will no longer trip on an
+>    invalid page.
+> - Add logic to arm_dma_map_sg() to avoid mapping the page when sg_table
+>    has DMA_ATTR_DEV_COHERENT_NOPAGE buffer.
+> - Add logic to arm_dma_unmap_sg() to do nothing for sg entries with
+>    DMA_ATTR_DEV_COHERENT_NOPAGE attribute.
+>
+> Without this change the following use-case that runs into kernel
+> pagefault when importer tries to attach the exported buffer.
+>
+> With this change it works: (what a relief after watching pagefaults for
+> weeks!!)
+>
+> gst-launch-1.0 filesrc location=~/GH3_MOV_HD.mp4 ! qtdemux ! h264parse ! v4l2video4dec capture-io-mode=dmabuf ! v4l2video7convert output-io-mode=dmabuf-import ! kmssink force-modesetting=true
+>
+> I am sending RFC patch to get feedback on the approach and see if I missed
+> anything.
 
-> > > This is what I *assume* was done for ioremap_uc() in asm-generic/io.h,
-> > > but honestly history is hard to follow here.
-> > > 
-> > > Thoughts ?
-> > 
-> > Hard to follow ?
-> 
-> I was referring to the whole asm-generic/io.h history.
-> 
-> > I think commit 8c7ea50c010b2 ("x86/mm, asm-generic: Add IOMMU ioremap_uc()
-> > variant default") makes it very clear that historically we have made bad
-> > assumptions and these assumptions are not safe, so the only correct thing we
-> > can do to not stall development is to do what you did above, and each
-> > architecture then can add support for its proper mapping. Its up to each
-> > architecture maintainer to be attentive and review these patches, if they don't
-> > get to it, this will just not work for the new driver that needs it, such is
-> > life, its better than having incorrect defaults spread for all architectures.
-> > 
-> > The old strategy was very sloppy. Its why I tried to be as clear as possible on
-> > both the commit log and headers about this. If the commit log and headers were
-> > not clear, please help clarify this more somehow in your patches.
-> 
-> I see your point and I can replicate (probably I will have to patch
-> microblaze too since some of the PCI drivers patches in this series
-> that I updated to use ioremap_nopost() will run on it too) 
+Frankly, once You decided to hack around dma-buf and issues with coherent,
+carved out memory, it might be a bit better to find the ultimate solution
+instead of the another hack. Please note that it will still not allow to
+share a buffer allocated from carved-out memory and a device, which is
+behind IOMMU.
 
-Cool right so if you add support for the archs for the drivers that you know
-use this new ioremap then there is no regressions, and then only if a new
-driver gets added and an arch needs this they will also need this, but that
-is precisely the sort of requirement thought process we want.
+I thought a bit about this and the current shape of dma-buf code.
 
-> what you
-> did for ioremap_uc() for ioremap_nopost(), I am ok with that, I need
-> to know if we all are.
+IMHO the proper way of solving all those issues would be to replace
+dma-buf internal representation of the memory from struct scatter_list
+to pfn array. This would really solve the problem of buffers which
+cannot be properly represented by scatter lists/struct pages and would
+even allow sharing buffers between all kinds of devices. Scatter-lists
+are also quite over-engineered structures to represent a single buffer
+(pfn array is a bit more compact representation). Also there is a lots
+of buggy code which use scatter-list in a bit creative way (like
+assuming that each page maps to a single scatter list entry for
+example). The only missing piece, required for such change would be
+extending DMA-mapping with dma_map_pfn() interface.
 
-Sure. And again, if consensus is built (again) on that strategy please
-update the docs to ensure that this is even clearer for the next person.
-I thought it was rather clear now but it does not seem so.
+This would be however quite large task, especially taking into account
+all current users of DMA-buf framework...
 
-  Luis
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>   arch/arm/mm/dma-mapping.c                      | 34 ++++++++++++++++++++++----
+>   drivers/base/dma-coherent.c                    | 25 +++++++++++++++++++
+>   drivers/media/v4l2-core/videobuf2-dma-contig.c |  6 +++++
+>   include/linux/dma-mapping.h                    |  8 ++++++
+>   include/linux/scatterlist.h                    |  1 +
+>   5 files changed, 69 insertions(+), 5 deletions(-)
+ > [...]
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
