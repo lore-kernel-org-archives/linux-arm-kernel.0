@@ -1,51 +1,47 @@
 From: you@example.com (Your Name)
-Date: Thu,  6 Apr 2017 20:22:11 +0800
-Subject: [PATCH v4 00/12] drm: rockchip: Fix rockchip drm unbind crash error
-Message-ID: <1491481343-11025-1-git-send-email-you@example.com>
+Date: Thu,  6 Apr 2017 20:22:16 +0800
+Subject: [PATCH v4 05/12] drm/rockchip: cdn-dp: Don't try to release firmware
+ when not loaded
+In-Reply-To: <1491481343-11025-1-git-send-email-you@example.com>
+References: <1491481343-11025-1-git-send-email-you@example.com>
+Message-ID: <1491481343-11025-6-git-send-email-you@example.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Verified on rk3399 chromebook kevin:
-1/ stop ui && pkill -9 frecon
-2/ unbind/bind drm
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Your Name <you@example.com>
+---
 
-Changes in v4:
-Address Andrzej Hajda <a.hajda@samsung.com>'s comments.
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Changes in v3:
-Update commit message.
-Address Sean Paul <seanpaul@chromium.org>'s comments.
-Update commit message.
-Address Sean Paul <seanpaul@chromium.org>'s comments.
-Update commit message.
-Address Daniel Vetter <daniel@ffwll.ch>'s comments.
-Update commit message.
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Changes in v2:
-Fix some commit messages.
-
-Jeffy Chen (12):
-  drm: bridge: analogix: Detach panel when unbinding analogix dp
-  drm: bridge: analogix: Unregister dp aux when unbinding
-  drm: bridge: analogix: Disable clock when unbinding
-  drm: bridge: analogix: Destroy connector & encoder when unbinding
-  drm/rockchip: cdn-dp: Don't try to release firmware when not loaded
-  drm/rockchip: cdn-dp: Don't unregister audio dev when unbinding
-  drm/rockchip: vop: Enable pm domain before vop_initial
-  drm/rockchip: vop: Unprepare clocks when unbinding
-  drm/rockchip: analogix_dp: Disable clock when unbinding
-  drm/rockchip: Reoder drm bind/unbind sequence
-  drm/rockchip: Shutdown all crtcs when unbinding drm
-  drm/drm_ioctl.c: Break ioctl when drm device not registered
-
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  6 +++
- drivers/gpu/drm/drm_ioctl.c                        |  2 +-
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  3 +-
- drivers/gpu/drm/rockchip/cdn-dp-core.c             | 10 +++--
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c        | 50 ++++++++++++----------
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 33 ++++++++++----
- 6 files changed, 67 insertions(+), 37 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+index 4e55d63..ee4195d 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+@@ -1053,6 +1053,7 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
+ 	dp->connected = false;
+ 	dp->active = false;
+ 	dp->active_port = -1;
++	dp->fw_loaded = false;
+ 
+ 	INIT_WORK(&dp->event_work, cdn_dp_pd_event_work);
+ 
+@@ -1133,7 +1134,8 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
+ 	connector->funcs->destroy(connector);
+ 
+ 	pm_runtime_disable(dev);
+-	release_firmware(dp->fw);
++	if (dp->fw_loaded)
++		release_firmware(dp->fw);
+ 	kfree(dp->edid);
+ 	dp->edid = NULL;
+ }
 -- 
 2.1.4
