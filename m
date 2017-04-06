@@ -1,33 +1,23 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 07 Apr 2017 00:21:43 +0200
-Subject: [PATCH v2 1/3] ARM: dts: rockchip: Add support for phyCORE-RK3288
- SoM
-In-Reply-To: <1491483866-18368-1-git-send-email-w.egorov@phytec.de>
-References: <1491483866-18368-1-git-send-email-w.egorov@phytec.de>
-Message-ID: <2316800.SYqXzj6arr@phil>
+Date: Fri, 07 Apr 2017 00:23:39 +0200
+Subject: [PATCH 2/3] ARM: dts: rockchip: rock2: Setup usb vbus-supply
+In-Reply-To: <20170405140613.4444-3-sjoerd.simons@collabora.co.uk>
+References: <20170405140613.4444-1-sjoerd.simons@collabora.co.uk>
+ <20170405140613.4444-3-sjoerd.simons@collabora.co.uk>
+Message-ID: <2204588.mS7ruK0rnT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 6. April 2017, 15:04:24 CEST schrieb Wadim Egorov:
-> The phyCORE-RK3288 is a SoM (System on Module) containing a RK3288 SoC.
-> The module can be connected to different carrier boards.
-> It can be also equipped with different RAM, SPI flash and eMMC variants.
-> The Rapid Development Kit option is using the following setup:
+Am Mittwoch, 5. April 2017, 16:06:11 CEST schrieb Sjoerd Simons:
+> Now that the rockchip usb phy has a vbus-supply property use that to
+> control the vbus regulator on rock2.
 > 
->   - 1 GB DDR3 RAM (2 Banks)
->   - 1x 4 KB EEPROM
->   - DP83867 Gigabit Ethernet PHY
->   - 16 MB SPI Flash
->   - 4 GB eMMC Flash
-> 
-> Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-applied all 3 for 4.12 .
+I've queued this for 4.13 .
 
-One minor change was making the touchscreen node name in patch2 read
-	touchscreen at 44
-
-Same rationale as before, nodes should be named after the device-category
+Not eligible for 4.12, as the patch alone (when testing my tree or armsoc)
+would regress the sata-bridge, due to the regulator-always-on going away.
 
 
 Heiko
