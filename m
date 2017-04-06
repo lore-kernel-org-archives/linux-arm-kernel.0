@@ -1,46 +1,31 @@
-From: daniel.kiper@oracle.com (Daniel Kiper)
-Date: Thu, 6 Apr 2017 16:27:10 +0200
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
- <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
- <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
-Message-ID: <20170406142710.GE4372@olila.local.net-space.pl>
+From: jacopo@jmondi.org (jmondi)
+Date: Thu, 6 Apr 2017 16:31:20 +0200
+Subject: [PATCH] arm64: dts: r8a7795: salvator-x: Add current sense
+ amplifiers
+In-Reply-To: <20170328121633.GA20146@verge.net.au>
+References: <1490694282-9439-1-git-send-email-geert+renesas@glider.be>
+ <20170328121633.GA20146@verge.net.au>
+Message-ID: <20170406143120.GA22962@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
-> Hi Juergen,
->
-> On 06/04/17 07:23, Juergen Gross wrote:
-> >On 05/04/17 21:49, Boris Ostrovsky wrote:
-> >>On 04/05/2017 02:14 PM, Julien Grall wrote:
-> >>>The x86 code has theoritically a similar issue, altought EFI does not
-> >>>seem to be the preferred method. I have left it unimplemented on x86 and
-> >>>CCed Linux Xen x86 maintainers to know their view here.
-> >>
-> >>(+Daniel)
-> >>
-> >>This could be a problem for x86 as well, at least theoretically.
-> >>xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
-> >>
-> >>So I think we should have a similar routine there.
-> >
-> >+1
-> >
-> >I don't see any problem with such a routine added, in contrast to
-> >potential "reboots" instead of power off without it.
-> >
-> >So I think this dummy xen_efi_reset_system() should be added to
-> >drivers/xen/efi.c instead.
->
-> I will resend the patch during day with xen_efi_reset_system moved
-> to common code and implement the x86 counterpart (thought, I will
-> not be able to test it).
+Hi Geert, Simon,
 
-I think that this is ARM specific issue. On x86 machine_restart() calls
-xen_restart(). Hence, everything works. So, I think that it should be
-fixed only for ARM. Anyway, please CC me when you send a patch.
+On Tue, Mar 28, 2017 at 02:16:38PM +0200, Simon Horman wrote:
+> On Tue, Mar 28, 2017 at 11:44:42AM +0200, Geert Uytterhoeven wrote:
+> > Add device nodes for two Maxim max961x current sense amplifiers
+> > sensing the VDD_0.8V and DVFS_0.8V lines.
+> >
+> > Based on a patch for r8a7796-salvator-x.dts by Jacopo Mondi.
+> >
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> > Pending acceptance of the maxim,max9611 DT bindings.
+>
+> I have marked this as deferred accordingly.
 
-Daniel
+Just to point out that in v5 I just sent out, bindings are different
+and this patch needs an update.
+
+Thanks
+  j
