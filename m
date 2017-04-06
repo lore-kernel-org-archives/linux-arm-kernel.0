@@ -1,147 +1,89 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 06 Apr 2017 17:03:14 +0100
-Subject: [PATCH v4] arm: Fix memory attribute inconsistencies when using fixmap
-In-Reply-To: <CAKv+Gu_EVqqQGXauWmfhhmJZEyrPDEHDiN2T23XVPy_eR99Lsg@mail.gmail.com>
-References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170405224245.GA17774@n2100.armlinux.org.uk>
- <1491486403.2950.3.camel@linaro.org>
- <CAKv+Gu_EVqqQGXauWmfhhmJZEyrPDEHDiN2T23XVPy_eR99Lsg@mail.gmail.com>
-Message-ID: <1491494594.2950.7.camel@linaro.org>
+From: daniel.kiper@oracle.com (Daniel Kiper)
+Date: Thu, 6 Apr 2017 18:06:53 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+ <20170406142710.GE4372@olila.local.net-space.pl>
+ <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
+ <20170406152040.GH4372@olila.local.net-space.pl>
+ <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+Message-ID: <20170406160653.GJ4372@olila.local.net-space.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To cope with the variety in ARM architectures and configurations, the
-pagetable attributes for kernel memory are generated at runtime to match
-the system the kernel finds itself on. This calculated value is stored
-in pgprot_kernel.
+Hi Julien,
 
-However, when early fixmap support was added for ARM (commit
-a5f4c561b3b1) the attributes used for mappings were hard coded because
-pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
-used after early boot this means the memory being mapped can have
-different attributes to existing mappings, potentially leading to
-unpredictable behaviour. A specific problem also exists due to the hard
-coded values not include the 'shareable' attribute which means on
-systems where this matters (e.g. those with multiple CPU clusters) the
-cache contents for a memory location can become inconsistent between
-CPUs.
+On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
+> Hi Daniel,
+>
+> On 06/04/17 16:20, Daniel Kiper wrote:
+> >On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
+> >>On 06/04/17 16:27, Daniel Kiper wrote:
+> >>>On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+> >>>>Hi Juergen,
+> >>>>
+> >>>>On 06/04/17 07:23, Juergen Gross wrote:
+> >>>>>On 05/04/17 21:49, Boris Ostrovsky wrote:
+> >>>>>>On 04/05/2017 02:14 PM, Julien Grall wrote:
+> >>>>>>>The x86 code has theoritically a similar issue, altought EFI does not
+> >>>>>>>seem to be the preferred method. I have left it unimplemented on x86 and
+> >>>>>>>CCed Linux Xen x86 maintainers to know their view here.
+> >>>>>>
+> >>>>>>(+Daniel)
+> >>>>>>
+> >>>>>>This could be a problem for x86 as well, at least theoretically.
+> >>>>>>xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+> >>>>>>
+> >>>>>>So I think we should have a similar routine there.
+> >>>>>
+> >>>>>+1
+> >>>>>
+> >>>>>I don't see any problem with such a routine added, in contrast to
+> >>>>>potential "reboots" instead of power off without it.
+> >>>>>
+> >>>>>So I think this dummy xen_efi_reset_system() should be added to
+> >>>>>drivers/xen/efi.c instead.
+> >>>>
+> >>>>I will resend the patch during day with xen_efi_reset_system moved
+> >>>>to common code and implement the x86 counterpart (thought, I will
+> >>>>not be able to test it).
+> >>>
+> >>>I think that this is ARM specific issue. On x86 machine_restart() calls
+> >>>xen_restart(). Hence, everything works. So, I think that it should be
+> >>>fixed only for ARM. Anyway, please CC me when you send a patch.
+> >>
+> >>What about xen_machine_power_off() (as stated in Boris' mail)?
+> >
+> >Guys what do you think about that:
+> >
+> >--- a/drivers/firmware/efi/reboot.c
+> >+++ b/drivers/firmware/efi/reboot.c
+> >@@ -55,7 +55,7 @@ static void efi_power_off(void)
+> >
+> > static int __init efi_shutdown_init(void)
+> > {
+> >-       if (!efi_enabled(EFI_RUNTIME_SERVICES))
+> >+       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
+> >                return -ENODEV;
+> >
+> >        if (efi_poweroff_required())
+> >
+> >
+> >Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
+> >
+> >I hope that tweaks for both files should solve our problem.
+>
+> This sounds good for power off (I haven't tried to power off DOM0
+> yet). But this will not solve the restart problem (see
+> machine_restart in arch/arm64/kernel/process.c) which call directly
+> efi_reboot.
 
-To resolve these issues we change fixmap to use the same memory
-attributes (from pgprot_kernel) that the rest of the kernel uses. To
-enable this we need to refactor the initialisation code so
-build_mem_type_table() is called early enough. Note, that relies on early
-param parsing for memory type overrides passed via the kernel command
-line, so we need to make sure this call is still after
-parse_early_params().
+Hmmm... It seems to me that efi.reset_system override with empty function
+in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
+One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
+for arch/arm64/kernel/efi.c. Does it make sense?
 
-Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
-Cc: <stable@vger.kernel.org> # v4.3+
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
-[ardb: keep early_fixmap_init() before param parsing, for earlycon]
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-v4: - Drop declaration of early_mm_init() from arch/arm/include/asm/mmu.h
-      and make early_paging_init() static.
-
-Ard's v3:
-    - Unfortunately, I failed to spot an issue with earlycon when testing
-      Tixy's v2. Earlycon depends on fixmap, but only for device mappings,
-      which are not affected by this change. So instead, preserve the calls
-      to early_fixmap_init() and early_ioremap_init() in their original
-      locations, and only move build_mem_type_table() to the earliest
-      possible moment in boot, which is right after early param parsing
-      (which may set cachepolicy/nocache/nowb variables)
-
- arch/arm/include/asm/fixmap.h |  2 +-
- arch/arm/kernel/setup.c       |  4 ++--
- arch/arm/mm/mmu.c             | 16 +++++++++++++---
- 3 files changed, 16 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 5c17d2dec777..8f967d1373f6 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
- 
- #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
- 
--#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-+#define FIXMAP_PAGE_NORMAL	(pgprot_kernel | L_PTE_XN)
- #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
- 
- /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index f4e54503afa9..32e1a9513dc7 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -80,7 +80,7 @@ __setup("fpe=", fpe_setup);
- 
- extern void init_default_cache_policy(unsigned long);
- extern void paging_init(const struct machine_desc *desc);
--extern void early_paging_init(const struct machine_desc *);
-+extern void early_mm_init(const struct machine_desc *);
- extern void adjust_lowmem_bounds(void);
- extern enum reboot_mode reboot_mode;
- extern void setup_dma_zone(const struct machine_desc *desc);
-@@ -1088,7 +1088,7 @@ void __init setup_arch(char **cmdline_p)
- 	parse_early_param();
- 
- #ifdef CONFIG_MMU
--	early_paging_init(mdesc);
-+	early_mm_init(mdesc);
- #endif
- 	setup_dma_zone(mdesc);
- 	xen_early_init();
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4e016d7f37b3..347cca965783 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -414,6 +414,11 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
- 		     FIXADDR_END);
- 	BUG_ON(idx >= __end_of_fixed_addresses);
- 
-+	/* we only support device mappings until pgprot_kernel has been set */
-+	if (WARN_ON(pgprot_val(prot) != pgprot_val(FIXMAP_PAGE_IO) &&
-+		    pgprot_val(pgprot_kernel) == 0))
-+		return;
-+
- 	if (pgprot_val(prot))
- 		set_pte_at(NULL, vaddr, pte,
- 			pfn_pte(phys >> PAGE_SHIFT, prot));
-@@ -1492,7 +1497,7 @@ pgtables_remap lpae_pgtables_remap_asm;
-  * early_paging_init() recreates boot time page table setup, allowing machines
-  * to switch over to a high (>4G) address space on LPAE systems
-  */
--void __init early_paging_init(const struct machine_desc *mdesc)
-+static void __init early_paging_init(const struct machine_desc *mdesc)
- {
- 	pgtables_remap *lpae_pgtables_remap;
- 	unsigned long pa_pgd;
-@@ -1560,7 +1565,7 @@ void __init early_paging_init(const struct machine_desc *mdesc)
- 
- #else
- 
--void __init early_paging_init(const struct machine_desc *mdesc)
-+static void __init early_paging_init(const struct machine_desc *mdesc)
- {
- 	long long offset;
- 
-@@ -1616,7 +1621,6 @@ void __init paging_init(const struct machine_desc *mdesc)
- {
- 	void *zero_page;
- 
--	build_mem_type_table();
- 	prepare_page_table();
- 	map_lowmem();
- 	memblock_set_current_limit(arm_lowmem_limit);
-@@ -1636,3 +1640,9 @@ void __init paging_init(const struct machine_desc *mdesc)
- 	empty_zero_page = virt_to_page(zero_page);
- 	__flush_dcache_page(NULL, empty_zero_page);
- }
-+
-+void __init early_mm_init(const struct machine_desc *mdesc)
-+{
-+	build_mem_type_table();
-+	early_paging_init(mdesc);
-+}
+Daniel
