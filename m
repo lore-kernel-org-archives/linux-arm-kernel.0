@@ -1,96 +1,147 @@
-From: olivier.moysan@st.com (olivier moysan)
-Date: Thu, 6 Apr 2017 17:40:35 +0200
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
-References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 06 Apr 2017 17:03:14 +0100
+Subject: [PATCH v4] arm: Fix memory attribute inconsistencies when using fixmap
+In-Reply-To: <CAKv+Gu_EVqqQGXauWmfhhmJZEyrPDEHDiN2T23XVPy_eR99Lsg@mail.gmail.com>
+References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170405224245.GA17774@n2100.armlinux.org.uk>
+ <1491486403.2950.3.camel@linaro.org>
+ <CAKv+Gu_EVqqQGXauWmfhhmJZEyrPDEHDiN2T23XVPy_eR99Lsg@mail.gmail.com>
+Message-ID: <1491494594.2950.7.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation of device tree bindings for STM32 SPI/I2S.
+To cope with the variety in ARM architectures and configurations, the
+pagetable attributes for kernel memory are generated at runtime to match
+the system the kernel finds itself on. This calculated value is stored
+in pgprot_kernel.
 
-Signed-off-by: olivier moysan <olivier.moysan@st.com>
+However, when early fixmap support was added for ARM (commit
+a5f4c561b3b1) the attributes used for mappings were hard coded because
+pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
+used after early boot this means the memory being mapped can have
+different attributes to existing mappings, potentially leading to
+unpredictable behaviour. A specific problem also exists due to the hard
+coded values not include the 'shareable' attribute which means on
+systems where this matters (e.g. those with multiple CPU clusters) the
+cache contents for a memory location can become inconsistent between
+CPUs.
+
+To resolve these issues we change fixmap to use the same memory
+attributes (from pgprot_kernel) that the rest of the kernel uses. To
+enable this we need to refactor the initialisation code so
+build_mem_type_table() is called early enough. Note, that relies on early
+param parsing for memory type overrides passed via the kernel command
+line, so we need to make sure this call is still after
+parse_early_params().
+
+Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
+Cc: <stable@vger.kernel.org> # v4.3+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+[ardb: keep early_fixmap_init() before param parsing, for earlycon]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- .../devicetree/bindings/sound/st,stm32h7-i2s.txt   | 71 ++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
-new file mode 100644
-index 0000000..b99467a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
-@@ -0,0 +1,71 @@
-+STMicroelectronics STM32 SPI/I2S Controller
+v4: - Drop declaration of early_mm_init() from arch/arm/include/asm/mmu.h
+      and make early_paging_init() static.
+
+Ard's v3:
+    - Unfortunately, I failed to spot an issue with earlycon when testing
+      Tixy's v2. Earlycon depends on fixmap, but only for device mappings,
+      which are not affected by this change. So instead, preserve the calls
+      to early_fixmap_init() and early_ioremap_init() in their original
+      locations, and only move build_mem_type_table() to the earliest
+      possible moment in boot, which is right after early param parsing
+      (which may set cachepolicy/nocache/nowb variables)
+
+ arch/arm/include/asm/fixmap.h |  2 +-
+ arch/arm/kernel/setup.c       |  4 ++--
+ arch/arm/mm/mmu.c             | 16 +++++++++++++---
+ 3 files changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 5c17d2dec777..8f967d1373f6 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+ 
+ #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+ 
+-#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
++#define FIXMAP_PAGE_NORMAL	(pgprot_kernel | L_PTE_XN)
+ #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
+ 
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index f4e54503afa9..32e1a9513dc7 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -80,7 +80,7 @@ __setup("fpe=", fpe_setup);
+ 
+ extern void init_default_cache_policy(unsigned long);
+ extern void paging_init(const struct machine_desc *desc);
+-extern void early_paging_init(const struct machine_desc *);
++extern void early_mm_init(const struct machine_desc *);
+ extern void adjust_lowmem_bounds(void);
+ extern enum reboot_mode reboot_mode;
+ extern void setup_dma_zone(const struct machine_desc *desc);
+@@ -1088,7 +1088,7 @@ void __init setup_arch(char **cmdline_p)
+ 	parse_early_param();
+ 
+ #ifdef CONFIG_MMU
+-	early_paging_init(mdesc);
++	early_mm_init(mdesc);
+ #endif
+ 	setup_dma_zone(mdesc);
+ 	xen_early_init();
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e016d7f37b3..347cca965783 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -414,6 +414,11 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
+ 		     FIXADDR_END);
+ 	BUG_ON(idx >= __end_of_fixed_addresses);
+ 
++	/* we only support device mappings until pgprot_kernel has been set */
++	if (WARN_ON(pgprot_val(prot) != pgprot_val(FIXMAP_PAGE_IO) &&
++		    pgprot_val(pgprot_kernel) == 0))
++		return;
 +
-+The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
-+Only some SPI instances support I2S.
+ 	if (pgprot_val(prot))
+ 		set_pte_at(NULL, vaddr, pte,
+ 			pfn_pte(phys >> PAGE_SHIFT, prot));
+@@ -1492,7 +1497,7 @@ pgtables_remap lpae_pgtables_remap_asm;
+  * early_paging_init() recreates boot time page table setup, allowing machines
+  * to switch over to a high (>4G) address space on LPAE systems
+  */
+-void __init early_paging_init(const struct machine_desc *mdesc)
++static void __init early_paging_init(const struct machine_desc *mdesc)
+ {
+ 	pgtables_remap *lpae_pgtables_remap;
+ 	unsigned long pa_pgd;
+@@ -1560,7 +1565,7 @@ void __init early_paging_init(const struct machine_desc *mdesc)
+ 
+ #else
+ 
+-void __init early_paging_init(const struct machine_desc *mdesc)
++static void __init early_paging_init(const struct machine_desc *mdesc)
+ {
+ 	long long offset;
+ 
+@@ -1616,7 +1621,6 @@ void __init paging_init(const struct machine_desc *mdesc)
+ {
+ 	void *zero_page;
+ 
+-	build_mem_type_table();
+ 	prepare_page_table();
+ 	map_lowmem();
+ 	memblock_set_current_limit(arm_lowmem_limit);
+@@ -1636,3 +1640,9 @@ void __init paging_init(const struct machine_desc *mdesc)
+ 	empty_zero_page = virt_to_page(zero_page);
+ 	__flush_dcache_page(NULL, empty_zero_page);
+ }
 +
-+Required properties:
-+  - compatible: Must be "st,stm32h7-i2s"
-+  - #sound-dai-cells: Must be 1. (one parameter)
-+    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
-+	index 0: playback DAI
-+	index 1: capture DAI
-+	index 2: full duplex DAI
-+  - reg: Offset and length of the device's register set.
-+  - interrupts: Must contain the interrupt line id.
-+  - clocks: Must contain phandle and clock specifier pairs for each entry
-+	in clock-names.
-+  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
-+	"i2sclk": clock which feeds the internal clock generator
-+	"pclk": clock which feeds the peripheral bus interface
-+	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
-+	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
-+  - dmas: DMA specifiers for tx and rx dma.
-+    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
-+  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
-+  - pinctrl-names: should contain only value "default"
-+  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
-+
-+Optional properties:
-+  - resets: Reference to a reset controller asserting the reset controller
-+
-+Example:
-+sound_card {
-+	compatible = "audio-graph-card";
-+	dais = <&i2s2_port 0>;
-+};
-+
-+i2s2: audio-controller at 40003800 {
-+	compatible = "st,stm32h7-i2s";
-+	#sound-dai-cells = <1>;
-+	reg = <0x40003800 0x400>;
-+	interrupts = <36>;
-+	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
-+	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
-+	dmas = <&dmamux2 2 39 0x400 0x1>,
-+		       <&dmamux2 3 40 0x400 0x1>;
-+	dma-names = "rx", "tx";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2s2>;
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2s2_port: port at 0 {
-+			reg = <0>;
-+			cpu_endpoint: endpoint {
-+				remote-endpoint = <&codec_endpoint>;
-+				audio-graph-card,format = "i2s";
-+				audio-graph-card,bitclock-master = <&codec_endpoint>;
-+				audio-graph-card,frame-master = <&codec_endpoint>;
-+			};
-+		};
-+};
-+
-+audio-codec {
-+		codec_port: port {
-+			codec_endpoint: endpoint {
-+				remote-endpoint = <&cpu_endpoint>;
-+		};
-+	};
-+};
--- 
-1.9.1
++void __init early_mm_init(const struct machine_desc *mdesc)
++{
++	build_mem_type_table();
++	early_paging_init(mdesc);
++}
