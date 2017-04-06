@@ -1,59 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 6 Apr 2017 16:10:03 -0700
-Subject: [GIT PULL] Allwinner clock fixes for 4.11, bis
-In-Reply-To: <20170406074121.tkivdvghbr27tr54@lukather>
-References: <20170406074121.tkivdvghbr27tr54@lukather>
-Message-ID: <20170406231003.GS7065@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  7 Apr 2017 01:10:17 +0200
+Subject: [GIT PULL 1/4] dt-bindings: Updates for v4.12-rc1
+Message-ID: <20170406231020.32048-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06, Maxime Ripard wrote:
-> Hi Mike, Stephen,
-> 
-> Please pull the following changes for one of the 4.11-rc's
-> 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
-> 
->   clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.11-2
-> 
-> for you to fetch changes up to d054a839a0986136374d49f9f9fbc264abae9c4c:
-> 
->   clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER (2017-03-27 13:37:05 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner clock fixes for 4.11, bis
-> 
-> A few patches to fix a build error and a few minor typos and bugs in the
-> sunxi-ng code
-> 
-> ----------------------------------------------------------------
-> Chen-Yu Tsai (3):
->       clk: sunxi-ng: use 1 as fallback for minimum multiplier
->       clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
->       clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
-> 
-> Tobias Regnery (1):
->       clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
-> 
+Hi ARM SoC maintainers,
 
-Two of these are fixes for regressions in v4.10? Why are these
-critical for the v4.11 release? The comment patch is totally
-bogus, it's not fixing any sort of regression that is causing
-problems for people so I'm not sure why it was put into this pull
-request. Am I right in assuming that the only real patch we need
-out of here is the last one for the build error from randconfigs?
-If so I can cherry-pick that from the branch into fixes and the
-rest can go the next merge window.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Not pulling for now.
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.12-dt-bindings
+
+for you to fetch changes up to bf594a896cdbae4a581eb80a2bdbda8df6997d75:
+
+  dt-bindings: Add documentation for GP10B GPU (2017-04-04 16:08:18 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+dt-bindings: Updates for v4.12-rc1
+
+This contains an update for the flow controller device tree binding as
+well as the addition of the binding for the GP10B GPU found on the new
+Tegra186 (Parker) SoC.
+
+----------------------------------------------------------------
+Alexandre Courbot (1):
+      dt-bindings: Add documentation for GP10B GPU
+
+Jon Hunter (1):
+      dt-bindings: tegra: Update compatible strings for Tegra flowctrl
+
+ .../bindings/arm/tegra/nvidia,tegra20-flowctrl.txt |  8 ++++++-
+ .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 25 +++++++++++++++++++++-
+ 2 files changed, 31 insertions(+), 2 deletions(-)
