@@ -1,39 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 6 Apr 2017 15:10:47 +0200
-Subject: [PATCH v3] pwm: rockchip: State of pwm clock should synchronize
- with pwm enabled state
-In-Reply-To: <1488366655-31387-1-git-send-email-david.wu@rock-chips.com>
-References: <1488366655-31387-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170406131047.GA8438@ulmo.ba.sec>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 06 Apr 2017 15:14:51 +0200
+Subject: [Patch v4 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
+ encoder
+In-Reply-To: <1491459105-16641-11-git-send-email-smitha.t@samsung.com>
+References: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170406061023epcas5p2a3fa65c4254e17a58f71c68d413e6bfd@epcas5p2.samsung.com>
+ <1491459105-16641-11-git-send-email-smitha.t@samsung.com>
+Message-ID: <374939c7-241a-fcca-c87e-5c4290bdb6aa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 07:10:55PM +0800, David Wu wrote:
-> From: "david.wu" <david.wu@rock-chips.com>
+On 04/06/2017 08:11 AM, Smitha T Murthy wrote:
+> @@ -775,6 +832,47 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+>  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
+>  
+> +	/* HEVC controls */
+[...]
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC LF Across Slice Boundary or Not";
 
-You might want to set up git to use the correct author.
+Please make sure the names are no longer than 31 characters to avoid
+truncation during control enumeration in user space.
+Data structures like struct v4l2_queryctrl, struct v4l2_query_ext_ctrl
+have only 32 bytes long array dedicated for the control name.
 
-> If the pwm was not enabled at uboot loader, pwm could not work for clock
-> always disabled at pwm driver. The pwm clock is enabled at beginning of
-> pwm_apply(), but disabled at end of pwm_apply().
-> 
-> If the pwm was enabled at uboot loader, pwm clock is always enabled unless
-> closed by ATF. The pwm-backlight might turn off the power at early suspend,
-> should disable pwm clock for saving power consume.
-> 
-> It is important to provide opportunity to enable/disable clock at pwm driver,
-> the pwm consumer should ensure correct order to call pwm enable/disable, and
-> pwm driver ensure state of pwm clock synchronized with pwm enabled state.
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP:		return "HEVC QP Values";
 
-Please always use all-caps for abbreviations suchs as "PWM". I've fixed
-up the commit message and applied this to for-4.11/fixes.
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:	return "HEVC Hierarchical Coding Type";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:return "HEVC Hierarchical Coding Layer";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:return "HEVC Hierarchical Layer QP";
 
+How about s/HIERARCHICAL_/HIER_ for the above 3 control IDs?
+
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER0_BITRATE:return "HEVC Hierarchical Lay 0 Bit Rate";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER1_BITRATE:return "HEVC Hierarchical Lay 1 Bit Rate";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER2_BITRATE:return "HEVC Hierarchical Lay 2 Bit Rate";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER3_BITRATE:return "HEVC Hierarchical Lay 3 Bit Rate";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER4_BITRATE:return "HEVC Hierarchical Lay 4 Bit Rate";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER5_BITRATE:return "HEVC Hierarchical Lay 5 Bit Rate";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER6_BITRATE:return "HEVC Hierarchical Lay 6 Bit Rate";
+
+Using single letter L instead of LAYER would make the control ID shorter
+and more consistent with existing controls, e.g. 
+V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_L6_BITRATE.
+
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:		return "HEVC Sign Data Hiding";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB:		return "HEVC General PB";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID:		return "HEVC Temporal ID";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING:		return "HEVC Strong Intra Smoothing";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT:		return "HEVC Intra PU Split";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION:		return "HEVC TMV Prediction";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "HEVC Max Number of Candidate MVs";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE:	return "HEVC ENC Without Startcode";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC Num of I Frame b/w 2 IDR";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC Loop Filter Beta Offset";
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC Loop Filter tc Offset";
+
+s/tc/Tc or s/tc/TC ?
+
+> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of Length Field";
+
+--
 Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/7673ddd4/attachment.sig>
+Sylwester
