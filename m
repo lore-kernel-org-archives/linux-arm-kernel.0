@@ -1,53 +1,39 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu,  6 Apr 2017 20:07:19 +0100
-Subject: [RFC kvm-unit-tests PATCH 0/8] Support for out-of-tree builds
-Message-ID: <20170406190727.5624-1-alex.bennee@linaro.org>
+Date: Thu,  6 Apr 2017 20:07:24 +0100
+Subject: [RFC kvm-unit-tests PATCH 5/8] Makefile: add explicit mkdir for .o
+ targets
+In-Reply-To: <20170406190727.5624-1-alex.bennee@linaro.org>
+References: <20170406190727.5624-1-alex.bennee@linaro.org>
+Message-ID: <20170406190727.5624-6-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is fairly direct way of ensuring the target build directories are
+created before we build a binary blob. mkdir -p fails gracefully if
+the directory is already there.
 
-While I was working on MTTCG I did find it a pain to maintain 2 source
-trees (one for 64bit and one for 32bit). After speaking to someone
-about the changes they made to their tests to support out-of-tree
-builds I thought it might be worth porting to kvm-unit-tests.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-As it turns out there where a few more warts involved but essentially
-most of the difficulty is handled by VPATH. The remaining changes deal
-creating target build directories and handling things like scripts
-(which are just symlinked to the repo).
-
-So far I've tested x86, arm and aarch64 builds but I'll complete the
-set once people are happy with the general approach.
-
-Enjoy,
-
-
-
-Alex Benn?e (8):
-  configure: make it run-able from outside source tree
-  Makefile: ensure build-head works out-of-src-tree
-  Makefile: set VPATH based on SRCDIR
-  Makefiles: use explicit path for including sub-Makefiles
-  Makefile: add explicit mkdir for .o targets
-  Makefiles: handle linking of scripts into build-tree
-  Makefiles: fix up the x86 build include and link paths
-  Makefiles: fix up the arm build include and link paths
-
- Makefile                | 33 +++++++++++++++++++++++++++------
- arm/Makefile            |  2 +-
- arm/Makefile.arm        |  2 +-
- arm/Makefile.arm64      |  2 +-
- arm/Makefile.common     | 15 +++++++++------
- configure               | 24 +++++++++++++++++-------
- powerpc/Makefile        |  2 +-
- powerpc/Makefile.ppc64  |  2 +-
- scripts/asm-offsets.mak |  4 +++-
- x86/Makefile            |  2 +-
- x86/Makefile.common     | 14 +++++++++-----
- x86/Makefile.i386       |  2 +-
- x86/Makefile.x86_64     |  2 +-
- 13 files changed, 73 insertions(+), 33 deletions(-)
-
+diff --git a/Makefile b/Makefile
+index 781186e..56598df 100644
+--- a/Makefile
++++ b/Makefile
+@@ -79,8 +79,13 @@ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
+ 	$(AR) rcs $@ $^
+ 
+ %.o: %.S
++	mkdir -p $(dir $@)
+ 	$(CC) $(CFLAGS) -c -nostdlib -o $@ $<
+ 
++%.o: %.c
++	mkdir -p $(dir $@)
++	$(CC) $(CFLAGS) -c -o $@ $<
++
+ -include */.*.d */*/.*.d
+ 
+ all: $(shell git -C $(SRCDIR) rev-parse --verify --short=8 HEAD >build-head 2>/dev/null)
 -- 
 2.11.0
