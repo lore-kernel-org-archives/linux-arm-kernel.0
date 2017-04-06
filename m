@@ -1,81 +1,64 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 06 Apr 2017 13:33:59 +0900
-Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
-In-Reply-To: <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
- <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
- <93e79e92-a102-e931-8d63-843031848888@samsung.com>
- <58DA1E38.50907@samsung.com>
- <CAJKOXPeD4HKemKTrnC2JaON3JkuNGO9g+Hg8M7F6f2WusiYkhg@mail.gmail.com>
- <CAJKOXPd-h4QqLXJ5AYr1KgpjvROaWpVZnd9KmeeGoVRQifssbw@mail.gmail.com>
-Message-ID: <58E5C537.1020301@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 6 Apr 2017 10:49:17 +0530
+Subject: [PATCH v6 01/23] PCI: endpoint: Add EP core layer to enable EP
+ controller and EP functions
+In-Reply-To: <20170405165254.GA17066@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170405085243.18123-1-kishon@ti.com>
+ <20170405085243.18123-2-kishon@ti.com>
+ <20170405165254.GA17066@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <f02ddadd-239a-b559-ab85-0bed3f3e0112@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bjorn,
 
+On Wednesday 05 April 2017 10:22 PM, Bjorn Helgaas wrote:
+> On Wed, Apr 05, 2017 at 02:22:21PM +0530, Kishon Vijay Abraham I wrote:
+>> Introduce a new EP core layer in order to support endpoint functions in
+>> linux kernel. This comprises the EPC library (Endpoint Controller Library)
+>> and EPF library (Endpoint Function Library). EPC library implements
+>> functions specific to an endpoint controller and EPF library implements
+>> functions specific to an endpoint function.
+>> ...
+> 
+>> +/**
+>> + * pci_epf_linkup() - Notify the function driver that EPC device has
+>> + *		      established a connection with the Root Complex.
+>> + * @epf: the EPF device bound to the EPC device which has established
+>> + *	 the connection with the host
+>> + *
+>> + * Invoke to notify the function driver that EPC device has established
+>> + * a connection with the Root Complex.
+>> + */
+>> +void pci_epf_linkup(struct pci_epf *epf)
+>> +{
+>> +	if (!epf->driver)
+>> +		dev_WARN(&epf->dev, "epf device not bound to driver\n");
+>> +
+>> +	epf->driver->ops->linkup(epf);
+> 
+> I don't understand what's going on here.  We warn if epf->driver is
+> NULL, but the next thing we do is dereference it.
+> 
+> For NULL pointers that are symptoms of Linux defects, I usually prefer
+> not to check at all so that a dereference generates an oops and we can
+> debug the problem.  For NULL pointers caused by user error, we would
+> generally return an error that percolates up to the user.
+> 
+> I haven't competely wrapped my head around this endpoint support, but
+> I assume a NULL pointer here would be caused by user error, not
+> necessarily a Linux defect.  So why would we dereference a NULL
+> pointer?  And what happens when we do?  Is this just going to oops an
+> embedded Linux running inside the endpoint?  Is that the correct
+> behavior?
 
-2017? 04? 05? 00:38? Krzysztof Kozlowski ?(?) ? ?:
-> On Tue, Mar 28, 2017 at 11:38 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On Tue, Mar 28, 2017 at 11:26 AM, Inki Dae <inki.dae@samsung.com> wrote:
->>> Merged.
->>
->> Hi,
->>
->> I do not see the tag (with DT patches) merged by you which I provided
->> to you before. These are essential for bisectability. Without them,
->> kernel bisectability is broken. Did you merged the tag somewhere?
->>
->> Best regards,
->> Krzysztof
->>
->>> Thanks,
->>> Inki Dae
-> 
-> Inki,
-> 
-> I still do not see the DTS tag [1] merged in your tree but you applied
-> patches breaking the display. I looked at exynos-drm-next branch.
-> 
-> We talked already about bisectability and with Hoegeun we provided
-> proper solution. Hoegeun split the patchset and I sent you a stable
-> tag to merge. Be aware not to apply the DTS patch because you would
-> effectively duplicate it. Instead, deal like with any pull request -
-> merge the tag as dependency *before* applying DRM DSI patch.
+With the new configfs directory structure, this should be a kernel error.
+However the EPF layer should be independent of how it's API's are used i.e
+someone can create a new sysfs/configfs structure and the value of epf->driver
+might be dependent on user actions.
 
-Krzysztof,
+I think I'd prefer not to dereference NULL pointers since we anyways have a
+dev_WARN for debug. I'll resend this patch with return if epf->driver is NULL.
 
-I think merging the DTS tag is not necessary because dt and drm patches will go to -next separately.
-Anyway, confirmed your email just now. Seems better so did what you want.
-
-
-Thanks,
-Inki Dae
-
-> 
-> I saw also a branch like this:
-> https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next-tm2
-> but this is something obviously wrong. I do not know what are your
-> plans to do with it, but please drop it as it brings only confusion.
-> 
-> Best regards,
-> Krzysztof
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg567053.html
-> 
->>> 2017? 03? 22? 10:36? Hoegeun Kwon ?(?) ? ?:
->>>> Hi inki,
->>>>
->>>> Could you check the this patch?
->>>> For reference, patch 1/5 and 2/5 have already been applied to Krzysztof tree.
->>>>
->>>> Best regards,
->>>> Hoegeun
->>>>
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> 
+Thanks
+Kishon
