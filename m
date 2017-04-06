@@ -1,60 +1,62 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 06 Apr 2017 14:46:43 +0100
-Subject: [PATCH v3] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <20170405224245.GA17774@n2100.armlinux.org.uk>
-References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170405224245.GA17774@n2100.armlinux.org.uk>
-Message-ID: <1491486403.2950.3.camel@linaro.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu,  6 Apr 2017 21:31:01 +0800
+Subject: [PATCH v6 8/8] arm64: dts: qcom: msm8916: Add debug unit
+In-Reply-To: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
+References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1491485461-22800-9-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-05 at 23:42 +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 04, 2017 at 08:31:27AM +0100, Ard Biesheuvel wrote:
-> > diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
-> > index a5b47421059d..80dfeb8ce8f2 100644
-> > --- a/arch/arm/include/asm/mmu.h
-> > +++ b/arch/arm/include/asm/mmu.h
-> > @@ -1,6 +1,8 @@
-> >  #ifndef __ARM_MMU_H
-> >  #define __ARM_MMU_H
-> >  
-> > +struct machine_desc;
-> > +
-> >  #ifdef CONFIG_MMU
-> >  
-> >  typedef struct {
-> > @@ -24,6 +26,8 @@ typedef struct {
-> >  #define ASID(mm)	(0)
-> >  #endif
-> >  
-> > +void early_mm_init(const struct machine_desc *mdesc);
-> > +
-> >  #else
-> >  
-> >  /*
-> > @@ -35,6 +39,8 @@ typedef struct {
-> >  	unsigned long	end_brk;
-> >  } mm_context_t;
-> >  
-> > +static inline void early_mm_init(const struct machine_desc *mdesc) { }
-> > +
-> 
-> Why are we stuffing this into mmu.h?  mmu.h is not the header file for
-> arch/arm/mm/mmu.c - although they have the same base filename, they are
-> not really related.
-> 
-> asm/mmu.h is supposed to be a kernel-wide include file for the mm_context_t
-> thing, and should not be filled with arch-private stuff.
-> 
-> Please find a better location for this.
+Add debug unit on Qualcomm msm8916 based platforms, including the
+DragonBoard 410c board.
 
-In arch/arm/mm/mm.h ?
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Or as early_mm_init() is replacing early_paging_init()?in setup.c, and
-that is currently handled by a local extern statement, keeping doing the
-same? That keeps the diff neater which is a plus for a patch that should
-be backported to stable kernels.
-
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 68a8e67..3af814b 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1104,6 +1104,38 @@
+ 			};
+ 		};
+ 
++		debug at 850000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x850000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU0>;
++		};
++
++		debug at 852000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x852000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU1>;
++		};
++
++		debug at 854000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x854000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU2>;
++		};
++
++		debug at 856000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x856000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU3>;
++		};
++
+ 		etm at 85c000 {
+ 			compatible = "arm,coresight-etm4x", "arm,primecell";
+ 			reg = <0x85c000 0x1000>;
 -- 
-Tixy
+2.7.4
