@@ -1,64 +1,20 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Apr 2017 10:49:17 +0530
-Subject: [PATCH v6 01/23] PCI: endpoint: Add EP core layer to enable EP
- controller and EP functions
-In-Reply-To: <20170405165254.GA17066@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170405085243.18123-1-kishon@ti.com>
- <20170405085243.18123-2-kishon@ti.com>
- <20170405165254.GA17066@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <f02ddadd-239a-b559-ab85-0bed3f3e0112@ti.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 6 Apr 2017 07:24:31 +0200
+Subject: [PATCH net-next] macb: Add hardware PTP support.
+In-Reply-To: <20170405.064303.211440601700403108.davem@davemloft.net>
+References: <20170329.093914.152103359543418375.davem@davemloft.net>
+ <1491225015-25553-1-git-send-email-rafalo@cadence.com>
+ <20170405.064303.211440601700403108.davem@davemloft.net>
+Message-ID: <20170406052431.GC1660@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Wed, Apr 05, 2017 at 06:43:03AM -0700, David Miller wrote:
+> This patch does too many things at one time.  Each entry in that list
+> of changes above should be a separate change, all posted together as
+> a group as a proper patch series.
 
-On Wednesday 05 April 2017 10:22 PM, Bjorn Helgaas wrote:
-> On Wed, Apr 05, 2017 at 02:22:21PM +0530, Kishon Vijay Abraham I wrote:
->> Introduce a new EP core layer in order to support endpoint functions in
->> linux kernel. This comprises the EPC library (Endpoint Controller Library)
->> and EPF library (Endpoint Function Library). EPC library implements
->> functions specific to an endpoint controller and EPF library implements
->> functions specific to an endpoint function.
->> ...
-> 
->> +/**
->> + * pci_epf_linkup() - Notify the function driver that EPC device has
->> + *		      established a connection with the Root Complex.
->> + * @epf: the EPF device bound to the EPC device which has established
->> + *	 the connection with the host
->> + *
->> + * Invoke to notify the function driver that EPC device has established
->> + * a connection with the Root Complex.
->> + */
->> +void pci_epf_linkup(struct pci_epf *epf)
->> +{
->> +	if (!epf->driver)
->> +		dev_WARN(&epf->dev, "epf device not bound to driver\n");
->> +
->> +	epf->driver->ops->linkup(epf);
-> 
-> I don't understand what's going on here.  We warn if epf->driver is
-> NULL, but the next thing we do is dereference it.
-> 
-> For NULL pointers that are symptoms of Linux defects, I usually prefer
-> not to check at all so that a dereference generates an oops and we can
-> debug the problem.  For NULL pointers caused by user error, we would
-> generally return an error that percolates up to the user.
-> 
-> I haven't competely wrapped my head around this endpoint support, but
-> I assume a NULL pointer here would be caused by user error, not
-> necessarily a Linux defect.  So why would we dereference a NULL
-> pointer?  And what happens when we do?  Is this just going to oops an
-> embedded Linux running inside the endpoint?  Is that the correct
-> behavior?
+And please start a new thread with the next posting.
 
-With the new configfs directory structure, this should be a kernel error.
-However the EPF layer should be independent of how it's API's are used i.e
-someone can create a new sysfs/configfs structure and the value of epf->driver
-might be dependent on user actions.
-
-I think I'd prefer not to dereference NULL pointers since we anyways have a
-dev_WARN for debug. I'll resend this patch with return if epf->driver is NULL.
-
-Thanks
-Kishon
+Thanks,
+Richard
