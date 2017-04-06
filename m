@@ -1,153 +1,49 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:15 +0100
-Subject: [PATCHv2 08/16] drivers/perf: arm_pmu: split cpu-local irq
- request/free
+Date: Thu,  6 Apr 2017 19:29:20 +0100
+Subject: [PATCHv2 13/16] arm64: parking: fix type endianness
 In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-14-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we have functions to request/free all IRQs for a given PMU.
-While this works today, this won't work for ACPI, where we don't know
-the full set of IRQs up front, and need to request them separately.
+The read*{,_relaxed}() return a value of native CPU endianness,
+swizzling the LE value they read from an __iomem pointer.
 
-To enable supporting ACPI, this patch splits out the cpu-local
-request/free into new functions, allowing us to request/free individual
-IRQs.
+Thus it isn't correct to treat their return values as __le32 or __le64,
+and we should use u32 and u64 respectively instead.
 
-As this makes it possible/necessary to request a PPI once per cpu, an
-additional check is added to detect mismatched PPIs. This shouldn't
-matter for the DT / platform case, as we check this when parsing.
+This makes sparse much happier, but should have no functional impact.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 88 +++++++++++++++++++++++++++++---------------------
- 1 file changed, 52 insertions(+), 36 deletions(-)
+ arch/arm64/kernel/acpi_parking_protocol.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 3c4e97d..c09c379 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -527,65 +527,81 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
- 
--static void armpmu_free_irqs(struct arm_pmu *armpmu)
-+static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+index e2c7399..b878b15 100644
+--- a/arch/arm64/kernel/acpi_parking_protocol.c
++++ b/arch/arm64/kernel/acpi_parking_protocol.c
+@@ -56,7 +56,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
  {
--	int cpu;
- 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
-+	int irq = per_cpu(hw_events->irq, cpu);
+ 	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
+ 	struct parking_protocol_mailbox __iomem *mailbox;
+-	__le32 cpu_id;
++	u32 cpu_id;
  
--	for_each_cpu(cpu, &armpmu->supported_cpus) {
--		int irq = per_cpu(hw_events->irq, cpu);
--		if (!irq)
--			continue;
-+	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
-+		return;
- 
--		if (irq_is_percpu(irq)) {
--			free_percpu_irq(irq, &hw_events->percpu_pmu);
--			break;
--		}
-+	if (irq_is_percpu(irq)) {
-+		free_percpu_irq(irq, &hw_events->percpu_pmu);
-+		cpumask_clear(&armpmu->active_irqs);
-+		return;
-+	}
- 
--		if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
--			continue;
-+	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
-+}
- 
--		free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
--	}
-+static void armpmu_free_irqs(struct arm_pmu *armpmu)
-+{
-+	int cpu;
-+
-+	for_each_cpu(cpu, &armpmu->supported_cpus)
-+		armpmu_free_irq(armpmu, cpu);
- }
- 
--static int armpmu_request_irqs(struct arm_pmu *armpmu)
-+static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 	/*
+ 	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+@@ -107,7 +107,7 @@ static void acpi_parking_protocol_cpu_postboot(void)
  {
--	int cpu, err;
-+	int err = 0;
- 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
- 	const irq_handler_t handler = armpmu_dispatch_irq;
-+	int irq = per_cpu(hw_events->irq, cpu);
-+	if (!irq)
-+		return 0;
+ 	int cpu = smp_processor_id();
+ 	struct parking_protocol_mailbox __iomem *mailbox;
+-	__le64 entry_point;
++	u64 entry_point;
  
--	for_each_cpu(cpu, &armpmu->supported_cpus) {
--		int irq = per_cpu(hw_events->irq, cpu);
--		if (!irq)
--			continue;
-+	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
-+		err = request_percpu_irq(irq, handler, "arm-pmu",
-+					 &hw_events->percpu_pmu);
-+	} else if (irq_is_percpu(irq)) {
-+		int other_cpu = cpumask_first(&armpmu->active_irqs);
-+		int other_irq = per_cpu(hw_events->irq, other_cpu);
+ 	mailbox = per_cpu(mailboxes, cpu);
  
--		if (irq_is_percpu(irq)) {
--			err = request_percpu_irq(irq, handler, "arm-pmu",
--						 &hw_events->percpu_pmu);
--			if (err) {
--				pr_err("unable to request IRQ%d for ARM PMU counters\n",
--					irq);
--			}
--
--			return err;
-+		if (irq != other_irq) {
-+			pr_warn("mismatched PPIs detected.\n");
-+			err = -EINVAL;
- 		}
--
-+	} else {
- 		err = request_irq(irq, handler,
- 				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
- 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
--		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
--			return err;
--		}
-+	}
- 
--		cpumask_set_cpu(cpu, &armpmu->active_irqs);
-+	if (err) {
-+		pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+			irq);
-+		return err;
- 	}
- 
-+	cpumask_set_cpu(cpu, &armpmu->active_irqs);
-+
- 	return 0;
- }
- 
-+static int armpmu_request_irqs(struct arm_pmu *armpmu)
-+{
-+	int cpu, err;
-+
-+	for_each_cpu(cpu, &armpmu->supported_cpus) {
-+		err = armpmu_request_irq(armpmu, cpu);
-+		if (err)
-+			break;
-+	}
-+
-+	return err;
-+}
-+
- static int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
- {
- 	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
 -- 
 1.9.1
