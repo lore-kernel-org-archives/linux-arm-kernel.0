@@ -1,156 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 6 Apr 2017 17:21:56 +0100
-Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
- interface
-In-Reply-To: <20170406130727.GE17774@n2100.armlinux.org.uk>
-References: <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
- <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
- <20170328144543.GA18046@red-moon>
- <20170405105841.GG7909@n2100.armlinux.org.uk>
- <20170405113238.GA2465@red-moon> <20170406102636.GA9623@red-moon>
- <20170406105312.GE28800@wotan.suse.de>
- <20170406113845.GA10013@red-moon>
- <20170406115906.GF28800@wotan.suse.de>
- <20170406130727.GE17774@n2100.armlinux.org.uk>
-Message-ID: <20170406162156.GA10134@red-moon>
+From: jgross@suse.com (Juergen Gross)
+Date: Thu, 6 Apr 2017 18:22:44 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <20170406160653.GJ4372@olila.local.net-space.pl>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+ <20170406142710.GE4372@olila.local.net-space.pl>
+ <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
+ <20170406152040.GH4372@olila.local.net-space.pl>
+ <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+ <20170406160653.GJ4372@olila.local.net-space.pl>
+Message-ID: <c23a6d11-cde8-7690-9676-537b5f17b967@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 02:07:27PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 06, 2017 at 01:59:07PM +0200, Luis R. Rodriguez wrote:
-> > On Thu, Apr 06, 2017 at 12:38:45PM +0100, Lorenzo Pieralisi wrote:
-> > > Ok but where ? linux/io.h or asm-generic/io.h ? As I replied to Russell,
-> > > having it in linux/io.h is a bit odd given that it would be the only
-> > > ioremap_* implementation declared there, I think we need more
-> > > consistency here instead of deviating again from what you did.
-> > 
-> > asm-generic/io.h is the right place for generics which let you override.
+On 06/04/17 18:06, Daniel Kiper wrote:
+> Hi Julien,
 > 
-> I disagree for two reasons, and I will refer you to Linus' comments back
-> in 2005 at http://yarchive.net/comp/linux/generic.html
+> On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
+>> Hi Daniel,
+>>
+>> On 06/04/17 16:20, Daniel Kiper wrote:
+>>> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
+>>>> On 06/04/17 16:27, Daniel Kiper wrote:
+>>>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+>>>>>> Hi Juergen,
+>>>>>>
+>>>>>> On 06/04/17 07:23, Juergen Gross wrote:
+>>>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
+>>>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
+>>>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
+>>>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
+>>>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
+>>>>>>>>
+>>>>>>>> (+Daniel)
+>>>>>>>>
+>>>>>>>> This could be a problem for x86 as well, at least theoretically.
+>>>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+>>>>>>>>
+>>>>>>>> So I think we should have a similar routine there.
+>>>>>>>
+>>>>>>> +1
+>>>>>>>
+>>>>>>> I don't see any problem with such a routine added, in contrast to
+>>>>>>> potential "reboots" instead of power off without it.
+>>>>>>>
+>>>>>>> So I think this dummy xen_efi_reset_system() should be added to
+>>>>>>> drivers/xen/efi.c instead.
+>>>>>>
+>>>>>> I will resend the patch during day with xen_efi_reset_system moved
+>>>>>> to common code and implement the x86 counterpart (thought, I will
+>>>>>> not be able to test it).
+>>>>>
+>>>>> I think that this is ARM specific issue. On x86 machine_restart() calls
+>>>>> xen_restart(). Hence, everything works. So, I think that it should be
+>>>>> fixed only for ARM. Anyway, please CC me when you send a patch.
+>>>>
+>>>> What about xen_machine_power_off() (as stated in Boris' mail)?
+>>>
+>>> Guys what do you think about that:
+>>>
+>>> --- a/drivers/firmware/efi/reboot.c
+>>> +++ b/drivers/firmware/efi/reboot.c
+>>> @@ -55,7 +55,7 @@ static void efi_power_off(void)
+>>>
+>>> static int __init efi_shutdown_init(void)
+>>> {
+>>> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
+>>> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
+>>>                return -ENODEV;
+>>>
+>>>        if (efi_poweroff_required())
+>>>
+>>>
+>>> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
+>>>
+>>> I hope that tweaks for both files should solve our problem.
+>>
+>> This sounds good for power off (I haven't tried to power off DOM0
+>> yet). But this will not solve the restart problem (see
+>> machine_restart in arch/arm64/kernel/process.c) which call directly
+>> efi_reboot.
 > 
-> 1) asm-generic/io.h has become an ifdef mess, every single definition in
->    there is conditional.  The reason for this has happened is that
->    architectures can't pick and choose what they want from a single file
->    unless something like that is done.  It would be _far_ better to
->    split this file up by functional group - eg, ISA IO accessors,
->    io(read|write)*(), read|write*(), and so forth.
-> 
-> 2) We're at the point where we have various .c files around the kernel
->    _directly_ including asm-generic header files, which means the
->    use of asm-generic headers is no longer a choice of the architecture.
-> 
-> 3) asm-generic/ started out life as the place where example
->    implementations of asm/*.h header files were found, and but has
->    grown into a place where we dump default implementations.  We had
->    a place for default implementations for years, which were the
->    linux/*.h headers.  We have now ended up with a mixture of both
->    techniques, even for something like io.h, we have the messy
->    asm-generic/io.h, the architecture's asm/io.h, and then linux/io.h.
->    We have ended up with both linux/io.h and asm-generic/io.h containing
->    default definitions.
-> 
-> We've had the rule that where both linux/foo.h and asm/foo.h exist, the
-> linux/ counterpart is the preferred include file.  That didn't really
-> happen with asm/io.h due to the number of users that there were, but
-> when new stuff was added to asm/io.h which we wanted to be generic,
-> linux/io.h was created to contain that.  This actually pre-dates the
-> "let's clutter up asm-generic with shared arch stuff" push.
-> 
-> Now, what you say _may_ make sense if we have an
-> asm-generic/ioremap-nopost.h header which just defines a default
-> ioremap_nopost.h implementation, and architectures would then be able to
-> choose whether to include that or not depending on whether they provide
-> their own implementation.  No ugly ifdefs are necessary with that
-> approach.
-> 
-> Out of the three choices, I would much rather see the
-> asm-generic/ioremap-nopost.h approach.  However, the down-side to that
-> is it means all architectures asm/io.h would need to be touched to
-> explicitly include that.
-> 
-> What I'm absolutely certain of, though, is that making asm-generic/io.h
-> even worse by adding yet more conditional stuff to it is not a sane way
-> forward.
+> Hmmm... It seems to me that efi.reset_system override with empty function
+> in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
+> One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
+> for arch/arm64/kernel/efi.c. Does it make sense?
 
-Ok, so:
+I still think the empty function should be in drivers/xen/efi.c and we
+should use it in arch/x86/xen/efi.c, too.
 
-(1) I can do asm-generic/ioremap-nopost.h, which I assume you want to
-    contain something like
 
-static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
-{
-	return ioremap_nocache(offset, size);
-}
-
-Funny bit is that it has to be included by asm*/io.h files _after_
-ioremap_nocache has been #defined (that's the reason my approach was
-failing miserably even on arches like eg powerpc (see [1] below) that
-does have ioremap_nocache), not sure it is going to be very nice to have
-an include in the middle of asm*/io.h include files (and I have to patch
-all arches which I can do).
-
-Or
-
-(2) I add:
-
-#ifndef ioremap_nopost
-static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
-{
-	return NULL; <-(making it return ioremap_nocache() does not
-			work, see [1] for the reason)
-}
-#endif
-
-in linux/io.h
-
-(3) ioremap_nopost follows Luis' ioremap_uc approach
-
-(1)-(2) bypass completely what Luis did for ioremap_uc(), which implies
-that we have yet another way of implementing ioremap_*.
-
-I would like to get this patchset done so if you have an opinion it
-is time to state it.
-
-Thanks,
-Lorenzo
-
-[1] powerpc build report:
-
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git pci/config-io-mappings-fix-v3
-head:   283a324b549a662346c95c05b08983dd5b83354b
-commit: e66b493fe93226c02b1a33355f79db7ed6efe718 [2/23] linux/io.h: add ioremap_nopost remap interface
-config: powerpc-defconfig (attached as .config)
-compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout e66b493fe93226c02b1a33355f79db7ed6efe718
-        # save the attached .config to linux build tree
-        make.cross ARCH=powerpc
-
-All errors (new ones prefixed by >>):
-
-   In file included from arch/powerpc/include/asm/io.h:28:0,
-                    from arch/powerpc/oprofile/op_model_cell.c:29:
-   include/linux/io.h: In function 'ioremap_nopost':
-   include/linux/io.h:169:9: error: implicit declaration of function 'ioremap_nocache' [-Werror=implicit-function-declaration]
-     return ioremap_nocache(offset, size);
-            ^~~~~~~~~~~~~~~
->> include/linux/io.h:169:9: error: return makes pointer from integer without a cast [-Werror=int-conversion]
-     return ioremap_nocache(offset, size);
-            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   cc1: all warnings being treated as errors
-
-vim +169 include/linux/io.h
-
-   163  }
-   164  #endif
-   165 
-   166  #ifndef ioremap_nopost
-   167  static inline void __iomem *ioremap_nopost(phys_addr_t offset, size_t size)
-   168  {
- > 169           return ioremap_nocache(offset, size);
-   170  }
-   171  #endif
-   172 
+Juergen
