@@ -1,421 +1,162 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Thu, 06 Apr 2017 11:41:45 +0530
-Subject: [Patch v4 12/12] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
-References: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
- <CGME20170406061027epcas5p2628e0a8e0fd76e2e267fad3ea1209f65@epcas5p2.samsung.com>
-Message-ID: <1491459105-16641-13-git-send-email-smitha.t@samsung.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Thu, 6 Apr 2017 08:23:10 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+Message-ID: <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added V4l2 controls for HEVC encoder
+On 05/04/17 21:49, Boris Ostrovsky wrote:
+> On 04/05/2017 02:14 PM, Julien Grall wrote:
+>> When rebooting DOM0 with ACPI, the kernel is crashing with the stack trace [1].
+>>
+>> This is happening because when EFI runtimes are enabled, the reset code
+>> (see machin_restart) will first try to use EFI restart method.
+>>
+>> However, the EFI restart code is expecting the reset_system callback to
+>> be always set. This is not the case for Xen and will lead to crash.
+>>
+>> Looking at the reboot path, it is expected to fallback on an alternative
+>> reboot method if one does not work. So implement reset_system callback
+>> as a NOP for Xen.
+>>
+>> [   36.999270] reboot: Restarting system
+>> [   37.002921] Internal error: Attempting to execute userspace memory: 86000004 [#1] PREEMPT SMP
+>> [   37.011460] Modules linked in:
+>> [   37.014598] CPU: 0 PID: 1 Comm: systemd-shutdow Not tainted 4.11.0-rc1-00003-g1e248b60a39b-dirty #506
+>> [   37.023903] Hardware name: (null) (DT)
+>> [   37.027734] task: ffff800902068000 task.stack: ffff800902064000
+>> [   37.033739] PC is at 0x0
+>> [   37.036359] LR is at efi_reboot+0x94/0xd0
+>> [   37.040438] pc : [<0000000000000000>] lr : [<ffff00000880f2c4>] pstate: 404001c5
+>> [   37.047920] sp : ffff800902067cf0
+>> [   37.051314] x29: ffff800902067cf0 x28: ffff800902068000
+>> [   37.056709] x27: ffff000008992000 x26: 000000000000008e
+>> [   37.062104] x25: 0000000000000123 x24: 0000000000000015
+>> [   37.067499] x23: 0000000000000000 x22: ffff000008e6e250
+>> [   37.072894] x21: ffff000008e6e000 x20: 0000000000000000
+>> [   37.078289] x19: ffff000008e5d4c8 x18: 0000000000000010
+>> [   37.083684] x17: 0000ffffa7c27470 x16: 00000000deadbeef
+>> [   37.089079] x15: 0000000000000006 x14: ffff000088f42bef
+>> [   37.094474] x13: ffff000008f42bfd x12: ffff000008e706c0
+>> [   37.099870] x11: ffff000008e70000 x10: 0000000005f5e0ff
+>> [   37.105265] x9 : ffff800902067a50 x8 : 6974726174736552
+>> [   37.110660] x7 : ffff000008cc6fb8 x6 : ffff000008cc6fb0
+>> [   37.116055] x5 : ffff000008c97dd8 x4 : 0000000000000000
+>> [   37.121453] x3 : 0000000000000000 x2 : 0000000000000000
+>> [   37.126845] x1 : 0000000000000000 x0 : 0000000000000000
+>> [   37.132239]
+>> [   37.133808] Process systemd-shutdow (pid: 1, stack limit = 0xffff800902064000)
+>> [   37.141118] Stack: (0xffff800902067cf0 to 0xffff800902068000)
+>> [   37.146949] 7ce0:                                   ffff800902067d40 ffff000008085334
+>> [   37.154869] 7d00: 0000000000000000 ffff000008f3b000 ffff800902067d40 ffff0000080852e0
+>> [   37.162787] 7d20: ffff000008cc6fb0 ffff000008cc6fb8 ffff000008c7f580 ffff000008c97dd8
+>> [   37.170706] 7d40: ffff800902067d60 ffff0000080e2c2c 0000000000000000 0000000001234567
+>> [   37.178624] 7d60: ffff800902067d80 ffff0000080e2ee8 0000000000000000 ffff0000080e2df4
+>> [   37.186544] 7d80: 0000000000000000 ffff0000080830f0 0000000000000000 00008008ff1c1000
+>> [   37.194462] 7da0: ffffffffffffffff 0000ffffa7c4b1cc 0000000000000000 0000000000000024
+>> [   37.202380] 7dc0: ffff800902067dd0 0000000000000005 0000fffff24743c8 0000000000000004
+>> [   37.210299] 7de0: 0000fffff2475f03 0000000000000010 0000fffff2474418 0000000000000005
+>> [   37.218218] 7e00: 0000fffff2474578 000000000000000a 0000aaaad6b722c0 0000000000000001
+>> [   37.226136] 7e20: 0000000000000123 0000000000000038 ffff800902067e50 ffff0000081e7294
+>> [   37.234055] 7e40: ffff800902067e60 ffff0000081e935c ffff800902067e60 ffff0000081e9388
+>> [   37.241973] 7e60: ffff800902067eb0 ffff0000081ea388 0000000000000000 00008008ff1c1000
+>> [   37.249892] 7e80: ffffffffffffffff 0000ffffa7c4a79c 0000000000000000 ffff000000020000
+>> [   37.257810] 7ea0: 0000010000000004 0000000000000000 0000000000000000 ffff0000080830f0
+>> [   37.265729] 7ec0: fffffffffee1dead 0000000028121969 0000000001234567 0000000000000000
+>> [   37.273651] 7ee0: ffffffffffffffff 8080000000800000 0000800000008080 feffa9a9d4ff2d66
+>> [   37.281567] 7f00: 000000000000008e feffa9a9d5b60e0f 7f7fffffffff7f7f 0101010101010101
+>> [   37.289485] 7f20: 0000000000000010 0000000000000008 000000000000003a 0000ffffa7ccf588
+>> [   37.297404] 7f40: 0000aaaad6b87d00 0000ffffa7c4b1b0 0000fffff2474be0 0000aaaad6b88000
+>> [   37.305326] 7f60: 0000fffff2474fb0 0000000001234567 0000000000000000 0000000000000000
+>> [   37.313240] 7f80: 0000000000000000 0000000000000001 0000aaaad6b70d4d 0000000000000000
+>> [   37.321159] 7fa0: 0000000000000001 0000fffff2474ea0 0000aaaad6b5e2e0 0000fffff2474e80
+>> [   37.329078] 7fc0: 0000ffffa7c4b1cc 0000000000000000 fffffffffee1dead 000000000000008e
+>> [   37.336997] 7fe0: 0000000000000000 0000000000000000 9ce839cffee77eab fafdbf9f7ed57f2f
+>> [   37.344911] Call trace:
+>> [   37.347437] Exception stack(0xffff800902067b20 to 0xffff800902067c50)
+>> [   37.353970] 7b20: ffff000008e5d4c8 0001000000000000 0000000080f82000 0000000000000000
+>> [   37.361883] 7b40: ffff800902067b60 ffff000008e17000 ffff000008f44c68 00000001081081b4
+>> [   37.369802] 7b60: ffff800902067bf0 ffff000008108478 0000000000000000 ffff000008c235b0
+>> [   37.377721] 7b80: ffff800902067ce0 0000000000000000 0000000000000000 0000000000000015
+>> [   37.385643] 7ba0: 0000000000000123 000000000000008e ffff000008992000 ffff800902068000
+>> [   37.393557] 7bc0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+>> [   37.401477] 7be0: 0000000000000000 ffff000008c97dd8 ffff000008cc6fb0 ffff000008cc6fb8
+>> [   37.409396] 7c00: 6974726174736552 ffff800902067a50 0000000005f5e0ff ffff000008e70000
+>> [   37.417318] 7c20: ffff000008e706c0 ffff000008f42bfd ffff000088f42bef 0000000000000006
+>> [   37.425234] 7c40: 00000000deadbeef 0000ffffa7c27470
+>> [   37.430190] [<          (null)>]           (null)
+>> [   37.434982] [<ffff000008085334>] machine_restart+0x6c/0x70
+>> [   37.440550] [<ffff0000080e2c2c>] kernel_restart+0x6c/0x78
+>> [   37.446030] [<ffff0000080e2ee8>] SyS_reboot+0x130/0x228
+>> [   37.451337] [<ffff0000080830f0>] el0_svc_naked+0x24/0x28
+>> [   37.456737] Code: bad PC value
+>> [   37.459891] ---[ end trace 76e2fc17e050aecd ]---
+>>
+>> Signed-off-by: Julien Grall <julien.grall@arm.com>
+>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>> Cc: Juergen Gross <jgross@suse.com>
+>>
+>> --
+>>
+>> The x86 code has theoritically a similar issue, altought EFI does not
+>> seem to be the preferred method. I have left it unimplemented on x86 and
+>> CCed Linux Xen x86 maintainers to know their view here.
+> 
+> (+Daniel)
+> 
+> This could be a problem for x86 as well, at least theoretically.
+> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+> 
+> So I think we should have a similar routine there.
 
-Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
----
- Documentation/media/uapi/v4l/extended-controls.rst | 391 +++++++++++++++++++++
- 1 file changed, 391 insertions(+)
++1
 
-diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-index abb1057..85a668d 100644
---- a/Documentation/media/uapi/v4l/extended-controls.rst
-+++ b/Documentation/media/uapi/v4l/extended-controls.rst
-@@ -1960,6 +1960,397 @@ enum v4l2_vp8_golden_frame_sel -
-     1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
- 
- 
-+HEVC Control Reference
-+---------------------
-+
-+The HEVC controls include controls for encoding parameters of HEVC video
-+codec.
-+
-+
-+.. _hevc-control-id:
-+
-+HEVC Control IDs
-+^^^^^^^^^^^^^^^
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP``
-+    Minimum quantization parameter for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP``
-+    Maximum quantization parameter for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP``
-+    Quantization parameter for an I frame for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP``
-+    Quantization parameter for a P frame for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP``
-+    Quantization parameter for a B frame for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP``
-+    HIERARCHICAL_QP allows host to specify the quantization parameter values
-+    for each temporal layer through HIERARCHICAL_QP_LAYER. This is valid only
-+    if HIERARCHICAL_CODING_LAYER is greater than 1.
-+
-+.. _v4l2-hevc-hierarchical-coding-type:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE``
-+    (enum)
-+
-+enum v4l2_mpeg_video_hevc_hier_coding_type -
-+    Selects the hierarchical coding type for encoding. Possible values are:
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+    :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B``
-+      - Use the B frame for hierarchical coding.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P``
-+      - Use the P frame for hierarchical coding.
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER``
-+    Selects the hierarchical coding layer. In normal encoding
-+    (non-hierarchial coding), it should be zero. Possible values are 0 ~ 6.
-+    0 indicates HIERARCHICAL CODING LAYER 0, 1 indicates HIERARCHICAL CODING
-+    LAYER 1 and so on.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP``
-+    Indicates the hierarchical coding layer quantization parameter.
-+    For HEVC it can have a value of 0-51. Hence in the control value passed
-+    the LSB 16 bits will indicate the quantization parameter. The MSB 16 bit
-+    will pass the layer(0-6) it is meant for.
-+
-+.. _v4l2-hevc-profile:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_PROFILE``
-+    (enum)
-+
-+enum v4l2_mpeg_video_hevc_profile -
-+    Select the desired profile for HEVC encoder.
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+    :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN``
-+      - Main profile.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_PROFILE_MAIN_STILL_PICTURE``
-+      - Main still picture profile.
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+
-+.. _v4l2-hevc-level:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LEVEL``
-+    (enum)
-+
-+enum v4l2_mpeg_video_hevc_level -
-+    Select the desired level for HEVC encoder.
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+       :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_1``
-+      - Level 1.0
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_2``
-+      - Level 2.0
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_2_1``
-+      - Level 2.1
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_3``
-+      - Level 3.0
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_3_1``
-+      - Level 3.1
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_4``
-+      - Level 4.0
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_4_1``
-+      - Level 4.1
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_5``
-+      - Level 5.0
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_5_1``
-+      - Level 5.1
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_5_2``
-+      - Level 5.2
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_6``
-+      - Level 6.0
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_6_1``
-+      - Level 6.1
-+    * - ``V4L2_MPEG_VIDEO_HEVC_LEVEL_6_2``
-+      - Level 6.2
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_FRAME_RATE_RESOLUTION``
-+    Indicates the number of evenly spaced subintervals, called ticks, within
-+    one modulo time. One modulo time represents the fixed interval of one
-+    second. This is a 16bit unsigned integer and has a maximum value upto
-+    0xffff.
-+
-+.. _v4l2-hevc-profile:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG``
-+    (enum)
-+
-+enum v4l2_mpeg_video_hevc_tier_flag -
-+    TIER_FLAG specifies tier information of the HEVC encoded picture. Tier were
-+    made to deal with applications that differ in terms of maximum bit rate.
-+    Setting the flag to 0 selects HEVC tier_flag as Main tier and setting this
-+    flag to 1 indicates High tier. High tier is for very demanding applications
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+    :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_TIER_MAIN``
-+      - Main tier.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_TIER_HIGH``
-+      - High tier.
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH``
-+    Selects HEVC maximum coding unit depth.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF``
-+    Indicates loop filtering. Control ID 0 indicates loop filtering
-+    is enabled and when set to 1 indicates no filter.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY``
-+    Selects whether to apply the loop filter across the slice boundary or not.
-+    If the value is 0, loop filter will not be applied across the slice boundary.
-+    If the value is 1, loop filter will be applied across the slice boundary.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2``
-+    Selects HEVC loop filter beta offset. The valid range is [-6, +6].
-+    This could be a negative value in the 2's complement expression.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2``
-+    Selects HEVC loop filter tc offset. The valid range is [-6, +6].
-+    This could be a negative value in the 2's complement expression.
-+
-+.. _v4l2-hevc-refresh-type:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE``
-+    (enum)
-+
-+enum v4l2_mpeg_video_hevc_hier_refresh_type -
-+    Selects refresh type for HEVC encoder.
-+    Host has to specify the period into
-+    HEVC_REFRESH_PERIOD.
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+    :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_REFRESH_NONE``
-+      - Use the B frame for hierarchical coding.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_REFRESH_CRA``
-+      - Use CRA(Clean Random Access Unit) picture encoding.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_REFRESH_IDR``
-+      - Use IDR picture encoding.
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD``
-+    Selects the refresh period for HEVC encoder.
-+    This specifies the number of I picture between two CRA/IDR pictures.
-+    This is valid only if REFRESH_TYPE is not 0.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU``
-+    Indicates HEVC lossless encoding. Setting it to 0 disables lossless
-+    encoding. Setting it to 1 enables lossless encoding.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED``
-+    Indicates constant intra prediction for HEVC encoder. Specifies the
-+    constrained intra prediction in which intra largest coding unit(LCU)
-+    prediction is performed by using residual data and decoded samples of
-+    neighboring intra LCU only. Setting it to 1 enables this control ID and
-+    setting it to 0 disables the control ID.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT``
-+    Indicates wavefront parallel processing for HEVC encoder. Setting it to 0
-+    disables the control ID and setting it to 1 enables the wavefront parallel
-+    processing.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING``
-+    Setting it to 1 indicates sign data hiding for HEVC encoder. Setting it to
-+    0 disables the control ID.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB``
-+    Setting the control ID to 1 enables general picture buffers for HEVC
-+    encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID``
-+    Indicates temporal identifier specified as temporal_id in
-+    nal_unit_header_svc_extension() for HEVC encoder which is enabled by
-+    setting the control ID to 1.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOOTHING``
-+    Indicates bi-linear interpolation is conditionally used in the intra
-+    prediction filtering process in the CVS when set to 1. Indicates bi-linear
-+    interpolation is not used in the CVS when set to 0.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1``
-+    Indicates max number of merge candidate motion vectors.
-+    Values are from zero to four.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_INTRA_PU_SPLIT``
-+    Indicates intra prediction unit split for HEVC Encoder. Setting it to 1
-+    disables the feature. Setting it to 1 enables the feature.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_TMV_PREDICTION``
-+    Indicates temporal motion vector prediction for HEVC encoder. Setting it to
-+    0 enables the prediction. Setting it to 1 disables the prediction.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE``
-+    Specifies if HEVC generates a stream with a size of length field instead of
-+    start code pattern. The size of the length field is configurable among 1,2
-+    or 4 thorugh the SIZE_OF_LENGTH_FIELD. It is not applied at SEQ_START.
-+    Setting it to 0 disables the control ID. Setting it to 1 will enables
-+    the control ID.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CR``
-+    Indicates the quantization parameter CR index.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CB``
-+    Indicates the quantization parameter CB index.
-+
-+.. _v4l2-hevc-size-of-length-field:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD``
-+(enum)
-+
-+enum v4l2_mpeg_video_hevc_size_of_length_field -
-+    Indicates the size of length field.
-+    This is valid when encoding WITHOUT_STARTCODE_ENABLE is enabled.
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+       :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_SIZE_0``
-+      - Generate start code pattern (Normal).
-+    * - ``V4L2_MPEG_VIDEO_HEVC_SIZE_1``
-+      - Generate size of length field instead of start code pattern and length is 1.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_SIZE_2``
-+      - Generate size of length field instead of start code pattern and length is 2.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_SIZE_4``
-+      - Generate size of length field instead of start code pattern and length is 4.
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER0_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 0 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER1_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 1 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER2_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 2 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER3_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 3 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER4_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 4 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER5_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 5 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIER_CODING_LAYER6_BITRATE``
-+    Indicates bit rate for hierarchical coding layer 6 for HEVC encoder.
-+
-+
-+MFC 10.10 MPEG Controls
-+-----------------------
-+
-+The following MPEG class controls deal with MPEG decoding and encoding
-+settings that are specific to the Multi Format Codec 10.10 device present
-+in the S5P family of SoCs by Samsung.
-+
-+
-+.. _mfc1010-control-id:
-+
-+MFC 10.10 Control IDs
-+^^^^^^^^^^^^^^^^^^^^^
-+
-+``V4L2_CID_MPEG_MFC1010_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES``
-+    Selects number of P reference picture required for HEVC encoder.
-+    P-Frame can use 1 or 2 frames for reference.
-+
-+``V4L2_CID_MPEG_MFC1010_VIDEO_HEVC_ADAPTIVE_RC_DARK``
-+    Indicates HEVC dark region adaptive rate control.
-+
-+``V4L2_CID_MPEG_MFC1010_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH``
-+    Indicates HEVC smooth region adaptive rate control.
-+
-+``V4L2_CID_MPEG_MFC1010_VIDEO_HEVC_ADAPTIVE_RC_STATIC``
-+    Indicates HEVC static region adaptive rate control.
-+
-+``V4L2_CID_MPEG_MFC1010_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY``
-+    Indicates HEVC activity region adaptive rate control.
-+
-+``V4L2_CID_MPEG_MFC1010_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR``
-+    Indicates whether to generate SPS and PPS at every IDR. Setting it to 0
-+    disables it and setting it to one enables the feature.
-+
-+
- .. _camera-controls:
- 
- Camera Control Reference
--- 
-2.7.4
+I don't see any problem with such a routine added, in contrast to
+potential "reboots" instead of power off without it.
+
+So I think this dummy xen_efi_reset_system() should be added to
+drivers/xen/efi.c instead.
+
+>> This should also probably be fixed in stable tree.
+
+Yes.
+
+
+Juergen
+
+>> ---
+>>  arch/arm/xen/efi.c | 10 +++++++++-
+>>  1 file changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/xen/efi.c b/arch/arm/xen/efi.c
+>> index 16db419f9e90..3b29788c29e9 100644
+>> --- a/arch/arm/xen/efi.c
+>> +++ b/arch/arm/xen/efi.c
+>> @@ -19,6 +19,14 @@
+>>  #include <xen/xen-ops.h>
+>>  #include <asm/xen/xen-ops.h>
+>>  
+>> +static void xen_efi_reset_system(int reset_type,
+>> +				 efi_status_t status,
+>> +				 unsigned long data_size,
+>> +				 efi_char16_t *data)
+>> +{
+>> +	/* NOP implementation, reset will fallback on an alternative method */
+>> +}
+>> +
+>>  /* Set XEN EFI runtime services function pointers. Other fields of struct efi,
+>>   * e.g. efi.systab, will be set like normal EFI.
+>>   */
+>> @@ -35,6 +43,6 @@ void __init xen_efi_runtime_setup(void)
+>>  	efi.update_capsule           = xen_efi_update_capsule;
+>>  	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
+>>  	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
+>> -	efi.reset_system             = NULL; /* Functionality provided by Xen. */
+>> +	efi.reset_system             = xen_efi_reset_system;
+>>  }
+>>  EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
+> 
+> 
