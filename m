@@ -1,95 +1,45 @@
-From: jgross@suse.com (Juergen Gross)
-Date: Thu, 6 Apr 2017 18:22:44 +0200
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <20170406160653.GJ4372@olila.local.net-space.pl>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
- <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
- <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
- <20170406142710.GE4372@olila.local.net-space.pl>
- <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
- <20170406152040.GH4372@olila.local.net-space.pl>
- <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
- <20170406160653.GJ4372@olila.local.net-space.pl>
-Message-ID: <c23a6d11-cde8-7690-9676-537b5f17b967@suse.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Apr 2017 17:27:14 +0100
+Subject: [PATCH v3 00/18] clocksource/arch_timer: Errata workaround
+ infrastructure rework
+In-Reply-To: <20170404171826.25030-1-marc.zyngier@arm.com>
+References: <20170404171826.25030-1-marc.zyngier@arm.com>
+Message-ID: <20170406162714.GC7705@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/17 18:06, Daniel Kiper wrote:
-> Hi Julien,
-> 
-> On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
->> Hi Daniel,
->>
->> On 06/04/17 16:20, Daniel Kiper wrote:
->>> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
->>>> On 06/04/17 16:27, Daniel Kiper wrote:
->>>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
->>>>>> Hi Juergen,
->>>>>>
->>>>>> On 06/04/17 07:23, Juergen Gross wrote:
->>>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
->>>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
->>>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
->>>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
->>>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
->>>>>>>>
->>>>>>>> (+Daniel)
->>>>>>>>
->>>>>>>> This could be a problem for x86 as well, at least theoretically.
->>>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
->>>>>>>>
->>>>>>>> So I think we should have a similar routine there.
->>>>>>>
->>>>>>> +1
->>>>>>>
->>>>>>> I don't see any problem with such a routine added, in contrast to
->>>>>>> potential "reboots" instead of power off without it.
->>>>>>>
->>>>>>> So I think this dummy xen_efi_reset_system() should be added to
->>>>>>> drivers/xen/efi.c instead.
->>>>>>
->>>>>> I will resend the patch during day with xen_efi_reset_system moved
->>>>>> to common code and implement the x86 counterpart (thought, I will
->>>>>> not be able to test it).
->>>>>
->>>>> I think that this is ARM specific issue. On x86 machine_restart() calls
->>>>> xen_restart(). Hence, everything works. So, I think that it should be
->>>>> fixed only for ARM. Anyway, please CC me when you send a patch.
->>>>
->>>> What about xen_machine_power_off() (as stated in Boris' mail)?
->>>
->>> Guys what do you think about that:
->>>
->>> --- a/drivers/firmware/efi/reboot.c
->>> +++ b/drivers/firmware/efi/reboot.c
->>> @@ -55,7 +55,7 @@ static void efi_power_off(void)
->>>
->>> static int __init efi_shutdown_init(void)
->>> {
->>> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
->>> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
->>>                return -ENODEV;
->>>
->>>        if (efi_poweroff_required())
->>>
->>>
->>> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
->>>
->>> I hope that tweaks for both files should solve our problem.
->>
->> This sounds good for power off (I haven't tried to power off DOM0
->> yet). But this will not solve the restart problem (see
->> machine_restart in arch/arm64/kernel/process.c) which call directly
->> efi_reboot.
-> 
-> Hmmm... It seems to me that efi.reset_system override with empty function
-> in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
-> One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
-> for arch/arm64/kernel/efi.c. Does it make sense?
+Hi Daniel,
 
-I still think the empty function should be in drivers/xen/efi.c and we
-should use it in arch/x86/xen/efi.c, too.
+On Tue, Apr 04, 2017 at 06:18:08PM +0100, Marc Zyngier wrote:
+> Marc Zyngier (18):
+>   arm64: Allow checking of a CPU-local erratum
+>   arm64: Add CNTVCT_EL0 trap handler
+>   arm64: Define Cortex-A73 MIDR
+>   arm64: cpu_errata: Allow an erratum to be match for all revisions of a
+>     core
+>   arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum
+>     858921
+>   arm64: arch_timer: Add infrastructure for multiple erratum detection
+>     methods
+>   arm64: arch_timer: Add erratum handler for CPU-specific capability
+>   arm64: arch_timer: Move arch_timer_reg_read/write around
+>   arm64: arch_timer: Get rid of erratum_workaround_set_sne
+>   arm64: arch_timer: Rework the set_next_event workarounds
+>   arm64: arch_timer: Make workaround methods optional
+>   arm64: arch_timer: Allows a CPU-specific erratum to only affect a
+>     subset of CPUs
+>   arm64: arch_timer: Move clocksource_counter and co around
+>   arm64: arch_timer: Save cntkctl_el1 as a per-cpu variable
+>   arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled
+>   arm64: arch_timer: Workaround for Cortex-A73 erratum 858921
+>   arm64: arch_timer: Allow erratum matching with ACPI OEM information
+>   arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data
 
+Are you happy to take the arch_timer patches above? If yes, Marc can
+create a common branch with the first 5 patches which I will merge in
+the arm64 tree. You can then pull the whole series into your tree.
 
-Juergen
+Thanks.
+
+-- 
+Catalin
