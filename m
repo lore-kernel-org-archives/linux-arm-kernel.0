@@ -1,97 +1,153 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 6 Apr 2017 19:28:30 +0800
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <118dee30-69a8-4ee0-791d-a46d268af3b4@huawei.com>
-References: <1491031554-19516-1-git-send-email-dingtianhong@huawei.com>
- <1491031554-19516-2-git-send-email-dingtianhong@huawei.com>
- <20170401.112603.1991545644693496714.davem@davemloft.net>
- <819bc6c1-581b-3ab9-d189-1befaaf43548@huawei.com>
- <118dee30-69a8-4ee0-791d-a46d268af3b4@huawei.com>
-Message-ID: <47a6333d-a853-5a40-e668-efe6f7b5c5b2@huawei.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 6 Apr 2017 12:38:45 +0100
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap
+ interface
+In-Reply-To: <20170406105312.GE28800@wotan.suse.de>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
+ <20170328014110.GI25380@bhelgaas-glaptop.roam.corp.google.com>
+ <20170328144543.GA18046@red-moon>
+ <20170405105841.GG7909@n2100.armlinux.org.uk>
+ <20170405113238.GA2465@red-moon> <20170406102636.GA9623@red-moon>
+ <20170406105312.GE28800@wotan.suse.de>
+Message-ID: <20170406113845.GA10013@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2017/4/5 21:05, John Garry wrote:
-> On 02/04/2017 07:49, Ding Tianhong wrote:
->>
->>
->> On 2017/4/2 2:26, David Miller wrote:
->>> From: Ding Tianhong <dingtianhong@huawei.com>
->>> Date: Sat, 1 Apr 2017 15:25:51 +0800
->>>
->>>> Till now only the Intel ixgbe could support enable
->>>> Relaxed ordering in the drivers for special architecture,
->>>> but the ARCH_WANT_RELAX_ORDER is looks like a general name
->>>> for all arch, so rename to a specific name for intel
->>>> card looks more appropriate.
->>>>
->>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->>>
->>> This is not a driver specific facility.
->>>
->>> Any driver can test this symbol and act accordingly.
->>>
->>> Just because IXGBE is the first and only user, doesn't mean
->>> the facility is driver specific.
->>>
->>
->> Understand clearly?but the ARCH_WANT_RELAX_ORDER is really too generic and simple,
->> cause much misleading to indicate that it looks like the hack code for some architecture.
->> what do you think of the ETHERNET_ALLOW_RELAXED_ORDER in the drivers/net/ethernet/*,
->> it will only affect ethernet and not only for Ixgbe.
->>
+On Thu, Apr 06, 2017 at 12:53:12PM +0200, Luis R. Rodriguez wrote:
+> On Thu, Apr 06, 2017 at 11:26:36AM +0100, Lorenzo Pieralisi wrote:
+> > On Wed, Apr 05, 2017 at 01:38:12PM +0100, Lorenzo Pieralisi wrote:
+> > > On Wed, Apr 05, 2017 at 11:58:41AM +0100, Russell King - ARM Linux wrote:
+> > > > On Tue, Mar 28, 2017 at 03:45:43PM +0100, Lorenzo Pieralisi wrote:
+> > > > > On Mon, Mar 27, 2017 at 08:41:10PM -0500, Bjorn Helgaas wrote:
+> > > > > > On Mon, Mar 27, 2017 at 10:49:30AM +0100, Lorenzo Pieralisi wrote:
+> > > > > > > diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+> > > > > > > index 7afb0e2..50b292f 100644
+> > > > > > > --- a/arch/x86/include/asm/io.h
+> > > > > > > +++ b/arch/x86/include/asm/io.h
+> > > > > > > @@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
+> > > > > > >  extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+> > > > > > >  extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
+> > > > > > >  #define ioremap_uc ioremap_uc
+> > > > > > > +#define ioremap_nopost ioremap_nocache
+> > > > > > 
+> > > > > > These are all the same as the default from asm-generic.h.  Do we really
+> > > > > > need these definitions in alpha, avr32, frv, ia64, x86?
+> > > > > 
+> > > > > Those arches do not include asm-generic.h (I suppose for a good reason)
+> > > > > but a definition is needed anyway if we want code using ioremap_nopost()
+> > > > > to be unconditional. This is one way of doing it, there are others not
+> > > > > sure they are any better, I am open to suggestions.
+> > > > 
+> > > > We do have linux/io.h, which should be included in preference to asm/io.h.
+> > > > linux/io.h has existed for years, but I still see (from time to time)
+> > > > patches adding drivers that (imho incorrectly) use asm/io.h.
+> > > > 
+> > > > Also, this:
+> > > > 
+> > > > > > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> > > > > > > index 7ef015e..0e81938 100644
+> > > > > > > --- a/include/asm-generic/io.h
+> > > > > > > +++ b/include/asm-generic/io.h
+> > > > > > > @@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
+> > > > > > >  #endif /* CONFIG_GENERIC_IOMAP */
+> > > > > > >  #endif /* CONFIG_HAS_IOPORT_MAP */
+> > > > > > >  
+> > > > > > > +#ifndef ioremap_nopost
+> > > > > > > +#define ioremap_nopost ioremap_nocache
+> > > > > > > +#endif
+> > > > > > > +
+> > > > > > >  #ifndef xlate_dev_kmem_ptr
+> > > > > > >  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
+> > > > > > >  static inline void *xlate_dev_kmem_ptr(void *addr)
+> > > > 
+> > > > could well be located in linux/io.h, which would make it available
+> > > > everywhere.
+> > > > 
+> > > > I'd suggest one change to this though:
+> > > > 
+> > > > #ifndef ioremap_nopost
+> > > > static inline void __iomem *ioremap_nopost(resource_size_t offset,
+> > > > 					   unsigned long size)
+> > > > {
+> > > > 	return ioremap_nocache(offset, size);
+> > > > }
+> > > > #endif
+> > > > 
+> > > > This way, if someone forgets to define ioremap_nopost() in their
+> > > > asm/io.h but provides a definition or extern prototype for
+> > > > ioremap_nopost(), we end up with a compile error to highlight the
+> > > > error, rather than the error being hidden by the preprocessor.
+> > > 
+> > > Yes, I could add ioremap_nopost() to linux/io.h I did not do it because
+> > > linux/io.h, for whatever reason, does not seem to contain ioremap_*
+> > > prototypes; this does not mean we should not add it there but that
+> > > would look odd (with all others ioremap_* in asm/io.h), all I am
+> > > saying. This stuff requires some clean-up regardless, for the records.
+> > > 
+> > > As for the static inline, I did that and that did not make the
+> > > kbuild robot happy at all on some arches:
+> > > 
+> > > eg: openrisc
+> > > 
+> > > >> include/asm-generic/io.h:922:9: error: implicit declaration of
+> > > >> function 'ioremap_nocache' [-Werror=implicit-function-declaration]
+> > >      return ioremap_nocache(offset, size);
+> > 
+> > Indeed, the static inline ioremap_nocache() fallback does not work
+> > on all arches (whether I add the fallback in linux/io.h or
+> > asm-generic/io.h is irrelevant), I bump into issues such as the one
+> > reported above.
 > 
-
-Hi John:
-
-> Hi Ding,
+> Its also not *safe* to assume on behalf of all architectures a new ioremap
+> call is both a good idea and proper.
 > 
-> I think the actual original config ARCH_WANT_RELAX_ORDER is quite dubious, and it does not really tell us which feature(s) of the architecture supports this (if indeed it is arch specific).
+> > I could make it:
+> > 
+> > #ifndef ioremap_nopost
+> > static inline void __iomem *ioremap_nopost(resource_size_t offset,
+> > 					   unsigned long size)
+> > {
+> > 	return NULL;
+> > }
+> > #endif
+> > 
+> > which would force arches to define ioremap_nopost() (if they need it).
 > 
+> Yes, please do this.
 
-Agree.
+Ok but where ? linux/io.h or asm-generic/io.h ? As I replied to Russell,
+having it in linux/io.h is a bit odd given that it would be the only
+ioremap_* implementation declared there, I think we need more
+consistency here instead of deviating again from what you did.
 
-> According to the original commit, 1a8b6d76dc5b net:add one common config ARCH_WANT_RELAX_ORDER to support relax ordering, this is specific to SPARC only:
-> "Currently it only supports one special cpu architecture(SPARC) in 82599 driver to enable RO feature, this is not very common for other cpu architecture which really needs RO feature".
+> > This is what I *assume* was done for ioremap_uc() in asm-generic/io.h,
+> > but honestly history is hard to follow here.
+> > 
+> > Thoughts ?
 > 
+> Hard to follow ?
 
-Relaxed Ordering is a general setting compare to the SO for PCIE controller, if the drivers support it, the architecture could choose to enable it, of course the feature is not support for
-every arch.
+I was referring to the whole asm-generic/io.h history.
 
-> This sounds wooly.
+> I think commit 8c7ea50c010b2 ("x86/mm, asm-generic: Add IOMMU ioremap_uc()
+> variant default") makes it very clear that historically we have made bad
+> assumptions and these assumptions are not safe, so the only correct thing we
+> can do to not stall development is to do what you did above, and each
+> architecture then can add support for its proper mapping. Its up to each
+> architecture maintainer to be attentive and review these patches, if they don't
+> get to it, this will just not work for the new driver that needs it, such is
+> life, its better than having incorrect defaults spread for all architectures.
 > 
-> So I think that we need to know which specific architecture, memory model, or PCI host/port/EP features, or combination of them, allows this so called relaxed ordering.
-> 
+> The old strategy was very sloppy. Its why I tried to be as clear as possible on
+> both the commit log and headers about this. If the commit log and headers were
+> not clear, please help clarify this more somehow in your patches.
 
-This depends on the PCIE design in the chip, I couldn't know whether other arch has some issues when enable RO?if the chip totally support PCIE3.0 standard and has no defect,should both support RO and SO.
+I see your point and I can replicate (probably I will have to patch
+microblaze too since some of the PCI drivers patches in this series
+that I updated to use ioremap_nopost() will run on it too) what you
+did for ioremap_uc() for ioremap_nopost(), I am ok with that, I need
+to know if we all are.
 
-Thanks
-Ding
-> And a config option is probably not even the proper check.
-> 
-> John
-
-
-
-
-
-> 
->> Thanks
->> Ding
->>
->>
->>> Thank you.
->>>
->>> .
->>>
->>
->>
->> .
->>
-> 
-> 
-> 
-> .
-> 
+Thanks,
+Lorenzo
