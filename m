@@ -1,47 +1,70 @@
 From: you@example.com (Your Name)
-Date: Thu,  6 Apr 2017 20:22:16 +0800
-Subject: [PATCH v4 05/12] drm/rockchip: cdn-dp: Don't try to release firmware
- when not loaded
+Date: Thu,  6 Apr 2017 20:22:17 +0800
+Subject: [PATCH v4 06/12] drm/rockchip: cdn-dp: Don't unregister audio dev
+ when unbinding
 In-Reply-To: <1491481343-11025-1-git-send-email-you@example.com>
 References: <1491481343-11025-1-git-send-email-you@example.com>
-Message-ID: <1491481343-11025-6-git-send-email-you@example.com>
+Message-ID: <1491481343-11025-7-git-send-email-you@example.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
+
+After snd_soc_unregister_codec, the dai link would remain bound to
+the invalid codec. That would cause crashes after unbind dp driver.
+
+Let's unregister audio codec when removing dp driver to prevent that.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 Signed-off-by: Your Name <you@example.com>
 ---
 
 Changes in v4: None
-Changes in v3: None
+Changes in v3:
+Update commit message.
+
 Changes in v2: None
 
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index 4e55d63..ee4195d 100644
+index ee4195d..a2169dd 100644
 --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
 +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -1053,6 +1053,7 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
- 	dp->connected = false;
- 	dp->active = false;
- 	dp->active_port = -1;
-+	dp->fw_loaded = false;
+@@ -1092,8 +1092,6 @@ static int cdn_dp_bind(struct device *dev, struct device *master, void *data)
+ 		goto err_free_connector;
+ 	}
  
- 	INIT_WORK(&dp->event_work, cdn_dp_pd_event_work);
+-	cdn_dp_audio_codec_init(dp, dev);
+-
+ 	for (i = 0; i < dp->ports; i++) {
+ 		port = dp->port[i];
  
-@@ -1133,7 +1134,8 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
+@@ -1128,7 +1126,6 @@ static void cdn_dp_unbind(struct device *dev, struct device *master, void *data)
+ 	struct drm_connector *connector = &dp->connector;
+ 
+ 	cancel_work_sync(&dp->event_work);
+-	platform_device_unregister(dp->audio_pdev);
+ 	cdn_dp_encoder_disable(encoder);
+ 	encoder->funcs->destroy(encoder);
  	connector->funcs->destroy(connector);
+@@ -1221,6 +1218,8 @@ static int cdn_dp_probe(struct platform_device *pdev)
+ 	mutex_init(&dp->lock);
+ 	dev_set_drvdata(dev, dp);
  
- 	pm_runtime_disable(dev);
--	release_firmware(dp->fw);
-+	if (dp->fw_loaded)
-+		release_firmware(dp->fw);
- 	kfree(dp->edid);
- 	dp->edid = NULL;
++	cdn_dp_audio_codec_init(dp, dev);
++
+ 	return component_add(dev, &cdn_dp_component_ops);
  }
+ 
+@@ -1228,6 +1227,7 @@ static int cdn_dp_remove(struct platform_device *pdev)
+ {
+ 	struct cdn_dp_device *dp = platform_get_drvdata(pdev);
+ 
++	platform_device_unregister(dp->audio_pdev);
+ 	cdn_dp_suspend(dp->dev);
+ 	component_del(&pdev->dev, &cdn_dp_component_ops);
+ 
 -- 
 2.1.4
