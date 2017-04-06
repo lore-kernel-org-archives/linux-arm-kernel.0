@@ -1,101 +1,69 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  6 Apr 2017 19:29:14 +0100
-Subject: [PATCHv2 07/16] drivers/perf: arm_pmu: rename irq request/free
- functions
+Date: Thu,  6 Apr 2017 19:29:16 +0100
+Subject: [PATCHv2 09/16] drivers/perf: arm_pmu: move irq request/free into
+ probe
 In-Reply-To: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
 References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491503363-17731-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491503363-17731-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, portions of the arm_pmu code use a cpu_pmu_
-prefix rather than an armpmu_ prefix. While a minor annoyance, this
-hasn't been a problem thusfar.
+Currently we request (and potentially free) all IRQs for a given PMU in
+cpu_pmu_init(). This works for platform/DT probing today, but it doesn't
+fit ACPI well as we don't have all our affinity data up-front.
 
-However, to enable ACPI support, we'll need to expose a few things in
-header files, and we should aim to keep those consistently namespaced.
-In preparation for exporting our IRQ request/free functions, rename
-these to have an armpmu_ prefix. For consistency, the 'cpu_pmu'
-parameter is also renamed to 'armpmu'.
+In preparation for ACPI support, fold the IRQ request/free into
+arm_pmu_device_probe(), which will remain specific to platform/DT
+probing.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ drivers/perf/arm_pmu.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 2442038..3c4e97d 100644
+index c09c379..f387d61 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -527,12 +527,12 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
- 
--static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
-+static void armpmu_free_irqs(struct arm_pmu *armpmu)
- {
- 	int cpu;
--	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-+	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
- 
--	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
-+	for_each_cpu(cpu, &armpmu->supported_cpus) {
- 		int irq = per_cpu(hw_events->irq, cpu);
- 		if (!irq)
- 			continue;
-@@ -542,20 +542,20 @@ static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
- 			break;
- 		}
- 
--		if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
-+		if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
- 			continue;
- 
- 		free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
- 	}
- }
- 
--static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu)
-+static int armpmu_request_irqs(struct arm_pmu *armpmu)
- {
- 	int cpu, err;
--	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-+	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
- 	const irq_handler_t handler = armpmu_dispatch_irq;
- 
--	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
-+	for_each_cpu(cpu, &armpmu->supported_cpus) {
- 		int irq = per_cpu(hw_events->irq, cpu);
- 		if (!irq)
- 			continue;
-@@ -580,7 +580,7 @@ static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu)
- 			return err;
- 		}
- 
--		cpumask_set_cpu(cpu, &cpu_pmu->active_irqs);
-+		cpumask_set_cpu(cpu, &armpmu->active_irqs);
- 	}
- 
- 	return 0;
-@@ -742,7 +742,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -758,10 +758,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
  {
  	int err;
  
--	err = cpu_pmu_request_irqs(cpu_pmu);
-+	err = armpmu_request_irqs(cpu_pmu);
+-	err = armpmu_request_irqs(cpu_pmu);
+-	if (err)
+-		goto out;
+-
+ 	err = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_STARTING,
+ 				       &cpu_pmu->node);
  	if (err)
- 		goto out;
- 
-@@ -761,7 +761,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+@@ -777,7 +773,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
  	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
  					    &cpu_pmu->node);
  out:
--	cpu_pmu_free_irqs(cpu_pmu);
-+	armpmu_free_irqs(cpu_pmu);
+-	armpmu_free_irqs(cpu_pmu);
  	return err;
  }
  
+@@ -1073,12 +1068,18 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		goto out_free;
+ 	}
+ 
++	ret = armpmu_request_irqs(pmu);
++	if (ret)
++		goto out_free_irqs;
++
+ 	ret = armpmu_register(pmu);
+ 	if (ret)
+ 		goto out_free;
+ 
+ 	return 0;
+ 
++out_free_irqs:
++	armpmu_free_irqs(pmu);
+ out_free:
+ 	pr_info("%s: failed to register PMU devices!\n",
+ 		of_node_full_name(node));
 -- 
 1.9.1
