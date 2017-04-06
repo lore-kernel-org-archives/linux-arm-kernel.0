@@ -1,108 +1,28 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 06 Apr 2017 14:01:23 +0200
-Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without
- struct page
-In-Reply-To: <20170405160242.14195-1-shuahkh@osg.samsung.com>
-References: <CGME20170405160251epcas4p14cc5d5f6064c84b133b9e280ac987a93@epcas4p1.samsung.com>
- <20170405160242.14195-1-shuahkh@osg.samsung.com>
-Message-ID: <e49715a3-b925-79ad-7d1d-ce2cb5673a97@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 6 Apr 2017 13:11:58 +0100
+Subject: [RFC PATCH v2 1/4] dt-bindings: update the Allwinner GPADC
+ device tree binding for H3
+In-Reply-To: <20170406095534.299945C355D@relay.mailchannels.net>
+References: <20170406095534.299945C355D@relay.mailchannels.net>
+Message-ID: <20170406121158.b33rrt4f54k3dz6f@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
+On Thu, 06 Apr 2017, Icenowy Zheng wrote:
+> 2017?4?6? 03:04? Rob Herring <robh@kernel.org>???
+> > On Tue, Apr 4, 2017 at 10:02 AM, Icenowy Zheng <icenowy@aosc.io> wrote: 
 
-On 2017-04-05 18:02, Shuah Khan wrote:
-> When coherent DMA memory without struct page is shared, importer
-> fails to find the page and runs into kernel page fault when it
-> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
-> in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
-> for more information on this problem.
->
-> This solution allows coherent DMA memory without struct page to be
-> shared by providing a way for the exporter to tag the DMA buffer as
-> a special buffer without struct page association and passing the
-> information in sg_table to the importer. This information is used
-> in attach/map_sg to avoid cleaning D-cache and mapping.
->
-> The details of the change are:
->
-> Framework:
-> - Add a new dma_attrs field to struct scatterlist.
-> - Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
->    Coherent memory without struct page.
-> - Add a new dma_check_dev_coherent() interface to check if memory is
->    the device coherent area. There is no way to tell where the memory
->    returned by dma_alloc_attrs() came from.
->
-> Exporter logic:
-> - Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
->    DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
->    done in the exporter context.
-> - Add logic to arm_dma_get_sgtable() to identify memory without struct
->    page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
->    set, arm_dma_get_sgtable() will set page as the cpu_addr and update
->    dma_address and dma_attrs fields in struct scatterlist for this sgl.
->    This is done in exporter context when buffer is exported. With this
->    Note: This change is made on top of Russell King's patch that added
->    !pfn_valid(pfn) check to arm_dma_get_sgtable() to error out on invalid
->    pages. Coherent memory without struct page will trigger this error.
->
-> Importer logic:
-> - Add logic to vb2_dc_dmabuf_ops_attach() to identify memory without
->    struct page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute when it copies
->    the sg_table from the exporter. It will copy dma_attrs and dma_address
->    fields. With this logic, dmabuf_ops_attach will no longer trip on an
->    invalid page.
-> - Add logic to arm_dma_map_sg() to avoid mapping the page when sg_table
->    has DMA_ATTR_DEV_COHERENT_NOPAGE buffer.
-> - Add logic to arm_dma_unmap_sg() to do nothing for sg entries with
->    DMA_ATTR_DEV_COHERENT_NOPAGE attribute.
->
-> Without this change the following use-case that runs into kernel
-> pagefault when importer tries to attach the exported buffer.
->
-> With this change it works: (what a relief after watching pagefaults for
-> weeks!!)
->
-> gst-launch-1.0 filesrc location=~/GH3_MOV_HD.mp4 ! qtdemux ! h264parse ! v4l2video4dec capture-io-mode=dmabuf ! v4l2video7convert output-io-mode=dmabuf-import ! kmssink force-modesetting=true
->
-> I am sending RFC patch to get feedback on the approach and see if I missed
-> anything.
+> > > ? 2017?04?04? 22:47, Rob Herring ??: 
 
-Frankly, once You decided to hack around dma-buf and issues with coherent,
-carved out memory, it might be a bit better to find the ultimate solution
-instead of the another hack. Please note that it will still not allow to
-share a buffer allocated from carved-out memory and a device, which is
-behind IOMMU.
+> OK. I will make it :
+> ths: temperature-sensor at 1c25000
 
-I thought a bit about this and the current shape of dma-buf code.
+Can you fix your broken email client please?  You need to set it up to
+reply to mails to they stay threaded.  Your mailer is currently
+sending all of your replies as their own, independent messages.
 
-IMHO the proper way of solving all those issues would be to replace
-dma-buf internal representation of the memory from struct scatter_list
-to pfn array. This would really solve the problem of buffers which
-cannot be properly represented by scatter lists/struct pages and would
-even allow sharing buffers between all kinds of devices. Scatter-lists
-are also quite over-engineered structures to represent a single buffer
-(pfn array is a bit more compact representation). Also there is a lots
-of buggy code which use scatter-list in a bit creative way (like
-assuming that each page maps to a single scatter list entry for
-example). The only missing piece, required for such change would be
-extending DMA-mapping with dma_map_pfn() interface.
-
-This would be however quite large task, especially taking into account
-all current users of DMA-buf framework...
-
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->   arch/arm/mm/dma-mapping.c                      | 34 ++++++++++++++++++++++----
->   drivers/base/dma-coherent.c                    | 25 +++++++++++++++++++
->   drivers/media/v4l2-core/videobuf2-dma-contig.c |  6 +++++
->   include/linux/dma-mapping.h                    |  8 ++++++
->   include/linux/scatterlist.h                    |  1 +
->   5 files changed, 69 insertions(+), 5 deletions(-)
- > [...]
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
