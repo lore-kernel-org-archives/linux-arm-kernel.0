@@ -1,293 +1,63 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 6 Apr 2017 18:11:56 +0200
-Subject: [PATCH v2 5/5] iio: dac: stm32: add support for waveform generator
+Date: Thu, 6 Apr 2017 18:11:54 +0200
+Subject: [PATCH v2 3/5] iio: trigger: add set_trigger callback to notify device
 In-Reply-To: <1491495116-7209-1-git-send-email-fabrice.gasnier@st.com>
 References: <1491495116-7209-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1491495116-7209-6-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1491495116-7209-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32 DAC has built-in noise or triangle waveform generator.
-- "wavetype" extended attribute selects noise or triangle.
-- "amplitude" extended attribute selects amplitude for waveform generator
-
-A DC offset can be added to waveform generator output. This can be done
-using out_voltage[1/2]_offset
-
-Waveform generator requires a trigger to be configured, to increment /
-decrement internal counter in case of triangle generator. Noise
-generator is a bit different,  but also requires a trigger to generate
-samples.
+Add 'set_trigger' callback to iio info structure. This allows device
+to be notified when a trigger (or no trigger) has been assigned. This
+maybe useful for instance in non buffered mode (e.g. event triggered).
+This is called, after trigger and device side validate callbacks have
+been called.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
 Changes in v2:
-- use _offset parameter to add DC offset to waveform generator
-- Rework ABI to better fit existing DDS ABI: use out_voltageY_wavetype,
-  out_voltage_wavetype_available, out_voltageY_amplitude,
-  out_voltage_amplitude_available
-- Better explain trigger usage in case of waveform generator.
+- Added set_trigger callback used in remaining patches
 ---
- Documentation/ABI/testing/sysfs-bus-iio-dac-stm32 |  16 +++
- drivers/iio/dac/stm32-dac-core.h                  |   4 +
- drivers/iio/dac/stm32-dac.c                       | 158 +++++++++++++++++++++-
- 3 files changed, 177 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
+ drivers/iio/industrialio-trigger.c | 6 ++++++
+ include/linux/iio/iio.h            | 2 ++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
-new file mode 100644
-index 0000000..8f1fa009
---- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
-@@ -0,0 +1,16 @@
-+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_wavetype
-+What:		/sys/bus/iio/devices/iio:deviceX/out_voltage_wavetype_available
-+KernelVersion:	4.12
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		List and/or select waveform generation provided by STM32 DAC:
-+		- "flat": waveform generator disabled (default)
-+		- "noise": select noise waveform
-+		- "triangle": select triangle waveform
-+
-+What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_amplitude
-+What:		/sys/bus/iio/devices/iio:deviceX/out_voltage_amplitude_available
-+KernelVersion:	4.12
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		List and/or select amplitude used for waveform generator
-diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
-index e51a468..0f02975 100644
---- a/drivers/iio/dac/stm32-dac-core.h
-+++ b/drivers/iio/dac/stm32-dac-core.h
-@@ -37,8 +37,12 @@
- #define STM32H7_DAC_CR_TEN1		BIT(1)
- #define STM32H7_DAC_CR_TSEL1_SHIFT	2
- #define STM32H7_DAC_CR_TSEL1		GENMASK(5, 2)
-+#define STM32_DAC_CR_WAVE1		GENMASK(7, 6)
-+#define STM32_DAC_CR_MAMP1		GENMASK(11, 8)
- #define STM32H7_DAC_CR_HFSEL		BIT(15)
- #define STM32_DAC_CR_EN2		BIT(16)
-+#define STM32_DAC_CR_WAVE2		GENMASK(23, 22)
-+#define STM32_DAC_CR_MAMP2		GENMASK(27, 24)
- 
- /* STM32_DAC_SWTRIGR bit fields */
- #define STM32_DAC_SWTRIGR_SWTRIG1	BIT(0)
-diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
-index a7a078e..2ed75db 100644
---- a/drivers/iio/dac/stm32-dac.c
-+++ b/drivers/iio/dac/stm32-dac.c
-@@ -42,10 +42,12 @@
- /**
-  * struct stm32_dac - private data of DAC driver
-  * @common:		reference to DAC common data
-+ * @wavetype:		waveform generator
-  * @swtrig:		Using software trigger
-  */
- struct stm32_dac {
- 	struct stm32_dac_common *common;
-+	u32 wavetype;
- 	bool swtrig;
- };
- 
-@@ -222,6 +224,29 @@ static int stm32_dac_set_value(struct stm32_dac *dac, int channel, int val)
- 	return ret;
- }
- 
-+static int stm32_dac_get_offset(struct stm32_dac *dac, int channel, int *val)
-+{
-+	int ret;
-+
-+	/* Offset is only relevant in waveform generation mode. */
-+	if (!dac->wavetype) {
-+		*val = 0;
-+		return IIO_VAL_INT;
-+	}
-+
-+	/*
-+	 * In waveform generation mode, DC offset in DHR is added to waveform
-+	 * generator output, then stored to DOR (data output register).
-+	 * Read offset from DHR.
-+	 */
-+	if (STM32_DAC_IS_CHAN_1(channel))
-+		ret = regmap_read(dac->common->regmap, STM32_DAC_DHR12R1, val);
-+	else
-+		ret = regmap_read(dac->common->regmap, STM32_DAC_DHR12R2, val);
-+
-+	return ret ? ret : IIO_VAL_INT;
-+}
-+
- static int stm32_dac_read_raw(struct iio_dev *indio_dev,
- 			      struct iio_chan_spec const *chan,
- 			      int *val, int *val2, long mask)
-@@ -231,6 +256,8 @@ static int stm32_dac_read_raw(struct iio_dev *indio_dev,
- 	switch (mask) {
- 	case IIO_CHAN_INFO_RAW:
- 		return stm32_dac_get_value(dac, chan->channel, val);
-+	case IIO_CHAN_INFO_OFFSET:
-+		return stm32_dac_get_offset(dac, chan->channel, val);
- 	case IIO_CHAN_INFO_SCALE:
- 		*val = dac->common->vref_mv;
- 		*val2 = chan->scan_type.realbits;
-@@ -247,8 +274,16 @@ static int stm32_dac_write_raw(struct iio_dev *indio_dev,
- 	struct stm32_dac *dac = iio_priv(indio_dev);
- 
- 	switch (mask) {
-+	case IIO_CHAN_INFO_OFFSET:
-+		/* Offset only makes sense in waveform generation mode */
-+		if (dac->wavetype)
-+			return stm32_dac_set_value(dac, chan->channel, val);
-+		return -EBUSY;
- 	case IIO_CHAN_INFO_RAW:
--		return stm32_dac_set_value(dac, chan->channel, val);
-+		if (!dac->wavetype)
-+			return stm32_dac_set_value(dac, chan->channel, val);
-+		/* raw value is read only in waveform generation mode */
-+		return -EBUSY;
- 	default:
- 		return -EINVAL;
+diff --git a/drivers/iio/industrialio-trigger.c b/drivers/iio/industrialio-trigger.c
+index 978e1592..010bdf2 100644
+--- a/drivers/iio/industrialio-trigger.c
++++ b/drivers/iio/industrialio-trigger.c
+@@ -434,6 +434,12 @@ static ssize_t iio_trigger_write_current(struct device *dev,
+ 			goto out_trigger_put;
  	}
-@@ -334,6 +369,122 @@ static ssize_t stm32_dac_write_powerdown(struct iio_dev *indio_dev,
- 	.set = stm32_dac_set_powerdown_mode,
- };
  
-+/* waveform generator wave selection */
-+static const char * const stm32_dac_wavetype_desc[] = {
-+	"flat",
-+	"noise",
-+	"triangle",
-+};
-+
-+static int stm32_dac_set_wavetype(struct iio_dev *indio_dev,
-+				  const struct iio_chan_spec *chan,
-+				  unsigned int wavetype)
-+{
-+	struct stm32_dac *dac = iio_priv(indio_dev);
-+	u32 mask, val;
-+	int ret;
-+
-+	/*
-+	 * Waveform generator requires a trigger to be configured, to increment
-+	 * or decrement internal counter in case of triangle generator. Noise
-+	 * generator is a bit different, but also requires a trigger to
-+	 * generate samples.
-+	 */
-+	if (wavetype && !indio_dev->trig)
-+		dev_dbg(&indio_dev->dev, "Wavegen requires a trigger\n");
-+
-+	if (STM32_DAC_IS_CHAN_1(chan->channel)) {
-+		val = FIELD_PREP(STM32_DAC_CR_WAVE1, wavetype);
-+		mask = STM32_DAC_CR_WAVE1;
-+	} else {
-+		val = FIELD_PREP(STM32_DAC_CR_WAVE2, wavetype);
-+		mask = STM32_DAC_CR_WAVE2;
++	if (indio_dev->info->set_trigger) {
++		ret = indio_dev->info->set_trigger(indio_dev, trig);
++		if (ret)
++			goto out_trigger_put;
 +	}
 +
-+	ret = regmap_update_bits(dac->common->regmap, STM32_DAC_CR, mask, val);
-+	if (ret)
-+		return ret;
-+	dac->wavetype = wavetype;
-+
-+	return 0;
-+}
-+
-+static int stm32_dac_get_wavetype(struct iio_dev *indio_dev,
-+				  const struct iio_chan_spec *chan)
-+{
-+	struct stm32_dac *dac = iio_priv(indio_dev);
-+	u32 val;
-+	int ret;
-+
-+	ret = regmap_read(dac->common->regmap, STM32_DAC_CR, &val);
-+	if (ret < 0)
-+		return ret;
-+
-+	if (STM32_DAC_IS_CHAN_1(chan->channel))
-+		return FIELD_GET(STM32_DAC_CR_WAVE1, val);
-+	else
-+		return FIELD_GET(STM32_DAC_CR_WAVE2, val);
-+}
-+
-+static const struct iio_enum stm32_dac_wavetype_enum = {
-+	.items = stm32_dac_wavetype_desc,
-+	.num_items = ARRAY_SIZE(stm32_dac_wavetype_desc),
-+	.get = stm32_dac_get_wavetype,
-+	.set = stm32_dac_set_wavetype,
-+};
-+
-+/*
-+ * waveform generator mamp selection: mask/amplitude
-+ * - noise: LFSR mask (linear feedback shift register, umasks bit 0, [1:0]...)
-+ * - triangle: amplitude (equal to 1, 3, 5, 7... 4095)
-+ */
-+static const char * const stm32_dac_amplitude_desc[] = {
-+	"1", "3", "7", "15", "31", "63", "127", "255", "511", "1023", "2047",
-+	"4095",
-+};
-+
-+static int stm32_dac_set_amplitude(struct iio_dev *indio_dev,
-+				   const struct iio_chan_spec *chan,
-+				   unsigned int amplitude)
-+{
-+	struct stm32_dac *dac = iio_priv(indio_dev);
-+	u32 mask, val;
-+
-+	if (STM32_DAC_IS_CHAN_1(chan->channel)) {
-+		val = FIELD_PREP(STM32_DAC_CR_MAMP1, amplitude);
-+		mask = STM32_DAC_CR_MAMP1;
-+	} else {
-+		val = FIELD_PREP(STM32_DAC_CR_MAMP2, amplitude);
-+		mask = STM32_DAC_CR_MAMP2;
-+	}
-+
-+	return regmap_update_bits(dac->common->regmap, STM32_DAC_CR, mask, val);
-+}
-+
-+static int stm32_dac_get_amplitude(struct iio_dev *indio_dev,
-+				   const struct iio_chan_spec *chan)
-+{
-+	struct stm32_dac *dac = iio_priv(indio_dev);
-+	u32 val;
-+	int ret;
-+
-+	ret = regmap_read(dac->common->regmap, STM32_DAC_CR, &val);
-+	if (ret < 0)
-+		return ret;
-+
-+	if (STM32_DAC_IS_CHAN_1(chan->channel))
-+		return FIELD_GET(STM32_DAC_CR_MAMP1, val);
-+	else
-+		return FIELD_GET(STM32_DAC_CR_MAMP2, val);
-+}
-+
-+static const struct iio_enum stm32_dac_amplitude_enum = {
-+	.items = stm32_dac_amplitude_desc,
-+	.num_items = ARRAY_SIZE(stm32_dac_amplitude_desc),
-+	.get = stm32_dac_get_amplitude,
-+	.set = stm32_dac_set_amplitude,
-+};
-+
- static const struct iio_chan_spec_ext_info stm32_dac_ext_info[] = {
- 	{
- 		.name = "powerdown",
-@@ -343,6 +494,10 @@ static ssize_t stm32_dac_write_powerdown(struct iio_dev *indio_dev,
- 	},
- 	IIO_ENUM("powerdown_mode", IIO_SEPARATE, &stm32_dac_powerdown_mode_en),
- 	IIO_ENUM_AVAILABLE("powerdown_mode", &stm32_dac_powerdown_mode_en),
-+	IIO_ENUM("wavetype", IIO_SEPARATE, &stm32_dac_wavetype_enum),
-+	IIO_ENUM_AVAILABLE("wavetype", &stm32_dac_wavetype_enum),
-+	IIO_ENUM("amplitude", IIO_SEPARATE, &stm32_dac_amplitude_enum),
-+	IIO_ENUM_AVAILABLE("amplitude", &stm32_dac_amplitude_enum),
- 	{},
- };
+ 	indio_dev->trig = trig;
  
-@@ -352,6 +507,7 @@ static ssize_t stm32_dac_write_powerdown(struct iio_dev *indio_dev,
- 	.output = 1,					\
- 	.channel = chan,				\
- 	.info_mask_separate =				\
-+		BIT(IIO_CHAN_INFO_OFFSET) |		\
- 		BIT(IIO_CHAN_INFO_RAW) |		\
- 		BIT(IIO_CHAN_INFO_SCALE),		\
- 	/* scan_index is always 0 as num_channels is 1 */ \
+ 	if (oldtrig) {
+diff --git a/include/linux/iio/iio.h b/include/linux/iio/iio.h
+index 3f5ea2e..9f51065 100644
+--- a/include/linux/iio/iio.h
++++ b/include/linux/iio/iio.h
+@@ -399,6 +399,7 @@ static inline bool iio_channel_has_available(const struct iio_chan_spec *chan,
+  * @write_event_value:	write a configuration value for the event.
+  * @validate_trigger:	function to validate the trigger when the
+  *			current trigger gets changed.
++ * @set_trigger:	function to notify current trigger gets changed.
+  * @update_scan_mode:	function to configure device and scan buffer when
+  *			channels have changed
+  * @debugfs_reg_access:	function to read or write register value of device
+@@ -478,6 +479,7 @@ struct iio_info {
+ 
+ 	int (*validate_trigger)(struct iio_dev *indio_dev,
+ 				struct iio_trigger *trig);
++	int (*set_trigger)(struct iio_dev *indio_dev, struct iio_trigger *trig);
+ 	int (*update_scan_mode)(struct iio_dev *indio_dev,
+ 				const unsigned long *scan_mask);
+ 	int (*debugfs_reg_access)(struct iio_dev *indio_dev,
 -- 
 1.9.1
