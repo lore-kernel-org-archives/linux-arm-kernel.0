@@ -1,98 +1,54 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 5 Apr 2017 17:14:09 -0700
-Subject: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
-Message-ID: <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 6 Apr 2017 09:25:32 +0800
+Subject: [PATCH v2 6/9] mm: rmap: Use correct helper when poisoning
+ hugepages
+In-Reply-To: <20170405133722.6406-7-punit.agrawal@arm.com>
+Message-ID: <201704060916.o3JFLNRt%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 4:57 PM, Andy Lutomirski <luto@kernel.org> wrote:
-> On Wed, Mar 29, 2017 at 6:41 PM, Kees Cook <keescook@chromium.org> wrote:
->> On Wed, Mar 29, 2017 at 3:38 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->>> On Wed, Mar 29, 2017 at 11:15 AM, Kees Cook <keescook@chromium.org> wrote:
->>>> Based on PaX's x86 pax_{open,close}_kernel() implementation, this
->>>> allows HAVE_ARCH_RARE_WRITE to work on x86.
->>>>
->>>
->>>> +
->>>> +static __always_inline unsigned long __arch_rare_write_begin(void)
->>>> +{
->>>> +       unsigned long cr0;
->>>> +
->>>> +       preempt_disable();
->>>
->>> This looks wrong.  DEBUG_LOCKS_WARN_ON(!irqs_disabled()) would work,
->>> as would local_irq_disable().  There's no way that just disabling
->>> preemption is enough.
->>>
->>> (Also, how does this interact with perf nmis?)
->>
->> Do you mean preempt_disable() isn't strong enough here? I'm open to
->> suggestions. The goal would be to make sure nothing between _begin and
->> _end would get executed without interruption...
->>
->
-> Sorry for the very slow response.
->
-> preempt_disable() isn't strong enough to prevent interrupts, and an
-> interrupt here would run with WP off, causing unknown havoc.  I tend
-> to think that the caller should be responsible for turning off
-> interrupts.
+Hi Punit,
 
-So, something like:
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.11-rc5 next-20170405]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Top-level functions:
+url:    https://github.com/0day-ci/linux/commits/Punit-Agrawal/Support-swap-entries-for-contiguous-pte-hugepages/20170406-090327
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: i386-tinyconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-static __always_inline rare_write_begin(void)
-{
-    preempt_disable();
-    local_irq_disable();
-    barrier();
-    __arch_rare_write_begin();
-    barrier();
-}
+All errors (new ones prefixed by >>):
 
-static __always_inline rare_write_end(void)
-{
-    barrier();
-    __arch_rare_write_end();
-    barrier();
-    local_irq_enable();
-    preempt_enable_no_resched();
-}
+   mm/rmap.c: In function 'try_to_unmap_one':
+>> mm/rmap.c:1393:5: error: implicit declaration of function 'set_huge_swap_pte_at' [-Werror=implicit-function-declaration]
+        set_huge_swap_pte_at(mm, address,
+        ^~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-x86-specific helpers:
+vim +/set_huge_swap_pte_at +1393 mm/rmap.c
 
-static __always_inline unsigned long __arch_rare_write_begin(void)
-{
-       unsigned long cr0;
+  1387	
+  1388			if (PageHWPoison(page) && !(flags & TTU_IGNORE_HWPOISON)) {
+  1389				pteval = swp_entry_to_pte(make_hwpoison_entry(subpage));
+  1390				if (PageHuge(page)) {
+  1391					int nr = 1 << compound_order(page);
+  1392					hugetlb_count_sub(nr, mm);
+> 1393					set_huge_swap_pte_at(mm, address,
+  1394							     pvmw.pte, pteval,
+  1395							     vma_mmu_pagesize(vma));
+  1396				} else {
 
-       cr0 = read_cr0() ^ X86_CR0_WP;
-       BUG_ON(cr0 & X86_CR0_WP);
-       write_cr0(cr0);
-       return cr0 ^ X86_CR0_WP;
-}
-
-static __always_inline unsigned long __arch_rare_write_end(void)
-{
-       unsigned long cr0;
-
-       cr0 = read_cr0() ^ X86_CR0_WP;
-       BUG_ON(!(cr0 & X86_CR0_WP));
-       write_cr0(cr0);
-       return cr0 ^ X86_CR0_WP;
-}
-
-I can give it a spin...
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6518 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/f26f6f20/attachment.gz>
