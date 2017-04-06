@@ -1,87 +1,34 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu,  6 Apr 2017 20:07:20 +0100
-Subject: [RFC kvm-unit-tests PATCH 1/8] configure: make it run-able from
- outside source tree
+Date: Thu,  6 Apr 2017 20:07:22 +0100
+Subject: [RFC kvm-unit-tests PATCH 3/8] Makefile: set VPATH based on SRCDIR
 In-Reply-To: <20170406190727.5624-1-alex.bennee@linaro.org>
 References: <20170406190727.5624-1-alex.bennee@linaro.org>
-Message-ID: <20170406190727.5624-2-alex.bennee@linaro.org>
+Message-ID: <20170406190727.5624-4-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a first step to enabling out-of-tree builds for
-kvm-unit-tests. When you invoke configure like this:
-
-  ../tree.git/configure [args]
-
-It will detect we the case and:
-
-  - link ../tree.git/Makefile to the build-dir
-  - ensure lib is created with a correct lib/asm
-  - set SRCDIR in the config.mk
+Setting the VPATH prompts make to search VPATH for source files. There
+are still some fix-ups needed for linking and including other Makefile
+fragments for each architecture.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- configure | 24 +++++++++++++++++-------
- 1 file changed, 17 insertions(+), 7 deletions(-)
+ Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/configure b/configure
-index 8821f37..223809c 100755
---- a/configure
-+++ b/configure
-@@ -1,5 +1,6 @@
- #!/bin/bash
+diff --git a/Makefile b/Makefile
+index eba7b28..80bc57e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -7,6 +7,9 @@ endif
  
-+srcdir=$(cd "$(dirname "$0")"; pwd)
- prefix=/usr/local
- cc=gcc
- ld=ld
-@@ -102,12 +103,12 @@ elif [ "$arch" = "ppc64" ]; then
- else
-     testdir=$arch
- fi
--if [ ! -d $testdir ]; then
-+if [ ! -d $srcdir/$testdir ]; then
-     echo "$testdir does not exist!"
-     exit 1
- fi
--if [ -f $testdir/run ]; then
--    ln -fs $testdir/run $testdir-run
-+if [ -f $srcdir/$testdir/run ]; then
-+    ln -fs $srcdir/$testdir/run $testdir-run
- fi
+ include config.mak
  
- # check if uint32_t needs a long format modifier
-@@ -135,18 +136,27 @@ fi
- rm -f lib_test.c
- fi
- 
-+# Are we in a separate build tree? If so, link the Makefile
-+# so that 'make' works.
-+if test ! -e Makefile; then
-+    echo "linking Makefile..."
-+    ln -s "${srcdir}/Makefile" .
-+fi
++# Set search path for all sources
++VPATH=$(SRCDIR)
 +
- # link lib/asm for the architecture
- rm -f lib/asm
- asm=asm-generic
--if [ -d lib/$arch/asm ]; then
--	asm=$arch/asm
--elif [ -d lib/$testdir/asm ]; then
--	asm=$testdir/asm
-+if [ -d $srcdir/lib/$arch/asm ]; then
-+	asm=$srcdir/lib/$arch/asm
-+elif [ -d $srcdir/lib/$testdir/asm ]; then
-+	asm=$srcdir/lib/$testdir/asm
- fi
-+mkdir -p lib
- ln -s $asm lib/asm
+ libdirs-get = $(shell [ -d "lib/$(1)" ] && echo "lib/$(1) lib/$(1)/asm")
+ ARCH_LIBDIRS := $(call libdirs-get,$(ARCH)) $(call libdirs-get,$(TEST_DIR))
  
- # create the config
- cat <<EOF > config.mak
-+SRCDIR=$srcdir
- PREFIX=$prefix
- HOST=$host
- ARCH=$arch
 -- 
 2.11.0
