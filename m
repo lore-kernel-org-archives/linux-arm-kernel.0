@@ -1,132 +1,75 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu,  6 Apr 2017 20:07:23 +0100
-Subject: [RFC kvm-unit-tests PATCH 4/8] Makefiles: use explicit path for
- including sub-Makefiles
+Date: Thu,  6 Apr 2017 20:07:25 +0100
+Subject: [RFC kvm-unit-tests PATCH 6/8] Makefiles: handle linking of scripts
+ into build-tree
 In-Reply-To: <20170406190727.5624-1-alex.bennee@linaro.org>
 References: <20170406190727.5624-1-alex.bennee@linaro.org>
-Message-ID: <20170406190727.5624-5-alex.bennee@linaro.org>
+Message-ID: <20170406190727.5624-7-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I would of thought VPATH took care of this but apparently not.
+When doing an out-of-src-tree build we still want access to the
+various bits of common script machinery to run. This is handled by the
+scripts-common list which sub-builds can add explicit extra stuff to.
+
+The final rule is conditional so we don't attempt to link files when
+we are doing an in-src-tree build.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- Makefile               | 8 ++++----
- arm/Makefile           | 2 +-
- arm/Makefile.arm       | 2 +-
- arm/Makefile.arm64     | 2 +-
- powerpc/Makefile       | 2 +-
- powerpc/Makefile.ppc64 | 2 +-
- x86/Makefile           | 2 +-
- x86/Makefile.i386      | 2 +-
- x86/Makefile.x86_64    | 2 +-
- 9 files changed, 12 insertions(+), 12 deletions(-)
+ Makefile            | 13 +++++++++++++
+ x86/Makefile.common |  4 ++++
+ 2 files changed, 17 insertions(+)
 
 diff --git a/Makefile b/Makefile
-index 80bc57e..781186e 100644
+index 56598df..c9fea88 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -32,14 +32,14 @@ cflatobjs := \
+@@ -31,6 +31,10 @@ cflatobjs := \
+ 	lib/report.o \
  	lib/stack.o
  
++# These are scripts we want linked from the source tree
++scripts-common := run_tests.sh \
++	scripts
++
  # libfdt paths
--LIBFDT_objdir = lib/libfdt
--LIBFDT_srcdir = lib/libfdt
-+LIBFDT_objdir = $(SRCDIR)/lib/libfdt
-+LIBFDT_srcdir = $(SRCDIR)/lib/libfdt
- LIBFDT_archive = $(LIBFDT_objdir)/libfdt.a
- LIBFDT_include = $(addprefix $(LIBFDT_srcdir)/,$(LIBFDT_INCLUDES))
- LIBFDT_version = $(addprefix $(LIBFDT_srcdir)/,$(LIBFDT_VERSION))
+ LIBFDT_objdir = $(SRCDIR)/lib/libfdt
+ LIBFDT_srcdir = $(SRCDIR)/lib/libfdt
+@@ -86,8 +90,17 @@ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
+ 	mkdir -p $(dir $@)
+ 	$(CC) $(CFLAGS) -c -o $@ $<
  
--#include architecure specific make rules
--include $(TEST_DIR)/Makefile
-+#include architecture specific make rules
-+include $(SRCDIR)/$(TEST_DIR)/Makefile
++$(scripts-common): $(SRCDIR)/$@
++	ln -sf $<$@ $@
++
+ -include */.*.d */*/.*.d
  
- # cc-option
- # Usage: OP_CFLAGS+=$(call cc-option, -falign-functions=0, -malign-functions=0)
-diff --git a/arm/Makefile b/arm/Makefile
-index 369a38b..8a007ab 100644
---- a/arm/Makefile
-+++ b/arm/Makefile
-@@ -1 +1 @@
--include $(TEST_DIR)/Makefile.$(ARCH)
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.$(ARCH)
-diff --git a/arm/Makefile.arm b/arm/Makefile.arm
-index 92f3757..6b57284 100644
---- a/arm/Makefile.arm
-+++ b/arm/Makefile.arm
-@@ -22,6 +22,6 @@ cflatobjs += lib/arm/stack.o
- # arm specific tests
- tests =
++
++# We only need to link common scripts for out-of-src-tree builds
++ifneq ($(CURDIR), $(SRCDIR))
++all: $(scripts-common)
++endif
++
+ all: $(shell git -C $(SRCDIR) rev-parse --verify --short=8 HEAD >build-head 2>/dev/null)
  
--include $(TEST_DIR)/Makefile.common
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.common
+ standalone: all
+diff --git a/x86/Makefile.common b/x86/Makefile.common
+index fbab82c..ef6e543 100644
+--- a/x86/Makefile.common
++++ b/x86/Makefile.common
+@@ -54,8 +54,12 @@ tests-common += api/dirty-log
+ tests-common += api/dirty-log-perf
+ endif
  
- arch_clean: arm_clean
-diff --git a/arm/Makefile.arm64 b/arm/Makefile.arm64
-index 0b0761c..b5fc1ec 100644
---- a/arm/Makefile.arm64
-+++ b/arm/Makefile.arm64
-@@ -14,7 +14,7 @@ cflatobjs += lib/arm64/spinlock.o
- # arm64 specific tests
- tests =
++scripts-common += $(TEST_DIR)/run
++scripts-common += $(TEST_DIR)/unittests.cfg
++
+ test_cases: $(tests-common) $(tests)
  
--include $(TEST_DIR)/Makefile.common
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.common
++
+ $(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I lib -I lib/x86
  
- arch_clean: arm_clean
- 	$(RM) lib/arm64/.*.d
-diff --git a/powerpc/Makefile b/powerpc/Makefile
-index 369a38b..8a007ab 100644
---- a/powerpc/Makefile
-+++ b/powerpc/Makefile
-@@ -1 +1 @@
--include $(TEST_DIR)/Makefile.$(ARCH)
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.$(ARCH)
-diff --git a/powerpc/Makefile.ppc64 b/powerpc/Makefile.ppc64
-index 3da3a83..3c0294a 100644
---- a/powerpc/Makefile.ppc64
-+++ b/powerpc/Makefile.ppc64
-@@ -20,7 +20,7 @@ cflatobjs += lib/ppc64/spinlock.o
- # ppc64 specific tests
- tests =
- 
--include $(TEST_DIR)/Makefile.common
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.common
- 
- arch_clean: powerpc_clean
- 	$(RM) lib/ppc64/.*.d
-diff --git a/x86/Makefile b/x86/Makefile
-index 369a38b..8a007ab 100644
---- a/x86/Makefile
-+++ b/x86/Makefile
-@@ -1 +1 @@
--include $(TEST_DIR)/Makefile.$(ARCH)
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.$(ARCH)
-diff --git a/x86/Makefile.i386 b/x86/Makefile.i386
-index 284b9e5..d801b80 100644
---- a/x86/Makefile.i386
-+++ b/x86/Makefile.i386
-@@ -7,4 +7,4 @@ cflatobjs += lib/x86/setjmp32.o
- tests = $(TEST_DIR)/taskswitch.flat $(TEST_DIR)/taskswitch2.flat \
- 	$(TEST_DIR)/cmpxchg8b.flat
- 
--include $(TEST_DIR)/Makefile.common
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.common
-diff --git a/x86/Makefile.x86_64 b/x86/Makefile.x86_64
-index 3e2821e..30f82a6 100644
---- a/x86/Makefile.x86_64
-+++ b/x86/Makefile.x86_64
-@@ -17,7 +17,7 @@ tests += $(TEST_DIR)/vmx.flat
- tests += $(TEST_DIR)/tscdeadline_latency.flat
- tests += $(TEST_DIR)/intel-iommu.flat
- 
--include $(TEST_DIR)/Makefile.common
-+include $(SRCDIR)/$(TEST_DIR)/Makefile.common
- 
- $(TEST_DIR)/hyperv_clock.elf: $(TEST_DIR)/hyperv_clock.o
- 
+ $(TEST_DIR)/realmode.elf: $(TEST_DIR)/realmode.o
 -- 
 2.11.0
