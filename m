@@ -1,87 +1,96 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 06 Apr 2017 18:01:21 +0200
-Subject: [PATCH] [media] imx: csi: retain current field order and
- colorimetry setting as default
-In-Reply-To: <59e72974-bfb0-6061-8b13-5f13f8723ba6@xs4all.nl>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
- <1491486929.2392.29.camel@pengutronix.de>
- <0f9690f8-c7f6-59ff-9e3e-123af9972d4b@xs4all.nl>
- <1491490451.2392.70.camel@pengutronix.de>
- <59e72974-bfb0-6061-8b13-5f13f8723ba6@xs4all.nl>
-Message-ID: <1491494481.2392.102.camel@pengutronix.de>
+From: olivier.moysan@st.com (olivier moysan)
+Date: Thu, 6 Apr 2017 17:40:35 +0200
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-04-06 at 17:43 +0200, Hans Verkuil wrote:
-> On 04/06/2017 04:54 PM, Philipp Zabel wrote:
-> > On Thu, 2017-04-06 at 16:20 +0200, Hans Verkuil wrote:
-> >> On 04/06/2017 03:55 PM, Philipp Zabel wrote:
-> >>> If the the field order is set to ANY in set_fmt, choose the currently
-> >>> set field order. If the colorspace is set to DEFAULT, choose the current
-> >>> colorspace.  If any of xfer_func, ycbcr_enc or quantization are set to
-> >>> DEFAULT, either choose the current setting, or the default setting for the
-> >>> new colorspace, if non-DEFAULT colorspace was given.
-> >>>
-> >>> This allows to let field order and colorimetry settings be propagated
-> >>> from upstream by calling media-ctl on the upstream entity source pad,
-> >>> and then call media-ctl on the sink pad to manually set the input frame
-> >>> interval, without changing the already set field order and colorimetry
-> >>> information.
-> >>>
-> >>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >>> ---
-> >>> This is based on imx-media-staging-md-v14, and it is supposed to allow
-> >>> configuring the pipeline with media-ctl like this:
-> >>>
-> >>> 1) media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY8_1X16/1920x1080]"
-> >>> 2) media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY8_1X16/1920x108]"
-> >>> 3) media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY8_1X16/1920x1080]"
-> >>> 4) media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60]"
-> >>> 5) media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080 at 1/30]"
-> >>>
-> >>> Without having step 4) overwrite the colorspace and field order set on
-> >>> 'ipu1_csi0':0 by the propagation in step 3).
-> >>> ---
-> >>>  drivers/staging/media/imx/imx-media-csi.c | 34 +++++++++++++++++++++++++++++++
-> >>>  1 file changed, 34 insertions(+)
-> >>>
-> >>> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-> >>> index 64dc454f6b371..d94ce1de2bf05 100644
-> >>> --- a/drivers/staging/media/imx/imx-media-csi.c
-> >>> +++ b/drivers/staging/media/imx/imx-media-csi.c
-> >>> @@ -1325,6 +1325,40 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
-> >>>  	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
-> >>>  
-> >>>  	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
-> >>> +
-> >>> +	/* Retain current field setting as default */
-> >>> +	if (sdformat->format.field == V4L2_FIELD_ANY)
-> >>> +		sdformat->format.field = fmt->field;
-> >>
-> >> sdformat->format.field should never be FIELD_ANY. If it is, then that's a
-> >> subdev bug and I'm pretty sure FIELD_NONE was intended.
-> > 
-> > This is the subdev. sdformat is passed in from userspace, so we have to
-> > deal with it being set to ANY. I'm trying hard right now not to return
-> > ANY though. The values in sdformat->format are applied to fmt down
-> > below.
-> 
-> Do you have a git tree with this patch? It is really hard to review without
-> having the full imx-media-csi.c source.
+Add documentation of device tree bindings for STM32 SPI/I2S.
 
-The patch applies on top of
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
+---
+ .../devicetree/bindings/sound/st,stm32h7-i2s.txt   | 71 ++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
 
-  https://github.com/slongerbeam/mediatree.git imx-media-staging-md-v14
-
-I have uploaded a branch
-
-  git://git.pengutronix.de/git/pza/linux imx-media-staging-md-v14+color
-
-with the patch applied on top.
-
-> I think one problem is that it is not clearly defined how subdevs and colorspace
-> information should work.
-
-regards
-Philipp
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
+new file mode 100644
+index 0000000..b99467a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
+@@ -0,0 +1,71 @@
++STMicroelectronics STM32 SPI/I2S Controller
++
++The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
++Only some SPI instances support I2S.
++
++Required properties:
++  - compatible: Must be "st,stm32h7-i2s"
++  - #sound-dai-cells: Must be 1. (one parameter)
++    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
++	index 0: playback DAI
++	index 1: capture DAI
++	index 2: full duplex DAI
++  - reg: Offset and length of the device's register set.
++  - interrupts: Must contain the interrupt line id.
++  - clocks: Must contain phandle and clock specifier pairs for each entry
++	in clock-names.
++  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
++	"i2sclk": clock which feeds the internal clock generator
++	"pclk": clock which feeds the peripheral bus interface
++	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
++	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
++  - dmas: DMA specifiers for tx and rx dma.
++    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
++  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
++  - pinctrl-names: should contain only value "default"
++  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
++
++Optional properties:
++  - resets: Reference to a reset controller asserting the reset controller
++
++Example:
++sound_card {
++	compatible = "audio-graph-card";
++	dais = <&i2s2_port 0>;
++};
++
++i2s2: audio-controller at 40003800 {
++	compatible = "st,stm32h7-i2s";
++	#sound-dai-cells = <1>;
++	reg = <0x40003800 0x400>;
++	interrupts = <36>;
++	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
++	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
++	dmas = <&dmamux2 2 39 0x400 0x1>,
++		       <&dmamux2 3 40 0x400 0x1>;
++	dma-names = "rx", "tx";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2s2>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2s2_port: port at 0 {
++			reg = <0>;
++			cpu_endpoint: endpoint {
++				remote-endpoint = <&codec_endpoint>;
++				audio-graph-card,format = "i2s";
++				audio-graph-card,bitclock-master = <&codec_endpoint>;
++				audio-graph-card,frame-master = <&codec_endpoint>;
++			};
++		};
++};
++
++audio-codec {
++		codec_port: port {
++			codec_endpoint: endpoint {
++				remote-endpoint = <&cpu_endpoint>;
++		};
++	};
++};
+-- 
+1.9.1
