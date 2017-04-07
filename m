@@ -1,85 +1,110 @@
-From: s.temerkhanov@gmail.com (Sergei Temerkhanov)
-Date: Fri, 7 Apr 2017 11:31:12 -0700
-Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
- ACPI mode
-In-Reply-To: <20170407171812.GA12012@red-moon>
-References: <20170406114711.17261-1-s.temerkhanov@gmail.com>
- <20170407171812.GA12012@red-moon>
-Message-ID: <CAPEA6daR9+BmyW6G9XOsO18782a-tjJrJKyxcYNHeHonuXRggw@mail.gmail.com>
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Fri, 7 Apr 2017 20:31:28 +0200
+Subject: [PATCH] drm: dw-hdmi: Implement the mode_fixup drm helper
+In-Reply-To: <bdb7e77a-9f0f-fcb4-e5d2-1968d499070d@codeaurora.org>
+References: <20170407121743.4142-1-romain.perier@collabora.com>
+ <bdb7e77a-9f0f-fcb4-e5d2-1968d499070d@codeaurora.org>
+Message-ID: <CAKMK7uH4SN7ayrgPeh=y_nSquBmtA=wWcF8hmPSdqha-vKZV_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 10:18 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Hi Sergey,
->
-> On Thu, Apr 06, 2017 at 11:47:11AM +0000, Sergey Temerkhanov wrote:
->> This commit modifies ARM64-specific ACPI PCI support functions to
->> properly set the numa_node property on host bridges and thus on PCI
->> devices. Such support requires _PXM objects to be set in DSDT/SSDT
->> tables describing PCI root bridges
+On Fri, Apr 7, 2017 at 7:15 PM, Archit Taneja <architt@codeaurora.org> wrote:
+> On 4/7/2017 5:47 PM, Romain Perier wrote:
 >>
->> Signed-off-by: Sergey Temerkhanov <s.temerkhanov@gmail.com>
+>> This helper is supposed to validate or reject the modeline before it
+>> applied by the mode setting. Currently this function has been dropped,
+>> it was previously set to a dummy function that always returned true. For
+>> both cases, this means that userspace can ask for a bad modeline that
+>> will be always accepted.
+>>
+>> On some platforms, like Rockchip, the drm dw_hdmi-rockchip variant driver
+>> already implements the atomic_check drm helper, so mode_fixup cannot be
+>> handled and implemented there (as drm_atomic_helper relies on either
+>> atomic_check or mode_fixup).
+>>
+>> This commit implements this helper. It only checks that this mode is
+>> correct from the connector point of view
+>
+>
+> We do have a atomic_check op in drm_connector_helper_funcs. I've
+> rarely seen it being used, but it could be used to validate
+> the mode w.r.t the connector, rather than checking it in the
+> bridge's mode_fixup op.
+>
+> Daniel,
+>
+> Is it okay to use the connector's atomic_check to validate a mode.
+> (by peeping into the new_crtc_state->mode?)
+
+This new atomic_check is super-new, and only for validating properties
+on the connector, before stuff like the routing or crtc is all set up.
+So no, can't be used for that. mode_fixup on the bridge is indeed the
+right place for limiting output specific stuff. Yes this is all a bit
+awkward, but thus far no one volunteered to improve the helpers after
+I explained the full nastiness of the situation ... I think we should
+have some helpers that implement the mode_valid helper in terms of the
+mode_fixup/atomic_check functions, but that's a bit tricky to get
+right :(
+-Daniel
+
+>
+> Thanks,
+> Archit
+>
+>
+>>
+>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
 >> ---
->>  arch/arm64/kernel/pci.c | 13 ++++++++++++-
->>  1 file changed, 12 insertions(+), 1 deletion(-)
+>>  drivers/gpu/drm/bridge/dw-hdmi.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
 >>
->> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
->> index 4f0e3ebfea4b..c45c7a26f984 100644
->> --- a/arch/arm64/kernel/pci.c
->> +++ b/arch/arm64/kernel/pci.c
->> @@ -81,7 +81,16 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
->>
->>  int pcibus_to_node(struct pci_bus *bus)
->>  {
->> -     return dev_to_node(&bus->dev);
->> +     struct pci_config_window *cfg = bus->sysdata;
->
-> Well, this implicit cast is a guess (ie it might be a DT sysdata
-> and there you can't have a clue on what it really is).
-
-Yes, but it's only accessed when acpi_disabled != 0. I just tried to
-save few lines and brackets :-)
-
-Regards,
-Sergey
-
->
->> +     struct acpi_device *adev = NULL;
->> +     struct device *dev;
->> +
->> +     if (!acpi_disabled)
->> +             adev = to_acpi_device(cfg->parent);
->> +
->> +     dev = adev ? &adev->dev : &bus->dev;
->> +
->> +     return dev_to_node(dev);
+>> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c
+>> b/drivers/gpu/drm/bridge/dw-hdmi.c
+>> index 22211ff..3bd0807 100644
+>> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+>> @@ -1740,6 +1740,21 @@ static int dw_hdmi_bridge_attach(struct drm_bridge
+>> *bridge)
+>>         return 0;
 >>  }
->>  EXPORT_SYMBOL(pcibus_to_node);
 >>
->> @@ -186,6 +195,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->>       struct pci_bus *bus, *child;
->>       struct acpi_pci_root_ops *root_ops;
->>
->> +     set_dev_node(&root->device->dev, node);
->
-> Ok I suspect this is one of those catch-22 issues with host bridge
-> creation/scan code (like domain nr), let me have a look I will send
-> you a patch next week when I figure out the call ordering required
-> to make this work, I want to make sure we can make this work with
-> DT and ACPI alike.
->
-> Thanks !
-> Lorenzo
->
 >> +
->>       ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
->>       if (!ri)
->>               return NULL;
->> --
->> 2.12.1
+>> +static bool dw_hdmi_bridge_mode_fixup(struct drm_bridge *bridge,
+>> +                                     const struct drm_display_mode
+>> *orig_mode,
+>> +                                     struct drm_display_mode *mode)
+>> +{
+>> +       struct dw_hdmi *hdmi = bridge->driver_private;
+>> +       struct drm_connector *connector = &hdmi->connector;
+>> +       enum drm_mode_status status;
+>> +
+>> +       status = dw_hdmi_connector_mode_valid(connector, mode);
+>> +       if (status != MODE_OK)
+>> +               return false;
+>> +       return true;
+>> +}
+>> +
+>>  static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+>>                                     struct drm_display_mode *orig_mode,
+>>                                     struct drm_display_mode *mode)
+>> @@ -1781,6 +1796,7 @@ static const struct drm_bridge_funcs
+>> dw_hdmi_bridge_funcs = {
+>>         .enable = dw_hdmi_bridge_enable,
+>>         .disable = dw_hdmi_bridge_disable,
+>>         .mode_set = dw_hdmi_bridge_mode_set,
+>> +       .mode_fixup = dw_hdmi_bridge_mode_fixup,
+>>  };
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>  static irqreturn_t dw_hdmi_i2c_irq(struct dw_hdmi *hdmi)
+>>
+>
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+
+
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
