@@ -1,44 +1,45 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 7 Apr 2017 17:22:39 +0100
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
-References: <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
- <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
-Message-ID: <20170407162238.GD858@leverpostej>
+Date: Fri, 7 Apr 2017 17:30:42 +0100
+Subject: [PATCHv2 15/16] arm64: pmuv3: handle !PMUv3 when probing
+In-Reply-To: <20170407142908.GO19342@arm.com>
+References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+ <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
+ <20170407142908.GO19342@arm.com>
+Message-ID: <20170407163042.GE858@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 09:14:29AM -0700, Andy Lutomirski wrote:
-> I think we're approaching this all wrong, actually.  The fact that x86
-> has this CR0.WP thing is arguably a historical accident, and the fact
-> that PaX uses it doesn't mean that PaX is doing it the best way for
-> upstream Linux.
+On Fri, Apr 07, 2017 at 03:29:09PM +0100, Will Deacon wrote:
+> >  static void __armv8pmu_probe_pmu(void *info)
+> >  {
+> > -	struct arm_pmu *cpu_pmu = info;
+> > +	struct armv8pmu_probe_info *probe = info;
+> > +	struct arm_pmu *cpu_pmu = probe->pmu;
+> > +	u64 dfr0;
+> >  	u32 pmceid[2];
+> >  
+> > +	dfr0 = read_sysreg(id_aa64dfr0_el1);
+> > +	if (((dfr0 >> ID_AA64DFR0_PMUVER_SHIFT) & 0xf) != 1)
+> > +		return;
 > 
-> Why don't we start at the other end and do a generic non-arch-specific
-> implementation: set up an mm_struct that contains an RW alias of the
-> relevant parts of rodata and use use_mm to access it.  (That is,
-> get_fs() to back up the old fs, set_fs(USER_DS),
-> use_mm(&rare_write_mm), do the write using copy_to_user, undo
-> everything.)
+> Shouldn't we be using one of those fancy cpuid_feature_extract_*_field helpers?
 
-FWIW, I completely agree with this approach.
+Sure. I can make this:
 
-That's largely the approach arm64 would have to take regardless (as per
-Hoeun's patches), and having a consistent common implementation would be
-desireable.
+	u64 dfr0, pmuver;
 
-There are a couple of other complications to handle (e.g. a perf
-interrupt coming in and trying to read from the mapping), but I think we
-can handle that generically.
+	...
+
+	dfr0 = read_sysreg(id_aa64dfr0_el1);
+	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
+			ID_AA64DFR0_PMUVER_SHIFT);
+	if (pmuver != 1)
+		return;
+
+> It would also be worth spinning this up on qemu, if you get a chance, as
+> I don't think that implements the PMU.
+
+I will try to give that a go shortly.
 
 Thanks,
 Mark.
