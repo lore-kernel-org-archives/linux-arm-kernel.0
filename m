@@ -1,71 +1,59 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Fri, 7 Apr 2017 13:36:13 -0400
-Subject: [PATCH v5 00/12] drm: rockchip: Fix rockchip drm unbind crash
- error
-In-Reply-To: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170407173613.bbau3xp2fasjzt2h@art_vandelay>
+From: andr2000@gmail.com (Oleksandr Andrushchenko)
+Date: Fri, 7 Apr 2017 20:38:03 +0300
+Subject: [PATCH v1] arm64: Add support for on-demand backtrace of other
+ CPUs
+In-Reply-To: <cc6f2535-fa37-1368-e14e-e76e086d4e28@linaro.org>
+References: <1489735663-2091-1-git-send-email-andr2000@gmail.com>
+ <1489735663-2091-2-git-send-email-andr2000@gmail.com>
+ <20170407170203.GC20645@e104818-lin.cambridge.arm.com>
+ <cc6f2535-fa37-1368-e14e-e76e086d4e28@linaro.org>
+Message-ID: <f357ff0b-c0bf-94b4-133d-bf69f0a96264@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 08:31:13PM +0800, Jeffy Chen wrote:
-> 
-> Verified on rk3399 chromebook kevin:
-> 1/ stop ui && pkill -9 frecon
-> 2/ unbind/bind drm
-> 
-> Changes in v5:
-> Fix wrong git account.
-> 
-> Changes in v4:
-> Address Andrzej Hajda <a.hajda@samsung.com>'s comments.
-> 
-> Changes in v3:
-> Update commit message.
-> Address Sean Paul <seanpaul@chromium.org>'s comments.
-> Update commit message.
-> Address Sean Paul <seanpaul@chromium.org>'s comments.
-> Update commit message.
-> Address Daniel Vetter <daniel@ffwll.ch>'s comments.
-> Update commit message.
-> 
-> Changes in v2:
-> Fix some commit messages.
-> 
-> Jeffy Chen (12):
->   drm: bridge: analogix: Detach panel when unbinding analogix dp
->   drm: bridge: analogix: Unregister dp aux when unbinding
->   drm: bridge: analogix: Disable clock when unbinding
->   drm: bridge: analogix: Destroy connector & encoder when unbinding
->   drm/rockchip: cdn-dp: Don't try to release firmware when not loaded
->   drm/rockchip: cdn-dp: Don't unregister audio dev when unbinding
->   drm/rockchip: vop: Enable pm domain before vop_initial
->   drm/rockchip: vop: Unprepare clocks when unbinding
->   drm/rockchip: analogix_dp: Disable clock when unbinding
->   drm/rockchip: Reoder drm bind/unbind sequence
->   drm/rockchip: Shutdown all crtcs when unbinding drm
+On 04/07/2017 08:09 PM, Daniel Thompson wrote:
+> On 07/04/17 18:02, Catalin Marinas wrote:
+>> On Fri, Mar 17, 2017 at 09:27:43AM +0200, Oleksandr Andrushchenko wrote:
+>>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>>
+>>> Currently arm64 has no implementation of 
+>>> arch_trigger_cpumask_backtrace.
+>>> The patch provides one using library code recently added by Russell 
+>>> King
+>>> for for the majority of the implementation. Currently this is realized
+>>> using regular irqs but could, in the future, be implemented using
+>>> NMI-like mechanisms.
+>>>
+>>> Note: There is a small (and nasty) change to the generic code to ensure
+>>>       good stack traces. The generic code currently assumes that
+>>>       show_regs() will include a stack trace but arch/arm64 does not do
+>>>       this so we must add extra code here. Ideas on a better approach
+>>>       here would be very welcome (is there any appetite to change arm64
+>>>       show_regs() or should we just tease out the dump code into a
+>>>       callback
+>>
+>> Please see this discussion here:
+>>
+>> http://lkml.kernel.org/r/20170323150357.GH9287 at leverpostej
+>>
+>> I'm not a ware of a follow up but if we change the arm64 show_regs() to
+>> dump the stack, we no longer need the generic code hunk in your patch.
+>
+> Great. That hack did always irk me!
+>
+> I'll tidy it up the next time I push out the PMR interrupt masking 
+> patch set.
+>
+> Is there any interest in taking the patch before that. I don't mind 
+> separating it out... I'm just not sure how useful it is.
+>
+Yes, please, could you make it as a separate patch, so it gets in the 
+tree faster?
+As to if it is useful... It is. I am working on Xen hypervisor [1] and 
+sometimes it is
+sooo useful to see what all the cores do.
 
-Hi Jeffy,
-I've applied the first 11 patches from this set to -misc. The last patch
-is still a work in progress.
+Thank you in advance,
+Oleksandr
 
-Thanks,
-
-Sean
-
->   drm/drm_ioctl.c: Break ioctl when drm device not registered
-> 
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  6 +++
->  drivers/gpu/drm/drm_ioctl.c                        |  2 +-
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  3 +-
->  drivers/gpu/drm/rockchip/cdn-dp-core.c             | 10 +++--
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.c        | 50 ++++++++++++----------
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 33 ++++++++++----
->  6 files changed, 67 insertions(+), 37 deletions(-)
-> 
-> -- 
-> 2.1.4
-> 
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+[1] https://www.xenproject.org/
