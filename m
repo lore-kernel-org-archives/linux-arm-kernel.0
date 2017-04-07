@@ -1,30 +1,99 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Apr 2017 09:31:25 +0200
-Subject: [PATCH v2 2/2] pinctrl: meson: meson8b: rename the NAND DQS pin
- definitions
-In-Reply-To: <20170401135922.1288-3-martin.blumenstingl@googlemail.com>
-References: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
- <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
- <20170401135922.1288-3-martin.blumenstingl@googlemail.com>
-Message-ID: <CACRpkdaHiDo5_NjfdEaqKyu+ZXrvrtuO7YLyv-wPvhAc2qfCgA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 7 Apr 2017 09:45:23 +0200
+Subject: [PATCH v9 01/12] ARM: EXYNOS: refactor firmware specific routines
+In-Reply-To: <1490879826-16754-2-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170330131419epcas5p4ac36250d3a9225643e327e60f47956c2@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAJKOXPfvD+Rm+pxvOMe8TefWsYZW4gvj0ZnXNtwOovkjzKFGCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 1, 2017 at 3:59 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-
-> The NAND DQS pins are currently named nand_dqs_0 and nand_dqs_1.
-> However, they both seem to have the same function, just exposed on
-> different pins (unlike the ethernet TX pins for example, where there's
-> eth_txd0..3 - all of these can be active at the same time as they are
-> different data lines).
-> Rename the NAND DQS pins to nand_dqs_15 and nand_dqs_18 to reflect that
-> it's the same functionality just exposed on different pins (BOOT_15 and
-> BOOT_18).
+On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> To remove dependency on soc_is_exynosMMMM macros and remove multiple
+> checks for such macros, let's refactor code in firmware.c file.
+> SoC specific firmware_ops are separated and registered during
+> exynos_firmware_init based on matching machine compatible.
 >
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/firmware.c | 114 +++++++++++++++++++++++++++++++---------
+>  1 file changed, 89 insertions(+), 25 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+> index e81a78b..b04c47a 100644
+> --- a/arch/arm/mach-exynos/firmware.c
+> +++ b/arch/arm/mach-exynos/firmware.c
+> @@ -35,6 +35,25 @@ static void exynos_save_cp15(void)
+>              : : "cc");
+>  }
+>
+> +static int exynos3250_do_idle(unsigned long mode)
+> +{
+> +       switch (mode) {
+> +       case FW_DO_IDLE_AFTR:
+> +               writel_relaxed(virt_to_phys(exynos_cpu_resume_ns),
+> +                              sysram_ns_base_addr + 0x24);
+> +               writel_relaxed(EXYNOS_AFTR_MAGIC, sysram_ns_base_addr + 0x20);
+> +               flush_cache_all();
+> +               exynos_smc(SMC_CMD_SAVE, OP_TYPE_CORE,
+> +                               SMC_POWERSTATE_IDLE, 0);
+> +               exynos_smc(SMC_CMD_SHUTDOWN, OP_TYPE_CLUSTER,
+> +                               SMC_POWERSTATE_IDLE, 0);
+> +               break;
+> +       case FW_DO_IDLE_SLEEP:
+> +               exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> +       }
+> +       return 0;
+> +}
+> +
+>  static int exynos_do_idle(unsigned long mode)
+>  {
+>         switch (mode) {
+> @@ -44,14 +63,7 @@ static int exynos_do_idle(unsigned long mode)
+>                 writel_relaxed(__pa_symbol(exynos_cpu_resume_ns),
+>                                sysram_ns_base_addr + 0x24);
+>                 writel_relaxed(EXYNOS_AFTR_MAGIC, sysram_ns_base_addr + 0x20);
+> -               if (soc_is_exynos3250()) {
+> -                       flush_cache_all();
+> -                       exynos_smc(SMC_CMD_SAVE, OP_TYPE_CORE,
+> -                                  SMC_POWERSTATE_IDLE, 0);
+> -                       exynos_smc(SMC_CMD_SHUTDOWN, OP_TYPE_CLUSTER,
+> -                                  SMC_POWERSTATE_IDLE, 0);
+> -               } else
+> -                       exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+> +               exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+>                 break;
+>         case FW_DO_IDLE_SLEEP:
+>                 exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+> @@ -59,28 +71,25 @@ static int exynos_do_idle(unsigned long mode)
+>         return 0;
+>  }
+>
+> -static int exynos_cpu_boot(int cpu)
+> +static int exynos4212_cpu_boot(int cpu)
+>  {
+>         /*
+> -        * Exynos3250 doesn't need to send smc command for secondary CPU boot
+> -        * because Exynos3250 removes WFE in secure mode.
+> -        */
+> -       if (soc_is_exynos3250())
+> -               return 0;
+> -
+> -       /*
+>          * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+>          * But, Exynos4212 has only one secondary CPU so second parameter
+>          * isn't used for informing secure firmware about CPU id.
+>          */
+> -       if (soc_is_exynos4212())
+> -               cpu = 0;
+> +       cpu = 0;
 
-Patch applied with Kevin's ACK.
+The comment above is clear enough so I think there is no need for this
+assignment. Just use 0 as argument in exynos_smc().
 
-Yours,
-Linus Walleij
+Rest looks good so with this change:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Best regards,
+Krzysztof
