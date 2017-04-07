@@ -1,68 +1,90 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 7 Apr 2017 14:51:38 +0200
-Subject: [PATCH v3 02/20] net: stmmac: add optional setup function
-In-Reply-To: <262f763b-d158-dd77-3dba-1d7b90a1eef9@st.com>
-References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
- <20170403091444.29876-3-clabbe.montjoie@gmail.com>
- <262f763b-d158-dd77-3dba-1d7b90a1eef9@st.com>
-Message-ID: <20170407125138.GC15546@Red>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 7 Apr 2017 14:57:39 +0200
+Subject: Supporting early console on a SERIAL_8250_RT288X platform
+In-Reply-To: <d797386a-009e-f21d-dec4-a7520b4f6a72@arm.com>
+References: <0ac351b9-46bd-3a35-fab3-73177cabb747@free.fr>
+ <d797386a-009e-f21d-dec4-a7520b4f6a72@arm.com>
+Message-ID: <f59323cb-f0f4-1936-9fab-8d3cf1799818@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 02:32:33PM +0200, Giuseppe CAVALLARO wrote:
-> Hello Corentin
+Thanks for answering so quickly! :-)
+
+On 07/04/2017 14:18, Robin Murphy wrote:
+
+> On 07/04/17 12:53, Mason wrote:
+>
+>> Did I implement something wrong?
+>> Why am I not seeing the output of the panic() call, like I do
+>> with earlyprintk?
+>> Since tty0 is enabled, why isn't it picking up where palmchip0
+>> left off?
 > 
-> On 4/3/2017 11:14 AM, Corentin Labbe wrote:
-> > Instead of adding more ifthen logic for adding a new mac_device_info
-> > setup function, it is easier to add a function pointer to the function
-> > needed.
-> >
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >   drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 4 +++-
-> >   include/linux/stmmac.h                            | 3 +++
-> >   2 files changed, 6 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> > index 43361f3..3beca41 100644
-> > --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> > +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-> > @@ -3508,7 +3508,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
-> >   	struct mac_device_info *mac;
-> >   
-> >   	/* Identify the MAC HW device */
-> > -	if (priv->plat->has_gmac) {
-> > +	if (priv->plat->setup) {
-> > +		mac = priv->plat->setup(priv);
-> > +	} else if (priv->plat->has_gmac) {
-> >   		priv->dev->priv_flags |= IFF_UNICAST_FLT;
-> >   		mac = dwmac1000_setup(priv->ioaddr,
-> >   				      priv->plat->multicast_filter_bins,
-> > diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
-> > index 3921cb9..dadd74b 100644
-> > --- a/include/linux/stmmac.h
-> > +++ b/include/linux/stmmac.h
-> > @@ -144,6 +144,8 @@ struct stmmac_txq_cfg {
-> >   	u32 prio;
-> >   };
-> >   
-> > +struct stmmac_priv;
-> > +
-> >   struct plat_stmmacenet_data {
-> >   	int bus_id;
-> >   	int phy_addr;
-> > @@ -177,6 +179,7 @@ struct plat_stmmacenet_data {
-> >   	void (*fix_mac_speed)(void *priv, unsigned int speed);
-> >   	int (*init)(struct platform_device *pdev, void *priv);
-> >   	void (*exit)(struct platform_device *pdev, void *priv);
-> > +	struct mac_device_info *(*setup)(struct stmmac_priv *priv);
-> 
-> In that case  I prefer to have void *priv as done for the other callbacks.
-> I mean, keep the priv struct inside the driver part.
-> 
+> As far as I'm aware, tty0 is a purely virtual console: look further down
+> still and you'll probably see a second switch over from tty0 to ttyS0,
+> which will be when the buffered output *actually* starts coming out
+> again. That's certainly what happens for me, albeit with
+> "pl11"->"tty0"->"ttyAMA0", (and complete with not realising ttyAMA0 is
+> still the same port and reprinting the entire log buffer from the top).
+
+Right you are!
+
+Also, I had not noticed the "print the entire log buffer from the top"
+issue you mention.
+
+[    0.000000] Booting Linux on physical CPU 0x0
+...
+[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
+[    0.000000] bootconsole [palmchip0] enabled
+...
+[    0.014147] Console: colour dummy device 80x30
+[    0.018616] console [tty0] enabled
+[    0.022039] bootconsole [palmchip0] disabled
+[    0.000000] Booting Linux on physical CPU 0x0
+...
+[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
+[    0.000000] bootconsole [palmchip0] enabled
+[    0.014147] Console: colour dummy device 80x30
+[    0.018616] console [tty0] enabled
+[    0.022039] bootconsole [palmchip0] disabled
+...
+[    0.460630] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.462278] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
+[    1.084227] console [ttyS0] enabled
+
+> I believe this is something to do with how the DT stdout-path property
+> is implemented, because with an explicit "console=ttyAMA0" (or ttyS0 in
+> your case) on the command line instead of relying on stdout-path, the
+> boot console does switch directly to the real UART without the
+> intermediate tty0 blind spot.
+
+Indeed, an explicit console=ttyS0,115200 does avoid the "dupe the entire log"
+issue. There is still some "stuttering" involved:
+
+[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
+[    0.000000] bootconsole [palmchip0] enabled
+...
+[    0.745811] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.753681] console [ttyS0] disabled
+[    0.757426] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
+[    0.766672] console [ttyS0] enabled
+[    0.766672] console [ttyS0] enabled
+[    0.773726] bootconsole [palmchip0] disabled
+[    0.773726] bootconsole [palmchip0] disabled
 
 
-Agree, I will change it
+More importantly, it also solves the "hang before panic message" issue:
 
-Thanks
-Regards
+...
+[    0.575937] io scheduler noop registered
+[    0.579888] io scheduler deadline registered
+[    0.584245] io scheduler cfq registered (default)
+[    0.589650] Kernel panic - not syncing: THIS IS A TEST
+
+
+Hopefully, supporting earlycon on this platform can be included
+in time for v4.12 :-)
+
+Greg, Peter, what do you think? ;-)
+
+Regards.
