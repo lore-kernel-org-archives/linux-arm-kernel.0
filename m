@@ -1,138 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 7 Apr 2017 16:41:29 +0100
-Subject: [RFC 8/9] arm64/kvm: context-switch PAC registers
-In-Reply-To: <1491232765-32501-9-git-send-email-mark.rutland@arm.com>
-References: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
- <1491232765-32501-9-git-send-email-mark.rutland@arm.com>
-Message-ID: <973af0d9-f7bc-24ee-567d-23e0e487b970@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 07 Apr 2017 16:47:04 +0100
+Subject: [PATCH 4/4] ef/libstub: arm/arm64: randomize the base of the
+ UEFI rt services region
+In-Reply-To: <20170324132410.16628-5-ard.biesheuvel@linaro.org>
+References: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
+ <20170324132410.16628-5-ard.biesheuvel@linaro.org>
+Message-ID: <58E7B478.6010305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Ard,
 
-On 03/04/17 16:19, Mark Rutland wrote:
-> If we have pointer authentication support, a guest may wish to use it.
-> This patch adds the infrastructure to allow it to do so.
+On 24/03/17 13:24, Ard Biesheuvel wrote:
+> Update the allocation logic for the virtual mapping of the UEFI runtime
+> services to start from a randomized base address if KASLR is in effect,
+> and if the UEFI firmware exposes an implementation of EFI_RNG_PROTOCOL.
 > 
-> This is sufficient for basic testing, but not for real-world usage. A
-> guest will still see pointer authentication support advertised in the ID
-> registers, and we will need to trap accesses to these to provide
-> santized values.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
-> ---
->  arch/arm64/include/asm/kvm_emulate.h | 15 +++++++++++++
->  arch/arm64/include/asm/kvm_host.h    | 12 ++++++++++
->  arch/arm64/kvm/hyp/sysreg-sr.c       | 43 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 70 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index f5ea0ba..0c3cb43 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -28,6 +28,8 @@
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmio.h>
->  #include <asm/ptrace.h>
-> +#include <asm/cpucaps.h>
-> +#include <asm/cpufeature.h>
->  #include <asm/cputype.h>
->  #include <asm/virt.h>
->  
-> @@ -49,6 +51,19 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
->  		vcpu->arch.hcr_el2 |= HCR_E2H;
->  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
->  		vcpu->arch.hcr_el2 &= ~HCR_RW;
-> +
-> +	/*
-> +	 * Address auth and generic auth share the same enable bits, so we have
-> +	 * to ensure both are uniform before we can enable support in a guest.
-> +	 * Until we have the infrastructure to detect uniform absence of a
-> +	 * feature, only permit the case when both are supported.
-> +	 *
-> +	 * Note that a guest will still see the feature in ID_AA64_ISAR1 until
-> +	 * we introduce code to emulate the ID registers.
-> +	 */
-> +	if (cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH) &&
-> +	    cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH))
-> +		vcpu->arch.hcr_el2 |= (HCR_API | HCR_APK);
+> This makes it more difficult to predict the location of exploitable
+> data structures in the runtime UEFI firmware, which increases robustness
+> against attacks. Note that these regions are only mapped during the
+> time a runtime service call is in progress, and only on a single CPU
+> at a time, bit give the lack of a downside, let's enable it nonetheless.
 
-Instead of unconditionally allowing the guest to access this feature...
+With next-20170407 on Seattle Overdrive, I get an SError[0] on boot:
 
->  }
->  
->  static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e7705e7..b25f710 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -133,6 +133,18 @@ enum vcpu_sysreg {
->  	PMSWINC_EL0,	/* Software Increment Register */
->  	PMUSERENR_EL0,	/* User Enable Register */
->  
-> +	/* Pointer Authentication Registers */
-> +	APIAKEYLO_EL1,
-> +	APIAKEYHI_EL1,
-> +	APIBKEYLO_EL1,
-> +	APIBKEYHI_EL1,
-> +	APDAKEYLO_EL1,
-> +	APDAKEYHI_EL1,
-> +	APDBKEYLO_EL1,
-> +	APDBKEYHI_EL1,
-> +	APGAKEYLO_EL1,
-> +	APGAKEYHI_EL1,
-> +
->  	/* 32bit specific registers. Keep them at the end of the range */
->  	DACR32_EL2,	/* Domain Access Control Register */
->  	IFSR32_EL2,	/* Instruction Fault Status Register */
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 9341376..3440b42 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -18,6 +18,8 @@
->  #include <linux/compiler.h>
->  #include <linux/kvm_host.h>
->  
-> +#include <asm/cpucaps.h>
-> +#include <asm/cpufeature.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_hyp.h>
->  
-> @@ -31,6 +33,24 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
->   * pstate, and guest must save everything.
->   */
->  
-> +#define __save_ap_key(regs, key) \
-> +	regs[key ## KEYLO_EL1] = read_sysreg_s(SYS_ ## key ## KEYLO_EL1); \
-> +	regs[key ## KEYHI_EL1] = read_sysreg_s(SYS_ ## key ## KEYHI_EL1)
-> +
-> +static void __hyp_text __sysreg_save_ap_keys(struct kvm_cpu_context *ctxt)
-> +{
-> +	if (cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH)) {
-> +		__save_ap_key(ctxt->sys_regs, APIA);
-> +		__save_ap_key(ctxt->sys_regs, APIB);
-> +		__save_ap_key(ctxt->sys_regs, APDA);
-> +		__save_ap_key(ctxt->sys_regs, APDB);
-> +	}
-> +
-> +	if (cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH)) {
-> +		__save_ap_key(ctxt->sys_regs, APGA);
-> +	}
-> +}
-> +
+The three patches I have on top of 4.11.0-rc5-next-20170407 are:
+* Revert "efi/libstub/arm*: Set default address and size cells values for an
+empty dtb"
+* Revert "ef/libstub/arm/arm64: Randomize the base of the UEFI rt services region"
 
-...which immediately translates in quite a bit of sysreg churn on both
-host and guest (specially given that these are not banked by exception
-level), could we make it a bit more lazy instead?
+At which point the machine start booting to a prompt again, (its noisier than
+usual but looks like double-printing).
 
-Even an "enable on first use" would be good, given that it is likely
-that we'll have non PAC-enabled VMs for quite a while.
+If I then cherry-pick:
+* ef/libstub/arm/arm64: Randomize the base of the UEFI rt services region"
 
-Thoughts?
+It again fails, producing the trace below. This is all with next-20170407's
+defconfig, 4K/48. UEFI identifies itself as:
+> UEFI v2.40 (American Megatrends, 0x0005000B)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+Thanks,
+
+James
+
+
+[0]
+Shell> efi\morse\Image console=ttyAMA0,115200 root=PARTUUID=b2edf709-3b28-4cb3-8
+809-203f262e2bcc rw earlycon=pl011,0xe1010000 crashkernel=1G stacktrace ignore_l
+oglevel=1 acpi=on efi=debug resume=/dev/sda3
+EFI stub: Booting Linux Kernel...
+EFI stub: Using DTB from configuration table
+EFI stub: Exiting boot services and installing virtual address map...
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.11.0-rc5-next-20170407-00003-gbe65d54f8671 (morse
+@melchizedek) (gcc version 4.9.3 20141031 (prerelease) (Linaro GCC 2014.11) ) #7
+401 SMP PREEMPT Fri Apr 7 16:19:28 BST 2017
+[    0.000000] Boot CPU: AArch64 Processor [411fd072]
+[    0.000000] earlycon: pl11 at MMIO 0x00000000e1010000 (options '')
+[    0.000000] bootconsole [pl11] enabled
+[    0.000000] debug: ignoring loglevel setting.
+[    0.000000] Bad mode in Error handler detected on CPU0, code 0xbf000000 -- SError
+[    0.000000] Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.11.0-rc5-next-20170407-
+00003-gbe65d54f8671 #7401
+[    0.000000] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive)
+ (DT)
+[    0.000000] task: ffff000008e02b80 task.stack: ffff000008df0000
+[    0.000000] PC is at setup_arch+0xf0/0x504
+[    0.000000] LR is at setup_arch+0xec/0x504
+[    0.000000] pc : [<ffff000008ce2844>] lr : [<ffff000008ce2840>] pstate: 000000c5
+
+[    0.000000] Call trace:
+[    0.000000] [<ffff000008ce2844>] setup_arch+0xf0/0x504
+[    0.000000] [<ffff000008ce0838>] start_kernel+0x70/0x398
+[    0.000000] [<ffff000008ce01e0>] __primary_switched+0x64/0x74
+[    0.000000] Code: 9111c000 940034d9 97fff7cd d50344ff (90fffce3)
+[    0.000000] ---[ end trace 0000000000000000 ]---
+[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
+[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
