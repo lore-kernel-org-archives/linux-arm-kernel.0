@@ -1,38 +1,71 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 07 Apr 2017 16:31:59 +0200
-Subject: [PATCH] video: ARM CLCD: fix dma allocation size
-In-Reply-To: <20170308145805.1325-1-slemieux.tyco@gmail.com>
-References: <20170308145805.1325-1-slemieux.tyco@gmail.com>
- <CGME20170407143202epcas5p337f2b743793c97abbb5e0c441eaae163@epcas5p3.samsung.com>
-Message-ID: <2871477.J78ljCzBX8@amdc3058>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Fri, 7 Apr 2017 16:29:36 +0200
+Subject: [PATCH 2/2] drm: dw-hdmi: Gate audio clock from the I2S
+ enablement callbacks
+In-Reply-To: <984b7a29-81a8-8404-0c76-d632b4ae9a9d@baylibre.com>
+References: <20170407141905.14147-1-romain.perier@collabora.com>
+ <20170407141905.14147-3-romain.perier@collabora.com>
+ <984b7a29-81a8-8404-0c76-d632b4ae9a9d@baylibre.com>
+Message-ID: <05452cde-3048-b572-80a9-55609724ba21@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Hi,
 
-On Wednesday, March 08, 2017 09:58:05 AM Sylvain Lemieux wrote:
-> From: Liam Beguin <lbeguin@tycoint.com>
-> 
-> This patch forces the frambuffer size to be aligned on kernel pages.
-> 
-> During the board startup, the splash screed did appear;
-> the "ts_test" program or our application were not able to start.
-> 
-> The following error message was reported:
-> error: failed to map framebuffer device to memory.
-> LinuxFB: driver cannot connect
-> 
-> The issue was discovered, on the LPC32xx platform, during the migration
-> of the LCD definition from the board file to the device tree.
-> 
-> Signed-off-by: Liam Beguin <lbeguin@tycoint.com>
-> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+Le 07/04/2017 ? 16:23, Neil Armstrong a ?crit :
+> On 04/07/2017 04:19 PM, Romain Perier wrote:
+>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
+>> step E. and is kept enabled for later use. This clock should be enabled
+>> and disabled along with the actual audio stream and not always on (that
+>> is bad for PM). Futhermore, as described by the datasheet, the I2S
+>> variant need to gate/ungate the clock when the stream is
+>> enabled/disabled.
+>>
+>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
+>> when the audio sample clock must be enabled or disabled. Then, it adds
+>> the call to this function from dw_hdmi_i2s_audio_enable() and
+>> dw_hdmi_i2s_audio_disable().
+>>
+>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+>> ---
+>>  drivers/gpu/drm/bridge/dw-hdmi.c | 16 +++++++++-------
+>>  1 file changed, 9 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+>> index d34e0a5..3bd0807 100644
+>> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+>> @@ -559,6 +559,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+>>  }
+>>  EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+>>  
+>> +static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
+>> +{
+>> +	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
+>> +		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+>> +}
+>> +
+>>  void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
+>>  {
+>>  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+>> @@ -572,12 +578,13 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
+>>  void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
+>>  {
+>>  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+>> +	hdmi_enable_audio_clk(hdmi, true);
+>>  }
+>>  
+>>  
+>>  void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
+>>  {
+>> -
+>> +	hdmi_enable_audio_clk(hdmi, false);
+>>  }
+> I think the NULL check is still valid if you fill this function, because the IP also
+> support other modes (SPDIF and GPA).
 
-Patch queued for 4.12, thanks.
+Ah, good point!
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thanks,
+Romain
