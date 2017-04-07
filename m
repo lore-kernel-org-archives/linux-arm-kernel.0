@@ -1,93 +1,84 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 7 Apr 2017 18:12:05 +0100
-Subject: [PATCH] acpi: pci: don't ignore function ID of bridge device in
- _PRT
-In-Reply-To: <20170407170654.GA30103@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170407132222.28300-1-ard.biesheuvel@linaro.org>
- <20170407170654.GA30103@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAKv+Gu_rivjMaQ740LWO1Nm8SPMGuQ1J1TFeD8QXnRch8Lv6bg@mail.gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 7 Apr 2017 22:45:12 +0530
+Subject: [PATCH] drm: dw-hdmi: Implement the mode_fixup drm helper
+In-Reply-To: <20170407121743.4142-1-romain.perier@collabora.com>
+References: <20170407121743.4142-1-romain.perier@collabora.com>
+Message-ID: <bdb7e77a-9f0f-fcb4-e5d2-1968d499070d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 April 2017 at 18:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> Hi Ard,
+Hi,
+
+On 4/7/2017 5:47 PM, Romain Perier wrote:
+> This helper is supposed to validate or reject the modeline before it
+> applied by the mode setting. Currently this function has been dropped,
+> it was previously set to a dummy function that always returned true. For
+> both cases, this means that userspace can ask for a bad modeline that
+> will be always accepted.
 >
-> On Fri, Apr 07, 2017 at 02:22:22PM +0100, Ard Biesheuvel wrote:
->> We currently derive legacy interrupt routing by matching _PRT
->> entries on the PCI device only, presumably under the assumption
->> that PRT entries always have a value of 0xffff in the function
->> field, meaning 'match all functions'.
+> On some platforms, like Rockchip, the drm dw_hdmi-rockchip variant driver
+> already implements the atomic_check drm helper, so mode_fixup cannot be
+> handled and implemented there (as drm_atomic_helper relies on either
+> atomic_check or mode_fixup).
 >
-> The spec (ACPI v6.0, sec 6.2.13) contains a note that:
+> This commit implements this helper. It only checks that this mode is
+> correct from the connector point of view
+
+We do have a atomic_check op in drm_connector_helper_funcs. I've
+rarely seen it being used, but it could be used to validate
+the mode w.r.t the connector, rather than checking it in the
+bridge's mode_fixup op.
+
+Daniel,
+
+Is it okay to use the connector's atomic_check to validate a mode.
+(by peeping into the new_crtc_state->mode?)
+
+Thanks,
+Archit
+
 >
->   The PCI function number in the Address field of the _PRT packages
->   must be 0xFFFF, indicating "any" function number or "all functions".
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> ---
+>  drivers/gpu/drm/bridge/dw-hdmi.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 >
-> If we need a patch like this, we need to somehow reconcile it with
-> that spec text to make sure firmware and OS folks have a common
-> understanding of how this is supposed to work.
+> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+> index 22211ff..3bd0807 100644
+> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+> @@ -1740,6 +1740,21 @@ static int dw_hdmi_bridge_attach(struct drm_bridge *bridge)
+>  	return 0;
+>  }
 >
->> This no longer holds for modern PCIe topologies, where the
->> legacy interrupts for different slots may be wired to different
->> functions on the same bridge device. For instance, on AMD Seattle,
->> we may have something like
->>
->> -[0000:00]-+-00.0  Advanced Micro Devices, Inc. [AMD] Device 1a00
->>            +-02.0  Advanced Micro Devices, Inc. [AMD] Device 1a01
->>            +-02.2-[01]----00.0  Renesas uPD720202 USB 3.0 Host Controller
->>            \-02.3-[02]----00.0  Realtek RTL8169 PCIe Gigabit Ethernet
->>
->> where the _PRT describes the legacy interrupt routing as
->>
->>     Name (_PRT, Package ()  // _PRT: PCI Routing Table
->>     {
->>         // slot 1: dev 2 fn 1
->>         Package () { 0x20001, 0x0, 0x0, 0x140 },
->>         Package () { 0x20001, 0x1, 0x0, 0x141 },
->>         Package () { 0x20001, 0x2, 0x0, 0x142 },
->>         Package () { 0x20001, 0x3, 0x0, 0x143 },
->>
->>         // slot 1: dev 2 fn 2
->>         Package () { 0x20002, 0x0, 0x0, 0x144 },
->>         Package () { 0x20002, 0x1, 0x0, 0x145 },
->>         Package () { 0x20002, 0x2, 0x0, 0x146 },
->>         Package () { 0x20002, 0x3, 0x0, 0x147 },
->>
->>         // slot 1: dev 2 fn 3
->>         Package () { 0x20003, 0x0, 0x0, 0x148 },
->>         Package () { 0x20003, 0x1, 0x0, 0x149 },
->>         Package () { 0x20003, 0x2, 0x0, 0x14a },
->>         Package () { 0x20003, 0x3, 0x0, 0x14b }
->>     }) // _PRT
+> +
+> +static bool dw_hdmi_bridge_mode_fixup(struct drm_bridge *bridge,
+> +				      const struct drm_display_mode *orig_mode,
+> +				      struct drm_display_mode *mode)
+> +{
+> +	struct dw_hdmi *hdmi = bridge->driver_private;
+> +	struct drm_connector *connector = &hdmi->connector;
+> +	enum drm_mode_status status;
+> +
+> +	status = dw_hdmi_connector_mode_valid(connector, mode);
+> +	if (status != MODE_OK)
+> +		return false;
+> +	return true;
+> +}
+> +
+>  static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
+>  				    struct drm_display_mode *orig_mode,
+>  				    struct drm_display_mode *mode)
+> @@ -1781,6 +1796,7 @@ static const struct drm_bridge_funcs dw_hdmi_bridge_funcs = {
+>  	.enable = dw_hdmi_bridge_enable,
+>  	.disable = dw_hdmi_bridge_disable,
+>  	.mode_set = dw_hdmi_bridge_mode_set,
+> +	.mode_fixup = dw_hdmi_bridge_mode_fixup,
+>  };
 >
-> But I think this _PRT description is incorrect and we should change
-> the _PRT rather than the kernel.  My laptop has a basically identical
-> topology:
->
->   -[0000:00]-+-00.0  Intel Corporation Sky Lake Host Bridge/DRAM Registers
->              +-1c.0-[02]----00.0  Realtek Semiconductor Co., Ltd.  Device 525a
->              +-1c.2-[04]----00.0  Intel Corporation Wireless 8260
->
-> and the ASL looks like this (paraphrased):
->
->   Device (EXP1) {
->     Name (_ADR, 0x001C0000)
->     Name (_PRT) {
->       Package () { 0xFFFF, 0x00, \_SB.LNKA, 0x00 },
->       Package () { 0xFFFF, 0x01, \_SB.LNKB, 0x00 },
->       ...
->     }
->   }
->   Device (EXP3) {
->     Name (_ADR, 0x001C0002)
->     Name (_PRT) {
->       Package () { 0xFFFF, 0x00, \_SB.LNKC, 0x00 },
->       Package () { 0xFFFF, 0x01, \_SB.LNKD, 0x00 },
->       ...
->     }
->   }
+>  static irqreturn_t dw_hdmi_i2c_irq(struct dw_hdmi *hdmi)
 >
 
-Thanks for the explanation. But how is this wired up into the PNP0A08
-device then? IOW, how does the ACPI code in Linux discover the
-relation between these devices and my PCI root device?
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
