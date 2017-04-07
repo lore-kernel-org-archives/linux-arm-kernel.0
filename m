@@ -1,43 +1,63 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 07 Apr 2017 17:45:44 +0530
-Subject: [PATCH v9 03/12] ARM: EXYNOS: remove secondary startup
- initialization from smp_prepare_cpus
-In-Reply-To: <CAJKOXPcyvVmsAvBUhqxV=WuFKjqKCqcidTFQ5mTtUFDAfmpcrg@mail.gmail.com>
-References: <CGME20170330131424epcas5p4fccfab06e5d77d70d09c3835c3332ee5@epcas5p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-4-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPcyvVmsAvBUhqxV=WuFKjqKCqcidTFQ5mTtUFDAfmpcrg@mail.gmail.com>
-Message-ID: <9b1b33ee-b88c-2fe3-0552-8afac2920334@samsung.com>
+From: josh.beavers@gmail.com (Josh Beavers)
+Date: Fri, 7 Apr 2017 08:13:45 -0400
+Subject: kmap_atomic() and manual VIVT cache flushes
+Message-ID: <CAE=AiOOB3QoDCy-XS=fyOTqziM8tHZi1oFcVFa88AQFoLjL+cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
+
+Short version:  Are manual cache flushes still required on Linux 4.10
+when using kmap_atomic() / kunmap_atomic()?
 
 
-On Friday 07 April 2017 02:01 PM, Krzysztof Kozlowski wrote:
-> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> We are taking care of setting secondary cpu boot address in
->> exynos_boot_secondary just before sending ipi to secondary CPUs,
->> so we can safely remove this setting from smp_prepare_cpus.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-exynos/platsmp.c | 26 --------------------------
->>  1 file changed, 26 deletions(-)
->>
-> 
-> I also wondered why we need this twice... Testing on different
-> platforms would be nice to be sure that we did not miss anything but
-> it looks correct for me. For my reference:
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
 
-Thanks for review.
-I am trying to get one Exynos3250 based board for testing, once I get
-chance to test on it, I will update status about this.
+I have been doing heavy refactoring of a driver.  Previously, it used
+vmalloc() mappings, and I learned there is no support for coherency
+with vmalloc mappings and userspace mappings.
 
-Pankaj Dubey
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+I am running on an ARMv5 VIVT cache system, so I refactored everything
+to malloc() in userspace, get_user_pages_locked() in the kernel to
+grab the pages, and then kmap_atomic() / kunmap_atomic() the pages
+when the kernel needs to read or write anything.  I do not know of any
+other "correct" way this can be done without causing incompatibility
+with other ARM systems (ARMv7 does not support multiple mappings where
+one side is cached and the other is not, for example).
+
+This initially looked promising, but once I removed all debug traces I
+started observing strange behavior.
+
+
+1.  If I write to user memory, call usleep(1), and then call into the
+driver, the driver reads the new data.
+2.  If I write to user memory, call printf() with some message, and
+then call into the driver, the driver reads the new data.
+3.  If I write to user memory and immediately call the driver, the
+driver DOES NOT read the new data.
+4.  If I write to user memory and immediately call the driver, and
+then call flush_dcache_page() in the driver before reading, the driver
+DOES NOT read the new data (at least, not all the time).
+5.  If I write to user memory and immediately call the driver, and
+then call flush_cache_all() in the driver before reading, the driver
+reads the new data.
+
+
+I suspect cases 1 and 2 work because context switching is causing a
+full cache flush.  I had hoped manual cache flushes in the driver
+would be magically handled inside the kmap_atomic() / kunmap_atomic()
+code but this does not appear to be the case empirically.
+
+Question A:  Is case 3 supposed to work and I may be missing something
+in my get_user_pages_locked() setup?
+
+Question B:  Why would I need a more extreme cache flush than
+flush_dcache_page()?
+
+
+Any insight is appreciated since I am still new to the memory mapping
+and cache internals.  I also appreciate being CC'd on replies since I
+am not directly subscribed to the list.
+
+
+Thanks,
+-J
