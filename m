@@ -1,20 +1,25 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 07 Apr 2017 14:01:32 -0700 (PDT)
-Subject: [PATCH] net: thunderx: Enable TSO and checksum offloads for ipv6
-In-Reply-To: <1491475346-7809-1-git-send-email-tsrinivasulu@cavium.com>
-References: <1491475346-7809-1-git-send-email-tsrinivasulu@cavium.com>
-Message-ID: <20170407.140132.1487659753638967093.davem@davemloft.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 07 Apr 2017 23:15:01 +0200
+Subject: [PATCH] arm64: dts: rockchip: fix the memory size of PX5
+ Evaluation board
+In-Reply-To: <1491553169-21106-1-git-send-email-andy.yan@rock-chips.com>
+References: <1491553169-21106-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <2801207.lkUh043LKq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: dev.srinivasulu@gmail.com
-Date: Thu,  6 Apr 2017 16:12:26 +0530
-
-> From: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
+Am Freitag, 7. April 2017, 16:19:29 CEST schrieb Andy Yan:
+> Commit 122682b2abb6 ("arm64: dts: rockchip: Add PX5 Evaluation board")
+> sets the memory size to 2 GB, but this board only has 1 GB DRAM, so change
+> it to the correct value here.
 > 
-> Adding support for TSO and checksum hardware offloads for ipv6.
-> 
-> Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-Applied to net-next, thanks.
+I've added a
+Fixes: 122682b2abb6 ("arm64: dts: rockchip: Add PX5 Evaluation board")
+
+and applied it for 4.12
+
+
+Thanks
+Heiko
