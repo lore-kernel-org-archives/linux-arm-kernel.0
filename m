@@ -1,74 +1,205 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  7 Apr 2017 14:22:22 +0100
-Subject: [PATCH] acpi: pci: don't ignore function ID of bridge device in _PRT
-Message-ID: <20170407132222.28300-1-ard.biesheuvel@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 7 Apr 2017 21:23:05 +0800
+Subject: [PATCH v3 3/9] ARM: dts: imx6qdl-icore: Add Sound card with
+ codec node
+In-Reply-To: <1491501735-1649-4-git-send-email-jagan@openedev.com>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+ <1491501735-1649-4-git-send-email-jagan@openedev.com>
+Message-ID: <20170407132304.GJ16503@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently derive legacy interrupt routing by matching _PRT
-entries on the PCI device only, presumably under the assumption
-that PRT entries always have a value of 0xffff in the function
-field, meaning 'match all functions'.
+On Thu, Apr 06, 2017 at 11:32:09PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> Add support for Sound card and related codec(via i2c1) nodes
+> on below Engicam module boards.
+> - i.CoreM6 DualLite/Solo Starter kit
+> - i.CoreM6 Quad/Dual Starter kit
+> - i.CoreM6 Quad/Dual OpenFrame Cap touch 10.1
+> - i.CoreM6 Quad/Dual OpenFrame Cap touch 12.3
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v3:
+> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+> Changes for v2:
+> - Use proper [label:] node-name[@unit-address] for codec
+> 
+>  arch/arm/boot/dts/imx6dl-icore.dts        | 11 +++++++
+>  arch/arm/boot/dts/imx6q-icore-ofcap10.dts | 11 +++++++
+>  arch/arm/boot/dts/imx6q-icore-ofcap12.dts | 11 +++++++
+>  arch/arm/boot/dts/imx6q-icore.dts         | 11 +++++++
+>  arch/arm/boot/dts/imx6qdl-icore.dtsi      | 48 +++++++++++++++++++++++++++++++
 
-This no longer holds for modern PCIe topologies, where the
-legacy interrupts for different slots may be wired to different
-functions on the same bridge device. For instance, on AMD Seattle,
-we may have something like
+Why cannot you just add sgtl5000 node into dtsi rather than keeping the
+same copy for 4 dts files?
 
--[0000:00]-+-00.0  Advanced Micro Devices, Inc. [AMD] Device 1a00
-           +-02.0  Advanced Micro Devices, Inc. [AMD] Device 1a01
-           +-02.2-[01]----00.0  Renesas uPD720202 USB 3.0 Host Controller
-           \-02.3-[02]----00.0  Realtek RTL8169 PCIe Gigabit Ethernet
+Shawn
 
-where the _PRT describes the legacy interrupt routing as
-
-    Name (_PRT, Package ()  // _PRT: PCI Routing Table
-    {
-        // slot 1: dev 2 fn 1
-        Package () { 0x20001, 0x0, 0x0, 0x140 },
-        Package () { 0x20001, 0x1, 0x0, 0x141 },
-        Package () { 0x20001, 0x2, 0x0, 0x142 },
-        Package () { 0x20001, 0x3, 0x0, 0x143 },
-
-        // slot 1: dev 2 fn 2
-        Package () { 0x20002, 0x0, 0x0, 0x144 },
-        Package () { 0x20002, 0x1, 0x0, 0x145 },
-        Package () { 0x20002, 0x2, 0x0, 0x146 },
-        Package () { 0x20002, 0x3, 0x0, 0x147 },
-
-        // slot 1: dev 2 fn 3
-        Package () { 0x20003, 0x0, 0x0, 0x148 },
-        Package () { 0x20003, 0x1, 0x0, 0x149 },
-        Package () { 0x20003, 0x2, 0x0, 0x14a },
-        Package () { 0x20003, 0x3, 0x0, 0x14b }
-    }) // _PRT
-
-The current code always matches on the first entry when trying to
-derive the legacy interrupt routing for the USB and Ethernet controllers
-behind bridges 02.2 and 02.3, which results in the wrong entry to
-be selected.
-
-So fix this by matching the function ID to the value in the _PRT entry
-if the _PRT entries are not using 0xffff in the lower word to match
-all functions.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/acpi/pci_irq.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
-index c576a6fe4ebb..caac4ac94418 100644
---- a/drivers/acpi/pci_irq.c
-+++ b/drivers/acpi/pci_irq.c
-@@ -160,6 +160,8 @@ static int acpi_pci_irq_check_entry(acpi_handle handle, struct pci_dev *dev,
- 	struct acpi_prt_entry *entry;
- 
- 	if (((prt->address >> 16) & 0xffff) != device ||
-+	    ((prt->address & 0xffff) != 0xffff &&
-+	     (prt->address & 0xffff) != PCI_FUNC(dev->devfn)) ||
- 	    prt->pin + 1 != pin)
- 		return -ENODEV;
- 
--- 
-2.9.3
+>  5 files changed, 92 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
+> index 6de83c7..0562ce4 100644
+> --- a/arch/arm/boot/dts/imx6dl-icore.dts
+> +++ b/arch/arm/boot/dts/imx6dl-icore.dts
+> @@ -57,3 +57,14 @@
+>  &can2 {
+>  	status = "okay";
+>  };
+> +
+> +&i2c3 {
+> +	sgtl5000: codec at a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p8v>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap10.dts b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+> index 49b60ca..f63b87f 100644
+> --- a/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+> +++ b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+> @@ -50,6 +50,17 @@
+>  	compatible = "engicam,imx6-icore", "fsl,imx6q";
+>  };
+>  
+> +&i2c3 {
+> +	sgtl5000: codec at a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p8v>;
+> +	};
+> +};
+> +
+>  &ldb {
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
+> index 9e230f5..68ca828 100644
+> --- a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
+> +++ b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
+> @@ -50,6 +50,17 @@
+>  	compatible = "engicam,imx6-icore", "fsl,imx6q";
+>  };
+>  
+> +&i2c3 {
+> +	sgtl5000: codec at a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p8v>;
+> +	};
+> +};
+> +
+>  &ldb {
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
+> index 5613dd9..1ae7294 100644
+> --- a/arch/arm/boot/dts/imx6q-icore.dts
+> +++ b/arch/arm/boot/dts/imx6q-icore.dts
+> @@ -67,6 +67,17 @@
+>  	};
+>  };
+>  
+> +&i2c3 {
+> +	sgtl5000: codec at a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p8v>;
+> +	};
+> +};
+> +
+>  &ldb {
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> index 56d0c5d..1bd7cdb 100644
+> --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> @@ -55,6 +55,25 @@
+>  		default-brightness-level = <7>;
+>  	};
+>  
+> +	reg_1p8v: regulator-1p8v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "1P8V";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-boot-on;
+> +		regulator-always-on;
+> +	};
+> +
+> +
+> +	reg_2p5v: regulator-3p3v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "2P5V";
+> +		regulator-min-microvolt = <2500000>;
+> +		regulator-max-microvolt = <2500000>;
+> +		regulator-boot-on;
+> +		regulator-always-on;
+> +	};
+> +
+>  	reg_3p3v: regulator-3p3v {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "3P3V";
+> @@ -87,6 +106,31 @@
+>  		#clock-cells = <0>;
+>  		clock-frequency = <25000000>;  /* 25MHz for example */
+>  	};
+> +
+> +	sound {
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "imx6qdl-icore-sgtl5000";
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,bitclock-master = <&dailink_master>;
+> +		simple-audio-card,frame-master = <&dailink_master>;
+> +		simple-audio-card,widgets =
+> +			"Microphone", "Mic Jack",
+> +			"Line", "Line In",
+> +			"Line", "Line Out",
+> +			"Headphone", "Headphone Jack";
+> +		simple-audio-card,routing =
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"Headphone Jack", "HP_OUT";
+> +
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&ssi1>;
+> +		};
+> +
+> +		dailink_master: simple-audio-card,codec {
+> +			sound-dai = <&sgtl5000>;
+> +		};
+> +	};
+>  };
+>  
+>  &can1 {
+> @@ -149,6 +193,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&ssi1 {
+> +	status = "okay";
+> +};
+> +
+>  &uart4 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart4>;
+> -- 
+> 1.9.1
+> 
