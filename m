@@ -1,80 +1,85 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 7 Apr 2017 19:43:23 +0530
-Subject: [PATCH v9 02/12] ARM: EXYNOS: remove usage of soc_is_exynosMMMM
- from pm.c
-In-Reply-To: <CAJKOXPf0O_3CZY5terJ7Vtu9yhf6AwD5ACOBuCrpTNa9Etd=5Q@mail.gmail.com>
-References: <CGME20170330131421epcas5p40b0ad9c1003d3ab807667ae2b05d25bc@epcas5p4.samsung.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 7 Apr 2017 16:18:32 +0200
+Subject: [PATCH v9 09/12] ARM: EXYNOS: introduce exynos_cpu_info struct
+In-Reply-To: <125999ed-afae-cd46-aae3-3139c7e94b02@samsung.com>
+References: <CGME20170330131438epcas1p459ce93da17fcd05249eddaef18d5021e@epcas1p4.samsung.com>
  <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-3-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPcDO_4JonsxoywQq_D_AcWQsP8NnAsFMw1VsAhOgjLW0g@mail.gmail.com>
- <6cf529ca-a28a-6757-39aa-5ef2e5391e16@samsung.com>
- <CAJKOXPf0O_3CZY5terJ7Vtu9yhf6AwD5ACOBuCrpTNa9Etd=5Q@mail.gmail.com>
-Message-ID: <cf6b5090-86f2-a016-53ab-c34d5e321746@samsung.com>
+ <1490879826-16754-10-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPdWo_3Og-NuPRnzC3FgF2mGZup6+BC1_=9CUW-3dTz99w@mail.gmail.com>
+ <125999ed-afae-cd46-aae3-3139c7e94b02@samsung.com>
+Message-ID: <CAJKOXPcipwoHhkeeEPyJ2HOoCrnR_iJeFOOUf8JFKa2yR1hMTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Friday 07 April 2017 05:54 PM, Krzysztof Kozlowski wrote:
-> On Fri, Apr 7, 2017 at 2:12 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
->>
->>
->> On Friday 07 April 2017 01:54 PM, Krzysztof Kozlowski wrote:
->>> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->>>> soc_is_exynosMMMM is staged for removal after adopting to exynos-chipid
->>>> driver, so let's remove/minimize usage of any such helper function usage
->>>> from pm.c.
->>>>
->>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>> ---
->>>>  arch/arm/mach-exynos/pm.c                   | 22 ++++++++++++----------
->>>>  include/linux/soc/samsung/exynos-regs-pmu.h |  3 +++
->>>>  2 files changed, 15 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->>>> index 1a7e5b5..4a73b02 100644
->>>> --- a/arch/arm/mach-exynos/pm.c
->>>> +++ b/arch/arm/mach-exynos/pm.c
->>>> @@ -123,11 +123,13 @@ int exynos_pm_central_resume(void)
->>>>  }
->>>>
->>>>  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
->>>> -static void exynos_set_wakeupmask(long mask)
->>>> +static void exynos_set_wakeupmask(void)
->>>>  {
->>>> -       pmu_raw_writel(mask, S5P_WAKEUP_MASK);
->>>> -       if (soc_is_exynos3250())
->>>> +       if (of_machine_is_compatible("samsung,exynos3250")) {
->>>> +               pmu_raw_writel(EXYNOS3_WAKEUP_MASK_VAL, S5P_WAKEUP_MASK);
->>>>                 pmu_raw_writel(0x0, S5P_WAKEUP_MASK2);
->>>> +       } else
->>>> +               pmu_raw_writel(EXYNOS_WAKEUP_MASK_VAL, S5P_WAKEUP_MASK);
+On Fri, Apr 7, 2017 at 4:00 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+>
+>
+> On Friday 07 April 2017 04:11 PM, Krzysztof Kozlowski wrote:
+>> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>>> Various Exynos SoC has different CPU related information, such as CPU
+>>> boot register, programming sequence making CPU up/down. Currently this
+>>> is handled by adding lots of soc_is_exynosMMM checks in the code, in
+>>> an attempt to remove the dependency of such helper functions specific to
+>>> each SoC, let's separate this information pertaining to CPU by introducing
+>>> a new "struct exynos_cpu_info". This struct will contain differences
+>>> associated with CPU on various Exynos SoC. This can be matched by using
+>>> generic API "soc_device_match".
 >>>
->>> You need {} around this too. Checkpatch should complain about it as
->>> well so be sure to run it.
+>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos/platsmp.c | 146 +++++++++++++++++++++++++++++++++++++----
+>>>  1 file changed, 135 insertions(+), 11 deletions(-)
 >>>
+>>> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+>>> index cb6d199..ff369b9 100644
+>>> --- a/arch/arm/mach-exynos/platsmp.c
+>>> +++ b/arch/arm/mach-exynos/platsmp.c
+>>> @@ -19,6 +19,7 @@
+>>>  #include <linux/smp.h>
+>>>  #include <linux/io.h>
+>>>  #include <linux/of_address.h>
+>>> +#include <linux/sys_soc.h>
+>>>  #include <linux/soc/samsung/exynos-regs-pmu.h>
+>>>
+>>>  #include <asm/cacheflush.h>
+>>> @@ -33,6 +34,16 @@
+>>>
+>>>  extern void exynos4_secondary_startup(void);
+>>>
+>>> +/*
+>>> + * struct exynos_cpu_info - Exynos CPU related info/operations
+>>> + * @cpu_boot_reg: computes cpu boot address for requested cpu
+>>> + */
+>>> +struct exynos_cpu_info {
+>>> +       void __iomem* (*cpu_boot_reg)(u32 cpu);
+>>> +};
 >>
->> I ran checkpatch before posting, but it didn't complain about this. Here
->> is the result when I ran it again today on the same patch.
+>> Beside Marek comments, I think we are getting too many structures for
+>> differentiating Exynos. Actually all of them describe the same -
+>> difference between Exynos revisions. Having many separate structures
+>> means that you have to initialize all of them in different places in
+>> different (probably) order. The good benefit is however making them
+>> local (static) so the scope is limited... but anyway I dislike the
+>> duplication.
 >>
->> ./scripts/checkpatch.pl
->> exynos-chipid-v9/0002-ARM-EXYNOS-remove-usage-of-soc_is_exynosMMMM-from-pm.patch
->>
->> total: 0 errors, 0 warnings, 81 lines checked
->>
->> exynos-chipid-v9/0002-ARM-EXYNOS-remove-usage-of-soc_is_exynosMMMM-from-pm.patch
->> has no obvious style problems and is ready for submission.
-> 
-> Ahh, okay, my bad. :)
-> But anyway please fix it.
+>
+> OK, regarding duplication, only the way they are initialized is getting
+> duplicated. But again, my long term goal was to remove dependency of
+> pm.c and suspend.c from arm/mach-exynos/{exynos.c,platsmp.c} or common.h
+> in mach-exynos. So that we could move these files as a Exynos Power
+> Management driver in drivers/soc/ where we already moved pm_domain.c, as
+> you see these three files pm.c, suspend.c and pm_domain.c are heavily
+> dependent on PMU driver, and handles Power Management states.
+>
+> So I feel keeping CPU specific data separate from PM specific data makes
+> sense and will help in moving these files as a platform driver one day?
+>
+> Surely I will work out and see how I can minimize duplication.
 
-OK will take care in next patchset.
+Hm, in that case it would make sense. However I am not quite sure what
+is the benefit of moving this from arm/mach to drivers/soc. This code
+will not be re-used on any other platform, unlike existing
+drivers/soc/samsung drivers which are used also on ARMv8.
 
-Thanks,
-Pankaj Dubey
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+Best regards,
+Krzysztof
