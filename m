@@ -1,85 +1,105 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 7 Apr 2017 16:18:32 +0200
-Subject: [PATCH v9 09/12] ARM: EXYNOS: introduce exynos_cpu_info struct
-In-Reply-To: <125999ed-afae-cd46-aae3-3139c7e94b02@samsung.com>
-References: <CGME20170330131438epcas1p459ce93da17fcd05249eddaef18d5021e@epcas1p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-10-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPdWo_3Og-NuPRnzC3FgF2mGZup6+BC1_=9CUW-3dTz99w@mail.gmail.com>
- <125999ed-afae-cd46-aae3-3139c7e94b02@samsung.com>
-Message-ID: <CAJKOXPcipwoHhkeeEPyJ2HOoCrnR_iJeFOOUf8JFKa2yR1hMTA@mail.gmail.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Fri,  7 Apr 2017 16:19:04 +0200
+Subject: [PATCH 1/2] drm: dw-hdmi: add specific I2S and AHB functions for
+ stream handling
+In-Reply-To: <20170407141905.14147-1-romain.perier@collabora.com>
+References: <20170407141905.14147-1-romain.perier@collabora.com>
+Message-ID: <20170407141905.14147-2-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 4:00 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
->
->
-> On Friday 07 April 2017 04:11 PM, Krzysztof Kozlowski wrote:
->> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->>> Various Exynos SoC has different CPU related information, such as CPU
->>> boot register, programming sequence making CPU up/down. Currently this
->>> is handled by adding lots of soc_is_exynosMMM checks in the code, in
->>> an attempt to remove the dependency of such helper functions specific to
->>> each SoC, let's separate this information pertaining to CPU by introducing
->>> a new "struct exynos_cpu_info". This struct will contain differences
->>> associated with CPU on various Exynos SoC. This can be matched by using
->>> generic API "soc_device_match".
->>>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/platsmp.c | 146 +++++++++++++++++++++++++++++++++++++----
->>>  1 file changed, 135 insertions(+), 11 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
->>> index cb6d199..ff369b9 100644
->>> --- a/arch/arm/mach-exynos/platsmp.c
->>> +++ b/arch/arm/mach-exynos/platsmp.c
->>> @@ -19,6 +19,7 @@
->>>  #include <linux/smp.h>
->>>  #include <linux/io.h>
->>>  #include <linux/of_address.h>
->>> +#include <linux/sys_soc.h>
->>>  #include <linux/soc/samsung/exynos-regs-pmu.h>
->>>
->>>  #include <asm/cacheflush.h>
->>> @@ -33,6 +34,16 @@
->>>
->>>  extern void exynos4_secondary_startup(void);
->>>
->>> +/*
->>> + * struct exynos_cpu_info - Exynos CPU related info/operations
->>> + * @cpu_boot_reg: computes cpu boot address for requested cpu
->>> + */
->>> +struct exynos_cpu_info {
->>> +       void __iomem* (*cpu_boot_reg)(u32 cpu);
->>> +};
->>
->> Beside Marek comments, I think we are getting too many structures for
->> differentiating Exynos. Actually all of them describe the same -
->> difference between Exynos revisions. Having many separate structures
->> means that you have to initialize all of them in different places in
->> different (probably) order. The good benefit is however making them
->> local (static) so the scope is limited... but anyway I dislike the
->> duplication.
->>
->
-> OK, regarding duplication, only the way they are initialized is getting
-> duplicated. But again, my long term goal was to remove dependency of
-> pm.c and suspend.c from arm/mach-exynos/{exynos.c,platsmp.c} or common.h
-> in mach-exynos. So that we could move these files as a Exynos Power
-> Management driver in drivers/soc/ where we already moved pm_domain.c, as
-> you see these three files pm.c, suspend.c and pm_domain.c are heavily
-> dependent on PMU driver, and handles Power Management states.
->
-> So I feel keeping CPU specific data separate from PM specific data makes
-> sense and will help in moving these files as a platform driver one day?
->
-> Surely I will work out and see how I can minimize duplication.
+Currently, CTS+N is forced to zero as a workaround of the IP block for
+i.MX platforms. This is requested in the datasheet of the corresponding
+IP for AHB mode only. However, we have seen that it introduces glitches
+or delays when playing a sound on HDMI for I2S mode. This proves that we
+cannot keep the current functions for handling audio stream as-is if
+these contain workaround that are specific to a mode.
 
-Hm, in that case it would make sense. However I am not quite sure what
-is the benefit of moving this from arm/mach to drivers/soc. This code
-will not be re-used on any other platform, unlike existing
-drivers/soc/samsung drivers which are used also on ARMv8.
+This commit introduces two callbacks, one for each variant.
+dw_hdmi_setup defines the right function depending on the detected
+variant. Then, the exported functions dw_hdmi_audio_enable and
+dw_hdmi_audio_disable calls the corresponding callbacks
 
-Best regards,
-Krzysztof
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+---
+ drivers/gpu/drm/bridge/dw-hdmi.c | 31 +++++++++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+index 542d198..d34e0a5 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+@@ -166,6 +166,8 @@ struct dw_hdmi {
+ 
+ 	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
+ 	u8 (*read)(struct dw_hdmi *hdmi, int offset);
++	void (*enable_audio)(struct dw_hdmi *hdmi);
++	void (*disable_audio)(struct dw_hdmi *hdmi);
+ };
+ 
+ #define HDMI_IH_PHY_STAT0_RX_SENSE \
+@@ -557,13 +559,34 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+ 
++void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
++{
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++}
++
++void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
++{
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
++}
++
++void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
++{
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++}
++
++
++void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
++{
++
++}
++
+ void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
+ {
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&hdmi->audio_lock, flags);
+ 	hdmi->audio_enable = true;
+-	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++	hdmi->enable_audio(hdmi);
+ 	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
+@@ -574,7 +597,7 @@ void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
+ 
+ 	spin_lock_irqsave(&hdmi->audio_lock, flags);
+ 	hdmi->audio_enable = false;
+-	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
++	hdmi->disable_audio(hdmi);
+ 	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
+@@ -2114,6 +2137,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		audio.irq = irq;
+ 		audio.hdmi = hdmi;
+ 		audio.eld = hdmi->connector.eld;
++		hdmi->enable_audio = dw_hdmi_ahb_audio_enable;
++		hdmi->disable_audio = dw_hdmi_ahb_audio_disable;
+ 
+ 		pdevinfo.name = "dw-hdmi-ahb-audio";
+ 		pdevinfo.data = &audio;
+@@ -2126,6 +2151,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		audio.hdmi	= hdmi;
+ 		audio.write	= hdmi_writeb;
+ 		audio.read	= hdmi_readb;
++		hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
++		hdmi->disable_audio = dw_hdmi_i2s_audio_disable;
+ 
+ 		pdevinfo.name = "dw-hdmi-i2s-audio";
+ 		pdevinfo.data = &audio;
+-- 
+2.9.3
