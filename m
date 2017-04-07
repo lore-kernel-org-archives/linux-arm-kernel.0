@@ -1,81 +1,113 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 07 Apr 2017 09:02:01 +0100
-Subject: [RFC kvm-unit-tests PATCH 9/8] Makefiles: Fix up the powerpc
- build include and link paths
-In-Reply-To: <1491548290-11401-1-git-send-email-thuth@redhat.com>
-References: <20170406190727.5624-9-alex.bennee@linaro.org>
- <1491548290-11401-1-git-send-email-thuth@redhat.com>
-Message-ID: <87o9w8abnq.fsf@linaro.org>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Fri, 07 Apr 2017 13:36:28 +0530
+Subject: [PATCH v9 01/12] ARM: EXYNOS: refactor firmware specific routines
+In-Reply-To: <CAJKOXPfvD+Rm+pxvOMe8TefWsYZW4gvj0ZnXNtwOovkjzKFGCQ@mail.gmail.com>
+References: <CGME20170330131419epcas5p4ac36250d3a9225643e327e60f47956c2@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-2-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPfvD+Rm+pxvOMe8TefWsYZW4gvj0ZnXNtwOovkjzKFGCQ@mail.gmail.com>
+Message-ID: <e1a1111c-5c34-ecdd-64f1-60d5b3042069@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Thomas Huth <thuth@redhat.com> writes:
 
-> The changes for out-of-tree builds are here pretty much the same
-> as for the ARM Makefile.common.
->
-> Signed-off-by: Thomas Huth <thuth@redhat.com>
+On Friday 07 April 2017 01:15 PM, Krzysztof Kozlowski wrote:
+> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>> To remove dependency on soc_is_exynosMMMM macros and remove multiple
+>> checks for such macros, let's refactor code in firmware.c file.
+>> SoC specific firmware_ops are separated and registered during
+>> exynos_firmware_init based on matching machine compatible.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/firmware.c | 114 +++++++++++++++++++++++++++++++---------
+>>  1 file changed, 89 insertions(+), 25 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
+>> index e81a78b..b04c47a 100644
+>> --- a/arch/arm/mach-exynos/firmware.c
+>> +++ b/arch/arm/mach-exynos/firmware.c
+>> @@ -35,6 +35,25 @@ static void exynos_save_cp15(void)
+>>              : : "cc");
+>>  }
+>>
+>> +static int exynos3250_do_idle(unsigned long mode)
+>> +{
+>> +       switch (mode) {
+>> +       case FW_DO_IDLE_AFTR:
+>> +               writel_relaxed(virt_to_phys(exynos_cpu_resume_ns),
+>> +                              sysram_ns_base_addr + 0x24);
+>> +               writel_relaxed(EXYNOS_AFTR_MAGIC, sysram_ns_base_addr + 0x20);
+>> +               flush_cache_all();
+>> +               exynos_smc(SMC_CMD_SAVE, OP_TYPE_CORE,
+>> +                               SMC_POWERSTATE_IDLE, 0);
+>> +               exynos_smc(SMC_CMD_SHUTDOWN, OP_TYPE_CLUSTER,
+>> +                               SMC_POWERSTATE_IDLE, 0);
+>> +               break;
+>> +       case FW_DO_IDLE_SLEEP:
+>> +               exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+>> +       }
+>> +       return 0;
+>> +}
+>> +
+>>  static int exynos_do_idle(unsigned long mode)
+>>  {
+>>         switch (mode) {
+>> @@ -44,14 +63,7 @@ static int exynos_do_idle(unsigned long mode)
+>>                 writel_relaxed(__pa_symbol(exynos_cpu_resume_ns),
+>>                                sysram_ns_base_addr + 0x24);
+>>                 writel_relaxed(EXYNOS_AFTR_MAGIC, sysram_ns_base_addr + 0x20);
+>> -               if (soc_is_exynos3250()) {
+>> -                       flush_cache_all();
+>> -                       exynos_smc(SMC_CMD_SAVE, OP_TYPE_CORE,
+>> -                                  SMC_POWERSTATE_IDLE, 0);
+>> -                       exynos_smc(SMC_CMD_SHUTDOWN, OP_TYPE_CLUSTER,
+>> -                                  SMC_POWERSTATE_IDLE, 0);
+>> -               } else
+>> -                       exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+>> +               exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
+>>                 break;
+>>         case FW_DO_IDLE_SLEEP:
+>>                 exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
+>> @@ -59,28 +71,25 @@ static int exynos_do_idle(unsigned long mode)
+>>         return 0;
+>>  }
+>>
+>> -static int exynos_cpu_boot(int cpu)
+>> +static int exynos4212_cpu_boot(int cpu)
+>>  {
+>>         /*
+>> -        * Exynos3250 doesn't need to send smc command for secondary CPU boot
+>> -        * because Exynos3250 removes WFE in secure mode.
+>> -        */
+>> -       if (soc_is_exynos3250())
+>> -               return 0;
+>> -
+>> -       /*
+>>          * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
+>>          * But, Exynos4212 has only one secondary CPU so second parameter
+>>          * isn't used for informing secure firmware about CPU id.
+>>          */
+>> -       if (soc_is_exynos4212())
+>> -               cpu = 0;
+>> +       cpu = 0;
+> 
+> The comment above is clear enough so I think there is no need for this
+> assignment. Just use 0 as argument in exynos_smc().
+> 
 
-It was only when I posted I realised that there was only one
-architecture left (too used to QEMUs multitude). I didn't intend for
-PowerPC to be the last puppy in the shop!
+Ok, will modify accordingly in next patchset.
 
-Thanks for you patch. Applied ;-)
+> Rest looks good so with this change:
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
 
-> ---
->  powerpc/Makefile.common | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
->
-> diff --git a/powerpc/Makefile.common b/powerpc/Makefile.common
-> index e536ffe..1fbcafb 100644
-> --- a/powerpc/Makefile.common
-> +++ b/powerpc/Makefile.common
-> @@ -12,7 +12,10 @@ tests-common = \
->  	$(TEST_DIR)/tm.elf \
->  	$(TEST_DIR)/sprs.elf
->
-> -tests-all = $(tests-common) $(tests)
-> +scripts-common += $(TEST_DIR)/run
-> +scripts-common += $(TEST_DIR)/unittests.cfg
-> +
-> +tests-all = $(tests-common) $(tests) $(scripts_common)
->  all: $(TEST_DIR)/boot_rom.bin $(tests-all)
->
->  ##################################################################
-> @@ -21,14 +24,14 @@ CFLAGS += -std=gnu99
->  CFLAGS += -ffreestanding
->  CFLAGS += -Wextra
->  CFLAGS += -O2
-> -CFLAGS += -I lib -I lib/libfdt
-> +CFLAGS += -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -I lib
->  CFLAGS += -Wa,-mregnames
->
->  # We want to keep intermediate files
->  .PRECIOUS: %.o
->
->  asm-offsets = lib/$(ARCH)/asm-offsets.h
-> -include scripts/asm-offsets.mak
-> +include $(SRCDIR)/scripts/asm-offsets.mak
->
->  cflatobjs += lib/util.o
->  cflatobjs += lib/alloc.o
-> @@ -44,10 +47,11 @@ cflatobjs += lib/powerpc/smp.o
->  FLATLIBS = $(libcflat) $(LIBFDT_archive)
->  %.elf: CFLAGS += $(arch_CFLAGS)
->  %.elf: LDFLAGS = $(arch_LDFLAGS) -nostdlib -pie -n
-> -%.elf: %.o $(FLATLIBS) powerpc/flat.lds $(cstart.o) $(reloc.o)
-> -	$(CC) $(CFLAGS) -c -o $(@:.elf=.aux.o) lib/auxinfo.c -DPROGNAME=\"$@\"
-> +%.elf: %.o $(FLATLIBS) $(SRCDIR)/powerpc/flat.lds $(cstart.o) $(reloc.o)
-> +	$(CC) $(CFLAGS) -c -o $(@:.elf=.aux.o) $(SRCDIR)/lib/auxinfo.c \
-> +		-DPROGNAME=\"$@\"
->  	$(LD) $(LDFLAGS) -o $@ \
-> -		-T powerpc/flat.lds --build-id=none \
-> +		-T $(SRCDIR)/powerpc/flat.lds --build-id=none \
->  		$(filter %.o, $^) $(FLATLIBS) $(@:.elf=.aux.o)
->  	$(RM) $(@:.elf=.aux.o)
->  	@echo -n Checking $@ for unsupported reloc types...
+Thanks for review,
+Pankaj Dubey
 
-
---
-Alex Benn?e
+> Best regards,
+> Krzysztof
+> 
+> 
+> 
