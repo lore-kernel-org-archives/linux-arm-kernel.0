@@ -1,90 +1,111 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 7 Apr 2017 12:32:48 +0200
-Subject: [PATCH v9 08/12] ARM: EXYNOS: move exynos_boot_vector_{addr, flag}
- ops to exynos_s2r_data
-In-Reply-To: <1490879826-16754-9-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170330131436epcas1p4a4f8bf7b64b4a5ff9ee692adc4e7d001@epcas1p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-9-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAJKOXPeFhmcscCX-so5qSx9pdX8oEmC+-283HO+J3vJNvWr_Hg@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 07 Apr 2017 11:38:07 +0100
+Subject: [RFC kvm-unit-tests PATCH 6/8] Makefiles: handle linking of
+ scripts into build-tree
+In-Reply-To: <a81e981b-1c6e-c8ac-82a6-ced80c045461@redhat.com>
+References: <20170406190727.5624-1-alex.bennee@linaro.org>
+ <20170406190727.5624-7-alex.bennee@linaro.org>
+ <a81e981b-1c6e-c8ac-82a6-ced80c045461@redhat.com>
+Message-ID: <87lgrca4fk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> Various Exynos SoC needs different boot addresses and flags. Currently we
-> are handling this difference by adding lots of soc_is_exynosMMM checks in
-> the code, in an attempt to remove the dependency of such helper functions
-> specific to each SoC, let's separate helper functions for these helper
-> functions by moving them into SoC specific hooks in struct exynos_s2r_data.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c | 60 +++++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 50 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index fa24098..c3fa537 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -32,26 +32,56 @@
->  #include "common.h"
->
->  struct exynos_s2r_data {
-> +       void __iomem* (*boot_vector_addr)(void);
-> +       void __iomem* (*boot_vector_flag)(void);
->         void (*enter_aftr)(void);
->  };
 
-OK, now I see more uses of this structure so the naming could be
-"exynos_pm_data"?
+Thomas Huth <thuth@redhat.com> writes:
+
+> On 06.04.2017 21:07, Alex Benn?e wrote:
+>> When doing an out-of-src-tree build we still want access to the
+>> various bits of common script machinery to run. This is handled by the
+>> scripts-common list which sub-builds can add explicit extra stuff to.
+>>
+>> The final rule is conditional so we don't attempt to link files when
+>> we are doing an in-src-tree build.
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>  Makefile            | 13 +++++++++++++
+>>  x86/Makefile.common |  4 ++++
+>>  2 files changed, 17 insertions(+)
+>>
+>> diff --git a/Makefile b/Makefile
+>> index 56598df..c9fea88 100644
+>> --- a/Makefile
+>> +++ b/Makefile
+>> @@ -31,6 +31,10 @@ cflatobjs := \
+>>  	lib/report.o \
+>>  	lib/stack.o
+>>
+>> +# These are scripts we want linked from the source tree
+>> +scripts-common := run_tests.sh \
+>> +	scripts
+>> +
+>>  # libfdt paths
+>>  LIBFDT_objdir = $(SRCDIR)/lib/libfdt
+>>  LIBFDT_srcdir = $(SRCDIR)/lib/libfdt
+>> @@ -86,8 +90,17 @@ $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
+>>  	mkdir -p $(dir $@)
+>>  	$(CC) $(CFLAGS) -c -o $@ $<
+>>
+>> +$(scripts-common): $(SRCDIR)/$@
+>> +	ln -sf $<$@ $@
+>
+> The prerequisite does not seem to work correctly here. I can see that
+> the symlinks are regenerated each time I run make. Even worse, during
+> the second run, there is a
+>
+> ln -sf /home/thuth/devel/kvm-unit-tests/scripts scripts
+>
+> which generates a symlink in the source directory, since the "scripts"
+> symlink already exists!
+>
+> I think you can not use automatic variables like $@ in the prerequisite
+> list, can you?
+>
+> Maybe it would be better to create these symlinks in the configure
+> script already?
+
+Hmm maybe. The trouble is catching them all. That's why I wanted to have
+something like scripts-common that sub Makefiles could add to.
+
+We could certainly make the rule a bit more robust against re-linking
+though.
 
 >
->  static const struct exynos_s2r_data *s2r_data;
+>>  -include */.*.d */*/.*.d
+>>
+>> +
+>> +# We only need to link common scripts for out-of-src-tree builds
+>> +ifneq ($(CURDIR), $(SRCDIR))
+>> +all: $(scripts-common)
+>> +endif
+>> +
+>>  all: $(shell git -C $(SRCDIR) rev-parse --verify --short=8 HEAD >build-head 2>/dev/null)
+>>
+>>  standalone: all
+>> diff --git a/x86/Makefile.common b/x86/Makefile.common
+>> index fbab82c..ef6e543 100644
+>> --- a/x86/Makefile.common
+>> +++ b/x86/Makefile.common
+>> @@ -54,8 +54,12 @@ tests-common += api/dirty-log
+>>  tests-common += api/dirty-log-perf
+>>  endif
+>>
+>> +scripts-common += $(TEST_DIR)/run
+>> +scripts-common += $(TEST_DIR)/unittests.cfg
+>> +
+>>  test_cases: $(tests-common) $(tests)
+>>
+>> +
 >
-> -static inline void __iomem *exynos_boot_vector_addr(void)
-> +static void __iomem *exynos_boot_vector_addr(void)
-> +{
-> +       if (s2r_data && s2r_data->boot_vector_addr)
-> +               return s2r_data->boot_vector_addr();
-> +
-> +       return NULL;
-> +}
-> +
-> +static inline void __iomem *exynos4210_rev11_boot_vector_addr(void)
-
-Inlines here are mixed up and you are changing them without
-explanation in commit msg. Previously the exynos_boot_vector_addr()
-was inlined, now not. Okay, I can accept that but please mention this
-in commit msg.
-But below you are adding new inline functions which are stored as
-pointers in ops. This looks both inconsistent with above and incorrect
-from logical point of view. How would you like to inline them if they
-are referenced through pointer? (okay, compilers are smart and crazy
-so maybe they can do it but anyway I am curious how this would look
-like).
-
-> +{
-> +       return pmu_base_addr + S5P_INFORM7;
-> +}
-> +
-> +static inline void __iomem *exynos4210_rev10_boot_vector_addr(void)
-> +{
-> +       return sysram_base_addr + 0x24;
-> +}
-> +
-> +static inline void __iomem *exynos_common_boot_vector_addr(void)
->  {
-> -       if (samsung_rev() == EXYNOS4210_REV_1_1)
-> -               return pmu_base_addr + S5P_INFORM7;
-> -       else if (samsung_rev() == EXYNOS4210_REV_1_0)
-> -               return sysram_base_addr + 0x24;
->         return pmu_base_addr + S5P_INFORM0;
->  }
+> Cosmetic nit: Superfluous white space change.
 >
-> -static inline void __iomem *exynos_boot_vector_flag(void)
-> +static void __iomem *exynos_boot_vector_flag(void)
+>>  $(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I lib -I lib/x86
+>>
+>>  $(TEST_DIR)/realmode.elf: $(TEST_DIR)/realmode.o
+>>
+>
+>  Thomas
 
-ditto for the flag.
 
-Best regards,
-Krzysztof
+--
+Alex Benn?e
