@@ -1,52 +1,55 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 07 Apr 2017 16:56:45 +0100
-Subject: [PATCH v3 8/8] arm64: exception: check shared writable page in
- SEI handler
-In-Reply-To: <1490869877-118713-9-git-send-email-xiexiuqi@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-9-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <58E7B6BD.3000401@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Apr 2017 11:57:59 -0400
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
+ v4.12
+Message-ID: <cover.1491578743.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xie XiuQi,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 30/03/17 11:31, Xie XiuQi wrote:
-> From: Wang Xiongfeng <wangxiongfeng2@huawei.com>
-> 
-> Since SEI is asynchronous, the error data has been consumed. So we must
-> suppose that all the memory data current process can write are
-> contaminated. If the process doesn't have shared writable pages, the
-> process will be killed, and the system will continue running normally.
-> Otherwise, the system must be terminated, because the error has been
-> propagated to other processes running on other cores, and recursively
-> the error may be propagated to several another processes.
+Please consider these second round of Renesas ARM64 based SoC DT updates
+for v4.12.
 
-This is pretty complicated. We can't guarantee that another CPU hasn't modified
-the page tables while we do this, (so its racy). We can't guarantee that the
-corrupt data hasn't been sent over the network or written to disk in the mean
-time (so its not enough).
-
-The scenario you have is a write of corrupt data to memory where another CPU
-reading it doesn't know the value is corrupt.
-
-The hardware gives us quite a lot of help containing errors. The RAS
-specification (DDI 0587A) describes your scenario as error propagation in '2.1.2
-Architectural error propagation', and then classifies it in '2.1.3
-Architecturally infected, containable and uncontainable' as uncontained because
-the value is no longer in the general-purpose registers. For uncontained errors
-we should panic().
-
-We shouldn't need to try to track errors after we get a notification as the
-hardware has done this for us.
+This pull request is based on the previous round of
+such requests, tagged as renesas-arm64-dt-for-v4.12,
+which you have already pulled.
 
 
-Firmware-first does complicate this if events like this are not delivered using
-a synchronous external abort, as Linux may have PSTATE.A masked preventing
-SError Interrupts from being taken. It looks like PSTATE.A is masked much more
-often than is necessary. I will look into cleaning this up.
+The following changes since commit 3cbe33367d4fd480a92fbc131a96fa925be9e95d:
 
+  arm64: dts: r8a7796: salvator-x: Drop superfluous status update for frequency override (2017-03-13 10:21:16 +0100)
 
-Thanks,
+are available in the git repository at:
 
-James
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.12
+
+for you to fetch changes up to 6922bd71adab0a7fe8ffbdc3e72a46431fa29656:
+
+  arm64: dts: r8a7795: salvator-x: Drop _clk suffix from X12 clock node name (2017-04-05 14:17:19 -0400)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM64 Based SoC DT Updates for v4.12
+
+Corrections:
+* r8a7795: Correct SATA device size to 2MiB for r8a7795 SoC
+
+Cleanup:
+* Drop _clk suffix from X12 clock node name for r8a7795 SoC
+
+Enhancements:
+* Add reset control properties for r8a779[56]
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      arm64: dts: r8a7795: Add reset control properties
+      arm64: dts: r8a7796: Add reset control properties
+      arm64: dts: r8a7795: salvator-x: Drop _clk suffix from X12 clock node name
+
+Magnus Damm (1):
+      arm64: dts: r8a7795: Correct SATA device size to 2MiB
+
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  2 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 95 +++++++++++++++++++++-
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 46 +++++++++++
+ 3 files changed, 141 insertions(+), 2 deletions(-)
