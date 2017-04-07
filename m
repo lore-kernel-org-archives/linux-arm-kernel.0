@@ -1,66 +1,142 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 7 Apr 2017 16:57:12 +0200
-Subject: [PATCH v9 07/12] ARM: EXYNOS: introduce soc specific pm ops
-In-Reply-To: <fc69a6fa-7cb2-478b-b346-c59039c2b8da@samsung.com>
-References: <CGME20170330131434epcas1p4e42fe06bae3456c39e0f93a2f8ae4bc0@epcas1p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPckh9C-mSq5NsJJfSW-brs6=wTDuctkD2EbtQOjKOQgbg@mail.gmail.com>
- <fc69a6fa-7cb2-478b-b346-c59039c2b8da@samsung.com>
-Message-ID: <CAJKOXPf0wyZiu-dfTKeW=DX=SboO2x5Y5Xy6a4Vzs3uEHgaqQA@mail.gmail.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Fri, 7 Apr 2017 11:09:30 -0400
+Subject: [RFC 0/9] ARMv8.3 pointer authentication userspace support
+In-Reply-To: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
+References: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <68cdfcee-33aa-8511-2fff-4b2308e80b7a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 4:11 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+On 4/3/2017 11:19 AM, Mark Rutland wrote:
+> This series adds support for the ARMv8.3 pointer authentication extension.
+> 
+> I've included a quick intro to the extension below, with the usual series
+> description below that. The final patch of the series adds additional
+> documentation regarding the extension.
+> 
+> I've based the series on the arm64 for-next/core branch [1]. I'm aware that
+> this series may conflict with other patches currently in flight (e.g.
+> allocation of ELF notes), and I intend to rebase this series as things settle.
+> 
+> I've pushed the series to the arm64/pointer-auth branch [2] of my linux tree.
+> I've also pushed out a necessary bootwrapper patch to the pointer-auth branch
+> [3] of my bootwrapper repo.
+> 
+> 
+> Extension Overview 
+> ==================
+> 
+> The ARMv8.3 pointer authentication extension adds functionality to detect
+> modification of pointer values, mitigating certain classes of attack such as
+> stack smashing, and making return oriented programming attacks harder
+> 
+> The extension introduces the concept of a pointer authentication code (PAC),
+> which is stored in some upper bits of pointers. Each PAC is derived from the
+> original pointer, another 64-bit value (e.g. the stack pointer), and a secret
+> 128-bit key.
+> 
+> New instructions are added which can be used to:
+> 
+> * Insert a PAC into a pointer
+> * Strip a PAC from a pointer
+> * Authenticate strip a PAC from a pointer
+> 
+> If authentication succeeds, the code is removed, yielding the original pointer.
+> If authentication fails, bits are set in the pointer such that it is guaranteed
+> to cause a fault if used.
+> 
+> These instructions can make use of four keys:
+> 
+> * APIAKey (A.K.A. Instruction A key)
+> * APIBKey (A.K.A. Instruction B key)
+> * APDAKey (A.K.A. Data A key)
+> * APDBKey (A.K.A. Data B Key)
+> 
+> A subset of these instruction encodings have been allocated from the HINT
+> space, and will operate as NOPs on any ARMv8 parts which do not feature the
+> extension (or if purposefully disabled by the kernel). Software using only this
+> subset of the instructions should function correctly on all ARMv8-A parts.
+> 
+> Additionally, instructions are added to authenticate small blocks of memory in
+> similar fashion, using APGAKey (A.K.A. Generic key).
+> 
+> 
+> This Series
+> ===========
+> 
+> This series enables the use of instructions using APIAKey, which is initialised
+> and maintained per-process (shared by all threads). This series does not add
+> support for APIBKey, APDAKey, APDBKey, nor APGAKey. The series only supports
+> the use of an architected algorithm.
+> 
+> I've given this some basic testing with a homebrew test suite. More ideally,
+> we'd add some tests to the kernel source tree.
+> 
+> I've added some basic KVM support, but this doesn't cater for systems with
+> mismatched support. Looking forward, we'll need ID register emulation in KVM so
+> that we can hide features from guests to cater for cases like this.
+> 
+> There are also a few questions to consider, e.g:
+> 
+> * Should we expose a per-process data key now, to go with the insn key?
+> * Should keys be per-thread rather than per-process?
+> * Should we expose generic authentication (i.e. APGAKey)?
+> * Should the kernel remove PACs when unwinding user stacks?
+> 
+> Thanks,
+> Mark.
+> 
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/pointer-auth
+> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/boot-wrapper-aarch64.git pointer-auth
+> 
+> Mark Rutland (9):
+>   asm-generic: mm_hooks: allow hooks to be overridden individually
+>   arm64: add pointer authentication register bits
+>   arm64/cpufeature: add ARMv8.3 id_aa64isar1 bits
+>   arm64/cpufeature: detect pointer authentication
+>   arm64: Don't trap host pointer auth use to EL2
+>   arm64: add basic pointer authentication support
+>   arm64: expose PAC bit positions via ptrace
+>   arm64/kvm: context-switch PAC registers
+>   arm64: docs: document pointer authentication
+> 
+>  Documentation/arm64/booting.txt                |  8 +++
+>  Documentation/arm64/pointer-authentication.txt | 78 +++++++++++++++++++++
+>  arch/arm64/Kconfig                             | 23 ++++++
+>  arch/arm64/include/asm/cpucaps.h               |  4 +-
+>  arch/arm64/include/asm/esr.h                   |  3 +-
+>  arch/arm64/include/asm/kvm_arm.h               |  2 +
+>  arch/arm64/include/asm/kvm_emulate.h           | 15 ++++
+>  arch/arm64/include/asm/kvm_host.h              | 12 ++++
+>  arch/arm64/include/asm/mmu.h                   |  5 ++
+>  arch/arm64/include/asm/mmu_context.h           | 25 ++++++-
+>  arch/arm64/include/asm/pointer_auth.h          | 96 ++++++++++++++++++++++++++
+>  arch/arm64/include/asm/sysreg.h                | 30 ++++++++
+>  arch/arm64/include/uapi/asm/hwcap.h            |  1 +
+>  arch/arm64/include/uapi/asm/ptrace.h           |  5 ++
+>  arch/arm64/kernel/cpufeature.c                 | 39 ++++++++++-
+>  arch/arm64/kernel/cpuinfo.c                    |  1 +
+>  arch/arm64/kernel/head.S                       | 19 ++++-
+>  arch/arm64/kernel/ptrace.c                     | 39 +++++++++++
+>  arch/arm64/kvm/hyp/sysreg-sr.c                 | 43 ++++++++++++
+>  include/asm-generic/mm_hooks.h                 | 12 ++++
+>  include/uapi/linux/elf.h                       |  1 +
+>  21 files changed, 454 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/arm64/pointer-authentication.txt
+>  create mode 100644 arch/arm64/include/asm/pointer_auth.h
+> 
 
-(...)
+Tested on Qualcomm platform with ARMV8 architecture (without 8.3 extensions) for
+backwards compatibility (meaning I did not pass -march=armv8.3-a to GCC; only
+-msign-return-address=all). The HINT PACIASP/AUTIASP caused no issues and no
+other issues were encountered. Will test again once a platform is available with
+8.3-a extensions.
 
->>> +int __init exynos_s2r_init(void)
->>> +{
->>> +       const struct soc_device_attribute *match;
->>> +
->>> +       match = soc_device_match(exynos_soc_revision);
->>> +
->>> +       if (match)
->>> +               s2r_data = (const struct exynos_s2r_data *) match->data;
->>> +
->>> +       if (!s2r_data)
->>> +               return -ENODEV;
->>> +
->>> +       return 0;
->>> +}
->>> +arch_initcall(exynos_s2r_init);
->>> +
->>
->> I guess you already found possible probe-order issue. You should
->> register all of this after having the soc chipid driver. However it is
->> required by cpuidle driver which is being registered in machine_init()
->> call....  You cannot use deferred probe here, so maybe the only way is
->> to manually order the calls in machine_init():
->> 1. exynos_chipid_early_init()
->> 2. this one.
->> 3. cpuidle driver register.
->>
->
-> exynos_s2r_init is not required during early stage of boot, so as Arnd
-> suggested I can drop arch_initcall here and probably go for
->
-> 1: late_init
-> 2: Call this directly from machine_init
+Thanks
 
-I think this will be used on first AFTR which might happen few moments
-after exynos_dt_machine_init() because it registers the cpuidle
-platform devices thus probing them. This is before late_init. You
-might call it from machine_init, but again mind the order.
-
->
-> I prefer first option, as I mentioned my long term plan to move these
-> files out of arch/arm/mach-exynos/ and if I call it from mach-exynos,
-> then while moving I have to make this function as export symbol or make
-> it extern so that mach-exynos/exynos.c should be able to access it. Both
-> of these approaches have been rejected in past. What do you say?
-
-Because of the cpuidle I think late_initcall is too late.
-
-Best regards,
-Krzysztof
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
