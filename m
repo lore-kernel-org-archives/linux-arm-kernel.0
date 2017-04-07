@@ -1,66 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Apr 2017 14:59:21 +0100
-Subject: [PULL] clocksource/arch_timer: Errata workaround infrastructure rework
-Message-ID: <20170407135921.17549-1-marc.zyngier@arm.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Fri, 7 Apr 2017 14:00:58 +0000
+Subject: [7/7] crypto: caam/qi - add ablkcipher and authenc algorithms
+In-Reply-To: <87inmggxp7.fsf@concordia.ellerman.id.au>
+References: <20170317100602.2837-8-horia.geanta@nxp.com>
+ <87vaqkvk6c.fsf@concordia.ellerman.id.au> <58E39F90.6050408@nxp.com>
+ <87lgrftbgl.fsf@concordia.ellerman.id.au> <58E4D9C3.4070406@nxp.com>
+ <87inmggxp7.fsf@concordia.ellerman.id.au>
+Message-ID: <VI1PR0401MB1856407F4A75878EA66AF51EEC0C0@VI1PR0401MB1856.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-Please find below the pull request for the arm64 architected timer
-workaround infrastructure. As discussed on the list, the first 5
-patches are shared with the arm64 tree (and the whole branch is stable
-anyway).
 
-Thanks,
+-----Original Message-----
+From: Michael Ellerman [mailto:mpe at ellerman.id.au] 
+Sent: Friday, April 07, 2017 4:22 PM
+To: Laurentiu Tudor <laurentiu.tudor@nxp.com>; Horia Geant? <horia.geanta@nxp.com>; Herbert Xu <herbert@gondor.apana.org.au>; Scott Wood <oss@buserror.net>; Roy Pledge <roy.pledge@nxp.com>
+Cc: Claudiu Manoil <claudiu.manoil@nxp.com>; Cristian Stoica <cristian.stoica@nxp.com>; Dan Douglass <dan.douglass@nxp.com>; linux-arm-kernel at lists.infradead.org; Vakul Garg <vakul.garg@nxp.com>; linuxppc-dev at lists.ozlabs.org; David S. Miller <davem@davemloft.net>; Alexandru Porosanu <alexandru.porosanu@nxp.com>; linux-crypto at vger.kernel.org
+Subject: Re: [7/7] crypto: caam/qi - add ablkcipher and authenc algorithms
+Importance: High
 
-	M.
+Laurentiu Tudor <laurentiu.tudor@nxp.com> writes:
 
-The following changes since commit 97da3854c526d3a6ee05c849c96e48d21527606c:
+> On 04/05/2017 01:06 PM, Michael Ellerman wrote:
+>> Laurentiu Tudor <laurentiu.tudor@nxp.com> writes:
+>>
+>>> Hi Michael,
+>>>
+>>> Just a couple of basic things to check:
+>>>    - was the dtb updated to the newest?
+>>
+>> Possibly not, it's an automated build/boot, I'll have to check what 
+>> it does with the dtb.
+>>
+>>>    - is the qman node present? This should be easily visible in 
+>>> /proc/device-tree/soc at ffe000000/qman at 318000.
+>>
+>> No it's not there.
+>>
+>> That's running linux-next with:
+>>
+>> CONFIG_CRYPTO_DEV_FSL_CAAM_CRYPTO_API_QI=n
+>>
+>>
+>> Does that mean I didn't update the device tree?
+>
+> I think so. Also, I just checked that the node is actually there by 
+> compiling p5020ds.dts and then decompiling the dtb.
 
-  Linux 4.11-rc3 (2017-03-19 19:09:39 -0700)
+> OK, I'll make sure I update the DTB.
+> 
+> It will still be good if the code was a bit more robust about the qman being missing.
 
-are available in the git repository at:
+Totally agree. We should handle this error condition.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git tags/arch-timer-errata
-
-for you to fetch changes up to d003d029cea8a28139b4f9b88a36b8fac864f45b:
-
-  arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data (2017-04-07 11:22:10 +0100)
-
-----------------------------------------------------------------
-arm64 arch timer workaround series, including the base patches
-that will also go via the arm64 tree.
-
-----------------------------------------------------------------
-Marc Zyngier (18):
-      arm64: Allow checking of a CPU-local erratum
-      arm64: Add CNTVCT_EL0 trap handler
-      arm64: Define Cortex-A73 MIDR
-      arm64: cpu_errata: Allow an erratum to be match for all revisions of a core
-      arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum 858921
-      arm64: arch_timer: Add infrastructure for multiple erratum detection methods
-      arm64: arch_timer: Add erratum handler for CPU-specific capability
-      arm64: arch_timer: Move arch_timer_reg_read/write around
-      arm64: arch_timer: Get rid of erratum_workaround_set_sne
-      arm64: arch_timer: Rework the set_next_event workarounds
-      arm64: arch_timer: Make workaround methods optional
-      arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs
-      arm64: arch_timer: Move clocksource_counter and co around
-      arm64: arch_timer: Save cntkctl_el1 as a per-cpu variable
-      arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled
-      arm64: arch_timer: Workaround for Cortex-A73 erratum 858921
-      arm64: arch_timer: Allow erratum matching with ACPI OEM information
-      arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data
-
- Documentation/arm64/silicon-errata.txt |   1 +
- arch/arm64/include/asm/arch_timer.h    |  43 ++-
- arch/arm64/include/asm/cpucaps.h       |   3 +-
- arch/arm64/include/asm/cputype.h       |   2 +
- arch/arm64/include/asm/esr.h           |   2 +
- arch/arm64/kernel/cpu_errata.c         |  15 +
- arch/arm64/kernel/cpufeature.c         |  13 +-
- arch/arm64/kernel/traps.c              |  14 +
- drivers/clocksource/Kconfig            |  11 +
- drivers/clocksource/arm_arch_timer.c   | 535 +++++++++++++++++++++++----------
- 10 files changed, 466 insertions(+), 173 deletions(-)
+---
+Thanks & Best Regards, Laurentiu
