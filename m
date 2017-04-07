@@ -1,87 +1,86 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 7 Apr 2017 14:15:36 +0200
-Subject: [PATCH v2] ARM: at91: Document new TCB bindings
-In-Reply-To: <fd4a2797-d8eb-ac80-36fc-01240fb0e944@atmel.com>
-References: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160701012743.GA16698@rob-hp-laptop> <20160704151058.44b679bf@bbrezillon>
- <CAL_JsqL2Kjtf-BuCjK8ZHcDdbgVDy-L-_AN+=4HmxVAwy3ucdA@mail.gmail.com>
- <20170125161129.41acaa9a@bbrezillon>
- <fd4a2797-d8eb-ac80-36fc-01240fb0e944@atmel.com>
-Message-ID: <a8d541f0-e70a-a12d-5a7e-b1b72eddbe65@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 7 Apr 2017 14:23:07 +0200
+Subject: [PATCH v9 11/12] ARM: EXYNOS: move cpu_restart as a SoC specific
+ hook to exynos_cpu_info
+In-Reply-To: <1490879826-16754-12-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170330131442epcas5p4f2be72cb3ec506847d8e832675e682c4@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-12-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAJKOXPdejfBQDtSv-r+kaUDHwYbYu=YzHxHh8AeaYO8wzAE4Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/2017 16:18, Nicolas Ferre wrote:
-> Le 25/01/2017 ? 16:11, Boris Brezillon a ?crit :
->> Hi Rob,
->>
->> Sorry to revive this old discussion, but there's still one aspect I'm
->> not sure about.
->>
->> On Tue, 5 Jul 2016 10:40:22 -0500
->> Rob Herring <robh@kernel.org> wrote:
->>
->>>>>> +   - compatible: Should be "atmel,tcb-free-running-timer"
->>>>>> +   - reg: Should contain the TCB channels to be used. If the
->>>>>> +     counter width is 16 bits (at91rm9200-tcb), two consecutive
->>>>>> +     channels are needed. Else, only one channel will be used.
->>>>>> +
->>>>>> + * a clockevent device
->>>>>> +   - compatible: Should be "atmel,tcb-programmable-timer"  
->>>>>
->>>>> This still looks like assigning usage in DT. As I'm willing to accept
->>>>> that for PWM, either timer channels should be whatever channels are not
->>>>> assigned to PWM (i.e. not in DT) or they should just be "timer" and let
->>>>> the kernel decide their usage.  
->>>>
->>>> I just reviewed Alexandre's new binding, and it makes the whole thing
->>>> a lot more obscure: on older SoCs, we have to chain 2 channels to
->>>> create an acceptable wraparound time (16 bits at 5MHz is generating too
->>>> much interrupts to be acceptable).
->>>>
->>>> If we don't assign the mode from the DT, how should we know which
->>>> channels should be chained to create the free-running timer? Note that
->>>> not all channels can be chained together: they have to be part of the
->>>> same timer counter block and have to be consecutive (0+1, 1+2 or 3+0).  
->>>
->>> The driver can have this knowledge if it is just picking 2 consecutive
->>> timers. It should already know it has 16-bit timers based on the
->>> compatible string. If it gets more complicated then the features or
->>> limitations of the channels should be listed so the driver can make a
->>> choice. OMAP is a good example of lots of timers with differing
->>> features.
->>
->> Yes it's possible to do that, but what about DT overlays then? Say you
->> have some TCB channels you'd like to reserve because they are connected
->> to pins that are exposed on your board. Those pins are not connected to
->> any device yet, but extension boards can be added, and in this case you
->> might want to expose new PWM devices by dynamically loading DT overlays.
->>
->> If your clksource/clkevent driver parsed the initial DT and picked X
->> free channels randomly, it may conflicts with the one requested by the
->> DT overlay.
->>
->> What's your solution for this case?
-> 
-> It seems that we don't have any progress on this topic for more than 6
-> months which is a pity as we now experience an issue that would have
-> been addressed completely by the TC rework [1].
-> 
-> aka "ping"... ;-)
+On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> To handle differences in cpu_restart functionality among various Exynos SoC
+> let's move cpu_restart as a SoC specific function hook to exynos_cpu_info.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/platsmp.c | 16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index 6f08b15..af9332c 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -39,11 +39,13 @@ extern void exynos4_secondary_startup(void);
+>   * @cpu_boot_reg: computes cpu boot address for requested cpu
+>   * @cpu_power_down: handles cpu power down routine for requested cpu
+>   * @cpu_power_up: handles cpu power up routine for requested cpu
+> + * @cpu_restart: handles cpu restart routine for requested cpu
+>   */
+>  struct exynos_cpu_info {
+>         void __iomem* (*cpu_boot_reg)(u32 cpu);
+>         void (*cpu_power_down)(u32 cpu);
+>         void (*cpu_power_up)(u32 cpu);
+> +       void (*cpu_restart)(u32 cpu);
+>  };
+>
+>  static const struct exynos_cpu_info *cpu_info;
+> @@ -252,16 +254,19 @@ static inline void __iomem *cpu_boot_reg(int cpu)
+>  }
+>
+>  /*
+> - * Set wake up by local power mode and execute software reset for given core.
+> - *
+> + * exynos_core_restart : restart the specified cpu
+> + * @core_id : the cpu to be restarted
+>   * Currently this is needed only when booting secondary CPU on Exynos3250.
+>   */
+>  void exynos_core_restart(u32 core_id)
+>  {
+> -       u32 val;
+> +       if (cpu_info && cpu_info->cpu_restart)
+> +               cpu_info->cpu_restart(core_id);
+> +}
+>
+> -       if (!of_machine_is_compatible("samsung,exynos3250"))
+> -               return;
+> +static void exynos3250_core_restart(u32 core_id)
+> +{
+> +       u32 val;
+>
+>         while (!pmu_raw_readl(S5P_PMU_SPARE2))
+>                 udelay(10);
+> @@ -362,6 +367,7 @@ static const struct exynos_cpu_info exynos3250_cpu_info = {
+>         .cpu_boot_reg = exynos_common_cpu_boot_reg,
+>         .cpu_power_down = exynos_common_cpu_power_down,
+>         .cpu_power_up = exynos3250_cpu_power_up,
+> +       .cpu_restart = exynos3250_core_restart,
 
+This is actually not a CPU restart but poking a CPU after power up. It
+is called right after enabling power to given CPU but before setting
+boot addr. For Exynos3250 in fact we do a restart but before we wait
+for bootloader flag and we set local wakeup mode.
 
-Hi Nicolas, Boris,
+Putting this under cpu_restart will be misleading because:
+1. I am not sure this is a valid restart method even for Exynos3250
+(although it might work because the bootloader flag would be set
+anyway).
+2. It is called in specific moment.
 
-is there any news from your side ?
+I think this should not be made generic... or the naming should be
+different, like: cpu_post_power_up().
 
-Thanks.
-
-  -- Daniel
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Best regards,
+Krzysztof
