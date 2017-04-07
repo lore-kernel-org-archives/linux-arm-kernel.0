@@ -1,37 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Apr 2017 11:58:09 -0400
-Subject: [PATCH 08/22] ARM: dts: r7s72100: fix ethernet clock parent
+Date: Fri,  7 Apr 2017 11:58:11 -0400
+Subject: [PATCH 10/22] ARM: dts: r8a7791: Correct parent of SSI[0-9] clocks
 In-Reply-To: <cover.1491580547.git.horms+renesas@verge.net.au>
 References: <cover.1491580547.git.horms+renesas@verge.net.au>
-Message-ID: <91a7c50cb4fabfba218549dfa84356069918bfbf.1491580547.git.horms+renesas@verge.net.au>
+Message-ID: <16fe68dcab5702a024d85229ff7e98979cb701a5.1491580547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Technically, the Ethernet block is run off the 133MHz Bus (B) clock, not
-the 33MHz Peripheral 0 (P0) clock.
+The SSI-ALL gate clock is located in between the P clock and the
+individual SSI[0-9] clocks, hence the former should be listed as their
+parent.
 
-Fixes: 969244f9c720 ("ARM: dts: r7s72100: add ethernet clock to device tree")
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fixes: ee9141522dcf13f8 ("ARM: shmobile: r8a7791: add MSTP10 support on DTSI")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 9fb2e510958a..47ef53a4c8bf 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -121,7 +121,7 @@
- 			#clock-cells = <1>;
- 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0xfcfe0430 4>;
--			clocks = <&p0_clk>;
-+			clocks = <&b_clk>;
- 			clock-indices = <R7S72100_CLK_ETHER>;
- 			clock-output-names = "ether";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index b319ef4d57b0..a6478ca3f4ca 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1447,8 +1447,11 @@
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
+ 			clocks = <&p_clk>,
+-				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
+-				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
++				<&mstp10_clks R8A7791_CLK_SSI_ALL>, <&mstp10_clks R8A7791_CLK_SSI_ALL>,
+ 				<&p_clk>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
 -- 
 2.7.0.rc3.207.g0ac5344
