@@ -1,132 +1,127 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 7 Apr 2017 15:46:27 +0100
-Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
-In-Reply-To: <58E69831.6010306@gmail.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
- <58E5E7B7.1050400@gmail.com>
- <b77e3405-f060-bcd5-99f6-7d76f9edf08a@codeaurora.org>
- <58E69831.6010306@gmail.com>
-Message-ID: <b38312b0-268b-ed86-a5b3-886f86ea13f5@arm.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Fri, 7 Apr 2017 15:48:10 +0100
+Subject: [PATCH] coresight: etm_perf: Fix using uninitialised work
+In-Reply-To: <1490984331-12231-1-git-send-email-suzuki.poulose@arm.com>
+References: <1490984331-12231-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CAJ9a7VhXVAeMR_KAtqST0HpUczk6COWfWCupBYD=7Bg0aXbKQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/17 20:34, Frank Rowand wrote:
-> On 04/06/17 04:01, Sricharan R wrote:
->> Hi Frank,
->>
->> On 4/6/2017 12:31 PM, Frank Rowand wrote:
->>> On 04/04/17 03:18, Sricharan R wrote:
->>>> Size of the dma-range is calculated as coherent_dma_mask + 1
->>>> and passed to arch_setup_dma_ops further. It overflows when
->>>> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
->>>> resulting in size getting passed as 0 wrongly. Fix this by
->>>> passsing in max(mask, mask + 1). Note that in this case
->>>> when the mask is set to full 64bits, we will be passing the mask
->>>> itself to arch_setup_dma_ops instead of the size. The real fix
->>>> for this should be to make arch_setup_dma_ops receive the
->>>> mask and handle it, to be done in the future.
->>>>
->>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->>>> ---
->>>>  drivers/of/device.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/of/device.c b/drivers/of/device.c
->>>> index c17c19d..c2ae6bb 100644
->>>> --- a/drivers/of/device.c
->>>> +++ b/drivers/of/device.c
->>>> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->>>>      ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->>>>      if (ret < 0) {
->>>>          dma_addr = offset = 0;
->>>> -        size = dev->coherent_dma_mask + 1;
->>>> +        size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>>>      } else {
->>>>          offset = PFN_DOWN(paddr - dma_addr);
->>>>          dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->>>>
->>>
->>> NACK.
->>>
->>> Passing an invalid size to arch_setup_dma_ops() is only part of the problem.
->>> size is also used in of_dma_configure() before calling arch_setup_dma_ops():
->>>
->>>         dev->coherent_dma_mask = min(dev->coherent_dma_mask,
->>>                                      DMA_BIT_MASK(ilog2(dma_addr + size)));
->>>         *dev->dma_mask = min((*dev->dma_mask),
->>>                              DMA_BIT_MASK(ilog2(dma_addr + size)));
->>>
->>> which would be incorrect for size == 0xffffffffffffffffULL when
->>> dma_addr != 0.  So the proposed fix really is not papering over
->>> the base problem very well.
->>>
->>
->> Ok, but with your fix for of_dma_get_range and the above fix,
->> dma_addr will be '0' when size = 0xffffffffffffffffULL,
->> but DMA_BIT_MASK(ilog2(dma_addr + size)) would be wrong though,
->> making coherent_dma_mask to be smaller 0x7fffffffffffffffULL.
-> 
-> Yes, that was my point.  Setting size to 0x7fffffffffffffffULL
-> affects several places.  Another potential location (based only
-> on the function header comment, not from reading the code) is
-> iommu_dma_init_domain().  The header comment says:
-> 
->     * @base and @size should be exact multiples of IOMMU page granularity to
->     * avoid rounding surprises.
+Tested against the 4.11-rc1 OpenCSD perf tree - reproduced the problem
+and confirmed the patch fixes it on Juno r1.
+Noted that the command line
+./perf record -e cs_etm/@20010000.etf/ uname
+also causes the same problem,
 
-That is really only referring to the fact that some of the work done
-therein involves truncation to PFNs, so anyone passing in non-exact
-values expecting them to round a particular way may get things off by a
-page one way or the other. It's not going to have much practical
-significance for real devices (in particular since size is used more as
-a sanity check than any kind of actual limit there).
+Larger question that may need future investigation in the openCSD
+project is why the sink provided in the perf command line is not being
+enabled?
 
-> I have not read enough context to really understand of_dma_configure(), but
-> it seems there is yet another issue in how the error return case from
-> of_dma_get_range() is handled (with the existing code, as well as if
-> my patch gets accepted).  An error return value can mean _either_
-> there is no dma-ranges property _or_ "an other problem occurred".  Should
-> the "an other problem occurred" case be handled by defaulting size to
-> a value based on dev->coherent_dma_mask (the current case) or should the
-> attempt to set up the DMA configuration just fail?
+Regards
 
-There is indeed a lot wrong with of_dma_configure() and
-arch_setup_dma_ops(), but fixing those is beyond the scope of this
-series. This is just working around a latent bug in the one specific
-case where a value is *not* derived from DT. Any DT which worked before
-still works; any DT which made of_dma_configure() go wrong before still
-makes of_dma_configure() go wrong exactly the same.
+Mike
 
-Whilst it's not ideal, since a DMA mask basically represents the maximum
-size of address that that particular device can be given, I can't see it
-making any practical difference for a full 64-bit DMA mask to be trimmed
-down to 63 bits upon re-probing - no system is likely to have that many
-physical address bits anyway, and I don't think any IOMMUs support that
-large an IOVA space either, so as long as it's still big enough to cover
-"everything", it'll be OK.
+On 31 March 2017 at 19:18, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> With 4.11-rc4, the following command triggers a WARN_ON,
+> when a sink is not enabled.
+>
+>  perf record -e cs_etm/@20010000.etf/
+>
+>  [88286.547741] ------------[ cut here ]------------
+>  [88286.552332] WARNING: CPU: 3 PID: 2156 at kernel/workqueue.c:1442 __queue_work+0x29c/0x3b8
+>  [88286.560427] Modules linked in:
+>  [88286.563451]
+>  [88286.564928] CPU: 3 PID: 2156 Comm: perf_v4.11 Not tainted 4.11.0-rc4 #217
+>  [88286.573453] Hardware name: ARM LTD ARM Juno Development Platform/ARM Juno Development Platform, BIOS EDK II Aug 15
+>   2016
+>  [88286.584128] task: ffff80097597c200 task.stack: ffff8009768b0000
+>  [88286.589990] PC is at __queue_work+0x29c/0x3b8
+>  [88286.594303] LR is at __queue_work+0x104/0x3b8
+>  [88286.598614] pc : [<ffff0000080d8c7c>] lr : [<ffff0000080d8ae4>] pstate: a00001c5
+>  [88286.605934] sp : ffff8009768b3aa0
+>  [88286.609212] x29: ffff8009768b3aa0 x28: ffff80097ff3da00
+>  [88286.614477] x27: ffff80097ff89c00 x26: ffff8009751b0e00
+>  [88286.619741] x25: ffff000008c9f000 x24: 0000000000000003
+>  [88286.625004] x23: 0000000000000040 x22: ffff000008d3dab8
+>  [88286.630268] x21: ffff800977804400 x20: 0000000000000007
+>  [88286.635532] x19: ffff000008c54000 x18: 0000fffff9185160
+>  [88286.640795] x17: 0000ffffb33d9a38 x16: ffff000008088270
+>  [88286.646059] x15: 0000ffffb345b590 x14: 0000000000000000
+>  [88286.651322] x13: 0000000000000004 x12: 0000000000000040
+>  [88286.656586] x11: 0000000000000068 x10: 0000000000000000
+>  [88286.661849] x9 : ffff800977400028 x8 : 0000000000000000
+>  [88286.667113] x7 : 0000000000000000 x6 : ffff0000080d8ae4
+>  [88286.672376] x5 : 0000000000000000 x4 : 0000000000000080
+>  [88286.677639] x3 : 0000000000000000 x2 : 0000000000000000
+>  [88286.682903] x1 : 0000000000000000 x0 : ffff8009751b0e08
+>  [88286.688166]
+>  [88286.689638] ---[ end trace 31633f18fd33d4cb ]---
+>  [88286.694206] Call trace:
+>  [88286.696627] Exception stack(0xffff8009768b38d0 to 0xffff8009768b3a00)
+>  [88286.703004] 38c0:                                   ffff000008c54000 0001000000000000
+>  [88286.710757] 38e0: ffff8009768b3aa0 ffff0000080d8c7c ffff8009768b3b50 ffff80097ff8a5b0
+>  [88286.718511] 3900: 0000800977325000 0000000000000000 0000000000000040 ffff80097ffc6180
+>  [88286.726264] 3920: ffff8009768b3940 ffff0000088a8694 ffff80097ffc5800 0000000000000000
+>  [88286.734017] 3940: ffff8009768b3960 ffff0000081919c0 ffff80097ffc5280 0000000000000001
+>  [88286.741771] 3960: ffff8009768b3a50 ffff00000819206c ffff8009751b0e08 0000000000000000
+>  [88286.749523] 3980: 0000000000000000 0000000000000000 0000000000000080 0000000000000000
+>  [88286.757277] 39a0: ffff0000080d8ae4 0000000000000000 0000000000000000 ffff800977400028
+>  [88286.765029] 39c0: 0000000000000000 0000000000000068 0000000000000040 0000000000000004
+>  [88286.772783] 39e0: 0000000000000000 0000ffffb345b590 ffff000008088270 0000ffffb33d9a38
+>  [88286.780537] [<ffff0000080d8c7c>] __queue_work+0x29c/0x3b8
+>  [88286.785883] [<ffff0000080d8df8>] queue_work_on+0x60/0x78
+>  [88286.791146] [<ffff000008764c68>] etm_setup_aux+0x178/0x238
+>  [88286.796578] [<ffff000008183600>] rb_alloc_aux+0x228/0x310
+>  [88286.801925] [<ffff00000817e564>] perf_mmap+0x404/0x5a8
+>  [88286.807015] [<ffff0000081c60cc>] mmap_region+0x394/0x5c0
+>  [88286.812276] [<ffff0000081c654c>] do_mmap+0x254/0x388
+>  [88286.817191] [<ffff0000081a989c>] vm_mmap_pgoff+0xbc/0xe0
+>  [88286.822452] [<ffff0000081c3ffc>] SyS_mmap_pgoff+0xac/0x228
+>  [88286.827884] [<ffff000008088288>] sys_mmap+0x18/0x28
+>  [88286.832714] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
+>
+> The patch makes sure that the event_data->work is initialised
+> properly before we could possibly use it.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm-perf.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 26cfac3..df63315 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -201,6 +201,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+>         event_data = alloc_event_data(event_cpu);
+>         if (!event_data)
+>                 return NULL;
+> +       INIT_WORK(&event_data->work, free_event_data);
+>
+>         /*
+>          * In theory nothing prevent tracers in a trace session from being
+> @@ -217,8 +218,6 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+>         if (!sink)
+>                 goto err;
+>
+> -       INIT_WORK(&event_data->work, free_event_data);
+> -
+>         mask = &event_data->mask;
+>
+>         /* Setup the path for each CPU in a trace session */
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Of course, whether DMA_BIT_MASK(ilog2(dma_addr + size)) is the right
-thing to do in the first place is yet another matter, as there are
-plenty of cases where it results in something which can't reach the
-given range at all, but again, this isn't the place. Much as I'm keen to
-get the behaviour of of_dma_configure() sorted out properly, it doesn't
-seem reasonable that that should suddenly block this
-almost-entirely-orthogonal series that various other work has been
-waiting on for some time now. The WIP patch I have for
-arch_setup_dma_ops() already touches 3 architectures and 4 other
-subsystems...
 
-Robin.
 
-> 
->>
->> Regards,
->>  Sricharan
->>
->>> I agree that the proper solution involves passing a mask instead
->>> of a size to arch_setup_dma_ops().
->>>
->>
-> 
+-- 
+Mike Leach
+Principal Engineer, ARM Ltd.
+Blackburn Design Centre. UK
