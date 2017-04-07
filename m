@@ -1,72 +1,106 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 7 Apr 2017 21:51:41 +0800
-Subject: [PATCH v3] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <1491309014-13967-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <201704072148.iWIGWjTi%fengguang.wu@intel.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 7 Apr 2017 15:56:58 +0200
+Subject: [RFC kvm-unit-tests PATCH 8/8] Makefiles: fix up the arm build
+ include and link paths
+In-Reply-To: <20170406190727.5624-9-alex.bennee@linaro.org>
+References: <20170406190727.5624-1-alex.bennee@linaro.org>
+ <20170406190727.5624-9-alex.bennee@linaro.org>
+Message-ID: <20170407135658.nayjvdgm4jgtbqqo@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+On Thu, Apr 06, 2017 at 08:07:27PM +0100, Alex Benn?e wrote:
+> We still need to tell the compiler the correct search path for finding
+> headers and the like. This is slightly complicated by the "dynamic"
+> asm search path which is in our build tree but (may be) symlinked to
+> the right architectures headers.
+> 
+> Also we explicitly include SRCDIR for the linking scripts as VPATH
+> doesn't seem to find them well enough.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  arm/Makefile.common     | 15 +++++++++------
+>  scripts/asm-offsets.mak |  4 +++-
+>  2 files changed, 12 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arm/Makefile.common b/arm/Makefile.common
+> index 74c7394..b1fead1 100644
+> --- a/arm/Makefile.common
+> +++ b/arm/Makefile.common
+> @@ -16,7 +16,10 @@ tests-common += $(TEST_DIR)/pmu.flat
+>  tests-common += $(TEST_DIR)/gic.flat
+>  tests-common += $(TEST_DIR)/psci.flat
+>  
+> -tests-all = $(tests-common) $(tests)
+> +scripts-common += $(TEST_DIR)/run
+> +scripts-common += $(TEST_DIR)/unittests.cfg
+> +
+> +tests-all = $(tests-common) $(tests) $(scripts_common)
+>  all: $(tests-all)
+>  
+>  ##################################################################
+> @@ -26,13 +29,13 @@ CFLAGS += -std=gnu99
+>  CFLAGS += -ffreestanding
+>  CFLAGS += -Wextra
+>  CFLAGS += -O2
+> -CFLAGS += -I lib -I lib/libfdt
+> +CFLAGS += -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -I lib
+>  
+>  # We want to keep intermediate files
+>  .PRECIOUS: %.elf %.o
+>  
+>  asm-offsets = lib/$(ARCH)/asm-offsets.h
+> -include scripts/asm-offsets.mak
+> +include $(SRCDIR)/scripts/asm-offsets.mak
+>  
+>  cflatobjs += lib/util.o
+>  cflatobjs += lib/alloc.o
+> @@ -60,11 +63,11 @@ start_addr := $(shell printf "%x\n" $$(( $(phys_base) + $(kernel_offset) )))
+>  
+>  FLATLIBS = $(libcflat) $(LIBFDT_archive) $(libgcc) $(libeabi)
+>  %.elf: LDFLAGS = $(CFLAGS) -nostdlib
+> -%.elf: %.o $(FLATLIBS) arm/flat.lds $(cstart.o)
+> +%.elf: %.o $(FLATLIBS) $(SRCDIR)/arm/flat.lds $(cstart.o)
+>  	$(CC) $(LDFLAGS) -o $@ \
+> -		-Wl,-T,arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
+> +		-Wl,-T,$(SRCDIR)/arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
+>  		$(filter %.o, $^) $(FLATLIBS) \
+> -		lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
+> +		$(SRCDIR)/lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
+>  
+>  %.flat: %.elf
+>  	$(OBJCOPY) -O binary $^ $@
+> diff --git a/scripts/asm-offsets.mak b/scripts/asm-offsets.mak
+> index b2578a6..ecf583f 100644
+> --- a/scripts/asm-offsets.mak
+> +++ b/scripts/asm-offsets.mak
+> @@ -29,11 +29,13 @@ define make_asm_offsets
+>  endef
+>  
+>  $(asm-offsets:.h=.s): $(asm-offsets:.h=.c)
+> +	mkdir -p $(dir $@)
+>  	$(CC) $(CFLAGS) -fverbose-asm -S -o $@ $<
 
-[auto build test WARNING on clk/clk-next]
-[also build test WARNING on v4.11-rc5 next-20170406]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+For some reason I'm not a big fan of all these mkdirs getting sprinkled
+around.  Maybe we can just have the arch makefiles be sure to create
+lib/$(ARCH) first?
 
-url:    https://github.com/0day-ci/linux/commits/gabriel-fernandez-st-com/clk-stm32h7-Add-stm32h743-clock-driver/20170405-100654
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-stm32_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+>  
+>  $(asm-offsets): $(asm-offsets:.h=.s)
+>  	$(call make_asm_offsets)
+> -	cp -f $(asm-offsets) lib/generated
+> +	mkdir -p lib/generated
 
-All warnings (new ones prefixed by >>):
+Could make this directory from configure
 
-   drivers/clk/clk-stm32h7.c: In function 'ready_gate_clk_disable':
->> drivers/clk/clk-stm32h7.c:250:2: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
-     if (rgate->backup_domain && dbp_status)
-     ^~
-   drivers/clk/clk-stm32h7.c:253:3: note: ...this statement, but the latter is misleadingly indented as if it is guarded by the 'if'
-      clk_gate_ops.disable(hw);
-      ^~~~~~~~~~~~
+> +	cp -f $(asm-offsets) lib/generated/
+>  
+>  asm_offsets_clean:
+>  	$(RM) $(asm-offsets) $(asm-offsets:.h=.s) \
+> -- 
+> 2.11.0
+>
 
-vim +/if +250 drivers/clk/clk-stm32h7.c
-
-   234		return bit_status;
-   235	}
-   236	
-   237	static void ready_gate_clk_disable(struct clk_hw *hw)
-   238	{
-   239		struct clk_gate *gate = to_clk_gate(hw);
-   240		struct stm32_ready_gate *rgate = to_ready_gate_clk(gate);
-   241		int dbp_status;
-   242		int bit_status;
-   243		unsigned int timeout = RGATE_TIMEOUT;
-   244	
-   245		if (!ready_gate_clk_is_enabled(hw))
-   246			return;
-   247	
-   248		dbp_status = is_enable_power_domain_write_protection();
-   249	
- > 250		if (rgate->backup_domain && dbp_status)
-   251			disable_power_domain_write_protection();
-   252	
-   253			clk_gate_ops.disable(hw);
-   254	
-   255		do {
-   256			bit_status = !!(readl(gate->reg) & BIT(rgate->bit_rdy));
-   257	
-   258			if (bit_status)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 9580 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170407/d9d660e8/attachment.gz>
+Thanks,
+drew 
