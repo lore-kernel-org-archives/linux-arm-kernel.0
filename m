@@ -1,147 +1,69 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 7 Apr 2017 09:11:37 +0200
-Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
- iio-hwmon
-In-Reply-To: <7420fc7a-4a65-0ff8-adb8-f2e9815fdeba@metafoo.de>
-References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
- <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
- <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
- <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
- <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
- <6767a340-b150-c21a-b6cb-5ca1ce2cd721@xilinx.com>
- <1027ba77-6141-5d6e-e5e8-b15df29957f2@metafoo.de>
- <1cb2a735-59cd-3d8c-b55e-bd775ded3fc0@xilinx.com>
- <c7f47571-6f59-302c-92ff-4512e78ff112@xilinx.com>
- <7420fc7a-4a65-0ff8-adb8-f2e9815fdeba@metafoo.de>
-Message-ID: <c7b5cf05-fb8d-e3d9-b15e-593064daba62@xilinx.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 7 Apr 2017 09:15:31 +0200
+Subject: [PATCH v3 8/9] drm/rockchip: gem: Don't alloc/free gem buf when
+ dev_private is invalid
+In-Reply-To: <58E73535.4000409@rock-chips.com>
+References: <1491380967-28570-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1491380967-28570-9-git-send-email-jeffy.chen@rock-chips.com>
+ <20170405162839.k6q4b3tpt6t2s3zm@art_vandelay>
+ <20170406082612.qmwyfjr5uwcp3arr@phenom.ffwll.local>
+ <58E621D7.3030205@rock-chips.com>
+ <CAKMK7uEjyBwJKmZUnXZLZ_YzgajFMKNem-2Eoc80ZDXha-7o6g@mail.gmail.com>
+ <58E73535.4000409@rock-chips.com>
+Message-ID: <20170407071531.2siqzefoddys6lut@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.3.2017 16:34, Lars-Peter Clausen wrote:
-> On 03/20/2017 04:33 PM, Michal Simek wrote:
->> On 17.3.2017 07:46, Michal Simek wrote:
->>> On 16.3.2017 22:20, Lars-Peter Clausen wrote:
->>>> On 03/16/2017 07:06 PM, Michal Simek wrote:
->>>>> On 16.3.2017 17:51, Lars-Peter Clausen wrote:
->>>>>> On 03/16/2017 05:45 PM, Michal Simek wrote:
->>>>>>> On 16.3.2017 17:39, Moritz Fischer wrote:
->>>>>>>> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>>>>>>>> Hi,
->>>>>>>>>
->>>>>>>>> On 8.3.2017 21:11, Moritz Fischer wrote:
->>>>>>>>>> Fix
->>>>>>>>>>
->>>>>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>>>>>>>> /amba/adc at f8007100
->>>>>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>>>>>>>> /amba/adc at f8007100
->>>>>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>>>>>>>> /amba/adc at f8007100
->>>>>>>>>>
->>>>>>>>>> by adding the #io-channel-cells property.
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>>>>>>>>> Cc: Michal Simek <michal.simek@xilinx.com>
->>>>>>>>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>>>>>>>>> Cc: Julia Cartwright <julia@ni.com>
->>>>>>>>>> Cc: linux-kernel at vger.kernel.org
->>>>>>>>>> Cc: devicetree at vger.kernel.org
->>>>>>>>>> ---
->>>>>>>>>>
->>>>>>>>>> Changes from v1:
->>>>>>>>>> - fix messed up commit message
->>>>>>>>>> ---
->>>>>>>>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
->>>>>>>>>>  1 file changed, 1 insertion(+)
->>>>>>>>>>
->>>>>>>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->>>>>>>>>> index f3ac9bf..98233a8 100644
->>>>>>>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->>>>>>>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->>>>>>>>>> @@ -72,6 +72,7 @@
->>>>>>>>>>                       interrupts = <0 7 4>;
->>>>>>>>>>                       interrupt-parent = <&intc>;
->>>>>>>>>>                       clocks = <&clkc 12>;
->>>>>>>>>> +                     #io-channel-cells = <1>;
->>>>>>>>>>               };
->>>>>>>>>>
->>>>>>>>>>               can0: can at e0008000 {
->>>>>>>>>>
->>>>>>>>>
->>>>>>>>> I think it will be good to the next step too.
->>>>>>>>> It means also add iio-hwmon node too.
->>>>>>>>>
->>>>>>>>> What do you think?
->>>>>>>>
->>>>>>>> I hadn't put it in there since dts is supposed to describe hw,
->>>>>>>> but obviously putting the actual hwmon in there makes it more useful.
->>>>>>>
->>>>>>> I had one discussion about this with Grant in past and it is common
->>>>>>> mistake. It is simplification of purpose of dts.
->>>>>>>
->>>>>>
->>>>>> If the iio-hwmon binding had gone through review it would have been rejected.
->>>>>
->>>>> Isn't it a time to deprecate it?
->>>>
->>>> Well, it's ABI now and has to stay forever. Deprecating it makes only sense
->>>> if there is a replacement, which there is not. The iio-hwmon bridge has its
->>>> usecases it's just instantiating it via devicetree which is not so nice.
->>>>
->>>>>
->>>>>>
->>>>>>>>
->>>>>>>> I can resubmit with the hwmon node in there.
->>>>>>>
->>>>>>> If you grep kernel tree you will see that others are using it too.
->>>>>>> Also there is accepted binding for that that's why I can't see big
->>>>>>> problem with it.
->>>>>>
->>>>>> Since this is an application specific binding I wouldn't put it in the
->>>>>> generic DT include file. It's a bit like adding a gpio-key binding for each
->>>>>> of the GPIOs just in case somebody wants to use it.
->>>>>
->>>>> psci is system specific too.
->>>>>
->>>>> IIRC this driver for zynq was written by ADI or with ADI help that's why
->>>>> you know much better than I what's the correct configuration.
->>>>>
->>>>> This targets PS IP which should be present in the hw all the time.
->>>>> Not sure if for all configuration but I expect at least the part of it
->>>>> is there all them time.
->>>>>
->>>>> If binding is incorrect then please remove it with removing from all
->>>>> dts/dtsi files which have this. The same is for of probe function in the
->>>>> driver itself.
->>>>> If this is not done then this is just +1 case.
->>>>>
->>>>> If you still insist that we shouldn't do it then please at least extend
->>>>> commit message and put there example how to wire it on zynq.
->>>>
->>>> There is a IIO driver for the XADC, this driver has a userspace interface
->>>> that exposes the measurements provided by the hardware. Using the hwmon
->>>> bridge will expose the same information just through a hwmon interface.
->>>>
->>>> One reason for using the iio-hwmon bridge is because you have a legacy
->>>> application that expects the a hwmon interface. But new applications that
->>>> want to access the XADC should really use the IIO interface if possible.
->>>>
->>>> In my opinion instantiating the hwmon bridge by default will only cause
->>>> confusion. There are now redundant interfaces and users will wonder what is
->>>> the difference between the two. Is it the same data, is it different data?
->>>> Which is the preferred interface? Which one is 'better'?
->>>
->>> IMHO this should be covered by documentation. One paragraph in iio-hwmon
->>> binding can have answers for this and it will be very clear what people
->>> should use.
->>
->> Any comment on this one?
+On Fri, Apr 07, 2017 at 02:44:05PM +0800, jeffy wrote:
+> Hi Daniel,
 > 
-> Send a patch? :)
-> 
+> On 04/07/2017 02:30 PM, Daniel Vetter wrote:
+> > On Thu, Apr 6, 2017 at 1:09 PM, jeffy <jeffy.chen@rock-chips.com> wrote:
+> > > 
+> > > On 04/06/2017 04:26 PM, Daniel Vetter wrote:
+> > > > 
+> > > > On Wed, Apr 05, 2017 at 12:28:40PM -0400, Sean Paul wrote:
+> > > > > 
+> > > > > On Wed, Apr 05, 2017 at 04:29:26PM +0800, Jeffy Chen wrote:
+> > > > > > 
+> > > > > > After unbinding drm, the userspace may still has a chance to access
+> > > > > > gem buf.
+> > > > > > 
+> > > > > > Add a sanity check for a NULL dev_private to prevent that from
+> > > > > > happening.
+> > > > > 
+> > > > > 
+> > > > > I still don't understand how this is happening. You're saying that these
+> > > > > hooks
+> > > > > can be called after rockchip_drm_unbind() has finished?
+> > > > 
+> > > > 
+> > > > Yeah this is supposed to be impossible. If it isn't, we need to debug and
+> > > > fix this properly. This smells like pretty bad duct-tape ...
+> > > 
+> > > 
+> > > it looks like after unbind, the user space may still own drm dev fd, and
+> > > could be able to call ioctl:
+> > > lrwx------. 1 chronos chronos 64 Mar 15 12:53 28 -> /dev/dri/card1 (deleted)
+> > > 
+> > > and the drm_unplug_dev may help it, maybe we should call it in unbind? or
+> > > just break drm_ioctl when drm_dev not registered?
+> > 
+> > Yes, by default unbind while userspace is running is totally broken in
+> > drm. drm_unplug_dev would be the fix, but it's only used by udl and
+> > not many use that. You might need to fix infrastructure up a bit.
+> please check this patch:
+> 9667071 New          [v5,12/12] drm/drm_ioctl.c: Break ioctl when drm device
+> not registered
+> > 
+> > For normal module unload the module reference will prevent unloading.
+> > So why exactly do you care about the unbind use-case?
+> sometimes we use unbind/bind for testing ;)
 
-I don't feel that I know iio enough to be good candidate to describe
-this properly.
-
-Thanks,
-Michal
+Then make sure you stop your userspace first. Fixing unbind to be
+completely race-free requires a bit of work in the drm core.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
