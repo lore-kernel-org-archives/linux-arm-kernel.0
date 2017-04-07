@@ -1,65 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Apr 2017 17:02:12 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.12
-Message-ID: <20170407160212.GR19342@arm.com>
+Date: Fri, 7 Apr 2017 17:02:39 +0100
+Subject: [GIT PULL] arm64: fixes for -rc6
+Message-ID: <20170407160239.GS19342@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi Linus,
 
-Please pull these arm-smmu updates for 4.12. Highlights include:
+Please pull these two arm64 fixes for -rc6. We've got a regression fix for
+the signal raised when userspace makes an unsupported unaligned access and a
+revert of the contiguous (hugepte) support for hugetlb, which has once again
+been found to be broken. One day, maybe, we'll get it right.
 
-  * TLB sync optimisations for SMMUv2
-  * Support for using an IDENTITY domain in conjunction with DMA ops
-  * Support for SMR masking
-  * Support for 16-bit ASIDs (was previously broken)
-
-Thanks,
+Cheers,
 
 Will
 
 --->8
 
-The following changes since commit c02ed2e75ef4c74e41e421acb4ef1494671585e8:
+The following changes since commit a71c9a1c779f2499fb2afc0553e543f18aff6edf:
 
-  Linux 4.11-rc4 (2017-03-26 14:15:16 -0700)
+  Linux 4.11-rc5 (2017-04-02 17:23:54 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
 
-for you to fetch changes up to 022f4e4f31fea69702f3ec810dc567af6a6d86d8:
+for you to fetch changes up to 6ae979ab39a368c18ceb0424bf824d172d6ab56f:
 
-  iommu/io-pgtable-arm: Avoid shift overflow in block size (2017-04-06 16:06:44 +0100)
+  Revert "Revert "arm64: hugetlb: partial revert of 66b3923a1a0f"" (2017-04-07 12:27:29 +0100)
 
 ----------------------------------------------------------------
-Robert Richter (1):
-      iommu/arm-smmu: Print message when Cavium erratum 27704 was detected
+arm64 fixes:
 
-Robin Murphy (7):
-      iommu: Better document the IOMMU_PRIV flag
-      iommu/arm-smmu: Simplify ASID/VMID handling
-      iommu/arm-smmu: Tidy up context bank indexing
-      iommu/arm-smmu: Use per-context TLB sync as appropriate
-      iommu/arm-smmu: Poll for TLB sync completion more effectively
-      iommu/arm-smmu: Add global SMR masking property
-      iommu/io-pgtable-arm: Avoid shift overflow in block size
+- Restore previous SIGBUS behaviour for unhandled unaligned user accesses
 
-Sunil Goutham (1):
-      iommu/arm-smmu: Fix 16-bit ASID configuration
+- Revert broken support for the contiguous bit in hugetlb (again...)
 
-Will Deacon (5):
-      iommu/arm-smmu: Restrict domain attributes to UNMANAGED domains
-      iommu/arm-smmu: Install bypass S2CRs for IOMMU_DOMAIN_IDENTITY domains
-      iommu/arm-smmu-v3: Make arm_smmu_install_ste_for_dev return void
-      iommu/arm-smmu-v3: Install bypass STEs for IOMMU_DOMAIN_IDENTITY domains
-      iommu: Allow default domain type to be set on the kernel command line
+----------------------------------------------------------------
+Victor Kamensky (1):
+      arm64: mm: unaligned access by user-land should be received as SIGBUS
 
- Documentation/admin-guide/kernel-parameters.txt    |   6 +
- .../devicetree/bindings/iommu/arm,smmu.txt         |  28 +++
- drivers/iommu/arm-smmu-v3.c                        |  76 +++---
- drivers/iommu/arm-smmu.c                           | 259 +++++++++++++--------
- drivers/iommu/io-pgtable-arm.c                     |   2 +-
- drivers/iommu/iommu.c                              |  28 ++-
- include/linux/iommu.h                              |  11 +-
- 7 files changed, 281 insertions(+), 129 deletions(-)
+Will Deacon (1):
+      Revert "Revert "arm64: hugetlb: partial revert of 66b3923a1a0f""
+
+ arch/arm64/mm/fault.c       | 42 ++++++++++++++++++++++++------------------
+ arch/arm64/mm/hugetlbpage.c | 14 --------------
+ 2 files changed, 24 insertions(+), 32 deletions(-)
