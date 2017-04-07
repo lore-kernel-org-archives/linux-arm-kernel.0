@@ -1,61 +1,47 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  8 Apr 2017 02:34:36 +0800
-Subject: [PATCH v2 06/11] dt-bindings: add AXP803's regulator info
-In-Reply-To: <20170407183441.58750-1-icenowy@aosc.io>
-References: <20170407183441.58750-1-icenowy@aosc.io>
-Message-ID: <20170407183441.58750-7-icenowy@aosc.io>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri,  7 Apr 2017 15:06:18 -0400
+Subject: [PATCH V2] scsi: mpt3sas: remove redundant wmb
+Message-ID: <1491591978-17880-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AXP803 have the most regulators in currently supported AXP PMICs.
+Due to relaxed ordering requirements on multiple architectures,
+drivers are required to use wmb/rmb/mb combinations when they
+need to guarantee observability between the memory and the HW.
 
-Add info for the regulators in the dt-bindings document.
+The mpt3sas driver is already using wmb() for this purpose.
+However, it issues a writel following wmb(). writel() function
+on arm/arm64 arhictectures have an embedded wmb() call inside.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+This results in unnecessary performance loss and code duplication.
+
+writel already guarantees ordering for both cpu and bus. we don't need
+additional wmb()
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
-Changes in v2:
-- Place AXP803 regulators before AXP806/809 ones.
+ drivers/scsi/mpt3sas/mpt3sas_base.c | 2 --
+ 1 file changed, 2 deletions(-)
 
- Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 334fb19ce605..50e381cdbf44 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -90,6 +90,33 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
- RTC_LDO		: LDO		: ips-supply		: always on
- DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+diff --git a/drivers/scsi/mpt3sas/mpt3sas_base.c b/drivers/scsi/mpt3sas/mpt3sas_base.c
+index 5b7aec5..18039bb 100644
+--- a/drivers/scsi/mpt3sas/mpt3sas_base.c
++++ b/drivers/scsi/mpt3sas/mpt3sas_base.c
+@@ -1025,7 +1025,6 @@ static int mpt3sas_remove_dead_ioc_func(void *arg)
+ 				    0 : ioc->reply_free_host_index + 1;
+ 				ioc->reply_free[ioc->reply_free_host_index] =
+ 				    cpu_to_le32(reply);
+-				wmb();
+ 				writel(ioc->reply_free_host_index,
+ 				    &ioc->chip->ReplyFreeHostIndex);
+ 			}
+@@ -1074,7 +1073,6 @@ static int mpt3sas_remove_dead_ioc_func(void *arg)
+ 		return IRQ_NONE;
+ 	}
  
-+AXP803 regulators, type, and corresponding input supply names:
-+
-+Regulator	  Type		  Supply Name		  Notes
-+---------	  ----		  -----------		  -----
-+DCDC1		: DC-DC buck	: vin1-supply
-+DCDC2		: DC-DC buck	: vin2-supply		: poly-phase capable
-+DCDC3		: DC-DC	buck	: vin3-supply		: poly-phase capable
-+DCDC4		: DC-DC	buck	: vin4-supply
-+DCDC5		: DC-DC	buck	: vin5-supply		: poly-phase capable
-+DCDC6		: DC-DC	buck	: vin6-supply		: poly-phase capable
-+DC1SW		: On/Off Switch	:			: DCDC1 secondary output
-+ALDO1		: LDO		: aldoin-supply		: shared supply
-+ALDO2		: LDO		: aldoin-supply		: shared supply
-+ALDO3		: LDO		: aldoin-supply		: shared supply
-+DLDO1		: LDO		: dldoin-supply		: shared supply
-+DLDO2		: LDO		: dldoin-supply		: shared supply
-+DLDO3		: LDO		: dldoin-supply		: shared supply
-+DLDO4		: LDO		: dldoin-supply		: shared supply
-+ELDO1		: LDO		: eldoin-supply		: shared supply
-+ELDO2		: LDO		: eldoin-supply		: shared supply
-+ELDO3		: LDO		: eldoin-supply		: shared supply
-+FLDO1		: LDO		: fldoin-supply		: shared supply
-+FLDO2		: LDO		: fldoin-supply		: shared supply
-+LDO_IO0		: LDO		: ips-supply		: GPIO 0
-+LDO_IO1		: LDO		: ips-supply		: GPIO 1
-+RTC_LDO		: LDO		: ips-supply		: always on
-+
- AXP806 regulators, type, and corresponding input supply names:
- 
- Regulator	  Type		  Supply Name		  Notes
+-	wmb();
+ 	if (ioc->is_warpdrive) {
+ 		writel(reply_q->reply_post_host_index,
+ 		ioc->reply_post_host_index[msix_index]);
 -- 
-2.12.2
+1.9.1
