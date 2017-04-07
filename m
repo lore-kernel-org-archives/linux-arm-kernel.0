@@ -1,54 +1,118 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 7 Apr 2017 15:14:22 +0200 (CEST)
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.20.1704071426300.1716@nanos>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 7 Apr 2017 21:16:51 +0800
+Subject: [PATCH v3 1/9] ARM: dts: imx6ul-isiot: Add Sound card with codec
+ node
+In-Reply-To: <1491501735-1649-2-git-send-email-jagan@openedev.com>
+References: <1491501735-1649-1-git-send-email-jagan@openedev.com>
+ <1491501735-1649-2-git-send-email-jagan@openedev.com>
+Message-ID: <20170407131649.GH16503@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Apr 2017, Mathias Krause wrote:
-> On 7 April 2017 at 11:46, Thomas Gleixner <tglx@linutronix.de> wrote:
-> > Whether protected by preempt_disable or local_irq_disable, to make that
-> > work it needs CR0 handling in the exception entry/exit at the lowest
-> > level. And that's just a nightmare maintainence wise as it's prone to be
-> > broken over time.
+On Thu, Apr 06, 2017 at 11:32:07PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> It seems to be working fine for more than a decade now in PaX. So it
-> can't be such a big maintenance nightmare ;)
-
-I really do not care whether PaX wants to chase and verify that over and
-over. I certainly don't want to take the chance to leak CR0.WP ever and I
-very much care about extra stuff to check in the entry/exit path.
-
-> The "proper solution" seems to be much slower compared to just
-> toggling CR0.WP (which is costly in itself, already) because of the
-> TLB invalidation / synchronisation involved.
-
-Why the heck should we care about rare writes being performant?
-
-> > It's valid (at least on x86) to have a shadow map with the same page
-> > attributes but write enabled. That does not require any fixups of CR0 and
-> > just works.
+> Add support for Sound card and related codec(via i2c1) nodes
+> on Engicam Is.IoT MX6UL variant module boards.
 > 
-> "Just works", sure -- but it's not as tightly focused as the PaX
-> solution which is CPU local, while your proposed solution is globally
-> visible.
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v3:
+> - Replace fsl,imx-audio-sgtl5000 and use simple-audio-card
+> Changes for v2:
+> - Use proper [label:] node-name[@unit-address] for codec
+> - Remove incorrect codec property 'wlf,shared-lrclk'
+> - Remove 'gpr' from sound card node
+> 
+>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 10 +++++++
+>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 44 ++++++++++++++++++++++++++++++
 
-Making the world and some more writeable hardly qualifies as tightly
-focussed. Making the mapping concept CPU local is not rocket science
-either. The question is whethers it's worth the trouble.
+Can you help me understand how these two files are related?  Why is
+sgtl5000 added into one and sound node added into the other?
 
-Thanks,
+Shawn
 
-	tglx
+>  2 files changed, 54 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> index 2beaab6..d456080 100644
+> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> @@ -41,6 +41,16 @@
+>   */
+>  
+>  &i2c1 {
+> +	sgtl5000: codec at a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6UL_CLK_OSC>;
+> +		clock-names = "mclk";
+> +		VDDA-supply = <&reg_3p3v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +		VDDD-supply = <&reg_1p8v>;
+> +	};
+> +
+>  	stmpe811: gpio-expander at 44 {
+>  		compatible = "st,stmpe811";
+>  		reg = <0x44>;
+> diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+> index ea30380..7e947e5 100644
+> --- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+> @@ -69,6 +69,50 @@
+>  				    100>;
+>  		default-brightness-level = <100>;
+>  	};
+> +
+> +	reg_1p8v: regulator-1p8v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "1P8V";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	reg_3p3v: regulator-3p3v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3P3V";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	sound {
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "imx6ul-isiot-sgtl5000";
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,bitclock-master = <&dailink_master>;
+> +		simple-audio-card,frame-master = <&dailink_master>;
+> +		simple-audio-card,widgets =
+> +			"Microphone", "Mic Jack",
+> +			"Line", "Line In",
+> +			"Line", "Line Out",
+> +			"Headphone", "Headphone Jack";
+> +		simple-audio-card,routing =
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias",
+> +			"Headphone Jack", "HP_OUT";
+> +
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&sai2>;
+> +		};
+> +
+> +		dailink_master: simple-audio-card,codec {
+> +			sound-dai = <&sgtl5000>;
+> +			clocks = <&clks IMX6UL_CLK_SAI2>;
+> +		};
+> +	};
+>  };
+>  
+>  &i2c1 {
+> -- 
+> 1.9.1
+> 
