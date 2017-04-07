@@ -1,434 +1,68 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 7 Apr 2017 17:38:11 +0800
-Subject: [PATCH] arm64: dts: Add coresight DT nodes for hi6220-hikey
-In-Reply-To: <1491552418-74386-1-git-send-email-lipengcheng8@huawei.com>
-References: <1491552418-74386-1-git-send-email-lipengcheng8@huawei.com>
-Message-ID: <20170407093811.GA17455@leoy-linaro>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 7 Apr 2017 11:46:01 +0200 (CEST)
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.20.1704071048360.1716@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pengcheng,
-
-[ + Mathieu ]
-
-On Fri, Apr 07, 2017 at 04:06:58PM +0800, Li Pengcheng wrote:
-> Add coresight DT nodes for hikey board.
+On Fri, 7 Apr 2017, Mathias Krause wrote:
+> On 6 April 2017 at 17:59, Andy Lutomirski <luto@amacapital.net> wrote:
+> > On Wed, Apr 5, 2017 at 5:14 PM, Kees Cook <keescook@chromium.org> wrote:
+> >> static __always_inline rare_write_begin(void)
+> >> {
+> >>     preempt_disable();
+> >>     local_irq_disable();
+> >>     barrier();
+> >>     __arch_rare_write_begin();
+> >>     barrier();
+> >> }
+> >
+> > Looks good, except you don't need preempt_disable().
+> > local_irq_disable() also disables preemption.  You might need to use
+> > local_irq_save(), though, depending on whether any callers already
+> > have IRQs off.
 > 
-> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-> Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
-> ---
->  .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 318 +++++++++++++++++++++
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   1 +
->  2 files changed, 319 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+> Well, doesn't look good to me. NMIs will still be able to interrupt
+> this code and will run with CR0.WP = 0.
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> new file mode 100644
-> index 0000000..a523e43
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> @@ -0,0 +1,318 @@
-> +/*
-> + * Hisilicon Ltd. Hi6220 SoC
-> + *
-> + * Copyright (C) 2015-2016 Hisilicon Ltd.
-> + * Author: lipengcheng  <lipengcheng8@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +/ {
-> +	amba {
+> Shouldn't you instead question yourself why PaX can do it "just" with
+> preempt_disable() instead?!
 
-Here I'm curious if can use the similiar implementation with Juno?
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi?id=refs/tags/v4.11-rc5
+That's silly. Just because PaX does it, doesn't mean it's correct. To be
+honest, playing games with the CR0.WP bit is outright stupid to begin with.
 
-So finally can include this file into hi6220.dtsi 'soc' section; this
-can reflect the hardware topology more clearly:
+Whether protected by preempt_disable or local_irq_disable, to make that
+work it needs CR0 handling in the exception entry/exit at the lowest
+level. And that's just a nightmare maintainence wise as it's prone to be
+broken over time. Aside of that it's pointless overhead for the normal case.
 
-        soc {
-                [...]
+The proper solution is:
 
-                #include "hi6220-coresight.dtsi"
-        }
+write_rare(ptr, val)
+{
+	mp = map_shadow_rw(ptr);
+	*mp = val;
+	unmap_shadow_rw(mp);
+}
 
-> +		/* A53 cluster0 internal coresight */
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "arm,amba-bus";
+map_shadow_rw() is essentially the same thing as we do in the highmem case
+where the kernel creates a shadow mapping of the user space pages via
+kmap_atomic().
 
-Usually the compatible string should be documented in
-Documentation/devicetree/bindings/, so please drop it.
+It's valid (at least on x86) to have a shadow map with the same page
+attributes but write enabled. That does not require any fixups of CR0 and
+just works.
 
-I think "#address-cells" and "#size-cells" also can remove. This is
-defined by its parent node.
+Thanks,
 
-> +		ranges;
-> +		etm at 0,f659c000 {
-
-Change to etm at f659c000?
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf659c000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu0>;
-> +			port {
-> +				etm0_out_port: endpoint {
-> +					remote-endpoint = <&funnel0_in_port0>;
-> +				};
-> +			};
-> +		};
-> +
-> +		etm at 1,f659d000 {
-
-Same with above.
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf659d000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu1>;
-> +			port {
-> +				etm1_out_port: endpoint {
-> +					remote-endpoint = <&funnel0_in_port1>;
-> +				};
-> +			};
-> +
-> +		};
-> +
-> +		etm at 2,f659e000 {
-
-Same with above.
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf659e000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu2>;
-> +			port {
-> +				etm2_out_port: endpoint {
-> +					remote-endpoint = <&funnel0_in_port2>;
-> +				};
-> +			};
-> +		};
-> +
-> +		etm at 3,f659f000 {
-
-Same with above.
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf659f000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu3>;
-> +			port {
-> +				etm3_out_port: endpoint {
-> +					remote-endpoint = <&funnel0_in_port3>;
-> +				};
-> +			};
-> +		};
-> +
-> +		/* A53 cluster1 internal coresight */
-> +		etm at 4,f65dc000 {
-
-Same with above.
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf65dc000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu4>;
-> +			port {
-> +				etm4_out_port: endpoint {
-> +				remote-endpoint = <&funnel0_in_port4>;
-
-Wrong indent.
-
-> +				};
-> +			};
-> +		};
-> +
-> +		etm at 5,f65dd000 {
-
-Same with above.
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf65dd000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu5>;
-> +			port {
-> +				etm5_out_port: endpoint {
-> +				remote-endpoint = <&funnel0_in_port5>;
-
-Wrong indent.
-
-> +				};
-> +			};
-> +		};
-> +
-> +		etm at 6,f65de000 {
-
-Change to etm at f65de000?
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf65de000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu6>;
-> +			port {
-> +				etm6_out_port: endpoint {
-> +					remote-endpoint = <&funnel0_in_port6>;
-> +				};
-> +			};
-> +		};
-> +
-> +		etm at 7,f65df000 {
-
-Same with above.
-
-> +			compatible = "arm,coresight-etm4x","arm,primecell";
-> +			reg = <0 0xf65df000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu7>;
-> +			port {
-> +				etm7_out_port: endpoint {
-> +					remote-endpoint = <&funnel0_in_port7>;
-> +				};
-> +			};
-> +		};
-> +
-> +		funnel0:funnel at 0,f6501000 {
-
-funnel0 at f6501000.
-
-> +			compatible = "arm,coresight-funnel","arm,primecell";
-> +			reg = <0 0xf6501000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				/* funnel output port */
-> +				port at 0 {
-> +					reg = <0>;
-> +					funnel0_out_port: endpoint {
-> +						remote-endpoint = <&funnel1_in_port>;
-> +					};
-> +				};
-> +
-> +				/* funnel input ports */
-> +				port at 1 {
-> +					reg = <0>;
-> +					funnel0_in_port0: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm0_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 2 {
-> +					reg = <1>;
-> +					funnel0_in_port1: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm1_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 3 {
-> +					reg = <2>;
-> +					funnel0_in_port2: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm2_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 4 {
-> +					reg = <3>;
-> +					funnel0_in_port3: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm3_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 5 {
-> +					reg = <4>;
-> +					funnel0_in_port4: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm4_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 6 {
-> +					reg = <5>;
-> +					funnel0_in_port5: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm5_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 7 {
-> +					reg = <6>;
-> +					funnel0_in_port6: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm6_out_port>;
-> +					};
-> +				};
-> +
-> +				port at 8 {
-> +					reg = <7>;
-> +					funnel0_in_port7: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&etm7_out_port>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		funnel1:funnel at 1,f6401000 {
-
-funnel1 at f6401000
-
-> +			compatible = "arm,coresight-funnel","arm,primecell";
-> +			reg = <0 0xf6401000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				/* funnel1 output port */
-> +				port at 0 {
-> +					reg = <0>;
-> +					funnel1_out_port: endpoint {
-> +						remote-endpoint = <&etf_in_port>;
-> +					};
-> +				};
-> +
-> +				/* funnel1 input port */
-> +				port at 1 {
-> +					reg = <0>;
-> +					funnel1_in_port: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&funnel0_out_port>;
-> +					};
-> +				};
-> +			};
-> +		};
-
-Extra blank line.
-
-> +		etf:etf at 0,f6402000 {
-> +			compatible = "arm,coresight-tmc","arm,primecell";
-> +			reg = <0 0xf6402000 0 0x1000>;
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				/* etf input port */
-> +				port at 0 {
-> +					reg = <0>;
-> +					etf_in_port: endpoint {
-> +						slave-mode;
-> +						remote-endpoint = <&funnel1_out_port>;
-> +					};
-> +				};
-> +				/* etf output port */
-> +				port at 1 {
-> +					reg = <0>;
-> +					etf_out_port: endpoint {
-> +						remote-endpoint = <&replicator0_in_port>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		replicator at 0{
-> +			compatible = "arm,coresight-replicator";
-> +
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				/* replicator input port  */
-> +				port at 0 {
-> +					reg = <0>;
-> +					replicator0_in_port: endpoint{
-> +					slave-mode;
-> +					remote-endpoint = <&etf_out_port>;
-
-Wrong indent.
-
-> +					};
-> +				};
-> +				/* replicator out port  */
-> +				port at 1 {
-> +					reg = <0>;
-> +					replicator0_out_port: endpoint {
-> +						remote-endpoint = <&etr0_in_port>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		etr at 0,f6404000 {
-> +			compatible = "arm,coresight-tmc","arm,primecell";
-> +			reg = <0 0xf6404000 0 0x1000>;
-> +
-> +			coresight-default-sink;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				/* etr input port  */
-> +				port at 0 {
-> +					etr0_in_port: endpoint{
-> +					slave-mode;
-> +					remote-endpoint = <&replicator0_out_port>;
-
-Wrong indent.
-
-> +					};
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index dba3c13..fb70c9b 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -8,6 +8,7 @@
->  /dts-v1/;
->  #include "hi6220.dtsi"
->  #include "hikey-pinctrl.dtsi"
-> +#include "hi6220-coresight.dtsi"
-
-Please review upper comments for adding it into 'soc' node.
-
-BTW, it's good to use script ./scripts/checkpatch.pl to check the
-patch.
-
->  #include <dt-bindings/gpio/gpio.h>
->  
->  / {
-> -- 
-> 2.1.0
-> 
+	tglx
