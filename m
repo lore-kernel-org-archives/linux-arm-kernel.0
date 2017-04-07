@@ -1,72 +1,36 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 7 Apr 2017 12:01:05 -0600
-Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
-In-Reply-To: <20170404193914.GF18246@codeaurora.org>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <20170331175457.GD4897@arm.com>
- <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
- <20170403172307.GI5706@arm.com>
- <20170404193914.GF18246@codeaurora.org>
-Message-ID: <20170407180105.GA22050@jcrouse-lnx.qualcomm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 7 Apr 2017 19:05:07 +0100
+Subject: [PATCHv2 15/16] arm64: pmuv3: handle !PMUv3 when probing
+In-Reply-To: <20170407142908.GO19342@arm.com>
+References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+ <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
+ <20170407142908.GO19342@arm.com>
+Message-ID: <20170407180507.GA5783@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 12:39:14PM -0700, Stephen Boyd wrote:
-> On 04/03, Will Deacon wrote:
-> > On Fri, Mar 31, 2017 at 10:58:16PM -0400, Rob Clark wrote:
-> > > On Fri, Mar 31, 2017 at 1:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
-> > > >> This series provides the support for turning on the arm-smmu's
-> > > >> clocks/power domains using runtime pm. This is done using the
-> > > >> recently introduced device links patches, which lets the symmu's
-> > > >> runtime to follow the master's runtime pm, so the smmu remains
-> > > >> powered only when the masters use it.
-> > > >
-> > > > Do you have any numbers for the power savings you achieve with this?
-> > > > How often do we actually manage to stop the SMMU clocks on an SoC with
-> > > > a handful of masters?
-> > > >
-> > > > In other words, is this too coarse-grained to be useful, or is it common
-> > > > that all the devices upstream of the SMMU are suspended?
-> > > 
-> > > well, if you think about a phone/tablet with a command mode panel,
-> > > pretty much all devices will be suspended most of the time ;-)
+On Fri, Apr 07, 2017 at 03:29:09PM +0100, Will Deacon wrote:
+> On Thu, Apr 06, 2017 at 07:29:22PM +0100, Mark Rutland wrote:
+> > When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
+> > compatible PMU. Thus we need to consult ID registers during probe time.
 > > 
-> > Well, that's really what I was asking about. I assumed that periodic
-> > modem/radio transactions would keep the SMMU clocked, so would like to get a
-> > rough idea of the power savings achieved with this coarse-grained approach.
-> 
-> Sometimes we distribute SMMUs to each IP block in the system and
-> let each one of those live in their own clock + power domain. In
-> these cases, the SMMU can be powered down along with the only IP
-> block that uses it. Furthermore, sometimes we put the IP block
-> and the SMMU inside the same power domain to really tie the two
-> together, so we definitely have cases where all devices (device?)
-> upstream of the SMMU are suspended. And in the case of
-> multimedia, it could be very often that something like the camera
-> app isn't open and thus the SMMU dedicated for the camera can be
-> powered down.
-> 
-> Other times we have two SMMUs in the system where one is
-> dedicated to GPU and the other is "everything else". Even in
-> these cases, we can suspend the GPU one when the GPU is inactive
-> because it's the only consumer. The other SMMU might not be as
-> fine grained, but I think we still power it down quite often
-> because the consumers are mostly multimedia devices that aren't
-> active when the display is off.
+> > This patch updates our PMUv3 probing code to test for the presence of
+> > PMUv3 functionality before touching an PMUv3-specific registers, and
+> > before updating the struct arm_pmu with PMUv3 data.
 
-And just to confuse things even further: with per-instance pagetables we have an
-interest in forcing the SMMU clocks *on* because we don't know when the GPU
-might try to hit the registers to switch a pagetable and if somebody in the
-pipeline is actively trying to do power management at the same time hilarity
-will ensue.
+[...]
 
-The alternative to pm_runtime is the downstream driver that probes the SMMU
-clocks from DT and frobs them itself. I think we can agree that is far less
-reasonable.
+> It would also be worth spinning this up on qemu, if you get a chance, as
+> I don't think that implements the PMU.
 
-Jordan
+That raises the usual problem with GSIs in static ACPI tables; the MADT
+GICC doesn't have any way of describing the absense of a PMU interrupt.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Booting a TCG qemu, the PMU GSI is zero, which is a valid GSI...
+
+There's a spec bug to fix here.
+
+Urrgh.
+
+Thanks,
+Mark.
