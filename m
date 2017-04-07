@@ -1,41 +1,48 @@
 From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Fri, 7 Apr 2017 19:07:20 +0300
-Subject: [PATCH v4 0/2] usb: gadget: udc: atmel: Endpoint allocation scheme
- fixes
-Message-ID: <cover.1491577793.git.cristian.birsan@microchip.com>
+Date: Fri, 7 Apr 2017 19:07:21 +0300
+Subject: [PATCH v4 1/2] usb: gadget: udc: atmel: Use dev_err() to display EP
+ configuration error
+In-Reply-To: <cover.1491577793.git.cristian.birsan@microchip.com>
+References: <cover.1491577793.git.cristian.birsan@microchip.com>
+Message-ID: <08d921b687965dc77ce48b5da30ebabacbc60590.1491577793.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cristian Birsan <cristian.birsan@microchip.com>
 
-This patch series provides fixes, based on the feedback received on the mailing list, for
-the following:
-	- fifo table parameters validation against device tree values
-	- coding style
-	- message display for EP configuration error
-	- Kconfig comments for fifo_mode=0
+Use dev_err() to display EP configuration error to avoid silent failure.
 
-Changes since v1:
-	- Removed static for usba_config_fifo_table() function from "Check fifo
-	configuration values against device tree" patch
-
-Changes since v2:
-	- Use shorter warning message if the fifo table size is greather than device 
-	tree value
-	- replace dev_warn() with dev_err() for hardware fifo allocation error
-
-Changes since v3:
-	- rebase the code on testing/next branch as requested
-	- remove from patch series the patches that are already in testing/next branch
-
-Cristian Birsan (2):
-  usb: gadget: udc: atmel: Use dev_err() to display EP configuration
-    error
-  usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
-
- drivers/usb/gadget/udc/Kconfig          | 5 +++--
+Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
  drivers/usb/gadget/udc/atmel_usba_udc.c | 8 ++++----
- 2 files changed, 7 insertions(+), 6 deletions(-)
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 8bc0b52a..3ccc341 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1851,8 +1851,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 		 * but it's clearly harmless...
+ 		 */
+ 		if (!(usba_ep_readl(ep0, CFG) & USBA_EPT_MAPPED))
+-			dev_dbg(&udc->pdev->dev,
+-				 "ODD: EP0 configuration is invalid!\n");
++			dev_err(&udc->pdev->dev,
++				"ODD: EP0 configuration is invalid!\n");
+ 
+ 		/* Preallocate other endpoints */
+ 		n = fifo_mode ? udc->num_ep : udc->configured_ep;
+@@ -1860,8 +1860,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 			ep = &udc->usba_ep[i];
+ 			usba_ep_writel(ep, CFG, ep->ept_cfg);
+ 			if (!(usba_ep_readl(ep, CFG) & USBA_EPT_MAPPED))
+-				dev_dbg(&udc->pdev->dev,
+-				 "ODD: EP%d configuration is invalid!\n", i);
++				dev_err(&udc->pdev->dev,
++					"ODD: EP%d configuration is invalid!\n", i);
+ 		}
+ 	}
+ 
 -- 
 2.7.4
