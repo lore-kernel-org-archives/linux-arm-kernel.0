@@ -1,51 +1,54 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Fri, 07 Apr 2017 15:24:26 +0530
-Subject: [Patch v4 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
- encoder
-In-Reply-To: <9f81ed3a-4adb-7827-6094-88847bc0787a@samsung.com>
-References: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
- <CGME20170406061023epcas5p2a3fa65c4254e17a58f71c68d413e6bfd@epcas5p2.samsung.com>
- <1491459105-16641-11-git-send-email-smitha.t@samsung.com>
- <374939c7-241a-fcca-c87e-5c4290bdb6aa@samsung.com>
- <1491553894.15698.1142.camel@smitha-fedora>
- <9f81ed3a-4adb-7827-6094-88847bc0787a@samsung.com>
-Message-ID: <1491558866.15698.1227.camel@smitha-fedora>
+From: youlin.pei@mediatek.com (Youlin Pei)
+Date: Fri, 7 Apr 2017 17:54:44 +0800
+Subject: [PATCH v4 0/3] Add Mediatek CIRQ interrupt controller
+In-Reply-To: <771954fe-c994-96be-76ab-ece75383d058@arm.com>
+References: <1491552397-7893-1-git-send-email-youlin.pei@mediatek.com>
+ <771954fe-c994-96be-76ab-ece75383d058@arm.com>
+Message-ID: <1491558884.24848.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-04-07 at 11:25 +0200, Sylwester Nawrocki wrote:
-> On 04/07/2017 10:31 AM, Smitha T Murthy wrote:
-> > On Thu, 2017-04-06 at 15:14 +0200, Sylwester Nawrocki wrote:
-> >> On 04/06/2017 08:11 AM, Smitha T Murthy wrote:
-> >>> @@ -775,6 +832,47 @@ const char *v4l2_ctrl_get_name(u32 id)
-> >>>  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
-> >>>  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
-> >>>
-> >>> +	/* HEVC controls */
-> >> [...]
-> >>> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC LF Across Slice Boundary or Not";
-> >> Please make sure the names are no longer than 31 characters to avoid
-> >> truncation during control enumeration in user space.
-> >> Data structures like struct v4l2_queryctrl, struct v4l2_query_ext_ctrl
-> >> have only 32 bytes long array dedicated for the control name.
->  >
-> > I will try to make the names less than 31 characters long without losing
-> > the context. But there are many control names in this file which are
-> > longer than 31 characters like
-> > V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP,
-> > V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_REF_PERIOD etc so I assumed it was
-> > alright to have such long names. But I will shorten them as per your
-> > suggestion.
+On Fri, 2017-04-07 at 09:52 +0100, Marc Zyngier wrote:
+> On 07/04/17 09:06, Youlin Pei wrote:
+> > In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
+> > works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
+> > 
+> > The CIRQ controller is integrated in between MCUSYS and interrupt sources
+> > as the second level interrupt controller. The external interrupts which 
+> > outside MCUSYS will feed through CIRQ then bypass to GIC.
+> > 
+> > In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
+> > will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
+> > is power downed. CIRQ will be enabled and monitor all edge trigger
+> > interrupts(only edge trigger interrupts will be lost in this scenario).
+> > When an edge interrupt is triggered, CIRQ will record the status and
+> > generated a pulse signal to GIC when flush command is executed. 
+> > 
+> > With CIRQ, MCUSYS can be completely turned off to improve the system 
+> > power consumption without losing interrupts.
+> > 
+> > change in v4:
+> > 1. add some comment to explain CIRQ suspend callback.
+> > 2. rebase on 4.11
 > 
-> Apologies if it wasn't clean enough but my comment referred to the
-> length of the character string being returned (e.g. "HEVC LF Across
-> Slice Boundary or Not") and not to the name of the enum.
+> Hi Youlin,
 > 
-> --
-> Regards,
-> Sylwester
+> I'm happy to take the first two patches through the irq tree. How do we
+> deal with the third one? It seems to me that it'd be better routed via
+> armsoc.
 > 
-Sorry I misunderstood I will take care of it in the next version.
+> Let me know what you and Matthias want to do.
 
-Thank you,
-Smitha
+Hi Marc,
+
+Thanks for your review. I think that driver and dtsi can merged
+separately.
+
+Hi Matthias,
+Could you help to review the dtsi patch?
+Thanks a lot!
+
+> 
+> Thanks,
+> 
+> 	M.
