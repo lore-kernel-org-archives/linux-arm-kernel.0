@@ -1,113 +1,53 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 07 Apr 2017 13:36:28 +0530
-Subject: [PATCH v9 01/12] ARM: EXYNOS: refactor firmware specific routines
-In-Reply-To: <CAJKOXPfvD+Rm+pxvOMe8TefWsYZW4gvj0ZnXNtwOovkjzKFGCQ@mail.gmail.com>
-References: <CGME20170330131419epcas5p4ac36250d3a9225643e327e60f47956c2@epcas5p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-2-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPfvD+Rm+pxvOMe8TefWsYZW4gvj0ZnXNtwOovkjzKFGCQ@mail.gmail.com>
-Message-ID: <e1a1111c-5c34-ecdd-64f1-60d5b3042069@samsung.com>
+From: youlin.pei@mediatek.com (Youlin Pei)
+Date: Fri, 7 Apr 2017 16:06:34 +0800
+Subject: [PATCH v4 0/3] Add Mediatek CIRQ interrupt controller
+Message-ID: <1491552397-7893-1-git-send-email-youlin.pei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
+works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
 
+The CIRQ controller is integrated in between MCUSYS and interrupt sources
+as the second level interrupt controller. The external interrupts which 
+outside MCUSYS will feed through CIRQ then bypass to GIC.
 
-On Friday 07 April 2017 01:15 PM, Krzysztof Kozlowski wrote:
-> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> To remove dependency on soc_is_exynosMMMM macros and remove multiple
->> checks for such macros, let's refactor code in firmware.c file.
->> SoC specific firmware_ops are separated and registered during
->> exynos_firmware_init based on matching machine compatible.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-exynos/firmware.c | 114 +++++++++++++++++++++++++++++++---------
->>  1 file changed, 89 insertions(+), 25 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
->> index e81a78b..b04c47a 100644
->> --- a/arch/arm/mach-exynos/firmware.c
->> +++ b/arch/arm/mach-exynos/firmware.c
->> @@ -35,6 +35,25 @@ static void exynos_save_cp15(void)
->>              : : "cc");
->>  }
->>
->> +static int exynos3250_do_idle(unsigned long mode)
->> +{
->> +       switch (mode) {
->> +       case FW_DO_IDLE_AFTR:
->> +               writel_relaxed(virt_to_phys(exynos_cpu_resume_ns),
->> +                              sysram_ns_base_addr + 0x24);
->> +               writel_relaxed(EXYNOS_AFTR_MAGIC, sysram_ns_base_addr + 0x20);
->> +               flush_cache_all();
->> +               exynos_smc(SMC_CMD_SAVE, OP_TYPE_CORE,
->> +                               SMC_POWERSTATE_IDLE, 0);
->> +               exynos_smc(SMC_CMD_SHUTDOWN, OP_TYPE_CLUSTER,
->> +                               SMC_POWERSTATE_IDLE, 0);
->> +               break;
->> +       case FW_DO_IDLE_SLEEP:
->> +               exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
->> +       }
->> +       return 0;
->> +}
->> +
->>  static int exynos_do_idle(unsigned long mode)
->>  {
->>         switch (mode) {
->> @@ -44,14 +63,7 @@ static int exynos_do_idle(unsigned long mode)
->>                 writel_relaxed(__pa_symbol(exynos_cpu_resume_ns),
->>                                sysram_ns_base_addr + 0x24);
->>                 writel_relaxed(EXYNOS_AFTR_MAGIC, sysram_ns_base_addr + 0x20);
->> -               if (soc_is_exynos3250()) {
->> -                       flush_cache_all();
->> -                       exynos_smc(SMC_CMD_SAVE, OP_TYPE_CORE,
->> -                                  SMC_POWERSTATE_IDLE, 0);
->> -                       exynos_smc(SMC_CMD_SHUTDOWN, OP_TYPE_CLUSTER,
->> -                                  SMC_POWERSTATE_IDLE, 0);
->> -               } else
->> -                       exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
->> +               exynos_smc(SMC_CMD_CPU0AFTR, 0, 0, 0);
->>                 break;
->>         case FW_DO_IDLE_SLEEP:
->>                 exynos_smc(SMC_CMD_SLEEP, 0, 0, 0);
->> @@ -59,28 +71,25 @@ static int exynos_do_idle(unsigned long mode)
->>         return 0;
->>  }
->>
->> -static int exynos_cpu_boot(int cpu)
->> +static int exynos4212_cpu_boot(int cpu)
->>  {
->>         /*
->> -        * Exynos3250 doesn't need to send smc command for secondary CPU boot
->> -        * because Exynos3250 removes WFE in secure mode.
->> -        */
->> -       if (soc_is_exynos3250())
->> -               return 0;
->> -
->> -       /*
->>          * The second parameter of SMC_CMD_CPU1BOOT command means CPU id.
->>          * But, Exynos4212 has only one secondary CPU so second parameter
->>          * isn't used for informing secure firmware about CPU id.
->>          */
->> -       if (soc_is_exynos4212())
->> -               cpu = 0;
->> +       cpu = 0;
-> 
-> The comment above is clear enough so I think there is no need for this
-> assignment. Just use 0 as argument in exynos_smc().
-> 
+In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
+will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
+is power downed. CIRQ will be enabled and monitor all edge trigger
+interrupts(only edge trigger interrupts will be lost in this scenario).
+When an edge interrupt is triggered, CIRQ will record the status and
+generated a pulse signal to GIC when flush command is executed. 
 
-Ok, will modify accordingly in next patchset.
+With CIRQ, MCUSYS can be completely turned off to improve the system 
+power consumption without losing interrupts.
 
-> Rest looks good so with this change:
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
+change in v4:
+1. add some comment to explain CIRQ suspend callback.
+2. rebase on 4.11
 
-Thanks for review,
-Pankaj Dubey
+change in v3:
+1. add an explicit cirq range in DT and do the range check in driver.
+2. change the option "mediatek,ext-irq-start" to s"mediatek,ext-irq-range".
+3. remove mtk_cirq_eoi and clear the irq status in suspend callback.
+4. remove some pure copy code.
+5. rebase on 4.10-rc2.
 
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+change in v2:
+1. fix coding style issue.
+2. change the compatible string.
+3. resolve IRQ offset at alloc time.
+4. clear irq status in irq_eoi function.
+5. rebase on 4.9-rc1.
+
+v1:
+http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007213.html
+v2:
+http://lists.infradead.org/pipermail/linux-mediatek/2016-November/007350.html
+v3:
+http://lists.infradead.org/pipermail/linux-mediatek/2017-February/008134.html
+
+Youlin Pei (3):
+  binding: irqchip: mtk-cirq: Add binding document
+  irqchip: mtk-cirq: Add mediatek mtk-cirq implement
+  ARM: dts: mt2701: Add mtk-cirq node for mt2701 
