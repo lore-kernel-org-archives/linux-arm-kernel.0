@@ -1,47 +1,46 @@
-From: pageexec@freemail.hu (PaX Team)
-Date: Fri, 07 Apr 2017 21:58:40 +0200
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>,
- <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
-Message-ID: <58E7EF70.30766.621C4F44@pageexec.freemail.hu>
+From: dcbw@redhat.com (Dan Williams)
+Date: Fri, 07 Apr 2017 15:09:18 -0500
+Subject: [PATCH v2 3/4] bluetooth: hci_uart: add LL protocol serdev
+ driver support
+In-Reply-To: <CAL_Jsq+aM+xxbu=3v8_w9Ce+=t_pXmVWuisnckA8_8LOS-ftVA@mail.gmail.com>
+References: <20170407143516.9945-1-robh@kernel.org>
+ <1491584978.2136.21.camel@redhat.com>
+ <CAL_Jsq+aM+xxbu=3v8_w9Ce+=t_pXmVWuisnckA8_8LOS-ftVA@mail.gmail.com>
+Message-ID: <1491595758.2136.28.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 Apr 2017 at 9:14, Andy Lutomirski wrote:
-
-> On Fri, Apr 7, 2017 at 6:30 AM, Mathias Krause <minipli@googlemail.com> wrote:
-> > On 7 April 2017 at 15:14, Thomas Gleixner <tglx@linutronix.de> wrote:
-> >> On Fri, 7 Apr 2017, Mathias Krause wrote:
-> > Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
-> > somewhere sensible should make those "leaks" visible fast -- and their
-> > exploitation impossible, i.e. fail hard.
+On Fri, 2017-04-07 at 13:48 -0500, Rob Herring wrote:
+> On Fri, Apr 7, 2017 at 12:09 PM, Dan Williams <dcbw@redhat.com>
+> wrote:
+> > On Fri, 2017-04-07 at 09:35 -0500, Rob Herring wrote:
+> > > Turns out that the LL protocol and the TI-ST are the same thing
+> > > AFAICT.
+> > > The TI-ST adds firmware loading, GPIO control, and shared access
+> > > for
+> > > NFC, FM radio, etc. For now, we're only implementing what is
+> > > needed
+> > > for
+> > > BT. This mirrors other drivers like BCM and Intel, but uses the
+> > > new
+> > > serdev bus.
+> > > 
+> > > The firmware loading is greatly simplified by using existing
+> > > infrastructure to send commands. It may be a bit slower than the
+> > > original code using synchronous functions, but the real
+> > > bottleneck is
+> > > likely doing firmware load at 115.2kbps.
+> > 
+> > Is there no way to put the TI-specific stuff into a TI UART module
+> > rather than building it into the generic one?
 > 
-> The leaks surely exist and now we'll just add an exploitable BUG.
+> In case it's not clear, all of HCI_LL is the TI specific part, not
+> just what I'm adding. So you are talking about putting each UART BT
+> protocol into a separate module. I'd assume that is doable, but seems
+> orthogonal to this patch set. I'd also assume there was some reason
+> that was not done already.
 
-can you please share those leaks that 'surely exist' and CC oss-security
-while at it?
+Ok, thanks for the explanation.  Wasn't clear at all from the file
+paths in the source tree; it looked generic.
 
-> I think we're approaching this all wrong, actually.  The fact that x86
-> has this CR0.WP thing is arguably a historical accident, and the fact
-> that PaX uses it doesn't mean that PaX is doing it the best way for
-> upstream Linux.
-> 
-> Why don't we start at the other end and do a generic non-arch-specific
-> implementation: set up an mm_struct that contains an RW alias of the
-> relevant parts of rodata and use use_mm to access it.  (That is,
-> get_fs() to back up the old fs, set_fs(USER_DS),
-> use_mm(&rare_write_mm), do the write using copy_to_user, undo
-> everything.)
-> 
-> Then someone who cares about performance can benchmark the CR0.WP
-> approach against it and try to argue that it's a good idea.  This
-> benchmark should wait until I'm done with my PCID work, because PCID
-> is going to make use_mm() a whole heck of a lot faster.
-
-in my measurements switching PCID is hovers around 230 cycles for snb-ivb
-and 200-220 for hsw-skl whereas cr0 writes are around 230-240 cycles. there's
-of course a whole lot more impact for switching address spaces so it'll never
-be fast enough to beat cr0.wp.
+Dan
