@@ -1,48 +1,38 @@
 From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Fri, 7 Apr 2017 19:07:21 +0300
-Subject: [PATCH v4 1/2] usb: gadget: udc: atmel: Use dev_err() to display EP
- configuration error
+Date: Fri, 7 Apr 2017 19:07:22 +0300
+Subject: [PATCH v4 2/2] usb: gadget: udc: atmel: Update Kconfig help for
+ fifo_mode = 0
 In-Reply-To: <cover.1491577793.git.cristian.birsan@microchip.com>
 References: <cover.1491577793.git.cristian.birsan@microchip.com>
-Message-ID: <08d921b687965dc77ce48b5da30ebabacbc60590.1491577793.git.cristian.birsan@microchip.com>
+Message-ID: <6ba2584f702e48def48741d5957d683ac2a885d6.1491577793.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cristian Birsan <cristian.birsan@microchip.com>
 
-Use dev_err() to display EP configuration error to avoid silent failure.
+Update Kconfig help for fifo_mode = 0 to explain the behavior better.
 
 Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/usb/gadget/udc/Kconfig | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 8bc0b52a..3ccc341 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -1851,8 +1851,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 		 * but it's clearly harmless...
- 		 */
- 		if (!(usba_ep_readl(ep0, CFG) & USBA_EPT_MAPPED))
--			dev_dbg(&udc->pdev->dev,
--				 "ODD: EP0 configuration is invalid!\n");
-+			dev_err(&udc->pdev->dev,
-+				"ODD: EP0 configuration is invalid!\n");
+diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
+index 707814d..c90a4a2 100644
+--- a/drivers/usb/gadget/udc/Kconfig
++++ b/drivers/usb/gadget/udc/Kconfig
+@@ -62,8 +62,9 @@ config USB_ATMEL_USBA
  
- 		/* Preallocate other endpoints */
- 		n = fifo_mode ? udc->num_ep : udc->configured_ep;
-@@ -1860,8 +1860,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 			ep = &udc->usba_ep[i];
- 			usba_ep_writel(ep, CFG, ep->ept_cfg);
- 			if (!(usba_ep_readl(ep, CFG) & USBA_EPT_MAPPED))
--				dev_dbg(&udc->pdev->dev,
--				 "ODD: EP%d configuration is invalid!\n", i);
-+				dev_err(&udc->pdev->dev,
-+					"ODD: EP%d configuration is invalid!\n", i);
- 		}
- 	}
+ 	  The fifo_mode parameter is used to select endpoint allocation mode.
+ 	  fifo_mode = 0 is used to let the driver autoconfigure the endpoints.
+-	  In this case 2 banks are allocated for isochronous endpoints and
+-	  only one bank is allocated for the rest of the endpoints.
++	  In this case, for ep1 2 banks are allocated if it works in isochronous
++	  mode and only 1 bank otherwise. For the rest of the endpoints
++	  only 1 bank is allocated.
  
+ 	  fifo_mode = 1 is a generic maximum fifo size (1024 bytes) configuration
+ 	  allowing the usage of ep1 - ep6
 -- 
 2.7.4
