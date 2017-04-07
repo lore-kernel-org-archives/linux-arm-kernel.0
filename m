@@ -1,42 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Apr 2017 11:58:12 -0400
-Subject: [PATCH 11/22] ARM: dts: r8a7793: Correct parent of SSI[0-9] clocks
+Date: Fri,  7 Apr 2017 11:58:15 -0400
+Subject: [PATCH 14/22] ARM: dts: koelsch: Correct clock frequency of X2 DU
+ clock input
 In-Reply-To: <cover.1491580547.git.horms+renesas@verge.net.au>
 References: <cover.1491580547.git.horms+renesas@verge.net.au>
-Message-ID: <1cd9028027c7a7c10b774df698c3cfafec6aa67d.1491580547.git.horms+renesas@verge.net.au>
+Message-ID: <ebf06af55c7594ed1fc18469a5cddf911c40e687.1491580547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The SSI-ALL gate clock is located in between the P clock and the
-individual SSI[0-9] clocks, hence the former should be listed as their
-parent.
+The X2 crystal oscillator on the Koelsch development board provides a
+74.25 MHz clock, not a 148.5 MHz clock.
 
-Fixes: 072d326542e49187 ("ARM: dts: r8a7793: add MSTP10 clocks to device tree")
+Fixes: cd21cb46e14aae3a ("ARM: shmobile: koelsch: Add DU external pixel clocks to DT")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Tested-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 9fcf3a9ca084..4de6041d61f9 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1269,8 +1269,11 @@
- 			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
- 			clocks = <&p_clk>,
--				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
--				<&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
-+				<&mstp10_clks R8A7793_CLK_SSI_ALL>, <&mstp10_clks R8A7793_CLK_SSI_ALL>,
-+				<&mstp10_clks R8A7793_CLK_SSI_ALL>, <&mstp10_clks R8A7793_CLK_SSI_ALL>,
-+				<&mstp10_clks R8A7793_CLK_SSI_ALL>, <&mstp10_clks R8A7793_CLK_SSI_ALL>,
-+				<&mstp10_clks R8A7793_CLK_SSI_ALL>, <&mstp10_clks R8A7793_CLK_SSI_ALL>,
-+				<&mstp10_clks R8A7793_CLK_SSI_ALL>, <&mstp10_clks R8A7793_CLK_SSI_ALL>,
- 				<&p_clk>,
- 				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
- 				<&mstp10_clks R8A7793_CLK_SCU_ALL>, <&mstp10_clks R8A7793_CLK_SCU_ALL>,
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 59beb8402a36..001e6116c47c 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -292,7 +292,7 @@
+ 	x2_clk: x2-clock {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <148500000>;
++		clock-frequency = <74250000>;
+ 	};
+ 
+ 	x13_clk: x13-clock {
 -- 
 2.7.0.rc3.207.g0ac5344
