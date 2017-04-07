@@ -1,25 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Apr 2017 09:29:53 +0200
-Subject: [PATCH v2 1/2] pinctrl: meson: meson8b: fix the NAND DQS pins
-In-Reply-To: <20170401135922.1288-2-martin.blumenstingl@googlemail.com>
+Date: Fri, 7 Apr 2017 09:31:25 +0200
+Subject: [PATCH v2 2/2] pinctrl: meson: meson8b: rename the NAND DQS pin
+ definitions
+In-Reply-To: <20170401135922.1288-3-martin.blumenstingl@googlemail.com>
 References: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
  <20170401135922.1288-1-martin.blumenstingl@googlemail.com>
- <20170401135922.1288-2-martin.blumenstingl@googlemail.com>
-Message-ID: <CACRpkdbc9BqTAo-KbqVdeJ5ZS1K5ikepdvz_-ScjcX_sDvioPA@mail.gmail.com>
+ <20170401135922.1288-3-martin.blumenstingl@googlemail.com>
+Message-ID: <CACRpkdaHiDo5_NjfdEaqKyu+ZXrvrtuO7YLyv-wPvhAc2qfCgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Apr 1, 2017 at 3:59 PM, Martin Blumenstingl
 <martin.blumenstingl@googlemail.com> wrote:
 
-> The nand_groups table uses different names for the NAND DQS pins than
-> the GROUP() definition in meson8b_cbus_groups (nand_dqs_0 vs nand_dqs0).
-> This prevents using the NAND DQS pins in the devicetree.
+> The NAND DQS pins are currently named nand_dqs_0 and nand_dqs_1.
+> However, they both seem to have the same function, just exposed on
+> different pins (unlike the ethernet TX pins for example, where there's
+> eth_txd0..3 - all of these can be active at the same time as they are
+> different data lines).
+> Rename the NAND DQS pins to nand_dqs_15 and nand_dqs_18 to reflect that
+> it's the same functionality just exposed on different pins (BOOT_15 and
+> BOOT_18).
 >
-> Fix this by ensuring that the GROUP() definition and the
-> meson8b_cbus_groups use the same name for these pins.
->
-> Fixes: 0fefcb6876d0 ("pinctrl: Add support for Meson8b")
 > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
 Patch applied with Kevin's ACK.
