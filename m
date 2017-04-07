@@ -1,84 +1,87 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 07 Apr 2017 17:12:36 +0200
-Subject: [PATCH 1/2] clk: meson: mpll: fix division by zero in
- rate_from_params
-In-Reply-To: <1491168866.3480.10.camel@baylibre.com>
-References: <20170401130225.8811-1-martin.blumenstingl@googlemail.com>
- <20170401130225.8811-2-martin.blumenstingl@googlemail.com>
- <1491144577.3480.1.camel@baylibre.com>
- <CAFBinCDNsyEVzmkPQ5T_Kvkp3iARtS3VAG+RLrh_mLgn-7GQAA@mail.gmail.com>
- <1491168866.3480.10.camel@baylibre.com>
-Message-ID: <1491577956.3480.25.camel@baylibre.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 7 Apr 2017 17:15:32 +0200
+Subject: Enumerating an empty bus hangs the entire system
+In-Reply-To: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
+References: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
+Message-ID: <d0bdd0da-e6f6-396f-486a-7b1685d45d69@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-04-02 at 23:34 +0200, Jerome Brunet wrote:
-> On Sun, 2017-04-02 at 20:43 +0200, Martin Blumenstingl wrote:
-> > Hi Jerome,
-> > 
-> > On Sun, Apr 2, 2017 at 4:49 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> > > On Sat, 2017-04-01 at 15:02 +0200, Martin Blumenstingl wrote:
-> > > > According to the public datasheet all register bits in HHI_MPLL_CNTL7,
-> > > > HHI_MPLL_CNTL8 and HHI_MPLL_CNTL9 default to zero. On all GX SoCs these
-> > > > seem to be initialized by the bootloader to some default value.
-> > > > However, on my Meson8 board they are not initialized, leading to a
-> > > > division by zero in rate_from_params as the math is:
-> > > > (parent_rate * SDM_DEN) / ((SDM_DEN * 0) + 0)
-> > > > 
-> > > > Although the rate_from_params function was only introduced recently the
-> > > > original bug has been there for much longer. It was only exposed
-> > > > recently when the MPLL clocks were added to the Meson8b clock driver.
-> > > 
-> > > The Documentation of the S905 also state that N2 minimal value is 4 and
-> > > SDM
-> > > minimal is 1 ... I should have been more careful ! Thanks for catching
-> > > this
-> > > Martin. We definitely need to fix this.
-> > > 
-> > > Patch seems ok but I have one question. Is the rate actually zero when the
-> > > divisor is zero ?
-> > > I'll be away from my boards until Wednesday but I can check this when I
-> > > get
-> > > back
-> > > if you can't.
-> > 
-> > is there a way how I can check this? I have a consumer device so I
-> > can't measure the frequencies at some pin.
+On 15/03/2017 16:25, Mason wrote:
+
+> My driver works reasonably well on revision 1 of the PCIe controller.
+> (For lax enough values of "reasonably well"...)
 > 
-> I'll try through the audio pins on wednesday. Don't worry about it.
-
-So I checked, when N2 is less than the documented minimum (4), the clock get
-into some weird state but is not grounded.
-For example, on gxbb with N2 the rate of the mpll is around 4Mhz.
-
-We have to return an error code here.
-I've reworked the patch ... i'll send it very soon
-
+> So I wanted to try it out on revision 2 of the controller.
 > 
-> > 
-> > > > 
-> > > > Fixes: 1c50da4f27 ("clk: meson: add mpll support")
-> > > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > > > ---
-> > > > ?drivers/clk/meson/clk-mpll.c | 7 ++++++-
-> > > > ?1 file changed, 6 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
-> > > > index 540dabe5adad..551aa2a5b291 100644
-> > > > --- a/drivers/clk/meson/clk-mpll.c
-> > > > +++ b/drivers/clk/meson/clk-mpll.c
-> > > > @@ -76,7 +76,12 @@ static unsigned long rate_from_params(unsigned long
-> > > > parent_rate,
-> > > > ????????????????????????????????????unsigned long sdm,
-> > > > ????????????????????????????????????unsigned long n2)
-> > > > ?{
-> > > > -?????return (parent_rate * SDM_DEN) / ((SDM_DEN * n2) + sdm);
-> > > > +?????unsigned long divisor = (SDM_DEN * n2) + sdm;
-> > > > +
-> > > > +?????if (divisor == 0)
-> > > > +?????????????return 0;
-> > > > +?????else
-> > > > +?????????????return (parent_rate * SDM_DEN) / divisor;
-> > > > ?}
-> > > > 
-> > > > ?static void params_from_rate(unsigned long requested_rate,
+> Turns out the system hangs if I boot with no card inserted in the PCIe
+> slot. (This does not happen on revision 1.) If I log all config space
+> accesses, this is what I see:
+> 
+> ...
+> [    2.966402] tango_config_read: bus=0 devfn=0 where=128 size=2
+> [    2.972284] tango_config_read: bus=0 devfn=0 where=140 size=4
+> [    2.978167] tango_config_read: bus=0 devfn=0 where=146 size=2
+> [    2.984144] pci_bus 0000:01: busn_res: can not insert [bus 01-ff] under [bus 00-3f] (conflicts with (null) [bus 00-3f])
+> [    2.995105] tango_config_write: bus=0 devfn=0 where=24 size=4 val=0xff0100
+> [    3.002134] pci_bus 0000:01: scanning bus
+> [    3.006274] tango_config_read: bus=1 devfn=0 where=0 size=4
+> 
+> Basically, the PCI framework tries to read vendor and device IDs
+> of the non-existent device on bus 1, which hangs the system,
+> because the read never completes :-(
+> 
+> I had the same problem with the legacy driver for 3.4 but I was
+> hoping I would magically avoid it in a recent kernel.
+> 
+> The only work-around I see is: assuming the first access to a
+> bus will be to register 0, check the PHY for an active link
+> before sending an actual read request to register 0.
+> 
+> Is that reasonable?
+> 
+> Is it compliant for the PCIe controller to hang like that,
+> or should it handle some kind of time out?
+> 
+> Liviu suggested: "The PCIe controller probably generates (or propagates)
+> a bus abort that it should actually trap in HW. Check if there is a SW
+> configurable way to recover that."
+> 
+> But I unmasked all system/misc errors, and I don't see any
+> interrupts firing.
+
+I now have a better understanding of the situation, which inevitably
+leads to more questions...
+
+By reading a controller-specific debug register, I sampled the LTSSM
+(Link Training and Status State-Machine) value as fast as possible.
+
+A) if there is no card inserted in the PCIe slot, the State-Machine
+oscillates between "Detect.Quiet" and "Detect.Active" SubStates of
+the "Detect" State.
+
+B) if there is a card inserted in the PCIe slot, then after a few
+milliseconds, the State-Machine changes to "Polling.Active", then
+"Polling.Configuration", then "Configuration" (this step must be
+very short, because I don't see it consistently), then "L0".
+
+
+One issue I noted in a separate message is that, on rev1 of my HW,
+if the PCIe framework tries to read the card's device ID too soon,
+i.e. before link training is complete, then the read returns ~0,
+and the framework immediately gives up.
+
+Looking at pci_bus_read_dev_vendor_id(), I see that there is a
+retry mechanism implemented, but it seems to be a quirk?
+
+Does the framework expect pci_bus_read_dev_vendor_id() to always
+succeed when there is indeed a device on that specific bus?
+
+In that cas, my driver needs to take care of only starting enumeration
+once the link to the PCIe card is really "up" and functional?
+
+I was given the advice to move the link detection code to the
+probe function, and reset the host bridge (to save power) when
+no link is detected after some time. What do you think?
+
+Regards.
