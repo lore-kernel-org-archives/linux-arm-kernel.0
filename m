@@ -1,25 +1,80 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 07 Apr 2017 23:15:01 +0200
-Subject: [PATCH] arm64: dts: rockchip: fix the memory size of PX5
- Evaluation board
-In-Reply-To: <1491553169-21106-1-git-send-email-andy.yan@rock-chips.com>
-References: <1491553169-21106-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <2801207.lkUh043LKq@phil>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 7 Apr 2017 14:20:45 -0700
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <alpine.DEB.2.20.1704072125460.1958@nanos>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+ <alpine.DEB.2.20.1704071426300.1716@nanos>
+ <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
+ <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
+ <alpine.DEB.2.20.1704072125460.1958@nanos>
+Message-ID: <CAGXu5jLXB4J_ZGCKF0WD2SNTGyam8-tP5K1iYChW8wZEtAVM2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 7. April 2017, 16:19:29 CEST schrieb Andy Yan:
-> Commit 122682b2abb6 ("arm64: dts: rockchip: Add PX5 Evaluation board")
-> sets the memory size to 2 GB, but this board only has 1 GB DRAM, so change
-> it to the correct value here.
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+On Fri, Apr 7, 2017 at 1:44 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 7 Apr 2017, Andy Lutomirski wrote:
+>> On Fri, Apr 7, 2017 at 6:30 AM, Mathias Krause <minipli@googlemail.com> wrote:
+>> > On 7 April 2017 at 15:14, Thomas Gleixner <tglx@linutronix.de> wrote:
+>> >> I really do not care whether PaX wants to chase and verify that over and
+>> >> over. I certainly don't want to take the chance to leak CR0.WP ever and I
+>> >> very much care about extra stuff to check in the entry/exit path.
+>> >
+>> > Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
+>> > somewhere sensible should make those "leaks" visible fast -- and their
+>> > exploitation impossible, i.e. fail hard.
+>>
+>> The leaks surely exist and now we'll just add an exploitable BUG.
+>
+> :)
+>
+>> I think we're approaching this all wrong, actually.  The fact that x86
+>> has this CR0.WP thing is arguably a historical accident, and the fact
+>> that PaX uses it doesn't mean that PaX is doing it the best way for
+>> upstream Linux.
+>
+> As I said before. It should be fused to 1.
+>
+>> Why don't we start at the other end and do a generic non-arch-specific
+>> implementation: set up an mm_struct that contains an RW alias of the
+>> relevant parts of rodata and use use_mm to access it.  (That is,
+>> get_fs() to back up the old fs, set_fs(USER_DS),
+>> use_mm(&rare_write_mm), do the write using copy_to_user, undo
+>> everything.)
+>
+> That works too, though I'm not sure that it's more efficient than
+> temporarily creating and undoing a single cpu local alias mapping similar
+> to the kmap_atomic mechanism in the highmem case.
+>
+> Aside of that the alias mapping requires a full PGDIR entry unless you want
+> to get into the mess of keeping yet another identity mapping up to date.
 
-I've added a
-Fixes: 122682b2abb6 ("arm64: dts: rockchip: Add PX5 Evaluation board")
+I probably chose the wrong name for this feature (write rarely).
+That's _usually_ true, but "sensitive_write()" was getting rather
+long. The things that we need to protect with this are certainly stuff
+that doesn't get much writing, but some things are just plain
+sensitive (like page tables) and we should still try to be as fast as
+possible with them.
 
-and applied it for 4.12
+I'll try to include a third example in the next posting of the series
+that makes this more obvious.
 
+I'm all for a general case for the infrastructure (as Andy and Mark
+has mentioned), but I don't want to get into the situation where
+people start refusing to use it because it's "too slow" (for example,
+see refcount_t vs net-dev right now).
 
-Thanks
-Heiko
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
