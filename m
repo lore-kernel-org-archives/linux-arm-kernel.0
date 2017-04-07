@@ -1,102 +1,72 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 7 Apr 2017 12:49:52 -0500
-Subject: [PATCH] acpi: pci: don't ignore function ID of bridge device in
- _PRT
-In-Reply-To: <CAKv+Gu_rivjMaQ740LWO1Nm8SPMGuQ1J1TFeD8QXnRch8Lv6bg@mail.gmail.com>
-References: <20170407132222.28300-1-ard.biesheuvel@linaro.org>
- <20170407170654.GA30103@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_rivjMaQ740LWO1Nm8SPMGuQ1J1TFeD8QXnRch8Lv6bg@mail.gmail.com>
-Message-ID: <20170407174952.GA4351@bhelgaas-glaptop.roam.corp.google.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 7 Apr 2017 12:01:05 -0600
+Subject: [PATCH V3 0/5] iommu/arm-smmu: Add runtime pm/sleep support
+In-Reply-To: <20170404193914.GF18246@codeaurora.org>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <20170331175457.GD4897@arm.com>
+ <CAF6AEGv_1pNvhCc-mVP5S28Yt5kTJmTRfe8tKSJpEmxfOKM7Jg@mail.gmail.com>
+ <20170403172307.GI5706@arm.com>
+ <20170404193914.GF18246@codeaurora.org>
+Message-ID: <20170407180105.GA22050@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 06:12:05PM +0100, Ard Biesheuvel wrote:
-> On 7 April 2017 at 18:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > Hi Ard,
-> >
-> > On Fri, Apr 07, 2017 at 02:22:22PM +0100, Ard Biesheuvel wrote:
-> >> We currently derive legacy interrupt routing by matching _PRT
-> >> entries on the PCI device only, presumably under the assumption
-> >> that PRT entries always have a value of 0xffff in the function
-> >> field, meaning 'match all functions'.
-> >
-> > The spec (ACPI v6.0, sec 6.2.13) contains a note that:
-> >
-> >   The PCI function number in the Address field of the _PRT packages
-> >   must be 0xFFFF, indicating "any" function number or "all functions".
-> >
-> > If we need a patch like this, we need to somehow reconcile it with
-> > that spec text to make sure firmware and OS folks have a common
-> > understanding of how this is supposed to work.
-> >
-> >> This no longer holds for modern PCIe topologies, where the
-> >> legacy interrupts for different slots may be wired to different
-> >> functions on the same bridge device. For instance, on AMD Seattle,
-> >> we may have something like
-> >>
-> >> -[0000:00]-+-00.0  Advanced Micro Devices, Inc. [AMD] Device 1a00
-> >>            +-02.0  Advanced Micro Devices, Inc. [AMD] Device 1a01
-> >>            +-02.2-[01]----00.0  Renesas uPD720202 USB 3.0 Host Controller
-> >>            \-02.3-[02]----00.0  Realtek RTL8169 PCIe Gigabit Ethernet
-> >>
-> >> where the _PRT describes the legacy interrupt routing as
-> >>
-> >>     Name (_PRT, Package ()  // _PRT: PCI Routing Table
-> >>     {
-> >>         // slot 1: dev 2 fn 1
-> >>         Package () { 0x20001, 0x0, 0x0, 0x140 },
-> >>         Package () { 0x20001, 0x1, 0x0, 0x141 },
-> >>         Package () { 0x20001, 0x2, 0x0, 0x142 },
-> >>         Package () { 0x20001, 0x3, 0x0, 0x143 },
-> >>
-> >>         // slot 1: dev 2 fn 2
-> >>         Package () { 0x20002, 0x0, 0x0, 0x144 },
-> >>         Package () { 0x20002, 0x1, 0x0, 0x145 },
-> >>         Package () { 0x20002, 0x2, 0x0, 0x146 },
-> >>         Package () { 0x20002, 0x3, 0x0, 0x147 },
-> >>
-> >>         // slot 1: dev 2 fn 3
-> >>         Package () { 0x20003, 0x0, 0x0, 0x148 },
-> >>         Package () { 0x20003, 0x1, 0x0, 0x149 },
-> >>         Package () { 0x20003, 0x2, 0x0, 0x14a },
-> >>         Package () { 0x20003, 0x3, 0x0, 0x14b }
-> >>     }) // _PRT
-> >
-> > But I think this _PRT description is incorrect and we should change
-> > the _PRT rather than the kernel.  My laptop has a basically identical
-> > topology:
-> >
-> >   -[0000:00]-+-00.0  Intel Corporation Sky Lake Host Bridge/DRAM Registers
-> >              +-1c.0-[02]----00.0  Realtek Semiconductor Co., Ltd.  Device 525a
-> >              +-1c.2-[04]----00.0  Intel Corporation Wireless 8260
-> >
-> > and the ASL looks like this (paraphrased):
-> >
-> >   Device (EXP1) {
-> >     Name (_ADR, 0x001C0000)
-> >     Name (_PRT) {
-> >       Package () { 0xFFFF, 0x00, \_SB.LNKA, 0x00 },
-> >       Package () { 0xFFFF, 0x01, \_SB.LNKB, 0x00 },
-> >       ...
-> >     }
-> >   }
-> >   Device (EXP3) {
-> >     Name (_ADR, 0x001C0002)
-> >     Name (_PRT) {
-> >       Package () { 0xFFFF, 0x00, \_SB.LNKC, 0x00 },
-> >       Package () { 0xFFFF, 0x01, \_SB.LNKD, 0x00 },
-> >       ...
-> >     }
-> >   }
-> >
+On Tue, Apr 04, 2017 at 12:39:14PM -0700, Stephen Boyd wrote:
+> On 04/03, Will Deacon wrote:
+> > On Fri, Mar 31, 2017 at 10:58:16PM -0400, Rob Clark wrote:
+> > > On Fri, Mar 31, 2017 at 1:54 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > On Thu, Mar 09, 2017 at 09:05:43PM +0530, Sricharan R wrote:
+> > > >> This series provides the support for turning on the arm-smmu's
+> > > >> clocks/power domains using runtime pm. This is done using the
+> > > >> recently introduced device links patches, which lets the symmu's
+> > > >> runtime to follow the master's runtime pm, so the smmu remains
+> > > >> powered only when the masters use it.
+> > > >
+> > > > Do you have any numbers for the power savings you achieve with this?
+> > > > How often do we actually manage to stop the SMMU clocks on an SoC with
+> > > > a handful of masters?
+> > > >
+> > > > In other words, is this too coarse-grained to be useful, or is it common
+> > > > that all the devices upstream of the SMMU are suspended?
+> > > 
+> > > well, if you think about a phone/tablet with a command mode panel,
+> > > pretty much all devices will be suspended most of the time ;-)
+> > 
+> > Well, that's really what I was asking about. I assumed that periodic
+> > modem/radio transactions would keep the SMMU clocked, so would like to get a
+> > rough idea of the power savings achieved with this coarse-grained approach.
 > 
-> Thanks for the explanation. But how is this wired up into the PNP0A08
-> device then? IOW, how does the ACPI code in Linux discover the
-> relation between these devices and my PCI root device?
+> Sometimes we distribute SMMUs to each IP block in the system and
+> let each one of those live in their own clock + power domain. In
+> these cases, the SMMU can be powered down along with the only IP
+> block that uses it. Furthermore, sometimes we put the IP block
+> and the SMMU inside the same power domain to really tie the two
+> together, so we definitely have cases where all devices (device?)
+> upstream of the SMMU are suspended. And in the case of
+> multimedia, it could be very often that something like the camera
+> app isn't open and thus the SMMU dedicated for the camera can be
+> powered down.
+> 
+> Other times we have two SMMUs in the system where one is
+> dedicated to GPU and the other is "everything else". Even in
+> these cases, we can suspend the GPU one when the GPU is inactive
+> because it's the only consumer. The other SMMU might not be as
+> fine grained, but I think we still power it down quite often
+> because the consumers are mostly multimedia devices that aren't
+> active when the display is off.
 
-  Device (PCI0) {
-    Name (_ADR, 0x00)
-    Name (_HID, "PNP0A08")
-    Device (EXP1) { ... }
-    Device (EXP3) { ... }
-  }
+And just to confuse things even further: with per-instance pagetables we have an
+interest in forcing the SMMU clocks *on* because we don't know when the GPU
+might try to hit the registers to switch a pagetable and if somebody in the
+pipeline is actively trying to do power management at the same time hilarity
+will ensue.
+
+The alternative to pm_runtime is the downstream driver that probes the SMMU
+clocks from DT and frobs them itself. I think we can agree that is far less
+reasonable.
+
+Jordan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
