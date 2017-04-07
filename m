@@ -1,49 +1,79 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 07 Apr 2017 10:21:27 +0100
-Subject: [RFC kvm-unit-tests PATCH 4/8] Makefiles: use explicit path for
- including sub-Makefiles
-In-Reply-To: <7f6fe583-a765-b8cd-d1f6-5068ee5d52e0@redhat.com>
-References: <20170406190727.5624-1-alex.bennee@linaro.org>
- <20170406190727.5624-5-alex.bennee@linaro.org>
- <7f6fe583-a765-b8cd-d1f6-5068ee5d52e0@redhat.com>
-Message-ID: <87mvbsa7zc.fsf@linaro.org>
+From: lersek@redhat.com (Laszlo Ersek)
+Date: Fri, 7 Apr 2017 11:21:41 +0200
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <55546a4b-c33b-37b9-dafe-15ce75bc1b62@huawei.com>
+References: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+ <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
+ <20170321193933.GB31111@cbox> <58DA3F68.6090901@arm.com>
+ <20170328112328.GA31156@cbox> <20170328115413.GJ23682@e104320-lin>
+ <b1c6e747-2fa7-b7a1-60d5-4a9c480b9dc9@huawei.com> <58DA67BA.8070404@arm.com>
+ <5b7352f4-4965-3ed5-3879-db871797be47@huawei.com>
+ <20170329103658.GQ23682@e104320-lin>
+ <2a427164-9b37-6711-3a56-906634ba7f12@redhat.com>
+ <7c5c8ab7-8fcc-1c98-0bc1-cccb66c4c84d@huawei.com>
+ <6ac1597a-2ed5-36b2-848d-5fd048b16d66@redhat.com>
+ <55546a4b-c33b-37b9-dafe-15ce75bc1b62@huawei.com>
+Message-ID: <09c64b28-5eb5-4efd-6cb8-035b69313a99@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/07/17 04:52, gengdongjiu wrote:
+> 
+> On 2017/4/7 2:55, Laszlo Ersek wrote:
 
-Thomas Huth <thuth@redhat.com> writes:
-
-> On 06.04.2017 21:07, Alex Benn?e wrote:
->> I would of thought VPATH took care of this but apparently not.
+>> I'm unsure if, by "not fixed", you are saying
 >>
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  Makefile               | 8 ++++----
->>  arm/Makefile           | 2 +-
->>  arm/Makefile.arm       | 2 +-
->>  arm/Makefile.arm64     | 2 +-
->>  powerpc/Makefile       | 2 +-
->>  powerpc/Makefile.ppc64 | 2 +-
->>  x86/Makefile           | 2 +-
->>  x86/Makefile.i386      | 2 +-
->>  x86/Makefile.x86_64    | 2 +-
->>  9 files changed, 12 insertions(+), 12 deletions(-)
+>>   the number of CPER entries that fits in Error Status Data Block N is
+>>   not *uniform* across 0 <= N <= 10 [1]
 >>
->> diff --git a/Makefile b/Makefile
->> index 80bc57e..781186e 100644
->> --- a/Makefile
->> +++ b/Makefile
->> @@ -32,14 +32,14 @@ cflatobjs := \
->>  	lib/stack.o
+>> or
 >>
->>  # libfdt paths
->> -LIBFDT_objdir = lib/libfdt
->> -LIBFDT_srcdir = lib/libfdt
->> +LIBFDT_objdir = $(SRCDIR)/lib/libfdt
->
-> I think this is wrong - objdir should not get a SRCDIR prefix.
+>>   the number of CPER entries that fits in Error Status Data Block N is
+>>   not *known* in advance, for all of 0 <= N <= 10 [2]
+>>
+>> Which one is your point?
+>>
+>> If [1], that's no problem; you can simply sum the individual error
+>> status data block sizes in advance, and allocate "etc/hardware_errors"
+>> accordingly, using the total size.
+>>
+>> (Allocating one shared fw_cfg blob for all status data blocks is more
+>> memory efficient, as each ALLOCATE command will allocate whole pages
+>> (rounded up from the actual blob size).)
+>>
+>> If your point is [2], then splitting the error status data blocks to
+>> separate fw_cfg blobs makes no difference: regardless of whether we try
+>> to place all the error status data blocks in a single fw_cfg blob, or in
+>> separate fw_cfg blobs, the individual data block cannot be resized at OS
+>> runtime, so there's no way to make it work.
+>>
+> My Point is [2]. The HEST(Hardware Error Source Table) table format is here:
+> https://wiki.linaro.org/LEG/Engineering/Kernel/RAS/APEITables#Hardware_Error_Source_Table_.28HEST.29
+> 
+> Now I understand your thought.
 
-Good catch - which explains why I was seeing libfdt.a in the source tree.
+But if you mean [2], then I am confused, with regard to firmware on
+physical hardware. Namely, even on physical machines, the firmware has
+to estimate, in advance, the area size that will be needed for CPERs,
+doesn't it? And once the firmware allocates that memory area, it cannot
+be resized at OS runtime. If there are more CPERs at runtime (due to
+hardware errors) than the firmware allocated room for, they must surely
+wrap around in the preallocated buffer (like in a ring buffer). Isn't
+that correct?
 
---
-Alex Benn?e
+On the diagrams that you linked above (great looking diagrams BTW!), I
+see CPER in two places (it is helpfully shaded red):
+
+- to the right of BERT; the CPER is part of a box that is captioned
+"firmware reserved memory"
+
+- to the right of HEST; again the CPER is part of a box that is
+captioned "firmware reserved memory"
+
+So, IMO, when QEMU has to guesstimate the room for CPERs in advance,
+that doesn't differ from the physical firmware case. In QEMU maybe you
+can let the user specify the area size on the command line, with a
+machine type property or similar.
+
+Thanks
+Laszlo
