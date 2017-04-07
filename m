@@ -1,77 +1,58 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Fri, 7 Apr 2017 09:14:29 -0700
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
-Message-ID: <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Fri, 7 Apr 2017 18:15:24 +0200
+Subject: [PATCH v2] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
+In-Reply-To: <e941f7f4-1904-a0c5-3ef0-973477087b2b@ti.com>
+References: <20170405171750.16821-1-abailon@baylibre.com>
+ <e941f7f4-1904-a0c5-3ef0-973477087b2b@ti.com>
+Message-ID: <dade7b1b-af0f-0f3e-26fc-4e845c451330@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 6:30 AM, Mathias Krause <minipli@googlemail.com> wrote:
-> On 7 April 2017 at 15:14, Thomas Gleixner <tglx@linutronix.de> wrote:
->> On Fri, 7 Apr 2017, Mathias Krause wrote:
->>> On 7 April 2017 at 11:46, Thomas Gleixner <tglx@linutronix.de> wrote:
->>> > Whether protected by preempt_disable or local_irq_disable, to make that
->>> > work it needs CR0 handling in the exception entry/exit at the lowest
->>> > level. And that's just a nightmare maintainence wise as it's prone to be
->>> > broken over time.
->>>
->>> It seems to be working fine for more than a decade now in PaX. So it
->>> can't be such a big maintenance nightmare ;)
+
+
+On 04/07/2017 04:36 PM, Sekhar Nori wrote:
+> On Wednesday 05 April 2017 10:47 PM, Alexandre Bailon wrote:
+>> The CPPI 4.1 DMA is sharing its clock with the USB OTG,
+>> and most of the time, the clock will be enabled by USB.
+>> But during the init of the DMA, USB is not enabled (waiting for DMA),
+>> and then we must enable the clock before doing anything.
+>> Add the clock for the CPPI 4.1 DMA engine.
 >>
->> I really do not care whether PaX wants to chase and verify that over and
->> over. I certainly don't want to take the chance to leak CR0.WP ever and I
->> very much care about extra stuff to check in the entry/exit path.
->
-> Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
-> somewhere sensible should make those "leaks" visible fast -- and their
-> exploitation impossible, i.e. fail hard.
-
-The leaks surely exist and now we'll just add an exploitable BUG.
-
->>> > It's valid (at least on x86) to have a shadow map with the same page
->>> > attributes but write enabled. That does not require any fixups of CR0 and
->>> > just works.
->>>
->>> "Just works", sure -- but it's not as tightly focused as the PaX
->>> solution which is CPU local, while your proposed solution is globally
->>> visible.
+>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>> ---
+>>   arch/arm/mach-davinci/da830.c | 6 ++++++
+>>   arch/arm/mach-davinci/da850.c | 6 ++++++
+>>   2 files changed, 12 insertions(+)
 >>
->> Making the world and some more writeable hardly qualifies as tightly
->> focussed. Making the mapping concept CPU local is not rocket science
->> either. The question is whethers it's worth the trouble.
+>> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+>> index 073c458..bd88470 100644
+>> --- a/arch/arm/mach-davinci/da830.c
+>> +++ b/arch/arm/mach-davinci/da830.c
+>> @@ -304,6 +304,11 @@ static struct clk usb20_clk = {
+>>   	.gpsc		= 1,
+>>   };
+>>   
+>> +static struct clk cppi41_clk = {
+>> +	.name		= "cppi41",
+>> +	.parent		= &usb20_clk,
+>> +};
+>> +
+>>   static struct clk aemif_clk = {
+>>   	.name		= "aemif",
+>>   	.parent		= &pll0_sysclk3,
+>> @@ -413,6 +418,7 @@ static struct clk_lookup da830_clks[] = {
+>>   	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
+>>   	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
+>>   	CLK("musb-da8xx",	"usb20",	&usb20_clk),
+>> +	CLK("cppi41-dmaengine",	NULL,		&cppi41_clk),
+> I dont see this device name being used in current linux-next. Is this
+> name accepted ?
+There is here a typo. The name should be cppi41-dma-engine.
+I will fix it.
 >
-> No, the question is if the value of the concept is well understood and
-> if people can see what could be done with such a strong primitive.
-> Apparently not...
-
-I think we're approaching this all wrong, actually.  The fact that x86
-has this CR0.WP thing is arguably a historical accident, and the fact
-that PaX uses it doesn't mean that PaX is doing it the best way for
-upstream Linux.
-
-Why don't we start at the other end and do a generic non-arch-specific
-implementation: set up an mm_struct that contains an RW alias of the
-relevant parts of rodata and use use_mm to access it.  (That is,
-get_fs() to back up the old fs, set_fs(USER_DS),
-use_mm(&rare_write_mm), do the write using copy_to_user, undo
-everything.)
-
-Then someone who cares about performance can benchmark the CR0.WP
-approach against it and try to argue that it's a good idea.  This
-benchmark should wait until I'm done with my PCID work, because PCID
-is going to make use_mm() a whole heck of a lot faster.
-
---Andy
+> The patch otherwise looks okay.
+>
+> Thanks,
+> Sekhar
+Thanks,
+Alexandre
