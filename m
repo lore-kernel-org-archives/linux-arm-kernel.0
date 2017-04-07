@@ -1,33 +1,43 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri,  7 Apr 2017 17:34:31 +0200
-Subject: [PATCH v2 0/2] clk: meson: MPLL fixes for Meson8b
-Message-ID: <20170407153433.18640-1-jbrunet@baylibre.com>
+Date: Fri,  7 Apr 2017 17:34:33 +0200
+Subject: [PATCH v2 2/2] clk: meson: mpll: use 64bit math in rate_from_params
+In-Reply-To: <20170407153433.18640-1-jbrunet@baylibre.com>
+References: <20170407153433.18640-1-jbrunet@baylibre.com>
+Message-ID: <20170407153433.18640-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MPLL clocks have been recently added to the Meson8b clock driver: [0]
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-On meson8b boards this unfortunately causes a division by zero error which
-is fixed by patch #1 in this series.
+On Meson8b the MPLL parent clock (fixed_pll) has a rate of 2550MHz.
+Multiplying this with SDM_DEN results in a value greater than 32bits.
+This is not a problem on the 64bit Meson GX SoCs, but it may result in
+undefined behavior on the older 32bit Meson8b SoC.
 
-While investigating this I found that there also seems to be a 32bit
-overflow in the calculation in rate_from_params(), which is fixed by
-patch #2 in this series.
+While rate_from_params was only introduced recently to make the math
+reusable from _round_rate and _recalc_rate the original bug exists much
+longer.
 
-Changes since v1: [1]
- - Return an error code when the mpll parameters are out of the specified
-   range.
- - As agreed with martin, use DIV_ROUND_UP_ULL instead of mul_u64_u32_div.
+Fixes: 1c50da4f27 ("clk: meson: add mpll support")
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+[as discussed on the ml, use DIV_ROUND_UP_ULL]
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/clk/meson/clk-mpll.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002757.html
-[1] https://lkml.kernel.org/r/20170401130225.8811-1-martin.blumenstingl at googlemail.com
-
-Martin Blumenstingl (2):
-  clk: meson: mpll: fix division by zero in rate_from_params
-  clk: meson: mpll: use 64bit math in rate_from_params
-
- drivers/clk/meson/clk-mpll.c | 26 +++++++++++++++-----------
- 1 file changed, 15 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
+index d9462b505dcc..39eab69fe51a 100644
+--- a/drivers/clk/meson/clk-mpll.c
++++ b/drivers/clk/meson/clk-mpll.c
+@@ -79,7 +79,7 @@ static long rate_from_params(unsigned long parent_rate,
+ 	if (n2 < N2_MIN)
+ 		return -EINVAL;
+ 
+-	return (parent_rate * SDM_DEN) / divisor;
++	return DIV_ROUND_UP_ULL((u64)parent_rate * SDM_DEN, divisor);
+ }
+ 
+ static void params_from_rate(unsigned long requested_rate,
 -- 
 2.9.3
