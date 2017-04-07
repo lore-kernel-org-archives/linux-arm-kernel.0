@@ -1,110 +1,138 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 7 Apr 2017 17:39:18 +0200
-Subject: [PATCH v2 1/2] clk: meson: mpll: fix division by zero in
- rate_from_params
-In-Reply-To: <20170407153433.18640-2-jbrunet@baylibre.com>
-References: <20170407153433.18640-1-jbrunet@baylibre.com>
- <20170407153433.18640-2-jbrunet@baylibre.com>
-Message-ID: <5218d51a-3381-31e8-7fd5-07665163ddaa@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 7 Apr 2017 16:41:29 +0100
+Subject: [RFC 8/9] arm64/kvm: context-switch PAC registers
+In-Reply-To: <1491232765-32501-9-git-send-email-mark.rutland@arm.com>
+References: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
+ <1491232765-32501-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <973af0d9-f7bc-24ee-567d-23e0e487b970@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2017 05:34 PM, Jerome Brunet wrote:
-> From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> 
-> According to the public datasheet all register bits in HHI_MPLL_CNTL7,
-> HHI_MPLL_CNTL8 and HHI_MPLL_CNTL9 default to zero. On all GX SoCs these
-> seem to be initialized by the bootloader to some default value.
-> However, on my Meson8 board they are not initialized, leading to a
-> division by zero in rate_from_params as the math is:
-> (parent_rate * SDM_DEN) / ((SDM_DEN * 0) + 0)
-> 
-> According to the datasheet, the minimum n2 value is 4. The rate provided
-> by the clock when n2 is less than this minimum is unpredictable. In such
-> case, we report an error.
-> 
-> Although the rate_from_params function was only introduced recently the
-> original bug has been there for much longer. It was only exposed
-> recently when the MPLL clocks were added to the Meson8b clock driver.
-> 
-> Fixes: 1c50da4f27 ("clk: meson: add mpll support")
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  drivers/clk/meson/clk-mpll.c | 26 +++++++++++++++-----------
->  1 file changed, 15 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
-> index 540dabe5adad..d9462b505dcc 100644
-> --- a/drivers/clk/meson/clk-mpll.c
-> +++ b/drivers/clk/meson/clk-mpll.c
-> @@ -65,18 +65,21 @@
->  #include "clkc.h"
->  
->  #define SDM_DEN 16384
-> -#define SDM_MIN 1
-> -#define SDM_MAX 16383
->  #define N2_MIN	4
->  #define N2_MAX	511
->  
->  #define to_meson_clk_mpll(_hw) container_of(_hw, struct meson_clk_mpll, hw)
->  
-> -static unsigned long rate_from_params(unsigned long parent_rate,
-> +static long rate_from_params(unsigned long parent_rate,
->  				      unsigned long sdm,
->  				      unsigned long n2)
->  {
-> -	return (parent_rate * SDM_DEN) / ((SDM_DEN * n2) + sdm);
-> +	unsigned long divisor = (SDM_DEN * n2) + sdm;
-> +
-> +	if (n2 < N2_MIN)
-> +		return -EINVAL;
-> +
-> +	return (parent_rate * SDM_DEN) / divisor;
->  }
->  
->  static void params_from_rate(unsigned long requested_rate,
-> @@ -89,17 +92,13 @@ static void params_from_rate(unsigned long requested_rate,
->  
->  	if (div < N2_MIN) {
->  		*n2 = N2_MIN;
-> -		*sdm = SDM_MIN;
-> +		*sdm = 0;
->  	} else if (div > N2_MAX) {
->  		*n2 = N2_MAX;
-> -		*sdm = SDM_MAX;
-> +		*sdm = SDM_DEN - 1;
->  	} else {
->  		*n2 = div;
->  		*sdm = DIV_ROUND_UP(rem * SDM_DEN, requested_rate);
-> -		if (*sdm < SDM_MIN)
-> -			*sdm = SDM_MIN;
-> -		else if (*sdm > SDM_MAX)
-> -			*sdm = SDM_MAX;
->  	}
->  }
->  
-> @@ -109,6 +108,7 @@ static unsigned long mpll_recalc_rate(struct clk_hw *hw,
->  	struct meson_clk_mpll *mpll = to_meson_clk_mpll(hw);
->  	struct parm *p;
->  	unsigned long reg, sdm, n2;
-> +	long rate;
->  
->  	p = &mpll->sdm;
->  	reg = readl(mpll->base + p->reg_off);
-> @@ -118,7 +118,11 @@ static unsigned long mpll_recalc_rate(struct clk_hw *hw,
->  	reg = readl(mpll->base + p->reg_off);
->  	n2 = PARM_GET(p->width, p->shift, reg);
->  
-> -	return rate_from_params(parent_rate, sdm, n2);
-> +	rate = rate_from_params(parent_rate, sdm, n2);
-> +	if (rate < 0)
-> +		return 0;
-> +
-> +	return rate;
->  }
->  
->  static long mpll_round_rate(struct clk_hw *hw,
-> 
+Hi Mark,
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+On 03/04/17 16:19, Mark Rutland wrote:
+> If we have pointer authentication support, a guest may wish to use it.
+> This patch adds the infrastructure to allow it to do so.
+> 
+> This is sufficient for basic testing, but not for real-world usage. A
+> guest will still see pointer authentication support advertised in the ID
+> registers, and we will need to trap accesses to these to provide
+> santized values.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> ---
+>  arch/arm64/include/asm/kvm_emulate.h | 15 +++++++++++++
+>  arch/arm64/include/asm/kvm_host.h    | 12 ++++++++++
+>  arch/arm64/kvm/hyp/sysreg-sr.c       | 43 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 70 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index f5ea0ba..0c3cb43 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -28,6 +28,8 @@
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_mmio.h>
+>  #include <asm/ptrace.h>
+> +#include <asm/cpucaps.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/cputype.h>
+>  #include <asm/virt.h>
+>  
+> @@ -49,6 +51,19 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+>  		vcpu->arch.hcr_el2 |= HCR_E2H;
+>  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
+>  		vcpu->arch.hcr_el2 &= ~HCR_RW;
+> +
+> +	/*
+> +	 * Address auth and generic auth share the same enable bits, so we have
+> +	 * to ensure both are uniform before we can enable support in a guest.
+> +	 * Until we have the infrastructure to detect uniform absence of a
+> +	 * feature, only permit the case when both are supported.
+> +	 *
+> +	 * Note that a guest will still see the feature in ID_AA64_ISAR1 until
+> +	 * we introduce code to emulate the ID registers.
+> +	 */
+> +	if (cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH) &&
+> +	    cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH))
+> +		vcpu->arch.hcr_el2 |= (HCR_API | HCR_APK);
+
+Instead of unconditionally allowing the guest to access this feature...
+
+>  }
+>  
+>  static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e7705e7..b25f710 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -133,6 +133,18 @@ enum vcpu_sysreg {
+>  	PMSWINC_EL0,	/* Software Increment Register */
+>  	PMUSERENR_EL0,	/* User Enable Register */
+>  
+> +	/* Pointer Authentication Registers */
+> +	APIAKEYLO_EL1,
+> +	APIAKEYHI_EL1,
+> +	APIBKEYLO_EL1,
+> +	APIBKEYHI_EL1,
+> +	APDAKEYLO_EL1,
+> +	APDAKEYHI_EL1,
+> +	APDBKEYLO_EL1,
+> +	APDBKEYHI_EL1,
+> +	APGAKEYLO_EL1,
+> +	APGAKEYHI_EL1,
+> +
+>  	/* 32bit specific registers. Keep them at the end of the range */
+>  	DACR32_EL2,	/* Domain Access Control Register */
+>  	IFSR32_EL2,	/* Instruction Fault Status Register */
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 9341376..3440b42 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -18,6 +18,8 @@
+>  #include <linux/compiler.h>
+>  #include <linux/kvm_host.h>
+>  
+> +#include <asm/cpucaps.h>
+> +#include <asm/cpufeature.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_hyp.h>
+>  
+> @@ -31,6 +33,24 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+>   * pstate, and guest must save everything.
+>   */
+>  
+> +#define __save_ap_key(regs, key) \
+> +	regs[key ## KEYLO_EL1] = read_sysreg_s(SYS_ ## key ## KEYLO_EL1); \
+> +	regs[key ## KEYHI_EL1] = read_sysreg_s(SYS_ ## key ## KEYHI_EL1)
+> +
+> +static void __hyp_text __sysreg_save_ap_keys(struct kvm_cpu_context *ctxt)
+> +{
+> +	if (cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH)) {
+> +		__save_ap_key(ctxt->sys_regs, APIA);
+> +		__save_ap_key(ctxt->sys_regs, APIB);
+> +		__save_ap_key(ctxt->sys_regs, APDA);
+> +		__save_ap_key(ctxt->sys_regs, APDB);
+> +	}
+> +
+> +	if (cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH)) {
+> +		__save_ap_key(ctxt->sys_regs, APGA);
+> +	}
+> +}
+> +
+
+...which immediately translates in quite a bit of sysreg churn on both
+host and guest (specially given that these are not banked by exception
+level), could we make it a bit more lazy instead?
+
+Even an "enable on first use" would be good, given that it is likely
+that we'll have non PAC-enabled VMs for quite a while.
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
