@@ -1,76 +1,34 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 6 Apr 2017 16:51:08 -0700
-Subject: [PATCH v6 19/39] media: Add i.MX media core driver
-In-Reply-To: <1491471814.2392.11.camel@pengutronix.de>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-20-git-send-email-steve_longerbeam@mentor.com>
- <1491471814.2392.11.camel@pengutronix.de>
-Message-ID: <fafcad5e-1717-cd85-6763-b52e242ea2f1@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 6 Apr 2017 20:34:13 -0400
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+ <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
+ <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
+ <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
+ <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
+Message-ID: <da4ddb16-3d60-93e5-1b5e-ac7a759d3f23@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rajat,
 
+On 4/6/2017 1:10 PM, Rajat Jain wrote:
+> Thanks, The above commit specifically adds a comment to
+> pcie_aspm_check_latency(), because I wanted to leave a note
+> highlighting that potentially, we could add a more stringent check for
+> exit latency for L1SS. But that has nothing to do with how we are
+> configuring or enabling / disabling the L1 substates.
 
-On 04/06/2017 02:43 AM, Philipp Zabel wrote:
-> On Mon, 2017-03-27 at 17:40 -0700, Steve Longerbeam wrote:
->> Add the core media driver for i.MX SOC.
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> [...]
->> diff --git a/drivers/staging/media/imx/imx-media-of.c b/drivers/staging/media/imx/imx-media-of.c
->> new file mode 100644
->> index 0000000..b383be4
->> --- /dev/null
->> +++ b/drivers/staging/media/imx/imx-media-of.c
->> @@ -0,0 +1,267 @@
-> [...]
->> +/*
->> + * find the remote device node and remote port id (remote pad #)
->> + * given local endpoint node
->> + */
->> +static void of_get_remote_pad(struct device_node *epnode,
->> +			      struct device_node **remote_node,
->> +			      int *remote_pad)
->> +{
->> +	struct device_node *rp, *rpp;
->> +	struct device_node *remote;
->> +
->> +	rp = of_graph_get_remote_port(epnode);
->> +	rpp = of_graph_get_remote_port_parent(epnode);
->> +
->> +	if (of_device_is_compatible(rpp, "fsl,imx6q-ipu")) {
->> +		/* the remote is one of the CSI ports */
->> +		remote = rp;
->> +		*remote_pad = 0;
->> +		of_node_put(rpp);
->> +	} else {
->> +		remote = rpp;
->> +		of_property_read_u32(rp, "reg", remote_pad);
->
-> If this fails because there is no reg property, *remote_pad will keep
-> the previous value. It should be set to 0 in this case.
+I saw your name in two L1SS reviews. I wanted to pull you into the discussion
+as an L1SS expert. I didn't want to imply that there was something wrong
+with the review. Apologies for that.
 
-Ok, I will apply this change.
+Sinan
 
-Steve
-
->
-> ----------8<----------
-> --- a/drivers/staging/media/imx/imx-media-of.c
-> +++ b/drivers/staging/media/imx/imx-media-of.c
-> @@ -85,7 +85,9 @@ static void of_get_remote_pad(struct device_node *epnode,
->                 of_node_put(rpp);
->         } else {
->                 remote = rpp;
-> -               of_property_read_u32(rp, "reg", remote_pad);
-> +               /* FIXME port number and pad index are not the same */
-> +               if (of_property_read_u32(rp, "reg", remote_pad))
-> +                       *remote_pad = 0;
->                 of_node_put(rp);
->         }
->
-> ---------->8----------
->
-> regards
-> Philipp
->
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
