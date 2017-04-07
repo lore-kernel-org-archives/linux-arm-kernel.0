@@ -1,68 +1,89 @@
-From: minipli@googlemail.com (Mathias Krause)
-Date: Fri, 7 Apr 2017 15:30:34 +0200
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <alpine.DEB.2.20.1704071426300.1716@nanos>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
-Message-ID: <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 7 Apr 2017 15:31:52 +0200
+Subject: [RFC kvm-unit-tests PATCH 7/8] Makefiles: fix up the x86 build
+ include and link paths
+In-Reply-To: <20170406190727.5624-8-alex.bennee@linaro.org>
+References: <20170406190727.5624-1-alex.bennee@linaro.org>
+ <20170406190727.5624-8-alex.bennee@linaro.org>
+Message-ID: <20170407133152.j4lrz43cj4vkl7ox@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 April 2017 at 15:14, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 7 Apr 2017, Mathias Krause wrote:
->> On 7 April 2017 at 11:46, Thomas Gleixner <tglx@linutronix.de> wrote:
->> > Whether protected by preempt_disable or local_irq_disable, to make that
->> > work it needs CR0 handling in the exception entry/exit at the lowest
->> > level. And that's just a nightmare maintainence wise as it's prone to be
->> > broken over time.
->>
->> It seems to be working fine for more than a decade now in PaX. So it
->> can't be such a big maintenance nightmare ;)
+On Thu, Apr 06, 2017 at 08:07:26PM +0100, Alex Benn?e wrote:
+> We still need to tell the compiler the correct search path for finding
+> headers and the like. This is slightly complicated by the "dynamic"
+> asm search path which is in our build tree but (may be) symlinked to
+> the right architectures headers.
+> 
+> Also we explicitly include SRCDIR for the linking scripts as VPATH
+> doesn't seem to find them well enough.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  Makefile            |  2 +-
+>  x86/Makefile.common | 10 +++++-----
+>  2 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Makefile b/Makefile
+> index c9fea88..22da887 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -78,7 +78,7 @@ $(libcflat): $(cflatobjs)
+>  	$(AR) rcs $@ $^
+>  
+>  include $(LIBFDT_srcdir)/Makefile.libfdt
+> -$(LIBFDT_archive): CFLAGS += -ffreestanding -I lib -I lib/libfdt -Wno-sign-compare
+> +$(LIBFDT_archive): CFLAGS += -ffreestanding -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -Wno-sign-compare
+>  $(LIBFDT_archive): $(addprefix $(LIBFDT_objdir)/,$(LIBFDT_OBJS))
+>  	$(AR) rcs $@ $^
+>  
+> diff --git a/x86/Makefile.common b/x86/Makefile.common
+> index ef6e543..032ed19 100644
+> --- a/x86/Makefile.common
+> +++ b/x86/Makefile.common
+> @@ -17,7 +17,7 @@ cflatobjs += lib/x86/acpi.o
+>  cflatobjs += lib/x86/stack.o
+>  
+>  $(libcflat): LDFLAGS += -nostdlib
+> -$(libcflat): CFLAGS += -ffreestanding -I lib
+> +$(libcflat): CFLAGS += -ffreestanding -I $(SRCDIR)/lib -I lib
+>  
+>  CFLAGS += -m$(bits)
+>  CFLAGS += -O1
+> @@ -31,8 +31,8 @@ libgcc := $(shell $(CC) -m$(bits) --print-libgcc-file-name)
+>  .PRECIOUS: %.elf %.o
+>  
+>  FLATLIBS = lib/libcflat.a $(libgcc)
+> -%.elf: %.o $(FLATLIBS) x86/flat.lds $(cstart.o)
+> -	$(CC) $(CFLAGS) -nostdlib -o $@ -Wl,-T,x86/flat.lds \
+> +%.elf: %.o $(FLATLIBS) $(SRCDIR)/x86/flat.lds $(cstart.o)
+> +	$(CC) $(CFLAGS) -nostdlib -o $@ -Wl,-T,$(SRCDIR)/x86/flat.lds \
+>  		$(filter %.o, $^) $(FLATLIBS)
+>  
+>  %.flat: %.elf
+> @@ -60,10 +60,10 @@ scripts-common += $(TEST_DIR)/unittests.cfg
+>  test_cases: $(tests-common) $(tests)
+>  
+>  
+> -$(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I lib -I lib/x86
+> +$(TEST_DIR)/%.o: CFLAGS += -std=gnu99 -ffreestanding -I $(SRCDIR)/lib -I $(SRCDIR)/lib/x86 -I lib
+>  
+>  $(TEST_DIR)/realmode.elf: $(TEST_DIR)/realmode.o
+> -	$(CC) -m32 -nostdlib -o $@ -Wl,-T,$(TEST_DIR)/realmode.lds $^
+> +	$(CC) -m32 -nostdlib -o $@ -Wl,-T,$(SRCDIR)/$(TEST_DIR)/realmode.lds $^
+>  
+>  $(TEST_DIR)/realmode.o: bits = 32
+>  
+> -- 
+> 2.11.0
 >
-> I really do not care whether PaX wants to chase and verify that over and
-> over. I certainly don't want to take the chance to leak CR0.WP ever and I
-> very much care about extra stuff to check in the entry/exit path.
 
-Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
-somewhere sensible should make those "leaks" visible fast -- and their
-exploitation impossible, i.e. fail hard.
+I'm curious if we can drop this patch by telling VPATH about all the
+directories: VPATH += $(SRCDIR)/$(TEST_DIR) $(SRCDIR)/lib ...
 
->> The "proper solution" seems to be much slower compared to just
->> toggling CR0.WP (which is costly in itself, already) because of the
->> TLB invalidation / synchronisation involved.
->
-> Why the heck should we care about rare writes being performant?
+If so, then I think the earlier patch that sets VPATH to SRCDIR should
+set it to the list of all common dirs, and the arch makefiles will += in
+whatever else they need.
 
-As soon as they stop being rare and people start extending the r/o
-protection to critical data structures accessed often. Then
-performance matters.
-
->> > It's valid (at least on x86) to have a shadow map with the same page
->> > attributes but write enabled. That does not require any fixups of CR0 and
->> > just works.
->>
->> "Just works", sure -- but it's not as tightly focused as the PaX
->> solution which is CPU local, while your proposed solution is globally
->> visible.
->
-> Making the world and some more writeable hardly qualifies as tightly
-> focussed. Making the mapping concept CPU local is not rocket science
-> either. The question is whethers it's worth the trouble.
-
-No, the question is if the value of the concept is well understood and
-if people can see what could be done with such a strong primitive.
-Apparently not...
-
-
-Cheers,
-Mathias
+Thanks,
+drew
