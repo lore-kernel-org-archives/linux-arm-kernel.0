@@ -1,48 +1,52 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 07 Apr 2017 17:11:52 +0100
-Subject: [PATCH 4/4] ef/libstub: arm/arm64: randomize the base of the
- UEFI rt services region
-In-Reply-To: <CAKv+Gu9CpCWHT=3KboPTtuZVDundtGheKawS=iV_P756RFbaDg@mail.gmail.com>
-References: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
- <20170324132410.16628-5-ard.biesheuvel@linaro.org> <58E7B478.6010305@arm.com>
- <CAKv+Gu9CpCWHT=3KboPTtuZVDundtGheKawS=iV_P756RFbaDg@mail.gmail.com>
-Message-ID: <58E7BA48.70903@arm.com>
+Date: Fri, 07 Apr 2017 17:12:32 +0100
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <CAMj-D2AKzp-J97ZZGYdtgMvUR7o=sDw5n-Ygy7amvRk6k1p9aQ@mail.gmail.com>
+References: <20170315160727.16465-1-james.morse@arm.com>
+ <CAMj-D2A2QyvjUvbEcnaPcPsgySvAguWFkZSS1WxxT+T3uNU7aw@mail.gmail.com>
+ <58E6096E.4060206@arm.com>
+ <CAMj-D2AKzp-J97ZZGYdtgMvUR7o=sDw5n-Ygy7amvRk6k1p9aQ@mail.gmail.com>
+Message-ID: <58E7BA70.4040004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi gengdongjiu,
 
-On 07/04/17 16:51, Ard Biesheuvel wrote:
-> That is quite interesting, to be honest, because that patch should
-> effectively be a NOP on systems that do not implement
-> EFI_RNG_PROTOCOL.
-> 
-> Could you run this from the UEFI shell please?
-> 
-> http://people.linaro.org/~ard.biesheuvel/RngTest.efi
+On 06/04/17 16:06, gengdongjiu wrote:
+> Below is my previous idea:
+>   When signalling Qemu, Qemu generate GHES ,then  Qemu/kvmtool  inject
+> the SEA/SEI to guest OS. For different reason, Qemu/.KVMtool injects
+> diferent notification type. if inject SEA/SEI/IRQ, guest OS handle the
+> guest SEA/SEI/IRQ. handling guest OS SEA/SEI and IRQ guest OS software
+> logical is  different.
+> for example, guest OS call API "ghes_notify_sea" when happening SEA;
+> call API  "ghes_notify_sei" when happening SEI.
 
-As you predicted:
-
-Shell> RngTest.efi
-UEFI RNG Protocol Testing :
-----------------------------
- -- Locate UEFI RNG Protocol : [Fail - Status = Not Found]
-Error reported: Not Found
+Sounds reasonable. Qemu shouldn't have to care what the guest OS is so the
+injecting notifications should stick to KVM APIs.
 
 
-> I would expect it to report that it has no EFI_RNG_PROTOCOL
-> implementation. Could you also check whether the working kernel still
-> works /after/ having executed that utility?
+> so what is your suggested way to notify guest OS after Qemu generating the CPER?
+[...]
+> so for the notification guest OS, I think Qemu uses IOCTL to let KVM
+> inject error may be better.
 
-The broken kernel remains broken after running that test. reboot. The working
-kernel continues to work after running that test.
+I agree.
 
-(On Monday) I will try with just these efi changes on v4.11-rc. to try and
-eliminate everything else in linux-next.
+Synchronous External Abort is something that can always be delivered, Qemu can
+make it look like SEA was taken on a vcpu by modifying the registers using KVM's
+KVM_SET_ONE_REG ioctl(). The pseudo code for what is required is in the
+ARM-ARM's 'AArch64.TakeException'.
 
-This is one of those firmware versions that prints lots of
-> efi: [Firmware Bug]: IRQ flags corrupted (0x00000140=>0x00000100) by EFI
-get_variable
+
+SError Interrupt is more complicated as it can be masked. Fortunately the
+architecture has a way to inject SError into a guest using HCR_EL2.VSE, I think
+KVM should allow users-space to inject SError with this. Marc and Christoffer
+will have the best idea about how such an API should work. To be useful for
+injecting SEI we need to be able to set VSESR_EL2 along with the HCR_EL2.VSE bit.
+KVM will need to know about the RAS extensions to save/restore some of the new
+registers listed in A1.7.5 of the new ARM-ARM.
 
 
 Thanks,
