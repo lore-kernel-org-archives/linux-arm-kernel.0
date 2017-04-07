@@ -1,144 +1,169 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Fri, 7 Apr 2017 09:03:22 +0000
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
- <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
- <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
- <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 7 Apr 2017 11:13:15 +0200
+Subject: [PATCH v9 04/12] soc: samsung: add exynos chipid driver support
+In-Reply-To: <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170330131427epcas5p4c3d238022dc75694ad3baa8a1018ea04@epcas5p4.samsung.com>
+ <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
+ <1490879826-16754-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAJKOXPeCD+U_2U4yj7LiKkWZjvXr9joY4bRqL+-MHdka=9viWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajat
-
-
->On Thu, Apr 6, 2017 at 8:19 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>
->> On 4/6/2017 9:23 AM, Patel, Mayurkumar wrote:
->> > Actually, The enabling/configuring of ASPM L1.2 is opposite then ASPM L1.
->> > In case of L1, Upstream must configure first L1 and then downstream according to PCIe spec.
->> > In case of L1.2, Downstream must configure L1.2 and then upstream according (to L1.2 ECN spec. -> 5.5.4. L1 PM
->> > substates Configuration).
->> >
->> > @Bjorn:
->> > I even found that programming of pcie_config_aspm_l1ss() sub-states is done in the opposite way than described in
->> > the spec.,
->> >
->> > The spec. says following and correct me If I am wrong or I misinterpret the spec. :
->> >
->> > 5.5.4. L1 PM Substates Configuration
->> >
->> > The Setting of any enable bit must be performed at the Downstream Port before the
->> > corresponding bit is permitted to be Set at the Upstream Port. If any L1 PM Substates enable
->> > bit is at a later time to be cleared, the enable bit(s) must be cleared in the Upstream Port
->> > before the corresponding enable bit(s) are permitted to be cleared in the Downstream Port.
->> >
+On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> Exynos SoCs have Chipid, for identification of product IDs and SoC
+> revisions. This patch intends to provide initialization code for all
+> these functionalities, at the same time it provides some sysfs entries
+> for accessing these information to user-space.
 >
->Thanks for bringing to attention. My understanding / interpretation of
->"Downstream port" was the port pointing downwards (from the "Upstream"
->component). E.g. when an EP connects to a hub port, PCIe text refers
->to the hub port as the "downstream port". Similarly "upstream port" is
->used for referring to a switch's port that "points" upwards towards
->the root port. Thus, I interpreted the text to mean that I need to
->enable it in the "downstream port" (in the root port / switch port)
->followed by the "upstream port" (in the device).
+> This driver uses existing binding for exynos-chipid.
 >
->It would have been great if the PCIe spec was as clear for L1
->substates as it was for L1:
->----------------------------
->ASPM L1 must be enabled by software in the Upstream
->component on a Link prior to enabling ASPM L1 in the
->Downstream component on that Link.
->-----------------------------
->For ASPM L1, the spec clearly says "Upstream component" which can only
->mean the switch's "downstream" port. I'm open to changing it if there
->is consensus that my interpretation is wrong.
-
-In fact, Your understanding seems to be correct. It was my mistake that I raised it without
-actually, keeping in mind or understanding port/component difference which I didn't notice.
-My sincere apologies for that.
-
-
+> CC: Grant Likely <grant.likely@linaro.org>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> [m.szyprowski: for suggestion and code snippet of product_id_to_soc_id]
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/soc/samsung/Kconfig         |   5 ++
+>  drivers/soc/samsung/Makefile        |   1 +
+>  drivers/soc/samsung/exynos-chipid.c | 109 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 115 insertions(+)
+>  create mode 100644 drivers/soc/samsung/exynos-chipid.c
 >
->I'm actually not sure if I understood what is the problem that is
->being seen with L1 PM substates. Can you please elaborate?
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> index 8b25bd5..a90a4ad 100644
+> --- a/drivers/soc/samsung/Kconfig
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -6,6 +6,11 @@ menuconfig SOC_SAMSUNG
 >
-
-
-The actual problem, what Sinan and me were seeing with ASPM L1 with POLICY_DEFAULT
-as described in https://patchwork.kernel.org/patch/9548321/ 
-
-
-Sinan worked out patches to resolve the issue but on my platform now I am starting to see
-that ASPM L1SS gets impacted by these patches. Basically, with his patches, when Policy is set to default,
-and if no PCIe EP is connected to Root Port during boot up, BIOS does not configure L1SS for it, on my
-platform. So the link->aspm_default in aspm.c stores configuration without L1SS. When the EP gets
-connected afterwards, due to link->aspm_default set to non L1SS configuration, even if BIOS
-sets ASPM L1SS for Root Port and Endpoint both, it gets cleared in the aspm driver.
-
-Without the patches Sinan has worked, it was a different issue as described above, and L1/L1SS were
-getting always enabled by the BIOS for endpoint and RP, but kernel enabled/disabled them alternatively.
-
-So basically, I am not currently 100% sure, what is the proper fix for this. Whether BIOS should
-enable L1SS on Root Port no matter Endpoint is connected or not during boot?
-
-Or I am not sure, whether could we should still update link->aspm_default partly for L1SS in the old patch way
-https://patchwork.ozlabs.org/patch/736771/ 
-
-Any feedback would be helpful then may be if required I can or if Sinan can work out the patches for L1SS also fine for me.
-
-
+>  if SOC_SAMSUNG
 >
->>
->>
->> Thanks for testing.
->>
->> commit a142f4d3e5c54db5e942fa6ee5f3dc0e8c83207b
->> Author: Rajat Jain <rajatja@google.com>
->> Date:   Mon Jan 2 22:34:15 2017 -0800
->>
->>     PCI/ASPM: Add comment about L1 substate latency
->>
->>     Since the exit latencies for L1 substates are not advertised by a device,
->>     it is not clear in spec how to do a L1 substate exit latency check.  We
->>     assume that the L1 exit latencies advertised by a device include L1
->>     substate latencies (and hence do not do any check).  If that is not true,
->>     we should do some sort of check here.
->>
->>     (I'm not clear about what that check should like currently. I'd be glad to
->>     take up any suggestions).
->>
->>     Signed-off-by: Rajat Jain <rajatja@google.com>
->>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->>
->> I added Rajat for discussion on L1SS. I think this deserves its own discussion.
+> +config EXYNOS_CHIPID
+> +       bool "Exynos Chipid controller driver" if COMPILE_TEST
+> +       depends on ARCH_EXYNOS || COMPILE_TEST
+> +       select SOC_BUS
+> +
+>  config EXYNOS_PMU
+>         bool "Exynos PMU controller driver" if COMPILE_TEST
+>         depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> index 4d7694a..be3b6bb 100644
+> --- a/drivers/soc/samsung/Makefile
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -1,3 +1,4 @@
+> +obj-$(CONFIG_EXYNOS_CHIPID)    += exynos-chipid.o
+>  obj-$(CONFIG_EXYNOS_PMU)       += exynos-pmu.o
 >
->Thanks, The above commit specifically adds a comment to
->pcie_aspm_check_latency(), because I wanted to leave a note
->highlighting that potentially, we could add a more stringent check for
->exit latency for L1SS. But that has nothing to do with how we are
->configuring or enabling / disabling the L1 substates.
->
->Thanks & Best Regards,
->
->Rajat
->
->> I'll look at the other part of your email and move things around a little bit
->> less aggressively for the aspm_default.
->>
->>
->> --
->> Sinan Kaya
->> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+>  obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)   += exynos3250-pmu.o exynos4-pmu.o \
+> diff --git a/drivers/soc/samsung/exynos-chipid.c b/drivers/soc/samsung/exynos-chipid.c
+> new file mode 100644
+> index 0000000..1e9fb6b
+> --- /dev/null
+> +++ b/drivers/soc/samsung/exynos-chipid.c
+> @@ -0,0 +1,109 @@
+> +/*
+> + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+> + *           http://www.samsung.com/
+> + *
+> + * EXYNOS - CHIP ID support
+> + * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/sys_soc.h>
+> +
+> +#define EXYNOS_SUBREV_MASK     (0xF << 4)
+> +#define EXYNOS_MAINREV_MASK    (0xF << 0)
+> +#define EXYNOS_REV_MASK                (EXYNOS_SUBREV_MASK | EXYNOS_MAINREV_MASK)
+> +
+> +static const struct exynos_soc_id {
+> +       const char *name;
+> +       unsigned int id;
+> +       unsigned int mask;
+> +} soc_ids[] = {
+> +       { "EXYNOS3250", 0xE3472000, 0xFFFFF000 },
+> +       { "EXYNOS4210", 0x43210000, 0xFFFFF000 },
+> +       { "EXYNOS4212", 0x43220000, 0xFFFFF000 },
+> +       { "EXYNOS4412", 0xE4412000, 0xFFFFF000 },
+> +       { "EXYNOS5250", 0x43520000, 0xFFFFF000 },
+> +       { "EXYNOS5260", 0xE5260000, 0xFFFFF000 },
+> +       { "EXYNOS5410", 0xE5410000, 0xFFFFF000 },
+> +       { "EXYNOS5420", 0xE5420000, 0xFFFFF000 },
+> +       { "EXYNOS5440", 0xE5440000, 0xFFFFF000 },
+> +       { "EXYNOS5800", 0xE5422000, 0xFFFFF000 },
+> +       { "EXYNOS7420", 0xE7420000, 0xFFFFF000 },
+> +       { "EXYNOS5433", 0xE5433000, 0xFFFFF000 },
+> +};
+> +
+> +static const char * __init product_id_to_soc_id(unsigned int product_id)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(soc_ids); i++)
+> +               if ((product_id & soc_ids[i].mask) == soc_ids[i].id)
+> +                       return soc_ids[i].name;
+> +       return "UNKNOWN";
+> +}
+> +
+> +int __init exynos_chipid_early_init(void)
+> +{
+> +       struct soc_device_attribute *soc_dev_attr;
+> +       void __iomem *exynos_chipid_base;
+> +       struct soc_device *soc_dev;
+> +       struct device_node *root;
+> +       struct device_node *np;
+> +       struct device *dev;
+> +       u32 product_id;
+> +       u32 revision;
+> +
+> +       /* look up for chipid node */
+> +       np = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-chipid");
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       exynos_chipid_base = of_iomap(np, 0);
+> +       of_node_put(np);
+> +
+> +       if (!exynos_chipid_base) {
+> +               pr_err("%s: failed to map chipid\n", np->name);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       product_id = readl_relaxed(exynos_chipid_base);
+> +       revision = product_id & EXYNOS_REV_MASK;
+> +       iounmap(exynos_chipid_base);
+> +
+> +       soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +       if (!soc_dev_attr)
+> +               return -ENODEV;
+
+This should be -ENOMEM
+
+> +
+> +       soc_dev_attr->family = "Samsung Exynos";
+> +
+> +       root = of_find_node_by_path("/");
+> +       of_property_read_string(root, "model", &soc_dev_attr->machine);
+> +       of_node_put(root);
+> +
+> +       soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%x", revision);
+> +       soc_dev_attr->soc_id = product_id_to_soc_id(product_id);
+> +
+> +       soc_dev = soc_device_register(soc_dev_attr);
+> +       if (IS_ERR(soc_dev)) {
+> +               kfree(soc_dev_attr->revision);
+> +               kfree_const(soc_dev_attr->soc_id);
+
+This was not allocated with kstrdup_const() so it should not be freed.
+
+Best regards,
+Krzysztof
