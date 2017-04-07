@@ -1,89 +1,49 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 7 Apr 2017 11:40:25 +0930
-Subject: [PATCH] ARM: dts: aspeed: add a fastread property
-In-Reply-To: <1491498153-26564-1-git-send-email-clg@kaod.org>
-References: <1491498153-26564-1-git-send-email-clg@kaod.org>
-Message-ID: <CACPK8XedrYaeBq5P5g0XUzXS6WHzPLwXAMF5V7cp9ntuxC=0hQ@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu,  6 Apr 2017 21:47:33 -0500
+Subject: [GIT PULL] Qualcomm ARM64 DT Updates for v4.12
+Message-ID: <1491533253-13389-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 2:32 AM, C?dric Le Goater <clg@kaod.org> wrote:
-> All chips on OpenPOWER platforms support the fastread SPI command.
->
-> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Thanks, applied.
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-Cheers,
+are available in the git repository at:
 
-Joel
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.12
 
-> ---
->  arch/arm/boot/dts/aspeed-ast2500-evb.dts      | 2 ++
->  arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 2 ++
->  arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts  | 2 ++
->  3 files changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> index 8f82e8ab1875..7c90dac99822 100644
-> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> @@ -24,6 +24,7 @@
->         status = "okay";
->         flash at 0 {
->                 status = "okay";
-> +               m25p,fast-read;
->                 label = "bmc";
->         };
->  };
-> @@ -32,6 +33,7 @@
->         status = "okay";
->         flash at 0 {
->                 status = "okay";
-> +               m25p,fast-read;
->                 label = "pnor";
->         };
->  };
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> index aab1889f702f..112551766275 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> @@ -35,6 +35,7 @@
->         status = "okay";
->         flash at 0 {
->                 status = "okay";
-> +               m25p,fast-read;
->                 label = "bmc";
->         };
->  };
-> @@ -43,6 +44,7 @@
->         status = "okay";
->         flash at 0 {
->                 status = "okay";
-> +               m25p,fast-read;
->                 label = "pnor";
->         };
->  };
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> index e3c6358bc7d9..b82f67eb3dae 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-> @@ -35,6 +35,7 @@
->         status = "okay";
->         flash at 0 {
->                 status = "okay";
-> +               m25p,fast-read;
->                 label = "bmc";
->         };
->  };
-> @@ -43,6 +44,7 @@
->         status = "okay";
->         flash at 0 {
->                 status = "okay";
-> +               m25p,fast-read;
->                 label = "pnor";
->         };
->  };
-> --
-> 2.7.4
->
+for you to fetch changes up to 6c8583d6feeb45a4c812114f6087e9911b93ea48:
+
+  arm64: dts: msm8996: Add ADSP PIL node (2017-03-29 13:43:52 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Updates for v4.12
+
+* Fixup MSM8996 SMP2P and add ADSP PIL / SLPI SMP2P node
+* Replace PMU compatible w/ A53 specific one
+* Add APQ8016 ramoops
+* Update MSM8916 hexagon node
+* Add PM8994 RTC
+
+----------------------------------------------------------------
+Bjorn Andersson (4):
+      arm64: dts: qcom: msm8996: Fixup smp2p node
+      arm64: dts: qcom: msm8916: Update hexagon node
+      arm64: dts: apq8016-sbc: Add ramoops
+      arm64: dts: qcom: pm8994: Add rtc node
+
+Sarangdhar Joshi (1):
+      arm64: dts: msm8996: Add ADSP PIL node
+
+Stephen Boyd (1):
+      arm64: dts: qcom: Replace PMU compatible with a53 specific one
+
+avaneesh dwivedi (1):
+      arm64: dts: msm8996: Add SLPI SMP2P dt node.
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 11 ++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi     | 26 +++++++++--------
+ arch/arm64/boot/dts/qcom/msm8996.dtsi     | 46 ++++++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/pm8994.dtsi      |  7 +++++
+ 4 files changed, 78 insertions(+), 12 deletions(-)
