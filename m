@@ -1,38 +1,68 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 7 Apr 2017 15:23:17 +0200
-Subject: [PATCH] clockevents/drivers/atlas7: set ->min_delta_ticks and
- ->max_delta_ticks
-In-Reply-To: <20170330201022.8548-1-nicstange@gmail.com>
-References: <20170326134403.16226-1-nicstange@gmail.com>
- <20170330201022.8548-1-nicstange@gmail.com>
-Message-ID: <20170407132317.GI2078@mai>
+From: minipli@googlemail.com (Mathias Krause)
+Date: Fri, 7 Apr 2017 15:30:34 +0200
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <alpine.DEB.2.20.1704071426300.1716@nanos>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+ <alpine.DEB.2.20.1704071426300.1716@nanos>
+Message-ID: <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 10:10:21PM +0200, Nicolai Stange wrote:
-> In preparation for making the clockevents core NTP correction aware,
-> all clockevent device drivers must set ->min_delta_ticks and
-> ->max_delta_ticks rather than ->min_delta_ns and ->max_delta_ns: a
-> clockevent device's rate is going to change dynamically and thus, the
-> ratio of ns to ticks ceases to stay invariant.
-> 
-> Make the timer-atlas7 clockevent driver initialize these fields properly.
-> 
-> This patch alone doesn't introduce any change in functionality as the
-> clockevents core still looks exclusively at the (untouched) ->min_delta_ns
-> and ->max_delta_ns. As soon as this has changed, a followup patch will
-> purge the initialization of ->min_delta_ns and ->max_delta_ns from this
-> driver.
-> 
-> Signed-off-by: Nicolai Stange <nicstange@gmail.com>
-> ---
+On 7 April 2017 at 15:14, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 7 Apr 2017, Mathias Krause wrote:
+>> On 7 April 2017 at 11:46, Thomas Gleixner <tglx@linutronix.de> wrote:
+>> > Whether protected by preempt_disable or local_irq_disable, to make that
+>> > work it needs CR0 handling in the exception entry/exit at the lowest
+>> > level. And that's just a nightmare maintainence wise as it's prone to be
+>> > broken over time.
+>>
+>> It seems to be working fine for more than a decade now in PaX. So it
+>> can't be such a big maintenance nightmare ;)
+>
+> I really do not care whether PaX wants to chase and verify that over and
+> over. I certainly don't want to take the chance to leak CR0.WP ever and I
+> very much care about extra stuff to check in the entry/exit path.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org> 
+Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
+somewhere sensible should make those "leaks" visible fast -- and their
+exploitation impossible, i.e. fail hard.
 
--- 
+>> The "proper solution" seems to be much slower compared to just
+>> toggling CR0.WP (which is costly in itself, already) because of the
+>> TLB invalidation / synchronisation involved.
+>
+> Why the heck should we care about rare writes being performant?
 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+As soon as they stop being rare and people start extending the r/o
+protection to critical data structures accessed often. Then
+performance matters.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>> > It's valid (at least on x86) to have a shadow map with the same page
+>> > attributes but write enabled. That does not require any fixups of CR0 and
+>> > just works.
+>>
+>> "Just works", sure -- but it's not as tightly focused as the PaX
+>> solution which is CPU local, while your proposed solution is globally
+>> visible.
+>
+> Making the world and some more writeable hardly qualifies as tightly
+> focussed. Making the mapping concept CPU local is not rocket science
+> either. The question is whethers it's worth the trouble.
+
+No, the question is if the value of the concept is well understood and
+if people can see what could be done with such a strong primitive.
+Apparently not...
+
+
+Cheers,
+Mathias
