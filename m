@@ -1,211 +1,44 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 7 Apr 2017 11:24:18 +0200
-Subject: [PATCH v9 07/12] ARM: EXYNOS: introduce soc specific pm ops
-In-Reply-To: <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170330131434epcas1p4e42fe06bae3456c39e0f93a2f8ae4bc0@epcas1p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-8-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAJKOXPckh9C-mSq5NsJJfSW-brs6=wTDuctkD2EbtQOjKOQgbg@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 07 Apr 2017 11:25:43 +0200
+Subject: [Patch v4 10/12] [media] v4l2: Add v4l2 control IDs for HEVC
+ encoder
+In-Reply-To: <1491553894.15698.1142.camel@smitha-fedora>
+References: <1491459105-16641-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170406061023epcas5p2a3fa65c4254e17a58f71c68d413e6bfd@epcas5p2.samsung.com>
+ <1491459105-16641-11-git-send-email-smitha.t@samsung.com>
+ <374939c7-241a-fcca-c87e-5c4290bdb6aa@samsung.com>
+ <1491553894.15698.1142.camel@smitha-fedora>
+Message-ID: <9f81ed3a-4adb-7827-6094-88847bc0787a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> For s2r various Exynos SoC needs different programming sequence and data.
+On 04/07/2017 10:31 AM, Smitha T Murthy wrote:
+> On Thu, 2017-04-06 at 15:14 +0200, Sylwester Nawrocki wrote:
+>> On 04/06/2017 08:11 AM, Smitha T Murthy wrote:
+>>> @@ -775,6 +832,47 @@ const char *v4l2_ctrl_get_name(u32 id)
+>>>  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+>>>  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
+>>>
+>>> +	/* HEVC controls */
+>> [...]
+>>> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC LF Across Slice Boundary or Not";
+>> Please make sure the names are no longer than 31 characters to avoid
+>> truncation during control enumeration in user space.
+>> Data structures like struct v4l2_queryctrl, struct v4l2_query_ext_ctrl
+>> have only 32 bytes long array dedicated for the control name.
+ >
+> I will try to make the names less than 31 characters long without losing
+> the context. But there are many control names in this file which are
+> longer than 31 characters like
+> V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP,
+> V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_REF_PERIOD etc so I assumed it was
+> alright to have such long names. But I will shorten them as per your
+> suggestion.
 
-This is not S2R so:
-"Sleep modes on various Exynos SoCs need..."
+Apologies if it wasn't clean enough but my comment referred to the
+length of the character string being returned (e.g. "HEVC LF Across
+Slice Boundary or Not") and not to the name of the enum.
 
-> Currently this is handled by adding lots of soc_is_exynosMMM checks in the
-> code, in an attempt to remove the dependency of such helper functions
-"code." full stop.
-
-> specific to each SoC, let's separate these programming sequence by
-> introducing a new struct exynos_s2r_data. This struct will contain
-
-If you plan to extend it to all sleep modes, then:
-"exynos_sleep_data"? But if not, then just "exynos_aftr_data" or
-"exynos_cpuidle_data" as this is real use for now.
-
-> different function hooks and data for differentiating these programming
-> sequences based on SoC's soc_id and revision parameters which can be
-> matched by using generic API "soc_device_match".
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/pm.c | 122 +++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 116 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 4a73b02..fa24098 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -20,6 +20,7 @@
->  #include <linux/of.h>
->  #include <linux/soc/samsung/exynos-regs-pmu.h>
->  #include <linux/soc/samsung/exynos-pmu.h>
-> +#include <linux/sys_soc.h>
->
->  #include <asm/firmware.h>
->  #include <asm/smp_scu.h>
-> @@ -30,6 +31,12 @@
->
->  #include "common.h"
->
-> +struct exynos_s2r_data {
-
-Rename all "s2r" occurrences to appropriate name.
-
-> +       void (*enter_aftr)(void);
-> +};
-> +
-> +static const struct exynos_s2r_data *s2r_data;
-> +
->  static inline void __iomem *exynos_boot_vector_addr(void)
->  {
->         if (samsung_rev() == EXYNOS4210_REV_1_1)
-> @@ -160,13 +167,26 @@ static int exynos_aftr_finisher(unsigned long flags)
->
->  void exynos_enter_aftr(void)
->  {
-> +       if (s2r_data && s2r_data->enter_aftr)
-> +               s2r_data->enter_aftr();
-> +}
-> +
-> +static void exynos3_enter_aftr(void)
-> +{
->         unsigned int cpuid = smp_processor_id();
->
->         cpu_pm_enter();
-> +       exynos_set_boot_flag(cpuid, C2_STATE);
-> +       exynos_pm_central_suspend();
-> +       cpu_suspend(0, exynos_aftr_finisher);
-> +       exynos_pm_central_resume();
-> +       exynos_clear_boot_flag(cpuid, C2_STATE);
-> +       cpu_pm_exit();
-> +}
->
-> -       if (of_machine_is_compatible("samsung,exynos3250"))
-> -               exynos_set_boot_flag(cpuid, C2_STATE);
-> -
-> +static void exynos4_enter_aftr(void)
-> +{
-> +       cpu_pm_enter();
->         exynos_pm_central_suspend();
->
->         if (of_machine_is_compatible("samsung,exynos4212") ||
-> @@ -185,13 +205,103 @@ void exynos_enter_aftr(void)
->         }
->
->         exynos_pm_central_resume();
-> +       cpu_pm_exit();
-> +}
->
-> -       if (of_machine_is_compatible("samsung,exynos3250"))
-> -               exynos_clear_boot_flag(cpuid, C2_STATE);
-> -
-> +static void exynos5_enter_aftr(void)
-> +{
-> +       cpu_pm_enter();
-> +       exynos_pm_central_suspend();
-> +       cpu_suspend(0, exynos_aftr_finisher);
-> +       exynos_pm_central_resume();
->         cpu_pm_exit();
->  }
->
-> +static const struct exynos_s2r_data exynos_common_s2r_data = {
-> +       .enter_aftr             = exynos5_enter_aftr,
-> +};
-> +
-> +static const struct exynos_s2r_data exynos3250_s2r_data = {
-> +       .enter_aftr             = exynos3_enter_aftr,
-> +};
-> +
-> +static const struct exynos_s2r_data exynos4210_rev11_s2r_data = {
-> +       .enter_aftr             = exynos4_enter_aftr,
-> +};
-> +
-> +static const struct exynos_s2r_data exynos4210_rev10_s2r_data = {
-> +       .enter_aftr             = exynos4_enter_aftr,
-> +};
-> +
-> +static const struct exynos_s2r_data exynos4x12_s2r_data = {
-> +       .enter_aftr             = exynos4_enter_aftr,
-> +};
-> +
-> +static const struct soc_device_attribute exynos_soc_revision[] __initconst = {
-> +       {
-> +               .soc_id = "EXYNOS3250",
-> +               .data = &exynos3250_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS4210",
-> +               .revision = "11",
-> +               .data = &exynos4210_rev11_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS4210",
-> +               .revision = "10",
-> +               .data = &exynos4210_rev10_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS4212",
-> +               .data = &exynos4x12_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS4412",
-> +               .data = &exynos4x12_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5250",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5260",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5440",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5410",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5420",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +       {
-> +               .soc_id = "EXYNOS5800",
-> +               .data = &exynos_common_s2r_data
-> +       },
-> +};
-> +
-> +int __init exynos_s2r_init(void)
-> +{
-> +       const struct soc_device_attribute *match;
-> +
-> +       match = soc_device_match(exynos_soc_revision);
-> +
-> +       if (match)
-> +               s2r_data = (const struct exynos_s2r_data *) match->data;
-> +
-> +       if (!s2r_data)
-> +               return -ENODEV;
-> +
-> +       return 0;
-> +}
-> +arch_initcall(exynos_s2r_init);
-> +
-
-I guess you already found possible probe-order issue. You should
-register all of this after having the soc chipid driver. However it is
-required by cpuidle driver which is being registered in machine_init()
-call....  You cannot use deferred probe here, so maybe the only way is
-to manually order the calls in machine_init():
-1. exynos_chipid_early_init()
-2. this one.
-3. cpuidle driver register.
-
-Best regards,
-Krzysztof
+--
+Regards,
+Sylwester
