@@ -1,37 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Apr 2017 11:58:23 -0400
-Subject: [PATCH 22/22] ARM: dts: r8a7791: Drop _clk suffix from external CAN
- clock node name
-In-Reply-To: <cover.1491580547.git.horms+renesas@verge.net.au>
-References: <cover.1491580547.git.horms+renesas@verge.net.au>
-Message-ID: <eb77d7260c4c25206e2a455be0dbe6443e0856b5.1491580547.git.horms+renesas@verge.net.au>
+From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
+Date: Fri, 7 Apr 2017 19:07:20 +0300
+Subject: [PATCH v4 0/2] usb: gadget: udc: atmel: Endpoint allocation scheme
+ fixes
+Message-ID: <cover.1491577793.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Cristian Birsan <cristian.birsan@microchip.com>
 
-The current practice is to not add _clk suffixes to clock node names in
-DT, as these names are used as the actual clock names.
+This patch series provides fixes, based on the feedback received on the mailing list, for
+the following:
+	- fifo table parameters validation against device tree values
+	- coding style
+	- message display for EP configuration error
+	- Kconfig comments for fifo_mode=0
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since v1:
+	- Removed static for usba_config_fifo_table() function from "Check fifo
+	configuration values against device tree" patch
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index a6478ca3f4ca..4d0c2ce59900 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1126,7 +1126,7 @@
- 		};
- 
- 		/* External CAN clock */
--		can_clk: can_clk {
-+		can_clk: can {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			/* This value must be overridden by the board. */
+Changes since v2:
+	- Use shorter warning message if the fifo table size is greather than device 
+	tree value
+	- replace dev_warn() with dev_err() for hardware fifo allocation error
+
+Changes since v3:
+	- rebase the code on testing/next branch as requested
+	- remove from patch series the patches that are already in testing/next branch
+
+Cristian Birsan (2):
+  usb: gadget: udc: atmel: Use dev_err() to display EP configuration
+    error
+  usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
+
+ drivers/usb/gadget/udc/Kconfig          | 5 +++--
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 8 ++++----
+ 2 files changed, 7 insertions(+), 6 deletions(-)
+
 -- 
-2.7.0.rc3.207.g0ac5344
+2.7.4
