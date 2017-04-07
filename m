@@ -1,109 +1,85 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Apr 2017 14:14:10 -0400
-Subject: [PATCH 3/3] soc: renesas: rcar-sysc: Add support for R-Car H3 ES2.0
-In-Reply-To: <cover.1491588035.git.horms+renesas@verge.net.au>
-References: <cover.1491588035.git.horms+renesas@verge.net.au>
-Message-ID: <fcb87087261e1be51b4c03677f39246bdc312b1c.1491588035.git.horms+renesas@verge.net.au>
+From: s.temerkhanov@gmail.com (Sergei Temerkhanov)
+Date: Fri, 7 Apr 2017 11:31:12 -0700
+Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
+ ACPI mode
+In-Reply-To: <20170407171812.GA12012@red-moon>
+References: <20170406114711.17261-1-s.temerkhanov@gmail.com>
+ <20170407171812.GA12012@red-moon>
+Message-ID: <CAPEA6daR9+BmyW6G9XOsO18782a-tjJrJKyxcYNHeHonuXRggw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Fri, Apr 7, 2017 at 10:18 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Hi Sergey,
+>
+> On Thu, Apr 06, 2017 at 11:47:11AM +0000, Sergey Temerkhanov wrote:
+>> This commit modifies ARM64-specific ACPI PCI support functions to
+>> properly set the numa_node property on host bridges and thus on PCI
+>> devices. Such support requires _PXM objects to be set in DSDT/SSDT
+>> tables describing PCI root bridges
+>>
+>> Signed-off-by: Sergey Temerkhanov <s.temerkhanov@gmail.com>
+>> ---
+>>  arch/arm64/kernel/pci.c | 13 ++++++++++++-
+>>  1 file changed, 12 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index 4f0e3ebfea4b..c45c7a26f984 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -81,7 +81,16 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
+>>
+>>  int pcibus_to_node(struct pci_bus *bus)
+>>  {
+>> -     return dev_to_node(&bus->dev);
+>> +     struct pci_config_window *cfg = bus->sysdata;
+>
+> Well, this implicit cast is a guess (ie it might be a DT sysdata
+> and there you can't have a clue on what it really is).
 
-Power area A2VC0 was removed in revision ES2.0, cfr. R-Car Gen3 Hardware
-User's Manual rev. 0.53E.
+Yes, but it's only accessed when acpi_disabled != 0. I just tried to
+save few lines and brackets :-)
 
-Hence remove it from the power area table when not running on ES1.x.
+Regards,
+Sergey
 
-This is in line with the goal to:
-  1. Support both the ES1.x and ES2.0 SoC revisions in a single binary
-     for now,
-  2. Make it clear which code supports ES1.x, so it can easily be
-     identified and removed later, when production SoCs are deemed
-     ubiquitous.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/r8a7795-sysc.c       | 26 ++++++++++++++++++++++++--
- include/dt-bindings/power/r8a7795-sysc.h |  2 +-
- 2 files changed, 25 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/soc/renesas/r8a7795-sysc.c b/drivers/soc/renesas/r8a7795-sysc.c
-index 5e7537c96f7b..7412666187b3 100644
---- a/drivers/soc/renesas/r8a7795-sysc.c
-+++ b/drivers/soc/renesas/r8a7795-sysc.c
-@@ -1,7 +1,7 @@
- /*
-  * Renesas R-Car H3 System Controller
-  *
-- * Copyright (C) 2016 Glider bvba
-+ * Copyright (C) 2016-2017 Glider bvba
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -10,12 +10,13 @@
- 
- #include <linux/bug.h>
- #include <linux/kernel.h>
-+#include <linux/sys_soc.h>
- 
- #include <dt-bindings/power/r8a7795-sysc.h>
- 
- #include "rcar-sysc.h"
- 
--static const struct rcar_sysc_area r8a7795_areas[] __initconst = {
-+static struct rcar_sysc_area r8a7795_areas[] __initdata = {
- 	{ "always-on",	    0, 0, R8A7795_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
- 	{ "ca57-scu",	0x1c0, 0, R8A7795_PD_CA57_SCU,	R8A7795_PD_ALWAYS_ON,
- 	  PD_SCU },
-@@ -40,6 +41,7 @@ static const struct rcar_sysc_area r8a7795_areas[] __initconst = {
- 	{ "a3vp",	0x340, 0, R8A7795_PD_A3VP,	R8A7795_PD_ALWAYS_ON },
- 	{ "cr7",	0x240, 0, R8A7795_PD_CR7,	R8A7795_PD_ALWAYS_ON },
- 	{ "a3vc",	0x380, 0, R8A7795_PD_A3VC,	R8A7795_PD_ALWAYS_ON },
-+	/* A2VC0 exists on ES1.x only */
- 	{ "a2vc0",	0x3c0, 0, R8A7795_PD_A2VC0,	R8A7795_PD_A3VC },
- 	{ "a2vc1",	0x3c0, 1, R8A7795_PD_A2VC1,	R8A7795_PD_A3VC },
- 	{ "3dg-a",	0x100, 0, R8A7795_PD_3DG_A,	R8A7795_PD_ALWAYS_ON },
-@@ -50,7 +52,27 @@ static const struct rcar_sysc_area r8a7795_areas[] __initconst = {
- 	{ "a3ir",	0x180, 0, R8A7795_PD_A3IR,	R8A7795_PD_ALWAYS_ON },
- };
- 
-+
-+	/*
-+	 * Fixups for R-Car H3 revisions after ES1.x
-+	 */
-+
-+static const struct soc_device_attribute r8a7795es1[] __initconst = {
-+	{ .soc_id = "r8a7795", .revision = "ES1.*" },
-+	{ /* sentinel */ }
-+};
-+
-+static int __init r8a7795_sysc_init(void)
-+{
-+	if (!soc_device_match(r8a7795es1))
-+		rcar_sysc_nullify(r8a7795_areas, ARRAY_SIZE(r8a7795_areas),
-+				  R8A7795_PD_A2VC0);
-+
-+	return 0;
-+}
-+
- const struct rcar_sysc_info r8a7795_sysc_info __initconst = {
-+	.init = r8a7795_sysc_init,
- 	.areas = r8a7795_areas,
- 	.num_areas = ARRAY_SIZE(r8a7795_areas),
- };
-diff --git a/include/dt-bindings/power/r8a7795-sysc.h b/include/dt-bindings/power/r8a7795-sysc.h
-index ee2e26ba605e..ad679eeda137 100644
---- a/include/dt-bindings/power/r8a7795-sysc.h
-+++ b/include/dt-bindings/power/r8a7795-sysc.h
-@@ -33,7 +33,7 @@
- #define R8A7795_PD_CA53_SCU		21
- #define R8A7795_PD_3DG_E		22
- #define R8A7795_PD_A3IR			24
--#define R8A7795_PD_A2VC0		25
-+#define R8A7795_PD_A2VC0		25	/* ES1.x only */
- #define R8A7795_PD_A2VC1		26
- 
- /* Always-on power area */
--- 
-2.7.0.rc3.207.g0ac5344
+>
+>> +     struct acpi_device *adev = NULL;
+>> +     struct device *dev;
+>> +
+>> +     if (!acpi_disabled)
+>> +             adev = to_acpi_device(cfg->parent);
+>> +
+>> +     dev = adev ? &adev->dev : &bus->dev;
+>> +
+>> +     return dev_to_node(dev);
+>>  }
+>>  EXPORT_SYMBOL(pcibus_to_node);
+>>
+>> @@ -186,6 +195,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>>       struct pci_bus *bus, *child;
+>>       struct acpi_pci_root_ops *root_ops;
+>>
+>> +     set_dev_node(&root->device->dev, node);
+>
+> Ok I suspect this is one of those catch-22 issues with host bridge
+> creation/scan code (like domain nr), let me have a look I will send
+> you a patch next week when I figure out the call ordering required
+> to make this work, I want to make sure we can make this work with
+> DT and ACPI alike.
+>
+> Thanks !
+> Lorenzo
+>
+>> +
+>>       ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+>>       if (!ri)
+>>               return NULL;
+>> --
+>> 2.12.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
