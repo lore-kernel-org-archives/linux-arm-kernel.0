@@ -1,206 +1,186 @@
-From: denys.zagorui@globallogic.com (Denys Zagorui)
-Date: Fri, 7 Apr 2017 14:52:35 +0300
-Subject: Testing kexec/kdump on ls2085ardb (arm64)
-Message-ID: <799fca3b-8d1c-c1d0-f3d7-e3b060f962fd@globallogic.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 7 Apr 2017 13:53:54 +0200
+Subject: Supporting early console on a SERIAL_8250_RT288X platform
+Message-ID: <0ac351b9-46bd-3a35-fab3-73177cabb747@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-I was testing kexec/kdump on ls2085ardb using kexec-tools from:
+Some drivers hang or panic before the normal console is available.
+In these situations, "earlyprintk" is a life-saver.
 
-https://git.linaro.org/people/takahiro.akashi/kexec-tools.git/log/?h=arm64/kdump
+My problem with earlyprintk is that the UART address needs to be
+hard-coded in the kernel binary, which means I can't use the same
+binary for two chips with different UART addresses, right?
 
-and kernel from:
+As far as I understand, "earlycon" helps in that situation, because
+it looks up the UART address at run-time in the device tree.
 
-https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git/log/?h=arm64/kdump
 
-------------------------------------------------------------------------------------
+QUESTION #1
 
-Kernel required configs:
+Is that the only difference between earlyprintk and earlycon?
+(Probably not, see below)
 
-CONFIG_KEXEC=y
-CONFIG_SYSFS=y
-CONFIG_DEBUG_INFO=y
-CONFIG_CRASH_DUMP=y
-CONFIG_PROC_VMCORE=y
 
-------------------------------------------------------------------------------------
-Starting kernel ...
+I hacked kernel v4.9.20 to add early console support on my platform.
+The patch is provided below, I'd like to hear comments on what needs
+fixing... because something is not right. If I call panic() in one of
+my driver's probe function, I don't see the output of the panic()
+call, which makes the whole exercise rather pointless.
+
+This is what I see:
 
 [    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.11.0-rc3 (denyszagorui at kbp1-ldl-f65370) 
-(gcc version 6.2.0 (GCC) ) #4 SMP PREEMPT Tue Apr 4 17:08:07 EEST 2017
-[    0.000000] Boot CPU: AArch64 Processor [411fd071]
-[    0.000000] earlycon: uart8250 at MMIO 0x00000000021c0600 (options '')
-[    0.000000] bootconsole [uart8250] enabled
-[    0.000000] efi: Getting EFI parameters from FDT:
-[    0.000000] efi: UEFI not found.
-[    0.000000] crashkernel reserved: 0x00000000bfe00000 - 
-0x00000000ffe00000 (1024 MB)
+[    0.000000] Linux version 4.9.20-1-rc3 (gcc version 5.3.1 20160113 (Linaro GCC 5.3-2016.02) ) #4 SMP PREEMPT Fri Apr 7 12:57
+[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] OF: fdt:Machine model: Sigma Designs SMP8758 Vantage-1172 Rev E1
+[    0.000000] ENTER param_setup_earlycon
+[    0.000000] ENTER early_init_dt_scan_chosen_stdout
+[    0.000000] early_init_dt_scan_chosen_stdout: scan __earlycon_table
+[    0.000000] name=palmchip compatible=ralink,rt2880-uart setup=early_palmchip_setup
+[    0.000000] ENTER of_setup_earlycon
+[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
+[    0.000000] bootconsole [palmchip0] enabled
+[    0.000000] Memory policy: Data cache writealloc
+[    0.000000] percpu: Embedded 14 pages/cpu @cfdd6000 s24704 r8192 d24448 u57344
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 65024
+[    0.000000] Kernel command line: mem=256M earlycon
+[    0.000000] PID hash table entries: 1024 (order: 0, 4096 bytes)
+[    0.000000] Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
+[    0.000000] Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
+[    0.000000] Memory: 248064K/262144K available (4096K kernel code, 147K rwdata, 892K rodata, 6144K init, 233K bss, 14080K reserved, 0K cma-reserved, 0K highmem)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+[    0.000000]     vmalloc : 0xd0800000 - 0xff800000   ( 752 MB)
+[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
+[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+[    0.000000]       .text : 0xc0008000 - 0xc0500000   (5088 kB)
+[    0.000000]       .init : 0xc0600000 - 0xc0c00000   (6144 kB)
+[    0.000000]       .data : 0xc0c00000 - 0xc0c24c60   ( 148 kB)
+[    0.000000]        .bss : 0xc0c24c60 - 0xc0c5f140   ( 234 kB)
+[    0.000000] Preemptible hierarchical RCU implementation.
+[    0.000000]  Build-time adjustment of leaf fanout to 32.
+[    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=2.
+[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=32, nr_cpu_ids=2
+[    0.000000] NR_IRQS:16 nr_irqs:16 16
+[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+[    0.000000] L2C-310 ID prefetch enabled, offset 4 lines
+[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+[    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
+[    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x72860401
+[    0.000000] clocksource: tango-xtal: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 70787423951 ns
+[    0.000003] sched_clock: 32 bits at 27MHz, resolution 37ns, wraps every 79536431085ns
+[    0.007873] Switching to timer-based delay loop, resolution 37ns
+[    0.014146] Console: colour dummy device 80x30
+[    0.018616] console [tty0] enabled
+[    0.022039] bootconsole [palmchip0] disabled
 
-.....
+And it just hangs there...
 
-[    0.000000] Kernel command line: console=ttyS1,115200 
-root=/dev/mmcblk0p1 rootwait earlycon=uart8250,mmio,0x21c0600, 
-ramdisk_size=0x2000000 default_hugepagesz=2m hugepagesz=2m hugepages=256 
-crashkernel=1024M
-------------------------------------------------------------------------------------
+If I remove the panic() call, it boots normally, like this:
 
-I was trying two modes: direct boot (kexec -l than kexec -e) and kdump 
-(kexec -p than echo c > /proc/sysrq-trigger).
-
-Direct boot:
-------------------------------------------------------------------------------------
-root at ls2085ardb:~# kexec -l /boot/Image --initrd=/boot/initrd.cpio 
---command-line="console=ttyS1,115200 root=/dev/ram0 
-earlycon=uart8250,mmio,0x21c0600, 1 maxcpus=1 reset_devices" -d
-arch_process_options:147: command_line: console=ttyS1,115200 
-root=/dev/ram0 earlycon=uart8250,mmio,0x21c0600, 1 maxcpus=1 reset_devices
-arch_process_options:149: initrd: /boot/initrd.cpio
-arch_process_options:150: dtb: (null)
-Try gzip decompression.
-Try LZMA decompression.
-lzma_decompress_file: read on /boot/Image of 65536 bytes failed
-kernel: 0xffffac0f8010 kernel_size: 0xe80a00
-get_memory_ranges_iomem_cb: 0000000080000000 - 00000000ffffffff : System RAM
-get_memory_ranges_iomem_cb: 0000008080000000 - 00000083bfffffff : System RAM
-elf_arm64_probe: Not an ELF executable.
-image_arm64_load: kernel_segment: 0000000080000000
-image_arm64_load: text_offset:    0000000000080000
-image_arm64_load: image_size:     0000000000eea000
-image_arm64_load: phys_offset:    0000000080000000
-image_arm64_load: vp_offset:      ffffffffffffffff
-image_arm64_load: PE format:      yes
-.....
-kexec_load: entry = 0x817ed660 flags = 0xb70000
-nr_segments = 4
-segment[0].buf   = 0xffffac0f8010
-segment[0].bufsz = 0xe80a00
-segment[0].mem   = 0x80080000
-segment[0].memsz = 0xeea000
-segment[1].buf   = 0xffffab879010
-segment[1].bufsz = 0x87e800
-segment[1].mem   = 0x80f6a000
-segment[1].memsz = 0x87f000
-segment[2].buf   = 0x377b3e80
-segment[2].bufsz = 0x3d64
-segment[2].mem   = 0x817e9000
-segment[2].memsz = 0x4000
-segment[3].buf   = 0x377b7f20
-segment[3].bufsz = 0x31c8
-segment[3].mem   = 0x817ed000
-segment[3].memsz = 0x4000
-kexec_load failed: Device or resource busy
-entry       = 0x817ed660 flags = 0xb70000
-nr_segments = 4
-segment[0].buf   = 0xffffac0f8010
-segment[0].bufsz = 0xe80a00
-segment[0].mem   = 0x80080000
-segment[0].memsz = 0xeea000
-segment[1].buf   = 0xffffab879010
-segment[1].bufsz = 0x87e800
-segment[1].mem   = 0x80f6a000
-segment[1].memsz = 0x87f000
-segment[2].buf   = 0x377b3e80
-segment[2].bufsz = 0x3d64
-segment[2].mem   = 0x817e9000
-segment[2].memsz = 0x4000
-segment[3].buf   = 0x377b7f20
-segment[3].bufsz = 0x31c8
-segment[3].mem   = 0x817ed000
-segment[3].memsz = 0x4000
-root at ls2085ardb:~# kexec -e
-Nothing has been loaded!
-
-Not working for me:
-kexec_load failed: Device or resource busy
-
-
-kdump mode:
-------------------------------------------------------------------------------------
-root at ls2085ardb:~# kexec -p /boot/Image --initrd=/boot/initrd.cpio 
---command-line="console=ttyS1,115200 root=/dev/ram0 
-earlycon=uart8250,mmio,0x21c0600, 1 maxcpus=1 reset_devices" -d
-arch_process_options:147: command_line: console=ttyS1,115200 
-root=/dev/ram0 earlycon=uart8250,mmio,0x21c0600, 1 maxcpus=1 reset_devices
-arch_process_options:149: initrd: /boot/initrd.cpio
-arch_process_options:150: dtb: (null)
-Try gzip decompression.
-Try LZMA decompression.
-lzma_decompress_file: read on /boot/Image of 65536 bytes failed
-kernel: 0xffff86fa8010 kernel_size: 0xe80a00
-get_memory_ranges_iomem_cb: 0000000080000000 - 00000000ffffffff : System RAM
-get_memory_ranges_iomem_cb: 0000008080000000 - 00000083bfffffff : System RAM
-elf_arm64_probe: Not an ELF executable.
-image_arm64_load: kernel_segment: 00000000bfe00000
-image_arm64_load: text_offset:    0000000000080000
-image_arm64_load: image_size:     0000000000eea000
-image_arm64_load: phys_offset:    0000000080000000
-image_arm64_load: vp_offset:      ffffffffffffffff
-image_arm64_load: PE format:      yes
-Reserved memory range
-00000000bfe00000-00000000ffdfffff (0)
-Coredump memory ranges
-0000000080000000-00000000bfdfffff (0)
-00000000ffe00000-00000000ffffffff (0)
-0000008080000000-00000083bfffffff (0)
-kernel symbol _text vaddr = ffff000008080000
-load_crashdump_segments: page_offset:   ffff800000000000
 ...
-kexec_load: entry = 0xc15ed660 flags = 0xb70001
-nr_segments = 5
-segment[0].buf   = 0xffff86fa8010
-segment[0].bufsz = 0xe80a00
-segment[0].mem   = 0xbfe80000
-segment[0].memsz = 0xeea000
-segment[1].buf   = 0xffff86729010
-segment[1].bufsz = 0x87e800
-segment[1].mem   = 0xc0d6a000
-segment[1].memsz = 0x87f000
-segment[2].buf   = 0x36959590
-segment[2].bufsz = 0x3dc7
-segment[2].mem   = 0xc15e9000
-segment[2].memsz = 0x4000
-segment[3].buf   = 0x3695d690
-segment[3].bufsz = 0x31c8
-segment[3].mem   = 0xc15ed000
-segment[3].memsz = 0x4000
-segment[4].buf   = 0x36949490
-segment[4].bufsz = 0x400
-segment[4].mem   = 0xffdff000
-segment[4].memsz = 0x1000
-
-root at ls2085ardb:~# echo c > /proc/sysrroot at ls2085ardb:~# echo c > 
-/proc/sysrq-trigger
-
-[  265.274402] sysrq: SysRq : Trigger a crash
-[  265.278588] Unable to handle kernel NULL pointer dereference at 
-virtual address 00000000
-...
-[  265.750726] Starting crashdump kernel...
-[  265.754644] Some CPUs may be stale, kdump will be unreliable.
-[  265.760388] ------------[ cut here ]------------
-[  265.765006] WARNING: CPU: 0 PID: 1360 at 
-arch/arm64/kernel/machine_kexec.c:158 machine_kexec+0x44/0x280
+[    0.014147] Console: colour dummy device 80x30
+[    0.018616] console [tty0] enabled
+[    0.022039] bootconsole [palmchip0] disabled
+[    0.026345] Calibrating delay loop (skipped), value calculated using timer frequency.. 54.25 BogoMIPS (lpj=90000)
+[    0.026364] pid_max: default: 32768 minimum: 301
 ...
 
-root at ls2085ardb:~# ls -al /proc/
-...
--r--------    1 root     root     15048032256 Mar 28 15:36 vmcore
--r--r--r--    1 root     root             0 Mar 28 15:36 vmstat
--r--r--r--    1 root     root             0 Mar 28 15:36 zoneinfo
+Did I implement something wrong?
+Why am I not seeing the output of the panic() call, like I do
+with earlyprintk?
+Since tty0 is enabled, why isn't it picking up where palmchip0
+left off?
 
-After that watched through /proc/vmcore using gdb. Seems to be working
 
-Best Regards,
-Denys
+Earlier discussion:
+https://www.spinics.net/lists/linux-serial/msg16227.html
 
--- 
-Denys Zagorui
-GlobalLogic
-Kyiv, 03038, Protasov Business Park, N.Grinchenka, 2/1
-M +380673173093
-www.globallogic.com
 
-http://www.globallogic.com/email_disclaimer.txt
+This is the patch I'm using:
+
+diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+index 85a12f032402..2adabe788c17 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -172,3 +172,52 @@ static int __init early_omap8250_setup(struct earlycon_device *device,
+ OF_EARLYCON_DECLARE(omap8250, "ti,omap4-uart", early_omap8250_setup);
+ 
+ #endif
++
++#ifdef CONFIG_SERIAL_8250_RT288X
++
++extern unsigned int au_serial_in(struct uart_port *p, int offset);
++extern void au_serial_out(struct uart_port *p, int offset, int value);
++
++/*** Copy serial_putc with s/serial8250_early/au_serial/g ***/
++
++static void __init palmchip_putc(struct uart_port *port, int c)
++{
++	unsigned int status;
++
++	au_serial_out(port, UART_TX, c);
++
++	for (;;) {
++		status = au_serial_in(port, UART_LSR);
++		if ((status & BOTH_EMPTY) == BOTH_EMPTY)
++			break;
++		cpu_relax();
++	}
++}
++
++/*** Copy early_serial8250_write with s/serial_putc/palmchip_putc/g ***/
++
++static void __init early_palmchip_write(struct console *console,
++					const char *s, unsigned int count)
++{
++	struct earlycon_device *device = console->data;
++	struct uart_port *port = &device->port;
++
++	//extern void printascii(const char *); printascii("EARLY: ");
++	uart_console_write(port, s, count, palmchip_putc);
++}
++
++static int __init early_palmchip_setup(struct earlycon_device *device,
++				       const char *options)
++{
++	struct uart_port *port = &device->port;
++
++	if (!(device->port.membase || device->port.iobase))
++		return -ENODEV;
++
++	port->regshift = 2; /* Hard coding the value doesn't feel right */
++	device->con->write = early_palmchip_write;
++	return 0;
++}
++OF_EARLYCON_DECLARE(palmchip, "ralink,rt2880-uart", early_palmchip_setup);
++
++#endif
+diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
+index 080d5a59d0a7..7eb60146cb3f 100644
+--- a/drivers/tty/serial/8250/8250_port.c
++++ b/drivers/tty/serial/8250/8250_port.c
+@@ -313,7 +313,7 @@ static void default_serial_dl_write(struct uart_8250_port *up, int value)
+ 	-1,	/* UART_SCR (unmapped) */
+ };
+ 
+-static unsigned int au_serial_in(struct uart_port *p, int offset)
++/*static*/ unsigned int au_serial_in(struct uart_port *p, int offset)
+ {
+ 	if (offset >= ARRAY_SIZE(au_io_in_map))
+ 		return UINT_MAX;
+@@ -323,7 +323,7 @@ static unsigned int au_serial_in(struct uart_port *p, int offset)
+ 	return __raw_readl(p->membase + (offset << p->regshift));
+ }
+ 
+-static void au_serial_out(struct uart_port *p, int offset, int value)
++/*static*/ void au_serial_out(struct uart_port *p, int offset, int value)
+ {
+ 	if (offset >= ARRAY_SIZE(au_io_out_map))
+ 		return;
