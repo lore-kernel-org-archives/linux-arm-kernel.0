@@ -1,26 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 7 Apr 2017 17:13:35 +0100
-Subject: [PATCHv2 00/16] arm_pmu: ACPI support
-In-Reply-To: <20170407143006.GP19342@arm.com>
-References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
- <20170407143006.GP19342@arm.com>
-Message-ID: <20170407161335.GC858@leverpostej>
+From: Cristian.Birsan@microchip.com (m91496)
+Date: Fri, 7 Apr 2017 19:05:07 +0300
+Subject: [PATCH linux-next v3 2/4] usb: gadget: udc: atmel: Minor code
+ cleanup
+In-Reply-To: <87efx7ghkz.fsf@linux.intel.com>
+References: <cover.1491201365.git.cristian.birsan@microchip.com>
+ <1be887c4aeddab99e78238282b2cdd2ebc61a595.1491201365.git.cristian.birsan@microchip.com>
+ <87efx7ghkz.fsf@linux.intel.com>
+Message-ID: <d736c194-e827-8d48-2e10-900dc33c6808@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 03:30:06PM +0100, Will Deacon wrote:
-> On Thu, Apr 06, 2017 at 07:29:07PM +0100, Mark Rutland wrote:
-> > This series implements ACPI support in the ARM PMU code. It borrows some code
-> > from Jeremy's series [1], but takes a different approach to probing and
-> > association, using the usual hotplug state machine, minimising external changes
-> > required, and simplifying the relationship with the common arm_pmu code.
+Hi,
+
+The patch 2 does not apply because it's already on testing/next.
+
+I'll send a new patch series version that will apply clean on top of testing branch.
+
+Regards,
+Cristi
+
+On 05.04.2017 15:33, Felipe Balbi wrote:
 > 
-> Patches 12 and 13 seem unrelated to this series, and I've made some small
-> comments on a couple of other patches.
-
-Those were cleanup that relied on the GICC rework in this series.
-
-I'll drop those for v3, and send them separately once the rest is in.
-
-Thanks,
-Mark.
+> Hi,
+> 
+> cristian.birsan at microchip.com writes:
+>> From: Cristian Birsan <cristian.birsan@microchip.com>
+>>
+>> Minor code cleanup based on feedback received on mailinglist.
+>>
+>> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> 
+> patch 1 applied fine, patch 2 didn't. Please rebase on testing/next
+> 
