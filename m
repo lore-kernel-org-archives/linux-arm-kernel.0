@@ -1,80 +1,73 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 7 Apr 2017 20:33:07 +0200
-Subject: [PATCH] drm: dw-hdmi: Implement the mode_fixup drm helper
-In-Reply-To: <20170407121743.4142-1-romain.perier@collabora.com>
-References: <20170407121743.4142-1-romain.perier@collabora.com>
-Message-ID: <20170407183307.etouyzkwr6yzchan@phenom.ffwll.local>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat,  8 Apr 2017 02:34:30 +0800
+Subject: [PATCH v2 00/11] AXP803 PMIC support for Pine64
+Message-ID: <20170407183441.58750-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 02:17:43PM +0200, Romain Perier wrote:
-> This helper is supposed to validate or reject the modeline before it
-> applied by the mode setting. Currently this function has been dropped,
-> it was previously set to a dummy function that always returned true. For
-> both cases, this means that userspace can ask for a bad modeline that
-> will be always accepted.
-> 
-> On some platforms, like Rockchip, the drm dw_hdmi-rockchip variant driver
-> already implements the atomic_check drm helper, so mode_fixup cannot be
-> handled and implemented there (as drm_atomic_helper relies on either
-> atomic_check or mode_fixup).
-> 
-> This commit implements this helper. It only checks that this mode is
-> correct from the connector point of view
-> 
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+The Pine64 (including Pine64+) boards have an AXP803 PMIC, which is a PMIC
+similar to AXP288, but tweaked to use with Allwinner SoCs rather than Intel
+tablets (with DCIN and Vbus re-splitted like other AXP PMICs, and RSB bus
+support added).
 
-Yup this is how it's supposed to be done, check bridge limits in the
-bridge's mode_fixup hook.
+This patchset adds support for it and enabled it in Pine64 device tree.
 
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> ---
->  drivers/gpu/drm/bridge/dw-hdmi.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-> index 22211ff..3bd0807 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-> @@ -1740,6 +1740,21 @@ static int dw_hdmi_bridge_attach(struct drm_bridge *bridge)
->  	return 0;
->  }
->  
-> +
-> +static bool dw_hdmi_bridge_mode_fixup(struct drm_bridge *bridge,
-> +				      const struct drm_display_mode *orig_mode,
-> +				      struct drm_display_mode *mode)
-> +{
-> +	struct dw_hdmi *hdmi = bridge->driver_private;
-> +	struct drm_connector *connector = &hdmi->connector;
-> +	enum drm_mode_status status;
-> +
-> +	status = dw_hdmi_connector_mode_valid(connector, mode);
-> +	if (status != MODE_OK)
-> +		return false;
-> +	return true;
-> +}
-> +
->  static void dw_hdmi_bridge_mode_set(struct drm_bridge *bridge,
->  				    struct drm_display_mode *orig_mode,
->  				    struct drm_display_mode *mode)
-> @@ -1781,6 +1796,7 @@ static const struct drm_bridge_funcs dw_hdmi_bridge_funcs = {
->  	.enable = dw_hdmi_bridge_enable,
->  	.disable = dw_hdmi_bridge_disable,
->  	.mode_set = dw_hdmi_bridge_mode_set,
-> +	.mode_fixup = dw_hdmi_bridge_mode_fixup,
->  };
->  
->  static irqreturn_t dw_hdmi_i2c_irq(struct dw_hdmi *hdmi)
-> -- 
-> 2.9.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+This patchset can be splitted into two big parts:
+
+- Part1: PATCH 1/11 to PATCH 5/11, which are enabling the MFD (and the
+  power key functionality) of AXP803.
+
+- Part2: PATCH 6/11 to PATCH 11/11, which are enabling the regulator
+  function of the AXP803 PMIC. Finally Wi-Fi function is added
+  as a usage of regulators function.
+
+PATCH 1 and 2 added RSB and NMI device nodes, which are used for the
+communication between A64 and AXP803.
+
+PATCH 3 adds basical devicetree binding for AXP803.
+
+PATCH 4 adds support for the AXP803 variant in axp20x-rsb mfd driver.
+
+PATCH 5 enabled the AXP803 MFD in Pine64 device tree.
+
+PATCH 6 adds devicetree binding for the regulators in AXP803.
+
+PATCH 7 adds support for the regulators in AXP803 in the axp20x-regulator
+driver.
+
+PATCH 8 enabled the regulator MFD cell in AXP803.
+
+PATCH 9 adds a DTSI file for AXP803, just like what have been done for other
+AXPs.
+
+PATCH 10 enabled the regulators on Pine64.
+
+PATCH 11 enabled Wi-Fi support on Pine64, which required DLDO4 and ELDO1
+regulators.
+
+Icenowy Zheng (11):
+  arm64: allwinner: a64: enable RSB on A64
+  arm64: allwinner: a64: add NMI controller on A64
+  dt-bindings: add device tree binding for X-Powers AXP803 PMIC
+  mfd: axp20x: support AXP803 variant
+  arm64: allwinner: a64: add AXP803 node to Pine64 device tree
+  dt-bindings: add AXP803's regulator info
+  regulator: axp20x-regulator: add support for AXP803
+  mfd: axp20x: add axp20x-regulator cell for AXP803
+  arm64: allwinner: a64: add DTSI file for AXP803 PMIC
+  arm64: allwinner: a64: enable AXP803 regulators for Pine64
+  arm64: allwinner: a64: enable Wi-Fi for Pine64
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt   |  32 ++++-
+ arch/arm64/boot/dts/allwinner/axp803.dtsi          | 150 ++++++++++++++++++++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 136 +++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  27 ++++
+ drivers/mfd/axp20x-rsb.c                           |   1 +
+ drivers/mfd/axp20x.c                               |  81 +++++++++++
+ drivers/regulator/axp20x-regulator.c               | 151 ++++++++++++++++++---
+ include/linux/mfd/axp20x.h                         |  77 ++++++++++-
+ 8 files changed, 631 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.12.2
