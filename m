@@ -1,82 +1,108 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Fri,  7 Apr 2017 16:19:05 +0200
-Subject: [PATCH 2/2] drm: dw-hdmi: Gate audio clock from the I2S enablement
- callbacks
-In-Reply-To: <20170407141905.14147-1-romain.perier@collabora.com>
-References: <20170407141905.14147-1-romain.perier@collabora.com>
-Message-ID: <20170407141905.14147-3-romain.perier@collabora.com>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Fri, 7 Apr 2017 14:22:14 +0000
+Subject: at91: serial: Can't use DMA on 4.x kernels in RS-485 mode on
+ at91sam9x5
+In-Reply-To: <DM5PR05MB295425DD88B5A8ADF88B81F8BB0B0@DM5PR05MB2954.namprd05.prod.outlook.com>
+References: <DM5PR05MB2954D56C2E266AF16B250ACCBB0B0@DM5PR05MB2954.namprd05.prod.outlook.com>
+ <20170404203249.GA4416@gradator.net>
+ <DM5PR05MB295425DD88B5A8ADF88B81F8BB0B0@DM5PR05MB2954.namprd05.prod.outlook.com>
+Message-ID: <DM5PR05MB29548291A13C348889156EDDBB0C0@DM5PR05MB2954.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
-step E. and is kept enabled for later use. This clock should be enabled
-and disabled along with the actual audio stream and not always on (that
-is bad for PM). Futhermore, as described by the datasheet, the I2S
-variant need to gate/ungate the clock when the stream is
-enabled/disabled.
+All,
 
-This commit adds a parameter to hdmi_audio_enable_clk() that controls
-when the audio sample clock must be enabled or disabled. Then, it adds
-the call to this function from dw_hdmi_i2s_audio_enable() and
-dw_hdmi_i2s_audio_disable().
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Bryan Evenson
+> Sent: Tuesday, April 04, 2017 4:48 PM
+> To: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: at91: serial: Can't use DMA on 4.x kernels in RS-485 mode on
+> at91sam9x5
+> 
+> 
+> Hi Sylvain,
+> 
+> > -----Original Message-----
+> > From: Sylvain Rochet [mailto:sylvain.rochet at finsecur.com]
+> > Sent: Tuesday, April 04, 2017 4:33 PM
+> > To: Bryan Evenson <bevenson@melinkcorp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; Nicolas Ferre
+> > <nicolas.ferre@atmel.com>
+> > Subject: Re: at91: serial: Can't use DMA on 4.x kernels in RS-485 mode
+> > on
+> > at91sam9x5
+> >
+> > Hi Bryan,
+> >
+> > On Tue, Apr 04, 2017 at 08:28:34PM +0000, Bryan Evenson wrote:
+> > >
+> > > With the 3.10 kernel, I had to use the TX DMA only.  For some reason
+> > > receive wouldn't work for me with the DMA.  Now with the latest on
+> > > the
+> > > linux-4.4-at91 branch I can't use the TX DMA.  The data is
+> > > transmitted correctly out the USART (verified on a receiving
+> > > device), but then the return message is not received.  I verified
+> > > the same results when both RX&TX DMA was enabled and only when the
+> > > TX DMA was enabled.  If I use only the RX DMA, everything works fine
+> > > if I have only one device on the RS-485 port.  As soon as I daisy
+> > > chain more than one device on an
+> > > RS-485 port, then I start dropping messages.  If I turn off both the
+> > > RX and TX DMA, then all data transfers work just fine.
+> > >
+> > > I'd like to get both TX and RX DMA working for all three RS-485 ports.
+> > > Anyone have any suggestions for what to look at to get DMA working
+> > > while in RS-485 mode?  I'm planning to start trying a git bisect,
+> > > but given these are different branches I wasn't sure how well that
+> > > was going to work.
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- drivers/gpu/drm/bridge/dw-hdmi.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+I found a working version with my setup.  Back at commit 1e1257860fd10487795b782f1dbb5b5f2c203474 (https://github.com/linux4sam/linux-at91/commit/1e1257860fd10487795b782f1dbb5b5f2c203474) I can use both RX and TX DMA on the RS-485 ports.  As recent as commit b6f9cb564bcbfff46dc618bb7c246369194dfe11 (https://github.com/linux4sam/linux-at91/commit/b6f9cb564bcbfff46dc618bb7c246369194dfe11) neither the RX or TX DMA work for my RS-485 ports.  I've been trying to bisect, but this has been slow going as I keep getting builds that don't boot (probably because I get a commit that is in the middle of a series).  I'm assuming the change either has to do with the Atmel device tree, the Atmel DMA driver or the Atmel serial port driver.  My current git bisect I started as follows:
 
-diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-index d34e0a5..3bd0807 100644
---- a/drivers/gpu/drm/bridge/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-@@ -559,6 +559,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
- }
- EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
- 
-+static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
-+{
-+	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
-+		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-+}
-+
- void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
- {
- 	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-@@ -572,12 +578,13 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
- void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
- {
- 	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-+	hdmi_enable_audio_clk(hdmi, true);
- }
- 
- 
- void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
- {
--
-+	hdmi_enable_audio_clk(hdmi, false);
- }
- 
- void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
-@@ -1365,11 +1372,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
- 	}
- }
- 
--static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
--{
--	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
--}
--
- /* Workaround to clear the overflow condition */
- static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
- {
-@@ -1471,7 +1473,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
- 
- 		/* HDMI Initialization Step E - Configure audio */
- 		hdmi_clk_regenerator_update_pixel_clock(hdmi);
--		hdmi_enable_audio_clk(hdmi);
-+		hdmi_enable_audio_clk(hdmi, true);
- 	}
- 
- 	/* not for DVI mode */
--- 
-2.9.3
+git bisect start -- arch/arm/boot/dts/at91* drivers/tty/serial/atmel_serial.c drivers/dma/at_*
+
+If there a section of source code that I should also focus on or if someone knows of a specific change I should test, I'd appreciate the suggestion.
+
+Thanks,
+Bryan
+
+> >
+> > Did you check that you didn't run out of available DMA channels on
+> > each DMA controller ? AT91SAM9G25 unfortunately doesn't have much of
+> them.
+> >
+> 
+> Here's what dmesg is telling me about the DMA channel access when I am
+> enabling DMA on TX only.
+> 
+> root at at91sam9x5ek:~# dmesg | grep -E '(DMA|dma)'
+> [    0.109375] DMA: preallocated 256 KiB pool for atomic coherent allocations
+> [    0.210937] at_hdmac ffffec00.dma-controller: Atmel AHB DMA Controller (
+> cpy set slave sg-cpy ), 8 channels
+> [    0.218750] at_hdmac ffffee00.dma-controller: Atmel AHB DMA Controller (
+> cpy set slave sg-cpy ), 8 channels
+> [    0.234375] at91_i2c f8010000.i2c: using dma0chan0 (tx) and dma0chan1 (rx)
+> for DMA transfers
+> [    0.765625] atmel_nand 40000000.nand: Using dma0chan2 for DMA
+> transfers.
+> [    0.914062] atmel_spi f0004000.spi: Using dma1chan0 (tx) and dma1chan1
+> (rx) for DMA transfers
+> [   22.351562] atmel_usart f8020000.serial: using dma0chan3 for tx DMA
+> transfers
+> [   22.406250] atmel_usart f8028000.serial: using dma1chan2 for tx DMA
+> transfers
+> [   23.078125] atmel_usart f801c000.serial: using dma0chan4 for tx DMA
+> transfers
+> 
+> It looks like there should be enough DMA channels left (eight by my count)
+> for me to also enable RX DMA on all three USARTs.
+> 
+> Thanks,
+> Bryan
+> 
+> > Sylvain
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
