@@ -1,183 +1,355 @@
-From: hoeun.ryu@gmail.com (Ho-Eun Ryu)
-Date: Fri, 7 Apr 2017 17:09:18 +0900
-Subject: [RFC v2][PATCH 01/11] Introduce rare_write() infrastructure
-In-Reply-To: <1490811363-93944-2-git-send-email-keescook@chromium.org>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-2-git-send-email-keescook@chromium.org>
-Message-ID: <FDCFFA43-5B6D-42CB-A65C-5FA485B64C7A@gmail.com>
+From: lipengcheng8@huawei.com (Li Pengcheng)
+Date: Fri, 7 Apr 2017 16:06:58 +0800
+Subject: [PATCH] arm64: dts: Add coresight DT nodes for hi6220-hikey
+Message-ID: <1491552418-74386-1-git-send-email-lipengcheng8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add coresight DT nodes for hikey board.
 
-> On 30 Mar 2017, at 3:15 AM, Kees Cook <keescook@chromium.org> wrote:
-> 
-> Several types of data storage exist in the kernel: read-write data (.data,
-> .bss), read-only data (.rodata), and RO-after-init. This introduces the
-> infrastructure for another type: write-rarely, which is intended for data
-> that is either only rarely modified or especially security-sensitive. The
-> goal is to further reduce the internal attack surface of the kernel by
-> making this storage read-only when "at rest". This makes it much harder
-> to be subverted by attackers who have a kernel-write flaw, since they
-> cannot directly change these memory contents.
-> 
-> This work is heavily based on PaX and grsecurity's pax_{open,close}_kernel
-> API, its __read_only annotations, its constify plugin, and the work done
-> to identify sensitive structures that should be moved from .data into
-> .rodata. This builds the initial infrastructure to support these kinds
-> of changes, though the API and naming has been adjusted in places for
-> clarity and maintainability.
-> 
-> Variables declared with the __wr_rare annotation will be moved to the
-> .rodata section if an architecture supports CONFIG_HAVE_ARCH_WRITE_RARE.
-> To change these variables, either a single rare_write() macro can be used,
-> or multiple uses of __rare_write(), wrapped in a matching pair of
-> rare_write_begin() and rare_write_end() macros can be used. These macros
-> are expanded into the arch-specific functions that perform the actions
-> needed to write to otherwise read-only memory.
-> 
-> As detailed in the Kconfig help, the arch-specific helpers have several
-> requirements to make them sensible/safe for use by the kernel: they must
-> not allow non-current CPUs to write the memory area, they must run
-> non-preemptible to avoid accidentally leaving memory writable, and must
-> be inline to avoid making them desirable ROP targets for attackers.
-> 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> arch/Kconfig             | 25 +++++++++++++++++++++++++
-> include/linux/compiler.h | 32 ++++++++++++++++++++++++++++++++
-> include/linux/preempt.h  |  6 ++++--
-> 3 files changed, 61 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index cd211a14a88f..5ebf62500b99 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -847,4 +847,29 @@ config STRICT_MODULE_RWX
-> config ARCH_WANT_RELAX_ORDER
-> 	bool
-> 
-> +config HAVE_ARCH_RARE_WRITE
-> +	def_bool n
-> +	help
-> +	  An arch should select this option if it has defined the functions
-> +	  __arch_rare_write_begin() and __arch_rare_write_end() to
-> +	  respectively enable and disable writing to read-only memory. The
-> +	  routines must meet the following requirements:
-> +	  - read-only memory writing must only be available on the current
-> +	    CPU (to make sure other CPUs can't race to make changes too).
-> +	  - the routines must be declared inline (to discourage ROP use).
-> +	  - the routines must not be preemptible (likely they will call
-> +	    preempt_disable() and preempt_enable_no_resched() respectively).
-> +	  - the routines must validate expected state (e.g. when enabling
-> +	    writes, BUG() if writes are already be enabled).
-> +
-> +config HAVE_ARCH_RARE_WRITE_MEMCPY
-> +	def_bool n
-> +	depends on HAVE_ARCH_RARE_WRITE
-> +	help
-> +	  An arch should select this option if a special accessor is needed
-> +	  to write to otherwise read-only memory, defined by the function
-> +	  __arch_rare_write_memcpy(). Without this, the write-rarely
-> +	  infrastructure will just attempt to write directly to the memory
-> +	  using a const-ignoring assignment.
-> +
-> source "kernel/gcov/Kconfig"
-> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-> index f8110051188f..274bd03cfe9e 100644
-> --- a/include/linux/compiler.h
-> +++ b/include/linux/compiler.h
-> @@ -336,6 +336,38 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
-> 	__u.__val;					\
-> })
-> 
-> +/*
-> + * Build "write rarely" infrastructure for flipping memory r/w
-> + * on a per-CPU basis.
-> + */
-> +#ifndef CONFIG_HAVE_ARCH_RARE_WRITE
-> +# define __wr_rare
-> +# define __wr_rare_type
-> +# define __rare_write(__var, __val)	(__var = (__val))
-> +# define rare_write_begin()		do { } while (0)
-> +# define rare_write_end()		do { } while (0)
-> +#else
-> +# define __wr_rare			__ro_after_init
-> +# define __wr_rare_type			const
-> +# ifdef CONFIG_HAVE_ARCH_RARE_WRITE_MEMCPY
-> +#  define __rare_write_n(dst, src, len)	({			\
-> +		BUILD_BUG(!builtin_const(len));			\
-> +		__arch_rare_write_memcpy((dst), (src), (len));	\
-> +	})
-> +#  define __rare_write(var, val)  __rare_write_n(&(var), &(val), sizeof(var))
-> +# else
-> +#  define __rare_write(var, val)  ((*(typeof((typeof(var))0) *)&(var)) = (val))
-> +# endif
-> +# define rare_write_begin()	__arch_rare_write_begin()
-> +# define rare_write_end()	__arch_rare_write_end()
-> +#endif
-> +#define rare_write(__var, __val) ({			\
-> +	rare_write_begin();				\
-> +	__rare_write(__var, __val);			\
-> +	rare_write_end();				\
-> +	__var;						\
-> +})
-> +
+Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
+---
+ .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 318 +++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   1 +
+ 2 files changed, 319 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
 
-How about we have a separate header file splitting section annotations and the actual APIs.
-
-include/linux/compiler.h:
-    __wr_rare
-    __wr_rare_type
-
-include/linux/rare_write.h:
-    __rare_write_n()
-    __rare_write()
-    rare_write_begin()
-    rare_write_end()
-
-OR moving all of them to include/linux/rare_write.h.
-
-I?m writing the arm64 port for rare_write feature and I?ve stucked in some header problems for the next version of the patch.
-I need some other mmu related APIs (mostly defined in `arch/arm64/include/asm/mmu_context.h`) to implement those helpers.
-but I cannot include the header in `include/linux/compiler.h` prior to definition of rare_write macros (huge compilation errors).
-You know that `linux/compiler.h` header is mostly base of other headers not a user.
-
-I have to define `__arch_rare_write_[begin/end/memcpy]()` functions as `static inline` in a header file somewhere in `arch/arm64/include/asm/`
-to avoid making them ROP targets and the helpers need other mmu related APIs.
-And the helpers and the mmu related APIs cannot be defined prior to definition of rare_write macros in `linux/compile.h`.
-
-And I think I'll need `include/linux/module.h` for module related APIs like `is_module_address()` to support module address conversion
-in `__arch_rare_write_memcpy()` and it?ll make the situation worse.
-
-* make `include/linux/rare_write.h`
-* the header defines rare_write APIs
-* the header includes `include/asm/rare_write.h` for arch-specific helpers
-* users using rare_write feature should include `linux/rare_write.h`
-
-OR suggest other solutions please.
-
-> #endif /* __KERNEL__ */
-> 
-> #endif /* __ASSEMBLY__ */
-> diff --git a/include/linux/preempt.h b/include/linux/preempt.h
-> index cae461224948..4fc97aaa22ea 100644
-> --- a/include/linux/preempt.h
-> +++ b/include/linux/preempt.h
-> @@ -258,10 +258,12 @@ do { \
-> /*
->  * Modules have no business playing preemption tricks.
->  */
-> -#undef sched_preempt_enable_no_resched
-> -#undef preempt_enable_no_resched
-> #undef preempt_enable_no_resched_notrace
-> #undef preempt_check_resched
-> +#ifndef CONFIG_HAVE_ARCH_RARE_WRITE
-> +#undef sched_preempt_enable_no_resched
-> +#undef preempt_enable_no_resched
-> +#endif
-> #endif
-> 
-> #define preempt_set_need_resched() \
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+new file mode 100644
+index 0000000..a523e43
+--- /dev/null
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+@@ -0,0 +1,318 @@
++/*
++ * Hisilicon Ltd. Hi6220 SoC
++ *
++ * Copyright (C) 2015-2016 Hisilicon Ltd.
++ * Author: lipengcheng  <lipengcheng8@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * publishhed by the Free Software Foundation.
++ */
++/ {
++	amba {
++		/* A53 cluster0 internal coresight */
++		#address-cells = <2>;
++		#size-cells = <2>;
++		compatible = "arm,amba-bus";
++		ranges;
++		etm at 0,f659c000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf659c000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu0>;
++			port {
++				etm0_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port0>;
++				};
++			};
++		};
++
++		etm at 1,f659d000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf659d000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu1>;
++			port {
++				etm1_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port1>;
++				};
++			};
++
++		};
++
++		etm at 2,f659e000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf659e000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu2>;
++			port {
++				etm2_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port2>;
++				};
++			};
++		};
++
++		etm at 3,f659f000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf659f000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu3>;
++			port {
++				etm3_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port3>;
++				};
++			};
++		};
++
++		/* A53 cluster1 internal coresight */
++		etm at 4,f65dc000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf65dc000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu4>;
++			port {
++				etm4_out_port: endpoint {
++				remote-endpoint = <&funnel0_in_port4>;
++				};
++			};
++		};
++
++		etm at 5,f65dd000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf65dd000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu5>;
++			port {
++				etm5_out_port: endpoint {
++				remote-endpoint = <&funnel0_in_port5>;
++				};
++			};
++		};
++
++		etm at 6,f65de000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf65de000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu6>;
++			port {
++				etm6_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port6>;
++				};
++			};
++		};
++
++		etm at 7,f65df000 {
++			compatible = "arm,coresight-etm4x","arm,primecell";
++			reg = <0 0xf65df000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu7>;
++			port {
++				etm7_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port7>;
++				};
++			};
++		};
++
++		funnel0:funnel at 0,f6501000 {
++			compatible = "arm,coresight-funnel","arm,primecell";
++			reg = <0 0xf6501000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				/* funnel output port */
++				port at 0 {
++					reg = <0>;
++					funnel0_out_port: endpoint {
++						remote-endpoint = <&funnel1_in_port>;
++					};
++				};
++
++				/* funnel input ports */
++				port at 1 {
++					reg = <0>;
++					funnel0_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm0_out_port>;
++					};
++				};
++
++				port at 2 {
++					reg = <1>;
++					funnel0_in_port1: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm1_out_port>;
++					};
++				};
++
++				port at 3 {
++					reg = <2>;
++					funnel0_in_port2: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm2_out_port>;
++					};
++				};
++
++				port at 4 {
++					reg = <3>;
++					funnel0_in_port3: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm3_out_port>;
++					};
++				};
++
++				port at 5 {
++					reg = <4>;
++					funnel0_in_port4: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm4_out_port>;
++					};
++				};
++
++				port at 6 {
++					reg = <5>;
++					funnel0_in_port5: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm5_out_port>;
++					};
++				};
++
++				port at 7 {
++					reg = <6>;
++					funnel0_in_port6: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm6_out_port>;
++					};
++				};
++
++				port at 8 {
++					reg = <7>;
++					funnel0_in_port7: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm7_out_port>;
++					};
++				};
++			};
++		};
++
++		funnel1:funnel at 1,f6401000 {
++			compatible = "arm,coresight-funnel","arm,primecell";
++			reg = <0 0xf6401000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				/* funnel1 output port */
++				port at 0 {
++					reg = <0>;
++					funnel1_out_port: endpoint {
++						remote-endpoint = <&etf_in_port>;
++					};
++				};
++
++				/* funnel1 input port */
++				port at 1 {
++					reg = <0>;
++					funnel1_in_port: endpoint {
++						slave-mode;
++						remote-endpoint = <&funnel0_out_port>;
++					};
++				};
++			};
++		};
++		etf:etf at 0,f6402000 {
++			compatible = "arm,coresight-tmc","arm,primecell";
++			reg = <0 0xf6402000 0 0x1000>;
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				/* etf input port */
++				port at 0 {
++					reg = <0>;
++					etf_in_port: endpoint {
++						slave-mode;
++						remote-endpoint = <&funnel1_out_port>;
++					};
++				};
++				/* etf output port */
++				port at 1 {
++					reg = <0>;
++					etf_out_port: endpoint {
++						remote-endpoint = <&replicator0_in_port>;
++					};
++				};
++			};
++		};
++
++		replicator at 0{
++			compatible = "arm,coresight-replicator";
++
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				/* replicator input port  */
++				port at 0 {
++					reg = <0>;
++					replicator0_in_port: endpoint{
++					slave-mode;
++					remote-endpoint = <&etf_out_port>;
++					};
++				};
++				/* replicator out port  */
++				port at 1 {
++					reg = <0>;
++					replicator0_out_port: endpoint {
++						remote-endpoint = <&etr0_in_port>;
++					};
++				};
++			};
++		};
++
++		etr at 0,f6404000 {
++			compatible = "arm,coresight-tmc","arm,primecell";
++			reg = <0 0xf6404000 0 0x1000>;
++
++			coresight-default-sink;
++			clocks = <&sys_ctrl HI6220_CS_ATB>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				/* etr input port  */
++				port at 0 {
++					etr0_in_port: endpoint{
++					slave-mode;
++					remote-endpoint = <&replicator0_out_port>;
++					};
++				};
++			};
++		};
++	};
++};
++
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index dba3c13..fb70c9b 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -8,6 +8,7 @@
+ /dts-v1/;
+ #include "hi6220.dtsi"
+ #include "hikey-pinctrl.dtsi"
++#include "hi6220-coresight.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+-- 
+2.1.0
