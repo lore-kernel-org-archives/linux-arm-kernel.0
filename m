@@ -1,45 +1,74 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 07 Apr 2017 23:21:40 +1000
-Subject: [7/7] crypto: caam/qi - add ablkcipher and authenc algorithms
-In-Reply-To: <58E4D9C3.4070406@nxp.com>
-References: <20170317100602.2837-8-horia.geanta@nxp.com>
- <87vaqkvk6c.fsf@concordia.ellerman.id.au> <58E39F90.6050408@nxp.com>
- <87lgrftbgl.fsf@concordia.ellerman.id.au> <58E4D9C3.4070406@nxp.com>
-Message-ID: <87inmggxp7.fsf@concordia.ellerman.id.au>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri,  7 Apr 2017 14:22:22 +0100
+Subject: [PATCH] acpi: pci: don't ignore function ID of bridge device in _PRT
+Message-ID: <20170407132222.28300-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurentiu Tudor <laurentiu.tudor@nxp.com> writes:
+We currently derive legacy interrupt routing by matching _PRT
+entries on the PCI device only, presumably under the assumption
+that PRT entries always have a value of 0xffff in the function
+field, meaning 'match all functions'.
 
-> On 04/05/2017 01:06 PM, Michael Ellerman wrote:
->> Laurentiu Tudor <laurentiu.tudor@nxp.com> writes:
->>
->>> Hi Michael,
->>>
->>> Just a couple of basic things to check:
->>>    - was the dtb updated to the newest?
->>
->> Possibly not, it's an automated build/boot, I'll have to check what it
->> does with the dtb.
->>
->>>    - is the qman node present? This should be easily visible in
->>> /proc/device-tree/soc at ffe000000/qman at 318000.
->>
->> No it's not there.
->>
->> That's running linux-next with:
->>
->> CONFIG_CRYPTO_DEV_FSL_CAAM_CRYPTO_API_QI=n
->>
->>
->> Does that mean I didn't update the device tree?
->
-> I think so. Also, I just checked that the node is actually there by 
-> compiling p5020ds.dts and then decompiling the dtb.
+This no longer holds for modern PCIe topologies, where the
+legacy interrupts for different slots may be wired to different
+functions on the same bridge device. For instance, on AMD Seattle,
+we may have something like
 
-OK, I'll make sure I update the DTB.
+-[0000:00]-+-00.0  Advanced Micro Devices, Inc. [AMD] Device 1a00
+           +-02.0  Advanced Micro Devices, Inc. [AMD] Device 1a01
+           +-02.2-[01]----00.0  Renesas uPD720202 USB 3.0 Host Controller
+           \-02.3-[02]----00.0  Realtek RTL8169 PCIe Gigabit Ethernet
 
-It will still be good if the code was a bit more robust about the qman
-being missing.
+where the _PRT describes the legacy interrupt routing as
 
-cheers
+    Name (_PRT, Package ()  // _PRT: PCI Routing Table
+    {
+        // slot 1: dev 2 fn 1
+        Package () { 0x20001, 0x0, 0x0, 0x140 },
+        Package () { 0x20001, 0x1, 0x0, 0x141 },
+        Package () { 0x20001, 0x2, 0x0, 0x142 },
+        Package () { 0x20001, 0x3, 0x0, 0x143 },
+
+        // slot 1: dev 2 fn 2
+        Package () { 0x20002, 0x0, 0x0, 0x144 },
+        Package () { 0x20002, 0x1, 0x0, 0x145 },
+        Package () { 0x20002, 0x2, 0x0, 0x146 },
+        Package () { 0x20002, 0x3, 0x0, 0x147 },
+
+        // slot 1: dev 2 fn 3
+        Package () { 0x20003, 0x0, 0x0, 0x148 },
+        Package () { 0x20003, 0x1, 0x0, 0x149 },
+        Package () { 0x20003, 0x2, 0x0, 0x14a },
+        Package () { 0x20003, 0x3, 0x0, 0x14b }
+    }) // _PRT
+
+The current code always matches on the first entry when trying to
+derive the legacy interrupt routing for the USB and Ethernet controllers
+behind bridges 02.2 and 02.3, which results in the wrong entry to
+be selected.
+
+So fix this by matching the function ID to the value in the _PRT entry
+if the _PRT entries are not using 0xffff in the lower word to match
+all functions.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/acpi/pci_irq.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/acpi/pci_irq.c b/drivers/acpi/pci_irq.c
+index c576a6fe4ebb..caac4ac94418 100644
+--- a/drivers/acpi/pci_irq.c
++++ b/drivers/acpi/pci_irq.c
+@@ -160,6 +160,8 @@ static int acpi_pci_irq_check_entry(acpi_handle handle, struct pci_dev *dev,
+ 	struct acpi_prt_entry *entry;
+ 
+ 	if (((prt->address >> 16) & 0xffff) != device ||
++	    ((prt->address & 0xffff) != 0xffff &&
++	     (prt->address & 0xffff) != PCI_FUNC(dev->devfn)) ||
+ 	    prt->pin + 1 != pin)
+ 		return -ENODEV;
+ 
+-- 
+2.9.3
