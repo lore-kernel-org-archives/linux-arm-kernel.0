@@ -1,57 +1,124 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Apr 2017 15:29:09 +0100
-Subject: [PATCHv2 15/16] arm64: pmuv3: handle !PMUv3 when probing
-In-Reply-To: <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
-References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
- <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170407142908.GO19342@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 07 Apr 2017 15:29:36 +0100
+Subject: [RFC kvm-unit-tests PATCH 8/8] Makefiles: fix up the arm build
+ include and link paths
+In-Reply-To: <20170407135658.nayjvdgm4jgtbqqo@kamzik.brq.redhat.com>
+References: <20170406190727.5624-1-alex.bennee@linaro.org>
+ <20170406190727.5624-9-alex.bennee@linaro.org>
+ <20170407135658.nayjvdgm4jgtbqqo@kamzik.brq.redhat.com>
+Message-ID: <87h9209tpr.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 07:29:22PM +0100, Mark Rutland wrote:
-> When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
-> compatible PMU. Thus we need to consult ID registers during probe time.
-> 
-> This patch updates our PMUv3 probing code to test for the presence of
-> PMUv3 functionality before touching an PMUv3-specific registers, and
-> before updating the struct arm_pmu with PMUv3 data.
-> 
-> When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 85 ++++++++++++++++++++++++++++++++++--------
->  1 file changed, 69 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 57ae9d9..50790d7 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -957,11 +957,24 @@ static int armv8_vulcan_map_event(struct perf_event *event)
->  				ARMV8_PMU_EVTYPE_EVENT);
->  }
->  
-> +struct armv8pmu_probe_info {
-> +	struct arm_pmu *pmu;
-> +	bool present;
-> +};
-> +
->  static void __armv8pmu_probe_pmu(void *info)
->  {
-> -	struct arm_pmu *cpu_pmu = info;
-> +	struct armv8pmu_probe_info *probe = info;
-> +	struct arm_pmu *cpu_pmu = probe->pmu;
-> +	u64 dfr0;
->  	u32 pmceid[2];
->  
-> +	dfr0 = read_sysreg(id_aa64dfr0_el1);
-> +	if (((dfr0 >> ID_AA64DFR0_PMUVER_SHIFT) & 0xf) != 1)
-> +		return;
 
-Shouldn't we be using one of those fancy cpuid_feature_extract_*_field helpers?
+Andrew Jones <drjones@redhat.com> writes:
 
-It would also be worth spinning this up on qemu, if you get a chance, as
-I don't think that implements the PMU.
+> On Thu, Apr 06, 2017 at 08:07:27PM +0100, Alex Benn?e wrote:
+>> We still need to tell the compiler the correct search path for finding
+>> headers and the like. This is slightly complicated by the "dynamic"
+>> asm search path which is in our build tree but (may be) symlinked to
+>> the right architectures headers.
+>>
+>> Also we explicitly include SRCDIR for the linking scripts as VPATH
+>> doesn't seem to find them well enough.
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> ---
+>>  arm/Makefile.common     | 15 +++++++++------
+>>  scripts/asm-offsets.mak |  4 +++-
+>>  2 files changed, 12 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arm/Makefile.common b/arm/Makefile.common
+>> index 74c7394..b1fead1 100644
+>> --- a/arm/Makefile.common
+>> +++ b/arm/Makefile.common
+>> @@ -16,7 +16,10 @@ tests-common += $(TEST_DIR)/pmu.flat
+>>  tests-common += $(TEST_DIR)/gic.flat
+>>  tests-common += $(TEST_DIR)/psci.flat
+>>
+>> -tests-all = $(tests-common) $(tests)
+>> +scripts-common += $(TEST_DIR)/run
+>> +scripts-common += $(TEST_DIR)/unittests.cfg
+>> +
+>> +tests-all = $(tests-common) $(tests) $(scripts_common)
+>>  all: $(tests-all)
+>>
+>>  ##################################################################
+>> @@ -26,13 +29,13 @@ CFLAGS += -std=gnu99
+>>  CFLAGS += -ffreestanding
+>>  CFLAGS += -Wextra
+>>  CFLAGS += -O2
+>> -CFLAGS += -I lib -I lib/libfdt
+>> +CFLAGS += -I $(SRCDIR)/lib -I $(SRCDIR)/lib/libfdt -I lib
+>>
+>>  # We want to keep intermediate files
+>>  .PRECIOUS: %.elf %.o
+>>
+>>  asm-offsets = lib/$(ARCH)/asm-offsets.h
+>> -include scripts/asm-offsets.mak
+>> +include $(SRCDIR)/scripts/asm-offsets.mak
+>>
+>>  cflatobjs += lib/util.o
+>>  cflatobjs += lib/alloc.o
+>> @@ -60,11 +63,11 @@ start_addr := $(shell printf "%x\n" $$(( $(phys_base) + $(kernel_offset) )))
+>>
+>>  FLATLIBS = $(libcflat) $(LIBFDT_archive) $(libgcc) $(libeabi)
+>>  %.elf: LDFLAGS = $(CFLAGS) -nostdlib
+>> -%.elf: %.o $(FLATLIBS) arm/flat.lds $(cstart.o)
+>> +%.elf: %.o $(FLATLIBS) $(SRCDIR)/arm/flat.lds $(cstart.o)
+>>  	$(CC) $(LDFLAGS) -o $@ \
+>> -		-Wl,-T,arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
+>> +		-Wl,-T,$(SRCDIR)/arm/flat.lds,--build-id=none,-Ttext=$(start_addr) \
+>>  		$(filter %.o, $^) $(FLATLIBS) \
+>> -		lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
+>> +		$(SRCDIR)/lib/auxinfo.c -DPROGNAME=\"$(@:.elf=.flat)\"
+>>
+>>  %.flat: %.elf
+>>  	$(OBJCOPY) -O binary $^ $@
+>> diff --git a/scripts/asm-offsets.mak b/scripts/asm-offsets.mak
+>> index b2578a6..ecf583f 100644
+>> --- a/scripts/asm-offsets.mak
+>> +++ b/scripts/asm-offsets.mak
+>> @@ -29,11 +29,13 @@ define make_asm_offsets
+>>  endef
+>>
+>>  $(asm-offsets:.h=.s): $(asm-offsets:.h=.c)
+>> +	mkdir -p $(dir $@)
+>>  	$(CC) $(CFLAGS) -fverbose-asm -S -o $@ $<
+>
+> For some reason I'm not a big fan of all these mkdirs getting sprinkled
+> around.  Maybe we can just have the arch makefiles be sure to create
+> lib/$(ARCH) first?
 
-Will
+Yeah I guess its a bit of a hammer to crack a nut. I guess the correct
+way to deal with it is to have a proper dependency for build
+directories.
+
+I spent some time looking at QEMU's build-systems approach to it but
+there was some deep magic involved so I went simple instead.
+
+>>  $(asm-offsets): $(asm-offsets:.h=.s)
+>>  	$(call make_asm_offsets)
+>> -	cp -f $(asm-offsets) lib/generated
+>> +	mkdir -p lib/generated
+>
+> Could make this directory from configure
+
+Sure. I guess it depends on if we are likely to see other such
+directories need creating.
+
+>
+>> +	cp -f $(asm-offsets) lib/generated/
+>>
+>>  asm_offsets_clean:
+>>  	$(RM) $(asm-offsets) $(asm-offsets:.h=.s) \
+>> --
+>> 2.11.0
+>>
+>
+> Thanks,
+> drew
+
+
+--
+Alex Benn?e
