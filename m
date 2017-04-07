@@ -1,142 +1,34 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Fri, 7 Apr 2017 11:09:30 -0400
-Subject: [RFC 0/9] ARMv8.3 pointer authentication userspace support
-In-Reply-To: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
-References: <1491232765-32501-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <68cdfcee-33aa-8511-2fff-4b2308e80b7a@codeaurora.org>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Fri, 7 Apr 2017 17:10:07 +0200
+Subject: [PATCH 0/4] Add fixes to STM32 pintrl
+Message-ID: <1491577811-26989-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2017 11:19 AM, Mark Rutland wrote:
-> This series adds support for the ARMv8.3 pointer authentication extension.
-> 
-> I've included a quick intro to the extension below, with the usual series
-> description below that. The final patch of the series adds additional
-> documentation regarding the extension.
-> 
-> I've based the series on the arm64 for-next/core branch [1]. I'm aware that
-> this series may conflict with other patches currently in flight (e.g.
-> allocation of ELF notes), and I intend to rebase this series as things settle.
-> 
-> I've pushed the series to the arm64/pointer-auth branch [2] of my linux tree.
-> I've also pushed out a necessary bootwrapper patch to the pointer-auth branch
-> [3] of my bootwrapper repo.
-> 
-> 
-> Extension Overview 
-> ==================
-> 
-> The ARMv8.3 pointer authentication extension adds functionality to detect
-> modification of pointer values, mitigating certain classes of attack such as
-> stack smashing, and making return oriented programming attacks harder
-> 
-> The extension introduces the concept of a pointer authentication code (PAC),
-> which is stored in some upper bits of pointers. Each PAC is derived from the
-> original pointer, another 64-bit value (e.g. the stack pointer), and a secret
-> 128-bit key.
-> 
-> New instructions are added which can be used to:
-> 
-> * Insert a PAC into a pointer
-> * Strip a PAC from a pointer
-> * Authenticate strip a PAC from a pointer
-> 
-> If authentication succeeds, the code is removed, yielding the original pointer.
-> If authentication fails, bits are set in the pointer such that it is guaranteed
-> to cause a fault if used.
-> 
-> These instructions can make use of four keys:
-> 
-> * APIAKey (A.K.A. Instruction A key)
-> * APIBKey (A.K.A. Instruction B key)
-> * APDAKey (A.K.A. Data A key)
-> * APDBKey (A.K.A. Data B Key)
-> 
-> A subset of these instruction encodings have been allocated from the HINT
-> space, and will operate as NOPs on any ARMv8 parts which do not feature the
-> extension (or if purposefully disabled by the kernel). Software using only this
-> subset of the instructions should function correctly on all ARMv8-A parts.
-> 
-> Additionally, instructions are added to authenticate small blocks of memory in
-> similar fashion, using APGAKey (A.K.A. Generic key).
-> 
-> 
-> This Series
-> ===========
-> 
-> This series enables the use of instructions using APIAKey, which is initialised
-> and maintained per-process (shared by all threads). This series does not add
-> support for APIBKey, APDAKey, APDBKey, nor APGAKey. The series only supports
-> the use of an architected algorithm.
-> 
-> I've given this some basic testing with a homebrew test suite. More ideally,
-> we'd add some tests to the kernel source tree.
-> 
-> I've added some basic KVM support, but this doesn't cater for systems with
-> mismatched support. Looking forward, we'll need ID register emulation in KVM so
-> that we can hide features from guests to cater for cases like this.
-> 
-> There are also a few questions to consider, e.g:
-> 
-> * Should we expose a per-process data key now, to go with the insn key?
-> * Should keys be per-thread rather than per-process?
-> * Should we expose generic authentication (i.e. APGAKey)?
-> * Should the kernel remove PACs when unwinding user stacks?
-> 
-> Thanks,
-> Mark.
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/pointer-auth
-> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/boot-wrapper-aarch64.git pointer-auth
-> 
-> Mark Rutland (9):
->   asm-generic: mm_hooks: allow hooks to be overridden individually
->   arm64: add pointer authentication register bits
->   arm64/cpufeature: add ARMv8.3 id_aa64isar1 bits
->   arm64/cpufeature: detect pointer authentication
->   arm64: Don't trap host pointer auth use to EL2
->   arm64: add basic pointer authentication support
->   arm64: expose PAC bit positions via ptrace
->   arm64/kvm: context-switch PAC registers
->   arm64: docs: document pointer authentication
-> 
->  Documentation/arm64/booting.txt                |  8 +++
->  Documentation/arm64/pointer-authentication.txt | 78 +++++++++++++++++++++
->  arch/arm64/Kconfig                             | 23 ++++++
->  arch/arm64/include/asm/cpucaps.h               |  4 +-
->  arch/arm64/include/asm/esr.h                   |  3 +-
->  arch/arm64/include/asm/kvm_arm.h               |  2 +
->  arch/arm64/include/asm/kvm_emulate.h           | 15 ++++
->  arch/arm64/include/asm/kvm_host.h              | 12 ++++
->  arch/arm64/include/asm/mmu.h                   |  5 ++
->  arch/arm64/include/asm/mmu_context.h           | 25 ++++++-
->  arch/arm64/include/asm/pointer_auth.h          | 96 ++++++++++++++++++++++++++
->  arch/arm64/include/asm/sysreg.h                | 30 ++++++++
->  arch/arm64/include/uapi/asm/hwcap.h            |  1 +
->  arch/arm64/include/uapi/asm/ptrace.h           |  5 ++
->  arch/arm64/kernel/cpufeature.c                 | 39 ++++++++++-
->  arch/arm64/kernel/cpuinfo.c                    |  1 +
->  arch/arm64/kernel/head.S                       | 19 ++++-
->  arch/arm64/kernel/ptrace.c                     | 39 +++++++++++
->  arch/arm64/kvm/hyp/sysreg-sr.c                 | 43 ++++++++++++
->  include/asm-generic/mm_hooks.h                 | 12 ++++
->  include/uapi/linux/elf.h                       |  1 +
->  21 files changed, 454 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/arm64/pointer-authentication.txt
->  create mode 100644 arch/arm64/include/asm/pointer_auth.h
-> 
+This series add several fixes to STM32 pinctrl:
+ - Set input mode when PIN is used as interrupt
+ - Implement .get_direction() gpio_chip callback  
+ - In DT: set each gpio controller as a interrupt controller. User who
+   wants to use gpio as interrupt will have choice to use either "gpiolib"
+   interface or "common" interrupt interface.
 
-Tested on Qualcomm platform with ARMV8 architecture (without 8.3 extensions) for
-backwards compatibility (meaning I did not pass -march=armv8.3-a to GCC; only
--msign-return-address=all). The HINT PACIASP/AUTIASP caused no issues and no
-other issues were encountered. Will test again once a platform is available with
-8.3-a extensions.
+Regards
+Alex
 
-Thanks
+Alexandre TORGUE (4):
+  pinctrl: stm32: set pin to gpio input when used as interrupt
+  pinctrl: stm32: replace device_initcall() with arch_initcall()
+  pinctrl: stm32: Implement .get_direction gpio_chip callback
+  ARM: dts: stm32: Set gpio controller also as interrupt controller
+
+ arch/arm/boot/dts/stm32f429.dtsi          | 22 +++++++++++++++
+ arch/arm/boot/dts/stm32f746.dtsi          | 22 +++++++++++++++
+ drivers/pinctrl/stm32/pinctrl-stm32.c     | 47 +++++++++++++++++++++++++++++--
+ drivers/pinctrl/stm32/pinctrl-stm32.h     |  5 +++-
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c |  6 +++-
+ drivers/pinctrl/stm32/pinctrl-stm32f746.c |  7 ++++-
+ drivers/pinctrl/stm32/pinctrl-stm32h743.c |  6 +++-
+ 7 files changed, 109 insertions(+), 6 deletions(-)
 
 -- 
-Adam Wallis
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+1.9.1
