@@ -1,44 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 7 Apr 2017 09:52:54 +0100
-Subject: [PATCH v4 0/3] Add Mediatek CIRQ interrupt controller
-In-Reply-To: <1491552397-7893-1-git-send-email-youlin.pei@mediatek.com>
-References: <1491552397-7893-1-git-send-email-youlin.pei@mediatek.com>
-Message-ID: <771954fe-c994-96be-76ab-ece75383d058@arm.com>
+From: thuth@redhat.com (Thomas Huth)
+Date: Fri, 7 Apr 2017 10:53:01 +0200
+Subject: [RFC kvm-unit-tests PATCH 4/8] Makefiles: use explicit path for
+ including sub-Makefiles
+In-Reply-To: <20170406190727.5624-5-alex.bennee@linaro.org>
+References: <20170406190727.5624-1-alex.bennee@linaro.org>
+ <20170406190727.5624-5-alex.bennee@linaro.org>
+Message-ID: <7f6fe583-a765-b8cd-d1f6-5068ee5d52e0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/17 09:06, Youlin Pei wrote:
-> In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
-> works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
+On 06.04.2017 21:07, Alex Benn?e wrote:
+> I would of thought VPATH took care of this but apparently not.
 > 
-> The CIRQ controller is integrated in between MCUSYS and interrupt sources
-> as the second level interrupt controller. The external interrupts which 
-> outside MCUSYS will feed through CIRQ then bypass to GIC.
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  Makefile               | 8 ++++----
+>  arm/Makefile           | 2 +-
+>  arm/Makefile.arm       | 2 +-
+>  arm/Makefile.arm64     | 2 +-
+>  powerpc/Makefile       | 2 +-
+>  powerpc/Makefile.ppc64 | 2 +-
+>  x86/Makefile           | 2 +-
+>  x86/Makefile.i386      | 2 +-
+>  x86/Makefile.x86_64    | 2 +-
+>  9 files changed, 12 insertions(+), 12 deletions(-)
 > 
-> In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
-> will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
-> is power downed. CIRQ will be enabled and monitor all edge trigger
-> interrupts(only edge trigger interrupts will be lost in this scenario).
-> When an edge interrupt is triggered, CIRQ will record the status and
-> generated a pulse signal to GIC when flush command is executed. 
-> 
-> With CIRQ, MCUSYS can be completely turned off to improve the system 
-> power consumption without losing interrupts.
-> 
-> change in v4:
-> 1. add some comment to explain CIRQ suspend callback.
-> 2. rebase on 4.11
+> diff --git a/Makefile b/Makefile
+> index 80bc57e..781186e 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -32,14 +32,14 @@ cflatobjs := \
+>  	lib/stack.o
+>  
+>  # libfdt paths
+> -LIBFDT_objdir = lib/libfdt
+> -LIBFDT_srcdir = lib/libfdt
+> +LIBFDT_objdir = $(SRCDIR)/lib/libfdt
 
-Hi Youlin,
+I think this is wrong - objdir should not get a SRCDIR prefix.
 
-I'm happy to take the first two patches through the irq tree. How do we
-deal with the third one? It seems to me that it'd be better routed via
-armsoc.
-
-Let me know what you and Matthias want to do.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+ Thomas
