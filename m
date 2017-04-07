@@ -1,55 +1,36 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  8 Apr 2017 02:34:41 +0800
-Subject: [PATCH v2 11/11] arm64: allwinner: a64: enable Wi-Fi for Pine64
-In-Reply-To: <20170407183441.58750-1-icenowy@aosc.io>
-References: <20170407183441.58750-1-icenowy@aosc.io>
-Message-ID: <20170407183441.58750-12-icenowy@aosc.io>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 7 Apr 2017 13:48:52 -0500
+Subject: [PATCH v2 3/4] bluetooth: hci_uart: add LL protocol serdev driver
+ support
+In-Reply-To: <1491584978.2136.21.camel@redhat.com>
+References: <20170407143516.9945-1-robh@kernel.org>
+ <1491584978.2136.21.camel@redhat.com>
+Message-ID: <CAL_Jsq+aM+xxbu=3v8_w9Ce+=t_pXmVWuisnckA8_8LOS-ftVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Wi-Fi modules of Pine64 is powered via DLDO4 and ELDO1 (the latter
-one provides I/O voltage).
+On Fri, Apr 7, 2017 at 12:09 PM, Dan Williams <dcbw@redhat.com> wrote:
+> On Fri, 2017-04-07 at 09:35 -0500, Rob Herring wrote:
+>> Turns out that the LL protocol and the TI-ST are the same thing
+>> AFAICT.
+>> The TI-ST adds firmware loading, GPIO control, and shared access for
+>> NFC, FM radio, etc. For now, we're only implementing what is needed
+>> for
+>> BT. This mirrors other drivers like BCM and Intel, but uses the new
+>> serdev bus.
+>>
+>> The firmware loading is greatly simplified by using existing
+>> infrastructure to send commands. It may be a bit slower than the
+>> original code using synchronous functions, but the real bottleneck is
+>> likely doing firmware load at 115.2kbps.
+>
+> Is there no way to put the TI-specific stuff into a TI UART module
+> rather than building it into the generic one?
 
-Add device node for it.
+In case it's not clear, all of HCI_LL is the TI specific part, not
+just what I'm adding. So you are talking about putting each UART BT
+protocol into a separate module. I'd assume that is doable, but seems
+orthogonal to this patch set. I'd also assume there was some reason
+that was not done already.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 7da074f95065..9d90bb32aa87 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -64,6 +64,11 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-+	};
- };
- 
- &ehci1 {
-@@ -91,6 +96,17 @@
- 	status = "okay";
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dldo4>;
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	non-removable;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
--- 
-2.12.2
+Rob
