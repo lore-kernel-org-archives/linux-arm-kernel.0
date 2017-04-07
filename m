@@ -1,58 +1,34 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Fri, 7 Apr 2017 18:15:24 +0200
-Subject: [PATCH v2] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
-In-Reply-To: <e941f7f4-1904-a0c5-3ef0-973477087b2b@ti.com>
-References: <20170405171750.16821-1-abailon@baylibre.com>
- <e941f7f4-1904-a0c5-3ef0-973477087b2b@ti.com>
-Message-ID: <dade7b1b-af0f-0f3e-26fc-4e845c451330@baylibre.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat,  8 Apr 2017 00:19:03 +0800
+Subject: [PATCH 1/2] clk: sunxi-ng: fix PRCM CCU ir clk parent
+Message-ID: <20170407161904.32624-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The first parent of ir clk in PRCM CCU is wrongly written as "osc32K"
+instead of "osc32k".
 
+Change it to "osc32k".
 
-On 04/07/2017 04:36 PM, Sekhar Nori wrote:
-> On Wednesday 05 April 2017 10:47 PM, Alexandre Bailon wrote:
->> The CPPI 4.1 DMA is sharing its clock with the USB OTG,
->> and most of the time, the clock will be enabled by USB.
->> But during the init of the DMA, USB is not enabled (waiting for DMA),
->> and then we must enable the clock before doing anything.
->> Add the clock for the CPPI 4.1 DMA engine.
->>
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->> ---
->>   arch/arm/mach-davinci/da830.c | 6 ++++++
->>   arch/arm/mach-davinci/da850.c | 6 ++++++
->>   2 files changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
->> index 073c458..bd88470 100644
->> --- a/arch/arm/mach-davinci/da830.c
->> +++ b/arch/arm/mach-davinci/da830.c
->> @@ -304,6 +304,11 @@ static struct clk usb20_clk = {
->>   	.gpsc		= 1,
->>   };
->>   
->> +static struct clk cppi41_clk = {
->> +	.name		= "cppi41",
->> +	.parent		= &usb20_clk,
->> +};
->> +
->>   static struct clk aemif_clk = {
->>   	.name		= "aemif",
->>   	.parent		= &pll0_sysclk3,
->> @@ -413,6 +418,7 @@ static struct clk_lookup da830_clks[] = {
->>   	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
->>   	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
->>   	CLK("musb-da8xx",	"usb20",	&usb20_clk),
->> +	CLK("cppi41-dmaengine",	NULL,		&cppi41_clk),
-> I dont see this device name being used in current linux-next. Is this
-> name accepted ?
-There is here a typo. The name should be cppi41-dma-engine.
-I will fix it.
->
-> The patch otherwise looks okay.
->
-> Thanks,
-> Sekhar
-Thanks,
-Alexandre
+Fixes: cdb8b80b6093 ("clk: sunxi-ng: add support for PRCM CCUs")
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-r.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r.c b/drivers/clk/sunxi-ng/ccu-sun8i-r.c
+index 0d027d53dbdf..119f47b568ea 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-r.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-r.c
+@@ -81,7 +81,7 @@ static SUNXI_CCU_GATE(apb0_i2c_clk,	"apb0-i2c",	"apb0",
+ static SUNXI_CCU_GATE(apb0_twd_clk,	"apb0-twd",	"apb0",
+ 		      0x28, BIT(7), 0);
+ 
+-static const char * const r_mod0_default_parents[] = { "osc32K", "osc24M" };
++static const char * const r_mod0_default_parents[] = { "osc32k", "osc24M" };
+ static SUNXI_CCU_MP_WITH_MUX_GATE(ir_clk, "ir",
+ 				  r_mod0_default_parents, 0x54,
+ 				  0, 4,		/* M */
+-- 
+2.12.2
