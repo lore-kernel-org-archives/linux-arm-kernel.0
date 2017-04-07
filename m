@@ -1,61 +1,20 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 7 Apr 2017 22:44:39 +0200 (CEST)
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
- <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.20.1704072125460.1958@nanos>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 07 Apr 2017 14:01:32 -0700 (PDT)
+Subject: [PATCH] net: thunderx: Enable TSO and checksum offloads for ipv6
+In-Reply-To: <1491475346-7809-1-git-send-email-tsrinivasulu@cavium.com>
+References: <1491475346-7809-1-git-send-email-tsrinivasulu@cavium.com>
+Message-ID: <20170407.140132.1487659753638967093.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Apr 2017, Andy Lutomirski wrote:
-> On Fri, Apr 7, 2017 at 6:30 AM, Mathias Krause <minipli@googlemail.com> wrote:
-> > On 7 April 2017 at 15:14, Thomas Gleixner <tglx@linutronix.de> wrote:
-> >> I really do not care whether PaX wants to chase and verify that over and
-> >> over. I certainly don't want to take the chance to leak CR0.WP ever and I
-> >> very much care about extra stuff to check in the entry/exit path.
-> >
-> > Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
-> > somewhere sensible should make those "leaks" visible fast -- and their
-> > exploitation impossible, i.e. fail hard.
+From: dev.srinivasulu@gmail.com
+Date: Thu,  6 Apr 2017 16:12:26 +0530
+
+> From: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
 > 
-> The leaks surely exist and now we'll just add an exploitable BUG.
+> Adding support for TSO and checksum hardware offloads for ipv6.
+> 
+> Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 
-:)
-
-> I think we're approaching this all wrong, actually.  The fact that x86
-> has this CR0.WP thing is arguably a historical accident, and the fact
-> that PaX uses it doesn't mean that PaX is doing it the best way for
-> upstream Linux.
-
-As I said before. It should be fused to 1.
-
-> Why don't we start at the other end and do a generic non-arch-specific
-> implementation: set up an mm_struct that contains an RW alias of the
-> relevant parts of rodata and use use_mm to access it.  (That is,
-> get_fs() to back up the old fs, set_fs(USER_DS),
-> use_mm(&rare_write_mm), do the write using copy_to_user, undo
-> everything.)
-
-That works too, though I'm not sure that it's more efficient than
-temporarily creating and undoing a single cpu local alias mapping similar
-to the kmap_atomic mechanism in the highmem case.
-
-Aside of that the alias mapping requires a full PGDIR entry unless you want
-to get into the mess of keeping yet another identity mapping up to date.
-
-Thanks,
-
-	tglx
+Applied to net-next, thanks.
