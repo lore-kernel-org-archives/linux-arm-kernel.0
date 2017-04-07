@@ -1,45 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Apr 2017 14:14:07 -0400
-Subject: [GIT PULL] Renesas ARM Based SoC Sysc Updates for v4.12
-Message-ID: <cover.1491588035.git.horms+renesas@verge.net.au>
+Date: Fri,  7 Apr 2017 14:14:08 -0400
+Subject: [PATCH 1/3] soc: renesas: Register SoC device early
+In-Reply-To: <cover.1491588035.git.horms+renesas@verge.net.au>
+References: <cover.1491588035.git.horms+renesas@verge.net.au>
+Message-ID: <b1d134ba9de2b7a136406530e34fc8b110ba6efd.1491588035.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC sysc updates for v4.12.
+The r8a7795 SYSC driver manages PM Domains, and thus is initialized from
+an early_initcall().  However, this means the driver cannot check the
+SoC revision, as the SoC device hasn't been registered yet.
 
-This pull request is based on the soc-device-match-tag2 tag of
-Geert Uytterhoeven's renesas-drivers tree which he has already
-sent a pull-request for.
+Change renesas_soc_init() from a core_initcall() to an early_initcall()
+to fix this (renesas-soc.o is listed before rcar-sysc.o in the Makefile).
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/soc/renesas/renesas-soc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit 6e12db376b60b7158e4e6006af60566f8c68f7ab:
-
-  base: soc: Allow early registration of a single SoC device (2017-03-29 21:43:26 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sysc-for-v4.12
-
-for you to fetch changes up to fcb87087261e1be51b4c03677f39246bdc312b1c:
-
-  soc: renesas: rcar-sysc: Add support for R-Car H3 ES2.0 (2017-04-07 13:53:41 -0400)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Sysc Updates for v4.12
-
-* Add support for R-Car H3 ES2.0
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      soc: renesas: Register SoC device early
-      soc: renesas: rcar-sysc: Add support for fixing up power area tables
-      soc: renesas: rcar-sysc: Add support for R-Car H3 ES2.0
-
- drivers/soc/renesas/r8a7795-sysc.c       | 26 ++++++++++++++++++++++++--
- drivers/soc/renesas/rcar-sysc.c          | 25 ++++++++++++++++++++++++-
- drivers/soc/renesas/rcar-sysc.h          | 10 ++++++++++
- drivers/soc/renesas/renesas-soc.c        |  2 +-
- include/dt-bindings/power/r8a7795-sysc.h |  2 +-
- 5 files changed, 60 insertions(+), 5 deletions(-)
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index 330960312296..51ed33f3426d 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -254,4 +254,4 @@ static int __init renesas_soc_init(void)
+ 
+ 	return 0;
+ }
+-core_initcall(renesas_soc_init);
++early_initcall(renesas_soc_init);
+-- 
+2.7.0.rc3.207.g0ac5344
