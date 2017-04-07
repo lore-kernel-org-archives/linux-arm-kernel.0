@@ -1,90 +1,29 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 7 Apr 2017 14:57:39 +0200
-Subject: Supporting early console on a SERIAL_8250_RT288X platform
-In-Reply-To: <d797386a-009e-f21d-dec4-a7520b4f6a72@arm.com>
-References: <0ac351b9-46bd-3a35-fab3-73177cabb747@free.fr>
- <d797386a-009e-f21d-dec4-a7520b4f6a72@arm.com>
-Message-ID: <f59323cb-f0f4-1936-9fab-8d3cf1799818@free.fr>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 7 Apr 2017 09:09:36 -0400
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+ <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
+ <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
+ <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
+ <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
+ <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
+Message-ID: <896488eb-cb1d-03b9-73a0-011e4a9025c5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for answering so quickly! :-)
+On 4/7/2017 5:03 AM, Patel, Mayurkumar wrote:
+> So basically, I am not currently 100% sure, what is the proper fix for this. Whether BIOS should
+> enable L1SS on Root Port no matter Endpoint is connected or not during boot?
 
-On 07/04/2017 14:18, Robin Murphy wrote:
+I'd like to force the kernel to reconfigure ASPM for all combinations
+when there is no card attached during boot and we do a hotplug insertion. 
 
-> On 07/04/17 12:53, Mason wrote:
->
->> Did I implement something wrong?
->> Why am I not seeing the output of the panic() call, like I do
->> with earlyprintk?
->> Since tty0 is enabled, why isn't it picking up where palmchip0
->> left off?
-> 
-> As far as I'm aware, tty0 is a purely virtual console: look further down
-> still and you'll probably see a second switch over from tty0 to ttyS0,
-> which will be when the buffered output *actually* starts coming out
-> again. That's certainly what happens for me, albeit with
-> "pl11"->"tty0"->"ttyAMA0", (and complete with not realising ttyAMA0 is
-> still the same port and reprinting the entire log buffer from the top).
+I'm thinking about how to do this now.
 
-Right you are!
-
-Also, I had not noticed the "print the entire log buffer from the top"
-issue you mention.
-
-[    0.000000] Booting Linux on physical CPU 0x0
-...
-[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
-[    0.000000] bootconsole [palmchip0] enabled
-...
-[    0.014147] Console: colour dummy device 80x30
-[    0.018616] console [tty0] enabled
-[    0.022039] bootconsole [palmchip0] disabled
-[    0.000000] Booting Linux on physical CPU 0x0
-...
-[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
-[    0.000000] bootconsole [palmchip0] enabled
-[    0.014147] Console: colour dummy device 80x30
-[    0.018616] console [tty0] enabled
-[    0.022039] bootconsole [palmchip0] disabled
-...
-[    0.460630] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[    0.462278] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
-[    1.084227] console [ttyS0] enabled
-
-> I believe this is something to do with how the DT stdout-path property
-> is implemented, because with an explicit "console=ttyAMA0" (or ttyS0 in
-> your case) on the command line instead of relying on stdout-path, the
-> boot console does switch directly to the real UART without the
-> intermediate tty0 blind spot.
-
-Indeed, an explicit console=ttyS0,115200 does avoid the "dupe the entire log"
-issue. There is still some "stuttering" involved:
-
-[    0.000000] earlycon: palmchip0 at MMIO 0x00010700 (options '115200n8')
-[    0.000000] bootconsole [palmchip0] enabled
-...
-[    0.745811] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[    0.753681] console [ttyS0] disabled
-[    0.757426] 10700.serial: ttyS0 at MMIO 0x10700 (irq = 20, base_baud = 460800) is a Palmchip BK-3103
-[    0.766672] console [ttyS0] enabled
-[    0.766672] console [ttyS0] enabled
-[    0.773726] bootconsole [palmchip0] disabled
-[    0.773726] bootconsole [palmchip0] disabled
-
-
-More importantly, it also solves the "hang before panic message" issue:
-
-...
-[    0.575937] io scheduler noop registered
-[    0.579888] io scheduler deadline registered
-[    0.584245] io scheduler cfq registered (default)
-[    0.589650] Kernel panic - not syncing: THIS IS A TEST
-
-
-Hopefully, supporting earlycon on this platform can be included
-in time for v4.12 :-)
-
-Greg, Peter, what do you think? ;-)
-
-Regards.
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
