@@ -1,242 +1,37 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  8 Apr 2017 00:56:30 +0800
-Subject: [PATCH] arm64: allwinner: h5: add support for Orange Pi Prime board
-Message-ID: <20170407165630.7632-1-icenowy@aosc.io>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Apr 2017 18:02:03 +0100
+Subject: [PATCH v1] arm64: Add support for on-demand backtrace of other
+ CPUs
+In-Reply-To: <1489735663-2091-2-git-send-email-andr2000@gmail.com>
+References: <1489735663-2091-1-git-send-email-andr2000@gmail.com>
+ <1489735663-2091-2-git-send-email-andr2000@gmail.com>
+Message-ID: <20170407170203.GC20645@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi Prime is a new Allwinner H5-based SBC by Xunlong.
+On Fri, Mar 17, 2017 at 09:27:43AM +0200, Oleksandr Andrushchenko wrote:
+> From: Daniel Thompson <daniel.thompson@linaro.org>
+> 
+> Currently arm64 has no implementation of arch_trigger_cpumask_backtrace.
+> The patch provides one using library code recently added by Russell King
+> for for the majority of the implementation. Currently this is realized
+> using regular irqs but could, in the future, be implemented using
+> NMI-like mechanisms.
+> 
+> Note: There is a small (and nasty) change to the generic code to ensure
+>       good stack traces. The generic code currently assumes that
+>       show_regs() will include a stack trace but arch/arm64 does not do
+>       this so we must add extra code here. Ideas on a better approach
+>       here would be very welcome (is there any appetite to change arm64
+>       show_regs() or should we just tease out the dump code into a
+>       callback?).
 
-It's like a Orange Pi Plus 2E with H3 replaced with H5, eMMC replaced
-with onboard SPI NOR Flash and wireless card changed to Realtek
-RTL8723BS (with Bluetooth functionality).
+Please see this discussion here:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 202 +++++++++++++++++++++
- 2 files changed, 203 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+http://lkml.kernel.org/r/20170323150357.GH9287 at leverpostej
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 244e8b7565f9..92a84eea6b96 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-new file mode 100644
-index 000000000000..2ebfe6c359ed
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-@@ -0,0 +1,202 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi Prime";
-+	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r-gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	reg_usb0_vbus: usb0-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb0-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
-+		status = "okay";
-+	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&pio 2 14 GPIO_ACTIVE_LOW>; /* PC14 */
-+	};
-+};
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Line Out", "LINEOUT",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "disabled";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB Type-A ports' VBUS is always on */
-+	usb0_id_det-gpios = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	status = "okay";
-+};
+I'm not a ware of a follow up but if we change the arm64 show_regs() to
+dump the stack, we no longer need the generic code hunk in your patch.
+
 -- 
-2.12.2
+Catalin
