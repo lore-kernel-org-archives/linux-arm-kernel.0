@@ -1,87 +1,113 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 7 Apr 2017 16:23:57 +0200
-Subject: [PATCH 2/2] drm: dw-hdmi: Gate audio clock from the I2S
- enablement callbacks
-In-Reply-To: <20170407141905.14147-3-romain.perier@collabora.com>
-References: <20170407141905.14147-1-romain.perier@collabora.com>
- <20170407141905.14147-3-romain.perier@collabora.com>
-Message-ID: <984b7a29-81a8-8404-0c76-d632b4ae9a9d@baylibre.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Apr 2017 15:27:06 +0100
+Subject: [PATCHv2 14/16] drivers/perf: arm_pmu: add ACPI framework
+In-Reply-To: <1491503363-17731-15-git-send-email-mark.rutland@arm.com>
+References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+ <1491503363-17731-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170407142706.GN19342@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2017 04:19 PM, Romain Perier wrote:
-> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
-> step E. and is kept enabled for later use. This clock should be enabled
-> and disabled along with the actual audio stream and not always on (that
-> is bad for PM). Futhermore, as described by the datasheet, the I2S
-> variant need to gate/ungate the clock when the stream is
-> enabled/disabled.
-> 
-> This commit adds a parameter to hdmi_audio_enable_clk() that controls
-> when the audio sample clock must be enabled or disabled. Then, it adds
-> the call to this function from dw_hdmi_i2s_audio_enable() and
-> dw_hdmi_i2s_audio_disable().
-> 
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> ---
->  drivers/gpu/drm/bridge/dw-hdmi.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-> index d34e0a5..3bd0807 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-> @@ -559,6 +559,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
->  }
->  EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
->  
-> +static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
+Hi Mark,
+
+Just a couple of minor comments below.
+
+On Thu, Apr 06, 2017 at 07:29:21PM +0100, Mark Rutland wrote:
+> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+> new file mode 100644
+> index 0000000..5cacd7b
+> --- /dev/null
+> +++ b/drivers/perf/arm_pmu_acpi.c
+> @@ -0,0 +1,240 @@
+> +/*
+> + * ACPI probing code for ARM performance counters.
+> + *
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/init.h>
+> +#include <linux/percpu.h>
+> +#include <linux/perf/arm_pmu.h>
+> +
+> +#include <asm/cputype.h>
+> +
+> +static DEFINE_PER_CPU(struct arm_pmu *, probed_pmus);
+> +static DEFINE_PER_CPU(int, pmu_irqs);
+> +
+> +static int arm_pmu_acpi_parse_irq(int cpu)
 > +{
-> +	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
-> +		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+> +	struct acpi_madt_generic_interrupt *gicc;
+> +	int gsi, trigger;
+> +
+> +	gicc = acpi_cpu_get_madt_gicc(cpu);
+> +	if (WARN_ON(!gicc))
+> +		return -EINVAL;
+> +
+> +	gsi = gicc->performance_interrupt;
+> +	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
+> +		trigger = ACPI_EDGE_SENSITIVE;
+> +	else
+> +		trigger = ACPI_LEVEL_SENSITIVE;
+> +
+> +	/*
+> +	 * Helpfully, the MADT GICC doesn't have a polarity flag for the
+> +	 * "performance interrupt". Luckily, on compliant GICs the polarity is
+> +	 * fixed in HW (for both SPIs and PPIs), and thus we don't care. Other
+> +	 * interrupt controllers are not supported with ACPI.
+> +	 *
+> +	 * Here we pass in ACPI_ACTIVE_HIGH to keep the core code happy.
+> +	 */
+> +	return acpi_register_gsi(NULL, gsi, trigger, ACPI_ACTIVE_HIGH);
 > +}
 > +
->  void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
->  {
->  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-> @@ -572,12 +578,13 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
->  void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
->  {
->  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-> +	hdmi_enable_audio_clk(hdmi, true);
->  }
->  
->  
->  void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
->  {
-> -
-> +	hdmi_enable_audio_clk(hdmi, false);
->  }
+> +static void arm_pmu_acpi_unparse_irq(int cpu)
+> +{
 
-I think the NULL check is still valid if you fill this function, because the IP also
-support other modes (SPDIF and GPA).
+"unparse" is a bit weird. Can you rename this register/unregister please?
 
->  
->  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
-> @@ -1365,11 +1372,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
->  	}
->  }
->  
-> -static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
-> -{
-> -	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-> -}
-> -
->  /* Workaround to clear the overflow condition */
->  static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
->  {
-> @@ -1471,7 +1473,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
->  
->  		/* HDMI Initialization Step E - Configure audio */
->  		hdmi_clk_regenerator_update_pixel_clock(hdmi);
-> -		hdmi_enable_audio_clk(hdmi);
-> +		hdmi_enable_audio_clk(hdmi, true);
->  	}
->  
->  	/* not for DVI mode */
-> 
+> +	struct acpi_madt_generic_interrupt *gicc;
+> +	int gsi;
+> +
+> +	gicc = acpi_cpu_get_madt_gicc(cpu);
+> +	if (!gicc)
+> +		return;
+> +
+> +	gsi = gicc->performance_interrupt;
+> +	acpi_unregister_gsi(gsi);
+> +}
+> +
+> +static int arm_pmu_acpi_parse_irqs(void)
+> +{
+> +	int cpu, irq;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		int irq = arm_pmu_acpi_parse_irq(cpu);
+> +		if (irq < 0) {
+> +			pr_warn("Unable to parse ACPI PMU IRQ for CPU%d: %d\n",
+> +				cpu, irq);
+> +			goto out_err;
+> +		} else if (irq == 0) {
+> +			pr_warn("No ACPI PMU IRQ for CPU%d\n", cpu);
+> +		}
+> +
+> +		per_cpu(pmu_irqs, cpu) = irq;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_err:
+> +	for_each_possible_cpu(cpu) {
+> +		arm_pmu_acpi_unparse_irq(cpu);
+> +		per_cpu(pmu_irqs, cpu) = 0;
+> +	}
+
+It might work at the moment (I really can't tell), but I'd rather we didn't
+unregister GSIs that we didn't register.
+
+Will
