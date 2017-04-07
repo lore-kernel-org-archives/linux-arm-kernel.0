@@ -1,28 +1,34 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Fri, 7 Apr 2017 14:43:02 +0200
-Subject: [PATCH v2 5/7] Documentation: dt: Add new compatible to STM32 pinctrl
- driver bindings
+Date: Fri, 7 Apr 2017 14:43:03 +0200
+Subject: [PATCH v2 6/7] ARM: Kconfig: Introduce MACH_STM32F469 flag
 In-Reply-To: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
 References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1491568984-20169-6-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1491568984-20169-7-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new compatible for stm32f469 MCU.
+This patch introduces the MACH_STM32F469 to make possible to only select
+STM32F469 pinctrl driver
+
+By default, all the MACH_STM32Fxxx flags will be set with STM32 defconfig.
 
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-index e4cda3d..d907a74 100644
---- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-@@ -9,6 +9,7 @@ Pin controller node:
- Required properies:
-  - compatible: value should be one of the following:
-    "st,stm32f429-pinctrl"
-+   "st,stm32f469-pinctrl"
-    "st,stm32f746-pinctrl"
-    "st,stm32h743-pinctrl"
-  - #address-cells: The value of this property must be 1
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0d4e71b..19c43e6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -894,6 +894,11 @@ config MACH_STM32F429
+ 	depends on ARCH_STM32
+ 	default y
+ 
++config MACH_STM32F469
++	bool "STMicrolectronics STM32F469"
++	depends on ARCH_STM32
++	default y
++
+ config MACH_STM32F746
+ 	bool "STMicrolectronics STM32F746"
+ 	depends on ARCH_STM32
 -- 
 1.9.1
