@@ -1,49 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Apr 2017 17:02:39 +0100
-Subject: [GIT PULL] arm64: fixes for -rc6
-Message-ID: <20170407160239.GS19342@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Apr 2017 11:58:22 -0400
+Subject: [PATCH 21/22] ARM: dts: r8a7790: Drop _clk suffix from external CAN
+ clock node name
+In-Reply-To: <cover.1491580547.git.horms+renesas@verge.net.au>
+References: <cover.1491580547.git.horms+renesas@verge.net.au>
+Message-ID: <5b476a9610910a6ac5222bee4ae83a8d41800dbd.1491580547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please pull these two arm64 fixes for -rc6. We've got a regression fix for
-the signal raised when userspace makes an unsupported unaligned access and a
-revert of the contiguous (hugepte) support for hugetlb, which has once again
-been found to be broken. One day, maybe, we'll get it right.
+The current practice is to not add _clk suffixes to clock node names in
+DT, as these names are used as the actual clock names.
 
-Cheers,
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will
-
---->8
-
-The following changes since commit a71c9a1c779f2499fb2afc0553e543f18aff6edf:
-
-  Linux 4.11-rc5 (2017-04-02 17:23:54 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 6ae979ab39a368c18ceb0424bf824d172d6ab56f:
-
-  Revert "Revert "arm64: hugetlb: partial revert of 66b3923a1a0f"" (2017-04-07 12:27:29 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Restore previous SIGBUS behaviour for unhandled unaligned user accesses
-
-- Revert broken support for the contiguous bit in hugetlb (again...)
-
-----------------------------------------------------------------
-Victor Kamensky (1):
-      arm64: mm: unaligned access by user-land should be received as SIGBUS
-
-Will Deacon (1):
-      Revert "Revert "arm64: hugetlb: partial revert of 66b3923a1a0f""
-
- arch/arm64/mm/fault.c       | 42 ++++++++++++++++++++++++------------------
- arch/arm64/mm/hugetlbpage.c | 14 --------------
- 2 files changed, 24 insertions(+), 32 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index fe6b8c2a2d71..99269aaca6fc 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1101,7 +1101,7 @@
+ 		};
+ 
+ 		/* External CAN clock */
+-		can_clk: can_clk {
++		can_clk: can {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			/* This value must be overridden by the board. */
+-- 
+2.7.0.rc3.207.g0ac5344
