@@ -1,68 +1,71 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Fri, 7 Apr 2017 19:31:12 +0200
-Subject: [PATCH v2] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
-In-Reply-To: <dade7b1b-af0f-0f3e-26fc-4e845c451330@baylibre.com>
-References: <20170405171750.16821-1-abailon@baylibre.com>
- <e941f7f4-1904-a0c5-3ef0-973477087b2b@ti.com>
- <dade7b1b-af0f-0f3e-26fc-4e845c451330@baylibre.com>
-Message-ID: <d73b5bf4-4772-4089-0e04-76275b6a00a3@baylibre.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 7 Apr 2017 13:36:13 -0400
+Subject: [PATCH v5 00/12] drm: rockchip: Fix rockchip drm unbind crash
+ error
+In-Reply-To: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1491481885-13775-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20170407173613.bbau3xp2fasjzt2h@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 06, 2017 at 08:31:13PM +0800, Jeffy Chen wrote:
+> 
+> Verified on rk3399 chromebook kevin:
+> 1/ stop ui && pkill -9 frecon
+> 2/ unbind/bind drm
+> 
+> Changes in v5:
+> Fix wrong git account.
+> 
+> Changes in v4:
+> Address Andrzej Hajda <a.hajda@samsung.com>'s comments.
+> 
+> Changes in v3:
+> Update commit message.
+> Address Sean Paul <seanpaul@chromium.org>'s comments.
+> Update commit message.
+> Address Sean Paul <seanpaul@chromium.org>'s comments.
+> Update commit message.
+> Address Daniel Vetter <daniel@ffwll.ch>'s comments.
+> Update commit message.
+> 
+> Changes in v2:
+> Fix some commit messages.
+> 
+> Jeffy Chen (12):
+>   drm: bridge: analogix: Detach panel when unbinding analogix dp
+>   drm: bridge: analogix: Unregister dp aux when unbinding
+>   drm: bridge: analogix: Disable clock when unbinding
+>   drm: bridge: analogix: Destroy connector & encoder when unbinding
+>   drm/rockchip: cdn-dp: Don't try to release firmware when not loaded
+>   drm/rockchip: cdn-dp: Don't unregister audio dev when unbinding
+>   drm/rockchip: vop: Enable pm domain before vop_initial
+>   drm/rockchip: vop: Unprepare clocks when unbinding
+>   drm/rockchip: analogix_dp: Disable clock when unbinding
+>   drm/rockchip: Reoder drm bind/unbind sequence
+>   drm/rockchip: Shutdown all crtcs when unbinding drm
 
+Hi Jeffy,
+I've applied the first 11 patches from this set to -misc. The last patch
+is still a work in progress.
 
-On 04/07/2017 06:15 PM, Alexandre Bailon wrote:
->
->
-> On 04/07/2017 04:36 PM, Sekhar Nori wrote:
->> On Wednesday 05 April 2017 10:47 PM, Alexandre Bailon wrote:
->>> The CPPI 4.1 DMA is sharing its clock with the USB OTG,
->>> and most of the time, the clock will be enabled by USB.
->>> But during the init of the DMA, USB is not enabled (waiting for DMA),
->>> and then we must enable the clock before doing anything.
->>> Add the clock for the CPPI 4.1 DMA engine.
->>>
->>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
->>> ---
->>>   arch/arm/mach-davinci/da830.c | 6 ++++++
->>>   arch/arm/mach-davinci/da850.c | 6 ++++++
->>>   2 files changed, 12 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-davinci/da830.c 
->>> b/arch/arm/mach-davinci/da830.c
->>> index 073c458..bd88470 100644
->>> --- a/arch/arm/mach-davinci/da830.c
->>> +++ b/arch/arm/mach-davinci/da830.c
->>> @@ -304,6 +304,11 @@ static struct clk usb20_clk = {
->>>       .gpsc        = 1,
->>>   };
->>>   +static struct clk cppi41_clk = {
->>> +    .name        = "cppi41",
->>> +    .parent        = &usb20_clk,
->>> +};
->>> +
->>>   static struct clk aemif_clk = {
->>>       .name        = "aemif",
->>>       .parent        = &pll0_sysclk3,
->>> @@ -413,6 +418,7 @@ static struct clk_lookup da830_clks[] = {
->>>       CLK("davinci-mcasp.1",    NULL,        &mcasp1_clk),
->>>       CLK("davinci-mcasp.2",    NULL,        &mcasp2_clk),
->>>       CLK("musb-da8xx",    "usb20",    &usb20_clk),
->>> +    CLK("cppi41-dmaengine",    NULL,        &cppi41_clk),
->> I dont see this device name being used in current linux-next. Is this
->> name accepted ?
-> There is here a typo. The name should be cppi41-dma-engine.
-> I will fix it.
-Actually, it is not a typo. It would have be more logical to name it 
-cppi41-dma-engine
-(like the driver name) but the name is correct.
-The device name is not yet in linux-next as the device is created in 
-da8xx driver.
-http://marc.info/?l=linux-usb&m=149080474124498&w=2
->>
->> The patch otherwise looks okay.
->>
->> Thanks,
->> Sekhar
-> Thanks,
-> Alexandre
+Thanks,
+
+Sean
+
+>   drm/drm_ioctl.c: Break ioctl when drm device not registered
+> 
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  6 +++
+>  drivers/gpu/drm/drm_ioctl.c                        |  2 +-
+>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  3 +-
+>  drivers/gpu/drm/rockchip/cdn-dp-core.c             | 10 +++--
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.c        | 50 ++++++++++++----------
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 33 ++++++++++----
+>  6 files changed, 67 insertions(+), 37 deletions(-)
+> 
+> -- 
+> 2.1.4
+> 
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
