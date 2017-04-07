@@ -1,105 +1,224 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 7 Apr 2017 09:42:55 +0530
-Subject: [PATCH V10 06/12] of: device: Fix overflow of coherent_dma_mask
-In-Reply-To: <58E69831.6010306@gmail.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-1-git-send-email-sricharan@codeaurora.org>
- <1491301105-5274-7-git-send-email-sricharan@codeaurora.org>
- <58E5E7B7.1050400@gmail.com>
- <b77e3405-f060-bcd5-99f6-7d76f9edf08a@codeaurora.org>
- <58E69831.6010306@gmail.com>
-Message-ID: <750b18f2-7cc5-c2d5-9bee-3574e787c80f@codeaurora.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 6 Apr 2017 21:42:21 -0700
+Subject: [PATCH V5 2/2] thermal: broadcom: add Northstar thermal driver
+In-Reply-To: <20170403154829.29780-2-zajec5@gmail.com>
+References: <20170331201124.656-1-zajec5@gmail.com>
+ <20170403154829.29780-1-zajec5@gmail.com>
+ <20170403154829.29780-2-zajec5@gmail.com>
+Message-ID: <20170407044218.GA12447@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+On Mon, Apr 03, 2017 at 05:48:29PM +0200, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> Northstar is a SoC family commonly used in home routers. This commit
+> adds a driver for checking CPU temperature. As Northstar Plus seems to
+> also have this IP block this new symbol gets ARCH_BCM_IPROC dependency.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 
-On 4/7/2017 1:04 AM, Frank Rowand wrote:
-> On 04/06/17 04:01, Sricharan R wrote:
->> Hi Frank,
->>
->> On 4/6/2017 12:31 PM, Frank Rowand wrote:
->>> On 04/04/17 03:18, Sricharan R wrote:
->>>> Size of the dma-range is calculated as coherent_dma_mask + 1
->>>> and passed to arch_setup_dma_ops further. It overflows when
->>>> the coherent_dma_mask is set for full 64 bits 0xFFFFFFFFFFFFFFFF,
->>>> resulting in size getting passed as 0 wrongly. Fix this by
->>>> passsing in max(mask, mask + 1). Note that in this case
->>>> when the mask is set to full 64bits, we will be passing the mask
->>>> itself to arch_setup_dma_ops instead of the size. The real fix
->>>> for this should be to make arch_setup_dma_ops receive the
->>>> mask and handle it, to be done in the future.
->>>>
->>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->>>> ---
->>>>  drivers/of/device.c | 2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/of/device.c b/drivers/of/device.c
->>>> index c17c19d..c2ae6bb 100644
->>>> --- a/drivers/of/device.c
->>>> +++ b/drivers/of/device.c
->>>> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->>>>      ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->>>>      if (ret < 0) {
->>>>          dma_addr = offset = 0;
->>>> -        size = dev->coherent_dma_mask + 1;
->>>> +        size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>>>      } else {
->>>>          offset = PFN_DOWN(paddr - dma_addr);
->>>>          dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->>>>
->>>
->>> NACK.
->>>
->>> Passing an invalid size to arch_setup_dma_ops() is only part of the problem.
->>> size is also used in of_dma_configure() before calling arch_setup_dma_ops():
->>>
->>>         dev->coherent_dma_mask = min(dev->coherent_dma_mask,
->>>                                      DMA_BIT_MASK(ilog2(dma_addr + size)));
->>>         *dev->dma_mask = min((*dev->dma_mask),
->>>                              DMA_BIT_MASK(ilog2(dma_addr + size)));
->>>
->>> which would be incorrect for size == 0xffffffffffffffffULL when
->>> dma_addr != 0.  So the proposed fix really is not papering over
->>> the base problem very well.
->>>
->>
->> Ok, but with your fix for of_dma_get_range and the above fix,
->> dma_addr will be '0' when size = 0xffffffffffffffffULL,
->> but DMA_BIT_MASK(ilog2(dma_addr + size)) would be wrong though,
->> making coherent_dma_mask to be smaller 0x7fffffffffffffffULL.
->
-> Yes, that was my point.  Setting size to 0x7fffffffffffffffULL
-> affects several places.  Another potential location (based only
-> on the function header comment, not from reading the code) is
-> iommu_dma_init_domain().  The header comment says:
->
->     * @base and @size should be exact multiples of IOMMU page granularity to
->     * avoid rounding surprises.
->
+If no objection, I am applying this series.
 
-ok, this is the same problem that should get solved when arch_setup_dma_ops
-is prepared to take mask instead of size. It would still work as said above
-with a smaller mask than specified.
 
-> I have not read enough context to really understand of_dma_configure(), but
-> it seems there is yet another issue in how the error return case from
-> of_dma_get_range() is handled (with the existing code, as well as if
-> my patch gets accepted).  An error return value can mean _either_
-> there is no dma-ranges property _or_ "an other problem occurred".  Should
-> the "an other problem occurred" case be handled by defaulting size to
-> a value based on dev->coherent_dma_mask (the current case) or should the
-> attempt to set up the DMA configuration just fail?
+> ---
+> V2: Make it iProc specific as NSP can also use this driver
+>     Select proper symbols in config ARCH_BCM_IPROC
+>     Define PVTMON register bits
+>     Update code selecting temperature monitor mode
+>     Thank you Jon!
+> V3: More details in help message for BCM_NS_THERMAL
+>     Use slope & offset
+>     Drop arch code change (I'll be submitted using a proper tree)
+>     Thank you Eduardo!
+> V4: Comment operations on PVTMON_CONTROL0 register
+> ---
+>  drivers/thermal/Kconfig               |   5 ++
+>  drivers/thermal/Makefile              |   1 +
+>  drivers/thermal/broadcom/Kconfig      |   8 +++
+>  drivers/thermal/broadcom/Makefile     |   1 +
+>  drivers/thermal/broadcom/ns-thermal.c | 105 ++++++++++++++++++++++++++++++++++
+>  5 files changed, 120 insertions(+)
+>  create mode 100644 drivers/thermal/broadcom/Kconfig
+>  create mode 100644 drivers/thermal/broadcom/Makefile
+>  create mode 100644 drivers/thermal/broadcom/ns-thermal.c
+> 
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index 3bd24063375e..ac7301703d03 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -392,6 +392,11 @@ config MTK_THERMAL
+>  	  Enable this option if you want to have support for thermal management
+>  	  controller present in Mediatek SoCs
+>  
+> +menu "Broadcom thermal drivers"
+> +depends on ARCH_BCM || COMPILE_TEST
+> +source "drivers/thermal/broadcom/Kconfig"
+> +endmenu
+> +
+>  menu "Texas Instruments thermal drivers"
+>  depends on ARCH_HAS_BANDGAP || COMPILE_TEST
+>  depends on HAS_IOMEM
+> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+> index f23cde05dac6..6b7706b9f27c 100644
+> --- a/drivers/thermal/Makefile
+> +++ b/drivers/thermal/Makefile
+> @@ -27,6 +27,7 @@ thermal_sys-$(CONFIG_CLOCK_THERMAL)	+= clock_cooling.o
+>  thermal_sys-$(CONFIG_DEVFREQ_THERMAL) += devfreq_cooling.o
+>  
+>  # platform thermal drivers
+> +obj-y				+= broadcom/
+>  obj-$(CONFIG_QCOM_SPMI_TEMP_ALARM)	+= qcom-spmi-temp-alarm.o
+>  obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
+>  obj-$(CONFIG_ROCKCHIP_THERMAL)	+= rockchip_thermal.o
+> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
+> new file mode 100644
+> index 000000000000..f0dea8a8e002
+> --- /dev/null
+> +++ b/drivers/thermal/broadcom/Kconfig
+> @@ -0,0 +1,8 @@
+> +config BCM_NS_THERMAL
+> +	tristate "Northstar thermal driver"
+> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
+> +	help
+> +	  Northstar is a family of SoCs that includes e.g. BCM4708, BCM47081,
+> +	  BCM4709 and BCM47094. It contains DMU (Device Management Unit) block
+> +	  with a thermal sensor that allows checking CPU temperature. This
+> +	  driver provides support for it.
+> diff --git a/drivers/thermal/broadcom/Makefile b/drivers/thermal/broadcom/Makefile
+> new file mode 100644
+> index 000000000000..059df9a0ed69
+> --- /dev/null
+> +++ b/drivers/thermal/broadcom/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_BCM_NS_THERMAL)		+= ns-thermal.o
+> diff --git a/drivers/thermal/broadcom/ns-thermal.c b/drivers/thermal/broadcom/ns-thermal.c
+> new file mode 100644
+> index 000000000000..eab96b3572b9
+> --- /dev/null
+> +++ b/drivers/thermal/broadcom/ns-thermal.c
+> @@ -0,0 +1,105 @@
+> +/*
+> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/thermal.h>
+> +
+> +#define PVTMON_CONTROL0					0x00
+> +#define PVTMON_CONTROL0_SEL_MASK			0x0000000e
+> +#define PVTMON_CONTROL0_SEL_TEMP_MONITOR		0x00000000
+> +#define PVTMON_CONTROL0_SEL_TEST_MODE			0x0000000e
+> +#define PVTMON_STATUS					0x08
+> +
+> +struct ns_thermal {
+> +	struct thermal_zone_device *tz;
+> +	void __iomem *pvtmon;
+> +};
+> +
+> +static int ns_thermal_get_temp(void *data, int *temp)
+> +{
+> +	struct ns_thermal *ns_thermal = data;
+> +	int offset = thermal_zone_get_offset(ns_thermal->tz);
+> +	int slope = thermal_zone_get_slope(ns_thermal->tz);
+> +	u32 val;
+> +
+> +	val = readl(ns_thermal->pvtmon + PVTMON_CONTROL0);
+> +	if ((val & PVTMON_CONTROL0_SEL_MASK) != PVTMON_CONTROL0_SEL_TEMP_MONITOR) {
+> +		/* Clear current mode selection */
+> +		val &= ~PVTMON_CONTROL0_SEL_MASK;
+> +
+> +		/* Set temp monitor mode (it's the default actually) */
+> +		val |= PVTMON_CONTROL0_SEL_TEMP_MONITOR;
+> +
+> +		writel(val, ns_thermal->pvtmon + PVTMON_CONTROL0);
+> +	}
+> +
+> +	val = readl(ns_thermal->pvtmon + PVTMON_STATUS);
+> +	*temp = slope * val + offset;
+> +
+> +	return 0;
+> +}
+> +
+> +const struct thermal_zone_of_device_ops ns_thermal_ops = {
 
-The handling of return error value looks like separate item, but looks
-like its correct with what is there now. (ie) when of_dma_get_range fails
-either because 'dma-ranges property' populated in DT (or) because of some
-erroneous DT setting, better to set the mask which the driver has specified
-and ignore DT. So the above patch just corrects a mistake in that path.
+minor correction here:
 
-Regards,
-  Sricharan
+-const struct thermal_zone_of_device_ops ns_thermal_ops = {
++static const struct thermal_zone_of_device_ops ns_thermal_ops = {
 
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+but I am applying this already in my tree.
+
+> +	.get_temp = ns_thermal_get_temp,
+> +};
+> +
+> +static int ns_thermal_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct ns_thermal *ns_thermal;
+> +
+> +	ns_thermal = devm_kzalloc(dev, sizeof(*ns_thermal), GFP_KERNEL);
+> +	if (!ns_thermal)
+> +		return -ENOMEM;
+> +
+> +	ns_thermal->pvtmon = of_iomap(dev_of_node(dev), 0);
+> +	if (WARN_ON(!ns_thermal->pvtmon))
+> +		return -ENOENT;
+> +
+> +	ns_thermal->tz = devm_thermal_zone_of_sensor_register(dev, 0,
+> +							      ns_thermal,
+> +							      &ns_thermal_ops);
+> +	if (IS_ERR(ns_thermal->tz)) {
+> +		iounmap(ns_thermal->pvtmon);
+> +		return PTR_ERR(ns_thermal->tz);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, ns_thermal);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ns_thermal_remove(struct platform_device *pdev)
+> +{
+> +	struct ns_thermal *ns_thermal = platform_get_drvdata(pdev);
+> +
+> +	iounmap(ns_thermal->pvtmon);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ns_thermal_of_match[] = {
+> +	{ .compatible = "brcm,ns-thermal", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, ns_thermal_of_match);
+> +
+> +static struct platform_driver ns_thermal_driver = {
+> +	.probe		= ns_thermal_probe,
+> +	.remove		= ns_thermal_remove,
+> +	.driver = {
+> +		.name = "ns-thermal",
+> +		.of_match_table = ns_thermal_of_match,
+> +	},
+> +};
+> +module_platform_driver(ns_thermal_driver);
+> +
+> +MODULE_DESCRIPTION("Northstar thermal driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.11.0
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170406/53f45255/attachment.sig>
