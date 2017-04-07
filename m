@@ -1,29 +1,54 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 7 Apr 2017 09:09:36 -0400
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
- <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
- <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
- <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
-Message-ID: <896488eb-cb1d-03b9-73a0-011e4a9025c5@codeaurora.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 7 Apr 2017 15:14:22 +0200 (CEST)
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.20.1704071426300.1716@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/7/2017 5:03 AM, Patel, Mayurkumar wrote:
-> So basically, I am not currently 100% sure, what is the proper fix for this. Whether BIOS should
-> enable L1SS on Root Port no matter Endpoint is connected or not during boot?
+On Fri, 7 Apr 2017, Mathias Krause wrote:
+> On 7 April 2017 at 11:46, Thomas Gleixner <tglx@linutronix.de> wrote:
+> > Whether protected by preempt_disable or local_irq_disable, to make that
+> > work it needs CR0 handling in the exception entry/exit at the lowest
+> > level. And that's just a nightmare maintainence wise as it's prone to be
+> > broken over time.
+> 
+> It seems to be working fine for more than a decade now in PaX. So it
+> can't be such a big maintenance nightmare ;)
 
-I'd like to force the kernel to reconfigure ASPM for all combinations
-when there is no card attached during boot and we do a hotplug insertion. 
+I really do not care whether PaX wants to chase and verify that over and
+over. I certainly don't want to take the chance to leak CR0.WP ever and I
+very much care about extra stuff to check in the entry/exit path.
 
-I'm thinking about how to do this now.
+> The "proper solution" seems to be much slower compared to just
+> toggling CR0.WP (which is costly in itself, already) because of the
+> TLB invalidation / synchronisation involved.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Why the heck should we care about rare writes being performant?
+
+> > It's valid (at least on x86) to have a shadow map with the same page
+> > attributes but write enabled. That does not require any fixups of CR0 and
+> > just works.
+> 
+> "Just works", sure -- but it's not as tightly focused as the PaX
+> solution which is CPU local, while your proposed solution is globally
+> visible.
+
+Making the world and some more writeable hardly qualifies as tightly
+focussed. Making the mapping concept CPU local is not rocket science
+either. The question is whethers it's worth the trouble.
+
+Thanks,
+
+	tglx
