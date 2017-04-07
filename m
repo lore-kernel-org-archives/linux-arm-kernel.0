@@ -1,152 +1,92 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 7 Apr 2017 15:38:05 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 1/6] clk: sunxi-ng: Add sun4i/sun7i
- CCU driver
-In-Reply-To: <20170404200919.GA22159@plaes.org>
-References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
- <ac8c4dab4f160ec605d52120517774bf1de87c2e.1490545262.git-series.plaes@plaes.org>
- <20170327075438.cw3d6s7zyeemenwr@lukather>
- <20170404200919.GA22159@plaes.org>
-Message-ID: <20170407133805.aiythp3hdvuyhcrc@lukather>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 7 Apr 2017 15:45:09 +0200
+Subject: [PATCH] ARM: dts: hi6220: Reset the mmc hosts
+In-Reply-To: <1489673004-11075-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1489673004-11075-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170407134509.GK2078@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Priit,
-
-On Tue, Apr 04, 2017 at 08:09:19PM +0000, Priit Laes wrote:
-> > > +/* Not documented on A10 */
-> > > +static SUNXI_CCU_GATE(pll_periph_sata_clk, "pll-periph-sata", "pll-periph",
-> > > +		      0x028, BIT(14), 0);
-> > 
-> > The rate doesn't come from pll-periph directly, does it?
+On Thu, Mar 16, 2017 at 03:03:24PM +0100, Daniel Lezcano wrote:
+> The MMC hosts could be left in an unconsistent or uninitialized state from
+> the firmware. Instead of assuming, the firmware did the right things, let's
+> reset the host controllers.
 > 
-> So it uses hosc (24MHz parent clock) instead of pll-periph?
-
-I never looked too much at this, but it looks more like the input is
-pll-periph-sata itself.
-
-> > > +/* Undocumented on A10 */
-> > > +static SUNXI_CCU_PHASE(mmc0_output_clk, "mmc0_output", "mmc0",
-> > > +		       0x088, 8, 3, 0);
-> > > +/* Undocumented on A10 */
-> > > +static SUNXI_CCU_PHASE(mmc0_sample_clk, "mmc0_sample", "mmc0",
-> > > +		       0x088, 20, 3, 0);
-> > 
-> > The A10 doesn't have them.
+> This change fixes a bug when the mmc2/sdio is initialized leading to a hung
+> task:
 > 
-> Are you sure? Although, they weren't listed in datasheet, they are defined
-> in the sun4i-a10.dtsi:
+> [  242.704294] INFO: task kworker/7:1:675 blocked for more than 120 seconds.
+> [  242.711129]       Not tainted 4.9.0-rc8-00017-gcf0251f #3
+> [  242.716571] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+> [  242.724435] kworker/7:1     D    0   675      2 0x00000000
+> [  242.729973] Workqueue: events_freezable mmc_rescan
+> [  242.734796] Call trace:
+> [  242.737269] [<ffff00000808611c>] __switch_to+0xa8/0xb4
+> [  242.742437] [<ffff000008d07c04>] __schedule+0x1c0/0x67c
+> [  242.747689] [<ffff000008d08254>] schedule+0x40/0xa0
+> [  242.752594] [<ffff000008d0b284>] schedule_timeout+0x1c4/0x35c
+> [  242.758366] [<ffff000008d08e38>] wait_for_common+0xd0/0x15c
+> [  242.763964] [<ffff000008d09008>] wait_for_completion+0x28/0x34
+> [  242.769825] [<ffff000008a1a9f4>] mmc_wait_for_req_done+0x40/0x124
+> [  242.775949] [<ffff000008a1ab98>] mmc_wait_for_req+0xc0/0xf8
+> [  242.781549] [<ffff000008a1ac3c>] mmc_wait_for_cmd+0x6c/0x84
+> [  242.787149] [<ffff000008a26610>] mmc_io_rw_direct_host+0x9c/0x114
+> [  242.793270] [<ffff000008a26aa0>] sdio_reset+0x34/0x7c
+> [  242.798347] [<ffff000008a1d46c>] mmc_rescan+0x2fc/0x360
 > 
-> mmc0_clk: clk at 01c20088 {
->         #clock-cells = <1>;
->         compatible = "allwinner,sun4i-a10-mmc-clk";
->         reg = <0x01c20088 0x4>;
->         clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
->         clock-output-names = "mmc0",
->                              "mmc0_output",
->                              "mmc0_sample";
-> };
-
-Yes, those clocks have been introduced in the A20, but we didn't find
-out until much later, which is why there's still left overs in the
-DT. We're not using them in the driver for the A10 either (but we do
-for the A20, obviously).
-
-> > > +/* TODO: Check whether A10 actually supports osc32k as 4th parent? */
-> > > +static const char *const ir_parents_sun4i[] = { "hosc", "pll-periph",
-> > > +						"pll-ddr-other" };
-> > 
-> > What does the BSP say about this?
+> [ ... ]
 > 
-> sun7i datasheet mentions osc32k, but BSP code for sun4i, sun5i and sun7i
-> is identical and supports only 3 first parents without osc32k.
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
 
-Ok. Leave the TODO for now, we'll fix it if relevant.
+Hi Xu,
 
-> > > +/* Undocumented on A10 */
-> > > +static SUNXI_CCU_MUX_WITH_GATE(spdif_clk, "spdif", audio_parents,
-> > > +			       0x0c0, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
-> > 
-> > This doesn't seem to exist at all on the A10
+gentle ping.
+
+Thanks.
+
+  -- Daniel
+
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Wasn't listed in datasheet, but it's in BSP and also in sun4i-a10.dtsi:
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 470461d..1e5129b 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -774,6 +774,7 @@
+>  			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
+>  			clock-names = "ciu", "biu";
+>  			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC0>;
+> +			reset-names = "reset";
+>  			bus-width = <0x8>;
+>  			vmmc-supply = <&ldo19>;
+>  			pinctrl-names = "default";
+> @@ -797,6 +798,7 @@
+>  			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
+>  			clock-names = "ciu", "biu";
+>  			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC1>;
+> +			reset-names = "reset";
+>  			vqmmc-supply = <&ldo7>;
+>  			vmmc-supply = <&ldo10>;
+>  			bus-width = <0x4>;
+> @@ -815,6 +817,7 @@
+>  			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
+>  			clock-names = "ciu", "biu";
+>  			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC2>;
+> +			reset-names = "reset";
+>  			bus-width = <0x4>;
+>  			broken-cd;
+>  			pinctrl-names = "default", "idle";
+> -- 
+> 1.9.1
 > 
-> spdif_clk: clk at 01c200c0 {
->         #clock-cells = <0>;
->         compatible = "allwinner,sun4i-a10-mod1-clk";
->         reg = <0x01c200c0 0x4>;
->         clocks = <&pll2 SUN4I_A10_PLL2_8X>,
->                  <&pll2 SUN4I_A10_PLL2_4X>,
->                  <&pll2 SUN4I_A10_PLL2_2X>,
->                  <&pll2 SUN4I_A10_PLL2_1X>;
->         clock-output-names = "spdif";
-> };
-
-Ack.
-
-> > > +/*
-> > > + * TODO: SATA clock also supports external clock as parent via BIT(24)
-> > > + * The external clock is probably an optional crystal or oscillator
-> > > + * that can be connected to the SATA-CLKM / SATA-CLKP pins.
-> > > + */
-> > > +static SUNXI_CCU_GATE(sata_clk, "sata", "pll-periph-sata",
-> > > +		      0x0c8, BIT(31), 0);
-> > 
-> > The rate won't be good here either. This is supposed to be 100MHz.
-> 
-> Hmm.. I tested SATA with Cubietruck. Or what do you mean?
-
-As long as you don't have any dependency on the rate itself, as long
-as the gate is opened, I expect it to work. But the rate itself will
-be reported wrong.
-
-> > > +static const char *const csi_isp_parents[] = { "pll-video0", "pll-ve",
-> > > +					       "pll-ddr-other", "pll-sata" };
-> > > +
-> > > +static SUNXI_CCU_M_WITH_MUX_GATE(csi_isp_clk, "csi-isp",
-> > > +				 csi_isp_parents,
-> > > +				 0x120, 0, 4, 24, 2, BIT(31), 0);
-> > 
-> > We've been calling it sclk in the other SoC iirc. Any particular
-> > reason to call it differently?
-> 
-> It's called ISP in BSP and A10 manual.
-> In A20 it's indeed Special Clock Register (SCLK).
-
-Let's call it SCLK too then, for consistency.
-
-> > > +static const char *const out_parents[] = { "hosc", "osc32k", "hosc" };
-> > > +static SUNXI_CCU_MP_WITH_MUX_GATE(out_a_clk, "out-a", out_parents,
-> > > +				  0x1f0, 8, 5, 20, 2, 24, 2, BIT(31), 0);
-> > > +static SUNXI_CCU_MP_WITH_MUX_GATE(out_b_clk, "out-b", out_parents,
-> > > +				  0x1f4, 8, 5, 20, 2, 24, 2, BIT(31), 0);
-> > 
-> > There's a fixed pre-divider on the first hosc of 750.
-> 
-> Nice catch.
-> 
-> So it should be something like this:
-> 
-> [snip]
-> static const char *const out_parents[] = { "osc24M", "osc32k", "osc24M" };
-> static const struct ccu_mux_fixed_prediv out_prediv = {
->         .index = 0, .div = 750
-> };
-
-I think it shoud still be hosc (or at least, the name that you used
-for the gate controlling the 24MHz oscillator input).
-
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170407/7a077fee/attachment.sig>
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
