@@ -1,36 +1,177 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 7 Apr 2017 13:48:52 -0500
-Subject: [PATCH v2 3/4] bluetooth: hci_uart: add LL protocol serdev driver
- support
-In-Reply-To: <1491584978.2136.21.camel@redhat.com>
-References: <20170407143516.9945-1-robh@kernel.org>
- <1491584978.2136.21.camel@redhat.com>
-Message-ID: <CAL_Jsq+aM+xxbu=3v8_w9Ce+=t_pXmVWuisnckA8_8LOS-ftVA@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat,  8 Apr 2017 02:34:39 +0800
+Subject: [PATCH v2 09/11] arm64: allwinner: a64: add DTSI file for AXP803 PMIC
+In-Reply-To: <20170407183441.58750-1-icenowy@aosc.io>
+References: <20170407183441.58750-1-icenowy@aosc.io>
+Message-ID: <20170407183441.58750-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 12:09 PM, Dan Williams <dcbw@redhat.com> wrote:
-> On Fri, 2017-04-07 at 09:35 -0500, Rob Herring wrote:
->> Turns out that the LL protocol and the TI-ST are the same thing
->> AFAICT.
->> The TI-ST adds firmware loading, GPIO control, and shared access for
->> NFC, FM radio, etc. For now, we're only implementing what is needed
->> for
->> BT. This mirrors other drivers like BCM and Intel, but uses the new
->> serdev bus.
->>
->> The firmware loading is greatly simplified by using existing
->> infrastructure to send commands. It may be a bit slower than the
->> original code using synchronous functions, but the real bottleneck is
->> likely doing firmware load at 115.2kbps.
->
-> Is there no way to put the TI-specific stuff into a TI UART module
-> rather than building it into the generic one?
+As nearly all A64 boards are using AXP803 PMIC, add a DTSI file for it,
+like the old DTSI files for AXP20x/22x, for the common parts of the
+PMIC.
 
-In case it's not clear, all of HCI_LL is the TI specific part, not
-just what I'm adding. So you are talking about putting each UART BT
-protocol into a separate module. I'd assume that is doable, but seems
-orthogonal to this patch set. I'd also assume there was some reason
-that was not done already.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/axp803.dtsi | 150 ++++++++++++++++++++++++++++++
+ 1 file changed, 150 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
 
-Rob
+diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+new file mode 100644
+index 000000000000..f0e53a7fffbd
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
+@@ -0,0 +1,150 @@
++/*
++ * Copyright 2017 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/*
++ * AXP803 Integrated Power Management Chip
++ * http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
++ */
++
++&axp803 {
++	interrupt-controller;
++	#interrupt-cells = <1>;
++
++	regulators {
++		/* Default work frequency for buck regulators */
++		x-powers,dcdc-freq = <3000>;
++
++		reg_dcdc1: dcdc1 {
++			regulator-name = "dcdc1";
++		};
++
++		reg_dcdc2: dcdc2 {
++			regulator-name = "dcdc2";
++		};
++
++		reg_dcdc3: dcdc3 {
++			regulator-name = "dcdc3";
++		};
++
++		reg_dcdc4: dcdc4 {
++			regulator-name = "dcdc4";
++		};
++
++		reg_dcdc5: dcdc5 {
++			regulator-name = "dcdc5";
++		};
++
++		reg_dcdc6: dcdc6 {
++			regulator-name = "dcdc6";
++		};
++
++		reg_dc1sw: dc1sw {
++			regulator-name = "dc1sw";
++		};
++
++		reg_aldo1: aldo1 {
++			regulator-name = "aldo1";
++		};
++
++		reg_aldo2: aldo2 {
++			regulator-name = "aldo2";
++		};
++
++		reg_aldo3: aldo3 {
++			regulator-name = "aldo3";
++		};
++
++		reg_dldo1: dldo1 {
++			regulator-name = "dldo1";
++		};
++
++		reg_dldo2: dldo2 {
++			regulator-name = "dldo2";
++		};
++
++		reg_dldo3: dldo3 {
++			regulator-name = "dldo3";
++		};
++
++		reg_dldo4: dldo4 {
++			regulator-name = "dldo4";
++		};
++
++		reg_eldo1: eldo1 {
++			regulator-name = "eldo1";
++		};
++
++		reg_eldo2: eldo2 {
++			regulator-name = "eldo2";
++		};
++
++		reg_eldo3: eldo3 {
++			regulator-name = "eldo3";
++		};
++
++		reg_fldo1: fldo1 {
++			regulator-name = "fldo1";
++		};
++
++		reg_fldo2: fldo2 {
++			regulator-name = "fldo2";
++		};
++
++		reg_ldo_io0: ldo_io0 {
++			regulator-name = "ldo_io0";
++			status = "disabled";
++		};
++
++		reg_ldo_io1: ldo_io1 {
++			regulator-name = "ldo_io1";
++			status = "disabled";
++		};
++
++		reg_rtc_ldo: rtc_ldo {
++			/* RTC_LDO is a fixed, always-on regulator */
++			regulator-always-on;
++			regulator-min-microvolt = <3000000>;
++			regulator-max-microvolt = <3000000>;
++			regulator-name = "rtc_ldo";
++		};
++	};
++};
+-- 
+2.12.2
