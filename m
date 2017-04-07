@@ -1,83 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 7 Apr 2017 20:33:13 +0800
-Subject: [PATCH] ARM: dts: imx: ventana: fix DTC warnings
-In-Reply-To: <1491252168-7934-1-git-send-email-tharvey@gateworks.com>
-References: <1491252168-7934-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20170407123312.GE16503@dragon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Apr 2017 14:34:03 +0200
+Subject: [PATCH] pinctrl: at91-pio4: handle suspend to ram
+In-Reply-To: <20170407104846.5ghrcqc2ws4dkqxt@piout.net>
+References: <20170406133623.19160-1-alexandre.belloni@free-electrons.com>
+ <CACRpkdYFPhewV4NLNxxVkXCwuyoo3rgeLt0auErS47R=055FHQ@mail.gmail.com>
+ <20170407104846.5ghrcqc2ws4dkqxt@piout.net>
+Message-ID: <CACRpkdZ=7e71XR++RWY8j5Lqb_UF6oMZzibCRo=76b8YPvcPiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 01:42:48PM -0700, Tim Harvey wrote:
-> Remove the sky2 ethernet device node from the pcie controller which was
-> invalid to begin with.
-> 
-> The original intent was to allow the bootloader to populate the MAC via
-> dt but this requires the PCI bus topology to be complete in dt as well
-> and as these boards have an expansion connector that topology is dynamic
-> and can't be represented here.
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  arch/arm/boot/dts/imx6q-gw5400-a.dts  | 4 ----
->  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 4 ----
->  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 4 ----
->  3 files changed, 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-> index 8e84713..5b066c0 100644
-> --- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
-> +++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
-> @@ -347,10 +347,6 @@
->  &pcie {
->  	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
->  	status = "okay";
-> -
-> -	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
-> -		compatible = "marvell,sky2";
-> -	};
+On Fri, Apr 7, 2017 at 12:48 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 07/04/2017 at 12:16:22 +0200, Linus Walleij wrote:
+>> On Thu, Apr 6, 2017 at 3:36 PM, Alexandre Belloni
+>> <alexandre.belloni@free-electrons.com> wrote:
+>>
+>> > When suspending to RAM, the power to the core is cut and the register
+>> > values are lost. Save and restore more registers than just IMR.
+>> >
+>> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>
+>> Should this be tagged for stable?
+>>
+>
+> No because that particular suspend to ram mode is not yet implemented
+> upstream.
+>
+>> Waiting for input from the AT91 maintainers here.
+>>
+>
+> Well, I've been an AT91 maintainer for 2 years now and I have done all
+> the AT91 pull requests since 3.16. I hope this qualifies me here.
 
-The label 'eth1' is referenced by aliases, and so DTC complains as
-below.
+So much for trying to keep MAINTAINERS in my head :(
 
-ERROR (path_references): Reference to non-existent node or label "eth1".
+I wish there was gmail integration so I could annotate people
+with roles...
 
-Please test before submitting.
+Patch applied.
 
-Shawn
-
->  };
->  
->  &ssi1 {
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-> index a208e7e..420a2f6 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-> @@ -342,10 +342,6 @@
->  	pinctrl-0 = <&pinctrl_pcie>;
->  	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
->  	status = "okay";
-> -
-> -	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
-> -		compatible = "marvell,sky2";
-> -	};
->  };
->  
->  &pwm2 {
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-> index 968fda9..e742153 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-> @@ -379,10 +379,6 @@
->  	pinctrl-0 = <&pinctrl_pcie>;
->  	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
->  	status = "okay";
-> -
-> -	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
-> -		compatible = "marvell,sky2";
-> -	};
->  };
->  
->  &pwm1 {
-> -- 
-> 2.7.4
-> 
+Yours,
+Linus Walleij
