@@ -1,124 +1,72 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 07 Apr 2017 19:22:50 +0530
-Subject: [PATCH v9 08/12] ARM: EXYNOS: move exynos_boot_vector_{addr, flag}
- ops to exynos_s2r_data
-In-Reply-To: <CAJKOXPeFhmcscCX-so5qSx9pdX8oEmC+-283HO+J3vJNvWr_Hg@mail.gmail.com>
-References: <CGME20170330131436epcas1p4a4f8bf7b64b4a5ff9ee692adc4e7d001@epcas1p4.samsung.com>
- <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-9-git-send-email-pankaj.dubey@samsung.com>
- <CAJKOXPeFhmcscCX-so5qSx9pdX8oEmC+-283HO+J3vJNvWr_Hg@mail.gmail.com>
-Message-ID: <ef086da4-5994-3f44-5225-69ca469882e0@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 7 Apr 2017 21:51:41 +0800
+Subject: [PATCH v3] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <1491309014-13967-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <201704072148.iWIGWjTi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Gabriel,
 
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on v4.11-rc5 next-20170406]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On Friday 07 April 2017 04:02 PM, Krzysztof Kozlowski wrote:
-> On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> Various Exynos SoC needs different boot addresses and flags. Currently we
->> are handling this difference by adding lots of soc_is_exynosMMM checks in
->> the code, in an attempt to remove the dependency of such helper functions
->> specific to each SoC, let's separate helper functions for these helper
->> functions by moving them into SoC specific hooks in struct exynos_s2r_data.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-exynos/pm.c | 60 +++++++++++++++++++++++++++++++++++++++--------
->>  1 file changed, 50 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->> index fa24098..c3fa537 100644
->> --- a/arch/arm/mach-exynos/pm.c
->> +++ b/arch/arm/mach-exynos/pm.c
->> @@ -32,26 +32,56 @@
->>  #include "common.h"
->>
->>  struct exynos_s2r_data {
->> +       void __iomem* (*boot_vector_addr)(void);
->> +       void __iomem* (*boot_vector_flag)(void);
->>         void (*enter_aftr)(void);
->>  };
-> 
-> OK, now I see more uses of this structure so the naming could be
-> "exynos_pm_data"?
+url:    https://github.com/0day-ci/linux/commits/gabriel-fernandez-st-com/clk-stm32h7-Add-stm32h743-clock-driver/20170405-100654
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm-stm32_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-OK. I will update accordingly.
+All warnings (new ones prefixed by >>):
 
-> 
->>
->>  static const struct exynos_s2r_data *s2r_data;
->>
->> -static inline void __iomem *exynos_boot_vector_addr(void)
->> +static void __iomem *exynos_boot_vector_addr(void)
->> +{
->> +       if (s2r_data && s2r_data->boot_vector_addr)
->> +               return s2r_data->boot_vector_addr();
->> +
->> +       return NULL;
->> +}
->> +
->> +static inline void __iomem *exynos4210_rev11_boot_vector_addr(void)
-> 
-> Inlines here are mixed up and you are changing them without
-> explanation in commit msg. Previously the exynos_boot_vector_addr()
-> was inlined, now not. Okay, I can accept that but please mention this
-> in commit msg.
+   drivers/clk/clk-stm32h7.c: In function 'ready_gate_clk_disable':
+>> drivers/clk/clk-stm32h7.c:250:2: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
+     if (rgate->backup_domain && dbp_status)
+     ^~
+   drivers/clk/clk-stm32h7.c:253:3: note: ...this statement, but the latter is misleadingly indented as if it is guarded by the 'if'
+      clk_gate_ops.disable(hw);
+      ^~~~~~~~~~~~
 
-OK, let me recheck these inline functions once again.
+vim +/if +250 drivers/clk/clk-stm32h7.c
 
-> But below you are adding new inline functions which are stored as
-> pointers in ops. This looks both inconsistent with above and incorrect
-> from logical point of view. How would you like to inline them if they
-> are referenced through pointer? (okay, compilers are smart and crazy
-> so maybe they can do it but anyway I am curious how this would look
-> like).
+   234		return bit_status;
+   235	}
+   236	
+   237	static void ready_gate_clk_disable(struct clk_hw *hw)
+   238	{
+   239		struct clk_gate *gate = to_clk_gate(hw);
+   240		struct stm32_ready_gate *rgate = to_ready_gate_clk(gate);
+   241		int dbp_status;
+   242		int bit_status;
+   243		unsigned int timeout = RGATE_TIMEOUT;
+   244	
+   245		if (!ready_gate_clk_is_enabled(hw))
+   246			return;
+   247	
+   248		dbp_status = is_enable_power_domain_write_protection();
+   249	
+ > 250		if (rgate->backup_domain && dbp_status)
+   251			disable_power_domain_write_protection();
+   252	
+   253			clk_gate_ops.disable(hw);
+   254	
+   255		do {
+   256			bit_status = !!(readl(gate->reg) & BIT(rgate->bit_rdy));
+   257	
+   258			if (bit_status)
 
-Well I am also wondering what was in my mind when I made them inline and
-why I do not get any compilation warning or error?
-
-Just looking for answer, is it OK for inline functions to be used as
-function pointers? I can see it is allowed and compilers won't complain
-as 'inline' specifier is just hint for compiler and they may or may not
-make them inline. Here also as you pointed out probably compilers will
-take care and not make them inline.
-
-I further checked with 'nm' command on pm.o file I can see even these
-inline marked functions are present in symbol listing so looks they have
-not been really inlined by compiler.
-
-I will update this in next patchset.
-
-> 
->> +{
->> +       return pmu_base_addr + S5P_INFORM7;
->> +}
->> +
->> +static inline void __iomem *exynos4210_rev10_boot_vector_addr(void)
->> +{
->> +       return sysram_base_addr + 0x24;
->> +}
->> +
->> +static inline void __iomem *exynos_common_boot_vector_addr(void)
->>  {
->> -       if (samsung_rev() == EXYNOS4210_REV_1_1)
->> -               return pmu_base_addr + S5P_INFORM7;
->> -       else if (samsung_rev() == EXYNOS4210_REV_1_0)
->> -               return sysram_base_addr + 0x24;
->>         return pmu_base_addr + S5P_INFORM0;
->>  }
->>
->> -static inline void __iomem *exynos_boot_vector_flag(void)
->> +static void __iomem *exynos_boot_vector_flag(void)
-> 
-> ditto for the flag.
-> 
-
-This also I will take care in next patchset.
-
-Thanks,
-Pankaj Dubey
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 9580 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170407/d9d660e8/attachment.gz>
