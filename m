@@ -1,23 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Apr 2017 12:22:13 -0700
-Subject: [PATCH 2/3] zte: clk: pd_bit is not 0 on zx296718
-In-Reply-To: <1490085503-15713-3-git-send-email-shawnguo@kernel.org>
+Date: Fri, 7 Apr 2017 12:22:08 -0700
+Subject: [PATCH 1/3] clk: zte: set CLK_SET_RATE_PARENT for a few zx296718
+ clocks
+In-Reply-To: <1490085503-15713-2-git-send-email-shawnguo@kernel.org>
 References: <1490085503-15713-1-git-send-email-shawnguo@kernel.org>
- <1490085503-15713-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170407192213.GZ7065@codeaurora.org>
+ <1490085503-15713-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170407192208.GY7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/21, Shawn Guo wrote:
 > From: Shawn Guo <shawn.guo@linaro.org>
 > 
-> The bit 0 of PLL_CFG0 register is not powerdown on zx296718, but part of
-> of postdiv2 field.  The consequence is that functions like hw_to_idx()
-> and zx_pll_enable() will end up tampering the postdiv2 of the PLL.
+> To support VOU VGA display driver with different modes, we need to set
+> flag for a few clocks, so that clk_set_rate() call in VOU driver can get
+> VGA device desired pixel rate.
 > 
-> Let's fix it by defining pd_bit 0xff which is obviously invalid for a
-> bit position and having PLL driver check the validity before operating
-> on the bit.
+> While at it, the divider between pll_vga and clk_vga gets corrected, as
+> it's 1:1 instead of 1:2.
 > 
 > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
