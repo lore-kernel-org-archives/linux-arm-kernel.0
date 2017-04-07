@@ -1,133 +1,144 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 7 Apr 2017 09:59:10 +0100
-Subject: [PATCH] Revert "arm64: Increase the max granular size"
-In-Reply-To: <CADAEsF_Hr=mPspvuPsQtKWiSDu6oCjfyy0rGwWrF9EJo-ZO1JA@mail.gmail.com>
-References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
- <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
- <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
- <CAPub14-sFgx=oCHzJPb9h9b_V0rbn5UAMDNJ-yTkjhz38JPqMQ@mail.gmail.com>
- <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
- <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
- <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
- <CADAEsF_Hr=mPspvuPsQtKWiSDu6oCjfyy0rGwWrF9EJo-ZO1JA@mail.gmail.com>
-Message-ID: <20170407085909.GB18291@e104818-lin.cambridge.arm.com>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Fri, 7 Apr 2017 09:03:22 +0000
+Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
+References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
+ <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
+ <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
+ <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
+ <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 10:06:31AM +0800, Ganesh Mahendran wrote:
-> 2017-04-06 23:58 GMT+08:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > On Thu, Apr 06, 2017 at 12:52:13PM +0530, Imran Khan wrote:
-> >> On 4/5/2017 10:13 AM, Imran Khan wrote:
-> >> >> We may have to revisit this logic and consider L1_CACHE_BYTES the
-> >> >> _minimum_ of cache line sizes in arm64 systems supported by the kernel.
-> >> >> Do you have any benchmarks on Cavium boards that would show significant
-> >> >> degradation with 64-byte L1_CACHE_BYTES vs 128?
-> >> >>
-> >> >> For non-coherent DMA, the simplest is to make ARCH_DMA_MINALIGN the
-> >> >> _maximum_ of the supported systems:
-> >> >>
-> >> >> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-> >> >> index 5082b30bc2c0..4b5d7b27edaf 100644
-> >> >> --- a/arch/arm64/include/asm/cache.h
-> >> >> +++ b/arch/arm64/include/asm/cache.h
-> >> >> @@ -18,17 +18,17 @@
-> >> >>
-> >> >>  #include <asm/cachetype.h>
-> >> >>
-> >> >> -#define L1_CACHE_SHIFT         7
-> >> >> +#define L1_CACHE_SHIFT         6
-> >> >>  #define L1_CACHE_BYTES         (1 << L1_CACHE_SHIFT)
-> >> >>
-> >> >>  /*
-> >> >>   * Memory returned by kmalloc() may be used for DMA, so we must make
-> >> >> - * sure that all such allocations are cache aligned. Otherwise,
-> >> >> - * unrelated code may cause parts of the buffer to be read into the
-> >> >> - * cache before the transfer is done, causing old data to be seen by
-> >> >> - * the CPU.
-> >> >> + * sure that all such allocations are aligned to the maximum *known*
-> >> >> + * cache line size on ARMv8 systems. Otherwise, unrelated code may cause
-> >> >> + * parts of the buffer to be read into the cache before the transfer is
-> >> >> + * done, causing old data to be seen by the CPU.
-> >> >>   */
-> >> >> -#define ARCH_DMA_MINALIGN      L1_CACHE_BYTES
-> >> >> +#define ARCH_DMA_MINALIGN      (128)
-> >> >>
-> >> >>  #ifndef __ASSEMBLY__
-> >> >>
-> >> >> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> >> >> index 392c67eb9fa6..30bafca1aebf 100644
-> >> >> --- a/arch/arm64/kernel/cpufeature.c
-> >> >> +++ b/arch/arm64/kernel/cpufeature.c
-> >> >> @@ -976,9 +976,9 @@ void __init setup_cpu_features(void)
-> >> >>         if (!cwg)
-> >> >>                 pr_warn("No Cache Writeback Granule information, assuming
-> >> >> cache line size %d\n",
-> >> >>                         cls);
-> >> >> -       if (L1_CACHE_BYTES < cls)
-> >> >> -               pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
-> >> >> -                       L1_CACHE_BYTES, cls);
-> >> >> +       if (ARCH_DMA_MINALIGN < cls)
-> >> >> +               pr_warn("ARCH_DMA_MINALIGN smaller than the Cache Writeback Granule (%d < %d)\n",
-> >> >> +                       ARCH_DMA_MINALIGN, cls);
-> >> >>  }
-> >> >>
-> >> >>  static bool __maybe_unused
-> >> >
-> >> > This change was discussed at: [1] but was not concluded as apparently no one
-> >> > came back with test report and numbers. After including this change in our
-> >> > local kernel we are seeing significant throughput improvement. For example with:
-> >> >
-> >> > iperf -c 192.168.1.181 -i 1 -w 128K -t 60
-> >> >
-> >> > The average throughput is improving by about 30% (230Mbps from 180Mbps).
-> >> > Could you please let us know if this change can be included in upstream kernel.
-> >> >
-> >> > [1]: https://groups.google.com/forum/#!topic/linux.kernel/P40yDB90ePs
-> >>
-> >> Could you please provide some feedback about the above mentioned query ?
-> >
-> > Do you have an explanation on the performance variation when
-> > L1_CACHE_BYTES is changed? We'd need to understand how the network stack
-> > is affected by L1_CACHE_BYTES, in which context it uses it (is it for
-> > non-coherent DMA?).
-> 
-> network stack use SKB_DATA_ALIGN to align.
-> ---
-> #define SKB_DATA_ALIGN(X) (((X) + (SMP_CACHE_BYTES - 1)) & \
-> ~(SMP_CACHE_BYTES - 1))
-> 
-> #define SMP_CACHE_BYTES L1_CACHE_BYTES
-> ---
-> I think this is the reason of performance regression.
+Hi Rajat
 
-And is this alignment required for DMA coherency? (I hope not since
-SMP_CACHE_BYTES doesn't give this).
 
-Anyway, to be sure, it's worth changing SKB_DATA_ALIGN to use 64 bytes
-(hard-coded) and check the results again.
+>On Thu, Apr 6, 2017 at 8:19 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>
+>> On 4/6/2017 9:23 AM, Patel, Mayurkumar wrote:
+>> > Actually, The enabling/configuring of ASPM L1.2 is opposite then ASPM L1.
+>> > In case of L1, Upstream must configure first L1 and then downstream according to PCIe spec.
+>> > In case of L1.2, Downstream must configure L1.2 and then upstream according (to L1.2 ECN spec. -> 5.5.4. L1 PM
+>> > substates Configuration).
+>> >
+>> > @Bjorn:
+>> > I even found that programming of pcie_config_aspm_l1ss() sub-states is done in the opposite way than described in
+>> > the spec.,
+>> >
+>> > The spec. says following and correct me If I am wrong or I misinterpret the spec. :
+>> >
+>> > 5.5.4. L1 PM Substates Configuration
+>> >
+>> > The Setting of any enable bit must be performed at the Downstream Port before the
+>> > corresponding bit is permitted to be Set at the Upstream Port. If any L1 PM Substates enable
+>> > bit is at a later time to be cleared, the enable bit(s) must be cleared in the Upstream Port
+>> > before the corresponding enable bit(s) are permitted to be cleared in the Downstream Port.
+>> >
+>
+>Thanks for bringing to attention. My understanding / interpretation of
+>"Downstream port" was the port pointing downwards (from the "Upstream"
+>component). E.g. when an EP connects to a hub port, PCIe text refers
+>to the hub port as the "downstream port". Similarly "upstream port" is
+>used for referring to a switch's port that "points" upwards towards
+>the root port. Thus, I interpreted the text to mean that I need to
+>enable it in the "downstream port" (in the root port / switch port)
+>followed by the "upstream port" (in the device).
+>
+>It would have been great if the PCIe spec was as clear for L1
+>substates as it was for L1:
+>----------------------------
+>ASPM L1 must be enabled by software in the Upstream
+>component on a Link prior to enabling ASPM L1 in the
+>Downstream component on that Link.
+>-----------------------------
+>For ASPM L1, the spec clearly says "Upstream component" which can only
+>mean the switch's "downstream" port. I'm open to changing it if there
+>is consensus that my interpretation is wrong.
 
-> > The Cavium guys haven't shown any numbers (IIUC) to back the
-> > L1_CACHE_BYTES performance improvement but I would not revert the
-> > original commit since ARCH_DMA_MINALIGN definitely needs to cover the
-> > maximum available cache line size, which is 128 for them.
-> 
-> how about define L1_CACHE_SHIFT like below:
-> ---
-> #ifdef CONFIG_ARM64_L1_CACHE_SHIFT
-> #define L1_CACHE_SHIFT CONFIG_ARM64_L1_CACHE_SHIFT
-> #else
-> #define L1_CACHE_SHIFT 7
-> endif
-> ---
+In fact, Your understanding seems to be correct. It was my mistake that I raised it without
+actually, keeping in mind or understanding port/component difference which I didn't notice.
+My sincere apologies for that.
 
-I'd very much like to avoid this, still aiming for a single kernel
-image.
 
-My suggestion is to check whether L1_CACHE_BYTES is wrongly used for DMA
-buffer alignment in the network code and, if not, move it back to 64
-bytes while keeping ARCH_DMA_MINALIGN to 128 (as per my patch above). If
-the performance on the Cavium system is affected by the L1_CACHE_BYTES
-change, further patches would need to be backed by some numbers.
+>
+>I'm actually not sure if I understood what is the problem that is
+>being seen with L1 PM substates. Can you please elaborate?
+>
 
--- 
-Catalin
+
+The actual problem, what Sinan and me were seeing with ASPM L1 with POLICY_DEFAULT
+as described in https://patchwork.kernel.org/patch/9548321/ 
+
+
+Sinan worked out patches to resolve the issue but on my platform now I am starting to see
+that ASPM L1SS gets impacted by these patches. Basically, with his patches, when Policy is set to default,
+and if no PCIe EP is connected to Root Port during boot up, BIOS does not configure L1SS for it, on my
+platform. So the link->aspm_default in aspm.c stores configuration without L1SS. When the EP gets
+connected afterwards, due to link->aspm_default set to non L1SS configuration, even if BIOS
+sets ASPM L1SS for Root Port and Endpoint both, it gets cleared in the aspm driver.
+
+Without the patches Sinan has worked, it was a different issue as described above, and L1/L1SS were
+getting always enabled by the BIOS for endpoint and RP, but kernel enabled/disabled them alternatively.
+
+So basically, I am not currently 100% sure, what is the proper fix for this. Whether BIOS should
+enable L1SS on Root Port no matter Endpoint is connected or not during boot?
+
+Or I am not sure, whether could we should still update link->aspm_default partly for L1SS in the old patch way
+https://patchwork.ozlabs.org/patch/736771/ 
+
+Any feedback would be helpful then may be if required I can or if Sinan can work out the patches for L1SS also fine for me.
+
+
+>
+>>
+>>
+>> Thanks for testing.
+>>
+>> commit a142f4d3e5c54db5e942fa6ee5f3dc0e8c83207b
+>> Author: Rajat Jain <rajatja@google.com>
+>> Date:   Mon Jan 2 22:34:15 2017 -0800
+>>
+>>     PCI/ASPM: Add comment about L1 substate latency
+>>
+>>     Since the exit latencies for L1 substates are not advertised by a device,
+>>     it is not clear in spec how to do a L1 substate exit latency check.  We
+>>     assume that the L1 exit latencies advertised by a device include L1
+>>     substate latencies (and hence do not do any check).  If that is not true,
+>>     we should do some sort of check here.
+>>
+>>     (I'm not clear about what that check should like currently. I'd be glad to
+>>     take up any suggestions).
+>>
+>>     Signed-off-by: Rajat Jain <rajatja@google.com>
+>>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>>
+>> I added Rajat for discussion on L1SS. I think this deserves its own discussion.
+>
+>Thanks, The above commit specifically adds a comment to
+>pcie_aspm_check_latency(), because I wanted to leave a note
+>highlighting that potentially, we could add a more stringent check for
+>exit latency for L1SS. But that has nothing to do with how we are
+>configuring or enabling / disabling the L1 substates.
+>
+>Thanks & Best Regards,
+>
+>Rajat
+>
+>> I'll look at the other part of your email and move things around a little bit
+>> less aggressively for the aspm_default.
+>>
+>>
+>> --
+>> Sinan Kaya
+>> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
