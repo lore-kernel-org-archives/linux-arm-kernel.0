@@ -1,54 +1,26 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 07 Apr 2017 17:12:32 +0100
-Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <CAMj-D2AKzp-J97ZZGYdtgMvUR7o=sDw5n-Ygy7amvRk6k1p9aQ@mail.gmail.com>
-References: <20170315160727.16465-1-james.morse@arm.com>
- <CAMj-D2A2QyvjUvbEcnaPcPsgySvAguWFkZSS1WxxT+T3uNU7aw@mail.gmail.com>
- <58E6096E.4060206@arm.com>
- <CAMj-D2AKzp-J97ZZGYdtgMvUR7o=sDw5n-Ygy7amvRk6k1p9aQ@mail.gmail.com>
-Message-ID: <58E7BA70.4040004@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 7 Apr 2017 17:13:35 +0100
+Subject: [PATCHv2 00/16] arm_pmu: ACPI support
+In-Reply-To: <20170407143006.GP19342@arm.com>
+References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+ <20170407143006.GP19342@arm.com>
+Message-ID: <20170407161335.GC858@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+On Fri, Apr 07, 2017 at 03:30:06PM +0100, Will Deacon wrote:
+> On Thu, Apr 06, 2017 at 07:29:07PM +0100, Mark Rutland wrote:
+> > This series implements ACPI support in the ARM PMU code. It borrows some code
+> > from Jeremy's series [1], but takes a different approach to probing and
+> > association, using the usual hotplug state machine, minimising external changes
+> > required, and simplifying the relationship with the common arm_pmu code.
+> 
+> Patches 12 and 13 seem unrelated to this series, and I've made some small
+> comments on a couple of other patches.
 
-On 06/04/17 16:06, gengdongjiu wrote:
-> Below is my previous idea:
->   When signalling Qemu, Qemu generate GHES ,then  Qemu/kvmtool  inject
-> the SEA/SEI to guest OS. For different reason, Qemu/.KVMtool injects
-> diferent notification type. if inject SEA/SEI/IRQ, guest OS handle the
-> guest SEA/SEI/IRQ. handling guest OS SEA/SEI and IRQ guest OS software
-> logical is  different.
-> for example, guest OS call API "ghes_notify_sea" when happening SEA;
-> call API  "ghes_notify_sei" when happening SEI.
+Those were cleanup that relied on the GICC rework in this series.
 
-Sounds reasonable. Qemu shouldn't have to care what the guest OS is so the
-injecting notifications should stick to KVM APIs.
-
-
-> so what is your suggested way to notify guest OS after Qemu generating the CPER?
-[...]
-> so for the notification guest OS, I think Qemu uses IOCTL to let KVM
-> inject error may be better.
-
-I agree.
-
-Synchronous External Abort is something that can always be delivered, Qemu can
-make it look like SEA was taken on a vcpu by modifying the registers using KVM's
-KVM_SET_ONE_REG ioctl(). The pseudo code for what is required is in the
-ARM-ARM's 'AArch64.TakeException'.
-
-
-SError Interrupt is more complicated as it can be masked. Fortunately the
-architecture has a way to inject SError into a guest using HCR_EL2.VSE, I think
-KVM should allow users-space to inject SError with this. Marc and Christoffer
-will have the best idea about how such an API should work. To be useful for
-injecting SEI we need to be able to set VSESR_EL2 along with the HCR_EL2.VSE bit.
-KVM will need to know about the RAS extensions to save/restore some of the new
-registers listed in A1.7.5 of the new ARM-ARM.
-
+I'll drop those for v3, and send them separately once the rest is in.
 
 Thanks,
-
-James
+Mark.
