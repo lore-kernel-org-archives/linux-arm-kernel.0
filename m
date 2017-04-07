@@ -1,47 +1,43 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri,  7 Apr 2017 15:06:18 -0400
-Subject: [PATCH V2] scsi: mpt3sas: remove redundant wmb
-Message-ID: <1491591978-17880-1-git-send-email-okaya@codeaurora.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 7 Apr 2017 14:09:45 -0500
+Subject: [PATCHv2 15/16] arm64: pmuv3: handle !PMUv3 when probing
+In-Reply-To: <20170407180507.GA5783@leverpostej>
+References: <1491503363-17731-1-git-send-email-mark.rutland@arm.com>
+ <1491503363-17731-16-git-send-email-mark.rutland@arm.com>
+ <20170407142908.GO19342@arm.com> <20170407180507.GA5783@leverpostej>
+Message-ID: <1e55376b-3c38-354c-6ba2-f607f0cc9709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to relaxed ordering requirements on multiple architectures,
-drivers are required to use wmb/rmb/mb combinations when they
-need to guarantee observability between the memory and the HW.
+On 04/07/2017 01:05 PM, Mark Rutland wrote:
+> On Fri, Apr 07, 2017 at 03:29:09PM +0100, Will Deacon wrote:
+>> On Thu, Apr 06, 2017 at 07:29:22PM +0100, Mark Rutland wrote:
+>>> When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
+>>> compatible PMU. Thus we need to consult ID registers during probe time.
+>>>
+>>> This patch updates our PMUv3 probing code to test for the presence of
+>>> PMUv3 functionality before touching an PMUv3-specific registers, and
+>>> before updating the struct arm_pmu with PMUv3 data.
+>
+> [...]
+>
+>> It would also be worth spinning this up on qemu, if you get a chance, as
+>> I don't think that implements the PMU.
+>
+> That raises the usual problem with GSIs in static ACPI tables; the MADT
+> GICC doesn't have any way of describing the absense of a PMU interrupt.
+>
+> Booting a TCG qemu, the PMU GSI is zero, which is a valid GSI...
+>
+> There's a spec bug to fix here.
 
-The mpt3sas driver is already using wmb() for this purpose.
-However, it issues a writel following wmb(). writel() function
-on arm/arm64 arhictectures have an embedded wmb() call inside.
+Or a QEMU bug... The SBSA mandates a PMU AFAIK. So you won't have an 
+ACPI system without one.
 
-This results in unnecessary performance loss and code duplication.
 
-writel already guarantees ordering for both cpu and bus. we don't need
-additional wmb()
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/scsi/mpt3sas/mpt3sas_base.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/scsi/mpt3sas/mpt3sas_base.c b/drivers/scsi/mpt3sas/mpt3sas_base.c
-index 5b7aec5..18039bb 100644
---- a/drivers/scsi/mpt3sas/mpt3sas_base.c
-+++ b/drivers/scsi/mpt3sas/mpt3sas_base.c
-@@ -1025,7 +1025,6 @@ static int mpt3sas_remove_dead_ioc_func(void *arg)
- 				    0 : ioc->reply_free_host_index + 1;
- 				ioc->reply_free[ioc->reply_free_host_index] =
- 				    cpu_to_le32(reply);
--				wmb();
- 				writel(ioc->reply_free_host_index,
- 				    &ioc->chip->ReplyFreeHostIndex);
- 			}
-@@ -1074,7 +1073,6 @@ static int mpt3sas_remove_dead_ioc_func(void *arg)
- 		return IRQ_NONE;
- 	}
- 
--	wmb();
- 	if (ioc->is_warpdrive) {
- 		writel(reply_q->reply_post_host_index,
- 		ioc->reply_post_host_index[msix_index]);
--- 
-1.9.1
+>
+> Urrgh.
+>
+> Thanks,
+> Mark.
+>
