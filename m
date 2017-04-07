@@ -1,86 +1,68 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 7 Apr 2017 14:23:07 +0200
-Subject: [PATCH v9 11/12] ARM: EXYNOS: move cpu_restart as a SoC specific
- hook to exynos_cpu_info
-In-Reply-To: <1490879826-16754-12-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170330131442epcas5p4f2be72cb3ec506847d8e832675e682c4@epcas5p4.samsung.com>
+Date: Fri, 7 Apr 2017 14:24:12 +0200
+Subject: [PATCH v9 02/12] ARM: EXYNOS: remove usage of soc_is_exynosMMMM
+ from pm.c
+In-Reply-To: <6cf529ca-a28a-6757-39aa-5ef2e5391e16@samsung.com>
+References: <CGME20170330131421epcas5p40b0ad9c1003d3ab807667ae2b05d25bc@epcas5p4.samsung.com>
  <1490879826-16754-1-git-send-email-pankaj.dubey@samsung.com>
- <1490879826-16754-12-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAJKOXPdejfBQDtSv-r+kaUDHwYbYu=YzHxHh8AeaYO8wzAE4Hw@mail.gmail.com>
+ <1490879826-16754-3-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPcDO_4JonsxoywQq_D_AcWQsP8NnAsFMw1VsAhOgjLW0g@mail.gmail.com>
+ <6cf529ca-a28a-6757-39aa-5ef2e5391e16@samsung.com>
+Message-ID: <CAJKOXPf0O_3CZY5terJ7Vtu9yhf6AwD5ACOBuCrpTNa9Etd=5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 3:17 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> To handle differences in cpu_restart functionality among various Exynos SoC
-> let's move cpu_restart as a SoC specific function hook to exynos_cpu_info.
+On Fri, Apr 7, 2017 at 2:12 PM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
 >
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c | 16 +++++++++++-----
->  1 file changed, 11 insertions(+), 5 deletions(-)
 >
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 6f08b15..af9332c 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -39,11 +39,13 @@ extern void exynos4_secondary_startup(void);
->   * @cpu_boot_reg: computes cpu boot address for requested cpu
->   * @cpu_power_down: handles cpu power down routine for requested cpu
->   * @cpu_power_up: handles cpu power up routine for requested cpu
-> + * @cpu_restart: handles cpu restart routine for requested cpu
->   */
->  struct exynos_cpu_info {
->         void __iomem* (*cpu_boot_reg)(u32 cpu);
->         void (*cpu_power_down)(u32 cpu);
->         void (*cpu_power_up)(u32 cpu);
-> +       void (*cpu_restart)(u32 cpu);
->  };
+> On Friday 07 April 2017 01:54 PM, Krzysztof Kozlowski wrote:
+>> On Thu, Mar 30, 2017 at 3:16 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+>>> soc_is_exynosMMMM is staged for removal after adopting to exynos-chipid
+>>> driver, so let's remove/minimize usage of any such helper function usage
+>>> from pm.c.
+>>>
+>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos/pm.c                   | 22 ++++++++++++----------
+>>>  include/linux/soc/samsung/exynos-regs-pmu.h |  3 +++
+>>>  2 files changed, 15 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+>>> index 1a7e5b5..4a73b02 100644
+>>> --- a/arch/arm/mach-exynos/pm.c
+>>> +++ b/arch/arm/mach-exynos/pm.c
+>>> @@ -123,11 +123,13 @@ int exynos_pm_central_resume(void)
+>>>  }
+>>>
+>>>  /* Ext-GIC nIRQ/nFIQ is the only wakeup source in AFTR */
+>>> -static void exynos_set_wakeupmask(long mask)
+>>> +static void exynos_set_wakeupmask(void)
+>>>  {
+>>> -       pmu_raw_writel(mask, S5P_WAKEUP_MASK);
+>>> -       if (soc_is_exynos3250())
+>>> +       if (of_machine_is_compatible("samsung,exynos3250")) {
+>>> +               pmu_raw_writel(EXYNOS3_WAKEUP_MASK_VAL, S5P_WAKEUP_MASK);
+>>>                 pmu_raw_writel(0x0, S5P_WAKEUP_MASK2);
+>>> +       } else
+>>> +               pmu_raw_writel(EXYNOS_WAKEUP_MASK_VAL, S5P_WAKEUP_MASK);
+>>
+>> You need {} around this too. Checkpatch should complain about it as
+>> well so be sure to run it.
+>>
 >
->  static const struct exynos_cpu_info *cpu_info;
-> @@ -252,16 +254,19 @@ static inline void __iomem *cpu_boot_reg(int cpu)
->  }
+> I ran checkpatch before posting, but it didn't complain about this. Here
+> is the result when I ran it again today on the same patch.
 >
->  /*
-> - * Set wake up by local power mode and execute software reset for given core.
-> - *
-> + * exynos_core_restart : restart the specified cpu
-> + * @core_id : the cpu to be restarted
->   * Currently this is needed only when booting secondary CPU on Exynos3250.
->   */
->  void exynos_core_restart(u32 core_id)
->  {
-> -       u32 val;
-> +       if (cpu_info && cpu_info->cpu_restart)
-> +               cpu_info->cpu_restart(core_id);
-> +}
+> ./scripts/checkpatch.pl
+> exynos-chipid-v9/0002-ARM-EXYNOS-remove-usage-of-soc_is_exynosMMMM-from-pm.patch
 >
-> -       if (!of_machine_is_compatible("samsung,exynos3250"))
-> -               return;
-> +static void exynos3250_core_restart(u32 core_id)
-> +{
-> +       u32 val;
+> total: 0 errors, 0 warnings, 81 lines checked
 >
->         while (!pmu_raw_readl(S5P_PMU_SPARE2))
->                 udelay(10);
-> @@ -362,6 +367,7 @@ static const struct exynos_cpu_info exynos3250_cpu_info = {
->         .cpu_boot_reg = exynos_common_cpu_boot_reg,
->         .cpu_power_down = exynos_common_cpu_power_down,
->         .cpu_power_up = exynos3250_cpu_power_up,
-> +       .cpu_restart = exynos3250_core_restart,
+> exynos-chipid-v9/0002-ARM-EXYNOS-remove-usage-of-soc_is_exynosMMMM-from-pm.patch
+> has no obvious style problems and is ready for submission.
 
-This is actually not a CPU restart but poking a CPU after power up. It
-is called right after enabling power to given CPU but before setting
-boot addr. For Exynos3250 in fact we do a restart but before we wait
-for bootloader flag and we set local wakeup mode.
-
-Putting this under cpu_restart will be misleading because:
-1. I am not sure this is a valid restart method even for Exynos3250
-(although it might work because the bootloader flag would be set
-anyway).
-2. It is called in specific moment.
-
-I think this should not be made generic... or the naming should be
-different, like: cpu_post_power_up().
+Ahh, okay, my bad. :)
+But anyway please fix it.
 
 Best regards,
 Krzysztof
