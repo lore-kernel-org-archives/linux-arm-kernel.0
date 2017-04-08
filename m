@@ -1,71 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 08 Apr 2017 19:58:54 +0100
-Subject: [PATCH v4 11/22] KVM: arm64: ITS: Interpret MAPD ITT_addr field
-In-Reply-To: <1490607072-21610-12-git-send-email-eric.auger@redhat.com> (Eric
- Auger's message of "Mon, 27 Mar 2017 11:31:01 +0200")
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-12-git-send-email-eric.auger@redhat.com>
-Message-ID: <86lgrabua9.fsf@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 8 Apr 2017 16:08:48 -0400
+Subject: [git pull] base: soc: Improvements for the SoC bus and
+ soc_device_match()
+In-Reply-To: <20170408153505.GA1140@kroah.com>
+References: <1490950460-8945-1-git-send-email-geert+renesas@glider.be>
+ <20170403102831.GF31988@verge.net.au>
+ <20170408153505.GA1140@kroah.com>
+Message-ID: <20170408200848.GC6533@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27 2017 at 10:31:01 AM, Eric Auger <eric.auger@redhat.com> wrote:
-> Up to now the MAPD ITT_addr had been ignored. We will need it
-> for save/restore. Let's record it in the its_device struct.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->
-> ---
->
-> v3 -> v4:
-> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
-> - correct ittaddr bitmask to support 48bit GPA
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index ddd2780..89a0db7 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -103,6 +103,7 @@ struct its_device {
->  	/* the head for the list of ITTEs */
->  	struct list_head itt_head;
->  	u32 nb_eventid_bits;
-> +	gpa_t itt_addr;
->  	u32 device_id;
->  };
->  
-> @@ -553,6 +554,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
->  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
->  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-> +#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2,  8, 47)
->  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
->  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
->  
-> @@ -824,6 +826,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->  	bool valid = its_cmd_get_validbit(its_cmd);
->  	u8 nb_eventid_bits = its_cmd_get_size(its_cmd) + 1;
-> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd) << 8;
+On Sat, Apr 08, 2017 at 05:35:05PM +0200, Greg Kroah-Hartman wrote:
+> On Mon, Apr 03, 2017 at 06:28:31AM -0400, Simon Horman wrote:
+> > On Fri, Mar 31, 2017 at 10:54:20AM +0200, Geert Uytterhoeven wrote:
+> > > 	Hi Greg,
+> > > 	Hi Arnd, Kevin, Olof,
+> > > 	Hi Magnus, Simon,
+> > > 
+> > > The following changes since commit c470abd4fde40ea6a0846a2beab642a578c0b8cd:
+> > > 
+> > >   Linux 4.10 (2017-02-19 14:34:00 -0800)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git tags/soc-device-match-tag2
+> > > 
+> > > for you to fetch changes up to 6e12db376b60b7158e4e6006af60566f8c68f7ab:
+> > > 
+> > >   base: soc: Allow early registration of a single SoC device (2017-03-29 21:43:26 +0200)
+> > 
+> > Hi Geert,
+> > 
+> > I have pulled this into the renesas tree.
+> > 
+> > Hi Greg,
+> > 
+> > I would be most grateful if you could pull the above tag too.
+> 
+> Pull it into where?  Why do I need this if they are going in through
+> your tree?
 
-Same remark as previously. I'd rather have the macro returning something
-that is directly useful rather than having to shift afterwards.
-
->  	struct its_device *device;
->  
->  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-> @@ -855,6 +858,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  
->  	device->device_id = device_id;
->  	device->nb_eventid_bits = nb_eventid_bits;
-> +	device->itt_addr = itt_addr;
->  
->  	INIT_LIST_HEAD(&device->itt_head);
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Good point. I don't think you need to pull it unless it would satisfy
+dependencies you have and it seems there are none at this time.
