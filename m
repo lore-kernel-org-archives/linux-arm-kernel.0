@@ -1,120 +1,101 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 8 Apr 2017 06:15:52 -0700
-Subject: [PATCH v4 01/22] KVM: arm/arm64: Add vITS save/restore API
- documentation
-In-Reply-To: <86y3vbcj20.fsf@arm.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-2-git-send-email-eric.auger@redhat.com>
- <86y3vbcj20.fsf@arm.com>
-Message-ID: <20170408131552.GA29201@lvm>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Sat, 8 Apr 2017 14:22:32 +0100
+Subject: [PATCH] acpi: pci: don't ignore function ID of bridge device in
+ _PRT
+In-Reply-To: <CAKv+Gu9EoUo+_BDSBj_v6eS7yYdjktcbQQA_eiLoqY47y1oK6w@mail.gmail.com>
+References: <20170407132222.28300-1-ard.biesheuvel@linaro.org>
+ <20170407170654.GA30103@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_rivjMaQ740LWO1Nm8SPMGuQ1J1TFeD8QXnRch8Lv6bg@mail.gmail.com>
+ <20170407180652.GA12301@red-moon>
+ <CAKv+Gu-wXAU9_eHFLSDNKa6hTznHne=HDU8qi-c69PrgSR1i=Q@mail.gmail.com>
+ <CAKv+Gu9EoUo+_BDSBj_v6eS7yYdjktcbQQA_eiLoqY47y1oK6w@mail.gmail.com>
+Message-ID: <20170408132232.GA13027@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 08, 2017 at 11:03:51AM +0100, Marc Zyngier wrote:
-> On Mon, Mar 27 2017 at 10:30:51 AM, Eric Auger <eric.auger@redhat.com> wrote:
-> > Add description for how to access vITS registers and how to flush/restore
-> > vITS tables into/from memory
+On Sat, Apr 08, 2017 at 12:22:15PM +0100, Ard Biesheuvel wrote:
+> On 7 April 2017 at 19:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 7 April 2017 at 19:06, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> >> On Fri, Apr 07, 2017 at 06:12:05PM +0100, Ard Biesheuvel wrote:
+> >>> On 7 April 2017 at 18:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> [...]
 > >
-> > Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> > OK, I have changed my DSDT as follows:
 > >
-> > ---
-> > v3 -> v4:
-> > - take into account Peter's comments:
-> >   - typos
-> >   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
-> >   - add a validity bit in DTE
-> >   - document all fields in CTE and ITE
-> >   - document ABI revision
-> > - take into account Andre's comments:
-> >   - document restrictions about GITS_CREADR writing and GITS_IIDR
-> >   - document -EBUSY error if one or more VCPUS are runnning
-> >   - document 64b registers only can be accessed with 64b access
-> > - itt_addr field matches bits [51:8] of the itt_addr
 > >
-> > v1 -> v2:
-> > - DTE and ITE now are 8 bytes
-> > - DTE and ITE now indexed by deviceid/eventid
-> > - use ITE name instead of ITTE
-> > - mentions ITT_addr matches bits [51:8] of the actual address
-> > - mentions LE layout
-> > ---
-> >  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 118 +++++++++++++++++++++
-> >  1 file changed, 118 insertions(+)
+> > Device (PCI0)
+> > {
+> >     Name (_ADR, 0x00)
+> >     Name (_HID, "PNP0A08" /* PCI Express Bus */)  // _HID: Hardware ID
+> >     Name (_CID, "PNP0A03" /* PCI Bus */)  // _CID: Compatible ID
+> >     Name (_SEG, 0x00)  // _SEG: PCI Segment
+> >     Name (_BBN, 0x00)  // _BBN: BIOS Bus Number
+> >     Name (_CCA, 0x01)  // _CCA: Cache Coherency Attribute
 > >
-> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> > index 6081a5b..0902d20 100644
-> > --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> > +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> > @@ -36,3 +36,121 @@ Groups:
-> >      -ENXIO:  ITS not properly configured as required prior to setting
-> >               this attribute
-> >      -ENOMEM: Memory shortage when allocating ITS internal data
-> > +
-> > +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-> > +  Attributes:
-> > +      The attr field of kvm_device_attr encodes the offset of the
-> > +      ITS register, relative to the ITS control frame base address
-> > +      (ITS_base).
-> > +
-> > +      kvm_device_attr.addr points to a __u64 value whatever the width
-> > +      of the addressed register (32/64 bits). 64 bit registers can only
-> > +      be accessed with full length.
-> > +
-> > +      Writes to read-only registers are ignored by the kernel except for:
-> > +      - GITS_READR. It needs to be restored otherwise commands in the queue
-> > +        will be re-executed after CWRITER setting. Writing this register is
-> > +        allowed if the ITS is not enabled (GITS_CTLR.enable = 0). Also it
-> > +        needs to be restored after GITS_CBASER since a write to GITS_CBASER
-> > +        resets GITS_CREADR.
-> > +      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
-> > +
-> > +      For other registers, getting or setting a register has the same
-> > +      effect as reading/writing the register on real hardware.
-> > +  Errors:
-> > +    -ENXIO: Offset does not correspond to any supported register
-> > +    -EFAULT: Invalid user pointer for attr->addr
-> > +    -EINVAL: Offset is not 64-bit aligned
-> > +    -EBUSY: one or more VCPUS are running
-> > +
-> > +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
-> > +  Attributes
-> > +       The attr field of kvm_device_attr must be zero.
-> > +
-> > +       request the flush-save/restore of the ITS tables, namely
-> > +       the device table, the collection table, all the ITT tables,
-> > +       the LPI pending tables. On save, the tables are flushed
-> > +       into guest memory at the location provisioned by the guest
-> > +       in GITS_BASER (device and collection tables), in the MAPD
-> > +       command (ITT_addr), GICR_PENDBASERs (pending tables).
+> >     Device (EXP1)
+> >     {
+> >         Name (_ADR, 0x20001)  // _ADR: Address
+> >         Name (_PRT, Package ()  // _PRT: PCI Routing Table
+> >         {
+> >             // slot 1: dev 2 fn 1
+> >             Package () { 0xFFFF, 0x0, 0x0, 0x140 },
+> >             Package () { 0xFFFF, 0x1, 0x0, 0x141 },
+> >             Package () { 0xFFFF, 0x2, 0x0, 0x142 },
+> >             Package () { 0xFFFF, 0x3, 0x0, 0x143 }
+> >         }) // _PRT
+> >     }
+> >     Device (EXP2)
+> >     {
+> >         Name (_ADR, 0x20002)  // _ADR: Address
+> >         Name (_PRT, Package ()  // _PRT: PCI Routing Table
+> >         {
+> >             // slot 2: dev 2 fn 2
+> >             Package () { 0xFFFF, 0x0, 0x0, 0x144 },
+> >             Package () { 0xFFFF, 0x1, 0x0, 0x145 },
+> >             Package () { 0xFFFF, 0x2, 0x0, 0x146 },
+> >             Package () { 0xFFFF, 0x3, 0x0, 0x147 }
+> >         }) // _PRT
+> >     }
+> >     Device (EXP3)
+> >     {
+> >         Name (_ADR, 0x20003)  // _ADR: Address
+> >         Name (_PRT, Package ()  // _PRT: PCI Routing Table
+> >         {
+> >             // slot 3: dev 2 fn 3
+> >             Package () { 0xFFFF, 0x0, 0x0, 0x148 },
+> >             Package () { 0xFFFF, 0x1, 0x0, 0x149 },
+> >             Package () { 0xFFFF, 0x2, 0x0, 0x14a },
+> >             Package () { 0xFFFF, 0x3, 0x0, 0x14b }
+> >         }) // _PRT
+> >     }
+> >
+> > but it does not get picked up, and I am back to
+> >
+> > [    3.357555] pcieport 0000:00:02.2: can't derive routing for PCI INT A
+> > [    3.370477] pcieport 0000:00:02.2: PCI INT A: no GSI
+> > [    3.380549] pcieport 0000:00:02.3: can't derive routing for PCI INT A
+> > [    3.393476] pcieport 0000:00:02.3: PCI INT A: no GSI
+> >
 > 
-> May I echo Andre's concern here? Seeing the GICR_PENDBASER registers
-> here feels wrong. The pending table is a redistributor concept, and is
-> local to it. Even more, it is perfectly possible to use the
-> redistributors (and its pending tables) without an ITS by using the
-> GICR_SETLPIR registers.
+> OK, this does appear to work in fact, for the devices behind the
+> bridges. These messages are from the pcieport driver trying to request
+> an IRQ for the bridge device itself, which no longer works now that
+> the _PRT methods have been moved out.
 > 
-> Granted, we do not support this (and I'm *not* looking forward to
-> supporting it), but I would rather implement a redistributor flush than
-> using the ITS to indirectly force it. That's not how the HW works, and I
-> don't think we should deviate from it.
-> 
-> I appreciate this brings additional complexity to userspace (having to
-> iterate over the vcpus or the redistributors is likely more costly than
-> hitting the ITS which is likely to be unique), but sticking to the
-> letter of the architecture is probably our best bet. Each time we tried
-> to deviate from it, we've had to backtrack.
+> So that mostly solves the problem. I'll try adding back a _PRT in the
+> PCI root device itself, but i'm not sure if I can make any inferences
+> about the IRQ wiring from the data i have.
 
-I agree.  I think the possibility of using LPIs without an ITS is the
-winning argument.
+Yes and IIUC with the $SUBJECT patch applied, the endpoints would match
+the _PRT entry under PNP0A08 through their bridge (PCIe port device = 2
+fn = X) device entry, not their own (device = 0) (ie first look-up in
+acpi_pci_irq_lookup() through acpi_pci_irq_find_prt_entry() should fail
+for the endpoints, then the same look-up is carried out with the bridge
+device instead and that succeeds, the _PRT entry routes IRQs for the
+PCIeport AND their downstream endpoint with $SUBJECT patch applied).
 
-However, I could see it being reasonable to have a single call that
-userspace can make on the vgic device to ask it to flush all the
-redistributors at the same time.  We defined the cpu sysreg interface
-via the vgic device as well, so I don't think we're breaking anything,
-and in fact, it may be good to have a single sync-point where the kernel
-can atomically say "all redistributors are flushed correctly" or
-"something bad happened".  Do we have any arguments for wanting to be
-able flush redistributors independently?
+If you add the _PRT under the PCIe port itself (table above) the PCIe
+port can't find an ACPI parent device to route its own IRQx, that's my
+reading of what's going on, I will debug it next week.
 
-Thanks,
--Christoffer
+Lorenzo
