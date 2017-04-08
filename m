@@ -1,61 +1,43 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Sat, 8 Apr 2017 08:20:03 -0700
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CA+DvKQKQzMk==8Z4sF1pCeDDwE4+m_2Kgtztamaf2BWYm5ENUA@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
- <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
- <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
- <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
- <CA+DvKQKQzMk==8Z4sF1pCeDDwE4+m_2Kgtztamaf2BWYm5ENUA@mail.gmail.com>
-Message-ID: <CALCETrXQaRcNz7EQW9DHF-LMr5SkooLq=1HKsdOfXH-kY4fcBw@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 8 Apr 2017 17:35:05 +0200
+Subject: [git pull] base: soc: Improvements for the SoC bus and
+ soc_device_match()
+In-Reply-To: <20170403102831.GF31988@verge.net.au>
+References: <1490950460-8945-1-git-send-email-geert+renesas@glider.be>
+ <20170403102831.GF31988@verge.net.au>
+Message-ID: <20170408153505.GA1140@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 8, 2017 at 12:33 AM, Daniel Micay <danielmicay@gmail.com> wrote:
-> The
-> submitted code is aimed at rare writes to globals, but this feature is
-> more than that and design decisions shouldn't be based on just the
-> short term.
+On Mon, Apr 03, 2017 at 06:28:31AM -0400, Simon Horman wrote:
+> On Fri, Mar 31, 2017 at 10:54:20AM +0200, Geert Uytterhoeven wrote:
+> > 	Hi Greg,
+> > 	Hi Arnd, Kevin, Olof,
+> > 	Hi Magnus, Simon,
+> > 
+> > The following changes since commit c470abd4fde40ea6a0846a2beab642a578c0b8cd:
+> > 
+> >   Linux 4.10 (2017-02-19 14:34:00 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git tags/soc-device-match-tag2
+> > 
+> > for you to fetch changes up to 6e12db376b60b7158e4e6006af60566f8c68f7ab:
+> > 
+> >   base: soc: Allow early registration of a single SoC device (2017-03-29 21:43:26 +0200)
+> 
+> Hi Geert,
+> 
+> I have pulled this into the renesas tree.
+> 
+> Hi Greg,
+> 
+> I would be most grateful if you could pull the above tag too.
 
-Then, if you disagree with a proposed design, *explain why* in a
-standalone manner.  Say what future uses a different design would
-have.
+Pull it into where?  Why do I need this if they are going in through
+your tree?
 
-> I actually care a lot more about 64-bit ARM support than I do x86, but
-> using a portable API for pax_open_kernel (for the simple uses at
-> least) is separate from choosing the underlying implementation. There
-> might not be a great way to do it on the architectures I care about
-> but that doesn't need to hinder x86. It's really not that much code...
-> A weaker/slower implementation for x86 also encourages the same
-> elsewhere.
+thanks,
 
-No one has explained how CR0.WP is weaker or slower than my proposal.
-Here's what I'm proposing:
-
-At boot, choose a random address A.  Create an mm_struct that has a
-single VMA starting at A that represents the kernel's rarely-written
-section.  Compute O = (A - VA of rarely-written section).  To do a
-rare write, use_mm() the mm, write to (VA + O), then unuse_mm().
-
-This should work on any arch that has an MMU that allows this type of
-aliasing and that doesn't have PA-based protections on the
-rarely-written section.
-
-It'll be considerably slower than CR0.WP on a current x86 kernel, but,
-with PCID landed, it shouldn't be much slower.  It has the added
-benefit that writes to non-rare-write data using the rare-write
-primitive will fail.
-
---Andy
+greg k-h
