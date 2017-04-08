@@ -1,279 +1,48 @@
-From: vikas.manocha@st.com (Vikas Manocha)
-Date: Fri, 7 Apr 2017 18:12:07 -0700
-Subject: [PATCH] ARM: dts: stm32f7: add STM32f769I & stm32f746 discovery board
- support
-Message-ID: <1491613929-11485-1-git-send-email-vikas.manocha@st.com>
+From: danielmicay@gmail.com (Daniel Micay)
+Date: Sat, 8 Apr 2017 00:12:53 -0400
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <CAGXu5jLXB4J_ZGCKF0WD2SNTGyam8-tP5K1iYChW8wZEtAVM2A@mail.gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+ <alpine.DEB.2.20.1704071426300.1716@nanos>
+ <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
+ <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
+ <alpine.DEB.2.20.1704072125460.1958@nanos>
+ <CAGXu5jLXB4J_ZGCKF0WD2SNTGyam8-tP5K1iYChW8wZEtAVM2A@mail.gmail.com>
+Message-ID: <CA+DvKQKTHBdyQ0_Kn0dpZzAo1g3yBt-OGK309K+UN6upq-5FAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stm32f769I & stm32f746 are MCUs of stm32f7 family. Here are the major
-spces of the two boards:
+> I probably chose the wrong name for this feature (write rarely).
+> That's _usually_ true, but "sensitive_write()" was getting rather
+> long. The things that we need to protect with this are certainly stuff
+> that doesn't get much writing, but some things are just plain
+> sensitive (like page tables) and we should still try to be as fast as
+> possible with them.
 
-stm32f769I discovery board:
-	- Cortex-M7 core @216MHz
-	- 2MB mcu internal flash
-	- 512KB internal sram
-	- 16MB sdram memory
-	- 64MB qspi flash memory
-	- 4 inch wvga LCD-TFT Display
+Not too late to rename it. Scoped write? I think it makes change to
+use a different API than PaX for portability too, but not a different
+x86 implementation. It's quite important to limit the writes to the
+calling thread and it needs to perform well to be introduced widely.
 
-stm32f746 discovery board:
-	- Cortex-M7 core @216MHz
-	- 1MB mcu internal flash
-	- 320KB internal sram
-	- 8MB sdram memory
-	- 16MB qspi flash memory
-	- 4.3 inch 480x272 LCD-TFT display
+> I'm all for a general case for the infrastructure (as Andy and Mark
+> has mentioned), but I don't want to get into the situation where
+> people start refusing to use it because it's "too slow" (for example,
+> see refcount_t vs net-dev right now).
 
-Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
----
- arch/arm/boot/dts/Makefile            |   2 +
- arch/arm/boot/dts/stm32f746-disco.dts | 101 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stm32f746.dtsi      |   2 +-
- arch/arm/boot/dts/stm32f769-disco.dts | 101 ++++++++++++++++++++++++++++++++++
- 4 files changed, 205 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/stm32f746-disco.dts
- create mode 100644 arch/arm/boot/dts/stm32f769-disco.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0118084..a119f74 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -763,6 +763,8 @@ dtb-$(CONFIG_ARCH_STI) += \
- dtb-$(CONFIG_ARCH_STM32)+= \
- 	stm32f429-disco.dtb \
- 	stm32f469-disco.dtb \
-+	stm32f746-disco.dtb \
-+	stm32f769-disco.dtb \
- 	stm32429i-eval.dtb \
- 	stm32746g-eval.dtb
- dtb-$(CONFIG_MACH_SUN4I) += \
-diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
-new file mode 100644
-index 0000000..c0e313f
---- /dev/null
-+++ b/arch/arm/boot/dts/stm32f746-disco.dts
-@@ -0,0 +1,101 @@
-+/*
-+ * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "stm32f746.dtsi"
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "STMicroelectronics STM32F746-DISCO board";
-+	compatible = "st,stm32f746-disco", "st,stm32f746";
-+
-+	chosen {
-+		bootargs = "root=/dev/ram";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0xC0000000 0x800000>;
-+	};
-+
-+	aliases {
-+		serial0 = &usart1;
-+	};
-+
-+};
-+
-+&clk_hse {
-+	clock-frequency = <25000000>;
-+};
-+
-+&pinctrl {
-+	usart1_pins: usart1 at 0	{
-+		pins1 {
-+			pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
-+				bias-disable;
-+				drive-push-pull;
-+				slew-rate = <2>;
-+		};
-+		pins2 {
-+			pinmux = <STM32F746_PB7_FUNC_USART1_RX>;
-+			bias-disable;
-+		};
-+	};
-+
-+	qspi_pins: qspi at 0 {
-+		pins {
-+			pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
-+			       <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
-+			       <STM32F746_PD11_FUNC_QUADSPI_BK1_IO0>,
-+			       <STM32F746_PD12_FUNC_QUADSPI_BK1_IO1>,
-+			       <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
-+			       <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
-+			slew-rate = <2>;
-+		};
-+	};
-+};
-+
-+&usart1 {
-+	pinctrl-0 = <&usart1_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index f321ffe..826700f 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -178,7 +178,7 @@
- 			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
- 		};
- 
--		pin-controller {
-+		pinctrl: pin-controller {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "st,stm32f746-pinctrl";
-diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-new file mode 100644
-index 0000000..5f8558e
---- /dev/null
-+++ b/arch/arm/boot/dts/stm32f769-disco.dts
-@@ -0,0 +1,101 @@
-+/*
-+ * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "stm32f746.dtsi"
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "STMicroelectronics STM32F769-DISCO board";
-+	compatible = "st,stm32f769-disco", "st,stm32f7";
-+
-+	chosen {
-+		bootargs = "root=/dev/ram";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0xC0000000 0x1000000>;
-+	};
-+
-+	aliases {
-+		serial0 = &usart1;
-+	};
-+
-+};
-+
-+&clk_hse {
-+	clock-frequency = <25000000>;
-+};
-+
-+&pinctrl {
-+	usart1_pins: usart1 at 0	{
-+		pins1 {
-+			pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
-+				bias-disable;
-+				drive-push-pull;
-+				slew-rate = <2>;
-+		};
-+		pins2 {
-+			pinmux = <STM32F746_PA10_FUNC_USART1_RX>;
-+			bias-disable;
-+		};
-+	};
-+
-+	qspi_pins: qspi at 0 {
-+		pins {
-+			pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
-+			       <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
-+			       <STM32F746_PC9_FUNC_QUADSPI_BK1_IO0>,
-+			       <STM32F746_PC10_FUNC_QUADSPI_BK1_IO1>,
-+			       <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
-+			       <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
-+			slew-rate = <2>;
-+		};
-+	};
-+};
-+
-+&usart1 {
-+	pinctrl-0 = <&usart1_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
--- 
-1.9.1
+Meanwhile, the PaX implementation has improved to avoid the issues
+that were brought up while only introducing a single always-predicted
+(due to code placement) branch on the overflow flag. That seems to
+have gone unnoticed upstream, where there's now a much slower
+implementation that's not more secure, and is blocked from
+introduction in areas where it's most needed based on the performance.
+Not to mention that it's opt-in... which is never going to work.
