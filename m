@@ -1,76 +1,81 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Fri, 7 Apr 2017 22:07:20 -0700
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
- <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
- <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
-Message-ID: <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Sat, 8 Apr 2017 14:38:23 +0800
+Subject: [PATCH] ARM: dts: hi6220: Reset the mmc hosts
+In-Reply-To: <1489673004-11075-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1489673004-11075-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <58E8855F.5060200@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 7, 2017 at 9:21 PM, Daniel Micay <danielmicay@gmail.com> wrote:
->>> Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
->>> somewhere sensible should make those "leaks" visible fast -- and their
->>> exploitation impossible, i.e. fail hard.
->>
->> The leaks surely exist and now we'll just add an exploitable BUG.
+Hi Daniel,
+
+On 2017/3/16 22:03, Daniel Lezcano wrote:
+> The MMC hosts could be left in an unconsistent or uninitialized state from
+> the firmware. Instead of assuming, the firmware did the right things, let's
+> reset the host controllers.
 >
-> That didn't seem to matter for landing a rewrite of KSTACKOVERFLOW
-> with a bunch of *known* DoS bugs dealt with in grsecurity and those
-> were known issues that were unfixed for no apparent reason other than
-> keeping egos intact. It looks like there are still some left...
+> This change fixes a bug when the mmc2/sdio is initialized leading to a hung
+> task:
 >
-> In that case, there also wasn't a security/performance advantage.
+> [  242.704294] INFO: task kworker/7:1:675 blocked for more than 120 seconds.
+> [  242.711129]       Not tainted 4.9.0-rc8-00017-gcf0251f #3
+> [  242.716571] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+> [  242.724435] kworker/7:1     D    0   675      2 0x00000000
+> [  242.729973] Workqueue: events_freezable mmc_rescan
+> [  242.734796] Call trace:
+> [  242.737269] [<ffff00000808611c>] __switch_to+0xa8/0xb4
+> [  242.742437] [<ffff000008d07c04>] __schedule+0x1c0/0x67c
+> [  242.747689] [<ffff000008d08254>] schedule+0x40/0xa0
+> [  242.752594] [<ffff000008d0b284>] schedule_timeout+0x1c4/0x35c
+> [  242.758366] [<ffff000008d08e38>] wait_for_common+0xd0/0x15c
+> [  242.763964] [<ffff000008d09008>] wait_for_completion+0x28/0x34
+> [  242.769825] [<ffff000008a1a9f4>] mmc_wait_for_req_done+0x40/0x124
+> [  242.775949] [<ffff000008a1ab98>] mmc_wait_for_req+0xc0/0xf8
+> [  242.781549] [<ffff000008a1ac3c>] mmc_wait_for_cmd+0x6c/0x84
+> [  242.787149] [<ffff000008a26610>] mmc_io_rw_direct_host+0x9c/0x114
+> [  242.793270] [<ffff000008a26aa0>] sdio_reset+0x34/0x7c
+> [  242.798347] [<ffff000008a1d46c>] mmc_rescan+0x2fc/0x360
+>
+> [ ... ]
+>
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-This is wildly off topic, but I think it's worth answering anyway
-because there's an important point here:
+Thanks!
+Applied to the hisilicon arm64 dt tree.
 
-grsecurity and PaX are great projects.  They have a lot of good ideas,
-and they're put together quite nicely.  The upstream kernel should
-*not* do things differently from they way they are in grsecurity/PaX
-just because it wants to be different.  Conversely, the upstream
-kernel should not do things the same way as PaX just to be more like
-PaX.
+Best Regards,
+Wei
 
-Keep in mind that the upstream kernel and grsecurity/PaX operate under
-different constraints.  The upstream kernel tries to keep itself clean
-and to make tree-wide updates rather that keeping compatibility stuff
-around.  PaX and grsecurity presumably want to retain some degree of
-simplicity when porting to newer upstream versions.
-
-In the context of virtually mapped stacks / KSTACKOVERFLOW, this
-naturally leads to different solutions.  The upstream kernel had a
-bunch of buggy drivers that played badly with virtually mapped stacks.
-grsecurity sensibly went for the approach where the buggy drivers kept
-working.  The upstream kernel went for the approach of fixing the
-drivers rather than keeping a compatibility workaround.  Different
-constraints, different solutions.
-
-The point being that, if someone sends a patch to the x86 entry code
-that's justified by "be like PaX" or by "be different than PaX",
-that's not okay.  It needs a real justification that stands on its
-own.
-
-In the case of rare writes or pax_open_kernel [1] or whatever we want
-to call it, CR3 would work without arch-specific code, and CR0 would
-not.  That's an argument for CR3 that would need to be countered by
-something.  (Sure, avoiding leaks either way might need arch changes.
-OTOH, a *randomized* CR3-based approach might not have as much of a
-leak issue to begin with.)
-
-[1] Contrary to popular belief, I don't sit around reading grsecurity
-code or config options, so I really don't know what this thing is
-called.
+> ---
+>   arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 470461d..1e5129b 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -774,6 +774,7 @@
+>   			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
+>   			clock-names = "ciu", "biu";
+>   			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC0>;
+> +			reset-names = "reset";
+>   			bus-width = <0x8>;
+>   			vmmc-supply = <&ldo19>;
+>   			pinctrl-names = "default";
+> @@ -797,6 +798,7 @@
+>   			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
+>   			clock-names = "ciu", "biu";
+>   			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC1>;
+> +			reset-names = "reset";
+>   			vqmmc-supply = <&ldo7>;
+>   			vmmc-supply = <&ldo10>;
+>   			bus-width = <0x4>;
+> @@ -815,6 +817,7 @@
+>   			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
+>   			clock-names = "ciu", "biu";
+>   			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC2>;
+> +			reset-names = "reset";
+>   			bus-width = <0x4>;
+>   			broken-cd;
+>   			pinctrl-names = "default", "idle";
