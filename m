@@ -1,31 +1,46 @@
 From: dev@lynxeye.de (Lucas Stach)
-Date: Sat,  8 Apr 2017 16:36:02 +0200
-Subject: [RFC PATCH 2/7] ARM: dts: imx6*-hummingboard2: add SGTL5000 VDDD
- supply
+Date: Sat,  8 Apr 2017 16:36:01 +0200
+Subject: [RFC PATCH 1/7] ARM: dts: imx6*-hummingboard2: fix formatting
 In-Reply-To: <20170408143607.15928-1-dev@lynxeye.de>
 References: <20170408143607.15928-1-dev@lynxeye.de>
-Message-ID: <20170408143607.15928-3-dev@lynxeye.de>
+Message-ID: <20170408143607.15928-2-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VDDD is supplied by VCC_1P8 on HB2.
+Trivial formatting change.
 
 Signed-off-by: Lucas Stach <dev@lynxeye.de>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 4513e98..8246597 100644
+index fc79751..4513e98 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -182,6 +182,7 @@
- 		reg = <0x0a>;
- 		VDDA-supply = <&reg_3p3v>;
- 		VDDIO-supply = <&reg_3p3v>;
-+		VDDD-supply = <&reg_1p8v>;
- 	};
+@@ -486,9 +486,9 @@
  };
  
+ &pwm1 {
+-        pinctrl-names = "default";
+-        pinctrl-0 = <&pinctrl_hummingboard2_pwm1>;
+-        status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hummingboard2_pwm1>;
++	status = "okay";
+ };
+ 
+ &pwm3 {
+@@ -538,9 +538,7 @@
+ 
+ &usdhc3 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <
+-		&pinctrl_hummingboard2_usdhc3
+-	>;
++	pinctrl-0 = <&pinctrl_hummingboard2_usdhc3>;
+ 	vmmc-supply = <&reg_3p3v>;
+ 	vqmmc-supply = <&reg_3p3v>;
+ 	bus-width = <8>;
 -- 
 2.9.3
