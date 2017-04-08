@@ -1,36 +1,71 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  9 Apr 2017 02:50:22 +0800
-Subject: [PATCH 2/5] clk: sunxi-ng: allow set parent clock (PLL_CPUX) for CPUX
- clock on H3
-In-Reply-To: <20170408185025.53841-1-icenowy@aosc.io>
-References: <20170408185025.53841-1-icenowy@aosc.io>
-Message-ID: <20170408185025.53841-3-icenowy@aosc.io>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 08 Apr 2017 19:58:54 +0100
+Subject: [PATCH v4 11/22] KVM: arm64: ITS: Interpret MAPD ITT_addr field
+In-Reply-To: <1490607072-21610-12-git-send-email-eric.auger@redhat.com> (Eric
+ Auger's message of "Mon, 27 Mar 2017 11:31:01 +0200")
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-12-git-send-email-eric.auger@redhat.com>
+Message-ID: <86lgrabua9.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPUX clock, which is the main clock of the ARM core on Allwinner H3,
-can be adjusted by changing the frequency of the PLL_CPUX clock.
+On Mon, Mar 27 2017 at 10:31:01 AM, Eric Auger <eric.auger@redhat.com> wrote:
+> Up to now the MAPD ITT_addr had been ignored. We will need it
+> for save/restore. Let's record it in the its_device struct.
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>
+> ---
+>
+> v3 -> v4:
+> - in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
+> - correct ittaddr bitmask to support 48bit GPA
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index ddd2780..89a0db7 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -103,6 +103,7 @@ struct its_device {
+>  	/* the head for the list of ITTEs */
+>  	struct list_head itt_head;
+>  	u32 nb_eventid_bits;
+> +	gpa_t itt_addr;
+>  	u32 device_id;
+>  };
+>  
+> @@ -553,6 +554,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
+>  #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
+>  #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
+>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
+> +#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2,  8, 47)
+>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
+>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
+>  
+> @@ -824,6 +826,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
+>  	bool valid = its_cmd_get_validbit(its_cmd);
+>  	u8 nb_eventid_bits = its_cmd_get_size(its_cmd) + 1;
+> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd) << 8;
 
-Allowing setting parent clock for the CPUX clock, thus the PLL_CPUX
-clock can be adjusted when adjusting the CPUX clock.
+Same remark as previously. I'd rather have the macro returning something
+that is directly useful rather than having to shift afterwards.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>  	struct its_device *device;
+>  
+>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+> @@ -855,6 +858,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  
+>  	device->device_id = device_id;
+>  	device->nb_eventid_bits = nb_eventid_bits;
+> +	device->itt_addr = itt_addr;
+>  
+>  	INIT_LIST_HEAD(&device->itt_head);
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 4cbc1b701b7c..90b4e26a70bc 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -135,7 +135,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_de_clk, "pll-de",
- static const char * const cpux_parents[] = { "osc32k", "osc24M",
- 					     "pll-cpux" , "pll-cpux" };
- static SUNXI_CCU_MUX(cpux_clk, "cpux", cpux_parents,
--		     0x050, 16, 2, CLK_IS_CRITICAL);
-+		     0x050, 16, 2, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT);
- 
- static SUNXI_CCU_M(axi_clk, "axi", "cpux", 0x050, 0, 2, 0);
- 
+Thanks,
+
+	M.
 -- 
-2.12.2
+Jazz is not dead. It just smells funny.
