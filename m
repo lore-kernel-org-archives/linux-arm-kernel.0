@@ -1,45 +1,34 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Sat, 8 Apr 2017 14:46:58 +0800
-Subject: [PATCH v3 1/2] dt-bindings: arm: hisilicon: add bindings for
- hi3798cv200 SoC and Poplar board
-In-Reply-To: <1490769009-12552-2-git-send-email-xuejiancheng@hisilicon.com>
-References: <1490769009-12552-1-git-send-email-xuejiancheng@hisilicon.com>
- <1490769009-12552-2-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <58E88762.6060000@hisilicon.com>
+Date: Sat, 8 Apr 2017 14:51:48 +0800
+Subject: [PATCH 0/5] arm64: dts: hisi: add NIC, RoCE and SAS support for
+ hip07
+In-Reply-To: <1491530876-109791-1-git-send-email-xuwei5@hisilicon.com>
+References: <1491530876-109791-1-git-send-email-xuwei5@hisilicon.com>
+Message-ID: <58E88884.2090702@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiancheng,
+Hi All,
 
-On 2017/3/29 14:30, Jiancheng Xue wrote:
-> Add bindings for HiSilicon hi3798cv200 SoC and Poplar Board.
+On 2017/4/7 10:07, Wei.Xu wrote:
+> This patch series adds Mbigen, NIC, RoCE and SAS nodes for the hip07
+> SoC and enables the NIC, RoCE and SAS on the hip07 d05 board.
 >
-> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
-> Reviewed-by: Alex Elder <elder@linaro.org>
-> Acked-by: Peter Griffin <peter.griffin@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-Thanks!
-Applied both to the hisilicon arm64 dt tree but added hi3798cv200 soc
-binding to avoid the patch checking warning.
+> Wei Xu (5):
+>    arm64: dts: hisi: add mbigen nodes for the hip07 SoC
+>    arm64: dts: hisi: add network related nodes for the hip07 SoC
+>    arm64: dts: hisi: add RoCE nodes for the hip07 SoC
+>    arm64: dts: hisi: add SAS nodes for the hip07 SoC
+>    arm64: dts: hisi: enalbe the NIC and SAS for the hip07-d05 board
+>
+>   arch/arm64/boot/dts/hisilicon/hip07-d05.dts |  24 ++
+>   arch/arm64/boot/dts/hisilicon/hip07.dtsi    | 479 ++++++++++++++++++++++++++++
+>   2 files changed, 503 insertions(+)
+>
+After removed the PCIe node in the patch 5, the series has been applied 
+to the hisilicon arm64
+dt tree since this series patches just to add the nodes and the binding 
+has been reviewed before.
 
 Best Regards,
 Wei
-> ---
->   Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> index f1c1e21..1fd3dd7 100644
-> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> @@ -4,6 +4,10 @@ Hi3660 SoC
->   Required root node properties:
->   	- compatible = "hisilicon,hi3660";
->   
-> +Hi3798cv200 Poplar Board
-> +Required root node properties:
-> +	- compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
-> +
->   Hi4511 Board
->   Required root node properties:
->   	- compatible = "hisilicon,hi3620-hi4511";
