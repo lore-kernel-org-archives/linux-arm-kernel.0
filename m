@@ -1,140 +1,38 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  9 Apr 2017 02:50:21 +0800
-Subject: [PATCH 1/5] clk: sunxi-ng: prevent NKMP clocks from temporarily get
- higher freq
+Date: Sun,  9 Apr 2017 02:50:23 +0800
+Subject: [PATCH 3/5] cpufreq: dt: Add support for some new Allwinner SoCs
 In-Reply-To: <20170408185025.53841-1-icenowy@aosc.io>
 References: <20170408185025.53841-1-icenowy@aosc.io>
-Message-ID: <20170408185025.53841-2-icenowy@aosc.io>
+Message-ID: <20170408185025.53841-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that on newer SoCs (already observed on A33, H3), when setting
-all NKMP factors at the same time, the multiplier get applied first,
-then the divider get applied. In some situations (e.g. the multiplier
-increased but the divider decreased), this will make the clock
-frequency temporarily higher than both the original frequency and the
-target frequency, which may lead to system hang due to PLL_CPU(X) clock
-usually being a NKMP clock.
+Some new Allwinner SoCs get supported in the kernel after the
+compatibles are added to cpufreq-dt-platdev driver.
 
-A comparsion between the old divider (M*P) and the new one is added, and
-if the divider get smaller when changing clock, the multiplier will be
-applied first, so that the clock won't go to a frequency higher than
-normal.
-
-The interval between applying the first group of factors and the second
-group is based on experiments results on an Orange Pi Zero board.
+Add their compatible strings in the cpufreq-dt-platdev driver.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/sunxi-ng/ccu_nkmp.c | 76 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 65 insertions(+), 11 deletions(-)
+ drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index e58c95787f94..5da77eb60335 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -9,6 +9,7 @@
-  */
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 921b4a6c3d16..2180e509e383 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -24,7 +24,12 @@ static const struct of_device_id machines[] __initconst = {
+ 	{ .compatible = "allwinner,sun8i-a23", },
+ 	{ .compatible = "allwinner,sun8i-a33", },
+ 	{ .compatible = "allwinner,sun8i-a83t", },
++	{ .compatible = "allwinner,sun8i-h2-plus", },
+ 	{ .compatible = "allwinner,sun8i-h3", },
++	{ .compatible = "allwinner,sun8i-v3s", },
++	{ .compatible = "allwinner,sun50i-a64", },
++	{ .compatible = "allwinner,sun50i-h5", },
++	{ .compatible = "nextthing,gr8", },
  
- #include <linux/clk-provider.h>
-+#include <linux/delay.h>
- 
- #include "ccu_gate.h"
- #include "ccu_nkmp.h"
-@@ -130,12 +131,49 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
- 	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
- }
- 
-+static void ccu_nkmp_extract_factors(const struct ccu_nkmp *nkmp,
-+				     struct _ccu_nkmp *_nkmp, u32 reg)
-+{
-+	_nkmp->n = ((reg >> nkmp->n.shift) & GENMASK(nkmp->n.width - 1, 0))
-+		   + nkmp->n.offset;
-+	_nkmp->k = ((reg >> nkmp->k.shift) & GENMASK(nkmp->k.width - 1, 0))
-+		   + nkmp->k.offset;
-+	_nkmp->m = ((reg >> nkmp->m.shift) & GENMASK(nkmp->m.width - 1, 0))
-+		   + nkmp->m.offset;
-+	_nkmp->p = 1 <<
-+		   ((reg >> nkmp->p.shift) & GENMASK(nkmp->p.width - 1, 0));
-+}
-+
-+static u32 ccu_nkmp_apply_multiplier(const struct ccu_nkmp *nkmp,
-+				     const struct _ccu_nkmp *_nkmp, u32 reg)
-+{
-+	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
-+	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
-+
-+	reg |= (_nkmp->n - nkmp->n.offset) << nkmp->n.shift;
-+	reg |= (_nkmp->k - nkmp->k.offset) << nkmp->k.shift;
-+
-+	return reg;
-+}
-+
-+static u32 ccu_nkmp_apply_divider(const struct ccu_nkmp *nkmp,
-+				  const struct _ccu_nkmp *_nkmp, u32 reg)
-+{
-+	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
-+	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
-+
-+	reg |= (_nkmp->m - nkmp->m.offset) << nkmp->m.shift;
-+	reg |= ilog2(_nkmp->p) << nkmp->p.shift;
-+
-+	return reg;
-+}
-+
- static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
- 			   unsigned long parent_rate)
- {
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
--	struct _ccu_nkmp _nkmp;
--	unsigned long flags;
-+	struct _ccu_nkmp _nkmp, _nkmp_old;
-+	unsigned long flags, old_mp, mp;
- 	u32 reg;
- 
- 	_nkmp.min_n = nkmp->n.min ?: 1;
-@@ -152,17 +190,33 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
- 	spin_lock_irqsave(nkmp->common.lock, flags);
- 
- 	reg = readl(nkmp->common.base + nkmp->common.reg);
--	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
--	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
--	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
--	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
- 
--	reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
--	reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
--	reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
--	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
-+	ccu_nkmp_extract_factors(nkmp, &_nkmp_old, reg);
-+
-+	old_mp = _nkmp_old.m * _nkmp_old.p;
-+	mp = _nkmp.m * _nkmp.p;
-+
-+	if (mp > old_mp) {
-+		reg = ccu_nkmp_apply_divider(nkmp, &_nkmp, reg);
-+		writel(reg, nkmp->common.base + nkmp->common.reg);
-+
-+		/*
-+		 * This value is decided by experiment results on an
-+		 * Allwinner H2+ board (Orange Pi Zero).
-+		 */
-+		udelay(500);
- 
--	writel(reg, nkmp->common.base + nkmp->common.reg);
-+		reg = ccu_nkmp_apply_multiplier(nkmp, &_nkmp, reg);
-+		writel(reg, nkmp->common.base + nkmp->common.reg);
-+	} else {
-+		reg = ccu_nkmp_apply_multiplier(nkmp, &_nkmp, reg);
-+		writel(reg, nkmp->common.base + nkmp->common.reg);
-+
-+		udelay(500);
-+
-+		reg = ccu_nkmp_apply_divider(nkmp, &_nkmp, reg);
-+		writel(reg, nkmp->common.base + nkmp->common.reg);
-+	}
- 
- 	spin_unlock_irqrestore(nkmp->common.lock, flags);
+ 	{ .compatible = "apm,xgene-shadowcat", },
  
 -- 
 2.12.2
