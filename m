@@ -1,75 +1,164 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sat, 8 Apr 2017 19:20:08 +0900
-Subject: [PATCH v2] dt-bindings: Add documentation for GP10B GPU
-In-Reply-To: <20170331125607.GA29779@ulmo.ba.sec>
-References: <20170330091831.18322-2-acourbot@nvidia.com>
- <20170330092644.11890-1-acourbot@nvidia.com>
- <20170331125607.GA29779@ulmo.ba.sec>
-Message-ID: <CAAVeFuJN3BQfuvA2dVP=6US1cMW9jfdfswAwNCKUg6w4Md3Xqg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 08 Apr 2017 11:24:28 +0100
+Subject: [PATCH v4 06/22] KVM: arm64: ITS: Implement
+ vgic_its_has_attr_regs and attr_regs_access
+In-Reply-To: <1490607072-21610-7-git-send-email-eric.auger@redhat.com> (Eric
+ Auger's message of "Mon, 27 Mar 2017 11:30:56 +0200")
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-7-git-send-email-eric.auger@redhat.com>
+Message-ID: <86d1cnci3n.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 9:56 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Thu, Mar 30, 2017 at 06:26:44PM +0900, Alexandre Courbot wrote:
->> GP10B's definition is mostly similar to GK20A's and GM20B's. The only
->> noticeable difference is the use of power domains instead of a regulator
->> for power supply.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> ---
->> Changes since v1:
->> - It's much better when it compiles.
->>
->>  .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 25 +++++++++++++++++++++-
->>  1 file changed, 24 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
->> index ff3db65e50de..b7e4c7444510 100644
->> --- a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
->> +++ b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
->> @@ -5,6 +5,7 @@ Required properties:
->>    Currently recognized values:
->>    - nvidia,gk20a
->>    - nvidia,gm20b
->> +  - nvidia,gp10b
->>  - reg: Physical base address and length of the controller's registers.
->>    Must contain two entries:
->>    - first entry for bar0
->> @@ -14,7 +15,8 @@ Required properties:
->>  - interrupt-names: Must include the following entries:
->>    - stall
->>    - nonstall
->> -- vdd-supply: regulator for supply voltage.
->> +- vdd-supply: regulator for supply voltage. Only required for GPUs not using
->> +  power domains.
->>  - clocks: Must contain an entry for each entry in clock-names.
->>    See ../clocks/clock-bindings.txt for details.
->>  - clock-names: Must include the following entries:
->> @@ -27,6 +29,8 @@ is also required:
->>    See ../reset/reset.txt for details.
->>  - reset-names: Must include the following entries:
->>    - gpu
->> +- power-domains: GPUs that make use of power domains can define this property
->> +  instead of vdd-supply. Currently "nvidia,gp10b" makes use of this.
->>
->>  Optional properties:
->>  - iommus: A reference to the IOMMU. See ../iommu/iommu.txt for details.
->> @@ -68,3 +72,22 @@ Example for GM20B:
->>               iommus = <&mc TEGRA_SWGROUP_GPU>;
->>               status = "disabled";
->>       };
->> +
->> +Example for GP10B:
->> +
->> +     gpu at 17000000 {
->> +             compatible = "nvidia,gp10b";
->> +             reg = <0x0 0x17000000 0x0 0x1000000>,
->> +                   <0x0 0x18000000 0x0 0x1000000>;
+On Mon, Mar 27 2017 at 10:30:56 AM, Eric Auger <eric.auger@redhat.com> wrote:
+> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> group becomes functional.
 >
-> Would it make sense to add a reg-names property to give these meaning? I
-> know that the binding describes what each entry is, but having the names
-> specified in a property would make it more immediately obvious.
+> At least GITS_CREADR requires to differentiate a guest write action from a
+> user access. As such let's introduce a new uaccess_its_write
+> vgic_register_region callback.
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>
+> ---
+>
+> v3 -> v4:
+> - remove changes to the REGISTER_ITS_DESC macro. This will be handled in
+>   subsequent patch with the introduction of a new REGISTER_ITS_DESC_UACCESS
+>   macro
+> - fix IIDR access and add a comment wrt full length access
+> - handle endianness
+> - add kvm lock and vcpus lock
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c  | 78 +++++++++++++++++++++++++++++++++++++++++--
+>  virt/kvm/arm/vgic/vgic-mmio.h |  9 +++--
+>  2 files changed, 83 insertions(+), 4 deletions(-)
+>
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index f687e91..9b9ea86 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1469,14 +1469,88 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+>  int vgic_its_has_attr_regs(struct kvm_device *dev,
+>  			   struct kvm_device_attr *attr)
+>  {
+> -	return -ENXIO;
+> +	const struct vgic_register_region *region;
+> +	struct vgic_io_device iodev = {
+> +		.regions = its_registers,
+> +		.nr_regions = ARRAY_SIZE(its_registers),
+> +	};
+> +	gpa_t offset = attr->attr;
+> +
+> +	region = vgic_find_mmio_region(iodev.regions,
+> +				       iodev.nr_regions,
+> +				       offset);
+> +	if (!region)
+> +		return -ENXIO;
+> +
+> +	return 0;
+>  }
+>  
+>  int vgic_its_attr_regs_access(struct kvm_device *dev,
+>  			      struct kvm_device_attr *attr,
+>  			      u64 *reg, bool is_write)
+>  {
+> -	return -ENXIO;
+> +	const struct vgic_register_region *region;
+> +	struct vgic_io_device iodev = {
+> +		.regions = its_registers,
+> +		.nr_regions = ARRAY_SIZE(its_registers),
+> +	};
+> +	struct vgic_its *its = dev->private;
+> +	gpa_t addr, offset = attr->attr;
+> +	unsigned int len;
+> +	unsigned long data = 0;
+> +	int ret = 0;
+> +
+> +	/*
+> +	 * Among supported registers, only GITS_CTLR (0x0) and GITS_IIDR (0x4)
+> +	 * are 32 bits. Others are 64 bits.
+> +	 */
+> +	if ((offset < 0x8 && offset & 0x3) || (offset >= 0x8 && offset & 0x7))
+> +		return -EINVAL;
 
-Would certainly work, especially since we have been doing this for
-other properties. Is there an obvious pro to doing this though?
+Can you use the actual register names instead of raw offsets? It's
+certainly be more readable.
+
+> +
+> +	mutex_lock(&dev->kvm->lock);
+> +
+> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
+> +		ret = -ENXIO;
+> +		goto out;
+> +	}
+> +
+> +	region = vgic_find_mmio_region(iodev.regions,
+> +				       iodev.nr_regions,
+> +				       offset);
+> +	if (!region) {
+> +		ret = -ENXIO;
+> +		goto out;
+> +	}
+> +
+> +	if (!lock_all_vcpus(dev->kvm)) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	addr = its->vgic_its_base + offset;
+> +
+> +	/*
+> +	 * Only full length register accesses are supported although
+> +	 * the architecture spec theoretically allows upper/lower 32
+> +	 * bits to be accessed independently
+> +	 */
+> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
+> +
+> +	if (is_write) {
+> +		data = vgic_data_mmio_bus_to_host(reg, len);
+> +		if (region->uaccess_its_write)
+> +			region->uaccess_its_write(dev->kvm, its, addr,
+> +						  len, data);
+> +		else
+> +			region->its_write(dev->kvm, its, addr, len, data);
+> +	} else {
+> +		data = region->its_read(dev->kvm, its, addr, len);
+> +		vgic_data_host_to_mmio_bus(reg, len, data);
+> +	}
+> +	unlock_all_vcpus(dev->kvm);
+> +out:
+> +	mutex_unlock(&dev->kvm->lock);
+> +	return ret;
+>  }
+>  
+>  static int vgic_its_has_attr(struct kvm_device *dev,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 6eec91b..becc473 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -36,8 +36,13 @@ struct vgic_register_region {
+>  	};
+>  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+>  				      unsigned int len);
+> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+> -			      unsigned int len, unsigned long val);
+> +	union {
+> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+> +				      unsigned int len, unsigned long val);
+> +		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+> +					  gpa_t addr, unsigned int len,
+> +					  unsigned long val);
+> +	};
+>  };
+>  
+>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+
+Other that that, looks good to me
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
