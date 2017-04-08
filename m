@@ -1,43 +1,41 @@
-From: kilobyte@angband.pl (Adam Borowski)
-Date: Sat, 8 Apr 2017 20:38:17 +0200
-Subject: Linux next-20170407 failed to build on ARM due to usage of mod
- in btrfs code
-In-Reply-To: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
-References: <alpine.LNX.2.20.1704090002520.35546@x220i>
- <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
-Message-ID: <20170408183817.lnlw7db2thmwcnz3@angband.pl>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun,  9 Apr 2017 02:50:20 +0800
+Subject: [PATCH 0/5] Some Allwinner CCU tweaks and basical DVFS support for
+ H3/H2+
+Message-ID: <20170408185025.53841-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 08, 2017 at 02:45:34PM -0300, Fabio Estevam wrote:
-> On Sat, Apr 8, 2017 at 1:02 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> > Hello everyone,
-> > Today I tried to build a kernel with btrfs enabled on ARM, then when linking
-> > I met such an error:
-> >
-> > ```
-> > fs/built-in.o: In function `scrub_bio_end_io_worker':
-> > acl.c:(.text+0x2f0450): undefined reference to `__aeabi_uldivmod'
-> > fs/built-in.o: In function `scrub_extent_for_parity':
-> > acl.c:(.text+0x2f0bcc): undefined reference to `__aeabi_uldivmod'
-> > fs/built-in.o: In function `scrub_raid56_parity':
-> > acl.c:(.text+0x2f12a8): undefined reference to `__aeabi_uldivmod'
-> > acl.c:(.text+0x2f15c4): undefined reference to `__aeabi_uldivmod'
-> > ```
-> >
-> > These functions are found at fs/btrfs/scrub.c .
-> >
-> > After disabling btrfs the kernel is successfully built.
-> 
-> I see the same error with ARM imx_v6_v7_defconfig + btrfs support.
-> 
-> Looks like it is caused by commit 7d0ef8b4dbbd220 ("Btrfs: update
-> scrub_parity to use u64 stripe_len").
+This patchset aim to add basical DVFS support for Allwinner H3/H2+ SoCs, they
+seem to be nearly the same.
 
-+1, my bisect just finished, same bad commit.
+The first patch is a CCU fix for all NKMP-type clocks, not H3 limited. Please
+schedule this patch to 4.11 queue, as A33 needs also this patch. It solves the
+problem that system hangs when the PLL_CPUX change for the first time.
+
+The second patch allows the PLL_CPUX to change for CPUX clock on H3.
+
+The third patch imports a bunch of new SoCs' compatibles into
+cpufreq-dt-platdev driver.
+
+The fourth patch adds several operating points for Allwinner H3/H2+ CPU.
+
+The fifth patch adds the regulator node to Orange Pi Zero board's device
+tree.
+
+Icenowy Zheng (5):
+  clk: sunxi-ng: prevent NKMP clocks from temporarily get higher freq
+  clk: sunxi-ng: allow set parent clock (PLL_CPUX) for CPUX clock on H3
+  cpufreq: dt: Add support for some new Allwinner SoCs
+  ARM: sun8i: h3: add operating-points-v2 table for CPU
+  ARM: sun8i: h2+: add SY8113B regulator used by Orange Pi Zero board
+
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 21 +++++++
+ arch/arm/boot/dts/sun8i-h3.dtsi                   | 38 +++++++++++-
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c               |  2 +-
+ drivers/clk/sunxi-ng/ccu_nkmp.c                   | 76 +++++++++++++++++++----
+ drivers/cpufreq/cpufreq-dt-platdev.c              |  5 ++
+ 5 files changed, 129 insertions(+), 13 deletions(-)
 
 -- 
-??????? Meow!
-???????
-??????? Collisions shmolisions, let's see them find a collision or second
-??????? preimage for double rot13!
+2.12.2
