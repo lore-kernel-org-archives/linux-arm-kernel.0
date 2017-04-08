@@ -1,39 +1,39 @@
 From: dev@lynxeye.de (Lucas Stach)
-Date: Sat,  8 Apr 2017 16:36:03 +0200
-Subject: [RFC PATCH 3/7] ARM: dts: imx6*-hummingboard2: remove LDB node
+Date: Sat,  8 Apr 2017 16:36:06 +0200
+Subject: [RFC PATCH 6/7] ARM: dts: imx6*-hummingboard2: remove redundant PWM
+ disables
 In-Reply-To: <20170408143607.15928-1-dev@lynxeye.de>
 References: <20170408143607.15928-1-dev@lynxeye.de>
-Message-ID: <20170408143607.15928-4-dev@lynxeye.de>
+Message-ID: <20170408143607.15928-7-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's disabled by default and the data mapping is supposed to be
-retrieved from the attached panel driver in mainline.
+The PWM nodes are already disabled in the imx6qdl.dtsi, so there
+is no need to disable them again in the board DTS.
 
 Signed-off-by: Lucas Stach <dev@lynxeye.de>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 8 --------
+ 1 file changed, 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index 8246597..126169a 100644
+index 31a029c..892259f 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -470,15 +470,6 @@
- 	};
+@@ -482,14 +482,6 @@
+ 	status = "okay";
  };
  
--&ldb {
+-&pwm3 {
 -	status = "disabled";
--
--	lvds-channel at 0 {
--		fsl,data-mapping = "spwg";
--		fsl,data-width = <18>;
--	};
 -};
 -
- &pcie {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard2_pcie_reset>;
+-&pwm4 {
+-	status = "disabled";
+-};
+-
+ &ssi1 {
+ 	status = "okay";
+ };
 -- 
 2.9.3
