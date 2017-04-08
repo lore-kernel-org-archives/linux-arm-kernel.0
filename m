@@ -1,8 +1,8 @@
 From: danielmicay@gmail.com (Daniel Micay)
-Date: Sat, 8 Apr 2017 00:13:59 -0400
+Date: Sat, 8 Apr 2017 00:21:48 -0400
 Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
  __arch_rare_write_begin/unmap()
-In-Reply-To: <CA+DvKQKTHBdyQ0_Kn0dpZzAo1g3yBt-OGK309K+UN6upq-5FAQ@mail.gmail.com>
+In-Reply-To: <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
 References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
  <1490811363-93944-5-git-send-email-keescook@chromium.org>
  <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
@@ -16,13 +16,19 @@ References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
  <alpine.DEB.2.20.1704071426300.1716@nanos>
  <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
  <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
- <alpine.DEB.2.20.1704072125460.1958@nanos>
- <CAGXu5jLXB4J_ZGCKF0WD2SNTGyam8-tP5K1iYChW8wZEtAVM2A@mail.gmail.com>
- <CA+DvKQKTHBdyQ0_Kn0dpZzAo1g3yBt-OGK309K+UN6upq-5FAQ@mail.gmail.com>
-Message-ID: <CA+DvKQJTHYjjTJoASRJN+G9HSpH8X=vekYPADkEwojeyOhx5SQ@mail.gmail.com>
+Message-ID: <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Not too late to rename it. Scoped write? I think it makes change to
+>> Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
+>> somewhere sensible should make those "leaks" visible fast -- and their
+>> exploitation impossible, i.e. fail hard.
+>
+> The leaks surely exist and now we'll just add an exploitable BUG.
 
-s/change/sense/
+That didn't seem to matter for landing a rewrite of KSTACKOVERFLOW
+with a bunch of *known* DoS bugs dealt with in grsecurity and those
+were known issues that were unfixed for no apparent reason other than
+keeping egos intact. It looks like there are still some left...
+
+In that case, there also wasn't a security/performance advantage.
