@@ -1,41 +1,140 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun,  9 Apr 2017 02:50:20 +0800
-Subject: [PATCH 0/5] Some Allwinner CCU tweaks and basical DVFS support for
- H3/H2+
-Message-ID: <20170408185025.53841-1-icenowy@aosc.io>
+Date: Sun,  9 Apr 2017 02:50:21 +0800
+Subject: [PATCH 1/5] clk: sunxi-ng: prevent NKMP clocks from temporarily get
+ higher freq
+In-Reply-To: <20170408185025.53841-1-icenowy@aosc.io>
+References: <20170408185025.53841-1-icenowy@aosc.io>
+Message-ID: <20170408185025.53841-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset aim to add basical DVFS support for Allwinner H3/H2+ SoCs, they
-seem to be nearly the same.
+It seems that on newer SoCs (already observed on A33, H3), when setting
+all NKMP factors at the same time, the multiplier get applied first,
+then the divider get applied. In some situations (e.g. the multiplier
+increased but the divider decreased), this will make the clock
+frequency temporarily higher than both the original frequency and the
+target frequency, which may lead to system hang due to PLL_CPU(X) clock
+usually being a NKMP clock.
 
-The first patch is a CCU fix for all NKMP-type clocks, not H3 limited. Please
-schedule this patch to 4.11 queue, as A33 needs also this patch. It solves the
-problem that system hangs when the PLL_CPUX change for the first time.
+A comparsion between the old divider (M*P) and the new one is added, and
+if the divider get smaller when changing clock, the multiplier will be
+applied first, so that the clock won't go to a frequency higher than
+normal.
 
-The second patch allows the PLL_CPUX to change for CPUX clock on H3.
+The interval between applying the first group of factors and the second
+group is based on experiments results on an Orange Pi Zero board.
 
-The third patch imports a bunch of new SoCs' compatibles into
-cpufreq-dt-platdev driver.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 76 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 65 insertions(+), 11 deletions(-)
 
-The fourth patch adds several operating points for Allwinner H3/H2+ CPU.
-
-The fifth patch adds the regulator node to Orange Pi Zero board's device
-tree.
-
-Icenowy Zheng (5):
-  clk: sunxi-ng: prevent NKMP clocks from temporarily get higher freq
-  clk: sunxi-ng: allow set parent clock (PLL_CPUX) for CPUX clock on H3
-  cpufreq: dt: Add support for some new Allwinner SoCs
-  ARM: sun8i: h3: add operating-points-v2 table for CPU
-  ARM: sun8i: h2+: add SY8113B regulator used by Orange Pi Zero board
-
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 21 +++++++
- arch/arm/boot/dts/sun8i-h3.dtsi                   | 38 +++++++++++-
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c               |  2 +-
- drivers/clk/sunxi-ng/ccu_nkmp.c                   | 76 +++++++++++++++++++----
- drivers/cpufreq/cpufreq-dt-platdev.c              |  5 ++
- 5 files changed, 129 insertions(+), 13 deletions(-)
-
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index e58c95787f94..5da77eb60335 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -9,6 +9,7 @@
+  */
+ 
+ #include <linux/clk-provider.h>
++#include <linux/delay.h>
+ 
+ #include "ccu_gate.h"
+ #include "ccu_nkmp.h"
+@@ -130,12 +131,49 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
+ }
+ 
++static void ccu_nkmp_extract_factors(const struct ccu_nkmp *nkmp,
++				     struct _ccu_nkmp *_nkmp, u32 reg)
++{
++	_nkmp->n = ((reg >> nkmp->n.shift) & GENMASK(nkmp->n.width - 1, 0))
++		   + nkmp->n.offset;
++	_nkmp->k = ((reg >> nkmp->k.shift) & GENMASK(nkmp->k.width - 1, 0))
++		   + nkmp->k.offset;
++	_nkmp->m = ((reg >> nkmp->m.shift) & GENMASK(nkmp->m.width - 1, 0))
++		   + nkmp->m.offset;
++	_nkmp->p = 1 <<
++		   ((reg >> nkmp->p.shift) & GENMASK(nkmp->p.width - 1, 0));
++}
++
++static u32 ccu_nkmp_apply_multiplier(const struct ccu_nkmp *nkmp,
++				     const struct _ccu_nkmp *_nkmp, u32 reg)
++{
++	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
++	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
++
++	reg |= (_nkmp->n - nkmp->n.offset) << nkmp->n.shift;
++	reg |= (_nkmp->k - nkmp->k.offset) << nkmp->k.shift;
++
++	return reg;
++}
++
++static u32 ccu_nkmp_apply_divider(const struct ccu_nkmp *nkmp,
++				  const struct _ccu_nkmp *_nkmp, u32 reg)
++{
++	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
++	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
++
++	reg |= (_nkmp->m - nkmp->m.offset) << nkmp->m.shift;
++	reg |= ilog2(_nkmp->p) << nkmp->p.shift;
++
++	return reg;
++}
++
+ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			   unsigned long parent_rate)
+ {
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+-	struct _ccu_nkmp _nkmp;
+-	unsigned long flags;
++	struct _ccu_nkmp _nkmp, _nkmp_old;
++	unsigned long flags, old_mp, mp;
+ 	u32 reg;
+ 
+ 	_nkmp.min_n = nkmp->n.min ?: 1;
+@@ -152,17 +190,33 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	spin_lock_irqsave(nkmp->common.lock, flags);
+ 
+ 	reg = readl(nkmp->common.base + nkmp->common.reg);
+-	reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift - 1, nkmp->n.shift);
+-	reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift - 1, nkmp->k.shift);
+-	reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
+-	reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
+ 
+-	reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
+-	reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
+-	reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
+-	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
++	ccu_nkmp_extract_factors(nkmp, &_nkmp_old, reg);
++
++	old_mp = _nkmp_old.m * _nkmp_old.p;
++	mp = _nkmp.m * _nkmp.p;
++
++	if (mp > old_mp) {
++		reg = ccu_nkmp_apply_divider(nkmp, &_nkmp, reg);
++		writel(reg, nkmp->common.base + nkmp->common.reg);
++
++		/*
++		 * This value is decided by experiment results on an
++		 * Allwinner H2+ board (Orange Pi Zero).
++		 */
++		udelay(500);
+ 
+-	writel(reg, nkmp->common.base + nkmp->common.reg);
++		reg = ccu_nkmp_apply_multiplier(nkmp, &_nkmp, reg);
++		writel(reg, nkmp->common.base + nkmp->common.reg);
++	} else {
++		reg = ccu_nkmp_apply_multiplier(nkmp, &_nkmp, reg);
++		writel(reg, nkmp->common.base + nkmp->common.reg);
++
++		udelay(500);
++
++		reg = ccu_nkmp_apply_divider(nkmp, &_nkmp, reg);
++		writel(reg, nkmp->common.base + nkmp->common.reg);
++	}
+ 
+ 	spin_unlock_irqrestore(nkmp->common.lock, flags);
+ 
 -- 
 2.12.2
