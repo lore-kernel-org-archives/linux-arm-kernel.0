@@ -1,35 +1,29 @@
-From: sfaragnaus@gmail.com (Andrea della Porta)
-Date: Sat, 8 Apr 2017 17:22:32 +0100
-Subject: [PATCH v2 3/3] staging: vc04_services: bcm2835-audio: bcm2835-pcm.c
- Fixed extra space coding style issue
-In-Reply-To: <cover.1491666884.git.sfaragnaus@gmail.com>
-References: <cover.1491666884.git.sfaragnaus@gmail.com>
-Message-ID: <9ddab5ddd106486a48d6dbdd3d8925f515448b02.1491666884.git.sfaragnaus@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 8 Apr 2017 18:25:48 +0200
+Subject: [PATCH v3 5/9] arm, arm64: factorize common cpu capacity default
+ code
+In-Reply-To: <20170327131825.32134-6-juri.lelli@arm.com>
+References: <20170327131825.32134-1-juri.lelli@arm.com>
+ <20170327131825.32134-6-juri.lelli@arm.com>
+Message-ID: <20170408162548.GA18881@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed an extra spaces at the end of the line
+On Mon, Mar 27, 2017 at 02:18:21PM +0100, Juri Lelli wrote:
+> arm and arm64 share lot of code relative to parsing CPU capacity
+> information from DT, using that information for appropriate scaling and
+> exposing a sysfs interface for chaging such values at runtime.
+> 
+> Factorize such code in a common place (driver/base/arch_topology.c) in
+> preparation for further additions.
+> 
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Andrea della Porta <sfaragnaus@gmail.com>
----
-Changes in v2:
-- subject line more explicit
+I need some acks here from the arm maintainers before I can take this
+series...
 
- drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+thanks,
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-index f1ce5cf..451942a 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-@@ -539,7 +539,7 @@ int snd_bcm2835_new_spdif_pcm(struct bcm2835_chip *chip)
- 	/* NOTE: this may fail */
- 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS,
- 					      snd_dma_continuous_data(GFP_KERNEL),
--					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max, 
-+					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max,
- 					      snd_bcm2835_playback_spdif_hw.buffer_bytes_max);
- out:
- 	mutex_unlock(&chip->audio_mutex);
--- 
-2.4.10
+greg k-h
