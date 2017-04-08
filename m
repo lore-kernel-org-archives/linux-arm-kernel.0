@@ -1,150 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 8 Apr 2017 08:04:47 +0100
-Subject: [PATCH] acpi: pci: don't ignore function ID of bridge device in
- _PRT
-In-Reply-To: <20170407213621.GA12591@red-moon>
-References: <20170407132222.28300-1-ard.biesheuvel@linaro.org>
- <20170407170654.GA30103@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_rivjMaQ740LWO1Nm8SPMGuQ1J1TFeD8QXnRch8Lv6bg@mail.gmail.com>
- <20170407180652.GA12301@red-moon>
- <CAKv+Gu-wXAU9_eHFLSDNKa6hTznHne=HDU8qi-c69PrgSR1i=Q@mail.gmail.com>
- <20170407213621.GA12591@red-moon>
-Message-ID: <CAKv+Gu_ZCWgAwWBQYOCJ_hNOqdpCa5kLYtU=bnnfg4Q9nVNDeA@mail.gmail.com>
+From: danielmicay@gmail.com (Daniel Micay)
+Date: Sat, 8 Apr 2017 03:33:27 -0400
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+ <alpine.DEB.2.20.1704071426300.1716@nanos>
+ <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
+ <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
+ <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
+ <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
+Message-ID: <CA+DvKQKQzMk==8Z4sF1pCeDDwE4+m_2Kgtztamaf2BWYm5ENUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 April 2017 at 22:36, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Apr 07, 2017 at 07:35:45PM +0100, Ard Biesheuvel wrote:
->> On 7 April 2017 at 19:06, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > On Fri, Apr 07, 2017 at 06:12:05PM +0100, Ard Biesheuvel wrote:
->> >> On 7 April 2017 at 18:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
->> >> > Hi Ard,
->> >> >
->> >> > On Fri, Apr 07, 2017 at 02:22:22PM +0100, Ard Biesheuvel wrote:
->> >> >> We currently derive legacy interrupt routing by matching _PRT
->> >> >> entries on the PCI device only, presumably under the assumption
->> >> >> that PRT entries always have a value of 0xffff in the function
->> >> >> field, meaning 'match all functions'.
->> >> >
->> >> > The spec (ACPI v6.0, sec 6.2.13) contains a note that:
->> >> >
->> >> >   The PCI function number in the Address field of the _PRT packages
->> >> >   must be 0xFFFF, indicating "any" function number or "all functions".
->> >> >
->> >> > If we need a patch like this, we need to somehow reconcile it with
->> >> > that spec text to make sure firmware and OS folks have a common
->> >> > understanding of how this is supposed to work.
->> >> >
->> >> >> This no longer holds for modern PCIe topologies, where the
->> >> >> legacy interrupts for different slots may be wired to different
->> >> >> functions on the same bridge device. For instance, on AMD Seattle,
->> >> >> we may have something like
->> >> >>
->> >> >> -[0000:00]-+-00.0  Advanced Micro Devices, Inc. [AMD] Device 1a00
->> >> >>            +-02.0  Advanced Micro Devices, Inc. [AMD] Device 1a01
->> >> >>            +-02.2-[01]----00.0  Renesas uPD720202 USB 3.0 Host Controller
->> >> >>            \-02.3-[02]----00.0  Realtek RTL8169 PCIe Gigabit Ethernet
->> >> >>
->> >> >> where the _PRT describes the legacy interrupt routing as
->> >> >>
->> >> >>     Name (_PRT, Package ()  // _PRT: PCI Routing Table
->> >> >>     {
->> >> >>         // slot 1: dev 2 fn 1
->> >> >>         Package () { 0x20001, 0x0, 0x0, 0x140 },
->> >> >>         Package () { 0x20001, 0x1, 0x0, 0x141 },
->> >> >>         Package () { 0x20001, 0x2, 0x0, 0x142 },
->> >> >>         Package () { 0x20001, 0x3, 0x0, 0x143 },
->> >> >>
->> >> >>         // slot 1: dev 2 fn 2
->> >> >>         Package () { 0x20002, 0x0, 0x0, 0x144 },
->> >> >>         Package () { 0x20002, 0x1, 0x0, 0x145 },
->> >> >>         Package () { 0x20002, 0x2, 0x0, 0x146 },
->> >> >>         Package () { 0x20002, 0x3, 0x0, 0x147 },
->> >> >>
->> >> >>         // slot 1: dev 2 fn 3
->> >> >>         Package () { 0x20003, 0x0, 0x0, 0x148 },
->> >> >>         Package () { 0x20003, 0x1, 0x0, 0x149 },
->> >> >>         Package () { 0x20003, 0x2, 0x0, 0x14a },
->> >> >>         Package () { 0x20003, 0x3, 0x0, 0x14b }
->> >> >>     }) // _PRT
->> >> >
->> >> > But I think this _PRT description is incorrect and we should change
->> >> > the _PRT rather than the kernel.  My laptop has a basically identical
->> >> > topology:
->> >> >
->> >> >   -[0000:00]-+-00.0  Intel Corporation Sky Lake Host Bridge/DRAM Registers
->> >> >              +-1c.0-[02]----00.0  Realtek Semiconductor Co., Ltd.  Device 525a
->> >> >              +-1c.2-[04]----00.0  Intel Corporation Wireless 8260
->> >> >
->> >> > and the ASL looks like this (paraphrased):
->> >> >
->> >> >   Device (EXP1) {
->> >> >     Name (_ADR, 0x001C0000)
->> >> >     Name (_PRT) {
->> >> >       Package () { 0xFFFF, 0x00, \_SB.LNKA, 0x00 },
->> >> >       Package () { 0xFFFF, 0x01, \_SB.LNKB, 0x00 },
->> >> >       ...
->> >> >     }
->> >> >   }
->> >> >   Device (EXP3) {
->> >> >     Name (_ADR, 0x001C0002)
->> >> >     Name (_PRT) {
->> >> >       Package () { 0xFFFF, 0x00, \_SB.LNKC, 0x00 },
->> >> >       Package () { 0xFFFF, 0x01, \_SB.LNKD, 0x00 },
->> >> >       ...
->> >> >     }
->> >> >   }
->> >> >
->> >>
->> >> Thanks for the explanation. But how is this wired up into the PNP0A08
->> >> device then? IOW, how does the ACPI code in Linux discover the
->> >> relation between these devices and my PCI root device?
->> >
->> > You describe the PCI hierarchy starting from PNP0A08 at root and the
->> > kernel assigns the ACPI companion through _ADR matching (see
->> > acpi_pci_find_companion()) which is what is used by _PRT parsing
->> > code to route IRQs IIUC.
->> >
->>
->> OK, I have changed my DSDT as follows:
->>
->>
->> Device (PCI0)
->> {
->>     Name (_ADR, 0x00)
->>     Name (_HID, "PNP0A08" /* PCI Express Bus */)  // _HID: Hardware ID
->>     Name (_CID, "PNP0A03" /* PCI Bus */)  // _CID: Compatible ID
->>     Name (_SEG, 0x00)  // _SEG: PCI Segment
->>     Name (_BBN, 0x00)  // _BBN: BIOS Bus Number
->>     Name (_CCA, 0x01)  // _CCA: Cache Coherency Attribute
->>
->>     Device (EXP1)
->>     {
->>         Name (_ADR, 0x20001)  // _ADR: Address
->>         Name (_PRT, Package ()  // _PRT: PCI Routing Table
->>         {
->>             // slot 1: dev 2 fn 1
->>             Package () { 0xFFFF, 0x0, 0x0, 0x140 },
->                            ^
->                            0x2FFFF
+> grsecurity and PaX are great projects.  They have a lot of good ideas,
+> and they're put together quite nicely.  The upstream kernel should
+> *not* do things differently from they way they are in grsecurity/PaX
+> just because it wants to be different.  Conversely, the upstream
+> kernel should not do things the same way as PaX just to be more like
+> PaX.
 >
-> Ditto for the other entries.
+> Keep in mind that the upstream kernel and grsecurity/PaX operate under
+> different constraints.  The upstream kernel tries to keep itself clean
+> and to make tree-wide updates rather that keeping compatibility stuff
+> around.  PaX and grsecurity presumably want to retain some degree of
+> simplicity when porting to newer upstream versions.
 >
+> In the context of virtually mapped stacks / KSTACKOVERFLOW, this
+> naturally leads to different solutions.  The upstream kernel had a
+> bunch of buggy drivers that played badly with virtually mapped stacks.
+> grsecurity sensibly went for the approach where the buggy drivers kept
+> working.  The upstream kernel went for the approach of fixing the
+> drivers rather than keeping a compatibility workaround.  Different
+> constraints, different solutions.
 
-I had already tried that as well, but it doesn't work.
+Sure, but nothing is currently landed right now and the PaX
+implementation is a known quantity with a lot of testing. The
+submitted code is aimed at rare writes to globals, but this feature is
+more than that and design decisions shouldn't be based on just the
+short term. Kees is sensibly landing features by submitting them a
+little bit at a time, but a negative side effect of that is too much
+focus on just the initial proposed usage.
 
-Single stepping through the ACPI code, it seems like the _PRT entry is
-never found by acpi_get_irq_routing_table(), and so whether the
-contents are correct doesn't really matter at this point.
+As a downstream that's going to be making heavy use of mainline
+security features as a base due to PaX and grsecurity becoming
+commercial only private patches (*because* of upstream and the
+companies involved), I hope things go in the right direction i.e. not
+weaker/slower implementations than PaX. For example, while USERCOPY
+isn't entirely landed upstream (missing slab whitelisting and user
+offset/size), it's the base for the full feature and is going to get
+more testing. On the other hand, refcount_t and the slab/page
+sanitization work is 100% useless if you're willing to incorporate the
+changes to do it without needless performance loss and complexity. PAN
+emulation on 64-bit ARM was fresh ground while on ARMv7 a weaker
+implementation was used for no better reason than clashing egos. The
+upstream virtual mapped stacks will probably be perfectly good, but I
+just find it to be such a waste of time and effort to reinvent it and
+retread the same ground in terms of finding the bugs.
 
->>
->> So could we be missing anything in the arm64 implementation that
->> prevents the companion device from being found?
->
-> No and if there is that's a bug. I will help you debug it next week,
-> mind trying the change I suggest above please ? I *think* the devfn
-> parameter in the _PRT entry must match the device looked-up, in
-> particular the device bits.
->
+I actually care a lot more about 64-bit ARM support than I do x86, but
+using a portable API for pax_open_kernel (for the simple uses at
+least) is separate from choosing the underlying implementation. There
+might not be a great way to do it on the architectures I care about
+but that doesn't need to hinder x86. It's really not that much code...
+A weaker/slower implementation for x86 also encourages the same
+elsewhere.
 
-Yes, let's look into this on Monday.
+> In the case of rare writes or pax_open_kernel [1] or whatever we want
+> to call it, CR3 would work without arch-specific code, and CR0 would
+> not.  That's an argument for CR3 that would need to be countered by
+> something.  (Sure, avoiding leaks either way might need arch changes.
+> OTOH, a *randomized* CR3-based approach might not have as much of a
+> leak issue to begin with.)
+
+By randomized do you mean just ASLR? Even if the window of opportunity
+to exploit it is small, it's really not the same and this has a lot
+more use than just rare writes to small global variables.
+
+I wouldn't consider stack ASLR to be a replacement for making them
+readable/writable only by the current thread either (required for
+race-free return CFI on x86, at least without not using actual
+returns).
+
+> [1] Contrary to popular belief, I don't sit around reading grsecurity
+> code or config options, so I really don't know what this thing is
+> called.
+
+Lots of the features aren't actually named. Maybe this could be
+considered part of KERNEXEC but I don't think it is.
