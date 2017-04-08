@@ -1,101 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 08 Apr 2017 11:36:06 +0100
-Subject: [PATCH v4 07/22] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_creadr
-In-Reply-To: <1490607072-21610-8-git-send-email-eric.auger@redhat.com> (Eric
- Auger's message of "Mon, 27 Mar 2017 11:30:57 +0200")
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-8-git-send-email-eric.auger@redhat.com>
-Message-ID: <868tnbchk9.fsf@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 8 Apr 2017 12:38:21 +0200
+Subject: [PATCHv3 00/22] Ion clean up in preparation in moving out of
+ staging
+In-Reply-To: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+Message-ID: <20170408103821.GA12084@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27 2017 at 10:30:57 AM, Eric Auger <eric.auger@redhat.com> wrote:
-> GITS_CREADR needs to be restored so let's implement the associated
-> uaccess_write_its callback. The write only is allowed if the its
-> is disabled.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->
-> ---
->
-> v3 -> v4:
-> - REGISTER_ITS_DESC_UACCESS now introduced in this patch
-> - we now check the its is disabled
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 37 +++++++++++++++++++++++++++++++++++--
->  1 file changed, 35 insertions(+), 2 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 9b9ea86..a5f3abe 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1213,6 +1213,28 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
->  	return extract_bytes(its->creadr, addr & 0x7, len);
->  }
->  
-> +static void vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
-> +					       struct vgic_its *its,
-> +					       gpa_t addr, unsigned int len,
-> +					       unsigned long val)
-> +{
-> +	u32 reg;
-> +
-> +	mutex_lock(&its->cmd_lock);
-> +
-> +	if (its->enabled)
-> +		goto out;
-> + 
-> +	reg = update_64bit_reg(its->creadr, addr & 7, len, val);
-> +	reg = ITS_CMD_OFFSET(reg);
-> +	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser))
-> +		goto out;
-> +
-> +	its->creadr = reg;
+On Mon, Apr 03, 2017 at 11:57:42AM -0700, Laura Abbott wrote:
+> Hi,
+> 
+> This is v3 of the series to do some serious Ion cleanup in preparation for
+> moving out of staging. I didn't hear much on v2 so I'm going to assume
+> people are okay with the series as is. I know there were still some open
+> questions about moving away from /dev/ion but in the interest of small
+> steps I'd like to go ahead and merge this series assuming there are no more
+> major objections. More work can happen on top of this.
 
-Careful. Here, you're loosing the "Stalled" bit. We do not implement
-support for it yet, but I wonder if we should preserve it. If not, we
-should at least document that we're purposely stripping that bit.
+I've applied patches 3-11 as those were independant of the CMA changes.
+I'd like to take the rest, including the CMA changes, but I need an ack
+from someone dealing with the -mm tree before I can do that.
 
-> +out:
-> +	mutex_unlock(&its->cmd_lock);
-> +}
-> +
->  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
->  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
->  					      struct vgic_its *its,
-> @@ -1317,6 +1339,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
->  	.its_write = wr,					\
->  }
->  
-> +#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
-> +{								\
-> +	.reg_offset = off,					\
-> +	.len = length,						\
-> +	.access_flags = acc,					\
-> +	.its_read = rd,						\
-> +	.its_write = wr,					\
-> +	.uaccess_its_write = uwr,				\
-> +}
-> +
->  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->  			      gpa_t addr, unsigned int len, unsigned long val)
->  {
-> @@ -1339,8 +1371,9 @@ static struct vgic_register_region its_registers[] = {
->  	REGISTER_ITS_DESC(GITS_CWRITER,
->  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> -	REGISTER_ITS_DESC(GITS_CREADR,
-> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
-> +	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
-> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
-> +		vgic_mmio_uaccess_write_its_creadr, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_BASER,
->  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+Or, if they just keep ignoring it, I guess I can take them :)
 
-Thanks,
+thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+greg k-h
