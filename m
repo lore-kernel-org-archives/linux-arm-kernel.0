@@ -1,21 +1,20 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 08 Apr 2017 11:06:22 +0100
-Subject: [PATCH v4 03/22] arm/arm64: vgic: turn vgic_find_mmio_region into
- public
-In-Reply-To: <1490607072-21610-4-git-send-email-eric.auger@redhat.com> (Eric
- Auger's message of "Mon, 27 Mar 2017 11:30:53 +0200")
+Date: Sat, 08 Apr 2017 11:07:17 +0100
+Subject: [PATCH v4 04/22] KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+ group
+In-Reply-To: <1490607072-21610-5-git-send-email-eric.auger@redhat.com> (Eric
+ Auger's message of "Mon, 27 Mar 2017 11:30:54 +0200")
 References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-4-git-send-email-eric.auger@redhat.com>
-Message-ID: <86pogncixt.fsf@arm.com>
+ <1490607072-21610-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <86lgrbciwa.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27 2017 at 10:30:53 AM, Eric Auger <eric.auger@redhat.com> wrote:
-> We plan to use vgic_find_mmio_region in vgic-its.c so let's
-> turn it into a public function.
+On Mon, Mar 27 2017 at 10:30:54 AM, Eric Auger <eric.auger@redhat.com> wrote:
+> The ITS KVM device exposes a new KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> group which allows the userspace to save/restore ITS registers.
 >
-> Also let's take the opportunity to rename the region parameter
-> into regions to emphasize this latter is an array of regions.
+> At this stage the get/set/has operations are not yet implemented.
 >
 > Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > Reviewed-by: Andre Przywara <andre.przywara@arm.com>
