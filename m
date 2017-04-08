@@ -1,25 +1,33 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 8 Apr 2017 16:59:07 +0200
-Subject: [PATCH v2] staging: bcm2835-audio: remove unnecessary log messages
-In-Reply-To: <20170403183343.GA3620@aishwarya>
-References: <20170403183343.GA3620@aishwarya>
-Message-ID: <20170408145907.GA3789@kroah.com>
+Date: Sat, 8 Apr 2017 16:59:24 +0200
+Subject: [PATCH] staging: media/platform/bcm2835: remove gstreamer
+ workaround
+In-Reply-To: <20170402044815.GA23614@kwern-HP-Pavilion-dv5-Notebook-PC>
+References: <20170402044815.GA23614@kwern-HP-Pavilion-dv5-Notebook-PC>
+Message-ID: <20170408145924.GB3789@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 12:03:43AM +0530, Aishwarya Pant wrote:
-> Remove unnecessary log messages in the driver which are just tracking
-> function entry and exits.
+On Sun, Apr 02, 2017 at 12:48:15AM -0400, Kevin Wern wrote:
+> Gstreamer's v4l2src reacted poorly to certain outputs from the bcm2835
+> video driver's ioctl ops function vidioc_enum_framesizes, so a
+> workaround was created that could be activated by user input. This
+> workaround would replace the driver's ioctl ops struct with another,
+> similar struct--only with no function pointed to by
+> vidioc_enum_framesizes. With no response, gstreamer would attempt to
+> continue with some default settings that happened to work better.
 > 
-> Signed-off-by: Aishwarya Pant <aishpant@gmail.com>
+> However, this bug has been fixed in gstreamer since 2014, so we
+> shouldn't include this workaround in the stable version of the driver.
+> 
+> Signed-off-by: Kevin Wern <kevin.m.wern@gmail.com>
 > ---
-> Changes in v2:
-> Patch v1 introduced a compile error; remove it by deleting the log
-> continuation.
-> 
->  .../vc04_services/bcm2835-audio/bcm2835-ctl.c      |  2 --
->  .../vc04_services/bcm2835-audio/bcm2835-pcm.c      | 19 -----------
->  .../vc04_services/bcm2835-audio/bcm2835-vchiq.c    | 38 ----------------------
->  3 files changed, 59 deletions(-)
+>  drivers/staging/media/platform/bcm2835/TODO        |  5 --
+>  .../media/platform/bcm2835/bcm2835-camera.c        | 59 ----------------------
+>  2 files changed, 64 deletions(-)
 
 Doesn't apply against my tree at all :(
+
+thanks,
+
+greg k-h
