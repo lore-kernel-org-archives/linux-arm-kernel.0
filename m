@@ -1,99 +1,113 @@
-From: danielmicay@gmail.com (Daniel Micay)
-Date: Sat, 8 Apr 2017 03:33:27 -0400
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <alpine.DEB.2.20.1704071426300.1716@nanos>
- <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
- <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
- <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
- <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
-Message-ID: <CA+DvKQKQzMk==8Z4sF1pCeDDwE4+m_2Kgtztamaf2BWYm5ENUA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 08 Apr 2017 11:03:51 +0100
+Subject: [PATCH v4 01/22] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <1490607072-21610-2-git-send-email-eric.auger@redhat.com> (Eric
+ Auger's message of "Mon, 27 Mar 2017 11:30:51 +0200")
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-2-git-send-email-eric.auger@redhat.com>
+Message-ID: <86y3vbcj20.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> grsecurity and PaX are great projects.  They have a lot of good ideas,
-> and they're put together quite nicely.  The upstream kernel should
-> *not* do things differently from they way they are in grsecurity/PaX
-> just because it wants to be different.  Conversely, the upstream
-> kernel should not do things the same way as PaX just to be more like
-> PaX.
+On Mon, Mar 27 2017 at 10:30:51 AM, Eric Auger <eric.auger@redhat.com> wrote:
+> Add description for how to access vITS registers and how to flush/restore
+> vITS tables into/from memory
 >
-> Keep in mind that the upstream kernel and grsecurity/PaX operate under
-> different constraints.  The upstream kernel tries to keep itself clean
-> and to make tree-wide updates rather that keeping compatibility stuff
-> around.  PaX and grsecurity presumably want to retain some degree of
-> simplicity when porting to newer upstream versions.
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 >
-> In the context of virtually mapped stacks / KSTACKOVERFLOW, this
-> naturally leads to different solutions.  The upstream kernel had a
-> bunch of buggy drivers that played badly with virtually mapped stacks.
-> grsecurity sensibly went for the approach where the buggy drivers kept
-> working.  The upstream kernel went for the approach of fixing the
-> drivers rather than keeping a compatibility workaround.  Different
-> constraints, different solutions.
+> ---
+> v3 -> v4:
+> - take into account Peter's comments:
+>   - typos
+>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
+>   - add a validity bit in DTE
+>   - document all fields in CTE and ITE
+>   - document ABI revision
+> - take into account Andre's comments:
+>   - document restrictions about GITS_CREADR writing and GITS_IIDR
+>   - document -EBUSY error if one or more VCPUS are runnning
+>   - document 64b registers only can be accessed with 64b access
+> - itt_addr field matches bits [51:8] of the itt_addr
+>
+> v1 -> v2:
+> - DTE and ITE now are 8 bytes
+> - DTE and ITE now indexed by deviceid/eventid
+> - use ITE name instead of ITTE
+> - mentions ITT_addr matches bits [51:8] of the actual address
+> - mentions LE layout
+> ---
+>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 118 +++++++++++++++++++++
+>  1 file changed, 118 insertions(+)
+>
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> index 6081a5b..0902d20 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> @@ -36,3 +36,121 @@ Groups:
+>      -ENXIO:  ITS not properly configured as required prior to setting
+>               this attribute
+>      -ENOMEM: Memory shortage when allocating ITS internal data
+> +
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> +  Attributes:
+> +      The attr field of kvm_device_attr encodes the offset of the
+> +      ITS register, relative to the ITS control frame base address
+> +      (ITS_base).
+> +
+> +      kvm_device_attr.addr points to a __u64 value whatever the width
+> +      of the addressed register (32/64 bits). 64 bit registers can only
+> +      be accessed with full length.
+> +
+> +      Writes to read-only registers are ignored by the kernel except for:
+> +      - GITS_READR. It needs to be restored otherwise commands in the queue
+> +        will be re-executed after CWRITER setting. Writing this register is
+> +        allowed if the ITS is not enabled (GITS_CTLR.enable = 0). Also it
+> +        needs to be restored after GITS_CBASER since a write to GITS_CBASER
+> +        resets GITS_CREADR.
+> +      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
+> +
+> +      For other registers, getting or setting a register has the same
+> +      effect as reading/writing the register on real hardware.
+> +  Errors:
+> +    -ENXIO: Offset does not correspond to any supported register
+> +    -EFAULT: Invalid user pointer for attr->addr
+> +    -EINVAL: Offset is not 64-bit aligned
+> +    -EBUSY: one or more VCPUS are running
+> +
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+> +  Attributes
+> +       The attr field of kvm_device_attr must be zero.
+> +
+> +       request the flush-save/restore of the ITS tables, namely
+> +       the device table, the collection table, all the ITT tables,
+> +       the LPI pending tables. On save, the tables are flushed
+> +       into guest memory at the location provisioned by the guest
+> +       in GITS_BASER (device and collection tables), in the MAPD
+> +       command (ITT_addr), GICR_PENDBASERs (pending tables).
 
-Sure, but nothing is currently landed right now and the PaX
-implementation is a known quantity with a lot of testing. The
-submitted code is aimed at rare writes to globals, but this feature is
-more than that and design decisions shouldn't be based on just the
-short term. Kees is sensibly landing features by submitting them a
-little bit at a time, but a negative side effect of that is too much
-focus on just the initial proposed usage.
+May I echo Andre's concern here? Seeing the GICR_PENDBASER registers
+here feels wrong. The pending table is a redistributor concept, and is
+local to it. Even more, it is perfectly possible to use the
+redistributors (and its pending tables) without an ITS by using the
+GICR_SETLPIR registers.
 
-As a downstream that's going to be making heavy use of mainline
-security features as a base due to PaX and grsecurity becoming
-commercial only private patches (*because* of upstream and the
-companies involved), I hope things go in the right direction i.e. not
-weaker/slower implementations than PaX. For example, while USERCOPY
-isn't entirely landed upstream (missing slab whitelisting and user
-offset/size), it's the base for the full feature and is going to get
-more testing. On the other hand, refcount_t and the slab/page
-sanitization work is 100% useless if you're willing to incorporate the
-changes to do it without needless performance loss and complexity. PAN
-emulation on 64-bit ARM was fresh ground while on ARMv7 a weaker
-implementation was used for no better reason than clashing egos. The
-upstream virtual mapped stacks will probably be perfectly good, but I
-just find it to be such a waste of time and effort to reinvent it and
-retread the same ground in terms of finding the bugs.
+Granted, we do not support this (and I'm *not* looking forward to
+supporting it), but I would rather implement a redistributor flush than
+using the ITS to indirectly force it. That's not how the HW works, and I
+don't think we should deviate from it.
 
-I actually care a lot more about 64-bit ARM support than I do x86, but
-using a portable API for pax_open_kernel (for the simple uses at
-least) is separate from choosing the underlying implementation. There
-might not be a great way to do it on the architectures I care about
-but that doesn't need to hinder x86. It's really not that much code...
-A weaker/slower implementation for x86 also encourages the same
-elsewhere.
+I appreciate this brings additional complexity to userspace (having to
+iterate over the vcpus or the redistributors is likely more costly than
+hitting the ITS which is likely to be unique), but sticking to the
+letter of the architecture is probably our best bet. Each time we tried
+to deviate from it, we've had to backtrack (and I'm using the royal "we"
+here).
 
-> In the case of rare writes or pax_open_kernel [1] or whatever we want
-> to call it, CR3 would work without arch-specific code, and CR0 would
-> not.  That's an argument for CR3 that would need to be countered by
-> something.  (Sure, avoiding leaks either way might need arch changes.
-> OTOH, a *randomized* CR3-based approach might not have as much of a
-> leak issue to begin with.)
+Any chance you could revisit this aspect?
 
-By randomized do you mean just ASLR? Even if the window of opportunity
-to exploit it is small, it's really not the same and this has a lot
-more use than just rare writes to small global variables.
+Thanks,
 
-I wouldn't consider stack ASLR to be a replacement for making them
-readable/writable only by the current thread either (required for
-race-free return CFI on x86, at least without not using actual
-returns).
-
-> [1] Contrary to popular belief, I don't sit around reading grsecurity
-> code or config options, so I really don't know what this thing is
-> called.
-
-Lots of the features aren't actually named. Maybe this could be
-considered part of KERNEXEC but I don't think it is.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
