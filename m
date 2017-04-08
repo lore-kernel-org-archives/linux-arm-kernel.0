@@ -1,38 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 8 Apr 2017 01:03:08 -0400
-Subject: [PATCH V7 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <896488eb-cb1d-03b9-73a0-011e4a9025c5@codeaurora.org>
-References: <1490880636-30542-1-git-send-email-okaya@codeaurora.org>
- <7c48ca8b-b834-3257-91dc-77e9d19def6c@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466761383@IRSMSX101.ger.corp.intel.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676271D@IRSMSX101.ger.corp.intel.com>
- <951505b8-9580-7131-2f14-de92817190a7@codeaurora.org>
- <CACK8Z6FG7QHs1kQUoTJTcP3606+xBLFp9RUmLuv0m0X2mxH9XA@mail.gmail.com>
- <92EBB4272BF81E4089A7126EC1E7B2846676309A@IRSMSX101.ger.corp.intel.com>
- <896488eb-cb1d-03b9-73a0-011e4a9025c5@codeaurora.org>
-Message-ID: <a1e13239-9471-5ea3-4d26-2a7ee4ff08b6@codeaurora.org>
+From: luto@kernel.org (Andy Lutomirski)
+Date: Fri, 7 Apr 2017 22:07:20 -0700
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <1490811363-93944-5-git-send-email-keescook@chromium.org>
+ <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
+ <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
+ <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
+ <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
+ <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
+ <alpine.DEB.2.20.1704071426300.1716@nanos>
+ <CA+rthh8TbqU-4tY4Y8trnyMDBe6dRLhVrAnk-COJCZCOyHqSog@mail.gmail.com>
+ <CALCETrWuZPDjAuE1jnhJNKiZOOEdbus-O6GY8++0UO56Q84PZw@mail.gmail.com>
+ <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
+Message-ID: <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mayurkumar,
+On Fri, Apr 7, 2017 at 9:21 PM, Daniel Micay <danielmicay@gmail.com> wrote:
+>>> Fair enough. However, placing a BUG_ON(!(read_cr0() & X86_CR0_WP))
+>>> somewhere sensible should make those "leaks" visible fast -- and their
+>>> exploitation impossible, i.e. fail hard.
+>>
+>> The leaks surely exist and now we'll just add an exploitable BUG.
+>
+> That didn't seem to matter for landing a rewrite of KSTACKOVERFLOW
+> with a bunch of *known* DoS bugs dealt with in grsecurity and those
+> were known issues that were unfixed for no apparent reason other than
+> keeping egos intact. It looks like there are still some left...
+>
+> In that case, there also wasn't a security/performance advantage.
 
-On 4/7/2017 9:09 AM, Sinan Kaya wrote:
-> On 4/7/2017 5:03 AM, Patel, Mayurkumar wrote:
->> So basically, I am not currently 100% sure, what is the proper fix for this. Whether BIOS should
->> enable L1SS on Root Port no matter Endpoint is connected or not during boot?
-> 
-> I'd like to force the kernel to reconfigure ASPM for all combinations
-> when there is no card attached during boot and we do a hotplug insertion. 
-> 
-> I'm thinking about how to do this now.
-> 
+This is wildly off topic, but I think it's worth answering anyway
+because there's an important point here:
 
-I posted V8. can you please test it again?
+grsecurity and PaX are great projects.  They have a lot of good ideas,
+and they're put together quite nicely.  The upstream kernel should
+*not* do things differently from they way they are in grsecurity/PaX
+just because it wants to be different.  Conversely, the upstream
+kernel should not do things the same way as PaX just to be more like
+PaX.
 
-Sinan
+Keep in mind that the upstream kernel and grsecurity/PaX operate under
+different constraints.  The upstream kernel tries to keep itself clean
+and to make tree-wide updates rather that keeping compatibility stuff
+around.  PaX and grsecurity presumably want to retain some degree of
+simplicity when porting to newer upstream versions.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+In the context of virtually mapped stacks / KSTACKOVERFLOW, this
+naturally leads to different solutions.  The upstream kernel had a
+bunch of buggy drivers that played badly with virtually mapped stacks.
+grsecurity sensibly went for the approach where the buggy drivers kept
+working.  The upstream kernel went for the approach of fixing the
+drivers rather than keeping a compatibility workaround.  Different
+constraints, different solutions.
+
+The point being that, if someone sends a patch to the x86 entry code
+that's justified by "be like PaX" or by "be different than PaX",
+that's not okay.  It needs a real justification that stands on its
+own.
+
+In the case of rare writes or pax_open_kernel [1] or whatever we want
+to call it, CR3 would work without arch-specific code, and CR0 would
+not.  That's an argument for CR3 that would need to be countered by
+something.  (Sure, avoiding leaks either way might need arch changes.
+OTOH, a *randomized* CR3-based approach might not have as much of a
+leak issue to begin with.)
+
+[1] Contrary to popular belief, I don't sit around reading grsecurity
+code or config options, so I really don't know what this thing is
+called.
