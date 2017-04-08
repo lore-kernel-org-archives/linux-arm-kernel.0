@@ -1,29 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 8 Apr 2017 12:38:21 +0200
-Subject: [PATCHv3 00/22] Ion clean up in preparation in moving out of
- staging
-In-Reply-To: <1491245884-15852-1-git-send-email-labbott@redhat.com>
-References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
-Message-ID: <20170408103821.GA12084@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 08 Apr 2017 11:42:27 +0100
+Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
+ vgic_mmio_uaccess_write_its_iidr
+In-Reply-To: <1490607072-21610-9-git-send-email-eric.auger@redhat.com> (Eric
+ Auger's message of "Mon, 27 Mar 2017 11:30:58 +0200")
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <864lxzch9o.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 03, 2017 at 11:57:42AM -0700, Laura Abbott wrote:
-> Hi,
-> 
-> This is v3 of the series to do some serious Ion cleanup in preparation for
-> moving out of staging. I didn't hear much on v2 so I'm going to assume
-> people are okay with the series as is. I know there were still some open
-> questions about moving away from /dev/ion but in the interest of small
-> steps I'd like to go ahead and merge this series assuming there are no more
-> major objections. More work can happen on top of this.
+On Mon, Mar 27 2017 at 10:30:58 AM, Eric Auger <eric.auger@redhat.com> wrote:
+> The GITS_IIDR revision field is used to encode the version of the
+> table layout (ABI). So we need to restore it to check the table
+> layout to be restored is compatible with the destination vITS.
+>
+> The user selected revision is stored in the user_revision field.
+> It will be compared against the REV num at table restoration time.
 
-I've applied patches 3-11 as those were independant of the CMA changes.
-I'd like to take the rest, including the CMA changes, but I need an ack
-from someone dealing with the -mm tree before I can do that.
+Why isn't it sufficient to keep it GITS_IIDR RO and let userspace find
+out about the ABI revision that the kernel understands?
 
-Or, if they just keep ignoring it, I guess I can take them :)
+Or are we planning on supporting multiple ABIs in the kernel? If so, do
+we have a deprecation policy/plan? I don't mind either way, but it would
+be good to document it...
 
-thanks,
+Maybe it is documented already and I missed it (which is perfectly
+possible!).
 
-greg k-h
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
