@@ -1,51 +1,102 @@
-From: pageexec@freemail.hu (PaX Team)
-Date: Sun, 09 Apr 2017 14:47:20 +0200
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrXd9MgAk2p72UMbOOoL2W1fP0UT_pc2bfG8r0t=qJotwg@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
- <58E7EF70.30766.621C4F44@pageexec.freemail.hu>,
- <CALCETrXd9MgAk2p72UMbOOoL2W1fP0UT_pc2bfG8r0t=qJotwg@mail.gmail.com>
-Message-ID: <58EA2D58.17782.6ADE22BD@pageexec.freemail.hu>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 9 Apr 2017 15:09:42 +0200
+Subject: [PATCH v3 2/2] PCI: Add tango PCIe host bridge support
+In-Reply-To: <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
+References: <5309e718-5813-5b79-db57-9d702b50d0f9@sigmadesigns.com>
+ <65114e62-7458-b6f7-327c-f07a5096a452@sigmadesigns.com>
+Message-ID: <b10928a1-7f74-2dee-678f-4cadc9f7f44b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 Apr 2017 at 21:58, Andy Lutomirski wrote:
+On 29/03/2017 13:34, Marc Gonzalez wrote:
 
-> On Fri, Apr 7, 2017 at 12:58 PM, PaX Team <pageexec@freemail.hu> wrote:
-> > On 7 Apr 2017 at 9:14, Andy Lutomirski wrote:
-> >> Then someone who cares about performance can benchmark the CR0.WP
-> >> approach against it and try to argue that it's a good idea.  This
-> >> benchmark should wait until I'm done with my PCID work, because PCID
-> >> is going to make use_mm() a whole heck of a lot faster.
-> >
-> > in my measurements switching PCID is hovers around 230 cycles for snb-ivb
-> > and 200-220 for hsw-skl whereas cr0 writes are around 230-240 cycles. there's
-> > of course a whole lot more impact for switching address spaces so it'll never
-> > be fast enough to beat cr0.wp.
-> >
-> 
-> If I'm reading this right, you're saying that a non-flushing CR3 write
-> is about the same cost as a CR0.WP write.  If so, then why should CR0
-> be preferred over the (arch-neutral) CR3 approach?
+> +	/*
+> +	 * QUIRK #1
+> +	 * Reads in configuration space outside devfn 0 return garbage.
+> +	 */
+> +	if (devfn != 0) {
+> +		*val = ~0; /* Is this required even if we return an error? */
+> +		return PCIBIOS_FUNC_NOT_SUPPORTED; /* Error seems appropriate */
+> +	}
 
-cr3 (page table switching) isn't arch neutral at all ;). you probably meant
-the higher level primitives except they're not enough to implement the scheme
-as discussed before since the enter/exit paths are very much arch dependent.
+AFAICT, the relevant caller is:
 
-on x86 the cost of the pax_open/close_kernel primitives comes from the cr0
-writes and nothing else, use_mm suffers not only from the cr3 writes but
-also locking/atomic ops and cr4 writes on its path and the inevitable TLB
-entry costs. and if cpu vendors cared enough, they could make toggling cr0.wp
-a fast path in the microcode and reduce its overhead by an order of magnitude.
+bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+				int crs_timeout)
 
->  And why would switching address spaces obviously be much slower? 
-> There'll be a very small number of TLB fills needed for the actual
-> protected access. 
+	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+		return false;
 
-you'll be duplicating TLB entries in the alternative PCID for both code
-and data, where they will accumulate (=take room away from the normal PCID
-and expose unwanted memory for access) unless you also flush them when
-switching back (which then will cost even more cycles). also i'm not sure
-that processors implement all the 12 PCID bits so depending on how many PCIDs
-you plan to use, you could be causing even more unnecessary TLB replacements.
+Therefore, I believe updating *val is unnecessary.
+What matters is returning an error when appropriate.
+PCIBIOS_FUNC_NOT_SUPPORTED fits my purpose.
+
+
+> +
+> +	/*
+> +	 * QUIRK #2
+> +	 * The root complex advertizes a fake BAR, which is used to filter
+> +	 * bus-to-system requests. Hide it from Linux.
+> +	 */
+> +	if (where == PCI_BASE_ADDRESS_0 && bus->number == 0) {
+> +		*val = 0; /* 0 or ~0 to hide the BAR from Linux? */
+> +		return PCIBIOS_SUCCESSFUL; /* Should we return error or success? */
+> +	}
+AFAICT, the relevant caller is:
+
+int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
+		    struct resource *res, unsigned int pos)
+
+	u32 l, sz, mask;
+
+	pci_read_config_dword(dev, pos, &l);
+	pci_write_config_dword(dev, pos, l | mask);
+	pci_read_config_dword(dev, pos, &sz);
+	pci_write_config_dword(dev, pos, l);
+
+
+Several things are note-worthy:
+
+1) __pci_read_base() ignores the config accessors return value.
+Of the existing PCIBIOS errors, none seem to be a good fit for
+my use-case (hiding a non-standard BAR).
+
+Tangent:
+
+Maybe I should set dev->non_compliant_bars = true; instead
+of messing around in the accessor...
+
+I would likely set the flag in a PCI_FIXUP_EARLY function.
+/* Early fixups, before probing the BARs */
+
+
+1b) Perhaps a generic error could be added to the PCIBIOS_*
+error family, to signal that the requested operation was not
+completed, and *val remains unchanged.
+=> Maybe PCIBIOS_FAILURE or PCIBIOS_NOP ?
+
+
+2) Some drivers are not aware that *val needs to be updated
+for BAR accesses.
+
+e.g. drivers/pci/host/pcie-altera.c
+
+if altera_pcie_hide_rc_bar() is true, 'l' and 'sz' are not updated,
+and therefore contain garbage (uninitialized stack variables).
+
+I think we should apply the following trivial patch.
+
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -175,7 +175,7 @@ static inline unsigned long decode_bar(struct pci_dev *dev, u32 bar)
+ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
+                    struct resource *res, unsigned int pos)
+ {
+-       u32 l, sz, mask;
++       u32 l = 0, sz = 0, mask;
+        u64 l64, sz64, mask64;
+        u16 orig_cmd;
+        struct pci_bus_region region, inverted_region;
+
+
+Regards.
