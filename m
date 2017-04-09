@@ -1,309 +1,349 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 9 Apr 2017 10:04:56 +0100
-Subject: [PATCH v2 4/5] iio: dac: stm32: add support for trigger events
-In-Reply-To: <1491495116-7209-5-git-send-email-fabrice.gasnier@st.com>
+Date: Sun, 9 Apr 2017 10:34:54 +0100
+Subject: [PATCH v2 5/5] iio: dac: stm32: add support for waveform generator
+In-Reply-To: <1491495116-7209-6-git-send-email-fabrice.gasnier@st.com>
 References: <1491495116-7209-1-git-send-email-fabrice.gasnier@st.com>
- <1491495116-7209-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <14dfe2a9-d459-0074-532e-d44daf336406@kernel.org>
+ <1491495116-7209-6-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <8fa183fe-42f1-dc27-efd9-1f7d2e5b5057@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/04/17 17:11, Fabrice Gasnier wrote:
-> STM32 DAC supports triggers to synchronize conversions. When trigger
-> occurs, data is transferred from DHR (data holding register) to DOR
-> (data output register) so output voltage is updated.
-> Both hardware and software triggers are supported.
+> STM32 DAC has built-in noise or triangle waveform generator.
+> - "wavetype" extended attribute selects noise or triangle.
+> - "amplitude" extended attribute selects amplitude for waveform generator
+> 
+> A DC offset can be added to waveform generator output. This can be done
+> using out_voltage[1/2]_offset
+> 
+> Waveform generator requires a trigger to be configured, to increment /
+> decrement internal counter in case of triangle generator. Noise
+> generator is a bit different,  but also requires a trigger to generate
+> samples.
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Hmm. I'm really not sure on how to handle this...  The problem to my mind
-is knowing when it has triggered so we can know that it makes sense to
-put the next reading in.... Anyhow bear with me...
 
-I think the same arguement holds for this as equivalent input devices.
-There we have always argued that if you need multichannel synchronized
-capture (which is 'kind' of what we are looking at here) then you have
-to use the buffered interface.
-
-I think we need buffered output for this to fit nicely in the subsystem.
-It definitely isn't a correct use of the event triggers.
-
-That means we really need to figure out the ABI for buffered output and
-get that sorted.  To my mind it shouldn't be too tricky and should look
-much like buffered input, just with us writing to a fifo from userspace
-rather than reading from it.
-
-The DMA side of that can come later, in a similar fashion to how it is
-added for the ADC side of things.  We can also have 'providers'
-(equivalent of 'consumers' on the ADC side), perhaps giving a neat way
-of describing DDS devices (I'm not so sure on this yet).
-
-So to my mind, if you are not in buffered mode and do a sysfs write it
-should be 'instant'. If in buffered mode, then it will wait on the
-trigger.
-
-So the complex side of things is what we 'know' about the data flow.
-1) Case you have here.  We want to do direct write through to the device,
-but have no way of knowing (or do we?) that it has triggered and written
-the data to the output.  So we have no way of knowing we can push the next
-value in from a fifo yet...  In this case I guess the solution might be to
-have a fifo length of 0.  That is data flows straight to hardware.
-
-2) Simple stream case - always enough data in the fifo and we get an interrupt
-to signify that the previous trigger happened.
-
-3) Case where we are only just keeping up.  So we won't have data in the fifo
-until sometime after the previous trigger.  In this case we need the fifo to
-push straight through if there isn't data ready to go.
-
-4) Case where we are not pushing data fast enough.  Just don't update?
-
-That last case 4 is nasty as the reason we typically want to do triggered
-DAC updates is to ensure we always have valid states in some control loop,
-but we might get a race here where one DAC has a value ready to go on a trigger
-and another one isn't quite ready.  In this case we might want to hold off
-until all are ready... So there might need to be a sanity check that everyone
-on a given trigger is ready to go - an extra callback.
-
-So a bit fiddly and I'm not sure I like the representation of through flow as
-a fifo of 0 length... (can't think of a neater way though atm)
-
-Anyhow, time to sort output buffers out once and for all I think if we can
-get a reasonable group of people together who have the time.
-
-Sorry Fabrice that this has hit your driver!  Perhaps we can figure
-enough out to be able to at least get the basics (i.e. patches 1,2) in as
-asap.
+Various bits inline.  Mostly I think the blockers on this will be
+making sure the ABI defined is generic enough to handle the more crazy
+DDS chips out there... (basically the ones doing frequency modulation).
 
 Jonathan
 > ---
 > Changes in v2:
-> - Fix issue with trigger, by using set_trigger callback
-> - trigger can now be assigned, no matters powerdown state
+> - use _offset parameter to add DC offset to waveform generator
+Conceptually this offset is just the normal DAC output value (particularly
+in the flat case)  I guess we can paper over this by having the _raw
+and this always have th same value, but it's a little inelegant.
+Still people are going to expect _raw to control it when in DAC mode but
+that makes limited sense in DDS mode.
+
+Mind you nothing stops us defining all DDS channels as the sum of whatever
+the DDS is doing and whatever is _raw is set to. Perhaps we tidy this up
+purely through documentation.  Think of the DDS as a modulation on top
+of the DAC...
+
+> - Rework ABI to better fit existing DDS ABI: use out_voltageY_wavetype,
+>   out_voltage_wavetype_available, out_voltageY_amplitude,
+>   out_voltage_amplitude_available
+Hmm. I'm thinking those amplitude values aren't nice and don't fit well
+with the more general ABI.
+
+I suggested (but didn't really expand upon) having standard defined types
+for each waveform then using scale to control the amplitude.
+
+Is that something that might work here?
+
+So say we have our triangle standard form having an amplitude of 1V Peak to
+Peak. Then we can use scale to make it whatever we actually have in this
+case?  The docs for wave type will need to describe those standard forms
+though.
+
+Hmm. Whether this is worth doing is unclear however as we'll still have
+to describe the 'frequency' in terms of the clock ticks (here the triggers)
+So maybe amplitude is worth having.  Again, looking for input from ADI lot
+on this...  There are some really fiddly cases to describe were we are doing
+symbol encoding so have multiple waveforms that we are switching between based
+on some external signal. Any ABI needs to encompass that sort of usage.
+Parts like the AD9833 for example...
+
+> - Better explain trigger usage in case of waveform generator.
 > ---
->  drivers/iio/dac/Kconfig          |   3 +
->  drivers/iio/dac/stm32-dac-core.h |   8 +++
->  drivers/iio/dac/stm32-dac.c      | 127 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 137 insertions(+), 1 deletion(-)
+>  Documentation/ABI/testing/sysfs-bus-iio-dac-stm32 |  16 +++
+>  drivers/iio/dac/stm32-dac-core.h                  |   4 +
+>  drivers/iio/dac/stm32-dac.c                       | 158 +++++++++++++++++++++-
+>  3 files changed, 177 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
 > 
-> diff --git a/drivers/iio/dac/Kconfig b/drivers/iio/dac/Kconfig
-> index 7198648..786c38b 100644
-> --- a/drivers/iio/dac/Kconfig
-> +++ b/drivers/iio/dac/Kconfig
-> @@ -278,6 +278,9 @@ config STM32_DAC
->  	tristate "STMicroelectronics STM32 DAC"
->  	depends on (ARCH_STM32 && OF) || COMPILE_TEST
->  	depends on REGULATOR
-> +	select IIO_TRIGGERED_EVENT
-> +	select IIO_STM32_TIMER_TRIGGER
-> +	select MFD_STM32_TIMERS
->  	select STM32_DAC_CORE
->  	help
->  	  Say yes here to build support for STMicroelectronics STM32 Digital
+> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
+> new file mode 100644
+> index 0000000..8f1fa009
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-bus-iio-dac-stm32
+Fair enough to initially introduced these for this part only, but I'd very
+much like to see us agree on these sufficiently to get them into the main
+docs asap so we have something to work with for getting the DDS chips out
+of staging...
+> @@ -0,0 +1,16 @@
+> +What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_wavetype
+> +What:		/sys/bus/iio/devices/iio:deviceX/out_voltage_wavetype_available
+> +KernelVersion:	4.12
+> +Contact:	fabrice.gasnier at st.com
+> +Description:
+> +		List and/or select waveform generation provided by STM32 DAC:
+> +		- "flat": waveform generator disabled (default)
+> +		- "noise": select noise waveform
+> +		- "triangle": select triangle waveform
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/out_voltageY_amplitude
+> +What:		/sys/bus/iio/devices/iio:deviceX/out_voltage_amplitude_available
+> +KernelVersion:	4.12
+> +Contact:	fabrice.gasnier at st.com
+> +Description:
+> +		List and/or select amplitude used for waveform generator
 > diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
-> index daf0993..e51a468 100644
+> index e51a468..0f02975 100644
 > --- a/drivers/iio/dac/stm32-dac-core.h
 > +++ b/drivers/iio/dac/stm32-dac-core.h
-> @@ -26,6 +26,7 @@
->  
->  /* STM32 DAC registers */
->  #define STM32_DAC_CR		0x00
-> +#define STM32_DAC_SWTRIGR	0x04
->  #define STM32_DAC_DHR12R1	0x08
->  #define STM32_DAC_DHR12R2	0x14
->  #define STM32_DAC_DOR1		0x2C
-> @@ -33,9 +34,16 @@
->  
->  /* STM32_DAC_CR bit fields */
->  #define STM32_DAC_CR_EN1		BIT(0)
-> +#define STM32H7_DAC_CR_TEN1		BIT(1)
-> +#define STM32H7_DAC_CR_TSEL1_SHIFT	2
-> +#define STM32H7_DAC_CR_TSEL1		GENMASK(5, 2)
+> @@ -37,8 +37,12 @@
+>  #define STM32H7_DAC_CR_TEN1		BIT(1)
+>  #define STM32H7_DAC_CR_TSEL1_SHIFT	2
+>  #define STM32H7_DAC_CR_TSEL1		GENMASK(5, 2)
+> +#define STM32_DAC_CR_WAVE1		GENMASK(7, 6)
+> +#define STM32_DAC_CR_MAMP1		GENMASK(11, 8)
 >  #define STM32H7_DAC_CR_HFSEL		BIT(15)
 >  #define STM32_DAC_CR_EN2		BIT(16)
+> +#define STM32_DAC_CR_WAVE2		GENMASK(23, 22)
+> +#define STM32_DAC_CR_MAMP2		GENMASK(27, 24)
 >  
-> +/* STM32_DAC_SWTRIGR bit fields */
-> +#define STM32_DAC_SWTRIGR_SWTRIG1	BIT(0)
-> +#define STM32_DAC_SWTRIGR_SWTRIG2	BIT(1)
-> +
->  /**
->   * struct stm32_dac_common - stm32 DAC driver common data (for all instances)
->   * @regmap: DAC registers shared via regmap
+>  /* STM32_DAC_SWTRIGR bit fields */
+>  #define STM32_DAC_SWTRIGR_SWTRIG1	BIT(0)
 > diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
-> index c0d993a..a7a078e 100644
+> index a7a078e..2ed75db 100644
 > --- a/drivers/iio/dac/stm32-dac.c
 > +++ b/drivers/iio/dac/stm32-dac.c
-> @@ -23,6 +23,10 @@
->  #include <linux/bitfield.h>
->  #include <linux/delay.h>
->  #include <linux/iio/iio.h>
-> +#include <linux/iio/timer/stm32-timer-trigger.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/iio/trigger_consumer.h>
-> +#include <linux/iio/triggered_event.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> @@ -32,15 +36,113 @@
->  #define STM32_DAC_CHANNEL_1		1
->  #define STM32_DAC_CHANNEL_2		2
->  #define STM32_DAC_IS_CHAN_1(ch)		((ch) & STM32_DAC_CHANNEL_1)
-> +/* channel2 shift */
-> +#define STM32_DAC_CHAN2_SHIFT		16
->  
+> @@ -42,10 +42,12 @@
 >  /**
 >   * struct stm32_dac - private data of DAC driver
 >   * @common:		reference to DAC common data
-> + * @swtrig:		Using software trigger
+> + * @wavetype:		waveform generator
+>   * @swtrig:		Using software trigger
 >   */
 >  struct stm32_dac {
 >  	struct stm32_dac_common *common;
-> +	bool swtrig;
+> +	u32 wavetype;
+>  	bool swtrig;
 >  };
 >  
-> +/**
-> + * struct stm32_dac_trig_info - DAC trigger info
-> + * @name: name of the trigger, corresponding to its source
-> + * @tsel: trigger selection, value to be configured in DAC_CR.TSELx
-> + */
-> +struct stm32_dac_trig_info {
-> +	const char *name;
-> +	u32 tsel;
-> +};
-> +
-> +static const struct stm32_dac_trig_info stm32h7_dac_trinfo[] = {
-> +	{ "swtrig", 0 },
-> +	{ TIM1_TRGO, 1 },
-> +	{ TIM2_TRGO, 2 },
-> +	{ TIM4_TRGO, 3 },
-> +	{ TIM5_TRGO, 4 },
-> +	{ TIM6_TRGO, 5 },
-> +	{ TIM7_TRGO, 6 },
-> +	{ TIM8_TRGO, 7 },
-> +	{},
-> +};
-> +
-> +static irqreturn_t stm32_dac_trigger_handler(int irq, void *p)
-> +{
-> +	struct iio_poll_func *pf = p;
-> +	struct iio_dev *indio_dev = pf->indio_dev;
-> +	struct stm32_dac *dac = iio_priv(indio_dev);
-> +	int channel = indio_dev->channels[0].channel;
-> +
-> +	/* Using software trigger? Then, trigger it now */
-Can we get here otherwise?
-If not I'd prefer to either see an error on the other case
-(perhaps simply return IRQ_NONE) 
-> +	if (dac->swtrig) {
-> +		u32 swtrig;
-> +
-> +		if (STM32_DAC_IS_CHAN_1(channel))
-> +			swtrig = STM32_DAC_SWTRIGR_SWTRIG1;
-> +		else
-> +			swtrig = STM32_DAC_SWTRIGR_SWTRIG2;
-> +		regmap_update_bits(dac->common->regmap, STM32_DAC_SWTRIGR,
-> +				   swtrig, swtrig);
-> +	}
-> +
-> +	iio_trigger_notify_done(indio_dev->trig);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static unsigned int stm32_dac_get_trig_tsel(struct stm32_dac *dac,
-> +					    struct iio_trigger *trig)
-> +{
-> +	unsigned int i;
-> +
-> +	/* skip 1st trigger that should be swtrig */
-> +	for (i = 1; stm32h7_dac_trinfo[i].name; i++) {
-> +		/*
-> +		 * Checking both stm32 timer trigger type and trig name
-> +		 * should be safe against arbitrary trigger names.
-> +		 */
-> +		if (is_stm32_timer_trigger(trig) &&
-> +		    !strcmp(stm32h7_dac_trinfo[i].name, trig->name)) {
-> +			return stm32h7_dac_trinfo[i].tsel;
-> +		}
-> +	}
-> +
-> +	/* When no trigger has been found, default to software trigger */
-> +	dac->swtrig = true;
-> +
-> +	return stm32h7_dac_trinfo[0].tsel;
-> +}
-> +
-> +static int stm32_dac_set_trigger(struct iio_dev *indio_dev,
-> +				 struct iio_trigger *trig)
-> +{
-> +	struct stm32_dac *dac = iio_priv(indio_dev);
-> +	int channel = indio_dev->channels[0].channel;
-> +	u32 shift = STM32_DAC_IS_CHAN_1(channel) ? 0 : STM32_DAC_CHAN2_SHIFT;
-> +	u32 val = 0, tsel;
-> +	u32 msk = (STM32H7_DAC_CR_TEN1 | STM32H7_DAC_CR_TSEL1) << shift;
-> +
-> +	dac->swtrig = false;
-> +	if (trig) {
-> +		/* select & enable trigger (tsel / ten) */
-> +		tsel = stm32_dac_get_trig_tsel(dac, trig);
-> +		val = tsel << STM32H7_DAC_CR_TSEL1_SHIFT;
-> +		val = (val | STM32H7_DAC_CR_TEN1) << shift;
-> +	}
-> +
-> +	if (trig)
-> +		dev_dbg(&indio_dev->dev, "enable trigger: %s\n", trig->name);
-> +	else
-> +		dev_dbg(&indio_dev->dev, "disable trigger\n");
-> +
-> +	return regmap_update_bits(dac->common->regmap, STM32_DAC_CR, msk, val);
-> +}
-> +
->  static int stm32_dac_is_enabled(struct iio_dev *indio_dev, int channel)
->  {
->  	struct stm32_dac *dac = iio_priv(indio_dev);
-> @@ -167,6 +269,7 @@ static int stm32_dac_debugfs_reg_access(struct iio_dev *indio_dev,
->  static const struct iio_info stm32_dac_iio_info = {
->  	.read_raw = stm32_dac_read_raw,
->  	.write_raw = stm32_dac_write_raw,
-> +	.set_trigger = stm32_dac_set_trigger,
->  	.debugfs_reg_access = stm32_dac_debugfs_reg_access,
->  	.driver_module = THIS_MODULE,
->  };
-> @@ -326,7 +429,28 @@ static int stm32_dac_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		return ret;
->  
-> -	return devm_iio_device_register(&pdev->dev, indio_dev);
-> +	ret = iio_triggered_event_setup(indio_dev, NULL,
-> +					stm32_dac_trigger_handler);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = iio_device_register(indio_dev);
-> +	if (ret) {
-> +		iio_triggered_event_cleanup(indio_dev);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int stm32_dac_remove(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +
-> +	iio_triggered_event_cleanup(indio_dev);
-> +	iio_device_unregister(indio_dev);
-> +
-> +	return 0;
+> @@ -222,6 +224,29 @@ static int stm32_dac_set_value(struct stm32_dac *dac, int channel, int val)
+>  	return ret;
 >  }
 >  
->  static const struct of_device_id stm32_dac_of_match[] = {
-> @@ -337,6 +461,7 @@ static int stm32_dac_probe(struct platform_device *pdev)
+> +static int stm32_dac_get_offset(struct stm32_dac *dac, int channel, int *val)
+> +{
+> +	int ret;
+> +
+> +	/* Offset is only relevant in waveform generation mode. */
+> +	if (!dac->wavetype) {
+> +		*val = 0;
+> +		return IIO_VAL_INT;
+> +	}
+> +
+> +	/*
+> +	 * In waveform generation mode, DC offset in DHR is added to waveform
+> +	 * generator output, then stored to DOR (data output register).
+> +	 * Read offset from DHR.
+> +	 */
+Just thinking what fun we could have if we do the fifo based output to push
+this that I was suggesting for the previous patch ;) triangles on top
+of fun general waveforms..
+
+> +	if (STM32_DAC_IS_CHAN_1(channel))
+> +		ret = regmap_read(dac->common->regmap, STM32_DAC_DHR12R1, val);
+> +	else
+> +		ret = regmap_read(dac->common->regmap, STM32_DAC_DHR12R2, val);
+> +
+> +	return ret ? ret : IIO_VAL_INT;
+> +}
+> +
+>  static int stm32_dac_read_raw(struct iio_dev *indio_dev,
+>  			      struct iio_chan_spec const *chan,
+>  			      int *val, int *val2, long mask)
+> @@ -231,6 +256,8 @@ static int stm32_dac_read_raw(struct iio_dev *indio_dev,
+>  	switch (mask) {
+>  	case IIO_CHAN_INFO_RAW:
+>  		return stm32_dac_get_value(dac, chan->channel, val);
+> +	case IIO_CHAN_INFO_OFFSET:
+> +		return stm32_dac_get_offset(dac, chan->channel, val);
+>  	case IIO_CHAN_INFO_SCALE:
+>  		*val = dac->common->vref_mv;
+>  		*val2 = chan->scan_type.realbits;
+> @@ -247,8 +274,16 @@ static int stm32_dac_write_raw(struct iio_dev *indio_dev,
+>  	struct stm32_dac *dac = iio_priv(indio_dev);
 >  
->  static struct platform_driver stm32_dac_driver = {
->  	.probe = stm32_dac_probe,
-> +	.remove = stm32_dac_remove,
->  	.driver = {
->  		.name = "stm32-dac",
->  		.of_match_table = stm32_dac_of_match,
+>  	switch (mask) {
+> +	case IIO_CHAN_INFO_OFFSET:
+> +		/* Offset only makes sense in waveform generation mode */
+> +		if (dac->wavetype)
+> +			return stm32_dac_set_value(dac, chan->channel, val);
+> +		return -EBUSY;
+Yeah, I think I sent you down a blind alley here.  If people agree, lets
+just define DDS signals as always being the sum of _raw + the dds element.
+Then it's easy.
+>  	case IIO_CHAN_INFO_RAW:
+> -		return stm32_dac_set_value(dac, chan->channel, val);
+> +		if (!dac->wavetype)
+> +			return stm32_dac_set_value(dac, chan->channel, val);
+> +		/* raw value is read only in waveform generation mode */
+> +		return -EBUSY;
+>  	default:
+>  		return -EINVAL;
+>  	}
+> @@ -334,6 +369,122 @@ static ssize_t stm32_dac_write_powerdown(struct iio_dev *indio_dev,
+>  	.set = stm32_dac_set_powerdown_mode,
+>  };
+>  
+> +/* waveform generator wave selection */
+> +static const char * const stm32_dac_wavetype_desc[] = {
+> +	"flat",
+> +	"noise",
+> +	"triangle",
+> +};
+> +
+> +static int stm32_dac_set_wavetype(struct iio_dev *indio_dev,
+> +				  const struct iio_chan_spec *chan,
+> +				  unsigned int wavetype)
+> +{
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
+> +	u32 mask, val;
+> +	int ret;
+> +
+> +	/*
+> +	 * Waveform generator requires a trigger to be configured, to increment
+> +	 * or decrement internal counter in case of triangle generator. Noise
+> +	 * generator is a bit different, but also requires a trigger to
+> +	 * generate samples.
+> +	 */
+> +	if (wavetype && !indio_dev->trig)
+> +		dev_dbg(&indio_dev->dev, "Wavegen requires a trigger\n");
+> +
+> +	if (STM32_DAC_IS_CHAN_1(chan->channel)) {
+> +		val = FIELD_PREP(STM32_DAC_CR_WAVE1, wavetype);
+> +		mask = STM32_DAC_CR_WAVE1;
+> +	} else {
+> +		val = FIELD_PREP(STM32_DAC_CR_WAVE2, wavetype);
+> +		mask = STM32_DAC_CR_WAVE2;
+> +	}
+> +
+> +	ret = regmap_update_bits(dac->common->regmap, STM32_DAC_CR, mask, val);
+> +	if (ret)
+> +		return ret;
+> +	dac->wavetype = wavetype;
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_dac_get_wavetype(struct iio_dev *indio_dev,
+> +				  const struct iio_chan_spec *chan)
+> +{
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = regmap_read(dac->common->regmap, STM32_DAC_CR, &val);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if (STM32_DAC_IS_CHAN_1(chan->channel))
+> +		return FIELD_GET(STM32_DAC_CR_WAVE1, val);
+> +	else
+> +		return FIELD_GET(STM32_DAC_CR_WAVE2, val);
+> +}
+> +
+> +static const struct iio_enum stm32_dac_wavetype_enum = {
+> +	.items = stm32_dac_wavetype_desc,
+> +	.num_items = ARRAY_SIZE(stm32_dac_wavetype_desc),
+> +	.get = stm32_dac_get_wavetype,
+> +	.set = stm32_dac_set_wavetype,
+> +};
+> +
+> +/*
+> + * waveform generator mamp selection: mask/amplitude
+> + * - noise: LFSR mask (linear feedback shift register, umasks bit 0, [1:0]...)
+This needs breaking out into two attributes - for noise it isn't amplitude in
+any conventional sense...  Keep the result device specific for now. I'm not
+even sure what type of pseudo random source that actually is...
+If anyone wants to figure it out it would be great to document it in a general
+form!
+
+> + * - triangle: amplitude (equal to 1, 3, 5, 7... 4095)
+> + */
+> +static const char * const stm32_dac_amplitude_desc[] = {
+> +	"1", "3", "7", "15", "31", "63", "127", "255", "511", "1023", "2047",
+> +	"4095",
+> +};
+> +
+> +static int stm32_dac_set_amplitude(struct iio_dev *indio_dev,
+> +				   const struct iio_chan_spec *chan,
+> +				   unsigned int amplitude)
+> +{
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
+> +	u32 mask, val;
+> +
+> +	if (STM32_DAC_IS_CHAN_1(chan->channel)) {
+> +		val = FIELD_PREP(STM32_DAC_CR_MAMP1, amplitude);
+> +		mask = STM32_DAC_CR_MAMP1;
+> +	} else {
+> +		val = FIELD_PREP(STM32_DAC_CR_MAMP2, amplitude);
+> +		mask = STM32_DAC_CR_MAMP2;
+> +	}
+> +
+> +	return regmap_update_bits(dac->common->regmap, STM32_DAC_CR, mask, val);
+> +}
+> +
+> +static int stm32_dac_get_amplitude(struct iio_dev *indio_dev,
+> +				   const struct iio_chan_spec *chan)
+> +{
+> +	struct stm32_dac *dac = iio_priv(indio_dev);
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = regmap_read(dac->common->regmap, STM32_DAC_CR, &val);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if (STM32_DAC_IS_CHAN_1(chan->channel))
+> +		return FIELD_GET(STM32_DAC_CR_MAMP1, val);
+> +	else
+> +		return FIELD_GET(STM32_DAC_CR_MAMP2, val);
+> +}
+> +
+> +static const struct iio_enum stm32_dac_amplitude_enum = {
+> +	.items = stm32_dac_amplitude_desc,
+> +	.num_items = ARRAY_SIZE(stm32_dac_amplitude_desc),
+> +	.get = stm32_dac_get_amplitude,
+> +	.set = stm32_dac_set_amplitude,
+> +};
+> +
+>  static const struct iio_chan_spec_ext_info stm32_dac_ext_info[] = {
+>  	{
+>  		.name = "powerdown",
+> @@ -343,6 +494,10 @@ static ssize_t stm32_dac_write_powerdown(struct iio_dev *indio_dev,
+>  	},
+>  	IIO_ENUM("powerdown_mode", IIO_SEPARATE, &stm32_dac_powerdown_mode_en),
+>  	IIO_ENUM_AVAILABLE("powerdown_mode", &stm32_dac_powerdown_mode_en),
+> +	IIO_ENUM("wavetype", IIO_SEPARATE, &stm32_dac_wavetype_enum),
+> +	IIO_ENUM_AVAILABLE("wavetype", &stm32_dac_wavetype_enum),
+> +	IIO_ENUM("amplitude", IIO_SEPARATE, &stm32_dac_amplitude_enum),
+> +	IIO_ENUM_AVAILABLE("amplitude", &stm32_dac_amplitude_enum),
+>  	{},
+>  };
+>  
+> @@ -352,6 +507,7 @@ static ssize_t stm32_dac_write_powerdown(struct iio_dev *indio_dev,
+>  	.output = 1,					\
+>  	.channel = chan,				\
+>  	.info_mask_separate =				\
+> +		BIT(IIO_CHAN_INFO_OFFSET) |		\
+>  		BIT(IIO_CHAN_INFO_RAW) |		\
+>  		BIT(IIO_CHAN_INFO_SCALE),		\
+>  	/* scan_index is always 0 as num_channels is 1 */ \
 > 
