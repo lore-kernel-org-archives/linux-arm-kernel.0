@@ -1,9 +1,9 @@
 From: geliangtang@gmail.com (Geliang Tang)
-Date: Sun,  9 Apr 2017 09:34:05 +0800
-Subject: [PATCH 09/12] [media] s5p-mfc: use setup_timer
+Date: Sun,  9 Apr 2017 09:34:06 +0800
+Subject: [PATCH 10/12] [media] c8sectpfe: use setup_timer
 In-Reply-To: <77c0fb26d214e023a99afc948c71d6edd9284205.1490953290.git.geliangtang@gmail.com>
 References: <77c0fb26d214e023a99afc948c71d6edd9284205.1490953290.git.geliangtang@gmail.com>
-Message-ID: <f35bda17a884852135983ab4128976b9c220a768.1490953290.git.geliangtang@gmail.com>
+Message-ID: <cad969ccd0b4524d1ecdc1c5ac58e5f2009d0073.1490953290.git.geliangtang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,24 +11,24 @@ Use setup_timer() instead of init_timer() to simplify the code.
 
 Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 5 ++---
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index bb0a588..2c363aa 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1266,9 +1266,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 	dev->hw_lock = 0;
- 	INIT_WORK(&dev->watchdog_work, s5p_mfc_watchdog_worker);
- 	atomic_set(&dev->watchdog_cnt, 0);
--	init_timer(&dev->watchdog_timer);
--	dev->watchdog_timer.data = (unsigned long)dev;
--	dev->watchdog_timer.function = s5p_mfc_watchdog;
-+	setup_timer(&dev->watchdog_timer, s5p_mfc_watchdog,
-+		    (unsigned long)dev);
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index 7652ce2..59280ac 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -865,9 +865,8 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+ 	}
  
- 	/* Initialize HW ops and commands based on MFC version */
- 	s5p_mfc_init_hw_ops(dev);
+ 	/* Setup timer interrupt */
+-	init_timer(&fei->timer);
+-	fei->timer.function = c8sectpfe_timer_interrupt;
+-	fei->timer.data = (unsigned long)fei;
++	setup_timer(&fei->timer, c8sectpfe_timer_interrupt,
++		    (unsigned long)fei);
+ 
+ 	mutex_init(&fei->lock);
+ 
 -- 
 2.9.3
