@@ -1,106 +1,38 @@
-From: vagrant@debian.org (Vagrant Cascadian)
-Date: Sat, 08 Apr 2017 19:22:41 -0700
-Subject: [PATCH] arm64: tegra: Add CPU and PSCI nodes for NVIDIA Tegra210
- platforms
-In-Reply-To: <1490701718-16571-1-git-send-email-jonathanh@nvidia.com>
-References: <1490701718-16571-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <87vaqemia6.fsf@aikidev.net>
+From: kilobyte@angband.pl (Adam Borowski)
+Date: Sun, 9 Apr 2017 05:58:54 +0200
+Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
+In-Reply-To: <20170408210737.5456-1-kilobyte@angband.pl>
+References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
+ <20170408210737.5456-1-kilobyte@angband.pl>
+Message-ID: <20170409035854.7swkcndswifd622w@angband.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-03-28, Jon Hunter wrote:
-> Add the CPU and PSCI nodes for the NVIDIA Tegra210 platforms so that
-> all CPUs can be enabled on boot. This assumes that the PSCI firmware
-> has been loaded during the initial bootstrap on the device before the
-> kernel starts (which is typically the case for these platforms). The
-> PSCI firmware version is set to v0.2 which aligns with the current
-> shipping version for Tegra.
->
-> Reported-by: Martin Michlmayr <tbm@cyrius.com>
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+On Sat, Apr 08, 2017 at 11:07:37PM +0200, Adam Borowski wrote:
+> Unbreaks ARM and possibly other 32-bit architectures.
 
-Tested on a jetson-tx1; all CPUs were recognized.
+Turns out those "other 32-bit architectures" happen to include i386.
 
-Tested-By: Vagrant Cascadian <vagrant@debian.org>
+A modular build:
 
-> ---
->  arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 23 +++++++++++++++++++++++
->  arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi | 24 ++++++++++++++++++++++++
->  2 files changed, 47 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
-> index 906fb836d241..de1696c28140 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
-> @@ -296,6 +296,29 @@
->  		};
->  	};
->  
-> +	cpus {
-> +		cpu at 0 {
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 1 {
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 2 {
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 3 {
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
->  	regulators {
->  		vdd_gpu: regulator at 100 {
->  			compatible = "pwm-regulator";
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
-> index 0ec92578cacb..67cb039965fd 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi
-> @@ -51,4 +51,28 @@
->  			clock-frequency = <32768>;
->  		};
->  	};
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 1 {
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 2 {
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 3 {
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
->  };
-> -- 
-> 2.7.4
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170408/ff6044d6/attachment.sig>
+ERROR: "__udivdi3" [fs/btrfs/btrfs.ko] undefined!
+
+With the patch, i386 builds fine.
+
+> Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
+> sometimes works, but, like most operations, randomly dies with some badness
+> that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
+> there in 4.11-rc5, needs investigating, but since it's not connected to our
+> issue at hand, I consider this patch sort-of tested.
+
+Looks like current -next is pretty broken: while amd64 is ok, on an i386 box
+(non-NX Pentium 4) it hangs very early during boot, way before filesystem
+modules would be loaded.  Qemu boots but has random hangs.
+
+So it looks like it's compile only for now...
+
+-- 
+??????? Meow!
+???????
+??????? Collisions shmolisions, let's see them find a collision or second
+??????? preimage for double rot13!
