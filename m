@@ -1,11 +1,11 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Sun, 9 Apr 2017 16:04:59 -0500
-Subject: [PATCH v5 19/23] drivers/fsi: Add GPIO based FSI master
-In-Reply-To: <5d173f9c-e01c-6093-16ab-d114857009b2@infradead.org>
+Date: Sun, 9 Apr 2017 16:06:28 -0500
+Subject: [PATCH v5 21/23] drivers/fsi: Add SCOM FSI client device driver
+In-Reply-To: <bddbb80e-10b6-fbb9-152a-6e192dfe0745@infradead.org>
 References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
- <20170405020607.79939-20-cbostic@linux.vnet.ibm.com>
- <5d173f9c-e01c-6093-16ab-d114857009b2@infradead.org>
-Message-ID: <518e0abc-f1da-2ca0-fa44-6802e2b74c71@linux.vnet.ibm.com>
+ <20170405020607.79939-22-cbostic@linux.vnet.ibm.com>
+ <bddbb80e-10b6-fbb9-152a-6e192dfe0745@infradead.org>
+Message-ID: <90dac991-03db-614e-09f6-ab55b8db79be@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,47 +15,43 @@ On 4/5/17 11:35 AM, Randy Dunlap wrote:
 > On 04/04/17 19:06, Christopher Bostic wrote:
 >> From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 >>
->> Implement a FSI master using GPIO.  Will generate FSI protocol for
->> read and write commands to particular addresses.  Sends master command
->> and waits for and decodes a slave response.
+>> Create a simple SCOM engine device driver that reads and writes
+>> its control registers via an FSI bus.
 >>
->> Includes changes from Edward A. James <eajames@us.ibm.com> and Jeremy
->> Kerr <jk@ozlabs.org>.
+>> Includes changes from Edward A. James <eajames@us.ibm.com>.
 >>
->> Signed-off-by: Edward A. James <eajames@us.ibm.com>
->> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 >> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 >> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> Signed-off-by: Edward A. James <eajames@us.ibm.com>
+>> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 >> ---
->>   drivers/fsi/Kconfig           |  11 +
->>   drivers/fsi/Makefile          |   1 +
->>   drivers/fsi/fsi-master-gpio.c | 610 ++++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 622 insertions(+)
->>   create mode 100644 drivers/fsi/fsi-master-gpio.c
+>>   drivers/fsi/Kconfig    |   6 ++
+>>   drivers/fsi/Makefile   |   1 +
+>>   drivers/fsi/fsi-scom.c | 263 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 270 insertions(+)
+>>   create mode 100644 drivers/fsi/fsi-scom.c
 >>
 >> diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
->> index 04c1a0e..9cf8345 100644
+>> index 9cf8345..0fa265c 100644
 >> --- a/drivers/fsi/Kconfig
 >> +++ b/drivers/fsi/Kconfig
->> @@ -9,4 +9,15 @@ config FSI
+>> @@ -18,6 +18,12 @@ config FSI_MASTER_GPIO
 >>   	---help---
->>   	  FSI - the FRU Support Interface - is a simple bus for low-level
->>   	  access to POWER-based hardware.
->> +
->> +if FSI
->> +
->> +config FSI_MASTER_GPIO
->> +	tristate "GPIO-based FSI master"
->> +	depends on FSI && GPIOLIB
-> depends on FSI is redundant since "if FSI" does the same thing.
+>>   	This option enables a FSI master driver using GPIO lines.
+>>   
+>> +config FSI_SCOM
+>> +	tristate "SCOM FSI client device driver"
+>> +	depends on FSI
+> depends on FSI is redundant.
 
-Hi Randy,
-Thanks for the feedback, will correct.
+Will correct.
 
--Chris
+Thanks,
+Chris
+>
 >> +	---help---
->> +	This option enables a FSI master driver using GPIO lines.
+>> +	This option enables an FSI based SCOM device driver.
 >> +
->> +endif
->> +
+>>   endif
+>>   
 >
