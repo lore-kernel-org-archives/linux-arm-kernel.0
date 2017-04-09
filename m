@@ -1,38 +1,26 @@
-From: kilobyte@angband.pl (Adam Borowski)
-Date: Sun, 9 Apr 2017 05:58:54 +0200
-Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
-In-Reply-To: <20170408210737.5456-1-kilobyte@angband.pl>
-References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
- <20170408210737.5456-1-kilobyte@angband.pl>
-Message-ID: <20170409035854.7swkcndswifd622w@angband.pl>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 9 Apr 2017 09:30:57 +0200
+Subject: [PATCH v2 1/3] staging: vc04_services: bcm2835-audio:
+ bcm2835-pcm.c Fixed checkpatch warning about unaligned function params
+In-Reply-To: <98a8c562937da2a6edc1ab2663ca0ca6c902ab04.1491666884.git.sfaragnaus@gmail.com>
+References: <cover.1491666884.git.sfaragnaus@gmail.com>
+ <98a8c562937da2a6edc1ab2663ca0ca6c902ab04.1491666884.git.sfaragnaus@gmail.com>
+Message-ID: <20170409073057.GA22422@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 08, 2017 at 11:07:37PM +0200, Adam Borowski wrote:
-> Unbreaks ARM and possibly other 32-bit architectures.
+On Sat, Apr 08, 2017 at 05:21:38PM +0100, Andrea della Porta wrote:
+> Fixed unaligned function parameters issues, as per checkpatch warning
+> 
+> Signed-off-by: Andrea della Porta <sfaragnaus@gmail.com>
+> ---
+> Changes in v2:
+> - subject line more explicit
+> - checkpatch output removed as requested, summarized in one line
 
-Turns out those "other 32-bit architectures" happen to include i386.
+This does not apply to my tree at all, can you rebase this series
+against staging-testing and resend?
 
-A modular build:
+thanks,
 
-ERROR: "__udivdi3" [fs/btrfs/btrfs.ko] undefined!
-
-With the patch, i386 builds fine.
-
-> Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
-> sometimes works, but, like most operations, randomly dies with some badness
-> that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
-> there in 4.11-rc5, needs investigating, but since it's not connected to our
-> issue at hand, I consider this patch sort-of tested.
-
-Looks like current -next is pretty broken: while amd64 is ok, on an i386 box
-(non-NX Pentium 4) it hangs very early during boot, way before filesystem
-modules would be loaded.  Qemu boots but has random hangs.
-
-So it looks like it's compile only for now...
-
--- 
-??????? Meow!
-???????
-??????? Collisions shmolisions, let's see them find a collision or second
-??????? preimage for double rot13!
+greg k-h
