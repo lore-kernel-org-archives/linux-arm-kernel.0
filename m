@@ -1,23 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Apr 2017 01:09:22 +0200
-Subject: [PATCH 3/3 v5] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
-In-Reply-To: <46160aa5-f4f0-56a9-7105-50469b9089d1@kernel.org>
-References: <20170404120819.6921-1-linus.walleij@linaro.org>
- <20170404120819.6921-3-linus.walleij@linaro.org>
- <46160aa5-f4f0-56a9-7105-50469b9089d1@kernel.org>
-Message-ID: <CACRpkdbrxaosJd9+GRY-cCbAdEX6E6nX+SNuxVimyPTNR5T2=g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun,  9 Apr 2017 16:26:21 -0700
+Subject: [PATCH] ARM: omap2plus_defconfig: Add QMI,
+ ACM and PPP as loadable modules
+Message-ID: <20170409232621.17291-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 8, 2017 at 6:47 PM, Jonathan Cameron <jic23@kernel.org> wrote:
+We have devices with modems connected, so let's make them usable.
 
-> If you have time, it would be great to make these build
-> with COMPILE_TEST to get some better build coverage in general..
-> I bodged it in for the MFD and it works but there may be other
-> hidden dependencies.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-That's what I did too. I'll make a proper patch and send to Lee
-and see what happens in the autobuilders if we do that.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -173,6 +173,15 @@ CONFIG_AT803X_PHY=y
+ CONFIG_DP83848_PHY=y
+ CONFIG_MICREL_PHY=y
+ CONFIG_SMSC_PHY=y
++CONFIG_PPP=m
++CONFIG_PPP_BSDCOMP=m
++CONFIG_PPP_DEFLATE=m
++CONFIG_PPP_FILTER=y
++CONFIG_PPP_MPPE=m
++CONFIG_PPP_MULTILINK=y
++CONFIG_PPPOE=m
++CONFIG_PPP_ASYNC=m
++CONFIG_PPP_SYNC_TTY=m
+ CONFIG_USB_USBNET=m
+ CONFIG_USB_NET_SMSC75XX=m
+ CONFIG_USB_NET_SMSC95XX=m
+@@ -180,6 +189,7 @@ CONFIG_USB_ALI_M5632=y
+ CONFIG_USB_AN2720=y
+ CONFIG_USB_EPSON2888=y
+ CONFIG_USB_KC2190=y
++CONFIG_USB_NET_QMI_WWAN=m
+ CONFIG_USB_CDC_PHONET=m
+ CONFIG_LIBERTAS=m
+ CONFIG_LIBERTAS_USB=m
+@@ -359,6 +369,7 @@ CONFIG_USB_XHCI_HCD=m
+ CONFIG_USB_EHCI_HCD=m
+ CONFIG_USB_OHCI_HCD=m
+ CONFIG_USB_WDM=m
++CONFIG_USB_ACM=m
+ CONFIG_USB_STORAGE=m
+ CONFIG_USB_MUSB_HDRC=m
+ CONFIG_USB_MUSB_TUSB6010=m
+-- 
+2.12.2
