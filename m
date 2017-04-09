@@ -1,122 +1,61 @@
-From: pageexec@freemail.hu (PaX Team)
-Date: Sun, 09 Apr 2017 22:24:47 +0200
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
- <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>,
- <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
-Message-ID: <58EA988F.29293.6C80F08B@pageexec.freemail.hu>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Sun, 9 Apr 2017 16:04:59 -0500
+Subject: [PATCH v5 19/23] drivers/fsi: Add GPIO based FSI master
+In-Reply-To: <5d173f9c-e01c-6093-16ab-d114857009b2@infradead.org>
+References: <20170405020607.79939-1-cbostic@linux.vnet.ibm.com>
+ <20170405020607.79939-20-cbostic@linux.vnet.ibm.com>
+ <5d173f9c-e01c-6093-16ab-d114857009b2@infradead.org>
+Message-ID: <518e0abc-f1da-2ca0-fa44-6802e2b74c71@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 Apr 2017 at 22:07, Andy Lutomirski wrote:
-> grsecurity and PaX are great projects.  They have a lot of good ideas,
-> and they're put together quite nicely.  The upstream kernel should
-> *not* do things differently from they way they are in grsecurity/PaX
-> just because it wants to be different.  Conversely, the upstream
-> kernel should not do things the same way as PaX just to be more like
-> PaX.
 
-so weit so gut.
 
-> Keep in mind that the upstream kernel and grsecurity/PaX operate under
-> different constraints.  The upstream kernel tries to keep itself clean
+On 4/5/17 11:35 AM, Randy Dunlap wrote:
+> On 04/04/17 19:06, Christopher Bostic wrote:
+>> From: Chris Bostic <cbostic@linux.vnet.ibm.com>
+>>
+>> Implement a FSI master using GPIO.  Will generate FSI protocol for
+>> read and write commands to particular addresses.  Sends master command
+>> and waits for and decodes a slave response.
+>>
+>> Includes changes from Edward A. James <eajames@us.ibm.com> and Jeremy
+>> Kerr <jk@ozlabs.org>.
+>>
+>> Signed-off-by: Edward A. James <eajames@us.ibm.com>
+>> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+>> Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> ---
+>>   drivers/fsi/Kconfig           |  11 +
+>>   drivers/fsi/Makefile          |   1 +
+>>   drivers/fsi/fsi-master-gpio.c | 610 ++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 622 insertions(+)
+>>   create mode 100644 drivers/fsi/fsi-master-gpio.c
+>>
+>> diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+>> index 04c1a0e..9cf8345 100644
+>> --- a/drivers/fsi/Kconfig
+>> +++ b/drivers/fsi/Kconfig
+>> @@ -9,4 +9,15 @@ config FSI
+>>   	---help---
+>>   	  FSI - the FRU Support Interface - is a simple bus for low-level
+>>   	  access to POWER-based hardware.
+>> +
+>> +if FSI
+>> +
+>> +config FSI_MASTER_GPIO
+>> +	tristate "GPIO-based FSI master"
+>> +	depends on FSI && GPIOLIB
+> depends on FSI is redundant since "if FSI" does the same thing.
 
-so do we.
+Hi Randy,
+Thanks for the feedback, will correct.
 
-> and to make tree-wide updates rather that keeping compatibility stuff
-> around.
-
-so do we (e.g., fptr fixes for RAP, non-refcount atomic users, etc).
-
->  PaX and grsecurity presumably want to retain some degree of
-> simplicity when porting to newer upstream versions.
-
-s/simplicity/minimality/ as the code itself can be complex but that'll be
-of the minimal complexity we can come up with.
-
-> In the context of virtually mapped stacks / KSTACKOVERFLOW, this
-> naturally leads to different solutions.  The upstream kernel had a
-> bunch of buggy drivers that played badly with virtually mapped stacks.
-> grsecurity sensibly went for the approach where the buggy drivers kept
-> working.  The upstream kernel went for the approach of fixing the
-> drivers rather than keeping a compatibility workaround.  Different
-> constraints, different solutions.
-
-except that's not what happened at all. spender's first version did just
-a vmalloc for the kstack like the totally NIH'd version upstream does
-now. while we always anticipated buggy dma users and thus had code that
-would detect them so that we could fix them, we quickly figured that the
-upstream kernel wasn't quite up to snuff as we had assumed and faced with
-the amount of buggy code, we went for the current vmap approach which
-kept users' systems working instead of breaking them.
-
-you're trying to imply that upstream fixed the drivers but as the facts
-show, that's not true. you simply unleashed your code on the world and
-hoped(?) that enough suckers would try it out during the -rc window. as
-we all know several releases and almost a year later, that was a losing
-bet as you still keep fixing those drivers (and something tells me that
-we haven't seen the end of it). this is simply irresponsible engineering
-for no technical reason.
-
-> In the case of rare writes or pax_open_kernel [1] or whatever we want
-> to call it, CR3 would work without arch-specific code, and CR0 would
-> not.  That's an argument for CR3 that would need to be countered by
-> something.  (Sure, avoiding leaks either way might need arch changes.
-> OTOH, a *randomized* CR3-based approach might not have as much of a
-> leak issue to begin with.)
-
-i have yet to see anyone explain what they mean by 'leak' here but if it
-is what i think it is then the arch specific entry/exit changes are not
-optional but mandatory. see below for randomization.
-
-[merging in your other mail as it's the same topic]
-
-> No one has explained how CR0.WP is weaker or slower than my proposal.
-
-you misunderstood, Daniel was talking about your use_mm approach.
-
-> Here's what I'm proposing:
-> 
-> At boot, choose a random address A.
-
-what is the threat that a random address defends against?
-
->  Create an mm_struct that has a
-> single VMA starting at A that represents the kernel's rarely-written
-> section.  Compute O = (A - VA of rarely-written section).  To do a
-> rare write, use_mm() the mm, write to (VA + O), then unuse_mm().
-
-the problem is that the amount of __read_only data extends beyond vmlinux,
-i.e., this approach won't scale. another problem is that it can't be used
-inside use_mm and switch_mm themselves (no read-only task structs or percpu
-pgd for you ;) and probably several other contexts.
-
-last but not least, use_mm says this about itself:
-
-    (Note: this routine is intended to be called only
-    from a kernel thread context)
-
-so using it will need some engineering (or the comment be fixed).
-
-> This should work on any arch that has an MMU that allows this type of
-> aliasing and that doesn't have PA-based protections on the rarely-written
-> section.
-
-you didn't address the arch-specific changes needed in the enter/exit paths.
-
-> It'll be considerably slower than CR0.WP on a current x86 kernel, but,
-> with PCID landed, it shouldn't be much slower.
-
-based on my experience with UDEREF on amd64, unfortunately PCID isn't all
-it's cracked up to be (IIRC, it maybe halved the UDEREF overhead instead of
-basically eliminating it as i had anticipated, and that was on snb, ivb and
-later do even worse).
-
-> It has the added benefit that writes to non-rare-write data using the
-> rare-write primitive will fail.
-
-what is the threat model you're assuming for this feature? based on what i
-have for PaX (arbitrary read/write access exploited for data-only attacks),
-the above makes no sense to me...
+-Chris
+>> +	---help---
+>> +	This option enables a FSI master driver using GPIO lines.
+>> +
+>> +endif
+>> +
+>
