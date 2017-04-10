@@ -1,89 +1,115 @@
 From: olivier.moysan@st.com (olivier moysan)
-Date: Mon, 10 Apr 2017 17:19:54 +0200
-Subject: [PATCH v3 0/2] Add STM32 SAI support
-Message-ID: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
+Date: Mon, 10 Apr 2017 17:19:55 +0200
+Subject: [PATCH v3 1/2] ASoC: stm32: add bindings for SAI
+In-Reply-To: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
+References: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <1491837596-2924-2-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set handles the Serial Audio Interface (SAI) IP on STM32 platforms.
+This patch adds documentation of device tree bindings for the
+STM32 SAI ASoC driver.
 
-The SAI IP is composed of two Sub-block A and B. (see the figure below)
-Each sub-block makes use of individual and shared resources.
-
-Shared resources:
-	- Reset line. Reset common and sub-block registers.
-	- Bus interface clocks. This clock is not exposed in device
-	as it it managed by clock driver, according to kernel clocks gating.
-	- Common register. SAI IP exhibits a common configuration register
-	to manage synchronization modes. NB: These modes are not yet implemented
-	in this version of the SAI driver.
-	- Interrupt. Sub-blocks have their own interrupt status registers but they 
-	share the same interrupt line.
-
-Individual resources:
-	- Register set
-	- DMA request line.
-	- Communication interface. 
-	Each sub-block has its own GPIOs and associated bus lines.
-	- Kernel clock. 
-	Each sub-block has its own dedicated clock for its communication interface.
-
-To reflect this architecture Sub-block A and B are handled by 2 child devices.
-Sub-block A and B devices can be configured independently either as transmitter
-or receiver. A PCM device is associated to each sub-block.
-
-A sub-block has to select the appropriated parent clock at runtime, 
-depending on the audio stream sampling rate to be played or captured.
-Two parent clocks must be provided to support sampling rates multiples
-of 8 kHz or 11.025kHz.
-
- Interface clock  +--------------------------------+
-+---------------> | SAI IP                         |
- Reset            |     +-----------------+        |
-+---------------> |     |common registers |        |
-                  |     +-----------------+        |
-                  |                                |
-                  |    +----------------------+    |
-                  |    | Sub-block A          |    |
- Kernel clock A   |    |                      |    | Bus A
-+--------------------> | +----------------+   +---------------->
-                  |    | |A registers     |   |    |
-                  |    | +----------------+   |    |
-                  |    +----------------------+    |
-                  |                                |
-                  |    +----------------------+    |
-                  |    | Sub-block B          |    |
- Kernel clock B   |    |                      |    | Bus B
-+--------------------> | +----------------+   +----------------->
-                  |    | |B registers     |   |    |
-                  |    | +----------------+   |    |
-                  |    +----------------------+    |
-                  |                                |
-                  +--------------------------------+
-
-v3: correct DT bindings
-	- remove aliases
-	- use audio graph card
-
-olivier moysan (2):
-  ASoC: stm32: add bindings for SAI
-  ASoC: stm32: add SAI driver
-
- .../devicetree/bindings/sound/st,stm32-sai.txt     |  89 +++
- sound/soc/Kconfig                                  |   1 +
- sound/soc/Makefile                                 |   1 +
- sound/soc/stm/Kconfig                              |   8 +
- sound/soc/stm/Makefile                             |   6 +
- sound/soc/stm/stm32_sai.c                          | 115 +++
- sound/soc/stm/stm32_sai.h                          | 200 +++++
- sound/soc/stm/stm32_sai_sub.c                      | 884 +++++++++++++++++++++
- 8 files changed, 1304 insertions(+)
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
+---
+ .../devicetree/bindings/sound/st,stm32-sai.txt     | 89 ++++++++++++++++++++++
+ 1 file changed, 89 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
- create mode 100644 sound/soc/stm/Kconfig
- create mode 100644 sound/soc/stm/Makefile
- create mode 100644 sound/soc/stm/stm32_sai.c
- create mode 100644 sound/soc/stm/stm32_sai.h
- create mode 100644 sound/soc/stm/stm32_sai_sub.c
 
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+new file mode 100644
+index 0000000..c59a3d7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+@@ -0,0 +1,89 @@
++STMicroelectronics STM32 Serial Audio Interface (SAI).
++
++The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
++as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
++The SAI contains two independent audio sub-blocks. Each sub-block has
++its own clock generator and I/O lines controller.
++
++Required properties:
++  - compatible: Should be "st,stm32f4-sai"
++  - reg: Base address and size of SAI common register set.
++  - clocks: Must contain phandle and clock specifier pairs for each entry
++	in clock-names.
++  - clock-names: Must contain "x8k" and "x11k"
++	"x8k": SAI parent clock for sampling rates multiple of 8kHz.
++	"x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
++  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
++
++Optional properties:
++  - resets: Reference to a reset controller asserting the SAI
++
++SAI subnodes:
++Two subnodes corresponding to SAI sub-block instances A et B can be defined.
++Subnode can be omitted for unsused sub-block.
++
++SAI subnodes required properties:
++  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
++	for SAI sub-block A or B respectively.
++  - reg: Base address and size of SAI sub-block register set.
++  - clocks: Must contain one phandle and clock specifier pair
++	for sai_ck which feeds the internal clock generator.
++  - clock-names: Must contain "sai_ck".
++  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
++  - dma-names: identifier string for each DMA request line
++	"tx": if sai sub-block is configured as playback DAI
++	"rx": if sai sub-block is configured as capture DAI
++  - pinctrl-names: should contain only value "default"
++  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
++
++Example:
++sound_card {
++	compatible = "audio-graph-card";
++	dais = <&sai1b_port>;
++};
++
++sai1: sai1 at 40015800 {
++	compatible = "st,stm32f4-sai";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++	reg = <0x40015800 0x4>;
++	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
++	clock-names = "x8k", "x11k";
++	interrupts = <87>;
++
++	sai1b: audio-controller at 40015824 {
++		#sound-dai-cells = <0>;
++		compatible = "st,stm32-sai-sub-b";
++		reg = <0x40015824 0x1C>;
++		clocks = <&rcc 1 CLK_SAI2>;
++		clock-names = "sai_ck";
++		dmas = <&dma2 5 0 0x400 0x0>;
++		dma-names = "tx";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_sai1b>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			sai1b_port: port at 0 {
++				reg = <0>;
++				cpu_endpoint: endpoint {
++					remote-endpoint = <&codec_endpoint>;
++					audio-graph-card,format = "i2s";
++					audio-graph-card,bitclock-master = <&codec_endpoint>;
++					audio-graph-card,frame-master = <&codec_endpoint>;
++				};
++			};
++		};
++	};
++};
++
++audio-codec {
++	codec_port: port {
++		codec_endpoint: endpoint {
++			remote-endpoint = <&cpu_endpoint>;
++		};
++	};
++};
 -- 
 1.9.1
