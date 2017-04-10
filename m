@@ -1,97 +1,49 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 10 Apr 2017 10:55:37 +0530
-Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
-References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
- <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
- <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
- <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
- <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
- <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
-Message-ID: <9fbef986-721c-05aa-28a1-4c49016fe2ca@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Apr 2017 08:10:45 +0200
+Subject: [PATCH] PM / OPP: Use - instead of @ for DT entries
+In-Reply-To: <5ce1fbbc7cd37a6cfe54e93eeca311a7a52093ff.1491801395.git.viresh.kumar@linaro.org>
+References: <5ce1fbbc7cd37a6cfe54e93eeca311a7a52093ff.1491801395.git.viresh.kumar@linaro.org>
+Message-ID: <20170410061045.2jjk5aw75s6am7xv@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 10, 2017 at 10:46:37AM +0530, Viresh Kumar wrote:
+> Compiling the DT file with W=1, DTC warns like follows:
+> 
+> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> unit name, but no reg property
+> 
+> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> "reg" property.
+> 
+> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
+>  Documentation/devicetree/bindings/opp/opp.txt      | 38 ++++++-------
+>  arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
+>  arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
+>  arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
+>  arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
+>  arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
+>  arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
+>  arch/arm/boot/dts/pxa25x.dtsi                      |  8 +--
+>  arch/arm/boot/dts/pxa27x.dtsi                      | 14 ++---
+>  arch/arm/boot/dts/sun8i-a33.dtsi                   |  8 +--
 
-On Wednesday 05 April 2017 07:40 PM, Raviteja Garimella wrote:
-> Hi Kishon,
-> 
-> On Wed, Apr 5, 2017 at 7:04 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi Ravi,
->>
->> On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
->>> Hi Kishon,
->>>
->>> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> Hi,
->>>>
->>>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
->>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
->>>>> SoC. The phy can be configured to be in Device mode or Host
->>>>> mode based on the type of cable connected to the port. The
->>>>> driver registers to  extcon framework to get appropriate
->>>>> connect events for Host/Device cables connect/disconnect
->>>>> states based on VBUS and ID interrupts.
->>>>
->>>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
->>>> Northstar2.
->>>>
->>>
->>> Will do.
->>>
->>>> Sorry for not letting you know this earlier. But I feel the design of the
->>>> driver should be changed. Extcon shouldn't be used here. The extcon
->>>> notifications should be sent to the consumer driver and the consumer driver
->>>> should be responsible for invoking the phy ops.
->>>>
->>>
->>> The consumer drivers here would be a UDC driver (USB device
->>> controller), EHCI and OHCI host controller drivers.
->>> I was already suggested in UDC driver review to deal with extcon in Phy driver.
->>>
->>> This phy connects to 2 host controllers, and one device controller.
->>> That's the design in Broadcom Northstar2
->>> platform. The values of the VBUS and ID pins of this port are
->>> determined based on the type of the cable (device cable
->>> or host cable). And. phy has to be configured accordingly.
->>>
->>>> The phy ops being invoked during extcon events doesn't look right.
->>>
->>> Could you please elaborate on the concern, so that we can think of
->>> mitigating those issues in this driver?
->>> Since we are dealing with phy init/shutdown in this driver itself, are
->>> you okay with moving the extcon handling code
->>> out of phy ops ?
->>
->> yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
->> extcon events too. Can a phy which is initialized by a phy consumer (say your
->> UDC invokes phy_init) can be shutdown by an extcon event?
->>
->> Maybe a clear explanation of when phy_ops here will be invoked and when it will
->> set using extcon events might help.
->>
-> 
-> Say, we have a USB pendrive which is connected to the DRD port through
-> a host cable.
-> Now the PHY will be initialized to be in host mode.
-> When the pendrive is unplugged, and we now connect the NS2 device to
-> some linux PC,
-> now the PHY has to be shutdown, and re-initialized to be in Device mode.
-> 
-> On unplug event, it is set neither to Host nor Device mode (basically
-> shutdown). Next time which ever cable is connected, the PHY is
-> initialized to the respective
-> mode.
-> 
-> Please let me know if it's fine to do these initializations outside
-> phy ops, because those will
-> be irrelevant for phy consumers (the controllers) as it's anyways
-> dealt in the phy driver through
-> extcon.
+For sunxi,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-How does the consumer get to know whether they have to operate in host mode or
-device mode?
+Maxime
 
-Thanks
-Kishon
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170410/d0bd45d1/attachment.sig>
