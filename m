@@ -1,33 +1,30 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 10 Apr 2017 16:24:02 +0800
-Subject: [PATCH v4 6/9] ARM: dts: add support for I2SE Duckbill 2 boards
-In-Reply-To: <1486626169-20022-7-git-send-email-michael.heimpold@i2se.com>
-References: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
- <1486626169-20022-7-git-send-email-michael.heimpold@i2se.com>
-Message-ID: <20170410082400.GA1872@dragon>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 10 Apr 2017 10:25:16 +0200
+Subject: [PATCH 1/2] ARM: dts: at91: sama5d3_xplained: fix ADC vref
+Message-ID: <20170410082517.19628-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 08:42:46AM +0100, Michael Heimpold wrote:
-> From: Michael Heimpold <mhei@heimpold.de>
-> 
-> This machine is an USB pen drive sized development board,
-> based on NXP's i.MX28 CPU. In contrast to the previous
-> model "Duckbill", the "Duckbill 2" series has internal
-> eMMC storage.
-> 
-> Signed-off-by: Michael Heimpold <mhei@heimpold.de>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  arch/arm/boot/dts/Makefile             |   1 +
->  arch/arm/boot/dts/imx28-duckbill-2.dts | 183 +++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/mach-mxs.c           |   3 +-
+The voltage reference for the ADC is not 3V but 3.3V since it is connected to
+VDDANA.
 
-I'm preparing pull request for 4.12 merge window, and found this.
-C file change shouldn't be mixed in DTS patch, so I dropped it.  Please
-submit C code change in a separate patch.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Cc: <stable@vger.kernel.org> # 3.16+
+---
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn
-
->  3 files changed, 186 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/imx28-duckbill-2.dts
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index c51fc65..7a0fa1a 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -162,6 +162,7 @@
+ 			};
+ 
+ 			adc0: adc at f8018000 {
++				atmel,adc-vref = <3300>;
+ 				pinctrl-0 = <
+ 					&pinctrl_adc0_adtrg
+ 					&pinctrl_adc0_ad0
+-- 
+2.9.0
