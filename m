@@ -1,165 +1,128 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 11 Apr 2017 01:35:04 +0400
-Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
-In-Reply-To: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 10 Apr 2017 16:50:16 -0600
+Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without
+ struct page
+In-Reply-To: <e49715a3-b925-79ad-7d1d-ce2cb5673a97@samsung.com>
+References: <CGME20170405160251epcas4p14cc5d5f6064c84b133b9e280ac987a93@epcas4p1.samsung.com>
+ <20170405160242.14195-1-shuahkh@osg.samsung.com>
+ <e49715a3-b925-79ad-7d1d-ce2cb5673a97@samsung.com>
+Message-ID: <3afd77e5-2a98-42fd-b5c9-cbf4c32baa4f@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Glauber <jglauber@cavium.com>
+On 04/06/2017 06:01 AM, Marek Szyprowski wrote:
+> Hi Shuah,
+> 
+> On 2017-04-05 18:02, Shuah Khan wrote:
+>> When coherent DMA memory without struct page is shared, importer
+>> fails to find the page and runs into kernel page fault when it
+>> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
+>> in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
+>> for more information on this problem.
+>>
+>> This solution allows coherent DMA memory without struct page to be
+>> shared by providing a way for the exporter to tag the DMA buffer as
+>> a special buffer without struct page association and passing the
+>> information in sg_table to the importer. This information is used
+>> in attach/map_sg to avoid cleaning D-cache and mapping.
+>>
+>> The details of the change are:
+>>
+>> Framework:
+>> - Add a new dma_attrs field to struct scatterlist.
+>> - Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
+>>    Coherent memory without struct page.
+>> - Add a new dma_check_dev_coherent() interface to check if memory is
+>>    the device coherent area. There is no way to tell where the memory
+>>    returned by dma_alloc_attrs() came from.
+>>
+>> Exporter logic:
+>> - Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
+>>    DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
+>>    done in the exporter context.
+>> - Add logic to arm_dma_get_sgtable() to identify memory without struct
+>>    page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
+>>    set, arm_dma_get_sgtable() will set page as the cpu_addr and update
+>>    dma_address and dma_attrs fields in struct scatterlist for this sgl.
+>>    This is done in exporter context when buffer is exported. With this
+>>    Note: This change is made on top of Russell King's patch that added
+>>    !pfn_valid(pfn) check to arm_dma_get_sgtable() to error out on invalid
+>>    pages. Coherent memory without struct page will trigger this error.
+>>
+>> Importer logic:
+>> - Add logic to vb2_dc_dmabuf_ops_attach() to identify memory without
+>>    struct page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute when it copies
+>>    the sg_table from the exporter. It will copy dma_attrs and dma_address
+>>    fields. With this logic, dmabuf_ops_attach will no longer trip on an
+>>    invalid page.
+>> - Add logic to arm_dma_map_sg() to avoid mapping the page when sg_table
+>>    has DMA_ATTR_DEV_COHERENT_NOPAGE buffer.
+>> - Add logic to arm_dma_unmap_sg() to do nothing for sg entries with
+>>    DMA_ATTR_DEV_COHERENT_NOPAGE attribute.
+>>
+>> Without this change the following use-case that runs into kernel
+>> pagefault when importer tries to attach the exported buffer.
+>>
+>> With this change it works: (what a relief after watching pagefaults for
+>> weeks!!)
+>>
+>> gst-launch-1.0 filesrc location=~/GH3_MOV_HD.mp4 ! qtdemux ! h264parse ! v4l2video4dec capture-io-mode=dmabuf ! v4l2video7convert output-io-mode=dmabuf-import ! kmssink force-modesetting=true
+>>
+>> I am sending RFC patch to get feedback on the approach and see if I missed
+>> anything.
+> 
+> Frankly, once You decided to hack around dma-buf and issues with coherent,
+> carved out memory, it might be a bit better to find the ultimate solution
+> instead of the another hack. Please note that it will still not allow to
+> share a buffer allocated from carved-out memory and a device, which is
+> behind IOMMU.
 
-Ported from x86_64 with paravirtualization support removed.
+With your patch s5p-mfc patch series does address the problem for this
+use-case for 4.12 onwards. However I am still concerned about prior
+release and this pagefault is bad.
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
+Invalid page test partially solves the problem. Would it helpful to
+at least prevent the pagfault with a definitive test. Please see my
+response to Russell. Let me know your thoughts on that.
 
-Note. This patch removes protection from direct inclusion of
-arch/arm64/include/asm/spinlock_types.h. It's done because
-kernel/locking/qrwlock.c file does it thru the header
-include/asm-generic/qrwlock_types.h. Until now the only user
-of qrwlock.c was x86, and there's no such protection too.
+> 
+> I thought a bit about this and the current shape of dma-buf code.
+> 
+> IMHO the proper way of solving all those issues would be to replace
+> dma-buf internal representation of the memory from struct scatter_list
+> to pfn array. This would really solve the problem of buffers which
+> cannot be properly represented by scatter lists/struct pages and would
+> even allow sharing buffers between all kinds of devices. Scatter-lists
+> are also quite over-engineered structures to represent a single buffer
+> (pfn array is a bit more compact representation). Also there is a lots
+> of buggy code which use scatter-list in a bit creative way (like
+> assuming that each page maps to a single scatter list entry for
+> example). The only missing piece, required for such change would be
+> extending DMA-mapping with dma_map_pfn() interface.
 
-I'm not happy to remove the protection, but if it's OK for x86,
-it should be also OK for arm64. If not, I think we'd fix it
-for x86, and add the protection there too.
+I agree with you on scatterlists being clumsy. Changing over to pfn array
+could simplify things. I am exploring a slightly different option that
+might not require too many changes. I will respond with concrete ideas
+later on this week.
 
-Yury
+> 
+> This would be however quite large task, especially taking into account
+> all current users of DMA-buf framework...
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/Kconfig                      |  2 ++
- arch/arm64/include/asm/qrwlock.h        |  7 +++++++
- arch/arm64/include/asm/qspinlock.h      | 20 ++++++++++++++++++++
- arch/arm64/include/asm/spinlock.h       | 12 ++++++++++++
- arch/arm64/include/asm/spinlock_types.h | 14 +++++++++++---
- 5 files changed, 52 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/include/asm/qrwlock.h
- create mode 100644 arch/arm64/include/asm/qspinlock.h
+Yeah it will be a large task.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index f2b0b52..ac1c170 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -24,6 +24,8 @@ config ARM64
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
- 	select ARCH_HAS_UBSAN_SANITIZE_ALL
-+	select ARCH_USE_QUEUED_SPINLOCKS
-+	select ARCH_USE_QUEUED_RWLOCKS
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
- 	select ARM_GIC
-diff --git a/arch/arm64/include/asm/qrwlock.h b/arch/arm64/include/asm/qrwlock.h
-new file mode 100644
-index 0000000..626f6eb
---- /dev/null
-+++ b/arch/arm64/include/asm/qrwlock.h
-@@ -0,0 +1,7 @@
-+#ifndef _ASM_ARM64_QRWLOCK_H
-+#define _ASM_ARM64_QRWLOCK_H
-+
-+#include <asm-generic/qrwlock_types.h>
-+#include <asm-generic/qrwlock.h>
-+
-+#endif /* _ASM_ARM64_QRWLOCK_H */
-diff --git a/arch/arm64/include/asm/qspinlock.h b/arch/arm64/include/asm/qspinlock.h
-new file mode 100644
-index 0000000..98f50fc
---- /dev/null
-+++ b/arch/arm64/include/asm/qspinlock.h
-@@ -0,0 +1,20 @@
-+#ifndef _ASM_ARM64_QSPINLOCK_H
-+#define _ASM_ARM64_QSPINLOCK_H
-+
-+#include <asm-generic/qspinlock_types.h>
-+
-+#define	queued_spin_unlock queued_spin_unlock
-+/**
-+ * queued_spin_unlock - release a queued spinlock
-+ * @lock : Pointer to queued spinlock structure
-+ *
-+ * A smp_store_release() on the least-significant byte.
-+ */
-+static inline void queued_spin_unlock(struct qspinlock *lock)
-+{
-+	smp_store_release((u8 *)lock, 0);
-+}
-+
-+#include <asm-generic/qspinlock.h>
-+
-+#endif /* _ASM_ARM64_QSPINLOCK_H */
-diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-index cae331d..3771339 100644
---- a/arch/arm64/include/asm/spinlock.h
-+++ b/arch/arm64/include/asm/spinlock.h
-@@ -20,6 +20,10 @@
- #include <asm/spinlock_types.h>
- #include <asm/processor.h>
- 
-+#ifdef CONFIG_QUEUED_SPINLOCKS
-+#include <asm/qspinlock.h>
-+#else
-+
- /*
-  * Spinlock implementation.
-  *
-@@ -187,6 +191,12 @@ static inline int arch_spin_is_contended(arch_spinlock_t *lock)
- }
- #define arch_spin_is_contended	arch_spin_is_contended
- 
-+#endif /* CONFIG_QUEUED_SPINLOCKS */
-+
-+#ifdef CONFIG_QUEUED_RWLOCKS
-+#include <asm/qrwlock.h>
-+#else
-+
- /*
-  * Write lock implementation.
-  *
-@@ -351,6 +361,8 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
- /* read_can_lock - would read_trylock() succeed? */
- #define arch_read_can_lock(x)		((x)->lock < 0x80000000)
- 
-+#endif /* CONFIG_QUEUED_RWLOCKS */
-+
- #define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
- #define arch_write_lock_flags(lock, flags) arch_write_lock(lock)
- 
-diff --git a/arch/arm64/include/asm/spinlock_types.h b/arch/arm64/include/asm/spinlock_types.h
-index 55be59a..0f0f156 100644
---- a/arch/arm64/include/asm/spinlock_types.h
-+++ b/arch/arm64/include/asm/spinlock_types.h
-@@ -16,9 +16,9 @@
- #ifndef __ASM_SPINLOCK_TYPES_H
- #define __ASM_SPINLOCK_TYPES_H
- 
--#if !defined(__LINUX_SPINLOCK_TYPES_H) && !defined(__ASM_SPINLOCK_H)
--# error "please don't include this file directly"
--#endif
-+#ifdef CONFIG_QUEUED_SPINLOCKS
-+#include <asm-generic/qspinlock_types.h>
-+#else
- 
- #include <linux/types.h>
- 
-@@ -36,10 +36,18 @@ typedef struct {
- 
- #define __ARCH_SPIN_LOCK_UNLOCKED	{ 0 , 0 }
- 
-+#endif /* CONFIG_QUEUED_SPINLOCKS */
-+
-+#ifdef CONFIG_QUEUED_RWLOCKS
-+#include <asm-generic/qrwlock_types.h>
-+#else
-+
- typedef struct {
- 	volatile unsigned int lock;
- } arch_rwlock_t;
- 
- #define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
- 
-+#endif /* CONFIG_QUEUED_RWLOCKS */
-+
- #endif
--- 
-2.7.4
+thanks,
+-- Shuah
+
+> 
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>   arch/arm/mm/dma-mapping.c                      | 34 ++++++++++++++++++++++----
+>>   drivers/base/dma-coherent.c                    | 25 +++++++++++++++++++
+>>   drivers/media/v4l2-core/videobuf2-dma-contig.c |  6 +++++
+>>   include/linux/dma-mapping.h                    |  8 ++++++
+>>   include/linux/scatterlist.h                    |  1 +
+>>   5 files changed, 69 insertions(+), 5 deletions(-)
+>> [...]
+> 
+> Best regards
