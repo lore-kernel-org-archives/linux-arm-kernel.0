@@ -1,50 +1,92 @@
-From: pageexec@freemail.hu (PaX Team)
-Date: Mon, 10 Apr 2017 12:42:35 +0200
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrWvGLtObdk3V0k_Esa_L=EOf+Whe=6DpcJ7H_W8Z-5Btw@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
- <58EA2D58.17782.6ADE22BD@pageexec.freemail.hu>,
- <CALCETrWvGLtObdk3V0k_Esa_L=EOf+Whe=6DpcJ7H_W8Z-5Btw@mail.gmail.com>
-Message-ID: <58EB619B.8144.6F924846@pageexec.freemail.hu>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Apr 2017 11:44:03 +0100
+Subject: [PATCH] efi/libstub: arm/arm64: don't use TASK_SIZE when
+ randomising the RT space
+In-Reply-To: <20170410103038.20117-1-ard.biesheuvel@linaro.org>
+References: <20170410103038.20117-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170410104403.GC13899@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 Apr 2017 at 17:10, Andy Lutomirski wrote:
-
-> On Sun, Apr 9, 2017 at 5:47 AM, PaX Team <pageexec@freemail.hu> wrote:
-> > on x86 the cost of the pax_open/close_kernel primitives comes from the cr0
-> > writes and nothing else, use_mm suffers not only from the cr3 writes but
-> > also locking/atomic ops and cr4 writes on its path and the inevitable TLB
-> > entry costs. and if cpu vendors cared enough, they could make toggling cr0.wp
-> > a fast path in the microcode and reduce its overhead by an order of magnitude.
-> >
+On Mon, Apr 10, 2017 at 11:30:38AM +0100, Ard Biesheuvel wrote:
+> As reported by James, Catalin and Mark, commit e69176d68d26
+> ("ef/libstub/arm/arm64: Randomize the base of the UEFI rt services
+> region") results in a crash in the firmware regardless of whether KASLR
+> is in effect or not, and whether the firmware implements EFI_RNG_PROTOCOL
+> or not.
 > 
-> If the CR4 writes happen in for this use case, that's a bug.
-
-that depends on how you plan to handle perf/rdpmc users and how many
-alternative mm structs you plan to manage (one global, one per cpu,
-one per mm struct, etc).
-
-> > you'll be duplicating TLB entries in the alternative PCID for both code
-> > and data, where they will accumulate (=take room away from the normal PCID
-> > and expose unwanted memory for access) unless you also flush them when
-> > switching back (which then will cost even more cycles). also i'm not sure
-> > that processors implement all the 12 PCID bits so depending on how many PCIDs
-> > you plan to use, you could be causing even more unnecessary TLB replacements.
-> >
+> Mark has identified the root cause to be the inappropriate use of
+> TASK_SIZE in the stub, which arm64 defines as
 > 
-> Unless the CPU is rather dumber than I expect, the only duplicated
-> entries should be for the writable aliases of pages that are written.
-> The rest of the pages are global and should be shared for all PCIDs.
+>   #define TASK_SIZE             (test_thread_flag(TIF_32BIT) ? \
+>                                 TASK_SIZE_32 : TASK_SIZE_64)
+> 
+> and testing thread flags at this point results in the dereference of
+> pointers in uninitialized structures.
+> 
+> So instead, introduce a preprocessor symbol EFI_RT_VIRTUAL_LIMIT and
+> define it to TASK_SIZE_64 on arm64 and TASK_SIZE on ARM, both of which
+> are compile time constants. Also, change the 'headroom' variable to
+> static const to force an error if this changes in the future.
+> 
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-well, 4.10.2.4 has language like this (4.10.3.2 implies similar):
+With this patch applied atop of next-20170410, a defconfig arm64 kernel
+built with the Linaro 15.08 toolchain boots happily for me on Juno R1.
 
-   A logical processor may use a global TLB entry to translate a linear
-   address, even if the TLB entry is associated with a PCID different
-   from the current PCID.
+So FWIW:
 
-that to me says that global page entries are associated with a PCID and
-may (not) be used while in another PCID. in Intel-speak that's not 'dumb'
-but "tricks up our sleeve that we don't really want to tell you about in
-detail, except perhaps under a NDA".
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+> 
+> Apologies for the breakage. On the systems I have tested, sp_el0 apparently
+> pointed somewhere sane when I inadvertently dereferenced it, and the
+> resulting addresses looked sufficiently random to me.
+> 
+> Ingo, once we have some confirmation that this makes the problem go away,
+> could you please take this straight into efi/core? Thanks. 
+> 
+>  drivers/firmware/efi/libstub/arm-stub.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index 1e45ec51b094..34010ff3b77e 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -32,6 +32,12 @@
+>  #define EFI_RT_VIRTUAL_BASE	SZ_512M
+>  #define EFI_RT_VIRTUAL_SIZE	SZ_512M
+>  
+> +#ifdef CONFIG_ARM64
+> +#define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE_64
+> +#else
+> +#define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE
+> +#endif
+> +
+>  static u64 virtmap_base = EFI_RT_VIRTUAL_BASE;
+>  
+>  efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg,
+> @@ -236,8 +242,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>  		 * shift of 21 bit positions into account when scaling
+>  		 * the headroom value using a 32-bit random value.
+>  		 */
+> -		u64 headroom = TASK_SIZE - EFI_RT_VIRTUAL_BASE -
+> -			       EFI_RT_VIRTUAL_SIZE;
+> +		static const u64 headroom = EFI_RT_VIRTUAL_LIMIT -
+> +					    EFI_RT_VIRTUAL_BASE -
+> +					    EFI_RT_VIRTUAL_SIZE;
+>  		u32 rnd;
+>  
+>  		status = efi_get_random_bytes(sys_table, sizeof(rnd),
+> -- 
+> 2.9.3
+> 
