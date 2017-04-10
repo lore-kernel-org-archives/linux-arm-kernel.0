@@ -1,252 +1,76 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Apr 2017 13:15:14 -0500
-Subject: [PATCH v4 1/7] pinctrl: dt-bindings: Add documentation for
- Armada 37xx pin controllers
-In-Reply-To: <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
-References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
- <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170410181514.kzbpkaxkwf7uycdc@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 10 Apr 2017 11:24:31 -0700
+Subject: [GIT PULL] Allwinner clock fixes for 4.11, bis
+In-Reply-To: <20170410080048.l7xjndj457wa2b2q@lukather>
+References: <20170406074121.tkivdvghbr27tr54@lukather>
+ <20170406231003.GS7065@codeaurora.org>
+ <20170410080048.l7xjndj457wa2b2q@lukather>
+Message-ID: <20170410182431.GI7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 05:18:02PM +0200, Gregory CLEMENT wrote:
-> Document the device tree binding for the pin controllers found on the
-> Armada 37xx SoCs.
+On 04/10, Maxime Ripard wrote:
+> On Thu, Apr 06, 2017 at 04:10:03PM -0700, Stephen Boyd wrote:
+> > On 04/06, Maxime Ripard wrote:
+> > > Hi Mike, Stephen,
+> > > 
+> > > Please pull the following changes for one of the 4.11-rc's
+> > > 
+> > > Thanks!
+> > > Maxime
+> > > 
+> > > The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
+> > > 
+> > >   clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.11-2
+> > > 
+> > > for you to fetch changes up to d054a839a0986136374d49f9f9fbc264abae9c4c:
+> > > 
+> > >   clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER (2017-03-27 13:37:05 +0200)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Allwinner clock fixes for 4.11, bis
+> > > 
+> > > A few patches to fix a build error and a few minor typos and bugs in the
+> > > sunxi-ng code
+> > > 
+> > > ----------------------------------------------------------------
+> > > Chen-Yu Tsai (3):
+> > >       clk: sunxi-ng: use 1 as fallback for minimum multiplier
+> > >       clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
+> > >       clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
+> > > 
+> > > Tobias Regnery (1):
+> > >       clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
+> > > 
+> > 
+> > Two of these are fixes for regressions in v4.10? Why are these
+> > critical for the v4.11 release? The comment patch is totally
+> > bogus, it's not fixing any sort of regression that is causing
+> > problems for people so I'm not sure why it was put into this pull
+> > request. Am I right in assuming that the only real patch we need
+> > out of here is the last one for the build error from randconfigs?
+> > If so I can cherry-pick that from the branch into fixes and the
+> > rest can go the next merge window.
+> > 
+> > Not pulling for now.
 > 
-> Update the binding documention of the xtal clk which is a subnode of this
-> syscon node.
+> Actually, all of them but the comment fix are real fix.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +--
->  Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 183 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 187 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+> "clk: sunxi-ng: use 1 as fallback for minimum multiplier" can lead to
+> a multiplier set to 0 in some cases (depending on the rate asked for),
+> and "clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum
+> mismatch" will prevent inconsistensies in factors selection between
+> round_rate and set_rate.
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-> index a88f1f05fbd6..4c0807f28cfa 100644
-> --- a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-> @@ -5,6 +5,7 @@ reading the gpio latch register.
->  
->  This node must be a subnode of the node exposing the register address
->  of the GPIO block where the gpio latch is located.
-> +See Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
->  
->  Required properties:
->  - compatible : shall be one of the following:
-> @@ -16,9 +17,9 @@ Optional properties:
->  	output names ("xtal")
->  
->  Example:
-> -gpio1: gpio at 13800 {
-> -	compatible = "marvell,armada-3700-gpio", "syscon", "simple-mfd";
-> -	reg = <0x13800 0x1000>;
-> +pinctrl_nb: pinctrl-nb at 13800 {
-> +	compatible = "armada3710-nb-pinctrl", "syscon", "simple-mfd";
-> +	reg = <0x13800 0x100>, <0x13C00 0x20>;
->  
->  	xtalclk: xtal-clk {
->  		compatible = "marvell,armada-3700-xtal-clock";
-> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
-> new file mode 100644
-> index 000000000000..2eda81e0bca1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
-> @@ -0,0 +1,183 @@
-> +* Marvell Armada 37xx SoC pin and gpio controller
-> +
-> +Each Armada 37xx SoC come with two pin and gpio controller one for the
-> +south bridge and the other for the north bridge.
-> +
-> +Inside this set of register the gpio latch allows exposing some
-> +configuration of the SoC and especially the clock frequency of the
-> +xtal. Hence, this node is a represent as syscon allowing sharing the
-> +register between multiple hardware block.
-> +
-> +GPIO and pin controller:
-> +------------------------
-> +
-> +Main node:
-> +
-> +Refer to pinctrl-bindings.txt in this directory for details of the
-> +common pinctrl bindings used by client devices, including the meaning
-> +of the phrase "pin configuration node".
-> +
-> +Required properties for pinctrl driver:
-> +
-> +- compatible:	"marvell,armada3710-sb-pinctrl", "syscon, "simple-mfd"
-> +		for the south bridge
-> +		"marvell,armada3710-nb-pinctrl", "syscon, "simple-mfd"
-> +		for the north bridge
-> +- reg: The first set of register are for pinctrl/gpio and the second
-> +  set for the interrupt controller
-> +- interrupts: list of the interrupt use by the gpio
-> +
-> +Available groups and functions for the North bridge:
-> +
-> +group: jtag
-> + - pins 20-24
-> + - functions jtag, gpio
-> +
-> +group sdio0
-> + - pins 8-10
-> + - functions sdio, gpio
-> +
-> +group emmc_nb
-> + - pins 27-35
-> + - functions emmc, gpio
-> +
-> +group pwm0
-> + - pin 11 (GPIO1-11)
-> + - functions pwm, gpio
-> +
-> +group pwm1
-> + - pin 12
-> + - functions pwm, gpio
-> +
-> +group pwm2
-> + - pin 13
-> + - functions pwm, gpio
-> +
-> +group pwm3
-> + - pin 14
-> + - functions pwm, gpio
-> +
-> +group pmic1
-> + - pin 17
-> + - functions pmic, gpio
-> +
-> +group pmic0
-> + - pin 16
-> + - functions pmic, gpio
-> +
-> +group i2c2
-> + - pins 2-3
-> + - functions i2c, gpio
-> +
-> +group i2c1
-> + - pins 0-1
-> + - functions i2c, gpio
-> +
-> +group spi_cs1
-> + - pin 17
-> + - functions spi, gpio
-> +
-> +group spi_cs2
-> + - pin 18
-> + - functions spi, gpio
-> +
-> +group spi_cs3
-> + - pin 19
-> + - functions spi, gpio
-> +
-> +group onewire
-> + - pin 4
-> + - functions onewire, gpio
-> +
-> +group uart1
-> + - pins 25-26
-> + - functions uart, gpio
-> +
-> +group spi_quad
-> + - pins 15-16
-> + - functions spi, gpio
-> +
-> +group uart_2
-> + - pins 9-10
-> + - functions uart, gpio
-> +
-> +Available groups and functions for the South bridge:
-> +
-> +group usb32_drvvbus0
-> + - pin 36
-> + - functions drvbus, gpio
-> +
-> +group usb2_drvvbus1
-> + - pin 37
-> + - functions drvbus, gpio
-> +
-> +group sdio_sb
-> + - pins 60-64
-> + - functions sdio, gpio
-> +
-> +group rgmii
-> + - pins 42-55
-> + - functions mii, gpio
-> +
-> +group pcie1
-> + - pins 39-40
-> + - functions pcie, gpio
-> +
-> +group ptp
-> + - pins 56-58
-> + - functions ptp, gpio
-> +
-> +group ptp_clk
-> + - pin 57
-> + - functions ptp, mii
-> +
-> +group ptp_trig
-> + - pin 58
-> + - functions ptp, mii
-> +
-> +group mii_col
-> + - pin 59
-> + - functions mii, mii_err
-> +
-> +GPIO subnode:
-> +
-> +Please refer to gpio.txt in this directory for details of gpio-ranges property
-> +and the common GPIO bindings used by client devices.
-> +
-> +Required properties for gpio driver under the gpio subnode:
-> +- interrupts: List of interrupt specifier for the controllers interrupt.
-> +- gpio-controller: Marks the device node as a gpio controller.
-> +- #gpio-cells: Should be 2. The first cell is the GPIO number and the
-> +   second cell specifies GPIO flags, as defined in
-> +   <dt-bindings/gpio/gpio.h>. Only the GPIO_ACTIVE_HIGH and
-> +   GPIO_ACTIVE_LOW flags are supported.
-> +- gpio-ranges: Range of pins managed by the GPIO controller.
-> +
-> +Xtal Clock bindings for Marvell Armada 37xx SoCs
-> +------------------------------------------------
-> +
-> +see Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-> +
-> +
-> +Example:
-> +pinctrl_sb: pinctrl-sb at 18800 {
+> So, yes, they are not critical fixes in the sense that it will fix a
+> panic. but still those are bugs.
 
-Just pinctrl at ...
+Ok so it sounds like we agree that this can all wait until v4.12.
 
-> +	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
-> +	reg = <0x18800 0x100>, <0x18C00 0x20>;
-> +	gpiosb: gpiosb {
-
-gpio {
-
-With that,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-
-> +		#gpio-cells = <2>;
-> +		gpio-ranges = <&pinctrl_sb 0 0 29>;
-> +		gpio-controller;
-> +		interrupts =
-> +		<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-> +		<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
-> +		<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-> +		<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-> +		<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> +
-> +	rgmii_pins: mii-pins {
-> +		groups = "rgmii";
-> +		function = "mii";
-> +	};
-> +
-> +};
-> -- 
-> git-series 0.9.1
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
