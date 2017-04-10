@@ -1,100 +1,187 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 10 Apr 2017 11:47:09 +0200
-Subject: [PATCH v2] serial: 8250_early: Add earlycon support for Palmchip UART
-Message-ID: <7a016ff6-08fc-2811-92e0-7c4603fa8586@sigmadesigns.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Apr 2017 10:55:40 +0100
+Subject: [PATCH v4 18/22] KVM: arm64: ITS: Collection table save/restore
+In-Reply-To: <1490607072-21610-19-git-send-email-eric.auger@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-19-git-send-email-eric.auger@redhat.com>
+Message-ID: <95a88e33-3cbc-9c4d-b76c-3cec5c4cc310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define an OF early console for Palmchip UART, which can be enabled
-by passing "earlycon" on the boot command line.
+On 27/03/17 10:31, Eric Auger wrote:
+> The flush path copies the collection entries into guest RAM
+> at the GPA specified in the BASER register. This obviously
+> requires the BASER to be set. The last written element
+> is a dummy collection table entry.
+> 
+> We do not index by collection ID as the collection entry
+> can fit into 8 bytes while containing the collection ID.
+> 
+> On restore path we re-allocate the collection objects.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> 
+> v3 -> v4:
+> - replaced u64 *ptr by gpa_t gpa
+> - check the collection does not exist before allocating it
+> 
+> v1 -> v2:
+> - reword commit message and directly use 8 as entry size
+> - no kvm parameter anymore
+> - add helper for flush/restore cte
+> - table size computed here
+> - add le64/cpu conversions
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 99 +++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 97 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 8eaeba4..df984b6 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1828,13 +1828,89 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+>  	return -ENXIO;
+>  }
+>  
+> +static int vgic_its_flush_cte(struct vgic_its *its,
+> +			      struct its_collection *collection, gpa_t gpa)
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- drivers/tty/serial/8250/8250_early.c | 24 ++++++++++++++++++++++++
- drivers/tty/serial/8250/8250_port.c  |  4 ++--
- 2 files changed, 26 insertions(+), 2 deletions(-)
+Given that the pendent of this function is name ..._restore_..., should
+this be called ..._save_... ?
 
-diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
-index 85a12f032402..82fc48eca1df 100644
---- a/drivers/tty/serial/8250/8250_early.c
-+++ b/drivers/tty/serial/8250/8250_early.c
-@@ -39,6 +39,7 @@
- 
- static unsigned int __init serial8250_early_in(struct uart_port *port, int offset)
- {
-+	int reg_offset = offset;
- 	offset <<= port->regshift;
- 
- 	switch (port->iotype) {
-@@ -52,6 +53,8 @@ static unsigned int __init serial8250_early_in(struct uart_port *port, int offse
- 		return ioread32be(port->membase + offset);
- 	case UPIO_PORT:
- 		return inb(port->iobase + offset);
-+	case UPIO_AU:
-+		return port->serial_in(port, reg_offset);
- 	default:
- 		return 0;
- 	}
-@@ -59,6 +62,7 @@ static unsigned int __init serial8250_early_in(struct uart_port *port, int offse
- 
- static void __init serial8250_early_out(struct uart_port *port, int offset, int value)
- {
-+	int reg_offset = offset;
- 	offset <<= port->regshift;
- 
- 	switch (port->iotype) {
-@@ -77,6 +81,9 @@ static void __init serial8250_early_out(struct uart_port *port, int offset, int
- 	case UPIO_PORT:
- 		outb(value, port->iobase + offset);
- 		break;
-+	case UPIO_AU:
-+		port->serial_out(port, reg_offset, value);
-+		break;
- 	}
- }
- 
-@@ -172,3 +179,20 @@ OF_EARLYCON_DECLARE(omap8250, "ti,omap3-uart", early_omap8250_setup);
- OF_EARLYCON_DECLARE(omap8250, "ti,omap4-uart", early_omap8250_setup);
- 
- #endif
-+
-+#ifdef CONFIG_SERIAL_8250_RT288X
-+
-+unsigned int au_serial_in(struct uart_port *p, int offset);
-+void au_serial_out(struct uart_port *p, int offset, int value);
-+
-+static int __init early_au_setup(struct earlycon_device *dev, const char *opt)
-+{
-+	dev->port.serial_in = au_serial_in;
-+	dev->port.serial_out = au_serial_out;
-+	dev->port.iotype = UPIO_AU;
-+	dev->con->write = early_serial8250_write;
-+	return 0;
-+}
-+OF_EARLYCON_DECLARE(palmchip, "ralink,rt2880-uart", early_au_setup);
-+
-+#endif
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index 080d5a59d0a7..1f08d22d1a80 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -313,7 +313,7 @@ static const s8 au_io_out_map[8] = {
- 	-1,	/* UART_SCR (unmapped) */
- };
- 
--static unsigned int au_serial_in(struct uart_port *p, int offset)
-+unsigned int au_serial_in(struct uart_port *p, int offset)
- {
- 	if (offset >= ARRAY_SIZE(au_io_in_map))
- 		return UINT_MAX;
-@@ -323,7 +323,7 @@ static unsigned int au_serial_in(struct uart_port *p, int offset)
- 	return __raw_readl(p->membase + (offset << p->regshift));
- }
- 
--static void au_serial_out(struct uart_port *p, int offset, int value)
-+void au_serial_out(struct uart_port *p, int offset, int value)
- {
- 	if (offset >= ARRAY_SIZE(au_io_out_map))
- 		return;
+> +{
+> +	u64 val;
+> +	int ret;
+> +
+> +	val = ((u64)1 << 63 | ((u64)collection->target_addr << 16) |
+> +	       collection->collection_id);
+
+Please provide some #defines that describe the encoding. This will be
+specially useful if we need to export this to userspace (KVM/TCG
+interoperability?).
+
+> +	val = cpu_to_le64(val);
+> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, 8);
+> +	return ret;
+> +}
+> +
+> +static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa, bool *valid)
+> +{
+> +	struct its_collection *collection;
+> +	u32 target_addr;
+> +	u32 coll_id;
+> +	u64 val;
+> +	int ret;
+> +
+> +	*valid = false;
+> +
+> +	ret = kvm_read_guest(its->dev->kvm, gpa, &val, 8);
+> +	if (ret)
+> +		return ret;
+> +	val = le64_to_cpu(val);
+> +	*valid = val & BIT_ULL(63);
+> +
+> +	if (!*valid)
+> +		return 0;
+> +
+> +	target_addr = (u32)(val >> 16);
+
+u32?
+
+> +	coll_id = val & 0xFFFF;
+
+Same comment about the various shifts/masks.
+
+> +
+> +	collection = find_collection(its, coll_id);
+> +	if (collection)
+> +		return -EEXIST;
+> +	ret = vgic_its_alloc_collection(its, &collection, coll_id);
+> +	if (ret)
+> +		return ret;
+> +	collection->target_addr = target_addr;
+> +	return 0;
+> +}
+> +
+>  /**
+>   * vgic_its_flush_collection_table - flush the collection table into
+>   * guest RAM
+>   */
+>  static int vgic_its_flush_collection_table(struct vgic_its *its)
+>  {
+> -	return -ENXIO;
+> +	struct its_collection *collection;
+> +	u64 val;
+> +	gpa_t gpa;
+> +	size_t max_size, filled = 0;
+> +	int ret;
+> +
+> +	gpa = BASER_ADDRESS(its->baser_coll_table);
+> +	if (!gpa)
+> +		return 0;
+> +
+> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
+> +
+> +	list_for_each_entry(collection, &its->collection_list, coll_list) {
+> +		if (filled == max_size)
+> +			return -ENOSPC;
+> +		ret = vgic_its_flush_cte(its, collection, gpa);
+> +		if (ret)
+> +			return ret;
+> +		gpa += 8;
+> +		filled += 8;
+
+This "8" should be extracted from the BASER register itself (Entry_Size).
+
+> +	}
+> +
+> +	if (filled == max_size)
+> +		return 0;
+> +
+> +	/*
+> +	 * table is not fully filled, add a last dummy element
+> +	 * with valid bit unset
+> +	 */
+> +	val = 0;
+> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, 8);
+> +	return ret;
+>  }
+>  
+>  /**
+> @@ -1844,7 +1920,26 @@ static int vgic_its_flush_collection_table(struct vgic_its *its)
+>   */
+>  static int vgic_its_restore_collection_table(struct vgic_its *its)
+>  {
+> -	return -ENXIO;
+> +	size_t max_size, read = 0;
+> +	gpa_t gpa;
+> +	int ret;
+> +
+> +	gpa = BASER_ADDRESS(its->baser_coll_table);
+> +	if (!gpa)
+> +		return 0;
+> +
+> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
+> +
+> +	while (read < max_size) {
+> +		bool valid;
+> +
+> +		ret = vgic_its_restore_cte(its, gpa, &valid);
+> +		if (!valid || ret)
+> +			break;
+> +		gpa += 8;
+> +		read += 8;
+> +	}
+> +	return ret;
+>  }
+>  
+>  /**
+> 
+
+Thanks,
+
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
