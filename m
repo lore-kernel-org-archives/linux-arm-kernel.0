@@ -1,89 +1,49 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Mon, 10 Apr 2017 13:09:10 -0700
-Subject: [PATCH v7 4/4] arm64/syscalls: Architecture specific pre-usermode
- check
-In-Reply-To: <20170410200622.8654-1-thgarnie@google.com>
-References: <20170410171240.GE30647@e104818-lin.cambridge.arm.com>
- <20170410200622.8654-1-thgarnie@google.com>
-Message-ID: <CAJcbSZHT+Tg7qS3Xe+oryCZ3BkWXj_MUSZQK9N+Cjy_eU=u+FA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 10 Apr 2017 13:13:06 -0700
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <58EA988F.29293.6C80F08B@pageexec.freemail.hu>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
+ <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
+ <58EA988F.29293.6C80F08B@pageexec.freemail.hu>
+Message-ID: <CAGXu5jJa=7_KyvNxYuEYvx9EjbMwXN5QDyNGuc_zuYFP56Ga8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 1:06 PM, Thomas Garnier <thgarnie@google.com> wrote:
-> Disable the generic pre-usermode check in favor of an optimized
-> implementation. This patch adds specific checks on user-mode return path
-> to make it faster and smaller.
+On Sun, Apr 9, 2017 at 1:24 PM, PaX Team <pageexec@freemail.hu> wrote:
+> On 7 Apr 2017 at 22:07, Andy Lutomirski wrote:
+>> No one has explained how CR0.WP is weaker or slower than my proposal.
 >
-> The address limit is checked on each syscall return path to user-mode.
-> If it was changed, a generic handler is called to stop the kernel on an
-> explicit check.
+> you misunderstood, Daniel was talking about your use_mm approach.
 >
-> Signed-off-by: Thomas Garnier <thgarnie@google.com>
-> ---
-> Based on next-20170410
-> ---
->  arch/arm64/Kconfig        |  1 +
->  arch/arm64/kernel/entry.S | 13 +++++++++++++
->  2 files changed, 14 insertions(+)
+>> Here's what I'm proposing:
+>>
+>> At boot, choose a random address A.
 >
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 9b8fcab7da56..3f9e8e7d9376 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -24,6 +24,7 @@ config ARM64
->         select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
->         select ARCH_WANT_FRAME_POINTERS
->         select ARCH_HAS_UBSAN_SANITIZE_ALL
-> +       select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->         select ARM_AMBA
->         select ARM_ARCH_TIMER
->         select ARM_GIC
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 43512d4d7df2..bdd094c7837a 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -744,6 +744,8 @@ ENDPROC(cpu_switch_to)
->  ret_fast_syscall:
->         disable_irq                             // disable interrupts
->         str     x0, [sp, #S_X0]                 // returned x0
-> +       ldr     x2, [tsk, #TSK_TI_ADDR_LIMIT]   // check addr limit change
-> +       tbnz    x2, #63, addr_limit_fail
->         ldr     x1, [tsk, #TSK_TI_FLAGS]        // re-check for syscall tracing
->         and     x2, x1, #_TIF_SYSCALL_WORK
->         cbnz    x2, ret_fast_syscall_trace
-> @@ -771,6 +773,9 @@ work_pending:
->   */
->  ret_to_user:
->         disable_irq                             // disable interrupts
-> +       ldr     x2, [tsk, #TSK_TI_ADDR_LIMIT]   // check addr limit change
-> +       tbnz    x2, #63, addr_limit_fail
-> +
->         ldr     x1, [tsk, #TSK_TI_FLAGS]
->         and     x2, x1, #_TIF_WORK_MASK
->         cbnz    x2, work_pending
-> @@ -780,6 +785,14 @@ finish_ret_to_user:
->  ENDPROC(ret_to_user)
+> what is the threat that a random address defends against?
 >
->  /*
-> + * Address limit was incorrect before returning in user-mode which could be
-> + * used to elevate privileges. Call the generic handler to stop the kernel on
-> + * the appropriate check. This function does not return.
-> + */
-> +addr_limit_fail:
-> +       bl address_limit_check_failed
-> +
-> +/*
->   * This is how we return from a fork.
->   */
->  ENTRY(ret_from_fork)
-> --
-> 2.12.2.715.g7642488e1d-goog
+>>  Create an mm_struct that has a
+>> single VMA starting at A that represents the kernel's rarely-written
+>> section.  Compute O = (A - VA of rarely-written section).  To do a
+>> rare write, use_mm() the mm, write to (VA + O), then unuse_mm().
 >
+> the problem is that the amount of __read_only data extends beyond vmlinux,
+> i.e., this approach won't scale. another problem is that it can't be used
+> inside use_mm and switch_mm themselves (no read-only task structs or percpu
+> pgd for you ;) and probably several other contexts.
 
-Ignore this revision, I sent the previous patch by mistake. The next
-email is the changed patch.
-Sorry about that.
+These are the limitations that concern me: what will we NOT be able to
+make read-only as a result of the use_mm() design choice? My RFC
+series included a simple case and a constify case, but I did not
+include things like making page tables read-only, etc.
 
+I cant accept not using cr0, since we need to design something that
+works on arm64 too, which doesn't have anything like this (AFAIK), but
+I'd like to make sure we don't paint ourselves into a corner.
+
+-Kees
 
 -- 
-Thomas
+Kees Cook
+Pixel Security
