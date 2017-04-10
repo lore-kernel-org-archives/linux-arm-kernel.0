@@ -1,40 +1,138 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 10 Apr 2017 15:39:43 +0300
-Subject: [v3, 5/7] mmc: sdhci-of-esdhc: add delay between tuning cycles
-In-Reply-To: <1490600982-5410-6-git-send-email-yangbo.lu@nxp.com>
-References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
- <1490600982-5410-6-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <6f4ebcff-7051-cc3a-98b5-16345c4f9e83@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Apr 2017 13:50:37 +0100
+Subject: [PATCH v4 22/22] KVM: arm64: ITS: Pending table save/restore
+In-Reply-To: <1490607072-21610-23-git-send-email-eric.auger@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-23-git-send-email-eric.auger@redhat.com>
+Message-ID: <0cd4382f-30e1-c9b5-c171-6137436d8751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 10:49, Yangbo Lu wrote:
-> It's observed that eSDHC needed delay between tuning cycles for
-> HS200 successful tuning. This patch is to set 1ms delay for that.
+On 27/03/17 10:31, Eric Auger wrote:
+> Save and restore the pending tables.
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
+> Pending table restore obviously requires the pendbaser to be
+> already set.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
 > ---
-> Changes for v2:
-> 	- None
-> Changes for v3:
-> 	- Used a host member for tuning delay instead of a quirk.
+> 
+> v3 -> v4:
+> - remove the wrong comment about locking
+> - pass kvm struct instead of its handle
+> - add comment about restore method
+> - remove GITR_PENDABASER.PTZ check
+> - continue if target_vcpu == NULL
+> - new locking strategy
+> 
+> v1 -> v2:
+> - do not care about the 1st KB which should be zeroed according to
+>   the spec.
 > ---
->  drivers/mmc/host/sdhci-of-esdhc.c | 1 +
->  1 file changed, 1 insertion(+)
+>  virt/kvm/arm/vgic/vgic-its.c | 66 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 64 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-> index 8c8e147..0754ef4 100644
-> --- a/drivers/mmc/host/sdhci-of-esdhc.c
-> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
-> @@ -807,6 +807,7 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
->  	host->mmc_host_ops.start_signal_voltage_switch =
->  		esdhc_signal_voltage_switch;
->  	host->mmc_host_ops.execute_tuning = esdhc_execute_tuning;
-> +	host->tuning_delay = 1;
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index a516bbb..e10aa81 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1804,16 +1804,78 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>   */
+>  static int vgic_its_flush_pending_tables(struct kvm *kvm)
+>  {
+> -	return -ENXIO;
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_irq *irq;
+> +	int ret;
+> +
+> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+> +		struct kvm_vcpu *vcpu;
+> +		gpa_t pendbase, ptr;
+> +		bool stored;
+> +		u8 val;
+> +
+> +		vcpu = irq->target_vcpu;
+> +		if (!vcpu)
+> +			continue;
+> +
+> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +
+> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
+> +
+> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+
+ptr is already a gpa_t...
+
+> +		if (ret)
+> +			return ret;
+> +
+> +		stored = val & (irq->intid % BITS_PER_BYTE);
+> +		if (stored == irq->pending_latch)
+> +			continue;
+> +
+> +		if (irq->pending_latch)
+> +			val |= 1 << (irq->intid % BITS_PER_BYTE);
+> +		else
+> +			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
+> +
+> +		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
+> +		if (ret)
+> +			return ret;
+
+Consider the optimization used in its_sync_lpi_pending_table(), where
+consecutive LPIs stored in the same byte are set in a single access.
+
+> +	}
+> +
+> +	return 0;
+>  }
 >  
->  	esdhc_init(pdev, host);
+>  /**
+>   * vgic_its_restore_pending_tables - Restore the pending tables from guest
+>   * RAM to internal data structs
+> + *
+> + * Does not scan the whole pending tables but just loop on all registered
+> + * LPIS and scan their associated pending bit. This obviously requires
+> + * the ITEs to be restored before.
+>   */
+>  static int vgic_its_restore_pending_tables(struct kvm *kvm)
+>  {
+> -	return -ENXIO;
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_irq *irq;
+> +	int ret;
+> +
+> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+> +		struct kvm_vcpu *vcpu;
+> +		gpa_t pendbase, ptr;
+> +		u8 val;
+> +
+> +		vcpu = irq->target_vcpu;
+> +		if (!vcpu)
+> +			continue;
+> +
+> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +
+> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
+> +
+> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+> +		if (ret)
+> +			return ret;
+> +		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
+> +	}
+> +	return 0;
+
+Again, this feels very similar to what its_sync_lpi_pending_table is
+doing. We should be able to have some common code here.
+
+>  }
 >  
+>  static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
 > 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
