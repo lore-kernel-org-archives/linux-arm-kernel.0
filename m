@@ -1,89 +1,107 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:46:54 -0500
-Subject: [PATCH v6 11/23] drivers/fsi: Add master unscan
+Date: Mon, 10 Apr 2017 14:46:53 -0500
+Subject: [PATCH v6 10/23] drivers/fsi: Add device read/write/peek API
 In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
 References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-12-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-11-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@linux.vnet.ibm.com>
+From: Jeremy Kerr <jk@ozlabs.org>
 
-Allow a master to undo a previous scan.  Should a master scan a bus
-twice it will need to ensure it doesn't double register any
-previously detected device.
+This change introduces the fsi device API: simple read, write and peek
+accessors for the devices' address spaces.
 
+Includes contributions from Chris Bostic <cbostic@linux.vnet.ibm.com>
+and Edward A. James <eajames@us.ibm.com>.
+
+Signed-off-by: Edward A. James <eajames@us.ibm.com>
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-core.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/fsi/fsi-core.c | 33 +++++++++++++++++++++++++++++++++
+ include/linux/fsi.h    |  7 ++++++-
+ 2 files changed, 39 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4da0b030..75d2a88 100644
+index a8faa89..4da0b030 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -69,6 +69,7 @@ struct fsi_slave {
- 	uint32_t		size;	/* size of slave address space */
+@@ -32,6 +32,8 @@
+ #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
+ #define FSI_SLAVE_CONF_DATA_BITS	28
+ 
++#define FSI_PEEK_BASE			0x410
++
+ static const int engine_page_size = 0x400;
+ 
+ #define FSI_SLAVE_BASE			0x800
+@@ -73,9 +75,40 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+ static int fsi_master_write(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
++static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++		void *val, size_t size);
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++		const void *val, size_t size);
+ 
+ /* FSI endpoint-device support */
+ 
++int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
++		size_t size)
++{
++	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++		return -EINVAL;
++
++	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_read);
++
++int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
++		size_t size)
++{
++	if (addr > dev->size || size > dev->size || addr > dev->size - size)
++		return -EINVAL;
++
++	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_write);
++
++int fsi_device_peek(struct fsi_device *dev, void *val)
++{
++	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
++
++	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
++}
++
+ static void fsi_device_release(struct device *_device)
+ {
+ 	struct fsi_device *device = to_fsi_dev(_device);
+diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+index efa55ba..66bce48 100644
+--- a/include/linux/fsi.h
++++ b/include/linux/fsi.h
+@@ -27,6 +27,12 @@ struct fsi_device {
+ 	uint32_t		size;
  };
  
-+#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
++extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
++		void *val, size_t size);
++extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
++		const void *val, size_t size);
++extern int fsi_device_peek(struct fsi_device *dev, void *val);
++
+ struct fsi_device_id {
+ 	u8	engine_type;
+ 	u8	version;
+@@ -40,7 +46,6 @@ struct fsi_device_id {
+ #define FSI_DEVICE_VERSIONED(t, v) \
+ 	.engine_type = (t), .version = (v),
  
- static int fsi_master_read(struct fsi_master *master, int link,
-@@ -491,6 +492,37 @@ static int fsi_master_scan(struct fsi_master *master)
- 	return 0;
- }
- 
-+static int __fsi_slave_remove_device(struct device *dev, void *arg)
-+{
-+	device_unregister(dev);
-+	return 0;
-+}
-+
-+static int __fsi_master_remove_slave(struct device *dev, void *arg)
-+{
-+	device_for_each_child(dev, NULL, __fsi_slave_remove_device);
-+	device_unregister(dev);
-+	return 0;
-+}
-+
-+static void fsi_master_unscan(struct fsi_master *master)
-+{
-+	device_for_each_child(&master->dev, NULL, __fsi_master_remove_slave);
-+}
-+
-+static ssize_t master_rescan_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	struct fsi_master *master = to_fsi_master(dev);
-+
-+	fsi_master_unscan(master);
-+	fsi_master_scan(master);
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
-+
- int fsi_master_register(struct fsi_master *master)
- {
- 	int rc;
-@@ -507,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
- 		return rc;
- 	}
- 
-+	rc = device_create_file(&master->dev, &dev_attr_rescan);
-+	if (rc) {
-+		device_unregister(&master->dev);
-+		ida_simple_remove(&master_ida, master->idx);
-+		return rc;
-+	}
-+
- 	fsi_master_scan(master);
-+
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(fsi_master_register);
+-
+ struct fsi_driver {
+ 	struct device_driver		drv;
+ 	const struct fsi_device_id	*id_table;
 -- 
 1.8.2.2
