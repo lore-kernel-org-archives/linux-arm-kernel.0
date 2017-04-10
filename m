@@ -1,271 +1,150 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Apr 2017 13:42:26 +0100
-Subject: [PATCH v4 21/22] KVM: arm64: ITS: Device table save/restore
-In-Reply-To: <1490607072-21610-22-git-send-email-eric.auger@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-22-git-send-email-eric.auger@redhat.com>
-Message-ID: <2e7772fc-cdce-9a75-07e2-7817095fef42@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 10 Apr 2017 15:37:50 +0300
+Subject: [v3, 2/7] mmc: sdhci-of-esdhc: add support for signal voltage
+ switch
+In-Reply-To: <1490600982-5410-3-git-send-email-yangbo.lu@nxp.com>
+References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
+ <1490600982-5410-3-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <e7e08c87-ecd6-ab24-636c-7707a5172b08@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 10:31, Eric Auger wrote:
-> This patch flushes the device table entries into guest RAM.
-> Both flat table and 2 stage tables are supported.  DeviceId
-> indexing is used.
+On 27/03/17 10:49, Yangbo Lu wrote:
+> eSDHC supports signal voltage switch from 3.3v to 1.8v by
+> eSDHC_PROCTL[VOLT_SEL] bit. This bit changes the value of output
+> signal SDHC_VS, and there must be a control circuit out of eSDHC
+> to change the signal voltage according to SDHC_VS output signal.
 > 
-> For each device listed in the device table, we also flush
-> the translation table using the vgic_its_flush/restore_itt
-> routines.
-> 
-> On restore, devices are re-allocated and their itte are
-> re-built.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+
+Apart from minor comment below:
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
 > ---
-> v3 -> v4:
-> - use the new proto for its_alloc_device
-> - compute_next_devid_offset, vgic_its_flush/restore_itt
->   become static in this patch
-> - change in the DTE entry format with the introduction of the
->   valid bit and next field width decrease; ittaddr encoded
->   on its full range
-> - fix handle_l1_entry entry handling
-> - correct vgic_its_table_restore error handling
-> 
-> v2 -> v3:
-> - fix itt_addr bitmask in vgic_its_restore_dte
-> - addition of return 0 in vgic_its_restore_ite moved to
->   the ITE related patch
-> 
-> v1 -> v2:
-> - use 8 byte format for DTE and ITE
-> - support 2 stage format
-> - remove kvm parameter
-> - ITT flush/restore moved in a separate patch
-> - use deviceid indexing
+> Changes for v2:
+> 	- Used Adrain's method to support voltage switching:
+>           host->mmc_host_ops.start_signal_voltage_switch =
+>                      esdhc_signal_voltage_switch;
+> Changes for v3:
+> 	- Put .start_signal_voltage_switch assigning after IS_ERR(host) check.
 > ---
->  virt/kvm/arm/vgic/vgic-its.c | 161 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 156 insertions(+), 5 deletions(-)
+>  drivers/mmc/host/sdhci-esdhc.h    |  1 +
+>  drivers/mmc/host/sdhci-of-esdhc.c | 74 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 75 insertions(+)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 02c0694..a516bbb 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1693,7 +1693,8 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->  	return ret;
+> diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+> index 5343fc0..6869567 100644
+> --- a/drivers/mmc/host/sdhci-esdhc.h
+> +++ b/drivers/mmc/host/sdhci-esdhc.h
+> @@ -37,6 +37,7 @@
+>  
+>  /* Protocol Control Register */
+>  #define ESDHC_PROCTL			0x28
+> +#define ESDHC_VOLT_SEL			0x00000400
+>  #define ESDHC_CTRL_4BITBUS		(0x1 << 1)
+>  #define ESDHC_CTRL_8BITBUS		(0x2 << 1)
+>  #define ESDHC_CTRL_BUSWIDTH_MASK	(0x3 << 1)
+> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+> index 7ce1caf..a70499a 100644
+> --- a/drivers/mmc/host/sdhci-of-esdhc.c
+> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/delay.h>
+>  #include <linux/module.h>
+>  #include <linux/sys_soc.h>
+> @@ -559,6 +560,76 @@ static void esdhc_reset(struct sdhci_host *host, u8 mask)
+>  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
 >  }
 >  
-> -u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
-> +static u32 compute_next_devid_offset(struct list_head *h,
-> +				     struct its_device *dev)
->  {
->  	struct list_head *e = &dev->dev_list;
->  	struct its_device *next;
-> @@ -1884,7 +1885,7 @@ static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
->  	return 0;
->  }
->  
-> -int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
-> +static int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
->  {
->  	gpa_t base = device->itt_addr;
->  	struct its_ite *ite;
-> @@ -1900,7 +1901,7 @@ int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
->  	return 0;
->  }
->  
-> -int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
-> +static int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
->  {
->  	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * VITS_ESZ;
->  	gpa_t base = dev->itt_addr;
-> @@ -1917,12 +1918,141 @@ int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
->  }
->  
->  /**
-> + * vgic_its_flush_dte - Flush a device table entry at a given GPA
-> + *
-> + * @its: ITS handle
-> + * @dev: ITS device
-> + * @ptr: GPA
+> +/* The SCFG, Supplemental Configuration Unit, provides SoC specific
+> + * configuration and status registers for the device. There is a
+> + * SDHC IO VSEL control register on SCFG for some platforms. It's
+> + * used to support SDHC IO voltage switching.
 > + */
-> +static int vgic_its_flush_dte(struct vgic_its *its,
-> +			      struct its_device *dev, gpa_t ptr)
+> +static const struct of_device_id scfg_device_ids[] = {
+> +	{ .compatible = "fsl,t1040-scfg", },
+> +	{ .compatible = "fsl,ls1012a-scfg", },
+> +	{ .compatible = "fsl,ls1046a-scfg", },
+> +	{}
+> +};
+> +
+> +/* SDHC IO VSEL control register definition */
+> +#define SCFG_SDHCIOVSELCR	0x408
+> +#define SDHCIOVSELCR_TGLEN	0x80000000
+> +#define SDHCIOVSELCR_VSELVAL	0x60000000
+> +#define SDHCIOVSELCR_SDHC_VS	0x00000001
+> +
+> +static int esdhc_signal_voltage_switch(struct mmc_host *mmc,
+> +				       struct mmc_ios *ios)
 > +{
-> +	struct kvm *kvm = its->dev->kvm;
-> +	u64 val, itt_addr_field;
-> +	int ret;
-> +	u32 next_offset;
+> +	struct sdhci_host *host = mmc_priv(mmc);
+> +	struct device_node *scfg_node;
+> +	void __iomem *scfg_base = NULL;
+> +	u32 sdhciovselcr;
+> +	u32 val;
 > +
-> +	itt_addr_field = dev->itt_addr >> 8;
-> +	next_offset = compute_next_devid_offset(&its->device_list, dev);
-> +	val = (1ULL << 63 | ((u64)next_offset << 49) | (itt_addr_field << 5) |
-> +		(dev->nb_eventid_bits - 1));
-> +	val = cpu_to_le64(val);
-> +	ret = kvm_write_guest(kvm, ptr, &val, 8);
-> +	return ret;
-> +}
-> +
-> +/**
-> + * vgic_its_restore_dte - restore a device table entry
-> + *
-> + * @its: its handle
-> + * @id: device id the DTE corresponds to
-> + * @ptr: kernel VA where the 8 byte DTE is located
-> + * @opaque: unused
-> + * @next: offset to the next valid device id
-> + *
-> + * Return: < 0 on error, 0 otherwise
-> + */
-> +static int vgic_its_restore_dte(struct vgic_its *its, u32 id,
-> +				void *ptr, void *opaque, u32 *next)
-> +{
-> +	struct its_device *dev;
-> +	gpa_t itt_addr;
-> +	u8 nb_eventid_bits;
-> +	u64 entry = *(u64 *)ptr;
-> +	bool valid;
-> +	int ret;
-> +
-> +	entry = le64_to_cpu(entry);
-> +
-> +	valid = entry >> 63;
-> +	nb_eventid_bits = (entry & GENMASK_ULL(4, 0)) + 1;
-> +	itt_addr = ((entry & GENMASK_ULL(48, 5)) >> 5) << 8;
-> +	*next = 1;
-> +
-> +	if (!valid)
+> +	/*
+> +	 * Signal Voltage Switching is only applicable for Host Controllers
+> +	 * v3.00 and above.
+> +	 */
+> +	if (host->version < SDHCI_SPEC_300)
 > +		return 0;
 > +
-> +	/* dte entry is valid */
-> +	*next = (entry & GENMASK_ULL(62, 49)) >> 49;
+> +	val = sdhci_readl(host, ESDHC_PROCTL);
 > +
-> +	ret = vgic_its_alloc_device(its, &dev, id,
-> +				    itt_addr, nb_eventid_bits);
-> +	if (ret)
-> +		return ret;
-> +	ret = vgic_its_restore_itt(its, dev);
+> +	switch (ios->signal_voltage) {
+> +	case MMC_SIGNAL_VOLTAGE_330:
+> +		val &= ~ESDHC_VOLT_SEL;
+> +		sdhci_writel(host, val, ESDHC_PROCTL);
+> +		return 0;
+> +	case MMC_SIGNAL_VOLTAGE_180:
+> +		scfg_node = of_find_matching_node(NULL, scfg_device_ids);
+> +		if (scfg_node)
+> +			scfg_base = of_iomap(scfg_node, 0);
+> +		if (scfg_base) {
+> +			sdhciovselcr = SDHCIOVSELCR_TGLEN |
+> +				       SDHCIOVSELCR_VSELVAL;
+> +			iowrite32be(sdhciovselcr,
+> +				scfg_base + SCFG_SDHCIOVSELCR);
+
+In other places there is support for little endian also, so why not here?
+
 > +
-> +	return ret;
-> +}
+> +			val |= ESDHC_VOLT_SEL;
+> +			sdhci_writel(host, val, ESDHC_PROCTL);
+> +			mdelay(5);
 > +
-> +/**
->   * vgic_its_flush_device_tables - flush the device table and all ITT
->   * into guest RAM
-> + *
-> + * L1/L2 handling is hidden by vgic_its_check_id() helper which directly
-> + * returns the GPA of the device entry
->   */
->  static int vgic_its_flush_device_tables(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	struct its_device *dev;
-> +	u64 baser;
-> +
-> +	baser = its->baser_device_table;
-> +
-> +	list_for_each_entry(dev, &its->device_list, dev_list) {
-> +		int ret;
-> +		gpa_t eaddr;
-> +
-> +		if (!vgic_its_check_id(its, baser,
-> +				       dev->device_id, &eaddr))
-> +			return -EINVAL;
-> +
-> +		ret = vgic_its_flush_itt(its, dev);
-> +		if (ret)
-> +			return ret;
-> +
-> +		ret = vgic_its_flush_dte(its, dev, eaddr);
-> +		if (ret)
-> +			return ret;
+> +			sdhciovselcr = SDHCIOVSELCR_TGLEN |
+> +				       SDHCIOVSELCR_SDHC_VS;
+> +			iowrite32be(sdhciovselcr,
+> +				scfg_base + SCFG_SDHCIOVSELCR);
+> +			iounmap(scfg_base);
+> +		} else {
+> +			val |= ESDHC_VOLT_SEL;
+> +			sdhci_writel(host, val, ESDHC_PROCTL);
+> +		}
+> +		return 0;
+> +	default:
+> +		return 0;
 > +	}
-> +	return 0;
 > +}
 > +
-> +/**
-> + * handle_l1_entry - callback used for L1 entries (2 stage case)
-> + *
-> + * @its: its handle
-> + * @id: id
-> + * @addr: kernel VA
-> + * @opaque: unused
-> + * @next_offset: offset to the next L1 entry: 0 if the last element
-> + * was found, 1 otherwise
-> + */
-> +static int handle_l1_entry(struct vgic_its *its, u32 id, void *addr,
-> +			   void *opaque, u32 *next_offset)
-> +{
-> +	int l2_start_id = id * (SZ_64K / GITS_LVL1_ENTRY_SIZE);
-> +	u64 entry = *(u64 *)addr;
-> +	gpa_t gpa;
-> +	int ret;
-> +
-> +	entry = le64_to_cpu(entry);
-> +	*next_offset = 1;
-> +
-> +	if (!(entry & BIT_ULL(63)))
-> +		return 0;
-> +
-> +	gpa = entry & GENMASK_ULL(51, 16);
-> +
-> +	ret = lookup_table(its, gpa, SZ_64K, 8,
-> +			    l2_start_id, vgic_its_restore_dte, NULL);
-> +
-> +	if (ret == 1) {
-> +		/* last entry was found in this L2 table */
-> +		*next_offset = 0;
-> +		ret = 0;
-> +	}
-
-Ah, that's why you have this complicated return convention.
-
-> +
-> +	return ret;
->  }
+>  #ifdef CONFIG_PM_SLEEP
+>  static u32 esdhc_proctl;
+>  static int esdhc_of_suspend(struct device *dev)
+> @@ -714,6 +785,9 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(host))
+>  		return PTR_ERR(host);
 >  
->  /**
-> @@ -1931,7 +2061,28 @@ static int vgic_its_flush_device_tables(struct vgic_its *its)
->   */
->  static int vgic_its_restore_device_tables(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	u64 baser = its->baser_device_table;
-> +	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
-> +	int l1_esz = GITS_BASER_ENTRY_SIZE(baser);
-> +	gpa_t l1_gpa;
-> +	int ret;
+> +	host->mmc_host_ops.start_signal_voltage_switch =
+> +		esdhc_signal_voltage_switch;
 > +
-> +	l1_gpa = BASER_ADDRESS(baser);
-> +	if (!l1_gpa)
-> +		return 0;
-> +
-> +	if (baser & GITS_BASER_INDIRECT)
-> +		ret = lookup_table(its, l1_gpa, l1_tbl_size, 8, 0,
-> +			    	   handle_l1_entry, NULL);
-
-I wonder if you shouldn't make this a different function (maybe using
-the same core helper) to parse L1 tables.
-
-> +	else
-> +		ret = lookup_table(its, l1_gpa, l1_tbl_size, l1_esz,
-> +				    0, vgic_its_restore_dte, NULL);
-> +
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	/* if last element was not found we have an issue here */
-> +	return ret ? 0 : -EINVAL;
->  }
+>  	esdhc_init(pdev, host);
 >  
->  static int vgic_its_flush_cte(struct vgic_its *its,
+>  	sdhci_get_of_property(pdev);
 > 
-
-The previous comments about the the encoding still apply... ;-)
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
