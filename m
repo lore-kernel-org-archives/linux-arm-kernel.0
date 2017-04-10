@@ -1,31 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Apr 2017 10:06:27 -0700
-Subject: [GIT PULL] omap deferred probe regression fix
-Message-ID: <pull-1491843962-982485>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 10 Apr 2017 13:06:40 -0400
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <20170410165328.GA5248@red-moon>
+References: <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
+ <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
+ <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
+ <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
+ <20170330100524.GA22801@red-moon>
+ <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+ <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
+ <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
+ <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
+ <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
+ <20170410165328.GA5248@red-moon>
+Message-ID: <a92d4d6a-0d94-350e-a0dd-55516fbc8ab7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 351b7c490700747d1dba1b0a10fbfe3448d11c35:
+On 4/10/2017 12:53 PM, Lorenzo Pieralisi wrote:
+> Do we want to enforce it on ARM ? I do not know to be honest (and it
+> still would not solve the DT firmware case).
+> 
 
-  ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot (2017-03-27 10:10:42 -0700)
+Yes for ACPI on ARM. Probably no for DT. 
 
-are available in the git repository at:
+> Whatever we do, it is not going to be clean cut IMO. I think that
+> what x86 does is sensible (well, minus the link ordering dependency we
+> discovered), I can do it for ARM64 but get ready for regressions and
+> I still think we have no real FW binding support that would make this
+> behaviour robust.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-rc6-signed
+Is it possible to move the code from arch/x86 into drivers/acpi directory
+so that the code is shared across multiple ACPI based archs. We get more
+coverage this way.
 
-for you to fetch changes up to 04abaf07f6d5cdf22b7a478a86e706dfeeeef960:
+Can we fallback to the allocate everything behavior if we can't use the
+stuff from FW or would it be too late to recover?
 
-  ARM: OMAP2+: omap_device: Sync omap_device and pm_runtime after probe defer (2017-04-04 08:49:56 -0700)
+We can prevent regressions this way and issue a lot of warnings. We can
+sit down and fix those warnings over time whether the issue is in 
+UEFI BIOS or the code itself.
 
-----------------------------------------------------------------
-Regression fix for omap interconnect code for deferred probe.
-Without this fix we can get PM related warnings for devices that
-use deferred probe. If necessary, this fix can wait for the
-v4.12 merge window no problem.
-
-----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: OMAP2+: omap_device: Sync omap_device and pm_runtime after probe defer
-
- arch/arm/mach-omap2/omap_device.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
