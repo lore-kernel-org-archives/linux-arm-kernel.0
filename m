@@ -1,46 +1,133 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Apr 2017 15:42:11 +0100
-Subject: [PATCH] efi/libstub: arm/arm64: don't use TASK_SIZE when
- randomising the RT space
-In-Reply-To: <20170410103038.20117-1-ard.biesheuvel@linaro.org>
-References: <20170410103038.20117-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170410144210.GA30647@e104818-lin.cambridge.arm.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 10 Apr 2017 08:52:24 -0600
+Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without
+ struct page
+In-Reply-To: <20170405231451.GB17774@n2100.armlinux.org.uk>
+References: <20170405160242.14195-1-shuahkh@osg.samsung.com>
+ <20170405231451.GB17774@n2100.armlinux.org.uk>
+Message-ID: <953a06da-6eb3-a37e-d126-e11119217f29@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 11:30:38AM +0100, Ard Biesheuvel wrote:
-> As reported by James, Catalin and Mark, commit e69176d68d26
-> ("ef/libstub/arm/arm64: Randomize the base of the UEFI rt services
-> region") results in a crash in the firmware regardless of whether KASLR
-> is in effect or not, and whether the firmware implements EFI_RNG_PROTOCOL
-> or not.
+On 04/05/2017 05:14 PM, Russell King - ARM Linux wrote:
+> On Wed, Apr 05, 2017 at 10:02:42AM -0600, Shuah Khan wrote:
+>> When coherent DMA memory without struct page is shared, importer
+>> fails to find the page and runs into kernel page fault when it
+>> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
+>> in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
+>> for more information on this problem.
+>>
+>> This solution allows coherent DMA memory without struct page to be
+>> shared by providing a way for the exporter to tag the DMA buffer as
+>> a special buffer without struct page association and passing the
+>> information in sg_table to the importer. This information is used
+>> in attach/map_sg to avoid cleaning D-cache and mapping.
+>>
+>> The details of the change are:
+>>
+>> Framework:
+>> - Add a new dma_attrs field to struct scatterlist.
+>> - Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
+>>   Coherent memory without struct page.
+>> - Add a new dma_check_dev_coherent() interface to check if memory is
+>>   the device coherent area. There is no way to tell where the memory
+>>   returned by dma_alloc_attrs() came from.
+>>
+>> Exporter logic:
+>> - Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
+>>   DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
+>>   done in the exporter context.
+>> - Add logic to arm_dma_get_sgtable() to identify memory without struct
+>>   page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
+>>   set, arm_dma_get_sgtable() will set page as the cpu_addr and update
+>>   dma_address and dma_attrs fields in struct scatterlist for this sgl.
+>>   This is done in exporter context when buffer is exported. With this
 > 
-> Mark has identified the root cause to be the inappropriate use of
-> TASK_SIZE in the stub, which arm64 defines as
+> This sentence appears to just end...
 > 
->   #define TASK_SIZE             (test_thread_flag(TIF_32BIT) ? \
->                                 TASK_SIZE_32 : TASK_SIZE_64)
+> I'm not convinced that coherent allocations should be setting the "page"
+> of a scatterlist to anything that isn't a real struct page or NULL.  It
+> is, after all, an error to look up the virtual address etc of the
+> scatterlist entry or kmap it when it isn't backed by a struct page.
 > 
-> and testing thread flags at this point results in the dereference of
-> pointers in uninitialized structures.
+> I'm actually already passing non-page backed memory through the DMA API
+> in armada-drm, although not entirely correctly, and etnaviv handles it
+> fine:
 > 
-> So instead, introduce a preprocessor symbol EFI_RT_VIRTUAL_LIMIT and
-> define it to TASK_SIZE_64 on arm64 and TASK_SIZE on ARM, both of which
-> are compile time constants. Also, change the 'headroom' variable to
-> static const to force an error if this changes in the future.
+>         } else if (dobj->linear) {
+>                 /* Single contiguous physical region - no struct page */
+>                 if (sg_alloc_table(sgt, 1, GFP_KERNEL))
+>                         goto free_sgt;
+>                 sg_dma_address(sgt->sgl) = dobj->dev_addr;
+>                 sg_dma_len(sgt->sgl) = dobj->obj.size;
 > 
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> This is not quite correct, as it assumes (which is safe for it currently)
+> that the DMA address is the same on all devices.  On Dove, which is where
+> this is used, that is the case, but it's not true elsewhere.  Also note
+> that I'm avoid calling dma_map_sg() and dma_unmap_sg() - there's no iommus
+> to be considered.
 
-It works for me as well:
+I see. That is not the case for the drivers involved in my use-case. exynos
+has iommu and this s5p-mfc exporting buffers to exynos-gsc use-case does
+work when iommu is enabled.
 
-Tested-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> I'd suggest that this follows the same pattern - setting the DMA address
+> (more appropriately for generic code) and the DMA length, while leaving
+> the virtual address members NULL/0.  However, there's also the
+> complication of setting up any IOMMUs that would be necessary.  I haven't
+> looked at that, or how it could work.
+> 
+> I also think this should be documented in the dmabuf API that it can
+> pass such scatterlists that are DMA-parameter only.
+> 
+> Lastly, I'd recommend that anything using this does _not_ provide
+> functional kmap/kmap_atomic support for these - kmap and kmap_atomic
+> are both out because there's no struct page anyway (and their use would
+> probably oops the kernel in this scenario.)  I avoided mmap support in
+> armada drm, but if there's a pressing reason and real use case for the
+> importer to mmap() the buffers in userspace, it's something I could be
+> convinced of.
+> 
+> What I'm quite certain of is that we do _not_ want to be passing
+> coherent memory allocations into the streaming DMA API, not even with
+> a special attribute.  The DMA API is about gaining coherent memory
+> (shared ownership of the buffer), or mapping system memory to a
+> specified device (which can imply unique ownership.)  Trying to mix
+> the two together muddies the separation that we have there, and makes
+> it harder to explain.  As can be seen from this patch, we'd end up
+> needing to add this special DMA_ATTR_DEV_COHERENT_NOPAGE everywhere,
+> which is added complexity on top of stuff that is not required for
+> this circumstance.
 
-Thanks Ard and Mark.
+The ownership can be tricky as you mentioned. In this particular use-case,
+there is a clear ownership definition because of the way v4l2 export/import
+works and also the qbuf/dqbuf rules. However, there might be other use-cases
+ownership isn't clearly established.
 
--- 
-Catalin
+> 
+> I can see why you're doing it, to avoid having to duplicate more of
+> the generic code in drm_prime, but I don't think plasting over this
+> problem in arch code by adding this special flag is a particularly
+> good way forward.
+> 
+
+Right. I went with this approach to avoid duplicating the code. It does
+come with the complexity of needing to check the attribute in a few
+places.
+
+With the current code, we still have the issue of pagefault. Your patch
+that adds a check for invalid doesn't cover all cases.
+
+My goal behind this patch is two fold. 1. Fix the pagefault with a
+definitive test and 2. see if per-device coherent memory can be passed
+through.
+
+The first goal is still worth while. Would it be reasonable to use
+dma_check_dev_coherent() to test for this case in arm_dma_get_sgtable()
+or even from dma_get_sgtable_attrs() and fail early? This will avoid
+false negatives with the invalid page test. If this sounds reasonable,
+I can spin this work to do that instead.
+
+thanks,
+-- Shuah
