@@ -1,83 +1,89 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Apr 2017 10:20:25 -0500
-Subject: [PATCH v3 1/8] dt-bindings: Document STM32 DCMI bindings
-In-Reply-To: <1491320678-17246-2-git-send-email-hugues.fruchet@st.com>
-References: <1491320678-17246-1-git-send-email-hugues.fruchet@st.com>
- <1491320678-17246-2-git-send-email-hugues.fruchet@st.com>
-Message-ID: <20170410152025.nx4zrnbth6wgamro@rob-hp-laptop>
+From: olivier.moysan@st.com (olivier moysan)
+Date: Mon, 10 Apr 2017 17:19:54 +0200
+Subject: [PATCH v3 0/2] Add STM32 SAI support
+Message-ID: <1491837596-2924-1-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 05:44:31PM +0200, Hugues Fruchet wrote:
-> This adds documentation of device tree bindings for the STM32 DCMI
-> (Digital Camera Memory Interface).
-> 
-> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
-> ---
->  .../devicetree/bindings/media/st,stm32-dcmi.txt    | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+This patch-set handles the Serial Audio Interface (SAI) IP on STM32 platforms.
 
-One nit below, otherwise:
+The SAI IP is composed of two Sub-block A and B. (see the figure below)
+Each sub-block makes use of individual and shared resources.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Shared resources:
+	- Reset line. Reset common and sub-block registers.
+	- Bus interface clocks. This clock is not exposed in device
+	as it it managed by clock driver, according to kernel clocks gating.
+	- Common register. SAI IP exhibits a common configuration register
+	to manage synchronization modes. NB: These modes are not yet implemented
+	in this version of the SAI driver.
+	- Interrupt. Sub-blocks have their own interrupt status registers but they 
+	share the same interrupt line.
 
-> 
-> diff --git a/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-> new file mode 100644
-> index 0000000..c0f6f4b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-> @@ -0,0 +1,46 @@
-> +STMicroelectronics STM32 Digital Camera Memory Interface (DCMI)
-> +
-> +Required properties:
-> +- compatible: "st,stm32-dcmi"
-> +- reg: physical base address and length of the registers set for the device
-> +- interrupts: should contain IRQ line for the DCMI
-> +- resets: reference to a reset controller,
-> +          see Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> +- clocks: list of clock specifiers, corresponding to entries in
-> +          the clock-names property
-> +- clock-names: must contain "mclk", which is the DCMI peripherial clock
-> +- pinctrl: the pincontrol settings to configure muxing properly
-> +           for pins that connect to DCMI device.
-> +           See Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt.
-> +- dmas: phandle to DMA controller node,
-> +        see Documentation/devicetree/bindings/dma/stm32-dma.txt
-> +- dma-names: must contain "tx", which is the transmit channel from DCMI to DMA
-> +
-> +DCMI supports a single port node with parallel bus. It should contain one
-> +'port' child node with child 'endpoint' node. Please refer to the bindings
-> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Example:
-> +
-> +	dcmi: dcmi at 50050000 {
-> +		compatible = "st,stm32-dcmi";
-> +		reg = <0x50050000 0x400>;
-> +		interrupts = <78>;
-> +		resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
-> +		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
-> +		clock-names = "mclk";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&dcmi_pins>;
-> +		dmas = <&dma2 1 1 0x414 0x3>;
-> +		dma-names = "tx";
-> +		port {
-> +			dcmi_0: endpoint at 0 {
+Individual resources:
+	- Register set
+	- DMA request line.
+	- Communication interface. 
+	Each sub-block has its own GPIOs and associated bus lines.
+	- Kernel clock. 
+	Each sub-block has its own dedicated clock for its communication interface.
 
-Unit address in not valid without a reg prop, so drop it.
+To reflect this architecture Sub-block A and B are handled by 2 child devices.
+Sub-block A and B devices can be configured independently either as transmitter
+or receiver. A PCM device is associated to each sub-block.
 
-> +				remote-endpoint = <...>;
-> +				bus-width = <8>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				pclk-sample = <1>;
-> +			};
-> +		};
-> +	};
-> +
-> -- 
-> 1.9.1
-> 
+A sub-block has to select the appropriated parent clock at runtime, 
+depending on the audio stream sampling rate to be played or captured.
+Two parent clocks must be provided to support sampling rates multiples
+of 8 kHz or 11.025kHz.
+
+ Interface clock  +--------------------------------+
++---------------> | SAI IP                         |
+ Reset            |     +-----------------+        |
++---------------> |     |common registers |        |
+                  |     +-----------------+        |
+                  |                                |
+                  |    +----------------------+    |
+                  |    | Sub-block A          |    |
+ Kernel clock A   |    |                      |    | Bus A
++--------------------> | +----------------+   +---------------->
+                  |    | |A registers     |   |    |
+                  |    | +----------------+   |    |
+                  |    +----------------------+    |
+                  |                                |
+                  |    +----------------------+    |
+                  |    | Sub-block B          |    |
+ Kernel clock B   |    |                      |    | Bus B
++--------------------> | +----------------+   +----------------->
+                  |    | |B registers     |   |    |
+                  |    | +----------------+   |    |
+                  |    +----------------------+    |
+                  |                                |
+                  +--------------------------------+
+
+v3: correct DT bindings
+	- remove aliases
+	- use audio graph card
+
+olivier moysan (2):
+  ASoC: stm32: add bindings for SAI
+  ASoC: stm32: add SAI driver
+
+ .../devicetree/bindings/sound/st,stm32-sai.txt     |  89 +++
+ sound/soc/Kconfig                                  |   1 +
+ sound/soc/Makefile                                 |   1 +
+ sound/soc/stm/Kconfig                              |   8 +
+ sound/soc/stm/Makefile                             |   6 +
+ sound/soc/stm/stm32_sai.c                          | 115 +++
+ sound/soc/stm/stm32_sai.h                          | 200 +++++
+ sound/soc/stm/stm32_sai_sub.c                      | 884 +++++++++++++++++++++
+ 8 files changed, 1304 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+ create mode 100644 sound/soc/stm/Kconfig
+ create mode 100644 sound/soc/stm/Makefile
+ create mode 100644 sound/soc/stm/stm32_sai.c
+ create mode 100644 sound/soc/stm/stm32_sai.h
+ create mode 100644 sound/soc/stm/stm32_sai_sub.c
+
+-- 
+1.9.1
