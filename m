@@ -1,9 +1,9 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 10 Apr 2017 22:37:53 +0800
-Subject: [GIT PULL 2/5] i.MX SoC changes for 4.12
+Date: Mon, 10 Apr 2017 22:37:55 +0800
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.12
 In-Reply-To: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
 References: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1491835076-1995-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <1491835076-1995-4-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,44 +13,72 @@ The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.12
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.12
 
-for you to fetch changes up to ff8abc2839bfab9185978f3c27b5e3b744262efd:
+for you to fetch changes up to 6678254bb4a46dc47620f993a4b71480a3c56ee4:
 
-  ARM: mxs: add support for I2SE Duckbill 2 boards (2017-04-10 21:25:50 +0800)
-
-----------------------------------------------------------------
-i.MX SoC changes for 4.12:
- - A correction on mmdc_pmu_write_accesses event definition.
- - Add new axi_id perf command to support MMDC filter memory usage
-   profiling.
- - Set correct SPI chip_select in platform device registration, so that
-   spi-imx driver code can be improved to use chip_select directly for
-   harwdare setup instead of indirectly via the cs_gpio mapping array.
- - Disable APIS bus supervisor protect for i.MX25, since the default
-   configuration doesn't work for a few peripherals accessed through
-   SDMA.
- - Add compatible check for the secondary generation of I2SE i.MX28
-   Duckbill board support.
+  dt-bindings: arm: Add entry for FSL LS1088A RDB, QDS boards (2017-04-04 20:57:27 +0800)
 
 ----------------------------------------------------------------
-Greg Ungerer (1):
-      ARM: imx: set correct chip_select in platform setup
+Freescale arm64 device tree updates for 4.12:
+ - Add support of LS2088A SoC, which is a derivative of existing
+   LS2080A SoC, and the major difference is on ARM cores.
+ - Add support of LS1088A SoC which includes eight Cortex-A53 cores
+   with 32 KB L1 D-cache and I-cache respectively.
+ - Add crypto and thermal device support for LS1012A platform.
+ - Add ECC register region for SATA device on LS1012A, LS1043A and
+   LS1046A platforms.
 
-Martin Kaiser (1):
-      ARM: i.MX25: globally disable supervisor protect
+----------------------------------------------------------------
+Abhimanyu Saini (3):
+      dt-bindings: Add compatible for LS2088A QDS and RDB board
+      arm64: dts: freescale: ls2080a: Split devicetree for code resuability
+      arm64: dts: freescale: ls2088a: Add DTS support for FSL's LS2088A SoC
 
-Michael Heimpold (1):
-      ARM: mxs: add support for I2SE Duckbill 2 boards
+Harninder Rai (3):
+      arm64: dts: Add support for FSL's LS1088A SoC
+      dt-bindings: clockgen: Add compatible string for LS1088A
+      dt-bindings: arm: Add entry for FSL LS1088A RDB, QDS boards
 
-Tiberiu Breana (2):
-      ARM: imx: Fix mmdc_pmu_write_accesses event definition
-      ARM: imx: Add AXI address filter support for MMDC profiling
+Horia Geant? (1):
+      arm64: dts: ls1012a: add crypto node
 
- arch/arm/mach-imx/mach-imx25.c       |  6 ++++++
- arch/arm/mach-imx/mach-mx31_3ds.c    |  7 +++++--
- arch/arm/mach-imx/mach-mx31moboard.c |  4 ++--
- arch/arm/mach-imx/mach-pcm037_eet.c  |  4 ++--
- arch/arm/mach-imx/mmdc.c             | 20 +++++++++++++++++++-
- arch/arm/mach-mxs/mach-mxs.c         |  3 ++-
- 6 files changed, 36 insertions(+), 8 deletions(-)
+Tang Yuantian (2):
+      arm64: dts: added ecc register address to sata node on ls1043a
+      arm64: dts: added ecc register address to sata node on ls1046a
+
+Yuantian Tang (2):
+      arm64: dts: updated sata node on ls1012a platform
+      arm64: dts: ls1012a: add thermal monitor node
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |  23 +
+ .../devicetree/bindings/clock/qoriq-clock.txt      |   1 +
+ arch/arm64/boot/dts/freescale/Makefile             |   4 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts |   4 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |   4 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  |   4 +
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 182 ++++-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |   4 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |   4 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts  | 123 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts  | 107 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi     | 275 +++++++
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  | 155 +---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts  | 110 +--
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 863 +++------------------
+ arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts  |  64 ++
+ arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts  |  64 ++
+ arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi     | 165 ++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 196 +++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi | 151 ++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     | 737 ++++++++++++++++++
+ 21 files changed, 2206 insertions(+), 1034 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls208xa-rdb.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
