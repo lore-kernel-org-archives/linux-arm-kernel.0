@@ -1,109 +1,181 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Mon, 10 Apr 2017 12:57:14 +0530
-Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <9fbef986-721c-05aa-28a1-4c49016fe2ca@ti.com>
-References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
- <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
- <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
- <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
- <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
- <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
- <9fbef986-721c-05aa-28a1-4c49016fe2ca@ti.com>
-Message-ID: <CAEHZuqMJU=ZLL2xsbtpHLC6SU4uzNBpZmPPADs-g7=OXJyCbBQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 10 Apr 2017 10:31:51 +0300
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170407164731.GJ13234@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+ <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+ <20170403153604.GI10760@atomide.com>
+ <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
+ <20170407164731.GJ13234@atomide.com>
+Message-ID: <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/04/17 19:47, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170406 09:51]:
+>> On 03/04/17 18:36, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [170403 07:54]:
+>>>> On 30/03/17 19:54, Tony Lindgren wrote:
+>>>>> * Tero Kristo <t-kristo@ti.com> [170330 00:20]:
+>>>>>> On 23/03/17 19:02, Tony Lindgren wrote:
+>>>>>>> * Tony Lindgren <tony@atomide.com> [170322 18:03]:
+>>>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+>>>>>>>>> On 17/03/17 17:25, Tony Lindgren wrote:
+>>>>>>>>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>>>>>>>>>>> Any additional testing on omap4 welcome as this series basically
+>>>>>>>>>>> tweaks every possible peripheral clock on the SoC.
+>>>>>>>>>>
+>>>>>>>>>> Without the last patch in this series, booting fails for me:
+>>>>>>>>>>
+>>>>>>>>>> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+>>>>>>>>>> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+>>>>>>>>>>
+>>>>>>>>>> Care to check that booting keeps working for each patch in the
+>>>>>>>>>> series to avoid breaking git bisect for booting?
+>>>>>>>>>
+>>>>>>>>> Hmm, I think patch 8+9 need to be squashed then. I can double check this
+>>>>>>>>> next week though.
+>>>>>>>>
+>>>>>>>> Also looks like with this set merged HDMI stops working on
+>>>>>>>> omap4 with:
+>>>>>>>>
+>>>>>>>> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>>>>>
+>>>>>>> Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+>>>>>>> encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+>>>>>>> dmesg output in case that provides more clues:
+>>>>>>>
+>>>>>>> [   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+>>>>>>> [   91.078308] [drm] Enabling DMM ywrap scrolling
+>>>>>>> [   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+>>>>>>> [   91.107879] omapdss HDMI error: failed to power on device
+>>>>>>> [   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+>>>>>>> [   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>>>> [   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>>>> [   91.620300] Console: switching to colour frame buffer device 128x48
+>>>>>>> [   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+>>>>>>> [   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+>>>>>>> [   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+>>>>>>> [   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>>>> [   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+>>>>>>>
+>>>>>>> Regards,
+>>>>>>>
+>>>>>>> Tony
+>>>>>>>
+>>>>>>
+>>>>>> Can you try with this additional hwmod data tweak in place? Apply this on
+>>>>>> top of the existing series.
+>>>>>
+>>>>> Does not seem to help, still get the same errors. But maybe I'm doing
+>>>>> something wrong as the patch did not apply and I applied it manually.
+>>>>>
+>>>>> Regards,
+>>>>>
+>>>>> Tony
+>>>>>
+>>>>
+>>>> Hmm ok, can you provide some brief instructions how to test what you are
+>>>> doing with the HDMI? Just connect it to some external monitor? My monitor
+>>>> has a spare HDMI connector so I could try it out.
+>>>
+>>> Well build a kernel using omap2plus_defconfig, then with HDMI cable
+>>> connected load the following modules:
+>>>
+>>> encoder-tpd12s015 encoder-tfp410 connector-hdmi omapfb
+>>>
+>>> And a console should appear on the HDMI monitor. If using omapdrm, then
+>>> load omapdss and omapdrm instead.
+>>>
+>>> And if using NFSroot, you need to have ehci and smsc drivers built-in
+>>> or use an initramfs.
+>>
+>> Ok, I have a solution to the issue.
+>>
+>> Try the slightly modified patch below. It just required a couple of hwmod
+>> flags applied in addition to the patch I sent before.
+>>
+>> I also pushed a branch named "4.11-rc1-clkctrl-wip" as a reference, where
+>> also the hdmi works fine on omap4.
+>
+> OK hdmi works now on panda for both omapfb and omapdrm. Any ideas why
+> that change is now needed though?
 
-On Mon, Apr 10, 2017 at 10:55 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Wednesday 05 April 2017 07:40 PM, Raviteja Garimella wrote:
->> Hi Kishon,
->>
->> On Wed, Apr 5, 2017 at 7:04 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi Ravi,
->>>
->>> On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
->>>> Hi Kishon,
->>>>
->>>> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>>> Hi,
->>>>>
->>>>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
->>>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
->>>>>> SoC. The phy can be configured to be in Device mode or Host
->>>>>> mode based on the type of cable connected to the port. The
->>>>>> driver registers to  extcon framework to get appropriate
->>>>>> connect events for Host/Device cables connect/disconnect
->>>>>> states based on VBUS and ID interrupts.
->>>>>
->>>>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
->>>>> Northstar2.
->>>>>
->>>>
->>>> Will do.
->>>>
->>>>> Sorry for not letting you know this earlier. But I feel the design of the
->>>>> driver should be changed. Extcon shouldn't be used here. The extcon
->>>>> notifications should be sent to the consumer driver and the consumer driver
->>>>> should be responsible for invoking the phy ops.
->>>>>
->>>>
->>>> The consumer drivers here would be a UDC driver (USB device
->>>> controller), EHCI and OHCI host controller drivers.
->>>> I was already suggested in UDC driver review to deal with extcon in Phy driver.
->>>>
->>>> This phy connects to 2 host controllers, and one device controller.
->>>> That's the design in Broadcom Northstar2
->>>> platform. The values of the VBUS and ID pins of this port are
->>>> determined based on the type of the cable (device cable
->>>> or host cable). And. phy has to be configured accordingly.
->>>>
->>>>> The phy ops being invoked during extcon events doesn't look right.
->>>>
->>>> Could you please elaborate on the concern, so that we can think of
->>>> mitigating those issues in this driver?
->>>> Since we are dealing with phy init/shutdown in this driver itself, are
->>>> you okay with moving the extcon handling code
->>>> out of phy ops ?
->>>
->>> yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
->>> extcon events too. Can a phy which is initialized by a phy consumer (say your
->>> UDC invokes phy_init) can be shutdown by an extcon event?
->>>
->>> Maybe a clear explanation of when phy_ops here will be invoked and when it will
->>> set using extcon events might help.
->>>
->>
->> Say, we have a USB pendrive which is connected to the DRD port through
->> a host cable.
->> Now the PHY will be initialized to be in host mode.
->> When the pendrive is unplugged, and we now connect the NS2 device to
->> some linux PC,
->> now the PHY has to be shutdown, and re-initialized to be in Device mode.
->>
->> On unplug event, it is set neither to Host nor Device mode (basically
->> shutdown). Next time which ever cable is connected, the PHY is
->> initialized to the respective
->> mode.
->>
->> Please let me know if it's fine to do these initializations outside
->> phy ops, because those will
->> be irrelevant for phy consumers (the controllers) as it's anyways
->> dealt in the phy driver through
->> extcon.
->
-> How does the consumer get to know whether they have to operate in host mode or
-> device mode?
->
-In NS2, we have host controllers and device controller (not OTG/other
-that can switch
-between host and device mode). It's only phy that can be in host/device mode.
-Since both Host Controllers and Device Controller are connected to the same PHY,
-it is based on the extcon logic (the type of cable connected) that PHY
-will be in one
-of the modes host/device and the respective controller will operate.
+Yes, it is pretty clear actually. Previously, the hwmod main clock was 
+controlling the hdmi clock, but this is now rerouted to the clkctrl 
+module clock, which is shared between all DSS submodules. This leaves 
+the hdmi clock disabled, causing the failure.
 
-> Thanks
-> Kishon
+The fix just puts the hdmi clock into the optional clocks list, and 
+forces all the optional clocks on when pm_runtime is enabled for the module.
+
+-Tero
+
+>
+> Regards,
+>
+> Tony
+>
+>> ===================================
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> index dad871a..43163b5 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> @@ -775,6 +775,7 @@
+>>
+>>  static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
+>>  	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+>> +	{ .role = "hdmi_clk", .clk = "dss_48mhz_clk" },
+>>  };
+>>
+>>  static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
+>> @@ -785,7 +786,7 @@
+>>  	 * HDMI audio requires to use no-idle mode. Hence,
+>>  	 * set idle mode by software.
+>>  	 */
+>> -	.flags		= HWMOD_SWSUP_SIDLE,
+>> +	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_OPT_CLKS_NEEDED,
+>>  	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
+>>  	.xlate_irq	= omap4_xlate_irq,
+>>  	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
+>> @@ -858,11 +859,16 @@
+>>  };
+>>
+>>  /* dss_venc */
+>> +static struct omap_hwmod_opt_clk dss_venc_opt_clks[] = {
+>> +	{ .role = "tv_clk", .clk = "dss_tv_clk" },
+>> +};
+>> +
+>>  static struct omap_hwmod omap44xx_dss_venc_hwmod = {
+>>  	.name		= "dss_venc",
+>>  	.class		= &omap44xx_venc_hwmod_class,
+>>  	.clkdm_name	= "l3_dss_clkdm",
+>>  	.main_clk	= "dss_tv_clk",
+>> +	.flags		= HWMOD_OPT_CLKS_NEEDED,
+>>  	.prcm = {
+>>  		.omap4 = {
+>>  			.clkctrl_offs = OMAP4_CM_DSS_DSS_CLKCTRL_OFFSET,
+>> @@ -870,6 +876,8 @@
+>>  		},
+>>  	},
+>>  	.parent_hwmod	= &omap44xx_dss_hwmod,
+>> +	.opt_clks	= dss_venc_opt_clks,
+>> +	.opt_clks_cnt	= ARRAY_SIZE(dss_venc_opt_clks),
+>>  };
+>>
+>>  /*
+>>
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
