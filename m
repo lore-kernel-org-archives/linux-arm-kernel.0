@@ -1,138 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Apr 2017 13:50:37 +0100
-Subject: [PATCH v4 22/22] KVM: arm64: ITS: Pending table save/restore
-In-Reply-To: <1490607072-21610-23-git-send-email-eric.auger@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-23-git-send-email-eric.auger@redhat.com>
-Message-ID: <0cd4382f-30e1-c9b5-c171-6137436d8751@arm.com>
+From: ahferroin7@gmail.com (Austin S. Hemmelgarn)
+Date: Mon, 10 Apr 2017 08:50:37 -0400
+Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
+In-Reply-To: <20170408210737.5456-1-kilobyte@angband.pl>
+References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
+ <20170408210737.5456-1-kilobyte@angband.pl>
+Message-ID: <7179b0c7-0951-b5f3-6835-2f005ea743e1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 10:31, Eric Auger wrote:
-> Save and restore the pending tables.
-> 
-> Pending table restore obviously requires the pendbaser to be
-> already set.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
+On 2017-04-08 17:07, Adam Borowski wrote:
+> Unbreaks ARM and possibly other 32-bit architectures.
+>
+> Fixes: 7d0ef8b4d: Btrfs: update scrub_parity to use u64 stripe_len
+> Reported-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Adam Borowski <kilobyte@angband.pl>
 > ---
-> 
-> v3 -> v4:
-> - remove the wrong comment about locking
-> - pass kvm struct instead of its handle
-> - add comment about restore method
-> - remove GITR_PENDABASER.PTZ check
-> - continue if target_vcpu == NULL
-> - new locking strategy
-> 
-> v1 -> v2:
-> - do not care about the 1st KB which should be zeroed according to
->   the spec.
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 66 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 64 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index a516bbb..e10aa81 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1804,16 +1804,78 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->   */
->  static int vgic_its_flush_pending_tables(struct kvm *kvm)
->  {
-> -	return -ENXIO;
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_irq *irq;
-> +	int ret;
-> +
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		struct kvm_vcpu *vcpu;
-> +		gpa_t pendbase, ptr;
-> +		bool stored;
-> +		u8 val;
-> +
-> +		vcpu = irq->target_vcpu;
-> +		if (!vcpu)
-> +			continue;
-> +
-> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-> +
-> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
-> +
-> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+> You'd probably want to squash this with Liu's commit, to be nice to future
+> bisects.
+>
+> Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
+> sometimes works, but, like most operations, randomly dies with some badness
+> that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
+> there in 4.11-rc5, needs investigating, but since it's not connected to our
+> issue at hand, I consider this patch sort-of tested.
+>
+>  fs/btrfs/scrub.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/fs/btrfs/scrub.c b/fs/btrfs/scrub.c
+> index b6fe1cd08048..95372e3679f3 100644
+> --- a/fs/btrfs/scrub.c
+> +++ b/fs/btrfs/scrub.c
+> @@ -2407,7 +2407,7 @@ static inline void __scrub_mark_bitmap(struct scrub_parity *sparity,
+>
+>  	start -= sparity->logic_start;
+>  	start = div64_u64_rem(start, sparity->stripe_len, &offset);
+> -	offset /= sectorsize;
+> +	do_div(offset, sectorsize);
+>  	nsectors = (int)len / sectorsize;
+>
+>  	if (offset + nsectors <= sparity->nsectors) {
+>
+Also fixes things on:
+32-bit MIPS (eb and el variants)
+32-bit SPARC
+32-bit PPC
 
-ptr is already a gpa_t...
-
-> +		if (ret)
-> +			return ret;
-> +
-> +		stored = val & (irq->intid % BITS_PER_BYTE);
-> +		if (stored == irq->pending_latch)
-> +			continue;
-> +
-> +		if (irq->pending_latch)
-> +			val |= 1 << (irq->intid % BITS_PER_BYTE);
-> +		else
-> +			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
-> +
-> +		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
-> +		if (ret)
-> +			return ret;
-
-Consider the optimization used in its_sync_lpi_pending_table(), where
-consecutive LPIs stored in the same byte are set in a single access.
-
-> +	}
-> +
-> +	return 0;
->  }
->  
->  /**
->   * vgic_its_restore_pending_tables - Restore the pending tables from guest
->   * RAM to internal data structs
-> + *
-> + * Does not scan the whole pending tables but just loop on all registered
-> + * LPIS and scan their associated pending bit. This obviously requires
-> + * the ITEs to be restored before.
->   */
->  static int vgic_its_restore_pending_tables(struct kvm *kvm)
->  {
-> -	return -ENXIO;
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_irq *irq;
-> +	int ret;
-> +
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		struct kvm_vcpu *vcpu;
-> +		gpa_t pendbase, ptr;
-> +		u8 val;
-> +
-> +		vcpu = irq->target_vcpu;
-> +		if (!vcpu)
-> +			continue;
-> +
-> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-> +
-> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
-> +
-> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
-> +		if (ret)
-> +			return ret;
-> +		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
-> +	}
-> +	return 0;
-
-Again, this feels very similar to what its_sync_lpi_pending_table is
-doing. We should be able to have some common code here.
-
->  }
->  
->  static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
-> 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+You can add my Tested-by if you want.
