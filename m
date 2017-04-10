@@ -1,52 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 10 Apr 2017 12:34:42 +0100
-Subject: [PATCH] efi/libstub: arm/arm64: don't use TASK_SIZE when
- randomising the RT space
-In-Reply-To: <20170410104403.GC13899@leverpostej>
-References: <20170410103038.20117-1-ard.biesheuvel@linaro.org>
- <20170410104403.GC13899@leverpostej>
-Message-ID: <58EB6DD2.1010102@arm.com>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Mon, 10 Apr 2017 11:37:03 +0000
+Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B284667665E7@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard, Mark
+>
+>When the operating system is booted with the default ASPM policy
+>(POLICY_DEFAULT), current code is querying the enable/disable
+>states from ASPM registers to determine the policy.
+>
+>For example, a BIOS could set the power saving state to performance
+>and clear all ASPM control registers. A balanced ASPM policy could
+>enable L0s and disable L1. A power conscious BIOS could enable both
+>L0s and L1 to trade off latency and performance vs. power.
+>
+>After hotplug removal, pcie_aspm_exit_link_state() function clears
+>the ASPM registers. An insertion following hotplug removal reads
+>incorrect policy as ASPM disabled even though ASPM was enabled
+>during boot.
+>
+>This is caused by the fact that same function is used for reconfiguring
+>ASPM regardless of the power on state.
+>
+>------------------------
+>Changes from v7 (https://www.spinics.net/lists/arm-kernel/msg573034.html)
+>------------------------
+>- enable LTSSM as a best effort if the endpoint is not connected during
+>  boot
+>
+>
+>Sinan Kaya (5):
+>  PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+>  PCI/ASPM: split pci_aspm_init() into two
+>  PCI/ASPM: add init hook to device_add
+>  PCI/ASPM: save power on values during bridge init
+>  PCI/ASPM: move link_state cleanup to bridge remove
+>
 
-On 10/04/17 11:44, Mark Rutland wrote:
-> On Mon, Apr 10, 2017 at 11:30:38AM +0100, Ard Biesheuvel wrote:
->> As reported by James, Catalin and Mark, commit e69176d68d26
->> ("ef/libstub/arm/arm64: Randomize the base of the UEFI rt services
->> region") results in a crash in the firmware regardless of whether KASLR
->> is in effect or not, and whether the firmware implements EFI_RNG_PROTOCOL
->> or not.
->>
->> Mark has identified the root cause to be the inappropriate use of
->> TASK_SIZE in the stub, which arm64 defines as
->>
->>   #define TASK_SIZE             (test_thread_flag(TIF_32BIT) ? \
->>                                 TASK_SIZE_32 : TASK_SIZE_64)
->>
->> and testing thread flags at this point results in the dereference of
->> pointers in uninitialized structures.
->>
->> So instead, introduce a preprocessor symbol EFI_RT_VIRTUAL_LIMIT and
->> define it to TASK_SIZE_64 on arm64 and TASK_SIZE on ARM, both of which
->> are compile time constants. Also, change the 'headroom' variable to
->> static const to force an error if this changes in the future.
->>
->> Cc: James Morse <james.morse@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Matt Fleming <matt@codeblueprint.co.uk>
->> Cc: Ingo Molnar <mingo@kernel.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> With this patch applied atop of next-20170410, a defconfig arm64 kernel
-> built with the Linaro 15.08 toolchain boots happily for me on Juno R1.
+Thanks Sinan for new patches. No issues seen so far in my testing for L1 and L1SS both.
+May you please add my tested-by in the patches?
 
-Likewise, this fixes the problem I was seeing on Seattle. If it's useful:
-Tested-by: James Morse <james.morse@arm.com>
+I will keep on testing it and let you know if something goes wrong for any
+corner case.
 
-Thanks for debugging that so quickly Mark!
+> drivers/pci/pcie/aspm.c | 149 +++++++++++++++++++++++++++++++++---------------
+> drivers/pci/probe.c     |   3 +
+> drivers/pci/remove.c    |   3 +-
+> include/linux/pci.h     |   2 +
+> 4 files changed, 110 insertions(+), 47 deletions(-)
+>
+>--
+>1.9.1
 
-
-James
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
