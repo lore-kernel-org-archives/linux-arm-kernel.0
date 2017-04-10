@@ -1,57 +1,126 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Apr 2017 12:46:06 -0700
-Subject: [GIT PULL 1/2] omap devicetree changes for v4.12, part 2
-Message-ID: <pull-1491846028-72246>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Mon, 10 Apr 2017 14:46:44 -0500
+Subject: [PATCH v6 01/23] drivers/fsi: Add fsi master definition
+In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-2-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit da72e4936445e1081e1223fc58470644da8e8cdb:
+From: Jeremy Kerr <jk@ozlabs.org>
 
-  Merge branch 'omap-for-v4.12/dt-droid4-v2' into omap-for-v4.12/dt-v2 (2017-03-28 14:00:55 -0700)
+Add a `struct fsi_master` to represent a FSI master controller.
 
-are available in the git repository at:
+FSI master drivers register one of these structs to provide
+device-specific of the standard operations: read/write/term/break and
+link control.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.12/dt-pt2-signed
+Includes changes from Edward A. James <eajames@us.ibm.com> & Jeremy Kerr
+<jk@ozlabs.org>.
 
-for you to fetch changes up to b4e1566e4c5e9fcaf9e17ad741b6094b4f3ddce5:
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ drivers/fsi/fsi-core.c   | 35 +++++++++++++++++++++++++++++++++++
+ drivers/fsi/fsi-master.h | 41 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+ create mode 100644 drivers/fsi/fsi-master.h
 
-  Merge branch 'omap-for-v4.12/dt-droid4-v2' into omap-for-v4.12/dt-v2 (2017-04-09 16:35:51 -0700)
-
-----------------------------------------------------------------
-Second set of devicetree changes for omaps for v4.12 merge window
-to configure various devices:
-
-- Enable DCAN on am57xx-idk
-
-- Enable CPSW ethernet0 and 1 on am335x-icev2
-
-- Non-critical fix for droid 4 PMIC interrupt triggering
-
-- Stop disabling SRAM and GPMC on droid 4
-
-- Configure CPCAP PMIC related devices on droid 4 for ADC, charger
-  and USB PHY. The charger and USB PHY drivers are still being
-  discussed, but the binding for them has been acked by Rob and
-  Sebastian so they should be safe to merge together with the ADC
-  driver in Linux next that they depend on
-
-----------------------------------------------------------------
-Roger Quadros (1):
-      ARM: dts: am335x-icev2: Add CPSW ethernet0 and ethernet1
-
-Schuyler Patton (1):
-      ARM: dts: am57xx-idk: Add DCAN support
-
-Tony Lindgren (6):
-      ARM: dts: omap4-droid4: Fix interrupt triggering for cpcap
-      ARM: dts: omap4-droid4: Stop disabling SRAM and GPMC
-      ARM: dts: omap4-droid4: Add CPCAP PMIC ADC configuration
-      ARM: dts: omap4-droid4: Add CPCAP PMIC battery charger configuration
-      ARM: dts: omap4-droid4: Add CPCAP PMIC OTG PHY configuration
-      Merge branch 'omap-for-v4.12/dt-droid4-v2' into omap-for-v4.12/dt-v2
-
- arch/arm/boot/dts/am335x-icev2.dts             | 121 +++++++++++++++++++++++++
- arch/arm/boot/dts/am57xx-idk-common.dtsi       |  24 +++++
- arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi |  51 ++++++++++-
- arch/arm/boot/dts/omap4-droid4-xt894.dts       |  13 +--
- 4 files changed, 196 insertions(+), 13 deletions(-)
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 3d55bd5..ca02913 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -15,8 +15,43 @@
+ 
+ #include <linux/device.h>
+ #include <linux/fsi.h>
++#include <linux/idr.h>
+ #include <linux/module.h>
+ 
++#include "fsi-master.h"
++
++static DEFINE_IDA(master_ida);
++
++/* FSI master support */
++int fsi_master_register(struct fsi_master *master)
++{
++	int rc;
++
++	if (!master)
++		return -EINVAL;
++
++	master->idx = ida_simple_get(&master_ida, 0, INT_MAX, GFP_KERNEL);
++	dev_set_name(&master->dev, "fsi%d", master->idx);
++
++	rc = device_register(&master->dev);
++	if (rc)
++		ida_simple_remove(&master_ida, master->idx);
++
++	return rc;
++}
++EXPORT_SYMBOL_GPL(fsi_master_register);
++
++void fsi_master_unregister(struct fsi_master *master)
++{
++	if (master->idx >= 0) {
++		ida_simple_remove(&master_ida, master->idx);
++		master->idx = -1;
++	}
++
++	device_unregister(&master->dev);
++}
++EXPORT_SYMBOL_GPL(fsi_master_unregister);
++
+ /* FSI core & Linux bus type definitions */
+ 
+ static int fsi_bus_match(struct device *dev, struct device_driver *drv)
+diff --git a/drivers/fsi/fsi-master.h b/drivers/fsi/fsi-master.h
+new file mode 100644
+index 0000000..7764b00
+--- /dev/null
++++ b/drivers/fsi/fsi-master.h
+@@ -0,0 +1,41 @@
++/*
++ * FSI master definitions. These comprise the core <--> master interface,
++ * to allow the core to interact with the (hardware-specific) masters.
++ *
++ * Copyright (C) IBM Corporation 2016
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef DRIVERS_FSI_MASTER_H
++#define DRIVERS_FSI_MASTER_H
++
++#include <linux/device.h>
++
++struct fsi_master {
++	struct device	dev;
++	int		idx;
++	int		n_links;
++	int		flags;
++	int		(*read)(struct fsi_master *, int link, uint8_t id,
++				uint32_t addr, void *val, size_t size);
++	int		(*write)(struct fsi_master *, int link, uint8_t id,
++				uint32_t addr, const void *val, size_t size);
++	int		(*term)(struct fsi_master *, int link, uint8_t id);
++	int		(*send_break)(struct fsi_master *, int link);
++	int		(*link_enable)(struct fsi_master *, int link);
++};
++
++#define dev_to_fsi_master(d) container_of(d, struct fsi_master, dev)
++
++extern int fsi_master_register(struct fsi_master *master);
++extern void fsi_master_unregister(struct fsi_master *master);
++
++#endif /* DRIVERS_FSI_MASTER_H */
+-- 
+1.8.2.2
