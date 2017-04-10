@@ -1,323 +1,218 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:47:04 -0500
-Subject: [PATCH v6 21/23] drivers/fsi: Add SCOM FSI client device driver
+Date: Mon, 10 Apr 2017 14:46:59 -0500
+Subject: [PATCH v6 16/23] drivers/fsi: Add tracepoints for low-level operations
 In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
 References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-22-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-17-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@linux.vnet.ibm.com>
+From: Jeremy Kerr <jk@ozlabs.org>
 
-Create a simple SCOM engine device driver that reads and writes
-its control registers via an FSI bus.
-
-Includes changes from Edward A. James <eajames@us.ibm.com>.
-
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
-Signed-off-by: Edward A. James <eajames@us.ibm.com>
 Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 ---
- drivers/fsi/Kconfig    |   5 +
- drivers/fsi/Makefile   |   1 +
- drivers/fsi/fsi-scom.c | 263 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 269 insertions(+)
- create mode 100644 drivers/fsi/fsi-scom.c
+ drivers/fsi/fsi-core.c     |  27 +++++++---
+ include/trace/events/fsi.h | 127 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 148 insertions(+), 6 deletions(-)
+ create mode 100644 include/trace/events/fsi.h
 
-diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
-index 448bc3b..e8dad25 100644
---- a/drivers/fsi/Kconfig
-+++ b/drivers/fsi/Kconfig
-@@ -18,6 +18,11 @@ config FSI_MASTER_GPIO
- 	---help---
- 	This option enables a FSI master driver using GPIO lines.
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index f7e55e7..09becec 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -21,6 +21,9 @@
  
-+config FSI_SCOM
-+	tristate "SCOM FSI client device driver"
-+	---help---
-+	This option enables an FSI based SCOM device driver.
+ #include "fsi-master.h"
+ 
++#define CREATE_TRACE_POINTS
++#include <trace/events/fsi.h>
 +
- endif
+ #define FSI_SLAVE_CONF_NEXT_MASK	0x80000000
+ #define FSI_SLAVE_CONF_SLOTS_MASK	0x00ff0000
+ #define FSI_SLAVE_CONF_SLOTS_SHIFT	16
+@@ -541,11 +544,16 @@ static int fsi_master_read(struct fsi_master *master, int link,
+ {
+ 	int rc;
  
- endmenu
-diff --git a/drivers/fsi/Makefile b/drivers/fsi/Makefile
-index ed28ac0..3466f08 100644
---- a/drivers/fsi/Makefile
-+++ b/drivers/fsi/Makefile
-@@ -1,3 +1,4 @@
++	trace_fsi_master_read(master, link, slave_id, addr, size);
++
+ 	rc = fsi_check_access(addr, size);
+-	if (rc)
+-		return rc;
++	if (!rc)
++		rc = master->read(master, link, slave_id, addr, val, size);
++
++	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
++			false, val, rc);
  
- obj-$(CONFIG_FSI) += fsi-core.o
- obj-$(CONFIG_FSI_MASTER_GPIO) += fsi-master-gpio.o
-+obj-$(CONFIG_FSI_SCOM) += fsi-scom.o
-diff --git a/drivers/fsi/fsi-scom.c b/drivers/fsi/fsi-scom.c
+-	return master->read(master, link, slave_id, addr, val, size);
++	return rc;
+ }
+ 
+ static int fsi_master_write(struct fsi_master *master, int link,
+@@ -553,11 +561,16 @@ static int fsi_master_write(struct fsi_master *master, int link,
+ {
+ 	int rc;
+ 
++	trace_fsi_master_write(master, link, slave_id, addr, size, val);
++
+ 	rc = fsi_check_access(addr, size);
+-	if (rc)
+-		return rc;
++	if (!rc)
++		rc = master->write(master, link, slave_id, addr, val, size);
+ 
+-	return master->write(master, link, slave_id, addr, val, size);
++	trace_fsi_master_rw_result(master, link, slave_id, addr, size,
++			true, val, rc);
++
++	return rc;
+ }
+ 
+ static int fsi_master_link_enable(struct fsi_master *master, int link)
+@@ -573,6 +586,8 @@ static int fsi_master_link_enable(struct fsi_master *master, int link)
+  */
+ static int fsi_master_break(struct fsi_master *master, int link)
+ {
++	trace_fsi_master_break(master, link);
++
+ 	if (master->send_break)
+ 		return master->send_break(master, link);
+ 
+diff --git a/include/trace/events/fsi.h b/include/trace/events/fsi.h
 new file mode 100644
-index 0000000..98d062f
+index 0000000..ac74a30
 --- /dev/null
-+++ b/drivers/fsi/fsi-scom.c
-@@ -0,0 +1,263 @@
-+/*
-+ * SCOM FSI Client device driver
-+ *
-+ * Copyright (C) IBM Corporation 2016
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERGCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++++ b/include/trace/events/fsi.h
+@@ -0,0 +1,127 @@
 +
-+#include <linux/fsi.h>
-+#include <linux/module.h>
-+#include <linux/cdev.h>
-+#include <linux/delay.h>
-+#include <linux/fs.h>
-+#include <linux/uaccess.h>
-+#include <linux/slab.h>
-+#include <linux/miscdevice.h>
-+#include <linux/list.h>
-+#include <linux/idr.h>
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fsi
 +
-+#define FSI_ENGID_SCOM		0x5
++#if !defined(_TRACE_FSI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_FSI_H
 +
-+#define SCOM_FSI2PIB_DELAY	50
++#include <linux/tracepoint.h>
 +
-+/* SCOM engine register set */
-+#define SCOM_DATA0_REG		0x00
-+#define SCOM_DATA1_REG		0x04
-+#define SCOM_CMD_REG		0x08
-+#define SCOM_RESET_REG		0x1C
++TRACE_EVENT(fsi_master_read,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size),
++	TP_ARGS(master, link, id, addr, size),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd]",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size
++	)
++);
 +
-+#define SCOM_RESET_CMD		0x80000000
-+#define SCOM_WRITE_CMD		0x80000000
++TRACE_EVENT(fsi_master_write,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size, const void *data),
++	TP_ARGS(master, link, id, addr, size, data),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++		__field(__u32,	data)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++		__entry->data = 0;
++		memcpy(&__entry->data, data, size);
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd] <= {%*ph}",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size,
++		__entry->size, &__entry->data
++	)
++);
 +
-+struct scom_device {
-+	struct list_head link;
-+	struct fsi_device *fsi_dev;
-+	struct miscdevice mdev;
-+	char	name[32];
-+	int idx;
-+};
++TRACE_EVENT(fsi_master_rw_result,
++	TP_PROTO(const struct fsi_master *master, int link, int id,
++			uint32_t addr, size_t size,
++			bool write, const void *data, int ret),
++	TP_ARGS(master, link, id, addr, size, write, data, ret),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++		__field(int,	id)
++		__field(__u32,	addr)
++		__field(size_t,	size)
++		__field(bool,	write)
++		__field(__u32,	data)
++		__field(int,	ret)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++		__entry->id = id;
++		__entry->addr = addr;
++		__entry->size = size;
++		__entry->write = write;
++		__entry->data = 0;
++		__entry->ret = ret;
++		if (__entry->write || !__entry->ret)
++			memcpy(&__entry->data, data, size);
++	),
++	TP_printk("fsi%d:%02d:%02d %08x[%zd] %s {%*ph} ret %d",
++		__entry->master_idx,
++		__entry->link,
++		__entry->id,
++		__entry->addr,
++		__entry->size,
++		__entry->write ? "<=" : "=>",
++		__entry->size, &__entry->data,
++		__entry->ret
++	)
++);
 +
-+#define to_scom_dev(x)		container_of((x), struct scom_device, mdev)
++TRACE_EVENT(fsi_master_break,
++	TP_PROTO(const struct fsi_master *master, int link),
++	TP_ARGS(master, link),
++	TP_STRUCT__entry(
++		__field(int,	master_idx)
++		__field(int,	link)
++	),
++	TP_fast_assign(
++		__entry->master_idx = master->idx;
++		__entry->link = link;
++	),
++	TP_printk("fsi%d:%d",
++		__entry->master_idx,
++		__entry->link
++	)
++);
 +
-+static struct list_head scom_devices;
 +
-+static DEFINE_IDA(scom_ida);
++#endif /* _TRACE_FSI_H */
 +
-+static int put_scom(struct scom_device *scom_dev, uint64_t value,
-+			uint32_t addr)
-+{
-+	int rc;
-+	uint32_t data;
-+
-+	data = cpu_to_be32(SCOM_RESET_CMD);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_RESET_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	data = cpu_to_be32((value >> 32) & 0xffffffff);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_DATA0_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	data = cpu_to_be32(value & 0xffffffff);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_DATA1_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	data = cpu_to_be32(SCOM_WRITE_CMD | addr);
-+	return fsi_device_write(scom_dev->fsi_dev, SCOM_CMD_REG, &data,
-+				sizeof(uint32_t));
-+}
-+
-+static int get_scom(struct scom_device *scom_dev, uint64_t *value,
-+			uint32_t addr)
-+{
-+	uint32_t result, data;
-+	int rc;
-+
-+	*value = 0ULL;
-+	data = cpu_to_be32(addr);
-+	rc = fsi_device_write(scom_dev->fsi_dev, SCOM_CMD_REG, &data,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	rc = fsi_device_read(scom_dev->fsi_dev, SCOM_DATA0_REG, &result,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	*value |= (uint64_t)cpu_to_be32(result) << 32;
-+	rc = fsi_device_read(scom_dev->fsi_dev, SCOM_DATA1_REG, &result,
-+				sizeof(uint32_t));
-+	if (rc)
-+		return rc;
-+
-+	*value |= cpu_to_be32(result);
-+
-+	return 0;
-+}
-+
-+static ssize_t scom_read(struct file *filep, char __user *buf, size_t len,
-+			loff_t *offset)
-+{
-+	int rc;
-+	struct miscdevice *mdev =
-+				(struct miscdevice *)filep->private_data;
-+	struct scom_device *scom = to_scom_dev(mdev);
-+	struct device *dev = &scom->fsi_dev->dev;
-+	uint64_t val;
-+
-+	if (len != sizeof(uint64_t))
-+		return -EINVAL;
-+
-+	rc = get_scom(scom, &val, *offset);
-+	if (rc) {
-+		dev_dbg(dev, "get_scom fail:%d\n", rc);
-+		return rc;
-+	}
-+
-+	rc = copy_to_user(buf, &val, len);
-+	if (rc)
-+		dev_dbg(dev, "copy to user failed:%d\n", rc);
-+
-+	return rc ? rc : len;
-+}
-+
-+static ssize_t scom_write(struct file *filep, const char __user *buf,
-+			size_t len, loff_t *offset)
-+{
-+	int rc;
-+	struct miscdevice *mdev = filep->private_data;
-+	struct scom_device *scom = to_scom_dev(mdev);
-+	struct device *dev = &scom->fsi_dev->dev;
-+	uint64_t val;
-+
-+	if (len != sizeof(uint64_t))
-+		return -EINVAL;
-+
-+	rc = copy_from_user(&val, buf, len);
-+	if (rc) {
-+		dev_dbg(dev, "copy from user failed:%d\n", rc);
-+		return -EINVAL;
-+	}
-+
-+	rc = put_scom(scom, val, *offset);
-+	if (rc) {
-+		dev_dbg(dev, "put_scom failed with:%d\n", rc);
-+		return rc;
-+	}
-+
-+	return len;
-+}
-+
-+static loff_t scom_llseek(struct file *file, loff_t offset, int whence)
-+{
-+	switch (whence) {
-+	case SEEK_CUR:
-+		break;
-+	case SEEK_SET:
-+		file->f_pos = offset;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return offset;
-+}
-+
-+static const struct file_operations scom_fops = {
-+	.owner	= THIS_MODULE,
-+	.llseek	= scom_llseek,
-+	.read	= scom_read,
-+	.write	= scom_write,
-+};
-+
-+static int scom_probe(struct device *dev)
-+{
-+	struct fsi_device *fsi_dev = to_fsi_dev(dev);
-+	struct scom_device *scom;
-+
-+	scom = devm_kzalloc(dev, sizeof(*scom), GFP_KERNEL);
-+	if (!scom)
-+		return -ENOMEM;
-+
-+	scom->idx = ida_simple_get(&scom_ida, 1, INT_MAX, GFP_KERNEL);
-+	snprintf(scom->name, sizeof(scom->name), "scom%d", scom->idx);
-+	scom->fsi_dev = fsi_dev;
-+	scom->mdev.minor = MISC_DYNAMIC_MINOR;
-+	scom->mdev.fops = &scom_fops;
-+	scom->mdev.name = scom->name;
-+	scom->mdev.parent = dev;
-+	list_add(&scom->link, &scom_devices);
-+
-+	return misc_register(&scom->mdev);
-+}
-+
-+static int scom_remove(struct device *dev)
-+{
-+	struct scom_device *scom, *scom_tmp;
-+	struct fsi_device *fsi_dev = to_fsi_dev(dev);
-+
-+	list_for_each_entry_safe(scom, scom_tmp, &scom_devices, link) {
-+		if (scom->fsi_dev == fsi_dev) {
-+			list_del(&scom->link);
-+			ida_simple_remove(&scom_ida, scom->idx);
-+			misc_deregister(&scom->mdev);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static struct fsi_device_id scom_ids[] = {
-+	{
-+		.engine_type = FSI_ENGID_SCOM,
-+		.version = FSI_VERSION_ANY,
-+	},
-+	{ 0 }
-+};
-+
-+static struct fsi_driver scom_drv = {
-+	.id_table = scom_ids,
-+	.drv = {
-+		.name = "scom",
-+		.bus = &fsi_bus_type,
-+		.probe = scom_probe,
-+		.remove = scom_remove,
-+	}
-+};
-+
-+static int scom_init(void)
-+{
-+	INIT_LIST_HEAD(&scom_devices);
-+	return fsi_driver_register(&scom_drv);
-+}
-+
-+static void scom_exit(void)
-+{
-+	struct list_head *pos;
-+	struct scom_device *scom;
-+
-+	list_for_each(pos, &scom_devices) {
-+		scom = list_entry(pos, struct scom_device, link);
-+		misc_deregister(&scom->mdev);
-+		devm_kfree(&scom->fsi_dev->dev, scom);
-+	}
-+	fsi_driver_unregister(&scom_drv);
-+}
-+
-+module_init(scom_init);
-+module_exit(scom_exit);
-+MODULE_LICENSE("GPL");
++#include <trace/define_trace.h>
 -- 
 1.8.2.2
