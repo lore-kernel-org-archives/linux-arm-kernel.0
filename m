@@ -1,140 +1,87 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 10 Apr 2017 17:53:28 +0100
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
-References: <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
- <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
- <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
- <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
- <20170330100524.GA22801@red-moon>
- <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
- <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
- <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
- <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
- <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
-Message-ID: <20170410165328.GA5248@red-moon>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 10 Apr 2017 18:56:42 +0200
+Subject: [GIT PULL] ARM: at91: soc for 4.12
+Message-ID: <20170410165642.jt4bucl2zwk26orm@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 04:28:11PM +0100, Ard Biesheuvel wrote:
-> On 2 April 2017 at 16:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 30 March 2017 at 14:50, Sinan Kaya <okaya@codeaurora.org> wrote:
-> >> On 3/30/2017 9:38 AM, Ard Biesheuvel wrote:
-> >>> On 30 March 2017 at 11:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >>>> On 30 March 2017 at 11:05, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> >>>>> On Thu, Mar 30, 2017 at 09:46:39AM +0100, Ard Biesheuvel wrote:
-> >>>>>
-> >>>>> [...]
-> >>>>>
-> >>>>>>> I'm asking why we don't fix the actual problem in PCIe ARM64 adaptation instead
-> >>>>>>> of working around it by quirks.
-> >>>>>>>
-> >>>>>>> I don't see any reason why ACPI ARM64 should carry the burden of legacy systems.
-> >>>>>>>
-> >>>>>>> Legacy only applies to DT based systems.
-> >>>>>>>
-> >>>>>>
-> >>>>>> I fully agree with this point: ACPI implies firmware, and so we should
-> >>>>>> be able to rely on firmware to have initialized the PCIe subsystem by
-> >>>>>> the time the kernel gets to access it.
-> >>>>>
-> >>>>> https://lkml.org/lkml/2016/3/3/458
-> >>>>>
-> >>>>
-> >>>> I don't think the fact that at least one system existed over a year
-> >>>> ago whose UEFI assigned resources incorrectly should prevent us from
-> >>>> being normative in this case.
-> >>>
-> >>> In any case, given that EFIFB is enabled by default on some distros,
-> >>> and the fact that DT boot is affected as well, I should get this patch
-> >>> in to prevent serious potential issues that could arise when someone
-> >>> with a graphical UEFI stack updates to such a new kernel.
-> >>>
-> >>> So I think we are in agreement that this is needed on both ARM and
-> >>> arm64, since their PCI configuration is usually not preserved. The
-> >>> open question is whether there is any harm in enabling it for x86 as
-> >>> well.
-> >>>
-> >>
-> >> Agreed, the other issue is about compatibility with UEFI and future
-> >> proofing Linux for other potential issues like hotplug reservation.
-> >>
-> >
-> > OK, given the lack of feedback regarding the suitability of this patch
-> > for x86, I am going to rework it as a ARM/arm64 only patch, and queue
-> > it as a fix for v4.11. This way, we can backport it to stable (which
-> > is arguably appropriate, given that upgrading to a EFIFB enabled
-> > kernel may cause severe breakage for existing systems that implement
-> > the GOP protocol), and easily change the patch to apply to x86 going
-> > forwards, by removing the #ifdefs
-> >
-> 
-> As it turns out, this patch does not solve the problem completely.
-> 
-> For EFI framebuffers that are backed by a PCI bar of a device residing
-> on bus 0, things work happily. However, claiming resources for devices
-> behind bridges doesn't work.
+Hi Arnd, Olof,
 
-May I ask you to elaborate on this please ? It is because we do not
-claim the bridge windows upstream the device and they are reassigned ?
+This is a huge cleanup of the PM code in order to prepare support for a
+new suspend mode on sama5d2.
 
-> Given that we have not made the situation worse, fixing it is less
-> urgent than it was before. I.e., there is no longer a risk of
-> inadvertently poking the wrong BAR when writing to the framebuffer.
-> There is a regression in functionality, though, since EFI fb devices
-> that happened to work (because the firmware BAR == the kernel BAR)
-> have stopped working if they are behind a bridge, which is of course
-> always the case for PCIe.
-> 
-> So before starting the next round of hacking to work around this, I
-> would like rekindle the discussion regarding the way we blindly
-> reassign all resources on ACPI/arm64 systems, and whether there is a
-> way imaginable to avoid doing that.
+Note that as discussed with Arnd, the first two patches are fixes that
+are already upstream since v4.11-rc4. The rest of the pull request
+depends on them.
 
-There is a way if the whole ARM ecosystem work together to sort this
-out and we think that's the right way to do; I am personally not
-entirely convinced about that.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-> I suppose the state of the BARs as we inherit it from the firmware
-> cannot be blindly trusted (and IIUC, this is Lorenzo's primary issue
-> with it). So should there be some side channel (UEFI config table
-> perhaps?) to describe this?
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-PCI firmware specifications rev 3.1, 4.6.5, "_DSM for Ignoring PCI
-Boot Configurations".
+are available in the git repository at:
 
-Do we want to enforce it on ARM ? I do not know to be honest (and it
-still would not solve the DT firmware case).
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.12-soc
 
-Whatever we do, it is not going to be clean cut IMO. I think that
-what x86 does is sensible (well, minus the link ordering dependency we
-discovered), I can do it for ARM64 but get ready for regressions and
-I still think we have no real FW binding support that would make this
-behaviour robust.
+for you to fetch changes up to b32de9dd38fcf9063e993dcdd64cc64ad344d3ac:
 
-I can provide you with examples where, by simply claiming resources
-on an ARM system you trigger resources allocation regressions by
-preventing the kernel from allocating bigger bridge windows than
-the ones set-up by FW.
+  ARM: at91: move SoC detection to its own driver (2017-03-31 20:36:10 +0200)
 
-> How do other architectures deal with this?
+----------------------------------------------------------------
+SoC for 4.12:
 
-On an arch specific basis that make things work.
+ - huge PM cleanup
+ - Move SoC detection to its own driver
 
-> Is this what the PCI bios accesses are for?
+----------------------------------------------------------------
+Alexandre Belloni (14):
+      MAINTAINERS: Update AT91 entry
+      MAINTAINERS: Add memory drivers to AT91 entry
+      ARM: at91: pm: Cleanup headers
+      ARM: at91: pm: Move at91_ramc_read/write to pm.c
+      ARM: at91: pm: Move global variables into at91_pm_data
+      ARM: at91: pm: Use struct at91_pm_data in pm_suspend.S
+      ARM: at91: pm: Simplify at91rm9200_standby
+      ARM: at91: pm: Workaround DDRSDRC self-refresh bug with LPDDR1 memories.
+      ARM: at91: pm: Tie the memory controller type to the ramc id
+      ARM: at91: pm: Tie the USB clock mask to the pmc
+      ARM: at91: pm: Merge all at91sam9*_pm_init
+      ARM: at91: pm: Remove at91_pm_set_standby
+      ARM: at91: pm: correct typo
+      ARM: at91: move SoC detection to its own driver
 
-Which ones :) ?
+Nicolas Ferre (1):
+      ARM: at91: pm: cpu_idle: switch DDR to power-down mode
 
-> In any case, I have updated the UEFI firmware we have for ARM Juno to
-> use EDK2's generic PCI host bridge driver instead of one that was
-> specially written for ARM Juno, and may deviate in the way it
-> allocates PCI resources.
+Romain Izard (1):
+      Revert "ARM: at91/dt: sama5d2: Use new compatible for ohci node"
 
-As long as the kernel is free to reallocate them and that FW quiesces
-devices at FW->OS handover I see no issues with that.
+ MAINTAINERS                                     |   2 +-
+ arch/arm/boot/dts/sama5d2.dtsi                  |   2 +-
+ arch/arm/mach-at91/Makefile                     |  34 +++-
+ arch/arm/mach-at91/at91rm9200.c                 |  15 +-
+ arch/arm/mach-at91/at91sam9.c                   |  91 +---------
+ arch/arm/mach-at91/generic.h                    |   8 +-
+ arch/arm/mach-at91/pm.c                         | 215 +++++++++++-----------
+ arch/arm/mach-at91/pm.h                         |  24 +--
+ arch/arm/mach-at91/pm_data-offsets.c            |  13 ++
+ arch/arm/mach-at91/pm_suspend.S                 |  31 ++--
+ arch/arm/mach-at91/sama5.c                      |  52 +-----
+ arch/arm/mach-at91/soc.c                        | 142 ---------------
+ drivers/soc/Kconfig                             |   1 +
+ drivers/soc/Makefile                            |   1 +
+ drivers/soc/atmel/Kconfig                       |   6 +
+ drivers/soc/atmel/Makefile                      |   1 +
+ drivers/soc/atmel/soc.c                         | 231 ++++++++++++++++++++++++
+ {arch/arm/mach-at91 => drivers/soc/atmel}/soc.h |   0
+ 18 files changed, 433 insertions(+), 436 deletions(-)
+ create mode 100644 arch/arm/mach-at91/pm_data-offsets.c
+ delete mode 100644 arch/arm/mach-at91/soc.c
+ create mode 100644 drivers/soc/atmel/Kconfig
+ create mode 100644 drivers/soc/atmel/Makefile
+ create mode 100644 drivers/soc/atmel/soc.c
+ rename {arch/arm/mach-at91 => drivers/soc/atmel}/soc.h (100%)
 
-If we want to try to claim the whole resource tree on boot (in ACPI)
-I can send a patch for that but there will be regressions.
-
-Lorenzo
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
