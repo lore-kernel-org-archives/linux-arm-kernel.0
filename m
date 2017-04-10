@@ -1,201 +1,115 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 10 Apr 2017 23:47:40 +0400
-Subject: [PATCH v7 resend 00/20] ILP32 for ARM64
-In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20170410194740.GA28503@yury-N73SV>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Mon, 10 Apr 2017 14:46:50 -0500
+Subject: [PATCH v6 07/23] drivers/fsi: Implement slave initialisation
+In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-8-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+From: Jeremy Kerr <jk@ozlabs.org>
 
-According to latest plans figured out on Linaro Connect, ILP32 should
-be taken in 4.12 merge window. The window will be opened in less than
-a month, so I'd like to remind it to you, and ask if you have any
-questions/requests related to ILP32. Is it still realistic idea to take
-patches in 4.12? 
+Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
+devices and register with the driver core.
 
-This is the rebase of ILP32 on latest linux-next:
-https://github.com/norov/linux/tree/ilp32-20170410
+Includes changes from Chris Bostic <cbostic@linux.vnet.ibm.com>.
 
-And glibc that I use for testing:
-https://github.com/norov/glibc/commits/dev9
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ drivers/fsi/fsi-core.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 64 insertions(+), 2 deletions(-)
 
-Yury
-
-On Thu, Mar 02, 2017 at 12:49:08AM +0530, Yury Norov wrote:
-> This series enables aarch64 with ilp32 mode.
-> 
-> As supporting work, it introduces ARCH_32BIT_OFF_T configuration
-> option that is enabled for existing 32-bit architectures but disabled
-> for new arches (so 64-bit off_t is is used by new userspace). Also it
-> deprecates getrlimit and setrlimit syscalls prior to prlimit64.
-> 
-> This version is based on linux-next from 2017-03-01. It works with
-> glibc-2.25, and tested with LTP, glibc testsuite, trinity, lmbench,
-> CPUSpec.
-> 
-> Patches 1, 2, 3 and 8 are general, and may be applied separately.
-> 
-> This is the rebase of v7 - no major changes has been made.
-> 
-> Kernel and GLIBC trees:
-> https://github.com/norov/linux/tree/ilp32-20170301
-> https://github.com/norov/glibc/tree/dev9
-> 
-> (GLIBC patches are managed by Steve Ellcey, so my tree is only for
-> reference.)
-> 
-> Changes:
-> v3: https://lkml.org/lkml/2014/9/3/704
-> v4: https://lkml.org/lkml/2015/4/13/691
-> v5: https://lkml.org/lkml/2015/9/29/911
-> v6: https://lkml.org/lkml/2016/5/23/661
-> v7: RFC nowrap:  https://lkml.org/lkml/2016/6/17/990
-> v7: RFC2 nowrap: https://lkml.org/lkml/2016/8/17/245
-> v7: RFC3 nowrap: https://lkml.org/lkml/2016/10/21/883
-> v7: https://lkml.org/lkml/2017/1/9/213
-> v7: Resend: fixed couple of typos, rebased on next-20170301
-> 
-> Andrew Pinski (6):
->   arm64: rename COMPAT to AARCH32_EL0 in Kconfig
->   arm64: ensure the kernel is compiled for LP64
->   arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
->   arm64: ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
->     it
->   arm64: ilp32: introduce ilp32-specific handlers for sigframe and
->     ucontext
->   arm64:ilp32: add ARM64_ILP32 to Kconfig
-> 
-> Philipp Tomsich (1):
->   arm64:ilp32: add vdso-ilp32 and use for signal return
-> 
-> Yury Norov (13):
->   compat ABI: use non-compat openat and open_by_handle_at variants
->   32-bit ABI: introduce ARCH_32BIT_OFF_T config option
->   asm-generic: Drop getrlimit and setrlimit syscalls from default list
->   arm64: ilp32: add documentation on the ILP32 ABI for ARM64
->   thread: move thread bits accessors to separated file
->   arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
->   arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
->   arm64: introduce binfmt_elf32.c
->   arm64: ilp32: introduce binfmt_ilp32.c
->   arm64: ilp32: share aarch32 syscall handlers
->   arm64: signal: share lp64 signal routines to ilp32
->   arm64: signal32: move ilp32 and aarch32 common code to separated file
->   arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
-> 
->  Documentation/arm64/ilp32.txt                 |  45 +++++++
->  arch/Kconfig                                  |   4 +
->  arch/arc/Kconfig                              |   1 +
->  arch/arc/include/uapi/asm/unistd.h            |   1 +
->  arch/arm/Kconfig                              |   1 +
->  arch/arm64/Kconfig                            |  19 ++-
->  arch/arm64/Makefile                           |   5 +
->  arch/arm64/include/asm/compat.h               |  19 +--
->  arch/arm64/include/asm/elf.h                  |  32 ++---
->  arch/arm64/include/asm/fpsimd.h               |   2 +-
->  arch/arm64/include/asm/ftrace.h               |   2 +-
->  arch/arm64/include/asm/hwcap.h                |   6 +-
->  arch/arm64/include/asm/is_compat.h            |  90 ++++++++++++++
->  arch/arm64/include/asm/memory.h               |   5 +-
->  arch/arm64/include/asm/processor.h            |  11 +-
->  arch/arm64/include/asm/ptrace.h               |   2 +-
->  arch/arm64/include/asm/seccomp.h              |   2 +-
->  arch/arm64/include/asm/signal32.h             |   9 +-
->  arch/arm64/include/asm/signal32_common.h      |  27 ++++
->  arch/arm64/include/asm/signal_common.h        |  33 +++++
->  arch/arm64/include/asm/signal_ilp32.h         |  38 ++++++
->  arch/arm64/include/asm/syscall.h              |   2 +-
->  arch/arm64/include/asm/thread_info.h          |   4 +-
->  arch/arm64/include/asm/unistd.h               |   8 +-
->  arch/arm64/include/asm/vdso.h                 |   6 +
->  arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
->  arch/arm64/include/uapi/asm/unistd.h          |  13 ++
->  arch/arm64/kernel/Makefile                    |  18 ++-
->  arch/arm64/kernel/asm-offsets.c               |   9 +-
->  arch/arm64/kernel/binfmt_elf32.c              |  32 +++++
->  arch/arm64/kernel/binfmt_ilp32.c              |  85 +++++++++++++
->  arch/arm64/kernel/cpufeature.c                |   8 +-
->  arch/arm64/kernel/cpuinfo.c                   |  20 +--
->  arch/arm64/kernel/entry.S                     |  34 +++++-
->  arch/arm64/kernel/entry32.S                   |  80 ------------
->  arch/arm64/kernel/entry32_common.S            | 107 ++++++++++++++++
->  arch/arm64/kernel/entry_ilp32.S               |  22 ++++
->  arch/arm64/kernel/head.S                      |   2 +-
->  arch/arm64/kernel/hw_breakpoint.c             |   8 +-
->  arch/arm64/kernel/perf_regs.c                 |   2 +-
->  arch/arm64/kernel/process.c                   |   7 +-
->  arch/arm64/kernel/ptrace.c                    |  80 ++++++++++--
->  arch/arm64/kernel/signal.c                    | 102 ++++++++++------
->  arch/arm64/kernel/signal32.c                  | 107 ----------------
->  arch/arm64/kernel/signal32_common.c           | 135 ++++++++++++++++++++
->  arch/arm64/kernel/signal_ilp32.c              | 170 ++++++++++++++++++++++++++
->  arch/arm64/kernel/sys_ilp32.c                 | 100 +++++++++++++++
->  arch/arm64/kernel/traps.c                     |   5 +-
->  arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
->  arch/arm64/kernel/vdso-ilp32/Makefile         |  74 +++++++++++
->  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++++
->  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 ++++++++++++++
->  arch/arm64/kernel/vdso.c                      |  69 +++++++++--
->  arch/arm64/kernel/vdso/gettimeofday.S         |  20 ++-
->  arch/arm64/kernel/vdso/vdso.S                 |   6 +-
->  arch/blackfin/Kconfig                         |   1 +
->  arch/c6x/include/uapi/asm/unistd.h            |   1 +
->  arch/cris/Kconfig                             |   1 +
->  arch/frv/Kconfig                              |   1 +
->  arch/h8300/Kconfig                            |   1 +
->  arch/h8300/include/uapi/asm/unistd.h          |   1 +
->  arch/hexagon/Kconfig                          |   1 +
->  arch/hexagon/include/uapi/asm/unistd.h        |   1 +
->  arch/m32r/Kconfig                             |   1 +
->  arch/m68k/Kconfig                             |   1 +
->  arch/metag/Kconfig                            |   1 +
->  arch/metag/include/uapi/asm/unistd.h          |   1 +
->  arch/microblaze/Kconfig                       |   1 +
->  arch/mips/Kconfig                             |   1 +
->  arch/mn10300/Kconfig                          |   1 +
->  arch/nios2/Kconfig                            |   1 +
->  arch/nios2/include/uapi/asm/unistd.h          |   1 +
->  arch/openrisc/Kconfig                         |   1 +
->  arch/openrisc/include/uapi/asm/unistd.h       |   1 +
->  arch/parisc/Kconfig                           |   1 +
->  arch/powerpc/Kconfig                          |   1 +
->  arch/score/Kconfig                            |   1 +
->  arch/score/include/uapi/asm/unistd.h          |   1 +
->  arch/sh/Kconfig                               |   1 +
->  arch/sparc/Kconfig                            |   1 +
->  arch/tile/Kconfig                             |   1 +
->  arch/tile/include/uapi/asm/unistd.h           |   1 +
->  arch/tile/kernel/compat.c                     |   3 +
->  arch/unicore32/Kconfig                        |   1 +
->  arch/unicore32/include/uapi/asm/unistd.h      |   1 +
->  arch/x86/Kconfig                              |   1 +
->  arch/x86/um/Kconfig                           |   1 +
->  arch/xtensa/Kconfig                           |   1 +
->  drivers/clocksource/arm_arch_timer.c          |   2 +-
->  include/linux/fcntl.h                         |   2 +-
->  include/linux/thread_bits.h                   |  63 ++++++++++
->  include/linux/thread_info.h                   |  54 +-------
->  include/uapi/asm-generic/unistd.h             |  10 +-
->  93 files changed, 1586 insertions(+), 408 deletions(-)
->  create mode 100644 Documentation/arm64/ilp32.txt
->  create mode 100644 arch/arm64/include/asm/is_compat.h
->  create mode 100644 arch/arm64/include/asm/signal32_common.h
->  create mode 100644 arch/arm64/include/asm/signal_common.h
->  create mode 100644 arch/arm64/include/asm/signal_ilp32.h
->  create mode 100644 arch/arm64/kernel/binfmt_elf32.c
->  create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
->  create mode 100644 arch/arm64/kernel/entry32_common.S
->  create mode 100644 arch/arm64/kernel/entry_ilp32.S
->  create mode 100644 arch/arm64/kernel/signal32_common.c
->  create mode 100644 arch/arm64/kernel/signal_ilp32.c
->  create mode 100644 arch/arm64/kernel/sys_ilp32.c
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
->  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
->  create mode 100644 include/linux/thread_bits.h
-> 
-> -- 
-> 2.7.4
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 6e1cfdf..c705ca2 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -17,9 +17,12 @@
+ #include <linux/fsi.h>
+ #include <linux/idr.h>
+ #include <linux/module.h>
++#include <linux/slab.h>
+ 
+ #include "fsi-master.h"
+ 
++#define FSI_SLAVE_SIZE_23b		0x800000
++
+ static DEFINE_IDA(master_ida);
+ 
+ struct fsi_slave {
+@@ -114,11 +117,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			addr, val, size);
+ }
+ 
++static void fsi_slave_release(struct device *dev)
++{
++	struct fsi_slave *slave = to_fsi_slave(dev);
++
++	kfree(slave);
++}
++
+ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
+ {
+-	/* todo: initialise slave device, perform engine scan */
++	struct fsi_slave *slave;
++	uint32_t chip_id;
++	uint8_t crc;
++	int rc;
++
++	/* Currently, we only support single slaves on a link, and use the
++	 * full 23-bit address range
++	 */
++	if (id != 0)
++		return -EINVAL;
++
++	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
++	if (rc) {
++		dev_warn(&master->dev, "can't read slave %02x:%02x %d\n",
++				link, id, rc);
++		return -ENODEV;
++	}
++	chip_id = be32_to_cpu(chip_id);
++
++	crc = fsi_crc4(0, chip_id, 32);
++	if (crc) {
++		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
++				link, id);
++		return -EIO;
++	}
++
++	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
++			chip_id, master->idx, link, id);
++
++	/* We can communicate with a slave; create the slave device and
++	 * register.
++	 */
++	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
++	if (!slave)
++		return -ENOMEM;
++
++	slave->master = master;
++	slave->dev.parent = &master->dev;
++	slave->dev.release = fsi_slave_release;
++	slave->link = link;
++	slave->id = id;
++	slave->size = FSI_SLAVE_SIZE_23b;
++
++	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
++	rc = device_register(&slave->dev);
++	if (rc < 0) {
++		dev_warn(&master->dev, "failed to create slave device: %d\n",
++				rc);
++		put_device(&slave->dev);
++		return rc;
++	}
++
++	/* todo: perform engine scan */
+ 
+-	return -ENODEV;
++	return rc;
+ }
+ 
+ /* FSI master support */
+-- 
+1.8.2.2
