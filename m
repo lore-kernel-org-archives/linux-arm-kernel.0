@@ -1,48 +1,84 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 10 Apr 2017 13:06:40 -0400
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <20170410165328.GA5248@red-moon>
-References: <466dcd2b-a781-2fe7-6ef0-5a3767c793e0@codeaurora.org>
- <CAKv+Gu9LbwpnJNi1OL25MWvYPxEOfKRHcs2jA2121BPaQWPzow@mail.gmail.com>
- <27f50de3-721e-e8ec-00c8-b7a9d3cff0d6@codeaurora.org>
- <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
- <20170330100524.GA22801@red-moon>
- <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
- <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
- <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
- <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
- <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
- <20170410165328.GA5248@red-moon>
-Message-ID: <a92d4d6a-0d94-350e-a0dd-55516fbc8ab7@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Apr 2017 18:12:40 +0100
+Subject: [PATCH v7 4/4] arm64/syscalls: Architecture specific
+ pre-usermode check
+In-Reply-To: <20170410164420.64003-4-thgarnie@google.com>
+References: <20170410164420.64003-1-thgarnie@google.com>
+ <20170410164420.64003-4-thgarnie@google.com>
+Message-ID: <20170410171240.GE30647@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/10/2017 12:53 PM, Lorenzo Pieralisi wrote:
-> Do we want to enforce it on ARM ? I do not know to be honest (and it
-> still would not solve the DT firmware case).
+On Mon, Apr 10, 2017 at 09:44:20AM -0700, Thomas Garnier wrote:
+> Disable the generic pre-usermode check in favor of an optimized
+> implementation. This patch adds specific checks on user-mode return path
+> to make it faster and smaller.
 > 
+> The address limit is checked on each syscall return path to user-mode.
+> If it was changed, a generic handler is called to stop the kernel on an
+> explicit check.
+> 
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+> ---
+> Based on next-20170410
+> ---
+>  arch/arm64/Kconfig        |  1 +
+>  arch/arm64/kernel/entry.S | 13 +++++++++++++
+>  2 files changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 9b8fcab7da56..3f9e8e7d9376 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -24,6 +24,7 @@ config ARM64
+>  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>  	select ARCH_WANT_FRAME_POINTERS
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+> +	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+>  	select ARM_AMBA
+>  	select ARM_ARCH_TIMER
+>  	select ARM_GIC
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 43512d4d7df2..bdd094c7837a 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -744,6 +744,8 @@ ENDPROC(cpu_switch_to)
+>  ret_fast_syscall:
+>  	disable_irq				// disable interrupts
+>  	str	x0, [sp, #S_X0]			// returned x0
+> +	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
+> +	tbnz	x2, #63, addr_limit_fail
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+>  	and	x2, x1, #_TIF_SYSCALL_WORK
+>  	cbnz	x2, ret_fast_syscall_trace
+> @@ -771,6 +773,9 @@ work_pending:
+>   */
+>  ret_to_user:
+>  	disable_irq				// disable interrupts
+> +	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
+> +	tbnz	x2, #63, addr_limit_fail
+> +
 
-Yes for ACPI on ARM. Probably no for DT. 
+Nitpick: unnecessary empty line added.
 
-> Whatever we do, it is not going to be clean cut IMO. I think that
-> what x86 does is sensible (well, minus the link ordering dependency we
-> discovered), I can do it for ARM64 but get ready for regressions and
-> I still think we have no real FW binding support that would make this
-> behaviour robust.
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]
+>  	and	x2, x1, #_TIF_WORK_MASK
+>  	cbnz	x2, work_pending
+> @@ -780,6 +785,14 @@ finish_ret_to_user:
+>  ENDPROC(ret_to_user)
+>  
+>  /*
+> + * Address limit was incorrect before returning in user-mode which could be
+> + * used to elevate privileges. Call the generic handler to stop the kernel on
+> + * the appropriate check. This function does not return.
+> + */
+> +addr_limit_fail:
+> +	bl address_limit_check_failed
 
-Is it possible to move the code from arch/x86 into drivers/acpi directory
-so that the code is shared across multiple ACPI based archs. We get more
-coverage this way.
+You could do a "b address_limit_check_failed" rather than "bl" since we
+don't care about returning here (and a nitpick: insert tab between "b"
+and "address_limit_check_failed").
 
-Can we fallback to the allocate everything behavior if we can't use the
-stuff from FW or would it be too late to recover?
+With the above:
 
-We can prevent regressions this way and issue a lot of warnings. We can
-sit down and fix those warnings over time whether the issue is in 
-UEFI BIOS or the code itself.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
