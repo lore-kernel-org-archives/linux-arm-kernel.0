@@ -1,74 +1,184 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 10 Apr 2017 14:08:44 +0200
-Subject: [PATCH 0/2] drm: dw-hdmi: various improvements
-In-Reply-To: <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
-References: <20170407141905.14147-1-romain.perier@collabora.com>
- <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
- <20170410100807.GN17774@n2100.armlinux.org.uk>
- <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
-Message-ID: <20170410120844.3czcqwjsyzmkznhp@phenom.ffwll.local>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Apr 2017 13:39:21 +0100
+Subject: [PATCH v4 20/22] KVM: arm64: ITS: ITT flush and restore
+In-Reply-To: <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
+Message-ID: <718afa1b-e0ad-f758-012a-8e0ac6a140b8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 12:35:43PM +0200, Neil Armstrong wrote:
-> On 04/10/2017 12:08 PM, Russell King - ARM Linux wrote:
-> > On Mon, Apr 10, 2017 at 10:49:18AM +0530, Archit Taneja wrote:
-> >> Hi,
-> >>
-> >> On 04/07/2017 07:49 PM, Romain Perier wrote:
-> >>> This set of patches split the stream handling functions in two parts. It
-> >>> introduces new callbacks that are specific to each variant, one for I2S
-> >>> and one for AHB.
-> >>>
-> >>> Then, as requested by the datasheet for the I2S variant, it adds support
-> >>> for gating the audio sampler clock when the audio stream is enabled and
-> >>> disabled.
-> >>>
-> >>> This patches series is the continuity of the following discussion:
-> >>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/493550.html
-> >>
-> >> Since these aren't fixes, could you make sure to redo the patches over:
-> >>
-> >> git://anongit.freedesktop.org/drm-misc drm-misc-next
-> >>
-> >> The dw-hdmi driver is now under drivers/gpu/drm/bridge/synopsis/
-> > 
-> > This is annoying as it makes submission of CEC support for dw-hdmi
-> > rather difficult due to the now horrid cross-tree dependencies:
-> > 
-> > * if I submit it to the DRM tree, the DRM tree will build break because
-> >   you don't have the necessary CEC changes which have recently been
-> >   merged into the media tree.
-> > 
-> > * if I submit it to the media tree, the new files will be placed into
-> >   drivers/gpu/drm/bridge and when stuff gets merged into linux-next
-> >   and/or Linus' tree, things will need quite a large fixup (someone
-> >   will have to rename the files and fix the Kconfig/Makefiles.)
-> > 
-> > So, I'll hold it back for another cycle to avoid the mess that would
-> > result from trying to get it merged during this cycle.
-> > 
+On 27/03/17 10:31, Eric Auger wrote:
+> Introduce routines to flush and restore device ITT and their
+> interrupt table entries (ITE).
 > 
-> Hi Russell,
+> The routines will be called on device table flush and
+> restore. They will become static in subsequent patches.
 > 
-> Cross tree with media has already been done on this cycle with the
-> dw-hdmi formats changes.
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > 
-> Nevertheless, please push your updated dw-hdmi cec patchset for tests
-> and review based on the latest drm-misc-next and hverkuil's HPD notifier
-> release.
+> ---
 > 
-> I would like to run it on some Amlogic boards.
+> v3 -> v4:
+> - lookup_table and compute_next_eventid_offset become static in this
+>   patch
+> - remove static along with vgic_its_flush/restore_itt to avoid
+>   compilation warnings
+> - next field only computed with a shift (mask removed)
+> - handle the case where the last element has not been found
+> 
+> v2 -> v3:
+> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
+> 
+> v2: creation
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 107 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 104 insertions(+), 3 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index b907e3c..02c0694 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1707,7 +1707,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+>  	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+>  }
+>  
+> -u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+> +static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
+>  {
+>  	struct list_head *e = &ite->ite_list;
+>  	struct its_ite *next;
+> @@ -1749,8 +1749,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
+>   *
+>   * Return: < 0 on error, 1 if last element identified, 0 otherwise
+>   */
+> -int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> -		 int start_id, entry_fn_t fn, void *opaque)
+> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> +			int start_id, entry_fn_t fn, void *opaque)
+>  {
+>  	gpa_t gpa = base, top = base + size - 1;
+>  	unsigned long len = size;
+> @@ -1815,6 +1815,107 @@ static int vgic_its_restore_pending_tables(struct kvm *kvm)
+>  	return -ENXIO;
+>  }
+>  
+> +static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
+> +			      struct its_ite *ite, gpa_t gpa)
+> +{
+> +	struct kvm *kvm = its->dev->kvm;
+> +	u32 next_offset;
+> +	u64 val;
+> +
+> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
+> +	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
+> +		ite->collection->collection_id;
 
-Yeah, cross subsystem topic branches aren't rocket science, we have the
-entire process documented and scripted on the drm side. Hairy depencies
-really aren't a reason to not submit patches, we've got this :-)
+Same remark as before concerning the #define-ing of the encoding and the
+name of the function.
 
-But 4.12 is done anyway on the drm side, so will get delayed to 4.13 no
-matter what. Still would be good to get the patches reviewed as early as
-possible.
--Daniel
+> +	val = cpu_to_le64(val);
+> +	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
+> +}
+> +
+> +/**
+> + * vgic_its_restore_ite - restore an interrupt translation entry
+> + * @event_id: id used for indexing
+> + * @ptr: kernel VA where the 8 byte ITE is located
+> + * @opaque: pointer to the its_device
+> + * @next: id offset to the next entry
+> + */
+> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
+> +				void *ptr, void *opaque, u32 *next)
+> +{
+> +	struct its_device *dev = (struct its_device *)opaque;
+> +	struct its_collection *collection;
+> +	struct kvm *kvm = its->dev->kvm;
+> +	u64 val, *p = (u64 *)ptr;
+> +	struct vgic_irq *irq;
+> +	u32 coll_id, lpi_id;
+> +	struct its_ite *ite;
+> +	int ret;
+> +
+> +	val = *p;
+> +	*next = 1;
+> +
+> +	val = le64_to_cpu(val);
+> +
+> +	coll_id = val & GENMASK_ULL(15, 0);
+> +	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
+> +
+> +	if (!lpi_id)
+> +		return 0;
+> +
+> +	*next = val >> 48;
+> +
+> +	collection = find_collection(its, coll_id);
+> +	if (!collection)
+> +		return -EINVAL;
+> +
+> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
+> +				  lpi_id, event_id);
+> +	if (ret)
+> +		return ret;
+> +
+> +	irq = vgic_add_lpi(kvm, lpi_id);
+> +	if (IS_ERR(irq))
+> +		return PTR_ERR(irq);
+> +	ite->irq = irq;
+> +
+> +	/* restore the configuration of the LPI */
+> +	ret = update_lpi_config(kvm, irq, NULL);
+> +	if (ret)
+> +		return ret;
+> +
+> +	update_affinity_ite(kvm, ite);
+> +	return 0;
+> +}
+> +
+> +int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
+> +{
+> +	gpa_t base = device->itt_addr;
+> +	struct its_ite *ite;
+> +	int ret;
+> +
+> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
+> +		gpa_t gpa = base + ite->event_id * VITS_ESZ;
+> +
+> +		ret = vgic_its_flush_ite(its, device, ite, gpa);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +	return 0;
+> +}
+> +
+> +int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
+> +{
+> +	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * VITS_ESZ;
+> +	gpa_t base = dev->itt_addr;
+> +	int ret;
+> +
+> +	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
+> +			    vgic_its_restore_ite, dev);
+> +
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* if the last element has not been found we are in trouble */
+> +	return ret ? 0 : -EINVAL;
+
+This makes me wonder. Can't lookup_table perform that check on its own
+and always return an error when something went wrong?
+
+> +}
+> +
+>  /**
+>   * vgic_its_flush_device_tables - flush the device table and all ITT
+>   * into guest RAM
+> 
+
+Thanks,
+
+	M.
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Jazz is not dead. It just smells funny...
