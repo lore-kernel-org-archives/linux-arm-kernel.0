@@ -1,133 +1,138 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 10 Apr 2017 08:52:24 -0600
-Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without
- struct page
-In-Reply-To: <20170405231451.GB17774@n2100.armlinux.org.uk>
-References: <20170405160242.14195-1-shuahkh@osg.samsung.com>
- <20170405231451.GB17774@n2100.armlinux.org.uk>
-Message-ID: <953a06da-6eb3-a37e-d126-e11119217f29@osg.samsung.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 10 Apr 2017 09:52:47 -0500
+Subject: [PATCH v2] misc: sram-exec: Use aligned fncpy instead of memcpy
+Message-ID: <20170410145247.6023-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2017 05:14 PM, Russell King - ARM Linux wrote:
-> On Wed, Apr 05, 2017 at 10:02:42AM -0600, Shuah Khan wrote:
->> When coherent DMA memory without struct page is shared, importer
->> fails to find the page and runs into kernel page fault when it
->> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
->> in the sg_table. Please see www.spinics.net/lists/stable/msg164204.html
->> for more information on this problem.
->>
->> This solution allows coherent DMA memory without struct page to be
->> shared by providing a way for the exporter to tag the DMA buffer as
->> a special buffer without struct page association and passing the
->> information in sg_table to the importer. This information is used
->> in attach/map_sg to avoid cleaning D-cache and mapping.
->>
->> The details of the change are:
->>
->> Framework:
->> - Add a new dma_attrs field to struct scatterlist.
->> - Add a new DMA_ATTR_DEV_COHERENT_NOPAGE attribute to clearly identify
->>   Coherent memory without struct page.
->> - Add a new dma_check_dev_coherent() interface to check if memory is
->>   the device coherent area. There is no way to tell where the memory
->>   returned by dma_alloc_attrs() came from.
->>
->> Exporter logic:
->> - Add logic to vb2_dc_alloc() to call dma_check_dev_coherent() and set
->>   DMA_ATTR_DEV_COHERENT_NOPAGE based the results of the check. This is
->>   done in the exporter context.
->> - Add logic to arm_dma_get_sgtable() to identify memory without struct
->>   page using DMA_ATTR_DEV_COHERENT_NOPAGE attribute. If this attr is
->>   set, arm_dma_get_sgtable() will set page as the cpu_addr and update
->>   dma_address and dma_attrs fields in struct scatterlist for this sgl.
->>   This is done in exporter context when buffer is exported. With this
-> 
-> This sentence appears to just end...
-> 
-> I'm not convinced that coherent allocations should be setting the "page"
-> of a scatterlist to anything that isn't a real struct page or NULL.  It
-> is, after all, an error to look up the virtual address etc of the
-> scatterlist entry or kmap it when it isn't backed by a struct page.
-> 
-> I'm actually already passing non-page backed memory through the DMA API
-> in armada-drm, although not entirely correctly, and etnaviv handles it
-> fine:
-> 
->         } else if (dobj->linear) {
->                 /* Single contiguous physical region - no struct page */
->                 if (sg_alloc_table(sgt, 1, GFP_KERNEL))
->                         goto free_sgt;
->                 sg_dma_address(sgt->sgl) = dobj->dev_addr;
->                 sg_dma_len(sgt->sgl) = dobj->obj.size;
-> 
-> This is not quite correct, as it assumes (which is safe for it currently)
-> that the DMA address is the same on all devices.  On Dove, which is where
-> this is used, that is the case, but it's not true elsewhere.  Also note
-> that I'm avoid calling dma_map_sg() and dma_unmap_sg() - there's no iommus
-> to be considered.
+Currently the sram-exec functionality, which allows allocation of
+executable memory and provides an API to move code to it, is only
+selected in configs for the ARM architecture. Based on commit
+5756e9dd0de6 ("ARM: 6640/1: Thumb-2: Symbol manipulation macros for
+function body copying") simply copying a C function pointer address
+using memcpy without consideration of alignment and Thumb is unsafe on
+ARM platforms.
 
-I see. That is not the case for the drivers involved in my use-case. exynos
-has iommu and this s5p-mfc exporting buffers to exynos-gsc use-case does
-work when iommu is enabled.
+The aforementioned patch introduces the fncpy macro which is a safe way
+to copy executable code on ARM platforms, so let's make use of that here
+rather than the unsafe plain memcpy that was previously used by
+sram_exec_copy. Now sram_exec_copy will move the code to "dst" and
+return an address that is guaranteed to be safely callable.
 
-> 
-> I'd suggest that this follows the same pattern - setting the DMA address
-> (more appropriately for generic code) and the DMA length, while leaving
-> the virtual address members NULL/0.  However, there's also the
-> complication of setting up any IOMMUs that would be necessary.  I haven't
-> looked at that, or how it could work.
-> 
-> I also think this should be documented in the dmabuf API that it can
-> pass such scatterlists that are DMA-parameter only.
-> 
-> Lastly, I'd recommend that anything using this does _not_ provide
-> functional kmap/kmap_atomic support for these - kmap and kmap_atomic
-> are both out because there's no struct page anyway (and their use would
-> probably oops the kernel in this scenario.)  I avoided mmap support in
-> armada drm, but if there's a pressing reason and real use case for the
-> importer to mmap() the buffers in userspace, it's something I could be
-> convinced of.
-> 
-> What I'm quite certain of is that we do _not_ want to be passing
-> coherent memory allocations into the streaming DMA API, not even with
-> a special attribute.  The DMA API is about gaining coherent memory
-> (shared ownership of the buffer), or mapping system memory to a
-> specified device (which can imply unique ownership.)  Trying to mix
-> the two together muddies the separation that we have there, and makes
-> it harder to explain.  As can be seen from this patch, we'd end up
-> needing to add this special DMA_ATTR_DEV_COHERENT_NOPAGE everywhere,
-> which is added complexity on top of stuff that is not required for
-> this circumstance.
+In the future, architectures hoping to make use of the sram-exec
+functionality must define an fncpy macro just as ARM has done to
+guarantee or check for safe copying to executable memory before allowing
+the arch to select CONFIG_SRAM_EXEC.
 
-The ownership can be tricky as you mentioned. In this particular use-case,
-there is a clear ownership definition because of the way v4l2 export/import
-works and also the qbuf/dqbuf rules. However, there might be other use-cases
-ownership isn't clearly established.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
 
-> 
-> I can see why you're doing it, to avoid having to duplicate more of
-> the generic code in drm_prime, but I don't think plasting over this
-> problem in arch code by adding this special flag is a particularly
-> good way forward.
-> 
+v1: http://www.spinics.net/lists/linux-omap/msg136517.html
 
-Right. I went with this approach to avoid duplicating the code. It does
-come with the complexity of needing to check the attribute in a few
-places.
+v2 changes: Return value of fncpy, as the returned address is the safely
+	    executable one, and add supporting docs in comments.
 
-With the current code, we still have the issue of pagefault. Your patch
-that adds a check for invalid doesn't cover all cases.
+ drivers/misc/sram-exec.c | 27 ++++++++++++++++++++-------
+ include/linux/sram.h     |  8 ++++----
+ 2 files changed, 24 insertions(+), 11 deletions(-)
 
-My goal behind this patch is two fold. 1. Fix the pagefault with a
-definitive test and 2. see if per-device coherent memory can be passed
-through.
-
-The first goal is still worth while. Would it be reasonable to use
-dma_check_dev_coherent() to test for this case in arm_dma_get_sgtable()
-or even from dma_get_sgtable_attrs() and fail early? This will avoid
-false negatives with the invalid page test. If this sounds reasonable,
-I can spin this work to do that instead.
-
-thanks,
--- Shuah
+diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+index ac522417c462..9d54e14e8360 100644
+--- a/drivers/misc/sram-exec.c
++++ b/drivers/misc/sram-exec.c
+@@ -19,6 +19,7 @@
+ #include <linux/sram.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/fncpy.h>
+ 
+ #include "sram.h"
+ 
+@@ -57,20 +58,32 @@ int sram_add_protect_exec(struct sram_partition *part)
+  * @src: Source address for the data to copy
+  * @size: Size of copy to perform, which starting from dst, must reside in pool
+  *
++ * Return: Address for copied data that can safely be called through function
++ *	   pointer, or NULL if problem.
++ *
+  * This helper function allows sram driver to act as central control location
+  * of 'protect-exec' pools which are normal sram pools but are always set
+  * read-only and executable except when copying data to them, at which point
+  * they are set to read-write non-executable, to make sure no memory is
+  * writeable and executable at the same time. This region must be page-aligned
+  * and is checked during probe, otherwise page attribute manipulation would
+- * not be possible.
++ * not be possible. Care must be taken to only call the returned address as
++ * dst address is not guaranteed to be safely callable.
++ *
++ * NOTE: This function uses the fncpy macro to move code to the executable
++ * region. Some architectures have strict requirements for relocating
++ * executable code, so fncpy is a macro that must be defined by any arch
++ * making use of this functionality that guarantees a safe copy of exec
++ * data and returns a safe address that can be called as a C function
++ * pointer.
+  */
+-int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+-		   size_t size)
++void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
++		     size_t size)
+ {
+ 	struct sram_partition *part = NULL, *p;
+ 	unsigned long base;
+ 	int pages;
++	void *dst_cpy;
+ 
+ 	mutex_lock(&exec_pool_list_mutex);
+ 	list_for_each_entry(p, &exec_pool_list, list) {
+@@ -80,10 +93,10 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+ 	mutex_unlock(&exec_pool_list_mutex);
+ 
+ 	if (!part)
+-		return -EINVAL;
++		return NULL;
+ 
+ 	if (!addr_in_gen_pool(pool, (unsigned long)dst, size))
+-		return -EINVAL;
++		return NULL;
+ 
+ 	base = (unsigned long)part->base;
+ 	pages = PAGE_ALIGN(size) / PAGE_SIZE;
+@@ -93,13 +106,13 @@ int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+ 	set_memory_nx((unsigned long)base, pages);
+ 	set_memory_rw((unsigned long)base, pages);
+ 
+-	memcpy(dst, src, size);
++	dst_cpy = fncpy(dst, src, size);
+ 
+ 	set_memory_ro((unsigned long)base, pages);
+ 	set_memory_x((unsigned long)base, pages);
+ 
+ 	mutex_unlock(&part->lock);
+ 
+-	return 0;
++	return dst_cpy;
+ }
+ EXPORT_SYMBOL_GPL(sram_exec_copy);
+diff --git a/include/linux/sram.h b/include/linux/sram.h
+index c97dcbe8ce25..4fb405fb0480 100644
+--- a/include/linux/sram.h
++++ b/include/linux/sram.h
+@@ -16,12 +16,12 @@
+ struct gen_pool;
+ 
+ #ifdef CONFIG_SRAM_EXEC
+-int sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
++void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src, size_t size);
+ #else
+-static inline int sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
+-				 size_t size)
++static inline void *sram_exec_copy(struct gen_pool *pool, void *dst, void *src,
++				   size_t size)
+ {
+-	return -ENODEV;
++	return NULL;
+ }
+ #endif /* CONFIG_SRAM_EXEC */
+ #endif /* __LINUX_SRAM_H__ */
+-- 
+2.11.0
