@@ -1,87 +1,83 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 10 Apr 2017 15:38:10 +0300
-Subject: [v3, 3/7] mmc: sdhci-of-esdhc: add tuning support
-In-Reply-To: <1490600982-5410-4-git-send-email-yangbo.lu@nxp.com>
-References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
- <1490600982-5410-4-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <deb93f31-abae-6242-801f-505427a7f557@intel.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Apr 2017 13:44:21 +0100
+Subject: [PATCH 0/2] drm: dw-hdmi: various improvements
+In-Reply-To: <20170410120844.3czcqwjsyzmkznhp@phenom.ffwll.local>
+References: <20170407141905.14147-1-romain.perier@collabora.com>
+ <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
+ <20170410100807.GN17774@n2100.armlinux.org.uk>
+ <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
+ <20170410120844.3czcqwjsyzmkznhp@phenom.ffwll.local>
+Message-ID: <20170410124420.GQ17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 10:49, Yangbo Lu wrote:
-> eSDHC uses tuning block for tuning procedure. So the tuning
-> block control register must be configured properly before tuning.
+On Mon, Apr 10, 2017 at 02:08:44PM +0200, Daniel Vetter wrote:
+> On Mon, Apr 10, 2017 at 12:35:43PM +0200, Neil Armstrong wrote:
+> > On 04/10/2017 12:08 PM, Russell King - ARM Linux wrote:
+> > > On Mon, Apr 10, 2017 at 10:49:18AM +0530, Archit Taneja wrote:
+> > >> Hi,
+> > >>
+> > >> On 04/07/2017 07:49 PM, Romain Perier wrote:
+> > >>> This set of patches split the stream handling functions in two parts. It
+> > >>> introduces new callbacks that are specific to each variant, one for I2S
+> > >>> and one for AHB.
+> > >>>
+> > >>> Then, as requested by the datasheet for the I2S variant, it adds support
+> > >>> for gating the audio sampler clock when the audio stream is enabled and
+> > >>> disabled.
+> > >>>
+> > >>> This patches series is the continuity of the following discussion:
+> > >>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/493550.html
+> > >>
+> > >> Since these aren't fixes, could you make sure to redo the patches over:
+> > >>
+> > >> git://anongit.freedesktop.org/drm-misc drm-misc-next
+> > >>
+> > >> The dw-hdmi driver is now under drivers/gpu/drm/bridge/synopsis/
+> > > 
+> > > This is annoying as it makes submission of CEC support for dw-hdmi
+> > > rather difficult due to the now horrid cross-tree dependencies:
+> > > 
+> > > * if I submit it to the DRM tree, the DRM tree will build break because
+> > >   you don't have the necessary CEC changes which have recently been
+> > >   merged into the media tree.
+> > > 
+> > > * if I submit it to the media tree, the new files will be placed into
+> > >   drivers/gpu/drm/bridge and when stuff gets merged into linux-next
+> > >   and/or Linus' tree, things will need quite a large fixup (someone
+> > >   will have to rename the files and fix the Kconfig/Makefiles.)
+> > > 
+> > > So, I'll hold it back for another cycle to avoid the mess that would
+> > > result from trying to get it merged during this cycle.
+> > > 
+> > 
+> > Hi Russell,
+> > 
+> > Cross tree with media has already been done on this cycle with the
+> > dw-hdmi formats changes.
+> > 
+> > Nevertheless, please push your updated dw-hdmi cec patchset for tests
+> > and review based on the latest drm-misc-next and hverkuil's HPD notifier
+> > release.
+> > 
+> > I would like to run it on some Amlogic boards.
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> Yeah, cross subsystem topic branches aren't rocket science, we have the
+> entire process documented and scripted on the drm side. Hairy depencies
+> really aren't a reason to not submit patches, we've got this :-)
+> 
+> But 4.12 is done anyway on the drm side, so will get delayed to 4.13 no
+> matter what. Still would be good to get the patches reviewed as early as
+> possible.
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Maybe if I had infinite bandwidth, then that would happen, but I don't.
+That makes it very low priority for me, as there's no benefit to me to
+spending time on it before the merge window, and if I wait until after
+the merge window, things get easier, and I don't have to pollute my tree
+with unmerged changes from other trees.  So there's actually beneficial
+reasons for me to do nothing on this right now.
 
-> ---
-> Changes for v2:
-> 	- Replaced old function for mmc_host_ops.execute_tuning with
-> 	  esdhc_execute_tuning to support eSDHC tuning.
-> Changes for v3:
-> 	- Put .execute_tuning assigning after after IS_ERR(host) check.
-> ---
->  drivers/mmc/host/sdhci-esdhc.h    |  5 +++++
->  drivers/mmc/host/sdhci-of-esdhc.c | 20 ++++++++++++++++++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-> index 6869567..c4bbd74 100644
-> --- a/drivers/mmc/host/sdhci-esdhc.h
-> +++ b/drivers/mmc/host/sdhci-esdhc.h
-> @@ -53,9 +53,14 @@
->  #define ESDHC_CLOCK_HCKEN		0x00000002
->  #define ESDHC_CLOCK_IPGEN		0x00000001
->  
-> +/* Tuning Block Control Register */
-> +#define ESDHC_TBCTL			0x120
-> +#define ESDHC_TB_EN			0x00000004
-> +
->  /* Control Register for DMA transfer */
->  #define ESDHC_DMA_SYSCTL		0x40c
->  #define ESDHC_PERIPHERAL_CLK_SEL	0x00080000
-> +#define ESDHC_FLUSH_ASYNC_FIFO		0x00040000
->  #define ESDHC_DMA_SNOOP			0x00000040
->  
->  #endif /* _DRIVERS_MMC_SDHCI_ESDHC_H */
-> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-> index a70499a..8c8e147 100644
-> --- a/drivers/mmc/host/sdhci-of-esdhc.c
-> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
-> @@ -630,6 +630,25 @@ static int esdhc_signal_voltage_switch(struct mmc_host *mmc,
->  	}
->  }
->  
-> +static int esdhc_execute_tuning(struct mmc_host *mmc, u32 opcode)
-> +{
-> +	struct sdhci_host *host = mmc_priv(mmc);
-> +	u32 val;
-> +
-> +	/* Use tuning block for tuning procedure */
-> +	esdhc_clock_enable(host, false);
-> +	val = sdhci_readl(host, ESDHC_DMA_SYSCTL);
-> +	val |= ESDHC_FLUSH_ASYNC_FIFO;
-> +	sdhci_writel(host, val, ESDHC_DMA_SYSCTL);
-> +
-> +	val = sdhci_readl(host, ESDHC_TBCTL);
-> +	val |= ESDHC_TB_EN;
-> +	sdhci_writel(host, val, ESDHC_TBCTL);
-> +	esdhc_clock_enable(host, true);
-> +
-> +	return sdhci_execute_tuning(mmc, opcode);
-> +}
-> +
->  #ifdef CONFIG_PM_SLEEP
->  static u32 esdhc_proctl;
->  static int esdhc_of_suspend(struct device *dev)
-> @@ -787,6 +806,7 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
->  
->  	host->mmc_host_ops.start_signal_voltage_switch =
->  		esdhc_signal_voltage_switch;
-> +	host->mmc_host_ops.execute_tuning = esdhc_execute_tuning;
->  
->  	esdhc_init(pdev, host);
->  
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
