@@ -1,45 +1,48 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Mon, 10 Apr 2017 09:52:12 +0800
-Subject: [PATCH] arm64: kaslr: fix ARM64_MODULE_PLTS dependency
-Message-ID: <1491789132-18933-1-git-send-email-huawei.libin@huawei.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 10 Apr 2017 13:18:51 +1000
+Subject: linux-next: manual merge of the clockevents tree with the arm-soc tree
+Message-ID: <20170410131851.556bc24f@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a bug that when RANDOMIZE_BASE enabled and
-RANDOMIZE_MODULE_REGION_FULL disabled, and assume that there are
-many modules, and module space is not enabled, module_alloc code
-now will alloc space in vmalloc space, and the patch
-"fe88a4 arm64: kaslr: keep modules close to the kernel when
-DYNAMIC_FTRACE=y" will be invalid.
+Hi Daniel,
 
-In fact, we only need plt when RANDOMIZE_MODULE_REGION_FULL enabled,
-so fix the dependency, that only RANDOMIZE_MODULE_REGION_FULL select
-ARM64_MODULE_PLTS.
+Today's linux-next merge of the clockevents tree got a conflict in:
 
-Signed-off-by: Li Bin <huawei.libin@huawei.com>
----
- arch/arm64/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  arch/arm/boot/dts/rk3188.dtsi
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3741859..40692bb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -952,7 +952,6 @@ config RELOCATABLE
- 
- config RANDOMIZE_BASE
- 	bool "Randomize the address of the kernel image"
--	select ARM64_MODULE_PLTS if MODULES
- 	select RELOCATABLE
- 	help
- 	  Randomizes the virtual address at which the kernel image is
-@@ -972,6 +971,7 @@ config RANDOMIZE_BASE
- config RANDOMIZE_MODULE_REGION_FULL
- 	bool "Randomize the module region independently from the core kernel"
- 	depends on RANDOMIZE_BASE && !DYNAMIC_FTRACE
-+	select ARM64_MODULE_PLTS if MODULES
- 	default y
- 	help
- 	  Randomizes the location of the module region without considering the
+between commit:
+
+  2e1aa605fadd ("ARM: dts: rockchip: fix PPI misconfiguration on Cortex-A9 socs")
+
+from the arm-soc tree and commit:
+
+  500d0aa918a2 ("ARM: dts: rockchip: disable arm-global-timer for rk3188")
+
+from the clockevents tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
 -- 
-1.7.12.4
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/boot/dts/rk3188.dtsi
+index fa1bdb8875ae,1aff4ad22fc4..000000000000
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@@ -529,7 -545,8 +545,8 @@@
+  };
+  
+  &global_timer {
+ -	interrupts = <GIC_PPI 11 0xf04>;
+ +	interrupts = <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
++ 	status = "disabled";
+  };
+  
+  &local_timer {
