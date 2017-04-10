@@ -1,22 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Apr 2017 13:26:41 -0500
-Subject: [PATCH v2 3/3] dt-bindings: Document Phytec phyCORE-RK3288 RDK
-In-Reply-To: <1491483866-18368-3-git-send-email-w.egorov@phytec.de>
-References: <1491483866-18368-1-git-send-email-w.egorov@phytec.de>
- <1491483866-18368-3-git-send-email-w.egorov@phytec.de>
-Message-ID: <20170410182641.gckm7wpbqlh2kp2q@rob-hp-laptop>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 10 Apr 2017 21:33:43 +0300
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170410161816.GD5339@atomide.com>
+References: <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+ <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+ <20170403153604.GI10760@atomide.com>
+ <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
+ <20170407164731.GJ13234@atomide.com>
+ <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
+ <20170410161816.GD5339@atomide.com>
+Message-ID: <74c65472-cc1c-1ab9-7d27-65a164a6f025@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 03:04:26PM +0200, Wadim Egorov wrote:
-> Add documentation for the PCM-947 carrier board, a RK3288 based
-> development board made by PHYTEC.
-> 
-> Signed-off-by: Wadim Egorov <w.egorov@phytec.de>
-> ---
-> No changes in v2
-> ---
->  Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+On 10/04/17 19:18, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170410 00:34]:
+>> On 07/04/17 19:47, Tony Lindgren wrote:
+>>> OK hdmi works now on panda for both omapfb and omapdrm. Any ideas why
+>>> that change is now needed though?
+>>
+>> Yes, it is pretty clear actually. Previously, the hwmod main clock was
+>> controlling the hdmi clock, but this is now rerouted to the clkctrl module
+>> clock, which is shared between all DSS submodules. This leaves the hdmi
+>> clock disabled, causing the failure.
+>>
+>> The fix just puts the hdmi clock into the optional clocks list, and forces
+>> all the optional clocks on when pm_runtime is enabled for the module.
+>
+> OK so no need to fix it in the current kernels then.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Yeah, just need to figure out a clean order of applying these patches. 
+The hwmod data change for DSS modules can most likely be applied before 
+the dts change for clkctrl is going in, as it is just causing double 
+clk_enable / disable for the main clocks in that case.
+
+-Tero
