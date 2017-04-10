@@ -1,40 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 10 Apr 2017 21:33:43 +0300
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <20170410161816.GD5339@atomide.com>
-References: <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
- <20170323010057.GI10760@atomide.com> <20170323170210.GL10760@atomide.com>
- <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
- <20170330165448.GF10760@atomide.com>
- <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
- <20170403153604.GI10760@atomide.com>
- <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
- <20170407164731.GJ13234@atomide.com>
- <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
- <20170410161816.GD5339@atomide.com>
-Message-ID: <74c65472-cc1c-1ab9-7d27-65a164a6f025@ti.com>
+From: bo.li.liu@oracle.com (Liu Bo)
+Date: Mon, 10 Apr 2017 11:41:56 -0700
+Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
+In-Reply-To: <20170408210737.5456-1-kilobyte@angband.pl>
+References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
+ <20170408210737.5456-1-kilobyte@angband.pl>
+Message-ID: <20170410184155.GC15214@lim.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/17 19:18, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [170410 00:34]:
->> On 07/04/17 19:47, Tony Lindgren wrote:
->>> OK hdmi works now on panda for both omapfb and omapdrm. Any ideas why
->>> that change is now needed though?
->>
->> Yes, it is pretty clear actually. Previously, the hwmod main clock was
->> controlling the hdmi clock, but this is now rerouted to the clkctrl module
->> clock, which is shared between all DSS submodules. This leaves the hdmi
->> clock disabled, causing the failure.
->>
->> The fix just puts the hdmi clock into the optional clocks list, and forces
->> all the optional clocks on when pm_runtime is enabled for the module.
+On Sat, Apr 08, 2017 at 11:07:37PM +0200, Adam Borowski wrote:
+> Unbreaks ARM and possibly other 32-bit architectures.
 >
-> OK so no need to fix it in the current kernels then.
 
-Yeah, just need to figure out a clean order of applying these patches. 
-The hwmod data change for DSS modules can most likely be applied before 
-the dts change for clkctrl is going in, as it is just causing double 
-clk_enable / disable for the main clocks in that case.
+Thanks a lot for the fix.
 
--Tero
+Reviewed-by: Liu Bo <bo.li.liu@oracle.com>
+
+Thanks,
+
+-liubo
+
+> Fixes: 7d0ef8b4d: Btrfs: update scrub_parity to use u64 stripe_len
+> Reported-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Adam Borowski <kilobyte@angband.pl>
+> ---
+> You'd probably want to squash this with Liu's commit, to be nice to future
+> bisects.
+> 
+> Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
+> sometimes works, but, like most operations, randomly dies with some badness
+> that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
+> there in 4.11-rc5, needs investigating, but since it's not connected to our
+> issue at hand, I consider this patch sort-of tested.
+> 
+>  fs/btrfs/scrub.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/fs/btrfs/scrub.c b/fs/btrfs/scrub.c
+> index b6fe1cd08048..95372e3679f3 100644
+> --- a/fs/btrfs/scrub.c
+> +++ b/fs/btrfs/scrub.c
+> @@ -2407,7 +2407,7 @@ static inline void __scrub_mark_bitmap(struct scrub_parity *sparity,
+>  
+>  	start -= sparity->logic_start;
+>  	start = div64_u64_rem(start, sparity->stripe_len, &offset);
+> -	offset /= sectorsize;
+> +	do_div(offset, sectorsize);
+>  	nsectors = (int)len / sectorsize;
+>  
+>  	if (offset + nsectors <= sparity->nsectors) {
+> -- 
+> 2.11.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-btrfs" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
