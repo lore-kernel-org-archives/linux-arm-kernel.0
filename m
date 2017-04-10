@@ -1,90 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 10 Apr 2017 18:01:37 +0200
-Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
- functions
-In-Reply-To: <20170410151011.GA18753@ulmo.ba.sec>
-References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
- <20170410163558.494cf9be@bbrezillon>
- <20170410151011.GA18753@ulmo.ba.sec>
-Message-ID: <20170410180137.6b4f3a74@bbrezillon>
+From: luto@kernel.org (Andy Lutomirski)
+Date: Mon, 10 Apr 2017 09:01:21 -0700
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <58EB619B.8144.6F924846@pageexec.freemail.hu>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <58EA2D58.17782.6ADE22BD@pageexec.freemail.hu>
+ <CALCETrWvGLtObdk3V0k_Esa_L=EOf+Whe=6DpcJ7H_W8Z-5Btw@mail.gmail.com>
+ <58EB619B.8144.6F924846@pageexec.freemail.hu>
+Message-ID: <CALCETrXN2ocUWa_FNjYDXxjm_BTV86yAqq8yRpwYz1VbKvF4Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Apr 2017 17:10:11 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+On Mon, Apr 10, 2017 at 3:42 AM, PaX Team <pageexec@freemail.hu> wrote:
+> On 9 Apr 2017 at 17:10, Andy Lutomirski wrote:
+>
+>> On Sun, Apr 9, 2017 at 5:47 AM, PaX Team <pageexec@freemail.hu> wrote:
+>> > on x86 the cost of the pax_open/close_kernel primitives comes from the cr0
+>> > writes and nothing else, use_mm suffers not only from the cr3 writes but
+>> > also locking/atomic ops and cr4 writes on its path and the inevitable TLB
+>> > entry costs. and if cpu vendors cared enough, they could make toggling cr0.wp
+>> > a fast path in the microcode and reduce its overhead by an order of magnitude.
+>> >
+>>
+>> If the CR4 writes happen in for this use case, that's a bug.
+>
+> that depends on how you plan to handle perf/rdpmc users and how many
+> alternative mm structs you plan to manage (one global, one per cpu,
+> one per mm struct, etc).
+>
 
-> On Mon, Apr 10, 2017 at 04:35:58PM +0200, Boris Brezillon wrote:
-> > On Mon, 10 Apr 2017 17:20:20 +0300
-> > Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
-> >   
-> > > Implement suspend and resume power management specific
-> > > function to allow PWM controller to correctly suspend
-> > > and resume.
-> > > 
-> > > Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> > > ---
-> > >  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 81 insertions(+)
-> > > 
-> > > diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> > > index 530d7dc..75177c6 100644
-> > > --- a/drivers/pwm/pwm-atmel.c
-> > > +++ b/drivers/pwm/pwm-atmel.c
-> > > @@ -58,6 +58,8 @@
-> > >  #define PWM_MAX_PRD		0xFFFF
-> > >  #define PRD_MAX_PRES		10
-> > >  
-> > > +#define PWM_MAX_CH_NUM		(4)
-> > > +
-> > >  struct atmel_pwm_registers {
-> > >  	u8 period;
-> > >  	u8 period_upd;
-> > > @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
-> > >  	u8 duty_upd;
-> > >  };
-> > >  
-> > > +struct atmel_pwm_pm_ctx {
-> > > +	u32 cmr;
-> > > +	u32 cdty;
-> > > +	u32 cprd;
-> > > +};
-> > > +
-> > >  struct atmel_pwm_chip {
-> > >  	struct pwm_chip chip;
-> > >  	struct clk *clk;
-> > >  	void __iomem *base;
-> > >  	const struct atmel_pwm_registers *regs;
-> > > +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];  
-> > 
-> > Hm, I'm pretty sure you can rely on the current PWM state and call
-> > atmel_pwm_apply() at resume time instead of doing that. See what I did
-> > here [1].
-> > 
-> > Thierry, maybe it's time to start thinking about a generic solution to
-> > save/restore PWM states.  
-> 
-> Generally speaking I think applying the states are the right way to go.
-> Ideally the PWM core could simply resume all of the PWM channels that a
-> device exports and the ->apply() callback would be enough to restore
-> that. I'm not sure if that's going to work with current implementations,
-> though. Your pwm-atmel-hlcdc patch certainly indicates that we're not
-> quite there yet.
-> 
-> On the other hand, I'm beginning to think that maybe PWMs are too low-
-> level for this kind of suspend/resume. For example if you use the PWM to
-> control a backlight brightness, restoring it via the driver core's
-> resume hook is potentially going to turn it back on at the wrong time. I
-> have a feeling that we might be better off just pushing this up to the
-> PWM users. A slight special case might be sysfs, for which no external
-> user driver exists. But we already have separate data structures to keep
-> track of sysfs-related context, so suspend/resume support could be added
-> there.
+I was thinking one global unless more are needed for some reason.
 
-Yep, you're probably right, we should let the PWM user take care of
-re-applying the PWM state, because it's the only one having enough
-knowledge about what the PWM is really driving to take a wise decision.
+>> > you'll be duplicating TLB entries in the alternative PCID for both code
+>> > and data, where they will accumulate (=take room away from the normal PCID
+>> > and expose unwanted memory for access) unless you also flush them when
+>> > switching back (which then will cost even more cycles). also i'm not sure
+>> > that processors implement all the 12 PCID bits so depending on how many PCIDs
+>> > you plan to use, you could be causing even more unnecessary TLB replacements.
+>> >
+>>
+>> Unless the CPU is rather dumber than I expect, the only duplicated
+>> entries should be for the writable aliases of pages that are written.
+>> The rest of the pages are global and should be shared for all PCIDs.
+>
+> well, 4.10.2.4 has language like this (4.10.3.2 implies similar):
+>
+>    A logical processor may use a global TLB entry to translate a linear
+>    address, even if the TLB entry is associated with a PCID different
+>    from the current PCID.
 
-This goes against my patch adding suspend/resume hooks to the
-pwm-atmel-hlcdc driver, but we can easily drop the call to
-atmel_hlcdc_pwm_apply() in ->resume() once we have patched the
-pwm-backlight driver to take care of that.
+I read this as: the CPU still semantically tags global TLB entries
+with a PCID, but the CPU will use (probably) use those TLB entries
+even if the PCIDs don't match.  IIRC none of the TLB instructions have
+any effect that makes the PCID associated with a global entry visible,
+so the CPU could presumably omit the PCID tags entirely for global
+entries.  E.g. I don't think there's any way to say "flush global
+entries with a given PCID".
+
+--Andy
