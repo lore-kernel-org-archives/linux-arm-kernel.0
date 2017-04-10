@@ -1,289 +1,109 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 10 Apr 2017 09:23:20 +0200
-Subject: [PATCH] ARM: dts: stm32f7: add STM32f769I & stm32f746 discovery
- board support
-In-Reply-To: <1491613929-11485-1-git-send-email-vikas.manocha@st.com>
-References: <1491613929-11485-1-git-send-email-vikas.manocha@st.com>
-Message-ID: <6ea617a3-94bc-870f-dd52-a45ad45c6d26@st.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Mon, 10 Apr 2017 12:57:14 +0530
+Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
+In-Reply-To: <9fbef986-721c-05aa-28a1-4c49016fe2ca@ti.com>
+References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
+ <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
+ <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
+ <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
+ <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
+ <9fbef986-721c-05aa-28a1-4c49016fe2ca@ti.com>
+Message-ID: <CAEHZuqMJU=ZLL2xsbtpHLC6SU4uzNBpZmPPADs-g7=OXJyCbBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi,
 
-On 04/08/2017 03:12 AM, Vikas Manocha wrote:
-> Stm32f769I & stm32f746 are MCUs of stm32f7 family. Here are the major
-> spces of the two boards:
+On Mon, Apr 10, 2017 at 10:55 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
 >
-> stm32f769I discovery board:
-> 	- Cortex-M7 core @216MHz
-> 	- 2MB mcu internal flash
-> 	- 512KB internal sram
-> 	- 16MB sdram memory
-> 	- 64MB qspi flash memory
-> 	- 4 inch wvga LCD-TFT Display
+> On Wednesday 05 April 2017 07:40 PM, Raviteja Garimella wrote:
+>> Hi Kishon,
+>>
+>> On Wed, Apr 5, 2017 at 7:04 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi Ravi,
+>>>
+>>> On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
+>>>> Hi Kishon,
+>>>>
+>>>> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
+>>>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
+>>>>>> SoC. The phy can be configured to be in Device mode or Host
+>>>>>> mode based on the type of cable connected to the port. The
+>>>>>> driver registers to  extcon framework to get appropriate
+>>>>>> connect events for Host/Device cables connect/disconnect
+>>>>>> states based on VBUS and ID interrupts.
+>>>>>
+>>>>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
+>>>>> Northstar2.
+>>>>>
+>>>>
+>>>> Will do.
+>>>>
+>>>>> Sorry for not letting you know this earlier. But I feel the design of the
+>>>>> driver should be changed. Extcon shouldn't be used here. The extcon
+>>>>> notifications should be sent to the consumer driver and the consumer driver
+>>>>> should be responsible for invoking the phy ops.
+>>>>>
+>>>>
+>>>> The consumer drivers here would be a UDC driver (USB device
+>>>> controller), EHCI and OHCI host controller drivers.
+>>>> I was already suggested in UDC driver review to deal with extcon in Phy driver.
+>>>>
+>>>> This phy connects to 2 host controllers, and one device controller.
+>>>> That's the design in Broadcom Northstar2
+>>>> platform. The values of the VBUS and ID pins of this port are
+>>>> determined based on the type of the cable (device cable
+>>>> or host cable). And. phy has to be configured accordingly.
+>>>>
+>>>>> The phy ops being invoked during extcon events doesn't look right.
+>>>>
+>>>> Could you please elaborate on the concern, so that we can think of
+>>>> mitigating those issues in this driver?
+>>>> Since we are dealing with phy init/shutdown in this driver itself, are
+>>>> you okay with moving the extcon handling code
+>>>> out of phy ops ?
+>>>
+>>> yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
+>>> extcon events too. Can a phy which is initialized by a phy consumer (say your
+>>> UDC invokes phy_init) can be shutdown by an extcon event?
+>>>
+>>> Maybe a clear explanation of when phy_ops here will be invoked and when it will
+>>> set using extcon events might help.
+>>>
+>>
+>> Say, we have a USB pendrive which is connected to the DRD port through
+>> a host cable.
+>> Now the PHY will be initialized to be in host mode.
+>> When the pendrive is unplugged, and we now connect the NS2 device to
+>> some linux PC,
+>> now the PHY has to be shutdown, and re-initialized to be in Device mode.
+>>
+>> On unplug event, it is set neither to Host nor Device mode (basically
+>> shutdown). Next time which ever cable is connected, the PHY is
+>> initialized to the respective
+>> mode.
+>>
+>> Please let me know if it's fine to do these initializations outside
+>> phy ops, because those will
+>> be irrelevant for phy consumers (the controllers) as it's anyways
+>> dealt in the phy driver through
+>> extcon.
 >
-> stm32f746 discovery board:
-> 	- Cortex-M7 core @216MHz
-> 	- 1MB mcu internal flash
-> 	- 320KB internal sram
-> 	- 8MB sdram memory
-> 	- 16MB qspi flash memory
-> 	- 4.3 inch 480x272 LCD-TFT display
+> How does the consumer get to know whether they have to operate in host mode or
+> device mode?
 >
-> Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
-> ---
->  arch/arm/boot/dts/Makefile            |   2 +
->  arch/arm/boot/dts/stm32f746-disco.dts | 101 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/stm32f746.dtsi      |   2 +-
->  arch/arm/boot/dts/stm32f769-disco.dts | 101 ++++++++++++++++++++++++++++++++++
->  4 files changed, 205 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/stm32f746-disco.dts
->  create mode 100644 arch/arm/boot/dts/stm32f769-disco.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 0118084..a119f74 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -763,6 +763,8 @@ dtb-$(CONFIG_ARCH_STI) += \
->  dtb-$(CONFIG_ARCH_STM32)+= \
->  	stm32f429-disco.dtb \
->  	stm32f469-disco.dtb \
-> +	stm32f746-disco.dtb \
-> +	stm32f769-disco.dtb \
->  	stm32429i-eval.dtb \
->  	stm32746g-eval.dtb
->  dtb-$(CONFIG_MACH_SUN4I) += \
-> diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
-> new file mode 100644
-> index 0000000..c0e313f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stm32f746-disco.dts
-> @@ -0,0 +1,101 @@
-> +/*
-> + * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "stm32f746.dtsi"
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +	model = "STMicroelectronics STM32F746-DISCO board";
-> +	compatible = "st,stm32f746-disco", "st,stm32f746";
-> +
-> +	chosen {
-> +		bootargs = "root=/dev/ram";
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		reg = <0xC0000000 0x800000>;
-> +	};
-> +
-> +	aliases {
-> +		serial0 = &usart1;
-> +	};
-> +
-> +};
-> +
-> +&clk_hse {
-> +	clock-frequency = <25000000>;
-> +};
-> +
-> +&pinctrl {
+In NS2, we have host controllers and device controller (not OTG/other
+that can switch
+between host and device mode). It's only phy that can be in host/device mode.
+Since both Host Controllers and Device Controller are connected to the same PHY,
+it is based on the extcon logic (the type of cable connected) that PHY
+will be in one
+of the modes host/device and the respective controller will operate.
 
-
-Pin muxing is not defined in board file. Please move it into SOC dtsi file.
-> +	usart1_pins: usart1 at 0	{
-> +		pins1 {
-> +			pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
-> +				bias-disable;
-> +				drive-push-pull;
-> +				slew-rate = <2>;
-> +		};
-> +		pins2 {
-> +			pinmux = <STM32F746_PB7_FUNC_USART1_RX>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	qspi_pins: qspi at 0 {
-> +		pins {
-> +			pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
-> +			       <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
-> +			       <STM32F746_PD11_FUNC_QUADSPI_BK1_IO0>,
-> +			       <STM32F746_PD12_FUNC_QUADSPI_BK1_IO1>,
-> +			       <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
-> +			       <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
-> +			slew-rate = <2>;
-> +		};
-> +	};
-> +};
-> +
-> +&usart1 {
-> +	pinctrl-0 = <&usart1_pins>;
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-> index f321ffe..826700f 100644
-> --- a/arch/arm/boot/dts/stm32f746.dtsi
-> +++ b/arch/arm/boot/dts/stm32f746.dtsi
-> @@ -178,7 +178,7 @@
->  			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
->  		};
->
-> -		pin-controller {
-> +		pinctrl: pin-controller {
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			compatible = "st,stm32f746-pinctrl";
-> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
-> new file mode 100644
-> index 0000000..5f8558e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
-> @@ -0,0 +1,101 @@
-> +/*
-> + * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "stm32f746.dtsi"
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +	model = "STMicroelectronics STM32F769-DISCO board";
-> +	compatible = "st,stm32f769-disco", "st,stm32f7";
-> +
-> +	chosen {
-> +		bootargs = "root=/dev/ram";
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		reg = <0xC0000000 0x1000000>;
-> +	};
-> +
-> +	aliases {
-> +		serial0 = &usart1;
-> +	};
-> +
-> +};
-> +
-> +&clk_hse {
-> +	clock-frequency = <25000000>;
-> +};
-> +
-> +&pinctrl {
-
-same.
-
-> +	usart1_pins: usart1 at 0	{
-> +		pins1 {
-> +			pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
-> +				bias-disable;
-> +				drive-push-pull;
-> +				slew-rate = <2>;
-> +		};
-> +		pins2 {
-> +			pinmux = <STM32F746_PA10_FUNC_USART1_RX>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	qspi_pins: qspi at 0 {
-> +		pins {
-> +			pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
-> +			       <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
-> +			       <STM32F746_PC9_FUNC_QUADSPI_BK1_IO0>,
-> +			       <STM32F746_PC10_FUNC_QUADSPI_BK1_IO1>,
-> +			       <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
-> +			       <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
-> +			slew-rate = <2>;
-> +		};
-> +	};
-> +};
-> +
-> +&usart1 {
-> +	pinctrl-0 = <&usart1_pins>;
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +};
->
+> Thanks
+> Kishon
