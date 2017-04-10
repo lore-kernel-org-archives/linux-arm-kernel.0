@@ -1,77 +1,82 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 04 Apr 2017 10:40:20 +0200
-Subject: [PATCH v3 1/4] dt-bindings: clock: gxbb: expose UART clocks
-In-Reply-To: <20170331165437.26227-2-hgkr.klein@gmail.com>
-References: <20170331165437.26227-1-hgkr.klein@gmail.com>
- <20170331165437.26227-2-hgkr.klein@gmail.com>
-Message-ID: <149129522024.91618.13395564164212234056@resonance>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Apr 2017 10:00:48 +0200
+Subject: [GIT PULL] Allwinner clock fixes for 4.11, bis
+In-Reply-To: <20170406231003.GS7065@codeaurora.org>
+References: <20170406074121.tkivdvghbr27tr54@lukather>
+ <20170406231003.GS7065@codeaurora.org>
+Message-ID: <20170410080048.l7xjndj457wa2b2q@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Helmut Klein (2017-03-31 18:54:34)
-> Expose the clock ids of the three none AO uarts to the dt-bindings
+On Thu, Apr 06, 2017 at 04:10:03PM -0700, Stephen Boyd wrote:
+> On 04/06, Maxime Ripard wrote:
+> > Hi Mike, Stephen,
+> > 
+> > Please pull the following changes for one of the 4.11-rc's
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
+> > 
+> >   clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.11-2
+> > 
+> > for you to fetch changes up to d054a839a0986136374d49f9f9fbc264abae9c4c:
+> > 
+> >   clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER (2017-03-27 13:37:05 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Allwinner clock fixes for 4.11, bis
+> > 
+> > A few patches to fix a build error and a few minor typos and bugs in the
+> > sunxi-ng code
+> > 
+> > ----------------------------------------------------------------
+> > Chen-Yu Tsai (3):
+> >       clk: sunxi-ng: use 1 as fallback for minimum multiplier
+> >       clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
+> >       clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
+> > 
+> > Tobias Regnery (1):
+> >       clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
+> > 
 > 
-> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> Two of these are fixes for regressions in v4.10? Why are these
+> critical for the v4.11 release? The comment patch is totally
+> bogus, it's not fixing any sort of regression that is causing
+> problems for people so I'm not sure why it was put into this pull
+> request. Am I right in assuming that the only real patch we need
+> out of here is the last one for the build error from randconfigs?
+> If so I can cherry-pick that from the branch into fixes and the
+> rest can go the next merge window.
+> 
+> Not pulling for now.
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+Actually, all of them but the comment fix are real fix.
 
-> ---
->  drivers/clk/meson/gxbb.h              | 6 +++---
->  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
->  2 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index 8ee2022ce5d5..1edfaa5fe307 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -194,7 +194,7 @@
->  /* #define CLKID_SAR_ADC */
->  #define CLKID_SMART_CARD         24
->  #define CLKID_RNG0               25
-> -#define CLKID_UART0              26
-> +/* CLKID_UART0 */
->  #define CLKID_SDHC               27
->  #define CLKID_STREAM             28
->  #define CLKID_ASYNC_FIFO         29
-> @@ -216,7 +216,7 @@
->  #define CLKID_ADC                45
->  #define CLKID_BLKMV              46
->  #define CLKID_AIU                47
-> -#define CLKID_UART1              48
-> +/* CLKID_UART1 */
->  #define CLKID_G2D                49
->  /* CLKID_USB0 */
->  /* CLKID_USB1 */
-> @@ -236,7 +236,7 @@
->  /* CLKID_USB0_DDR_BRIDGE */
->  #define CLKID_MMC_PCLK           66
->  #define CLKID_DVIN               67
-> -#define CLKID_UART2              68
-> +/* CLKID_UART2 */
->  /* #define CLKID_SANA */
->  #define CLKID_VPU_INTR           70
->  #define CLKID_SEC_AHB_AHB3_BRIDGE 71
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-> index 692846c7941b..7b329df47752 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -15,13 +15,16 @@
->  #define CLKID_SPI              34
->  #define CLKID_I2C              22
->  #define CLKID_SAR_ADC          23
-> +#define CLKID_UART0            26
->  #define CLKID_ETH              36
-> +#define CLKID_UART1            48
->  #define CLKID_USB0             50
->  #define CLKID_USB1             51
->  #define CLKID_USB              55
->  #define CLKID_HDMI_PCLK                63
->  #define CLKID_USB1_DDR_BRIDGE  64
->  #define CLKID_USB0_DDR_BRIDGE  65
-> +#define CLKID_UART2            68
->  #define CLKID_SANA             69
->  #define CLKID_GCLK_VENCI_INT0  77
->  #define CLKID_AO_I2C           93
-> --
-> 2.11.0
-> 
+"clk: sunxi-ng: use 1 as fallback for minimum multiplier" can lead to
+a multiplier set to 0 in some cases (depending on the rate asked for),
+and "clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum
+mismatch" will prevent inconsistensies in factors selection between
+round_rate and set_rate.
+
+So, yes, they are not critical fixes in the sense that it will fix a
+panic. but still those are bugs.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170410/a36df8cf/attachment.sig>
