@@ -1,116 +1,93 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 10 Apr 2017 13:57:07 +0530
-Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <CAEHZuqMJU=ZLL2xsbtpHLC6SU4uzNBpZmPPADs-g7=OXJyCbBQ@mail.gmail.com>
-References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
- <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
- <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
- <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
- <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
- <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
- <9fbef986-721c-05aa-28a1-4c49016fe2ca@ti.com>
- <CAEHZuqMJU=ZLL2xsbtpHLC6SU4uzNBpZmPPADs-g7=OXJyCbBQ@mail.gmail.com>
-Message-ID: <a78f6948-0900-56f9-dc0c-5b161c470847@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 10 Apr 2017 10:26:56 +0200 (CEST)
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <58E7EE04.29218.6216C107@pageexec.freemail.hu>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
+ <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>,
+ <alpine.DEB.2.20.1704071048360.1716@nanos>
+ <58E7EE04.29218.6216C107@pageexec.freemail.hu>
+Message-ID: <alpine.DEB.2.20.1704100913520.1810@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday 10 April 2017 12:57 PM, Raviteja Garimella wrote:
-> Hi,
+On Fri, 7 Apr 2017, PaX Team wrote:
+> On 7 Apr 2017 at 11:46, Thomas Gleixner wrote:
 > 
-> On Mon, Apr 10, 2017 at 10:55 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Hi,
->>
->> On Wednesday 05 April 2017 07:40 PM, Raviteja Garimella wrote:
->>> Hi Kishon,
->>>
->>> On Wed, Apr 5, 2017 at 7:04 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>> Hi Ravi,
->>>>
->>>> On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
->>>>> Hi Kishon,
->>>>>
->>>>> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
->>>>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
->>>>>>> SoC. The phy can be configured to be in Device mode or Host
->>>>>>> mode based on the type of cable connected to the port. The
->>>>>>> driver registers to  extcon framework to get appropriate
->>>>>>> connect events for Host/Device cables connect/disconnect
->>>>>>> states based on VBUS and ID interrupts.
->>>>>>
->>>>>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
->>>>>> Northstar2.
->>>>>>
->>>>>
->>>>> Will do.
->>>>>
->>>>>> Sorry for not letting you know this earlier. But I feel the design of the
->>>>>> driver should be changed. Extcon shouldn't be used here. The extcon
->>>>>> notifications should be sent to the consumer driver and the consumer driver
->>>>>> should be responsible for invoking the phy ops.
->>>>>>
->>>>>
->>>>> The consumer drivers here would be a UDC driver (USB device
->>>>> controller), EHCI and OHCI host controller drivers.
->>>>> I was already suggested in UDC driver review to deal with extcon in Phy driver.
->>>>>
->>>>> This phy connects to 2 host controllers, and one device controller.
->>>>> That's the design in Broadcom Northstar2
->>>>> platform. The values of the VBUS and ID pins of this port are
->>>>> determined based on the type of the cable (device cable
->>>>> or host cable). And. phy has to be configured accordingly.
->>>>>
->>>>>> The phy ops being invoked during extcon events doesn't look right.
->>>>>
->>>>> Could you please elaborate on the concern, so that we can think of
->>>>> mitigating those issues in this driver?
->>>>> Since we are dealing with phy init/shutdown in this driver itself, are
->>>>> you okay with moving the extcon handling code
->>>>> out of phy ops ?
->>>>
->>>> yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
->>>> extcon events too. Can a phy which is initialized by a phy consumer (say your
->>>> UDC invokes phy_init) can be shutdown by an extcon event?
->>>>
->>>> Maybe a clear explanation of when phy_ops here will be invoked and when it will
->>>> set using extcon events might help.
->>>>
->>>
->>> Say, we have a USB pendrive which is connected to the DRD port through
->>> a host cable.
->>> Now the PHY will be initialized to be in host mode.
->>> When the pendrive is unplugged, and we now connect the NS2 device to
->>> some linux PC,
->>> now the PHY has to be shutdown, and re-initialized to be in Device mode.
->>>
->>> On unplug event, it is set neither to Host nor Device mode (basically
->>> shutdown). Next time which ever cable is connected, the PHY is
->>> initialized to the respective
->>> mode.
->>>
->>> Please let me know if it's fine to do these initializations outside
->>> phy ops, because those will
->>> be irrelevant for phy consumers (the controllers) as it's anyways
->>> dealt in the phy driver through
->>> extcon.
->>
->> How does the consumer get to know whether they have to operate in host mode or
->> device mode?
->>
-> In NS2, we have host controllers and device controller (not OTG/other
-> that can switch
-> between host and device mode). It's only phy that can be in host/device mode.
-> Since both Host Controllers and Device Controller are connected to the same PHY,
-> it is based on the extcon logic (the type of cable connected) that PHY
-> will be in one
-> of the modes host/device and the respective controller will operate.
+> > On Fri, 7 Apr 2017, Mathias Krause wrote:
+> > > Well, doesn't look good to me. NMIs will still be able to interrupt
+> > > this code and will run with CR0.WP = 0.
+> > > 
+> > > Shouldn't you instead question yourself why PaX can do it "just" with
+> > > preempt_disable() instead?!
+> > 
+> > That's silly. Just because PaX does it, doesn't mean it's correct.
+> 
+> is that FUD or do you have actionable information to share?
 
-So at a point of time either the host controller or the device controller will
-be active? and the PHY decides which of them should be active? Is that right?
+That has absolutely nothing to do with FUD. I'm merily not accepting
+argumentations which say: PaX can do it "just"....
 
-Thanks
-Kishon
+That has exactly zero technical merit and it's not asked too much to
+provide precise technical arguments why one implementation is better than
+some other.
+
+> > To be honest, playing games with the CR0.WP bit is outright stupid to begin with.
+> 
+> why is that? cr0.wp exists since the i486 and its behaviour fits my
+> purposes quite well, it's the best security/performance i know of.
+
+Works for me has never be a good engineering principle.
+
+> > Whether protected by preempt_disable or local_irq_disable, to make that
+> > work it needs CR0 handling in the exception entry/exit at the lowest
+> > level.
+> 
+> correct.
+> 
+> > And that's just a nightmare maintainence wise as it's prone to be
+> > broken over time.
+> 
+> i've got 14 years of experience of maintaining it and i never saw it break.
+
+It's a difference whether you maintain a special purpose patch set out of
+tree for a subset of architectures - I certainly know what I'm talking
+about - or keeping stuff sane in the upstream kernel.
+
+> > I certainly don't want to take the chance to leak CR0.WP ever
+>
+> why and where would cr0.wp leak?
+
+It's bound to happen due to some subtle mistake and up to the point where
+you catch it (in the scheduler or entry/exit path) the world is
+writeable. And that will be some almost never executed error path which can
+be triggered by a carefully crafted attack. A very restricted writeable
+region is definitely preferred over full world writeable then, right?
+
+> > Why the heck should we care about rare writes being performant?
+> 
+> because you've been misled by the NIH crowd here that the PaX feature they
+> tried to (badly) extract from has anything to do with frequency of writes.
+
+It would be apprectiated if you could keep your feud out of this. It's
+enough to tell me that 'rare write' is a misleading term and why.
+
+> > Making the world and some more writeable hardly qualifies as tightly
+> > focused.
+> 
+> you forgot to add 'for a window of a few insns' and that the map/unmap
+
+If it'd be guaranteed to be a few instructions, then I wouldn't be that
+worried. The availability of make_world_writeable() as an unrestricted
+usable function makes me nervous as hell. We've had long standing issues
+where kmap_atomic() got leaked through a hard to spot almost never executed
+error handling path. And the same is bound to happen with this, just with a
+way worse outcome.
+
+> approach does the same under an attacker controlled ptr.
+
+Which attacker controlled pointer?
+
+Thanks,
+
+	tglx
