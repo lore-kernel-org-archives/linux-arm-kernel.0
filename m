@@ -1,233 +1,365 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 10 Apr 2017 15:22:24 +0100
-Subject: [PATCH 2/2] arm64: ftrace: add support for far branches to
- dynamic ftrace
-In-Reply-To: <20170410141343.1045-3-ard.biesheuvel@linaro.org>
-References: <20170410141343.1045-1-ard.biesheuvel@linaro.org>
- <20170410141343.1045-3-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9Y+LNomTJZi1B3vyzCSXa3-VYRtKUkpNFimDpPkD_KFw@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 10 Apr 2017 16:26:14 +0200
+Subject: [PATCH v4 01/22] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <20170408181712.GB29201@lvm>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-2-git-send-email-eric.auger@redhat.com>
+ <20170408181712.GB29201@lvm>
+Message-ID: <e60aa03e-b6af-3be3-6afd-ae795c45cf33@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2017 at 15:13, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Currently, dynamic ftrace support in the arm64 kernel assumes that all
-> core kernel code is within range of ordinary branch instructions in
-> module code, which is usually the case, but is no longer guaranteed now
-> that we have support for module PLTs and address space randomization.
->
-> Since all patching of branch instructions involves function calls to
-> ftrace_caller(), we can emit the modules with a trampoline that has
-> unlimited range, and patch the branch instruction to call the trampoline
-> if ftrace_caller() itself is out of range.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig              |  2 +-
->  arch/arm64/Makefile             |  3 ++
->  arch/arm64/include/asm/module.h |  3 ++
->  arch/arm64/kernel/ftrace.c      | 37 ++++++++++++++++++--
->  arch/arm64/kernel/module-plts.c | 10 ++++++
->  arch/arm64/lib/Makefile         |  2 ++
->  arch/arm64/lib/ftrace-mod.S     | 25 +++++++++++++
->  7 files changed, 78 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index e7f043efff41..31af7ea72072 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -982,7 +982,7 @@ config RANDOMIZE_BASE
->
->  config RANDOMIZE_MODULE_REGION_FULL
->         bool "Randomize the module region independently from the core kernel"
-> -       depends on RANDOMIZE_BASE && !DYNAMIC_FTRACE
-> +       depends on RANDOMIZE_BASE
->         default y
->         help
->           Randomizes the location of the module region without considering the
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index b9a4a934ca05..01498eab5ada 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -68,6 +68,9 @@ endif
->
->  ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
->  KBUILD_LDFLAGS_MODULE  += -T $(srctree)/arch/arm64/kernel/module.lds
-> +ifeq ($(CONFIG_DYNAMIC_FTRACE),y)
-> +KBUILD_LDFLAGS_MODULE  += $(objtree)/arch/arm64/lib/ftrace-mod.o
-> +endif
->  endif
->
->  # Default value
-> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-> index e12af6754634..2ff2b7782957 100644
-> --- a/arch/arm64/include/asm/module.h
-> +++ b/arch/arm64/include/asm/module.h
-> @@ -25,6 +25,9 @@ struct mod_arch_specific {
->         struct elf64_shdr       *plt;
->         int                     plt_num_entries;
->         int                     plt_max_entries;
-> +
-> +       /* for CONFIG_DYNAMIC_FTRACE */
-> +       struct elf64_shdr       *ftrace_trampoline;
->  };
->  #endif
->
-> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> index a8db6857cad6..8f5a7dc36c1b 100644
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -9,11 +9,14 @@
->   * published by the Free Software Foundation.
->   */
->
-> +#include <linux/elf.h>
->  #include <linux/ftrace.h>
-> +#include <linux/module.h>
->  #include <linux/swab.h>
->  #include <linux/uaccess.h>
->
->  #include <asm/cacheflush.h>
-> +#include <asm/debug-monitors.h>
->  #include <asm/ftrace.h>
->  #include <asm/insn.h>
->
-> @@ -63,6 +66,35 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
->         return ftrace_modify_code(pc, 0, new, false);
->  }
->
-> +#ifdef CONFIG_ARM64_MODULE_PLTS
-> +EXPORT_SYMBOL_GPL(ftrace_caller);
-> +#endif
-> +
-> +static u32 __ftrace_gen_branch(unsigned long pc, unsigned long addr)
-> +{
-> +       long offset = (long)pc - (long)addr;
-> +       struct module *mod;
-> +
-> +       if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS) &&
-> +           addr == (unsigned long)&ftrace_caller &&
-> +           unlikely(offset < -SZ_128M || offset >= SZ_128M)) {
-> +
-> +               /*
-> +                * On kernels that support module PLTs, the offset between the
-> +                * call and its target may legally exceed the range of an
-> +                * ordinary branch instruction. In this case, we need to branch
-> +                * via a trampoline in the module.
-> +                */
-> +               mod = __module_address(pc);
-> +               if (WARN_ON(!mod))
-> +                       return AARCH64_BREAK_FAULT;
-> +
-> +               addr = (unsigned long)mod->arch.ftrace_trampoline->sh_addr;
-> +       }
-> +
-> +       return aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-> +}
-> +
->  /*
->   * Turn on the call to ftrace_caller() in instrumented function
->   */
-> @@ -72,7 +104,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
->         u32 old, new;
->
->         old = aarch64_insn_gen_nop();
-> -       new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
-> +       new = __ftrace_gen_branch(pc, addr);
->
->         return ftrace_modify_code(pc, old, new, true);
->  }
-> @@ -87,8 +119,7 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->         u32 old = 0, new;
->
->         if (!IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
-> -               old = aarch64_insn_gen_branch_imm(pc, addr,
-> -                                                 AARCH64_INSN_BRANCH_LINK);
-> +               old = __ftrace_gen_branch(pc, addr);
->         new = aarch64_insn_gen_nop();
->
->         return ftrace_modify_code(pc, old, new,
-> diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-> index 1ce90d8450ae..859c7170e69a 100644
-> --- a/arch/arm64/kernel/module-plts.c
-> +++ b/arch/arm64/kernel/module-plts.c
-> @@ -162,6 +162,10 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                         mod->arch.plt = sechdrs + i;
->                 else if (sechdrs[i].sh_type == SHT_SYMTAB)
->                         syms = (Elf64_Sym *)sechdrs[i].sh_addr;
-> +               else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-> +                        strcmp(".text.ftrace_trampoline",
-> +                               secstrings + sechdrs[i].sh_name) == 0)
-> +                       mod->arch.ftrace_trampoline = sechdrs + i;
->         }
->
->         if (!mod->arch.plt) {
-> @@ -173,6 +177,12 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                 return -ENOEXEC;
->         }
->
-> +       if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) && !mod->arch.ftrace_trampoline) {
-> +               pr_err("%s: module ftrace trampoline section missing\n",
-> +                      mod->name);
-> +               return -ENOEXEC;
-> +       }
-> +
->         for (i = 0; i < ehdr->e_shnum; i++) {
->                 Elf64_Rela *rels = (void *)ehdr + sechdrs[i].sh_offset;
->                 int numrels = sechdrs[i].sh_size / sizeof(Elf64_Rela);
-> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-> index c86b7909ef31..b01dcfa9c002 100644
-> --- a/arch/arm64/lib/Makefile
-> +++ b/arch/arm64/lib/Makefile
-> @@ -4,6 +4,8 @@ lib-y           := bitops.o clear_user.o delay.o copy_from_user.o       \
->                    memcmp.o strcmp.o strncmp.o strlen.o strnlen.o       \
->                    strchr.o strrchr.o
->
-> +lib-$(CONFIG_DYNAMIC_FTRACE) += ftrace-mod.o
-> +
->  # Tell the compiler to treat all general purpose registers (with the
->  # exception of the IP registers, which are already handled by the caller
->  # in case of a PLT) as callee-saved, which allows for efficient runtime
-> diff --git a/arch/arm64/lib/ftrace-mod.S b/arch/arm64/lib/ftrace-mod.S
-> new file mode 100644
-> index 000000000000..ce15b9948851
-> --- /dev/null
-> +++ b/arch/arm64/lib/ftrace-mod.S
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +
-> +       .section        ".text.ftrace_trampoline", "ax"
-> +ENTRY(__ftrace_trampoline)
-> +       stp             x29, x30, [sp, #-16]!
-> +       mov             x29, sp
-> +
-> +       movz            x30, #:abs_g3:ftrace_caller
-> +       movk            x30, #:abs_g2_nc:ftrace_caller
-> +       movk            x30, #:abs_g1_nc:ftrace_caller
-> +       movk            x30, #:abs_g0_nc:ftrace_caller
-> +       blr             x30
-> +
-> +       ldp             x29, x30, [sp], #16
-> +       ret
-> +ENDPROC(__ftrace_trampoline)
+Hi Christoffer,
 
-I suppose the additional stack frame interferes with correct operation
-of ftrace() here, so we should probably do this:
+On 08/04/2017 20:17, Christoffer Dall wrote:
+> Hi Eric,
+> 
+> Most of my comments below are just me being picky about text when
+> defining a user space ABI, so I think this mainly looks good, but just
+> needs a bit of clarify, except the versioning aspect and exporting the
+> pending table vie the redistributor instead, as Marc and Andre have
+> pointed out.
+> 
+> On Mon, Mar 27, 2017 at 11:30:51AM +0200, Eric Auger wrote:
+>> Add description for how to access vITS registers and how to flush/restore
+>> vITS tables into/from memory
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v3 -> v4:
+>> - take into account Peter's comments:
+>>   - typos
+>>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
+>>   - add a validity bit in DTE
+>>   - document all fields in CTE and ITE
+>>   - document ABI revision
+>> - take into account Andre's comments:
+>>   - document restrictions about GITS_CREADR writing and GITS_IIDR
+>>   - document -EBUSY error if one or more VCPUS are runnning
+>>   - document 64b registers only can be accessed with 64b access
+>> - itt_addr field matches bits [51:8] of the itt_addr
+>>
+>> v1 -> v2:
+>> - DTE and ITE now are 8 bytes
+>> - DTE and ITE now indexed by deviceid/eventid
+>> - use ITE name instead of ITTE
+>> - mentions ITT_addr matches bits [51:8] of the actual address
+>> - mentions LE layout
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 118 +++++++++++++++++++++
+>>  1 file changed, 118 insertions(+)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> index 6081a5b..0902d20 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> @@ -36,3 +36,121 @@ Groups:
+>>      -ENXIO:  ITS not properly configured as required prior to setting
+>>               this attribute
+>>      -ENOMEM: Memory shortage when allocating ITS internal data
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>> +  Attributes:
+>> +      The attr field of kvm_device_attr encodes the offset of the
+>> +      ITS register, relative to the ITS control frame base address
+>> +      (ITS_base).
+>> +
+>> +      kvm_device_attr.addr points to a __u64 value whatever the width
+>> +      of the addressed register (32/64 bits). 64 bit registers can only
+>> +      be accessed with full length.
+>> +
+>> +      Writes to read-only registers are ignored by the kernel except for:
+>> +      - GITS_READR. It needs to be restored otherwise commands in the queue
+>> +        will be re-executed after CWRITER setting. Writing this register is
+>                                      ^^^^^^^^^^^^^^^
+> 
+> "after restoring CWRITER." ?
+OK
+> 
+>> +        allowed if the ITS is not enabled (GITS_CTLR.enable = 0). Also it
+> 
+> Does that mean that you can only save/restore a disabled ITS or does it
+> mean that initially after creating the ITS it is disabled and userspace
+> should restore the CWRITER before restoring GITS_CTLR (which may enable
+> the ITS) ?
+No I meant the second. As normally the ITS is responsible for updating
+the GITS_READR, if the userspace plays with it while the ITS is enabled
+this can mess everything. So the userspace is supposed to restore the
+GITS_READR *before* restoring the GITS_CTLR which is likely to enable
+the ITS.
+> 
+>> +        needs to be restored after GITS_CBASER since a write to GITS_CBASER
+>> +        resets GITS_CREADR.
+>> +      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
+> 
+> How is this really going to work?  Your ABI here must be backwards
+> compatible for future revisions, so what is userspace supposed to do,
+> when it reads a newer revision than it was programmed for?
+destination ABI revision must be >= source ABI revision
+By restoring the IIDR value on the destination side, the userspace
+informs destination KVM about the layout of the table. If the
+destination KVM does not support this ABI revision, the restoration of
+the ITS table fails. Is that wrong?
 
-ENTRY(__ftrace_trampoline)
-    movz x16, #:abs_g3:ftrace_caller
-    movk x16, #:abs_g2_nc:ftrace_caller
-    movk x16, #:abs_g1_nc:ftrace_caller
-    movk x16, #:abs_g0_nc:ftrace_caller
-    blr  x16
-ENDPROC(__ftrace_trampoline)
+> 
+> I think we need a more clear description of how the revision is going to
+> be used, such that each operation on the ITS here is described as
+> requiring a minimum revision X, and making sure that userspace can
+> safely ignore things that are of a higher revision number, while at the
+> same time userspace can decide not to use newer features with older
+> kernels.
 
-instead.
+At the moment I did not plan to implement any way for the userspace to
+force the ITS state save in a specified ABI revision. Today it uses the
+higher revision. Let's say that ABI V2 supports GICv4, save of source
+ITS with be done in v2 layout. A destination only supporting GICv3 (ABI
+v1) won't be able to read that format. Does it make sense?
+
+> 
+>> +
+>> +      For other registers, getting or setting a register has the same
+>> +      effect as reading/writing the register on real hardware.
+>> +  Errors:
+>> +    -ENXIO: Offset does not correspond to any supported register
+>> +    -EFAULT: Invalid user pointer for attr->addr
+>> +    -EINVAL: Offset is not 64-bit aligned
+>> +    -EBUSY: one or more VCPUS are running
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+> 
+> Shouldn't this be called KVM_DEV_ARM_VGIC_GRP_FLUSH_ITS_TABLES ?
+At the moment this group is used for flush and restore. But as you have
+the same remark as Andre I guess it is worth having separate commands in
+KVM_DEV_ARM_VGIC_GRP_CTRL then.
+> 
+>> +  Attributes
+>> +       The attr field of kvm_device_attr must be zero.
+>> +
+>> +       request the flush-save/restore of the ITS tables, namely
+> 
+> Nit: Request (upper case R)
+OK
+> 
+> what does flush-save/restore mean as opposed to just flush?
+meant flush/restore
+> 
+>> +       the device table, the collection table, all the ITT tables,
+>> +       the LPI pending tables. On save, the tables are flushed
+> 
+> , and the LPI pending table.
+OK
+> 
+>> +       into guest memory at the location provisioned by the guest
+>> +       in GITS_BASER (device and collection tables), in the MAPD
+>> +       command (ITT_addr), GICR_PENDBASERs (pending tables).
+>> +
+>> +       This means the GIC should be restored before the ITS and all
+> 
+> should or must?  Is this enforced?
+must. yes it is.
+> 
+>> +       ITS registers but the GITS_CTLR must be restored before
+>> +       restoring the ITS tables.
+>> +
+>> +       The GITS_READR and GITS_IIDR read-only registers must also
+>> +       be restored before the table restore. The IIDR revision field
+>> +       encodes the ABI revision of the table layout. If not set by
+>> +       user space, the restoration of the tables will fail.
+> 
+> consider rewording: ", restoring the ITS tables will fail."
+OK
+> 
+>> +
+>> +       Note the LPI configuration table is read-only for the
+> 
+> Note that
+OK
+> 
+>> +       in-kernel ITS and its save/restore goes through the standard
+> 
+> and saving/restoring it is done via the normal process to save/restore
+> guest RAM.
+OK
+> 
+>> +       RAM save/restore.
+>> +
+>> +       The layout of the tables in guest memory defines an ABI.
+>> +       The entries are laid in little endian format as follows;
+> 
+> s/;/:/
+OK
+> 
+> It's a bit weird to say "as follows:" and then proceed with the error
+> descriptions.  I would simply say "as described in the following
+> paragraph."
+OK
+> 
+>> +
+>> +  Errors:
+>> +    -EINVAL: kvm_device_attr not equal to 0, invalid table data
+>> +    -EFAULT: invalid guest ram access
+>> +    -EBUSY: one or more VCPUS are running
+>> +
+>> +    ITS Table ABI REV1:
+>> +    -------------------
+>> +
+>> +    The device table and ITE are respectively indexed by device id and
+> 
+> s/ITE/ITT/
+right
+> 
+> are indexed by the device id and eventid, respectively.
+> 
+>> +    eventid. The collection table however is not indexed by collection id:
+> 
+> ...by collection id, instead all the CTEs are written...
+> 
+>> +    CTE are written at the beginning of the buffer.
+> 
+> in any particular order, or?
+no order or creation
+> 
+>> +
+>> +    Device Table Entry (DTE) layout: entry size = 8 bytes
+>> +
+>> +    bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
+>> +    values:   | V |   next    | ITT_addr |  Size   |
+>> +
+>> +    where;
+>> +    - V indicates whether the entry is valid,
+>> +    - ITT_addr matches bits [51:8] of the ITT address (256B aligned),
+>> +    - next field is meaningful only if the entry is valid.
+> 
+> is the ITT_addr meaningful if the entry is not valid?
+no, I will add this detail.
+> 
+>> +    It equals to 0 if this entry is the last one; otherwise it corresponds
+>> +    to the minimum between the offset to the next device id and 2^14 -1.
+> 
+> I don't easily understand this last paragraph and the indentation is
+> weird and makes it look like it's not explaining the next field.
+
+reworded:
+It equals to 0 if this entry is the last one; otherwise it corresponds
+to the the deviceid offset to the next DTE, capped by 2^14 -1.
+> 
+> You're missing a description of the size field.  Size in what unit?
+> Size of what?
+right, added "size matches the MAPD Size semantic."
+> 
+> 
+>> +
+>> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
+>> +
+>> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
+>> +    values:   | V |    RES0    |  RDBase   |    ICID     |
+>> +
+>> +    where:
+>> +    - V indicates whether the entry is valid,
+> 
+> Do we explain anywhere what RES0 means?
+Added RES0: reserved field with Should-Be-Zero-or-Preserved behavior.
+> 
+>> +    - RDBase matches the PE number (GICR_TYPER.Processor_Number),
+> 
+> is 'matches' the right verb to use here?
+is
+> 
+> What exactly is the format of GICR_TYPER.Processor_Number ?
+> 
+>> +    - ICID matches the collection ID
+> 
+> again, is 'matches' the right verb to use here?
+is
+> 
+>> +
+>> +    Interrupt Translation Entry (ITE) layout: entry size = 8 bytes
+>> +
+>> +    bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
+>> +    values:   |    next   |   pINTID  |  ICID    |
+>> +
+>> +    where:
+>> +    - pINTID is the physical LPI ID,
+>> +    - ICID is the collection ID,
+> 
+> here you use 'is' intead of 'matches'.  At leat be consistent.
+is
+> 
+>> +    - next field is meaningful only if the entry is valid (pINTID != 0).
+>> +    It equals to 0 if this entry is the last one; otherwise it corresponds
+>> +    to the minimum between the eventid offset to the next ITE and 2^16 -1.
+> 
+> same comments, as above.
+ok
+> 
+> also, can you list the field in the order they appear?
+ok
+> 
+>> +
+>> +    LPI Pending Table layout:
+>> +
+>> +    As specified in the ARM Generic Interrupt Controller Architecture
+>> +    Specification GIC Architecture version 3.0 and version 4. The first
+> 
+> "...version 4, the first".  ("As specified in X." is not a sentence).
+> 
+>> +    1kB is not modified and therefore should contain zeroes.
+> 
+> should or must?  or always contains zeros?  Will you return an error if
+> userspace puts something non-zero in there?
+no I don't. Spec says it should initialized to zero. $
+> 
+>> +
+>> +    Future evolutions of the ITS table layout:
+>> +
+>> +    At the moment the table layout is defined and optimized for physical
+>> +    LPI support.
+> 
+> This comment is a bit confusing, because this is all about virtual
+> interrupts really, so 'physical from the point of view of the VM', but I
+> think you should just drop this sentence.
+OK
+> 
+>> +
+>> +    In the future we might implement direct injection of virtual LPIS.
+> 
+> For nesting, yes?  (on the host this should not be visible here, should
+> it?)
+yes for nesting.
+> 
+>> +    This will require an upgrade of the table layout and an evolution of
+>> +    the ABI. The ABI revision is encoded in the GITS_IIDR revision field.
+>> +    That register must be restored before the table restoration, otherwise
+>> +    the operation will fail.
+> 
+> Hmm, I thought we dealt with that before, feels a bit out of place.
+
+OK moved to the register description.
+> 
+>> +
+>> +    ABI V1: GITS_IIDR.Revision = 1
+> 
+> I feel like this should go in the ITS register description of the IIDR.
+> Most likely, I think this particular line can be dropped, but all other
+> definitions in this file can be annoted with a minimum revision number
+> ensuring that future revisions implement this, plus potentially more
+> stuff.
+I already put the following title, "ITS Table ABI REV1" for the table
+layout description. My intent was to create a new chapter per revision.
+Is it OK?
+
+Thanks
+
+Eric
+
+> 
+> Thanks,
+> -Christoffer
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
