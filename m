@@ -1,38 +1,41 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 10 Apr 2017 09:20:27 -0700
-Subject: [PATCHv3 00/22] Ion clean up in preparation in moving out of
- staging
-In-Reply-To: <20170408103821.GA12084@kroah.com>
-References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
- <20170408103821.GA12084@kroah.com>
-Message-ID: <b1a52f74-a089-96c1-a6b9-5f4eb3d28f8b@redhat.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 10 Apr 2017 17:21:48 +0100
+Subject: [PATCH v3 0/9] Fix issues and factorize arm/arm64 capacity
+ information code
+In-Reply-To: <20170410150503.GS17774@n2100.armlinux.org.uk>
+References: <20170327131825.32134-1-juri.lelli@arm.com>
+ <20170410150503.GS17774@n2100.armlinux.org.uk>
+Message-ID: <20170410162148.GG30804@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2017 03:38 AM, Greg Kroah-Hartman wrote:
-> On Mon, Apr 03, 2017 at 11:57:42AM -0700, Laura Abbott wrote:
->> Hi,
->>
->> This is v3 of the series to do some serious Ion cleanup in preparation for
->> moving out of staging. I didn't hear much on v2 so I'm going to assume
->> people are okay with the series as is. I know there were still some open
->> questions about moving away from /dev/ion but in the interest of small
->> steps I'd like to go ahead and merge this series assuming there are no more
->> major objections. More work can happen on top of this.
+Hi,
+
+On 10/04/17 16:05, Russell King - ARM Linux wrote:
+> On Mon, Mar 27, 2017 at 02:18:16PM +0100, Juri Lelli wrote:
+> > arm and arm64 topology.c share a lot of code related to parsing of capacity
+> > information. This is v3 of a solution [1] (based on Will's, Catalin's and
+> > Mark's off-line suggestions) to move such common code in a single place:
+> > drivers/base/arch_topology.c (by creating such file and conditionally compiling
+> > it for arm and arm64 only).
 > 
-> I've applied patches 3-11 as those were independant of the CMA changes.
-> I'd like to take the rest, including the CMA changes, but I need an ack
-> from someone dealing with the -mm tree before I can do that.
+> I think overall this is okay, with the exception of one patch which seems
+> to be wrongly worded.
+
+As I said in reply to your comments, we could also consider dropping
+that patch entirely. What's your opinion?
+
+> Once that's resolved, then:
 > 
-> Or, if they just keep ignoring it, I guess I can take them :)
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 > 
-> thanks,
-> 
-> greg k-h
+> for the series.
 > 
 
-Thanks. I'll send out some nag e-mails asking for Acks. If I don't get
-any, I'll resend the rest of the series after the 4.12 merge window.
+Also, I'd like to update 3/9 as suggested by Vincent.
 
-Thanks,
-Laura
+Thanks for the review.
+
+Best,
+
+- Juri
