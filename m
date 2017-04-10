@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Apr 2017 09:35:09 +0200
-Subject: [GIT PULL] pinctrl: samsung: Fix for v4.11
-In-Reply-To: <20170408142050.1164-3-krzk@kernel.org>
+Date: Mon, 10 Apr 2017 09:36:27 +0200
+Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.12
+In-Reply-To: <20170408142050.1164-2-krzk@kernel.org>
 References: <20170408142050.1164-1-krzk@kernel.org>
- <20170408142050.1164-3-krzk@kernel.org>
-Message-ID: <CACRpkdY7h9za0_Pv7Hhm--+=14AKhgKYKi7-nprL=gtfLwDPuQ@mail.gmail.com>
+ <20170408142050.1164-2-krzk@kernel.org>
+Message-ID: <CACRpkdb9OJTsyLknXA-D9TZ_VHmGkaF8zbG1GQbsFgEfmqa9Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,16 +16,13 @@ On Sat, Apr 8, 2017 at 4:20 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-fixes-4.11
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.12
 >
-> for you to fetch changes up to 87dc66299e51a17aacd25ad25c1f1283ca2ae305:
+> for you to fetch changes up to f69ae4f58a198ad15b0422637434d2bcf6fc2e2a:
 >
->   pinctrl: samsung: Add missing part for PINCFG_TYPE_DRV of Exynos5433 (2017-03-23 20:47:34 +0200)
+>   pinctrl: samsung: Use devres version of gpiochip_add_data (2017-03-23 21:13:19 +0200)
 
-Thanks, pulled.
+Pulled into my devel branch for v4.12.
 
-I rebased it to v4.11-rc6 so as not to deviate too much from the HEAD at this
-point in development.
-
-Yours,
+Thanks!
 Linus Walleij
