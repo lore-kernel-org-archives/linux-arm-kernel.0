@@ -1,9 +1,10 @@
 From: thgarnie@google.com (Thomas Garnier)
-Date: Mon, 10 Apr 2017 09:44:18 -0700
-Subject: [PATCH v7 2/4] x86/syscalls: Architecture specific pre-usermode check
+Date: Mon, 10 Apr 2017 09:44:20 -0700
+Subject: [PATCH v7 4/4] arm64/syscalls: Architecture specific pre-usermode
+ check
 In-Reply-To: <20170410164420.64003-1-thgarnie@google.com>
 References: <20170410164420.64003-1-thgarnie@google.com>
-Message-ID: <20170410164420.64003-2-thgarnie@google.com>
+Message-ID: <20170410164420.64003-4-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,119 +12,67 @@ Disable the generic pre-usermode check in favor of an optimized
 implementation. This patch adds specific checks on user-mode return path
 to make it faster and smaller.
 
-The user-mode state check is added to the prepare_exit_to_usermode
-function. This function is called before any user-mode return on 32-bit
-and on the 64-bit syscall slowpath. For the 64-bit syscall fast path, an
-assembly address limit check redirects to the slow path if the address
-limit is different.
-
-The TASK_SIZE_MAX define is moved to the pgtable_64_types header so it
-can be used in assembly code.
+The address limit is checked on each syscall return path to user-mode.
+If it was changed, a generic handler is called to stop the kernel on an
+explicit check.
 
 Signed-off-by: Thomas Garnier <thgarnie@google.com>
 ---
 Based on next-20170410
 ---
- arch/x86/Kconfig                        |  1 +
- arch/x86/entry/common.c                 |  3 +++
- arch/x86/entry/entry_64.S               |  8 ++++++++
- arch/x86/include/asm/pgtable_64_types.h | 11 +++++++++++
- arch/x86/include/asm/processor.h        | 11 -----------
- 5 files changed, 23 insertions(+), 11 deletions(-)
+ arch/arm64/Kconfig        |  1 +
+ arch/arm64/kernel/entry.S | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index c43f47622440..74185795eb24 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -63,6 +63,7 @@ config X86
- 	select ARCH_MIGHT_HAVE_ACPI_PDC		if ACPI
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_MIGHT_HAVE_PC_SERIO
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9b8fcab7da56..3f9e8e7d9376 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -24,6 +24,7 @@ config ARM64
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_HAS_UBSAN_SANITIZE_ALL
 +	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_SUPPORTS_DEFERRED_STRUCT_PAGE_INIT
- 	select ARCH_SUPPORTS_NUMA_BALANCING	if X86_64
-diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
-index cdefcfdd9e63..76ef050255c9 100644
---- a/arch/x86/entry/common.c
-+++ b/arch/x86/entry/common.c
-@@ -23,6 +23,7 @@
- #include <linux/user-return-notifier.h>
- #include <linux/uprobes.h>
- #include <linux/livepatch.h>
-+#include <linux/syscalls.h>
- 
- #include <asm/desc.h>
- #include <asm/traps.h>
-@@ -183,6 +184,8 @@ __visible inline void prepare_exit_to_usermode(struct pt_regs *regs)
- 	struct thread_info *ti = current_thread_info();
- 	u32 cached_flags;
- 
-+	verify_pre_usermode_state();
-+
- 	if (IS_ENABLED(CONFIG_PROVE_LOCKING) && WARN_ON(!irqs_disabled()))
- 		local_irq_disable();
- 
-diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
-index 607d72c4a485..62aca6dcdaf4 100644
---- a/arch/x86/entry/entry_64.S
-+++ b/arch/x86/entry/entry_64.S
-@@ -218,6 +218,14 @@ entry_SYSCALL_64_fastpath:
- 	testl	$_TIF_ALLWORK_MASK, TASK_TI_flags(%r11)
- 	jnz	1f
- 
-+	/*
-+	 * If address limit is not based on user-mode, jump to slow path for
-+	 * additional security checks.
-+	 */
-+	movq	$TASK_SIZE_MAX, %rcx
-+	cmp	%rcx, TASK_addr_limit(%r11)
-+	jne	1f
-+
- 	LOCKDEP_SYS_EXIT
- 	TRACE_IRQS_ON		/* user mode is traced as IRQs on */
- 	movq	RIP(%rsp), %rcx
-diff --git a/arch/x86/include/asm/pgtable_64_types.h b/arch/x86/include/asm/pgtable_64_types.h
-index 06470da156ba..78af4d43a7ce 100644
---- a/arch/x86/include/asm/pgtable_64_types.h
-+++ b/arch/x86/include/asm/pgtable_64_types.h
-@@ -104,4 +104,15 @@ typedef struct { pteval_t pte; } pte_t;
- 
- #define EARLY_DYNAMIC_PAGE_TABLES	64
- 
-+/*
-+ * User space process size. 47bits minus one guard page.  The guard
-+ * page is necessary on Intel CPUs: if a SYSCALL instruction is at
-+ * the highest possible canonical userspace address, then that
-+ * syscall will enter the kernel with a non-canonical return
-+ * address, and SYSRET will explode dangerously.  We avoid this
-+ * particular problem by preventing anything from being mapped
-+ * at the maximum canonical address.
-+ */
-+#define TASK_SIZE_MAX	((_AC(1, UL) << 47) - PAGE_SIZE)
-+
- #endif /* _ASM_X86_PGTABLE_64_DEFS_H */
-diff --git a/arch/x86/include/asm/processor.h b/arch/x86/include/asm/processor.h
-index 3cada998a402..e80822582d3e 100644
---- a/arch/x86/include/asm/processor.h
-+++ b/arch/x86/include/asm/processor.h
-@@ -825,17 +825,6 @@ static inline void spin_lock_prefetch(const void *x)
- #define KSTK_ESP(task)		(task_pt_regs(task)->sp)
- 
- #else
--/*
-- * User space process size. 47bits minus one guard page.  The guard
-- * page is necessary on Intel CPUs: if a SYSCALL instruction is at
-- * the highest possible canonical userspace address, then that
-- * syscall will enter the kernel with a non-canonical return
-- * address, and SYSRET will explode dangerously.  We avoid this
-- * particular problem by preventing anything from being mapped
-- * at the maximum canonical address.
-- */
--#define TASK_SIZE_MAX	((1UL << 47) - PAGE_SIZE)
--
- /* This decides where the kernel will search for a free chunk of vm
-  * space during mmap's.
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 43512d4d7df2..bdd094c7837a 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -744,6 +744,8 @@ ENDPROC(cpu_switch_to)
+ ret_fast_syscall:
+ 	disable_irq				// disable interrupts
+ 	str	x0, [sp, #S_X0]			// returned x0
++	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
++	tbnz	x2, #63, addr_limit_fail
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+ 	cbnz	x2, ret_fast_syscall_trace
+@@ -771,6 +773,9 @@ work_pending:
   */
+ ret_to_user:
+ 	disable_irq				// disable interrupts
++	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
++	tbnz	x2, #63, addr_limit_fail
++
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+@@ -780,6 +785,14 @@ finish_ret_to_user:
+ ENDPROC(ret_to_user)
+ 
+ /*
++ * Address limit was incorrect before returning in user-mode which could be
++ * used to elevate privileges. Call the generic handler to stop the kernel on
++ * the appropriate check. This function does not return.
++ */
++addr_limit_fail:
++	bl address_limit_check_failed
++
++/*
+  * This is how we return from a fork.
+  */
+ ENTRY(ret_from_fork)
 -- 
 2.12.2.715.g7642488e1d-goog
