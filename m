@@ -1,67 +1,83 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 10 Apr 2017 08:10:13 -0700
-Subject: [PATCHv3 17/22] staging: android: ion: Collapse internal header
- files
-In-Reply-To: <CACvgo52qr=oBoiMnrww3cgoKozEMi3DwBV55c_GMi0mR_p0GcA@mail.gmail.com>
-References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
- <1491245884-15852-18-git-send-email-labbott@redhat.com>
- <CACvgo52qr=oBoiMnrww3cgoKozEMi3DwBV55c_GMi0mR_p0GcA@mail.gmail.com>
-Message-ID: <8f94fbd9-6aa4-f7a0-c9f1-8da894fe1eb8@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Apr 2017 10:20:25 -0500
+Subject: [PATCH v3 1/8] dt-bindings: Document STM32 DCMI bindings
+In-Reply-To: <1491320678-17246-2-git-send-email-hugues.fruchet@st.com>
+References: <1491320678-17246-1-git-send-email-hugues.fruchet@st.com>
+ <1491320678-17246-2-git-send-email-hugues.fruchet@st.com>
+Message-ID: <20170410152025.nx4zrnbth6wgamro@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2017 11:12 AM, Emil Velikov wrote:
-> Hi Laura,
+On Tue, Apr 04, 2017 at 05:44:31PM +0200, Hugues Fruchet wrote:
+> This adds documentation of device tree bindings for the STM32 DCMI
+> (Digital Camera Memory Interface).
 > 
-> Couple of trivial nitpicks below.
-> 
-> On 3 April 2017 at 19:57, Laura Abbott <labbott@redhat.com> wrote:
-> 
->> --- a/drivers/staging/android/ion/ion.h
->> +++ b/drivers/staging/android/ion/ion.h
->> @@ -1,5 +1,5 @@
->>  /*
->> - * drivers/staging/android/ion/ion.h
->> + * drivers/staging/android/ion/ion_priv.h
-> Does not match the actual filename.
-> 
->>   *
->>   * Copyright (C) 2011 Google, Inc.
->>   *
->> @@ -14,24 +14,26 @@
->>   *
->>   */
->>
->> -#ifndef _LINUX_ION_H
->> -#define _LINUX_ION_H
->> +#ifndef _ION_PRIV_H
->> +#define _ION_PRIV_H
->>
-> Ditto.
-> 
->> +#include <linux/device.h>
->> +#include <linux/dma-direction.h>
->> +#include <linux/kref.h>
->> +#include <linux/mm_types.h>
->> +#include <linux/mutex.h>
->> +#include <linux/rbtree.h>
->> +#include <linux/sched.h>
->> +#include <linux/shrinker.h>
->>  #include <linux/types.h>
->> +#include <linux/miscdevice.h>
->>
->>  #include "../uapi/ion.h"
->>
-> You don't want to use "../" in includes. Perhaps address with another
-> patch, if you haven't already ?
-> 
+> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+> ---
+>  .../devicetree/bindings/media/st,stm32-dcmi.txt    | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
 
-There isn't a better option until this driver moves out of staging.
-Once it moves out it can be fixed up.
+One nit below, otherwise:
 
-Thanks,
-Laura
+Acked-by: Rob Herring <robh@kernel.org>
 
-> Regards,
-> Emil
+> 
+> diff --git a/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+> new file mode 100644
+> index 0000000..c0f6f4b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+> @@ -0,0 +1,46 @@
+> +STMicroelectronics STM32 Digital Camera Memory Interface (DCMI)
+> +
+> +Required properties:
+> +- compatible: "st,stm32-dcmi"
+> +- reg: physical base address and length of the registers set for the device
+> +- interrupts: should contain IRQ line for the DCMI
+> +- resets: reference to a reset controller,
+> +          see Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+> +- clocks: list of clock specifiers, corresponding to entries in
+> +          the clock-names property
+> +- clock-names: must contain "mclk", which is the DCMI peripherial clock
+> +- pinctrl: the pincontrol settings to configure muxing properly
+> +           for pins that connect to DCMI device.
+> +           See Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt.
+> +- dmas: phandle to DMA controller node,
+> +        see Documentation/devicetree/bindings/dma/stm32-dma.txt
+> +- dma-names: must contain "tx", which is the transmit channel from DCMI to DMA
+> +
+> +DCMI supports a single port node with parallel bus. It should contain one
+> +'port' child node with child 'endpoint' node. Please refer to the bindings
+> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Example:
+> +
+> +	dcmi: dcmi at 50050000 {
+> +		compatible = "st,stm32-dcmi";
+> +		reg = <0x50050000 0x400>;
+> +		interrupts = <78>;
+> +		resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
+> +		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
+> +		clock-names = "mclk";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&dcmi_pins>;
+> +		dmas = <&dma2 1 1 0x414 0x3>;
+> +		dma-names = "tx";
+> +		port {
+> +			dcmi_0: endpoint at 0 {
+
+Unit address in not valid without a reg prop, so drop it.
+
+> +				remote-endpoint = <...>;
+> +				bus-width = <8>;
+> +				hsync-active = <0>;
+> +				vsync-active = <0>;
+> +				pclk-sample = <1>;
+> +			};
+> +		};
+> +	};
+> +
+> -- 
+> 1.9.1
 > 
