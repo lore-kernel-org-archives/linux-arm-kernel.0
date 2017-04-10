@@ -1,46 +1,50 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Apr 2017 11:56:37 +0200
-Subject: [GIT PULL 2/2] Rockchip dts64 updates for 4.12 part2
-In-Reply-To: <2927359.zDIxDMQbjs@phil>
-References: <2927359.zDIxDMQbjs@phil>
-Message-ID: <1589941.s7YUBqhHWQ@phil>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Apr 2017 11:08:07 +0100
+Subject: [PATCH 0/2] drm: dw-hdmi: various improvements
+In-Reply-To: <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
+References: <20170407141905.14147-1-romain.perier@collabora.com>
+ <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
+Message-ID: <20170410100807.GN17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 41b464ef10219e45513d1bcaddacd47ce0bd6136:
+On Mon, Apr 10, 2017 at 10:49:18AM +0530, Archit Taneja wrote:
+> Hi,
+> 
+> On 04/07/2017 07:49 PM, Romain Perier wrote:
+> >This set of patches split the stream handling functions in two parts. It
+> >introduces new callbacks that are specific to each variant, one for I2S
+> >and one for AHB.
+> >
+> >Then, as requested by the datasheet for the I2S variant, it adds support
+> >for gating the audio sampler clock when the audio stream is enabled and
+> >disabled.
+> >
+> >This patches series is the continuity of the following discussion:
+> >http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/493550.html
+> 
+> Since these aren't fixes, could you make sure to redo the patches over:
+> 
+> git://anongit.freedesktop.org/drm-misc drm-misc-next
+> 
+> The dw-hdmi driver is now under drivers/gpu/drm/bridge/synopsis/
 
-  arm64: dts: rockchip: fix PCIe domain number for rk3399 (2017-03-22 17:50:09 +0100)
+This is annoying as it makes submission of CEC support for dw-hdmi
+rather difficult due to the now horrid cross-tree dependencies:
 
-are available in the git repository at:
+* if I submit it to the DRM tree, the DRM tree will build break because
+  you don't have the necessary CEC changes which have recently been
+  merged into the media tree.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts64-2
+* if I submit it to the media tree, the new files will be placed into
+  drivers/gpu/drm/bridge and when stuff gets merged into linux-next
+  and/or Linus' tree, things will need quite a large fixup (someone
+  will have to rename the files and fix the Kconfig/Makefiles.)
 
-for you to fetch changes up to 2f513bd9eac1a2642b40387d4f89c3987641e59b:
+So, I'll hold it back for another cycle to avoid the mess that would
+result from trying to get it merged during this cycle.
 
-  arm64: dts: rockchip: fix the memory size of PX5 Evaluation board (2017-04-07 22:29:11 +0200)
-
-----------------------------------------------------------------
-Basic support for new rk3328, a 4-core Cortex-A53 soc and a fix for the
-default memory definition on the px5 eval board. While the bootloader
-should already override it with the actual amount, it's better to not
-carry around wrong values.
-
-----------------------------------------------------------------
-Andy Yan (1):
-      arm64: dts: rockchip: fix the memory size of PX5 Evaluation board
-
-Liang Chen (4):
-      dt-bindings: add binding for rk3328-grf
-      arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
-      dt-bindings: document rockchip rk3328-evb board
-      arm64: dts: rockchip: add RK3328 eavluation board devicetree
-
- Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
- .../devicetree/bindings/soc/rockchip/grf.txt       |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |   57 +
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 1264 ++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    |    2 +-
- 6 files changed, 1328 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328.dtsi
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
