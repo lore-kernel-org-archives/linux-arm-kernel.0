@@ -1,41 +1,88 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 10 Apr 2017 16:07:03 +0100
-Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
- <864lxzch9o.fsf@arm.com>
- <5f1423fd-8f73-364a-9cf7-b4310957e2fd@redhat.com>
- <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
-Message-ID: <CAFEAcA-dG-UuODon2c877m8oPdjSFfb9ZwHxUqDwSSiSXFMS8A@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 10 Apr 2017 17:10:11 +0200
+Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
+ functions
+In-Reply-To: <20170410163558.494cf9be@bbrezillon>
+References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
+ <20170410163558.494cf9be@bbrezillon>
+Message-ID: <20170410151011.GA18753@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2017 at 15:57, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 10/04/17 15:32, Auger Eric wrote:
->> Well this is partly documented in
->> Documentation/virtual/kvm/devices/arm-vgic-its.txt. No plan to
->> deprecate. migration from KVM supporting v1 to KVM supporting V2 would
->> be possible but not the contrary.
->>
->> Does it make sense?
->
-> Sort of. Say you have three systems: A and C, which only supports v1; B,
-> which supports v1 and v2. Let's say you migrate from A to B, and from B
-> to C. Is B mandated to be able to export the tables as v1 and v2? Or can
-> it restrict what it can export?
+On Mon, Apr 10, 2017 at 04:35:58PM +0200, Boris Brezillon wrote:
+> On Mon, 10 Apr 2017 17:20:20 +0300
+> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+> 
+> > Implement suspend and resume power management specific
+> > function to allow PWM controller to correctly suspend
+> > and resume.
+> > 
+> > Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> > ---
+> >  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 81 insertions(+)
+> > 
+> > diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> > index 530d7dc..75177c6 100644
+> > --- a/drivers/pwm/pwm-atmel.c
+> > +++ b/drivers/pwm/pwm-atmel.c
+> > @@ -58,6 +58,8 @@
+> >  #define PWM_MAX_PRD		0xFFFF
+> >  #define PRD_MAX_PRES		10
+> >  
+> > +#define PWM_MAX_CH_NUM		(4)
+> > +
+> >  struct atmel_pwm_registers {
+> >  	u8 period;
+> >  	u8 period_upd;
+> > @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
+> >  	u8 duty_upd;
+> >  };
+> >  
+> > +struct atmel_pwm_pm_ctx {
+> > +	u32 cmr;
+> > +	u32 cdty;
+> > +	u32 cprd;
+> > +};
+> > +
+> >  struct atmel_pwm_chip {
+> >  	struct pwm_chip chip;
+> >  	struct clk *clk;
+> >  	void __iomem *base;
+> >  	const struct atmel_pwm_registers *regs;
+> > +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];
+> 
+> Hm, I'm pretty sure you can rely on the current PWM state and call
+> atmel_pwm_apply() at resume time instead of doing that. See what I did
+> here [1].
+> 
+> Thierry, maybe it's time to start thinking about a generic solution to
+> save/restore PWM states.
 
-Generally for QEMU we only require forwards-compatibility (so
-in this case old-kernel to new-kernel has to work but new-kernel
-to old-kernel need not). Export-as-old-format if the in-kernel
-data can be represented in the old format would be a nice to have
-property only (and depending what the unanticipated future need
-is, might not be possible at all).
+Generally speaking I think applying the states are the right way to go.
+Ideally the PWM core could simply resume all of the PWM channels that a
+device exports and the ->apply() callback would be enough to restore
+that. I'm not sure if that's going to work with current implementations,
+though. Your pwm-atmel-hlcdc patch certainly indicates that we're not
+quite there yet.
 
-The idea here is not that we expect to need this, but to give
-ourselves an escape hatch for future use if we do find we need
-to add something which won't fit in the currently defined format.
+On the other hand, I'm beginning to think that maybe PWMs are too low-
+level for this kind of suspend/resume. For example if you use the PWM to
+control a backlight brightness, restoring it via the driver core's
+resume hook is potentially going to turn it back on at the wrong time. I
+have a feeling that we might be better off just pushing this up to the
+PWM users. A slight special case might be sysfs, for which no external
+user driver exists. But we already have separate data structures to keep
+track of sysfs-related context, so suspend/resume support could be added
+there.
 
-thanks
--- PMM
+Any thoughts on that?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170410/8dd56f59/attachment-0001.sig>
