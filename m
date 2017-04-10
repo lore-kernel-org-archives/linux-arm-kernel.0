@@ -1,105 +1,106 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Apr 2017 14:48:32 -0500
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
-References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
- <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+From: pageexec@freemail.hu (PaX Team)
+Date: Mon, 10 Apr 2017 21:47:31 +0200
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <CALCETrX+iQVjupq9NU5kOPypBBOSRziuvdGdnzCxTUXQkcFJcQ@mail.gmail.com>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
+ <58EA988F.29293.6C80F08B@pageexec.freemail.hu>,
+ <CALCETrX+iQVjupq9NU5kOPypBBOSRziuvdGdnzCxTUXQkcFJcQ@mail.gmail.com>
+Message-ID: <58EBE153.31145.71853724@pageexec.freemail.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
-> Add documentation of device tree bindings for STM32 SPI/I2S.
+On 9 Apr 2017 at 17:31, Andy Lutomirski wrote:
+
+> On Sun, Apr 9, 2017 at 1:24 PM, PaX Team <pageexec@freemail.hu> wrote:
+> >
+> I consider breaking buggy drivers (in a way that they either generally
+> work okay
+
+do they work okay when the dma transfer goes to a buffer that crosses
+physically non-contiguous page boundaries?
+
+> or that they break with a nice OOPS depending on config) to
+> be better than having a special case in what's supposed to be a fast
+> path to keep them working.  I did consider forcing the relevant debug
+> options on for a while just to help shake these bugs out the woodwork
+> faster.
+
+that's a false dichotomy, discovering buggy drivers is orthogonal to (not)
+breaking users' systems as grsec shows. and how did you expect to 'shake
+these bugs out' when your own suggestion at the time was for distros to
+not enable this feature 'for a while'?
+
+> > i have yet to see anyone explain what they mean by 'leak' here but if it
+> > is what i think it is then the arch specific entry/exit changes are not
+> > optional but mandatory. see below for randomization.
 > 
-> Signed-off-by: olivier moysan <olivier.moysan@st.com>
-> ---
->  .../devicetree/bindings/sound/st,stm32h7-i2s.txt   | 71 ++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
+> By "leak" I mean that a bug or exploit causes unintended code to run
+> with CR0.WP or a special CR3 or a special PTE or whatever loaded.
+
+how can a bug/exploit cause something like this?
+
+>  PaX hooks the entry code to avoid leaks. 
+
+PaX doesn't instrument enter/exit paths to prevent state leaks into interrupt
+context (it's a useful sideeffect though), rather it's needed for correctness
+if the kernel can be interrupted at all while it's open (address space switching
+will need to handle this too but you have yet to address it).
+
+> >> At boot, choose a random address A.
+> >
+> > what is the threat that a random address defends against?
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
-> new file mode 100644
-> index 0000000..b99467a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
-> @@ -0,0 +1,71 @@
-> +STMicroelectronics STM32 SPI/I2S Controller
-> +
-> +The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
-> +Only some SPI instances support I2S.
-> +
-> +Required properties:
-> +  - compatible: Must be "st,stm32h7-i2s"
-> +  - #sound-dai-cells: Must be 1. (one parameter)
-> +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
-> +	index 0: playback DAI
-> +	index 1: capture DAI
-> +	index 2: full duplex DAI
+> Makes it harder to exploit a case where the CR3 setting leaks.
 
-Is this still needed for graph-card?
+if an attacker has the ability to cause this leak (details of which are subject
+to the question i asked above) then why wouldn't he simply also make use of the
+primitives to modify his target via the writable vma without ever having to know
+the randomized address? i also wonder what exploit power you assume for this
+attack and whether that is already enough to simply go after page tables, etc
+instead of figuring out the alternative address space.
 
-> +  - reg: Offset and length of the device's register set.
-> +  - interrupts: Must contain the interrupt line id.
-> +  - clocks: Must contain phandle and clock specifier pairs for each entry
-> +	in clock-names.
-> +  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
-> +	"i2sclk": clock which feeds the internal clock generator
-> +	"pclk": clock which feeds the peripheral bus interface
-> +	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
-> +	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
-> +  - dmas: DMA specifiers for tx and rx dma.
-> +    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
-> +  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
-> +  - pinctrl-names: should contain only value "default"
-> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
-> +
-> +Optional properties:
-> +  - resets: Reference to a reset controller asserting the reset controller
-> +
-> +Example:
-> +sound_card {
-> +	compatible = "audio-graph-card";
-> +	dais = <&i2s2_port 0>;
-> +};
-> +
-> +i2s2: audio-controller at 40003800 {
-> +	compatible = "st,stm32h7-i2s";
-> +	#sound-dai-cells = <1>;
-> +	reg = <0x40003800 0x400>;
-> +	interrupts = <36>;
-> +	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
-> +	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
-> +	dmas = <&dmamux2 2 39 0x400 0x1>,
-> +		       <&dmamux2 3 40 0x400 0x1>;
-> +	dma-names = "rx", "tx";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2s2>;
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		i2s2_port: port at 0 {
-> +			reg = <0>;
-> +			cpu_endpoint: endpoint {
-> +				remote-endpoint = <&codec_endpoint>;
-> +				audio-graph-card,format = "i2s";
-> +				audio-graph-card,bitclock-master = <&codec_endpoint>;
-> +				audio-graph-card,frame-master = <&codec_endpoint>;
-
-The 'audio-graph-card,' part has been dropped.
-
-> +			};
-> +		};
-> +};
-> +
-> +audio-codec {
-> +		codec_port: port {
-> +			codec_endpoint: endpoint {
-> +				remote-endpoint = <&cpu_endpoint>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
+> > the problem is that the amount of __read_only data extends beyond vmlinux,
+> > i.e., this approach won't scale. another problem is that it can't be used
+> > inside use_mm and switch_mm themselves (no read-only task structs or percpu
+> > pgd for you ;) and probably several other contexts.
 > 
+> Can you clarify these uses that extend beyond vmlinux?
+
+one obvious candidate is modules. how do you want to handle them? then there's
+a whole bunch of dynamically allocated data that is a candidate for __read_only
+treatment.
+
+> > what is the threat model you're assuming for this feature? based on what i
+> > have for PaX (arbitrary read/write access exploited for data-only attacks),
+> > the above makes no sense to me...
+> 
+> If I use the primitive to try to write a value to the wrong section
+> (write to kernel text, for example), IMO it would be nice to OOPS
+> instead of succeeding.
+
+this doesn't tell me what power you're assuming the attacker has. is it
+my generic arbitrary read-write ability or something more restricted and
+thus less realistic? i.e., how does the attacker get to 'use the primitive'
+and (presumably) also control the ptr/data?
+
+as for your specific example, kernel text isn't 'non-rare-write data' that
+you spoke of before, but that aside, what prevents an attacker from computing
+his target ptr so that after your accessor rebases it, it'd point back to his
+intended target instead? will you range-check (find_vma eventually?) each time?
+how will you make all this code safe from races from another task? the more
+checks you make, the more likely that something sensitive will spill to memory
+and be a target itself in order to hijack the sensitive write.
+
+> Please keep in mind that, unlike PaX, uses of a pax_open_kernel()-like
+> function will may be carefully audited by a friendly security expert
+> such as yourself.  It would be nice to harden the primitive to a
+> reasonable extent against minor misuses such as putting it in a
+> context where the compiler will emit mov-a-reg-with-WP-set-to-CR0;
+> ret.
+
+i don't understand what's there to audit. if you want to treat a given piece
+of data as __read_only then you have no choice but to allow writes to it via
+the open/close mechanism and the compiler can tell you just where those
+writes are (and even do the instrumentation when you get tired of doing it
+by hand).
