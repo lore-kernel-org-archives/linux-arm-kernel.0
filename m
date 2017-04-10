@@ -1,77 +1,67 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 10 Apr 2017 17:17:11 +0200
-Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
- <864lxzch9o.fsf@arm.com> <5f1423fd-8f73-364a-9cf7-b4310957e2fd@redhat.com>
- <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
-Message-ID: <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 10 Apr 2017 08:10:13 -0700
+Subject: [PATCHv3 17/22] staging: android: ion: Collapse internal header
+ files
+In-Reply-To: <CACvgo52qr=oBoiMnrww3cgoKozEMi3DwBV55c_GMi0mR_p0GcA@mail.gmail.com>
+References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+ <1491245884-15852-18-git-send-email-labbott@redhat.com>
+ <CACvgo52qr=oBoiMnrww3cgoKozEMi3DwBV55c_GMi0mR_p0GcA@mail.gmail.com>
+Message-ID: <8f94fbd9-6aa4-f7a0-c9f1-8da894fe1eb8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 10/04/2017 16:57, Marc Zyngier wrote:
-> On 10/04/17 15:32, Auger Eric wrote:
->> Hi Marc,
+On 04/08/2017 11:12 AM, Emil Velikov wrote:
+> Hi Laura,
+> 
+> Couple of trivial nitpicks below.
+> 
+> On 3 April 2017 at 19:57, Laura Abbott <labbott@redhat.com> wrote:
+> 
+>> --- a/drivers/staging/android/ion/ion.h
+>> +++ b/drivers/staging/android/ion/ion.h
+>> @@ -1,5 +1,5 @@
+>>  /*
+>> - * drivers/staging/android/ion/ion.h
+>> + * drivers/staging/android/ion/ion_priv.h
+> Does not match the actual filename.
+> 
+>>   *
+>>   * Copyright (C) 2011 Google, Inc.
+>>   *
+>> @@ -14,24 +14,26 @@
+>>   *
+>>   */
 >>
->> On 08/04/2017 12:42, Marc Zyngier wrote:
->>> On Mon, Mar 27 2017 at 10:30:58 AM, Eric Auger <eric.auger@redhat.com> wrote:
->>>> The GITS_IIDR revision field is used to encode the version of the
->>>> table layout (ABI). So we need to restore it to check the table
->>>> layout to be restored is compatible with the destination vITS.
->>>>
->>>> The user selected revision is stored in the user_revision field.
->>>> It will be compared against the REV num at table restoration time.
->>>
->>> Why isn't it sufficient to keep it GITS_IIDR RO and let userspace find
->>> out about the ABI revision that the kernel understands?
->>>
->>> Or are we planning on supporting multiple ABIs in the kernel?
->> Yes as discussed with Peter, the plan is to allow several ABIs. So the
->> userspace informs the destination about the ABI revision of the stored
->> tables (contained by the GITS_IIDR). If the destination KVM does not
->> support this ABI revision, table restore will fail.
->>  If so, do
->>> we have a deprecation policy/plan? I don't mind either way, but it would
->>> be good to document it...
->>>
->>> Maybe it is documented already and I missed it (which is perfectly
->>> possible!).
->> Well this is partly documented in
->> Documentation/virtual/kvm/devices/arm-vgic-its.txt. No plan to
->> deprecate. migration from KVM supporting v1 to KVM supporting V2 would
->> be possible but not the contrary.
+>> -#ifndef _LINUX_ION_H
+>> -#define _LINUX_ION_H
+>> +#ifndef _ION_PRIV_H
+>> +#define _ION_PRIV_H
 >>
->> Does it make sense?
+> Ditto.
 > 
-> Sort of. Say you have three systems: A and C, which only supports v1; B,
-> which supports v1 and v2. Let's say you migrate from A to B, and from B
-> to C. Is B mandated to be able to export the tables as v1 and v2? Or can
-> it restrict what it can export?
-At the moment migration from B to C will fail because source ABI rev =
-v2 > destination support ABI = v1.
-
-A (v1) -> B (v1 & v2): migration OK
-B (v1 & v2) -> C (v1): migration NOK
-
-What could be done if we want something clever is source KVM detects
-which ABI is sufficient and choose the lowest revision for the save. for
-instance if no vLPI choose rev1, otherwise rev2. rev2 typically is
-needed for vLPI support for nested as we need to save/restore vPE table
-and vLPIs in ITE (2x8 byte entries).
-
-The problem is that once you have migrated to B and you start playing
-with vLPIs and C do not know the table layout for vPE/vLPIs, you can't
-migrate anymore.
-
-Thanks
-
-Eric
+>> +#include <linux/device.h>
+>> +#include <linux/dma-direction.h>
+>> +#include <linux/kref.h>
+>> +#include <linux/mm_types.h>
+>> +#include <linux/mutex.h>
+>> +#include <linux/rbtree.h>
+>> +#include <linux/sched.h>
+>> +#include <linux/shrinker.h>
+>>  #include <linux/types.h>
+>> +#include <linux/miscdevice.h>
+>>
+>>  #include "../uapi/ion.h"
+>>
+> You don't want to use "../" in includes. Perhaps address with another
+> patch, if you haven't already ?
 > 
-> Thanks,
-> 
-> 	M.
+
+There isn't a better option until this driver moves out of staging.
+Once it moves out it can be fixed up.
+
+Thanks,
+Laura
+
+> Regards,
+> Emil
 > 
