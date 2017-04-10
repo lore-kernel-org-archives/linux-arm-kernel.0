@@ -1,115 +1,105 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:46:50 -0500
-Subject: [PATCH v6 07/23] drivers/fsi: Implement slave initialisation
-In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-8-cbostic@linux.vnet.ibm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Apr 2017 14:48:32 -0500
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+ <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
+> Add documentation of device tree bindings for STM32 SPI/I2S.
+> 
+> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+> ---
+>  .../devicetree/bindings/sound/st,stm32h7-i2s.txt   | 71 ++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
+> new file mode 100644
+> index 0000000..b99467a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/st,stm32h7-i2s.txt
+> @@ -0,0 +1,71 @@
+> +STMicroelectronics STM32 SPI/I2S Controller
+> +
+> +The SPI/I2S block supports I2S/PCM protocols when configured on I2S mode.
+> +Only some SPI instances support I2S.
+> +
+> +Required properties:
+> +  - compatible: Must be "st,stm32h7-i2s"
+> +  - #sound-dai-cells: Must be 1. (one parameter)
+> +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
+> +	index 0: playback DAI
+> +	index 1: capture DAI
+> +	index 2: full duplex DAI
 
-Implement fsi_slave_init: if we can read a chip ID, create fsi_slave
-devices and register with the driver core.
+Is this still needed for graph-card?
 
-Includes changes from Chris Bostic <cbostic@linux.vnet.ibm.com>.
+> +  - reg: Offset and length of the device's register set.
+> +  - interrupts: Must contain the interrupt line id.
+> +  - clocks: Must contain phandle and clock specifier pairs for each entry
+> +	in clock-names.
+> +  - clock-names: Must contain "i2sclk", "pclk", "x8k" and "x11k".
+> +	"i2sclk": clock which feeds the internal clock generator
+> +	"pclk": clock which feeds the peripheral bus interface
+> +	"x8k": I2S parent clock for sampling rates multiple of 8kHz.
+> +	"x11k": I2S parent clock for sampling rates multiple of 11.025kHz.
+> +  - dmas: DMA specifiers for tx and rx dma.
+> +    See Documentation/devicetree/bindings/dma/stm32-dma.txt.
+> +  - dma-names: Identifier for each DMA request line. Must be "tx" and "rx".
+> +  - pinctrl-names: should contain only value "default"
+> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+> +
+> +Optional properties:
+> +  - resets: Reference to a reset controller asserting the reset controller
+> +
+> +Example:
+> +sound_card {
+> +	compatible = "audio-graph-card";
+> +	dais = <&i2s2_port 0>;
+> +};
+> +
+> +i2s2: audio-controller at 40003800 {
+> +	compatible = "st,stm32h7-i2s";
+> +	#sound-dai-cells = <1>;
+> +	reg = <0x40003800 0x400>;
+> +	interrupts = <36>;
+> +	clocks = <&rcc PCLK1>, <&rcc SPI2_CK>, <&rcc PLL1_Q>, <&rcc PLL2_P>;
+> +	clock-names = "pclk", "i2sclk",  "x8k", "x11k";
+> +	dmas = <&dmamux2 2 39 0x400 0x1>,
+> +		       <&dmamux2 3 40 0x400 0x1>;
+> +	dma-names = "rx", "tx";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2s2>;
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		i2s2_port: port at 0 {
+> +			reg = <0>;
+> +			cpu_endpoint: endpoint {
+> +				remote-endpoint = <&codec_endpoint>;
+> +				audio-graph-card,format = "i2s";
+> +				audio-graph-card,bitclock-master = <&codec_endpoint>;
+> +				audio-graph-card,frame-master = <&codec_endpoint>;
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- drivers/fsi/fsi-core.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 64 insertions(+), 2 deletions(-)
+The 'audio-graph-card,' part has been dropped.
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 6e1cfdf..c705ca2 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -17,9 +17,12 @@
- #include <linux/fsi.h>
- #include <linux/idr.h>
- #include <linux/module.h>
-+#include <linux/slab.h>
- 
- #include "fsi-master.h"
- 
-+#define FSI_SLAVE_SIZE_23b		0x800000
-+
- static DEFINE_IDA(master_ida);
- 
- struct fsi_slave {
-@@ -114,11 +117,70 @@ static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
- 			addr, val, size);
- }
- 
-+static void fsi_slave_release(struct device *dev)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(dev);
-+
-+	kfree(slave);
-+}
-+
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
--	/* todo: initialise slave device, perform engine scan */
-+	struct fsi_slave *slave;
-+	uint32_t chip_id;
-+	uint8_t crc;
-+	int rc;
-+
-+	/* Currently, we only support single slaves on a link, and use the
-+	 * full 23-bit address range
-+	 */
-+	if (id != 0)
-+		return -EINVAL;
-+
-+	rc = fsi_master_read(master, link, id, 0, &chip_id, sizeof(chip_id));
-+	if (rc) {
-+		dev_warn(&master->dev, "can't read slave %02x:%02x %d\n",
-+				link, id, rc);
-+		return -ENODEV;
-+	}
-+	chip_id = be32_to_cpu(chip_id);
-+
-+	crc = fsi_crc4(0, chip_id, 32);
-+	if (crc) {
-+		dev_warn(&master->dev, "slave %02x:%02x invalid chip id CRC!\n",
-+				link, id);
-+		return -EIO;
-+	}
-+
-+	dev_info(&master->dev, "fsi: found chip %08x at %02x:%02x:%02x\n",
-+			chip_id, master->idx, link, id);
-+
-+	/* We can communicate with a slave; create the slave device and
-+	 * register.
-+	 */
-+	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
-+	if (!slave)
-+		return -ENOMEM;
-+
-+	slave->master = master;
-+	slave->dev.parent = &master->dev;
-+	slave->dev.release = fsi_slave_release;
-+	slave->link = link;
-+	slave->id = id;
-+	slave->size = FSI_SLAVE_SIZE_23b;
-+
-+	dev_set_name(&slave->dev, "slave@%02x:%02x", link, id);
-+	rc = device_register(&slave->dev);
-+	if (rc < 0) {
-+		dev_warn(&master->dev, "failed to create slave device: %d\n",
-+				rc);
-+		put_device(&slave->dev);
-+		return rc;
-+	}
-+
-+	/* todo: perform engine scan */
- 
--	return -ENODEV;
-+	return rc;
- }
- 
- /* FSI master support */
--- 
-1.8.2.2
+> +			};
+> +		};
+> +};
+> +
+> +audio-codec {
+> +		codec_port: port {
+> +			codec_endpoint: endpoint {
+> +				remote-endpoint = <&cpu_endpoint>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
