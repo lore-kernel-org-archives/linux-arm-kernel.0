@@ -1,65 +1,74 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 10 Apr 2017 04:56:20 -0700
-Subject: [PATCH V11 00/11] IOMMU probe deferral support
-In-Reply-To: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
-References: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <58EB72E4.6030009@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 10 Apr 2017 14:08:44 +0200
+Subject: [PATCH 0/2] drm: dw-hdmi: various improvements
+In-Reply-To: <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
+References: <20170407141905.14147-1-romain.perier@collabora.com>
+ <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
+ <20170410100807.GN17774@n2100.armlinux.org.uk>
+ <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
+Message-ID: <20170410120844.3czcqwjsyzmkznhp@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/17 04:20, Sricharan R wrote:
-> This series calls the dma ops configuration for the devices
-> at a generic place so that it works for all busses.
-> The dma_configure_ops for a device is now called during
-> the device_attach callback just before the probe of the
-> bus/driver is called. Similarly dma_deconfigure is called during
-> device/driver_detach path.
+On Mon, Apr 10, 2017 at 12:35:43PM +0200, Neil Armstrong wrote:
+> On 04/10/2017 12:08 PM, Russell King - ARM Linux wrote:
+> > On Mon, Apr 10, 2017 at 10:49:18AM +0530, Archit Taneja wrote:
+> >> Hi,
+> >>
+> >> On 04/07/2017 07:49 PM, Romain Perier wrote:
+> >>> This set of patches split the stream handling functions in two parts. It
+> >>> introduces new callbacks that are specific to each variant, one for I2S
+> >>> and one for AHB.
+> >>>
+> >>> Then, as requested by the datasheet for the I2S variant, it adds support
+> >>> for gating the audio sampler clock when the audio stream is enabled and
+> >>> disabled.
+> >>>
+> >>> This patches series is the continuity of the following discussion:
+> >>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/493550.html
+> >>
+> >> Since these aren't fixes, could you make sure to redo the patches over:
+> >>
+> >> git://anongit.freedesktop.org/drm-misc drm-misc-next
+> >>
+> >> The dw-hdmi driver is now under drivers/gpu/drm/bridge/synopsis/
+> > 
+> > This is annoying as it makes submission of CEC support for dw-hdmi
+> > rather difficult due to the now horrid cross-tree dependencies:
+> > 
+> > * if I submit it to the DRM tree, the DRM tree will build break because
+> >   you don't have the necessary CEC changes which have recently been
+> >   merged into the media tree.
+> > 
+> > * if I submit it to the media tree, the new files will be placed into
+> >   drivers/gpu/drm/bridge and when stuff gets merged into linux-next
+> >   and/or Linus' tree, things will need quite a large fixup (someone
+> >   will have to rename the files and fix the Kconfig/Makefiles.)
+> > 
+> > So, I'll hold it back for another cycle to avoid the mess that would
+> > result from trying to get it merged during this cycle.
+> > 
 > 
-> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->        |                         |
-> pci_bus_add_device     (device_add/driver_register)
->        |                         |
-> device_attach           device_initial_probe
->        |                         |
-> __device_attach_driver    __device_attach_driver
->        |
-> driver_probe_device
->        |
-> really_probe
->        |
-> dma_configure
+> Hi Russell,
 > 
-> Similarly on the device/driver_unregister path __device_release_driver is
-> called which inturn calls dma_deconfigure.
+> Cross tree with media has already been done on this cycle with the
+> dw-hdmi formats changes.
 > 
-> Rebased the series against mainline 4.11-rc5. Applies and builds cleanly
-> against iommu-next and with 3-way merge applies on top of linux-next
-> as well (patch #8), because of "ACPI platform MSI support" from
-> Hanjun being merged.
->   
-> * Tested with platform and pci devices for probe deferral
->   and reprobe on arm64 based platform.
+> Nevertheless, please push your updated dw-hdmi cec patchset for tests
+> and review based on the latest drm-misc-next and hverkuil's HPD notifier
+> release.
 > 
-> Previous post of this series [8]. 
-> 
-> Please note that, i have kept the tested/acked tags intact from V8
-> because V9/10/11 were for more fixes that was added, so the original
-> tags that was given for the functional testing remains the same.
-> 
->  [V11]
->      * No functional changes.
-> 
->      * Rebased on top of 4.11-rc6.
-> 
->      * Dropped patch#3 from V10, as a result have to make
->        a change in patch#7 to return a 'non-void' to fix a
->        build warning.
-> 
->      * Added Robin's and Rob's tags.
+> I would like to run it on some Amlogic boards.
 
-< snip >
+Yeah, cross subsystem topic branches aren't rocket science, we have the
+entire process documented and scripted on the drm side. Hairy depencies
+really aren't a reason to not submit patches, we've got this :-)
 
-The changes are good enough for me and you have Rob's acks, so the
-series looks good from the device tree standpoint.
-
--Frank
+But 4.12 is done anyway on the drm side, so will get delayed to 4.13 no
+matter what. Still would be good to get the patches reviewed as early as
+possible.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
