@@ -1,44 +1,36 @@
-From: dsterba@suse.cz (David Sterba)
-Date: Mon, 10 Apr 2017 13:13:53 +0200
-Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
-In-Reply-To: <20170408210737.5456-1-kilobyte@angband.pl>
-References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
- <20170408210737.5456-1-kilobyte@angband.pl>
-Message-ID: <20170410111353.GX4781@suse.cz>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Apr 2017 12:14:03 +0100
+Subject: [PATCH 0/2] drm: dw-hdmi: various improvements
+In-Reply-To: <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
+References: <20170407141905.14147-1-romain.perier@collabora.com>
+ <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
+ <20170410100807.GN17774@n2100.armlinux.org.uk>
+ <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
+Message-ID: <20170410111402.GO17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 08, 2017 at 11:07:37PM +0200, Adam Borowski wrote:
-> Unbreaks ARM and possibly other 32-bit architectures.
+On Mon, Apr 10, 2017 at 12:35:43PM +0200, Neil Armstrong wrote:
+> Hi Russell,
 > 
-> Fixes: 7d0ef8b4d: Btrfs: update scrub_parity to use u64 stripe_len
-> Reported-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Adam Borowski <kilobyte@angband.pl>
-> ---
-> You'd probably want to squash this with Liu's commit, to be nice to future
-> bisects.
-
-Thanks for finding it!
-
-> Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
-> sometimes works, but, like most operations, randomly dies with some badness
-> that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
-> there in 4.11-rc5, needs investigating, but since it's not connected to our
-> issue at hand, I consider this patch sort-of tested.
+> Cross tree with media has already been done on this cycle with the
+> dw-hdmi formats changes.
 > 
->  fs/btrfs/scrub.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/fs/btrfs/scrub.c b/fs/btrfs/scrub.c
-> index b6fe1cd08048..95372e3679f3 100644
-> --- a/fs/btrfs/scrub.c
-> +++ b/fs/btrfs/scrub.c
-> @@ -2407,7 +2407,7 @@ static inline void __scrub_mark_bitmap(struct scrub_parity *sparity,
->  
->  	start -= sparity->logic_start;
->  	start = div64_u64_rem(start, sparity->stripe_len, &offset);
-> -	offset /= sectorsize;
-> +	do_div(offset, sectorsize);
+> Nevertheless, please push your updated dw-hdmi cec patchset for tests
+> and review based on the latest drm-misc-next and hverkuil's HPD notifier
+> release.
 
-I'll use the div_u64 helper instead, I don't want to reintroduce do_div
-to fs/btrfs , for-next will be updated in a minute.
+You can get my current version at:
+
+ git://git.armlinux.org.uk/~rmk/linux-arm.git cec-v18
+
+As it's taken me over a week to validate both dw-hdmi and tda998x against
+the latest version of Hans patches (despite me wanting to get it out to
+Hans), I don't have the bandwidth to rebase it onto some other tree and
+re-test at the moment.  As we're at -rc6 today, I doubt that'll happen
+before the merge window, sorry.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
