@@ -1,36 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Apr 2017 09:18:16 -0700
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
-References: <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
- <20170323010057.GI10760@atomide.com>
- <20170323170210.GL10760@atomide.com>
- <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
- <20170330165448.GF10760@atomide.com>
- <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
- <20170403153604.GI10760@atomide.com>
- <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
- <20170407164731.GJ13234@atomide.com>
- <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
-Message-ID: <20170410161816.GD5339@atomide.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 10 Apr 2017 09:20:27 -0700
+Subject: [PATCHv3 00/22] Ion clean up in preparation in moving out of
+ staging
+In-Reply-To: <20170408103821.GA12084@kroah.com>
+References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
+ <20170408103821.GA12084@kroah.com>
+Message-ID: <b1a52f74-a089-96c1-a6b9-5f4eb3d28f8b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170410 00:34]:
-> On 07/04/17 19:47, Tony Lindgren wrote:
-> > OK hdmi works now on panda for both omapfb and omapdrm. Any ideas why
-> > that change is now needed though?
+On 04/08/2017 03:38 AM, Greg Kroah-Hartman wrote:
+> On Mon, Apr 03, 2017 at 11:57:42AM -0700, Laura Abbott wrote:
+>> Hi,
+>>
+>> This is v3 of the series to do some serious Ion cleanup in preparation for
+>> moving out of staging. I didn't hear much on v2 so I'm going to assume
+>> people are okay with the series as is. I know there were still some open
+>> questions about moving away from /dev/ion but in the interest of small
+>> steps I'd like to go ahead and merge this series assuming there are no more
+>> major objections. More work can happen on top of this.
 > 
-> Yes, it is pretty clear actually. Previously, the hwmod main clock was
-> controlling the hdmi clock, but this is now rerouted to the clkctrl module
-> clock, which is shared between all DSS submodules. This leaves the hdmi
-> clock disabled, causing the failure.
+> I've applied patches 3-11 as those were independant of the CMA changes.
+> I'd like to take the rest, including the CMA changes, but I need an ack
+> from someone dealing with the -mm tree before I can do that.
 > 
-> The fix just puts the hdmi clock into the optional clocks list, and forces
-> all the optional clocks on when pm_runtime is enabled for the module.
+> Or, if they just keep ignoring it, I guess I can take them :)
+> 
+> thanks,
+> 
+> greg k-h
+> 
 
-OK so no need to fix it in the current kernels then.
+Thanks. I'll send out some nag e-mails asking for Acks. If I don't get
+any, I'll resend the rest of the series after the 4.12 merge window.
 
 Thanks,
-
-Tony
+Laura
