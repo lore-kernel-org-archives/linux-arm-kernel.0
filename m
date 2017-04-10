@@ -1,48 +1,148 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 10 Apr 2017 11:16:34 +0100
-Subject: [PATCH v4] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <20170408165100.GA3589@afzalpc>
-References: <1491291087-17450-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170405224245.GA17774@n2100.armlinux.org.uk>
- <1491486403.2950.3.camel@linaro.org>
- <CAKv+Gu_EVqqQGXauWmfhhmJZEyrPDEHDiN2T23XVPy_eR99Lsg@mail.gmail.com>
- <1491494594.2950.7.camel@linaro.org> <20170408165100.GA3589@afzalpc>
-Message-ID: <1491819394.3172.1.camel@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 10 Apr 2017 12:18:34 +0200
+Subject: [PATCH v4 01/22] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <86y3vabycb.fsf@arm.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-2-git-send-email-eric.auger@redhat.com>
+ <86y3vbcj20.fsf@arm.com> <20170408131552.GA29201@lvm>
+ <86y3vabycb.fsf@arm.com>
+Message-ID: <c4571a9a-46e1-441b-0162-29f75a24cb0d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-04-08 at 22:21 +0530, afzal mohammed wrote:
-> Hi,
-> 
-> On Thu, Apr 06, 2017 at 05:03:14PM +0100, Jon Medhurst (Tixy) wrote:
-> > To cope with the variety in ARM architectures and configurations, the
-> > pagetable attributes for kernel memory are generated at runtime to match
-> > the system the kernel finds itself on. This calculated value is stored
-> > in pgprot_kernel.
-> > 
-> > However, when early fixmap support was added for ARM (commit
-> > a5f4c561b3b1) the attributes used for mappings were hard coded because
-> > pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
-> > used after early boot this means the memory being mapped can have
-> > different attributes to existing mappings, potentially leading to
-> > unpredictable behaviour. A specific problem also exists due to the hard
-> > coded values not include the 'shareable' attribute which means on
-> > systems where this matters (e.g. those with multiple CPU clusters) the
-> > cache contents for a memory location can become inconsistent between
-> > CPUs.
-> > 
-> > To resolve these issues we change fixmap to use the same memory
-> > attributes (from pgprot_kernel) that the rest of the kernel uses. To
-> > enable this we need to refactor the initialisation code so
-> > build_mem_type_table() is called early enough. Note, that relies on early
-> > param parsing for memory type overrides passed via the kernel command
-> > line, so we need to make sure this call is still after
-> > parse_early_params().
-> 
-> Tested-by: afzal mohammed <afzal.mohd.ma@gmail.com>
-> 
-> with an emphasis on no-MMU's
+Hi Marc, Christoffer,
 
-Thanks. I've now submitted this new version to the patch tracker...
-http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8667/3
+On 08/04/2017 19:31, Marc Zyngier wrote:
+> On Sat, Apr 08 2017 at 02:15:52 PM, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> On Sat, Apr 08, 2017 at 11:03:51AM +0100, Marc Zyngier wrote:
+>>> On Mon, Mar 27 2017 at 10:30:51 AM, Eric Auger <eric.auger@redhat.com> wrote:
+>>>> Add description for how to access vITS registers and how to flush/restore
+>>>> vITS tables into/from memory
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>> v3 -> v4:
+>>>> - take into account Peter's comments:
+>>>>   - typos
+>>>>   - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
+>>>>   - add a validity bit in DTE
+>>>>   - document all fields in CTE and ITE
+>>>>   - document ABI revision
+>>>> - take into account Andre's comments:
+>>>>   - document restrictions about GITS_CREADR writing and GITS_IIDR
+>>>>   - document -EBUSY error if one or more VCPUS are runnning
+>>>>   - document 64b registers only can be accessed with 64b access
+>>>> - itt_addr field matches bits [51:8] of the itt_addr
+>>>>
+>>>> v1 -> v2:
+>>>> - DTE and ITE now are 8 bytes
+>>>> - DTE and ITE now indexed by deviceid/eventid
+>>>> - use ITE name instead of ITTE
+>>>> - mentions ITT_addr matches bits [51:8] of the actual address
+>>>> - mentions LE layout
+>>>> ---
+>>>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 118 +++++++++++++++++++++
+>>>>  1 file changed, 118 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>>>> index 6081a5b..0902d20 100644
+>>>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>>>> @@ -36,3 +36,121 @@ Groups:
+>>>>      -ENXIO:  ITS not properly configured as required prior to setting
+>>>>               this attribute
+>>>>      -ENOMEM: Memory shortage when allocating ITS internal data
+>>>> +
+>>>> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>>>> +  Attributes:
+>>>> +      The attr field of kvm_device_attr encodes the offset of the
+>>>> +      ITS register, relative to the ITS control frame base address
+>>>> +      (ITS_base).
+>>>> +
+>>>> +      kvm_device_attr.addr points to a __u64 value whatever the width
+>>>> +      of the addressed register (32/64 bits). 64 bit registers can only
+>>>> +      be accessed with full length.
+>>>> +
+>>>> +      Writes to read-only registers are ignored by the kernel except for:
+>>>> +      - GITS_READR. It needs to be restored otherwise commands in the queue
+>>>> +        will be re-executed after CWRITER setting. Writing this register is
+>>>> +        allowed if the ITS is not enabled (GITS_CTLR.enable = 0). Also it
+>>>> +        needs to be restored after GITS_CBASER since a write to GITS_CBASER
+>>>> +        resets GITS_CREADR.
+>>>> +      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
+>>>> +
+>>>> +      For other registers, getting or setting a register has the same
+>>>> +      effect as reading/writing the register on real hardware.
+>>>> +  Errors:
+>>>> +    -ENXIO: Offset does not correspond to any supported register
+>>>> +    -EFAULT: Invalid user pointer for attr->addr
+>>>> +    -EINVAL: Offset is not 64-bit aligned
+>>>> +    -EBUSY: one or more VCPUS are running
+>>>> +
+>>>> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+>>>> +  Attributes
+>>>> +       The attr field of kvm_device_attr must be zero.
+>>>> +
+>>>> +       request the flush-save/restore of the ITS tables, namely
+>>>> +       the device table, the collection table, all the ITT tables,
+>>>> +       the LPI pending tables. On save, the tables are flushed
+>>>> +       into guest memory at the location provisioned by the guest
+>>>> +       in GITS_BASER (device and collection tables), in the MAPD
+>>>> +       command (ITT_addr), GICR_PENDBASERs (pending tables).
+>>>
+>>> May I echo Andre's concern here? Seeing the GICR_PENDBASER registers
+>>> here feels wrong. The pending table is a redistributor concept, and is
+>>> local to it. Even more, it is perfectly possible to use the
+>>> redistributors (and its pending tables) without an ITS by using the
+>>> GICR_SETLPIR registers.
+>>>
+>>> Granted, we do not support this (and I'm *not* looking forward to
+>>> supporting it), but I would rather implement a redistributor flush than
+>>> using the ITS to indirectly force it. That's not how the HW works, and I
+>>> don't think we should deviate from it.
+>>>
+>>> I appreciate this brings additional complexity to userspace (having to
+>>> iterate over the vcpus or the redistributors is likely more costly than
+>>> hitting the ITS which is likely to be unique), but sticking to the
+>>> letter of the architecture is probably our best bet. Each time we tried
+>>> to deviate from it, we've had to backtrack.
+>>
+>> I agree.  I think the possibility of using LPIs without an ITS is the
+>> winning argument.
+>>
+>> However, I could see it being reasonable to have a single call that
+>> userspace can make on the vgic device to ask it to flush all the
+>> redistributors at the same time.  We defined the cpu sysreg interface
+>> via the vgic device as well, so I don't think we're breaking anything,
+>> and in fact, it may be good to have a single sync-point where the kernel
+>> can atomically say "all redistributors are flushed correctly" or
+>> "something bad happened".  Do we have any arguments for wanting to be
+>> able flush redistributors independently?
+> 
+> Not as such. The redistributors may support implementation-specific ways
+> of ensuring synchronization with the PT (for power management purposes,
+> for example), but there is no architected way of ensuring it.
+> 
+> So I agree that having a single synchronization hook for all
+> redistributors in the system is probably the right thing to do. This is
+> simple enough for userspace, and we already have the required code in
+> this series -- we just need to tie it to an additional property on the
+> GICv3 group.
+> 
+> Eric: can you explore this and let us know if there is any issue we
+> haven't foreseen yet?
+Yes I am going to investigate this. The extra complexity I foresee is
+that I need to implement coarse mapping in the first kB of the pending
+table to guess what LPI is pending and thus become independent on the
+restoration of the ITS - which is the goal -.
+
+Thanks
+
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
