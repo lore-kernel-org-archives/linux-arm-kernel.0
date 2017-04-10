@@ -1,82 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Apr 2017 10:00:48 +0200
-Subject: [GIT PULL] Allwinner clock fixes for 4.11, bis
-In-Reply-To: <20170406231003.GS7065@codeaurora.org>
-References: <20170406074121.tkivdvghbr27tr54@lukather>
- <20170406231003.GS7065@codeaurora.org>
-Message-ID: <20170410080048.l7xjndj457wa2b2q@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Apr 2017 09:18:07 +0100
+Subject: [PATCH v3 5/9] arm, arm64: factorize common cpu capacity default
+ code
+In-Reply-To: <20170327131825.32134-6-juri.lelli@arm.com>
+References: <20170327131825.32134-1-juri.lelli@arm.com>
+ <20170327131825.32134-6-juri.lelli@arm.com>
+Message-ID: <20170410081806.GB27538@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 04:10:03PM -0700, Stephen Boyd wrote:
-> On 04/06, Maxime Ripard wrote:
-> > Hi Mike, Stephen,
-> > 
-> > Please pull the following changes for one of the 4.11-rc's
-> > 
-> > Thanks!
-> > Maxime
-> > 
-> > The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
-> > 
-> >   clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.11-2
-> > 
-> > for you to fetch changes up to d054a839a0986136374d49f9f9fbc264abae9c4c:
-> > 
-> >   clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER (2017-03-27 13:37:05 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner clock fixes for 4.11, bis
-> > 
-> > A few patches to fix a build error and a few minor typos and bugs in the
-> > sunxi-ng code
-> > 
-> > ----------------------------------------------------------------
-> > Chen-Yu Tsai (3):
-> >       clk: sunxi-ng: use 1 as fallback for minimum multiplier
-> >       clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
-> >       clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
-> > 
-> > Tobias Regnery (1):
-> >       clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
-> > 
+On Mon, Mar 27, 2017 at 02:18:21PM +0100, Juri Lelli wrote:
+> arm and arm64 share lot of code relative to parsing CPU capacity
+> information from DT, using that information for appropriate scaling and
+> exposing a sysfs interface for chaging such values at runtime.
 > 
-> Two of these are fixes for regressions in v4.10? Why are these
-> critical for the v4.11 release? The comment patch is totally
-> bogus, it's not fixing any sort of regression that is causing
-> problems for people so I'm not sure why it was put into this pull
-> request. Am I right in assuming that the only real patch we need
-> out of here is the last one for the build error from randconfigs?
-> If so I can cherry-pick that from the branch into fixes and the
-> rest can go the next merge window.
+> Factorize such code in a common place (driver/base/arch_topology.c) in
+> preparation for further additions.
 > 
-> Not pulling for now.
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> ---
+> 
+> Changes from v2:
+>  - make capacity_scale and raw_capacity static
+>  - added SPDX header
+>  - improved indent
+>  - misc. whitespaces/newlines fixes
+> 
+> Changes from v1:
+>  - keep the original GPLv2 header
+> ---
+>  arch/arm/Kconfig             |   1 +
+>  arch/arm/kernel/topology.c   | 213 ++-----------------------------------
+>  arch/arm64/Kconfig           |   1 +
+>  arch/arm64/kernel/topology.c | 219 +--------------------------------------
+>  drivers/base/Kconfig         |   8 ++
+>  drivers/base/Makefile        |   1 +
+>  drivers/base/arch_topology.c | 242 +++++++++++++++++++++++++++++++++++++++++++
 
-Actually, all of them but the comment fix are real fix.
+For arm64:
 
-"clk: sunxi-ng: use 1 as fallback for minimum multiplier" can lead to
-a multiplier set to 0 in some cases (depending on the rate asked for),
-and "clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum
-mismatch" will prevent inconsistensies in factors selection between
-round_rate and set_rate.
-
-So, yes, they are not critical fixes in the sense that it will fix a
-panic. but still those are bugs.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170410/a36df8cf/attachment.sig>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
