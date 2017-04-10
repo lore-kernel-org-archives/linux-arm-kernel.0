@@ -1,49 +1,59 @@
-From: ahferroin7@gmail.com (Austin S. Hemmelgarn)
-Date: Mon, 10 Apr 2017 08:50:37 -0400
-Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
-In-Reply-To: <20170408210737.5456-1-kilobyte@angband.pl>
-References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
- <20170408210737.5456-1-kilobyte@angband.pl>
-Message-ID: <7179b0c7-0951-b5f3-6835-2f005ea743e1@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Apr 2017 13:54:49 +0100
+Subject: [PATCH v4 00/22] vITS save/restore
+In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <d730b3fd-f0be-58b6-02e9-3863682994cd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-04-08 17:07, Adam Borowski wrote:
-> Unbreaks ARM and possibly other 32-bit architectures.
->
-> Fixes: 7d0ef8b4d: Btrfs: update scrub_parity to use u64 stripe_len
-> Reported-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Adam Borowski <kilobyte@angband.pl>
-> ---
-> You'd probably want to squash this with Liu's commit, to be nice to future
-> bisects.
->
-> Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
-> sometimes works, but, like most operations, randomly dies with some badness
-> that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
-> there in 4.11-rc5, needs investigating, but since it's not connected to our
-> issue at hand, I consider this patch sort-of tested.
->
->  fs/btrfs/scrub.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/fs/btrfs/scrub.c b/fs/btrfs/scrub.c
-> index b6fe1cd08048..95372e3679f3 100644
-> --- a/fs/btrfs/scrub.c
-> +++ b/fs/btrfs/scrub.c
-> @@ -2407,7 +2407,7 @@ static inline void __scrub_mark_bitmap(struct scrub_parity *sparity,
->
->  	start -= sparity->logic_start;
->  	start = div64_u64_rem(start, sparity->stripe_len, &offset);
-> -	offset /= sectorsize;
-> +	do_div(offset, sectorsize);
->  	nsectors = (int)len / sectorsize;
->
->  	if (offset + nsectors <= sparity->nsectors) {
->
-Also fixes things on:
-32-bit MIPS (eb and el variants)
-32-bit SPARC
-32-bit PPC
+Hi Eric,
 
-You can add my Tested-by if you want.
+On 27/03/17 10:30, Eric Auger wrote:
+> This series specifies and implements an API aimed at saving and restoring
+> the state of the in-kernel emulated ITS device.
+> 
+> The ITS is programmed through registers and tables. Those latter
+> are allocated by the guest. Their base address is programmed in
+> registers or table entries before the ITS is enabled.
+> 
+> The ITS is free to use some of them to flush its internal caches. This
+> is likely to be used when entering low power state.
+> 
+> Therefore, for save/restore use case, it looks natural to use this
+> guest RAM allocated space to save the table related data. However,
+> currently, The ITS in-kernel emulated device does not use all of those
+> tables and for those it uses, it does not always sync them with its
+> cached data. Additional sync must happen for:
+> - the collection table
+> - the device table
+> - the per-device translation tables
+> - the LPI pending tables.
+> 
+> The LPI configation table and the command queues do not need extra
+> syncs.
+> 
+> An alternative to flushing the tables into guest RAM could have been
+> to flush them into a separate user-space buffer. However the drawback
+> of this alternative is that the virtualizer would allocate dedicated
+> buffers to store the data that should normally be laid out in guest
+> RAM. It would also be obliged to re-compute their size from
+> register/table content.
+> 
+> So saving the tables in guest RAM better fit the ITS programming
+> model and optimizes the memory usage. The drawback of this solution
+> is it brings additional challenges at user-space level to make sure
+> the guest RAM is frozen after table sync.
+
+I think this series is on the right track. What it needs is some
+clarification in the spec (as outlined by Christoffer), some tidying up
+around the encoding, and various nits that need addressing all over the map.
+
+The only architectural issue is really the ITS/GICR split, but I don't
+think this is a big deal.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
