@@ -1,40 +1,26 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Mon, 10 Apr 2017 13:11:32 +0000
-Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <33d18b40-8449-78a5-7127-9988d846d179@codeaurora.org>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B284667665E7@IRSMSX101.ger.corp.intel.com>
- <33d18b40-8449-78a5-7127-9988d846d179@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846676674D@IRSMSX101.ger.corp.intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Apr 2017 14:13:22 +0100
+Subject: next-20170410 build: 2 failures 3 warnings (next-20170410)
+In-Reply-To: <E1cxXQe-0006cv-TG@optimist>
+References: <E1cxXQe-0006cv-TG@optimist>
+Message-ID: <20170410131322.iriugmcym4zbqceg@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->On 4/10/2017 7:37 AM, Patel, Mayurkumar wrote:
->>> PCI/ASPM: save power on values during bridge init
->>>  PCI/ASPM: move link_state cleanup to bridge remove
->>>
->> Thanks Sinan for new patches. No issues seen so far in my testing for L1 and L1SS both.
->> May you please add my tested-by in the patches?
->>
->> I will keep on testing it and let you know if something goes wrong for any
->> corner case.
->>
->
->Thanks for testing and providing your tested-by.
+On Mon, Apr 10, 2017 at 12:24:17PM +0100, Build bot for Mark Brown wrote:
 
-Tested-by: Mayurkumar Patel <mayurkumar.patel@intel.com>
+Today's -next fails to build an arm64 allmodconfig due to:
 
->
->--
->Sinan Kaya
->Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+> 	arm64-allmodconfig
+> ../mm/hmm.c:816:2: error: implicit declaration of function 'arch_remove_memory' [-Werror=implicit-function-declaration]
+
+due to the recently added HMM support.  There's no such function for
+arm64 but HMM is unconditionally available for all 64 bit architectures
+with a MMU.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170410/e482b49b/attachment.sig>
