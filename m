@@ -1,172 +1,100 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:46:57 -0500
-Subject: [PATCH v6 14/23] drivers/fsi: Add sysfs files for FSI master & slave
- accesses
-In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-15-cbostic@linux.vnet.ibm.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon, 10 Apr 2017 13:58:10 -0700
+Subject: [PATCH v2] ARM: dts: imx: ventana: fix DTC warnings
+In-Reply-To: <1491252168-7934-1-git-send-email-tharvey@gateworks.com>
+References: <1491252168-7934-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <1491857890-10554-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+Remove the sky2 ethernet device node from the pcie controller which was
+invalid to begin with.
 
-This change adds a 'raw' file for reads & writes, and a 'term' file for
-the TERM command, and a 'break' file for issuing a BREAK.
+The original intent was to allow the bootloader to populate the MAC via
+dt but this requires the PCI bus topology to be complete in dt as well
+and as these boards have an expansion connector that topology is dynamic
+and can't be represented here.
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- drivers/fsi/fsi-core.c | 116 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 116 insertions(+)
+v2:
+ - remove eth1 aliases
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4359e26..f0f0556 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -294,6 +294,95 @@ static int fsi_slave_scan(struct fsi_slave *slave)
- 	return 0;
- }
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6q-gw5400-a.dts  | 5 -----
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 5 -----
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 5 -----
+ 3 files changed, 15 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-gw5400-a.dts b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+index 8e84713..687ab91 100644
+--- a/arch/arm/boot/dts/imx6q-gw5400-a.dts
++++ b/arch/arm/boot/dts/imx6q-gw5400-a.dts
+@@ -19,7 +19,6 @@
  
-+static ssize_t fsi_slave_sysfs_raw_read(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr, char *buf,
-+		loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	size_t total_len, read_len;
-+	int rc;
-+
-+	if (off < 0)
-+		return -EINVAL;
-+
-+	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
-+		return -EINVAL;
-+
-+	for (total_len = 0; total_len < count; total_len += read_len) {
-+		read_len = min_t(size_t, count, 4);
-+		read_len -= off & 0x3;
-+
-+		rc = fsi_slave_read(slave, off, buf + total_len, read_len);
-+		if (rc)
-+			return rc;
-+
-+		off += read_len;
-+	}
-+
-+	return count;
-+}
-+
-+static ssize_t fsi_slave_sysfs_raw_write(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr,
-+		char *buf, loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	size_t total_len, write_len;
-+	int rc;
-+
-+	if (off < 0)
-+		return -EINVAL;
-+
-+	if (off > 0xffffffff || count > 0xffffffff || off + count > 0xffffffff)
-+		return -EINVAL;
-+
-+	for (total_len = 0; total_len < count; total_len += write_len) {
-+		write_len = min_t(size_t, count, 4);
-+		write_len -= off & 0x3;
-+
-+		rc = fsi_slave_write(slave, off, buf + total_len, write_len);
-+		if (rc)
-+			return rc;
-+
-+		off += write_len;
-+	}
-+
-+	return count;
-+}
-+
-+static struct bin_attribute fsi_slave_raw_attr = {
-+	.attr = {
-+		.name = "raw",
-+		.mode = 0600,
-+	},
-+	.size = 0,
-+	.read = fsi_slave_sysfs_raw_read,
-+	.write = fsi_slave_sysfs_raw_write,
-+};
-+
-+static ssize_t fsi_slave_sysfs_term_write(struct file *file,
-+		struct kobject *kobj, struct bin_attribute *attr,
-+		char *buf, loff_t off, size_t count)
-+{
-+	struct fsi_slave *slave = to_fsi_slave(kobj_to_dev(kobj));
-+	struct fsi_master *master = slave->master;
-+
-+	if (!master->term)
-+		return -ENODEV;
-+
-+	master->term(master, slave->link, slave->id);
-+	return count;
-+}
-+
-+static struct bin_attribute fsi_slave_term_attr = {
-+	.attr = {
-+		.name = "term",
-+		.mode = 0200,
-+	},
-+	.size = 0,
-+	.write = fsi_slave_sysfs_term_write,
-+};
-+
- /* Encode slave local bus echo delay */
- static inline uint32_t fsi_smode_echodly(int x)
- {
-@@ -409,6 +498,14 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- 		return rc;
- 	}
+ 	/* these are used by bootloader for disabling nodes */
+ 	aliases {
+-		ethernet1 = &eth1;
+ 		i2c0 = &i2c1;
+ 		i2c1 = &i2c2;
+ 		i2c2 = &i2c3;
+@@ -347,10 +346,6 @@
+ &pcie {
+ 	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+-
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
+-	};
+ };
  
-+	rc = device_create_bin_file(&slave->dev, &fsi_slave_raw_attr);
-+	if (rc)
-+		dev_warn(&slave->dev, "failed to create raw attr: %d\n", rc);
-+
-+	rc = device_create_bin_file(&slave->dev, &fsi_slave_term_attr);
-+	if (rc)
-+		dev_warn(&slave->dev, "failed to create term attr: %d\n", rc);
-+
- 	fsi_slave_scan(slave);
- 	return 0;
- }
-@@ -523,6 +620,18 @@ static ssize_t master_rescan_store(struct device *dev,
+ &ssi1 {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index a208e7e..5bc6ed1 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -14,7 +14,6 @@
+ / {
+ 	/* these are used by bootloader for disabling nodes */
+ 	aliases {
+-		ethernet1 = &eth1;
+ 		led0 = &led0;
+ 		led1 = &led1;
+ 		led2 = &led2;
+@@ -342,10 +341,6 @@
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+-
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
+-	};
+ };
  
- static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
+ &pwm2 {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index 968fda9..66fcf838 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -14,7 +14,6 @@
+ / {
+ 	/* these are used by bootloader for disabling nodes */
+ 	aliases {
+-		ethernet1 = &eth1;
+ 		led0 = &led0;
+ 		led1 = &led1;
+ 		led2 = &led2;
+@@ -379,10 +378,6 @@
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+-
+-	eth1: sky2 at 8 { /* MAC/PHY on bus 8 */
+-		compatible = "marvell,sky2";
+-	};
+ };
  
-+static ssize_t master_break_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t count)
-+{
-+	struct fsi_master *master = to_fsi_master(dev);
-+
-+	fsi_master_break(master, 0);
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(break, 0200, NULL, master_break_store);
-+
- int fsi_master_register(struct fsi_master *master)
- {
- 	int rc;
-@@ -546,6 +655,13 @@ int fsi_master_register(struct fsi_master *master)
- 		return rc;
- 	}
- 
-+	rc = device_create_file(&master->dev, &dev_attr_break);
-+	if (rc) {
-+		device_unregister(&master->dev);
-+		ida_simple_remove(&master_ida, master->idx);
-+		return rc;
-+	}
-+
- 	fsi_master_scan(master);
- 
- 	return 0;
+ &pwm1 {
 -- 
-1.8.2.2
+2.7.4
