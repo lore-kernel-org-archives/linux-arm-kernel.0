@@ -1,53 +1,89 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:46:55 -0500
-Subject: [PATCH v6 12/23] drivers/fsi: Add documentation for GPIO bindings
+Date: Mon, 10 Apr 2017 14:46:54 -0500
+Subject: [PATCH v6 11/23] drivers/fsi: Add master unscan
 In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
 References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-13-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-12-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Add fsi master gpio device tree binding documentation
+Allow a master to undo a previous scan.  Should a master scan a bus
+twice it will need to ensure it doesn't double register any
+previously detected device.
 
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
 Signed-off-by: Joel Stanley <joel@jms.id.au>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+ drivers/fsi/fsi-core.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-new file mode 100644
-index 0000000..a767259
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-@@ -0,0 +1,24 @@
-+Device-tree bindings for gpio-based FSI master driver
-+-----------------------------------------------------
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 4da0b030..75d2a88 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -69,6 +69,7 @@ struct fsi_slave {
+ 	uint32_t		size;	/* size of slave address space */
+ };
+ 
++#define to_fsi_master(d) container_of(d, struct fsi_master, dev)
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ 
+ static int fsi_master_read(struct fsi_master *master, int link,
+@@ -491,6 +492,37 @@ static int fsi_master_scan(struct fsi_master *master)
+ 	return 0;
+ }
+ 
++static int __fsi_slave_remove_device(struct device *dev, void *arg)
++{
++	device_unregister(dev);
++	return 0;
++}
 +
-+Required properties:
-+ - compatible = "fsi-master-gpio";
-+ - clock-gpios = <gpio-descriptor>;	: GPIO for FSI clock
-+ - data-gpios = <gpio-descriptor>;	: GPIO for FSI data signal
++static int __fsi_master_remove_slave(struct device *dev, void *arg)
++{
++	device_for_each_child(dev, NULL, __fsi_slave_remove_device);
++	device_unregister(dev);
++	return 0;
++}
 +
-+Optional properties:
-+ - enable-gpios = <gpio-descriptor>;	: GPIO for enable signal
-+ - trans-gpios = <gpio-descriptor>;	: GPIO for voltage translator enable
-+ - mux-gpios = <gpio-descriptor>;	: GPIO for pin multiplexing with other
-+                                          functions (eg, external FSI masters)
++static void fsi_master_unscan(struct fsi_master *master)
++{
++	device_for_each_child(&master->dev, NULL, __fsi_master_remove_slave);
++}
 +
-+Examples:
++static ssize_t master_rescan_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	struct fsi_master *master = to_fsi_master(dev);
 +
-+    fsi-master {
-+        compatible = "fsi-master-gpio", "fsi-master";
-+        clock-gpios = <&gpio 0>;
-+        data-gpios = <&gpio 1>;
-+        enable-gpios = <&gpio 2>;
-+        trans-gpios = <&gpio 3>;
-+        mux-gpios = <&gpio 4>;
-+    }
++	fsi_master_unscan(master);
++	fsi_master_scan(master);
++
++	return count;
++}
++
++static DEVICE_ATTR(rescan, 0200, NULL, master_rescan_store);
++
+ int fsi_master_register(struct fsi_master *master)
+ {
+ 	int rc;
+@@ -507,7 +539,15 @@ int fsi_master_register(struct fsi_master *master)
+ 		return rc;
+ 	}
+ 
++	rc = device_create_file(&master->dev, &dev_attr_rescan);
++	if (rc) {
++		device_unregister(&master->dev);
++		ida_simple_remove(&master_ida, master->idx);
++		return rc;
++	}
++
+ 	fsi_master_scan(master);
++
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(fsi_master_register);
 -- 
 1.8.2.2
