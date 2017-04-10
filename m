@@ -1,115 +1,104 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Sun, 9 Apr 2017 17:31:36 -0700
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <58EA988F.29293.6C80F08B@pageexec.freemail.hu>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
- <CA+DvKQKc8uq=1O5d41GRU6u=GkOvuCJzkbPPBcp2ohHLU7A25g@mail.gmail.com>
- <CALCETrUk7k3SFKiu2kykwPM=AQ9q2rczetL4j5XyoOxX_gjCGw@mail.gmail.com>
- <58EA988F.29293.6C80F08B@pageexec.freemail.hu>
-Message-ID: <CALCETrX+iQVjupq9NU5kOPypBBOSRziuvdGdnzCxTUXQkcFJcQ@mail.gmail.com>
+From: kilobyte@angband.pl (Adam Borowski)
+Date: Mon, 10 Apr 2017 03:13:15 +0200
+Subject: [PATCH] btrfs: scrub: use do_div() for 64-by-32 division
+In-Reply-To: <20170409035854.7swkcndswifd622w@angband.pl>
+References: <CAOMZO5B9J15qvrsjOb-e5gk47gA=+2p2yLNLhswG+H3S0L7LXg@mail.gmail.com>
+ <20170408210737.5456-1-kilobyte@angband.pl>
+ <20170409035854.7swkcndswifd622w@angband.pl>
+Message-ID: <20170410011315.65rk2csei3ffh32g@angband.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 9, 2017 at 1:24 PM, PaX Team <pageexec@freemail.hu> wrote:
->
->> In the context of virtually mapped stacks / KSTACKOVERFLOW, this
->> naturally leads to different solutions.  The upstream kernel had a
->> bunch of buggy drivers that played badly with virtually mapped stacks.
->> grsecurity sensibly went for the approach where the buggy drivers kept
->> working.  The upstream kernel went for the approach of fixing the
->> drivers rather than keeping a compatibility workaround.  Different
->> constraints, different solutions.
->
-> except that's not what happened at all. spender's first version did just
-> a vmalloc for the kstack like the totally NIH'd version upstream does
-> now. while we always anticipated buggy dma users and thus had code that
-> would detect them so that we could fix them, we quickly figured that the
-> upstream kernel wasn't quite up to snuff as we had assumed and faced with
-> the amount of buggy code, we went for the current vmap approach which
-> kept users' systems working instead of breaking them.
->
-> you're trying to imply that upstream fixed the drivers but as the facts
-> show, that's not true. you simply unleashed your code on the world and
-> hoped(?) that enough suckers would try it out during the -rc window. as
-> we all know several releases and almost a year later, that was a losing
-> bet as you still keep fixing those drivers (and something tells me that
-> we haven't seen the end of it). this is simply irresponsible engineering
-> for no technical reason.
+On Sun, Apr 09, 2017 at 05:58:54AM +0200, Adam Borowski wrote:
+> On Sat, Apr 08, 2017 at 11:07:37PM +0200, Adam Borowski wrote:
+> > Unbreaks ARM and possibly other 32-bit architectures.
+> 
+> Turns out those "other 32-bit architectures" happen to include i386.
+> 
+> A modular build:
+> ERROR: "__udivdi3" [fs/btrfs/btrfs.ko] undefined!
+> With the patch, i386 builds fine.
+> 
+> > Tested on amd64 where all is fine, and on arm (Odroid-U2) where scrub
+> > sometimes works, but, like most operations, randomly dies with some badness
+> > that doesn't look related: io_schedule, kunmap_high.  That badness wasn't
+> > there in 4.11-rc5, needs investigating, but since it's not connected to our
+> > issue at hand, I consider this patch sort-of tested.
+> 
+> Looks like current -next is pretty broken: while amd64 is ok, on an i386 box
+> (non-NX Pentium 4) it hangs very early during boot, way before filesystem
+> modules would be loaded.  Qemu boots but has random hangs.
 
-I consider breaking buggy drivers (in a way that they either generally
-work okay or that they break with a nice OOPS depending on config) to
-be better than having a special case in what's supposed to be a fast
-path to keep them working.  I did consider forcing the relevant debug
-options on for a while just to help shake these bugs out the woodwork
-faster.
+A non-modular i386_defconfig + btrfs of -next is ok; whatever the problem
+is, it's not relevant to our division build failure in scrub.
 
->
->> In the case of rare writes or pax_open_kernel [1] or whatever we want
->> to call it, CR3 would work without arch-specific code, and CR0 would
->> not.  That's an argument for CR3 that would need to be countered by
->> something.  (Sure, avoiding leaks either way might need arch changes.
->> OTOH, a *randomized* CR3-based approach might not have as much of a
->> leak issue to begin with.)
->
-> i have yet to see anyone explain what they mean by 'leak' here but if it
-> is what i think it is then the arch specific entry/exit changes are not
-> optional but mandatory. see below for randomization.
+But, it looks like parity scrub is ${EXPLETIVE}ed on 32-bit.  Not just on
+-next, also on 4.11-rc5 and 4.9.  Test script I used is attached, although
+it's enough to just scrub a kosher filesystem without even damaging it.
+On 64-bit it mostly works, but still warns about bogus unrecoverable errors
+when in fact it succeeded.
 
-By "leak" I mean that a bug or exploit causes unintended code to run
-with CR0.WP or a special CR3 or a special PTE or whatever loaded.  PaX
-hooks the entry code to avoid leaks.
+Thus, I'd recommend:
+* applying this patch to at least make it compile
+* taking steps to warn outside people about RAID5/6
 
->> At boot, choose a random address A.
->
-> what is the threat that a random address defends against?
+Let's discuss the rest in another thread, it's no longer interesting to ARM
+people, they just want no build failures.
 
-Makes it harder to exploit a case where the CR3 setting leaks.
+-- 
+??????? Meow!
+???????
+??????? Collisions shmolisions, let's see them find a collision or second
+??????? preimage for double rot13!
+-------------- next part --------------
+#!/bin/sh
+set -x
+DATA=/usr/bin  # use whole /usr on non-bloated VMs
 
->
->>  Create an mm_struct that has a
->> single VMA starting at A that represents the kernel's rarely-written
->> section.  Compute O = (A - VA of rarely-written section).  To do a
->> rare write, use_mm() the mm, write to (VA + O), then unuse_mm().
->
-> the problem is that the amount of __read_only data extends beyond vmlinux,
-> i.e., this approach won't scale. another problem is that it can't be used
-> inside use_mm and switch_mm themselves (no read-only task structs or percpu
-> pgd for you ;) and probably several other contexts.
 
-Can you clarify these uses that extend beyond vmlinux?  I haven't
-looked at the grsecurity patch extensively.  Are you talking about the
-BPF JIT stuff?  If so, I think that should possibly be handled a bit
-differently, since I think the normal
-write-to-rare-write-vmlinux-sections primitive should preferably *not*
-be usable to write to executable pages.  Using a real mm_struct for
-this could help.
+mkdir -p /mnt/vol1
+umount /mnt/vol1; losetup -D   # clean up after repeats
 
->
-> last but not least, use_mm says this about itself:
->
->     (Note: this routine is intended to be called only
->     from a kernel thread context)
->
-> so using it will need some engineering (or the comment be fixed).
+dd if=/dev/zero bs=1048576 count=1 seek=4095 of=ra
+dd if=/dev/zero bs=1048576 count=1 seek=4095 of=rb
+dd if=/dev/zero bs=1048576 count=1 seek=4095 of=rc
+dd if=/dev/zero bs=1048576 count=1 seek=4095 of=rd
 
-Indeed.
+mkfs.btrfs -draid10 -mraid1 ra rb rc rd
 
->> It has the added benefit that writes to non-rare-write data using the
->> rare-write primitive will fail.
->
-> what is the threat model you're assuming for this feature? based on what i
-> have for PaX (arbitrary read/write access exploited for data-only attacks),
-> the above makes no sense to me...
->
+losetup -D
+losetup -f ra
+losetup -f rb
+losetup -f rc
+losetup -f rd
+sleep 2  # race with fsid detection
+mount -onoatime /dev/loop0 /mnt/vol1 || exit $?
+cp -pr "$DATA" /mnt/vol1
+btrfs fi sync /mnt/vol1
+btrfs fi us /mnt/vol1
 
-If I use the primitive to try to write a value to the wrong section
-(write to kernel text, for example), IMO it would be nice to OOPS
-instead of succeeding.
+btrfs balance start -dconvert=raid5 -mconvert=raid6 /mnt/vol1
 
-Please keep in mind that, unlike PaX, uses of a pax_open_kernel()-like
-function will may be carefully audited by a friendly security expert
-such as yourself.  It would be nice to harden the primitive to a
-reasonable extent against minor misuses such as putting it in a
-context where the compiler will emit mov-a-reg-with-WP-set-to-CR0;
-ret.
+btrfs scrub start -B /mnt/vol1
+btrfs scrub start -B /mnt/vol1
+
+umount /mnt/vol1
+dd if=/dev/urandom of=rd bs=1048576 seek=96 count=4000
+mount -onoatime /dev/loop0 /mnt/vol1 || exit $?
+btrfs scrub start -B /mnt/vol1
+btrfs scrub start -B /mnt/vol1
+
+btrfs balance start -dconvert=raid10 -mconvert=raid1 /mnt/vol1
+
+btrfs scrub start -B /mnt/vol1
+btrfs scrub start -B /mnt/vol1
+
+umount /mnt/vol1
+dd if=/dev/urandom of=rd bs=1048576 seek=96 count=4000
+mount -onoatime /dev/loop0 /mnt/vol1 || exit $?
+btrfs scrub start -B /mnt/vol1
+btrfs scrub start -B /mnt/vol1
+
+diff -urd --no-dereference "$DATA" /mnt/vol1/*
+
+umount /mnt/vol1
