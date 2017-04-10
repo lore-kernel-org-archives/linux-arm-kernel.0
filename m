@@ -1,61 +1,42 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 10 Apr 2017 12:35:43 +0200
-Subject: [PATCH 0/2] drm: dw-hdmi: various improvements
-In-Reply-To: <20170410100807.GN17774@n2100.armlinux.org.uk>
-References: <20170407141905.14147-1-romain.perier@collabora.com>
- <f0ff38c5-46f0-0702-ca68-ccebf5b8c910@codeaurora.org>
- <20170410100807.GN17774@n2100.armlinux.org.uk>
-Message-ID: <5b7e5643-e86d-37ac-e220-c81e34af13ba@baylibre.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 10 Apr 2017 12:36:56 +0200
+Subject: [PATCH 12/14] usb: dwc2: simplify optional reset handling
+In-Reply-To: <87o9w4ef6l.fsf@linux.intel.com>
+References: <20170130114116.22089-1-p.zabel@pengutronix.de>
+ <20170130114116.22089-12-p.zabel@pengutronix.de>
+ <87o9w4ef6l.fsf@linux.intel.com>
+Message-ID: <1491820616.3087.34.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2017 12:08 PM, Russell King - ARM Linux wrote:
-> On Mon, Apr 10, 2017 at 10:49:18AM +0530, Archit Taneja wrote:
->> Hi,
->>
->> On 04/07/2017 07:49 PM, Romain Perier wrote:
->>> This set of patches split the stream handling functions in two parts. It
->>> introduces new callbacks that are specific to each variant, one for I2S
->>> and one for AHB.
->>>
->>> Then, as requested by the datasheet for the I2S variant, it adds support
->>> for gating the audio sampler clock when the audio stream is enabled and
->>> disabled.
->>>
->>> This patches series is the continuity of the following discussion:
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/493550.html
->>
->> Since these aren't fixes, could you make sure to redo the patches over:
->>
->> git://anongit.freedesktop.org/drm-misc drm-misc-next
->>
->> The dw-hdmi driver is now under drivers/gpu/drm/bridge/synopsis/
-> 
-> This is annoying as it makes submission of CEC support for dw-hdmi
-> rather difficult due to the now horrid cross-tree dependencies:
-> 
-> * if I submit it to the DRM tree, the DRM tree will build break because
->   you don't have the necessary CEC changes which have recently been
->   merged into the media tree.
-> 
-> * if I submit it to the media tree, the new files will be placed into
->   drivers/gpu/drm/bridge and when stuff gets merged into linux-next
->   and/or Linus' tree, things will need quite a large fixup (someone
->   will have to rename the files and fix the Kconfig/Makefiles.)
-> 
-> So, I'll hold it back for another cycle to avoid the mess that would
-> result from trying to get it merged during this cycle.
-> 
+Hi Felipe,
 
-Hi Russell,
+On Mon, 2017-04-10 at 13:21 +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> Philipp Zabel <p.zabel@pengutronix.de> writes:
+> > As of commit bb475230b8e5 ("reset: make optional functions really
+> > optional"), the reset framework API calls use NULL pointers to describe
+> > optional, non-present reset controls.
+> >
+> > This allows to return errors from devm_reset_control_get_optional and to
+> > call reset_control_(de)assert unconditionally.
+> >
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> > Cc: John Youn <johnyoun@synopsys.com>
+> > Cc: Felipe Balbi <felipe.balbi@linux.intel.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> 
+> doesn't apply to testing/next. Care to rebase and resend?
 
-Cross tree with media has already been done on this cycle with the
-dw-hdmi formats changes.
+v2 is already applied as commit 5a6e4f46abd5 ("usb: dwc2: simplify
+optional reset handling"), as far as I can tell.
 
-Nevertheless, please push your updated dw-hdmi cec patchset for tests
-and review based on the latest drm-misc-next and hverkuil's HPD notifier
-release.
+> Also, please Cc linux-usb ;-)
 
-I would like to run it on some Amlogic boards.
+I messed up the Cc: list on the first submission, but v2 should have
+made it to linux-usb.
 
-Neil
+regards
+Philipp
