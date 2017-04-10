@@ -1,139 +1,391 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:47:03 -0500
-Subject: [PATCH v6 20/23] drivers/fsi/gpio: Add tracepoints for GPIO master
+Date: Mon, 10 Apr 2017 14:47:05 -0500
+Subject: [PATCH v6 22/23] drivers/ fsi: Add hub master support
 In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
 References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-21-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-23-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+From: Chris Bostic <cbostic@linux.vnet.ibm.com>
 
-Add trace points for key GPIO operations of the GPIO based FSI
-master.
+Add an engine driver to expose a "hub" FSI master - which has a set of
+control registers in the engine address space, and uses a chunk of the
+slave address space for actual FSI communication.
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Additional changes from Jeremy Kerr <jk@ozlabs.org>.
+
 Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- drivers/fsi/fsi-master-gpio.c          |  9 +++++
- include/trace/events/fsi_master_gpio.h | 68 ++++++++++++++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 include/trace/events/fsi_master_gpio.h
+ drivers/fsi/Kconfig          |   8 ++
+ drivers/fsi/Makefile         |   1 +
+ drivers/fsi/fsi-master-hub.c | 327 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 336 insertions(+)
+ create mode 100644 drivers/fsi/fsi-master-hub.c
 
-diff --git a/drivers/fsi/fsi-master-gpio.c b/drivers/fsi/fsi-master-gpio.c
-index 9fedfaf..5d9e0b0 100644
---- a/drivers/fsi/fsi-master-gpio.c
-+++ b/drivers/fsi/fsi-master-gpio.c
-@@ -61,6 +61,9 @@ struct fsi_master_gpio {
- 	struct gpio_desc	*gpio_mux;	/* Mux control */
- };
+diff --git a/drivers/fsi/Kconfig b/drivers/fsi/Kconfig
+index e8dad25..fc031ac 100644
+--- a/drivers/fsi/Kconfig
++++ b/drivers/fsi/Kconfig
+@@ -18,6 +18,14 @@ config FSI_MASTER_GPIO
+ 	---help---
+ 	This option enables a FSI master driver using GPIO lines.
  
-+#define CREATE_TRACE_POINTS
-+#include <trace/events/fsi_master_gpio.h>
++config FSI_MASTER_HUB
++	tristate "FSI hub master"
++	---help---
++	This option enables a FSI hub master driver.  Hub is a type of FSI
++	master that is connected to the upstream master via a slave.  Hubs
++	allow chaining of FSI links to an arbitrary depth.  This allows for
++	a high target device fanout.
 +
- #define to_fsi_master_gpio(m) container_of(m, struct fsi_master_gpio, master)
+ config FSI_SCOM
+ 	tristate "SCOM FSI client device driver"
+ 	---help---
+diff --git a/drivers/fsi/Makefile b/drivers/fsi/Makefile
+index 3466f08..65eb99d 100644
+--- a/drivers/fsi/Makefile
++++ b/drivers/fsi/Makefile
+@@ -1,4 +1,5 @@
  
- struct fsi_gpio_msg {
-@@ -128,6 +131,8 @@ static void serial_in(struct fsi_master_gpio *master, struct fsi_gpio_msg *msg,
- 		msg->msg |= ~in_bit & 0x1;	/* Data is negative active */
- 	}
- 	msg->bits += num_bits;
-+
-+	trace_fsi_master_gpio_in(master, num_bits, msg->msg);
- }
- 
- static void serial_out(struct fsi_master_gpio *master,
-@@ -139,6 +144,8 @@ static void serial_out(struct fsi_master_gpio *master,
- 	uint64_t last_bit = ~0;
- 	int next_bit;
- 
-+	trace_fsi_master_gpio_out(master, cmd->bits, cmd->msg);
-+
- 	if (!cmd->bits) {
- 		dev_warn(master->dev, "trying to output 0 bits\n");
- 		return;
-@@ -464,6 +471,8 @@ static int fsi_master_gpio_break(struct fsi_master *_master, int link)
- 	if (link != 0)
- 		return -ENODEV;
- 
-+	trace_fsi_master_gpio_break(master);
-+
- 	set_sda_output(master, 1);
- 	sda_out(master, 1);
- 	clock_toggle(master, FSI_PRE_BREAK_CLOCKS);
-diff --git a/include/trace/events/fsi_master_gpio.h b/include/trace/events/fsi_master_gpio.h
+ obj-$(CONFIG_FSI) += fsi-core.o
++obj-$(CONFIG_FSI_MASTER_HUB) += fsi-master-hub.o
+ obj-$(CONFIG_FSI_MASTER_GPIO) += fsi-master-gpio.o
+ obj-$(CONFIG_FSI_SCOM) += fsi-scom.o
+diff --git a/drivers/fsi/fsi-master-hub.c b/drivers/fsi/fsi-master-hub.c
 new file mode 100644
-index 0000000..11b36c1
+index 0000000..133b9bf
 --- /dev/null
-+++ b/include/trace/events/fsi_master_gpio.h
-@@ -0,0 +1,68 @@
++++ b/drivers/fsi/fsi-master-hub.c
+@@ -0,0 +1,327 @@
++/*
++ * FSI hub master driver
++ *
++ * Copyright (C) IBM Corporation 2016
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM fsi_master_gpio
++#include <linux/delay.h>
++#include <linux/fsi.h>
++#include <linux/module.h>
++#include <linux/slab.h>
 +
-+#if !defined(_TRACE_FSI_MASTER_GPIO_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_FSI_MASTER_GPIO_H
++#include "fsi-master.h"
 +
-+#include <linux/tracepoint.h>
++/* Control Registers */
++#define FSI_MMODE		0x0		/* R/W: mode */
++#define FSI_MDLYR		0x4		/* R/W: delay */
++#define FSI_MCRSP		0x8		/* R/W: clock rate */
++#define FSI_MENP0		0x10		/* R/W: enable */
++#define FSI_MLEVP0		0x18		/* R: plug detect */
++#define FSI_MSENP0		0x18		/* S: Set enable */
++#define FSI_MCENP0		0x20		/* C: Clear enable */
++#define FSI_MAEB		0x70		/* R: Error address */
++#define FSI_MVER		0x74		/* R: master version/type */
++#define FSI_MRESP0		0xd0		/* W: Port reset */
++#define FSI_MESRB0		0x1d0		/* R: Master error status */
++#define FSI_MRESB0		0x1d0		/* W: Reset bridge */
++#define FSI_MECTRL		0x2e0		/* W: Error control */
 +
-+TRACE_EVENT(fsi_master_gpio_in,
-+	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
-+	TP_ARGS(master, bits, msg),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	bits)
-+		__field(uint64_t, msg)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->master.idx;
-+		__entry->bits = bits;
-+		__entry->msg  = msg & ((1ull<<bits) - 1);
-+	),
-+	TP_printk("fsi-gpio%d => %0*llx[%d]",
-+		__entry->master_idx,
-+		(__entry->bits + 3) / 4,
-+		__entry->msg,
-+		__entry->bits
-+	)
-+);
++/* MMODE: Mode control */
++#define FSI_MMODE_EIP		0x80000000	/* Enable interrupt polling */
++#define FSI_MMODE_ECRC		0x40000000	/* Enable error recovery */
++#define FSI_MMODE_EPC		0x10000000	/* Enable parity checking */
++#define FSI_MMODE_P8_TO_LSB	0x00000010	/* Timeout value LSB */
++						/*   MSB=1, LSB=0 is 0.8 ms */
++						/*   MSB=0, LSB=1 is 0.9 ms */
++#define FSI_MMODE_CRS0SHFT	18		/* Clk rate selection 0 shift */
++#define FSI_MMODE_CRS0MASK	0x3ff		/* Clk rate selection 0 mask */
++#define FSI_MMODE_CRS1SHFT	8		/* Clk rate selection 1 shift */
++#define FSI_MMODE_CRS1MASK	0x3ff		/* Clk rate selection 1 mask */
 +
-+TRACE_EVENT(fsi_master_gpio_out,
-+	TP_PROTO(const struct fsi_master_gpio *master, int bits, uint64_t msg),
-+	TP_ARGS(master, bits, msg),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+		__field(int,	bits)
-+		__field(uint64_t, msg)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->master.idx;
-+		__entry->bits = bits;
-+		__entry->msg  = msg & ((1ull<<bits) - 1);
-+	),
-+	TP_printk("fsi-gpio%d <= %0*llx[%d]",
-+		__entry->master_idx,
-+		(__entry->bits + 3) / 4,
-+		__entry->msg,
-+		__entry->bits
-+	)
-+);
++/* MRESB: Reset brindge */
++#define FSI_MRESB_RST_GEN	0x80000000	/* General reset */
++#define FSI_MRESB_RST_ERR	0x40000000	/* Error Reset */
 +
-+TRACE_EVENT(fsi_master_gpio_break,
-+	TP_PROTO(const struct fsi_master_gpio *master),
-+	TP_ARGS(master),
-+	TP_STRUCT__entry(
-+		__field(int,	master_idx)
-+	),
-+	TP_fast_assign(
-+		__entry->master_idx = master->master.idx;
-+	),
-+	TP_printk("fsi-gpio%d ----break---",
-+		__entry->master_idx
-+	)
-+);
++/* MRESB: Reset port */
++#define FSI_MRESP_RST_ALL_MASTER 0x20000000	/* Reset all FSI masters */
++#define FSI_MRESP_RST_ALL_LINK	0x10000000	/* Reset all FSI port contr. */
++#define FSI_MRESP_RST_MCR	0x08000000	/* Reset FSI master reg. */
++#define FSI_MRESP_RST_PYE	0x04000000	/* Reset FSI parity error */
++#define FSI_MRESP_RST_ALL	0xfc000000	/* Reset any error */
 +
-+#endif /* _TRACE_FSI_MASTER_GPIO_H */
++/* MECTRL: Error control */
++#define FSI_MECTRL_EOAE		0x8000		/* Enable machine check when */
++						/* master 0 in error */
++#define FSI_MECTRL_P8_AUTO_TERM	0x4000		/* Auto terminate */
 +
-+#include <trace/define_trace.h>
++#define FSI_ENGID_HUB_MASTER		0x1c
++#define FSI_HUB_LINK_OFFSET		0x80000
++#define FSI_HUB_LINK_SIZE		0x80000
++#define FSI_HUB_MASTER_MAX_LINKS	8
++
++#define FSI_LINK_ENABLE_SETUP_TIME	10	/* in mS */
++
++/*
++ * FSI hub master support
++ *
++ * A hub master increases the number of potential target devices that the
++ * primary FSI master can access. For each link a primary master supports,
++ * each of those links can in turn be chained to a hub master with multiple
++ * links of its own.
++ *
++ * The hub is controlled by a set of control registers exposed as a regular fsi
++ * device (the hub->upstream device), and provides access to the downstream FSI
++ * bus as through an address range on the slave itself (->addr and ->size).
++ *
++ * [This differs from "cascaded" masters, which expose the entire downstream
++ * bus entirely through the fsi device address range, and so have a smaller
++ * accessible address space.]
++ */
++struct fsi_master_hub {
++	struct fsi_master	master;
++	struct fsi_device	*upstream;
++	uint32_t		addr, size;	/* slave-relative addr of */
++						/* master address space */
++};
++
++#define to_fsi_master_hub(m) container_of(m, struct fsi_master_hub, master)
++
++static int hub_master_read(struct fsi_master *master, int link,
++			uint8_t id, uint32_t addr, void *val, size_t size)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++
++	if (id != 0)
++		return -EINVAL;
++
++	addr += hub->addr + (link * FSI_HUB_LINK_SIZE);
++	return fsi_slave_read(hub->upstream->slave, addr, val, size);
++}
++
++static int hub_master_write(struct fsi_master *master, int link,
++			uint8_t id, uint32_t addr, const void *val, size_t size)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++
++	if (id != 0)
++		return -EINVAL;
++
++	addr += hub->addr + (link * FSI_HUB_LINK_SIZE);
++	return fsi_slave_write(hub->upstream->slave, addr, val, size);
++}
++
++static int hub_master_break(struct fsi_master *master, int link)
++{
++	uint32_t addr, cmd;
++
++	addr = 0x4;
++	cmd = cpu_to_be32(0xc0de0000);
++
++	return hub_master_write(master, link, 0, addr, &cmd, sizeof(cmd));
++}
++
++static int hub_master_link_enable(struct fsi_master *master, int link)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(master);
++	int idx, bit;
++	__be32 reg;
++	int rc;
++
++	idx = link / 32;
++	bit = link % 32;
++
++	reg = cpu_to_be32(0x80000000 >> bit);
++
++	rc = fsi_device_write(hub->upstream, FSI_MSENP0 + (4 * idx), &reg, 4);
++
++	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
++
++	fsi_device_read(hub->upstream, FSI_MENP0 + (4 * idx), &reg, 4);
++
++	return rc;
++}
++
++static void hub_master_release(struct device *dev)
++{
++	struct fsi_master_hub *hub = to_fsi_master_hub(dev_to_fsi_master(dev));
++
++	kfree(hub);
++}
++
++/* mmode encoders */
++static inline u32 fsi_mmode_crs0(u32 x)
++{
++	return (x & FSI_MMODE_CRS0MASK) << FSI_MMODE_CRS0SHFT;
++}
++
++static inline u32 fsi_mmode_crs1(u32 x)
++{
++	return (x & FSI_MMODE_CRS1MASK) << FSI_MMODE_CRS1SHFT;
++}
++
++static int hub_master_init(struct fsi_master_hub *hub)
++{
++	struct fsi_device *dev = hub->upstream;
++	__be32 reg;
++	int rc;
++
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK
++			| FSI_MRESP_RST_MCR | FSI_MRESP_RST_PYE);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Initialize the MFSI (hub master) engine */
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK
++			| FSI_MRESP_RST_MCR | FSI_MRESP_RST_PYE);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MECTRL_EOAE | FSI_MECTRL_P8_AUTO_TERM);
++	rc = fsi_device_write(dev, FSI_MECTRL, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MMODE_EIP | FSI_MMODE_ECRC | FSI_MMODE_EPC
++			| fsi_mmode_crs0(1) | fsi_mmode_crs1(1)
++			| FSI_MMODE_P8_TO_LSB);
++	rc = fsi_device_write(dev, FSI_MMODE, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(0xffff0000);
++	rc = fsi_device_write(dev, FSI_MDLYR, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = ~0;
++	rc = fsi_device_write(dev, FSI_MSENP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Leave enabled long enough for master logic to set up */
++	mdelay(FSI_LINK_ENABLE_SETUP_TIME);
++
++	rc = fsi_device_write(dev, FSI_MCENP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(dev, FSI_MAEB, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MRESP_RST_ALL_MASTER | FSI_MRESP_RST_ALL_LINK);
++	rc = fsi_device_write(dev, FSI_MRESP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	rc = fsi_device_read(dev, FSI_MLEVP0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	/* Reset the master bridge */
++	reg = cpu_to_be32(FSI_MRESB_RST_GEN);
++	rc = fsi_device_write(dev, FSI_MRESB0, &reg, sizeof(reg));
++	if (rc)
++		return rc;
++
++	reg = cpu_to_be32(FSI_MRESB_RST_ERR);
++	return fsi_device_write(dev, FSI_MRESB0, &reg, sizeof(reg));
++}
++
++static int hub_master_probe(struct device *dev)
++{
++	struct fsi_device *fsi_dev = to_fsi_dev(dev);
++	struct fsi_master_hub *hub;
++	uint32_t reg, links;
++	__be32 __reg;
++	int rc;
++
++	rc = fsi_device_read(fsi_dev, FSI_MVER, &__reg, sizeof(__reg));
++	if (rc)
++		return rc;
++
++	reg = be32_to_cpu(__reg);
++	links = (reg >> 8) & 0xff;
++	dev_info(dev, "hub version %08x (%d links)\n", reg, links);
++
++	rc = fsi_slave_claim_range(fsi_dev->slave, FSI_HUB_LINK_OFFSET,
++			FSI_HUB_LINK_SIZE * links);
++	if (rc) {
++		dev_err(dev, "can't claim slave address range for links");
++		return rc;
++	}
++
++	hub = kzalloc(sizeof(*hub), GFP_KERNEL);
++	if (!hub) {
++		rc = -ENOMEM;
++		goto err_release;
++	}
++
++	hub->addr = FSI_HUB_LINK_OFFSET;
++	hub->size = FSI_HUB_LINK_SIZE * links;
++	hub->upstream = fsi_dev;
++
++	hub->master.dev.parent = dev;
++	hub->master.dev.release = hub_master_release;
++
++	hub->master.n_links = links;
++	hub->master.read = hub_master_read;
++	hub->master.write = hub_master_write;
++	hub->master.send_break = hub_master_break;
++	hub->master.link_enable = hub_master_link_enable;
++
++	dev_set_drvdata(dev, hub);
++
++	hub_master_init(hub);
++
++	rc = fsi_master_register(&hub->master);
++	if (!rc)
++		return 0;
++
++	kfree(hub);
++err_release:
++	fsi_slave_release_range(fsi_dev->slave, FSI_HUB_LINK_OFFSET,
++			FSI_HUB_LINK_SIZE * links);
++	return rc;
++}
++
++static int hub_master_remove(struct device *dev)
++{
++	struct fsi_master_hub *hub = dev_get_drvdata(dev);
++
++	fsi_master_unregister(&hub->master);
++	fsi_slave_release_range(hub->upstream->slave, hub->addr, hub->size);
++	return 0;
++}
++
++static struct fsi_device_id hub_master_ids[] = {
++	{
++		.engine_type = FSI_ENGID_HUB_MASTER,
++		.version = FSI_VERSION_ANY,
++	},
++	{ 0 }
++};
++
++static struct fsi_driver hub_master_driver = {
++	.id_table = hub_master_ids,
++	.drv = {
++		.name = "fsi-master-hub",
++		.bus = &fsi_bus_type,
++		.probe = hub_master_probe,
++		.remove = hub_master_remove,
++	}
++};
++
++module_fsi_driver(hub_master_driver);
++MODULE_LICENSE("GPL");
 -- 
 1.8.2.2
