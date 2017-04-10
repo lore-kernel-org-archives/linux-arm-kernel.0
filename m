@@ -1,36 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Apr 2017 11:29:39 +0100
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <20170407144526.zxgvpnxt6n7twhqw@hirez.programming.kicks-ass.net>
-References: <1490811363-93944-5-git-send-email-keescook@chromium.org>
- <CALCETrWkrpuJkcgiwMdc61Vv5U2u39FiWgzWfA_85nziK0pZsg@mail.gmail.com>
- <CAGXu5jKif5UUMBbQBpB7Ha7w0L+su8dSXDU3nbccO3EBnv7bTw@mail.gmail.com>
- <CALCETrW7nN8Ja=r9k4ANpekKovC_wsYrGrge1WNoGsAjZZvqHQ@mail.gmail.com>
- <CAGXu5jLENkemQiL6bcL5=qsesi-2M=1jYhS7SGBpBG64ER2CsA@mail.gmail.com>
- <CALCETrVErxE5P=V4LD=kFCBtnp2YYEGRsbxhTG0SXJjrw6Yk1A@mail.gmail.com>
- <CA+rthh95rW95woiWvyeCcoJT-qRM18KCDGHGtH=bDHZdExmVmg@mail.gmail.com>
- <alpine.DEB.2.20.1704071048360.1716@nanos>
- <CA+rthh9-EJBBO6nYYY6noP0ybcvk+xJ+S5h6BCNPtidjMCv8VQ@mail.gmail.com>
- <20170407144526.zxgvpnxt6n7twhqw@hirez.programming.kicks-ass.net>
-Message-ID: <20170410102938.GB13899@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 10 Apr 2017 11:30:38 +0100
+Subject: [PATCH] efi/libstub: arm/arm64: don't use TASK_SIZE when randomising
+ the RT space
+Message-ID: <20170410103038.20117-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 04:45:26PM +0200, Peter Zijlstra wrote:
-> On Fri, Apr 07, 2017 at 12:51:15PM +0200, Mathias Krause wrote:
-> > Why that? It allows fast and CPU local modifications of r/o memory.
-> > OTOH, an approach that needs to fiddle with page table entries
-> > requires global synchronization to keep the individual TLB states in
-> > sync. Hmm.. Not that fast, I'd say.
-> 
-> The fixmaps used for kmap_atomic are per-cpu, no global sync required.
+As reported by James, Catalin and Mark, commit e69176d68d26
+("ef/libstub/arm/arm64: Randomize the base of the UEFI rt services
+region") results in a crash in the firmware regardless of whether KASLR
+is in effect or not, and whether the firmware implements EFI_RNG_PROTOCOL
+or not.
 
-That might be fine for x86, but for some architectures fixmap slots and
-kmap_atomic mappings happen to be visible to other CPUs even if they're
-not required to be.
+Mark has identified the root cause to be the inappropriate use of
+TASK_SIZE in the stub, which arm64 defines as
 
-Using an mm solves that for all, though.
+  #define TASK_SIZE             (test_thread_flag(TIF_32BIT) ? \
+                                TASK_SIZE_32 : TASK_SIZE_64)
 
-Thanks,
-Mark.
+and testing thread flags at this point results in the dereference of
+pointers in uninitialized structures.
+
+So instead, introduce a preprocessor symbol EFI_RT_VIRTUAL_LIMIT and
+define it to TASK_SIZE_64 on arm64 and TASK_SIZE on ARM, both of which
+are compile time constants. Also, change the 'headroom' variable to
+static const to force an error if this changes in the future.
+
+Cc: James Morse <james.morse@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+
+Apologies for the breakage. On the systems I have tested, sp_el0 apparently
+pointed somewhere sane when I inadvertently dereferenced it, and the
+resulting addresses looked sufficiently random to me.
+
+Ingo, once we have some confirmation that this makes the problem go away,
+could you please take this straight into efi/core? Thanks. 
+
+ drivers/firmware/efi/libstub/arm-stub.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index 1e45ec51b094..34010ff3b77e 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -32,6 +32,12 @@
+ #define EFI_RT_VIRTUAL_BASE	SZ_512M
+ #define EFI_RT_VIRTUAL_SIZE	SZ_512M
+ 
++#ifdef CONFIG_ARM64
++#define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE_64
++#else
++#define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE
++#endif
++
+ static u64 virtmap_base = EFI_RT_VIRTUAL_BASE;
+ 
+ efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg,
+@@ -236,8 +242,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 		 * shift of 21 bit positions into account when scaling
+ 		 * the headroom value using a 32-bit random value.
+ 		 */
+-		u64 headroom = TASK_SIZE - EFI_RT_VIRTUAL_BASE -
+-			       EFI_RT_VIRTUAL_SIZE;
++		static const u64 headroom = EFI_RT_VIRTUAL_LIMIT -
++					    EFI_RT_VIRTUAL_BASE -
++					    EFI_RT_VIRTUAL_SIZE;
+ 		u32 rnd;
+ 
+ 		status = efi_get_random_bytes(sys_table, sizeof(rnd),
+-- 
+2.9.3
