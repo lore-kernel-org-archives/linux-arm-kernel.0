@@ -1,42 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 10 Apr 2017 23:21:05 +0800
-Subject: [GIT PULL 2/2] ZTE arm64 device tree changes for 4.12
-In-Reply-To: <1491837665-2579-1-git-send-email-shawnguo@kernel.org>
-References: <1491837665-2579-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1491837665-2579-2-git-send-email-shawnguo@kernel.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 10 Apr 2017 16:23:37 +0100
+Subject: [PATCH -next v2] ARM: hisi: fix error return code in
+ hip04_smp_init()
+In-Reply-To: <20170205163255.28589-1-weiyj.lk@gmail.com>
+References: <20170122164128.29381-1-weiyj.lk@gmail.com>
+ <20170205163255.28589-1-weiyj.lk@gmail.com>
+Message-ID: <58EBA379.90401@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+Hi Yongjun,
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+On 2017/2/5 16:32, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+> Fix to return error code -ENODEV from the of_find_compatible_node()
+> error handling case instead of 0, as done elsewhere in this function.
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-are available in the git repository at:
+Thanks!
+Applied to the hisilicon soc tree.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt64-4.12
+Best Regards,
+Wei
 
-for you to fetch changes up to f006aaf7b11230e38a35f09d706e751fa77eb799:
-
-  arm64: dts: zte: add tvenc device for zx296718 (2017-03-24 16:25:19 +0800)
-
-----------------------------------------------------------------
-ZTE arm64 device tree updates for 4.12:
- - Add mmc devices for ZX296718 SoC and enable those available on
-   zx296718-evb board.
- - Add VOU controller device, output devices HDMI and TVENC, and enable
-   display support for zx296718-evb board.
- - Remove pll_vga clock from ZX296718 device tree, as it's not a fixed
-   rate clock.
-
-----------------------------------------------------------------
-Jun Nie (1):
-      arm64: dts: zte: add mmc devices for zx296718
-
-Shawn Guo (3):
-      arm64: dts: zte: remove zx296718 pll_vga clock
-      arm64: dts: zte: add vou and hdmi devices for zx296718
-      arm64: dts: zte: add tvenc device for zx296718
-
- arch/arm64/boot/dts/zte/zx296718-evb.dts |  28 +++++++
- arch/arm64/boot/dts/zte/zx296718.dtsi    | 126 +++++++++++++++++++++++++++++--
- 2 files changed, 147 insertions(+), 7 deletions(-)
+> ---
+> v1 -> v2: fix file module
+> ---
+>  arch/arm/mach-hisi/platmcpm.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+> index a6c1176..f0fff21 100644
+> --- a/arch/arm/mach-hisi/platmcpm.c
+> +++ b/arch/arm/mach-hisi/platmcpm.c
+> @@ -279,6 +279,8 @@ static int __init hip04_smp_init(void)
+>  					 &hip04_boot_method[0], 4);
+>  	if (ret)
+>  		goto err;
+> +
+> +	ret = -ENODEV;
+>  	np_sctl = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
+>  	if (!np_sctl)
+>  		goto err;
+> 
+> 
+> 
