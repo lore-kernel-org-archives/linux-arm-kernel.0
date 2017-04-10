@@ -1,80 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 10 Apr 2017 10:44:39 +0100
-Subject: [PATCH 4/4] ef/libstub: arm/arm64: randomize the base of the UEFI
- rt services region
-In-Reply-To: <20170410094124.GA9450@leverpostej>
-References: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
- <20170324132410.16628-5-ard.biesheuvel@linaro.org> <58E7B478.6010305@arm.com>
- <CAKv+Gu9CpCWHT=3KboPTtuZVDundtGheKawS=iV_P756RFbaDg@mail.gmail.com>
- <20170410094124.GA9450@leverpostej>
-Message-ID: <CAKv+Gu9YfALdyL-28X20X=T=XyyjDUxmtHy3_ZDDq-PF8RMxUA@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 10 Apr 2017 11:47:09 +0200
+Subject: [PATCH v2] serial: 8250_early: Add earlycon support for Palmchip UART
+Message-ID: <7a016ff6-08fc-2811-92e0-7c4603fa8586@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2017 at 10:41, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Apr 07, 2017 at 04:51:16PM +0100, Ard Biesheuvel wrote:
->> On 7 April 2017 at 16:47, James Morse <james.morse@arm.com> wrote:
->> > On 24/03/17 13:24, Ard Biesheuvel wrote:
->> >> Update the allocation logic for the virtual mapping of the UEFI runtime
->> >> services to start from a randomized base address if KASLR is in effect,
->> >> and if the UEFI firmware exposes an implementation of EFI_RNG_PROTOCOL.
->> >>
->> >> This makes it more difficult to predict the location of exploitable
->> >> data structures in the runtime UEFI firmware, which increases robustness
->> >> against attacks. Note that these regions are only mapped during the
->> >> time a runtime service call is in progress, and only on a single CPU
->> >> at a time, bit give the lack of a downside, let's enable it nonetheless.
->> >
->> > With next-20170407 on Seattle Overdrive, I get an SError[0] on boot:
->
->> > * Revert "ef/libstub/arm/arm64: Randomize the base of the UEFI rt services region"
->> >
->> > At which point the machine start booting to a prompt again, (its noisier than
->> > usual but looks like double-printing).
->
->> That is quite interesting, to be honest, because that patch should
->> effectively be a NOP on systems that do not implement
->> EFI_RNG_PROTOCOL.
->
-> FWIW, I'm also seeing a crash as a result of this patch, on a Juno R1
-> with an EFI_RNG_PROTOCOL implementation, with next-20170410 defconfig.
-> I'm using the Linaro 15.08 toolchain.
->
-> ----
-> EFI stub: Booting Linux Kernel...
-> EFI stub: Using DTB from configuration table
->
->
-> WARNING: this system is using an unsafe pseudo-random implementation of
-> RngLib!
->
->
->
-> Synchronous Exception at 0x00000000F80FC7E8
-> ----
->
-> If I replace the !nokaslr() in efi_entry() with false, my kernel boots.
->
-> If I replace !nokaslr() with true, it fails to boot, even with the call
-> to efi_get_random_bytes() replaced with status = EFI_ERROR.
->
-> The problem appears to be the use of TASK_SIZE, since on arm64 that's:
->
-> #define TASK_SIZE               (test_thread_flag(TIF_32BIT) ? \
->                                 TASK_SIZE_32 : TASK_SIZE_64)
->
-> ... which would mean that the stub would be trying to dereference whatever it
-> found in sp_el0. Looking at objdump:
->
-> 0000000000000160 <efi_entry>:
->  ...
->  4b4:   94000000        bl      0 <nokaslr>
->  4b8:   35000280        cbnz    w0, 508 <efi_entry+0x3a8>
->  4bc:   d5384100        mrs     x0, sp_el0
->  4c0:   f9400004        ldr     x4, [x0]
-> ...
->
-> So I think we should revert this for now.
->
+Define an OF early console for Palmchip UART, which can be enabled
+by passing "earlycon" on the boot command line.
 
-Thanks for debugging this! I will get a fixed version out asap
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ drivers/tty/serial/8250/8250_early.c | 24 ++++++++++++++++++++++++
+ drivers/tty/serial/8250/8250_port.c  |  4 ++--
+ 2 files changed, 26 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+index 85a12f032402..82fc48eca1df 100644
+--- a/drivers/tty/serial/8250/8250_early.c
++++ b/drivers/tty/serial/8250/8250_early.c
+@@ -39,6 +39,7 @@
+ 
+ static unsigned int __init serial8250_early_in(struct uart_port *port, int offset)
+ {
++	int reg_offset = offset;
+ 	offset <<= port->regshift;
+ 
+ 	switch (port->iotype) {
+@@ -52,6 +53,8 @@ static unsigned int __init serial8250_early_in(struct uart_port *port, int offse
+ 		return ioread32be(port->membase + offset);
+ 	case UPIO_PORT:
+ 		return inb(port->iobase + offset);
++	case UPIO_AU:
++		return port->serial_in(port, reg_offset);
+ 	default:
+ 		return 0;
+ 	}
+@@ -59,6 +62,7 @@ static unsigned int __init serial8250_early_in(struct uart_port *port, int offse
+ 
+ static void __init serial8250_early_out(struct uart_port *port, int offset, int value)
+ {
++	int reg_offset = offset;
+ 	offset <<= port->regshift;
+ 
+ 	switch (port->iotype) {
+@@ -77,6 +81,9 @@ static void __init serial8250_early_out(struct uart_port *port, int offset, int
+ 	case UPIO_PORT:
+ 		outb(value, port->iobase + offset);
+ 		break;
++	case UPIO_AU:
++		port->serial_out(port, reg_offset, value);
++		break;
+ 	}
+ }
+ 
+@@ -172,3 +179,20 @@ OF_EARLYCON_DECLARE(omap8250, "ti,omap3-uart", early_omap8250_setup);
+ OF_EARLYCON_DECLARE(omap8250, "ti,omap4-uart", early_omap8250_setup);
+ 
+ #endif
++
++#ifdef CONFIG_SERIAL_8250_RT288X
++
++unsigned int au_serial_in(struct uart_port *p, int offset);
++void au_serial_out(struct uart_port *p, int offset, int value);
++
++static int __init early_au_setup(struct earlycon_device *dev, const char *opt)
++{
++	dev->port.serial_in = au_serial_in;
++	dev->port.serial_out = au_serial_out;
++	dev->port.iotype = UPIO_AU;
++	dev->con->write = early_serial8250_write;
++	return 0;
++}
++OF_EARLYCON_DECLARE(palmchip, "ralink,rt2880-uart", early_au_setup);
++
++#endif
+diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
+index 080d5a59d0a7..1f08d22d1a80 100644
+--- a/drivers/tty/serial/8250/8250_port.c
++++ b/drivers/tty/serial/8250/8250_port.c
+@@ -313,7 +313,7 @@ static const s8 au_io_out_map[8] = {
+ 	-1,	/* UART_SCR (unmapped) */
+ };
+ 
+-static unsigned int au_serial_in(struct uart_port *p, int offset)
++unsigned int au_serial_in(struct uart_port *p, int offset)
+ {
+ 	if (offset >= ARRAY_SIZE(au_io_in_map))
+ 		return UINT_MAX;
+@@ -323,7 +323,7 @@ static unsigned int au_serial_in(struct uart_port *p, int offset)
+ 	return __raw_readl(p->membase + (offset << p->regshift));
+ }
+ 
+-static void au_serial_out(struct uart_port *p, int offset, int value)
++void au_serial_out(struct uart_port *p, int offset, int value)
+ {
+ 	if (offset >= ARRAY_SIZE(au_io_out_map))
+ 		return;
+-- 
+2.11.0
