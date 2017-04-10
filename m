@@ -1,28 +1,17 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Apr 2017 09:32:42 +0100
-Subject: [PATCH v3 9/9] arm, arm64, drivers: add a prefix to drivers
- arch_topology interfaces
-In-Reply-To: <20170327131825.32134-10-juri.lelli@arm.com>
-References: <20170327131825.32134-1-juri.lelli@arm.com>
- <20170327131825.32134-10-juri.lelli@arm.com>
-Message-ID: <20170410083242.GE27538@e104818-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 10 Apr 2017 10:33:59 +0200
+Subject: [PATCH 09/12] [media] s5p-mfc: use setup_timer
+In-Reply-To: <f35bda17a884852135983ab4128976b9c220a768.1490953290.git.geliangtang@gmail.com>
+References: <77c0fb26d214e023a99afc948c71d6edd9284205.1490953290.git.geliangtang@gmail.com>
+ <f35bda17a884852135983ab4128976b9c220a768.1490953290.git.geliangtang@gmail.com>
+ <CGME20170410083414epcas5p401f39ae110afbae34e0f2c6b53bd86a3@epcas5p4.samsung.com>
+Message-ID: <aa3f052e-c4c5-158f-79cb-d4e26b8e4f10@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 02:18:25PM +0100, Juri Lelli wrote:
-> Now that some functions that deal with arch topology information live
-> under drivers, there is a clash of naming that might create confusion.
-> 
-> Tidy things up by creating a drivers namespace for interfaces used by
-> arch code; achieve this by prepending a 'atd_' (arch topology driver)
-> prefix to driver interfaces.
-> 
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> ---
->  arch/arm/kernel/topology.c    |  8 ++++----
->  arch/arm64/kernel/topology.c  |  4 ++--
->  drivers/base/arch_topology.c  | 20 ++++++++++----------
->  include/linux/arch_topology.h |  8 ++++----
->  4 files changed, 20 insertions(+), 20 deletions(-)
+On 04/09/2017 03:34 AM, Geliang Tang wrote:
+> Use setup_timer() instead of init_timer() to simplify the code.
+>
+> Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Applied, thanks.
