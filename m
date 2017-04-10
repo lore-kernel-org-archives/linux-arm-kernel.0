@@ -1,30 +1,22 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Apr 2017 16:05:03 +0100
-Subject: [PATCH v3 0/9] Fix issues and factorize arm/arm64 capacity
- information code
-In-Reply-To: <20170327131825.32134-1-juri.lelli@arm.com>
-References: <20170327131825.32134-1-juri.lelli@arm.com>
-Message-ID: <20170410150503.GS17774@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Apr 2017 10:05:53 -0500
+Subject: [PATCH 1/3] dt-bindings: power: supply: New bindings for LEGO
+ MINDSTORMS EV3 battery
+In-Reply-To: <1491251029-23256-2-git-send-email-david@lechnology.com>
+References: <1491251029-23256-1-git-send-email-david@lechnology.com>
+ <1491251029-23256-2-git-send-email-david@lechnology.com>
+Message-ID: <20170410150553.35pjswc7liact3pd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 02:18:16PM +0100, Juri Lelli wrote:
-> arm and arm64 topology.c share a lot of code related to parsing of capacity
-> information. This is v3 of a solution [1] (based on Will's, Catalin's and
-> Mark's off-line suggestions) to move such common code in a single place:
-> drivers/base/arch_topology.c (by creating such file and conditionally compiling
-> it for arm and arm64 only).
+On Mon, Apr 03, 2017 at 03:23:47PM -0500, David Lechner wrote:
+> This add a new device tree binding for LEGO MINDSTORMS EV3 battery. The EV3
+> has some built-in capability for monitoring the attached battery.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+>  .../bindings/power/supply/lego_ev3_battery.txt      | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/supply/lego_ev3_battery.txt
 
-I think overall this is okay, with the exception of one patch which seems
-to be wrongly worded.  Once that's resolved, then:
-
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-for the series.
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Rob Herring <robh@kernel.org>
