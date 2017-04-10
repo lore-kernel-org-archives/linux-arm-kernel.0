@@ -1,57 +1,80 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Apr 2017 14:51:03 +0100
-Subject: [PATCH v3 6/9] drivers: remove useless comment from
- base/arch_topology.c
-In-Reply-To: <20170327131825.32134-7-juri.lelli@arm.com>
-References: <20170327131825.32134-1-juri.lelli@arm.com>
- <20170327131825.32134-7-juri.lelli@arm.com>
-Message-ID: <20170410135103.GR17774@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Apr 2017 15:52:35 +0200
+Subject: [PATCH v6 1/2] dt-bindings: mmc: add DT binding for S3C24XX
+ MMC/SD/SDIO controller
+In-Reply-To: <1491004256-13969-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1491004256-13969-1-git-send-email-sergio.prado@e-labworks.com>
+ <1491004256-13969-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <CAPDyKFqOBA5-UeDM0emn8XFO4HE81OhpBoNnMv3=e6J-H+V3UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 02:18:22PM +0100, Juri Lelli wrote:
-> Printing out an error message when we failed to get the cpu device is
-> not helping anyone. Remove it.
+On 1 April 2017 at 01:50, Sergio Prado <sergio.prado@e-labworks.com> wrote:
+> Adds the device tree bindings description for Samsung S3C24XX
+> MMC/SD/SDIO controller, used as a connectivity interface with external
+> MMC, SD and SDIO storage mediums.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
 
-(1) the subject line talks about removing a "comment" but you're
-    actually removing an error printk
-(2) I don't think it's "not helping anyone", although the description
-    above doesn't say _why_ - it's reporting the lack of a missing CPU
-    device that we expect to be present.  If it's not present, then
-    we're not going to end up with the cpu capacity attribute, and the
-    error message answers the "why is that sysfs file missing" question.
+Thanks, applied for next!
 
-I think a better commit message is needed for this change.
+Kind regards
+Uffe
 
-> 
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 > ---
->  drivers/base/arch_topology.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-> index c33482121b7d..b24d9a2af2c5 100644
-> --- a/drivers/base/arch_topology.c
-> +++ b/drivers/base/arch_topology.c
-> @@ -81,11 +81,9 @@ static int register_cpu_capacity_sysctl(void)
->  
->  	for_each_possible_cpu(i) {
->  		cpu = get_cpu_device(i);
-> -		if (!cpu) {
-> -			pr_err("%s: too early to get CPU%d device!\n",
-> -			       __func__, i);
-> +		if (!cpu)
->  			continue;
-> -		}
+>  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> new file mode 100644
+> index 000000000000..5f68feb9f9d6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> @@ -0,0 +1,42 @@
+> +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
 > +
->  		device_create_file(cpu, &dev_attr_cpu_capacity);
->  	}
->  
-> -- 
-> 2.10.0
-> 
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
+> +with external MMC, SD and SDIO storage mediums.
+> +
+> +This file documents differences between the core mmc properties described by
+> +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
+> +implementation.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be one of the following
+> +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
+> +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
+> +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
+> +- reg: register location and length
+> +- interrupts: mmc controller interrupt
+> +- clocks: Should reference the controller clock
+> +- clock-names: Should contain "sdi"
+> +
+> +Required Board Specific Properties:
+> +- pinctrl-0: Should specify pin control groups used for this controller.
+> +- pinctrl-names: Should contain only one value - "default".
+> +
+> +Optional Properties:
+> +- bus-width: number of data lines (see mmc.txt)
+> +- cd-gpios: gpio for card detection (see mmc.txt)
+> +- wp-gpios: gpio for write protection (see mmc.txt)
+> +
+> +Example:
+> +
+> +       mmc0: mmc at 5a000000 {
+> +               compatible = "samsung,s3c2440-sdi";
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&sdi_pins>;
+> +               reg = <0x5a000000 0x100000>;
+> +               interrupts = <0 0 21 3>;
+> +               clocks = <&clocks PCLK_SDI>;
+> +               clock-names = "sdi";
+> +               bus-width = <4>;
+> +               cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
+> +               wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
+> +       };
+> --
+> 1.9.1
+>
