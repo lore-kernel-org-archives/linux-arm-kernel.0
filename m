@@ -1,143 +1,78 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Mon, 10 Apr 2017 14:46:48 -0500
-Subject: [PATCH v6 05/23] drivers/fsi: Add slave & master read/write APIs
-In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170410194706.64280-6-cbostic@linux.vnet.ibm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Mon, 10 Apr 2017 13:06:22 -0700
+Subject: [PATCH v7 4/4] arm64/syscalls: Architecture specific pre-usermode
+ check
+In-Reply-To: <20170410171240.GE30647@e104818-lin.cambridge.arm.com>
+References: <20170410171240.GE30647@e104818-lin.cambridge.arm.com>
+Message-ID: <20170410200622.8654-1-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+Disable the generic pre-usermode check in favor of an optimized
+implementation. This patch adds specific checks on user-mode return path
+to make it faster and smaller.
 
-Introduce functions to perform reads/writes on the slave address space;
-these simply pass the request on the slave's master with the correct
-link and slave ID.
+The address limit is checked on each syscall return path to user-mode.
+If it was changed, a generic handler is called to stop the kernel on an
+explicit check.
 
-We implement these on top of similar helpers for the master.
-
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Joel Stanley <joel@jms.id.au>
-Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+Signed-off-by: Thomas Garnier <thgarnie@google.com>
 ---
- drivers/fsi/fsi-core.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+Based on next-20170410
+---
+ arch/arm64/Kconfig        |  1 +
+ arch/arm64/kernel/entry.S | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 4bbca95..32698ed 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -32,6 +32,11 @@ struct fsi_slave {
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9b8fcab7da56..3f9e8e7d9376 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -24,6 +24,7 @@ config ARM64
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_HAS_UBSAN_SANITIZE_ALL
++	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 43512d4d7df2..bdd094c7837a 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -744,6 +744,8 @@ ENDPROC(cpu_switch_to)
+ ret_fast_syscall:
+ 	disable_irq				// disable interrupts
+ 	str	x0, [sp, #S_X0]			// returned x0
++	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
++	tbnz	x2, #63, addr_limit_fail
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+ 	cbnz	x2, ret_fast_syscall_trace
+@@ -771,6 +773,9 @@ work_pending:
+  */
+ ret_to_user:
+ 	disable_irq				// disable interrupts
++	ldr	x2, [tsk, #TSK_TI_ADDR_LIMIT]	// check addr limit change
++	tbnz	x2, #63, addr_limit_fail
++
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+@@ -780,6 +785,14 @@ finish_ret_to_user:
+ ENDPROC(ret_to_user)
  
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
- 
-+static int fsi_master_read(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, void *val, size_t size);
-+static int fsi_master_write(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
+ /*
++ * Address limit was incorrect before returning in user-mode which could be
++ * used to elevate privileges. Call the generic handler to stop the kernel on
++ * the appropriate check. This function does not return.
++ */
++addr_limit_fail:
++	bl address_limit_check_failed
 +
- /* crc helpers */
- static const uint8_t crc4_tab[] = {
- 	0x0, 0x7, 0xe, 0x9, 0xb, 0xc, 0x5, 0x2,
-@@ -57,6 +62,58 @@ uint8_t fsi_crc4(uint8_t c, uint64_t x, int bits)
- EXPORT_SYMBOL_GPL(fsi_crc4);
- 
- /* FSI slave support */
-+static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
-+		uint8_t *idp)
-+{
-+	uint32_t addr = *addrp;
-+	uint8_t id = *idp;
-+
-+	if (addr > slave->size)
-+		return -EINVAL;
-+
-+	/* For 23 bit addressing, we encode the extra two bits in the slave
-+	 * id (and the slave's actual ID needs to be 0).
-+	 */
-+	if (addr > 0x1fffff) {
-+		if (slave->id != 0)
-+			return -EINVAL;
-+		id = (addr >> 21) & 0x3;
-+		addr &= 0x1fffff;
-+	}
-+
-+	*addrp = addr;
-+	*idp = id;
-+	return 0;
-+}
-+
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+			void *val, size_t size)
-+{
-+	uint8_t id = slave->id;
-+	int rc;
-+
-+	rc = fsi_slave_calc_addr(slave, &addr, &id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_master_read(slave->master, slave->link, id,
-+			addr, val, size);
-+}
-+
-+static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
-+			const void *val, size_t size)
-+{
-+	uint8_t id = slave->id;
-+	int rc;
-+
-+	rc = fsi_slave_calc_addr(slave, &addr, &id);
-+	if (rc)
-+		return rc;
-+
-+	return fsi_master_write(slave->master, slave->link, id,
-+			addr, val, size);
-+}
-+
- static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- {
- 	/* todo: initialise slave device, perform engine scan */
-@@ -65,6 +122,41 @@ static int fsi_slave_init(struct fsi_master *master, int link, uint8_t id)
- }
- 
- /* FSI master support */
-+static int fsi_check_access(uint32_t addr, size_t size)
-+{
-+	if (size != 1 && size != 2 && size != 4)
-+		return -EINVAL;
-+
-+	if ((addr & 0x3) != (size & 0x3))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static int fsi_master_read(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, void *val, size_t size)
-+{
-+	int rc;
-+
-+	rc = fsi_check_access(addr, size);
-+	if (rc)
-+		return rc;
-+
-+	return master->read(master, link, slave_id, addr, val, size);
-+}
-+
-+static int fsi_master_write(struct fsi_master *master, int link,
-+		uint8_t slave_id, uint32_t addr, const void *val, size_t size)
-+{
-+	int rc;
-+
-+	rc = fsi_check_access(addr, size);
-+	if (rc)
-+		return rc;
-+
-+	return master->write(master, link, slave_id, addr, val, size);
-+}
-+
- static int fsi_master_scan(struct fsi_master *master)
- {
- 	int link;
++/*
+  * This is how we return from a fork.
+  */
+ ENTRY(ret_from_fork)
 -- 
-1.8.2.2
+2.12.2.715.g7642488e1d-goog
