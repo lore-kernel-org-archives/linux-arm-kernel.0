@@ -1,54 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 10 Apr 2017 18:16:19 +0200
-Subject: DT overlay issues - dtc flags
-Message-ID: <1264bdc3-e61e-0256-0a0f-fdd8dbf50397@suse.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Apr 2017 09:18:16 -0700
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
+References: <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com>
+ <20170323170210.GL10760@atomide.com>
+ <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
+ <20170330165448.GF10760@atomide.com>
+ <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
+ <20170403153604.GI10760@atomide.com>
+ <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
+ <20170407164731.GJ13234@atomide.com>
+ <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
+Message-ID: <20170410161816.GD5339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Tero Kristo <t-kristo@ti.com> [170410 00:34]:
+> On 07/04/17 19:47, Tony Lindgren wrote:
+> > OK hdmi works now on panda for both omapfb and omapdrm. Any ideas why
+> > that change is now needed though?
+> 
+> Yes, it is pretty clear actually. Previously, the hwmod main clock was
+> controlling the hdmi clock, but this is now rerouted to the clkctrl module
+> clock, which is shared between all DSS submodules. This leaves the hdmi
+> clock disabled, causing the failure.
+> 
+> The fix just puts the hdmi clock into the optional clocks list, and forces
+> all the optional clocks on when pm_runtime is enabled for the module.
 
-I've tried to play around with Device Tree overlays (.dtbo files):
-
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/overlay-notes.txt
-
-First of all, that document refers to a non-existing
-Documentation/devicetree/dt-object-internal.txt. Could someone please
-fix that one way or another?
-
-In my particular example I've tried to extend the &i2c1 and &gpio nodes
-of 4.11-rc5 arm64 broadcom/bcm2837-rpi-3-b.dts. The above documentation
-prominently claims that this can be done via target = <&foo> syntax, but
-U-Boot's fdt apply command fails for such a file. If instead I use the
-alternative target-path = "/soc/..." then it works just fine.
-
-As mentioned in the very bottom of the documentation, resolution of
-phandle target references requires a __symbols__ node in the base .dtb.
-IIUC this is only generated when passing the -@ dtc command line flag.
-
-At first I thought this were an issue with how we build the .dtb files
-in openSUSE [1], but by my reading of the kernel Makefiles not passing
--@ in DTC_FLAGS or cmd_dtc, you should run into the exact same issue.
-
-I could think of a few ARMv7-M systems where such DT bloat might be
-undesired (small flash sector sizes), but then it would seem easier to
-suppress -@ where needed than to have a feature that by all practical
-means is half unusable by default.
-
-U-Boot itself appears to face a similar issue in that its internal
-Device Trees are built without -@, and via Alex' distro boot extensions
-this internal DT is passed on via UEFI as fallback when no external .dtb
-file is found. So in the non-SPL case the DT should probably be built
-with -@, too.
-
-Or am I misunderstanding something here?
+OK so no need to fix it in the current kernels then.
 
 Thanks,
-Andreas
 
-[1]
-https://build.opensuse.org/package/view_file/Kernel:HEAD/dtb-aarch64/dtb-aarch64.spec?expand=1
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Tony
