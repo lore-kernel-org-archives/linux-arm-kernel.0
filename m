@@ -1,76 +1,21 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 10 Apr 2017 11:24:31 -0700
-Subject: [GIT PULL] Allwinner clock fixes for 4.11, bis
-In-Reply-To: <20170410080048.l7xjndj457wa2b2q@lukather>
-References: <20170406074121.tkivdvghbr27tr54@lukather>
- <20170406231003.GS7065@codeaurora.org>
- <20170410080048.l7xjndj457wa2b2q@lukather>
-Message-ID: <20170410182431.GI7065@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Apr 2017 13:25:49 -0500
+Subject: [PATCH v5 1/5] dt-bindings: watchdog: Document STM32 IWDG bindings
+In-Reply-To: <1491481168-22213-2-git-send-email-yannick.fertre@st.com>
+References: <1491481168-22213-1-git-send-email-yannick.fertre@st.com>
+ <1491481168-22213-2-git-send-email-yannick.fertre@st.com>
+Message-ID: <20170410182549.yqkmolezpjj6eubg@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10, Maxime Ripard wrote:
-> On Thu, Apr 06, 2017 at 04:10:03PM -0700, Stephen Boyd wrote:
-> > On 04/06, Maxime Ripard wrote:
-> > > Hi Mike, Stephen,
-> > > 
-> > > Please pull the following changes for one of the 4.11-rc's
-> > > 
-> > > Thanks!
-> > > Maxime
-> > > 
-> > > The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
-> > > 
-> > >   clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.11-2
-> > > 
-> > > for you to fetch changes up to d054a839a0986136374d49f9f9fbc264abae9c4c:
-> > > 
-> > >   clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER (2017-03-27 13:37:05 +0200)
-> > > 
-> > > ----------------------------------------------------------------
-> > > Allwinner clock fixes for 4.11, bis
-> > > 
-> > > A few patches to fix a build error and a few minor typos and bugs in the
-> > > sunxi-ng code
-> > > 
-> > > ----------------------------------------------------------------
-> > > Chen-Yu Tsai (3):
-> > >       clk: sunxi-ng: use 1 as fallback for minimum multiplier
-> > >       clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
-> > >       clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
-> > > 
-> > > Tobias Regnery (1):
-> > >       clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
-> > > 
-> > 
-> > Two of these are fixes for regressions in v4.10? Why are these
-> > critical for the v4.11 release? The comment patch is totally
-> > bogus, it's not fixing any sort of regression that is causing
-> > problems for people so I'm not sure why it was put into this pull
-> > request. Am I right in assuming that the only real patch we need
-> > out of here is the last one for the build error from randconfigs?
-> > If so I can cherry-pick that from the branch into fixes and the
-> > rest can go the next merge window.
-> > 
-> > Not pulling for now.
+On Thu, Apr 06, 2017 at 02:19:24PM +0200, Yannick Fertre wrote:
+> This adds documentation of device tree bindings for the STM32 IWDG
+> (Independent WatchDoG).
 > 
-> Actually, all of them but the comment fix are real fix.
-> 
-> "clk: sunxi-ng: use 1 as fallback for minimum multiplier" can lead to
-> a multiplier set to 0 in some cases (depending on the rate asked for),
-> and "clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum
-> mismatch" will prevent inconsistensies in factors selection between
-> round_rate and set_rate.
-> 
-> So, yes, they are not critical fixes in the sense that it will fix a
-> panic. but still those are bugs.
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> ---
+>  .../devicetree/bindings/watchdog/st,stm32-iwdg.txt    | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
 
-Ok so it sounds like we agree that this can all wait until v4.12.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Rob Herring <robh@kernel.org>
