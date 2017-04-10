@@ -1,184 +1,177 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Apr 2017 13:39:21 +0100
-Subject: [PATCH v4 20/22] KVM: arm64: ITS: ITT flush and restore
-In-Reply-To: <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
-Message-ID: <718afa1b-e0ad-f758-012a-8e0ac6a140b8@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 10 Apr 2017 15:36:16 +0300
+Subject: [v3, 1/7] mmc: sdhci-of-esdhc: add peripheral clock support
+In-Reply-To: <1490600982-5410-2-git-send-email-yangbo.lu@nxp.com>
+References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
+ <1490600982-5410-2-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <a8810e0a-95fa-a590-6827-15031ff52886@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 10:31, Eric Auger wrote:
-> Introduce routines to flush and restore device ITT and their
-> interrupt table entries (ITE).
+On 27/03/17 10:49, Yangbo Lu wrote:
+> eSDHC could select peripheral clock or platform clock as clock source by
+> the PCS bit of eSDHC Control Register, and this bit couldn't be reset by
+> software reset for all. In default, the platform clock is used. But we have
+> to use peripheral clock since it has a higher frequency to support eMMC
+> HS200 mode and SD UHS-I mode. This patch is to add peripheral clock support
+> and use it instead of platform clock if it's declared in eSDHC dts node.
 > 
-> The routines will be called on device table flush and
-> restore. They will become static in subsequent patches.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+
+Apart from minor comments:
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
 > ---
-> 
-> v3 -> v4:
-> - lookup_table and compute_next_eventid_offset become static in this
->   patch
-> - remove static along with vgic_its_flush/restore_itt to avoid
->   compilation warnings
-> - next field only computed with a shift (mask removed)
-> - handle the case where the last element has not been found
-> 
-> v2 -> v3:
-> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
-> 
-> v2: creation
+> Changes for v2:
+> 	- None
+> Changes for v3:
+> 	- None
 > ---
->  virt/kvm/arm/vgic/vgic-its.c | 107 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 104 insertions(+), 3 deletions(-)
+>  drivers/mmc/host/sdhci-esdhc.h    |  1 +
+>  drivers/mmc/host/sdhci-of-esdhc.c | 70 +++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 69 insertions(+), 2 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index b907e3c..02c0694 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1707,7 +1707,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
->  	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
->  }
+> diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+> index ece8b37..5343fc0 100644
+> --- a/drivers/mmc/host/sdhci-esdhc.h
+> +++ b/drivers/mmc/host/sdhci-esdhc.h
+> @@ -54,6 +54,7 @@
 >  
-> -u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
-> +static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->  {
->  	struct list_head *e = &ite->ite_list;
->  	struct its_ite *next;
-> @@ -1749,8 +1749,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
->   *
->   * Return: < 0 on error, 1 if last element identified, 0 otherwise
->   */
-> -int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-> -		 int start_id, entry_fn_t fn, void *opaque)
-> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-> +			int start_id, entry_fn_t fn, void *opaque)
->  {
->  	gpa_t gpa = base, top = base + size - 1;
->  	unsigned long len = size;
-> @@ -1815,6 +1815,107 @@ static int vgic_its_restore_pending_tables(struct kvm *kvm)
->  	return -ENXIO;
->  }
+>  /* Control Register for DMA transfer */
+>  #define ESDHC_DMA_SYSCTL		0x40c
+> +#define ESDHC_PERIPHERAL_CLK_SEL	0x00080000
+>  #define ESDHC_DMA_SNOOP			0x00000040
 >  
-> +static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
-> +			      struct its_ite *ite, gpa_t gpa)
-> +{
-> +	struct kvm *kvm = its->dev->kvm;
-> +	u32 next_offset;
-> +	u64 val;
-> +
-> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
-> +	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
-> +		ite->collection->collection_id;
-
-Same remark as before concerning the #define-ing of the encoding and the
-name of the function.
-
-> +	val = cpu_to_le64(val);
-> +	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
-> +}
-> +
-> +/**
-> + * vgic_its_restore_ite - restore an interrupt translation entry
-> + * @event_id: id used for indexing
-> + * @ptr: kernel VA where the 8 byte ITE is located
-> + * @opaque: pointer to the its_device
-> + * @next: id offset to the next entry
-> + */
-> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
-> +				void *ptr, void *opaque, u32 *next)
-> +{
-> +	struct its_device *dev = (struct its_device *)opaque;
-> +	struct its_collection *collection;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	u64 val, *p = (u64 *)ptr;
-> +	struct vgic_irq *irq;
-> +	u32 coll_id, lpi_id;
-> +	struct its_ite *ite;
-> +	int ret;
-> +
-> +	val = *p;
-> +	*next = 1;
-> +
-> +	val = le64_to_cpu(val);
-> +
-> +	coll_id = val & GENMASK_ULL(15, 0);
-> +	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
-> +
-> +	if (!lpi_id)
-> +		return 0;
-> +
-> +	*next = val >> 48;
-> +
-> +	collection = find_collection(its, coll_id);
-> +	if (!collection)
-> +		return -EINVAL;
-> +
-> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
-> +				  lpi_id, event_id);
-> +	if (ret)
-> +		return ret;
-> +
-> +	irq = vgic_add_lpi(kvm, lpi_id);
-> +	if (IS_ERR(irq))
-> +		return PTR_ERR(irq);
-> +	ite->irq = irq;
-> +
-> +	/* restore the configuration of the LPI */
-> +	ret = update_lpi_config(kvm, irq, NULL);
-> +	if (ret)
-> +		return ret;
-> +
-> +	update_affinity_ite(kvm, ite);
-> +	return 0;
-> +}
-> +
-> +int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
-> +{
-> +	gpa_t base = device->itt_addr;
-> +	struct its_ite *ite;
-> +	int ret;
-> +
-> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
-> +		gpa_t gpa = base + ite->event_id * VITS_ESZ;
-> +
-> +		ret = vgic_its_flush_ite(its, device, ite, gpa);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +	return 0;
-> +}
-> +
-> +int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
-> +{
-> +	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * VITS_ESZ;
-> +	gpa_t base = dev->itt_addr;
-> +	int ret;
-> +
-> +	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
-> +			    vgic_its_restore_ite, dev);
-> +
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	/* if the last element has not been found we are in trouble */
-> +	return ret ? 0 : -EINVAL;
-
-This makes me wonder. Can't lookup_table perform that check on its own
-and always return an error when something went wrong?
-
-> +}
-> +
+>  #endif /* _DRIVERS_MMC_SDHCI_ESDHC_H */
+> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+> index ff37e74..7ce1caf 100644
+> --- a/drivers/mmc/host/sdhci-of-esdhc.c
+> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/module.h>
+>  #include <linux/sys_soc.h>
+> +#include <linux/clk.h>
+>  #include <linux/mmc/host.h>
+>  #include "sdhci-pltfm.h"
+>  #include "sdhci-esdhc.h"
+> @@ -30,6 +31,7 @@ struct sdhci_esdhc {
+>  	u8 vendor_ver;
+>  	u8 spec_ver;
+>  	bool quirk_incorrect_hostver;
+> +	unsigned int peripheral_clock;
+>  };
+>  
 >  /**
->   * vgic_its_flush_device_tables - flush the device table and all ITT
->   * into guest RAM
+> @@ -414,15 +416,25 @@ static int esdhc_of_enable_dma(struct sdhci_host *host)
+>  static unsigned int esdhc_of_get_max_clock(struct sdhci_host *host)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
+>  
+> -	return pltfm_host->clock;
+> +	if (esdhc->peripheral_clock)
+> +		return esdhc->peripheral_clock;
+> +	else
+> +		return pltfm_host->clock;
+>  }
+>  
+>  static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
+> +	unsigned int clock;
+>  
+> -	return pltfm_host->clock / 256 / 16;
+> +	if (esdhc->peripheral_clock)
+> +		clock = esdhc->peripheral_clock;
+> +	else
+> +		clock = pltfm_host->clock;
+> +	return clock / 256 / 16;
+>  }
+>  
+>  static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
+> @@ -512,6 +524,33 @@ static void esdhc_pltfm_set_bus_width(struct sdhci_host *host, int width)
+>  	sdhci_writel(host, ctrl, ESDHC_PROCTL);
+>  }
+>  
+> +static void esdhc_clock_enable(struct sdhci_host *host, bool enable)
+> +{
+> +	u32 val;
+> +	u32 timeout;
+> +
+> +	val = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> +
+> +	if (enable)
+> +		val |= ESDHC_CLOCK_SDCLKEN;
+> +	else
+> +		val &= ~ESDHC_CLOCK_SDCLKEN;
+> +
+> +	sdhci_writel(host, val, ESDHC_SYSTEM_CONTROL);
+> +
+> +	timeout = 20;
+> +	val = ESDHC_CLOCK_STABLE;
+> +	while (!(sdhci_readl(host, ESDHC_PRSSTAT) & val)) {
+> +		if (timeout == 0) {
+> +			pr_err("%s: Internal clock never stabilised.\n",
+> +				mmc_hostname(host->mmc));
+> +			break;
+> +		}
+> +		timeout--;
+> +		mdelay(1);
+
+If the time to stabilize is much less that 1 ms then this loop can waste
+time.  Have a look at the change in sdhci.c.
+
+> +	}
+> +}
+> +
+>  static void esdhc_reset(struct sdhci_host *host, u8 mask)
+>  {
+>  	sdhci_reset(host, mask);
+> @@ -613,6 +652,9 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
+>  {
+>  	struct sdhci_pltfm_host *pltfm_host;
+>  	struct sdhci_esdhc *esdhc;
+> +	struct device_node *np;
+> +	struct clk *clk;
+> +	u32 val;
+>  	u16 host_ver;
+>  
+>  	pltfm_host = sdhci_priv(host);
+> @@ -626,6 +668,30 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
+>  		esdhc->quirk_incorrect_hostver = true;
+>  	else
+>  		esdhc->quirk_incorrect_hostver = false;
+> +
+> +	np = pdev->dev.of_node;
+> +	clk = of_clk_get(np, 0);
+
+Should there be a clk_put somewhere?
+
+> +	if (!IS_ERR(clk)) {
+> +		/*
+> +		 * esdhc->peripheral_clock would be assigned with a value
+> +		 * which is eSDHC base clock when use periperal clock.
+> +		 * For ls1046a, the clock value got by common clk API is
+> +		 * peripheral clock while the eSDHC base clock is 1/2
+> +		 * peripheral clock.
+> +		 */
+> +		if (of_device_is_compatible(np, "fsl,ls1046a-esdhc"))
+> +			esdhc->peripheral_clock = clk_get_rate(clk) / 2;
+> +		else
+> +			esdhc->peripheral_clock = clk_get_rate(clk);
+> +	}
+> +
+> +	if (esdhc->peripheral_clock) {
+> +		esdhc_clock_enable(host, false);
+> +		val = sdhci_readl(host, ESDHC_DMA_SYSCTL);
+> +		val |= ESDHC_PERIPHERAL_CLK_SEL;
+> +		sdhci_writel(host, val, ESDHC_DMA_SYSCTL);
+> +		esdhc_clock_enable(host, true);
+> +	}
+>  }
+>  
+>  static int sdhci_esdhc_probe(struct platform_device *pdev)
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
