@@ -1,59 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Apr 2017 13:54:49 +0100
-Subject: [PATCH v4 00/22] vITS save/restore
-In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <d730b3fd-f0be-58b6-02e9-3863682994cd@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 10 Apr 2017 09:07:16 -0400
+Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B284667665E7@IRSMSX101.ger.corp.intel.com>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B284667665E7@IRSMSX101.ger.corp.intel.com>
+Message-ID: <33d18b40-8449-78a5-7127-9988d846d179@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On 4/10/2017 7:37 AM, Patel, Mayurkumar wrote:
+>> PCI/ASPM: save power on values during bridge init
+>>  PCI/ASPM: move link_state cleanup to bridge remove
+>>
+> Thanks Sinan for new patches. No issues seen so far in my testing for L1 and L1SS both.
+> May you please add my tested-by in the patches?
+> 
+> I will keep on testing it and let you know if something goes wrong for any
+> corner case.
+> 
 
-On 27/03/17 10:30, Eric Auger wrote:
-> This series specifies and implements an API aimed at saving and restoring
-> the state of the in-kernel emulated ITS device.
-> 
-> The ITS is programmed through registers and tables. Those latter
-> are allocated by the guest. Their base address is programmed in
-> registers or table entries before the ITS is enabled.
-> 
-> The ITS is free to use some of them to flush its internal caches. This
-> is likely to be used when entering low power state.
-> 
-> Therefore, for save/restore use case, it looks natural to use this
-> guest RAM allocated space to save the table related data. However,
-> currently, The ITS in-kernel emulated device does not use all of those
-> tables and for those it uses, it does not always sync them with its
-> cached data. Additional sync must happen for:
-> - the collection table
-> - the device table
-> - the per-device translation tables
-> - the LPI pending tables.
-> 
-> The LPI configation table and the command queues do not need extra
-> syncs.
-> 
-> An alternative to flushing the tables into guest RAM could have been
-> to flush them into a separate user-space buffer. However the drawback
-> of this alternative is that the virtualizer would allocate dedicated
-> buffers to store the data that should normally be laid out in guest
-> RAM. It would also be obliged to re-compute their size from
-> register/table content.
-> 
-> So saving the tables in guest RAM better fit the ITS programming
-> model and optimizes the memory usage. The drawback of this solution
-> is it brings additional challenges at user-space level to make sure
-> the guest RAM is frozen after table sync.
+Thanks for testing and providing your tested-by.
 
-I think this series is on the right track. What it needs is some
-clarification in the spec (as outlined by Christoffer), some tidying up
-around the encoding, and various nits that need addressing all over the map.
-
-The only architectural issue is really the ITS/GICR split, but I don't
-think this is a big deal.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
