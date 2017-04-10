@@ -1,102 +1,77 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Mon, 10 Apr 2017 09:44:19 -0700
-Subject: [PATCH v7 3/4] arm/syscalls: Architecture specific pre-usermode check
-In-Reply-To: <20170410164420.64003-1-thgarnie@google.com>
-References: <20170410164420.64003-1-thgarnie@google.com>
-Message-ID: <20170410164420.64003-3-thgarnie@google.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 10 Apr 2017 09:50:43 -0700
+Subject: [PATCH 1/2] clk: clk-imx7d: fix ahb clk definition
+In-Reply-To: <1491878269-9559-1-git-send-email-aisheng.dong@nxp.com>
+References: <1491878269-9559-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <04f76039b582a75d33e4142333d3a37f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the generic pre-usermode check in favor of an optimized
-implementation. This patch adds specific checks on user-mode return path
-to make it faster and smaller.
+On 2017-04-10 19:37, Dong Aisheng wrote:
+> MX7D ahb clk actually has no LPCG gate, current LPCG offset 0x4200
+> used actually is for adc, not ahb. After fix, correct ocram_s_clk
+> parent accordingly as well.
 
-The address limit is checked on each syscall return path to user-mode
-path as well as the irq user-mode return function. If the address limit
-was changed, a generic handler is called to stop the kernel on an
-explicit check.
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+Tested-by: Stefan Agner <stefan@agner.ch>
 
-Signed-off-by: Thomas Garnier <thgarnie@google.com>
----
-Based on next-20170410
----
- arch/arm/Kconfig               |  1 +
- arch/arm/kernel/entry-common.S | 10 +++++++++-
- 2 files changed, 10 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b0e8c9763e94..af0992debfd2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -12,6 +12,7 @@ config ARM
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
-+	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
- 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index eb5cd77bf1d8..c8a8ba5c22ad 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -12,6 +12,7 @@
- #include <asm/unistd.h>
- #include <asm/ftrace.h>
- #include <asm/unwind.h>
-+#include <asm/memory.h>
- #ifdef CONFIG_AEABI
- #include <asm/unistd-oabi.h>
- #endif
-@@ -27,7 +28,6 @@
- 
- #include "entry-header.S"
- 
--
- 	.align	5
- #if !(IS_ENABLED(CONFIG_TRACE_IRQFLAGS) || IS_ENABLED(CONFIG_CONTEXT_TRACKING))
- /*
-@@ -40,9 +40,12 @@ ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	disable_irq_notrace			@ disable interrupts
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	bne	fast_work_pending
-+	cmp	r2, #TASK_SIZE
-+	blne	address_limit_check_failed
- 
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-@@ -66,6 +69,7 @@ ret_fast_syscall:
-  UNWIND(.cantunwind	)
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
- 	disable_irq_notrace			@ disable interrupts
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	beq	no_work_pending
-@@ -82,6 +86,7 @@ slow_work_pending:
- 	mov	r2, why				@ 'syscall'
- 	bl	do_work_pending
- 	cmp	r0, #0
-+	ldreq   r2, [tsk, #TI_ADDR_LIMIT]
- 	beq	no_work_pending
- 	movlt	scno, #(__NR_restart_syscall - __NR_SYSCALL_BASE)
- 	ldmia	sp, {r0 - r6}			@ have to reload r0 - r6
-@@ -99,9 +104,12 @@ ret_slow_syscall:
- 	disable_irq_notrace			@ disable interrupts
- ENTRY(ret_to_user_from_irq)
- 	ldr	r1, [tsk, #TI_FLAGS]
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	slow_work_pending
- no_work_pending:
-+	cmp	r2, #TASK_SIZE
-+	blne	address_limit_check_failed
- 	asm_trace_hardirqs_on save = 0
- 
- 	/* perform architecture specific actions before user return */
--- 
-2.12.2.715.g7642488e1d-goog
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/clk/imx/clk-imx7d.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+> index ae1d31b..ad04483 100644
+> --- a/drivers/clk/imx/clk-imx7d.c
+> +++ b/drivers/clk/imx/clk-imx7d.c
+> @@ -725,7 +725,7 @@ static void __init imx7d_clocks_init(struct
+> device_node *ccm_node)
+>  	clks[IMX7D_DISP_AXI_ROOT_DIV] =
+> imx_clk_divider2("disp_axi_post_div", "disp_axi_pre_div", base +
+> 0x8880, 0, 6);
+>  	clks[IMX7D_ENET_AXI_ROOT_DIV] =
+> imx_clk_divider2("enet_axi_post_div", "enet_axi_pre_div", base +
+> 0x8900, 0, 6);
+>  	clks[IMX7D_NAND_USDHC_BUS_ROOT_DIV] =
+> imx_clk_divider2("nand_usdhc_post_div", "nand_usdhc_pre_div", base +
+> 0x8980, 0, 6);
+> -	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider2("ahb_post_div",
+> "ahb_pre_div", base + 0x9000, 0, 6);
+> +	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider2("ahb_root_clk",
+> "ahb_pre_div", base + 0x9000, 0, 6);
+>  	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider2("dram_post_div",
+> "dram_cg", base + 0x9880, 0, 3);
+>  	clks[IMX7D_DRAM_PHYM_ALT_ROOT_DIV] =
+> imx_clk_divider2("dram_phym_alt_post_div", "dram_phym_alt_pre_div",
+> base + 0xa000, 0, 3);
+>  	clks[IMX7D_DRAM_ALT_ROOT_DIV] =
+> imx_clk_divider2("dram_alt_post_div", "dram_alt_pre_div", base +
+> 0xa080, 0, 3);
+> @@ -796,9 +796,8 @@ static void __init imx7d_clocks_init(struct
+> device_node *ccm_node)
+>  	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate4("disp_axi_root_clk",
+> "disp_axi_post_div", base + 0x4050, 0);
+>  	clks[IMX7D_ENET_AXI_ROOT_CLK] = imx_clk_gate4("enet_axi_root_clk",
+> "enet_axi_post_div", base + 0x4060, 0);
+>  	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "axi_post_div",
+> base + 0x4110, 0);
+> -	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk",
+> "ahb_post_div", base + 0x4120, 0);
+> +	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk",
+> "ahb_root_clk", base + 0x4120, 0);
+>  	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] =
+> imx_clk_gate4("nand_usdhc_root_clk", "nand_usdhc_post_div", base +
+> 0x4130, 0);
+> -	clks[IMX7D_AHB_CHANNEL_ROOT_CLK] = imx_clk_gate4("ahb_root_clk",
+> "ahb_post_div", base + 0x4200, 0);
+>  	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk",
+> "dram_post_div", base + 0x4130, 0);
+>  	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk",
+> "dram_phym_cg", base + 0x4130, 0);
+>  	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] =
+> imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base
+> + 0x4130, 0);
