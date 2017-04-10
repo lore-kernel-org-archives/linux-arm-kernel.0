@@ -1,24 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Apr 2017 15:20:54 -0500
-Subject: [PATCH v2 2/7] Documentation: dt: Remove bindings for STM32
- pinctrl
-In-Reply-To: <1491568984-20169-3-git-send-email-alexandre.torgue@st.com>
+Date: Mon, 10 Apr 2017 15:27:36 -0500
+Subject: [PATCH v2 3/7] includes: dt-bindings: Rename STM32F429 pinctrl
+ DT bindings
+In-Reply-To: <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
 References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
- <1491568984-20169-3-git-send-email-alexandre.torgue@st.com>
-Message-ID: <20170410202054.urednfofxyb5iyou@rob-hp-laptop>
+ <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
+Message-ID: <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 02:42:59PM +0200, Alexandre TORGUE wrote:
-> Remove "ngpios" bindings definition as it is no more used in stm32 pinctrl
-> driver.
+On Fri, Apr 07, 2017 at 02:43:00PM +0200, Alexandre TORGUE wrote:
+> STM32F4 MCU series is composed of several SOC (STM32F429, STM32F469, ...).
+> Most of muxing definition are identical. So to avoid to duplicate bindings
+> definition, this patch create common definitions.
 
-I read the subject as "rm 
-Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt". You can 
-be more specific:
+This is a lot of churn. Some confirmation that the resultant dtb is the 
+same before and after would be nice. Perhaps the script you used to 
+convert this as well.
 
-dt-bindings: pinctrl: remove ngpios from stm32-pinctrl binding
-
-With that,
-
-Acked-by: Rob Herring <robh@kernel.org> 
+Rob
