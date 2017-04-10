@@ -1,100 +1,72 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 10 Apr 2017 16:35:58 +0200
-Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
- functions
-In-Reply-To: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20170410163558.494cf9be@bbrezillon>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 10 Apr 2017 22:37:52 +0800
+Subject: [GIT PULL 1/5] i.MX driver changes for 4.12
+Message-ID: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Apr 2017 17:20:20 +0300
-Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-> Implement suspend and resume power management specific
-> function to allow PWM controller to correctly suspend
-> and resume.
-> 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> ---
->  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 81 insertions(+)
-> 
-> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> index 530d7dc..75177c6 100644
-> --- a/drivers/pwm/pwm-atmel.c
-> +++ b/drivers/pwm/pwm-atmel.c
-> @@ -58,6 +58,8 @@
->  #define PWM_MAX_PRD		0xFFFF
->  #define PRD_MAX_PRES		10
->  
-> +#define PWM_MAX_CH_NUM		(4)
-> +
->  struct atmel_pwm_registers {
->  	u8 period;
->  	u8 period_upd;
-> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
->  	u8 duty_upd;
->  };
->  
-> +struct atmel_pwm_pm_ctx {
-> +	u32 cmr;
-> +	u32 cdty;
-> +	u32 cprd;
-> +};
-> +
->  struct atmel_pwm_chip {
->  	struct pwm_chip chip;
->  	struct clk *clk;
->  	void __iomem *base;
->  	const struct atmel_pwm_registers *regs;
-> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-Hm, I'm pretty sure you can rely on the current PWM state and call
-atmel_pwm_apply() at resume time instead of doing that. See what I did
-here [1].
+are available in the git repository at:
 
-Thierry, maybe it's time to start thinking about a generic solution to
-save/restore PWM states.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.12
 
->  
->  	unsigned int updated_pwms;
->  	/* ISR is cleared when read, ensure only one thread does that */
-> @@ -333,6 +342,77 @@ atmel_pwm_get_driver_data(struct platform_device *pdev)
->  	return (struct atmel_pwm_registers *)id->driver_data;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int atmel_pwm_suspend(struct device *dev)
-> +{
-> +	struct atmel_pwm_chip *atmel_pwm = dev_get_drvdata(dev);
-> +	struct pwm_device *pwm = atmel_pwm->chip.pwms;
-> +	int i;
-> +	bool disable_clk = false;
-> +
-> +	for (i = 0; i < atmel_pwm->chip.npwm; i++, pwm++) {
-> +		if (!pwm_is_enabled(pwm))
-> +			continue;
-> +
-> +		disable_clk = true;
-> +		atmel_pwm->ctx[i].cdty =
-> +			atmel_pwm_ch_readl(atmel_pwm, i,
-> +					   atmel_pwm->regs->duty);
-> +		atmel_pwm->ctx[i].cprd =
-> +			atmel_pwm_ch_readl(atmel_pwm, i,
-> +					   atmel_pwm->regs->period);
-> +		atmel_pwm->ctx[i].cmr =
-> +			atmel_pwm_ch_readl(atmel_pwm, i, PWM_CMR);
-> +
-> +		atmel_pwm_disable(&atmel_pwm->chip, pwm, false);
-> +	}
-> +
-> +	if (disable_clk)
-> +		clk_disable(atmel_pwm->clk);
+for you to fetch changes up to 44c43c98213fb123819c67c128a5d6c9a9a12280:
 
-I'm not so sure we want to disable the PWM and the PWM chip clk when
-entering suspend. What if the PWM is driving a critical device (like a
-regulator) that has to stay enabled in suspend?
-Shouldn't we delegate this responsibility to the PWM user?
+  soc: imx: gpc: add workaround for i.MX6QP to the GPC PD driver (2017-04-07 20:47:34 +0800)
 
-[1]http://patchwork.ozlabs.org/patch/734306/
+----------------------------------------------------------------
+i.MX drivers updates for 4.12:
+ - A series from Lucas Stach which partly rewrites the imx gpc driver
+   to support multiple power domains, and moves the related code from
+   imx platform into drivers folder.
+ - A series from Dong Aisheng which fixes the issues with Lucas' code
+   changes and improves things.
+ - Add workaround for i.MX6QP hardware erratum ERR009619 that is PRE
+   clocks may be stalled during the power up sequencing of the PU power
+   domain.
+ - Add imx-gpcv2 driver to support power domains managed by GPCv2 IP
+   block found on i.MX7 series of SoCs.
+
+----------------------------------------------------------------
+Andrey Smirnov (2):
+      dt-bindings: Add GPCv2 power gating driver
+      soc: imx: Add GPCv2 power gating driver
+
+Dong Aisheng (8):
+      soc: imx: gpc: fix gpc clk get error handling
+      soc: imx: gpc: fix the wrong using of regmap cache
+      soc: imx: gpc: fix domain_index sanity check issue
+      soc: imx: gpc: fix imx6sl gpc power domain regression
+      soc: imx: gpc: fix comment when power up domain
+      soc: imx: gpc: keep PGC_X_CTRL name align with reference manual
+      dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
+      soc: imx: gpc: remove unnecessary readable_reg callback
+
+Lucas Stach (5):
+      dt-bindings: add multidomain support to i.MX GPC DT binding
+      soc: imx: move PGC handling to a new GPC driver
+      soc: imx: gpc: add defines for domain index
+      dt-bindings: imx-gpc: add i.MX6 QuadPlus compatible
+      soc: imx: gpc: add workaround for i.MX6QP to the GPC PD driver
+
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |  85 ++--
+ .../devicetree/bindings/power/fsl,imx-gpcv2.txt    |  71 +++
+ MAINTAINERS                                        |   1 +
+ arch/arm/mach-imx/gpc.c                            | 217 ---------
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/imx/Kconfig                            |   9 +
+ drivers/soc/imx/Makefile                           |   2 +
+ drivers/soc/imx/gpc.c                              | 489 +++++++++++++++++++++
+ drivers/soc/imx/gpcv2.c                            | 363 +++++++++++++++
+ include/dt-bindings/power/imx7-power.h             |  16 +
+ 11 files changed, 1010 insertions(+), 245 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+ create mode 100644 drivers/soc/imx/Kconfig
+ create mode 100644 drivers/soc/imx/Makefile
+ create mode 100644 drivers/soc/imx/gpc.c
+ create mode 100644 drivers/soc/imx/gpcv2.c
+ create mode 100644 include/dt-bindings/power/imx7-power.h
