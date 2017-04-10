@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 10 Apr 2017 16:44:33 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.12
-Message-ID: <58EBA861.2010809@hisilicon.com>
+Date: Mon, 10 Apr 2017 16:48:06 +0100
+Subject: [GIT PULL] ARM: hisi: soc updates for v4.12
+Message-ID: <58EBA936.3020404@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,58 +14,27 @@ Best Regards,
 Wei
 
 ---
+
 The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.12
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.12
 
-for you to fetch changes up to d4e1eaeee56894f45d0093f9d432be0c868f7c4c:
+for you to fetch changes up to f147140c7f0350d363c10aeb51b78b65b2425266:
 
-  arm64: dts: hisi: add pinctrl dtsi file for HiKey960 development board (2017-04-10 23:34:26 +0800)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.12
-
-- Reset the hi6220 mmc hosts to avoid hang
-- Add the binding for the hi3798cv200 SoC and the poplar board
-- Add basic dts files to support the hi3798cv200 poplar board
-- Enable the Mbigen, XGE, RoCE and SAS for the hip07 d05 board
-- Add driver strength MACRO for the hi3660 SoC
-- Add the pinctrl dtsi file for hikey960 board to configure the pins
+  ARM: hisi: fix error return code in hip04_smp_init() (2017-03-28 15:30:54 +0100)
 
 ----------------------------------------------------------------
-Daniel Lezcano (1):
-      arm64: dts: hi6220: Reset the mmc hosts
+ARM: mach-hisi: Hisilicon SoC updates for 4.12
 
-Jiancheng Xue (2):
-      dt-bindings: arm: hisilicon: add bindings for hi3798cv200 SoC and Poplar board
-      arm64: dts: hisilicon: add dts files for hi3798cv200-poplar board
+- Fix the error return code in hip04_smp_init
 
-Wang Xiaoyin (2):
-      arm64: dts: hisi: add drive strength levels of the pins for Hi3660 SoC
-      arm64: dts: hisi: add pinctrl dtsi file for HiKey960 development board
+----------------------------------------------------------------
+Wei Yongjun (1):
+      ARM: hisi: fix error return code in hip04_smp_init()
 
-Wei Xu (5):
-      arm64: dts: hisi: add mbigen nodes for the hip07 SoC
-      arm64: dts: hisi: add network related nodes for the hip07 SoC
-      arm64: dts: hisi: add RoCE nodes for the hip07 SoC
-      arm64: dts: hisi: add SAS nodes for the hip07 SoC
-      arm64: dts: hisi: enable the NIC and SAS for the hip07-d05 board
-
- .../bindings/arm/hisilicon/hisilicon.txt           |   8 +
- arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   1 +
- .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 162 +++++++
- arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 411 ++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   3 +
- .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 407 +++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |  20 +
- arch/arm64/boot/dts/hisilicon/hip07.dtsi           | 479 +++++++++++++++++++++
- include/dt-bindings/pinctrl/hisi.h                 |  15 +
- 10 files changed, 1507 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+ arch/arm/mach-hisi/platmcpm.c | 2 ++
+ 1 file changed, 2 insertions(+)
