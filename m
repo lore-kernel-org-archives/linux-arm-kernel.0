@@ -1,112 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun,  9 Apr 2017 16:28:40 -0700
-Subject: [PATCH] ARM: omap2plus_defconfig: Enable droid 4 devices
-Message-ID: <20170409232840.19927-1-tony@atomide.com>
+From: luto@kernel.org (Andy Lutomirski)
+Date: Sun, 9 Apr 2017 17:10:16 -0700
+Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
+ __arch_rare_write_begin/unmap()
+In-Reply-To: <58EA2D58.17782.6ADE22BD@pageexec.freemail.hu>
+References: <1490811363-93944-1-git-send-email-keescook@chromium.org>
+ <58E7EF70.30766.621C4F44@pageexec.freemail.hu>
+ <CALCETrXd9MgAk2p72UMbOOoL2W1fP0UT_pc2bfG8r0t=qJotwg@mail.gmail.com>
+ <58EA2D58.17782.6ADE22BD@pageexec.freemail.hu>
+Message-ID: <CALCETrWvGLtObdk3V0k_Esa_L=EOf+Whe=6DpcJ7H_W8Z-5Btw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only need to have MFD_CPCAP and CPCAP_REGULATOR as built-in to
-be able to mount root on the eMMC. And then POWER_RESET_GPIO
-is good to have built-in. The rest of the devices can be loadable
-modules.
+On Sun, Apr 9, 2017 at 5:47 AM, PaX Team <pageexec@freemail.hu> wrote:
+> On 7 Apr 2017 at 21:58, Andy Lutomirski wrote:
+>
+>> On Fri, Apr 7, 2017 at 12:58 PM, PaX Team <pageexec@freemail.hu> wrote:
+>> > On 7 Apr 2017 at 9:14, Andy Lutomirski wrote:
+>> >> Then someone who cares about performance can benchmark the CR0.WP
+>> >> approach against it and try to argue that it's a good idea.  This
+>> >> benchmark should wait until I'm done with my PCID work, because PCID
+>> >> is going to make use_mm() a whole heck of a lot faster.
+>> >
+>> > in my measurements switching PCID is hovers around 230 cycles for snb-ivb
+>> > and 200-220 for hsw-skl whereas cr0 writes are around 230-240 cycles. there's
+>> > of course a whole lot more impact for switching address spaces so it'll never
+>> > be fast enough to beat cr0.wp.
+>> >
+>>
+>> If I'm reading this right, you're saying that a non-flushing CR3 write
+>> is about the same cost as a CR0.WP write.  If so, then why should CR0
+>> be preferred over the (arch-neutral) CR3 approach?
+>
+> cr3 (page table switching) isn't arch neutral at all ;). you probably meant
+> the higher level primitives except they're not enough to implement the scheme
+> as discussed before since the enter/exit paths are very much arch dependent.
 
-This gets various devices such as regulators, touchscreen, power
-button, charger, HDMI audio, LEDs, RTC, ADC, and USB working.
+Yes.
 
-Note that omapdrm needs to be configured manually as we're still
-using omapfb by default.
+>
+> on x86 the cost of the pax_open/close_kernel primitives comes from the cr0
+> writes and nothing else, use_mm suffers not only from the cr3 writes but
+> also locking/atomic ops and cr4 writes on its path and the inevitable TLB
+> entry costs. and if cpu vendors cared enough, they could make toggling cr0.wp
+> a fast path in the microcode and reduce its overhead by an order of magnitude.
+>
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+If the CR4 writes happen in for this use case, that's a bug.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -213,6 +213,7 @@ CONFIG_KEYBOARD_TWL4030=m
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=m
-+CONFIG_TOUCHSCREEN_ATMEL_MXT=m
- CONFIG_TOUCHSCREEN_EDT_FT5X06=m
- CONFIG_TOUCHSCREEN_TI_AM335X_TSC=m
- CONFIG_TOUCHSCREEN_PIXCIR=m
-@@ -220,6 +221,7 @@ CONFIG_TOUCHSCREEN_TSC2004=m
- CONFIG_TOUCHSCREEN_TSC2005=m
- CONFIG_TOUCHSCREEN_TSC2007=m
- CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_CPCAP_PWRBUTTON=m
- CONFIG_INPUT_TPS65218_PWRBUTTON=m
- CONFIG_INPUT_TWL4030_PWRBUTTON=m
- CONFIG_INPUT_PALMAS_PWRBUTTON=m
-@@ -256,7 +258,9 @@ CONFIG_W1=m
- CONFIG_HDQ_MASTER_OMAP=m
- CONFIG_POWER_AVS=y
- CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_GPIO=y
- CONFIG_BATTERY_BQ27XXX=m
-+CONFIG_CHARGER_CPCAP=m
- CONFIG_CHARGER_ISP1704=m
- CONFIG_CHARGER_TWL4030=m
- CONFIG_CHARGER_BQ2415X=m
-@@ -278,6 +282,7 @@ CONFIG_DRA752_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_OMAP_WATCHDOG=m
- CONFIG_TWL4030_WATCHDOG=m
-+CONFIG_MFD_CPCAP=y
- CONFIG_MFD_TI_AM335X_TSCADC=m
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65217=y
-@@ -285,7 +290,9 @@ CONFIG_MFD_TI_LP873X=y
- CONFIG_MFD_TPS65218=y
- CONFIG_MFD_TPS65910=y
- CONFIG_TWL6040_CORE=y
-+CONFIG_REGULATOR_CPCAP=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_REGULATOR_LM363X=m
- CONFIG_REGULATOR_LP872X=y
- CONFIG_REGULATOR_LP873X=y
- CONFIG_REGULATOR_PALMAS=y
-@@ -354,6 +361,7 @@ CONFIG_SND_SOC=m
- CONFIG_SND_EDMA_SOC=m
- CONFIG_SND_AM33XX_SOC_EVM=m
- CONFIG_SND_OMAP_SOC=m
-+CONFIG_SND_OMAP_SOC_HDMI_AUDIO=m
- CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
- CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
- CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
-@@ -418,6 +426,7 @@ CONFIG_MMC_OMAP=y
- CONFIG_MMC_OMAP_HS=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=m
-+CONFIG_LEDS_CPCAP=m
- CONFIG_LEDS_GPIO=m
- CONFIG_LEDS_PCA963X=m
- CONFIG_LEDS_PWM=m
-@@ -436,6 +445,7 @@ CONFIG_RTC_DRV_TWL92330=y
- CONFIG_RTC_DRV_TWL4030=m
- CONFIG_RTC_DRV_PALMAS=m
- CONFIG_RTC_DRV_OMAP=m
-+CONFIG_RTC_DRV_CPCAP=m
- CONFIG_DMADEVICES=y
- CONFIG_DMA_OMAP=y
- CONFIG_TI_EDMA=y
-@@ -448,6 +458,7 @@ CONFIG_IIO=m
- CONFIG_IIO_SW_DEVICE=m
- CONFIG_IIO_SW_TRIGGER=m
- CONFIG_IIO_ST_ACCEL_3AXIS=m
-+CONFIG_CPCAP_ADC=m
- CONFIG_TI_AM335X_ADC=m
- CONFIG_BMP280=m
- CONFIG_PWM=y
-@@ -456,6 +467,7 @@ CONFIG_PWM_TIECAP=m
- CONFIG_PWM_TIEHRPWM=m
- CONFIG_PWM_TWL=m
- CONFIG_PWM_TWL_LED=m
-+CONFIG_PHY_CPCAP_USB=m
- CONFIG_PHY_DM816X_USB=m
- CONFIG_OMAP_USB2=m
- CONFIG_TI_PIPE3=y
--- 
-2.12.2
+>>  And why would switching address spaces obviously be much slower?
+>> There'll be a very small number of TLB fills needed for the actual
+>> protected access.
+>
+> you'll be duplicating TLB entries in the alternative PCID for both code
+> and data, where they will accumulate (=take room away from the normal PCID
+> and expose unwanted memory for access) unless you also flush them when
+> switching back (which then will cost even more cycles). also i'm not sure
+> that processors implement all the 12 PCID bits so depending on how many PCIDs
+> you plan to use, you could be causing even more unnecessary TLB replacements.
+>
+
+Unless the CPU is rather dumber than I expect, the only duplicated
+entries should be for the writable aliases of pages that are written.
+The rest of the pages are global and should be shared for all PCIDs.
+
+--Andy
