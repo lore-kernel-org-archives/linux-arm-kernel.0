@@ -1,54 +1,252 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Mon, 10 Apr 2017 20:14:43 +0200
-Subject: [PATCH 1/1] ARM: dts: armada-xp-linksys-mamba: use wan instead
- of internet for DSA port
-In-Reply-To: <20170405180808.4f8924cb@gmail.com>
-References: <20170405052847.326-1-ralph.sennhauser@gmail.com>
- <20170405142824.GB13449@lunn.ch>
- <20170405172224.38c1f9fb@gmail.com>
- <20170405155032.GL13449@lunn.ch>
- <20170405180808.4f8924cb@gmail.com>
-Message-ID: <20170410201443.18af00d4@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Apr 2017 13:15:14 -0500
+Subject: [PATCH v4 1/7] pinctrl: dt-bindings: Add documentation for
+ Armada 37xx pin controllers
+In-Reply-To: <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
+References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
+ <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170410181514.kzbpkaxkwf7uycdc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Apr 2017 18:08:08 +0200
-Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
-
-> Hi Andrew,
+On Wed, Apr 05, 2017 at 05:18:02PM +0200, Gregory CLEMENT wrote:
+> Document the device tree binding for the pin controllers found on the
+> Armada 37xx SoCs.
 > 
-> On Wed, 5 Apr 2017 17:50:32 +0200
-> Andrew Lunn <andrew@lunn.ch> wrote:
-  
-> > > > I would say, this is now too late. Changing an interface name
-> > > > will break configuration scripts. We are stuck with it.
-> > > >     
-> > > 
-> > > If it weren't for commit cb4f71c42988 that would have been obvious
-> > > for me as well.    
-> > 
-> > Yes, that was not nice. But it was also very earlier in the life of
-> > 38x, so it just affected a few developers with reference boards, not
-> > real products out in the wild, as far as i remember.
-> > 
-> >      Andrew  
+> Update the binding documention of the xtal clk which is a subnode of this
+> syscon node.
 > 
-> The mentioned commit bit me amongst others, see
-> https://lkml.org/lkml/2016/8/21/62
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +--
+>  Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 183 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 187 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
 > 
-> In fact I expect the impact to be much lower this time around, before
-> 4.10 DSA was no contender for swconfig (out of tree switch driver as
-> used by OpenWrt and others). On Mamba ~200Mbit was top speed. Now they
-> perform roughly the same.
+> diff --git a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> index a88f1f05fbd6..4c0807f28cfa 100644
+> --- a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> @@ -5,6 +5,7 @@ reading the gpio latch register.
+>  
+>  This node must be a subnode of the node exposing the register address
+>  of the GPIO block where the gpio latch is located.
+> +See Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+>  
+>  Required properties:
+>  - compatible : shall be one of the following:
+> @@ -16,9 +17,9 @@ Optional properties:
+>  	output names ("xtal")
+>  
+>  Example:
+> -gpio1: gpio at 13800 {
+> -	compatible = "marvell,armada-3700-gpio", "syscon", "simple-mfd";
+> -	reg = <0x13800 0x1000>;
+> +pinctrl_nb: pinctrl-nb at 13800 {
+> +	compatible = "armada3710-nb-pinctrl", "syscon", "simple-mfd";
+> +	reg = <0x13800 0x100>, <0x13C00 0x20>;
+>  
+>  	xtalclk: xtal-clk {
+>  		compatible = "marvell,armada-3700-xtal-clock";
+> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+> new file mode 100644
+> index 000000000000..2eda81e0bca1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+> @@ -0,0 +1,183 @@
+> +* Marvell Armada 37xx SoC pin and gpio controller
+> +
+> +Each Armada 37xx SoC come with two pin and gpio controller one for the
+> +south bridge and the other for the north bridge.
+> +
+> +Inside this set of register the gpio latch allows exposing some
+> +configuration of the SoC and especially the clock frequency of the
+> +xtal. Hence, this node is a represent as syscon allowing sharing the
+> +register between multiple hardware block.
+> +
+> +GPIO and pin controller:
+> +------------------------
+> +
+> +Main node:
+> +
+> +Refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices, including the meaning
+> +of the phrase "pin configuration node".
+> +
+> +Required properties for pinctrl driver:
+> +
+> +- compatible:	"marvell,armada3710-sb-pinctrl", "syscon, "simple-mfd"
+> +		for the south bridge
+> +		"marvell,armada3710-nb-pinctrl", "syscon, "simple-mfd"
+> +		for the north bridge
+> +- reg: The first set of register are for pinctrl/gpio and the second
+> +  set for the interrupt controller
+> +- interrupts: list of the interrupt use by the gpio
+> +
+> +Available groups and functions for the North bridge:
+> +
+> +group: jtag
+> + - pins 20-24
+> + - functions jtag, gpio
+> +
+> +group sdio0
+> + - pins 8-10
+> + - functions sdio, gpio
+> +
+> +group emmc_nb
+> + - pins 27-35
+> + - functions emmc, gpio
+> +
+> +group pwm0
+> + - pin 11 (GPIO1-11)
+> + - functions pwm, gpio
+> +
+> +group pwm1
+> + - pin 12
+> + - functions pwm, gpio
+> +
+> +group pwm2
+> + - pin 13
+> + - functions pwm, gpio
+> +
+> +group pwm3
+> + - pin 14
+> + - functions pwm, gpio
+> +
+> +group pmic1
+> + - pin 17
+> + - functions pmic, gpio
+> +
+> +group pmic0
+> + - pin 16
+> + - functions pmic, gpio
+> +
+> +group i2c2
+> + - pins 2-3
+> + - functions i2c, gpio
+> +
+> +group i2c1
+> + - pins 0-1
+> + - functions i2c, gpio
+> +
+> +group spi_cs1
+> + - pin 17
+> + - functions spi, gpio
+> +
+> +group spi_cs2
+> + - pin 18
+> + - functions spi, gpio
+> +
+> +group spi_cs3
+> + - pin 19
+> + - functions spi, gpio
+> +
+> +group onewire
+> + - pin 4
+> + - functions onewire, gpio
+> +
+> +group uart1
+> + - pins 25-26
+> + - functions uart, gpio
+> +
+> +group spi_quad
+> + - pins 15-16
+> + - functions spi, gpio
+> +
+> +group uart_2
+> + - pins 9-10
+> + - functions uart, gpio
+> +
+> +Available groups and functions for the South bridge:
+> +
+> +group usb32_drvvbus0
+> + - pin 36
+> + - functions drvbus, gpio
+> +
+> +group usb2_drvvbus1
+> + - pin 37
+> + - functions drvbus, gpio
+> +
+> +group sdio_sb
+> + - pins 60-64
+> + - functions sdio, gpio
+> +
+> +group rgmii
+> + - pins 42-55
+> + - functions mii, gpio
+> +
+> +group pcie1
+> + - pins 39-40
+> + - functions pcie, gpio
+> +
+> +group ptp
+> + - pins 56-58
+> + - functions ptp, gpio
+> +
+> +group ptp_clk
+> + - pin 57
+> + - functions ptp, mii
+> +
+> +group ptp_trig
+> + - pin 58
+> + - functions ptp, mii
+> +
+> +group mii_col
+> + - pin 59
+> + - functions mii, mii_err
+> +
+> +GPIO subnode:
+> +
+> +Please refer to gpio.txt in this directory for details of gpio-ranges property
+> +and the common GPIO bindings used by client devices.
+> +
+> +Required properties for gpio driver under the gpio subnode:
+> +- interrupts: List of interrupt specifier for the controllers interrupt.
+> +- gpio-controller: Marks the device node as a gpio controller.
+> +- #gpio-cells: Should be 2. The first cell is the GPIO number and the
+> +   second cell specifies GPIO flags, as defined in
+> +   <dt-bindings/gpio/gpio.h>. Only the GPIO_ACTIVE_HIGH and
+> +   GPIO_ACTIVE_LOW flags are supported.
+> +- gpio-ranges: Range of pins managed by the GPIO controller.
+> +
+> +Xtal Clock bindings for Marvell Armada 37xx SoCs
+> +------------------------------------------------
+> +
+> +see Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+> +
+> +
+> +Example:
+> +pinctrl_sb: pinctrl-sb at 18800 {
 
-When I said much lower I left out the obvious, this only affects a
-specific product line respectively a single device unlike the 38x
-change.
+Just pinctrl at ...
 
-I asked Chad McCue, principal developer of McDebian [1] (the only
-"firmware" using DSA I know of / could make out) about this. McDebain
-already uses "wan" across all devices in the series.
+> +	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
+> +	reg = <0x18800 0x100>, <0x18C00 0x20>;
+> +	gpiosb: gpiosb {
 
-Ralph
+gpio {
 
-[1] https://github.com/Chadster766/McDebian
+With that,
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+
+> +		#gpio-cells = <2>;
+> +		gpio-ranges = <&pinctrl_sb 0 0 29>;
+> +		gpio-controller;
+> +		interrupts =
+> +		<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
+> +		<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+> +	rgmii_pins: mii-pins {
+> +		groups = "rgmii";
+> +		function = "mii";
+> +	};
+> +
+> +};
+> -- 
+> git-series 0.9.1
