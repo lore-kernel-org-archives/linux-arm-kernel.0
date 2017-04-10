@@ -1,106 +1,198 @@
-From: pageexec@freemail.hu (PaX Team)
-Date: Mon, 10 Apr 2017 21:47:31 +0200
-Subject: [kernel-hardening] Re: [RFC v2][PATCH 04/11] x86: Implement
- __arch_rare_write_begin/unmap()
-In-Reply-To: <CALCETrX+iQVjupq9NU5kOPypBBOSRziuvdGdnzCxTUXQkcFJcQ@mail.gmail.com>
-References: <1490811363-93944-1-git-send-email-keescook@chromium.org>,
- <58EA988F.29293.6C80F08B@pageexec.freemail.hu>,
- <CALCETrX+iQVjupq9NU5kOPypBBOSRziuvdGdnzCxTUXQkcFJcQ@mail.gmail.com>
-Message-ID: <58EBE153.31145.71853724@pageexec.freemail.hu>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Mon, 10 Apr 2017 14:47:00 -0500
+Subject: [PATCH v6 17/23] drivers/fsi: Add error handling for slave
+ communication errors
+In-Reply-To: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+References: <20170410194706.64280-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170410194706.64280-18-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 Apr 2017 at 17:31, Andy Lutomirski wrote:
+From: Jeremy Kerr <jk@ozlabs.org>
 
-> On Sun, Apr 9, 2017 at 1:24 PM, PaX Team <pageexec@freemail.hu> wrote:
-> >
-> I consider breaking buggy drivers (in a way that they either generally
-> work okay
+This change implements error handling in the FSI core, by cleaning up
+and retrying failed operations, using the SISC, TERM and BREAK
+facilities.
 
-do they work okay when the dma transfer goes to a buffer that crosses
-physically non-contiguous page boundaries?
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@linux.vnet.ibm.com>
+---
+ drivers/fsi/fsi-core.c | 121 ++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 114 insertions(+), 7 deletions(-)
 
-> or that they break with a nice OOPS depending on config) to
-> be better than having a special case in what's supposed to be a fast
-> path to keep them working.  I did consider forcing the relevant debug
-> options on for a while just to help shake these bugs out the woodwork
-> faster.
-
-that's a false dichotomy, discovering buggy drivers is orthogonal to (not)
-breaking users' systems as grsec shows. and how did you expect to 'shake
-these bugs out' when your own suggestion at the time was for distros to
-not enable this feature 'for a while'?
-
-> > i have yet to see anyone explain what they mean by 'leak' here but if it
-> > is what i think it is then the arch specific entry/exit changes are not
-> > optional but mandatory. see below for randomization.
-> 
-> By "leak" I mean that a bug or exploit causes unintended code to run
-> with CR0.WP or a special CR3 or a special PTE or whatever loaded.
-
-how can a bug/exploit cause something like this?
-
->  PaX hooks the entry code to avoid leaks. 
-
-PaX doesn't instrument enter/exit paths to prevent state leaks into interrupt
-context (it's a useful sideeffect though), rather it's needed for correctness
-if the kernel can be interrupted at all while it's open (address space switching
-will need to handle this too but you have yet to address it).
-
-> >> At boot, choose a random address A.
-> >
-> > what is the threat that a random address defends against?
-> 
-> Makes it harder to exploit a case where the CR3 setting leaks.
-
-if an attacker has the ability to cause this leak (details of which are subject
-to the question i asked above) then why wouldn't he simply also make use of the
-primitives to modify his target via the writable vma without ever having to know
-the randomized address? i also wonder what exploit power you assume for this
-attack and whether that is already enough to simply go after page tables, etc
-instead of figuring out the alternative address space.
-
-> > the problem is that the amount of __read_only data extends beyond vmlinux,
-> > i.e., this approach won't scale. another problem is that it can't be used
-> > inside use_mm and switch_mm themselves (no read-only task structs or percpu
-> > pgd for you ;) and probably several other contexts.
-> 
-> Can you clarify these uses that extend beyond vmlinux?
-
-one obvious candidate is modules. how do you want to handle them? then there's
-a whole bunch of dynamically allocated data that is a candidate for __read_only
-treatment.
-
-> > what is the threat model you're assuming for this feature? based on what i
-> > have for PaX (arbitrary read/write access exploited for data-only attacks),
-> > the above makes no sense to me...
-> 
-> If I use the primitive to try to write a value to the wrong section
-> (write to kernel text, for example), IMO it would be nice to OOPS
-> instead of succeeding.
-
-this doesn't tell me what power you're assuming the attacker has. is it
-my generic arbitrary read-write ability or something more restricted and
-thus less realistic? i.e., how does the attacker get to 'use the primitive'
-and (presumably) also control the ptr/data?
-
-as for your specific example, kernel text isn't 'non-rare-write data' that
-you spoke of before, but that aside, what prevents an attacker from computing
-his target ptr so that after your accessor rebases it, it'd point back to his
-intended target instead? will you range-check (find_vma eventually?) each time?
-how will you make all this code safe from races from another task? the more
-checks you make, the more likely that something sensitive will spill to memory
-and be a target itself in order to hijack the sensitive write.
-
-> Please keep in mind that, unlike PaX, uses of a pax_open_kernel()-like
-> function will may be carefully audited by a friendly security expert
-> such as yourself.  It would be nice to harden the primitive to a
-> reasonable extent against minor misuses such as putting it in a
-> context where the compiler will emit mov-a-reg-with-WP-set-to-CR0;
-> ret.
-
-i don't understand what's there to audit. if you want to treat a given piece
-of data as __read_only then you have no choice but to allow writes to it via
-the open/close mechanism and the compiler can tell you just where those
-writes are (and even do the instrumentation when you get tired of doing it
-by hand).
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index 09becec..747d0e3 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -44,7 +44,9 @@
+ /*
+  * FSI slave engine control register offsets
+  */
+-#define FSI_SMODE			0x0	/* R/W: Mode register */
++#define FSI_SMODE		0x0	/* R/W: Mode register */
++#define FSI_SISC		0x8	/* R/W: Interrupt condition */
++#define FSI_SSTAT		0x14	/* R  : Slave status */
+ 
+ /*
+  * SMODE fields
+@@ -75,10 +77,14 @@ struct fsi_slave {
+ #define to_fsi_master(d) container_of(d, struct fsi_master, dev)
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ 
++static const int slave_retries = 2;
++static int discard_errors;
++
+ static int fsi_master_read(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, void *val, size_t size);
+ static int fsi_master_write(struct fsi_master *master, int link,
+ 		uint8_t slave_id, uint32_t addr, const void *val, size_t size);
++static int fsi_master_break(struct fsi_master *master, int link);
+ 
+ /* FSI endpoint-device support */
+ 
+@@ -180,32 +186,131 @@ static int fsi_slave_calc_addr(struct fsi_slave *slave, uint32_t *addrp,
+ 	return 0;
+ }
+ 
++int fsi_slave_report_and_clear_errors(struct fsi_slave *slave)
++{
++	struct fsi_master *master = slave->master;
++	uint32_t irq, stat;
++	int rc, link;
++	uint8_t id;
++
++	link = slave->link;
++	id = slave->id;
++
++	rc = fsi_master_read(master, link, id, FSI_SLAVE_BASE + FSI_SISC,
++			&irq, sizeof(irq));
++	if (rc)
++		return rc;
++
++	rc =  fsi_master_read(master, link, id, FSI_SLAVE_BASE + FSI_SSTAT,
++			&stat, sizeof(stat));
++	if (rc)
++		return rc;
++
++	dev_info(&slave->dev, "status: 0x%08x, sisc: 0x%08x\n",
++			be32_to_cpu(stat), be32_to_cpu(irq));
++
++	/* clear interrupts */
++	return fsi_master_write(master, link, id, FSI_SLAVE_BASE + FSI_SISC,
++			&irq, sizeof(irq));
++}
++
++static int fsi_slave_set_smode(struct fsi_master *master, int link, int id);
++
++int fsi_slave_handle_error(struct fsi_slave *slave, bool write, uint32_t addr,
++		size_t size)
++{
++	struct fsi_master *master = slave->master;
++	int rc, link;
++	uint32_t reg;
++	uint8_t id;
++
++	if (discard_errors)
++		return -1;
++
++	link = slave->link;
++	id = slave->id;
++
++	dev_dbg(&slave->dev, "handling error on %s to 0x%08x[%zd]",
++			write ? "write" : "read", addr, size);
++
++	/* try a simple clear of error conditions, which may fail if we've lost
++	 * communication with the slave
++	 */
++	rc = fsi_slave_report_and_clear_errors(slave);
++	if (!rc)
++		return 0;
++
++	/* send a TERM and retry */
++	if (master->term) {
++		rc = master->term(master, link, id);
++		if (!rc) {
++			rc = fsi_master_read(master, link, id, 0,
++					&reg, sizeof(reg));
++			if (!rc)
++				rc = fsi_slave_report_and_clear_errors(slave);
++			if (!rc)
++				return 0;
++		}
++	}
++
++	/* getting serious, reset the slave via BREAK */
++	rc = fsi_master_break(master, link);
++	if (rc)
++		return rc;
++
++	rc = fsi_slave_set_smode(master, link, id);
++	if (rc)
++		return rc;
++
++	return fsi_slave_report_and_clear_errors(slave);
++}
++
+ int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			void *val, size_t size)
+ {
+ 	uint8_t id = slave->id;
+-	int rc;
++	int rc, err_rc, i;
+ 
+ 	rc = fsi_slave_calc_addr(slave, &addr, &id);
+ 	if (rc)
+ 		return rc;
+ 
+-	return fsi_master_read(slave->master, slave->link, id,
+-			addr, val, size);
++	for (i = 0; i < slave_retries; i++) {
++		rc = fsi_master_read(slave->master, slave->link,
++				id, addr, val, size);
++		if (!rc)
++			break;
++
++		err_rc = fsi_slave_handle_error(slave, false, addr, size);
++		if (err_rc)
++			break;
++	}
++
++	return rc;
+ }
+ 
+ int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
+ 			const void *val, size_t size)
+ {
+ 	uint8_t id = slave->id;
+-	int rc;
++	int rc, err_rc, i;
+ 
+ 	rc = fsi_slave_calc_addr(slave, &addr, &id);
+ 	if (rc)
+ 		return rc;
+ 
+-	return fsi_master_write(slave->master, slave->link, id,
+-			addr, val, size);
++	for (i = 0; i < slave_retries; i++) {
++		rc = fsi_master_write(slave->master, slave->link,
++				id, addr, val, size);
++		if (!rc)
++			break;
++
++		err_rc = fsi_slave_handle_error(slave, true, addr, size);
++		if (err_rc)
++			break;
++	}
++
++	return rc;
+ }
+ 
+ extern int fsi_slave_claim_range(struct fsi_slave *slave,
+@@ -765,3 +870,5 @@ static void fsi_exit(void)
+ 
+ module_init(fsi_init);
+ module_exit(fsi_exit);
++module_param(discard_errors, int, 0664);
++MODULE_PARM_DESC(discard_errors, "Don't invoke error handling on bus accesses");
+-- 
+1.8.2.2
