@@ -1,170 +1,52 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 10 Apr 2017 16:51:02 +0530
-Subject: [PATCH V11 07/11] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
-References: <1491823266-1209-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1491823266-1209-8-git-send-email-sricharan@codeaurora.org>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Mon, 10 Apr 2017 14:23:59 +0300
+Subject: [PATCH 12/14] usb: dwc2: simplify optional reset handling
+In-Reply-To: <1491820616.3087.34.camel@pengutronix.de>
+References: <20170130114116.22089-1-p.zabel@pengutronix.de>
+ <20170130114116.22089-12-p.zabel@pengutronix.de>
+ <87o9w4ef6l.fsf@linux.intel.com> <1491820616.3087.34.camel@pengutronix.de>
+Message-ID: <87lgr8eca8.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Failures to look up an IOMMU when parsing the DT iommus property need to
-be handled separately from the .of_xlate() failures to support deferred
-probing.
+Hi,
 
-The lack of a registered IOMMU can be caused by the lack of a driver for
-the IOMMU, the IOMMU device probe not having been performed yet, having
-been deferred, or having failed.
+Philipp Zabel <p.zabel@pengutronix.de> writes:
+>> Philipp Zabel <p.zabel@pengutronix.de> writes:
+>> > As of commit bb475230b8e5 ("reset: make optional functions really
+>> > optional"), the reset framework API calls use NULL pointers to describe
+>> > optional, non-present reset controls.
+>> >
+>> > This allows to return errors from devm_reset_control_get_optional and to
+>> > call reset_control_(de)assert unconditionally.
+>> >
+>> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> > Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> > Cc: John Youn <johnyoun@synopsys.com>
+>> > Cc: Felipe Balbi <felipe.balbi@linux.intel.com>
+>> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> 
+>> doesn't apply to testing/next. Care to rebase and resend?
+>
+> v2 is already applied as commit 5a6e4f46abd5 ("usb: dwc2: simplify
+> optional reset handling"), as far as I can tell.
 
-The first case occurs when the device tree describes the bus master and
-IOMMU topology correctly but no device driver exists for the IOMMU yet
-or the device driver has not been compiled in. Return NULL, the caller
-will configure the device without an IOMMU.
+indeed, heh :-)
 
-The second and third cases are handled by deferring the probe of the bus
-master device which will eventually get reprobed after the IOMMU.
+>> Also, please Cc linux-usb ;-)
+>
+> I messed up the Cc: list on the first submission, but v2 should have
+> made it to linux-usb.
 
-The last case is currently handled by deferring the probe of the bus
-master device as well. A mechanism to either configure the bus master
-device without an IOMMU or to fail the bus master device probe depending
-on whether the IOMMU is optional or mandatory would be a good
-enhancement.
+cool, thanks
 
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
-
- [V11] Small change to return non-void value in one of returns
-       in of_dma_configure, as a result of dropping patch #3 from
-       previous V10. No functional impact.
-
- drivers/base/dma-mapping.c | 5 +++--
- drivers/iommu/of_iommu.c   | 4 ++--
- drivers/of/device.c        | 9 +++++++--
- include/linux/of_device.h  | 9 ++++++---
- 4 files changed, 18 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index 449b948..82bd45c 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -353,6 +353,7 @@ int dma_configure(struct device *dev)
- {
- 	struct device *bridge = NULL, *dma_dev = dev;
- 	enum dev_dma_attr attr;
-+	int ret = 0;
- 
- 	if (dev_is_pci(dev)) {
- 		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
-@@ -363,7 +364,7 @@ int dma_configure(struct device *dev)
- 	}
- 
- 	if (dma_dev->of_node) {
--		of_dma_configure(dev, dma_dev->of_node);
-+		ret = of_dma_configure(dev, dma_dev->of_node);
- 	} else if (has_acpi_companion(dma_dev)) {
- 		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
- 		if (attr != DEV_DMA_NOT_SUPPORTED)
-@@ -373,7 +374,7 @@ int dma_configure(struct device *dev)
- 	if (bridge)
- 		pci_put_host_bridge_device(bridge);
- 
--	return 0;
-+	return ret;
- }
- 
- void dma_deconfigure(struct device *dev)
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index c8be889..9f44ee8 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -236,7 +236,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 			ops = ERR_PTR(err);
- 	}
- 
--	return IS_ERR(ops) ? NULL : ops;
-+	return ops;
- }
- 
- static int __init of_iommu_init(void)
-@@ -247,7 +247,7 @@ static int __init of_iommu_init(void)
- 	for_each_matching_node_and_match(np, matches, &match) {
- 		const of_iommu_init_fn init_fn = match->data;
- 
--		if (init_fn(np))
-+		if (init_fn && init_fn(np))
- 			pr_err("Failed to initialise IOMMU %s\n",
- 				of_node_full_name(np));
- 	}
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index e1ae9e7..8bd3d8c 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
-  * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
-  * to fix up DMA configuration.
-  */
--void of_dma_configure(struct device *dev, struct device_node *np)
-+int of_dma_configure(struct device *dev, struct device_node *np)
- {
- 	u64 dma_addr, paddr, size;
- 	int ret;
-@@ -123,7 +123,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 
- 		if (!size) {
- 			dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
--			return;
-+			return -EINVAL;
- 		}
- 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
- 	}
-@@ -144,10 +144,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 		coherent ? " " : " not ");
- 
- 	iommu = of_iommu_configure(dev, np);
-+	if (IS_ERR(iommu))
-+		return PTR_ERR(iommu);
-+
- 	dev_dbg(dev, "device is%sbehind an iommu\n",
- 		iommu ? " " : " not ");
- 
- 	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
-+
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(of_dma_configure);
- 
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index af98455..2cacdd8 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -55,7 +55,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- 	return of_node_get(cpu_dev->of_node);
- }
- 
--void of_dma_configure(struct device *dev, struct device_node *np);
-+int of_dma_configure(struct device *dev, struct device_node *np);
- void of_dma_deconfigure(struct device *dev);
- #else /* CONFIG_OF */
- 
-@@ -104,8 +104,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
- {
- 	return NULL;
- }
--static inline void of_dma_configure(struct device *dev, struct device_node *np)
--{}
-+
-+static inline int of_dma_configure(struct device *dev, struct device_node *np)
-+{
-+	return 0;
-+}
- static inline void of_dma_deconfigure(struct device *dev)
- {}
- #endif /* CONFIG_OF */
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170410/f4024ef7/attachment.sig>
