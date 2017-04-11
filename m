@@ -1,36 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Apr 2017 17:29:49 +0100
-Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.12
-In-Reply-To: <CAJKOXPc7D_1xaJDG+W4JJ5YxRVJ868RU-Vmbh_r4J0g0Qjufdw@mail.gmail.com>
-References: <20170408142050.1164-1-krzk@kernel.org>
- <20170408142050.1164-2-krzk@kernel.org>
- <20170411140816.3al2ge7zsskswmaq@dell>
- <CAJKOXPc7D_1xaJDG+W4JJ5YxRVJ868RU-Vmbh_r4J0g0Qjufdw@mail.gmail.com>
-Message-ID: <20170411162949.gcta3czjlmojnqzt@dell>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Apr 2017 17:33:11 +0100
+Subject: [PATCH 0/2] arm64: acpi/pci: allow the firmware BAR configuration to
+ be preserved
+Message-ID: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Apr 2017, Krzysztof Kozlowski wrote:
+This is a followup to the discussion regarding whether ACPI/arm64 systems
+should preserve the PCI configuration performed by the firmware, or always
+reconfigure it from scratch.
 
-> On Tue, Apr 11, 2017 at 4:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Sat, 08 Apr 2017, Krzysztof Kozlowski wrote:
-> >
-> >> Hi,
-> >>
-> >> Update for v4.12. Marek's commits were also shared (as separate sub-tag) to MFD
-> >> (Lee Jones) for his work (it is a dependency).
-> >
-> > I already pulled Marek's patches into MFD.
-> >
-> > What are Charles' patches for?
-> 
-> This is a pull request for Linus Walleij, not for you. As you said,
-> you already have all necessary dependencies for MFD.
+This series proposes to put it under the control of the firmware, by invoking
+the _DSM method, and preserving the firmware configuration only when it
+returns 0.
 
-Okay, so no need to sent it to me then, right? =;-)
+Patch #1 is a preparatory bugfix that solves the issue that I/O bridge
+windows starting at 0x0 are dismissed when looking for parent resources.
+
+Patch #2 adds the logic to invoke the _DSM and claim the existing
+configuration rather than reallocate it from scratch if it returns '0'
+
+Ard Biesheuvel (2):
+  drivers: pci: do not disregard parent resources starting at 0x0
+  arm64: acpi/pci: invoke _DSM whether to preserve firmware PCI setup
+
+ arch/arm64/kernel/pci.c  | 20 ++++++++++++++++++--
+ drivers/pci/pci.c        |  2 +-
+ include/linux/pci-acpi.h |  7 ++++---
+ 3 files changed, 23 insertions(+), 6 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.3
