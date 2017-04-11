@@ -1,24 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Apr 2017 16:45:57 +0100
-Subject: [PATCHv3 00/14] arm_pmu: ACPI support
-In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170411154557.GD17109@arm.com>
+From: olivier.moysan@st.com (olivier moysan)
+Date: Tue, 11 Apr 2017 17:47:24 +0200
+Subject: [PATCH v4 0/2] Add STM32 SAI support
+Message-ID: <1491925646-29113-1-git-send-email-olivier.moysan@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 09:39:43AM +0100, Mark Rutland wrote:
-> This series implements ACPI support in the ARM PMU code. It borrows some code
-> from Jeremy's series [1], but takes a different approach to probing and
-> association, using the usual hotplug state machine, minimising external changes
-> required, and simplifying the relationship with the common arm_pmu code.
-> 
-> The first few patches are preparatory cleanup/refactoring, with the latter half
-> of the series being specific to ACPI support.
-> 
-> The series is based on Will's perf/updates branch [2]. I've pushed the whole
-> series out to the arm/perf/acpi branch [3] of my kernel.org repo.
+This patch-set handles the Serial Audio Interface (SAI) IP on STM32 platforms.
 
-Thanks, I've queued this up so it should appear in linux-next shortly.
+The SAI IP is composed of two Sub-block A and B. (see the figure below)
+Each sub-block makes use of individual and shared resources.
 
-Will
+Shared resources:
+	- Reset line. Reset common and sub-block registers.
+	- Bus interface clocks. This clock is not exposed in device
+	as it it managed by clock driver, according to kernel clocks gating.
+	- Common register. SAI IP exhibits a common configuration register
+	to manage synchronization modes. NB: These modes are not yet implemented
+	in this version of the SAI driver.
+	- Interrupt. Sub-blocks have their own interrupt status registers but they 
+	share the same interrupt line.
+
+Individual resources:
+	- Register set
+	- DMA request line.
+	- Communication interface. 
+	Each sub-block has its own GPIOs and associated bus lines.
+	- Kernel clock. 
+	Each sub-block has its own dedicated clock for its communication interface.
+
+To reflect this architecture Sub-block A and B are handled by 2 child devices.
+Sub-block A and B devices can be configured independently either as transmitter
+or receiver. A PCM device is associated to each sub-block.
+
+A sub-block has to select the appropriated parent clock at runtime, 
+depending on the audio stream sampling rate to be played or captured.
+Two parent clocks must be provided to support sampling rates multiples
+of 8 kHz or 11.025kHz.
+
+ Interface clock  +--------------------------------+
++---------------> | SAI IP                         |
+ Reset            |     +-----------------+        |
++---------------> |     |common registers |        |
+                  |     +-----------------+        |
+                  |                                |
+                  |    +----------------------+    |
+                  |    | Sub-block A          |    |
+ Kernel clock A   |    |                      |    | Bus A
++--------------------> | +----------------+   +---------------->
+                  |    | |A registers     |   |    |
+                  |    | +----------------+   |    |
+                  |    +----------------------+    |
+                  |                                |
+                  |    +----------------------+    |
+                  |    | Sub-block B          |    |
+ Kernel clock B   |    |                      |    | Bus B
++--------------------> | +----------------+   +----------------->
+                  |    | |B registers     |   |    |
+                  |    | +----------------+   |    |
+                  |    +----------------------+    |
+                  |                                |
+                  +--------------------------------+
+
+v3 -> v4
+	Apply minor changes from Peter review
+
+olivier moysan (2):
+  ASoC: stm32: add bindings for SAI
+  ASoC: stm32: add SAI driver
+
+ .../devicetree/bindings/sound/st,stm32-sai.txt     |  89 +++
+ sound/soc/Kconfig                                  |   1 +
+ sound/soc/Makefile                                 |   1 +
+ sound/soc/stm/Kconfig                              |   8 +
+ sound/soc/stm/Makefile                             |   6 +
+ sound/soc/stm/stm32_sai.c                          | 115 +++
+ sound/soc/stm/stm32_sai.h                          | 199 +++++
+ sound/soc/stm/stm32_sai_sub.c                      | 881 +++++++++++++++++++++
+ 8 files changed, 1300 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+ create mode 100644 sound/soc/stm/Kconfig
+ create mode 100644 sound/soc/stm/Makefile
+ create mode 100644 sound/soc/stm/stm32_sai.c
+ create mode 100644 sound/soc/stm/stm32_sai.h
+ create mode 100644 sound/soc/stm/stm32_sai_sub.c
+
+-- 
+1.9.1
