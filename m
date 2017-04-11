@@ -1,41 +1,95 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 11 Apr 2017 11:51:24 +0200
-Subject: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
- (fwd)
-In-Reply-To: <alpine.DEB.2.20.1704111121510.3384@hadrien>
-References: <CGME20170403060045epcas2p215a1d85248b47cc389e20ff877505b09@epcas2p2.samsung.com>
- <alpine.DEB.2.20.1704030758540.2170@hadrien>
- <1491200242.24095.23.camel@smitha-fedora>
- <8fc9940e-3cb5-3ca7-f15d-0bf6284433a5@samsung.com>
- <alpine.DEB.2.20.1704111121510.3384@hadrien>
-Message-ID: <f02dd788-af84-b64e-0ebc-fe9fd6f5e671@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 11 Apr 2017 11:53:11 +0200
+Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
+ functions
+In-Reply-To: <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
+References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
+ <20170410163558.494cf9be@bbrezillon>
+ <ba255c5b-ff6e-a6fd-0546-9dde04026f4c@microchip.com>
+ <20170411105605.5ea65f75@bbrezillon>
+ <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
+Message-ID: <20170411115311.70a7239b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2017 11:23 AM, Julia Lawall wrote:
-> On Tue, 11 Apr 2017, Sylwester Nawrocki wrote:
->> Hi,
->>
->> On 04/03/2017 08:17 AM, Smitha T Murthy wrote:
->>> On Mon, 2017-04-03 at 08:00 +0200, Julia Lawall wrote:
->>>> See line 2101
->>>>
->>>> julia
->>>>
->>> Thank you for bringing it to my notice, I had not checked on this git.
->>> I will upload the next version of patches soon corresponding to this
->>> git.
->> In general please use the media master branch as a base for your patches
->> (git://linuxtv.org/media_tree.git master). Or latest branch in my
->> git repository, currently it's "for-v4.12/media/next-2" as can be seen
->> here: https://git.linuxtv.org/snawrocki/samsung.git
- >
-> I'm not making the patch.  It comes to me from kbuild.  If you would
-> prefer some tree not to be included, you can notify Fengguang about this:
+On Tue, 11 Apr 2017 12:41:59 +0300
+m18063 <Claudiu.Beznea@microchip.com> wrote:
 
-Oops, my message was addressed to Smitha only, apologies for the confusion.
-kbuild works fine. Thank you for your efforts.
+> On 11.04.2017 11:56, Boris Brezillon wrote:
+> > On Tue, 11 Apr 2017 11:22:39 +0300
+> > m18063 <Claudiu.Beznea@microchip.com> wrote:
+> >   
+> >> Hi Boris,
+> >>
+> >> On 10.04.2017 17:35, Boris Brezillon wrote:  
+> >>> On Mon, 10 Apr 2017 17:20:20 +0300
+> >>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+> >>>     
+> >>>> Implement suspend and resume power management specific
+> >>>> function to allow PWM controller to correctly suspend
+> >>>> and resume.
+> >>>>
+> >>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> >>>> ---
+> >>>>  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >>>>  1 file changed, 81 insertions(+)
+> >>>>
+> >>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> >>>> index 530d7dc..75177c6 100644
+> >>>> --- a/drivers/pwm/pwm-atmel.c
+> >>>> +++ b/drivers/pwm/pwm-atmel.c
+> >>>> @@ -58,6 +58,8 @@
+> >>>>  #define PWM_MAX_PRD		0xFFFF
+> >>>>  #define PRD_MAX_PRES		10
+> >>>>  
+> >>>> +#define PWM_MAX_CH_NUM		(4)
+> >>>> +
+> >>>>  struct atmel_pwm_registers {
+> >>>>  	u8 period;
+> >>>>  	u8 period_upd;
+> >>>> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
+> >>>>  	u8 duty_upd;
+> >>>>  };
+> >>>>  
+> >>>> +struct atmel_pwm_pm_ctx {
+> >>>> +	u32 cmr;
+> >>>> +	u32 cdty;
+> >>>> +	u32 cprd;
+> >>>> +};
+> >>>> +
+> >>>>  struct atmel_pwm_chip {
+> >>>>  	struct pwm_chip chip;
+> >>>>  	struct clk *clk;
+> >>>>  	void __iomem *base;
+> >>>>  	const struct atmel_pwm_registers *regs;
+> >>>> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];    
+> >>>
+> >>> Hm, I'm pretty sure you can rely on the current PWM state and call
+> >>> atmel_pwm_apply() at resume time instead of doing that. See what I did
+> >>> here [1].    
+> >>
+> >> I agree with the approach you propose but the thing is the atmel_pwm_apply()
+> >> take care of both, current PWM state and the new state received as argument
+> >> in order to change only duty factor without disabling the PWM channel (if
+> >> channel is enabled) and then returns. Changing PWM duty and period and polarity
+> >> in the same step without disabling + enabling the PWM channel (with atomic
+> >> approach) may lead to intermediary unwanted output waveforms (the IP doesn't
+> >> support this for ordinary PWM channels). To take advantage of atmel_pwm_apply()
+> >> (in the formit is today) in resume() hook might need to first call it to disable
+> >> channel and then to enable it. Or atmel_pwm_apply() should be changed to also
+> >> disable + enable the channel when user changes the duty factor at runtime.  
+> > 
+> > Nope. Just save the state at suspend time, implement ->get_state() and
+> > use it to retrieve the real PWM state when resuming before restoring
+> > the state you saved during suspend.  
+> Ok.
+> > But anyway, as Thierry explained, I'm not sure we should take the
+> > 're-apply PWM state' action here. It's probably better to leave this
+> > decision to the PWM user.   
+> Do you thinks we should proceed with restoring the registers behind
+> the re-apply as other drivers does at this moment?
 
--- 
-Regards,
-Sylwester
+Nope. IMO we'd better start patching PWM users to restore the states
+rather than supporting suspend/resume in all PWM drivers.
+
+Thierry, what's your opinion?
