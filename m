@@ -1,211 +1,151 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 12 Apr 2017 12:03:29 +0800
-Subject: [RFC PATCH 3/3] cpufreq: imx6q: refine clk operations
-In-Reply-To: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
-References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1491969809-20154-4-git-send-email-aisheng.dong@nxp.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 11 Apr 2017 13:28:40 +0100
+Subject: [PATCH v3 00/32] PCI: fix config and I/O Address space memory mappings
+Message-ID: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use clk_bulk_get to ease the driver clocks handling.
+This patch series[1] is a v3 of a previous version:
 
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: Robin Gong <yibin.gong@nxp.com>
-Cc: Bai Ping <ping.bai@nxp.com>
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: Octavian Purdila <octavian.purdila@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/cpufreq/imx6q-cpufreq.c | 119 ++++++++++++++++++----------------------
- 1 file changed, 53 insertions(+), 66 deletions(-)
+v2: https://lkml.org/lkml/2017/3/27/220
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index 7719b02..6158910 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -24,15 +24,29 @@ static struct regulator *arm_reg;
- static struct regulator *pu_reg;
- static struct regulator *soc_reg;
- 
--static struct clk *arm_clk;
--static struct clk *pll1_sys_clk;
--static struct clk *pll1_sw_clk;
--static struct clk *step_clk;
--static struct clk *pll2_pfd2_396m_clk;
--
--/* clk used by i.MX6UL */
--static struct clk *pll2_bus_clk;
--static struct clk *secondary_sel_clk;
-+enum IMX6_CPUFREQ_CLKS {
-+	ARM,
-+	PLL1_SYS,
-+	STEP,
-+	PLL1_SW,
-+	PLL2_PFD2_396M,
-+	/* MX6UL requires two more clks */
-+	PLL2_BUS,
-+	SECONDARY_SEL,
-+};
-+#define IMX6Q_CPUFREQ_CLK_NUM		5
-+#define IMX6UL_CPUFREQ_CLK_NUM		7
-+
-+static int num_clks;
-+static struct clk_bulk_data clks[] = {
-+	{ .id = "arm" },
-+	{ .id = "pll1_sys" },
-+	{ .id = "step" },
-+	{ .id = "pll1_sw" },
-+	{ .id = "pll2_pfd2_396m" },
-+	{ .id = "pll2_bus" },
-+	{ .id = "secondary_sel" },
-+};
- 
- static struct device *cpu_dev;
- static bool free_opp;
-@@ -51,7 +65,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 
- 	new_freq = freq_table[index].frequency;
- 	freq_hz = new_freq * 1000;
--	old_freq = clk_get_rate(arm_clk) / 1000;
-+	old_freq = clk_get_rate(clks[ARM].clk) / 1000;
- 
- 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
- 	if (IS_ERR(opp)) {
-@@ -109,25 +123,27 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		 * voltage of 528MHz, so lower the CPU frequency to one
- 		 * half before changing CPU frequency.
- 		 */
--		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
--		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
--			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
-+		clk_set_rate(clks[ARM].clk, (old_freq >> 1) * 1000);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
-+		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk))
-+			clk_set_parent(clks[SECONDARY_SEL].clk,
-+				       clks[PLL2_BUS].clk);
- 		else
--			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(step_clk, secondary_sel_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
-+			clk_set_parent(clks[SECONDARY_SEL].clk,
-+				       clks[PLL2_PFD2_396M].clk);
-+		clk_set_parent(clks[STEP].clk, clks[SECONDARY_SEL].clk);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
- 	} else {
--		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
--		clk_set_parent(pll1_sw_clk, step_clk);
--		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk)) {
--			clk_set_rate(pll1_sys_clk, new_freq * 1000);
--			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-+		clk_set_parent(clks[STEP].clk, clks[PLL2_PFD2_396M].clk);
-+		clk_set_parent(clks[PLL1_SW].clk, clks[STEP].clk);
-+		if (freq_hz > clk_get_rate(clks[PLL2_PFD2_396M].clk)) {
-+			clk_set_rate(clks[PLL1_SYS].clk, new_freq * 1000);
-+			clk_set_parent(clks[PLL1_SW].clk, clks[PLL1_SYS].clk);
- 		}
- 	}
- 
- 	/* Ensure the arm clock divider is what we expect */
--	ret = clk_set_rate(arm_clk, new_freq * 1000);
-+	ret = clk_set_rate(clks[ARM].clk, new_freq * 1000);
- 	if (ret) {
- 		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
- 		regulator_set_voltage_tol(arm_reg, volt_old, 0);
-@@ -161,7 +177,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 
- static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
- {
--	policy->clk = arm_clk;
-+	policy->clk = clks[ARM].clk;
- 	return cpufreq_generic_init(policy, freq_table, transition_latency);
- }
- 
-@@ -197,27 +213,14 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		return -ENOENT;
- 	}
- 
--	arm_clk = clk_get(cpu_dev, "arm");
--	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
--	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
--	step_clk = clk_get(cpu_dev, "step");
--	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
--	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
--	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
--		dev_err(cpu_dev, "failed to get clocks\n");
--		ret = -ENOENT;
--		goto put_clk;
--	}
-+	if (of_machine_is_compatible("fsl,imx6ul"))
-+		num_clks = IMX6UL_CPUFREQ_CLK_NUM;
-+	else
-+		num_clks = IMX6Q_CPUFREQ_CLK_NUM;
- 
--	if (of_machine_is_compatible("fsl,imx6ul")) {
--		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
--		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
--		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
--			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
--			ret = -ENOENT;
--			goto put_clk;
--		}
--	}
-+	ret = clk_bulk_get(cpu_dev, num_clks, clks);
-+	if (ret)
-+		goto put_node;
- 
- 	arm_reg = regulator_get(cpu_dev, "arm");
- 	pu_reg = regulator_get_optional(cpu_dev, "pu");
-@@ -354,22 +357,11 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 		regulator_put(pu_reg);
- 	if (!IS_ERR(soc_reg))
- 		regulator_put(soc_reg);
--put_clk:
--	if (!IS_ERR(arm_clk))
--		clk_put(arm_clk);
--	if (!IS_ERR(pll1_sys_clk))
--		clk_put(pll1_sys_clk);
--	if (!IS_ERR(pll1_sw_clk))
--		clk_put(pll1_sw_clk);
--	if (!IS_ERR(step_clk))
--		clk_put(step_clk);
--	if (!IS_ERR(pll2_pfd2_396m_clk))
--		clk_put(pll2_pfd2_396m_clk);
--	if (!IS_ERR(pll2_bus_clk))
--		clk_put(pll2_bus_clk);
--	if (!IS_ERR(secondary_sel_clk))
--		clk_put(secondary_sel_clk);
-+
-+	clk_bulk_put(num_clks, clks);
-+put_node:
- 	of_node_put(np);
-+
- 	return ret;
- }
- 
-@@ -383,13 +375,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
- 	if (!IS_ERR(pu_reg))
- 		regulator_put(pu_reg);
- 	regulator_put(soc_reg);
--	clk_put(arm_clk);
--	clk_put(pll1_sys_clk);
--	clk_put(pll1_sw_clk);
--	clk_put(step_clk);
--	clk_put(pll2_pfd2_396m_clk);
--	clk_put(pll2_bus_clk);
--	clk_put(secondary_sel_clk);
-+
-+	clk_bulk_put(num_clks, clks);
- 
- 	return 0;
- }
+v2 -> v3:
+	- Created a default ioremap_nopost() implementation in a separate
+	  asm-generic header and patched all arches to make use of it
+	- Removed PCI drivers patches from the series to simplify the
+	  review, they will be posted separately once the ioremap_nopost()
+	  interface is settled
+	- Fixed devm_ioremap_* BUS offset comments and implemented
+	  nopost interface on top of it
+	- Added collected tags
+
+v1: https://lkml.org/lkml/2017/2/27/228
+
+v1 -> v2:
+	- Changed pci_remap_cfgspace() to more generic ioremap_nopost()
+	  interface
+	- Added pgprot_nonposted
+	- Fixed build errors on arches not relying on asm-generic headers
+	- Added PCI versatile host controller driver patch
+	- Added missing config space remapping to hisilicon host controller
+
+---------------------
+Original cover letter
+---------------------
+
+PCI local bus specifications (Rev3.0, 3.2.5 "Transaction Ordering
+and Posting") strictly require PCI configuration and I/O Address space
+write transactions to be non-posted.
+
+Current crop of DT/ACPI PCI host controllers drivers relies on
+the ioremap interface to map ECAM and ECAM-derivative PCI config
+regions and pci_remap_iospace() to create a VMA for mapping
+PCI host bridge I/O Address space transactions to CPU virtual address
+space.
+
+On some platforms (ie ARM/ARM64) ioremap fails to comply with the PCI
+configuration non-posted write transactions requirement, because it
+provides a memory mapping that issues "bufferable" or, in PCI terms
+"posted" write transactions. Likewise, the current pci_remap_iospace()
+implementation maps the physical address range that the PCI translates
+to I/O space cycles to virtual address space through pgprot_device()
+attributes that on eg ARM64 provides a memory mapping issuing
+posted writes transactions, which is not PCI specifications compliant.
+
+This patch series[1] addresses both issues in one go:
+
+- It updates the pci_remap_iospace() function to use a page mapping
+  that guarantees non-posted write transactions for I/O space addresses
+- It adds a kernel API to remap PCI config space resources, so that
+  architecture can override it with a mapping implementation that
+  guarantees PCI specifications compliancy wrt non-posted write
+  configuration transactions
+- It updates all PCI host controller implementations (and the generic
+  ECAM layer) to use the newly introduced mapping interface
+
+Tested on Juno ECAM based interface (DT/ACPI).
+
+Non-ECAM PCI host controller drivers patches need checking to make
+sure that:
+
+- I patched the correct resource region mapping for config space
+- There are not any other ways to ensure posted-write completion
+  in the respective pci_ops that make the relevant patch unnecessary
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git
+pci/config-io-mappings-fix-v3
+
+Lorenzo Pieralisi (32):
+  PCI: remove __weak tag from pci_remap_iospace()
+  asm-generic/pgtable.h: introduce pgprot_nonposted remap attribute
+  PCI: fix pci_remap_iospace() remap attribute
+  asm-generic: add ioremap_nopost() remap interface
+  alpha: include default ioremap_nopost() implementation
+  avr32: include default ioremap_nopost() implementation
+  arc: include default ioremap_nopost() implementation
+  cris: include default ioremap_nopost() implementation
+  frv: include default ioremap_nopost() implementation
+  hexagon: include default ioremap_nopost() implementation
+  ia64: include default ioremap_nopost() implementation
+  m32r: include default ioremap_nopost() implementation
+  m68k: include default ioremap_nopost() implementation
+  metag: include default ioremap_nopost() implementation
+  microblaze: include default ioremap_nopost() implementation
+  mips: include default ioremap_nopost() implementation
+  mn10300: include default ioremap_nopost() implementation
+  nios2: include default ioremap_nopost() implementation
+  openrisc: include default ioremap_nopost() implementation
+  parisc: include default ioremap_nopost() implementation
+  powerpc: include default ioremap_nopost() implementation
+  s390: include default ioremap_nopost() implementation
+  sh: include default ioremap_nopost() implementation
+  sparc: include default ioremap_nopost() implementation
+  tile: include default ioremap_nopost() implementation
+  unicore32: include default ioremap_nopost() implementation
+  x86: include default ioremap_nopost() implementation
+  xtensa: include default ioremap_nopost() implementation
+  arm64: implement ioremap_nopost() interface
+  arm: implement ioremap_nopost() interface
+  lib: fix Devres devm_ioremap_* offset parameter kerneldoc description
+  lib: implement Devres ioremap_nopost() interface
+
+ Documentation/driver-model/devres.txt |  3 ++
+ arch/alpha/include/asm/io.h           |  1 +
+ arch/arc/include/asm/io.h             |  1 +
+ arch/arm/include/asm/io.h             |  9 ++++
+ arch/arm/mm/ioremap.c                 |  7 +++
+ arch/arm/mm/nommu.c                   |  9 ++++
+ arch/arm64/include/asm/io.h           | 12 +++++
+ arch/avr32/include/asm/io.h           |  1 +
+ arch/cris/include/asm/io.h            |  1 +
+ arch/frv/include/asm/io.h             |  1 +
+ arch/hexagon/include/asm/io.h         |  2 +
+ arch/ia64/include/asm/io.h            |  1 +
+ arch/m32r/include/asm/io.h            |  1 +
+ arch/m68k/include/asm/io.h            |  1 +
+ arch/metag/include/asm/io.h           |  2 +
+ arch/microblaze/include/asm/io.h      |  1 +
+ arch/mips/include/asm/io.h            |  1 +
+ arch/mn10300/include/asm/io.h         |  1 +
+ arch/nios2/include/asm/io.h           |  1 +
+ arch/openrisc/include/asm/io.h        |  2 +
+ arch/parisc/include/asm/io.h          |  1 +
+ arch/powerpc/include/asm/io.h         |  1 +
+ arch/s390/include/asm/io.h            |  1 +
+ arch/sh/include/asm/io.h              |  1 +
+ arch/sparc/include/asm/io.h           |  1 +
+ arch/tile/include/asm/io.h            |  1 +
+ arch/unicore32/include/asm/io.h       |  1 +
+ arch/x86/include/asm/io.h             |  1 +
+ arch/xtensa/include/asm/io.h          |  1 +
+ drivers/pci/pci.c                     |  4 +-
+ include/asm-generic/ioremap-nopost.h  |  9 ++++
+ include/asm-generic/pgtable.h         |  4 ++
+ include/linux/device.h                |  2 +
+ include/linux/io.h                    |  2 +
+ lib/devres.c                          | 84 +++++++++++++++++++++++++++++++++--
+ 35 files changed, 167 insertions(+), 5 deletions(-)
+ create mode 100644 include/asm-generic/ioremap-nopost.h
+
 -- 
-2.7.4
+2.10.0
