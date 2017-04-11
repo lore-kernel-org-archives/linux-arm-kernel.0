@@ -1,65 +1,87 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Apr 2017 09:24:55 -0700
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <74c65472-cc1c-1ab9-7d27-65a164a6f025@ti.com>
-References: <20170323170210.GL10760@atomide.com>
- <8648f054-cf04-41df-20f3-82e0d63feefa@ti.com>
- <20170330165448.GF10760@atomide.com>
- <55b439ed-8b81-2e6b-64f1-34f9f3cc5369@ti.com>
- <20170403153604.GI10760@atomide.com>
- <b135c5d6-f06d-030d-333b-5223ef1aca9a@ti.com>
- <20170407164731.GJ13234@atomide.com>
- <6dd4c892-f0b5-f72e-c5e9-357cb8506f05@ti.com>
- <20170410161816.GD5339@atomide.com>
- <74c65472-cc1c-1ab9-7d27-65a164a6f025@ti.com>
-Message-ID: <20170411162455.GK5339@atomide.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Apr 2017 18:26:23 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+ <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+Message-ID: <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170410 11:36]:
-> On 10/04/17 19:18, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [170410 00:34]:
-> > > On 07/04/17 19:47, Tony Lindgren wrote:
-> > > > OK hdmi works now on panda for both omapfb and omapdrm. Any ideas why
-> > > > that change is now needed though?
-> > > 
-> > > Yes, it is pretty clear actually. Previously, the hwmod main clock was
-> > > controlling the hdmi clock, but this is now rerouted to the clkctrl module
-> > > clock, which is shared between all DSS submodules. This leaves the hdmi
-> > > clock disabled, causing the failure.
-> > > 
-> > > The fix just puts the hdmi clock into the optional clocks list, and forces
-> > > all the optional clocks on when pm_runtime is enabled for the module.
-> > 
-> > OK so no need to fix it in the current kernels then.
+On 11/04/2017 17:49, Marc Zyngier wrote:
+> On 11/04/17 16:13, Mason wrote:
+>> On 27/03/2017 19:09, Marc Zyngier wrote:
+>>
+>>> Here's what your system looks like:
+>>>
+>>> PCI-EP -------> MSI Controller ------> INTC
+>>>          MSI                    IRQ
+>>>
+>>> A PCI MSI is always edge. No ifs, no buts. That's what it is, and nothing
+>>> else. Now, your MSI controller signals its output using a level interrupt,
+>>> since you need to whack it on the head so that it lowers its line.
+>>>
+>>> There is not a single trigger, because there is not a single interrupt.
+>>
+>> Hello Marc,
+>>
+>> I was hoping you or Thomas might help clear some confusion
+>> in my mind around IRQ domains (struct irq_domain).
+>>
+>> I have read https://www.kernel.org/doc/Documentation/IRQ-domain.txt
+>>
+>> IIUC, there should be one IRQ domain per IRQ controller.
+>>
+>> I have this MSI controller handling 256 interrupts, so I should
+>> have *one* domain for all possible MSIs. Yet the Altera driver
+>> registers *two* domains (msi_domain and inner_domain).
+>>
+>> Could I make everything work with a single IRQ domain?
 > 
-> Yeah, just need to figure out a clean order of applying these patches. The
-> hwmod data change for DSS modules can most likely be applied before the dts
-> change for clkctrl is going in, as it is just causing double clk_enable /
-> disable for the main clocks in that case.
+> No, because you have two irqchips. One that deals with the HW, and the
+> other that deals with the MSIs how they are presented to the kernel,
+> depending on the bus (PCI or something else). The fact that it doesn't
+> really drive any HW doesn't make it irrelevant.
 
-Yeah no idea about the hwmod change needed for DSS.. Maybe patch it in
-only in the no "ti,hwmods" path?
+The example given in IRQ-domain.txt is
 
-For the rest, how about the following for getting things patched with
-a minimal patching needed to revert in case of regressions:
+  Device --> IOAPIC -> Interrupt remapping Controller -> Local APIC -> CPU
 
-1. Let's add the clkctrl driver and it's dts clocks. Let's tag the
-   new clkctrl clocks with status = "disabled" and not add the
-   consumers into any existing devices
+with an irq_domain for each interrupt controller.
 
-2. Let's modify the dts files to add the hwmod related items for the
-   wrapper IP module but let's keep things probing the old way using
-   compatible = "simple-bus" for now
 
-3. Let's add the wrapper IP driver and make sure it does nothing
-   except probe the children just like "simple-bus" currently does if
-   the child module has the "ti,hwmods" property set
+On my system I have:
 
-4. Then we can finally start flipping things over one module at a
-   time just by removing "ti,hwmods" for the child device and
-   status = "disabled" for the related module clock
+  PCI-EP -> MSI controller -> System INTC -> GIC -> CPU
 
-Regards,
+The driver for System INTC is drivers/irqchip/irq-tango.c
+I think it has only one domain.
 
-Tony
+For the GIC, drivers/irqchip/irq-gic.c
+I see a call to irq_domain_create_linear()
+
+Is the handling of MSI different, and that is why we need
+two domains? (Sorry, I did not understand that part well.)
+
+When I looked at drivers/pci/host/pci-hyperv.c
+they seem to have a single pci_msi_create_irq_domain call,
+no call to domain_add or domain_create.
+And they have a single struct irq_chip.
+
+> You don't need to tell it anything about the number of interrupts you
+> manage. As for your private structure, you've already given it to your
+> low level domain, and there is no need to propagate it any further.
+
+My main issue is that in the ack callback, I was in the "wrong"
+domain, in that d->hwirq was not the MSI number. So I thought
+I needed a single irq_domain.
+
+Is there a function to map virq to the hwirq in any domain?
+
+Regards.
