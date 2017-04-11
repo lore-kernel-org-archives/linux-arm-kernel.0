@@ -1,216 +1,249 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Tue, 11 Apr 2017 16:39:09 -0700 (PDT)
-Subject: "Consolidate get_dma_ops" breaks Xen on ARM
-In-Reply-To: <20170411133649.GB27857@e104818-lin.cambridge.arm.com>
-References: <alpine.DEB.2.10.1704101713080.2759@sstabellini-ThinkPad-X260>
- <CY1PR0401MB1536C1FF3C069BC88D1DB14581000@CY1PR0401MB1536.namprd04.prod.outlook.com>
- <a758dfc6-2b00-e279-303c-ba1e27380e35@arm.com>
- <20170411133649.GB27857@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 12 Apr 2017 09:12:51 +1000
+Subject: [PATCH v3 00/32] PCI: fix config and I/O Address space memory
+ mappings
+In-Reply-To: <20170411140857.GA6821@red-moon>
+References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
+ <1491917906.7236.7.camel@kernel.crashing.org>
+ <20170411140857.GA6821@red-moon>
+Message-ID: <1491952371.7236.22.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Apr 2017, Catalin Marinas wrote:
-> On Tue, Apr 11, 2017 at 01:43:28PM +0100, Julien Grall wrote:
-> > On 11/04/17 02:14, Bart Van Assche wrote:
-> > > On 04/10/17 17:31, Stefano Stabellini wrote:
-> > >> I think the reason is that, as you can see, if (dev && dev->dma_ops),
-> > >> dev->dma_ops is returned, while before this changes, xen_dma_ops was
-> > >> returned on Xen on ARM.
-> > >>
-> > >> Unfortunately DMA cannot work properly without using the appropriate
-> > >> xen_dma_ops. See drivers/xen/swiotlb-xen.c and arch/arm/xen/mm.c for
-> > >> more details. (The problem is easy to spot, but I wasn't CC'ed on the
-> > >> patch.)
-> > >>
-> > >> I don't know how to solve this problem without introducing some sort of
-> > >> if (xen()) in include/linux/dma-mapping.h.
+On Tue, 2017-04-11 at 15:08 +0100, Lorenzo Pieralisi wrote:
+> On Tue, Apr 11, 2017 at 11:38:26PM +1000, Benjamin Herrenschmidt wrote:
+> > On Tue, 2017-04-11 at 13:28 +0100, Lorenzo Pieralisi wrote:
+> > > This patch series[1] is a v3 of a previous version:
 > > > 
-> > > Sorry but I don't have access to an ARM development system. Does your 
-> > > comment apply to dev == NULL only, dev != NULL only or perhaps to both? 
-> > > If your comment applies to dev != NULL only, can you check whether 
-> > > adding something like set_dma_ops(dev, get_arch_dma_ops(NULL)) to the 
-> > > appropriate ARM arch_setup_dma_ops() function is sufficient?
+> > > v2: https://lkml.org/lkml/2017/3/27/220
 > > 
-> > If I understand correctly, set_dma_ops will replace dev->dma_ops with
-> > Xen DMA ops.
+> > I am not a fan of this at All.
 > > 
-> > However, Xen DMA ops will need in some places to call the device 
-> > specific DMA ops (see __generic_dma_ops(...)). So I think replacing
-> > dev->dma_ops is not a solution here.
+> > That whole concept of "ioremap_nopost" is simply not applicable to the
+> > majority of architectures and certainly not in a way that can apply to
+> > arbitrary mappings.
 > > 
-> > The hackish patch below is fixing the problem for both ARM64 and ARM32.
-> > 
-> > diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> > index 0977317c6835..43a73ddeec7a 100644
-> > --- a/include/linux/dma-mapping.h
-> > +++ b/include/linux/dma-mapping.h
-> > @@ -174,6 +174,8 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
-> >  #include <asm/dma-mapping.h>
-> >  static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
-> >  {
-> > +       if (xen_initial_domain())
-> > +              return xen_dma_ops;
-> >         if (dev && dev->dma_ops)
-> >                 return dev->dma_ops;
-> >         return get_arch_dma_ops(dev ? dev->bus : NULL);
+> > It's also very wrong to provide a "default" operation whose semantics
+> > are weaker than what it's supposed to implement. Very wrong actually.
+> > People will use it assuming the non-posted behaviour and things will
+> > break in subtle way when it cannot be provided.
 > 
-> If we do this, I guess there is no need to check for
-> xen_initial_domain() in the get_arch_dma_ops() function. Anyway, this
-> hunk would break the other architectures since xen_dma_ops is only
-> defined for arm and arm64.
-> 
-> > It is not nice as this is common code, but I can't find a better solution
-> > so far. Any opinions?
-> 
-> A different hack would be to avoid the generic get_dma_ops
-> implementation on arm with some #ifdef hacks above.
-> 
-> Yet another way would be for dom0 to always set dev->dma_ops to
-> xen_dma_ops and preserve the real dma_ops somewhere under dev->archdata.
-> You could intercept the arch_setup_dma_ops() function for this or use
-> bus_register_notifier() (though I think the former is easier). The Xen
-> code making use of the real dma_ops would have to dig them out from
-> dev->archdata.
+> Well, what's very wrong for you it is not very wrong for others
+> (it is just v3, that's fine, see thread below).
 
-This is a good suggestion, Catalin. Thank you. See below. Is that what
-you have in mind? Julien could you test it, please? If it is the right
-approach, I'll submit the patch properly and rename __generic_dma_ops to
-xen_generic_dma_ops or something.
+Maybe, but I don't see in what universe it is ok to have something
+defined for the stronger ordering semantics it provide silently
+fallback to weaker semantics.
 
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index 220ba20..36ec9c8 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -16,6 +16,9 @@ struct dev_archdata {
- #ifdef CONFIG_ARM_DMA_USE_IOMMU
- 	struct dma_iommu_mapping	*mapping;
- #endif
-+#ifdef CONFIG_XEN
-+	const struct dma_map_ops *dev_dma_ops;
-+#endif
- 	bool dma_coherent;
- };
- 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 7166569..680d3f3 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -16,19 +16,9 @@
- extern const struct dma_map_ops arm_dma_ops;
- extern const struct dma_map_ops arm_coherent_dma_ops;
- 
--static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
--{
--	if (dev && dev->dma_ops)
--		return dev->dma_ops;
--	return &arm_dma_ops;
--}
--
- static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- {
--	if (xen_initial_domain())
--		return xen_dma_ops;
--	else
--		return __generic_dma_ops(NULL);
-+	return &arm_dma_ops;
- }
- 
- #define HAVE_ARCH_DMA_SUPPORTED 1
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 63eabb0..82d61eb 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2396,6 +2396,11 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 		dma_ops = arm_get_dma_map_ops(coherent);
- 
- 	set_dma_ops(dev, dma_ops);
-+
-+	if (xen_initial_domain()) {
-+		dev->archdata.dev_dma_ops = dev->dma_ops;
-+		dev->dma_ops = xen_dma_ops;
-+	}
- }
- 
- void arch_teardown_dma_ops(struct device *dev)
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-index 73d5bab..5a5fa47 100644
---- a/arch/arm64/include/asm/device.h
-+++ b/arch/arm64/include/asm/device.h
-@@ -20,6 +20,9 @@ struct dev_archdata {
- #ifdef CONFIG_IOMMU_API
- 	void *iommu;			/* private IOMMU data */
- #endif
-+#ifdef CONFIG_XEN
-+	const struct dma_map_ops *dev_dma_ops;
-+#endif
- 	bool dma_coherent;
- };
- 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 505756c..5392dbe 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -27,11 +27,8 @@
- #define DMA_ERROR_CODE	(~(dma_addr_t)0)
- extern const struct dma_map_ops dummy_dma_ops;
- 
--static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
-+static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- {
--	if (dev && dev->dma_ops)
--		return dev->dma_ops;
--
- 	/*
- 	 * We expect no ISA devices, and all other DMA masters are expected to
- 	 * have someone call arch_setup_dma_ops at device creation time.
-@@ -39,14 +36,6 @@ static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
- 	return &dummy_dma_ops;
- }
- 
--static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
--{
--	if (xen_initial_domain())
--		return xen_dma_ops;
--	else
--		return __generic_dma_ops(NULL);
--}
--
- void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 			const struct iommu_ops *iommu, bool coherent);
- #define arch_setup_dma_ops	arch_setup_dma_ops
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 81cdb2e..e574c39 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -977,4 +977,9 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 
- 	dev->archdata.dma_coherent = coherent;
- 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
-+
-+	if (xen_initial_domain()) {
-+		dev->archdata.dev_dma_ops = dev->dma_ops;
-+		dev->dma_ops = xen_dma_ops;
-+	}
- }
-diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
-index 95ce6ac..b0a2bfc 100644
---- a/include/xen/arm/page-coherent.h
-+++ b/include/xen/arm/page-coherent.h
-@@ -2,8 +2,16 @@
- #define _ASM_ARM_XEN_PAGE_COHERENT_H
- 
- #include <asm/page.h>
-+#include <asm/dma-mapping.h>
- #include <linux/dma-mapping.h>
- 
-+static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
-+{
-+	if (dev && dev->archdata.dev_dma_ops)
-+		return dev->archdata.dev_dma_ops;
-+	return get_arch_dma_ops(NULL);
-+}
-+
- void __xen_dma_map_page(struct device *hwdev, struct page *page,
- 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
- 	     enum dma_data_direction dir, unsigned long attrs);
+> I can easily make ioremap_nopost() mirror ioremap_uc() (ie return
+> NULL unless overriden so that basically you can't use in on an arch
+> that can't provide its semantics) but then that becomes very wrong
+> for other reviewers.
+
+Those reviewers are WRONG :-)
+
+> https://lkml.org/lkml/2017/4/6/396
+> 
+> > What exactly are you trying to fix here ?
+> 
+> I wrote in the commit logs and cover letter what I am fixing here.
+
+Right right, what *actual bug you have observed* are you trying to fix
+?
+
+I'm pretty such close to all non-x86 archs had that "problem" since the
+dawn of time and it has never hurt anybody.
+
+That said, I don't think it makes sense to "solve" it by creating a
+"generic" mapping semantic that is basically impossible to implement on
+most architectures out there (and cannot be emulated).
+
+This is a problem to be solved by the bridge itself. If ARM has a
+mapping attribute to make stores non-posted, keep this an ARM specific
+attribute at this stage I'd say.
+
+> Anyway:
+> 
+> "The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
+> Posting") mandate non-posted configuration transactions. As further
+> highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
+> Considerations for the Enhanced Configuration Access Mechanism"),
+> through ECAM and ECAM-derivative configuration mechanism, the memory
+> mapped transactions from the host CPU into Configuration Requests on the
+> PCI express fabric may create ordering problems for software because
+> writes to memory address are typically posted transactions (unless the
+> architecture can enforce through virtual address mapping non-posted
+> write transactions behaviour) but writes to Configuration Space are not
+> posted on the PCI express fabric."
+> 
+> On ARM64:
+> 
+> "This rule is reinforced by the ARM v8 architecture reference manual
+> (issue A.k, Early Write Acknowledgment) that explicitly recommends
+> that No Early Write Acknowledgment attribute should be used to map
+> PCI configuration (write) transactions."
+> 
+> > If a given PCIe host bridge (architecture specific) require a special
+> > sauce to provide the illusion of non-posting, then implement this in
+> > the actual root complex code.
+> > 
+> > BTW. I'm pretty sure we "accidentally" made config writes posted at
+> > least to the PHB on a number of powerpc systems forever and we *never*
+> > had a problem because of it ;)
+> 
+> Ok so we should ignore the PCIe specifications and ARM v8 reference
+> manual waiting for a kernel bug to appear ? Is that what you suggest
+> doing ?
+> 
+> Lorenzo
+> 
+> > > v2 -> v3:
+> > > 	- Created a default ioremap_nopost() implementation in a
+> > > separate
+> > > 	??asm-generic header and patched all arches to make use of it
+> > > 	- Removed PCI drivers patches from the series to simplify the
+> > > 	??review, they will be posted separately once the
+> > > ioremap_nopost()
+> > > 	??interface is settled
+> > > 	- Fixed devm_ioremap_* BUS offset comments and implemented
+> > > 	??nopost interface on top of it
+> > > 	- Added collected tags
+> > > 
+> > > v1: https://lkml.org/lkml/2017/2/27/228
+> > > 
+> > > v1 -> v2:
+> > > 	- Changed pci_remap_cfgspace() to more generic ioremap_nopost()
+> > > 	??interface
+> > > 	- Added pgprot_nonposted
+> > > 	- Fixed build errors on arches not relying on asm-generic
+> > > headers
+> > > 	- Added PCI versatile host controller driver patch
+> > > 	- Added missing config space remapping to hisilicon host
+> > > controller
+> > > 
+> > > ---------------------
+> > > Original cover letter
+> > > ---------------------
+> > > 
+> > > PCI local bus specifications (Rev3.0, 3.2.5 "Transaction Ordering
+> > > and Posting") strictly require PCI configuration and I/O Address
+> > > space
+> > > write transactions to be non-posted.
+> > > 
+> > > Current crop of DT/ACPI PCI host controllers drivers relies on
+> > > the ioremap interface to map ECAM and ECAM-derivative PCI config
+> > > regions and pci_remap_iospace() to create a VMA for mapping
+> > > PCI host bridge I/O Address space transactions to CPU virtual address
+> > > space.
+> > > 
+> > > On some platforms (ie ARM/ARM64) ioremap fails to comply with the PCI
+> > > configuration non-posted write transactions requirement, because it
+> > > provides a memory mapping that issues "bufferable" or, in PCI terms
+> > > "posted" write transactions. Likewise, the current
+> > > pci_remap_iospace()
+> > > implementation maps the physical address range that the PCI
+> > > translates
+> > > to I/O space cycles to virtual address space through pgprot_device()
+> > > attributes that on eg ARM64 provides a memory mapping issuing
+> > > posted writes transactions, which is not PCI specifications
+> > > compliant.
+> > > 
+> > > This patch series[1] addresses both issues in one go:
+> > > 
+> > > - It updates the pci_remap_iospace() function to use a page mapping
+> > > ? that guarantees non-posted write transactions for I/O space
+> > > addresses
+> > > - It adds a kernel API to remap PCI config space resources, so that
+> > > ? architecture can override it with a mapping implementation that
+> > > ? guarantees PCI specifications compliancy wrt non-posted write
+> > > ? configuration transactions
+> > > - It updates all PCI host controller implementations (and the generic
+> > > ? ECAM layer) to use the newly introduced mapping interface
+> > > 
+> > > Tested on Juno ECAM based interface (DT/ACPI).
+> > > 
+> > > Non-ECAM PCI host controller drivers patches need checking to make
+> > > sure that:
+> > > 
+> > > - I patched the correct resource region mapping for config space
+> > > - There are not any other ways to ensure posted-write completion
+> > > ? in the respective pci_ops that make the relevant patch unnecessary
+> > > 
+> > > [1]
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git
+> > > pci/config-io-mappings-fix-v3
+> > > 
+> > > Lorenzo Pieralisi (32):
+> > > ? PCI: remove __weak tag from pci_remap_iospace()
+> > > ? asm-generic/pgtable.h: introduce pgprot_nonposted remap attribute
+> > > ? PCI: fix pci_remap_iospace() remap attribute
+> > > ? asm-generic: add ioremap_nopost() remap interface
+> > > ? alpha: include default ioremap_nopost() implementation
+> > > ? avr32: include default ioremap_nopost() implementation
+> > > ? arc: include default ioremap_nopost() implementation
+> > > ? cris: include default ioremap_nopost() implementation
+> > > ? frv: include default ioremap_nopost() implementation
+> > > ? hexagon: include default ioremap_nopost() implementation
+> > > ? ia64: include default ioremap_nopost() implementation
+> > > ? m32r: include default ioremap_nopost() implementation
+> > > ? m68k: include default ioremap_nopost() implementation
+> > > ? metag: include default ioremap_nopost() implementation
+> > > ? microblaze: include default ioremap_nopost() implementation
+> > > ? mips: include default ioremap_nopost() implementation
+> > > ? mn10300: include default ioremap_nopost() implementation
+> > > ? nios2: include default ioremap_nopost() implementation
+> > > ? openrisc: include default ioremap_nopost() implementation
+> > > ? parisc: include default ioremap_nopost() implementation
+> > > ? powerpc: include default ioremap_nopost() implementation
+> > > ? s390: include default ioremap_nopost() implementation
+> > > ? sh: include default ioremap_nopost() implementation
+> > > ? sparc: include default ioremap_nopost() implementation
+> > > ? tile: include default ioremap_nopost() implementation
+> > > ? unicore32: include default ioremap_nopost() implementation
+> > > ? x86: include default ioremap_nopost() implementation
+> > > ? xtensa: include default ioremap_nopost() implementation
+> > > ? arm64: implement ioremap_nopost() interface
+> > > ? arm: implement ioremap_nopost() interface
+> > > ? lib: fix Devres devm_ioremap_* offset parameter kerneldoc
+> > > description
+> > > ? lib: implement Devres ioremap_nopost() interface
+> > > 
+> > > ?Documentation/driver-model/devres.txt |??3 ++
+> > > ?arch/alpha/include/asm/io.h???????????|??1 +
+> > > ?arch/arc/include/asm/io.h?????????????|??1 +
+> > > ?arch/arm/include/asm/io.h?????????????|??9 ++++
+> > > ?arch/arm/mm/ioremap.c?????????????????|??7 +++
+> > > ?arch/arm/mm/nommu.c???????????????????|??9 ++++
+> > > ?arch/arm64/include/asm/io.h???????????| 12 +++++
+> > > ?arch/avr32/include/asm/io.h???????????|??1 +
+> > > ?arch/cris/include/asm/io.h????????????|??1 +
+> > > ?arch/frv/include/asm/io.h?????????????|??1 +
+> > > ?arch/hexagon/include/asm/io.h?????????|??2 +
+> > > ?arch/ia64/include/asm/io.h????????????|??1 +
+> > > ?arch/m32r/include/asm/io.h????????????|??1 +
+> > > ?arch/m68k/include/asm/io.h????????????|??1 +
+> > > ?arch/metag/include/asm/io.h???????????|??2 +
+> > > ?arch/microblaze/include/asm/io.h??????|??1 +
+> > > ?arch/mips/include/asm/io.h????????????|??1 +
+> > > ?arch/mn10300/include/asm/io.h?????????|??1 +
+> > > ?arch/nios2/include/asm/io.h???????????|??1 +
+> > > ?arch/openrisc/include/asm/io.h????????|??2 +
+> > > ?arch/parisc/include/asm/io.h??????????|??1 +
+> > > ?arch/powerpc/include/asm/io.h?????????|??1 +
+> > > ?arch/s390/include/asm/io.h????????????|??1 +
+> > > ?arch/sh/include/asm/io.h??????????????|??1 +
+> > > ?arch/sparc/include/asm/io.h???????????|??1 +
+> > > ?arch/tile/include/asm/io.h????????????|??1 +
+> > > ?arch/unicore32/include/asm/io.h???????|??1 +
+> > > ?arch/x86/include/asm/io.h?????????????|??1 +
+> > > ?arch/xtensa/include/asm/io.h??????????|??1 +
+> > > ?drivers/pci/pci.c?????????????????????|??4 +-
+> > > ?include/asm-generic/ioremap-nopost.h??|??9 ++++
+> > > ?include/asm-generic/pgtable.h?????????|??4 ++
+> > > ?include/linux/device.h????????????????|??2 +
+> > > ?include/linux/io.h????????????????????|??2 +
+> > > ?lib/devres.c??????????????????????????| 84
+> > > +++++++++++++++++++++++++++++++++--
+> > > ?35 files changed, 167 insertions(+), 5 deletions(-)
+> > > ?create mode 100644 include/asm-generic/ioremap-nopost.h
+> > > 
