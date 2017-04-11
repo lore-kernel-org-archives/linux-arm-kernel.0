@@ -1,79 +1,98 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 11 Apr 2017 20:08:34 +0200
-Subject: [PATCH v5 1/2] linux/kernel.h: Add ALIGN_DOWN macro
-In-Reply-To: <20170411180835.8928-1-krzk@kernel.org>
-References: <20170411180835.8928-1-krzk@kernel.org>
-Message-ID: <20170411180835.8928-2-krzk@kernel.org>
+Date: Tue, 11 Apr 2017 20:08:33 +0200
+Subject: [PATCH v5 0/2] crypto: hw_random - Add new Exynos RNG driver
+Message-ID: <20170411180835.8928-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Few parts of kernel define their own macro for aligning down so provide
-a common define for this, with the same usage and assumptions as existing
-ALIGN.
+Hi,
 
-Convert also three existing implementations to this one.
+This is a follow up of my questions around exynos-rng [1].
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Changes since v4:
+=================
+1. Patch 2/2: Use "stdrng" name, as suggested by Herbert.
+2. Patch 2/2: Add Bartlomiej's reviewed-by.
 
----
+Changes since v3:
+=================
+1. New patch: 1/2 for ALIGN_DOWN macro. The change in metag architecture
+   was not compiled. Please test it.
+2. Dropped patches touching ARM defconfig as they are not changing and
+   they pollute this submission.
+3. Utilize all seed provided by kcapi (suggested by Stephan M?ller).
+4. Drop dev->ctx (suggested by PrasannaKumar Muralidharan).
+5. Remove any printks from set_seed callback as this might be a way
+   for unprivileged user to pollute the log (suggested by Stephan).
+6. Minor cleanups: initialize 'read' variable in exynos_rng_reseed()
+   for readability (it is not strictly required).
+7. Add review tags from Stephen and PrasannaKumar.
 
-The metag change was not even compiled due to lack of cross compiler.
----
- arch/metag/kernel/stacktrace.c | 2 --
- drivers/gpu/drm/udl/udl_fb.c   | 2 +-
- include/linux/kernel.h         | 1 +
- include/video/udlfb.h          | 2 +-
- 4 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/metag/kernel/stacktrace.c b/arch/metag/kernel/stacktrace.c
-index 91ffc4b75c33..09d67b7f51ca 100644
---- a/arch/metag/kernel/stacktrace.c
-+++ b/arch/metag/kernel/stacktrace.c
-@@ -31,8 +31,6 @@ static void tbi_boing_init(void)
- }
- #endif
- 
--#define ALIGN_DOWN(addr, size)  ((addr)&(~((size)-1)))
--
- /*
-  * Unwind the current stack frame and store the new register values in the
-  * structure passed as argument. Unwinding is equivalent to a function return,
-diff --git a/drivers/gpu/drm/udl/udl_fb.c b/drivers/gpu/drm/udl/udl_fb.c
-index d05abc69e305..4a6500362564 100644
---- a/drivers/gpu/drm/udl/udl_fb.c
-+++ b/drivers/gpu/drm/udl/udl_fb.c
-@@ -37,7 +37,7 @@ struct udl_fbdev {
- };
- 
- #define DL_ALIGN_UP(x, a) ALIGN(x, a)
--#define DL_ALIGN_DOWN(x, a) ALIGN(x-(a-1), a)
-+#define DL_ALIGN_DOWN(x, a) ALIGN_DOWN(x, a)
- 
- /** Read the red component (0..255) of a 32 bpp colour. */
- #define DLO_RGB_GETRED(col) (uint8_t)((col) & 0xFF)
-diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index 4c26dc3a8295..3d9f8420f973 100644
---- a/include/linux/kernel.h
-+++ b/include/linux/kernel.h
-@@ -47,6 +47,7 @@
- 
- /* @a is a power of 2 value */
- #define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
-+#define ALIGN_DOWN(x, a)	__ALIGN_KERNEL((x) - ((a) - 1), (a))
- #define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
- #define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
- #define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
-diff --git a/include/video/udlfb.h b/include/video/udlfb.h
-index f9466fa54ba4..3ea90aea5617 100644
---- a/include/video/udlfb.h
-+++ b/include/video/udlfb.h
-@@ -92,6 +92,6 @@ struct dlfb_data {
- 
- /* remove these once align.h patch is taken into kernel */
- #define DL_ALIGN_UP(x, a) ALIGN(x, a)
--#define DL_ALIGN_DOWN(x, a) ALIGN(x-(a-1), a)
-+#define DL_ALIGN_DOWN(x, a) ALIGN_DOWN(x, a)
- 
- #endif
+Changes since v2:
+=================
+1. Do not re-use random numbers for re-seed (neither for system resume
+   nor for periodic re-seed).  Instead the driver will just generate new
+   random numbers (suggested by Stephan M?ller).
+
+   Suspend path tested with suspend-to-freeze, not real suspend. Testing
+   on Trats2 would be welcomed.
+
+Changes since v1:
+=================
+1. Re-work the code for seeding after system resume, following suggestions
+   and review by Stephan M?ller.
+
+2. Re-seed itself from time to time (every 100 ms), suggested by Stephan
+   M?ller.
+
+3. Use a define for retries (Bartlomiej Zolnierkiewicz).
+4. Add some docs.
+
+
+Description:
+============
+The existing exynos-rng has many issues.  The most important one is that
+it is a pseudo RNG device but uses hw_random interface which does not allow
+proper seeding.
+
+The RNG module on Exynos4 requires seeding.  On newer SoCs (like Exynos5420)
+it can seed itself from a true RNG.  Converting the existing driver
+to use TRNG would effectively drop support for Exynos4 and break
+compatibility with existing users.
+
+Instead I decided to convert it to crypto API.  In the future I hope
+to add support for seeding from TRNG module.
+
+Tested with app [2].
+
+Patches are independent. I will take the defconfig changes (2/3 and 3/3)
+through samsung-soc tree.
+
+Best regards,
+Krzysztof
+
+[1] https://www.spinics.net/lists/arm-kernel/msg569641.html
+[2] https://www.spinics.net/lists/arm-kernel/msg571184.html
+
+Krzysztof Kozlowski (2):
+  linux/kernel.h: Add ALIGN_DOWN macro
+  crypto: hw_random - Add new Exynos RNG driver
+
+ MAINTAINERS                         |   8 +
+ arch/metag/kernel/stacktrace.c      |   2 -
+ drivers/char/hw_random/Kconfig      |  14 --
+ drivers/char/hw_random/Makefile     |   1 -
+ drivers/char/hw_random/exynos-rng.c | 231 ---------------------
+ drivers/crypto/Kconfig              |  15 ++
+ drivers/crypto/Makefile             |   1 +
+ drivers/crypto/exynos-rng.c         | 389 ++++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/udl/udl_fb.c        |   2 +-
+ include/linux/kernel.h              |   1 +
+ include/video/udlfb.h               |   2 +-
+ 11 files changed, 416 insertions(+), 250 deletions(-)
+ delete mode 100644 drivers/char/hw_random/exynos-rng.c
+ create mode 100644 drivers/crypto/exynos-rng.c
+
 -- 
 2.9.3
