@@ -1,69 +1,87 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:52 +0100
-Subject: [PATCHv3 09/14] drivers/perf: arm_pmu: move irq request/free into
- probe
+Date: Tue, 11 Apr 2017 09:39:54 +0100
+Subject: [PATCHv3 11/14] arm64: add function to get a cpu's MADT GICC table
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-12-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we request (and potentially free) all IRQs for a given PMU in
-cpu_pmu_init(). This works for platform/DT probing today, but it doesn't
-fit ACPI well as we don't have all our affinity data up-front.
+Currently the ACPI parking protocol code needs to parse each CPU's MADT
+GICC table to extract the mailbox address and so on. Each time we parse
+a GICC table, we call back to the parking protocol code to parse it.
 
-In preparation for ACPI support, fold the IRQ request/free into
-arm_pmu_device_probe(), which will remain specific to platform/DT
-probing.
+This has been fine so far, but we're about to have more code that needs
+to extract data from the GICC tables, and adding a callback for each
+user is going to get unwieldy.
+
+Instead, this patch ensures that we stash a copy of each CPU's GICC
+table at boot time, such that anything needing to parse it can later
+request it. This will allow for other parsers of GICC, and for
+simplification to the ACPI parking protocol code. Note that we must
+store a copy, rather than a pointer, since the core ACPI code
+temporarily maps/unmaps tables while iterating over them.
+
+Since we parse the MADT before we know how many CPUs we have (and hence
+before we setup the percpu areas), we must use an NR_CPUS sized array.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/acpi.h |  2 ++
+ arch/arm64/kernel/smp.c       | 10 ++++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index c09c379..f387d61 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -758,10 +758,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int err;
- 
--	err = armpmu_request_irqs(cpu_pmu);
--	if (err)
--		goto out;
--
- 	err = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_STARTING,
- 				       &cpu_pmu->node);
- 	if (err)
-@@ -777,7 +773,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
- 					    &cpu_pmu->node);
- out:
--	armpmu_free_irqs(cpu_pmu);
- 	return err;
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index c1976c0..0e99978 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -85,6 +85,8 @@ static inline bool acpi_has_cpu_in_madt(void)
+ 	return true;
  }
  
-@@ -1073,12 +1068,18 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		goto out_free;
- 	}
- 
-+	ret = armpmu_request_irqs(pmu);
-+	if (ret)
-+		goto out_free_irqs;
++struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
 +
- 	ret = armpmu_register(pmu);
- 	if (ret)
- 		goto out_free;
+ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ void __init acpi_init_cpus(void);
  
- 	return 0;
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index ef1caae..390c277 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -518,6 +518,13 @@ static int __init smp_cpu_setup(int cpu)
+ static unsigned int cpu_count = 1;
  
-+out_free_irqs:
-+	armpmu_free_irqs(pmu);
- out_free:
- 	pr_info("%s: failed to register PMU devices!\n",
- 		of_node_full_name(node));
+ #ifdef CONFIG_ACPI
++static struct acpi_madt_generic_interrupt cpu_madt_gicc[NR_CPUS];
++
++struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
++{
++	return &cpu_madt_gicc[cpu];
++}
++
+ /*
+  * acpi_map_gic_cpu_interface - parse processor MADT entry
+  *
+@@ -552,6 +559,7 @@ static int __init smp_cpu_setup(int cpu)
+ 			return;
+ 		}
+ 		bootcpu_valid = true;
++		cpu_madt_gicc[0] = *processor;
+ 		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
+ 		return;
+ 	}
+@@ -562,6 +570,8 @@ static int __init smp_cpu_setup(int cpu)
+ 	/* map the logical cpu id to cpu MPIDR */
+ 	cpu_logical_map(cpu_count) = hwid;
+ 
++	cpu_madt_gicc[cpu_count] = *processor;
++
+ 	/*
+ 	 * Set-up the ACPI parking protocol cpu entries
+ 	 * while initializing the cpu_logical_map to
 -- 
 1.9.1
