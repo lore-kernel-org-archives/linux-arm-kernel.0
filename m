@@ -1,85 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Apr 2017 17:33:13 +0100
-Subject: [PATCH 2/2] arm64: acpi/pci: invoke _DSM whether to preserve firmware
- PCI setup
-In-Reply-To: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170411163313.18577-3-ard.biesheuvel@linaro.org>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 11 Apr 2017 22:04:41 +0530
+Subject: [RFC PATCH 3/7] iommu/arm-smmu-v3: Introduce smmu option
+ USE_SHARED_IRQS for Silicon errata
+In-Reply-To: <20170411162123.GF17109@arm.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-4-git-send-email-linucherian@gmail.com>
+ <b84e2383-1a65-3c5a-8e2c-28eafdb20adc@arm.com>
+ <20170411162123.GF17109@arm.com>
+Message-ID: <CA+sq2Cev1r3AWpWTsfUqZaJW-h9XkctYGrGe4C9XOW5kqkcRkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64 ACPI systems, we unconditionally reconfigure the entire PCI
-hierarchy at boot. This is a departure from what is customary on ACPI
-systems, and may break assumptions in some places (e.g., EFIFB), that
-the kernel will leave BARs of enabled PCI devices where they are.
+On Tue, Apr 11, 2017 at 9:51 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Apr 11, 2017 at 04:54:26PM +0100, Robin Murphy wrote:
+>> On 11/04/17 15:42, linucherian at gmail.com wrote:
+>> > From: Geetha <gakula@cavium.com>
+>> >
+>> > Cavium 99xx SMMU implementation doesn't not support unique irq lines for
+>> > gerror, eventq and cmdq-sync. USE_SHARED_IRQS option enables to use single
+>> > irq line for all three interrupts.
+>>
+>> AFAICS, there's nothing actually wrong with using shared wired IRQs -
+>> the architecture spec doesn't appear to say anything about it. I think
+>> it might suffice to simply add IRQF_SHARED if we can see the SMMU
+>> doesn't support MSIs anyway - it doesn't really seem like something we
+>> need to treat as a specific quirk.
+>
+> No, this is not permitted by the spec. See 3.18.2 ("Interrupt sources"),
+> where it's clear that each source asserts a *unique* wired interrupt.
+>
+> Geetha: does your implementation support MSIs?
+>
+> Will
 
-Given that PCI already specifies a device specific ACPI method (_DSM)
-for PCI root bridge nodes that tells us whether the firmware thinks
-the configuration should be left alone, let's sidestep the entire
-policy debate about whether the PCI configuration should be preserved
-or not, and put it under the control of the firmware instead.
+No, this silicon doesn't support MSIs.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/pci.c  | 20 ++++++++++++++++++--
- include/linux/pci-acpi.h |  7 ++++---
- 2 files changed, 22 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4f0e3ebfea4b..c88e07e2eb84 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -185,6 +185,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	struct acpi_pci_generic_root_info *ri;
- 	struct pci_bus *bus, *child;
- 	struct acpi_pci_root_ops *root_ops;
-+	union acpi_object *obj;
- 
- 	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
- 	if (!ri)
-@@ -208,8 +209,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	if (!bus)
- 		return NULL;
- 
--	pci_bus_size_bridges(bus);
--	pci_bus_assign_resources(bus);
-+	/*
-+	 * Invoke the PCI device specific method (_DSM) #5 'Ignore PCI Boot
-+	 * Configuration', which tells us whether the firmware wants us to
-+	 * preserve the configuration of the PCI resource tree for this root
-+	 * bridge.
-+	 */
-+	obj = acpi_evaluate_dsm(ACPI_HANDLE(bus->bridge), pci_acpi_dsm_uuid, 1,
-+				IGNORE_PCI_BOOT_CONFIG_DSM, NULL);
-+	if (obj && obj->type == ACPI_TYPE_INTEGER && obj->integer.value == 0) {
-+		/* preserve existing resource assignment */
-+		pci_bus_claim_resources(bus);
-+	} else {
-+		/* reconfigure the resource tree from scratch */
-+		pci_bus_size_bridges(bus);
-+		pci_bus_assign_resources(bus);
-+	}
-+	ACPI_FREE(obj);
- 
- 	list_for_each_entry(child, &bus->children, node)
- 		pcie_bus_configure_settings(child);
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 7a4e83a8c89c..308111489b83 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -106,9 +106,10 @@ static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
- #endif
- 
- extern const u8 pci_acpi_dsm_uuid[];
--#define DEVICE_LABEL_DSM	0x07
--#define RESET_DELAY_DSM		0x08
--#define FUNCTION_DELAY_DSM	0x09
-+#define IGNORE_PCI_BOOT_CONFIG_DSM	0x05
-+#define DEVICE_LABEL_DSM		0x07
-+#define RESET_DELAY_DSM			0x08
-+#define FUNCTION_DELAY_DSM		0x09
- 
- #else	/* CONFIG_ACPI */
- static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
--- 
-2.9.3
+Thanks,
+Sunil.
