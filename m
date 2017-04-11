@@ -1,106 +1,52 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:46 +0100
-Subject: [PATCHv3 03/14] drivers/perf: arm_pmu: fold init into alloc
+Date: Tue, 11 Apr 2017 09:39:48 +0100
+Subject: [PATCHv3 05/14] drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given we always want to initialise common fields on an allocated PMU,
-this patch folds this common initialisation into armpmu_alloc(). This
-will make it simpler to reuse this code for an ACPI-specific probe path.
+The ARM PMU framework code always uses armpmu_dispatch_irq as its common
+IRQ handler. Passing this down from cpu_pmu_init() is somewhat
+pointless, and gets in the way of refactoring.
+
+This patch makes cpu_pmu_request_irqs() always use armpmu_dispatch_irq
+as the handler when requesting IRQs, and removes the handler parameter
+from its prototype.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 52 +++++++++++++++++++++++---------------------------
- 1 file changed, 24 insertions(+), 28 deletions(-)
+ drivers/perf/arm_pmu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 71a825d..1cb8b1a 100644
+index 985bd08..183c6fd 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -494,24 +494,6 @@ static ssize_t armpmu_cpumask_show(struct device *dev,
- 	.attrs = armpmu_common_attrs,
- };
- 
--static void armpmu_init(struct arm_pmu *armpmu)
--{
--	armpmu->pmu = (struct pmu) {
--		.pmu_enable	= armpmu_enable,
--		.pmu_disable	= armpmu_disable,
--		.event_init	= armpmu_event_init,
--		.add		= armpmu_add,
--		.del		= armpmu_del,
--		.start		= armpmu_start,
--		.stop		= armpmu_stop,
--		.read		= armpmu_read,
--		.filter_match	= armpmu_filter_match,
--		.attr_groups	= armpmu->attr_groups,
--	};
--	armpmu->attr_groups[ARMPMU_ATTR_GROUP_COMMON] =
--		&armpmu_common_attr_group;
--}
--
- /* Set at runtime when we know what CPU type we are. */
- static struct arm_pmu *__oprofile_cpu_pmu;
- 
-@@ -766,14 +748,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (err)
- 		goto out_unregister;
- 
--	/*
--	 * This is a CPU PMU potentially in a heterogeneous configuration (e.g.
--	 * big.LITTLE). This is not an uncore PMU, and we have taken ctx
--	 * sharing into account (e.g. with our pmu::filter_match callback and
--	 * pmu::event_init group validation).
--	 */
--	cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_HETEROGENEOUS_CPUS;
--
- 	return 0;
- 
- out_unregister:
-@@ -962,6 +936,30 @@ static struct arm_pmu *armpmu_alloc(void)
- 		goto out_free_pmu;
+@@ -543,10 +543,11 @@ static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
  	}
+ }
  
-+	pmu->pmu = (struct pmu) {
-+		.pmu_enable	= armpmu_enable,
-+		.pmu_disable	= armpmu_disable,
-+		.event_init	= armpmu_event_init,
-+		.add		= armpmu_add,
-+		.del		= armpmu_del,
-+		.start		= armpmu_start,
-+		.stop		= armpmu_stop,
-+		.read		= armpmu_read,
-+		.filter_match	= armpmu_filter_match,
-+		.attr_groups	= pmu->attr_groups,
-+		/*
-+		 * This is a CPU PMU potentially in a heterogeneous
-+		 * configuration (e.g. big.LITTLE). This is not an uncore PMU,
-+		 * and we have taken ctx sharing into account (e.g. with our
-+		 * pmu::filter_match callback and pmu::event_init group
-+		 * validation).
-+		 */
-+		.capabilities	= PERF_PMU_CAP_HETEROGENEOUS_CPUS,
-+	};
-+
-+	pmu->attr_groups[ARMPMU_ATTR_GROUP_COMMON] =
-+		&armpmu_common_attr_group;
-+
- 	for_each_possible_cpu(cpu) {
- 		struct pmu_hw_events *events;
+-static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu, irq_handler_t handler)
++static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu)
+ {
+ 	int cpu, err;
+ 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
++	const irq_handler_t handler = armpmu_dispatch_irq;
  
-@@ -998,8 +996,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	if (!pmu)
- 		return -ENOMEM;
+ 	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
+ 		int irq = per_cpu(hw_events->irq, cpu);
+@@ -735,7 +736,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int err;
  
--	armpmu_init(pmu);
--
- 	pmu->plat_device = pdev;
+-	err = cpu_pmu_request_irqs(cpu_pmu, armpmu_dispatch_irq);
++	err = cpu_pmu_request_irqs(cpu_pmu);
+ 	if (err)
+ 		goto out;
  
- 	ret = pmu_parse_irqs(pmu);
 -- 
 1.9.1
