@@ -1,79 +1,52 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 10 Apr 2017 20:28:47 -0500
-Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
- <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 12 Apr 2017 03:59:42 +0800
+Subject: [PATCH v2 1/2] clk: imx7d: fix USDHC NAND clock
+In-Reply-To: <20170410210015.1620-1-stefan@agner.ch>
+References: <20170410210015.1620-1-stefan@agner.ch>
+Message-ID: <20170411195941.GA13181@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jayachandran,
+On Mon, Apr 10, 2017 at 02:00:14PM -0700, Stefan Agner wrote:
+> The USDHC NAND root clock is not gated by any CCM clock gate. Remove
+> the bogus gate definition.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-On Mon, Apr 03, 2017 at 01:15:04PM +0000, Jayachandran C wrote:
-> The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
-> topology is slightly unusual. For a multi-node system, it looks like:
-> 
-> [node level PCI bridges - one per node]
->     [SoC PCI devices with MSI-X but no IOMMU]
->     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
->         [PCIe real root ports associated with IOMMU and GICv3 ITS]
->             [External PCI devices connected to PCIe links]
-> 
-> The top two levels of bridges should have introduced aliases since they
-> are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
-> In the case of external PCIe devices, the "real" root ports are connected
-> to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
-> alias. The SoC PCI devices are directly connected to the GIC ITS, so the
-> node level bridges do not introduce an alias either.
-> 
-> To handle this quirk, we mark the real PCIe root ports and node level
-> PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
-> pci_for_each_dma_alias() works correctly for external PCIe devices and
-> SoC PCI devices.
-> 
-> For the current revision of Cavium ThunderX2, the VendorID and Device ID
-> are from Broadcom Vulcan (14e4:90XX).
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Can you supply some text here about why we want to apply this patch?
-E.g., does it avoid making unnecessary IOMMU mappings, improve
-performance, avoid a crash, etc?
+Regards
+Dong Aisheng
 
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 > ---
->  drivers/pci/quirks.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  drivers/clk/imx/clk-imx7d.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index 6736836..564a84a 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -3958,6 +3958,20 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2260, quirk_mic_x200_dma_alias);
->  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2264, quirk_mic_x200_dma_alias);
->  
->  /*
-> + * The IOMMU and interrupt controller on Broadcom Vulcan/Cavium ThunderX2 are
-> + * associated not at the root bus, but at a bridge below. This quirk flag
-> + * will ensure that the aliases are identified correctly.
-> + */
-> +static void quirk_bridge_cavm_thrx2_pcie_root(struct pci_dev *pdev)
-> +{
-> +	pdev->dev_flags |= PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT;
-> +}
-> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9000,
-> +				quirk_bridge_cavm_thrx2_pcie_root);
-> +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9084,
-> +				quirk_bridge_cavm_thrx2_pcie_root);
-> +
-> +/*
->   * Intersil/Techwell TW686[4589]-based video capture cards have an empty (zero)
->   * class code.  Fix it.
->   */
+> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+> index 562055129ed8..93b03640da9b 100644
+> --- a/drivers/clk/imx/clk-imx7d.c
+> +++ b/drivers/clk/imx/clk-imx7d.c
+> @@ -724,7 +724,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+>  	clks[IMX7D_MAIN_AXI_ROOT_DIV] = imx_clk_divider2("axi_post_div", "axi_pre_div", base + 0x8800, 0, 6);
+>  	clks[IMX7D_DISP_AXI_ROOT_DIV] = imx_clk_divider2("disp_axi_post_div", "disp_axi_pre_div", base + 0x8880, 0, 6);
+>  	clks[IMX7D_ENET_AXI_ROOT_DIV] = imx_clk_divider2("enet_axi_post_div", "enet_axi_pre_div", base + 0x8900, 0, 6);
+> -	clks[IMX7D_NAND_USDHC_BUS_ROOT_DIV] = imx_clk_divider2("nand_usdhc_post_div", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
+> +	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_divider2("nand_usdhc_root_clk", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
+>  	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider2("ahb_root_clk", "ahb_pre_div", base + 0x9000, 0, 6);
+>  	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2);
+>  	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider2("dram_post_div", "dram_cg", base + 0x9880, 0, 3);
+> @@ -798,7 +798,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+>  	clks[IMX7D_ENET_AXI_ROOT_CLK] = imx_clk_gate4("enet_axi_root_clk", "enet_axi_post_div", base + 0x4060, 0);
+>  	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "axi_post_div", base + 0x4110, 0);
+>  	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk", "ahb_root_clk", base + 0x4120, 0);
+> -	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_gate4("nand_usdhc_root_clk", "nand_usdhc_post_div", base + 0x4130, 0);
+>  	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk", "dram_post_div", base + 0x4130, 0);
+>  	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
+>  	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
 > -- 
-> 2.7.4
+> 2.12.1
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
