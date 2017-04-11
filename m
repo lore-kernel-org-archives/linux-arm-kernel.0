@@ -1,54 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Apr 2017 15:04:27 +0100
-Subject: [PATCH v2 03/11] dt-bindings: add device tree binding for
- X-Powers AXP803 PMIC
-In-Reply-To: <20170407183441.58750-4-icenowy@aosc.io>
-References: <20170407183441.58750-1-icenowy@aosc.io>
- <20170407183441.58750-4-icenowy@aosc.io>
-Message-ID: <20170411140427.doq5atxk6ptjrp36@dell>
+Date: Tue, 11 Apr 2017 15:06:13 +0100
+Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
+In-Reply-To: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170411140613.jvhzsvrxa4evwxjh@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 08 Apr 2017, Icenowy Zheng wrote:
+On Sat, 08 Apr 2017, Daniel Lezcano wrote:
 
-> AXP803 is a PMIC produced by Shenzhen X-Powers, with either I2C or RSB
-> bus.
+> The hi655x multi function device is a PMIC providing regulators.
 > 
-> Add a compatible for it.
+> The PMIC also provides a clock for the WiFi and the Bluetooth, let's implement
+> this clock in order to add it in the hi655x MFD and allow proper wireless
+> initialization.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
-> Changes in v2:
-> - Place AXP803 before AXP806/809.
-> - Added Chen-Yu's ACK.
 > 
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> Changelog:
+> 
+>  V2:
+>     - Added COMPILE_TEST option, compiled on x86
+>     - Removed useless parenthesis
+>     - Used of_clk_hw_simple_get() instead of deref dance
+>     - Do bailout if the clock-names is not specified
+>     - Rollback on error
+>     - Folded mfd line change and binding
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index b41d2601c6ba..334fb19ce605 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -6,12 +6,13 @@ axp202 (X-Powers)
->  axp209 (X-Powers)
->  axp221 (X-Powers)
->  axp223 (X-Powers)
-> +axp803 (X-Powers)
->  axp809 (X-Powers)
->  
->  Required properties:
->  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
-> -	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
-> -	      "x-powers,axp809"
-> +	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp803",
-> +	      "x-powers,axp806", "x-powers,axp809"
->  - reg: The I2C slave address or RSB hardware address for the AXP chip
->  - interrupt-parent: The parent interrupt controller
->  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+Why did you do that?
 
 -- 
 Lee Jones
