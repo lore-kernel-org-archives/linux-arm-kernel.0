@@ -1,69 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Apr 2017 11:05:07 +0100
-Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
- <864lxzch9o.fsf@arm.com> <5f1423fd-8f73-364a-9cf7-b4310957e2fd@redhat.com>
- <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
- <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
-Message-ID: <e339c732-e1da-b620-ce09-8e141d2db376@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Apr 2017 11:05:28 +0100
+Subject: [GIT PULL] Immutable branch between MFD and IIO due for the v4.12
+ merge window
+In-Reply-To: <20170404063441.7656-1-quentin.schulz@free-electrons.com>
+References: <20170404063441.7656-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170411100528.2zif3fyi7uoyw33n@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/17 16:17, Auger Eric wrote:
-> Hi Marc,
-> 
-> On 10/04/2017 16:57, Marc Zyngier wrote:
->> On 10/04/17 15:32, Auger Eric wrote:
->>> Hi Marc,
->>>
->>> On 08/04/2017 12:42, Marc Zyngier wrote:
->>>> On Mon, Mar 27 2017 at 10:30:58 AM, Eric Auger <eric.auger@redhat.com> wrote:
->>>>> The GITS_IIDR revision field is used to encode the version of the
->>>>> table layout (ABI). So we need to restore it to check the table
->>>>> layout to be restored is compatible with the destination vITS.
->>>>>
->>>>> The user selected revision is stored in the user_revision field.
->>>>> It will be compared against the REV num at table restoration time.
->>>>
->>>> Why isn't it sufficient to keep it GITS_IIDR RO and let userspace find
->>>> out about the ABI revision that the kernel understands?
->>>>
->>>> Or are we planning on supporting multiple ABIs in the kernel?
->>> Yes as discussed with Peter, the plan is to allow several ABIs. So the
->>> userspace informs the destination about the ABI revision of the stored
->>> tables (contained by the GITS_IIDR). If the destination KVM does not
->>> support this ABI revision, table restore will fail.
->>>  If so, do
->>>> we have a deprecation policy/plan? I don't mind either way, but it would
->>>> be good to document it...
->>>>
->>>> Maybe it is documented already and I missed it (which is perfectly
->>>> possible!).
->>> Well this is partly documented in
->>> Documentation/virtual/kvm/devices/arm-vgic-its.txt. No plan to
->>> deprecate. migration from KVM supporting v1 to KVM supporting V2 would
->>> be possible but not the contrary.
->>>
->>> Does it make sense?
->>
->> Sort of. Say you have three systems: A and C, which only supports v1; B,
->> which supports v1 and v2. Let's say you migrate from A to B, and from B
->> to C. Is B mandated to be able to export the tables as v1 and v2? Or can
->> it restrict what it can export?
-> At the moment migration from B to C will fail because source ABI rev =
-> v2 > destination support ABI = v1.
-> 
-> A (v1) -> B (v1 & v2): migration OK
-> B (v1 & v2) -> C (v1): migration NOK
+Enjoy!
 
-So what does IIDR report on B once the A->B migration has taken place?
-Does it report v2?
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Thanks,
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-	M.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-iio-v4.12
+
+for you to fetch changes up to f2499ab450d3052097ba53a7d763f767935c0c59:
+
+  iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs (2017-04-11 11:02:33 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD and IIO due for the v4.12 merge window
+
+----------------------------------------------------------------
+Quentin Schulz (1):
+      iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs
+
+ drivers/iio/adc/Kconfig      |  10 +
+ drivers/iio/adc/Makefile     |   1 +
+ drivers/iio/adc/axp20x_adc.c | 617 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 628 insertions(+)
+ create mode 100644 drivers/iio/adc/axp20x_adc.c
+
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
