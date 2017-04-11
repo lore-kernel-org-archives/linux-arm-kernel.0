@@ -1,25 +1,78 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Tue, 11 Apr 2017 13:54:15 +0200
-Subject: [PATCH v7 resend 00/20] ILP32 for ARM64
-In-Reply-To: <20170411113334.GA27857@e104818-lin.cambridge.arm.com> (Catalin
- Marinas's message of "Tue, 11 Apr 2017 12:33:35 +0100")
-References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
- <20170410194740.GA28503@yury-N73SV>
- <20170411113334.GA27857@e104818-lin.cambridge.arm.com>
-Message-ID: <mvmbms3b1nc.fsf@suse.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Apr 2017 12:57:16 +0100
+Subject: [GIT PULL] mfd: exynos-lpass: Pinctrl dependency
+In-Reply-To: <20170404095751.GA28977@kozik-book>
+References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+ <20170328154217.5405-1-krzk@kernel.org>
+ <20170403101824.rpvkqzyigonyi77p@dell>
+ <CAJKOXPeVOMBZxXeh7=oXbgnxSrUtHa86eAtP2BppY=G4Uygarg@mail.gmail.com>
+ <20170404095054.7m6nf6bxweskabuu@dell>
+ <20170404095751.GA28977@kozik-book>
+Message-ID: <20170411115716.ahvcgwexaud2hhv7@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 11 2017, Catalin Marinas <catalin.marinas@arm.com> wrote:
+On Tue, 04 Apr 2017, Krzysztof Kozlowski wrote:
 
-> Is there an up to date pre-built toolchain and a filesystem for ILP32?
+> On Tue, Apr 04, 2017 at 10:50:54AM +0100, Lee Jones wrote:
+> > On Tue, 04 Apr 2017, Krzysztof Kozlowski wrote:
+> > 
+> > > On Mon, Apr 3, 2017 at 12:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > > On Tue, 28 Mar 2017, Krzysztof Kozlowski wrote:
+> > > >
+> > > >>
+> > > >> Hi Lee,
+> > > >>
+> > > >>
+> > > >> This is dependency for mfd/exynos-lpass driver changes from Marek Szyprowski.
+> > > >> That's a material for v4.12 and I will be pushing this later to Linus Walleij.
+> > > >
+> > > > This does not work, and *may* still break.
+> > > >
+> > > > The only way to guarantee the order of the patches is to have them
+> > > > *all* as part of the pull-request.  Not just some of them.
+> > > 
+> > > What do you mean exactly? If these two patches come through my tree
+> > > first, then everything will work fine because they do not break any
+> > > other stuff.
+> > > 
+> > > If you pull it and apply the rest on top, then it should also work
+> > > without problems because your history will contain everything needed
+> > > in proper order.
+> > > 
+> > > In both cases bisectability is preserved. Did I missed something?
+> > 
+> > Okay, so you're suggesting that I rebase MFD *on-top* of your PR.  That
+> > does work for me because I insist on being able to re-work my tree at
+> > any time.  However, be aware that some Maintainers do not work this
+> > way, thus *normally* you will have to send PR containing all of the
+> > dependant patches.
+> 
+> You could either rebased on top of this PR or merge it before applying
+> rest of patches. It does not matter because in both cases all dependant
+> patches will be after the dependency. Also in both cases you will be
+> sending them in your PR.
+> 
+> You can then rebase your stuff as well, keeping only the external
+> commits untouced and merged.
 
-https://build.opensuse.org/project/show/devel:ARM:Factory:Contrib:ILP32
-should have everything you need.
+Right.  As I say, it does work for me because I always rebase MFD
+patches on-top of the immutable branches.
 
-Andreas.
+What time trying to say is that, some Maintainers treat their master
+branches as stable once they get pushed, so this style of "pull this
+and apply it as a base for patches already in your tree" pull-request
+will not work for some.
+
+> Really, that does not differ from all your stable immutable branches you
+> have been providing for other folks.
+
+No, this is different.  When I create a pull-request it always
+contains *all* of the dependencies, so it can be pulled in before or
+after any other patches.
 
 -- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
