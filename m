@@ -1,48 +1,24 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Tue, 11 Apr 2017 15:44:52 +0000
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
-References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
- <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
- <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
- <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
-Message-ID: <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Apr 2017 16:45:57 +0100
+Subject: [PATCHv3 00/14] arm_pmu: ACPI support
+In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170411154557.GD17109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob, Mark
+On Tue, Apr 11, 2017 at 09:39:43AM +0100, Mark Rutland wrote:
+> This series implements ACPI support in the ARM PMU code. It borrows some code
+> from Jeremy's series [1], but takes a different approach to probing and
+> association, using the usual hotplug state machine, minimising external changes
+> required, and simplifying the relationship with the common arm_pmu code.
+> 
+> The first few patches are preparatory cleanup/refactoring, with the latter half
+> of the series being specific to ACPI support.
+> 
+> The series is based on Will's perf/updates branch [2]. I've pushed the whole
+> series out to the arm/perf/acpi branch [3] of my kernel.org repo.
 
-Thanks for your review.
-Please find my comments below.
+Thanks, I've queued this up so it should appear in linux-next shortly.
 
-On 04/11/2017 04:32 PM, Mark Brown wrote:
-> On Mon, Apr 10, 2017 at 02:48:32PM -0500, Rob Herring wrote:
->> On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
->
->>> +Required properties:
->>> +  - compatible: Must be "st,stm32h7-i2s"
->>> +  - #sound-dai-cells: Must be 1. (one parameter)
->>> +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
->>> +	index 0: playback DAI
->>> +	index 1: capture DAI
->>> +	index 2: full duplex DAI
->
->> Is this still needed for graph-card?
->
-> The graph card is blocked on your review...  I'm also not clear how
-> without something like this we'd be able to identify a specific DAI
-> within a device if we don't have a way of identifying them.
->
-Yes, it seems that audio graph card does not allow to select a specific 
-DAI. This will probably be necessary.
-
-However, regarding STM32 I2S driver, I'm wondering if selecting DAI
-is the best way to configure interface as tx, rx or fd.
-Maybe, it is more relevant to configure DAI according to DMA
-configuration from I2S node.
-This would moreover avoid to allocate 2 dmas channels when not
-necessary (tx or rx only).
-If you agree with this, I will implement this change in a v2.
-
-BRs
-olivier
+Will
