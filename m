@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:01 +0100
-Subject: [PATCH v3 21/32] powerpc: include default ioremap_nopost()
+Date: Tue, 11 Apr 2017 13:28:59 +0100
+Subject: [PATCH v3 19/32] openrisc: include default ioremap_nopost()
  implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-22-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-20-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,25 +25,25 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Jonas Bonn <jonas@southpole.se>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
+Cc: Stafford Horne <shorne@gmail.com>
+Cc: Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>
 ---
- arch/powerpc/include/asm/io.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/openrisc/include/asm/io.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/powerpc/include/asm/io.h b/arch/powerpc/include/asm/io.h
-index 5ed2924..6dcd0e2 100644
---- a/arch/powerpc/include/asm/io.h
-+++ b/arch/powerpc/include/asm/io.h
-@@ -757,6 +757,7 @@ extern void __iomem *ioremap_prot(phys_addr_t address, unsigned long size,
- extern void __iomem *ioremap_wc(phys_addr_t address, unsigned long size);
- #define ioremap_nocache(addr, size)	ioremap((addr), (size))
- #define ioremap_uc(addr, size)		ioremap((addr), (size))
+diff --git a/arch/openrisc/include/asm/io.h b/arch/openrisc/include/asm/io.h
+index 7c69139..1cea257 100644
+--- a/arch/openrisc/include/asm/io.h
++++ b/arch/openrisc/include/asm/io.h
+@@ -48,5 +48,7 @@ static inline void __iomem *ioremap_nocache(phys_addr_t offset,
+ 			 __pgprot(pgprot_val(PAGE_KERNEL) | _PAGE_CI));
+ }
+ 
 +#include <asm-generic/ioremap-nopost.h>
- 
- extern void iounmap(volatile void __iomem *addr);
- 
++
+ extern void iounmap(void *addr);
+ #endif
 -- 
 2.10.0
