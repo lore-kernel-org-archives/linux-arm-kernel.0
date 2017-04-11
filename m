@@ -1,72 +1,49 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 11 Apr 2017 16:05:23 -0500
-Subject: [PATCH v2 3/3] ARM: dts: da850: Add node for LEGO MINDSTORMS EV3
- Battery
+Date: Tue, 11 Apr 2017 16:05:21 -0500
+Subject: [PATCH v2 1/3] dt-bindings: power: supply: New bindings for LEGO
+ MINDSTORMS EV3 battery
 In-Reply-To: <1491944723-32174-1-git-send-email-david@lechnology.com>
 References: <1491944723-32174-1-git-send-email-david@lechnology.com>
-Message-ID: <1491944723-32174-4-git-send-email-david@lechnology.com>
+Message-ID: <1491944723-32174-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new node to the LEGO MINDSTORMS EV3 device tree for the battery.
+This add a new device tree binding for LEGO MINDSTORMS EV3 battery. The EV3
+has some built-in capability for monitoring the attached battery.
 
 Signed-off-by: David Lechner <david@lechnology.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/da850-lego-ev3.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ .../bindings/power/supply/lego_ev3_battery.txt      | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/supply/lego_ev3_battery.txt
 
-diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
-index c20580a..99cd561 100644
---- a/arch/arm/boot/dts/da850-lego-ev3.dts
-+++ b/arch/arm/boot/dts/da850-lego-ev3.dts
-@@ -172,6 +172,18 @@
- 		gpio = <&gpio 111 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
+diff --git a/Documentation/devicetree/bindings/power/supply/lego_ev3_battery.txt b/Documentation/devicetree/bindings/power/supply/lego_ev3_battery.txt
+new file mode 100644
+index 0000000..5485633
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/supply/lego_ev3_battery.txt
+@@ -0,0 +1,21 @@
++LEGO MINDSTORMS EV3 Battery
++~~~~~~~~~~~~~~~~~~~~~~~~~~~
 +
-+	/*
-+	 * The EV3 can use 6-AA batteries or a rechargeable Li-ion battery pack.
-+	 */
++LEGO MINDSTORMS EV3 has some built-in capability for monitoring the battery.
++It uses 6 AA batteries or a special Li-ion rechargeable battery pack that is
++detected by a key switch in the battery compartment.
++
++Required properties:
++ - compatible: Must be "lego,ev3-battery"
++ - io-channels: phandles to analog inputs for reading voltage and current
++ - io-channel-names: Must be "voltage", "current"
++ - rechargeable-gpios: phandle to the rechargeable battery indication gpio
++
++Example:
++
 +	battery {
-+		pinctrl-names = "default";
-+		pintctrl-0 = <&battery_pins>;
 +		compatible = "lego,ev3-battery";
 +		io-channels = <&adc 4>, <&adc 3>;
 +		io-channel-names = "voltage", "current";
 +		rechargeable-gpios = <&gpio 136 GPIO_ACTIVE_LOW>;
 +	};
- };
- 
- &pmx_core {
-@@ -235,6 +247,15 @@
- 			0x34 0x00000008 0x0000000f
- 		>;
- 	};
-+
-+	battery_pins: pinmux_battery_pins {
-+		pinctrl-single,bits = <
-+			/* GP0[6] */
-+			0x04 0x00000080 0x000000f0
-+			/* GP8[8] */
-+			0x4c 0x00000080 0x000000f0
-+		>;
-+	};
- };
- 
- &pinconf {
-@@ -349,6 +370,13 @@
- 
- &gpio {
- 	status = "okay";
-+
-+	/* Don't pull down battery voltage adc io channel */
-+	batt_volt_en {
-+		gpio-hog;
-+		gpios = <6 GPIO_ACTIVE_HIGH>;
-+		output-low;
-+	};
- };
- 
- &usb_phy {
 -- 
 2.7.4
