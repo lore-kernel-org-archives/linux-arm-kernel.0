@@ -1,74 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 11 Apr 2017 18:12:25 +0200
-Subject: [PATCH 0/7] arm64: marvell: add cryptographic engine support for
- 7k/8k
-In-Reply-To: <20170410093903.GA8035@gondor.apana.org.au> (Herbert Xu's message
- of "Mon, 10 Apr 2017 17:39:03 +0800")
-References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
- <20170410093903.GA8035@gondor.apana.org.au>
-Message-ID: <87efwyj53q.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Apr 2017 17:21:24 +0100
+Subject: [RFC PATCH 3/7] iommu/arm-smmu-v3: Introduce smmu option
+ USE_SHARED_IRQS for Silicon errata
+In-Reply-To: <b84e2383-1a65-3c5a-8e2c-28eafdb20adc@arm.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-4-git-send-email-linucherian@gmail.com>
+ <b84e2383-1a65-3c5a-8e2c-28eafdb20adc@arm.com>
+Message-ID: <20170411162123.GF17109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
- 
- On lun., avril 10 2017, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+On Tue, Apr 11, 2017 at 04:54:26PM +0100, Robin Murphy wrote:
+> On 11/04/17 15:42, linucherian at gmail.com wrote:
+> > From: Geetha <gakula@cavium.com>
+> > 
+> > Cavium 99xx SMMU implementation doesn't not support unique irq lines for
+> > gerror, eventq and cmdq-sync. USE_SHARED_IRQS option enables to use single
+> > irq line for all three interrupts.
+> 
+> AFAICS, there's nothing actually wrong with using shared wired IRQs -
+> the architecture spec doesn't appear to say anything about it. I think
+> it might suffice to simply add IRQF_SHARED if we can see the SMMU
+> doesn't support MSIs anyway - it doesn't really seem like something we
+> need to treat as a specific quirk.
 
-> On Wed, Mar 29, 2017 at 02:44:25PM +0200, Antoine Tenart wrote:
->> Hi all,
->> 
->> This series adds support for the Inside Secure SafeXcel EIP197
->> cryptographic engine which can be found on Marvell Armada 7k and 8k
->> boards. A new cryptographic engine driver is added, as well as the
->> relevant device tree definition for the Armada 7040 DB and 8040 DB
->> boards.
->> 
->> This driver needs two firmwares to work correctly. These firmware are
->> usually used for more advanced operations than the ones supported (as of
->> now), but we still need them to pass the data to the internal
->> cryptographic engine.
->> 
->> This series was tested in various ways on both the Armada 7040 DB and
->> the Armada 8040 DB: using the crypto framework self tests, using tcrypt
->> and while performing various transfers with iperf on top of IPsec.
->> 
->> This series is based on top of v4.11-rc1, and is available on a branch
->> (which also contains the PPv2 support for 7k/8k, to ease the process of
->> testing IPsec): https://github.com/atenart/linux  v4.11-rc1/7k8k-crypto
->> I can rebase if needed.
->> 
->> Thanks,
->> Antoine
->> 
->> 
->> Antoine Tenart (7):
->>   Documentation/bindings: Document the SafeXel cryptographic engine
->>     driver
->>   crypto: inside-secure: add SafeXcel EIP197 crypto engine driver
->>   MAINTAINERS: add a maintainer for the Inside Secure crypto driver
->>   arm64: marvell: dts: add crypto engine description for 7k/8k
->>   arm64: marvell: dts: enable the crypto engine on the Armada 7040 DB
->>   arm64: marvell: dts: enable the crypto engine on the Armada 8040 DB
->>   arm64: defconfig: enable the Safexcel crypto engine as a module
->
-> I have no problems with the crypto bits.
+No, this is not permitted by the spec. See 3.18.2 ("Interrupt sources"),
+where it's clear that each source asserts a *unique* wired interrupt.
 
-Does it means that you agree that I apply the arm-soc related patches
-(from 4 to 7) to my mvebu trees?
+Geetha: does your implementation support MSIs?
 
-Thanks,
-
-Gregory
-
->
-> Thanks,
-> -- 
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
