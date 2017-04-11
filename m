@@ -1,32 +1,42 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue, 11 Apr 2017 14:44:19 +0100
-Subject: [PATCH] drm/mediatek: re-phrase DRM_INFO error message
-Message-ID: <20170411134419.21277-1-colin.king@canonical.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Apr 2017 15:03:34 +0100
+Subject: [PATCH v2 08/11] mfd: axp20x: add axp20x-regulator cell for AXP803
+In-Reply-To: <20170407183441.58750-9-icenowy@aosc.io>
+References: <20170407183441.58750-1-icenowy@aosc.io>
+ <20170407183441.58750-9-icenowy@aosc.io>
+Message-ID: <20170411140334.7dqrrvjsyoqa2jdf@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Sat, 08 Apr 2017, Icenowy Zheng wrote:
 
-The current message contains a spelling mistake and is not easily
-parsable. Re-phrase it to be more understandable.
+> As axp20x-regulator now supports AXP803, add a cell for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/mfd/axp20x.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 2268a6a9aa2c..08b9bbd5bd71 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -839,6 +839,8 @@ static struct mfd_cell axp803_cells[] = {
+>  		.name			= "axp20x-pek",
+>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+>  		.resources		= axp803_pek_resources,
+> +	}, {
+> +		.name			= "axp20x-regulator",
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/gpu/drm/mediatek/mtk_dsi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'd prefer it if you placed single lined entries on one line.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 808b995a990f..79d240ff1331 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -933,7 +933,7 @@ static u32 mtk_dsi_recv_cnt(u8 type, u8 *read_data)
- 		DRM_INFO("type is 0x02, try again\n");
- 		break;
- 	default:
--		DRM_INFO("type(0x%x) cannot be non-recognite\n", type);
-+		DRM_INFO("type(0x%x) not recognized\n", type);
- 		break;
- 	}
- 
+Like this:
+
+	{	.name			= "axp20x-regulator" }
+
+
 -- 
-2.11.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
