@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:56 +0100
-Subject: [PATCH v3 16/32] mips: include default ioremap_nopost() implementation
+Date: Tue, 11 Apr 2017 13:28:47 +0100
+Subject: [PATCH v3 07/32] arc: include default ioremap_nopost() implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-17-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-8-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,24 +24,23 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: Huacai Chen <chenhc@lemote.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
 ---
- arch/mips/include/asm/io.h | 1 +
+ arch/arc/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/mips/include/asm/io.h b/arch/mips/include/asm/io.h
-index ecabc00..d8d1bae 100644
---- a/arch/mips/include/asm/io.h
-+++ b/arch/mips/include/asm/io.h
-@@ -257,6 +257,7 @@ static inline void __iomem * __ioremap_mode(phys_addr_t offset, unsigned long si
- #define ioremap_nocache(offset, size)					\
- 	__ioremap_mode((offset), (size), _CACHE_UNCACHED)
- #define ioremap_uc ioremap_nocache
+diff --git a/arch/arc/include/asm/io.h b/arch/arc/include/asm/io.h
+index c22b181..58686c8 100644
+--- a/arch/arc/include/asm/io.h
++++ b/arch/arc/include/asm/io.h
+@@ -39,6 +39,7 @@ extern void iounmap(const void __iomem *addr);
+ #define ioremap_nocache(phy, sz)	ioremap(phy, sz)
+ #define ioremap_wc(phy, sz)		ioremap(phy, sz)
+ #define ioremap_wt(phy, sz)		ioremap(phy, sz)
 +#include <asm-generic/ioremap-nopost.h>
  
  /*
-  * ioremap_cachable -	map bus memory into CPU space
+  * io{read,write}{16,32}be() macros
 -- 
 2.10.0
