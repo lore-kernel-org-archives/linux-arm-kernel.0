@@ -1,121 +1,89 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 11 Apr 2017 17:32:09 +0800
-Subject: [PATCH 00/14] arm_pmu: ACPI support
-In-Reply-To: <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
- <58CA8C8A.8080405@huawei.com>
- <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
-Message-ID: <58ECA299.6060704@huawei.com>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Tue, 11 Apr 2017 12:41:59 +0300
+Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
+ functions
+In-Reply-To: <20170411105605.5ea65f75@bbrezillon>
+References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
+ <20170410163558.494cf9be@bbrezillon>
+ <ba255c5b-ff6e-a6fd-0546-9dde04026f4c@microchip.com>
+ <20170411105605.5ea65f75@bbrezillon>
+Message-ID: <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/3/21 2:11, Ganapatrao Kulkarni wrote:
-> Hi Hanjun,
->
-> On Thu, Mar 16, 2017 at 6:30 PM, Hanjun Guo <guohanjun@huawei.com> wrote:
->> On 2017/3/10 19:04, Mark Rutland wrote:
->>> Hi,
->>>
->>> This series implements ACPI support in the ARM PMU code. It borrows some code
->>> from Jeremy's series [1], but takes a different approach to probing and
->>> association, using the usual hotplug state machine, minimising external changes
->>> required, and simplifying the relationship with the common arm_pmu code.
->>>
->>> The first few patches are preparatory cleanup/refactoring, with the latter half
->>> of the series being specific to ACPI support.
->>>
->>> The series is based on my IRQ rework patches [2]. I've pushed the whole series
->>> out to the arm/perf/acpi branch [3] of my kernel.org repo.
->>>
->>> Due to the innards of the hotplug callback framework, it's not entirely
->>> safe to register a PMU in a hotplug callback. Due to this, we can only
->>> associated hotplugged CPUs with a PMU if a matching CPU was around at
->>> probe time. A similar restriction already applies to DT systems. We may
->>> be able to relax this with some future work.
->>>
->>> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
->>> are correctly associated, I've tested with the following:
->>>
->>>   $ taskset -c ${SOME_CPU_HERE} perf record \
->>>     -e armv8_pmuv3_0/cpu_cycles/ \
->>>     -e armv8_pmuv3_1/cpu_cycles/ \
->>>     cat /proc/interrupts
->>>
->>> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
->>> association logic. This has also been tested in a VM using PPIs; I do not have
->>> access to a host machine which itself uses PPIs.
->> Booted OK and 'perf list' got on Hisilicon D03:
->>
->> d03-09:~ # perf list
->>
->> List of pre-defined events (to be used in -e):
->>
->>   branch-misses                                      [Hardware event]
->>   bus-cycles                                         [Hardware event]
->>   cache-misses                                       [Hardware event]
->>   cache-references                                   [Hardware event]
->>   cpu-cycles OR cycles                               [Hardware event]
->>   instructions                                       [Hardware event]
->>
->>   alignment-faults                                   [Software event]
->>   context-switches OR cs                             [Software event]
->>   cpu-clock                                          [Software event]
->>   cpu-migrations OR migrations                       [Software event]
->>   dummy                                              [Software event]
->>   emulation-faults                                   [Software event]
->>   major-faults                                       [Software event]
->>   minor-faults                                       [Software event]
->>   page-faults OR faults                              [Software event]
->>   task-clock                                         [Software event]
->>
->>   L1-dcache-load-misses                              [Hardware cache event]
->>   L1-dcache-loads                                    [Hardware cache event]
->>   L1-dcache-store-misses                             [Hardware cache event]
->>   L1-dcache-stores                                   [Hardware cache event]
->>   L1-icache-load-misses                              [Hardware cache event]
->>   L1-icache-loads                                    [Hardware cache event]
->>   branch-load-misses                                 [Hardware cache event]
->>   branch-loads                                       [Hardware cache event]
->>   dTLB-load-misses                                   [Hardware cache event]
->>   iTLB-load-misses                                   [Hardware cache event]
->>
->>   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
->>   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
->>   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
->>   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
->>   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
->>   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
->>   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
->>   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
->>   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
->>   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
->>   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
->>   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
->>   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
->>   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
->>   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
->>   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
->>   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
->>   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
->>   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
->>   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
->>   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
->>   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
->>   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
->>   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
->>
->>   rNNN                                               [Raw hardware event descriptor]
->>   cpu/t1=v1[,t2=v2,t3 ...]/modifier                  [Raw hardware event descriptor]
->>    (see 'man perf-list' on how to encode it)
->>
->>   mem:<addr>[/len][:access]                          [Hardware breakpoint]
->>
->>
->> Try some basic perf event and it works, anything else I can try in specific?
-> you can try perf fuzzer
 
-Sorry, just back from my paternity leave, I will try Mark's v2 (or v3 if there is a
-updated one) :)
 
-Thanks
-Hanjun
+On 11.04.2017 11:56, Boris Brezillon wrote:
+> On Tue, 11 Apr 2017 11:22:39 +0300
+> m18063 <Claudiu.Beznea@microchip.com> wrote:
+> 
+>> Hi Boris,
+>>
+>> On 10.04.2017 17:35, Boris Brezillon wrote:
+>>> On Mon, 10 Apr 2017 17:20:20 +0300
+>>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+>>>   
+>>>> Implement suspend and resume power management specific
+>>>> function to allow PWM controller to correctly suspend
+>>>> and resume.
+>>>>
+>>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>>> ---
+>>>>  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>>>  1 file changed, 81 insertions(+)
+>>>>
+>>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+>>>> index 530d7dc..75177c6 100644
+>>>> --- a/drivers/pwm/pwm-atmel.c
+>>>> +++ b/drivers/pwm/pwm-atmel.c
+>>>> @@ -58,6 +58,8 @@
+>>>>  #define PWM_MAX_PRD		0xFFFF
+>>>>  #define PRD_MAX_PRES		10
+>>>>  
+>>>> +#define PWM_MAX_CH_NUM		(4)
+>>>> +
+>>>>  struct atmel_pwm_registers {
+>>>>  	u8 period;
+>>>>  	u8 period_upd;
+>>>> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
+>>>>  	u8 duty_upd;
+>>>>  };
+>>>>  
+>>>> +struct atmel_pwm_pm_ctx {
+>>>> +	u32 cmr;
+>>>> +	u32 cdty;
+>>>> +	u32 cprd;
+>>>> +};
+>>>> +
+>>>>  struct atmel_pwm_chip {
+>>>>  	struct pwm_chip chip;
+>>>>  	struct clk *clk;
+>>>>  	void __iomem *base;
+>>>>  	const struct atmel_pwm_registers *regs;
+>>>> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];  
+>>>
+>>> Hm, I'm pretty sure you can rely on the current PWM state and call
+>>> atmel_pwm_apply() at resume time instead of doing that. See what I did
+>>> here [1].  
+>>
+>> I agree with the approach you propose but the thing is the atmel_pwm_apply()
+>> take care of both, current PWM state and the new state received as argument
+>> in order to change only duty factor without disabling the PWM channel (if
+>> channel is enabled) and then returns. Changing PWM duty and period and polarity
+>> in the same step without disabling + enabling the PWM channel (with atomic
+>> approach) may lead to intermediary unwanted output waveforms (the IP doesn't
+>> support this for ordinary PWM channels). To take advantage of atmel_pwm_apply()
+>> (in the formit is today) in resume() hook might need to first call it to disable
+>> channel and then to enable it. Or atmel_pwm_apply() should be changed to also
+>> disable + enable the channel when user changes the duty factor at runtime.
+> 
+> Nope. Just save the state at suspend time, implement ->get_state() and
+> use it to retrieve the real PWM state when resuming before restoring
+> the state you saved during suspend.
+Ok.
+> But anyway, as Thierry explained, I'm not sure we should take the
+> 're-apply PWM state' action here. It's probably better to leave this
+> decision to the PWM user. 
+Do you thinks we should proceed with restoring the registers behind
+the re-apply as other drivers does at this moment?
+> 
