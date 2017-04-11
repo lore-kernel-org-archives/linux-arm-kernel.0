@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:07 +0100
-Subject: [PATCH v3 27/32] x86: include default ioremap_nopost() implementation
+Date: Tue, 11 Apr 2017 13:28:54 +0100
+Subject: [PATCH v3 14/32] metag: include default ioremap_nopost()
+ implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-28-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-15-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,24 +25,22 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Ingo Molnar <mingo@redhat.com>
+Cc: James Hogan <james.hogan@imgtec.com>
 ---
- arch/x86/include/asm/io.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/metag/include/asm/io.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-index 7afb0e2..9d431ef 100644
---- a/arch/x86/include/asm/io.h
-+++ b/arch/x86/include/asm/io.h
-@@ -201,6 +201,7 @@ extern void set_iounmap_nonlazy(void);
- #ifdef __KERNEL__
+diff --git a/arch/metag/include/asm/io.h b/arch/metag/include/asm/io.h
+index 9890f21..c805e0d 100644
+--- a/arch/metag/include/asm/io.h
++++ b/arch/metag/include/asm/io.h
+@@ -166,4 +166,6 @@ extern void __iounmap(void __iomem *addr);
+ #define iounmap(addr)                           \
+ 	__iounmap(addr)
  
- #include <asm-generic/iomap.h>
 +#include <asm-generic/ioremap-nopost.h>
- 
- /*
-  * Convert a virtual cached pointer to an uncached pointer
++
+ #endif  /* _ASM_METAG_IO_H */
 -- 
 2.10.0
