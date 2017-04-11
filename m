@@ -1,176 +1,52 @@
 From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Tue, 11 Apr 2017 05:20:27 +0000
-Subject: [v3, 2/7] mmc: sdhci-of-esdhc: add support for signal voltage
- switch
-In-Reply-To: <e7e08c87-ecd6-ab24-636c-7707a5172b08@intel.com>
+Date: Tue, 11 Apr 2017 05:24:13 +0000
+Subject: [v3, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
+In-Reply-To: <CAPDyKFpN-+7mxxeBHEELROWsn275Mec6unDHdnY3Gsz3oKT9pw@mail.gmail.com>
 References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
- <1490600982-5410-3-git-send-email-yangbo.lu@nxp.com>
- <e7e08c87-ecd6-ab24-636c-7707a5172b08@intel.com>
-Message-ID: <DB6PR0401MB2536429268B58A13C69C5808F8000@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+ <DB6PR0401MB253627A0ABBF6DA9EC063A84F8010@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+ <CAPDyKFpN-+7mxxeBHEELROWsn275Mec6unDHdnY3Gsz3oKT9pw@mail.gmail.com>
+Message-ID: <DB6PR0401MB2536E5DEA75B7A1330D0FC39F8000@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+Hi Uffe and Adrian,
 
+Thanks for your quick response.
+I dropped the dts patches and would send the new version mmc patchset which addressed Adrian's comments.
+The dts patches would be sent separately to arm soc and will not have new bindings/compatibles to discuss.
+
+Thanks.
+
+
+Best regards,
+Yangbo Lu
 
 > -----Original Message-----
-> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
-> owner at vger.kernel.org] On Behalf Of Adrian Hunter
-> Sent: Monday, April 10, 2017 8:38 PM
-> To: Y.B. Lu; linux-mmc at vger.kernel.org; devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; ulf.hansson at linaro.org; Rob Herring;
-> Mark Rutland; Catalin Marinas; Will Deacon
-> Cc: Xiaobo Xie
-> Subject: Re: [v3, 2/7] mmc: sdhci-of-esdhc: add support for signal
-> voltage switch
+> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+> Sent: Monday, April 10, 2017 6:49 PM
+> To: Y.B. Lu
+> Cc: linux-mmc at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Adrian Hunter; Rob Herring; Mark Rutland;
+> Catalin Marinas; Will Deacon; Xiaobo Xie
+> Subject: Re: [v3, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
 > 
-> On 27/03/17 10:49, Yangbo Lu wrote:
-> > eSDHC supports signal voltage switch from 3.3v to 1.8v by
-> > eSDHC_PROCTL[VOLT_SEL] bit. This bit changes the value of output
-> > signal SDHC_VS, and there must be a control circuit out of eSDHC to
-> > change the signal voltage according to SDHC_VS output signal.
+> On 10 April 2017 at 10:20, Y.B. Lu <yangbo.lu@nxp.com> wrote:
+> > Hi Andrian and Uffe,
 > >
-> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> > Do you have any comments on MMC patches?
+> > Could you help to merge the mmc patches if there is no changes
+> requested?
 > 
-> Apart from minor comment below:
+> I am waiting for Adrian's acks.
 > 
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+> >
+> > Regarding to the dts patches, I have some more platforms to support.
+> > So I'd like to drop them currently, and send them all to arm mailing
+> list for reviewing.
 > 
-> > ---
-> > Changes for v2:
-> > 	- Used Adrain's method to support voltage switching:
-> >           host->mmc_host_ops.start_signal_voltage_switch =
-> >                      esdhc_signal_voltage_switch; Changes for v3:
-> > 	- Put .start_signal_voltage_switch assigning after IS_ERR(host)
-> check.
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc.h    |  1 +
-> >  drivers/mmc/host/sdhci-of-esdhc.c | 74
-> > +++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 75 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-esdhc.h
-> > b/drivers/mmc/host/sdhci-esdhc.h index 5343fc0..6869567 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc.h
-> > +++ b/drivers/mmc/host/sdhci-esdhc.h
-> > @@ -37,6 +37,7 @@
-> >
-> >  /* Protocol Control Register */
-> >  #define ESDHC_PROCTL			0x28
-> > +#define ESDHC_VOLT_SEL			0x00000400
-> >  #define ESDHC_CTRL_4BITBUS		(0x1 << 1)
-> >  #define ESDHC_CTRL_8BITBUS		(0x2 << 1)
-> >  #define ESDHC_CTRL_BUSWIDTH_MASK	(0x3 << 1)
-> > diff --git a/drivers/mmc/host/sdhci-of-esdhc.c
-> > b/drivers/mmc/host/sdhci-of-esdhc.c
-> > index 7ce1caf..a70499a 100644
-> > --- a/drivers/mmc/host/sdhci-of-esdhc.c
-> > +++ b/drivers/mmc/host/sdhci-of-esdhc.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/err.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/delay.h>
-> >  #include <linux/module.h>
-> >  #include <linux/sys_soc.h>
-> > @@ -559,6 +560,76 @@ static void esdhc_reset(struct sdhci_host *host,
-> u8 mask)
-> >  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);  }
-> >
-> > +/* The SCFG, Supplemental Configuration Unit, provides SoC specific
-> > + * configuration and status registers for the device. There is a
-> > + * SDHC IO VSEL control register on SCFG for some platforms. It's
-> > + * used to support SDHC IO voltage switching.
-> > + */
-> > +static const struct of_device_id scfg_device_ids[] = {
-> > +	{ .compatible = "fsl,t1040-scfg", },
-> > +	{ .compatible = "fsl,ls1012a-scfg", },
-> > +	{ .compatible = "fsl,ls1046a-scfg", },
-> > +	{}
-> > +};
-> > +
-> > +/* SDHC IO VSEL control register definition */
-> > +#define SCFG_SDHCIOVSELCR	0x408
-> > +#define SDHCIOVSELCR_TGLEN	0x80000000
-> > +#define SDHCIOVSELCR_VSELVAL	0x60000000
-> > +#define SDHCIOVSELCR_SDHC_VS	0x00000001
-> > +
-> > +static int esdhc_signal_voltage_switch(struct mmc_host *mmc,
-> > +				       struct mmc_ios *ios)
-> > +{
-> > +	struct sdhci_host *host = mmc_priv(mmc);
-> > +	struct device_node *scfg_node;
-> > +	void __iomem *scfg_base = NULL;
-> > +	u32 sdhciovselcr;
-> > +	u32 val;
-> > +
-> > +	/*
-> > +	 * Signal Voltage Switching is only applicable for Host Controllers
-> > +	 * v3.00 and above.
-> > +	 */
-> > +	if (host->version < SDHCI_SPEC_300)
-> > +		return 0;
-> > +
-> > +	val = sdhci_readl(host, ESDHC_PROCTL);
-> > +
-> > +	switch (ios->signal_voltage) {
-> > +	case MMC_SIGNAL_VOLTAGE_330:
-> > +		val &= ~ESDHC_VOLT_SEL;
-> > +		sdhci_writel(host, val, ESDHC_PROCTL);
-> > +		return 0;
-> > +	case MMC_SIGNAL_VOLTAGE_180:
-> > +		scfg_node = of_find_matching_node(NULL, scfg_device_ids);
-> > +		if (scfg_node)
-> > +			scfg_base = of_iomap(scfg_node, 0);
-> > +		if (scfg_base) {
-> > +			sdhciovselcr = SDHCIOVSELCR_TGLEN |
-> > +				       SDHCIOVSELCR_VSELVAL;
-> > +			iowrite32be(sdhciovselcr,
-> > +				scfg_base + SCFG_SDHCIOVSELCR);
+> If it's new bindings/compatibles, the DT doc changes needs to be
+> discussed and agreed upon first. Actual changes to the DTS files, should
+> preferably go via the arm soc tree.
 > 
-> In other places there is support for little endian also, so why not here?
-
-[Lu Yangbo-B47093] The SCFG unit is always a big-endian module on both ARM and PPC QorIQ platforms.
-There is little possibility to have little-endian in future.
-
-> 
-> > +
-> > +			val |= ESDHC_VOLT_SEL;
-> > +			sdhci_writel(host, val, ESDHC_PROCTL);
-> > +			mdelay(5);
-> > +
-> > +			sdhciovselcr = SDHCIOVSELCR_TGLEN |
-> > +				       SDHCIOVSELCR_SDHC_VS;
-> > +			iowrite32be(sdhciovselcr,
-> > +				scfg_base + SCFG_SDHCIOVSELCR);
-> > +			iounmap(scfg_base);
-> > +		} else {
-> > +			val |= ESDHC_VOLT_SEL;
-> > +			sdhci_writel(host, val, ESDHC_PROCTL);
-> > +		}
-> > +		return 0;
-> > +	default:
-> > +		return 0;
-> > +	}
-> > +}
-> > +
-> >  #ifdef CONFIG_PM_SLEEP
-> >  static u32 esdhc_proctl;
-> >  static int esdhc_of_suspend(struct device *dev) @@ -714,6 +785,9 @@
-> > static int sdhci_esdhc_probe(struct platform_device *pdev)
-> >  	if (IS_ERR(host))
-> >  		return PTR_ERR(host);
-> >
-> > +	host->mmc_host_ops.start_signal_voltage_switch =
-> > +		esdhc_signal_voltage_switch;
-> > +
-> >  	esdhc_init(pdev, host);
-> >
-> >  	sdhci_get_of_property(pdev);
-> >
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+> Kind regards
+> Uffe
