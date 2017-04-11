@@ -1,36 +1,48 @@
 From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Tue, 11 Apr 2017 20:12:42 +0530
-Subject: [RFC PATCH 4/7] ACPICA: IORT: Add SMMuV3 model definitions.
+Date: Tue, 11 Apr 2017 20:12:44 +0530
+Subject: [RFC PATCH 6/7] ACPI/IORT: Fixup SMMUv3 resource size for Cavium 99xx
+ SMMUv3 model.
 In-Reply-To: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
 References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
-Message-ID: <1491921765-29475-5-git-send-email-linucherian@gmail.com>
+Message-ID: <1491921765-29475-7-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linu Cherian <linu.cherian@cavium.com>
 
-Add SMMuV3 model definitions.
+Cavium 99xx implementation doesn't support second page in SMMU
+register space. Hence, resource size is set as 64k for this model.
 
 Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 ---
- include/acpi/actbl2.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/acpi/arm64/iort.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index 2b4af07..9db67d6 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -778,6 +778,11 @@ struct acpi_iort_smmu {
- #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
- #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 22e08d2..ac22280 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -765,12 +765,20 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
+ {
+ 	struct acpi_iort_smmu_v3 *smmu;
+ 	int num_res = 0;
++	unsigned long size = SZ_128K;
  
-+#define ACPI_IORT_SMMU_V3               0x00000000      /* Generic SMMUv3 */
-+#define ACPI_IORT_SMMU_CORELINK_MMU600  0x00000001      /* ARM Corelink MMU-600 */
-+#define ACPI_IORT_SMMU_V3_HISILICON     0x00000002      /* HiSilicon SMMUv3 */
-+#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000003      /* Cavium CN99xx SMMUv3 */
+ 	/* Retrieve SMMUv3 specific data */
+ 	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+ 
++	/*
++	 * Override the size, for Cavium CN99xx implementations
++	 * which doesn't support the page 1 SMMU register space.
++	 */
++	if (smmu->model == ACPI_IORT_SMMU_V3_CAVIUM_CN99XX)
++		size = SZ_64K;
 +
- /* Masks for Flags field above */
+ 	res[num_res].start = smmu->base_address;
+-	res[num_res].end = smmu->base_address + SZ_128K - 1;
++	res[num_res].end = smmu->base_address + size - 1;
+ 	res[num_res].flags = IORESOURCE_MEM;
  
- #define ACPI_IORT_SMMU_DVM_SUPPORTED    (1)
+ 	num_res++;
 -- 
 1.9.1
