@@ -1,77 +1,25 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 12 Apr 2017 04:00:13 +0800
-Subject: [PATCH v2 2/2] ARM: dts: imx7: add USDHC NAND and IPG clock to
- SDHC instances
-In-Reply-To: <20170410210015.1620-2-stefan@agner.ch>
-References: <20170410210015.1620-1-stefan@agner.ch>
- <20170410210015.1620-2-stefan@agner.ch>
-Message-ID: <20170411200013.GB13181@b29396-OptiPlex-7040>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Tue, 11 Apr 2017 00:40:09 -0400
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
+References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
+ <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
+ <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
+ <CAPub14-sFgx=oCHzJPb9h9b_V0rbn5UAMDNJ-yTkjhz38JPqMQ@mail.gmail.com>
+ <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
+ <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
+ <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
+Message-ID: <5d1fc066-d551-31cf-51bc-8fb17d7e2ec3@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 02:00:15PM -0700, Stefan Agner wrote:
-> The USDHC instances need the USDHC NAND and IPG clock in order to
-> operate. Reference them properly by replacing the dummy clocks with
-> the actual clocks.
-> 
-> Note that both clocks are currently implicitly enabled since they
-> are part of the i.MX 7 clock drivers init_on list. This might
-> change in the future.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+On 04/06/2017 11:58 AM, Catalin Marinas wrote:
 
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+> The Cavium guys haven't shown any numbers (IIUC) to back the
+> L1_CACHE_BYTES performance improvement but I would not revert the
+> original commit since ARCH_DMA_MINALIGN definitely needs to cover the
+> maximum available cache line size, which is 128 for them.
 
-Regards
-Dong Aisheng
+I am pinging them via other channels to ensure they've seen this.
 
-> ---
-> This patch depends on "clk: imx7d: add the missing ipg_root_clk"
-> which adds the IPG clock.
-> 
-> --
-> Stefan
-> 
->  arch/arm/boot/dts/imx7s.dtsi | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index c4f12fd2e044..843eb379e1ea 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -934,8 +934,8 @@
->  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
->  				reg = <0x30b40000 0x10000>;
->  				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&clks IMX7D_CLK_DUMMY>,
-> -					<&clks IMX7D_CLK_DUMMY>,
-> +				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
-> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
->  					<&clks IMX7D_USDHC1_ROOT_CLK>;
->  				clock-names = "ipg", "ahb", "per";
->  				bus-width = <4>;
-> @@ -946,8 +946,8 @@
->  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
->  				reg = <0x30b50000 0x10000>;
->  				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&clks IMX7D_CLK_DUMMY>,
-> -					<&clks IMX7D_CLK_DUMMY>,
-> +				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
-> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
->  					<&clks IMX7D_USDHC2_ROOT_CLK>;
->  				clock-names = "ipg", "ahb", "per";
->  				bus-width = <4>;
-> @@ -958,8 +958,8 @@
->  				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
->  				reg = <0x30b60000 0x10000>;
->  				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&clks IMX7D_CLK_DUMMY>,
-> -					<&clks IMX7D_CLK_DUMMY>,
-> +				clocks = <&clks IMX7D_IPG_ROOT_CLK>,
-> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
->  					<&clks IMX7D_USDHC3_ROOT_CLK>;
->  				clock-names = "ipg", "ahb", "per";
->  				bus-width = <4>;
-> -- 
-> 2.12.1
-> 
+Jon.
