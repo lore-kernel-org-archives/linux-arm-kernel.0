@@ -1,28 +1,32 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 12 Apr 2017 09:15:28 +1000
-Subject: [PATCH v3 21/32] powerpc: include default ioremap_nopost()
- implementation
-In-Reply-To: <20170411142456.GB6821@red-moon>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <20170411122923.6285-22-lorenzo.pieralisi@arm.com>
- <1491917928.7236.8.camel@kernel.crashing.org>
- <20170411142456.GB6821@red-moon>
-Message-ID: <1491952528.7236.26.camel@kernel.crashing.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 11 Apr 2017 20:23:19 -0300
+Subject: [PATCH 2/2] ARM: dts: imx7: add USDHC NAND clock to SDHC instances
+In-Reply-To: <20170411025956.GA9067@b29396-OptiPlex-7040>
+References: <20170330005029.6472-1-stefan@agner.ch>
+ <20170330005029.6472-2-stefan@agner.ch>
+ <20170401030312.GB24882@b29396-OptiPlex-7040>
+ <5c8339900fa1bd6215fb94d4386f7e06@agner.ch>
+ <CAOMZO5CprxqnqRXMFJLBAgYAZGGnXNs3ZciyVz_mSLRnnSQQRQ@mail.gmail.com>
+ <CAOMZO5A7QQEe5rgBbJBzo8GY41aYV9WA8e9teCUROyihg0kq_g@mail.gmail.com>
+ <c95a7f535296623bdd4e4a640b3c27f5@agner.ch>
+ <20170411025956.GA9067@b29396-OptiPlex-7040>
+Message-ID: <CAOMZO5DOib3PfCOQ-yqKAJnKRJZ2eBnMJnA84y=sv+vsYdbbBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-11 at 15:24 +0100, Lorenzo Pieralisi wrote:
-> Ok, point taken. BTW, may I ask you guys to have a look into this
-> please ?
-> 
-> https://lkml.org/lkml/2017/4/6/743
-> 
-> It is a side effect of this thread (v2), not sure why <asm/io.h>
-> on powerpc has to include <linux/io.h>.
+On Mon, Apr 10, 2017 at 11:59 PM, Dong Aisheng <dongas86@gmail.com> wrote:
 
-Not sure how we ended up with that... it's odd indeed.
+> This is caused by ahb_root_clk gets disabled accidently and system hangs.
+>
+> Because this patch defines ipg_root_clk earlier before its parent
+> (ahb_root_clk) got registered, then it will be marked as a orphan clk
+> temporarily. Until the parent ahb_root_clk got registered, the clk core
+> will reparent it to the newly found parent. (see __clk_core_init() function).
+>
+> Due to CLK_SET_RATE_PARENT flag, the ahb clk will be enabled during
+> set_parent operation and then disabled after that.
+> Then system hang cause we still get no chance to run init_on clks.
+>
+> I just send out a proper fix patch with correct register sequence.
 
-Michael ? Any reason we can't just remove it ?
-
-Cheers,
-Ben.
+Excellent, thanks!
