@@ -1,73 +1,89 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 11 Apr 2017 23:00:48 +0800 (CST)
-Subject: [PATCH v2 03/11] dt-bindings: add device tree binding for X-Powers
- AXP803 PMIC
-In-Reply-To: <20170411140427.doq5atxk6ptjrp36@dell>
-References: <20170407183441.58750-1-icenowy@aosc.io>
- <20170407183441.58750-4-icenowy@aosc.io>
- <20170411140427.doq5atxk6ptjrp36@dell>
-Message-ID: <alpine.LNX.2.20.1704112237290.39759@x220i>
+From: ar@linux.vnet.ibm.com (Andrea Reale)
+Date: Tue, 11 Apr 2017 15:56:04 +0100
+Subject: [PATCH 5/5] Add "remove" probe driver for memory hot-remove
+In-Reply-To: <cover.1491920513.git.ar@linux.vnet.ibm.com>
+References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
+Message-ID: <0547052acd62958af1336281fcee8735c9d91d07.1491920514.git.ar@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Allows to remove sections of memory that have been previously offlined
+from userspace.
 
+This is symmetric to the "memory probe" interface, as described in
+Documentation/memory-hotplug.txt. It can be used to manually notify the
+OS that one memory section has been removed.
 
-On Tue, 11 Apr 2017, Lee Jones wrote:
+Please, remind that a memory section can only be removed after it has
+been logically off-lined; trying to remove a section which has not been
+previously off-lined is not supported and will have undefined (but most
+likely very bad) behaviour.
 
-> On Sat, 08 Apr 2017, Icenowy Zheng wrote:
->
->> AXP803 is a PMIC produced by Shenzhen X-Powers, with either I2C or RSB
->> bus.
->> 
->> Add a compatible for it.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->> Changes in v2:
->> - Place AXP803 before AXP806/809.
->> - Added Chen-Yu's ACK.
->>
->>  Documentation/devicetree/bindings/mfd/axp20x.txt | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> For my own reference:
->  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+To offline a section one can:
+# echo offline > /sys/devices/system/memory/memoryXXX/state
 
-Excuse me... Who will apply this patch?
+To use the remove interface to remove the section:
+# echo $((0xYYYYYY)) > /sys/devices/system/memory/remove
 
-I think this patch should be applied by you as it's in bindings/mfd 
-directory, however, if I'm wrong, please point out ;-)
+where 0xYYYYYY is the physical address of the memory section to remove.
 
->
->> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
->> index b41d2601c6ba..334fb19ce605 100644
->> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
->> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
->> @@ -6,12 +6,13 @@ axp202 (X-Powers)
->>  axp209 (X-Powers)
->>  axp221 (X-Powers)
->>  axp223 (X-Powers)
->> +axp803 (X-Powers)
->>  axp809 (X-Powers)
->>
->>  Required properties:
->>  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
->> -	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
->> -	      "x-powers,axp809"
->> +	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp803",
->> +	      "x-powers,axp806", "x-powers,axp809"
->>  - reg: The I2C slave address or RSB hardware address for the AXP chip
->>  - interrupt-parent: The parent interrupt controller
->>  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
->
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+---
+ drivers/base/memory.c | 34 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 33 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/memory.c b/drivers/base/memory.c
+index cc4f1d0..8e033b5 100644
+--- a/drivers/base/memory.c
++++ b/drivers/base/memory.c
+@@ -511,7 +511,36 @@ static DEVICE_ATTR(auto_online_blocks, 0644, show_auto_online_blocks,
+ }
+ 
+ static DEVICE_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
+-#endif
++
++#ifdef CONFIG_MEMORY_HOTREMOVE
++static ssize_t
++memory_remove_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t count)
++{
++	u64 phys_addr;
++	int nid, ret;
++	unsigned long pages_per_block = PAGES_PER_SECTION * sections_per_block;
++
++	ret = kstrtoull(buf, 0, &phys_addr);
++	if (ret)
++		return ret;
++
++	if (phys_addr & ((pages_per_block << PAGE_SHIFT) - 1))
++		return -EINVAL;
++
++	nid = memory_add_physaddr_to_nid(phys_addr);
++	ret = lock_device_hotplug_sysfs();
++	if (ret)
++		return ret;
++
++	remove_memory(nid, phys_addr,
++			 MIN_MEMORY_BLOCK_SIZE * sections_per_block);
++	unlock_device_hotplug();
++	return count;
++}
++static DEVICE_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
++#endif /* CONFIG_MEMORY_HOTREMOVE */
++#endif /* CONFIG_ARCH_MEMORY_PROBE */
+ 
+ #ifdef CONFIG_MEMORY_FAILURE
+ /*
+@@ -776,6 +805,9 @@ bool is_memblock_offlined(struct memory_block *mem)
+ static struct attribute *memory_root_attrs[] = {
+ #ifdef CONFIG_ARCH_MEMORY_PROBE
+ 	&dev_attr_probe.attr,
++#ifdef CONFIG_MEMORY_HOTREMOVE
++	&dev_attr_remove.attr,
++#endif
+ #endif
+ 
+ #ifdef CONFIG_MEMORY_FAILURE
+-- 
+1.9.1
