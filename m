@@ -1,50 +1,44 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 11 Apr 2017 23:19:36 +0200
-Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
-In-Reply-To: <20170411140613.jvhzsvrxa4evwxjh@dell>
-References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
- <20170411140613.jvhzsvrxa4evwxjh@dell>
-Message-ID: <20170411211936.GT2078@mai>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 11 Apr 2017 17:27:59 -0400
+Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <20170411211924.GC14778@bhelgaas-glaptop.roam.corp.google.com>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <20170411211924.GC14778@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <7b94bfbb-b3e6-cbc3-06a1-4490f4142ffe@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 03:06:13PM +0100, Lee Jones wrote:
-> On Sat, 08 Apr 2017, Daniel Lezcano wrote:
+On 4/11/2017 5:19 PM, Bjorn Helgaas wrote:
+> Hi Sinan,
 > 
-> > The hi655x multi function device is a PMIC providing regulators.
-> > 
-> > The PMIC also provides a clock for the WiFi and the Bluetooth, let's implement
-> > this clock in order to add it in the hi655x MFD and allow proper wireless
-> > initialization.
-> > 
-> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > ---
-> > 
-> > Changelog:
-> > 
-> >  V2:
-> >     - Added COMPILE_TEST option, compiled on x86
-> >     - Removed useless parenthesis
-> >     - Used of_clk_hw_simple_get() instead of deref dance
-> >     - Do bailout if the clock-names is not specified
-> >     - Rollback on error
-> >     - Folded mfd line change and binding
+> What are these patches based on?  I normally apply things to my "master"
+> branch, which is typically -rc1 or -rc2.  Right now it's v4.11-rc1, and
+> these don't apply cleanly:
 > 
-> Why did you do that?
+>   04:17:59 ~/linux (master)$ stg branch --create pci/aspm-sk-v8 v4.11-rc1
+>   Checking for changes in the working directory ... done
+>   Don't know how to determine parent branch from "v4.11-rc1"
+>   Branch "pci/aspm-sk-v8" created
+>   04:18:18 ~/linux (pci/aspm-sk-v8)$ stg import -M --sign m/sk-v8
+>   Checking for changes in the working directory ... done
+>   Importing patch "pci-aspm-introduce" ... done
+>   Importing patch "pci-aspm-split-pci_aspm_init" ... done
+>   Importing patch "pci-aspm-add-init-hook-to" ... error: patch failed: drivers/pci/pcie/aspm.c:798
+>   error: drivers/pci/pcie/aspm.c: patch does not apply
+>   stg import: Diff does not apply cleanly
 
-I thought as the V1 had comments you would have waited for the V2 and as it was
-trivial enough, it could be folded and picked up via the clk tree via with your
-acked-by.
+This is what I have.
 
-I realize it was not a good idea.
+41a7175 PCI/ASPM: move link_state cleanup to bridge remove
+3b646e2 PCI/ASPM: save power on values during bridge init
+181510d PCI/ASPM: add init hook to device_add
+282d008 PCI/ASPM: split pci_aspm_init() into two
+8e89fc2 PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+97da385 Linux 4.11-rc3
 
-Do you want to drop it from your tree or shall I resubmit a V3 without the mfd
-change?
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
