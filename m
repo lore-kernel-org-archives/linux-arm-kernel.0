@@ -1,66 +1,65 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 11 Apr 2017 20:48:28 +0300
-Subject: [RFC PATCH 3/3] cpufreq: imx6q: refine clk operations
-In-Reply-To: <1491969809-20154-4-git-send-email-aisheng.dong@nxp.com>
-References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
- <1491969809-20154-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1491932908.31718.33.camel@nxp.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Apr 2017 19:52:10 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+ <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+ <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
+ <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
+Message-ID: <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-12 at 12:03 +0800, Dong Aisheng wrote:
-> +static int num_clks;
-> +static struct clk_bulk_data clks[] = {
-> +	{ .id = "arm" },
-> +	{ .id = "pll1_sys" },
-> +	{ .id = "step" },
-> +	{ .id = "pll1_sw" },
-> +	{ .id = "pll2_pfd2_396m" },
-> +	{ .id = "pll2_bus" },
-> +	{ .id = "secondary_sel" },
-> +};
+On 11/04/2017 18:43, Marc Zyngier wrote:
 
-The .id is only required for initialization, it seems strange to keep
-it around runtime data. It might be better for this API to work with an
-array of clk* and separate array of names (or clk_bulk_init_data if we
-need flags). Variable references would be shorter and it would allow
-more data to be const.
+> On 11/04/17 17:26, Mason wrote:
+>
+>> Is there a function to map virq to the hwirq in any domain?
+> 
+> Be more precise. If you want the hwirq associated with the view of a
+> virq in a given domain, that's the hwirq field in the corresponding
+> irq_data structure. Or are you after something else?
 
-> -put_clk:
-> -	if (!IS_ERR(arm_clk))
-> -		clk_put(arm_clk);
-> -	if (!IS_ERR(pll1_sys_clk))
-> -		clk_put(pll1_sys_clk);
-> -	if (!IS_ERR(pll1_sw_clk))
-> -		clk_put(pll1_sw_clk);
-> -	if (!IS_ERR(step_clk))
-> -		clk_put(step_clk);
-> -	if (!IS_ERR(pll2_pfd2_396m_clk))
-> -		clk_put(pll2_pfd2_396m_clk);
-> -	if (!IS_ERR(pll2_bus_clk))
-> -		clk_put(pll2_bus_clk);
-> -	if (!IS_ERR(secondary_sel_clk))
-> -		clk_put(secondary_sel_clk);
-> +
-> +	clk_bulk_put(num_clks, clks);
-> +put_node:
-> ?	of_node_put(np);
-> +
-> ?	return ret;
-> ?}
+I registered an unmask method for my irq_chip.
+(IIUC, I'm supposed to unmask a specific MSI in this callback.)
+
+# cat /proc/interrupts 
+           CPU0       CPU1       
+ 30:          0          0    MSIfoo      0 Edge      aerdrv
+ 34:          0          0    MSIfoo 524288 Edge      xhci_hcd
+ 35:          0          0    MSIfoo 524289 Edge      xhci_hcd
+ 36:          0          0    MSIfoo 524290 Edge      xhci_hcd
 
 
-My subjective opinion is that a better way to clean this up would be to
-have a single imx6q_cpufreq_clean function that takes all resources and
-does stuff like:
+void foo_unmask(struct irq_data *data)
+{
+	int xx,yy;
+	struct irq_domain *dom = data->domain;
+	printk("%s: irq_data=%p irq=%u hwirq=%lu chip=%p dom=%p pdata=%p data=%p\n",
+		__func__, data, data->irq, data->hwirq, data->chip, data->domain,
+		data->parent_data, data->chip_data);
+	printk("%s ops=%p data=%p parent=%p\n\n",
+		dom->name, dom->ops, dom->host_data, dom->parent);
+	printk("pcie=%p\n", dom->parent->host_data);
+	//dump_stack();
+	pci_msi_unmask_irq(data);
+	struct tango_pcie *pcie = data->domain->parent->host_data;
+	printk("\n%s: pcie=%p irq=%u hwirq=%lu\n\n",
+		__func__, pcie, data->irq, data->hwirq);
+	xx = irq_find_mapping(pcie->irq_domain, data->hwirq);
+	yy = irq_find_mapping(pcie->msi_domain, data->hwirq);
+	printk("xx=%d yy=%d\n", xx, yy);
+}
 
-if (!IS_ERR(clk)) clk_put(clk);
-clk = NULL;
+so data->irq is the virq (30, 34, 35, 36)
+and data->hwirq is the domain hwirq (0, 524288, 524289, 524290)
 
-That function can be called from both _remove and failed _probe without
-having to keep track of which resources have been allocated until then.
-Just free and NULL all clocks/regulators and simplify control flow.
+Is there a way to map hwirq 524288 to MSI 0, hwirq 524289 to MSI 1, etc?
 
---
-Regards,
-Leonard
+Regards.
