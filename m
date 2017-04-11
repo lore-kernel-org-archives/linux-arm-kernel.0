@@ -1,34 +1,34 @@
-From: ar@linux.vnet.ibm.com (Andrea Reale)
-Date: Tue, 11 Apr 2017 15:54:56 +0100
-Subject: [PATCH 2/5] arm64: defconfig: enable MEMORY_HOTPLUG config options
-In-Reply-To: <cover.1491920513.git.ar@linux.vnet.ibm.com>
-References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
-Message-ID: <f1d14a7a96bbaea807551a16395cfbab0702a366.1491920513.git.ar@linux.vnet.ibm.com>
+From: linucherian@gmail.com (linucherian at gmail.com)
+Date: Tue, 11 Apr 2017 20:12:45 +0530
+Subject: [RFC PATCH 7/7] arm64: Documentation: Add Cavium ThunderX2 SMMUv3
+ erratas.
+In-Reply-To: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+Message-ID: <1491921765-29475-8-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Scott Branden <scott.branden@broadcom.com>
+From: Linu Cherian <linu.cherian@cavium.com>
 
-Enable memory hotplug config options to add/remove memory.
+Add Cavium ThunderX2 SMMUv3 erratas to the errata list.
 
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 ---
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ Documentation/arm64/silicon-errata.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 7c48028..80f48b0 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -76,6 +76,9 @@ CONFIG_ARM64_VA_BITS_48=y
- CONFIG_SCHED_MC=y
- CONFIG_NUMA=y
- CONFIG_PREEMPT=y
-+CONFIG_MEMORY_HOTPLUG=y
-+CONFIG_MEMORY_HOTPLUG_DEFAULT_ONLINE=y
-+CONFIG_MEMORY_HOTREMOVE=y
- CONFIG_KSM=y
- CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_CMA=y
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 10f2ddd..42422f6 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -62,6 +62,8 @@ stable kernels.
+ | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154        |
+ | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456        |
+ | Cavium         | ThunderX SMMUv2 | #27704          | N/A                         |
++| Cavium         | ThunderX2 SMMUv3| #74             | N/A                         |
++| Cavium         | ThunderX2 SMMUv3| #126            | N/A                         |
+ |                |                 |                 |                             |
+ | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585         |
+ |                |                 |                 |                             |
 -- 
 1.9.1
