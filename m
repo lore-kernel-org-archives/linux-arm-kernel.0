@@ -1,71 +1,117 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Apr 2017 16:49:58 +0100
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
-Message-ID: <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 11 Apr 2017 16:54:26 +0100
+Subject: [RFC PATCH 3/7] iommu/arm-smmu-v3: Introduce smmu option
+ USE_SHARED_IRQS for Silicon errata
+In-Reply-To: <1491921765-29475-4-git-send-email-linucherian@gmail.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-4-git-send-email-linucherian@gmail.com>
+Message-ID: <b84e2383-1a65-3c5a-8e2c-28eafdb20adc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/17 16:13, Mason wrote:
-> On 27/03/2017 19:09, Marc Zyngier wrote:
+On 11/04/17 15:42, linucherian at gmail.com wrote:
+> From: Geetha <gakula@cavium.com>
 > 
->> Here's what your system looks like:
->>
->> PCI-EP -------> MSI Controller ------> INTC
->>          MSI                    IRQ
->>
->> A PCI MSI is always edge. No ifs, no buts. That's what it is, and nothing
->> else. Now, your MSI controller signals its output using a level interrupt,
->> since you need to whack it on the head so that it lowers its line.
->>
->> There is not a single trigger, because there is not a single interrupt.
-> 
-> Hello Marc,
-> 
-> I was hoping you or Thomas might help clear some confusion
-> in my mind around IRQ domains (struct irq_domain).
-> 
-> I have read https://www.kernel.org/doc/Documentation/IRQ-domain.txt
-> 
-> IIUC, there should be one IRQ domain per IRQ controller.
-> 
-> I have this MSI controller handling 256 interrupts, so I should
-> have *one* domain for all possible MSIs. Yet the Altera driver
-> registers *two* domains (msi_domain and inner_domain).
-> 
-> Could I make everything work with a single IRQ domain?
+> Cavium 99xx SMMU implementation doesn't not support unique irq lines for
+> gerror, eventq and cmdq-sync. USE_SHARED_IRQS option enables to use single
+> irq line for all three interrupts.
 
-No, because you have two irqchips. One that deals with the HW, and the
-other that deals with the MSIs how they are presented to the kernel,
-depending on the bus (PCI or something else). The fact that it doesn't
-really drive any HW doesn't make it irrelevant.
+AFAICS, there's nothing actually wrong with using shared wired IRQs -
+the architecture spec doesn't appear to say anything about it. I think
+it might suffice to simply add IRQF_SHARED if we can see the SMMU
+doesn't support MSIs anyway - it doesn't really seem like something we
+need to treat as a specific quirk.
 
-> I'm confused by the sequence:
+> Signed-off-by: Geetha Sowjanya <gakula@cavium.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 18 +++++++++++++++---
+>  1 file changed, 15 insertions(+), 3 deletions(-)
 > 
->   irq_dom = irq_domain_create_linear(fwnode, MSI_COUNT, &msi_dom_ops, pcie);
->   msi_dom = pci_msi_create_irq_domain(fwnode, &msi_domain_info, irq_dom);
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index b326195..1475ad8 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -415,6 +415,9 @@
+>  #define ARM_SMMU_PAGE0_REGS_ONLY(s)		\
+>  	((s)->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
+>  
+> +#define ARM_SMMU_USE_SHARED_IRQS(s)		\
+> +	((s)->options & ARM_SMMU_OPT_USE_SHARED_IRQS)
+> +
+>  static bool disable_bypass;
+>  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+>  MODULE_PARM_DESC(disable_bypass,
+> @@ -601,6 +604,7 @@ struct arm_smmu_device {
+>  
+>  #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+>  #define ARM_SMMU_OPT_PAGE0_REGS_ONLY    (1 << 1)
+> +#define ARM_SMMU_OPT_USE_SHARED_IRQS    (1 << 2)
+>  	u32				options;
+>  
+>  	struct arm_smmu_cmdq		cmdq;
+> @@ -668,6 +672,7 @@ struct arm_smmu_option_prop {
+>  static struct arm_smmu_option_prop arm_smmu_options[] = {
+>  	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
+>  	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium-cn99xx,broken-page1-regspace"},
+> +	{ ARM_SMMU_OPT_USE_SHARED_IRQS, "cavium-cn99xx,broken-unique-irqlines"},
+>  	{ 0, NULL},
+>  };
+>  
+> @@ -2237,6 +2242,7 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  {
+>  	int ret, irq;
+>  	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
+> +	u32 irqflags = IRQF_ONESHOT | IRQF_SHARED;
+
+Either way, this is a really ugly way to go about it - I'd much rather
+initialise the common base value:
+
+	u32 irqflags = (definitely not an MSI) ? IRQF_SHARED : 0;
+
+>  
+>  	/* Disable IRQs first */
+>  	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
+> @@ -2251,9 +2257,11 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  	/* Request interrupt lines */
+>  	irq = smmu->evtq.q.irq;
+>  	if (irq) {
+> +		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
+> +			irqflags = IRQF_ONESHOT;
+>  		ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
+>  						arm_smmu_evtq_thread,
+> -						IRQF_ONESHOT,
+
+...and just pass irqflags | IRQF_ONESHOT here (and irqflags elsewhere),
+without all the horrible copy-paste conditions.
+
+Robin.
+
+> +						irqflags,
+>  						"arm-smmu-v3-evtq", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable evtq irq\n");
+> @@ -2261,8 +2269,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  
+>  	irq = smmu->cmdq.q.irq;
+>  	if (irq) {
+> +		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
+> +			irqflags = 0;
+>  		ret = devm_request_irq(smmu->dev, irq,
+> -				       arm_smmu_cmdq_sync_handler, 0,
+> +				       arm_smmu_cmdq_sync_handler, irqflags,
+>  				       "arm-smmu-v3-cmdq-sync", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
+> @@ -2270,8 +2280,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+>  
+>  	irq = smmu->gerr_irq;
+>  	if (irq) {
+> +		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
+> +			irqflags = 0;
+>  		ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
+> -				       0, "arm-smmu-v3-gerror", smmu);
+> +				       irqflags, "arm-smmu-v3-gerror", smmu);
+>  		if (ret < 0)
+>  			dev_warn(smmu->dev, "failed to enable gerror irq\n");
+>  	}
 > 
-> It seems I should be able to call only pci_msi_create_irq_domain...
-> And the parent of the MSI controller is given in the DT.
-
-No, see above.
-
-> I'm not quite sure how I tell pci_msi_create_irq_domain how many
-> MSIs it's supposed to manage. Nor how I pass my private struct.
-
-You don't need to tell it anything about the number of interrupts you
-manage. As for your private structure, you've already given it to your
-low level domain, and there is no need to propagate it any further.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
