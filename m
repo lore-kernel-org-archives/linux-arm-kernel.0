@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:42 +0100
-Subject: [PATCH v3 02/32] asm-generic/pgtable.h: introduce pgprot_nonposted
- remap attribute
+Date: Tue, 11 Apr 2017 13:28:43 +0100
+Subject: [PATCH v3 03/32] PCI: fix pci_remap_iospace() remap attribute
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-3-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-4-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,16 +15,17 @@ region backing I/O Address Space transactions determines the I/O
 transactions attributes (before the transactions actually reaches the
 PCI bus where it is handled according to the PCI specifications).
 
-The kernel lacks a pgprot_* attribute to map memory with type
-generating non-posted writes transactions, which therefore needs to
-be added.
+Current pci_remap_iospace() interface, that is used to map the PCI I/O
+Address Space into virtual address space, use pgprot_device() as memory
+attribute for the virtual address mapping, that in some architectures
+(ie ARM64) provides non-cacheable but write bufferable mappings (ie
+posted writes), which clash with the non-posted write behaviour for I/O
+Address Space mandated by the PCI specifications.
 
-Add a pgprot_nonposted mapping prot to create a memory mapping for
-memory areas requiring non-posted write transactions; make it default to
-pgprot_noncached (which should provide a sane default behaviour) but
-still allowing architectures on which pgprot_noncached results in posted
-write transactions to override the prot with an arch specific
-implementation that guarantees non-posted writes transactions.
+Update the prot ioremap_page_range() parameter in pci_remap_iospace()
+to pgprot_nonposted to ensure that the virtual mapping backing
+I/O Address Space guarantee non-posted write transactions issued
+when addressing I/O Address Space through the MMIO mapping.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -34,23 +34,21 @@ Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- include/asm-generic/pgtable.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pci/pci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/asm-generic/pgtable.h b/include/asm-generic/pgtable.h
-index 1fad160..2070172 100644
---- a/include/asm-generic/pgtable.h
-+++ b/include/asm-generic/pgtable.h
-@@ -399,6 +399,10 @@ static inline int pud_same(pud_t pud_a, pud_t pud_b)
- #define pgprot_device pgprot_noncached
- #endif
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index bd98674..9e084c0 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+ 		return -EINVAL;
  
-+#ifndef pgprot_nonposted
-+#define pgprot_nonposted pgprot_noncached
-+#endif
-+
- #ifndef pgprot_modify
- #define pgprot_modify pgprot_modify
- static inline pgprot_t pgprot_modify(pgprot_t oldprot, pgprot_t newprot)
+ 	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+-				  pgprot_device(PAGE_KERNEL));
++				  pgprot_nonposted(PAGE_KERNEL));
+ #else
+ 	/* this architecture does not have memory mapped I/O space,
+ 	   so this function should never be called */
 -- 
 2.10.0
