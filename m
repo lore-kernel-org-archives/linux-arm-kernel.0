@@ -1,57 +1,90 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:45 +0100
-Subject: [PATCHv3 02/14] drivers/perf: arm_pmu: define armpmu_init_fn
+Date: Tue, 11 Apr 2017 09:39:47 +0100
+Subject: [PATCHv3 04/14] drivers/perf: arm_pmu: factor out pmu registration
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We expect an ARM PMU's init function to have a particular prototype,
-which we open-code in a few places. This is less than ideal, considering
-that we cast a void value to this type in one location, and a mismatch
-could easily be missed.
+Currently arm_pmu_device_probe contains probing logic specific to the
+platform_device infrastructure, and some logic required to safely
+register the PMU with various systems.
 
-Add a typedef so that we can ensure this is consistent.
+This patch factors out the logic relating to the registration of the
+PMU. This makes arm_pmu_device_probe a little easier to read, and will
+make it easier to reuse the logic for an ACPI-specific probing
+mechanism.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c       | 2 +-
- include/linux/perf/arm_pmu.h | 4 +++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/perf/arm_pmu.c | 40 ++++++++++++++++++++++++++--------------
+ 1 file changed, 26 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 316c4dc..71a825d 100644
+index 1cb8b1a..985bd08 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -989,7 +989,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct pmu_probe_info *probe_table)
- {
- 	const struct of_device_id *of_id;
--	const int (*init_fn)(struct arm_pmu *);
-+	armpmu_init_fn init_fn;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct arm_pmu *pmu;
- 	int ret = -ENODEV;
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 44f43fc..4249914 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -132,10 +132,12 @@ int armpmu_map_event(struct perf_event *event,
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX],
- 		     u32 raw_event_mask);
+@@ -982,6 +982,31 @@ static void armpmu_free(struct arm_pmu *pmu)
+ 	kfree(pmu);
+ }
  
-+typedef int (*armpmu_init_fn)(struct arm_pmu *);
++int armpmu_register(struct arm_pmu *pmu)
++{
++	int ret;
 +
- struct pmu_probe_info {
- 	unsigned int cpuid;
- 	unsigned int mask;
--	int (*init)(struct arm_pmu *);
-+	armpmu_init_fn init;
- };
++	ret = cpu_pmu_init(pmu);
++	if (ret)
++		return ret;
++
++	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
++	if (ret)
++		goto out_destroy;
++
++	if (!__oprofile_cpu_pmu)
++		__oprofile_cpu_pmu = pmu;
++
++	pr_info("enabled with %s PMU driver, %d counters available\n",
++		pmu->name, pmu->num_events);
++
++	return 0;
++
++out_destroy:
++	cpu_pmu_destroy(pmu);
++	return ret;
++}
++
+ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table)
+@@ -1025,25 +1050,12 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		goto out_free;
+ 	}
  
- #define PMU_PROBE(_cpuid, _mask, _fn)	\
+-
+-	ret = cpu_pmu_init(pmu);
++	ret = armpmu_register(pmu);
+ 	if (ret)
+ 		goto out_free;
+ 
+-	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
+-	if (ret)
+-		goto out_destroy;
+-
+-	if (!__oprofile_cpu_pmu)
+-		__oprofile_cpu_pmu = pmu;
+-
+-	pr_info("enabled with %s PMU driver, %d counters available\n",
+-			pmu->name, pmu->num_events);
+-
+ 	return 0;
+ 
+-out_destroy:
+-	cpu_pmu_destroy(pmu);
+ out_free:
+ 	pr_info("%s: failed to register PMU devices!\n",
+ 		of_node_full_name(node));
 -- 
 1.9.1
