@@ -1,48 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:46 +0100
-Subject: [PATCH v3 06/32] avr32: include default ioremap_nopost()
- implementation
-In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-7-lorenzo.pieralisi@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 11 Apr 2017 08:44:07 -0500
+Subject: [PATCH v4 0/2] Handle Cavium ThunderX2 PCI topology quirk
+In-Reply-To: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
+References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20170411134407.GB31773@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and Posting")
-mandate non-posted configuration transactions. As further highlighted in
-the PCIe specifications (4.0 - Rev0.3, "Ordering Considerations for the
-Enhanced Configuration Access Mechanism"), through ECAM and
-ECAM-derivative configuration mechanism, the memory mapped transactions
-from the host CPU into Configuration Requests on the PCI express fabric
-may create ordering problems for software because writes to memory
-address are typically posted transactions (unless the architecture can
-enforce through virtual address mapping non-posted write transactions
-behaviour) but writes to Configuration Space are not posted on the PCI
-express fabric.
+[+cc David]
 
-Include the asm-generic ioremap_nopost() implementation (currently
-falling back to ioremap_nocache()) to provide a non-posted writes
-ioremap interface to kernel subsystems.
+I forgot to mention that I'm also hoping for an ack from David, since
+he's listed as the maintainer of the ThunderX drivers.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
-Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
----
- arch/avr32/include/asm/io.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/avr32/include/asm/io.h b/arch/avr32/include/asm/io.h
-index f855646..b2ff522 100644
---- a/arch/avr32/include/asm/io.h
-+++ b/arch/avr32/include/asm/io.h
-@@ -298,6 +298,7 @@ extern void __iounmap(void __iomem *addr);
- #define ioremap_wc ioremap_nocache
- #define ioremap_wt ioremap_nocache
- #define ioremap_uc ioremap_nocache
-+#include <asm-generic/ioremap-nopost.h>
- 
- #define cached(addr) P1SEGADDR(addr)
- #define uncached(addr) P2SEGADDR(addr)
--- 
-2.10.0
+On Mon, Apr 03, 2017 at 01:15:02PM +0000, Jayachandran C wrote:
+> Hi Bjorn, Alex,
+> 
+> Sending this again (with a trivial fix to author name), please review.
+> Updated summary below:
+> 
+> Here is v4 of the patchset to handle the PCIe topology quirk of Cavium
+> ThunderX2 systems (previously known as Broadcom Vulcan).
+> 
+> The earlier discussions on this can be seen at:
+> http://www.spinics.net/lists/linux-pci/msg51001.html
+> https://patchwork.ozlabs.org/patch/582633/ and
+> https://lists.linuxfoundation.org/pipermail/iommu/2016-June/017681.html
+> 
+> The earlier discussion on this patchset ended with a suggestion that it
+> may be possible to fix up this quirk by handling the issue in the
+> function argument of pci_for_each_dma_alias(). But at that point we did
+> not have the codebase to make the changes since the full ACPI and OF code
+> for SMMU and GIC ITS was not upstream.
+> 
+> Now that the changes are upstream, I tried to fix it in both the SMMU
+> and the GIC ITS code based on this suggestion, the changes needed are at:
+>  https://github.com/jchandra-cavm/linux/commits/rid-xlate-fixup
+> 
+> The problems with this approach are:
+>  - of the 14 uses of pci_for_each_dma_alias in the function in the kernel
+>    tree, I have to fixup 6 callers (which is all but one ofthe callers
+>    outside x86)
+>  - 4 of these can be reasonably handled (please see the github repo above),
+>    but the calls in drivers/irqchip/irq-gic-v3-its-pci-msi.c and
+>    drivers/iommu/iommu.c cannot be reasonably fixed up.
+>  - Even without the 2 above two changes I can get it to work for now.
+>    But pci_for_each_dma_alias does not work as expected on this platform
+>    and we have to be aware of that for all future uses of the function.
+>   
+> For now, I have ruled out the approach, and I have rebased the earlier
+> patch on to 4.11-rc and submitting again for review. The changes are:
+> 
+> v3->v4:
+>  - new address of author
+> 
+> v2>v3:
+>  - changed device flag name from PCI_DEV_FLAGS_DMA_ALIAS_ROOT to
+>    PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
+>  - updated commit message to make the quirk clearer.
+> 
+> Let me know your comments and suggestions.
+> 
+> Thanks,
+> JC.
+> 
+> 
+> Jayachandran C (2):
+>   PCI: Add device flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
+>   PCI: quirks: Fix ThunderX2 dma alias handling
+> 
+>  drivers/pci/quirks.c | 14 ++++++++++++++
+>  drivers/pci/search.c |  4 ++++
+>  include/linux/pci.h  |  2 ++
+>  3 files changed, 20 insertions(+)
+> 
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
