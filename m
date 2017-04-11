@@ -1,93 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 16:58:43 +0100
-Subject: [PATCH 3/5] Memory hotplug support for arm64 platform (v2)
-In-Reply-To: <50119579bdbb23a4d888d13b0a46cb2e027839ed.1491920513.git.ar@linux.vnet.ibm.com>
-References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
- <50119579bdbb23a4d888d13b0a46cb2e027839ed.1491920513.git.ar@linux.vnet.ibm.com>
-Message-ID: <20170411155843.GC32267@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 11 Apr 2017 16:59:17 +0100
+Subject: [RFC PATCH 4/7] ACPICA: IORT: Add SMMuV3 model definitions.
+In-Reply-To: <1491921765-29475-5-git-send-email-linucherian@gmail.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-5-git-send-email-linucherian@gmail.com>
+Message-ID: <d60a1fcc-081e-03e8-3454-6802e830ddb9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Apr 11, 2017 at 03:55:22PM +0100, Andrea Reale wrote:
-> From: Maciej Bielski <m.bielski@virtualopensystems.com>
+On 11/04/17 15:42, linucherian at gmail.com wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
 > 
-> This is a second and improved version of the patch previously released
-> in [3].
+> Add SMMuV3 model definitions.
 > 
-> It builds on the work by Scott Branden [2] and, henceforth,
-> it needs to be applied on top of Scott's patches [2].
-> Comments are very welcome.
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> ---
+>  include/acpi/actbl2.h | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Changes from the original patchset and known issues:
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> index 2b4af07..9db67d6 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+> @@ -778,6 +778,11 @@ struct acpi_iort_smmu {
+>  #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002	/* ARM Corelink MMU-400 */
+>  #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003	/* ARM Corelink MMU-500 */
+>  
+> +#define ACPI_IORT_SMMU_V3               0x00000000      /* Generic SMMUv3 */
+> +#define ACPI_IORT_SMMU_CORELINK_MMU600  0x00000001      /* ARM Corelink MMU-600 */
+> +#define ACPI_IORT_SMMU_V3_HISILICON     0x00000002      /* HiSilicon SMMUv3 */
+> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000003      /* Cavium CN99xx SMMUv3 */
+
+None of those models are listed in the current IORT spec.
+
+What's MMU-600?
+
+Robin.
+
+> +
+>  /* Masks for Flags field above */
+>  
+>  #define ACPI_IORT_SMMU_DVM_SUPPORTED    (1)
 > 
-> - Compared to Scott's original patchset, this work adds the mapping of
->   the new hotplugged pages into the kernel page tables. This is done by
->   copying the old swapper_pg_dir over a new page, adding the new mappings,
->   and then switching to the newly built pg_dir (see `hotplug_paging` in
->   arch/arm64/mmu.c). There might be better ways to to this: suggestions
->   are more than welcome.
-
-For this reply, I'm just going to focus on the PGD replacement.
-
-It's not clear to me if we need to swap the PGD, since everything we do
-here is strictly additive and non-conflicting, and it should be safe to
-add things to the swapper_pg_dir live.
-
-However, assuming there's something I've missed, I have some comments
-below.
-
-[...]
-
-> +#ifdef CONFIG_MEMORY_HOTPLUG
-> +
-> +/*
-> + * hotplug_paging() is used by memory hotplug to build new page tables
-> + * for hot added memory.
-> + */
-> +void hotplug_paging(phys_addr_t start, phys_addr_t size)
-> +{
-> +
-> +	struct page *pg;
-> +	phys_addr_t pgd_phys = pgd_pgtable_alloc();
-> +	pgd_t *pgd = pgd_set_fixmap(pgd_phys);
-> +
-> +	memcpy(pgd, swapper_pg_dir, PAGE_SIZE);
-
-s/PAGE_SIZE/PGD_SIZE/ (and below, too).
-
-See commit 12f043ff2b28fa64 ("arm64: fix warning about swapper_pg_dir
-overflow").
-
-> +
-> +	__create_pgd_mapping(pgd, start, __phys_to_virt(start), size,
-> +		PAGE_KERNEL, pgd_pgtable_alloc, false);
-> +
-> +	cpu_replace_ttbr1(__va(pgd_phys));
-
-Other CPUs may be online at this point, and cpu_replace_ttbr1() was only
-intended for UP operation. Other CPUs will still have swapper_pg_dir in
-their TTBR1_EL1 at this point in time...
-
-> +	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
-
-... which this will alter, in an unsafe fashion.
-
-The other CPUs are live, and might be altering swapper. e.g. one might
-be using the fixmap to alter code. We will need some stop_machine()-like
-machinery here to synchronise with other CPUs, ensuring that they don't
-have swapper_pg_dir live.
-
-Unfortunately, we can't change other to the temporary pgdir in a cross
-call, then fix things up, then do another cross call. If any exception
-is taken when we're in the temporary pgdir, __uaccess_ttbr0_disable will
-install junk into TTBR0, and we risk the usual set of pain junk TLBs
-entail.
-
-We appear to have a latent bug at boot time along those lines, when
-setting up the page tables and initialising KASAN. I'll see about
-cleaning that up.
-
-Thanks,
-Mark.
