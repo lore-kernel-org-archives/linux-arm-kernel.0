@@ -1,193 +1,57 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 11 Apr 2017 12:19:06 +0200
-Subject: [PATCH v4 20/22] KVM: arm64: ITS: ITT flush and restore
-In-Reply-To: <718afa1b-e0ad-f758-012a-8e0ac6a140b8@arm.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
- <718afa1b-e0ad-f758-012a-8e0ac6a140b8@arm.com>
-Message-ID: <78d950d9-b66d-2428-ef60-4368323d13ff@redhat.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 11 Apr 2017 18:20:56 +0800
+Subject: [PATCH 2/2] mmc: sdhci: provide isr for card-detect interrupts
+In-Reply-To: <20170411102056.2869-1-jszhang@marvell.com>
+References: <20170411102056.2869-1-jszhang@marvell.com>
+Message-ID: <20170411102056.2869-3-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-On 10/04/2017 14:39, Marc Zyngier wrote:
-> On 27/03/17 10:31, Eric Auger wrote:
->> Introduce routines to flush and restore device ITT and their
->> interrupt table entries (ITE).
->>
->> The routines will be called on device table flush and
->> restore. They will become static in subsequent patches.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v3 -> v4:
->> - lookup_table and compute_next_eventid_offset become static in this
->>   patch
->> - remove static along with vgic_its_flush/restore_itt to avoid
->>   compilation warnings
->> - next field only computed with a shift (mask removed)
->> - handle the case where the last element has not been found
->>
->> v2 -> v3:
->> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
->>
->> v2: creation
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 107 +++++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 104 insertions(+), 3 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index b907e3c..02c0694 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1707,7 +1707,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
->>  	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
->>  }
->>  
->> -u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->> +static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
->>  {
->>  	struct list_head *e = &ite->ite_list;
->>  	struct its_ite *next;
->> @@ -1749,8 +1749,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
->>   *
->>   * Return: < 0 on error, 1 if last element identified, 0 otherwise
->>   */
->> -int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->> -		 int start_id, entry_fn_t fn, void *opaque)
->> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->> +			int start_id, entry_fn_t fn, void *opaque)
->>  {
->>  	gpa_t gpa = base, top = base + size - 1;
->>  	unsigned long len = size;
->> @@ -1815,6 +1815,107 @@ static int vgic_its_restore_pending_tables(struct kvm *kvm)
->>  	return -ENXIO;
->>  }
->>  
->> +static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
->> +			      struct its_ite *ite, gpa_t gpa)
->> +{
->> +	struct kvm *kvm = its->dev->kvm;
->> +	u32 next_offset;
->> +	u64 val;
->> +
->> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
->> +	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
->> +		ite->collection->collection_id;
-> 
-> Same remark as before concerning the #define-ing of the encoding and the
-> name of the function.
-> 
->> +	val = cpu_to_le64(val);
->> +	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
->> +}
->> +
->> +/**
->> + * vgic_its_restore_ite - restore an interrupt translation entry
->> + * @event_id: id used for indexing
->> + * @ptr: kernel VA where the 8 byte ITE is located
->> + * @opaque: pointer to the its_device
->> + * @next: id offset to the next entry
->> + */
->> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
->> +				void *ptr, void *opaque, u32 *next)
->> +{
->> +	struct its_device *dev = (struct its_device *)opaque;
->> +	struct its_collection *collection;
->> +	struct kvm *kvm = its->dev->kvm;
->> +	u64 val, *p = (u64 *)ptr;
->> +	struct vgic_irq *irq;
->> +	u32 coll_id, lpi_id;
->> +	struct its_ite *ite;
->> +	int ret;
->> +
->> +	val = *p;
->> +	*next = 1;
->> +
->> +	val = le64_to_cpu(val);
->> +
->> +	coll_id = val & GENMASK_ULL(15, 0);
->> +	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
->> +
->> +	if (!lpi_id)
->> +		return 0;
->> +
->> +	*next = val >> 48;
->> +
->> +	collection = find_collection(its, coll_id);
->> +	if (!collection)
->> +		return -EINVAL;
->> +
->> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
->> +				  lpi_id, event_id);
->> +	if (ret)
->> +		return ret;
->> +
->> +	irq = vgic_add_lpi(kvm, lpi_id);
->> +	if (IS_ERR(irq))
->> +		return PTR_ERR(irq);
->> +	ite->irq = irq;
->> +
->> +	/* restore the configuration of the LPI */
->> +	ret = update_lpi_config(kvm, irq, NULL);
->> +	if (ret)
->> +		return ret;
->> +
->> +	update_affinity_ite(kvm, ite);
->> +	return 0;
->> +}
->> +
->> +int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
->> +{
->> +	gpa_t base = device->itt_addr;
->> +	struct its_ite *ite;
->> +	int ret;
->> +
->> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
->> +		gpa_t gpa = base + ite->event_id * VITS_ESZ;
->> +
->> +		ret = vgic_its_flush_ite(its, device, ite, gpa);
->> +		if (ret)
->> +			return ret;
->> +	}
->> +	return 0;
->> +}
->> +
->> +int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
->> +{
->> +	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * VITS_ESZ;
->> +	gpa_t base = dev->itt_addr;
->> +	int ret;
->> +
->> +	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
->> +			    vgic_its_restore_ite, dev);
->> +
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	/* if the last element has not been found we are in trouble */
->> +	return ret ? 0 : -EINVAL;
-> 
-> This makes me wonder. Can't lookup_table perform that check on its own
-> and always return an error when something went wrong?
-No I don't think this is possible due to the fact we have 2 levels of
-tables for the device tables. If a second level table lookup does not
-find the last entry, this is not an issue.
+We found one issue on BG4CT platforms with GPIO for sdcar card detect
+interrupt: remove sdcard when there's read write access to the sdcard,
+sometimes the card remove event can't be handled for a long time, so
+the  system still think the sdcard is still plugged in. It turns out
+that the sdhci_card_event() is missing in common slot gpio's card
+detect isr.
 
-Thanks
+We fix this issue by providing sdhci's own isr for card-detect
+interrupts. In this own isr, we call sdhci_card_event() then process
+the change of state.
 
-Eric
-> 
->> +}
->> +
->>  /**
->>   * vgic_its_flush_device_tables - flush the device table and all ITT
->>   * into guest RAM
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/mmc/host/sdhci.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 63bc33a54d0d..b6c5021a5892 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2777,6 +2777,16 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+ 	return result;
+ }
+ 
++static irqreturn_t sdhci_cd_irq(int irq, void *dev_id)
++{
++	struct mmc_host *mmc = dev_id;
++	struct sdhci_host *host = mmc_priv(mmc);
++
++	mmc->ops->card_event(mmc);
++	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
++	return IRQ_HANDLED;
++}
++
+ static irqreturn_t sdhci_thread_irq(int irq, void *dev_id)
+ {
+ 	struct sdhci_host *host = dev_id;
+@@ -3617,6 +3627,8 @@ int __sdhci_add_host(struct sdhci_host *host)
+ 
+ 	sdhci_init(host, 0);
+ 
++	mmc_gpio_set_cd_isr(mmc, sdhci_cd_irq);
++
+ 	ret = request_threaded_irq(host->irq, sdhci_irq, sdhci_thread_irq,
+ 				   IRQF_SHARED,	mmc_hostname(mmc), host);
+ 	if (ret) {
+-- 
+2.11.0
