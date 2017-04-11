@@ -1,66 +1,153 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:57 +0100
-Subject: [PATCHv3 14/14] arm64: pmuv3: use arm_pmu ACPI framework
+Date: Tue, 11 Apr 2017 09:39:51 +0100
+Subject: [PATCHv3 08/14] drivers/perf: arm_pmu: split cpu-local irq
+ request/free
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a framework to handle the ACPI bits, make the PMUv3
-code use this. The framework is a little different to what was
-originally envisaged, and we can drop some unused support code in the
-process of moving over to it.
+Currently we have functions to request/free all IRQs for a given PMU.
+While this works today, this won't work for ACPI, where we don't know
+the full set of IRQs up front, and need to request them separately.
+
+To enable supporting ACPI, this patch splits out the cpu-local
+request/free into new functions, allowing us to request/free individual
+IRQs.
+
+As this makes it possible/necessary to request a PPI once per cpu, an
+additional check is added to detect mismatched PPIs. This shouldn't
+matter for the DT / platform case, as we check this when parsing.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 26 +++++++++-----------------
- 1 file changed, 9 insertions(+), 17 deletions(-)
+ drivers/perf/arm_pmu.c | 88 +++++++++++++++++++++++++++++---------------------
+ 1 file changed, 52 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 53f2354..156a564 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -1136,24 +1136,9 @@ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
- 	{},
- };
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 3c4e97d..c09c379 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -527,65 +527,81 @@ int perf_num_counters(void)
+ }
+ EXPORT_SYMBOL_GPL(perf_num_counters);
  
--/*
-- * Non DT systems have their micro/arch events probed at run-time.
-- * A fairly complete list of generic events are provided and ones that
-- * aren't supported by the current PMU are disabled.
-- */
--static const struct pmu_probe_info armv8_pmu_probe_table[] = {
--	PMU_PROBE(0, 0, armv8_pmuv3_init), /* enable all defined counters */
--	{ /* sentinel value */ }
--};
--
- static int armv8_pmu_device_probe(struct platform_device *pdev)
+-static void armpmu_free_irqs(struct arm_pmu *armpmu)
++static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
  {
--	if (acpi_disabled)
--		return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
--					    NULL);
--
--	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
--				    armv8_pmu_probe_table);
-+	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
+-	int cpu;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
++	int irq = per_cpu(hw_events->irq, cpu);
+ 
+-	for_each_cpu(cpu, &armpmu->supported_cpus) {
+-		int irq = per_cpu(hw_events->irq, cpu);
+-		if (!irq)
+-			continue;
++	if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
++		return;
+ 
+-		if (irq_is_percpu(irq)) {
+-			free_percpu_irq(irq, &hw_events->percpu_pmu);
+-			break;
+-		}
++	if (irq_is_percpu(irq)) {
++		free_percpu_irq(irq, &hw_events->percpu_pmu);
++		cpumask_clear(&armpmu->active_irqs);
++		return;
++	}
+ 
+-		if (!cpumask_test_and_clear_cpu(cpu, &armpmu->active_irqs))
+-			continue;
++	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++}
+ 
+-		free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+-	}
++static void armpmu_free_irqs(struct arm_pmu *armpmu)
++{
++	int cpu;
++
++	for_each_cpu(cpu, &armpmu->supported_cpus)
++		armpmu_free_irq(armpmu, cpu);
  }
  
- static struct platform_driver armv8_pmu_driver = {
-@@ -1164,4 +1149,11 @@ static int armv8_pmu_device_probe(struct platform_device *pdev)
- 	.probe		= armv8_pmu_device_probe,
- };
+-static int armpmu_request_irqs(struct arm_pmu *armpmu)
++static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ {
+-	int cpu, err;
++	int err = 0;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+ 	const irq_handler_t handler = armpmu_dispatch_irq;
++	int irq = per_cpu(hw_events->irq, cpu);
++	if (!irq)
++		return 0;
  
--builtin_platform_driver(armv8_pmu_driver);
-+int __init armv8_pmu_driver_init(void)
+-	for_each_cpu(cpu, &armpmu->supported_cpus) {
+-		int irq = per_cpu(hw_events->irq, cpu);
+-		if (!irq)
+-			continue;
++	if (irq_is_percpu(irq) && cpumask_empty(&armpmu->active_irqs)) {
++		err = request_percpu_irq(irq, handler, "arm-pmu",
++					 &hw_events->percpu_pmu);
++	} else if (irq_is_percpu(irq)) {
++		int other_cpu = cpumask_first(&armpmu->active_irqs);
++		int other_irq = per_cpu(hw_events->irq, other_cpu);
+ 
+-		if (irq_is_percpu(irq)) {
+-			err = request_percpu_irq(irq, handler, "arm-pmu",
+-						 &hw_events->percpu_pmu);
+-			if (err) {
+-				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-					irq);
+-			}
+-
+-			return err;
++		if (irq != other_irq) {
++			pr_warn("mismatched PPIs detected.\n");
++			err = -EINVAL;
+ 		}
+-
++	} else {
+ 		err = request_irq(irq, handler,
+ 				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+ 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+-		if (err) {
+-			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-				irq);
+-			return err;
+-		}
++	}
+ 
+-		cpumask_set_cpu(cpu, &armpmu->active_irqs);
++	if (err) {
++		pr_err("unable to request IRQ%d for ARM PMU counters\n",
++			irq);
++		return err;
+ 	}
+ 
++	cpumask_set_cpu(cpu, &armpmu->active_irqs);
++
+ 	return 0;
+ }
+ 
++static int armpmu_request_irqs(struct arm_pmu *armpmu)
 +{
-+	if (acpi_disabled)
-+		return platform_driver_register(&armv8_pmu_driver);
-+	else
-+		return arm_pmu_acpi_probe(armv8_pmuv3_init);
++	int cpu, err;
++
++	for_each_cpu(cpu, &armpmu->supported_cpus) {
++		err = armpmu_request_irq(armpmu, cpu);
++		if (err)
++			break;
++	}
++
++	return err;
 +}
-+device_initcall(armv8_pmu_driver_init)
++
+ static int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
+ {
+ 	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
 -- 
 1.9.1
