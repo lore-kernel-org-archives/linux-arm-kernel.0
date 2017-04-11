@@ -1,58 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Apr 2017 17:33:12 +0100
-Subject: [PATCH 1/2] drivers: pci: do not disregard parent resources starting
- at 0x0
+Date: Tue, 11 Apr 2017 17:33:13 +0100
+Subject: [PATCH 2/2] arm64: acpi/pci: invoke _DSM whether to preserve firmware
+ PCI setup
 In-Reply-To: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
 References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170411163313.18577-2-ard.biesheuvel@linaro.org>
+Message-ID: <20170411163313.18577-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f44116ae8818 ("PCI: Remove pci_find_parent_resource() use for
-allocation") updated the logic that iterates over all bus resources
-and compares them to a given resource, in order to decide whether one
-is the parent of the latter.
+On arm64 ACPI systems, we unconditionally reconfigure the entire PCI
+hierarchy at boot. This is a departure from what is customary on ACPI
+systems, and may break assumptions in some places (e.g., EFIFB), that
+the kernel will leave BARs of enabled PCI devices where they are.
 
-This change inadvertently causes pci_find_parent_resource() to disregard
-resources starting at address 0x0, resulting in an error such as the one
-below on ARM systems whose I/O window starts at 0x0.
+Given that PCI already specifies a device specific ACPI method (_DSM)
+for PCI root bridge nodes that tells us whether the firmware thinks
+the configuration should be left alone, let's sidestep the entire
+policy debate about whether the PCI configuration should be preserved
+or not, and put it under the control of the firmware instead.
 
-pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff window]
-pci_bus 0000:00: root bus resource [io  0x0000-0xffff window]
-pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff window]
-pci_bus 0000:00: root bus resource [bus 00-0f]
-pci 0000:00:01.0: PCI bridge to [bus 01]
-pci 0000:00:02.0: PCI bridge to [bus 02]
-pci 0000:00:03.0: PCI bridge to [bus 03]
-pci 0000:00:03.0: can't claim BAR 13 [io  0x0000-0x0fff]: no compatible bridge window
-pci 0000:03:01.0: can't claim BAR 0 [io  0x0000-0x001f]: no compatible bridge window
-
-While this never happens on x86, it is perfectly legal in general for a
-PCI MMIO or IO window to start at address 0x0, and it was supported in
-the code before commit f44116ae8818.
-
-So let's drop the test for res->start != 0; resource_contains() already
-checks whether [start, end) completely covers the resource, and so it
-should be redundant.
-
-Fixes: f44116ae8818 ("PCI: Remove pci_find_parent_resource() use for allocation")
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/pci/pci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/pci.c  | 20 ++++++++++++++++++--
+ include/linux/pci-acpi.h |  7 ++++---
+ 2 files changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 7904d02ffdb9..53a41b1f7ef7 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -454,7 +454,7 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev,
- 	pci_bus_for_each_resource(bus, r, i) {
- 		if (!r)
- 			continue;
--		if (res->start && resource_contains(r, res)) {
-+		if (resource_contains(r, res)) {
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4f0e3ebfea4b..c88e07e2eb84 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -185,6 +185,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	struct acpi_pci_generic_root_info *ri;
+ 	struct pci_bus *bus, *child;
+ 	struct acpi_pci_root_ops *root_ops;
++	union acpi_object *obj;
  
- 			/*
- 			 * If the window is prefetchable but the BAR is
+ 	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+ 	if (!ri)
+@@ -208,8 +209,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	if (!bus)
+ 		return NULL;
+ 
+-	pci_bus_size_bridges(bus);
+-	pci_bus_assign_resources(bus);
++	/*
++	 * Invoke the PCI device specific method (_DSM) #5 'Ignore PCI Boot
++	 * Configuration', which tells us whether the firmware wants us to
++	 * preserve the configuration of the PCI resource tree for this root
++	 * bridge.
++	 */
++	obj = acpi_evaluate_dsm(ACPI_HANDLE(bus->bridge), pci_acpi_dsm_uuid, 1,
++				IGNORE_PCI_BOOT_CONFIG_DSM, NULL);
++	if (obj && obj->type == ACPI_TYPE_INTEGER && obj->integer.value == 0) {
++		/* preserve existing resource assignment */
++		pci_bus_claim_resources(bus);
++	} else {
++		/* reconfigure the resource tree from scratch */
++		pci_bus_size_bridges(bus);
++		pci_bus_assign_resources(bus);
++	}
++	ACPI_FREE(obj);
+ 
+ 	list_for_each_entry(child, &bus->children, node)
+ 		pcie_bus_configure_settings(child);
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index 7a4e83a8c89c..308111489b83 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -106,9 +106,10 @@ static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
+ #endif
+ 
+ extern const u8 pci_acpi_dsm_uuid[];
+-#define DEVICE_LABEL_DSM	0x07
+-#define RESET_DELAY_DSM		0x08
+-#define FUNCTION_DELAY_DSM	0x09
++#define IGNORE_PCI_BOOT_CONFIG_DSM	0x05
++#define DEVICE_LABEL_DSM		0x07
++#define RESET_DELAY_DSM			0x08
++#define FUNCTION_DELAY_DSM		0x09
+ 
+ #else	/* CONFIG_ACPI */
+ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
 -- 
 2.9.3
