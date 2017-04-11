@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:05 +0100
-Subject: [PATCH v3 25/32] tile: include default ioremap_nopost() implementation
+Date: Tue, 11 Apr 2017 13:29:04 +0100
+Subject: [PATCH v3 24/32] sparc: include default ioremap_nopost()
+ implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-26-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-25-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,22 +26,22 @@ ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Chris Metcalf <cmetcalf@mellanox.com>
+Cc: "David S. Miller" <davem@davemloft.net>
 ---
- arch/tile/include/asm/io.h | 1 +
+ arch/sparc/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/tile/include/asm/io.h b/arch/tile/include/asm/io.h
-index 30f4a21..d3f2b77 100644
---- a/arch/tile/include/asm/io.h
-+++ b/arch/tile/include/asm/io.h
-@@ -57,6 +57,7 @@ extern void iounmap(volatile void __iomem *addr);
- #define ioremap_wt(physaddr, size)		ioremap(physaddr, size)
- #define ioremap_uc(physaddr, size)		ioremap(physaddr, size)
- #define ioremap_fullcache(physaddr, size)	ioremap(physaddr, size)
+diff --git a/arch/sparc/include/asm/io.h b/arch/sparc/include/asm/io.h
+index f6902cf..09bb613 100644
+--- a/arch/sparc/include/asm/io.h
++++ b/arch/sparc/include/asm/io.h
+@@ -5,6 +5,7 @@
+ #else
+ #include <asm/io_32.h>
+ #endif
 +#include <asm-generic/ioremap-nopost.h>
  
- #define mmiowb()
- 
+ /*
+  * Defines used for both SPARC32 and SPARC64
 -- 
 2.10.0
