@@ -1,39 +1,89 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 11 Apr 2017 12:33:25 +0530
-Subject: [PATCH 3/5] cpufreq: dt: Add support for some new Allwinner SoCs
-In-Reply-To: <20170408185025.53841-4-icenowy@aosc.io>
-References: <20170408185025.53841-1-icenowy@aosc.io>
- <20170408185025.53841-4-icenowy@aosc.io>
-Message-ID: <CAOh2x=kQE3fb0b-rD6-E0XJ0Xjm-c1PsnPFfGyLPhJur=urwLQ@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Tue, 11 Apr 2017 07:10:48 +0000
+Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
+References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
+ <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
+ <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170411071047.GA3610@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 9, 2017 at 12:20 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Some new Allwinner SoCs get supported in the kernel after the
-> compatibles are added to cpufreq-dt-platdev driver.
->
-> Add their compatible strings in the cpufreq-dt-platdev driver.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> index 921b4a6c3d16..2180e509e383 100644
-> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> @@ -24,7 +24,12 @@ static const struct of_device_id machines[] __initconst = {
->         { .compatible = "allwinner,sun8i-a23", },
->         { .compatible = "allwinner,sun8i-a33", },
->         { .compatible = "allwinner,sun8i-a83t", },
-> +       { .compatible = "allwinner,sun8i-h2-plus", },
->         { .compatible = "allwinner,sun8i-h3", },
-> +       { .compatible = "allwinner,sun8i-v3s", },
-> +       { .compatible = "allwinner,sun50i-a64", },
-> +       { .compatible = "allwinner,sun50i-h5", },
-> +       { .compatible = "nextthing,gr8", },
+On Mon, Apr 10, 2017 at 08:28:47PM -0500, Bjorn Helgaas wrote:
+> Hi Jayachandran,
+> 
+> On Mon, Apr 03, 2017 at 01:15:04PM +0000, Jayachandran C wrote:
+> > The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
+> > topology is slightly unusual. For a multi-node system, it looks like:
+> > 
+> > [node level PCI bridges - one per node]
+> >     [SoC PCI devices with MSI-X but no IOMMU]
+> >     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
+> >         [PCIe real root ports associated with IOMMU and GICv3 ITS]
+> >             [External PCI devices connected to PCIe links]
+> > 
+> > The top two levels of bridges should have introduced aliases since they
+> > are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
+> > In the case of external PCIe devices, the "real" root ports are connected
+> > to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
+> > alias. The SoC PCI devices are directly connected to the GIC ITS, so the
+> > node level bridges do not introduce an alias either.
+> > 
+> > To handle this quirk, we mark the real PCIe root ports and node level
+> > PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
+> > pci_for_each_dma_alias() works correctly for external PCIe devices and
+> > SoC PCI devices.
+> > 
+> > For the current revision of Cavium ThunderX2, the VendorID and Device ID
+> > are from Broadcom Vulcan (14e4:90XX).
+> 
+> Can you supply some text here about why we want to apply this patch?
+> E.g., does it avoid making unnecessary IOMMU mappings, improve
+> performance, avoid a crash, etc?
 
+If this is for the commit message, I hope the following is ok:
 
-This needs to be in alphabetical order and please cc cpufreq
-maintainers next time.
+"With this change, both MSI-X and IO virtualization work correctly on
+Cavium ThunderX2. The GIC ITS driver gets the correct device ID to
+configure MSI-X, the SMMUv3 driver gets the correct Stream IDs for PCI
+devices, and the IOMMU groups are setup correctly."
+
+I can send out a new patch if needed.
+
+The on chip SATA and USB use MSI-X, so this is needed for basic
+functionality of the platform.
+
+> 
+> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> > ---
+> >  drivers/pci/quirks.c | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+)
+> > 
+> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> > index 6736836..564a84a 100644
+> > --- a/drivers/pci/quirks.c
+> > +++ b/drivers/pci/quirks.c
+> > @@ -3958,6 +3958,20 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2260, quirk_mic_x200_dma_alias);
+> >  DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2264, quirk_mic_x200_dma_alias);
+> >  
+> >  /*
+> > + * The IOMMU and interrupt controller on Broadcom Vulcan/Cavium ThunderX2 are
+> > + * associated not at the root bus, but at a bridge below. This quirk flag
+> > + * will ensure that the aliases are identified correctly.
+> > + */
+> > +static void quirk_bridge_cavm_thrx2_pcie_root(struct pci_dev *pdev)
+> > +{
+> > +	pdev->dev_flags |= PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT;
+> > +}
+> > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9000,
+> > +				quirk_bridge_cavm_thrx2_pcie_root);
+> > +DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9084,
+> > +				quirk_bridge_cavm_thrx2_pcie_root);
+> > +
+> > +/*
+> >   * Intersil/Techwell TW686[4589]-based video capture cards have an empty (zero)
+> >   * class code.  Fix it.
+> >   */
+
+Thanks,
+JC.
