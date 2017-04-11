@@ -1,94 +1,71 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Apr 2017 17:48:26 +0200
-Subject: [PATCH] clockevents/tcb_clksrc: implement suspend/resume
-Message-ID: <20170411154826.5883-1-alexandre.belloni@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Apr 2017 16:49:58 +0100
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+Message-ID: <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On sama5d2, power to the core may be cut while entering suspend mode. It is
-necessary to save and restore the TCB registers.
+On 11/04/17 16:13, Mason wrote:
+> On 27/03/2017 19:09, Marc Zyngier wrote:
+> 
+>> Here's what your system looks like:
+>>
+>> PCI-EP -------> MSI Controller ------> INTC
+>>          MSI                    IRQ
+>>
+>> A PCI MSI is always edge. No ifs, no buts. That's what it is, and nothing
+>> else. Now, your MSI controller signals its output using a level interrupt,
+>> since you need to whack it on the head so that it lowers its line.
+>>
+>> There is not a single trigger, because there is not a single interrupt.
+> 
+> Hello Marc,
+> 
+> I was hoping you or Thomas might help clear some confusion
+> in my mind around IRQ domains (struct irq_domain).
+> 
+> I have read https://www.kernel.org/doc/Documentation/IRQ-domain.txt
+> 
+> IIUC, there should be one IRQ domain per IRQ controller.
+> 
+> I have this MSI controller handling 256 interrupts, so I should
+> have *one* domain for all possible MSIs. Yet the Altera driver
+> registers *two* domains (msi_domain and inner_domain).
+> 
+> Could I make everything work with a single IRQ domain?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clocksource/tcb_clksrc.c | 46 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+No, because you have two irqchips. One that deals with the HW, and the
+other that deals with the MSIs how they are presented to the kernel,
+depending on the bus (PCI or something else). The fact that it doesn't
+really drive any HW doesn't make it irrelevant.
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index d4ca9962a759..57f5d72328f4 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -9,6 +9,7 @@
- #include <linux/ioport.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <linux/syscore_ops.h>
- #include <linux/atmel_tc.h>
- 
- 
-@@ -40,6 +41,14 @@
-  */
- 
- static void __iomem *tcaddr;
-+static struct
-+{
-+	u32 cmr;
-+	u32 imr;
-+	u32 rc;
-+	bool clken;
-+} tcb_cache[3];
-+static u32 bmr_cache;
- 
- static u64 tc_get_cycles(struct clocksource *cs)
- {
-@@ -61,12 +70,49 @@ static u64 tc_get_cycles32(struct clocksource *cs)
- 	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
- }
- 
-+void tc_clksrc_suspend(struct clocksource *cs)
-+{
-+	int i;
-+
-+	for (i = 0; i < 3; i++) {
-+		tcb_cache[i].cmr = readl(tcaddr + ATMEL_TC_REG(i, CMR));
-+		tcb_cache[i].imr = readl(tcaddr + ATMEL_TC_REG(i, IMR));
-+		tcb_cache[i].rc = readl(tcaddr + ATMEL_TC_REG(i, RC));
-+		tcb_cache[i].clken = !!(readl(tcaddr + ATMEL_TC_REG(i, SR)) &
-+					ATMEL_TC_CLKSTA);
-+	}
-+
-+	bmr_cache = readl(tcaddr + ATMEL_TC_BMR);
-+}
-+
-+void tc_clksrc_resume(struct clocksource *cs)
-+{
-+	int i;
-+
-+	for (i = 0; i < 3; i++) {
-+		__raw_writel(tcb_cache[i].cmr, tcaddr + ATMEL_TC_REG(i, CMR));
-+		__raw_writel(0, tcaddr + ATMEL_TC_REG(i, RA));
-+		__raw_writel(0, tcaddr + ATMEL_TC_REG(i, RB));
-+		__raw_writel(tcb_cache[i].rc, tcaddr + ATMEL_TC_REG(i, RC));
-+		__raw_writel(0xff, tcaddr + ATMEL_TC_REG(i, IDR));
-+		__raw_writel(tcb_cache[i].imr, tcaddr + ATMEL_TC_REG(i, IER));
-+		if (tcb_cache[i].clken)
-+			__raw_writel(ATMEL_TC_CLKEN, tcaddr +
-+				     ATMEL_TC_REG(i, CCR));
-+	}
-+
-+	writel(bmr_cache, tcaddr + ATMEL_TC_BMR);
-+	writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
-+}
-+
- static struct clocksource clksrc = {
- 	.name           = "tcb_clksrc",
- 	.rating         = 200,
- 	.read           = tc_get_cycles,
- 	.mask           = CLOCKSOURCE_MASK(32),
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-+	.suspend	= tc_clksrc_suspend,
-+	.resume		= tc_clksrc_resume,
- };
- 
- #ifdef CONFIG_GENERIC_CLOCKEVENTS
+> I'm confused by the sequence:
+> 
+>   irq_dom = irq_domain_create_linear(fwnode, MSI_COUNT, &msi_dom_ops, pcie);
+>   msi_dom = pci_msi_create_irq_domain(fwnode, &msi_domain_info, irq_dom);
+> 
+> It seems I should be able to call only pci_msi_create_irq_domain...
+> And the parent of the MSI controller is given in the DT.
+
+No, see above.
+
+> I'm not quite sure how I tell pci_msi_create_irq_domain how many
+> MSIs it's supposed to manage. Nor how I pass my private struct.
+
+You don't need to tell it anything about the number of interrupts you
+manage. As for your private structure, you've already given it to your
+low level domain, and there is no need to propagate it any further.
+
+Thanks,
+
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
