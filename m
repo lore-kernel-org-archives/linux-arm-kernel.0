@@ -1,85 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Apr 2017 14:56:04 +0100
-Subject: [PATCH v4 2/8] mfd: retu: Drop -mfd suffix from I2C device ID name
-In-Reply-To: <20170404153036.6651-3-javier@osg.samsung.com>
-References: <20170404153036.6651-1-javier@osg.samsung.com>
- <20170404153036.6651-3-javier@osg.samsung.com>
-Message-ID: <20170411135604.x2bavwti7atebwux@dell>
+From: colin.king@canonical.com (Colin King)
+Date: Tue, 11 Apr 2017 14:44:19 +0100
+Subject: [PATCH] drm/mediatek: re-phrase DRM_INFO error message
+Message-ID: <20170411134419.21277-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Apr 2017, Javier Martinez Canillas wrote:
+From: Colin Ian King <colin.king@canonical.com>
 
-> It's not correct to encode the subsystem in the I2C device name, so
-> drop the -mfd suffix. To maintain bisect-ability, change driver and
-> platform code / DTS users in the same patch.
-> 
-> Suggested-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
-> 
->  arch/arm/boot/dts/omap2420-n8x0-common.dtsi | 4 ++--
->  arch/arm/mach-omap1/board-nokia770.c        | 4 ++--
->  drivers/mfd/retu-mfd.c                      | 4 ++--
->  3 files changed, 6 insertions(+), 6 deletions(-)
+The current message contains a spelling mistake and is not easily
+parsable. Re-phrase it to be more understandable.
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/gpu/drm/mediatek/mtk_dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> diff --git a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
-> index 7e5ffc583c90..1b06430c8013 100644
-> --- a/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
-> +++ b/arch/arm/boot/dts/omap2420-n8x0-common.dtsi
-> @@ -15,8 +15,8 @@
->  				>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> -			retu_mfd: retu at 1 {
-> -				compatible = "retu-mfd";
-> +			retu: retu at 1 {
-> +				compatible = "retu";
->  				interrupt-parent = <&gpio4>;
->  				interrupts = <12 IRQ_TYPE_EDGE_RISING>;
->  				reg = <0x1>;
-> diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
-> index ee8d9f553db4..06243c0b12d2 100644
-> --- a/arch/arm/mach-omap1/board-nokia770.c
-> +++ b/arch/arm/mach-omap1/board-nokia770.c
-> @@ -233,10 +233,10 @@ static struct platform_device nokia770_cbus_device = {
->  
->  static struct i2c_board_info nokia770_i2c_board_info_2[] __initdata = {
->  	{
-> -		I2C_BOARD_INFO("retu-mfd", 0x01),
-> +		I2C_BOARD_INFO("retu", 0x01),
->  	},
->  	{
-> -		I2C_BOARD_INFO("tahvo-mfd", 0x02),
-> +		I2C_BOARD_INFO("tahvo", 0x02),
->  	},
->  };
->  
-> diff --git a/drivers/mfd/retu-mfd.c b/drivers/mfd/retu-mfd.c
-> index d4c114abeb75..53e1d386d2c0 100644
-> --- a/drivers/mfd/retu-mfd.c
-> +++ b/drivers/mfd/retu-mfd.c
-> @@ -302,8 +302,8 @@ static int retu_remove(struct i2c_client *i2c)
->  }
->  
->  static const struct i2c_device_id retu_id[] = {
-> -	{ "retu-mfd", 0 },
-> -	{ "tahvo-mfd", 0 },
-> +	{ "retu", 0 },
-> +	{ "tahvo", 0 },
->  	{ }
->  };
->  MODULE_DEVICE_TABLE(i2c, retu_id);
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 808b995a990f..79d240ff1331 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -933,7 +933,7 @@ static u32 mtk_dsi_recv_cnt(u8 type, u8 *read_data)
+ 		DRM_INFO("type is 0x02, try again\n");
+ 		break;
+ 	default:
+-		DRM_INFO("type(0x%x) cannot be non-recognite\n", type);
++		DRM_INFO("type(0x%x) not recognized\n", type);
+ 		break;
+ 	}
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.11.0
