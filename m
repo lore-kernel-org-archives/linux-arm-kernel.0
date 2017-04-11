@@ -1,44 +1,127 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 11 Apr 2017 17:27:59 -0400
-Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <20170411211924.GC14778@bhelgaas-glaptop.roam.corp.google.com>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <20170411211924.GC14778@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <7b94bfbb-b3e6-cbc3-06a1-4490f4142ffe@codeaurora.org>
+From: kevin.m.wern@gmail.com (Kevin Wern)
+Date: Tue, 11 Apr 2017 18:17:02 -0400
+Subject: [PATCH v2] staging: media/platform/bcm2835: remove gstreamer
+ workaround
+Message-ID: <20170411221702.GA10800@kwern-HP-Pavilion-dv5-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2017 5:19 PM, Bjorn Helgaas wrote:
-> Hi Sinan,
-> 
-> What are these patches based on?  I normally apply things to my "master"
-> branch, which is typically -rc1 or -rc2.  Right now it's v4.11-rc1, and
-> these don't apply cleanly:
-> 
->   04:17:59 ~/linux (master)$ stg branch --create pci/aspm-sk-v8 v4.11-rc1
->   Checking for changes in the working directory ... done
->   Don't know how to determine parent branch from "v4.11-rc1"
->   Branch "pci/aspm-sk-v8" created
->   04:18:18 ~/linux (pci/aspm-sk-v8)$ stg import -M --sign m/sk-v8
->   Checking for changes in the working directory ... done
->   Importing patch "pci-aspm-introduce" ... done
->   Importing patch "pci-aspm-split-pci_aspm_init" ... done
->   Importing patch "pci-aspm-add-init-hook-to" ... error: patch failed: drivers/pci/pcie/aspm.c:798
->   error: drivers/pci/pcie/aspm.c: patch does not apply
->   stg import: Diff does not apply cleanly
+Gstreamer's v4l2src reacted poorly to certain outputs from the bcm2835
+video driver's ioctl ops function vidioc_enum_framesizes, so a
+workaround was created that could be activated by user input. This
+workaround would replace the driver's ioctl ops struct with another,
+similar struct--only with no function pointed to by
+vidioc_enum_framesizes. With no response, gstreamer would attempt to
+continue with some default settings that happened to work better.
 
-This is what I have.
+However, this bug has been fixed in gstreamer since 2014, so we
+shouldn't include this workaround in the stable version of the driver.
 
-41a7175 PCI/ASPM: move link_state cleanup to bridge remove
-3b646e2 PCI/ASPM: save power on values during bridge init
-181510d PCI/ASPM: add init hook to device_add
-282d008 PCI/ASPM: split pci_aspm_init() into two
-8e89fc2 PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
-97da385 Linux 4.11-rc3
+Signed-off-by: Kevin Wern <kevin.m.wern@gmail.com>
+---
+V2: patch against staging-next instead of torvalds/master
 
+ drivers/staging/vc04_services/bcm2835-camera/TODO  |  5 --
+ .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 60 ----------------------
+ 2 files changed, 65 deletions(-)
 
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/TODO b/drivers/staging/vc04_services/bcm2835-camera/TODO
+index 61a5099..0ab9e88 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/TODO
++++ b/drivers/staging/vc04_services/bcm2835-camera/TODO
+@@ -32,8 +32,3 @@ We should have VCHI create a platform device once it's initialized,
+ and have this driver bind to it, so that we automatically load the
+ v4l2 module after VCHI loads.
+ 
+-5) Drop the gstreamer workaround.
+-
+-This was a temporary workaround for a bug that was fixed mid-2014, and
+-we should remove it before stabilizing the driver.
+-
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+index 86bbd6e..a11e047 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+@@ -66,19 +66,6 @@ MODULE_PARM_DESC(max_video_width, "Threshold for video mode");
+ module_param(max_video_height, int, 0644);
+ MODULE_PARM_DESC(max_video_height, "Threshold for video mode");
+ 
+-/* Gstreamer bug https://bugzilla.gnome.org/show_bug.cgi?id=726521
+- * v4l2src does bad (and actually wrong) things when the vidioc_enum_framesizes
+- * function says type V4L2_FRMSIZE_TYPE_STEPWISE, which we do by default.
+- * It's happier if we just don't say anything at all, when it then
+- * sets up a load of defaults that it thinks might work.
+- * If gst_v4l2src_is_broken is non-zero, then we remove the function from
+- * our function table list (actually switch to an alternate set, but same
+- * result).
+- */
+-static int gst_v4l2src_is_broken;
+-module_param(gst_v4l2src_is_broken, int, 0644);
+-MODULE_PARM_DESC(gst_v4l2src_is_broken, "If non-zero, enable workaround for Gstreamer");
+-
+ /* global device data array */
+ static struct bm2835_mmal_dev *gdev[MAX_BCM2835_CAMERAS];
+ 
+@@ -1454,48 +1441,6 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops = {
+ 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+ };
+ 
+-static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
+-	/* overlay */
+-	.vidioc_enum_fmt_vid_overlay = vidioc_enum_fmt_vid_overlay,
+-	.vidioc_g_fmt_vid_overlay = vidioc_g_fmt_vid_overlay,
+-	.vidioc_try_fmt_vid_overlay = vidioc_try_fmt_vid_overlay,
+-	.vidioc_s_fmt_vid_overlay = vidioc_s_fmt_vid_overlay,
+-	.vidioc_overlay = vidioc_overlay,
+-	.vidioc_g_fbuf = vidioc_g_fbuf,
+-
+-	/* inputs */
+-	.vidioc_enum_input = vidioc_enum_input,
+-	.vidioc_g_input = vidioc_g_input,
+-	.vidioc_s_input = vidioc_s_input,
+-
+-	/* capture */
+-	.vidioc_querycap = vidioc_querycap,
+-	.vidioc_enum_fmt_vid_cap = vidioc_enum_fmt_vid_cap,
+-	.vidioc_g_fmt_vid_cap = vidioc_g_fmt_vid_cap,
+-	.vidioc_try_fmt_vid_cap = vidioc_try_fmt_vid_cap,
+-	.vidioc_s_fmt_vid_cap = vidioc_s_fmt_vid_cap,
+-
+-	/* buffer management */
+-	.vidioc_reqbufs = vb2_ioctl_reqbufs,
+-	.vidioc_create_bufs = vb2_ioctl_create_bufs,
+-	.vidioc_prepare_buf = vb2_ioctl_prepare_buf,
+-	.vidioc_querybuf = vb2_ioctl_querybuf,
+-	.vidioc_qbuf = vb2_ioctl_qbuf,
+-	.vidioc_dqbuf = vb2_ioctl_dqbuf,
+-	/* Remove this function ptr to fix gstreamer bug
+-	 * .vidioc_enum_framesizes = vidioc_enum_framesizes,
+-	 */
+-	.vidioc_enum_frameintervals = vidioc_enum_frameintervals,
+-	.vidioc_g_parm        = vidioc_g_parm,
+-	.vidioc_s_parm        = vidioc_s_parm,
+-	.vidioc_streamon = vb2_ioctl_streamon,
+-	.vidioc_streamoff = vb2_ioctl_streamoff,
+-
+-	.vidioc_log_status = v4l2_ctrl_log_status,
+-	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
+-	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
+-};
+-
+ /* ------------------------------------------------------------------
+  *	Driver init/finalise
+  * ------------------------------------------------------------------
+@@ -1811,11 +1756,6 @@ static int __init bm2835_mmal_init_device(struct bm2835_mmal_dev *dev,
+ 	int ret;
+ 
+ 	*vfd = vdev_template;
+-	if (gst_v4l2src_is_broken) {
+-		v4l2_info(&dev->v4l2_dev,
+-			  "Work-around for gstreamer issue is active.\n");
+-		vfd->ioctl_ops = &camera0_ioctl_ops_gstreamer;
+-	}
+ 
+ 	vfd->v4l2_dev = &dev->v4l2_dev;
+ 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
