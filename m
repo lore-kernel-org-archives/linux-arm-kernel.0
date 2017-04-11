@@ -1,43 +1,28 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 11 Apr 2017 17:41:39 -0500
-Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <7b94bfbb-b3e6-cbc3-06a1-4490f4142ffe@codeaurora.org>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <20170411211924.GC14778@bhelgaas-glaptop.roam.corp.google.com>
- <7b94bfbb-b3e6-cbc3-06a1-4490f4142ffe@codeaurora.org>
-Message-ID: <20170411224139.GA736@bhelgaas-glaptop.roam.corp.google.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 12 Apr 2017 09:15:28 +1000
+Subject: [PATCH v3 21/32] powerpc: include default ioremap_nopost()
+ implementation
+In-Reply-To: <20170411142456.GB6821@red-moon>
+References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
+ <20170411122923.6285-22-lorenzo.pieralisi@arm.com>
+ <1491917928.7236.8.camel@kernel.crashing.org>
+ <20170411142456.GB6821@red-moon>
+Message-ID: <1491952528.7236.26.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 05:27:59PM -0400, Sinan Kaya wrote:
-> On 4/11/2017 5:19 PM, Bjorn Helgaas wrote:
-> > Hi Sinan,
-> > 
-> > What are these patches based on?  I normally apply things to my "master"
-> > branch, which is typically -rc1 or -rc2.  Right now it's v4.11-rc1, and
-> > these don't apply cleanly:
-> > 
-> >   04:17:59 ~/linux (master)$ stg branch --create pci/aspm-sk-v8 v4.11-rc1
-> >   Checking for changes in the working directory ... done
-> >   Don't know how to determine parent branch from "v4.11-rc1"
-> >   Branch "pci/aspm-sk-v8" created
-> >   04:18:18 ~/linux (pci/aspm-sk-v8)$ stg import -M --sign m/sk-v8
-> >   Checking for changes in the working directory ... done
-> >   Importing patch "pci-aspm-introduce" ... done
-> >   Importing patch "pci-aspm-split-pci_aspm_init" ... done
-> >   Importing patch "pci-aspm-add-init-hook-to" ... error: patch failed: drivers/pci/pcie/aspm.c:798
-> >   error: drivers/pci/pcie/aspm.c: patch does not apply
-> >   stg import: Diff does not apply cleanly
+On Tue, 2017-04-11 at 15:24 +0100, Lorenzo Pieralisi wrote:
+> Ok, point taken. BTW, may I ask you guys to have a look into this
+> please ?
 > 
-> This is what I have.
+> https://lkml.org/lkml/2017/4/6/743
 > 
-> 41a7175 PCI/ASPM: move link_state cleanup to bridge remove
-> 3b646e2 PCI/ASPM: save power on values during bridge init
-> 181510d PCI/ASPM: add init hook to device_add
-> 282d008 PCI/ASPM: split pci_aspm_init() into two
-> 8e89fc2 PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
-> 97da385 Linux 4.11-rc3
+> It is a side effect of this thread (v2), not sure why <asm/io.h>
+> on powerpc has to include <linux/io.h>.
 
-Thanks, I guess I should have figured that out since my for-linus branch
-includes an ASPM patch.
+Not sure how we ended up with that... it's odd indeed.
+
+Michael ? Any reason we can't just remove it ?
+
+Cheers,
+Ben.
