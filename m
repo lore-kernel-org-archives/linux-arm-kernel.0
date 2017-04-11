@@ -1,83 +1,131 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 11 Apr 2017 09:05:00 -0700
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable PCI_MSI
-In-Reply-To: <1491394571.2904.44.camel@pengutronix.de>
-References: <1448902811-11399-1-git-send-email-l.stach@pengutronix.de>
- <1448902811-11399-2-git-send-email-l.stach@pengutronix.de>
- <CAJ+vNU2Fb7gpO0LsoVpPbUX5rSyH3yC4K30JpAf5j7aQkDH9tw@mail.gmail.com>
- <1460708469.22710.4.camel@pengutronix.de>
- <CAJ+vNU1-M3qSODKHMf872kfOsH0g9xFgKNEgKqiJu6A8z-ChxA@mail.gmail.com>
- <CAJ+vNU0+ksyYCpydpmcJOO-w0v4D0axvG84wK7f09iK_1yzo_A@mail.gmail.com>
- <001c01d2ad85$b06af1a0$1140d4e0$@gmail.com>
- <6eb58d54-b6e8-b709-c7f9-fa19d52cd492@synopsys.com>
- <1491394571.2904.44.camel@pengutronix.de>
-Message-ID: <CAJ+vNU2MG66ruQ87TmSrVCtWfHwGc3s=_NG-ysgV2uyJzzskiQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Apr 2017 17:06:53 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <20170411131639.GA6652@red-moon>
+References: <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
+ <20170330100524.GA22801@red-moon>
+ <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
+ <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
+ <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
+ <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
+ <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
+ <20170410165328.GA5248@red-moon>
+ <CAKv+Gu-AN-OwnAJG5dt0Qg4GU8HxZBowTSA0H3LhNA3nHfrsQg@mail.gmail.com>
+ <CAKv+Gu9dS4OhLbBw59yKYQmoJ8SpFexzk9yH=XfXnzn8NJ4mcg@mail.gmail.com>
+ <20170411131639.GA6652@red-moon>
+Message-ID: <CAKv+Gu92WM+LaPfNBMyZQ_wnBT0fNvx3CFmMhTDwZ961_KQXYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 5, 2017 at 5:16 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Mittwoch, den 05.04.2017, 13:07 +0100 schrieb Joao Pinto:
+On 11 April 2017 at 14:16, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Apr 10, 2017 at 06:29:27PM +0100, Ard Biesheuvel wrote:
+>
 > [...]
->> >>> Lucas,
->> >>>
->> >>> I feel a bit dumb here for forgetting about this issue and letting it
->> >>> drop, but I've just spent a day debugging an issue with the ath9k
->> >>> wireless driver only to realize it was that the ath9k card and/or
->> >>> driver doesn't support MSI interrupts and thus no longer work on
->> >>> mainline kernels that have MSI enabled. To be honest I'm not sure how
->> >>> many PCIe devices out there can't support MSI because of hardware
->> >>> limitations vs drivers that simply have not implemented it.
->> >>>
->> >>> To make matters worse 3ee803641e76bea76ec730c80dcc64739a9919ff makes
->> >>> it such that you can't disable MSI on the IMX6.
->> >>>
->> >>> Is there some fix you can think of to make the IMX6 PCIe host
->> >>> controller raise an interrupt for cards/drivers that use legacy irq's?
->> >>> If not, then we need to allow MSI to be disabled for IMX6 and default
->> >>> it to disabled for compatibility.
->> >>>
+>
+>> >>> So before starting the next round of hacking to work around this, I
+>> >>> would like rekindle the discussion regarding the way we blindly
+>> >>> reassign all resources on ACPI/arm64 systems, and whether there is a
+>> >>> way imaginable to avoid doing that.
 >> >>
->> >> Joao / Jingoo,
+>> >> There is a way if the whole ARM ecosystem work together to sort this
+>> >> out and we think that's the right way to do; I am personally not
+>> >> entirely convinced about that.
 >> >>
->> >> (Adding linux-pci to the list to pick up maintainers of other DWC PCIe
->> >> core drivers)
+>> >
+>> > So what are the pros and cons here? EFI fb is not a hugely important
+>> > use case, but it is one that relies on BARs staying where they are.
+>> > Are there others like that?
+>
+> Not that I am aware of, which means that pros are thin on the ground.
+>
+
+OK. Sinan?
+
+>> >>> I suppose the state of the BARs as we inherit it from the firmware
+>> >>> cannot be blindly trusted (and IIUC, this is Lorenzo's primary issue
+>> >>> with it). So should there be some side channel (UEFI config table
+>> >>> perhaps?) to describe this?
 >> >>
->> >> Is Luca's statement that 'legacy IRQs and MSIs can't be used together'
->> >> true in general for the DW PCIe core? If any of the host controllers
->> >> using this core can't support both legacy and MSI irqs together I
->> >> still believe we shouldn't enable/require MSI as it breaks any
->> >> card/driver that only supports legacy interrupts (such as ath9k).
+>> >> PCI firmware specifications rev 3.1, 4.6.5, "_DSM for Ignoring PCI
+>> >> Boot Configurations".
+>> >>
+>> >> Do we want to enforce it on ARM ? I do not know to be honest (and it
+>> >> still would not solve the DT firmware case).
+>> >>
 >> >
->> > If there are 2 DW PCIe controllers, one controller can be used for legacy
->> > and another controller can be used for MSI.
+>> > No, it doesn't. But that doesn't mean we shouldn't solve it on ACPI if
+>> > the pros outweigh the cons.
+>
+> No one is screaming for that to happen, I can implement resource
+> claiming but at the moment I do not see the benefit.
+>
+> [...]
+>
+>> > The reason is to eliminate another unknown from the discussion whether
+>> > UEFI can be expected to leave the entire PCI hierarchy in a sane
+>> > state.
 >> >
->> > But, I am not sure that one DW PCIe controller can support both MSI device
->> > and legacy interrupt device at the same time.
+>> >> If we want to try to claim the whole resource tree on boot (in ACPI)
+>> >> I can send a patch for that but there will be regressions.
+>> >>
 >> >
->> > To Joao Pinto,
->> > Will you confirm this?
->> >
+>> > I would like to see it, yes.
 >>
->> Hi Jingoo,
->> I confirm that if a RC has MSI enable, it won't support legacy interrupts.
+>> FWIW, the following minimal [naive] patch
+>>
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index 4f0e3ebfea4b..37c4d2f116a4 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -27,7 +27,7 @@
+>>   */
+>>  void pcibios_fixup_bus(struct pci_bus *bus)
+>>  {
+>> -       /* nothing to do, expected to be removed in the future */
+>> +       pci_read_bridge_bases(bus);
+>>  }
+>>
+>>  /*
+>> @@ -208,8 +208,8 @@ struct pci_bus *pci_acpi_scan_root(struct
+>> acpi_pci_root *root)
+>>         if (!bus)
+>>                 return NULL;
+>>
+>> -       pci_bus_size_bridges(bus);
+>> -       pci_bus_assign_resources(bus);
+>> +       pci_assign_unassigned_root_bus_resources(bus);
+>> +       pci_bus_claim_resources(bus);
 >
-> Okay, so the only way to solve this in a generic way, that I can see at
-> the moment is to defer MSI enable until the downstream device actually
-> requests an MSI irq.
->
-> Also we need to disable the MSI capability if any bridge device turns up
-> during the bus topology scan, as we can have devices with conflicting
-> requirements connected to the RC in that case.
->
-> I'll cook up some patches to implement this.
+> I do not understand this code. If you reassign the whole thing
+> before claiming it I am not sure what's the point of claiming
+> the resources later, that's basically a nop. pci_bus_claim_resources()
+> should suffice (if FW set-up is sane - which also reads bridge bases,
+> BTW).
 >
 
-Lucas,
+OK, I'm struggling a bit with this code. As you know, it is not light
+bedtime reading :-)
 
-Any thoughts yet? I'll likely want to backport this to stable although
-the restructuring to drivers/pci/dwc and subsequent changes since 4.10
-will likely require a re-written patch.
+In any case, I am starting to see your point. While I am able to claim
+most of the configuration by calling pci_bus_claim_resources() only
+[modulo some I/O BARs for which I will send out a bugfix shortly], the
+option ROM BARs are left disabled by UEFI, and so I end up with
 
-Best regards,
+pci 0000:00:01.0: PCI bridge to [bus 01]
+pci 0000:00:02.0: PCI bridge to [bus 02]
+pci 0000:00:03.0: PCI bridge to [bus 03]
+pci 0000:02:01.0: can't claim BAR 6 [mem 0xffff0000-0xffffffff pref]:
+no compatible bridge window
+pci 0000:03:01.0: can't claim BAR 6 [mem 0xfffc0000-0xffffffff pref]:
+no compatible bridge window
 
-Tim
+and everything else works fine.
+
+Both PPC and x86 have similar code to infer from the BARs themselves
+whether they were programmed, but in our case, it comes down to
+checking whether a parent resource exists that covers the range.
+
+It may still make sense to add support for the _DSM method, and leave
+it to the firmware to tell the kernel whether the PCI configuration is
+supposed to be correct, so I will send out an RFC for that as well.
