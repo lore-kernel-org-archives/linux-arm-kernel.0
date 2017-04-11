@@ -1,97 +1,47 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 11 Apr 2017 14:34:47 -0500
-Subject: [GIT PULL] PCI: Support for configurable PCI endpoint
-In-Reply-To: <20170410154328.GB13170@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170405085243.18123-1-kishon@ti.com>
- <20170410154328.GB13170@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170411193447.GA14778@bhelgaas-glaptop.roam.corp.google.com>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Tue, 11 Apr 2017 20:42:24 +0200
+Subject: [PATCH v7 resend 00/20] ILP32 for ARM64
+In-Reply-To: <20170411183636.GB5091@yury-N73SV>
+References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
+ <20170410194740.GA28503@yury-N73SV>
+ <20170411113334.GA27857@e104818-lin.cambridge.arm.com>
+ <20170411183636.GB5091@yury-N73SV>
+Message-ID: <18edebeb-201e-a9d6-7e66-6e34f98a40df@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 10:43:28AM -0500, Bjorn Helgaas wrote:
-> On Wed, Apr 05, 2017 at 02:22:20PM +0530, Kishon Vijay Abraham I wrote:
-> > Hi Bjorn,
-> > 
-> > Please find the pull request for PCI endpoint support below. I've
-> > also included all the history here.
-> 
-> Thanks, I applied these (with v7 of the first patch) to pci/host-designware
-> for v4.12.
+On 04/11/2017 08:36 PM, Yury Norov wrote:
+>> Also, the latest benchmarks I've seen were mostly for user space
+>> while I'm more concerned with the user-kernel interface
+>> (https://marc.info/?l=linux-arm-kernel&m=148690490713310&w=2).
+>
+>> On the glibc testing side, have the regressions been identified/fixed?
+>
+> I run LTP for testing the ABI and kernel, and there is no failures in
+> ltplite scenario. With glibc testsuite, there's only 3 failures
+> comparing to lp64. (Steve, fix me if something changed.) This is
+> slides on ilp32 from Linaro Connect, hope you'll find it useful.
+>
+> https://docs.google.com/presentation/d/1TKZqgH0XJUgMMGkw2fJA3Lzr57slht1sGKYJVBJTNM4/edit?usp=sharing
 
-Ok, sorry, I screwed this up.  I think my branch actually had v5, not
-v6.  But I *think* I fixed it.  Here's the diff from my branch to your
-git tree.  Apparently you haven't pushed the v7 patch there, so I
-*think* the diff below is the diff between v6 and v7 of that first
-patch.
+The listed failures are:
 
-$ git diff pci/host-designware a5c85ba45c96
-diff --git a/drivers/pci/endpoint/pci-epc-core.c b/drivers/pci/endpoint/pci-epc-core.c
-index caa7be10e473..9ae9e59b2a74 100644
---- a/drivers/pci/endpoint/pci-epc-core.c
-+++ b/drivers/pci/endpoint/pci-epc-core.c
-@@ -83,7 +83,6 @@ struct pci_epc *pci_epc_get(const char *epc_name)
- 			goto err;
- 		}
- 
--		class_dev_iter_exit(&iter);
- 		get_device(&epc->dev);
- 		return epc;
- 	}
-diff --git a/drivers/pci/endpoint/pci-epf-core.c b/drivers/pci/endpoint/pci-epf-core.c
-index 6877d6a5bcc9..92db7dcd911c 100644
---- a/drivers/pci/endpoint/pci-epf-core.c
-+++ b/drivers/pci/endpoint/pci-epf-core.c
-@@ -40,10 +40,8 @@ static struct device_type pci_epf_type;
-  */
- void pci_epf_linkup(struct pci_epf *epf)
- {
--	if (!epf->driver) {
-+	if (!epf->driver)
- 		dev_WARN(&epf->dev, "epf device not bound to driver\n");
--		return;
--	}
- 
- 	epf->driver->ops->linkup(epf);
- }
-@@ -59,10 +57,8 @@ EXPORT_SYMBOL_GPL(pci_epf_linkup);
-  */
- void pci_epf_unbind(struct pci_epf *epf)
- {
--	if (!epf->driver) {
-+	if (!epf->driver)
- 		dev_WARN(&epf->dev, "epf device not bound to driver\n");
--		return;
--	}
- 
- 	epf->driver->ops->unbind(epf);
- 	module_put(epf->driver->owner);
-@@ -78,10 +74,8 @@ EXPORT_SYMBOL_GPL(pci_epf_unbind);
-  */
- int pci_epf_bind(struct pci_epf *epf)
- {
--	if (!epf->driver) {
-+	if (!epf->driver)
- 		dev_WARN(&epf->dev, "epf device not bound to driver\n");
--		return -EINVAL;
--	}
- 
- 	if (!try_module_get(epf->driver->owner))
- 		return -EAGAIN;
-@@ -233,7 +227,7 @@ struct pci_epf *pci_epf_create(const char *name)
- 	epf->name = kstrdup(func_name, GFP_KERNEL);
- 	if (!epf->name) {
- 		ret = -ENOMEM;
--		goto free_func_name;
-+		goto free_epf;
- 	}
- 
- 	dev = &epf->dev;
-@@ -255,8 +249,6 @@ struct pci_epf *pci_epf_create(const char *name)
- put_dev:
- 	put_device(dev);
- 	kfree(epf->name);
--
--free_func_name:
- 	kfree(func_name);
- 
- free_epf:
+misc/tst-sync_file_range
+nptl/tst-stack4
+malloc/tst-mallocstate
+
+If necessary, I will fix malloc/tst-mallocstate once there's support for 
+a new architecture in build-many-glibcs.py.  The failure is 
+architecture-independent, it's related to the lack of a compat symbol 
+and the difficulty of checking for that at the Makefile or test level.
+
+nptl/tst-stack4 is also a generic failure, I think.
+
+misc/tst-sync_file_range is probably a real failure related to argument 
+passing.  I think this system call was problematic on other 
+architectures, too.
+
+Thanks,
+Florian
+
+(Sorry for the wide Cc: list despite the glibc content.)
