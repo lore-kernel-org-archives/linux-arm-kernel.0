@@ -1,49 +1,48 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 11 Apr 2017 11:43:37 +0100
-Subject: [PATCH v3 6/9] drivers: remove useless comment from
- base/arch_topology.c
-In-Reply-To: <20170410163325.GU17774@n2100.armlinux.org.uk>
-References: <20170327131825.32134-1-juri.lelli@arm.com>
- <20170327131825.32134-7-juri.lelli@arm.com>
- <20170410135103.GR17774@n2100.armlinux.org.uk>
- <20170410140214.GE30804@e106622-lin>
- <20170410163325.GU17774@n2100.armlinux.org.uk>
-Message-ID: <20170411104337.GP30804@e106622-lin>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 11 Apr 2017 11:43:29 +0100
+Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
+ vgic_mmio_uaccess_write_its_iidr
+In-Reply-To: <5b2a8ed0-bfc7-852b-07d8-8474aef25b2a@arm.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
+ <864lxzch9o.fsf@arm.com>
+ <5f1423fd-8f73-364a-9cf7-b4310957e2fd@redhat.com>
+ <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
+ <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
+ <e339c732-e1da-b620-ce09-8e141d2db376@arm.com>
+ <dc02a006-cef8-ac75-7cfd-5fe5c220ea22@redhat.com>
+ <CAFEAcA8XYUnC6zc+EF+amX8d1fP6sTF7Bypn455QkD++RsTRJA@mail.gmail.com>
+ <5b2a8ed0-bfc7-852b-07d8-8474aef25b2a@arm.com>
+Message-ID: <CAFEAcA8oznK3-pmsd2xzrt+HzpM9xkkCfL-iHe4L55NOtMH8vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/17 17:33, Russell King - ARM Linux wrote:
-> On Mon, Apr 10, 2017 at 03:02:14PM +0100, Juri Lelli wrote:
-> > Hi,
-> > 
-> > On 10/04/17 14:51, Russell King - ARM Linux wrote:
-> > > On Mon, Mar 27, 2017 at 02:18:22PM +0100, Juri Lelli wrote:
-> > > > Printing out an error message when we failed to get the cpu device is
-> > > > not helping anyone. Remove it.
-> > > 
-> > > (1) the subject line talks about removing a "comment" but you're
-> > >     actually removing an error printk
-> > > (2) I don't think it's "not helping anyone", although the description
-> > >     above doesn't say _why_ - it's reporting the lack of a missing CPU
-> > >     device that we expect to be present.  If it's not present, then
-> > >     we're not going to end up with the cpu capacity attribute, and the
-> > >     error message answers the "why is that sysfs file missing" question.
-> > 
-> > That's the same I was thinking when I put the error message there in the
-> > first place. But, then Greg didn't seem to like it.
-> 
-> I don't think it was a case of "not liking it" - Greg asked what use it
-> was.  Greg also pointed out the race with userspace.
-> 
+On 11 April 2017 at 11:29, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/04/17 11:16, Peter Maydell wrote:
+>> On 11 April 2017 at 11:08, Auger Eric <eric.auger@redhat.com> wrote:
+>>> On 11/04/2017 12:05, Marc Zyngier wrote:
+>>>> On 10/04/17 16:17, Auger Eric wrote:
+>>>>> A (v1) -> B (v1 & v2): migration OK
+>>>>> B (v1 & v2) -> C (v1): migration NOK
+>>>>
+>>>> So what does IIDR report on B once the A->B migration has taken place?
+>>>> Does it report v2?
+>>>
+>>> yes that was the plan
+>>
+>> Hmm, the IIDR value shouldn't change across a migration I think.
+>> It's guest visible so the guest should see it still the same
+>> value even after migration.
+>
+> That's my worry. But we then have a problem when this VM migrates again.
+> How does userspace find out which ABI to use then?
 
-Right. I asked him for more information, since I wasn't able to
-understand where the problem is.
+Userspace shouldn't need to care; the idea of this scheme is
+that if the kernel has to change its ABI then the kernel
+is what has to deal with the change.
 
-> I think dropping this patch is the quickest way to move forward.
-> 
+I think that means that if you can read the v1 format on input
+you have to output it too, though.
 
-OK, I'm also up for dropping it.
-
-Best,
-
-- Juri
+thanks
+-- PMM
