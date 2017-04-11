@@ -1,50 +1,138 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 11 Apr 2017 23:02:38 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 03/11] dt-bindings: add device tree
- binding for X-Powers AXP803 PMIC
-In-Reply-To: <alpine.LNX.2.20.1704112237290.39759@x220i>
-References: <20170407183441.58750-1-icenowy@aosc.io>
- <20170407183441.58750-4-icenowy@aosc.io>
- <20170411140427.doq5atxk6ptjrp36@dell>
- <alpine.LNX.2.20.1704112237290.39759@x220i>
-Message-ID: <CAGb2v65UiFqjYES3hF-S6THZ5Xu-HRS9R7Ngk8xeP1rZajsr7w@mail.gmail.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Tue, 11 Apr 2017 20:41:33 +0530
+Subject: [PATCHv3 00/14] arm_pmu: ACPI support
+In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <58ECF225.2040804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Apr 11, 2017 at 11:00 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> On Tue, 11 Apr 2017, Lee Jones wrote:
->
->> On Sat, 08 Apr 2017, Icenowy Zheng wrote:
->>
->>> AXP803 is a PMIC produced by Shenzhen X-Powers, with either I2C or RSB
->>> bus.
->>>
->>> Add a compatible for it.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> Acked-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>> Changes in v2:
->>> - Place AXP803 before AXP806/809.
->>> - Added Chen-Yu's ACK.
->>>
->>>  Documentation/devicetree/bindings/mfd/axp20x.txt | 5 +++--
->>>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->>
->> For my own reference:
->>  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
->
->
-> Excuse me... Who will apply this patch?
->
-> I think this patch should be applied by you as it's in bindings/mfd
-> directory, however, if I'm wrong, please point out ;-)
 
-We need the DT maintainers to ack it first. :)
+On Tuesday 11 April 2017 02:09 PM, Mark Rutland wrote:
+> Hi,
+>
+> This series implements ACPI support in the ARM PMU code. It borrows some code
+> from Jeremy's series [1], but takes a different approach to probing and
+> association, using the usual hotplug state machine, minimising external changes
+> required, and simplifying the relationship with the common arm_pmu code.
+>
+> The first few patches are preparatory cleanup/refactoring, with the latter half
+> of the series being specific to ACPI support.
+>
+> The series is based on Will's perf/updates branch [2]. I've pushed the whole
+> series out to the arm/perf/acpi branch [3] of my kernel.org repo.
+>
+> Due to the innards of the hotplug callback framework, it's not entirely
+> safe to register a PMU in a hotplug callback. Due to this, we can only
+> associated hotplugged CPUs with a PMU if a matching CPU was around at
+> probe time. A similar restriction already applies to DT systems. We may
+> be able to relax this with some future work.
+>
+> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+> are correctly associated, I've tested with the following:
+>
+>    $ taskset -c ${SOME_CPU_HERE} perf record \
+>      -e armv8_pmuv3_0/cpu_cycles/ \
+>      -e armv8_pmuv3_1/cpu_cycles/ \
+>      cat /proc/interrupts
+>   
+> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+> association logic. This has also been tested in a VM using PPIs; I do not have
+> access to a host machine which itself uses PPIs.
 
-ChenYu
+I have tried these patches on a Hisilicon D03 board.
+The perf list, basic perf events and perf fuzzer results are all fine.
+
+'perf list' on Hisilicon D03
+--------------------------------
+
+   L1-dcache-load-misses                              [Hardware cache event]
+   L1-dcache-loads                                    [Hardware cache event]
+   L1-dcache-store-misses                             [Hardware cache event]
+   L1-dcache-stores                                   [Hardware cache event]
+   L1-icache-load-misses                              [Hardware cache event]
+   L1-icache-loads                                    [Hardware cache event]
+   branch-load-misses                                 [Hardware cache event]
+   branch-loads                                       [Hardware cache event]
+   dTLB-load-misses                                   [Hardware cache event]
+   iTLB-load-misses                                   [Hardware cache event]
+
+   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
+   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
+   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
+   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
+   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
+   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
+   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
+   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
+   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
+   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
+   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
+   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
+   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
+   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
+   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
+   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
+   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
+   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
+   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
+   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
+   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
+   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
+   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
+   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
+
+Thanks,
+Anurup
+
+> Since v1 [4]:
+> * Fix up ACPI bits per Lorenzo's request
+> * Accumulate tags
+> * Check presence of PMUv3
+>
+> Since v2 [5]:
+> * Clean up GSIs when a request fails
+> * Rename parse/unparse functions
+> * Use cpuid_feature_extract_unsigned_field() for PMUVer
+> * Drop parking protocol cleanups. I'll resend these later.
+>
+> Thanks,
+> Mark.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/482397.html
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/updates
+> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/acpi
+> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492897.html
+> [5] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499982.html
+>
+> Mark Rutland (14):
+>    drivers/perf: arm_pmu: remove pointless PMU disabling
+>    drivers/perf: arm_pmu: define armpmu_init_fn
+>    drivers/perf: arm_pmu: fold init into alloc
+>    drivers/perf: arm_pmu: factor out pmu registration
+>    drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
+>    drivers/perf: arm_pmu: handle no platform_device
+>    drivers/perf: arm_pmu: rename irq request/free functions
+>    drivers/perf: arm_pmu: split cpu-local irq request/free
+>    drivers/perf: arm_pmu: move irq request/free into probe
+>    drivers/perf: arm_pmu: split out platform device probe logic
+>    arm64: add function to get a cpu's MADT GICC table
+>    drivers/perf: arm_pmu: add ACPI framework
+>    arm64: pmuv3: handle !PMUv3 when probing
+>    arm64: pmuv3: use arm_pmu ACPI framework
+>
+>   arch/arm64/include/asm/acpi.h   |   2 +
+>   arch/arm64/kernel/perf_event.c  | 113 ++++++++----
+>   arch/arm64/kernel/smp.c         |  10 ++
+>   drivers/perf/Kconfig            |   4 +
+>   drivers/perf/Makefile           |   3 +-
+>   drivers/perf/arm_pmu.c          | 387 ++++++++++------------------------------
+>   drivers/perf/arm_pmu_acpi.c     | 256 ++++++++++++++++++++++++++
+>   drivers/perf/arm_pmu_platform.c | 235 ++++++++++++++++++++++++
+>   include/linux/cpuhotplug.h      |   1 +
+>   include/linux/perf/arm_pmu.h    |  22 ++-
+>   10 files changed, 708 insertions(+), 325 deletions(-)
+>   create mode 100644 drivers/perf/arm_pmu_acpi.c
+>   create mode 100644 drivers/perf/arm_pmu_platform.c
+>
