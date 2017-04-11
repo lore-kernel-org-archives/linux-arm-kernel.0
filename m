@@ -1,34 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Apr 2017 15:32:50 +0100
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
-References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
- <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
- <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
-Message-ID: <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+From: linucherian@gmail.com (linucherian at gmail.com)
+Date: Tue, 11 Apr 2017 20:12:38 +0530
+Subject: [RFC PATCH 0/7] Cavium CN99xx SMMUv3 Errata workarounds
+Message-ID: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 02:48:32PM -0500, Rob Herring wrote:
-> On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
+From: Linu Cherian <linu.cherian@cavium.com>
 
-> > +Required properties:
-> > +  - compatible: Must be "st,stm32h7-i2s"
-> > +  - #sound-dai-cells: Must be 1. (one parameter)
-> > +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
-> > +	index 0: playback DAI
-> > +	index 1: capture DAI
-> > +	index 2: full duplex DAI
+Cavium CN99xx SMMUv3 implementation has two Silicon Erratas.
+1. Errata ID #74
+   SMMU register alias Page 1 is not implemented
+2. Errata ID #126
+   SMMU doesnt support unique IRQ lines for gerror, eventq and cmdq-sync
 
-> Is this still needed for graph-card?
+The following patchset does software workaround for these two erratas.
+An option flag is introduced for each errata which will enable/disable
+the errata workarounds.
+For device tree based probing, option flags can be turned on by passing 
+relevant options along with the smmuv3 device node. For ACPI, option flags
+are turned on when Cavium CN99xx SMMuv3 model is identified in the IORT.
 
-The graph card is blocked on your review...  I'm also not clear how
-without something like this we'd be able to identify a specific DAI
-within a device if we don't have a way of identifying them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/493117dc/attachment.sig>
+Note: We are in the process of getting necessary IORT SMMUv3 model ID 
+      for Cavium CN99xx SMMUv3 implementation and it is yet to get
+      allocated. We have assumed model ID 3 for this.
+
+Geetha (1):
+  iommu/arm-smmu-v3: Introduce smmu option USE_SHARED_IRQS for Silicon
+    errata
+
+Linu Cherian (6):
+  iommu/arm-smmu-v3: Introduce smmu option PAGE0_REGS_ONLY for Silicon
+    errata.
+  iommu/arm-smmu-v3: Do resource size checks based on smmu option
+    PAGE0_REGS_ONLY
+  ACPICA: IORT: Add SMMuV3 model definitions.
+  iommu/arm-smmu-v3: For ACPI based device probing, set relevant options
+    for different SMMUv3 implementations.
+  ACPI/IORT: Fixup SMMUv3 resource size for Cavium 99xx SMMUv3 model.
+  arm64: Documentation: Add Cavium ThunderX2 SMMUv3 erratas.
+
+ Documentation/arm64/silicon-errata.txt |   2 +
+ drivers/acpi/arm64/iort.c              |  10 ++-
+ drivers/iommu/arm-smmu-v3.c            | 115 ++++++++++++++++++++++++++-------
+ include/acpi/actbl2.h                  |   5 ++
+ 4 files changed, 107 insertions(+), 25 deletions(-)
+
+-- 
+1.9.1
