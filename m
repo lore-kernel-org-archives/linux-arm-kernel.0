@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:55 +0100
-Subject: [PATCH v3 15/32] microblaze: include default ioremap_nopost()
- implementation
+Date: Tue, 11 Apr 2017 13:28:53 +0100
+Subject: [PATCH v3 13/32] m68k: include default ioremap_nopost() implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-16-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-14-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,22 +25,22 @@ ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Michal Simek <monstr@monstr.eu>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
 ---
- arch/microblaze/include/asm/io.h | 1 +
+ arch/m68k/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/microblaze/include/asm/io.h b/arch/microblaze/include/asm/io.h
-index 39b6315..4714a6d 100644
---- a/arch/microblaze/include/asm/io.h
-+++ b/arch/microblaze/include/asm/io.h
-@@ -43,6 +43,7 @@ extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
- #define ioremap_fullcache(addr, size)		ioremap((addr), (size))
- #define ioremap_wc(addr, size)			ioremap((addr), (size))
- #define ioremap_wt(addr, size)			ioremap((addr), (size))
+diff --git a/arch/m68k/include/asm/io.h b/arch/m68k/include/asm/io.h
+index bccd5a9..ce39ee5 100644
+--- a/arch/m68k/include/asm/io.h
++++ b/arch/m68k/include/asm/io.h
+@@ -3,6 +3,7 @@
+ #else
+ #include <asm/io_mm.h>
+ #endif
 +#include <asm-generic/ioremap-nopost.h>
  
- #endif /* CONFIG_MMU */
- 
+ #define readb_relaxed(addr)	readb(addr)
+ #define readw_relaxed(addr)	readw(addr)
 -- 
 2.10.0
