@@ -1,63 +1,104 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 11 Apr 2017 22:27:55 +0530
-Subject: [RFC PATCH 4/7] ACPICA: IORT: Add SMMuV3 model definitions.
-In-Reply-To: <d60a1fcc-081e-03e8-3454-6802e830ddb9@arm.com>
-References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
- <1491921765-29475-5-git-send-email-linucherian@gmail.com>
- <d60a1fcc-081e-03e8-3454-6802e830ddb9@arm.com>
-Message-ID: <CA+sq2CfXQAM-ooNRQBbYNYc_T=p2yrvA2FYD=2_=_-Z9kQwVcA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 11 Apr 2017 10:01:29 -0700
+Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
+In-Reply-To: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <86200633-8349-f1c3-f4d8-a130a26381f7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 9:29 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 11/04/17 15:42, linucherian at gmail.com wrote:
->> From: Linu Cherian <linu.cherian@cavium.com>
->>
->> Add SMMuV3 model definitions.
->>
->> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
->> ---
->>  include/acpi/actbl2.h | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
->> index 2b4af07..9db67d6 100644
->> --- a/include/acpi/actbl2.h
->> +++ b/include/acpi/actbl2.h
->> @@ -778,6 +778,11 @@ struct acpi_iort_smmu {
->>  #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002   /* ARM Corelink MMU-400 */
->>  #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003   /* ARM Corelink MMU-500 */
->>
->> +#define ACPI_IORT_SMMU_V3               0x00000000      /* Generic SMMUv3 */
->> +#define ACPI_IORT_SMMU_CORELINK_MMU600  0x00000001      /* ARM Corelink MMU-600 */
->> +#define ACPI_IORT_SMMU_V3_HISILICON     0x00000002      /* HiSilicon SMMUv3 */
->> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000003      /* Cavium CN99xx SMMUv3 */
->
-> None of those models are listed in the current IORT spec.
+On 04/11/2017 09:03 PM, Dong Aisheng wrote:
+> These helper function allows drivers to get several clk consumers in
+> one operation.  If any of the clk cannot be acquired then any clks
+> that were got will be put before returning to the caller.
+> 
+> The idea firstly came out when i wanted to clean up and optimize
+> imx6q-cpufreq driver which needs to handle a lot of clocks as it
+> becomes a bit mess.
+> 
+> e.g. drivers/cpufreq/imx6q-cpufreq.c
+> 
+> You will see we need get 7 clocks during driver probe.
+> (Add there will be more, e.g. pll1, pll1_bypass, pll1_bypass_src,
+> in the future when adding busfreq support).
+> 
+> static int imx6q_cpufreq_probe(struct platform_device *pdev)
+> {
+> ....
+> 	arm_clk = clk_get(cpu_dev, "arm");
+> 	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
+> 	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
+> 	step_clk = clk_get(cpu_dev, "step");
+> 	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
+> 	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+> 	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+> 		dev_err(cpu_dev, "failed to get clocks\n");
+> 		ret = -ENOENT;
+> 		goto put_clk;
+> 	}
+> 
+> 	if (of_machine_is_compatible("fsl,imx6ul")) {
+> 		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+> 		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+> 		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+> 			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
+> 			ret = -ENOENT;
+> 			goto put_clk;
+> 		}
+> 	}
+> ....
+> put_clk: 
+>         if (!IS_ERR(arm_clk))
+>                 clk_put(arm_clk);
+>         if (!IS_ERR(pll1_sys_clk))
+>                 clk_put(pll1_sys_clk);
+> 	...........
+> }
+> 
+> Together with the err path handling for each clocks, it does make
+> things a bit ugly.
+> 
+> Since we already have regulator_bulk_get accessories, i thought we
+> probably could introduce clk_bulk_get as well to handle such case to
+> ease the driver owners' life. 
+> 
+> Besides IMX cpufreq driver, there is also some similar cases
+> in kernel which could befinit from this api as well.
+> e.g.
+> drivers/cpufreq/tegra124-cpufreq.c
+> drivers/cpufreq/s3c2412-cpufreq.c
+> sound/soc/samsung/smdk_spdif.c
+> arch/arm/mach-omap1/serial.c
+> ...
+> 
+> And actually, if we handle clocks more than 3, then it might be
+> worthy to try, which there is quite many manay in kernel and
+> that probably could save a lot codes.
+> 
+> This is a RFC patch intending to bring up the idea to discuss.
+> 
+> Comments are welcome and appreciated!
 
-As mentioned in the cover letter, we are in the process of getting
-model no added for
-our silicon in the soon to be published updated IORT spec. Meanwhile
-we wanted to take
-feedback on the errata patches from experts. Hence patches were
-submitted as RFC.
+Thanks a lot for doing this, we have historically done something similar
+on ARCH_BRCMSTB platforms in our downstream tree with a concept of a
+"software" clock which has multiple parents (yikes), using the bulk
+accessors would essentially allow us to remove part of this hack, so I
+am all in favor of this!
 
-Thanks,
-Sunil.
+> 
+> Dong Aisheng (3):
+>   clk: add clk_bulk_get accessories
+>   clk: add managed version of clk_bulk_get
+>   cpufreq: imx6q: refine clk operations
+> 
+>  drivers/clk/clk-devres.c        |  36 +++++++++++
+>  drivers/clk/clk.c               |  99 +++++++++++++++++++++++++++++
+>  drivers/clk/clkdev.c            |  42 +++++++++++++
+>  drivers/cpufreq/imx6q-cpufreq.c | 119 ++++++++++++++++-------------------
+>  include/linux/clk.h             | 135 ++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 365 insertions(+), 66 deletions(-)
+> 
 
->
-> What's MMU-600?
->
-> Robin.
->
->> +
->>  /* Masks for Flags field above */
->>
->>  #define ACPI_IORT_SMMU_DVM_SUPPORTED    (1)
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Florian
