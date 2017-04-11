@@ -1,48 +1,62 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:50 +0100
-Subject: [PATCH v3 10/32] hexagon: include default ioremap_nopost()
- implementation
+Date: Tue, 11 Apr 2017 13:29:09 +0100
+Subject: [PATCH v3 29/32] arm64: implement ioremap_nopost() interface
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-11-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-30-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and Posting")
-mandate non-posted configuration transactions. As further highlighted in
-the PCIe specifications (4.0 - Rev0.3, "Ordering Considerations for the
-Enhanced Configuration Access Mechanism"), through ECAM and
-ECAM-derivative configuration mechanism, the memory mapped transactions
-from the host CPU into Configuration Requests on the PCI express fabric
-may create ordering problems for software because writes to memory
-address are typically posted transactions (unless the architecture can
-enforce through virtual address mapping non-posted write transactions
-behaviour) but writes to Configuration Space are not posted on the PCI
-express fabric.
+The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+and Posting") defines rules for PCI configuration space transactions
+ordering and posting, that state that configuration writes
+are non-posted transactions.
 
-Include the asm-generic ioremap_nopost() implementation (currently
-falling back to ioremap_nocache()) to provide a non-posted writes
-ioremap interface to kernel subsystems.
+This rule is reinforced by the ARM v8 architecture reference manual
+(issue A.k, Early Write Acknowledgment) that explicitly recommends
+that No Early Write Acknowledgment attribute should be used to map
+PCI configuration (write) transactions.
 
+Current ioremap interface on ARM64 implements mapping functions
+where the Early Write Acknowledgment hint is enabled, so they
+cannot be used to map PCI configuration space in a PCI specs
+compliant way.
+
+Implement an ARM64 specific ioremap_nopost() interface
+that allows to map PCI config region with nGnRnE attributes, providing
+a remap function that complies with PCI specifications and the ARMv8
+architecture reference manual recommendations.
+
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Richard Kuo <rkuo@codeaurora.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/hexagon/include/asm/io.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/io.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
-index 66f5e9a..be630bf 100644
---- a/arch/hexagon/include/asm/io.h
-+++ b/arch/hexagon/include/asm/io.h
-@@ -197,6 +197,8 @@ static inline void __iomem *ioremap(unsigned long phys_addr, unsigned long size)
- 	return ioremap_nocache(phys_addr, size);
- }
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 0c00c87..1a703e5 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -173,6 +173,18 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
  
-+#include <asm-generic/ioremap-nopost.h>
+ /*
++ * ioremap implementation providing non-posted writes (ie v8 no Early
++ * Write Acknowledgment) semantics.
++ *
++ * PCI specifications disallows posted write configuration transactions.
++ * Add an arch specific ioremap_post definition that is implemented
++ * through nGnRnE device memory attribute as recommended by the ARM v8
++ * Architecture reference manual Issue A.k B2.8.2 "Device memory" so
++ * that it can be used to map PCI config space memory areas.
++ */
++#define ioremap_nopost(addr, size) __ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRnE))
 +
- static inline void iounmap(volatile void __iomem *addr)
- {
- 	__iounmap(addr);
++/*
+  * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
 -- 
 2.10.0
