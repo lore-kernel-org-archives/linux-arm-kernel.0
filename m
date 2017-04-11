@@ -1,121 +1,111 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Apr 2017 13:02:31 +0100
-Subject: [PATCH v4 3/6] mfd: exynos-lpass: Remove pad retention control
-In-Reply-To: <1490256207-10061-4-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 11 Apr 2017 13:03:08 +0100
+Subject: [PATCH v4 4/6] mfd: exynos-lpass: Add support for clocks
+In-Reply-To: <1490256207-10061-5-git-send-email-m.szyprowski@samsung.com>
 References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170323080348eucas1p29d1fb4eb06e4785d20341be7a374bfb3@eucas1p2.samsung.com>
- <1490256207-10061-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170411120231.hivtn6c7to4z2gu6@dell>
+ <CGME20170323080349eucas1p11187befd30ab70554373fb6d818cd851@eucas1p1.samsung.com>
+ <1490256207-10061-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170411120308.ilqanfczjhnrivhr@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 23 Mar 2017, Marek Szyprowski wrote:
 
-> Pad retention should be controlled from pin control driver, so remove it
-> from Exynos LPASS driver. After this change, no more access to PMU regmap
-> is needed, so remove also the code for handling PMU regmap.
+> Exynos LPASS requires some clocks to be enabled to make any access to its
+> registers. This patch adds code for handling such clocks. For current set
+> of registers it is enough to keep sfr0_ctrl clock enabled. Till now it
+> worked only because those clocks were enabled by bootloader and driver
+> probe() happened before they were disabled by clock core because of lack
+> of users. Handling those clocks is also needed to make it possible to
+> enable support for audio power domain.
+> 
+> This patch requires adding sfr0_ctrl clock to device tree.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 > Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > Acked-by: Rob Herring <robh@kernel.org>
 > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  .../bindings/mfd/samsung,exynos5433-lpass.txt           |  2 --
->  drivers/mfd/exynos-lpass.c                              | 17 -----------------
->  include/linux/mfd/syscon/exynos5-pmu.h                  |  3 ---
->  3 files changed, 22 deletions(-)
+>  .../devicetree/bindings/mfd/samsung,exynos5433-lpass.txt       |  6 ++++++
+>  drivers/mfd/exynos-lpass.c                                     | 10 ++++++++++
+>  2 files changed, 16 insertions(+)
 
 Applied, thanks.
 
 > diff --git a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
-> index c110e118b79f..a8deaee82c44 100644
+> index a8deaee82c44..df664018c148 100644
 > --- a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
 > +++ b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
-> @@ -5,7 +5,6 @@ Required properties:
+> @@ -5,6 +5,10 @@ Required properties:
 >   - compatible		: "samsung,exynos5433-lpass"
 >   - reg			: should contain the LPASS top SFR region location
 >  			  and size
-> - - samsung,pmu-syscon	: the phandle to the Power Management Unit node
+> + - clock-names		: should contain following required clocks: "sfr0_ctrl"
+> + - clocks		: should contain clock specifiers of all clocks, which
+> +			  input names have been specified in clock-names
+> +			  property, in same order.
 >   - #address-cells	: should be 1
 >   - #size-cells		: should be 1
 >   - ranges		: must be present
-> @@ -25,7 +24,6 @@ Example:
+> @@ -24,6 +28,8 @@ Example:
 >  audio-subsystem {
 >  	compatible = "samsung,exynos5433-lpass";
 >  	reg = <0x11400000 0x100>, <0x11500000 0x08>;
-> -	samsung,pmu-syscon = <&pmu_system_controller>;
+> +	clocks = <&cmu_aud CLK_PCLK_SFR0_CTRL>;
+> +	clock-names = "sfr0_ctrl";
 >  	#address-cells = <1>;
 >  	#size-cells = <1>;
 >  	ranges;
 > diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-> index 2e064fb8826f..17915daa2e80 100644
+> index 17915daa2e80..be264988bdc9 100644
 > --- a/drivers/mfd/exynos-lpass.c
 > +++ b/drivers/mfd/exynos-lpass.c
-> @@ -18,7 +18,6 @@
+> @@ -14,6 +14,7 @@
+>   * only version 2 as published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/delay.h>
 >  #include <linux/io.h>
 >  #include <linux/module.h>
->  #include <linux/mfd/syscon.h>
-> -#include <linux/mfd/syscon/exynos5-pmu.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> @@ -51,8 +50,6 @@
->  #define  LPASS_INTR_SFR			BIT(0)
->  
+> @@ -52,6 +53,7 @@
 >  struct exynos_lpass {
-> -	/* pointer to the Power Management Unit regmap */
-> -	struct regmap *pmu;
 >  	/* pointer to the LPASS TOP regmap */
 >  	struct regmap *top;
+> +	struct clk *sfr0_clk;
 >  };
-> @@ -81,10 +78,6 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
->  	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK,
->  		     LPASS_INTR_SFR | LPASS_INTR_DMA | LPASS_INTR_I2S);
 >  
-> -	/* Activate related PADs from retention state */
-> -	regmap_write(lpass->pmu, EXYNOS5433_PAD_RETENTION_AUD_OPTION,
-> -		     EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR);
-> -
->  	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
->  	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
->  	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
-> @@ -95,9 +88,6 @@ static void exynos_lpass_disable(struct exynos_lpass *lpass)
+>  static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
+> @@ -71,6 +73,8 @@ static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
+>  
+>  static void exynos_lpass_enable(struct exynos_lpass *lpass)
+>  {
+> +	clk_prepare_enable(lpass->sfr0_clk);
+> +
+>  	/* Unmask SFR, DMA and I2S interrupt */
+>  	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK,
+>  		     LPASS_INTR_SFR | LPASS_INTR_DMA | LPASS_INTR_I2S);
+> @@ -88,6 +92,8 @@ static void exynos_lpass_disable(struct exynos_lpass *lpass)
 >  	/* Mask any unmasked IP interrupt sources */
 >  	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK, 0);
 >  	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK, 0);
-> -
-> -	/* Deactivate related PADs from retention state */
-> -	regmap_write(lpass->pmu, EXYNOS5433_PAD_RETENTION_AUD_OPTION, 0);
+> +
+> +	clk_disable_unprepare(lpass->sfr0_clk);
 >  }
 >  
 >  static const struct regmap_config exynos_lpass_reg_conf = {
-> @@ -131,13 +121,6 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  		return PTR_ERR(lpass->top);
->  	}
+> @@ -114,6 +120,10 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+>  	if (IS_ERR(base_top))
+>  		return PTR_ERR(base_top);
 >  
-> -	lpass->pmu = syscon_regmap_lookup_by_phandle(dev->of_node,
-> -						"samsung,pmu-syscon");
-> -	if (IS_ERR(lpass->pmu)) {
-> -		dev_err(dev, "Failed to lookup PMU regmap\n");
-> -		return PTR_ERR(lpass->pmu);
-> -	}
-> -
->  	platform_set_drvdata(pdev, lpass);
->  	exynos_lpass_enable(lpass);
->  
-> diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
-> index c28ff21ca4d2..0622ae86f9db 100644
-> --- a/include/linux/mfd/syscon/exynos5-pmu.h
-> +++ b/include/linux/mfd/syscon/exynos5-pmu.h
-> @@ -46,7 +46,4 @@
->  #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
->  #define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
->  
-> -#define EXYNOS5433_PAD_RETENTION_AUD_OPTION		(0x3028)
-> -#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR	BIT(28)
-> -
->  #endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
+> +	lpass->sfr0_clk = devm_clk_get(dev, "sfr0_ctrl");
+> +	if (IS_ERR(lpass->sfr0_clk))
+> +		return PTR_ERR(lpass->sfr0_clk);
+> +
+>  	lpass->top = regmap_init_mmio(dev, base_top,
+>  					&exynos_lpass_reg_conf);
+>  	if (IS_ERR(lpass->top)) {
 
 -- 
 Lee Jones
