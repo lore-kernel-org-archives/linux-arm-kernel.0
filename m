@@ -1,27 +1,47 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 11 Apr 2017 23:39:43 +1000
-Subject: [PATCH v3 04/32] asm-generic: add ioremap_nopost() remap interface
-In-Reply-To: <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 11 Apr 2017 13:29:02 +0100
+Subject: [PATCH v3 22/32] s390: include default ioremap_nopost() implementation
+In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
-Message-ID: <1491917983.7236.9.camel@kernel.crashing.org>
+Message-ID: <20170411122923.6285-23-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-11 at 13:28 +0100, Lorenzo Pieralisi wrote:
-> +static inline void __iomem *ioremap_nopost(phys_addr_t offset,
-> size_t size)
-> +{
-> +???????return ioremap_nocache(offset, size);
-> +}
-> +
+The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and Posting")
+mandate non-posted configuration transactions. As further highlighted in
+the PCIe specifications (4.0 - Rev0.3, "Ordering Considerations for the
+Enhanced Configuration Access Mechanism"), through ECAM and
+ECAM-derivative configuration mechanism, the memory mapped transactions
+from the host CPU into Configuration Requests on the PCI express fabric
+may create ordering problems for software because writes to memory
+address are typically posted transactions (unless the architecture can
+enforce through virtual address mapping non-posted write transactions
+behaviour) but writes to Configuration Space are not posted on the PCI
+express fabric.
 
-No this is wrong as I explained.
+Include the asm-generic ioremap_nopost() implementation (currently
+falling back to ioremap_nocache()) to provide a non-posted writes
+ioremap interface to kernel subsystems.
 
-This is a semantic that simply *cannot* be generically provided accross
-architectures as a mapping attribute.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+---
+ arch/s390/include/asm/io.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-The solution to your problem lies elsewhere.
-
-Cheers,
-Ben.
+diff --git a/arch/s390/include/asm/io.h b/arch/s390/include/asm/io.h
+index 437e9af..374fb43 100644
+--- a/arch/s390/include/asm/io.h
++++ b/arch/s390/include/asm/io.h
+@@ -39,6 +39,7 @@ static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+ static inline void iounmap(volatile void __iomem *addr)
+ {
+ }
++#include <asm-generic/ioremap-nopost.h>
+ 
+ static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+ {
+-- 
+2.10.0
