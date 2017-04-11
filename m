@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:53 +0100
-Subject: [PATCH v3 13/32] m68k: include default ioremap_nopost() implementation
+Date: Tue, 11 Apr 2017 13:28:50 +0100
+Subject: [PATCH v3 10/32] hexagon: include default ioremap_nopost()
+ implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-14-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-11-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,22 +26,23 @@ ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Richard Kuo <rkuo@codeaurora.org>
 ---
- arch/m68k/include/asm/io.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/hexagon/include/asm/io.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/m68k/include/asm/io.h b/arch/m68k/include/asm/io.h
-index bccd5a9..ce39ee5 100644
---- a/arch/m68k/include/asm/io.h
-+++ b/arch/m68k/include/asm/io.h
-@@ -3,6 +3,7 @@
- #else
- #include <asm/io_mm.h>
- #endif
-+#include <asm-generic/ioremap-nopost.h>
+diff --git a/arch/hexagon/include/asm/io.h b/arch/hexagon/include/asm/io.h
+index 66f5e9a..be630bf 100644
+--- a/arch/hexagon/include/asm/io.h
++++ b/arch/hexagon/include/asm/io.h
+@@ -197,6 +197,8 @@ static inline void __iomem *ioremap(unsigned long phys_addr, unsigned long size)
+ 	return ioremap_nocache(phys_addr, size);
+ }
  
- #define readb_relaxed(addr)	readb(addr)
- #define readw_relaxed(addr)	readw(addr)
++#include <asm-generic/ioremap-nopost.h>
++
+ static inline void iounmap(volatile void __iomem *addr)
+ {
+ 	__iounmap(addr);
 -- 
 2.10.0
