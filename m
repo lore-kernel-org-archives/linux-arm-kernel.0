@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:03 +0100
-Subject: [PATCH v3 23/32] sh: include default ioremap_nopost() implementation
+Date: Tue, 11 Apr 2017 13:29:05 +0100
+Subject: [PATCH v3 25/32] tile: include default ioremap_nopost() implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-24-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-26-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,24 +24,23 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Rich Felker <dalias@libc.org>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Chris Metcalf <cmetcalf@mellanox.com>
 ---
- arch/sh/include/asm/io.h | 1 +
+ arch/tile/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/sh/include/asm/io.h b/arch/sh/include/asm/io.h
-index 3280a6b..23814cd 100644
---- a/arch/sh/include/asm/io.h
-+++ b/arch/sh/include/asm/io.h
-@@ -371,6 +371,7 @@ static inline int iounmap_fixed(void __iomem *addr) { return -EINVAL; }
- #define ioremap_nocache	ioremap
- #define ioremap_uc	ioremap
- #define iounmap		__iounmap
+diff --git a/arch/tile/include/asm/io.h b/arch/tile/include/asm/io.h
+index 30f4a21..d3f2b77 100644
+--- a/arch/tile/include/asm/io.h
++++ b/arch/tile/include/asm/io.h
+@@ -57,6 +57,7 @@ extern void iounmap(volatile void __iomem *addr);
+ #define ioremap_wt(physaddr, size)		ioremap(physaddr, size)
+ #define ioremap_uc(physaddr, size)		ioremap(physaddr, size)
+ #define ioremap_fullcache(physaddr, size)	ioremap(physaddr, size)
 +#include <asm-generic/ioremap-nopost.h>
  
- /*
-  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ #define mmiowb()
+ 
 -- 
 2.10.0
