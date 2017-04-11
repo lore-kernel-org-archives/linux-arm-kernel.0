@@ -1,90 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 11 Apr 2017 11:13:46 +0200
-Subject: [PATCH 4/5] ARM: sun8i: h3: add operating-points-v2 table for CPU
-In-Reply-To: <20170408185025.53841-5-icenowy@aosc.io>
-References: <20170408185025.53841-1-icenowy@aosc.io>
- <20170408185025.53841-5-icenowy@aosc.io>
-Message-ID: <20170411091346.mcwyskezadabsobn@lukather>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 11 Apr 2017 14:57:42 +0530
+Subject: [PATCH v2 2/4] cpufreq: imx6q: Set max suspend_freq to avoid
+ changes during suspend
+In-Reply-To: <5f61b819733127ddc7d41e82bf703a355c845b49.1491324640.git.leonard.crestez@nxp.com>
+References: <cover.1491324640.git.leonard.crestez@nxp.com>
+ <5f61b819733127ddc7d41e82bf703a355c845b49.1491324640.git.leonard.crestez@nxp.com>
+Message-ID: <20170411092742.GB13627@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 09, 2017 at 02:50:24AM +0800, Icenowy Zheng wrote:
-> The CPU on Allwinner H3 can do dynamic frequency scaling.
+On 04-04-17, 20:04, Leonard Crestez wrote:
+> If the cpufreq driver tries to modify voltage/freq during suspend/resume
+> it might need to control an external PMIC via I2C or SPI but those
+> devices might be already suspended. This issue is likely to happen
+> whenever the LDOs have their vin-supply set.
 > 
-> Add a DVFS table based on the one tweaked by Armbian developers, which
-> are proven to work stably on BSP kernels.
+> To avoid this scenario we just increase cpufreq to the maximum before
+> suspend.
 > 
-> Frequencies higher than 1008MHz are temporarily dropped in the table, as
-> they may lead to over voltage on boards without proper regulator
-> settings or over temperature on boards with proper regulator settings.
-> They will be added back once regulator settings are ready and thermal
-> sensor driver is merged.
-> 
-> In order to satisfy all different regulators (SY8106A which is 50mV per
-> level, SY8113B which have two states: 1.1V and 1.3V, and some board with
-> non-tweakable regulators), all the OPPs are defined with a range which has
-> the target value as the minimum allowed value, and 1.3V (the highest
-> VDD-CPUX voltage suggested by the datasheet) as the maximum allowed value.
-> It's proven to work well with a board with SY8113B.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 > ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 38 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 37 insertions(+), 1 deletion(-)
+>  drivers/cpufreq/imx6q-cpufreq.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index b36f9f423c39..a0cee17fe44b 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -43,32 +43,68 @@
->  #include "sunxi-h3-h5.dtsi"
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index be90ee3..786122e 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -161,8 +161,13 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
 >  
->  / {
-> +	cpu0_opp_table: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
+>  static int imx6q_cpufreq_init(struct cpufreq_policy *policy)
+>  {
+> +	int ret;
 > +
-> +		opp at 480000000 {
-> +			opp-hz = /bits/ 64 <480000000>;
-> +			opp-microvolt = <980000 980000 1300000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
+>  	policy->clk = arm_clk;
+> -	return cpufreq_generic_init(policy, freq_table, transition_latency);
+> +	ret = cpufreq_generic_init(policy, freq_table, transition_latency);
+> +	policy->suspend_freq = policy->max;
 > +
-> +		opp at 648000000 {
-> +			opp-hz = /bits/ 64 <816000000>;
-> +			opp-microvolt = <1020000 1020000 1300000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +
-> +		opp at 912000000 {
-> +			opp-hz = /bits/ 64 <960000000>;
-> +			opp-microvolt = <1080000 1080000 1300000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +
-> +		opp at 1008000000 {
-> +			opp-hz = /bits/ 64 <1008000000>;
-> +			opp-microvolt = <1140000 1140000 1300000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +	};
-> +
+> +	return ret;
+>  }
+>  
+>  static struct cpufreq_driver imx6q_cpufreq_driver = {
+> @@ -173,6 +178,7 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+>  	.init = imx6q_cpufreq_init,
+>  	.name = "imx6q-cpufreq",
+>  	.attr = cpufreq_generic_attr,
+> +	.suspend = cpufreq_generic_suspend,
+>  };
+>  
+>  static int imx6q_cpufreq_probe(struct platform_device *pdev)
 
->From your serie, I guess you never actually tested those OPPs on any
-board without SY8113B, right?
-
-(and therefore, without operating at the voltages listed here).
-
-Maxime
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/e0c661e2/attachment-0001.sig>
+viresh
