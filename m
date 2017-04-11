@@ -1,29 +1,31 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 11 Apr 2017 10:09:50 +0200
-Subject: [PATCH v4 2/2] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <20170410105547.GA8615@gondor.apana.org.au>
-References: <20170408133245.30147-1-krzk@kernel.org>
- <20170408133245.30147-3-krzk@kernel.org>
- <20170410105547.GA8615@gondor.apana.org.au>
-Message-ID: <CAJKOXPe4gDFWqNwa1WqADTv2Zv_wu3pVpEaefPz5POk8mVeaqQ@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 11 Apr 2017 11:16:23 +0300
+Subject: [PATCH v2 2/4] cpufreq: imx6q: Set max suspend_freq to avoid
+ changes during suspend
+In-Reply-To: <20170411063738.GE3670@vireshk-i7>
+References: <cover.1491324640.git.leonard.crestez@nxp.com>
+ <5f61b819733127ddc7d41e82bf703a355c845b49.1491324640.git.leonard.crestez@nxp.com>
+ <20170411063738.GE3670@vireshk-i7>
+Message-ID: <1491898583.26722.2.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 12:55 PM, Herbert Xu
-<herbert@gondor.apana.org.au> wrote:
-> On Sat, Apr 08, 2017 at 03:32:45PM +0200, Krzysztof Kozlowski wrote:
->>
->> +static struct rng_alg exynos_rng_alg = {
->> +     .generate               = exynos_rng_generate,
->> +     .seed                   = exynos_rng_seed,
->> +     .seedsize               = EXYNOS_RNG_SEED_SIZE,
->> +     .base                   = {
->> +             .cra_name               = "exynos_rng",
->
-> Please use stdrng.  Or is there a reason why this can't be used
-> by the crypto layer itself?
+On Tue, 2017-04-11 at 12:07 +0530, Viresh Kumar wrote:
+> On 04-04-17, 20:04, Leonard Crestez wrote:
+> > If the cpufreq driver tries to modify voltage/freq during suspend/resume
+> > it might need to control an external PMIC via I2C or SPI but those
+> > devices might be already suspended. This issue is likely to happen
+> > whenever the LDOs have their vin-supply set.
+> > 
+> > To avoid this scenario we just increase cpufreq to the maximum before
+> > suspend.
+> > 
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > ---
+> >  drivers/cpufreq/imx6q-cpufreq.c | 8 +++++++-
+> >  1 file changed, 7 insertions(+), 1 deletion(-)
 
-I think there is no reason against, I'll fix it.
+> I have already Acked this earlier, why didn't you add it ?
 
-Best regards,
-Krzysztof
+Because v2 is different based on comments from Lucas. It didn't seem
+appropriate to keep an old "Acked-by" in this case.
