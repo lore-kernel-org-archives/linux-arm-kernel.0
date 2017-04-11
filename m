@@ -1,52 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:48 +0100
-Subject: [PATCHv3 05/14] drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
+Date: Tue, 11 Apr 2017 09:39:49 +0100
+Subject: [PATCHv3 06/14] drivers/perf: arm_pmu: handle no platform_device
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM PMU framework code always uses armpmu_dispatch_irq as its common
-IRQ handler. Passing this down from cpu_pmu_init() is somewhat
-pointless, and gets in the way of refactoring.
+In armpmu_dispatch_irq() we look at arm_pmu::plat_device to acquire
+platdata, so that we can defer to platform-specific IRQ handling,
+required on some 32-bit parts. With the advent of ACPI we won't always
+have a platform_device, and so we must avoid trying to dereference
+fields from it.
 
-This patch makes cpu_pmu_request_irqs() always use armpmu_dispatch_irq
-as the handler when requesting IRQs, and removes the handler parameter
-from its prototype.
+This patch fixes up armpmu_dispatch_irq() to avoid doing so, introducing
+a new armpmu_get_platdata() helper.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/perf/arm_pmu.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 985bd08..183c6fd 100644
+index 183c6fd..2442038 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -543,10 +543,11 @@ static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
- 	}
+@@ -316,10 +316,16 @@ static void armpmu_start(struct perf_event *event, int flags)
+ 	return 0;
  }
  
--static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-+static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu)
++static struct arm_pmu_platdata *armpmu_get_platdata(struct arm_pmu *armpmu)
++{
++	struct platform_device *pdev = armpmu->plat_device;
++
++	return pdev ? dev_get_platdata(&pdev->dev) : NULL;
++}
++
+ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
  {
- 	int cpu, err;
- 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-+	const irq_handler_t handler = armpmu_dispatch_irq;
+ 	struct arm_pmu *armpmu;
+-	struct platform_device *plat_device;
+ 	struct arm_pmu_platdata *plat;
+ 	int ret;
+ 	u64 start_clock, finish_clock;
+@@ -331,8 +337,8 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ 	 * dereference.
+ 	 */
+ 	armpmu = *(void **)dev;
+-	plat_device = armpmu->plat_device;
+-	plat = dev_get_platdata(&plat_device->dev);
++
++	plat = armpmu_get_platdata(armpmu);
  
- 	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
- 		int irq = per_cpu(hw_events->irq, cpu);
-@@ -735,7 +736,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int err;
- 
--	err = cpu_pmu_request_irqs(cpu_pmu, armpmu_dispatch_irq);
-+	err = cpu_pmu_request_irqs(cpu_pmu);
- 	if (err)
- 		goto out;
- 
+ 	start_clock = sched_clock();
+ 	if (plat && plat->handle_irq)
 -- 
 1.9.1
