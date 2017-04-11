@@ -1,29 +1,36 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Apr 2017 22:25:00 +0200
-Subject: at91: serial: Can't use DMA on 4.x kernels in RS-485 mode on
- at91sam9x5
-In-Reply-To: <DM5PR05MB295463261205406FFF273D3BBB000@DM5PR05MB2954.namprd05.prod.outlook.com>
-References: <DM5PR05MB2954D56C2E266AF16B250ACCBB0B0@DM5PR05MB2954.namprd05.prod.outlook.com>
- <20170404203249.GA4416@gradator.net>
- <DM5PR05MB295425DD88B5A8ADF88B81F8BB0B0@DM5PR05MB2954.namprd05.prod.outlook.com>
- <DM5PR05MB29548291A13C348889156EDDBB0C0@DM5PR05MB2954.namprd05.prod.outlook.com>
- <DM5PR05MB2954F35F2EBB9EEE987F3401BB000@DM5PR05MB2954.namprd05.prod.outlook.com>
- <20170411185924.6g4cgk4h6ogsmyd5@piout.net>
- <DM5PR05MB295463261205406FFF273D3BBB000@DM5PR05MB2954.namprd05.prod.outlook.com>
-Message-ID: <20170411202500.xmi6qlbtqhrboedt@piout.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Apr 2017 21:31:24 +0100
+Subject: [PATCH 2/6] regulator: anatop: only set supply regulator when it
+ actually exists
+In-Reply-To: <1491962327-12477-2-git-send-email-aisheng.dong@nxp.com>
+References: <1491962327-12477-1-git-send-email-aisheng.dong@nxp.com>
+ <1491962327-12477-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170411203124.y7cwyttqfu4a2aov@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2017 at 20:13:19 +0000, Bryan Evenson wrote:
-> I checked the various branches on the linux-stable repository, and I see this commit in master and on 4.9, but I don't see it in any branches prior to that one.  Since this issue was introduced back in 4.1, I think this patch would be suitable for backporting to the 4.1 and 4.4 stable branches.  Is there something I can do to help make that happen?
+On Wed, Apr 12, 2017 at 09:58:43AM +0800, Dong Aisheng wrote:
+> Mandatorily set the initdata->supply_regulator while it actually not
+> exist will cause regulator core to resolve supply each time whenever
+> a new regulator registered which is meaningless and waste CPU mips.
 > 
+> We can observe more than one hundred times of iteration of resolving
+> during a MX6Q SDB board booting up.
+> 
+> This patch adds the condition check for vin-supply to avoid the issue.
 
-Indeed, the Fixes: tag doesn't have the usual format, that would explain
-why.
-
-I'll resend to stable
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+This is an obvious abstraction failure - there is nothing magical about
+your driver which means that we need special casing in it to handle
+badly written DTs that don't specify supplies.  Exactly the same
+argument applies to all other regulators so if this is worth fixing it's
+worth fixing in the core so we substitute in a dummy regulator if the
+supply is genuinely missing.  Which is something we in fact have code to
+do already though for some reason I can't see we bypass it, I'll send a
+patch just now...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/ff6b4591/attachment.sig>
