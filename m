@@ -1,67 +1,42 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Tue, 11 Apr 2017 19:25:30 +0800
-Subject: [PATCH RFC 2/4] coresight: tmc: set read pointer before dump RAM
-In-Reply-To: <1491901829-18477-3-git-send-email-leo.yan@linaro.org>
-References: <1491901829-18477-1-git-send-email-leo.yan@linaro.org>
- <1491901829-18477-3-git-send-email-leo.yan@linaro.org>
-Message-ID: <CAAfSe-vtq6TYaemE5R9H-80uVQ+4eVkKQp3Jom+RvXjFG2r-vQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 11 Apr 2017 12:33:35 +0100
+Subject: [PATCH v7 resend 00/20] ILP32 for ARM64
+In-Reply-To: <20170410194740.GA28503@yury-N73SV>
+References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
+ <20170410194740.GA28503@yury-N73SV>
+Message-ID: <20170411113334.GA27857@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 April 2017 at 17:10, Leo Yan <leo.yan@linaro.org> wrote:
-> When dump RAM, we need set read pointer so can make sure every time read
-> the consistent content. If the RAM is full by checking status register
-> (STS), so set the read pointer to same value with write pointer,
-> otherwise set read point to 0 so can read from the start of RAM.
->
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Mike Leach <mike.leach@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etf.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 6150dac..43cfeaa 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -43,10 +43,28 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->
->  static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
->  {
-> +       u32 write_ptr, status;
->         char *bufp;
->         u32 read_data;
->         int i;
->
-> +       write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
+On Mon, Apr 10, 2017 at 11:47:40PM +0400, Yury Norov wrote:
+> According to latest plans figured out on Linaro Connect, ILP32 should
+> be taken in 4.12 merge window.
 
-Since 'write_ptr' is only used in the below 'if' branch, I would
-suggest to move this statement into that.
+Sorry, I wasn't present at Linaro Connect, so definitely not involved in
+such decision.
 
-Regards,
-Chunyan
+BTW, it would be nice to have Arnd's ack on patch 2 (32-bit ABI:
+introduce ARCH_32BIT_OFF_T config option).
 
-> +
-> +       /*
-> +        * Get a hold of the status register and see if a wrap around
-> +        * has occurred.  If so adjust things accordingly.
-> +        */
-> +       status = readl_relaxed(drvdata->base + TMC_STS);
-> +       if (status & TMC_STS_FULL)
-> +               /* Tell the HW the reading start point */
-> +               writel_relaxed(write_ptr, drvdata->base + TMC_RRP);
-> +       else
-> +               /*
-> +                * In case this is not first time to read ETB RAM,
-> +                * always write 0 for reading pointer.
-> +                */
-> +               writel_relaxed(0x0, drvdata->base + TMC_RRP);
-> +
->         bufp = drvdata->buf;
->         drvdata->len = 0;
->         while (1) {
-> --
-> 2.7.4
->
+> The window will be opened in less than a month, so I'd like to remind
+> it to you, and ask if you have any questions/requests related to
+> ILP32. Is it still realistic idea to take patches in 4.12? 
+
+4.12 is not realistic and I wouldn't commit to a specific kernel
+version. Given the intrusiveness, such patches should sit in -next for
+at least 3-4 weeks (i.e. merged in the arch tree around -rc3).
+
+Anyway, I don't think the plan has changed since last time I stated it:
+
+https://lkml.org/lkml/2016/12/5/333
+
+I haven't got the chance to test these patches yet, run benchmarks (step
+4). Also, the latest benchmarks I've seen were mostly for user space
+while I'm more concerned with the user-kernel interface
+(https://marc.info/?l=linux-arm-kernel&m=148690490713310&w=2). Is there
+an up to date pre-built toolchain and a filesystem for ILP32?
+
+On the glibc testing side, have the regressions been identified/fixed?
+
+-- 
+Catalin
