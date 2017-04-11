@@ -1,83 +1,68 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 11 Apr 2017 08:44:07 -0500
-Subject: [PATCH v4 0/2] Handle Cavium ThunderX2 PCI topology quirk
-In-Reply-To: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20170411134407.GB31773@bhelgaas-glaptop.roam.corp.google.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 11 Apr 2017 21:46:45 +0800
+Subject: [PATCH RFC 2/4] coresight: tmc: set read pointer before dump RAM
+In-Reply-To: <CAAfSe-vtq6TYaemE5R9H-80uVQ+4eVkKQp3Jom+RvXjFG2r-vQ@mail.gmail.com>
+References: <1491901829-18477-1-git-send-email-leo.yan@linaro.org>
+ <1491901829-18477-3-git-send-email-leo.yan@linaro.org>
+ <CAAfSe-vtq6TYaemE5R9H-80uVQ+4eVkKQp3Jom+RvXjFG2r-vQ@mail.gmail.com>
+Message-ID: <20170411134645.GB8996@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc David]
+On Tue, Apr 11, 2017 at 07:25:30PM +0800, Chunyan Zhang wrote:
+> On 11 April 2017 at 17:10, Leo Yan <leo.yan@linaro.org> wrote:
+> > When dump RAM, we need set read pointer so can make sure every time read
+> > the consistent content. If the RAM is full by checking status register
+> > (STS), so set the read pointer to same value with write pointer,
+> > otherwise set read point to 0 so can read from the start of RAM.
+> >
+> > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > Cc: Mike Leach <mike.leach@linaro.org>
+> > Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  drivers/hwtracing/coresight/coresight-tmc-etf.c | 18 ++++++++++++++++++
+> >  1 file changed, 18 insertions(+)
+> >
+> > diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> > index 6150dac..43cfeaa 100644
+> > --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> > +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> > @@ -43,10 +43,28 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+> >
+> >  static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+> >  {
+> > +       u32 write_ptr, status;
+> >         char *bufp;
+> >         u32 read_data;
+> >         int i;
+> >
+> > +       write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
+> 
+> Since 'write_ptr' is only used in the below 'if' branch, I would
+> suggest to move this statement into that.
 
-I forgot to mention that I'm also hoping for an ack from David, since
-he's listed as the maintainer of the ThunderX drivers.
+Thanks, Chunyan. Agree, will fix.
 
-On Mon, Apr 03, 2017 at 01:15:02PM +0000, Jayachandran C wrote:
-> Hi Bjorn, Alex,
-> 
-> Sending this again (with a trivial fix to author name), please review.
-> Updated summary below:
-> 
-> Here is v4 of the patchset to handle the PCIe topology quirk of Cavium
-> ThunderX2 systems (previously known as Broadcom Vulcan).
-> 
-> The earlier discussions on this can be seen at:
-> http://www.spinics.net/lists/linux-pci/msg51001.html
-> https://patchwork.ozlabs.org/patch/582633/ and
-> https://lists.linuxfoundation.org/pipermail/iommu/2016-June/017681.html
-> 
-> The earlier discussion on this patchset ended with a suggestion that it
-> may be possible to fix up this quirk by handling the issue in the
-> function argument of pci_for_each_dma_alias(). But at that point we did
-> not have the codebase to make the changes since the full ACPI and OF code
-> for SMMU and GIC ITS was not upstream.
-> 
-> Now that the changes are upstream, I tried to fix it in both the SMMU
-> and the GIC ITS code based on this suggestion, the changes needed are at:
->  https://github.com/jchandra-cavm/linux/commits/rid-xlate-fixup
-> 
-> The problems with this approach are:
->  - of the 14 uses of pci_for_each_dma_alias in the function in the kernel
->    tree, I have to fixup 6 callers (which is all but one ofthe callers
->    outside x86)
->  - 4 of these can be reasonably handled (please see the github repo above),
->    but the calls in drivers/irqchip/irq-gic-v3-its-pci-msi.c and
->    drivers/iommu/iommu.c cannot be reasonably fixed up.
->  - Even without the 2 above two changes I can get it to work for now.
->    But pci_for_each_dma_alias does not work as expected on this platform
->    and we have to be aware of that for all future uses of the function.
->   
-> For now, I have ruled out the approach, and I have rebased the earlier
-> patch on to 4.11-rc and submitting again for review. The changes are:
-> 
-> v3->v4:
->  - new address of author
-> 
-> v2>v3:
->  - changed device flag name from PCI_DEV_FLAGS_DMA_ALIAS_ROOT to
->    PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
->  - updated commit message to make the quirk clearer.
-> 
-> Let me know your comments and suggestions.
-> 
-> Thanks,
-> JC.
-> 
-> 
-> Jayachandran C (2):
->   PCI: Add device flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
->   PCI: quirks: Fix ThunderX2 dma alias handling
-> 
->  drivers/pci/quirks.c | 14 ++++++++++++++
->  drivers/pci/search.c |  4 ++++
->  include/linux/pci.h  |  2 ++
->  3 files changed, 20 insertions(+)
-> 
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > +
+> > +       /*
+> > +        * Get a hold of the status register and see if a wrap around
+> > +        * has occurred.  If so adjust things accordingly.
+> > +        */
+> > +       status = readl_relaxed(drvdata->base + TMC_STS);
+> > +       if (status & TMC_STS_FULL)
+> > +               /* Tell the HW the reading start point */
+> > +               writel_relaxed(write_ptr, drvdata->base + TMC_RRP);
+> > +       else
+> > +               /*
+> > +                * In case this is not first time to read ETB RAM,
+> > +                * always write 0 for reading pointer.
+> > +                */
+> > +               writel_relaxed(0x0, drvdata->base + TMC_RRP);
+> > +
+> >         bufp = drvdata->buf;
+> >         drvdata->len = 0;
+> >         while (1) {
+> > --
+> > 2.7.4
+> >
