@@ -1,389 +1,577 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:55 +0100
-Subject: [PATCHv3 12/14] drivers/perf: arm_pmu: add ACPI framework
+Date: Tue, 11 Apr 2017 09:39:53 +0100
+Subject: [PATCHv3 10/14] drivers/perf: arm_pmu: split out platform device
+ probe logic
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-11-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds framework code to handle parsing PMU data out of the
-MADT, sanity checking this, and managing the association of CPUs (and
-their interrupts) with appropriate logical PMUs.
-
-For the time being, we expect that only one PMU driver (PMUv3) will make
-use of this, and we simply pass in a single probe function.
-
-This is based on an earlier patch from Jeremy Linton.
+Now that we've split the pdev and DT probing logic from the runtime
+management, let's move the former into its own file. We gain a few lines
+due to the copyright header and includes, but this should keep the logic
+clearly separated, and paves the way for adding ACPI support in a
+similar fashion.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/Kconfig         |   4 +
- drivers/perf/Makefile        |   1 +
- drivers/perf/arm_pmu.c       |   4 +-
- drivers/perf/arm_pmu_acpi.c  | 256 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/cpuhotplug.h   |   1 +
- include/linux/perf/arm_pmu.h |  11 ++
- 6 files changed, 275 insertions(+), 2 deletions(-)
- create mode 100644 drivers/perf/arm_pmu_acpi.c
+ drivers/perf/Makefile           |   2 +-
+ drivers/perf/arm_pmu.c          | 226 +-------------------------------------
+ drivers/perf/arm_pmu_platform.c | 235 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/perf/arm_pmu.h    |   7 ++
+ 4 files changed, 247 insertions(+), 223 deletions(-)
+ create mode 100644 drivers/perf/arm_pmu_platform.c
 
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index c436e0d..aa587ed 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -12,6 +12,10 @@ config ARM_PMU
- 	  Say y if you want to use CPU performance monitors on ARM-based
- 	  systems.
- 
-+config ARM_PMU_ACPI
-+	depends on ARM_PMU && ACPI
-+	def_bool y
-+
- config QCOM_L2_PMU
- 	bool "Qualcomm Technologies L2-cache PMU"
- 	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
 diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index 925cd39..6420bd4 100644
+index ef0c6b2..925cd39 100644
 --- a/drivers/perf/Makefile
 +++ b/drivers/perf/Makefile
-@@ -1,4 +1,5 @@
- obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
-+obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+@@ -1,4 +1,4 @@
+-obj-$(CONFIG_ARM_PMU) += arm_pmu.o
++obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
  obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
  obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
  obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index b3bedfa..dc459eb 100644
+index f387d61..b3bedfa 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -525,7 +525,7 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
+@@ -16,7 +16,6 @@
+ #include <linux/cpu_pm.h>
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+-#include <linux/of_device.h>
+ #include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -25,7 +24,6 @@
+ #include <linux/irq.h>
+ #include <linux/irqdesc.h>
  
--static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
-+void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
- {
- 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
- 	int irq = per_cpu(hw_events->irq, cpu);
-@@ -550,7 +550,7 @@ void armpmu_free_irqs(struct arm_pmu *armpmu)
- 		armpmu_free_irq(armpmu, cpu);
+-#include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+ 
+ static int
+@@ -544,7 +542,7 @@ static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ 	free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
  }
  
--static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
-+int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+-static void armpmu_free_irqs(struct arm_pmu *armpmu)
++void armpmu_free_irqs(struct arm_pmu *armpmu)
  {
- 	int err = 0;
- 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
-diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+ 	int cpu;
+ 
+@@ -589,7 +587,7 @@ static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 	return 0;
+ }
+ 
+-static int armpmu_request_irqs(struct arm_pmu *armpmu)
++int armpmu_request_irqs(struct arm_pmu *armpmu)
+ {
+ 	int cpu, err;
+ 
+@@ -783,161 +781,7 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+ 					    &cpu_pmu->node);
+ }
+ 
+-/*
+- * CPU PMU identification and probing.
+- */
+-static int probe_current_pmu(struct arm_pmu *pmu,
+-			     const struct pmu_probe_info *info)
+-{
+-	int cpu = get_cpu();
+-	unsigned int cpuid = read_cpuid_id();
+-	int ret = -ENODEV;
+-
+-	pr_info("probing PMU on CPU %d\n", cpu);
+-
+-	for (; info->init != NULL; info++) {
+-		if ((cpuid & info->mask) != info->cpuid)
+-			continue;
+-		ret = info->init(pmu);
+-		break;
+-	}
+-
+-	put_cpu();
+-	return ret;
+-}
+-
+-static int pmu_parse_percpu_irq(struct arm_pmu *pmu, int irq)
+-{
+-	int cpu, ret;
+-	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
+-
+-	ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
+-	if (ret)
+-		return ret;
+-
+-	for_each_cpu(cpu, &pmu->supported_cpus)
+-		per_cpu(hw_events->irq, cpu) = irq;
+-
+-	return 0;
+-}
+-
+-static bool pmu_has_irq_affinity(struct device_node *node)
+-{
+-	return !!of_find_property(node, "interrupt-affinity", NULL);
+-}
+-
+-static int pmu_parse_irq_affinity(struct device_node *node, int i)
+-{
+-	struct device_node *dn;
+-	int cpu;
+-
+-	/*
+-	 * If we don't have an interrupt-affinity property, we guess irq
+-	 * affinity matches our logical CPU order, as we used to assume.
+-	 * This is fragile, so we'll warn in pmu_parse_irqs().
+-	 */
+-	if (!pmu_has_irq_affinity(node))
+-		return i;
+-
+-	dn = of_parse_phandle(node, "interrupt-affinity", i);
+-	if (!dn) {
+-		pr_warn("failed to parse interrupt-affinity[%d] for %s\n",
+-			i, node->name);
+-		return -EINVAL;
+-	}
+-
+-	/* Now look up the logical CPU number */
+-	for_each_possible_cpu(cpu) {
+-		struct device_node *cpu_dn;
+-
+-		cpu_dn = of_cpu_device_node_get(cpu);
+-		of_node_put(cpu_dn);
+-
+-		if (dn == cpu_dn)
+-			break;
+-	}
+-
+-	if (cpu >= nr_cpu_ids) {
+-		pr_warn("failed to find logical CPU for %s\n", dn->name);
+-	}
+-
+-	of_node_put(dn);
+-
+-	return cpu;
+-}
+-
+-static int pmu_parse_irqs(struct arm_pmu *pmu)
+-{
+-	int i = 0, irqs;
+-	struct platform_device *pdev = pmu->plat_device;
+-	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
+-
+-	irqs = platform_irq_count(pdev);
+-	if (irqs < 0) {
+-		pr_err("unable to count PMU IRQs\n");
+-		return irqs;
+-	}
+-
+-	/*
+-	 * In this case we have no idea which CPUs are covered by the PMU.
+-	 * To match our prior behaviour, we assume all CPUs in this case.
+-	 */
+-	if (irqs == 0) {
+-		pr_warn("no irqs for PMU, sampling events not supported\n");
+-		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+-		cpumask_setall(&pmu->supported_cpus);
+-		return 0;
+-	}
+-
+-	if (irqs == 1) {
+-		int irq = platform_get_irq(pdev, 0);
+-		if (irq && irq_is_percpu(irq))
+-			return pmu_parse_percpu_irq(pmu, irq);
+-	}
+-
+-	if (!pmu_has_irq_affinity(pdev->dev.of_node)) {
+-		pr_warn("no interrupt-affinity property for %s, guessing.\n",
+-			of_node_full_name(pdev->dev.of_node));
+-	}
+-
+-	/*
+-	 * Some platforms have all PMU IRQs OR'd into a single IRQ, with a
+-	 * special platdata function that attempts to demux them.
+-	 */
+-	if (dev_get_platdata(&pdev->dev))
+-		cpumask_setall(&pmu->supported_cpus);
+-
+-	for (i = 0; i < irqs; i++) {
+-		int cpu, irq;
+-
+-		irq = platform_get_irq(pdev, i);
+-		if (WARN_ON(irq <= 0))
+-			continue;
+-
+-		if (irq_is_percpu(irq)) {
+-			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
+-			return -EINVAL;
+-		}
+-
+-		cpu = pmu_parse_irq_affinity(pdev->dev.of_node, i);
+-		if (cpu < 0)
+-			return cpu;
+-		if (cpu >= nr_cpu_ids)
+-			continue;
+-
+-		if (per_cpu(hw_events->irq, cpu)) {
+-			pr_warn("multiple PMU IRQs for the same CPU detected\n");
+-			return -EINVAL;
+-		}
+-
+-		per_cpu(hw_events->irq, cpu) = irq;
+-		cpumask_set_cpu(cpu, &pmu->supported_cpus);
+-	}
+-
+-	return 0;
+-}
+-
+-static struct arm_pmu *armpmu_alloc(void)
++struct arm_pmu *armpmu_alloc(void)
+ {
+ 	struct arm_pmu *pmu;
+ 	int cpu;
+@@ -994,7 +838,7 @@ static struct arm_pmu *armpmu_alloc(void)
+ 	return NULL;
+ }
+ 
+-static void armpmu_free(struct arm_pmu *pmu)
++void armpmu_free(struct arm_pmu *pmu)
+ {
+ 	free_percpu(pmu->hw_events);
+ 	kfree(pmu);
+@@ -1025,68 +869,6 @@ int armpmu_register(struct arm_pmu *pmu)
+ 	return ret;
+ }
+ 
+-int arm_pmu_device_probe(struct platform_device *pdev,
+-			 const struct of_device_id *of_table,
+-			 const struct pmu_probe_info *probe_table)
+-{
+-	const struct of_device_id *of_id;
+-	armpmu_init_fn init_fn;
+-	struct device_node *node = pdev->dev.of_node;
+-	struct arm_pmu *pmu;
+-	int ret = -ENODEV;
+-
+-	pmu = armpmu_alloc();
+-	if (!pmu)
+-		return -ENOMEM;
+-
+-	pmu->plat_device = pdev;
+-
+-	ret = pmu_parse_irqs(pmu);
+-	if (ret)
+-		goto out_free;
+-
+-	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
+-		init_fn = of_id->data;
+-
+-		pmu->secure_access = of_property_read_bool(pdev->dev.of_node,
+-							   "secure-reg-access");
+-
+-		/* arm64 systems boot only as non-secure */
+-		if (IS_ENABLED(CONFIG_ARM64) && pmu->secure_access) {
+-			pr_warn("ignoring \"secure-reg-access\" property for arm64\n");
+-			pmu->secure_access = false;
+-		}
+-
+-		ret = init_fn(pmu);
+-	} else if (probe_table) {
+-		cpumask_setall(&pmu->supported_cpus);
+-		ret = probe_current_pmu(pmu, probe_table);
+-	}
+-
+-	if (ret) {
+-		pr_info("%s: failed to probe PMU!\n", of_node_full_name(node));
+-		goto out_free;
+-	}
+-
+-	ret = armpmu_request_irqs(pmu);
+-	if (ret)
+-		goto out_free_irqs;
+-
+-	ret = armpmu_register(pmu);
+-	if (ret)
+-		goto out_free;
+-
+-	return 0;
+-
+-out_free_irqs:
+-	armpmu_free_irqs(pmu);
+-out_free:
+-	pr_info("%s: failed to register PMU devices!\n",
+-		of_node_full_name(node));
+-	armpmu_free(pmu);
+-	return ret;
+-}
+-
+ static int arm_pmu_hp_init(void)
+ {
+ 	int ret;
+diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
 new file mode 100644
-index 0000000..34c862f
+index 0000000..d725adc
 --- /dev/null
-+++ b/drivers/perf/arm_pmu_acpi.c
-@@ -0,0 +1,256 @@
++++ b/drivers/perf/arm_pmu_platform.c
+@@ -0,0 +1,235 @@
 +/*
-+ * ACPI probing code for ARM performance counters.
++ * platform_device probing code for ARM performance counters.
 + *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Copyright (C) 2009 picoChip Designs, Ltd., Jamie Iles
++ * Copyright (C) 2010 ARM Ltd., Will Deacon <will.deacon@arm.com>
 + */
++#define pr_fmt(fmt) "hw perfevents: " fmt
 +
-+#include <linux/acpi.h>
++#include <linux/bug.h>
 +#include <linux/cpumask.h>
-+#include <linux/init.h>
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/irq.h>
++#include <linux/irqdesc.h>
++#include <linux/kconfig.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
 +#include <linux/percpu.h>
 +#include <linux/perf/arm_pmu.h>
++#include <linux/platform_device.h>
++#include <linux/printk.h>
++#include <linux/smp.h>
 +
-+#include <asm/cputype.h>
-+
-+static DEFINE_PER_CPU(struct arm_pmu *, probed_pmus);
-+static DEFINE_PER_CPU(int, pmu_irqs);
-+
-+static int arm_pmu_acpi_register_irq(int cpu)
++static int probe_current_pmu(struct arm_pmu *pmu,
++			     const struct pmu_probe_info *info)
 +{
-+	struct acpi_madt_generic_interrupt *gicc;
-+	int gsi, trigger;
++	int cpu = get_cpu();
++	unsigned int cpuid = read_cpuid_id();
++	int ret = -ENODEV;
 +
-+	gicc = acpi_cpu_get_madt_gicc(cpu);
-+	if (WARN_ON(!gicc))
-+		return -EINVAL;
++	pr_info("probing PMU on CPU %d\n", cpu);
 +
-+	gsi = gicc->performance_interrupt;
-+	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
-+		trigger = ACPI_EDGE_SENSITIVE;
-+	else
-+		trigger = ACPI_LEVEL_SENSITIVE;
-+
-+	/*
-+	 * Helpfully, the MADT GICC doesn't have a polarity flag for the
-+	 * "performance interrupt". Luckily, on compliant GICs the polarity is
-+	 * a fixed value in HW (for both SPIs and PPIs) that we cannot change
-+	 * from SW.
-+	 *
-+	 * Here we pass in ACPI_ACTIVE_HIGH to keep the core code happy. This
-+	 * may not match the real polarity, but that should not matter.
-+	 *
-+	 * Other interrupt controllers are not supported with ACPI.
-+	 */
-+	return acpi_register_gsi(NULL, gsi, trigger, ACPI_ACTIVE_HIGH);
-+}
-+
-+static void arm_pmu_acpi_unregister_irq(int cpu)
-+{
-+	struct acpi_madt_generic_interrupt *gicc;
-+	int gsi;
-+
-+	gicc = acpi_cpu_get_madt_gicc(cpu);
-+	if (!gicc)
-+		return;
-+
-+	gsi = gicc->performance_interrupt;
-+	acpi_unregister_gsi(gsi);
-+}
-+
-+static int arm_pmu_acpi_parse_irqs(void)
-+{
-+	int irq, cpu, irq_cpu, err;
-+
-+	for_each_possible_cpu(cpu) {
-+		irq = arm_pmu_acpi_register_irq(cpu);
-+		if (irq < 0) {
-+			err = irq;
-+			pr_warn("Unable to parse ACPI PMU IRQ for CPU%d: %d\n",
-+				cpu, err);
-+			goto out_err;
-+		} else if (irq == 0) {
-+			pr_warn("No ACPI PMU IRQ for CPU%d\n", cpu);
-+		}
-+
-+		per_cpu(pmu_irqs, cpu) = irq;
-+	}
-+
-+	return 0;
-+
-+out_err:
-+	for_each_possible_cpu(cpu) {
-+		irq = per_cpu(pmu_irqs, cpu);
-+		if (!irq)
++	for (; info->init != NULL; info++) {
++		if ((cpuid & info->mask) != info->cpuid)
 +			continue;
-+
-+		arm_pmu_acpi_unregister_irq(cpu);
-+
-+		/*
-+		 * Blat all copies of the IRQ so that we only unregister the
-+		 * corresponding GSI once (e.g. when we have PPIs).
-+		 */
-+		for_each_possible_cpu(irq_cpu) {
-+			if (per_cpu(pmu_irqs, irq_cpu) == irq)
-+				per_cpu(pmu_irqs, irq_cpu) = 0;
-+		}
++		ret = info->init(pmu);
++		break;
 +	}
 +
-+	return err;
++	put_cpu();
++	return ret;
 +}
 +
-+static struct arm_pmu *arm_pmu_acpi_find_alloc_pmu(void)
++static int pmu_parse_percpu_irq(struct arm_pmu *pmu, int irq)
 +{
-+	unsigned long cpuid = read_cpuid_id();
-+	struct arm_pmu *pmu;
-+	int cpu;
-+
-+	for_each_possible_cpu(cpu) {
-+		pmu = per_cpu(probed_pmus, cpu);
-+		if (!pmu || pmu->acpi_cpuid != cpuid)
-+			continue;
-+
-+		return pmu;
-+	}
-+
-+	pmu = armpmu_alloc();
-+	if (!pmu) {
-+		pr_warn("Unable to allocate PMU for CPU%d\n",
-+			smp_processor_id());
-+		return NULL;
-+	}
-+
-+	pmu->acpi_cpuid = cpuid;
-+
-+	return pmu;
-+}
-+
-+/*
-+ * This must run before the common arm_pmu hotplug logic, so that we can
-+ * associate a CPU and its interrupt before the common code tries to manage the
-+ * affinity and so on.
-+ *
-+ * Note that hotplug events are serialized, so we cannot race with another CPU
-+ * coming up. The perf core won't open events while a hotplug event is in
-+ * progress.
-+ */
-+static int arm_pmu_acpi_cpu_starting(unsigned int cpu)
-+{
-+	struct arm_pmu *pmu;
-+	struct pmu_hw_events __percpu *hw_events;
-+	int irq;
-+
-+	/* If we've already probed this CPU, we have nothing to do */
-+	if (per_cpu(probed_pmus, cpu))
-+		return 0;
-+
-+	irq = per_cpu(pmu_irqs, cpu);
-+
-+	pmu = arm_pmu_acpi_find_alloc_pmu();
-+	if (!pmu)
-+		return -ENOMEM;
-+
-+	cpumask_set_cpu(cpu, &pmu->supported_cpus);
-+
-+	per_cpu(probed_pmus, cpu) = pmu;
-+
-+	/*
-+	 * Log and request the IRQ so the core arm_pmu code can manage it.  In
-+	 * some situations (e.g. mismatched PPIs), we may fail to request the
-+	 * IRQ. However, it may be too late for us to do anything about it.
-+	 * The common ARM PMU code will log a warning in this case.
-+	 */
-+	hw_events = pmu->hw_events;
-+	per_cpu(hw_events->irq, cpu) = irq;
-+	armpmu_request_irq(pmu, cpu);
-+
-+	/*
-+	 * Ideally, we'd probe the PMU here when we find the first matching
-+	 * CPU. We can't do that for several reasons; see the comment in
-+	 * arm_pmu_acpi_init().
-+	 *
-+	 * So for the time being, we're done.
-+	 */
-+	return 0;
-+}
-+
-+int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
-+{
-+	int pmu_idx = 0;
 +	int cpu, ret;
++	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
 +
-+	if (acpi_disabled)
-+		return 0;
-+
-+	/*
-+	 * Initialise and register the set of PMUs which we know about right
-+	 * now. Ideally we'd do this in arm_pmu_acpi_cpu_starting() so that we
-+	 * could handle late hotplug, but this may lead to deadlock since we
-+	 * might try to register a hotplug notifier instance from within a
-+	 * hotplug notifier.
-+	 *
-+	 * There's also the problem of having access to the right init_fn,
-+	 * without tying this too deeply into the "real" PMU driver.
-+	 *
-+	 * For the moment, as with the platform/DT case, we need at least one
-+	 * of a PMU's CPUs to be online at probe time.
-+	 */
-+	for_each_possible_cpu(cpu) {
-+		struct arm_pmu *pmu = per_cpu(probed_pmus, cpu);
-+		char *base_name;
-+
-+		if (!pmu || pmu->name)
-+			continue;
-+
-+		ret = init_fn(pmu);
-+		if (ret == -ENODEV) {
-+			/* PMU not handled by this driver, or not present */
-+			continue;
-+		} else if (ret) {
-+			pr_warn("Unable to initialise PMU for CPU%d\n", cpu);
-+			return ret;
-+		}
-+
-+		base_name = pmu->name;
-+		pmu->name = kasprintf(GFP_KERNEL, "%s_%d", base_name, pmu_idx++);
-+		if (!pmu->name) {
-+			pr_warn("Unable to allocate PMU name for CPU%d\n", cpu);
-+			return -ENOMEM;
-+		}
-+
-+		ret = armpmu_register(pmu);
-+		if (ret) {
-+			pr_warn("Failed to register PMU for CPU%d\n", cpu);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int arm_pmu_acpi_init(void)
-+{
-+	int ret;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	/*
-+	 * We can't request IRQs yet, since we don't know the cookie value
-+	 * until we know which CPUs share the same logical PMU. We'll handle
-+	 * that in arm_pmu_acpi_cpu_starting().
-+	 */
-+	ret = arm_pmu_acpi_parse_irqs();
++	ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
 +	if (ret)
 +		return ret;
 +
-+	ret = cpuhp_setup_state(CPUHP_AP_PERF_ARM_ACPI_STARTING,
-+				"perf/arm/pmu_acpi:starting",
-+				arm_pmu_acpi_cpu_starting, NULL);
++	for_each_cpu(cpu, &pmu->supported_cpus)
++		per_cpu(hw_events->irq, cpu) = irq;
 +
++	return 0;
++}
++
++static bool pmu_has_irq_affinity(struct device_node *node)
++{
++	return !!of_find_property(node, "interrupt-affinity", NULL);
++}
++
++static int pmu_parse_irq_affinity(struct device_node *node, int i)
++{
++	struct device_node *dn;
++	int cpu;
++
++	/*
++	 * If we don't have an interrupt-affinity property, we guess irq
++	 * affinity matches our logical CPU order, as we used to assume.
++	 * This is fragile, so we'll warn in pmu_parse_irqs().
++	 */
++	if (!pmu_has_irq_affinity(node))
++		return i;
++
++	dn = of_parse_phandle(node, "interrupt-affinity", i);
++	if (!dn) {
++		pr_warn("failed to parse interrupt-affinity[%d] for %s\n",
++			i, node->name);
++		return -EINVAL;
++	}
++
++	/* Now look up the logical CPU number */
++	for_each_possible_cpu(cpu) {
++		struct device_node *cpu_dn;
++
++		cpu_dn = of_cpu_device_node_get(cpu);
++		of_node_put(cpu_dn);
++
++		if (dn == cpu_dn)
++			break;
++	}
++
++	if (cpu >= nr_cpu_ids) {
++		pr_warn("failed to find logical CPU for %s\n", dn->name);
++	}
++
++	of_node_put(dn);
++
++	return cpu;
++}
++
++static int pmu_parse_irqs(struct arm_pmu *pmu)
++{
++	int i = 0, nr_irqs;
++	struct platform_device *pdev = pmu->plat_device;
++	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
++
++	nr_irqs = platform_irq_count(pdev);
++	if (nr_irqs < 0) {
++		pr_err("unable to count PMU IRQs\n");
++		return nr_irqs;
++	}
++
++	/*
++	 * In this case we have no idea which CPUs are covered by the PMU.
++	 * To match our prior behaviour, we assume all CPUs in this case.
++	 */
++	if (nr_irqs == 0) {
++		pr_warn("no irqs for PMU, sampling events not supported\n");
++		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
++		cpumask_setall(&pmu->supported_cpus);
++		return 0;
++	}
++
++	if (nr_irqs == 1) {
++		int irq = platform_get_irq(pdev, 0);
++		if (irq && irq_is_percpu(irq))
++			return pmu_parse_percpu_irq(pmu, irq);
++	}
++
++	if (!pmu_has_irq_affinity(pdev->dev.of_node)) {
++		pr_warn("no interrupt-affinity property for %s, guessing.\n",
++			of_node_full_name(pdev->dev.of_node));
++	}
++
++	/*
++	 * Some platforms have all PMU IRQs OR'd into a single IRQ, with a
++	 * special platdata function that attempts to demux them.
++	 */
++	if (dev_get_platdata(&pdev->dev))
++		cpumask_setall(&pmu->supported_cpus);
++
++	for (i = 0; i < nr_irqs; i++) {
++		int cpu, irq;
++
++		irq = platform_get_irq(pdev, i);
++		if (WARN_ON(irq <= 0))
++			continue;
++
++		if (irq_is_percpu(irq)) {
++			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
++			return -EINVAL;
++		}
++
++		cpu = pmu_parse_irq_affinity(pdev->dev.of_node, i);
++		if (cpu < 0)
++			return cpu;
++		if (cpu >= nr_cpu_ids)
++			continue;
++
++		if (per_cpu(hw_events->irq, cpu)) {
++			pr_warn("multiple PMU IRQs for the same CPU detected\n");
++			return -EINVAL;
++		}
++
++		per_cpu(hw_events->irq, cpu) = irq;
++		cpumask_set_cpu(cpu, &pmu->supported_cpus);
++	}
++
++	return 0;
++}
++
++int arm_pmu_device_probe(struct platform_device *pdev,
++			 const struct of_device_id *of_table,
++			 const struct pmu_probe_info *probe_table)
++{
++	const struct of_device_id *of_id;
++	armpmu_init_fn init_fn;
++	struct device_node *node = pdev->dev.of_node;
++	struct arm_pmu *pmu;
++	int ret = -ENODEV;
++
++	pmu = armpmu_alloc();
++	if (!pmu)
++		return -ENOMEM;
++
++	pmu->plat_device = pdev;
++
++	ret = pmu_parse_irqs(pmu);
++	if (ret)
++		goto out_free;
++
++	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
++		init_fn = of_id->data;
++
++		pmu->secure_access = of_property_read_bool(pdev->dev.of_node,
++							   "secure-reg-access");
++
++		/* arm64 systems boot only as non-secure */
++		if (IS_ENABLED(CONFIG_ARM64) && pmu->secure_access) {
++			pr_warn("ignoring \"secure-reg-access\" property for arm64\n");
++			pmu->secure_access = false;
++		}
++
++		ret = init_fn(pmu);
++	} else if (probe_table) {
++		cpumask_setall(&pmu->supported_cpus);
++		ret = probe_current_pmu(pmu, probe_table);
++	}
++
++	if (ret) {
++		pr_info("%s: failed to probe PMU!\n", of_node_full_name(node));
++		goto out_free;
++	}
++
++	ret = armpmu_request_irqs(pmu);
++	if (ret)
++		goto out_free_irqs;
++
++	ret = armpmu_register(pmu);
++	if (ret)
++		goto out_free;
++
++	return 0;
++
++out_free_irqs:
++	armpmu_free_irqs(pmu);
++out_free:
++	pr_info("%s: failed to register PMU devices!\n",
++		of_node_full_name(node));
++	armpmu_free(pmu);
 +	return ret;
 +}
-+subsys_initcall(arm_pmu_acpi_init)
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index cfcfab3..0f2a803 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -94,6 +94,7 @@ enum cpuhp_state {
- 	CPUHP_AP_ARM_VFP_STARTING,
- 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
- 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
-+	CPUHP_AP_PERF_ARM_ACPI_STARTING,
- 	CPUHP_AP_PERF_ARM_STARTING,
- 	CPUHP_AP_ARM_L2X0_STARTING,
- 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
 diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 25556eb..1360dd6 100644
+index 4249914..25556eb 100644
 --- a/include/linux/perf/arm_pmu.h
 +++ b/include/linux/perf/arm_pmu.h
-@@ -117,6 +117,9 @@ struct arm_pmu {
- 	struct notifier_block	cpu_pm_nb;
- 	/* the attr_groups array must be NULL-terminated */
- 	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
-+
-+	/* Only to be used by ACPI probing code */
-+	unsigned long acpi_cpuid;
- };
- 
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
-@@ -159,12 +162,20 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+@@ -159,6 +159,13 @@ int arm_pmu_device_probe(struct platform_device *pdev,
  			 const struct of_device_id *of_table,
  			 const struct pmu_probe_info *probe_table);
  
-+#ifdef CONFIG_ACPI
-+int arm_pmu_acpi_probe(armpmu_init_fn init_fn);
-+#else
-+static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
-+#endif
++/* Internal functions only for core arm_pmu code */
++struct arm_pmu *armpmu_alloc(void);
++void armpmu_free(struct arm_pmu *pmu);
++int armpmu_register(struct arm_pmu *pmu);
++int armpmu_request_irqs(struct arm_pmu *armpmu);
++void armpmu_free_irqs(struct arm_pmu *armpmu);
 +
- /* Internal functions only for core arm_pmu code */
- struct arm_pmu *armpmu_alloc(void);
- void armpmu_free(struct arm_pmu *pmu);
- int armpmu_register(struct arm_pmu *pmu);
- int armpmu_request_irqs(struct arm_pmu *armpmu);
- void armpmu_free_irqs(struct arm_pmu *armpmu);
-+int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
-+void armpmu_free_irq(struct arm_pmu *armpmu, int cpu);
- 
  #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
  
+ #endif /* CONFIG_ARM_PMU */
 -- 
 1.9.1
