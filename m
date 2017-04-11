@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:06 +0100
-Subject: [PATCH v3 26/32] unicore32: include default ioremap_nopost()
+Date: Tue, 11 Apr 2017 13:29:08 +0100
+Subject: [PATCH v3 28/32] xtensa: include default ioremap_nopost()
  implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-27-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-29-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,23 +25,24 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Max Filippov <jcmvbkbc@gmail.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Chris Zankel <chris@zankel.net>
 ---
- arch/unicore32/include/asm/io.h | 1 +
+ arch/xtensa/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/unicore32/include/asm/io.h b/arch/unicore32/include/asm/io.h
-index cb1d8fd..71fdfa2 100644
---- a/arch/unicore32/include/asm/io.h
-+++ b/arch/unicore32/include/asm/io.h
-@@ -38,6 +38,7 @@ extern void __uc32_iounmap(volatile void __iomem *addr);
- #define ioremap_cached(cookie, size)	__uc32_ioremap_cached(cookie, size)
- #define ioremap_nocache(cookie, size)	__uc32_ioremap(cookie, size)
- #define iounmap(cookie)			__uc32_iounmap(cookie)
+diff --git a/arch/xtensa/include/asm/io.h b/arch/xtensa/include/asm/io.h
+index c38e5a7..a469bef 100644
+--- a/arch/xtensa/include/asm/io.h
++++ b/arch/xtensa/include/asm/io.h
+@@ -55,6 +55,7 @@ static inline void __iomem *ioremap_cache(unsigned long offset,
+ 
+ #define ioremap_wc ioremap_nocache
+ #define ioremap_wt ioremap_nocache
 +#include <asm-generic/ioremap-nopost.h>
  
- #define readb_relaxed readb
- #define readw_relaxed readw
+ static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+ {
 -- 
 2.10.0
