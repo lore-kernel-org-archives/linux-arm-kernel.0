@@ -1,122 +1,90 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 11 Apr 2017 17:10:29 +0800
-Subject: [PATCH RFC 4/4] coresight: tmc: dump RAM for panic
-In-Reply-To: <1491901829-18477-1-git-send-email-leo.yan@linaro.org>
-References: <1491901829-18477-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1491901829-18477-5-git-send-email-leo.yan@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 11 Apr 2017 11:13:46 +0200
+Subject: [PATCH 4/5] ARM: sun8i: h3: add operating-points-v2 table for CPU
+In-Reply-To: <20170408185025.53841-5-icenowy@aosc.io>
+References: <20170408185025.53841-1-icenowy@aosc.io>
+ <20170408185025.53841-5-icenowy@aosc.io>
+Message-ID: <20170411091346.mcwyskezadabsobn@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If coresight ETB/ETF have been enabled by 'sysfs' or 'perf' modes and we
-can rely on panic notifier to save all ETB RAM data into memory. Relies
-on Kdump, finally the ETB RAM data can be extracted from kernel's
-vmcore, so we can analyse panic reason from dumped ETB RAM data.
+On Sun, Apr 09, 2017 at 02:50:24AM +0800, Icenowy Zheng wrote:
+> The CPU on Allwinner H3 can do dynamic frequency scaling.
+> 
+> Add a DVFS table based on the one tweaked by Armbian developers, which
+> are proven to work stably on BSP kernels.
+> 
+> Frequencies higher than 1008MHz are temporarily dropped in the table, as
+> they may lead to over voltage on boards without proper regulator
+> settings or over temperature on boards with proper regulator settings.
+> They will be added back once regulator settings are ready and thermal
+> sensor driver is merged.
+> 
+> In order to satisfy all different regulators (SY8106A which is 50mV per
+> level, SY8113B which have two states: 1.1V and 1.3V, and some board with
+> non-tweakable regulators), all the OPPs are defined with a range which has
+> the target value as the minimum allowed value, and 1.3V (the highest
+> VDD-CPUX voltage suggested by the datasheet) as the maximum allowed value.
+> It's proven to work well with a board with SY8113B.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 38 +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 37 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index b36f9f423c39..a0cee17fe44b 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -43,32 +43,68 @@
+>  #include "sunxi-h3-h5.dtsi"
+>  
+>  / {
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp at 480000000 {
+> +			opp-hz = /bits/ 64 <480000000>;
+> +			opp-microvolt = <980000 980000 1300000>;
+> +			clock-latency-ns = <244144>; /* 8 32k periods */
+> +		};
+> +
+> +		opp at 648000000 {
+> +			opp-hz = /bits/ 64 <816000000>;
+> +			opp-microvolt = <1020000 1020000 1300000>;
+> +			clock-latency-ns = <244144>; /* 8 32k periods */
+> +		};
+> +
+> +		opp at 912000000 {
+> +			opp-hz = /bits/ 64 <960000000>;
+> +			opp-microvolt = <1080000 1080000 1300000>;
+> +			clock-latency-ns = <244144>; /* 8 32k periods */
+> +		};
+> +
+> +		opp at 1008000000 {
+> +			opp-hz = /bits/ 64 <1008000000>;
+> +			opp-microvolt = <1140000 1140000 1300000>;
+> +			clock-latency-ns = <244144>; /* 8 32k periods */
+> +		};
+> +	};
+> +
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 52 +++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-tmc.h     |  2 +
- 2 files changed, 54 insertions(+)
+>From your serie, I guess you never actually tested those OPPs on any
+board without SY8113B, right?
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 5e709af..bc52cad 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -102,6 +102,47 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
-+static int tmc_etb_notify(struct notifier_block *nb,
-+			  unsigned long mode, void *_unused)
-+{
-+	struct tmc_drvdata *drvdata = container_of(nb, struct tmc_drvdata,
-+						   panic_nb);
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
-+		return -EINVAL;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	/* There is no point in reading a TMC in HW FIFO mode */
-+	mode = readl_relaxed(drvdata->base + TMC_MODE);
-+	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	/* If drvdata::buf is NULL the trace data has been read already */
-+	if (drvdata->buf == NULL) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	tmc_flush_and_stop(drvdata);
-+	tmc_etb_dump_hw(drvdata);
-+
-+	dev_info(drvdata->dev, "Flush ETB buffer 0x%x at 0x%p\n",
-+			drvdata->len, drvdata->buf);
-+
-+	CS_LOCK(drvdata->base);
-+out:
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+	return ret;
-+}
-+
- static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
-@@ -245,6 +286,12 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 	if (ret)
- 		return ret;
- 
-+	drvdata->panic_nb.notifier_call = tmc_etb_notify;
-+	ret = atomic_notifier_chain_register(&panic_notifier_list,
-+					     &drvdata->panic_nb);
-+	if (ret)
-+		return ret;
-+
- 	dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
- 	return 0;
- }
-@@ -262,6 +309,11 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- 
- 	/* Disable the TMC only if it needs to */
- 	if (drvdata->mode != CS_MODE_DISABLED) {
-+		/* Unregister panic notifier */
-+		drvdata->panic_nb.notifier_call = NULL;
-+		atomic_notifier_chain_unregister(&panic_notifier_list,
-+				&drvdata->panic_nb);
-+
- 		tmc_etb_disable_hw(drvdata);
- 		drvdata->mode = CS_MODE_DISABLED;
- 	}
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 51c0185..bb563b8 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -93,6 +93,7 @@ enum tmc_mem_intf_width {
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-  * @csdev:	component vitals needed by the framework.
-+ * @panic_nb:	notifier callback for panic.
-  * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
-  * @spinlock:	only one at a time pls.
-  * @buf:	area of memory where trace data get sent.
-@@ -109,6 +110,7 @@ struct tmc_drvdata {
- 	void __iomem		*base;
- 	struct device		*dev;
- 	struct coresight_device	*csdev;
-+	struct notifier_block	panic_nb;
- 	struct miscdevice	miscdev;
- 	spinlock_t		spinlock;
- 	bool			reading;
+(and therefore, without operating at the voltages listed here).
+
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/e0c661e2/attachment-0001.sig>
