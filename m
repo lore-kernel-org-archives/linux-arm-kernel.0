@@ -1,206 +1,389 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:56 +0100
-Subject: [PATCHv3 13/14] arm64: pmuv3: handle !PMUv3 when probing
+Date: Tue, 11 Apr 2017 09:39:55 +0100
+Subject: [PATCHv3 12/14] drivers/perf: arm_pmu: add ACPI framework
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-14-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-13-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
-compatible PMU. Thus we need to consult ID registers during probe time.
+This patch adds framework code to handle parsing PMU data out of the
+MADT, sanity checking this, and managing the association of CPUs (and
+their interrupts) with appropriate logical PMUs.
 
-This patch updates our PMUv3 probing code to test for the presence of
-PMUv3 functionality before touching an PMUv3-specific registers, and
-before updating the struct arm_pmu with PMUv3 data.
+For the time being, we expect that only one PMU driver (PMUv3) will make
+use of this, and we simply pass in a single probe function.
 
-When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
+This is based on an earlier patch from Jeremy Linton.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 87 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 71 insertions(+), 16 deletions(-)
+ drivers/perf/Kconfig         |   4 +
+ drivers/perf/Makefile        |   1 +
+ drivers/perf/arm_pmu.c       |   4 +-
+ drivers/perf/arm_pmu_acpi.c  | 256 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h   |   1 +
+ include/linux/perf/arm_pmu.h |  11 ++
+ 6 files changed, 275 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/perf/arm_pmu_acpi.c
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 57ae9d9..53f2354 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -957,11 +957,26 @@ static int armv8_vulcan_map_event(struct perf_event *event)
- 				ARMV8_PMU_EVTYPE_EVENT);
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index c436e0d..aa587ed 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -12,6 +12,10 @@ config ARM_PMU
+ 	  Say y if you want to use CPU performance monitors on ARM-based
+ 	  systems.
+ 
++config ARM_PMU_ACPI
++	depends on ARM_PMU && ACPI
++	def_bool y
++
+ config QCOM_L2_PMU
+ 	bool "Qualcomm Technologies L2-cache PMU"
+ 	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index 925cd39..6420bd4 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
++obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+ obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
+ obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index b3bedfa..dc459eb 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -525,7 +525,7 @@ int perf_num_counters(void)
+ }
+ EXPORT_SYMBOL_GPL(perf_num_counters);
+ 
+-static void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
++void armpmu_free_irq(struct arm_pmu *armpmu, int cpu)
+ {
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+ 	int irq = per_cpu(hw_events->irq, cpu);
+@@ -550,7 +550,7 @@ void armpmu_free_irqs(struct arm_pmu *armpmu)
+ 		armpmu_free_irq(armpmu, cpu);
  }
  
-+struct armv8pmu_probe_info {
-+	struct arm_pmu *pmu;
-+	bool present;
-+};
-+
- static void __armv8pmu_probe_pmu(void *info)
+-static int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
++int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
  {
--	struct arm_pmu *cpu_pmu = info;
-+	struct armv8pmu_probe_info *probe = info;
-+	struct arm_pmu *cpu_pmu = probe->pmu;
-+	u64 dfr0, pmuver;
- 	u32 pmceid[2];
- 
-+	dfr0 = read_sysreg(id_aa64dfr0_el1);
-+	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
-+			ID_AA64DFR0_PMUVER_SHIFT);
-+	if (pmuver != 1)
+ 	int err = 0;
+ 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+new file mode 100644
+index 0000000..34c862f
+--- /dev/null
++++ b/drivers/perf/arm_pmu_acpi.c
+@@ -0,0 +1,256 @@
++/*
++ * ACPI probing code for ARM performance counters.
++ *
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/acpi.h>
++#include <linux/cpumask.h>
++#include <linux/init.h>
++#include <linux/percpu.h>
++#include <linux/perf/arm_pmu.h>
++
++#include <asm/cputype.h>
++
++static DEFINE_PER_CPU(struct arm_pmu *, probed_pmus);
++static DEFINE_PER_CPU(int, pmu_irqs);
++
++static int arm_pmu_acpi_register_irq(int cpu)
++{
++	struct acpi_madt_generic_interrupt *gicc;
++	int gsi, trigger;
++
++	gicc = acpi_cpu_get_madt_gicc(cpu);
++	if (WARN_ON(!gicc))
++		return -EINVAL;
++
++	gsi = gicc->performance_interrupt;
++	if (gicc->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
++		trigger = ACPI_EDGE_SENSITIVE;
++	else
++		trigger = ACPI_LEVEL_SENSITIVE;
++
++	/*
++	 * Helpfully, the MADT GICC doesn't have a polarity flag for the
++	 * "performance interrupt". Luckily, on compliant GICs the polarity is
++	 * a fixed value in HW (for both SPIs and PPIs) that we cannot change
++	 * from SW.
++	 *
++	 * Here we pass in ACPI_ACTIVE_HIGH to keep the core code happy. This
++	 * may not match the real polarity, but that should not matter.
++	 *
++	 * Other interrupt controllers are not supported with ACPI.
++	 */
++	return acpi_register_gsi(NULL, gsi, trigger, ACPI_ACTIVE_HIGH);
++}
++
++static void arm_pmu_acpi_unregister_irq(int cpu)
++{
++	struct acpi_madt_generic_interrupt *gicc;
++	int gsi;
++
++	gicc = acpi_cpu_get_madt_gicc(cpu);
++	if (!gicc)
 +		return;
 +
-+	probe->present = true;
++	gsi = gicc->performance_interrupt;
++	acpi_unregister_gsi(gsi);
++}
 +
- 	/* Read the nb of CNTx counters supported from PMNC */
- 	cpu_pmu->num_events = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT)
- 		& ARMV8_PMU_PMCR_N_MASK;
-@@ -979,13 +994,27 @@ static void __armv8pmu_probe_pmu(void *info)
- 
- static int armv8pmu_probe_pmu(struct arm_pmu *cpu_pmu)
- {
--	return smp_call_function_any(&cpu_pmu->supported_cpus,
-+	struct armv8pmu_probe_info probe = {
-+		.pmu = cpu_pmu,
-+		.present = false,
-+	};
++static int arm_pmu_acpi_parse_irqs(void)
++{
++	int irq, cpu, irq_cpu, err;
++
++	for_each_possible_cpu(cpu) {
++		irq = arm_pmu_acpi_register_irq(cpu);
++		if (irq < 0) {
++			err = irq;
++			pr_warn("Unable to parse ACPI PMU IRQ for CPU%d: %d\n",
++				cpu, err);
++			goto out_err;
++		} else if (irq == 0) {
++			pr_warn("No ACPI PMU IRQ for CPU%d\n", cpu);
++		}
++
++		per_cpu(pmu_irqs, cpu) = irq;
++	}
++
++	return 0;
++
++out_err:
++	for_each_possible_cpu(cpu) {
++		irq = per_cpu(pmu_irqs, cpu);
++		if (!irq)
++			continue;
++
++		arm_pmu_acpi_unregister_irq(cpu);
++
++		/*
++		 * Blat all copies of the IRQ so that we only unregister the
++		 * corresponding GSI once (e.g. when we have PPIs).
++		 */
++		for_each_possible_cpu(irq_cpu) {
++			if (per_cpu(pmu_irqs, irq_cpu) == irq)
++				per_cpu(pmu_irqs, irq_cpu) = 0;
++		}
++	}
++
++	return err;
++}
++
++static struct arm_pmu *arm_pmu_acpi_find_alloc_pmu(void)
++{
++	unsigned long cpuid = read_cpuid_id();
++	struct arm_pmu *pmu;
++	int cpu;
++
++	for_each_possible_cpu(cpu) {
++		pmu = per_cpu(probed_pmus, cpu);
++		if (!pmu || pmu->acpi_cpuid != cpuid)
++			continue;
++
++		return pmu;
++	}
++
++	pmu = armpmu_alloc();
++	if (!pmu) {
++		pr_warn("Unable to allocate PMU for CPU%d\n",
++			smp_processor_id());
++		return NULL;
++	}
++
++	pmu->acpi_cpuid = cpuid;
++
++	return pmu;
++}
++
++/*
++ * This must run before the common arm_pmu hotplug logic, so that we can
++ * associate a CPU and its interrupt before the common code tries to manage the
++ * affinity and so on.
++ *
++ * Note that hotplug events are serialized, so we cannot race with another CPU
++ * coming up. The perf core won't open events while a hotplug event is in
++ * progress.
++ */
++static int arm_pmu_acpi_cpu_starting(unsigned int cpu)
++{
++	struct arm_pmu *pmu;
++	struct pmu_hw_events __percpu *hw_events;
++	int irq;
++
++	/* If we've already probed this CPU, we have nothing to do */
++	if (per_cpu(probed_pmus, cpu))
++		return 0;
++
++	irq = per_cpu(pmu_irqs, cpu);
++
++	pmu = arm_pmu_acpi_find_alloc_pmu();
++	if (!pmu)
++		return -ENOMEM;
++
++	cpumask_set_cpu(cpu, &pmu->supported_cpus);
++
++	per_cpu(probed_pmus, cpu) = pmu;
++
++	/*
++	 * Log and request the IRQ so the core arm_pmu code can manage it.  In
++	 * some situations (e.g. mismatched PPIs), we may fail to request the
++	 * IRQ. However, it may be too late for us to do anything about it.
++	 * The common ARM PMU code will log a warning in this case.
++	 */
++	hw_events = pmu->hw_events;
++	per_cpu(hw_events->irq, cpu) = irq;
++	armpmu_request_irq(pmu, cpu);
++
++	/*
++	 * Ideally, we'd probe the PMU here when we find the first matching
++	 * CPU. We can't do that for several reasons; see the comment in
++	 * arm_pmu_acpi_init().
++	 *
++	 * So for the time being, we're done.
++	 */
++	return 0;
++}
++
++int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
++{
++	int pmu_idx = 0;
++	int cpu, ret;
++
++	if (acpi_disabled)
++		return 0;
++
++	/*
++	 * Initialise and register the set of PMUs which we know about right
++	 * now. Ideally we'd do this in arm_pmu_acpi_cpu_starting() so that we
++	 * could handle late hotplug, but this may lead to deadlock since we
++	 * might try to register a hotplug notifier instance from within a
++	 * hotplug notifier.
++	 *
++	 * There's also the problem of having access to the right init_fn,
++	 * without tying this too deeply into the "real" PMU driver.
++	 *
++	 * For the moment, as with the platform/DT case, we need at least one
++	 * of a PMU's CPUs to be online at probe time.
++	 */
++	for_each_possible_cpu(cpu) {
++		struct arm_pmu *pmu = per_cpu(probed_pmus, cpu);
++		char *base_name;
++
++		if (!pmu || pmu->name)
++			continue;
++
++		ret = init_fn(pmu);
++		if (ret == -ENODEV) {
++			/* PMU not handled by this driver, or not present */
++			continue;
++		} else if (ret) {
++			pr_warn("Unable to initialise PMU for CPU%d\n", cpu);
++			return ret;
++		}
++
++		base_name = pmu->name;
++		pmu->name = kasprintf(GFP_KERNEL, "%s_%d", base_name, pmu_idx++);
++		if (!pmu->name) {
++			pr_warn("Unable to allocate PMU name for CPU%d\n", cpu);
++			return -ENOMEM;
++		}
++
++		ret = armpmu_register(pmu);
++		if (ret) {
++			pr_warn("Failed to register PMU for CPU%d\n", cpu);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int arm_pmu_acpi_init(void)
++{
 +	int ret;
 +
-+	ret = smp_call_function_any(&cpu_pmu->supported_cpus,
- 				    __armv8pmu_probe_pmu,
--				    cpu_pmu, 1);
-+				    &probe, 1);
++	if (acpi_disabled)
++		return 0;
++
++	/*
++	 * We can't request IRQs yet, since we don't know the cookie value
++	 * until we know which CPUs share the same logical PMU. We'll handle
++	 * that in arm_pmu_acpi_cpu_starting().
++	 */
++	ret = arm_pmu_acpi_parse_irqs();
 +	if (ret)
 +		return ret;
 +
-+	return probe.present ? 0 : -ENODEV;
- }
++	ret = cpuhp_setup_state(CPUHP_AP_PERF_ARM_ACPI_STARTING,
++				"perf/arm/pmu_acpi:starting",
++				arm_pmu_acpi_cpu_starting, NULL);
++
++	return ret;
++}
++subsys_initcall(arm_pmu_acpi_init)
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index cfcfab3..0f2a803 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -94,6 +94,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_ARM_VFP_STARTING,
+ 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
+ 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
++	CPUHP_AP_PERF_ARM_ACPI_STARTING,
+ 	CPUHP_AP_PERF_ARM_STARTING,
+ 	CPUHP_AP_ARM_L2X0_STARTING,
+ 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 25556eb..1360dd6 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -117,6 +117,9 @@ struct arm_pmu {
+ 	struct notifier_block	cpu_pm_nb;
+ 	/* the attr_groups array must be NULL-terminated */
+ 	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
++
++	/* Only to be used by ACPI probing code */
++	unsigned long acpi_cpuid;
+ };
  
--static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
-+static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
- {
-+	int ret = armv8pmu_probe_pmu(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
- 	cpu_pmu->enable			= armv8pmu_enable_event,
- 	cpu_pmu->disable		= armv8pmu_disable_event,
-@@ -997,78 +1026,104 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->reset			= armv8pmu_reset,
- 	cpu_pmu->max_period		= (1LLU << 32) - 1,
- 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
-+
-+	return 0;
- }
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+@@ -159,12 +162,20 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table);
  
- static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
++#ifdef CONFIG_ACPI
++int arm_pmu_acpi_probe(armpmu_init_fn init_fn);
++#else
++static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
++#endif
 +
- 	cpu_pmu->name			= "armv8_pmuv3";
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
+ /* Internal functions only for core arm_pmu code */
+ struct arm_pmu *armpmu_alloc(void);
+ void armpmu_free(struct arm_pmu *pmu);
+ int armpmu_register(struct arm_pmu *pmu);
+ int armpmu_request_irqs(struct arm_pmu *armpmu);
+ void armpmu_free_irqs(struct arm_pmu *armpmu);
++int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
++void armpmu_free_irq(struct arm_pmu *armpmu, int cpu);
  
- static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cortex_a53";
- 	cpu_pmu->map_event		= armv8_a53_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
+ #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
  
- static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cortex_a57";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cortex_a72";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_cavium_thunder";
- 	cpu_pmu->map_event		= armv8_thunder_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
-+	int ret = armv8_pmu_init(cpu_pmu);
-+	if (ret)
-+		return ret;
-+
- 	cpu_pmu->name			= "armv8_brcm_vulcan";
- 	cpu_pmu->map_event		= armv8_vulcan_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
- 		&armv8_pmuv3_format_attr_group;
--	return armv8pmu_probe_pmu(cpu_pmu);
-+
-+	return 0;
- }
- 
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
 -- 
 1.9.1
