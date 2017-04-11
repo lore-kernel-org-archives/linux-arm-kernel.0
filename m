@@ -1,269 +1,204 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Tue, 11 Apr 2017 10:38:20 +0530
-Subject: [PATCHv3 08/22] staging: android: ion: Remove crufty cache support
-In-Reply-To: <1491245884-15852-9-git-send-email-labbott@redhat.com>
-References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
- <1491245884-15852-9-git-send-email-labbott@redhat.com>
-Message-ID: <988c59e8-4a85-93f4-8d35-5ccd2a004424@codeaurora.org>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Tue, 11 Apr 2017 05:14:48 +0000
+Subject: [v3, 1/7] mmc: sdhci-of-esdhc: add peripheral clock support
+In-Reply-To: <a8810e0a-95fa-a590-6827-15031ff52886@intel.com>
+References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
+ <1490600982-5410-2-git-send-email-yangbo.lu@nxp.com>
+ <a8810e0a-95fa-a590-6827-15031ff52886@intel.com>
+Message-ID: <DB6PR0401MB253634F0774283AEA36D8ACDF8000@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Adrian,
 
-On 04/04/2017 12:27 AM, Laura Abbott wrote:
-> Now that we call dma_map in the dma_buf API callbacks there is no need
-> to use the existing cache APIs. Remove the sync ioctl and the existing
-> bad dma_sync calls. Explicit caching can be handled with the dma_buf
-> sync API.
 
-We could get rid of the ION_FLAG_CACHED_NEEDS_SYNC flag in this patch
-too.
+> -----Original Message-----
+> From: Adrian Hunter [mailto:adrian.hunter at intel.com]
+> Sent: Monday, April 10, 2017 8:36 PM
+> To: Y.B. Lu; linux-mmc at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; ulf.hansson at linaro.org; Rob Herring;
+> Mark Rutland; Catalin Marinas; Will Deacon
+> Cc: Xiaobo Xie
+> Subject: Re: [v3, 1/7] mmc: sdhci-of-esdhc: add peripheral clock support
+> 
+> On 27/03/17 10:49, Yangbo Lu wrote:
+> > eSDHC could select peripheral clock or platform clock as clock source
+> > by the PCS bit of eSDHC Control Register, and this bit couldn't be
+> > reset by software reset for all. In default, the platform clock is
+> > used. But we have to use peripheral clock since it has a higher
+> > frequency to support eMMC
+> > HS200 mode and SD UHS-I mode. This patch is to add peripheral clock
+> > support and use it instead of platform clock if it's declared in eSDHC
+> dts node.
+> >
+> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> 
+> Apart from minor comments:
+> 
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+> 
+> > ---
+> > Changes for v2:
+> > 	- None
+> > Changes for v3:
+> > 	- None
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc.h    |  1 +
+> >  drivers/mmc/host/sdhci-of-esdhc.c | 70
+> > +++++++++++++++++++++++++++++++++++++--
+> >  2 files changed, 69 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-esdhc.h
+> > b/drivers/mmc/host/sdhci-esdhc.h index ece8b37..5343fc0 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc.h
+> > +++ b/drivers/mmc/host/sdhci-esdhc.h
+> > @@ -54,6 +54,7 @@
+> >
+> >  /* Control Register for DMA transfer */
+> >  #define ESDHC_DMA_SYSCTL		0x40c
+> > +#define ESDHC_PERIPHERAL_CLK_SEL	0x00080000
+> >  #define ESDHC_DMA_SNOOP			0x00000040
+> >
+> >  #endif /* _DRIVERS_MMC_SDHCI_ESDHC_H */ diff --git
+> > a/drivers/mmc/host/sdhci-of-esdhc.c
+> > b/drivers/mmc/host/sdhci-of-esdhc.c
+> > index ff37e74..7ce1caf 100644
+> > --- a/drivers/mmc/host/sdhci-of-esdhc.c
+> > +++ b/drivers/mmc/host/sdhci-of-esdhc.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/module.h>
+> >  #include <linux/sys_soc.h>
+> > +#include <linux/clk.h>
+> >  #include <linux/mmc/host.h>
+> >  #include "sdhci-pltfm.h"
+> >  #include "sdhci-esdhc.h"
+> > @@ -30,6 +31,7 @@ struct sdhci_esdhc {
+> >  	u8 vendor_ver;
+> >  	u8 spec_ver;
+> >  	bool quirk_incorrect_hostver;
+> > +	unsigned int peripheral_clock;
+> >  };
+> >
+> >  /**
+> > @@ -414,15 +416,25 @@ static int esdhc_of_enable_dma(struct sdhci_host
+> > *host)  static unsigned int esdhc_of_get_max_clock(struct sdhci_host
+> > *host)  {
+> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
+> >
+> > -	return pltfm_host->clock;
+> > +	if (esdhc->peripheral_clock)
+> > +		return esdhc->peripheral_clock;
+> > +	else
+> > +		return pltfm_host->clock;
+> >  }
+> >
+> >  static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
+> > {
+> >  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
+> > +	unsigned int clock;
+> >
+> > -	return pltfm_host->clock / 256 / 16;
+> > +	if (esdhc->peripheral_clock)
+> > +		clock = esdhc->peripheral_clock;
+> > +	else
+> > +		clock = pltfm_host->clock;
+> > +	return clock / 256 / 16;
+> >  }
+> >
+> >  static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int
+> > clock) @@ -512,6 +524,33 @@ static void
+> esdhc_pltfm_set_bus_width(struct sdhci_host *host, int width)
+> >  	sdhci_writel(host, ctrl, ESDHC_PROCTL);  }
+> >
+> > +static void esdhc_clock_enable(struct sdhci_host *host, bool enable)
+> > +{
+> > +	u32 val;
+> > +	u32 timeout;
+> > +
+> > +	val = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+> > +
+> > +	if (enable)
+> > +		val |= ESDHC_CLOCK_SDCLKEN;
+> > +	else
+> > +		val &= ~ESDHC_CLOCK_SDCLKEN;
+> > +
+> > +	sdhci_writel(host, val, ESDHC_SYSTEM_CONTROL);
+> > +
+> > +	timeout = 20;
+> > +	val = ESDHC_CLOCK_STABLE;
+> > +	while (!(sdhci_readl(host, ESDHC_PRSSTAT) & val)) {
+> > +		if (timeout == 0) {
+> > +			pr_err("%s: Internal clock never stabilised.\n",
+> > +				mmc_hostname(host->mmc));
+> > +			break;
+> > +		}
+> > +		timeout--;
+> > +		mdelay(1);
+> 
+> If the time to stabilize is much less that 1 ms then this loop can waste
+> time.  Have a look at the change in sdhci.c.
+> 
 
-Thanks,
-Archit
+[Lu Yangbo-B47093] Thanks a lot. The method in sdhci.c is really better.
+I will send next version to use it soon.
 
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
->  drivers/staging/android/ion/compat_ion.c        |  1 -
->  drivers/staging/android/ion/ion-ioctl.c         |  6 ----
->  drivers/staging/android/ion/ion.c               | 40 -------------------------
->  drivers/staging/android/ion/ion_carveout_heap.c |  6 ----
->  drivers/staging/android/ion/ion_chunk_heap.c    |  6 ----
->  drivers/staging/android/ion/ion_page_pool.c     |  3 --
->  drivers/staging/android/ion/ion_priv.h          | 13 --------
->  drivers/staging/android/ion/ion_system_heap.c   |  5 ----
->  drivers/staging/android/uapi/ion.h              | 10 -------
->  9 files changed, 90 deletions(-)
->
-> diff --git a/drivers/staging/android/ion/compat_ion.c b/drivers/staging/android/ion/compat_ion.c
-> index 9a978d2..b892d3a 100644
-> --- a/drivers/staging/android/ion/compat_ion.c
-> +++ b/drivers/staging/android/ion/compat_ion.c
-> @@ -186,7 +186,6 @@ long compat_ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
->  	case ION_IOC_SHARE:
->  	case ION_IOC_MAP:
->  	case ION_IOC_IMPORT:
-> -	case ION_IOC_SYNC:
->  		return filp->f_op->unlocked_ioctl(filp, cmd,
->  						(unsigned long)compat_ptr(arg));
->  	default:
-> diff --git a/drivers/staging/android/ion/ion-ioctl.c b/drivers/staging/android/ion/ion-ioctl.c
-> index 5b2e93f..e096bcd 100644
-> --- a/drivers/staging/android/ion/ion-ioctl.c
-> +++ b/drivers/staging/android/ion/ion-ioctl.c
-> @@ -51,7 +51,6 @@ static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
->  static unsigned int ion_ioctl_dir(unsigned int cmd)
->  {
->  	switch (cmd) {
-> -	case ION_IOC_SYNC:
->  	case ION_IOC_FREE:
->  	case ION_IOC_CUSTOM:
->  		return _IOC_WRITE;
-> @@ -146,11 +145,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
->  			data.handle.handle = handle->id;
->  		break;
->  	}
-> -	case ION_IOC_SYNC:
-> -	{
-> -		ret = ion_sync_for_device(client, data.fd.fd);
-> -		break;
-> -	}
->  	case ION_IOC_CUSTOM:
->  	{
->  		if (!dev->custom_ioctl)
-> diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-> index 226ea1f..8757164 100644
-> --- a/drivers/staging/android/ion/ion.c
-> +++ b/drivers/staging/android/ion/ion.c
-> @@ -863,22 +863,6 @@ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
->  	dma_unmap_sg(attachment->dev, table->sgl, table->nents, direction);
->  }
->
-> -void ion_pages_sync_for_device(struct device *dev, struct page *page,
-> -			       size_t size, enum dma_data_direction dir)
-> -{
-> -	struct scatterlist sg;
-> -
-> -	sg_init_table(&sg, 1);
-> -	sg_set_page(&sg, page, size, 0);
-> -	/*
-> -	 * This is not correct - sg_dma_address needs a dma_addr_t that is valid
-> -	 * for the targeted device, but this works on the currently targeted
-> -	 * hardware.
-> -	 */
-> -	sg_dma_address(&sg) = page_to_phys(page);
-> -	dma_sync_sg_for_device(dev, &sg, 1, dir);
-> -}
-> -
->  static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
->  {
->  	struct ion_buffer *buffer = dmabuf->priv;
-> @@ -1097,30 +1081,6 @@ struct ion_handle *ion_import_dma_buf_fd(struct ion_client *client, int fd)
->  }
->  EXPORT_SYMBOL(ion_import_dma_buf_fd);
->
-> -int ion_sync_for_device(struct ion_client *client, int fd)
-> -{
-> -	struct dma_buf *dmabuf;
-> -	struct ion_buffer *buffer;
-> -
-> -	dmabuf = dma_buf_get(fd);
-> -	if (IS_ERR(dmabuf))
-> -		return PTR_ERR(dmabuf);
-> -
-> -	/* if this memory came from ion */
-> -	if (dmabuf->ops != &dma_buf_ops) {
-> -		pr_err("%s: can not sync dmabuf from another exporter\n",
-> -		       __func__);
-> -		dma_buf_put(dmabuf);
-> -		return -EINVAL;
-> -	}
-> -	buffer = dmabuf->priv;
-> -
-> -	dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
-> -			       buffer->sg_table->nents, DMA_BIDIRECTIONAL);
-> -	dma_buf_put(dmabuf);
-> -	return 0;
-> -}
-> -
->  int ion_query_heaps(struct ion_client *client, struct ion_heap_query *query)
->  {
->  	struct ion_device *dev = client->dev;
-> diff --git a/drivers/staging/android/ion/ion_carveout_heap.c b/drivers/staging/android/ion/ion_carveout_heap.c
-> index 9bf8e98..e0e360f 100644
-> --- a/drivers/staging/android/ion/ion_carveout_heap.c
-> +++ b/drivers/staging/android/ion/ion_carveout_heap.c
-> @@ -100,10 +100,6 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
->
->  	ion_heap_buffer_zero(buffer);
->
-> -	if (ion_buffer_cached(buffer))
-> -		dma_sync_sg_for_device(NULL, table->sgl, table->nents,
-> -				       DMA_BIDIRECTIONAL);
-> -
->  	ion_carveout_free(heap, paddr, buffer->size);
->  	sg_free_table(table);
->  	kfree(table);
-> @@ -128,8 +124,6 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
->  	page = pfn_to_page(PFN_DOWN(heap_data->base));
->  	size = heap_data->size;
->
-> -	ion_pages_sync_for_device(NULL, page, size, DMA_BIDIRECTIONAL);
-> -
->  	ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
->  	if (ret)
->  		return ERR_PTR(ret);
-> diff --git a/drivers/staging/android/ion/ion_chunk_heap.c b/drivers/staging/android/ion/ion_chunk_heap.c
-> index 8c41889..46e13f6 100644
-> --- a/drivers/staging/android/ion/ion_chunk_heap.c
-> +++ b/drivers/staging/android/ion/ion_chunk_heap.c
-> @@ -101,10 +101,6 @@ static void ion_chunk_heap_free(struct ion_buffer *buffer)
->
->  	ion_heap_buffer_zero(buffer);
->
-> -	if (ion_buffer_cached(buffer))
-> -		dma_sync_sg_for_device(NULL, table->sgl, table->nents,
-> -				       DMA_BIDIRECTIONAL);
-> -
->  	for_each_sg(table->sgl, sg, table->nents, i) {
->  		gen_pool_free(chunk_heap->pool, page_to_phys(sg_page(sg)),
->  			      sg->length);
-> @@ -132,8 +128,6 @@ struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
->  	page = pfn_to_page(PFN_DOWN(heap_data->base));
->  	size = heap_data->size;
->
-> -	ion_pages_sync_for_device(NULL, page, size, DMA_BIDIRECTIONAL);
-> -
->  	ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
->  	if (ret)
->  		return ERR_PTR(ret);
-> diff --git a/drivers/staging/android/ion/ion_page_pool.c b/drivers/staging/android/ion/ion_page_pool.c
-> index aea89c1..532eda7 100644
-> --- a/drivers/staging/android/ion/ion_page_pool.c
-> +++ b/drivers/staging/android/ion/ion_page_pool.c
-> @@ -30,9 +30,6 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
->
->  	if (!page)
->  		return NULL;
-> -	if (!pool->cached)
-> -		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order,
-> -					  DMA_BIDIRECTIONAL);
->  	return page;
->  }
->
-> diff --git a/drivers/staging/android/ion/ion_priv.h b/drivers/staging/android/ion/ion_priv.h
-> index 297d99d..4fc7026 100644
-> --- a/drivers/staging/android/ion/ion_priv.h
-> +++ b/drivers/staging/android/ion/ion_priv.h
-> @@ -440,21 +440,8 @@ void ion_page_pool_free(struct ion_page_pool *pool, struct page *page);
->  int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
->  			  int nr_to_scan);
->
-> -/**
-> - * ion_pages_sync_for_device - cache flush pages for use with the specified
-> - *                             device
-> - * @dev:		the device the pages will be used with
-> - * @page:		the first page to be flushed
-> - * @size:		size in bytes of region to be flushed
-> - * @dir:		direction of dma transfer
-> - */
-> -void ion_pages_sync_for_device(struct device *dev, struct page *page,
-> -		size_t size, enum dma_data_direction dir);
-> -
->  long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
->
-> -int ion_sync_for_device(struct ion_client *client, int fd);
-> -
->  struct ion_handle *ion_handle_get_by_id_nolock(struct ion_client *client,
->  						int id);
->
-> diff --git a/drivers/staging/android/ion/ion_system_heap.c b/drivers/staging/android/ion/ion_system_heap.c
-> index 6cb2fe7..a33331b 100644
-> --- a/drivers/staging/android/ion/ion_system_heap.c
-> +++ b/drivers/staging/android/ion/ion_system_heap.c
-> @@ -75,9 +75,6 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
->
->  	page = ion_page_pool_alloc(pool);
->
-> -	if (cached)
-> -		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
-> -					  DMA_BIDIRECTIONAL);
->  	return page;
->  }
->
-> @@ -401,8 +398,6 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
->
->  	buffer->sg_table = table;
->
-> -	ion_pages_sync_for_device(NULL, page, len, DMA_BIDIRECTIONAL);
-> -
->  	return 0;
->
->  free_table:
-> diff --git a/drivers/staging/android/uapi/ion.h b/drivers/staging/android/uapi/ion.h
-> index 14cd873..c3a87a5 100644
-> --- a/drivers/staging/android/uapi/ion.h
-> +++ b/drivers/staging/android/uapi/ion.h
-> @@ -207,16 +207,6 @@ struct ion_heap_query {
->  #define ION_IOC_IMPORT		_IOWR(ION_IOC_MAGIC, 5, struct ion_fd_data)
->
->  /**
-> - * DOC: ION_IOC_SYNC - syncs a shared file descriptors to memory
-> - *
-> - * Deprecated in favor of using the dma_buf api's correctly (syncing
-> - * will happen automatically when the buffer is mapped to a device).
-> - * If necessary should be used after touching a cached buffer from the cpu,
-> - * this will make the buffer in memory coherent.
-> - */
-> -#define ION_IOC_SYNC		_IOWR(ION_IOC_MAGIC, 7, struct ion_fd_data)
-> -
-> -/**
->   * DOC: ION_IOC_CUSTOM - call architecture specific ion ioctl
->   *
->   * Takes the argument of the architecture specific ioctl to call and
->
+Currently another place in esdhc driver could also change to use this method. I will send a separate patch for that later.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+
+> > +	}
+> > +}
+> > +
+> >  static void esdhc_reset(struct sdhci_host *host, u8 mask)  {
+> >  	sdhci_reset(host, mask);
+> > @@ -613,6 +652,9 @@ static void esdhc_init(struct platform_device
+> > *pdev, struct sdhci_host *host)  {
+> >  	struct sdhci_pltfm_host *pltfm_host;
+> >  	struct sdhci_esdhc *esdhc;
+> > +	struct device_node *np;
+> > +	struct clk *clk;
+> > +	u32 val;
+> >  	u16 host_ver;
+> >
+> >  	pltfm_host = sdhci_priv(host);
+> > @@ -626,6 +668,30 @@ static void esdhc_init(struct platform_device
+> *pdev, struct sdhci_host *host)
+> >  		esdhc->quirk_incorrect_hostver = true;
+> >  	else
+> >  		esdhc->quirk_incorrect_hostver = false;
+> > +
+> > +	np = pdev->dev.of_node;
+> > +	clk = of_clk_get(np, 0);
+> 
+> Should there be a clk_put somewhere?
+
+[Lu Yangbo-B47093] Will add it after driver gets the clock value.
+
+> 
+> > +	if (!IS_ERR(clk)) {
+> > +		/*
+> > +		 * esdhc->peripheral_clock would be assigned with a value
+> > +		 * which is eSDHC base clock when use periperal clock.
+> > +		 * For ls1046a, the clock value got by common clk API is
+> > +		 * peripheral clock while the eSDHC base clock is 1/2
+> > +		 * peripheral clock.
+> > +		 */
+> > +		if (of_device_is_compatible(np, "fsl,ls1046a-esdhc"))
+> > +			esdhc->peripheral_clock = clk_get_rate(clk) / 2;
+> > +		else
+> > +			esdhc->peripheral_clock = clk_get_rate(clk);
+> > +	}
+> > +
+> > +	if (esdhc->peripheral_clock) {
+> > +		esdhc_clock_enable(host, false);
+> > +		val = sdhci_readl(host, ESDHC_DMA_SYSCTL);
+> > +		val |= ESDHC_PERIPHERAL_CLK_SEL;
+> > +		sdhci_writel(host, val, ESDHC_DMA_SYSCTL);
+> > +		esdhc_clock_enable(host, true);
+> > +	}
+> >  }
+> >
+> >  static int sdhci_esdhc_probe(struct platform_device *pdev)
+> >
