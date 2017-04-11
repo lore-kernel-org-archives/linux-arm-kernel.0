@@ -1,87 +1,206 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Apr 2017 09:39:54 +0100
-Subject: [PATCHv3 11/14] arm64: add function to get a cpu's MADT GICC table
+Date: Tue, 11 Apr 2017 09:39:56 +0100
+Subject: [PATCHv3 13/14] arm64: pmuv3: handle !PMUv3 when probing
 In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
 References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1491899997-32210-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <1491899997-32210-14-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ACPI parking protocol code needs to parse each CPU's MADT
-GICC table to extract the mailbox address and so on. Each time we parse
-a GICC table, we call back to the parking protocol code to parse it.
+When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
+compatible PMU. Thus we need to consult ID registers during probe time.
 
-This has been fine so far, but we're about to have more code that needs
-to extract data from the GICC tables, and adding a callback for each
-user is going to get unwieldy.
+This patch updates our PMUv3 probing code to test for the presence of
+PMUv3 functionality before touching an PMUv3-specific registers, and
+before updating the struct arm_pmu with PMUv3 data.
 
-Instead, this patch ensures that we stash a copy of each CPU's GICC
-table at boot time, such that anything needing to parse it can later
-request it. This will allow for other parsers of GICC, and for
-simplification to the ACPI parking protocol code. Note that we must
-store a copy, rather than a pointer, since the core ACPI code
-temporarily maps/unmaps tables while iterating over them.
-
-Since we parse the MADT before we know how many CPUs we have (and hence
-before we setup the percpu areas), we must use an NR_CPUS sized array.
+When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/acpi.h |  2 ++
- arch/arm64/kernel/smp.c       | 10 ++++++++++
- 2 files changed, 12 insertions(+)
+ arch/arm64/kernel/perf_event.c | 87 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 71 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index c1976c0..0e99978 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -85,6 +85,8 @@ static inline bool acpi_has_cpu_in_madt(void)
- 	return true;
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 57ae9d9..53f2354 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -957,11 +957,26 @@ static int armv8_vulcan_map_event(struct perf_event *event)
+ 				ARMV8_PMU_EVTYPE_EVENT);
  }
  
-+struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
++struct armv8pmu_probe_info {
++	struct arm_pmu *pmu;
++	bool present;
++};
 +
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- void __init acpi_init_cpus(void);
+ static void __armv8pmu_probe_pmu(void *info)
+ {
+-	struct arm_pmu *cpu_pmu = info;
++	struct armv8pmu_probe_info *probe = info;
++	struct arm_pmu *cpu_pmu = probe->pmu;
++	u64 dfr0, pmuver;
+ 	u32 pmceid[2];
  
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index ef1caae..390c277 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -518,6 +518,13 @@ static int __init smp_cpu_setup(int cpu)
- static unsigned int cpu_count = 1;
++	dfr0 = read_sysreg(id_aa64dfr0_el1);
++	pmuver = cpuid_feature_extract_unsigned_field(dfr0,
++			ID_AA64DFR0_PMUVER_SHIFT);
++	if (pmuver != 1)
++		return;
++
++	probe->present = true;
++
+ 	/* Read the nb of CNTx counters supported from PMNC */
+ 	cpu_pmu->num_events = (armv8pmu_pmcr_read() >> ARMV8_PMU_PMCR_N_SHIFT)
+ 		& ARMV8_PMU_PMCR_N_MASK;
+@@ -979,13 +994,27 @@ static void __armv8pmu_probe_pmu(void *info)
  
- #ifdef CONFIG_ACPI
-+static struct acpi_madt_generic_interrupt cpu_madt_gicc[NR_CPUS];
+ static int armv8pmu_probe_pmu(struct arm_pmu *cpu_pmu)
+ {
+-	return smp_call_function_any(&cpu_pmu->supported_cpus,
++	struct armv8pmu_probe_info probe = {
++		.pmu = cpu_pmu,
++		.present = false,
++	};
++	int ret;
 +
-+struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
-+{
-+	return &cpu_madt_gicc[cpu];
-+}
++	ret = smp_call_function_any(&cpu_pmu->supported_cpus,
+ 				    __armv8pmu_probe_pmu,
+-				    cpu_pmu, 1);
++				    &probe, 1);
++	if (ret)
++		return ret;
 +
- /*
-  * acpi_map_gic_cpu_interface - parse processor MADT entry
-  *
-@@ -552,6 +559,7 @@ static int __init smp_cpu_setup(int cpu)
- 			return;
- 		}
- 		bootcpu_valid = true;
-+		cpu_madt_gicc[0] = *processor;
- 		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
- 		return;
- 	}
-@@ -562,6 +570,8 @@ static int __init smp_cpu_setup(int cpu)
- 	/* map the logical cpu id to cpu MPIDR */
- 	cpu_logical_map(cpu_count) = hwid;
++	return probe.present ? 0 : -ENODEV;
+ }
  
-+	cpu_madt_gicc[cpu_count] = *processor;
+-static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
++static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
+ {
++	int ret = armv8pmu_probe_pmu(cpu_pmu);
++	if (ret)
++		return ret;
 +
- 	/*
- 	 * Set-up the ACPI parking protocol cpu entries
- 	 * while initializing the cpu_logical_map to
+ 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
+ 	cpu_pmu->enable			= armv8pmu_enable_event,
+ 	cpu_pmu->disable		= armv8pmu_disable_event,
+@@ -997,78 +1026,104 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->reset			= armv8pmu_reset,
+ 	cpu_pmu->max_period		= (1LLU << 32) - 1,
+ 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
++
++	return 0;
+ }
+ 
+ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_pmuv3";
+ 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cortex_a53";
+ 	cpu_pmu->map_event		= armv8_a53_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cortex_a57";
+ 	cpu_pmu->map_event		= armv8_a57_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cortex_a72";
+ 	cpu_pmu->map_event		= armv8_a57_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_cavium_thunder";
+ 	cpu_pmu->map_event		= armv8_thunder_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv8_pmu_init(cpu_pmu);
++	int ret = armv8_pmu_init(cpu_pmu);
++	if (ret)
++		return ret;
++
+ 	cpu_pmu->name			= "armv8_brcm_vulcan";
+ 	cpu_pmu->map_event		= armv8_vulcan_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
+-	return armv8pmu_probe_pmu(cpu_pmu);
++
++	return 0;
+ }
+ 
+ static const struct of_device_id armv8_pmu_of_device_ids[] = {
 -- 
 1.9.1
