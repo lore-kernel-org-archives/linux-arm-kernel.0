@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:57 +0100
-Subject: [PATCH v3 17/32] mn10300: include default ioremap_nopost()
- implementation
+Date: Tue, 11 Apr 2017 13:28:56 +0100
+Subject: [PATCH v3 16/32] mips: include default ioremap_nopost() implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-18-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-17-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,23 +24,24 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Huacai Chen <chenhc@lemote.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: David Howells <dhowells@redhat.com>
 ---
- arch/mn10300/include/asm/io.h | 1 +
+ arch/mips/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/mn10300/include/asm/io.h b/arch/mn10300/include/asm/io.h
-index 6218935..95a3c20 100644
---- a/arch/mn10300/include/asm/io.h
-+++ b/arch/mn10300/include/asm/io.h
-@@ -284,6 +284,7 @@ static inline void __iomem *ioremap_nocache(unsigned long offset, unsigned long
- #define ioremap_wc ioremap_nocache
- #define ioremap_wt ioremap_nocache
+diff --git a/arch/mips/include/asm/io.h b/arch/mips/include/asm/io.h
+index ecabc00..d8d1bae 100644
+--- a/arch/mips/include/asm/io.h
++++ b/arch/mips/include/asm/io.h
+@@ -257,6 +257,7 @@ static inline void __iomem * __ioremap_mode(phys_addr_t offset, unsigned long si
+ #define ioremap_nocache(offset, size)					\
+ 	__ioremap_mode((offset), (size), _CACHE_UNCACHED)
  #define ioremap_uc ioremap_nocache
 +#include <asm-generic/ioremap-nopost.h>
  
- static inline void iounmap(void __iomem *addr)
- {
+ /*
+  * ioremap_cachable -	map bus memory into CPU space
 -- 
 2.10.0
