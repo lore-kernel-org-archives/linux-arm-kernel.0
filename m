@@ -1,10 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:59 +0100
-Subject: [PATCH v3 19/32] openrisc: include default ioremap_nopost()
+Date: Tue, 11 Apr 2017 13:28:58 +0100
+Subject: [PATCH v3 18/32] nios2: include default ioremap_nopost()
  implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-20-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-19-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,25 +25,23 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Jonas Bonn <jonas@southpole.se>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Stafford Horne <shorne@gmail.com>
-Cc: Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>
+Cc: Ley Foon Tan <lftan@altera.com>
 ---
- arch/openrisc/include/asm/io.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/nios2/include/asm/io.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/openrisc/include/asm/io.h b/arch/openrisc/include/asm/io.h
-index 7c69139..1cea257 100644
---- a/arch/openrisc/include/asm/io.h
-+++ b/arch/openrisc/include/asm/io.h
-@@ -48,5 +48,7 @@ static inline void __iomem *ioremap_nocache(phys_addr_t offset,
- 			 __pgprot(pgprot_val(PAGE_KERNEL) | _PAGE_CI));
- }
+diff --git a/arch/nios2/include/asm/io.h b/arch/nios2/include/asm/io.h
+index ce072ba..ff8ac76 100644
+--- a/arch/nios2/include/asm/io.h
++++ b/arch/nios2/include/asm/io.h
+@@ -47,6 +47,7 @@ static inline void iounmap(void __iomem *addr)
  
+ #define ioremap_wc ioremap_nocache
+ #define ioremap_wt ioremap_nocache
 +#include <asm-generic/ioremap-nopost.h>
-+
- extern void iounmap(void *addr);
- #endif
+ 
+ /* Pages to physical address... */
+ #define page_to_phys(page)	virt_to_phys(page_to_virt(page))
 -- 
 2.10.0
