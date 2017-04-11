@@ -1,98 +1,73 @@
 From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Tue, 11 Apr 2017 20:12:41 +0530
-Subject: [RFC PATCH 3/7] iommu/arm-smmu-v3: Introduce smmu option
- USE_SHARED_IRQS for Silicon errata
+Date: Tue, 11 Apr 2017 20:12:43 +0530
+Subject: [RFC PATCH 5/7] iommu/arm-smmu-v3: For ACPI based device probing,
+ set relevant options for different SMMUv3 implementations.
 In-Reply-To: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
 References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
-Message-ID: <1491921765-29475-4-git-send-email-linucherian@gmail.com>
+Message-ID: <1491921765-29475-6-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geetha <gakula@cavium.com>
+From: Linu Cherian <linu.cherian@cavium.com>
 
-Cavium 99xx SMMU implementation doesn't not support unique irq lines for
-gerror, eventq and cmdq-sync. USE_SHARED_IRQS option enables to use single
-irq line for all three interrupts.
+Enable SKIP_PREFETCH option for HiSilicon SMMUv3 model.
+Enable PAGE0_REGS_ONLY and USE_SHARED_IRQS options for
+Cavium 99xx SMMUv3 model.
 
-Signed-off-by: Geetha Sowjanya <gakula@cavium.com>
+Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index b326195..1475ad8 100644
+index 1475ad8..00b48b4 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -415,6 +415,9 @@
- #define ARM_SMMU_PAGE0_REGS_ONLY(s)		\
- 	((s)->options & ARM_SMMU_OPT_PAGE0_REGS_ONLY)
+@@ -2634,18 +2634,45 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ }
  
-+#define ARM_SMMU_USE_SHARED_IRQS(s)		\
-+	((s)->options & ARM_SMMU_OPT_USE_SHARED_IRQS)
+ #ifdef CONFIG_ACPI
++static int acpi_smmu_get_options(u32 model, struct arm_smmu_device *smmu)
++{
++	int ret = 0;
 +
- static bool disable_bypass;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
-@@ -601,6 +604,7 @@ struct arm_smmu_device {
- 
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
- #define ARM_SMMU_OPT_PAGE0_REGS_ONLY    (1 << 1)
-+#define ARM_SMMU_OPT_USE_SHARED_IRQS    (1 << 2)
- 	u32				options;
- 
- 	struct arm_smmu_cmdq		cmdq;
-@@ -668,6 +672,7 @@ struct arm_smmu_option_prop {
- static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
- 	{ ARM_SMMU_OPT_PAGE0_REGS_ONLY, "cavium-cn99xx,broken-page1-regspace"},
-+	{ ARM_SMMU_OPT_USE_SHARED_IRQS, "cavium-cn99xx,broken-unique-irqlines"},
- 	{ 0, NULL},
- };
- 
-@@ -2237,6 +2242,7 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
++	switch (model) {
++	case ACPI_IORT_SMMU_V3:
++	case ACPI_IORT_SMMU_CORELINK_MMU600:
++		break;
++	case ACPI_IORT_SMMU_V3_HISILICON:
++		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
++		break;
++	case ACPI_IORT_SMMU_V3_CAVIUM_CN99XX:
++		smmu->options |= (ARM_SMMU_OPT_PAGE0_REGS_ONLY |
++				  ARM_SMMU_OPT_USE_SHARED_IRQS);
++		break;
++	default:
++		ret = -ENODEV;
++	}
++
++	return ret;
++}
++
+ static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
+ 				      struct arm_smmu_device *smmu)
  {
- 	int ret, irq;
- 	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
-+	u32 irqflags = IRQF_ONESHOT | IRQF_SHARED;
+ 	struct acpi_iort_smmu_v3 *iort_smmu;
+ 	struct device *dev = smmu->dev;
+ 	struct acpi_iort_node *node;
++	int ret;
  
- 	/* Disable IRQs first */
- 	ret = arm_smmu_write_reg_sync(smmu, 0, ARM_SMMU_IRQ_CTRL,
-@@ -2251,9 +2257,11 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 	/* Request interrupt lines */
- 	irq = smmu->evtq.q.irq;
- 	if (irq) {
-+		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
-+			irqflags = IRQF_ONESHOT;
- 		ret = devm_request_threaded_irq(smmu->dev, irq, NULL,
- 						arm_smmu_evtq_thread,
--						IRQF_ONESHOT,
-+						irqflags,
- 						"arm-smmu-v3-evtq", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable evtq irq\n");
-@@ -2261,8 +2269,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+ 	node = *(struct acpi_iort_node **)dev_get_platdata(dev);
  
- 	irq = smmu->cmdq.q.irq;
- 	if (irq) {
-+		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
-+			irqflags = 0;
- 		ret = devm_request_irq(smmu->dev, irq,
--				       arm_smmu_cmdq_sync_handler, 0,
-+				       arm_smmu_cmdq_sync_handler, irqflags,
- 				       "arm-smmu-v3-cmdq-sync", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable cmdq-sync irq\n");
-@@ -2270,8 +2280,10 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+ 	/* Retrieve SMMUv3 specific data */
+ 	iort_smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
  
- 	irq = smmu->gerr_irq;
- 	if (irq) {
-+		if (!ARM_SMMU_USE_SHARED_IRQS(smmu))
-+			irqflags = 0;
- 		ret = devm_request_irq(smmu->dev, irq, arm_smmu_gerror_handler,
--				       0, "arm-smmu-v3-gerror", smmu);
-+				       irqflags, "arm-smmu-v3-gerror", smmu);
- 		if (ret < 0)
- 			dev_warn(smmu->dev, "failed to enable gerror irq\n");
- 	}
++	ret = acpi_smmu_get_options(iort_smmu->model, smmu);
++	if (ret < 0)
++		return ret;
++
+ 	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
+ 		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
+ 
 -- 
 1.9.1
