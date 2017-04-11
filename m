@@ -1,58 +1,48 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:11 +0100
-Subject: [PATCH v3 31/32] lib: fix Devres devm_ioremap_* offset parameter
- kerneldoc description
+Date: Tue, 11 Apr 2017 13:29:00 +0100
+Subject: [PATCH v3 20/32] parisc: include default ioremap_nopost()
+ implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-32-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-21-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The offset parameter in Devres devm_ioremap_* functions kerneldoc
-entries is erroneously defined as BUS offset whereas it is actually
-a resource address.
+The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and Posting")
+mandate non-posted configuration transactions. As further highlighted in
+the PCIe specifications (4.0 - Rev0.3, "Ordering Considerations for the
+Enhanced Configuration Access Mechanism"), through ECAM and
+ECAM-derivative configuration mechanism, the memory mapped transactions
+from the host CPU into Configuration Requests on the PCI express fabric
+may create ordering problems for software because writes to memory
+address are typically posted transactions (unless the architecture can
+enforce through virtual address mapping non-posted write transactions
+behaviour) but writes to Configuration Space are not posted on the PCI
+express fabric.
 
-Since it is actually misleading, fix the Devres devm_ioremap_* offset
-parameter kerneldoc entry by replacing BUS offset with a more
-suitable description (ie Resource address).
+Include the asm-generic ioremap_nopost() implementation (currently
+falling back to ioremap_nocache()) to provide a non-posted writes
+ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Tejun Heo <tj@kernel.org>
+Cc: "James E.J. Bottomley" <jejb@parisc-linux.org>
+Cc: Helge Deller <deller@gmx.de>
 ---
- lib/devres.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/parisc/include/asm/io.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/lib/devres.c b/lib/devres.c
-index cb1464c..78eca71 100644
---- a/lib/devres.c
-+++ b/lib/devres.c
-@@ -17,7 +17,7 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
- /**
-  * devm_ioremap - Managed ioremap()
-  * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-+ * @offset: Resource address to map
-  * @size: Size of map
-  *
-  * Managed ioremap().  Map is automatically unmapped on driver detach.
-@@ -45,7 +45,7 @@ EXPORT_SYMBOL(devm_ioremap);
- /**
-  * devm_ioremap_nocache - Managed ioremap_nocache()
-  * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-+ * @offset: Resource address to map
-  * @size: Size of map
-  *
-  * Managed ioremap_nocache().  Map is automatically unmapped on driver
-@@ -74,7 +74,7 @@ EXPORT_SYMBOL(devm_ioremap_nocache);
- /**
-  * devm_ioremap_wc - Managed ioremap_wc()
-  * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-+ * @offset: Resource address to map
-  * @size: Size of map
-  *
-  * Managed ioremap_wc().  Map is automatically unmapped on driver detach.
+diff --git a/arch/parisc/include/asm/io.h b/arch/parisc/include/asm/io.h
+index 1a16f1d..373ba75 100644
+--- a/arch/parisc/include/asm/io.h
++++ b/arch/parisc/include/asm/io.h
+@@ -139,6 +139,7 @@ static inline void __iomem * ioremap(unsigned long offset, unsigned long size)
+ #define ioremap_nocache(off, sz)	ioremap((off), (sz))
+ #define ioremap_wc			ioremap_nocache
+ #define ioremap_uc			ioremap_nocache
++#include <asm-generic/ioremap-nopost.h>
+ 
+ extern void iounmap(const volatile void __iomem *addr);
+ 
 -- 
 2.10.0
