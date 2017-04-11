@@ -1,355 +1,89 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 11 Apr 2017 09:50:51 +0200
-Subject: [PATCH] ARM: dts: stm32f7: add STM32f769I & stm32f746 discovery
- board support
-In-Reply-To: <6e07ebcf-4463-523f-ea24-5a176efb0779@st.com>
-References: <1491613929-11485-1-git-send-email-vikas.manocha@st.com>
- <6ea617a3-94bc-870f-dd52-a45ad45c6d26@st.com>
- <6e07ebcf-4463-523f-ea24-5a176efb0779@st.com>
-Message-ID: <e6592982-9c24-bfde-469b-770218bf88be@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Apr 2017 08:56:48 +0100
+Subject: [PATCH] arm64: kaslr: fix ARM64_MODULE_PLTS dependency
+In-Reply-To: <b0e872b9-f7ea-e3a4-84c4-fc9aa90cecbd@huawei.com>
+References: <1491789132-18933-1-git-send-email-huawei.libin@huawei.com>
+ <CAKv+Gu8x9sCq2b2OmjoARKJZ8V5e4MtJp962Z1gJxazvkfw-XA@mail.gmail.com>
+ <b0e872b9-f7ea-e3a4-84c4-fc9aa90cecbd@huawei.com>
+Message-ID: <CAKv+Gu_dTh5UMK7Gs=Tw1Tja+i1=dBQnc7H4vPybJ-8hNA2G1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vikas
-
-On 04/10/2017 08:40 PM, Vikas Manocha wrote:
-> Thanks Alex,
+On 11 April 2017 at 07:28, Li Bin <huawei.libin@huawei.com> wrote:
 >
-> On 04/10/2017 12:23 AM, Alexandre Torgue wrote:
->> Hi
->>
->> On 04/08/2017 03:12 AM, Vikas Manocha wrote:
->>> Stm32f769I & stm32f746 are MCUs of stm32f7 family. Here are the major
->>> spces of the two boards:
+> Hi,
+> on 2017/4/10 17:12, Ard Biesheuvel wrote:
+>> On 10 April 2017 at 02:52, Li Bin <huawei.libin@huawei.com> wrote:
+>>> There is a bug that when RANDOMIZE_BASE enabled and
+>>> RANDOMIZE_MODULE_REGION_FULL disabled, and assume that there are
+>>> many modules, and module space is not enabled, module_alloc code
+>>> now will alloc space in vmalloc space, and the patch
+>>> "fe88a4 arm64: kaslr: keep modules close to the kernel when
+>>> DYNAMIC_FTRACE=y" will be invalid.
 >>>
->>> stm32f769I discovery board:
->>>     - Cortex-M7 core @216MHz
->>>     - 2MB mcu internal flash
->>>     - 512KB internal sram
->>>     - 16MB sdram memory
->>>     - 64MB qspi flash memory
->>>     - 4 inch wvga LCD-TFT Display
->>>
->>> stm32f746 discovery board:
->>>     - Cortex-M7 core @216MHz
->>>     - 1MB mcu internal flash
->>>     - 320KB internal sram
->>>     - 8MB sdram memory
->>>     - 16MB qspi flash memory
->>>     - 4.3 inch 480x272 LCD-TFT display
->>>
->>> Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
->>> ---
->>>  arch/arm/boot/dts/Makefile            |   2 +
->>>  arch/arm/boot/dts/stm32f746-disco.dts | 101 ++++++++++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/stm32f746.dtsi      |   2 +-
->>>  arch/arm/boot/dts/stm32f769-disco.dts | 101 ++++++++++++++++++++++++++++++++++
->>>  4 files changed, 205 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm/boot/dts/stm32f746-disco.dts
->>>  create mode 100644 arch/arm/boot/dts/stm32f769-disco.dts
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index 0118084..a119f74 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -763,6 +763,8 @@ dtb-$(CONFIG_ARCH_STI) += \
->>>  dtb-$(CONFIG_ARCH_STM32)+= \
->>>      stm32f429-disco.dtb \
->>>      stm32f469-disco.dtb \
->>> +    stm32f746-disco.dtb \
->>> +    stm32f769-disco.dtb \
->>>      stm32429i-eval.dtb \
->>>      stm32746g-eval.dtb
->>>  dtb-$(CONFIG_MACH_SUN4I) += \
->>> diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
->>> new file mode 100644
->>> index 0000000..c0e313f
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/stm32f746-disco.dts
->>> @@ -0,0 +1,101 @@
->>> +/*
->>> + * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This file is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This file is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +#include "stm32f746.dtsi"
->>> +#include <dt-bindings/input/input.h>
->>> +
->>> +/ {
->>> +    model = "STMicroelectronics STM32F746-DISCO board";
->>> +    compatible = "st,stm32f746-disco", "st,stm32f746";
->>> +
->>> +    chosen {
->>> +        bootargs = "root=/dev/ram";
->>> +        stdout-path = "serial0:115200n8";
->>> +    };
->>> +
->>> +    memory {
->>> +        reg = <0xC0000000 0x800000>;
->>> +    };
->>> +
->>> +    aliases {
->>> +        serial0 = &usart1;
->>> +    };
->>> +
->>> +};
->>> +
->>> +&clk_hse {
->>> +    clock-frequency = <25000000>;
->>> +};
->>> +
->>> +&pinctrl {
 >>
+>> I guess you are alluding to the fact that this code [paraphrased]
 >>
->> Pin muxing is not defined in board file. Please move it into SOC dtsi file.
->
-> Pin muxing used is different for different boards. e.g. usart1_rx pad is PA10 for stm32f769-disco board while it is PB7 for stm32f746-disco board.
-> The other possibilities for same pad (usart1_rx) is PB15. To make situation bit more complex, it is only available in f769 device.
->
-> Putting in SOC dtsi file means having lot of combinations for different pins in separate groups.
-> e.g. only for one instance of one ip (usart1), following groups might be required at one point of time:
->
-> usart1_pa10_pa9 {..}
-> usart1_pa10_pb14 {..}
-> usart1_pa10_pb6 {..}
->
-> usart1_pb7_pa9 {..}
-> usart1_pb7_pb14 {..}
-> usart1_pb7_pb6 {..}
->
-> usart1_pb15_pa9 {..}
-> usart1_pb15_pb14 {..}
-> usart1_pb15_pb6 {..}
->
-> In case of boards based on stm32f746 device, all the above mentioned groups with pb14 & pb15 will not be available.
-> One solution (to avoid using not available groups) could be to have separate dtsi (or separate pinmux.dtsi) for different devices of same family like one for stm32f746 & other for stm32f769. Still it does not resolve the need to have lot of groups combinations for each instance of every peripheral in dtsi as mentioned above.
-
-Yes, it is what I want to have. I did the job on for STM32F4 (F429 / 
-F469). You could have a look on ARM Linux patchwork: 
-https://patchwork.kernel.org/patch/9669433/
-
-To sum-up the implementation:
-
--Pinmuxing is defined in separate files which will be included in board 
-dts file.
-
--We have a common pinmuxing file + a dedicated pinmuxing file per SOC.
-
-Example for STMF469-disco:
-stm32f4-pinctrl.dtsi --> stm32f469-pinctrl.dtsi --> stm32f469-disco.dts
-
-stm32f4-pinctrl.dtsi contains common pinmuxing bindings between STM32F4
-stm32f469-pinctrl.dtsi contains dedicated pinmuxing bindings for 
-STM32F469 (ex: QSPI pins, gpio-ranges ...)
-
-This implementation is under review.
-
-
-> It seems cleaner solution would be pin muxing in board dts file. Please let me know if there is some drawback of this approach. One point which i can think of is : duplication of pinmux groups in different board dts files.
-
-Pinmuxing in board file is currently not my choice. In the board file we 
-only select the group to use.
-
-Regards
-Alex
-
-
->
-> Cheers,
-> Vikas
->
->>> +    usart1_pins: usart1 at 0    {
->>> +        pins1 {
->>> +            pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
->>> +                bias-disable;
->>> +                drive-push-pull;
->>> +                slew-rate = <2>;
->>> +        };
->>> +        pins2 {
->>> +            pinmux = <STM32F746_PB7_FUNC_USART1_RX>;
->>> +            bias-disable;
->>> +        };
->>> +    };
->>> +
->>> +    qspi_pins: qspi at 0 {
->>> +        pins {
->>> +            pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
->>> +                   <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
->>> +                   <STM32F746_PD11_FUNC_QUADSPI_BK1_IO0>,
->>> +                   <STM32F746_PD12_FUNC_QUADSPI_BK1_IO1>,
->>> +                   <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
->>> +                   <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
->>> +            slew-rate = <2>;
->>> +        };
->>> +    };
->>> +};
->>> +
->>> +&usart1 {
->>> +    pinctrl-0 = <&usart1_pins>;
->>> +    pinctrl-names = "default";
->>> +    status = "okay";
->>> +};
->>> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
->>> index f321ffe..826700f 100644
->>> --- a/arch/arm/boot/dts/stm32f746.dtsi
->>> +++ b/arch/arm/boot/dts/stm32f746.dtsi
->>> @@ -178,7 +178,7 @@
->>>              interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
->>>          };
+>> p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
+>>             module_alloc_base + MODULES_VSIZE,
+>>             GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+>>             NUMA_NO_NODE, __builtin_return_address(0));
+>>
+>>     if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
+>>         p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
+>>                     VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+>>                     NUMA_NO_NODE, __builtin_return_address(0));
+>>
+>> will attempt to allocate from the vmalloc region when the module
+>> region is exhausted.
+>>
+>> I think this is an ftrace problem, not a kaslr problem. The ftrace
+>> code cannot deal with modules being far away from the kernel, which
+>> means it is incompatible with module PLTs, and our Kconfig description
+>> does not accurately describe that.
+>>
+>> So the correct way to fix this is to make CONFIG_ARM64_MODULE_PLTS and
+>> DYNAMIC_FTRACE mutually exclusive in Kconfig. Given the existing KASLR
+>> dependency on module PLTs, this would make DYNAMIC_FTRACE mutually
+>> exclusive with KASLR, and I am not sure whether that is worth it. With
+>> CONFIG_RANDOMIZE_MODULE_REGION_FULL disabled, it is highly unlikely
+>> that modules end up too far away from the kernel, and even if an
+>> ftrace splat should be avoided if we can, it doesn't really interfere
+>> with anything except ftrace functionality itself.
+>>
+>>> In fact, we only need plt when RANDOMIZE_MODULE_REGION_FULL enabled,
+>>> so fix the dependency, that only RANDOMIZE_MODULE_REGION_FULL select
+>>> ARM64_MODULE_PLTS.
 >>>
->>> -        pin-controller {
->>> +        pinctrl: pin-controller {
->>>              #address-cells = <1>;
->>>              #size-cells = <1>;
->>>              compatible = "st,stm32f746-pinctrl";
->>> diff --git a/arch/arm/boot/dts/stm32f769-disco.dts b/arch/arm/boot/dts/stm32f769-disco.dts
->>> new file mode 100644
->>> index 0000000..5f8558e
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
->>> @@ -0,0 +1,101 @@
->>> +/*
->>> + * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This file is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This file is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +#include "stm32f746.dtsi"
->>> +#include <dt-bindings/input/input.h>
->>> +
->>> +/ {
->>> +    model = "STMicroelectronics STM32F769-DISCO board";
->>> +    compatible = "st,stm32f769-disco", "st,stm32f7";
->>> +
->>> +    chosen {
->>> +        bootargs = "root=/dev/ram";
->>> +        stdout-path = "serial0:115200n8";
->>> +    };
->>> +
->>> +    memory {
->>> +        reg = <0xC0000000 0x1000000>;
->>> +    };
->>> +
->>> +    aliases {
->>> +        serial0 = &usart1;
->>> +    };
->>> +
->>> +};
->>> +
->>> +&clk_hse {
->>> +    clock-frequency = <25000000>;
->>> +};
->>> +
->>> +&pinctrl {
 >>
->> same.
+>> This is incorrect. Without KASLR, the module space is allocated from a
+>> dedicated region, which means we are guaranteed to have 128 MB of
+>> space available. With KASLR, the module space is also 128 MB (minus
+>> the size of the .text segment of vmlinux), but this region is *not*
+>> reserved for modules. Given the vastness of the vmalloc space on
+>> arm64, this is usually not a problem, but we have to be able to deal
+>> with the situation where unrelated vmalloc/vmap calls have chewed up
+>> our module space, and modules need to be allocated elsewhere.
 >>
->>> +    usart1_pins: usart1 at 0    {
->>> +        pins1 {
->>> +            pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
->>> +                bias-disable;
->>> +                drive-push-pull;
->>> +                slew-rate = <2>;
->>> +        };
->>> +        pins2 {
->>> +            pinmux = <STM32F746_PA10_FUNC_USART1_RX>;
->>> +            bias-disable;
->>> +        };
->>> +    };
->>> +
->>> +    qspi_pins: qspi at 0 {
->>> +        pins {
->>> +            pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
->>> +                   <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
->>> +                   <STM32F746_PC9_FUNC_QUADSPI_BK1_IO0>,
->>> +                   <STM32F746_PC10_FUNC_QUADSPI_BK1_IO1>,
->>> +                   <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
->>> +                   <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
->>> +            slew-rate = <2>;
->>> +        };
->>> +    };
->>> +};
->>> +
->>> +&usart1 {
->>> +    pinctrl-0 = <&usart1_pins>;
->>> +    pinctrl-names = "default";
->>> +    status = "okay";
->>> +};
->>>
->> .
->>
+>> So given the choice between the rare occurrence of an otherwise
+>> harmless ftrace splat, or the equally rare occurrence of a module that
+>> fails to load, I think I prefer the former.
+>
+> If this is the case, then the description in Kconfig is not correct.
+> ----------------------------------------------------------------------------
+> config RANDOMIZE_MODULE_REGION_FULL
+>         bool "Randomize the module region independently from the core kernel"
+>           .......
+>           .......
+>
+>           When this option is not set, the module region will be randomized over
+>           a limited range that contains the [_stext, _etext] interval of the
+>           core kernel, so branch relocations are always in range.
+> ----------------------------------------------------------------------------
+> This should be modified, right?
+>
+
+I guess 'always' could be changed here into something that reflects
+the 0.001% likelihood that a module ends up elsewhere if a huge
+vmap/vmalloc allocation just happens to end up right in the middle of
+the module area, but I don't think it is very useful.
