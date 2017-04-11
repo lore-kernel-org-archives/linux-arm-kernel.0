@@ -1,49 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 12 Apr 2017 08:34:04 +1000
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-Message-ID: <20170412083404.76cda3b3@canb.auug.org.au>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 11 Apr 2017 17:41:39 -0500
+Subject: [PATCH V8 0/5] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <7b94bfbb-b3e6-cbc3-06a1-4490f4142ffe@codeaurora.org>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <20170411211924.GC14778@bhelgaas-glaptop.roam.corp.google.com>
+ <7b94bfbb-b3e6-cbc3-06a1-4490f4142ffe@codeaurora.org>
+Message-ID: <20170411224139.GA736@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Apr 11, 2017 at 05:27:59PM -0400, Sinan Kaya wrote:
+> On 4/11/2017 5:19 PM, Bjorn Helgaas wrote:
+> > Hi Sinan,
+> > 
+> > What are these patches based on?  I normally apply things to my "master"
+> > branch, which is typically -rc1 or -rc2.  Right now it's v4.11-rc1, and
+> > these don't apply cleanly:
+> > 
+> >   04:17:59 ~/linux (master)$ stg branch --create pci/aspm-sk-v8 v4.11-rc1
+> >   Checking for changes in the working directory ... done
+> >   Don't know how to determine parent branch from "v4.11-rc1"
+> >   Branch "pci/aspm-sk-v8" created
+> >   04:18:18 ~/linux (pci/aspm-sk-v8)$ stg import -M --sign m/sk-v8
+> >   Checking for changes in the working directory ... done
+> >   Importing patch "pci-aspm-introduce" ... done
+> >   Importing patch "pci-aspm-split-pci_aspm_init" ... done
+> >   Importing patch "pci-aspm-add-init-hook-to" ... error: patch failed: drivers/pci/pcie/aspm.c:798
+> >   error: drivers/pci/pcie/aspm.c: patch does not apply
+> >   stg import: Diff does not apply cleanly
+> 
+> This is what I have.
+> 
+> 41a7175 PCI/ASPM: move link_state cleanup to bridge remove
+> 3b646e2 PCI/ASPM: save power on values during bridge init
+> 181510d PCI/ASPM: add init hook to device_add
+> 282d008 PCI/ASPM: split pci_aspm_init() into two
+> 8e89fc2 PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+> 97da385 Linux 4.11-rc3
 
-Today's linux-next merge of the mvebu tree got a conflict in:
-
-  arch/arm64/configs/defconfig
-
-between commit:
-
-  3c9d36192802 ("arm64: set CONFIG_MMC_BCM2835=y in defconfig")
-
-from the arm-soc tree and commit:
-
-  6ff829553345 ("arm64: configs: enable SDHCI driver for Xenon")
-
-from the mvebu tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
-BTW, that arm-soc commit has no Signed-off-by from its committer :-(
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm64/configs/defconfig
-index ab4461b6b226,93b0aab959c0..000000000000
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@@ -402,7 -401,7 +402,8 @@@ CONFIG_MMC_DW_EXYNOS=
-  CONFIG_MMC_DW_K3=y
-  CONFIG_MMC_DW_ROCKCHIP=y
-  CONFIG_MMC_SUNXI=y
- +CONFIG_MMC_BCM2835=y
-+ CONFIG_MMC_SDHCI_XENON=y
-  CONFIG_NEW_LEDS=y
-  CONFIG_LEDS_CLASS=y
-  CONFIG_LEDS_GPIO=y
+Thanks, I guess I should have figured that out since my for-linus branch
+includes an ASPM patch.
