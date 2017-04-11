@@ -1,33 +1,34 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 15:31:39 +0100
-Subject: [PATCH v3 04/32] asm-generic: add ioremap_nopost() remap interface
-In-Reply-To: <1491917983.7236.9.camel@kernel.crashing.org>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
- <1491917983.7236.9.camel@kernel.crashing.org>
-Message-ID: <20170411143138.GC6821@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Apr 2017 15:32:50 +0100
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+ <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+ <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+Message-ID: <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 11:39:43PM +1000, Benjamin Herrenschmidt wrote:
-> On Tue, 2017-04-11 at 13:28 +0100, Lorenzo Pieralisi wrote:
-> > +static inline void __iomem *ioremap_nopost(phys_addr_t offset,
-> > size_t size)
-> > +{
-> > +???????return ioremap_nocache(offset, size);
-> > +}
-> > +
-> 
-> No this is wrong as I explained.
-> 
-> This is a semantic that simply *cannot* be generically provided accross
-> architectures as a mapping attribute.
+On Mon, Apr 10, 2017 at 02:48:32PM -0500, Rob Herring wrote:
+> On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
 
-I agree that a default implementation does not make much sense. The
-only solution to this, if we want the ioremap_nopost to be made available
-to generic code (and drivers - ie DT PCI host bridge drivers on ARM/ARM64
-are not arch code), is to make the ioremap_nopost() call return NULL
-unless overriden by arch code that can provide its semantics.
+> > +Required properties:
+> > +  - compatible: Must be "st,stm32h7-i2s"
+> > +  - #sound-dai-cells: Must be 1. (one parameter)
+> > +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
+> > +	index 0: playback DAI
+> > +	index 1: capture DAI
+> > +	index 2: full duplex DAI
 
-Thanks,
-Lorenzo
+> Is this still needed for graph-card?
+
+The graph card is blocked on your review...  I'm also not clear how
+without something like this we'd be able to identify a specific DAI
+within a device if we don't have a way of identifying them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/493117dc/attachment.sig>
