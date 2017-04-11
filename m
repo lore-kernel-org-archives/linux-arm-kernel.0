@@ -1,87 +1,68 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 11 Apr 2017 18:26:23 +0200
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
- <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
-Message-ID: <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Apr 2017 17:29:06 +0100
+Subject: [linux-sunxi] Re: [PATCH v2 03/11] dt-bindings: add device tree
+ binding for X-Powers AXP803 PMIC
+In-Reply-To: <CAGb2v65UiFqjYES3hF-S6THZ5Xu-HRS9R7Ngk8xeP1rZajsr7w@mail.gmail.com>
+References: <20170407183441.58750-1-icenowy@aosc.io>
+ <20170407183441.58750-4-icenowy@aosc.io>
+ <20170411140427.doq5atxk6ptjrp36@dell>
+ <alpine.LNX.2.20.1704112237290.39759@x220i>
+ <CAGb2v65UiFqjYES3hF-S6THZ5Xu-HRS9R7Ngk8xeP1rZajsr7w@mail.gmail.com>
+Message-ID: <20170411162906.mz2tuwyji4gtw4pa@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2017 17:49, Marc Zyngier wrote:
-> On 11/04/17 16:13, Mason wrote:
->> On 27/03/2017 19:09, Marc Zyngier wrote:
->>
->>> Here's what your system looks like:
->>>
->>> PCI-EP -------> MSI Controller ------> INTC
->>>          MSI                    IRQ
->>>
->>> A PCI MSI is always edge. No ifs, no buts. That's what it is, and nothing
->>> else. Now, your MSI controller signals its output using a level interrupt,
->>> since you need to whack it on the head so that it lowers its line.
->>>
->>> There is not a single trigger, because there is not a single interrupt.
->>
->> Hello Marc,
->>
->> I was hoping you or Thomas might help clear some confusion
->> in my mind around IRQ domains (struct irq_domain).
->>
->> I have read https://www.kernel.org/doc/Documentation/IRQ-domain.txt
->>
->> IIUC, there should be one IRQ domain per IRQ controller.
->>
->> I have this MSI controller handling 256 interrupts, so I should
->> have *one* domain for all possible MSIs. Yet the Altera driver
->> registers *two* domains (msi_domain and inner_domain).
->>
->> Could I make everything work with a single IRQ domain?
+On Tue, 11 Apr 2017, Chen-Yu Tsai wrote:
+
+> Hi,
 > 
-> No, because you have two irqchips. One that deals with the HW, and the
-> other that deals with the MSIs how they are presented to the kernel,
-> depending on the bus (PCI or something else). The fact that it doesn't
-> really drive any HW doesn't make it irrelevant.
+> On Tue, Apr 11, 2017 at 11:00 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> >
+> >
+> > On Tue, 11 Apr 2017, Lee Jones wrote:
+> >
+> >> On Sat, 08 Apr 2017, Icenowy Zheng wrote:
+> >>
+> >>> AXP803 is a PMIC produced by Shenzhen X-Powers, with either I2C or RSB
+> >>> bus.
+> >>>
+> >>> Add a compatible for it.
+> >>>
+> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >>> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> >>> ---
+> >>> Changes in v2:
+> >>> - Place AXP803 before AXP806/809.
+> >>> - Added Chen-Yu's ACK.
+> >>>
+> >>>  Documentation/devicetree/bindings/mfd/axp20x.txt | 5 +++--
+> >>>  1 file changed, 3 insertions(+), 2 deletions(-)
+> >>
+> >>
+> >> For my own reference:
+> >>  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> >
+> >
+> > Excuse me... Who will apply this patch?
 
-The example given in IRQ-domain.txt is
+Excuse you?  Are you trying to be polite, or rude?
 
-  Device --> IOAPIC -> Interrupt remapping Controller -> Local APIC -> CPU
+I'm guessing due to the lagging '...', that it's the latter?
 
-with an irq_domain for each interrupt controller.
+> > I think this patch should be applied by you as it's in bindings/mfd
+> > directory, however, if I'm wrong, please point out ;-)
+>
+> We need the DT maintainers to ack it first. :)
 
+We don't really need the DT Maintainers to get involved here.
 
-On my system I have:
+What I do need is either clear direction as to how this
+patch-set should be applied, or an indication of which patches are
+dependant on others and which are orthogonal and can be applied
+independently.
 
-  PCI-EP -> MSI controller -> System INTC -> GIC -> CPU
-
-The driver for System INTC is drivers/irqchip/irq-tango.c
-I think it has only one domain.
-
-For the GIC, drivers/irqchip/irq-gic.c
-I see a call to irq_domain_create_linear()
-
-Is the handling of MSI different, and that is why we need
-two domains? (Sorry, I did not understand that part well.)
-
-When I looked at drivers/pci/host/pci-hyperv.c
-they seem to have a single pci_msi_create_irq_domain call,
-no call to domain_add or domain_create.
-And they have a single struct irq_chip.
-
-> You don't need to tell it anything about the number of interrupts you
-> manage. As for your private structure, you've already given it to your
-> low level domain, and there is no need to propagate it any further.
-
-My main issue is that in the ack callback, I was in the "wrong"
-domain, in that d->hwirq was not the MSI number. So I thought
-I needed a single irq_domain.
-
-Is there a function to map virq to the hwirq in any domain?
-
-Regards.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
