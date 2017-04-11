@@ -1,127 +1,49 @@
-From: kevin.m.wern@gmail.com (Kevin Wern)
-Date: Tue, 11 Apr 2017 18:17:02 -0400
-Subject: [PATCH v2] staging: media/platform/bcm2835: remove gstreamer
- workaround
-Message-ID: <20170411221702.GA10800@kwern-HP-Pavilion-dv5-Notebook-PC>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 12 Apr 2017 08:34:04 +1000
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+Message-ID: <20170412083404.76cda3b3@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gstreamer's v4l2src reacted poorly to certain outputs from the bcm2835
-video driver's ioctl ops function vidioc_enum_framesizes, so a
-workaround was created that could be activated by user input. This
-workaround would replace the driver's ioctl ops struct with another,
-similar struct--only with no function pointed to by
-vidioc_enum_framesizes. With no response, gstreamer would attempt to
-continue with some default settings that happened to work better.
+Hi all,
 
-However, this bug has been fixed in gstreamer since 2014, so we
-shouldn't include this workaround in the stable version of the driver.
+Today's linux-next merge of the mvebu tree got a conflict in:
 
-Signed-off-by: Kevin Wern <kevin.m.wern@gmail.com>
----
-V2: patch against staging-next instead of torvalds/master
+  arch/arm64/configs/defconfig
 
- drivers/staging/vc04_services/bcm2835-camera/TODO  |  5 --
- .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 60 ----------------------
- 2 files changed, 65 deletions(-)
+between commit:
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/TODO b/drivers/staging/vc04_services/bcm2835-camera/TODO
-index 61a5099..0ab9e88 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/TODO
-+++ b/drivers/staging/vc04_services/bcm2835-camera/TODO
-@@ -32,8 +32,3 @@ We should have VCHI create a platform device once it's initialized,
- and have this driver bind to it, so that we automatically load the
- v4l2 module after VCHI loads.
- 
--5) Drop the gstreamer workaround.
--
--This was a temporary workaround for a bug that was fixed mid-2014, and
--we should remove it before stabilizing the driver.
--
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-index 86bbd6e..a11e047 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-@@ -66,19 +66,6 @@ MODULE_PARM_DESC(max_video_width, "Threshold for video mode");
- module_param(max_video_height, int, 0644);
- MODULE_PARM_DESC(max_video_height, "Threshold for video mode");
- 
--/* Gstreamer bug https://bugzilla.gnome.org/show_bug.cgi?id=726521
-- * v4l2src does bad (and actually wrong) things when the vidioc_enum_framesizes
-- * function says type V4L2_FRMSIZE_TYPE_STEPWISE, which we do by default.
-- * It's happier if we just don't say anything at all, when it then
-- * sets up a load of defaults that it thinks might work.
-- * If gst_v4l2src_is_broken is non-zero, then we remove the function from
-- * our function table list (actually switch to an alternate set, but same
-- * result).
-- */
--static int gst_v4l2src_is_broken;
--module_param(gst_v4l2src_is_broken, int, 0644);
--MODULE_PARM_DESC(gst_v4l2src_is_broken, "If non-zero, enable workaround for Gstreamer");
--
- /* global device data array */
- static struct bm2835_mmal_dev *gdev[MAX_BCM2835_CAMERAS];
- 
-@@ -1454,48 +1441,6 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops = {
- 	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
- };
- 
--static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
--	/* overlay */
--	.vidioc_enum_fmt_vid_overlay = vidioc_enum_fmt_vid_overlay,
--	.vidioc_g_fmt_vid_overlay = vidioc_g_fmt_vid_overlay,
--	.vidioc_try_fmt_vid_overlay = vidioc_try_fmt_vid_overlay,
--	.vidioc_s_fmt_vid_overlay = vidioc_s_fmt_vid_overlay,
--	.vidioc_overlay = vidioc_overlay,
--	.vidioc_g_fbuf = vidioc_g_fbuf,
--
--	/* inputs */
--	.vidioc_enum_input = vidioc_enum_input,
--	.vidioc_g_input = vidioc_g_input,
--	.vidioc_s_input = vidioc_s_input,
--
--	/* capture */
--	.vidioc_querycap = vidioc_querycap,
--	.vidioc_enum_fmt_vid_cap = vidioc_enum_fmt_vid_cap,
--	.vidioc_g_fmt_vid_cap = vidioc_g_fmt_vid_cap,
--	.vidioc_try_fmt_vid_cap = vidioc_try_fmt_vid_cap,
--	.vidioc_s_fmt_vid_cap = vidioc_s_fmt_vid_cap,
--
--	/* buffer management */
--	.vidioc_reqbufs = vb2_ioctl_reqbufs,
--	.vidioc_create_bufs = vb2_ioctl_create_bufs,
--	.vidioc_prepare_buf = vb2_ioctl_prepare_buf,
--	.vidioc_querybuf = vb2_ioctl_querybuf,
--	.vidioc_qbuf = vb2_ioctl_qbuf,
--	.vidioc_dqbuf = vb2_ioctl_dqbuf,
--	/* Remove this function ptr to fix gstreamer bug
--	 * .vidioc_enum_framesizes = vidioc_enum_framesizes,
--	 */
--	.vidioc_enum_frameintervals = vidioc_enum_frameintervals,
--	.vidioc_g_parm        = vidioc_g_parm,
--	.vidioc_s_parm        = vidioc_s_parm,
--	.vidioc_streamon = vb2_ioctl_streamon,
--	.vidioc_streamoff = vb2_ioctl_streamoff,
--
--	.vidioc_log_status = v4l2_ctrl_log_status,
--	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
--	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
--};
--
- /* ------------------------------------------------------------------
-  *	Driver init/finalise
-  * ------------------------------------------------------------------
-@@ -1811,11 +1756,6 @@ static int __init bm2835_mmal_init_device(struct bm2835_mmal_dev *dev,
- 	int ret;
- 
- 	*vfd = vdev_template;
--	if (gst_v4l2src_is_broken) {
--		v4l2_info(&dev->v4l2_dev,
--			  "Work-around for gstreamer issue is active.\n");
--		vfd->ioctl_ops = &camera0_ioctl_ops_gstreamer;
--	}
- 
- 	vfd->v4l2_dev = &dev->v4l2_dev;
- 
+  3c9d36192802 ("arm64: set CONFIG_MMC_BCM2835=y in defconfig")
+
+from the arm-soc tree and commit:
+
+  6ff829553345 ("arm64: configs: enable SDHCI driver for Xenon")
+
+from the mvebu tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+BTW, that arm-soc commit has no Signed-off-by from its committer :-(
+
 -- 
-2.7.4
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm64/configs/defconfig
+index ab4461b6b226,93b0aab959c0..000000000000
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -402,7 -401,7 +402,8 @@@ CONFIG_MMC_DW_EXYNOS=
+  CONFIG_MMC_DW_K3=y
+  CONFIG_MMC_DW_ROCKCHIP=y
+  CONFIG_MMC_SUNXI=y
+ +CONFIG_MMC_BCM2835=y
++ CONFIG_MMC_SDHCI_XENON=y
+  CONFIG_NEW_LEDS=y
+  CONFIG_LEDS_CLASS=y
+  CONFIG_LEDS_GPIO=y
