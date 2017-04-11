@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:54 +0100
-Subject: [PATCH v3 14/32] metag: include default ioremap_nopost()
- implementation
+Date: Tue, 11 Apr 2017 13:29:03 +0100
+Subject: [PATCH v3 23/32] sh: include default ioremap_nopost() implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-15-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-24-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,22 +24,24 @@ falling back to ioremap_nocache()) to provide a non-posted writes
 ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Rich Felker <dalias@libc.org>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
 ---
- arch/metag/include/asm/io.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/sh/include/asm/io.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/metag/include/asm/io.h b/arch/metag/include/asm/io.h
-index 9890f21..c805e0d 100644
---- a/arch/metag/include/asm/io.h
-+++ b/arch/metag/include/asm/io.h
-@@ -166,4 +166,6 @@ extern void __iounmap(void __iomem *addr);
- #define iounmap(addr)                           \
- 	__iounmap(addr)
- 
+diff --git a/arch/sh/include/asm/io.h b/arch/sh/include/asm/io.h
+index 3280a6b..23814cd 100644
+--- a/arch/sh/include/asm/io.h
++++ b/arch/sh/include/asm/io.h
+@@ -371,6 +371,7 @@ static inline int iounmap_fixed(void __iomem *addr) { return -EINVAL; }
+ #define ioremap_nocache	ioremap
+ #define ioremap_uc	ioremap
+ #define iounmap		__iounmap
 +#include <asm-generic/ioremap-nopost.h>
-+
- #endif  /* _ASM_METAG_IO_H */
+ 
+ /*
+  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
 -- 
 2.10.0
