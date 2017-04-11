@@ -1,188 +1,119 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Tue, 11 Apr 2017 11:30:24 +0530
-Subject: [PATCHv3 07/22] staging: android: ion: Remove page faulting
- support
-In-Reply-To: <1491245884-15852-8-git-send-email-labbott@redhat.com>
-References: <1491245884-15852-1-git-send-email-labbott@redhat.com>
- <1491245884-15852-8-git-send-email-labbott@redhat.com>
-Message-ID: <d6336b76-e1a8-d05a-3f1c-9425e4b92498@codeaurora.org>
+From: huawei.libin@huawei.com (Li Bin)
+Date: Tue, 11 Apr 2017 14:28:07 +0800
+Subject: [PATCH] arm64: kaslr: fix ARM64_MODULE_PLTS dependency
+In-Reply-To: <CAKv+Gu8x9sCq2b2OmjoARKJZ8V5e4MtJp962Z1gJxazvkfw-XA@mail.gmail.com>
+References: <1491789132-18933-1-git-send-email-huawei.libin@huawei.com>
+ <CAKv+Gu8x9sCq2b2OmjoARKJZ8V5e4MtJp962Z1gJxazvkfw-XA@mail.gmail.com>
+Message-ID: <b0e872b9-f7ea-e3a4-84c4-fc9aa90cecbd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 Hi,
+on 2017/4/10 17:12, Ard Biesheuvel wrote:
+> On 10 April 2017 at 02:52, Li Bin <huawei.libin@huawei.com> wrote:
+>> There is a bug that when RANDOMIZE_BASE enabled and
+>> RANDOMIZE_MODULE_REGION_FULL disabled, and assume that there are
+>> many modules, and module space is not enabled, module_alloc code
+>> now will alloc space in vmalloc space, and the patch
+>> "fe88a4 arm64: kaslr: keep modules close to the kernel when
+>> DYNAMIC_FTRACE=y" will be invalid.
+>>
+> 
+> I guess you are alluding to the fact that this code [paraphrased]
+> 
+> p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
+>             module_alloc_base + MODULES_VSIZE,
+>             GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+>             NUMA_NO_NODE, __builtin_return_address(0));
+> 
+>     if (!p && IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
+>         p = __vmalloc_node_range(size, MODULE_ALIGN, VMALLOC_START,
+>                     VMALLOC_END, GFP_KERNEL, PAGE_KERNEL_EXEC, 0,
+>                     NUMA_NO_NODE, __builtin_return_address(0));
+> 
+> will attempt to allocate from the vmalloc region when the module
+> region is exhausted.
+> 
+> I think this is an ftrace problem, not a kaslr problem. The ftrace
+> code cannot deal with modules being far away from the kernel, which
+> means it is incompatible with module PLTs, and our Kconfig description
+> does not accurately describe that.
+> 
+> So the correct way to fix this is to make CONFIG_ARM64_MODULE_PLTS and
+> DYNAMIC_FTRACE mutually exclusive in Kconfig. Given the existing KASLR
+> dependency on module PLTs, this would make DYNAMIC_FTRACE mutually
+> exclusive with KASLR, and I am not sure whether that is worth it. With
+> CONFIG_RANDOMIZE_MODULE_REGION_FULL disabled, it is highly unlikely
+> that modules end up too far away from the kernel, and even if an
+> ftrace splat should be avoided if we can, it doesn't really interfere
+> with anything except ftrace functionality itself.
+> 
+>> In fact, we only need plt when RANDOMIZE_MODULE_REGION_FULL enabled,
+>> so fix the dependency, that only RANDOMIZE_MODULE_REGION_FULL select
+>> ARM64_MODULE_PLTS.
+>>
+> 
+> This is incorrect. Without KASLR, the module space is allocated from a
+> dedicated region, which means we are guaranteed to have 128 MB of
+> space available. With KASLR, the module space is also 128 MB (minus
+> the size of the .text segment of vmlinux), but this region is *not*
+> reserved for modules. Given the vastness of the vmalloc space on
+> arm64, this is usually not a problem, but we have to be able to deal
+> with the situation where unrelated vmalloc/vmap calls have chewed up
+> our module space, and modules need to be allocated elsewhere.
+> 
+> So given the choice between the rare occurrence of an otherwise
+> harmless ftrace splat, or the equally rare occurrence of a module that
+> fails to load, I think I prefer the former.
 
-On 04/04/2017 12:27 AM, Laura Abbott wrote:
-> The new method of syncing with dma_map means that the page faulting sync
-> implementation is no longer applicable. Remove it.
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
->  drivers/staging/android/ion/ion.c | 117 --------------------------------------
->  1 file changed, 117 deletions(-)
->
-> diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-> index 6aac935..226ea1f 100644
-> --- a/drivers/staging/android/ion/ion.c
-> +++ b/drivers/staging/android/ion/ion.c
-> @@ -42,37 +42,11 @@
->  #include "ion_priv.h"
->  #include "compat_ion.h"
->
-> -bool ion_buffer_fault_user_mappings(struct ion_buffer *buffer)
-> -{
-> -	return (buffer->flags & ION_FLAG_CACHED) &&
-> -		!(buffer->flags & ION_FLAG_CACHED_NEEDS_SYNC);
-> -}
-> -
->  bool ion_buffer_cached(struct ion_buffer *buffer)
->  {
->  	return !!(buffer->flags & ION_FLAG_CACHED);
->  }
->
-> -static inline struct page *ion_buffer_page(struct page *page)
-> -{
-> -	return (struct page *)((unsigned long)page & ~(1UL));
-> -}
-> -
-> -static inline bool ion_buffer_page_is_dirty(struct page *page)
-> -{
-> -	return !!((unsigned long)page & 1UL);
-> -}
-> -
-> -static inline void ion_buffer_page_dirty(struct page **page)
-> -{
-> -	*page = (struct page *)((unsigned long)(*page) | 1UL);
-> -}
-> -
-> -static inline void ion_buffer_page_clean(struct page **page)
-> -{
-> -	*page = (struct page *)((unsigned long)(*page) & ~(1UL));
-> -}
-> -
->  /* this function should only be called while dev->lock is held */
->  static void ion_buffer_add(struct ion_device *dev,
->  			   struct ion_buffer *buffer)
-> @@ -140,25 +114,6 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
->  	buffer->dev = dev;
->  	buffer->size = len;
->
-> -	if (ion_buffer_fault_user_mappings(buffer)) {
-> -		int num_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
-> -		struct scatterlist *sg;
-> -		int i, j, k = 0;
-> -
-> -		buffer->pages = vmalloc(sizeof(struct page *) * num_pages);
+If this is the case, then the description in Kconfig is not correct.
+----------------------------------------------------------------------------
+config RANDOMIZE_MODULE_REGION_FULL
+        bool "Randomize the module region independently from the core kernel"
+	  .......
+	  .......
 
-We should also remove the vfree(buffer->pages) call in ion_buffer_destroy. In fact, we
-could removes 'pages' member from ion_buffer altogether.
+          When this option is not set, the module region will be randomized over
+          a limited range that contains the [_stext, _etext] interval of the
+          core kernel, so branch relocations are always in range.
+----------------------------------------------------------------------------
+This should be modified, right?
 
 Thanks,
-Archit
+Li Bin
 
-> -		if (!buffer->pages) {
-> -			ret = -ENOMEM;
-> -			goto err1;
-> -		}
-> -
-> -		for_each_sg(table->sgl, sg, table->nents, i) {
-> -			struct page *page = sg_page(sg);
-> -
-> -			for (j = 0; j < sg->length / PAGE_SIZE; j++)
-> -				buffer->pages[k++] = page++;
-> -		}
-> -	}
-> -
->  	buffer->dev = dev;
->  	buffer->size = len;
->  	INIT_LIST_HEAD(&buffer->vmas);
-> @@ -924,69 +879,6 @@ void ion_pages_sync_for_device(struct device *dev, struct page *page,
->  	dma_sync_sg_for_device(dev, &sg, 1, dir);
->  }
->
-> -struct ion_vma_list {
-> -	struct list_head list;
-> -	struct vm_area_struct *vma;
-> -};
-> -
-> -static int ion_vm_fault(struct vm_fault *vmf)
-> -{
-> -	struct ion_buffer *buffer = vmf->vma->vm_private_data;
-> -	unsigned long pfn;
-> -	int ret;
-> -
-> -	mutex_lock(&buffer->lock);
-> -	ion_buffer_page_dirty(buffer->pages + vmf->pgoff);
-> -	BUG_ON(!buffer->pages || !buffer->pages[vmf->pgoff]);
-> -
-> -	pfn = page_to_pfn(ion_buffer_page(buffer->pages[vmf->pgoff]));
-> -	ret = vm_insert_pfn(vmf->vma, vmf->address, pfn);
-> -	mutex_unlock(&buffer->lock);
-> -	if (ret)
-> -		return VM_FAULT_ERROR;
-> -
-> -	return VM_FAULT_NOPAGE;
-> -}
-> -
-> -static void ion_vm_open(struct vm_area_struct *vma)
-> -{
-> -	struct ion_buffer *buffer = vma->vm_private_data;
-> -	struct ion_vma_list *vma_list;
-> -
-> -	vma_list = kmalloc(sizeof(*vma_list), GFP_KERNEL);
-> -	if (!vma_list)
-> -		return;
-> -	vma_list->vma = vma;
-> -	mutex_lock(&buffer->lock);
-> -	list_add(&vma_list->list, &buffer->vmas);
-> -	mutex_unlock(&buffer->lock);
-> -	pr_debug("%s: adding %p\n", __func__, vma);
-> -}
-> -
-> -static void ion_vm_close(struct vm_area_struct *vma)
-> -{
-> -	struct ion_buffer *buffer = vma->vm_private_data;
-> -	struct ion_vma_list *vma_list, *tmp;
-> -
-> -	pr_debug("%s\n", __func__);
-> -	mutex_lock(&buffer->lock);
-> -	list_for_each_entry_safe(vma_list, tmp, &buffer->vmas, list) {
-> -		if (vma_list->vma != vma)
-> -			continue;
-> -		list_del(&vma_list->list);
-> -		kfree(vma_list);
-> -		pr_debug("%s: deleting %p\n", __func__, vma);
-> -		break;
-> -	}
-> -	mutex_unlock(&buffer->lock);
-> -}
-> -
-> -static const struct vm_operations_struct ion_vma_ops = {
-> -	.open = ion_vm_open,
-> -	.close = ion_vm_close,
-> -	.fault = ion_vm_fault,
-> -};
-> -
->  static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
->  {
->  	struct ion_buffer *buffer = dmabuf->priv;
-> @@ -998,15 +890,6 @@ static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
->  		return -EINVAL;
->  	}
->
-> -	if (ion_buffer_fault_user_mappings(buffer)) {
-> -		vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND |
-> -							VM_DONTDUMP;
-> -		vma->vm_private_data = buffer;
-> -		vma->vm_ops = &ion_vma_ops;
-> -		ion_vm_open(vma);
-> -		return 0;
-> -	}
-> -
->  	if (!(buffer->flags & ION_FLAG_CACHED))
->  		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
->
->
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> 
+> 
+>> Signed-off-by: Li Bin <huawei.libin@huawei.com>
+>> ---
+>>  arch/arm64/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 3741859..40692bb 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -952,7 +952,6 @@ config RELOCATABLE
+>>
+>>  config RANDOMIZE_BASE
+>>         bool "Randomize the address of the kernel image"
+>> -       select ARM64_MODULE_PLTS if MODULES
+>>         select RELOCATABLE
+>>         help
+>>           Randomizes the virtual address at which the kernel image is
+>> @@ -972,6 +971,7 @@ config RANDOMIZE_BASE
+>>  config RANDOMIZE_MODULE_REGION_FULL
+>>         bool "Randomize the module region independently from the core kernel"
+>>         depends on RANDOMIZE_BASE && !DYNAMIC_FTRACE
+>> +       select ARM64_MODULE_PLTS if MODULES
+>>         default y
+>>         help
+>>           Randomizes the location of the module region without considering the
+>> --
+>> 1.7.12.4
+>>
+> 
+> .
+> 
