@@ -1,44 +1,48 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 11 Apr 2017 11:43:07 -0400
-Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <20170411152702.GA2910@localhost>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
- <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
- <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
- <20170411071047.GA3610@localhost>
- <20170411134125.GA31773@bhelgaas-glaptop.roam.corp.google.com>
- <20170411152702.GA2910@localhost>
-Message-ID: <bc0450db-5375-9774-b6e4-bcda18592d05@redhat.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Tue, 11 Apr 2017 15:44:52 +0000
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+ <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+ <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+ <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+Message-ID: <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2017 11:27 AM, Jayachandran C wrote:
-> On Tue, Apr 11, 2017 at 08:41:25AM -0500, Bjorn Helgaas wrote:
+Hello Rob, Mark
 
->> I suspect the reason this patch makes a difference is because the
->> current pci_for_each_dma_alias() believes one of those top-level
->> bridges is an alias, and the iterator produces it last, so that's the
->> one you map.  The IOMMU is attached lower down, so that top-level
->> bridge is not in fact an alias, but since you only look at the *last*
->> one, you don't map the correct aliases from lower down in the tree.
-> 
-> Exactly. The IORT spec allows a range of RIDs to map to an SMMU, which
-> means that a PCI RC can multiple SMMUs, each handling a subset of RIDs.
-> 
-> In the case of Cavium ThunderX2, the RID which we should see on the RC
-> - if we follow the standard and factor in the aliasing introduced by the
-> PCI bridge and the PCI/PCIe bridge - is not the RID seen by the SMMU (or
-> ITS).
-> 
-> But, if we stop the traversal at the point where SMMU (or ITS) is
-> attached, we will get the correct RID as seen by these.
+Thanks for your review.
+Please find my comments below.
 
-Side note that I am trying to get various specifications clarified to
-promote more of a familiar alternative architecture (x86) approach in
-the future in which these aren't at different levels in the topology.
-But to do that requires integrated Root Complex IP with bells/whistles.
+On 04/11/2017 04:32 PM, Mark Brown wrote:
+> On Mon, Apr 10, 2017 at 02:48:32PM -0500, Rob Herring wrote:
+>> On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
+>
+>>> +Required properties:
+>>> +  - compatible: Must be "st,stm32h7-i2s"
+>>> +  - #sound-dai-cells: Must be 1. (one parameter)
+>>> +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
+>>> +	index 0: playback DAI
+>>> +	index 1: capture DAI
+>>> +	index 2: full duplex DAI
+>
+>> Is this still needed for graph-card?
+>
+> The graph card is blocked on your review...  I'm also not clear how
+> without something like this we'd be able to identify a specific DAI
+> within a device if we don't have a way of identifying them.
+>
+Yes, it seems that audio graph card does not allow to select a specific 
+DAI. This will probably be necessary.
 
-Jon.
+However, regarding STM32 I2S driver, I'm wondering if selecting DAI
+is the best way to configure interface as tx, rx or fd.
+Maybe, it is more relevant to configure DAI according to DMA
+configuration from I2S node.
+This would moreover avoid to allocate 2 dmas channels when not
+necessary (tx or rx only).
+If you agree with this, I will implement this change in a v2.
 
--- 
-Computer Architect | Sent from my Fedora powered laptop
+BRs
+olivier
