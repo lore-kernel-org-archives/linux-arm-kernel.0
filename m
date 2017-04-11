@@ -1,95 +1,198 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 11 Apr 2017 11:53:11 +0200
-Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
- functions
-In-Reply-To: <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
-References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
- <20170410163558.494cf9be@bbrezillon>
- <ba255c5b-ff6e-a6fd-0546-9dde04026f4c@microchip.com>
- <20170411105605.5ea65f75@bbrezillon>
- <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
-Message-ID: <20170411115311.70a7239b@bbrezillon>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 11 Apr 2017 11:57:46 +0200
+Subject: [PATCH v4 18/22] KVM: arm64: ITS: Collection table save/restore
+In-Reply-To: <95a88e33-3cbc-9c4d-b76c-3cec5c4cc310@arm.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-19-git-send-email-eric.auger@redhat.com>
+ <95a88e33-3cbc-9c4d-b76c-3cec5c4cc310@arm.com>
+Message-ID: <3d5f7230-e55b-44b8-bc37-021d1784ee0e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Apr 2017 12:41:59 +0300
-m18063 <Claudiu.Beznea@microchip.com> wrote:
+Hi Marc,
 
-> On 11.04.2017 11:56, Boris Brezillon wrote:
-> > On Tue, 11 Apr 2017 11:22:39 +0300
-> > m18063 <Claudiu.Beznea@microchip.com> wrote:
-> >   
-> >> Hi Boris,
-> >>
-> >> On 10.04.2017 17:35, Boris Brezillon wrote:  
-> >>> On Mon, 10 Apr 2017 17:20:20 +0300
-> >>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
-> >>>     
-> >>>> Implement suspend and resume power management specific
-> >>>> function to allow PWM controller to correctly suspend
-> >>>> and resume.
-> >>>>
-> >>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> >>>> ---
-> >>>>  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
-> >>>>  1 file changed, 81 insertions(+)
-> >>>>
-> >>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> >>>> index 530d7dc..75177c6 100644
-> >>>> --- a/drivers/pwm/pwm-atmel.c
-> >>>> +++ b/drivers/pwm/pwm-atmel.c
-> >>>> @@ -58,6 +58,8 @@
-> >>>>  #define PWM_MAX_PRD		0xFFFF
-> >>>>  #define PRD_MAX_PRES		10
-> >>>>  
-> >>>> +#define PWM_MAX_CH_NUM		(4)
-> >>>> +
-> >>>>  struct atmel_pwm_registers {
-> >>>>  	u8 period;
-> >>>>  	u8 period_upd;
-> >>>> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
-> >>>>  	u8 duty_upd;
-> >>>>  };
-> >>>>  
-> >>>> +struct atmel_pwm_pm_ctx {
-> >>>> +	u32 cmr;
-> >>>> +	u32 cdty;
-> >>>> +	u32 cprd;
-> >>>> +};
-> >>>> +
-> >>>>  struct atmel_pwm_chip {
-> >>>>  	struct pwm_chip chip;
-> >>>>  	struct clk *clk;
-> >>>>  	void __iomem *base;
-> >>>>  	const struct atmel_pwm_registers *regs;
-> >>>> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];    
-> >>>
-> >>> Hm, I'm pretty sure you can rely on the current PWM state and call
-> >>> atmel_pwm_apply() at resume time instead of doing that. See what I did
-> >>> here [1].    
-> >>
-> >> I agree with the approach you propose but the thing is the atmel_pwm_apply()
-> >> take care of both, current PWM state and the new state received as argument
-> >> in order to change only duty factor without disabling the PWM channel (if
-> >> channel is enabled) and then returns. Changing PWM duty and period and polarity
-> >> in the same step without disabling + enabling the PWM channel (with atomic
-> >> approach) may lead to intermediary unwanted output waveforms (the IP doesn't
-> >> support this for ordinary PWM channels). To take advantage of atmel_pwm_apply()
-> >> (in the formit is today) in resume() hook might need to first call it to disable
-> >> channel and then to enable it. Or atmel_pwm_apply() should be changed to also
-> >> disable + enable the channel when user changes the duty factor at runtime.  
-> > 
-> > Nope. Just save the state at suspend time, implement ->get_state() and
-> > use it to retrieve the real PWM state when resuming before restoring
-> > the state you saved during suspend.  
-> Ok.
-> > But anyway, as Thierry explained, I'm not sure we should take the
-> > 're-apply PWM state' action here. It's probably better to leave this
-> > decision to the PWM user.   
-> Do you thinks we should proceed with restoring the registers behind
-> the re-apply as other drivers does at this moment?
+On 10/04/2017 11:55, Marc Zyngier wrote:
+> On 27/03/17 10:31, Eric Auger wrote:
+>> The flush path copies the collection entries into guest RAM
+>> at the GPA specified in the BASER register. This obviously
+>> requires the BASER to be set. The last written element
+>> is a dummy collection table entry.
+>>
+>> We do not index by collection ID as the collection entry
+>> can fit into 8 bytes while containing the collection ID.
+>>
+>> On restore path we re-allocate the collection objects.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>>
+>> v3 -> v4:
+>> - replaced u64 *ptr by gpa_t gpa
+>> - check the collection does not exist before allocating it
+>>
+>> v1 -> v2:
+>> - reword commit message and directly use 8 as entry size
+>> - no kvm parameter anymore
+>> - add helper for flush/restore cte
+>> - table size computed here
+>> - add le64/cpu conversions
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 99 +++++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 97 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 8eaeba4..df984b6 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1828,13 +1828,89 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+>>  	return -ENXIO;
+>>  }
+>>  
+>> +static int vgic_its_flush_cte(struct vgic_its *its,
+>> +			      struct its_collection *collection, gpa_t gpa)
+> 
+> Given that the pendent of this function is name ..._restore_..., should
+> this be called ..._save_... ?
+> 
+>> +{
+>> +	u64 val;
+>> +	int ret;
+>> +
+>> +	val = ((u64)1 << 63 | ((u64)collection->target_addr << 16) |
+>> +	       collection->collection_id);
+> 
+> Please provide some #defines that describe the encoding. This will be
+> specially useful if we need to export this to userspace (KVM/TCG
+> interoperability?).
+> 
+>> +	val = cpu_to_le64(val);
+>> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, 8);
+>> +	return ret;
+>> +}
+>> +
+>> +static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa, bool *valid)
+>> +{
+>> +	struct its_collection *collection;
+>> +	u32 target_addr;
+>> +	u32 coll_id;
+>> +	u64 val;
+>> +	int ret;
+>> +
+>> +	*valid = false;
+>> +
+>> +	ret = kvm_read_guest(its->dev->kvm, gpa, &val, 8);
+>> +	if (ret)
+>> +		return ret;
+>> +	val = le64_to_cpu(val);
+>> +	*valid = val & BIT_ULL(63);
+>> +
+>> +	if (!*valid)
+>> +		return 0;
+>> +
+>> +	target_addr = (u32)(val >> 16);
+> 
+> u32?
+At the moment its_collection.target_addr is u32 and corresponds to the
+PE number. Only GITS_TYPER.PTA = 0 is supported.
 
-Nope. IMO we'd better start patching PWM users to restore the states
-rather than supporting suspend/resume in all PWM drivers.
+Or do I miss something?
 
-Thierry, what's your opinion?
+Thanks
+
+Eric
+> 
+>> +	coll_id = val & 0xFFFF;
+> 
+> Same comment about the various shifts/masks.
+> 
+>> +
+>> +	collection = find_collection(its, coll_id);
+>> +	if (collection)
+>> +		return -EEXIST;
+>> +	ret = vgic_its_alloc_collection(its, &collection, coll_id);
+>> +	if (ret)
+>> +		return ret;
+>> +	collection->target_addr = target_addr;
+>> +	return 0;
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_flush_collection_table - flush the collection table into
+>>   * guest RAM
+>>   */
+>>  static int vgic_its_flush_collection_table(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	struct its_collection *collection;
+>> +	u64 val;
+>> +	gpa_t gpa;
+>> +	size_t max_size, filled = 0;
+>> +	int ret;
+>> +
+>> +	gpa = BASER_ADDRESS(its->baser_coll_table);
+>> +	if (!gpa)
+>> +		return 0;
+>> +
+>> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
+>> +
+>> +	list_for_each_entry(collection, &its->collection_list, coll_list) {
+>> +		if (filled == max_size)
+>> +			return -ENOSPC;
+>> +		ret = vgic_its_flush_cte(its, collection, gpa);
+>> +		if (ret)
+>> +			return ret;
+>> +		gpa += 8;
+>> +		filled += 8;
+> 
+> This "8" should be extracted from the BASER register itself (Entry_Size).
+> 
+>> +	}
+>> +
+>> +	if (filled == max_size)
+>> +		return 0;
+>> +
+>> +	/*
+>> +	 * table is not fully filled, add a last dummy element
+>> +	 * with valid bit unset
+>> +	 */
+>> +	val = 0;
+>> +	ret = kvm_write_guest(its->dev->kvm, gpa, &val, 8);
+>> +	return ret;
+>>  }
+>>  
+>>  /**
+>> @@ -1844,7 +1920,26 @@ static int vgic_its_flush_collection_table(struct vgic_its *its)
+>>   */
+>>  static int vgic_its_restore_collection_table(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	size_t max_size, read = 0;
+>> +	gpa_t gpa;
+>> +	int ret;
+>> +
+>> +	gpa = BASER_ADDRESS(its->baser_coll_table);
+>> +	if (!gpa)
+>> +		return 0;
+>> +
+>> +	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
+>> +
+>> +	while (read < max_size) {
+>> +		bool valid;
+>> +
+>> +		ret = vgic_its_restore_cte(its, gpa, &valid);
+>> +		if (!valid || ret)
+>> +			break;
+>> +		gpa += 8;
+>> +		read += 8;
+>> +	}
+>> +	return ret;
+>>  }
+>>  
+>>  /**
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
