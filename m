@@ -1,21 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Apr 2017 17:30:04 +0100
-Subject: [RFC PATCH 0/7] Cavium CN99xx SMMUv3 Errata workarounds
-In-Reply-To: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
-References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
-Message-ID: <20170411163004.GH17109@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Apr 2017 17:29:49 +0100
+Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.12
+In-Reply-To: <CAJKOXPc7D_1xaJDG+W4JJ5YxRVJ868RU-Vmbh_r4J0g0Qjufdw@mail.gmail.com>
+References: <20170408142050.1164-1-krzk@kernel.org>
+ <20170408142050.1164-2-krzk@kernel.org>
+ <20170411140816.3al2ge7zsskswmaq@dell>
+ <CAJKOXPc7D_1xaJDG+W4JJ5YxRVJ868RU-Vmbh_r4J0g0Qjufdw@mail.gmail.com>
+Message-ID: <20170411162949.gcta3czjlmojnqzt@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 08:12:38PM +0530, linucherian at gmail.com wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
+On Tue, 11 Apr 2017, Krzysztof Kozlowski wrote:
+
+> On Tue, Apr 11, 2017 at 4:08 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Sat, 08 Apr 2017, Krzysztof Kozlowski wrote:
+> >
+> >> Hi,
+> >>
+> >> Update for v4.12. Marek's commits were also shared (as separate sub-tag) to MFD
+> >> (Lee Jones) for his work (it is a dependency).
+> >
+> > I already pulled Marek's patches into MFD.
+> >
+> > What are Charles' patches for?
 > 
-> Cavium CN99xx SMMUv3 implementation has two Silicon Erratas.
-> 1. Errata ID #74
->    SMMU register alias Page 1 is not implemented
-> 2. Errata ID #126
->    SMMU doesnt support unique IRQ lines for gerror, eventq and cmdq-sync
+> This is a pull request for Linus Walleij, not for you. As you said,
+> you already have all necessary dependencies for MFD.
 
-Is this device in production, or just part of a test chip?
+Okay, so no need to sent it to me then, right? =;-)
 
-Will
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
