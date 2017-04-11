@@ -1,71 +1,71 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 11 Apr 2017 18:09:59 +0200
-Subject: [PATCH v4 1/7] pinctrl: dt-bindings: Add documentation for Armada
- 37xx pin controllers
-In-Reply-To: <20170410181514.kzbpkaxkwf7uycdc@rob-hp-laptop> (Rob Herring's
- message of "Mon, 10 Apr 2017 13:15:14 -0500")
-References: <cover.65d0e6796fecf1fe6c5d07b981160b54dc9b4acd.1491405475.git-series.gregory.clement@free-electrons.com>
- <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1491405475.git-series.gregory.clement@free-electrons.com>
- <20170410181514.kzbpkaxkwf7uycdc@rob-hp-laptop>
-Message-ID: <87inmbhqnc.fsf@free-electrons.com>
+Date: Tue, 11 Apr 2017 18:12:25 +0200
+Subject: [PATCH 0/7] arm64: marvell: add cryptographic engine support for
+ 7k/8k
+In-Reply-To: <20170410093903.GA8035@gondor.apana.org.au> (Herbert Xu's message
+ of "Mon, 10 Apr 2017 17:39:03 +0800")
+References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
+ <20170410093903.GA8035@gondor.apana.org.au>
+Message-ID: <87efwyj53q.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Herbert,
  
- On lun., avril 10 2017, Rob Herring <robh@kernel.org> wrote:
+ On lun., avril 10 2017, Herbert Xu <herbert@gondor.apana.org.au> wrote:
 
-> On Wed, Apr 05, 2017 at 05:18:02PM +0200, Gregory CLEMENT wrote:
+> On Wed, Mar 29, 2017 at 02:44:25PM +0200, Antoine Tenart wrote:
+>> Hi all,
+>> 
+>> This series adds support for the Inside Secure SafeXcel EIP197
+>> cryptographic engine which can be found on Marvell Armada 7k and 8k
+>> boards. A new cryptographic engine driver is added, as well as the
+>> relevant device tree definition for the Armada 7040 DB and 8040 DB
+>> boards.
+>> 
+>> This driver needs two firmwares to work correctly. These firmware are
+>> usually used for more advanced operations than the ones supported (as of
+>> now), but we still need them to pass the data to the internal
+>> cryptographic engine.
+>> 
+>> This series was tested in various ways on both the Armada 7040 DB and
+>> the Armada 8040 DB: using the crypto framework self tests, using tcrypt
+>> and while performing various transfers with iperf on top of IPsec.
+>> 
+>> This series is based on top of v4.11-rc1, and is available on a branch
+>> (which also contains the PPv2 support for 7k/8k, to ease the process of
+>> testing IPsec): https://github.com/atenart/linux  v4.11-rc1/7k8k-crypto
+>> I can rebase if needed.
+>> 
+>> Thanks,
+>> Antoine
+>> 
+>> 
+>> Antoine Tenart (7):
+>>   Documentation/bindings: Document the SafeXel cryptographic engine
+>>     driver
+>>   crypto: inside-secure: add SafeXcel EIP197 crypto engine driver
+>>   MAINTAINERS: add a maintainer for the Inside Secure crypto driver
+>>   arm64: marvell: dts: add crypto engine description for 7k/8k
+>>   arm64: marvell: dts: enable the crypto engine on the Armada 7040 DB
+>>   arm64: marvell: dts: enable the crypto engine on the Armada 8040 DB
+>>   arm64: defconfig: enable the Safexcel crypto engine as a module
+>
+> I have no problems with the crypto bits.
 
->> +Example:
->> +pinctrl_sb: pinctrl-sb at 18800 {
->
-> Just pinctrl at ...
->
->> +	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
->> +	reg = <0x18800 0x100>, <0x18C00 0x20>;
->> +	gpiosb: gpiosb {
->
-> gpio {
->
-> With that,
->
-> Acked-by: Rob Herring <robh@kernel.org>
-
-Could you do this change while applying the patches, or do you want a
-new series?
-
-Also, if the binding is also OK for you, do you agree that I apply the
-last 2 patches on the mvebu trees? (of course with the same changes
-asked by Rob)
+Does it means that you agree that I apply the arm-soc related patches
+(from 4 to 7) to my mvebu trees?
 
 Thanks,
 
 Gregory
 
-
-
 >
->
->> +		#gpio-cells = <2>;
->> +		gpio-ranges = <&pinctrl_sb 0 0 29>;
->> +		gpio-controller;
->> +		interrupts =
->> +		<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
->> +		<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
->> +		<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
->> +		<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
->> +		<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
->> +	};
->> +
->> +	rgmii_pins: mii-pins {
->> +		groups = "rgmii";
->> +		function = "mii";
->> +	};
->> +
->> +};
->> -- 
->> git-series 0.9.1
+> Thanks,
+> -- 
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
 
 -- 
 Gregory Clement, Free Electrons
