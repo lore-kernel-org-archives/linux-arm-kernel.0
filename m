@@ -1,46 +1,69 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 12 Apr 2017 09:58:47 +0800
-Subject: [PATCH 6/6] regulator: anatop: set default voltage selector for pcie
-In-Reply-To: <1491962327-12477-1-git-send-email-aisheng.dong@nxp.com>
-References: <1491962327-12477-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1491962327-12477-6-git-send-email-aisheng.dong@nxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Apr 2017 11:05:07 +0100
+Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
+ vgic_mmio_uaccess_write_its_iidr
+In-Reply-To: <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+ <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
+ <864lxzch9o.fsf@arm.com> <5f1423fd-8f73-364a-9cf7-b4310957e2fd@redhat.com>
+ <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
+ <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
+Message-ID: <e339c732-e1da-b620-ce09-8e141d2db376@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the initial voltage selector for vddpcie in case it's disabled
-by default.
+On 10/04/17 16:17, Auger Eric wrote:
+> Hi Marc,
+> 
+> On 10/04/2017 16:57, Marc Zyngier wrote:
+>> On 10/04/17 15:32, Auger Eric wrote:
+>>> Hi Marc,
+>>>
+>>> On 08/04/2017 12:42, Marc Zyngier wrote:
+>>>> On Mon, Mar 27 2017 at 10:30:58 AM, Eric Auger <eric.auger@redhat.com> wrote:
+>>>>> The GITS_IIDR revision field is used to encode the version of the
+>>>>> table layout (ABI). So we need to restore it to check the table
+>>>>> layout to be restored is compatible with the destination vITS.
+>>>>>
+>>>>> The user selected revision is stored in the user_revision field.
+>>>>> It will be compared against the REV num at table restoration time.
+>>>>
+>>>> Why isn't it sufficient to keep it GITS_IIDR RO and let userspace find
+>>>> out about the ABI revision that the kernel understands?
+>>>>
+>>>> Or are we planning on supporting multiple ABIs in the kernel?
+>>> Yes as discussed with Peter, the plan is to allow several ABIs. So the
+>>> userspace informs the destination about the ABI revision of the stored
+>>> tables (contained by the GITS_IIDR). If the destination KVM does not
+>>> support this ABI revision, table restore will fail.
+>>>  If so, do
+>>>> we have a deprecation policy/plan? I don't mind either way, but it would
+>>>> be good to document it...
+>>>>
+>>>> Maybe it is documented already and I missed it (which is perfectly
+>>>> possible!).
+>>> Well this is partly documented in
+>>> Documentation/virtual/kvm/devices/arm-vgic-its.txt. No plan to
+>>> deprecate. migration from KVM supporting v1 to KVM supporting V2 would
+>>> be possible but not the contrary.
+>>>
+>>> Does it make sense?
+>>
+>> Sort of. Say you have three systems: A and C, which only supports v1; B,
+>> which supports v1 and v2. Let's say you migrate from A to B, and from B
+>> to C. Is B mandated to be able to export the tables as v1 and v2? Or can
+>> it restrict what it can export?
+> At the moment migration from B to C will fail because source ABI rev =
+> v2 > destination support ABI = v1.
+> 
+> A (v1) -> B (v1 & v2): migration OK
+> B (v1 & v2) -> C (v1): migration NOK
 
-This fixes the below warning:
-20c8000.anatop:regulator-vddpcie: Failed to read a valid default voltage selector.
-anatop_regulator: probe of 20c8000.anatop:regulator-vddpcie failed with error -22
+So what does IIDR report on B once the A->B migration has taken place?
+Does it report v2?
 
-Cc: Liam Girdwood <lgirdwood@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Robin Gong <yibin.gong@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Signed-off-by: Richard Zhu <hongxing.zhu@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/regulator/anatop-regulator.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Thanks,
 
-diff --git a/drivers/regulator/anatop-regulator.c b/drivers/regulator/anatop-regulator.c
-index 6da0b20..910adfd 100644
---- a/drivers/regulator/anatop-regulator.c
-+++ b/drivers/regulator/anatop-regulator.c
-@@ -301,6 +301,11 @@ static int anatop_regulator_probe(struct platform_device *pdev)
- 		if (!sreg->sel && rdesc->name && !strcmp(rdesc->name, "vddpu"))
- 			sreg->sel = 22;
- 
-+		/* set the default voltage of the pcie phy to be 1.100v */
-+		if (!sreg->sel && rdesc->name &&
-+		    !strcmp(rdesc->name, "vddpcie"))
-+			sreg->sel = 0x10;
-+
- 		if (!sreg->bypass && !sreg->sel) {
- 			dev_err(&pdev->dev, "Failed to read a valid default voltage selector.\n");
- 			return -EINVAL;
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
