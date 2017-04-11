@@ -1,38 +1,67 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Tue, 11 Apr 2017 16:56:14 +0530
-Subject: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
- (fwd)
-In-Reply-To: <8fc9940e-3cb5-3ca7-f15d-0bf6284433a5@samsung.com>
-References: <CGME20170403060045epcas2p215a1d85248b47cc389e20ff877505b09@epcas2p2.samsung.com>
- <alpine.DEB.2.20.1704030758540.2170@hadrien>
- <1491200242.24095.23.camel@smitha-fedora>
- <8fc9940e-3cb5-3ca7-f15d-0bf6284433a5@samsung.com>
-Message-ID: <1491909974.11549.5.camel@smitha-fedora>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Tue, 11 Apr 2017 19:25:30 +0800
+Subject: [PATCH RFC 2/4] coresight: tmc: set read pointer before dump RAM
+In-Reply-To: <1491901829-18477-3-git-send-email-leo.yan@linaro.org>
+References: <1491901829-18477-1-git-send-email-leo.yan@linaro.org>
+ <1491901829-18477-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <CAAfSe-vtq6TYaemE5R9H-80uVQ+4eVkKQp3Jom+RvXjFG2r-vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-11 at 11:00 +0200, Sylwester Nawrocki wrote:
-> Hi,
-> 
-> On 04/03/2017 08:17 AM, Smitha T Murthy wrote:
-> > On Mon, 2017-04-03 at 08:00 +0200, Julia Lawall wrote:
-> >> See line 2101
-> >>
-> >> julia
-> >>
-> > Thank you for bringing it to my notice, I had not checked on this git.
-> > I will upload the next version of patches soon corresponding to this
-> > git.
-> 
-> In general please use the media master branch as a base for your patches
-> (git://linuxtv.org/media_tree.git master). Or latest branch in my
-> git repository, currently it's "for-v4.12/media/next-2" as can be seen
-> here: https://git.linuxtv.org/snawrocki/samsung.git
-> 
-I have submitted the next version(v4) of mfcv10.10 patches based on
-git://linuxtv.org/snawrocki/samsung.git for-v4.12/media/next. But I will
-keep this in mind next time I submit fresh patches. Thank you for the
-information :)
+On 11 April 2017 at 17:10, Leo Yan <leo.yan@linaro.org> wrote:
+> When dump RAM, we need set read pointer so can make sure every time read
+> the consistent content. If the RAM is full by checking status register
+> (STS), so set the read pointer to same value with write pointer,
+> otherwise set read point to 0 so can read from the start of RAM.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Mike Leach <mike.leach@linaro.org>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 6150dac..43cfeaa 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -43,10 +43,28 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+>
+>  static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+>  {
+> +       u32 write_ptr, status;
+>         char *bufp;
+>         u32 read_data;
+>         int i;
+>
+> +       write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
+
+Since 'write_ptr' is only used in the below 'if' branch, I would
+suggest to move this statement into that.
 
 Regards,
-Smitha
+Chunyan
+
+> +
+> +       /*
+> +        * Get a hold of the status register and see if a wrap around
+> +        * has occurred.  If so adjust things accordingly.
+> +        */
+> +       status = readl_relaxed(drvdata->base + TMC_STS);
+> +       if (status & TMC_STS_FULL)
+> +               /* Tell the HW the reading start point */
+> +               writel_relaxed(write_ptr, drvdata->base + TMC_RRP);
+> +       else
+> +               /*
+> +                * In case this is not first time to read ETB RAM,
+> +                * always write 0 for reading pointer.
+> +                */
+> +               writel_relaxed(0x0, drvdata->base + TMC_RRP);
+> +
+>         bufp = drvdata->buf;
+>         drvdata->len = 0;
+>         while (1) {
+> --
+> 2.7.4
+>
