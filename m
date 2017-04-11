@@ -1,57 +1,113 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 11 Apr 2017 12:56:28 +0200
-Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <5b2a8ed0-bfc7-852b-07d8-8474aef25b2a@arm.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
- <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
- <864lxzch9o.fsf@arm.com> <5f1423fd-8f73-364a-9cf7-b4310957e2fd@redhat.com>
- <74d62f62-c0eb-b7eb-4e3a-96b1b6d0d66d@arm.com>
- <42ca421f-3c36-2f67-1e39-ec071cea3649@redhat.com>
- <e339c732-e1da-b620-ce09-8e141d2db376@arm.com>
- <dc02a006-cef8-ac75-7cfd-5fe5c220ea22@redhat.com>
- <CAFEAcA8XYUnC6zc+EF+amX8d1fP6sTF7Bypn455QkD++RsTRJA@mail.gmail.com>
- <5b2a8ed0-bfc7-852b-07d8-8474aef25b2a@arm.com>
-Message-ID: <5a908f96-86e9-6ce6-7680-a08e2968bf7e@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Apr 2017 12:12:43 +0100
+Subject: [RESEND 1/2] [media] rc-core: Add inlined stubs for core rc_*
+ functions
+Message-ID: <20170411111244.29599-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently users have to use all sorts of ugly #ifery within
+their drivers in order to avoid linking issues at build time.
+This patch allows users to safely call these functions when
+!CONFIG_RC_CORE and make decisions based on the return value
+instead.  This is a much more common and clean way of doing
+things within the Linux kernel.
 
-On 11/04/2017 12:29, Marc Zyngier wrote:
-> On 11/04/17 11:16, Peter Maydell wrote:
->> On 11 April 2017 at 11:08, Auger Eric <eric.auger@redhat.com> wrote:
->>> On 11/04/2017 12:05, Marc Zyngier wrote:
->>>> On 10/04/17 16:17, Auger Eric wrote:
->>>>> A (v1) -> B (v1 & v2): migration OK
->>>>> B (v1 & v2) -> C (v1): migration NOK
->>>>
->>>> So what does IIDR report on B once the A->B migration has taken place?
->>>> Does it report v2?
->>>
->>> yes that was the plan
->>
->> Hmm, the IIDR value shouldn't change across a migration I think.
->> It's guest visible so the guest should see it still the same
->> value even after migration.
-> 
-> That's my worry. But we then have a problem when this VM migrates again.
-> How does userspace find out which ABI to use then?
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ include/media/rc-core.h | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-Today the userspace just conveys the information from source kernel to
-destination kernel through the IIDR value. This allows the destination
-kernel to know what was the table layout used during the migration.
-
-If we report the source ABI revision value on the destination, what is
-the strategy we should adopt:
-- limit the features to those that will be migratable through this ABI
-- allow the functionalities (GICv4 for instance) but reject save?
-
-Thanks
-
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+diff --git a/include/media/rc-core.h b/include/media/rc-core.h
+index 73ddd721..45ba739 100644
+--- a/include/media/rc-core.h
++++ b/include/media/rc-core.h
+@@ -209,7 +209,14 @@ struct rc_dev {
+  * @rc_driver_type: specifies the type of the RC output to be allocated
+  * returns a pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ struct rc_dev *rc_allocate_device(enum rc_driver_type);
++#else
++static inline struct rc_dev *rc_allocate_device(int unused)
++{
++	return NULL;
++}
++#endif
+ 
+ /**
+  * devm_rc_allocate_device - Managed RC device allocation
+@@ -218,21 +225,42 @@ struct rc_dev *rc_allocate_device(enum rc_driver_type);
+  * @rc_driver_type: specifies the type of the RC output to be allocated
+  * returns a pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ struct rc_dev *devm_rc_allocate_device(struct device *dev, enum rc_driver_type);
++#else
++static inline struct rc_dev *devm_rc_allocate_device(struct device *dev, int unused)
++{
++	return NULL;
++}
++#endif
+ 
+ /**
+  * rc_free_device - Frees a RC device
+  *
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ void rc_free_device(struct rc_dev *dev);
++#else
++static inline void rc_free_device(struct rc_dev *dev)
++{
++	return;
++}
++#endif
+ 
+ /**
+  * rc_register_device - Registers a RC device
+  *
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ int rc_register_device(struct rc_dev *dev);
++#else
++static inline int rc_register_device(struct rc_dev *dev)
++{
++	return -EOPNOTSUPP;
++}
++#endif
+ 
+ /**
+  * devm_rc_register_device - Manageded registering of a RC device
+@@ -240,14 +268,28 @@ int rc_register_device(struct rc_dev *dev);
+  * @parent: pointer to struct device.
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ int devm_rc_register_device(struct device *parent, struct rc_dev *dev);
++#else
++static inline int devm_rc_register_device(struct device *parent, struct rc_dev *dev)
++{
++	return -EOPNOTSUPP;
++}
++#endif
+ 
+ /**
+  * rc_unregister_device - Unregisters a RC device
+  *
+  * @dev: pointer to struct rc_dev.
+  */
++#ifdef CONFIG_RC_CORE
+ void rc_unregister_device(struct rc_dev *dev);
++#else
++static inline void rc_unregister_device(struct rc_dev *dev)
++{
++	return;
++}
++#endif
+ 
+ /**
+  * rc_open - Opens a RC device
+-- 
+2.9.3
