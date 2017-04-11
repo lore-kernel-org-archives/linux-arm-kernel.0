@@ -1,138 +1,56 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Tue, 11 Apr 2017 20:41:33 +0530
-Subject: [PATCHv3 00/14] arm_pmu: ACPI support
-In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <58ECF225.2040804@gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 11 Apr 2017 17:13:35 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+Message-ID: <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 27/03/2017 19:09, Marc Zyngier wrote:
 
+> Here's what your system looks like:
+> 
+> PCI-EP -------> MSI Controller ------> INTC
+>          MSI                    IRQ
+> 
+> A PCI MSI is always edge. No ifs, no buts. That's what it is, and nothing
+> else. Now, your MSI controller signals its output using a level interrupt,
+> since you need to whack it on the head so that it lowers its line.
+> 
+> There is not a single trigger, because there is not a single interrupt.
 
-On Tuesday 11 April 2017 02:09 PM, Mark Rutland wrote:
-> Hi,
->
-> This series implements ACPI support in the ARM PMU code. It borrows some code
-> from Jeremy's series [1], but takes a different approach to probing and
-> association, using the usual hotplug state machine, minimising external changes
-> required, and simplifying the relationship with the common arm_pmu code.
->
-> The first few patches are preparatory cleanup/refactoring, with the latter half
-> of the series being specific to ACPI support.
->
-> The series is based on Will's perf/updates branch [2]. I've pushed the whole
-> series out to the arm/perf/acpi branch [3] of my kernel.org repo.
->
-> Due to the innards of the hotplug callback framework, it's not entirely
-> safe to register a PMU in a hotplug callback. Due to this, we can only
-> associated hotplugged CPUs with a PMU if a matching CPU was around at
-> probe time. A similar restriction already applies to DT systems. We may
-> be able to relax this with some future work.
->
-> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
-> are correctly associated, I've tested with the following:
->
->    $ taskset -c ${SOME_CPU_HERE} perf record \
->      -e armv8_pmuv3_0/cpu_cycles/ \
->      -e armv8_pmuv3_1/cpu_cycles/ \
->      cat /proc/interrupts
->   
-> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
-> association logic. This has also been tested in a VM using PPIs; I do not have
-> access to a host machine which itself uses PPIs.
+Hello Marc,
 
-I have tried these patches on a Hisilicon D03 board.
-The perf list, basic perf events and perf fuzzer results are all fine.
+I was hoping you or Thomas might help clear some confusion
+in my mind around IRQ domains (struct irq_domain).
 
-'perf list' on Hisilicon D03
---------------------------------
+I have read https://www.kernel.org/doc/Documentation/IRQ-domain.txt
 
-   L1-dcache-load-misses                              [Hardware cache event]
-   L1-dcache-loads                                    [Hardware cache event]
-   L1-dcache-store-misses                             [Hardware cache event]
-   L1-dcache-stores                                   [Hardware cache event]
-   L1-icache-load-misses                              [Hardware cache event]
-   L1-icache-loads                                    [Hardware cache event]
-   branch-load-misses                                 [Hardware cache event]
-   branch-loads                                       [Hardware cache event]
-   dTLB-load-misses                                   [Hardware cache event]
-   iTLB-load-misses                                   [Hardware cache event]
+IIUC, there should be one IRQ domain per IRQ controller.
 
-   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
-   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
-   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
-   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
-   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
-   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
-   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
-   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
-   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
-   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
-   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
-   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
-   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
-   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
-   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
-   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
-   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
-   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
-   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
-   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
-   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
-   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
-   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
-   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
+I have this MSI controller handling 256 interrupts, so I should
+have *one* domain for all possible MSIs. Yet the Altera driver
+registers *two* domains (msi_domain and inner_domain).
 
-Thanks,
-Anurup
+Could I make everything work with a single IRQ domain?
 
-> Since v1 [4]:
-> * Fix up ACPI bits per Lorenzo's request
-> * Accumulate tags
-> * Check presence of PMUv3
->
-> Since v2 [5]:
-> * Clean up GSIs when a request fails
-> * Rename parse/unparse functions
-> * Use cpuid_feature_extract_unsigned_field() for PMUVer
-> * Drop parking protocol cleanups. I'll resend these later.
->
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/482397.html
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/updates
-> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/acpi
-> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492897.html
-> [5] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499982.html
->
-> Mark Rutland (14):
->    drivers/perf: arm_pmu: remove pointless PMU disabling
->    drivers/perf: arm_pmu: define armpmu_init_fn
->    drivers/perf: arm_pmu: fold init into alloc
->    drivers/perf: arm_pmu: factor out pmu registration
->    drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
->    drivers/perf: arm_pmu: handle no platform_device
->    drivers/perf: arm_pmu: rename irq request/free functions
->    drivers/perf: arm_pmu: split cpu-local irq request/free
->    drivers/perf: arm_pmu: move irq request/free into probe
->    drivers/perf: arm_pmu: split out platform device probe logic
->    arm64: add function to get a cpu's MADT GICC table
->    drivers/perf: arm_pmu: add ACPI framework
->    arm64: pmuv3: handle !PMUv3 when probing
->    arm64: pmuv3: use arm_pmu ACPI framework
->
->   arch/arm64/include/asm/acpi.h   |   2 +
->   arch/arm64/kernel/perf_event.c  | 113 ++++++++----
->   arch/arm64/kernel/smp.c         |  10 ++
->   drivers/perf/Kconfig            |   4 +
->   drivers/perf/Makefile           |   3 +-
->   drivers/perf/arm_pmu.c          | 387 ++++++++++------------------------------
->   drivers/perf/arm_pmu_acpi.c     | 256 ++++++++++++++++++++++++++
->   drivers/perf/arm_pmu_platform.c | 235 ++++++++++++++++++++++++
->   include/linux/cpuhotplug.h      |   1 +
->   include/linux/perf/arm_pmu.h    |  22 ++-
->   10 files changed, 708 insertions(+), 325 deletions(-)
->   create mode 100644 drivers/perf/arm_pmu_acpi.c
->   create mode 100644 drivers/perf/arm_pmu_platform.c
->
+I'm confused by the sequence:
+
+  irq_dom = irq_domain_create_linear(fwnode, MSI_COUNT, &msi_dom_ops, pcie);
+  msi_dom = pci_msi_create_irq_domain(fwnode, &msi_domain_info, irq_dom);
+
+It seems I should be able to call only pci_msi_create_irq_domain...
+And the parent of the MSI controller is given in the DT.
+
+I'm not quite sure how I tell pci_msi_create_irq_domain how many
+MSIs it's supposed to manage. Nor how I pass my private struct.
+
+I will keep looking.
+
+Regards.
