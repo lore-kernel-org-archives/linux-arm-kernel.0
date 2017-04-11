@@ -1,48 +1,40 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 11 Apr 2017 18:02:05 +0200
-Subject: [PATCH 2/3] power: supply: New driver for LEGO MINDSTORMS EV3
- battery
-In-Reply-To: <1491251029-23256-3-git-send-email-david@lechnology.com>
-References: <1491251029-23256-1-git-send-email-david@lechnology.com>
- <1491251029-23256-3-git-send-email-david@lechnology.com>
-Message-ID: <20170411160205.yqr6z5nwh5xn5zdb@earth>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 11 Apr 2017 11:02:57 -0500
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+ <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+ <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+ <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+Message-ID: <CAL_Jsq+bsh8Byow4poT7cdpLY_skb7QxbzkAmj4q7Cf6Z88GWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Driver looks fine. One minor thing, though:
-
-On Mon, Apr 03, 2017 at 03:23:48PM -0500, David Lechner wrote:
-> [...]
+On Tue, Apr 11, 2017 at 9:32 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Apr 10, 2017 at 02:48:32PM -0500, Rob Herring wrote:
+>> On Thu, Apr 06, 2017 at 05:40:35PM +0200, olivier moysan wrote:
 >
-> +	batt->psy = power_supply_register(dev, &lego_ev3_battery_desc, &psy_cfg);
-> +	err = PTR_ERR_OR_ZERO(batt->psy);
-> +	if (err) {
-> +		dev_err(dev, "failed to register power supply\n");
-> +		return err;
-> +	}
+>> > +Required properties:
+>> > +  - compatible: Must be "st,stm32h7-i2s"
+>> > +  - #sound-dai-cells: Must be 1. (one parameter)
+>> > +    This parameter allows to specify CPU DAI index in soundcard CPU dai link.
+>> > +   index 0: playback DAI
+>> > +   index 1: capture DAI
+>> > +   index 2: full duplex DAI
+>
+>> Is this still needed for graph-card?
+>
+> The graph card is blocked on your review...
 
-There is devm_power_supply_register() and it makes sense to use it,
-since that means you can drop the remove function completly :)
+Maybe if there were more reviewers it would move faster. I don't know
+ASoC that well.
 
-> +	return 0;
-> +}
-> +
-> +static int lego_ev3_battery_remove(struct platform_device *pdev)
-> +{
-> +	struct lego_ev3_battery *batt = platform_get_drvdata(pdev);
-> +
-> +	power_supply_unregister(batt->psy);
-> +
-> +	return 0;
-> +}
+> I'm also not clear how
+> without something like this we'd be able to identify a specific DAI
+> within a device if we don't have a way of identifying them.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/5eecb7ba/attachment.sig>
+Isn't that what the graph does? "dais" points to a list of ports which
+are the specific DAIs whether there are multiple ones in a single
+device or multiple devices with a single DAI each.
+
+Rob
