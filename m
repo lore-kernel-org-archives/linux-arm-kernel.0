@@ -1,99 +1,48 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 11 Apr 2017 09:01:27 -0700
-Subject: [PATCH v4 0/2] Handle Cavium ThunderX2 PCI topology quirk
-In-Reply-To: <20170411134407.GB31773@bhelgaas-glaptop.roam.corp.google.com>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
- <20170411134407.GB31773@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <bdfc225a-7859-926b-6e17-327fb93c02bc@gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 11 Apr 2017 18:02:05 +0200
+Subject: [PATCH 2/3] power: supply: New driver for LEGO MINDSTORMS EV3
+ battery
+In-Reply-To: <1491251029-23256-3-git-send-email-david@lechnology.com>
+References: <1491251029-23256-1-git-send-email-david@lechnology.com>
+ <1491251029-23256-3-git-send-email-david@lechnology.com>
+Message-ID: <20170411160205.yqr6z5nwh5xn5zdb@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2017 06:44 AM, Bjorn Helgaas wrote:
-> [+cc David]
+Hi,
+
+Driver looks fine. One minor thing, though:
+
+On Mon, Apr 03, 2017 at 03:23:48PM -0500, David Lechner wrote:
+> [...]
 >
-> I forgot to mention that I'm also hoping for an ack from David, since
-> he's listed as the maintainer of the ThunderX drivers.
->
+> +	batt->psy = power_supply_register(dev, &lego_ev3_battery_desc, &psy_cfg);
+> +	err = PTR_ERR_OR_ZERO(batt->psy);
+> +	if (err) {
+> +		dev_err(dev, "failed to register power supply\n");
+> +		return err;
+> +	}
 
-JC is really leading the development of this particular PCI 
-implementation, but I am happy to supply my:
+There is devm_power_supply_register() and it makes sense to use it,
+since that means you can drop the remove function completly :)
 
-Acked-by: David Daney <david.daney@cavium.com>
+> +	return 0;
+> +}
+> +
+> +static int lego_ev3_battery_remove(struct platform_device *pdev)
+> +{
+> +	struct lego_ev3_battery *batt = platform_get_drvdata(pdev);
+> +
+> +	power_supply_unregister(batt->psy);
+> +
+> +	return 0;
+> +}
 
-
-
-> On Mon, Apr 03, 2017 at 01:15:02PM +0000, Jayachandran C wrote:
->> Hi Bjorn, Alex,
->>
->> Sending this again (with a trivial fix to author name), please review.
->> Updated summary below:
->>
->> Here is v4 of the patchset to handle the PCIe topology quirk of Cavium
->> ThunderX2 systems (previously known as Broadcom Vulcan).
->>
->> The earlier discussions on this can be seen at:
->> http://www.spinics.net/lists/linux-pci/msg51001.html
->> https://patchwork.ozlabs.org/patch/582633/ and
->> https://lists.linuxfoundation.org/pipermail/iommu/2016-June/017681.html
->>
->> The earlier discussion on this patchset ended with a suggestion that it
->> may be possible to fix up this quirk by handling the issue in the
->> function argument of pci_for_each_dma_alias(). But at that point we did
->> not have the codebase to make the changes since the full ACPI and OF code
->> for SMMU and GIC ITS was not upstream.
->>
->> Now that the changes are upstream, I tried to fix it in both the SMMU
->> and the GIC ITS code based on this suggestion, the changes needed are at:
->>  https://github.com/jchandra-cavm/linux/commits/rid-xlate-fixup
->>
->> The problems with this approach are:
->>  - of the 14 uses of pci_for_each_dma_alias in the function in the kernel
->>    tree, I have to fixup 6 callers (which is all but one ofthe callers
->>    outside x86)
->>  - 4 of these can be reasonably handled (please see the github repo above),
->>    but the calls in drivers/irqchip/irq-gic-v3-its-pci-msi.c and
->>    drivers/iommu/iommu.c cannot be reasonably fixed up.
->>  - Even without the 2 above two changes I can get it to work for now.
->>    But pci_for_each_dma_alias does not work as expected on this platform
->>    and we have to be aware of that for all future uses of the function.
->>
->> For now, I have ruled out the approach, and I have rebased the earlier
->> patch on to 4.11-rc and submitting again for review. The changes are:
->>
->> v3->v4:
->>  - new address of author
->>
->> v2>v3:
->>  - changed device flag name from PCI_DEV_FLAGS_DMA_ALIAS_ROOT to
->>    PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
->>  - updated commit message to make the quirk clearer.
->>
->> Let me know your comments and suggestions.
->>
->> Thanks,
->> JC.
->>
->>
->> Jayachandran C (2):
->>   PCI: Add device flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
->>   PCI: quirks: Fix ThunderX2 dma alias handling
->>
->>  drivers/pci/quirks.c | 14 ++++++++++++++
->>  drivers/pci/search.c |  4 ++++
->>  include/linux/pci.h  |  2 ++
->>  3 files changed, 20 insertions(+)
->>
->> --
->> 2.7.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170411/5eecb7ba/attachment.sig>
