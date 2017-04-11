@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:29:04 +0100
-Subject: [PATCH v3 24/32] sparc: include default ioremap_nopost()
- implementation
+Date: Tue, 11 Apr 2017 13:28:52 +0100
+Subject: [PATCH v3 12/32] m32r: include default ioremap_nopost() implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-25-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-13-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,22 +25,21 @@ ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: "David S. Miller" <davem@davemloft.net>
 ---
- arch/sparc/include/asm/io.h | 1 +
+ arch/m32r/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/sparc/include/asm/io.h b/arch/sparc/include/asm/io.h
-index f6902cf..09bb613 100644
---- a/arch/sparc/include/asm/io.h
-+++ b/arch/sparc/include/asm/io.h
-@@ -5,6 +5,7 @@
- #else
- #include <asm/io_32.h>
- #endif
+diff --git a/arch/m32r/include/asm/io.h b/arch/m32r/include/asm/io.h
+index 4b0f5e0..1577102 100644
+--- a/arch/m32r/include/asm/io.h
++++ b/arch/m32r/include/asm/io.h
+@@ -70,6 +70,7 @@ extern void iounmap(volatile void __iomem *addr);
+ #define ioremap_wc ioremap_nocache
+ #define ioremap_wt ioremap_nocache
+ #define ioremap_uc ioremap_nocache
 +#include <asm-generic/ioremap-nopost.h>
  
  /*
-  * Defines used for both SPARC32 and SPARC64
+  * IO bus memory addresses are also 1:1 with the physical address
 -- 
 2.10.0
