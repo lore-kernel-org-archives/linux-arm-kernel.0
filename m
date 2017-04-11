@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Apr 2017 13:28:49 +0100
-Subject: [PATCH v3 09/32] frv: include default ioremap_nopost() implementation
+Date: Tue, 11 Apr 2017 13:28:45 +0100
+Subject: [PATCH v3 05/32] alpha: include default ioremap_nopost()
+ implementation
 In-Reply-To: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
 References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170411122923.6285-10-lorenzo.pieralisi@arm.com>
+Message-ID: <20170411122923.6285-6-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,21 +26,24 @@ ioremap interface to kernel subsystems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Richard Henderson <rth@twiddle.net>
+Cc: Ivan Kokshaysky <ink@jurassic.park.msu.ru>
+Cc: Matt Turner <mattst88@gmail.com>
 ---
- arch/frv/include/asm/io.h | 1 +
+ arch/alpha/include/asm/io.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/frv/include/asm/io.h b/arch/frv/include/asm/io.h
-index 8062fc7..8808502 100644
---- a/arch/frv/include/asm/io.h
-+++ b/arch/frv/include/asm/io.h
-@@ -290,6 +290,7 @@ static inline void __iomem *ioremap_fullcache(unsigned long physaddr, unsigned l
+diff --git a/arch/alpha/include/asm/io.h b/arch/alpha/include/asm/io.h
+index ff40491..5d7cc11 100644
+--- a/arch/alpha/include/asm/io.h
++++ b/arch/alpha/include/asm/io.h
+@@ -300,6 +300,7 @@ static inline void __iomem * ioremap_nocache(unsigned long offset,
+ }
  
- #define ioremap_wc ioremap_nocache
  #define ioremap_uc ioremap_nocache
 +#include <asm-generic/ioremap-nopost.h>
  
- extern void iounmap(void volatile __iomem *addr);
- 
+ static inline void iounmap(volatile void __iomem *addr)
+ {
 -- 
 2.10.0
