@@ -1,46 +1,121 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Tue, 11 Apr 2017 11:23:35 +0200 (CEST)
-Subject: [Patch v3 10/11] [media] s5p-mfc: Add support for HEVC encoder
- (fwd)
-In-Reply-To: <8fc9940e-3cb5-3ca7-f15d-0bf6284433a5@samsung.com>
-References: <CGME20170403060045epcas2p215a1d85248b47cc389e20ff877505b09@epcas2p2.samsung.com>
- <alpine.DEB.2.20.1704030758540.2170@hadrien>
- <1491200242.24095.23.camel@smitha-fedora>
- <8fc9940e-3cb5-3ca7-f15d-0bf6284433a5@samsung.com>
-Message-ID: <alpine.DEB.2.20.1704111121510.3384@hadrien>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 11 Apr 2017 17:32:09 +0800
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <58CA8C8A.8080405@huawei.com>
+ <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+Message-ID: <58ECA299.6060704@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tue, 11 Apr 2017, Sylwester Nawrocki wrote:
-
-> Hi,
+On 2017/3/21 2:11, Ganapatrao Kulkarni wrote:
+> Hi Hanjun,
 >
-> On 04/03/2017 08:17 AM, Smitha T Murthy wrote:
-> > On Mon, 2017-04-03 at 08:00 +0200, Julia Lawall wrote:
-> > > See line 2101
-> > >
-> > > julia
-> > >
-> > Thank you for bringing it to my notice, I had not checked on this git.
-> > I will upload the next version of patches soon corresponding to this
-> > git.
->
-> In general please use the media master branch as a base for your patches
-> (git://linuxtv.org/media_tree.git master). Or latest branch in my
-> git repository, currently it's "for-v4.12/media/next-2" as can be seen
-> here: https://git.linuxtv.org/snawrocki/samsung.git
+> On Thu, Mar 16, 2017 at 6:30 PM, Hanjun Guo <guohanjun@huawei.com> wrote:
+>> On 2017/3/10 19:04, Mark Rutland wrote:
+>>> Hi,
+>>>
+>>> This series implements ACPI support in the ARM PMU code. It borrows some code
+>>> from Jeremy's series [1], but takes a different approach to probing and
+>>> association, using the usual hotplug state machine, minimising external changes
+>>> required, and simplifying the relationship with the common arm_pmu code.
+>>>
+>>> The first few patches are preparatory cleanup/refactoring, with the latter half
+>>> of the series being specific to ACPI support.
+>>>
+>>> The series is based on my IRQ rework patches [2]. I've pushed the whole series
+>>> out to the arm/perf/acpi branch [3] of my kernel.org repo.
+>>>
+>>> Due to the innards of the hotplug callback framework, it's not entirely
+>>> safe to register a PMU in a hotplug callback. Due to this, we can only
+>>> associated hotplugged CPUs with a PMU if a matching CPU was around at
+>>> probe time. A similar restriction already applies to DT systems. We may
+>>> be able to relax this with some future work.
+>>>
+>>> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+>>> are correctly associated, I've tested with the following:
+>>>
+>>>   $ taskset -c ${SOME_CPU_HERE} perf record \
+>>>     -e armv8_pmuv3_0/cpu_cycles/ \
+>>>     -e armv8_pmuv3_1/cpu_cycles/ \
+>>>     cat /proc/interrupts
+>>>
+>>> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+>>> association logic. This has also been tested in a VM using PPIs; I do not have
+>>> access to a host machine which itself uses PPIs.
+>> Booted OK and 'perf list' got on Hisilicon D03:
+>>
+>> d03-09:~ # perf list
+>>
+>> List of pre-defined events (to be used in -e):
+>>
+>>   branch-misses                                      [Hardware event]
+>>   bus-cycles                                         [Hardware event]
+>>   cache-misses                                       [Hardware event]
+>>   cache-references                                   [Hardware event]
+>>   cpu-cycles OR cycles                               [Hardware event]
+>>   instructions                                       [Hardware event]
+>>
+>>   alignment-faults                                   [Software event]
+>>   context-switches OR cs                             [Software event]
+>>   cpu-clock                                          [Software event]
+>>   cpu-migrations OR migrations                       [Software event]
+>>   dummy                                              [Software event]
+>>   emulation-faults                                   [Software event]
+>>   major-faults                                       [Software event]
+>>   minor-faults                                       [Software event]
+>>   page-faults OR faults                              [Software event]
+>>   task-clock                                         [Software event]
+>>
+>>   L1-dcache-load-misses                              [Hardware cache event]
+>>   L1-dcache-loads                                    [Hardware cache event]
+>>   L1-dcache-store-misses                             [Hardware cache event]
+>>   L1-dcache-stores                                   [Hardware cache event]
+>>   L1-icache-load-misses                              [Hardware cache event]
+>>   L1-icache-loads                                    [Hardware cache event]
+>>   branch-load-misses                                 [Hardware cache event]
+>>   branch-loads                                       [Hardware cache event]
+>>   dTLB-load-misses                                   [Hardware cache event]
+>>   iTLB-load-misses                                   [Hardware cache event]
+>>
+>>   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
+>>   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
+>>   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
+>>   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
+>>   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
+>>   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
+>>   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
+>>   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
+>>   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
+>>
+>>   rNNN                                               [Raw hardware event descriptor]
+>>   cpu/t1=v1[,t2=v2,t3 ...]/modifier                  [Raw hardware event descriptor]
+>>    (see 'man perf-list' on how to encode it)
+>>
+>>   mem:<addr>[/len][:access]                          [Hardware breakpoint]
+>>
+>>
+>> Try some basic perf event and it works, anything else I can try in specific?
+> you can try perf fuzzer
 
-I'm not making the patch.  It comes to me from kbuild.  If you would
-prefer some tree not to be included, you can notify Fengguang about this:
+Sorry, just back from my paternity leave, I will try Mark's v2 (or v3 if there is a
+updated one) :)
 
-fengguang.wu at intel.com
-
-julia
-
->
-> --
-> Thanks,
-> Sylwester
->
+Thanks
+Hanjun
