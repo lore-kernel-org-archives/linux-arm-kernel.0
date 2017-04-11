@@ -1,65 +1,79 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 11 Apr 2017 19:52:10 +0200
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
- <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
- <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
- <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
-Message-ID: <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 11 Apr 2017 20:08:34 +0200
+Subject: [PATCH v5 1/2] linux/kernel.h: Add ALIGN_DOWN macro
+In-Reply-To: <20170411180835.8928-1-krzk@kernel.org>
+References: <20170411180835.8928-1-krzk@kernel.org>
+Message-ID: <20170411180835.8928-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2017 18:43, Marc Zyngier wrote:
+Few parts of kernel define their own macro for aligning down so provide
+a common define for this, with the same usage and assumptions as existing
+ALIGN.
 
-> On 11/04/17 17:26, Mason wrote:
->
->> Is there a function to map virq to the hwirq in any domain?
-> 
-> Be more precise. If you want the hwirq associated with the view of a
-> virq in a given domain, that's the hwirq field in the corresponding
-> irq_data structure. Or are you after something else?
+Convert also three existing implementations to this one.
 
-I registered an unmask method for my irq_chip.
-(IIUC, I'm supposed to unmask a specific MSI in this callback.)
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-# cat /proc/interrupts 
-           CPU0       CPU1       
- 30:          0          0    MSIfoo      0 Edge      aerdrv
- 34:          0          0    MSIfoo 524288 Edge      xhci_hcd
- 35:          0          0    MSIfoo 524289 Edge      xhci_hcd
- 36:          0          0    MSIfoo 524290 Edge      xhci_hcd
+---
 
+The metag change was not even compiled due to lack of cross compiler.
+---
+ arch/metag/kernel/stacktrace.c | 2 --
+ drivers/gpu/drm/udl/udl_fb.c   | 2 +-
+ include/linux/kernel.h         | 1 +
+ include/video/udlfb.h          | 2 +-
+ 4 files changed, 3 insertions(+), 4 deletions(-)
 
-void foo_unmask(struct irq_data *data)
-{
-	int xx,yy;
-	struct irq_domain *dom = data->domain;
-	printk("%s: irq_data=%p irq=%u hwirq=%lu chip=%p dom=%p pdata=%p data=%p\n",
-		__func__, data, data->irq, data->hwirq, data->chip, data->domain,
-		data->parent_data, data->chip_data);
-	printk("%s ops=%p data=%p parent=%p\n\n",
-		dom->name, dom->ops, dom->host_data, dom->parent);
-	printk("pcie=%p\n", dom->parent->host_data);
-	//dump_stack();
-	pci_msi_unmask_irq(data);
-	struct tango_pcie *pcie = data->domain->parent->host_data;
-	printk("\n%s: pcie=%p irq=%u hwirq=%lu\n\n",
-		__func__, pcie, data->irq, data->hwirq);
-	xx = irq_find_mapping(pcie->irq_domain, data->hwirq);
-	yy = irq_find_mapping(pcie->msi_domain, data->hwirq);
-	printk("xx=%d yy=%d\n", xx, yy);
-}
-
-so data->irq is the virq (30, 34, 35, 36)
-and data->hwirq is the domain hwirq (0, 524288, 524289, 524290)
-
-Is there a way to map hwirq 524288 to MSI 0, hwirq 524289 to MSI 1, etc?
-
-Regards.
+diff --git a/arch/metag/kernel/stacktrace.c b/arch/metag/kernel/stacktrace.c
+index 91ffc4b75c33..09d67b7f51ca 100644
+--- a/arch/metag/kernel/stacktrace.c
++++ b/arch/metag/kernel/stacktrace.c
+@@ -31,8 +31,6 @@ static void tbi_boing_init(void)
+ }
+ #endif
+ 
+-#define ALIGN_DOWN(addr, size)  ((addr)&(~((size)-1)))
+-
+ /*
+  * Unwind the current stack frame and store the new register values in the
+  * structure passed as argument. Unwinding is equivalent to a function return,
+diff --git a/drivers/gpu/drm/udl/udl_fb.c b/drivers/gpu/drm/udl/udl_fb.c
+index d05abc69e305..4a6500362564 100644
+--- a/drivers/gpu/drm/udl/udl_fb.c
++++ b/drivers/gpu/drm/udl/udl_fb.c
+@@ -37,7 +37,7 @@ struct udl_fbdev {
+ };
+ 
+ #define DL_ALIGN_UP(x, a) ALIGN(x, a)
+-#define DL_ALIGN_DOWN(x, a) ALIGN(x-(a-1), a)
++#define DL_ALIGN_DOWN(x, a) ALIGN_DOWN(x, a)
+ 
+ /** Read the red component (0..255) of a 32 bpp colour. */
+ #define DLO_RGB_GETRED(col) (uint8_t)((col) & 0xFF)
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index 4c26dc3a8295..3d9f8420f973 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -47,6 +47,7 @@
+ 
+ /* @a is a power of 2 value */
+ #define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
++#define ALIGN_DOWN(x, a)	__ALIGN_KERNEL((x) - ((a) - 1), (a))
+ #define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
+ #define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
+ #define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
+diff --git a/include/video/udlfb.h b/include/video/udlfb.h
+index f9466fa54ba4..3ea90aea5617 100644
+--- a/include/video/udlfb.h
++++ b/include/video/udlfb.h
+@@ -92,6 +92,6 @@ struct dlfb_data {
+ 
+ /* remove these once align.h patch is taken into kernel */
+ #define DL_ALIGN_UP(x, a) ALIGN(x, a)
+-#define DL_ALIGN_DOWN(x, a) ALIGN(x-(a-1), a)
++#define DL_ALIGN_DOWN(x, a) ALIGN_DOWN(x, a)
+ 
+ #endif
+-- 
+2.9.3
