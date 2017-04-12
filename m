@@ -1,12 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Apr 2017 10:36:48 +0200
-Subject: [PATCH 5/7] arm64: marvell: dts: enable the crypto engine on the
- Armada 7040 DB
-In-Reply-To: <20170329124432.27457-6-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Wed, 29 Mar 2017 14:44:30 +0200")
+Date: Wed, 12 Apr 2017 10:37:07 +0200
+Subject: [PATCH 6/7] arm64: marvell: dts: enable the crypto engine on the
+ Armada 8040 DB
+In-Reply-To: <20170329124432.27457-7-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Wed, 29 Mar 2017 14:44:31 +0200")
 References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
- <20170329124432.27457-6-antoine.tenart@free-electrons.com>
-Message-ID: <871ssyhvj3.fsf@free-electrons.com>
+ <20170329124432.27457-7-antoine.tenart@free-electrons.com>
+Message-ID: <87wpaqggy4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,7 +15,8 @@ Hi Antoine,
  On mer., mars 29 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
 > Enable the cryptographic engine available in the CP110 master on the
-> Armada 7040 DB.
+> Armada 8040 DB. Do not enable the one in the CP110 salve for now, as we
+> do not support multiple cryptographic engines yet.
 >
 > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
@@ -26,22 +27,26 @@ Thanks,
 
 Gregory
 
+
 > ---
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts | 4 ++++
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 4 ++++
 >  1 file changed, 4 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-> index bb0e1e8e7138..7e9a8a4e89a4 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-> @@ -171,3 +171,7 @@
->  	phy = <&phy1>;
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> index 80e685e4235d..f6d808bced51 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> @@ -140,6 +140,10 @@
 >  	phy-mode = "rgmii-id";
 >  };
-> +
+>  
 > +&cpm_crypto {
 > +	status = "okay";
 > +};
+> +
+>  /* CON5 on CP1 expansion */
+>  &cps_pcie2 {
+>  	status = "okay";
 > -- 
 > 2.11.0
 >
