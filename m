@@ -1,37 +1,45 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 12 Apr 2017 15:30:15 +0200
-Subject: [PATCH] serial: imx: Enable RTSD only when needed
-Message-ID: <20170412133015.23185-1-romain.perier@collabora.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 12 Apr 2017 15:31:01 +0200
+Subject: [PATCH v2 3/7] includes: dt-bindings: Rename STM32F429 pinctrl DT
+ bindings
+In-Reply-To: <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
+References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
+ <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
+ <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
+Message-ID: <800a68a4-d6ce-212b-5849-56c9d32f891a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nandor Han <nandor.han@ge.com>
+Hi Rob,
 
-Currently, this IRQ is always enabled. Some devices might mux these pins
-to other I/Os, like I2C. This could lead to spurious interrupts.
+On 04/10/2017 10:27 PM, Rob Herring wrote:
+> On Fri, Apr 07, 2017 at 02:43:00PM +0200, Alexandre TORGUE wrote:
+>> STM32F4 MCU series is composed of several SOC (STM32F429, STM32F469, ...).
+>> Most of muxing definition are identical. So to avoid to duplicate bindings
+>> definition, this patch create common definitions.
+>
+> This is a lot of churn. Some confirmation that the resultant dtb is the
+> same before and after would be nice. Perhaps the script you used to
+> convert this as well.
 
-This commit makes this IRQ optional, by using the field have_rtscts.
+I tried to use fdtdump but it seems bugged. So I used directly dtc 
+binary to (re)generate dts files (before and after apply the series) and 
+I compared "pinmux" field in both case.
 
-Signed-off-by: Nandor Han <nandor.han@ge.com>
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- drivers/tty/serial/imx.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Example on stm32f469-disco:
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index e3e152cb..6dd674f 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1294,7 +1294,9 @@ static int imx_startup(struct uart_port *port)
- 		imx_enable_dma(sport);
- 
- 	temp = readl(sport->port.membase + UCR1);
--	temp |= UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN;
-+	temp |= UCR1_RRDYEN | UCR1_UARTEN;
-+	if (sport->have_rtscts)
-+			temp |= UCR1_RTSDEN;
- 
- 	writel(temp, sport->port.membase + UCR1);
- 
--- 
-2.9.3
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts 
+stm32f469-disco-after.dtb
+
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts 
+stm32f469-disco-before.dtb
+
+cat stm32f469-disco-after.dts | grep pinmux
+cat stm32f469-disco-before.dts | grep pinmux
+
+regards
+alex
+
+>
+> Rob
+>
