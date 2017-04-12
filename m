@@ -1,80 +1,92 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Apr 2017 13:03:31 +0100
-Subject: [PATCH v4 6/6] mfd: exynos-lpass: Add runtime PM support
-In-Reply-To: <1490256207-10061-7-git-send-email-m.szyprowski@samsung.com>
-References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170323080350eucas1p273814a2f183f04f180f8f2a2a362b86e@eucas1p2.samsung.com>
- <1490256207-10061-7-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170411120331.ic7syfg3s4vtyay6@dell>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 12 Apr 2017 12:03:26 +0800
+Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
+Message-ID: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Mar 2017, Marek Szyprowski wrote:
+These helper function allows drivers to get several clk consumers in
+one operation.  If any of the clk cannot be acquired then any clks
+that were got will be put before returning to the caller.
 
-> Convert exisitng lpass-suspend/resume callbacks into runtime PM callbacks.
-> This way Exynos LPASS driver will be ready for use with power domains
-> enabled. LPASS will be runtime resumed/suspended as a result of its child
-> devices runtime PM transitions.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/exynos-lpass.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+The idea firstly came out when i wanted to clean up and optimize
+imx6q-cpufreq driver which needs to handle a lot of clocks as it
+becomes a bit mess.
 
-Applied, thanks.
+e.g. drivers/cpufreq/imx6q-cpufreq.c
 
-> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-> index 9dbbedad916f..6d735e22acda 100644
-> --- a/drivers/mfd/exynos-lpass.c
-> +++ b/drivers/mfd/exynos-lpass.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/regmap.h>
->  #include <linux/types.h>
->  
-> @@ -132,6 +133,8 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	}
->  
->  	platform_set_drvdata(pdev, lpass);
-> +	pm_runtime_set_active(dev);
-> +	pm_runtime_enable(dev);
->  	exynos_lpass_enable(lpass);
->  
->  	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-> @@ -141,7 +144,9 @@ static int exynos_lpass_remove(struct platform_device *pdev)
->  {
->  	struct exynos_lpass *lpass = platform_get_drvdata(pdev);
->  
-> -	exynos_lpass_disable(lpass);
-> +	pm_runtime_disable(&pdev->dev);
-> +	if (!pm_runtime_status_suspended(&pdev->dev))
-> +		exynos_lpass_disable(lpass);
->  	regmap_exit(lpass->top);
->  
->  	return 0;
-> @@ -165,8 +170,11 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
->  	return 0;
->  }
->  
-> -static SIMPLE_DEV_PM_OPS(lpass_pm_ops, exynos_lpass_suspend,
-> -					exynos_lpass_resume);
-> +static const struct dev_pm_ops lpass_pm_ops = {
-> +	SET_RUNTIME_PM_OPS(exynos_lpass_suspend, exynos_lpass_resume, NULL)
-> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +				     pm_runtime_force_resume)
-> +};
->  
->  static const struct of_device_id exynos_lpass_of_match[] = {
->  	{ .compatible = "samsung,exynos5433-lpass" },
+You will see we need get 7 clocks during driver probe.
+(Add there will be more, e.g. pll1, pll1_bypass, pll1_bypass_src,
+in the future when adding busfreq support).
+
+static int imx6q_cpufreq_probe(struct platform_device *pdev)
+{
+....
+	arm_clk = clk_get(cpu_dev, "arm");
+	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
+	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
+	step_clk = clk_get(cpu_dev, "step");
+	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
+	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+		dev_err(cpu_dev, "failed to get clocks\n");
+		ret = -ENOENT;
+		goto put_clk;
+	}
+
+	if (of_machine_is_compatible("fsl,imx6ul")) {
+		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
+			ret = -ENOENT;
+			goto put_clk;
+		}
+	}
+....
+put_clk: 
+        if (!IS_ERR(arm_clk))
+                clk_put(arm_clk);
+        if (!IS_ERR(pll1_sys_clk))
+                clk_put(pll1_sys_clk);
+	...........
+}
+
+Together with the err path handling for each clocks, it does make
+things a bit ugly.
+
+Since we already have regulator_bulk_get accessories, i thought we
+probably could introduce clk_bulk_get as well to handle such case to
+ease the driver owners' life. 
+
+Besides IMX cpufreq driver, there is also some similar cases
+in kernel which could befinit from this api as well.
+e.g.
+drivers/cpufreq/tegra124-cpufreq.c
+drivers/cpufreq/s3c2412-cpufreq.c
+sound/soc/samsung/smdk_spdif.c
+arch/arm/mach-omap1/serial.c
+...
+
+And actually, if we handle clocks more than 3, then it might be
+worthy to try, which there is quite many manay in kernel and
+that probably could save a lot codes.
+
+This is a RFC patch intending to bring up the idea to discuss.
+
+Comments are welcome and appreciated!
+
+Dong Aisheng (3):
+  clk: add clk_bulk_get accessories
+  clk: add managed version of clk_bulk_get
+  cpufreq: imx6q: refine clk operations
+
+ drivers/clk/clk-devres.c        |  36 +++++++++++
+ drivers/clk/clk.c               |  99 +++++++++++++++++++++++++++++
+ drivers/clk/clkdev.c            |  42 +++++++++++++
+ drivers/cpufreq/imx6q-cpufreq.c | 119 ++++++++++++++++-------------------
+ include/linux/clk.h             | 135 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 365 insertions(+), 66 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
