@@ -1,100 +1,149 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 12 Apr 2017 12:09:32 +0300
-Subject: [PATCH v6 17/39] platform: add video-multiplexer subdevice driver
-In-Reply-To: <e7368555-1644-4e8f-f355-6b07dc020f90@gmail.com>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
- <20170404124732.GD3288@valkosipuli.retiisi.org.uk>
- <e7368555-1644-4e8f-f355-6b07dc020f90@gmail.com>
-Message-ID: <20170412090932.GS4192@valkosipuli.retiisi.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Apr 2017 11:11:17 +0200
+Subject: [PATCH v5 0/4] gpio: mvebu: Add PWM fan support
+In-Reply-To: <20170409180931.4884-1-ralph.sennhauser@gmail.com> (Ralph
+ Sennhauser's message of "Sun, 9 Apr 2017 20:09:26 +0200")
+References: <20170409180931.4884-1-ralph.sennhauser@gmail.com>
+Message-ID: <87bms2gfd6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hi all,
+ 
+ On dim., avril 09 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-On Tue, Apr 11, 2017 at 05:50:58PM -0700, Steve Longerbeam wrote:
-> 
-> 
-> On 04/04/2017 05:47 AM, Sakari Ailus wrote:
-> >Hi Steve, Philipp and Pavel,
-> >
-> >On Mon, Mar 27, 2017 at 05:40:34PM -0700, Steve Longerbeam wrote:
-> >>From: Philipp Zabel <p.zabel@pengutronix.de>
-> >>
-> >>This driver can handle SoC internal and external video bus multiplexers,
-> >>controlled either by register bit fields or by a GPIO. The subdevice
-> >>passes through frame interval and mbus configuration of the active input
-> >>to the output side.
-> >
-> >The MUX framework is already in linux-next. Could you use that instead of
-> >adding new driver + bindings that are not compliant with the MUX framework?
-> >I don't think it'd be much of a change in terms of code, using the MUX
-> >framework appears quite simple.
-> 
-> I would prefer to wait on this, and get what we have merged now so I can
-> unload all these patches first.
+> Hi Therry,
+>
+> Resending this as v5 with some minor changes since v4. What is missing is
+> an ACK from you so Linus can merge the driver and Gregory the dts
+> changes. For this driver to make it into 4.12 it would be nice to have
+> it in next soon. I hope you can make some room in your schedule to have
+> another look at this series.
 
-The DT bindings will be different for this one and if you were using a MUX,
-won't they? And you can't remove support for the existing bindings either,
-you have to continue to support them going forward.
+If the other maintainer agree I can apply the arm-soc related patch (2,
+3 and 4) to my mvebu branches. Actually even if the gpio driver is not
+merged yet, these patches won't hurt. The only things I would like to
+check is that the binding won't change.
 
-> 
-> Also this is Philipp's driver, so again I would prefer to get this
-> merged as-is and then Philipp can address these issues in a future
-> patch. But I will add my comments below...
+Thanks,
 
-I bet there will be more issues to handle if you were to do the changes
-later than now.
+Gregory
 
-...
-
-> >>+static int vidsw_s_stream(struct v4l2_subdev *sd, int enable)
-> >>+{
-> >>+	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
-> >>+	struct v4l2_subdev *upstream_sd;
-> >>+	struct media_pad *pad;
-> >>+
-> >>+	if (vidsw->active == -1) {
-> >>+		dev_err(sd->dev, "Can not start streaming on inactive mux\n");
-> >>+		return -EINVAL;
-> >>+	}
-> >>+
-> >>+	pad = media_entity_remote_pad(&sd->entity.pads[vidsw->active]);
-> >>+	if (!pad) {
-> >>+		dev_err(sd->dev, "Failed to find remote source pad\n");
-> >>+		return -ENOLINK;
-> >>+	}
-> >>+
-> >>+	if (!is_media_entity_v4l2_subdev(pad->entity)) {
-> >>+		dev_err(sd->dev, "Upstream entity is not a v4l2 subdev\n");
-> >>+		return -ENODEV;
-> >>+	}
-> >>+
-> >>+	upstream_sd = media_entity_to_v4l2_subdev(pad->entity);
-> >>+
-> >>+	return v4l2_subdev_call(upstream_sd, video, s_stream, enable);
-> >
-> >Now that we'll have more than two drivers involved in the same pipeline it
-> >becomes necessary to define the behaviour of s_stream() throughout the
-> >pipeline --- i.e. whose responsibility is it to call s_stream() on the
-> >sub-devices in the pipeline?
-> 
-> In the case of imx-media, the capture device calls set stream on the
-> whole pipeline in the start_streaming() callback. This subdev call is
-> actually a NOOP for imx-media, because the upstream entity has already
-> started streaming. Again I think this should be removed. It also
-> enforces a stream order that some MC drivers may have a problem with.
-
-What I want to say here is that the order in which the different devices in
-the pipeline need to be started may not be known in a driver for a
-particular part of the pipeline.
-
-In order to avoid trying to have a single point of decision making, the
-s_stream() op implemented in sub-device drivers should serve the purpose.
-I'll cc you for the documentation patch.
+>
+> Thanks
+> Ralph
+>
+> ---
+>
+> Notes:
+>
+>   About npwm = 1:
+>     The only way I can think of to achieve that requires reading the
+>     GPIO line from the device tree. This would prevent a user to
+>     dynamically choose a line. Which is fine for the fan found on Mamba
+>     but let's take some development board with freely accessible GPIOs
+>     and suddenly we limit the use of this driver. Given the above, npwm
+>     = ngpio with only one usable at a time is a more accurate
+>     description of the situation. The only downside is some "wasted"
+>     space.
+>
+>   About the new compatible string:
+>     Orion was chosen for the SoC variant for the same reason as in
+>     commit 5f79c651e81e ("arm: mvebu: use global interrupts for GPIOs on
+>     Armada XP").
+>     The "pwm" property remains optional for the new compatible string so
+>     the compatiple string "marvell,armada-370-xp-gpio" can be used by
+>     all and not just the first two GPIO chips. A property to select "Set
+>     A" / "Set B" registers could be invented though.
+>
+> ---
+>
+> Pending:
+>   * Needs ACK from Thierry Reding to be merged via linux-gpio tree by Linus
+>     Walleij. (fine with the general approach, requested changes which
+>     should have been taken care of now)
+>
+> ---
+>
+> Changes v4->v5:
+>   All
+>     * add Tested-by: Andrew Lunn <andrew@lunn.ch>, thanks
+>   Patch 2/4 mvebu: xp: Add PWM properties to .dtsi files
+>     * keep the old compatible stings, we don't have to drop them,
+>       therefore keep them (suggested by Gregory CLEMENT)
+>     * subject starts with ARM: dts: mvebu: (suggested by Gregory CLEMENT)
+>   Patch 4/4 mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
+>     * subject starts with ARM: dts: armada-xp: (suggested by Gregory CLEMENT)
+>
+> Changes v3->v4:
+>   Patch 1/4 gpio: mvebu: Add limited PWM support:
+>     * braces for both branches in if statement if one needs it. (suggested
+>       by Andrew Lunn)
+>     * introduce compatible string marvell,armada-370-xp-gpio (suggest by
+>       Rob Herring)
+>     * fix mvebu_pwmreg_blink_on_duration -> mvebu_pwmreg_blink_off_duration
+>       for period callculation in mvebu_pwm_get_state()
+>   Patch 4/4 mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
+>     * Drop flags from pwms for Mamba, as no longer used (suggested by
+>       Andrew Lunn)
+>     * Use again #pwm-cell = 2, the second cell is actually the period.
+>
+> Changes v2->v3:
+>   Patch 1/4 gpio: mvebu: Add limited PWM support:
+>     * drop pin from mvebu_pwn, can be infered (suggested by Thierry Reding)
+>     * rename pwm to mvpwm so pwm can be used for pwm_device as in the API,
+>       avoids some mental gymnastic.
+>     * drop id from struct mvebu_gpio_chip, select blink counter in
+>       mvebu_pwm_probe for all lines instead. We do not care about the
+>       unused ones. I think a clear improvement in readability.
+>       Makes coming up with a good comment simple as well.
+>     * Switch to new atomic PWM API (suggested by Thierry Reding)
+>     * rename use mvebu_gpioreg_blink_select to
+>       mvebu_gpioreg_blink_counter_select.
+>     * mark *_suspend() / *_resume() as __maybe_unused (suggested by Linus
+>       Walleij)
+>     * document #pwm-cells = 1 (suggested by Thierry Reding)
+>   Patch 2/4 mvebu: xp: Add PWM properties to .dtsi files
+>     * add missing reg-names / #pwm-cell properties to
+>       armada-xp-mv78260.dtsi gpio1 node
+>     * set pwm-cells = 1 (suggested by Thierry Reding)
+>   All:
+>     * always uppercase GPIO/PWM in prose (suggested by Thierry Reding)
+>
+> Changes v1 -> v2:
+>   Patch 1/4 gpio: mvebu: Add limited PWM support:
+>     * use BIT macro (suggested by Linus Walleij)
+>     * move id from struct mvebu_pwm to struct mvebu_gpio_chip, implement
+>       blink select as if else and comment on the chip id for code clarity
+>       (to accommodate Linus Walleijs request for a code clarification /
+>       comment. If you can word it better I'm all ears.)
+>     * Move function comment mvebu_pwm_probe into the function itself.
+>
+> ---
+>
+> Andrew Lunn (4):
+>   gpio: mvebu: Add limited PWM support
+>   ARM: dts: mvebu: Add PWM properties to .dtsi files
+>   ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
+>   ARM: dts: armada-xp: Use pwm-fan rather than gpio-fan
+>
+>  .../devicetree/bindings/gpio/gpio-mvebu.txt        |  32 ++
+>  MAINTAINERS                                        |   2 +
+>  arch/arm/boot/dts/armada-370.dtsi                  |  19 +-
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |   8 +-
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  16 +-
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  19 +-
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  19 +-
+>  arch/arm/configs/mvebu_v7_defconfig                |   2 +
+>  drivers/gpio/gpio-mvebu.c                          | 324 ++++++++++++++++++++-
+>  9 files changed, 405 insertions(+), 36 deletions(-)
+>
+> -- 
+> 2.10.2
+>
 
 -- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
