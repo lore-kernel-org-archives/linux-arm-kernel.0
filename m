@@ -1,46 +1,40 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 12 Apr 2017 13:13:46 +0200
-Subject: [PATCH v4 04/18] dt-bindings: syscon: Add DT bindings documentation
- for Allwinner syscon
+Date: Wed, 12 Apr 2017 13:13:48 +0200
+Subject: [PATCH v4 06/18] arm: sun8i: sunxi-h3-h5: Add dt node for the syscon
+ control module
 In-Reply-To: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
 References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170412111400.2296-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170412111400.2296-7-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the
-syscon present in allwinner devices.
+This patch add the dt node for the syscon register present on the
+Allwinner H3/H5
+
+Only two register are present in this syscon and the only one useful is
+the one dedicated to EMAC clock..
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-new file mode 100644
-index 0000000..c056c5b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-@@ -0,0 +1,19 @@
-+* Allwinner sun8i system controller
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 1aeeacb..78d1d61 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -83,6 +83,12 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		syscon: syscon at 01c00000 {
++			compatible = "allwinner,sun8i-h3-system-controller",
++				"syscon";
++			reg = <0x01c00000 0x1000>;
++		};
 +
-+This file describes the bindings for the system controller present in
-+Allwinner SoC H3, A83T and A64.
-+The principal function of this syscon is to control EMAC PHY choice and
-+config.
-+
-+Required properties for the system controller:
-+- reg: address and length of the register for the device.
-+- compatible: should be "syscon" and one of the following string:
-+		"allwinner,sun8i-h3-system-controller"
-+		"allwinner,sun8i-a64-system-controller"
-+		"allwinner,sun8i-a83t-system-controller"
-+
-+Example:
-+syscon: syscon at 01c00000 {
-+	compatible = "allwinner,sun8i-h3-system-controller", "syscon";
-+	reg = <0x01c00000 0x1000>;
-+};
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun8i-h3-dma";
+ 			reg = <0x01c02000 0x1000>;
 -- 
 2.10.2
