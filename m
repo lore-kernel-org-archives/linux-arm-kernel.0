@@ -1,65 +1,96 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Wed, 12 Apr 2017 16:35:07 +0800
-Subject: [PATCH v3 8/8] arm64: exception: check shared writable page in
- SEI handler
-In-Reply-To: <58E7B6BD.3000401@arm.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-9-git-send-email-xiexiuqi@huawei.com>
- <58E7B6BD.3000401@arm.com>
-Message-ID: <5b914702-7262-54d5-2f64-0521a04add03@huawei.com>
+From: rric@kernel.org (Robert Richter)
+Date: Wed, 12 Apr 2017 10:43:36 +0200
+Subject: [RFC PATCH 5/7] iommu/arm-smmu-v3: For ACPI based device
+ probing, set relevant options for different SMMUv3 implementations.
+In-Reply-To: <1491921765-29475-6-git-send-email-linucherian@gmail.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-6-git-send-email-linucherian@gmail.com>
+Message-ID: <20170412084336.GM4906@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Linu,
 
+On 11.04.17 20:12:43, linucherian at gmail.com wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
+> 
+> Enable SKIP_PREFETCH option for HiSilicon SMMUv3 model.
+> Enable PAGE0_REGS_ONLY and USE_SHARED_IRQS options for
+> Cavium 99xx SMMUv3 model.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 1475ad8..00b48b4 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2634,18 +2634,45 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+>  }
+>  
+>  #ifdef CONFIG_ACPI
+> +static int acpi_smmu_get_options(u32 model, struct arm_smmu_device *smmu)
+> +{
+> +	int ret = 0;
+> +
+> +	switch (model) {
+> +	case ACPI_IORT_SMMU_V3:
+> +	case ACPI_IORT_SMMU_CORELINK_MMU600:
+> +		break;
+> +	case ACPI_IORT_SMMU_V3_HISILICON:
+> +		smmu->options |= ARM_SMMU_OPT_SKIP_PREFETCH;
+> +		break;
+> +	case ACPI_IORT_SMMU_V3_CAVIUM_CN99XX:
+> +		smmu->options |= (ARM_SMMU_OPT_PAGE0_REGS_ONLY |
+> +				  ARM_SMMU_OPT_USE_SHARED_IRQS);
+> +		break;
+> +	default:
+> +		ret = -ENODEV;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
+>  				      struct arm_smmu_device *smmu)
+>  {
+>  	struct acpi_iort_smmu_v3 *iort_smmu;
+>  	struct device *dev = smmu->dev;
+>  	struct acpi_iort_node *node;
+> +	int ret;
+>  
+>  	node = *(struct acpi_iort_node **)dev_get_platdata(dev);
+>  
+>  	/* Retrieve SMMUv3 specific data */
+>  	iort_smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+>  
+> +	ret = acpi_smmu_get_options(iort_smmu->model, smmu);
+> +	if (ret < 0)
+> +		return ret;
+> +
 
-On 2017/4/7 23:56, James Morse wrote:
-> Hi Xie XiuQi,
-> 
-> On 30/03/17 11:31, Xie XiuQi wrote:
->> From: Wang Xiongfeng <wangxiongfeng2@huawei.com>
->>
->> Since SEI is asynchronous, the error data has been consumed. So we must
->> suppose that all the memory data current process can write are
->> contaminated. If the process doesn't have shared writable pages, the
->> process will be killed, and the system will continue running normally.
->> Otherwise, the system must be terminated, because the error has been
->> propagated to other processes running on other cores, and recursively
->> the error may be propagated to several another processes.
-> 
-> This is pretty complicated. We can't guarantee that another CPU hasn't modified
-> the page tables while we do this, (so its racy). We can't guarantee that the
-> corrupt data hasn't been sent over the network or written to disk in the mean
-> time (so its not enough).
-> 
-> The scenario you have is a write of corrupt data to memory where another CPU
-> reading it doesn't know the value is corrupt.
-> 
-> The hardware gives us quite a lot of help containing errors. The RAS
-> specification (DDI 0587A) describes your scenario as error propagation in '2.1.2
-> Architectural error propagation', and then classifies it in '2.1.3
-> Architecturally infected, containable and uncontainable' as uncontained because
-> the value is no longer in the general-purpose registers. For uncontained errors
-> we should panic().
-> 
-> We shouldn't need to try to track errors after we get a notification as the
-> hardware has done this for us.
-> 
-Thanks for your comments. I think what you said is reasonable. We will remove this
-patch and use AET fields of ESR_ELx to determine whether we should kill current
-process or just panic.
-> 
-> Firmware-first does complicate this if events like this are not delivered using
-> a synchronous external abort, as Linux may have PSTATE.A masked preventing
-> SError Interrupts from being taken. It looks like PSTATE.A is masked much more
-> often than is necessary. I will look into cleaning this up.
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> .
-> 
+could we add at least:
+
+	dev_notice(smmu->dev, "option mask 0x%x\n", smmu->options);
+
+We need a note to see which options have been enabled.
+
+It could be even more fancy and maybe unified with DT code to see the
+same messages for DT and ACPI.
+
 Thanks,
-Wang Xiongfeng
+
+-Robert
+
+>  	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
+>  		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
+>  
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
