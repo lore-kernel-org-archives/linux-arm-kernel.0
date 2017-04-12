@@ -1,98 +1,36 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 12 Apr 2017 15:04:58 +0100
-Subject: [PATCH 2/3] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+Date: Wed, 12 Apr 2017 15:04:59 +0100
+Subject: [PATCH 3/3] arm64: kconfig: allow support for memory failure handling
 In-Reply-To: <20170412140459.21824-1-punit.agrawal@arm.com>
 References: <20170412140459.21824-1-punit.agrawal@arm.com>
-Message-ID: <20170412140459.21824-3-punit.agrawal@arm.com>
+Message-ID: <20170412140459.21824-4-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
 
-Add VM_FAULT_HWPOISON[_LARGE] handling to the arm64 page fault
-handler. Handling of VM_FAULT_HWPOISON[_LARGE] is very similar
-to VM_FAULT_OOM, the only difference is that a different si_code
-(BUS_MCEERR_AR) is passed to user space and si_addr_lsb field is
-initialized.
+Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
+memory failure recovery attempt.
 
 Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-(fix new __do_user_fault call-site)
+(Dropped changes to ACPI APEI Kconfig and updated commit log)
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- arch/arm64/mm/fault.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 1b35b8bddbfb..7684219d8cc4 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -31,6 +31,7 @@
- #include <linux/highmem.h>
- #include <linux/perf_event.h>
- #include <linux/preempt.h>
-+#include <linux/hugetlb.h>
- 
- #include <asm/bug.h>
- #include <asm/cpufeature.h>
-@@ -207,10 +208,11 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
-  */
- static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 			    unsigned int esr, unsigned int sig, int code,
--			    struct pt_regs *regs)
-+			    struct pt_regs *regs, int fault)
- {
- 	struct siginfo si;
- 	const struct fault_info *inf;
-+	unsigned int lsb = 0;
- 
- 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
- 		inf = esr_to_fault_info(esr);
-@@ -227,6 +229,17 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 	si.si_errno = 0;
- 	si.si_code = code;
- 	si.si_addr = (void __user *)addr;
-+	/*
-+	 * Either small page or large page may be poisoned.
-+	 * In other words, VM_FAULT_HWPOISON_LARGE and
-+	 * VM_FAULT_HWPOISON are mutually exclusive.
-+	 */
-+	if (fault & VM_FAULT_HWPOISON_LARGE)
-+		lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
-+	else if (fault & VM_FAULT_HWPOISON)
-+		lsb = PAGE_SHIFT;
-+	si.si_addr_lsb = lsb;
-+
- 	force_sig_info(sig, &si, tsk);
- }
- 
-@@ -242,7 +255,7 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
- 	 */
- 	if (user_mode(regs)) {
- 		inf = esr_to_fault_info(esr);
--		__do_user_fault(tsk, addr, esr, inf->sig, inf->code, regs);
-+		__do_user_fault(tsk, addr, esr, inf->sig, inf->code, regs, 0);
- 	} else
- 		__do_kernel_fault(mm, addr, esr, regs);
- }
-@@ -444,6 +457,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		 */
- 		sig = SIGBUS;
- 		code = BUS_ADRERR;
-+	} else if (fault & (VM_FAULT_HWPOISON | VM_FAULT_HWPOISON_LARGE)) {
-+		sig = SIGBUS;
-+		code = BUS_MCEERR_AR;
- 	} else {
- 		/*
- 		 * Something tried to access memory that isn't in our memory
-@@ -454,7 +470,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 			SEGV_ACCERR : SEGV_MAPERR;
- 	}
- 
--	__do_user_fault(tsk, addr, esr, sig, code, regs);
-+	__do_user_fault(tsk, addr, esr, sig, code, regs, fault);
- 	return 0;
- 
- no_context:
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3741859765cf..993a5fd85452 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -19,6 +19,7 @@ config ARM64
+ 	select ARCH_HAS_STRICT_MODULE_RWX
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_USE_CMPXCHG_LOCKREF
++	select ARCH_SUPPORTS_MEMORY_FAILURE
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_SUPPORTS_NUMA_BALANCING
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
 -- 
 2.11.0
