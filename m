@@ -1,42 +1,31 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 12 Apr 2017 11:02:59 -0500
-Subject: [PATCH 7/8] arm64: defconfig: enable APEI and GHES features
-In-Reply-To: <1492012980-11650-1-git-send-email-timur@codeaurora.org>
-References: <1492012980-11650-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1492012980-11650-8-git-send-email-timur@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Apr 2017 17:06:19 +0100
+Subject: [PATCH 2/6] regulator: anatop: only set supply regulator when it
+ actually exists
+In-Reply-To: <CAA+hA=QG7xwJrX0q3fyTEAHEcwJr-0z0T+MvC2ESDpBGrhQVRA@mail.gmail.com>
+References: <1491962327-12477-1-git-send-email-aisheng.dong@nxp.com>
+ <1491962327-12477-2-git-send-email-aisheng.dong@nxp.com>
+ <20170411203124.y7cwyttqfu4a2aov@sirena.org.uk>
+ <20170413071101.GA23163@b29396-OptiPlex-7040>
+ <20170412155336.vhhrftqmlxhti36n@sirena.org.uk>
+ <CAA+hA=QG7xwJrX0q3fyTEAHEcwJr-0z0T+MvC2ESDpBGrhQVRA@mail.gmail.com>
+Message-ID: <20170412160619.lz7jehm5bivoqwgn@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 server platforms can support ACPI Platform Error Interface (APEI)
-and Generic Hardware Error Source (GHES) features, so enable them.
+On Thu, Apr 13, 2017 at 12:00:36AM +0800, Dong Aisheng wrote:
 
-Platforms which support the firmware-first RAS error reporting model
-require APEI and GHES functionality for the OS to receive and report
-error records provided by the platform.
+> It can solve the problem.
+> But it breaks some thing and need a further tiny fix.
+> I just replied the mail in your patch thread.
+> Please check it!
 
-PCIe AER functionality is required for PCIe AER errors to be properly
-reported and recovered from.
-
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 5f50213..e99637a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -491,6 +491,9 @@ CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EFI_VARS=y
- CONFIG_EFI_CAPSULE_LOADER=y
- CONFIG_ACPI=y
-+CONFIG_ACPI_APEI=y
-+CONFIG_ACPI_APEI_GHES=y
-+CONFIG_ACPI_APEI_PCIEAER=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+OK, I'll look out for your mail (I've not seen it yet, guess it's got
+held up).  Thanks for testing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170412/635e41c0/attachment.sig>
