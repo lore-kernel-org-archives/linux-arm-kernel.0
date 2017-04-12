@@ -1,43 +1,42 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 12 Apr 2017 10:40:46 +0800
-Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
-In-Reply-To: <20170314105108.GA15248@leverpostej>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
- <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
- <CAFpQJXUQm84-DTCAng1RQq-wv-nqw=+MTe=vGTL7Sw=yL2sd+A@mail.gmail.com>
- <20170314105108.GA15248@leverpostej>
-Message-ID: <58ED93AE.3040605@huawei.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 12 Apr 2017 12:29:10 +0930
+Subject: [GIT PULL] ARM: aspeed: defconfig for 4.12
+Message-ID: <CACPK8XdwSk8y7ZTnU=H3DA+_O1UOcQNvv57y-GzZA2z8-AOWdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/3/14 18:51, Mark Rutland wrote:
-> Hi Ganapatrao,
->
-> On Tue, Mar 14, 2017 at 11:30:17AM +0530, Ganapatrao Kulkarni wrote:
->>> +int __init armv8_pmu_driver_init(void)
->>> +{
->>> +       if (acpi_disabled)
->>> +               return platform_driver_register(&armv8_pmu_driver);
->>> +       else
->>> +               return arm_pmu_acpi_probe(armv8_pmuv3_init);
->> i think this function needs to be updated to
->> probe SoC specific init (armv8_a53_pmu_init, armv8_vulcan_pmu_init
->> etc)  as well.
-> Only exposing generic PMUv3 here was a deliberate decision, based on
-> prior discussions, so as to keep things consistent on ACPI platforms
-> regardless of which CPU types the PMU code is immediately aware of.
->
-> I should have documented this better; sorry about that.
->
-> All events which can be enumerated via the PMU ID registers will be
-> exposed via sysfs.
->
-> Other events (e.g. those which are implementation defined) will not be
-> exposed via sysfs, but can still be used as raw events.
+Hello Arnd, Olof,
 
-Hmm, this means inconsistency of pmu events for system booted with
-ACPI and DT (DT may represent more events), is there any plan to support
-events not in generic PMUv3 for further steps in the future?
+These are the Aspeed defconfig changes for 4.12.
 
-Thanks
-Hanjun
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+tags/aspeed-4.12-defconfig
+
+for you to fetch changes up to 97bae47812dbbd220e354bc9f15c3b3c8b481a86:
+
+  ARM: configs: aspeed: Add new drivers (2017-04-07 15:29:50 +0930)
+
+----------------------------------------------------------------
+Aspeed defconfig updates for 4.12
+
+Add newly unstreamed drivers to the defconfigs for the Aspeed SoCs.
+The defconfigs are reworked to be useful for development and testing
+of OpenBMC on these systems.
+
+----------------------------------------------------------------
+C?dric Le Goater (1):
+      ARM: aspeed: Add CONFIG_SPI_ASPEED_SMC
+
+Joel Stanley (2):
+      ARM: configs: aspeed: Update configs for BMC systems
+      ARM: configs: aspeed: Add new drivers
+
+ arch/arm/configs/aspeed_g4_defconfig | 112 ++++++++++++++++++++++++++++-------
+ arch/arm/configs/aspeed_g5_defconfig | 111 ++++++++++++++++++++++++++--------
+ 2 files changed, 175 insertions(+), 48 deletions(-)
