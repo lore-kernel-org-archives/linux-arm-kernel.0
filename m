@@ -1,39 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Apr 2017 12:32:51 +0100
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <86a179ad-7961-18f7-8050-25e0e584c77d@st.com>
-References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
- <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
- <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
- <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
- <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
- <20170411211040.htrcedus3c57fbed@sirena.org.uk>
- <86a179ad-7961-18f7-8050-25e0e584c77d@st.com>
-Message-ID: <20170412113251.nfyk5sw6c5pnpmwr@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 12 Apr 2017 14:10:31 +0200
+Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
+In-Reply-To: <20170412080038.kk4vrjhvr3eao26q@dell>
+References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+ <20170411140613.jvhzsvrxa4evwxjh@dell> <20170411211936.GT2078@mai>
+ <20170412080038.kk4vrjhvr3eao26q@dell>
+Message-ID: <c1dba250-a60c-febc-a5c3-5ba645a61ce0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 08:30:31AM +0000, Olivier MOYSAN wrote:
-> On 04/11/2017 11:10 PM, Mark Brown wrote:
+On 12/04/2017 10:00, Lee Jones wrote:
+> On Tue, 11 Apr 2017, Daniel Lezcano wrote:
+> 
+>> On Tue, Apr 11, 2017 at 03:06:13PM +0100, Lee Jones wrote:
+>>> On Sat, 08 Apr 2017, Daniel Lezcano wrote:
+>>>
+>>>> The hi655x multi function device is a PMIC providing regulators.
+>>>>
+>>>> The PMIC also provides a clock for the WiFi and the Bluetooth, let's implement
+>>>> this clock in order to add it in the hi655x MFD and allow proper wireless
+>>>> initialization.
+>>>>
+>>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> > That sounds wrong, I'd expect this wiring to be done statically as part
-> > of the .dtsi for the SoC (or just grabbed as needed at runtime if
-> > things are flexbile enough) rather than being a configuration thing done
-> > per board...  I had thought that this was configuration reflecting
-> > different ways of taping out the IP with different feature sets, is that
-> > not the case?
+[ ... ]
 
-> This configuration is board dependent. The IP may be used as rx, tx or 
-> fd depending on board. So I think it can make sense to have a DMA 
-> configuration linked to board, and to set IP mode accordingly.
+>> Do you want to drop it from your tree or shall I resubmit a V3 without the mfd
+>> change?
+> 
+> The latter please.
 
-It is totally normal to just not use one direction in a given system, we
-don't normally need to do anything special to handle things.  I'm a bit
-confused as to what's different here and needs configuring?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170412/7caea188/attachment.sig>
+Ok.
+
+What about the DT binding change?
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
