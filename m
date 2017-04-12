@@ -1,45 +1,31 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 12 Apr 2017 13:13:58 +0200
-Subject: [PATCH v4 16/18] arm64: allwinner: bananapi-m64: Enable dwmac-sun8i
+Date: Wed, 12 Apr 2017 13:13:59 +0200
+Subject: [PATCH v4 17/18] arm: sunxi: Enable dwmac-sun8i driver on
+ sunxi_defconfig
 In-Reply-To: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
 References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170412111400.2296-17-clabbe.montjoie@gmail.com>
+Message-ID: <20170412111400.2296-18-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i  hardware is present on the BananaPi M64.
-It uses an external PHY rtl8211e via RGMII.
+Enable the dwmac-sun8i driver in the sunxi default configuration
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 6872135..0c07c89 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -77,6 +77,21 @@
- 	bias-pull-up;
- };
- 
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 5cd5dd70..504e022 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -40,6 +40,7 @@ CONFIG_ATA=y
+ CONFIG_AHCI_SUNXI=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
++CONFIG_DWMAC_SUN8I=y
+ # CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
 -- 
 2.10.2
