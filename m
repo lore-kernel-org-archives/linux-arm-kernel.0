@@ -1,60 +1,64 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 12 Apr 2017 12:29:12 +0930
-Subject: [GIT PULL] ARM: aspeed: devicetree for 4.12
-Message-ID: <CACPK8Xfp+x=MGtj-eOjdU+jSgkriJ1uG8LnP4=OB97pLdbO4Vw@mail.gmail.com>
+From: linucherian@gmail.com (Linu Cherian)
+Date: Wed, 12 Apr 2017 10:35:19 +0530
+Subject: [RFC PATCH 1/7] iommu/arm-smmu-v3: Introduce smmu option
+ PAGE0_REGS_ONLY for Silicon errata.
+In-Reply-To: <d89ecbd2-ed1b-b13b-a7e4-ff2478655203@arm.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-2-git-send-email-linucherian@gmail.com>
+ <d89ecbd2-ed1b-b13b-a7e4-ff2478655203@arm.com>
+Message-ID: <CAGOz-0Z-kwxdD0x=X51baRmGe1bWJ4PyNkmRSuyheepPUYKxmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Olof,
+On Tue, Apr 11, 2017 at 9:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 11/04/17 15:42, linucherian at gmail.com wrote:
+>> From: Linu Cherian <linu.cherian@cavium.com>
+>>
+>> Cavium 99xx SMMU implementation doesn't support page 1 register space
+>> and PAGE0_REGS_ONLY option will be enabled as an errata workaround.
+>
+> Ugh :(
+>
+>> This option when turned on, replaces all page 1 offsets used for
+>> EVTQ_PROD/CONS, PRIQ_PROD/CONS register access with page 0 offsets.
+>
+> I think it might be neater to have something like:
+>
+> arm_smmu_page1(smmu) {
+>         if (smmu->quirk)
+>                 return smmu->base;
+>         return smmu->base + 64k;
+> }
+>
+> and use it as the base in the appropriate places, rather than override
+> the individual registers. Much like ARM_SMMU_GR0_NS in the SMMUv2 driver.
+>
 
-These are the Aspeed devicetree changes for 4.12.
+IIUC, we need to change the offsets as well for this,
+Like,
+ #define ARM_SMMU_EVTQ_BASE             0xa0
+-#define ARM_SMMU_EVTQ_PROD             0x100a8
+-#define ARM_SMMU_EVTQ_CONS             0x100ac
++#define ARM_SMMU_EVTQ_PROD             0xa8
++#define ARM_SMMU_EVTQ_CONS             0xac
+ #define ARM_SMMU_EVTQ_IRQ_CFG0         0xb0
+ #define ARM_SMMU_EVTQ_IRQ_CFG1         0xb8
+ #define ARM_SMMU_EVTQ_IRQ_CFG2         0xbc
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+ #define ARM_SMMU_PRIQ_BASE             0xc0
+-#define ARM_SMMU_PRIQ_PROD             0x100c8
+-#define ARM_SMMU_PRIQ_CONS             0x100cc
++#define ARM_SMMU_PRIQ_PROD             0xc8
++#define ARM_SMMU_PRIQ_CONS             0xcc
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-are available in the git repository at:
+But, it appears difficult to take this approach, at least with
+arm_smmu_init_one_queue function.
+This function takes both page0 register offset and and page1 register
+offset as an argument.
+So, we might need to do additional checks in this function to decide,
+whether to use
+a pag0 base or page1 base.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-tags/aspeed-4.12-devicetree
 
-for you to fetch changes up to 78a2569fa60497347babeddb24a367946e258283:
-
-  arm: dts: aspeed: Describe ADCs for AST2400/AST2500 (2017-04-07
-13:09:47 +0930)
-
-----------------------------------------------------------------
-Aspeed devicetree updates for 4.12
-
-Updates to the device tree to include upstreamed drivers:
-
- - SPI flash controller
- - Watchdog
- - ADC
-
-In addition we describe some of the clocks so that upstream kernels can
-boot on hardware.
-
-----------------------------------------------------------------
-C?dric Le Goater (3):
-      ARM: dts: aspeed: add SPI controller bindings
-      ARM: dts: aspeed: Add SPI controller bindings to Romulus
-      ARM: dts: aspeed: Add a fastread property
-
-Joel Stanley (3):
-      ARM: dts: aspeed: Make G5 clocks fixed
-      ARM: dts: aspeed: Make G4 clocks fixed
-      ARM: dts: aspeed: Update watchdog compatible strings
-
-Lei YU (1):
-      ARM: dts: aspeed: romulus: Add UART1
-
-Rick Altherr (1):
-      arm: dts: aspeed: Describe ADCs for AST2400/AST2500
-
- arch/arm/boot/dts/aspeed-ast2500-evb.dts      |  22 ++++
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |  18 +++
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts  |  36 ++++++
- arch/arm/boot/dts/aspeed-g4.dtsi              | 109 +++++++++++++-----
- arch/arm/boot/dts/aspeed-g5.dtsi              | 156 +++++++++++++++++++-------
- 5 files changed, 271 insertions(+), 70 deletions(-)
+Thanks.
