@@ -1,75 +1,55 @@
-From: domenico.andreoli@linux.com (Domenico Andreoli)
-Date: Wed, 12 Apr 2017 10:33:43 +0200
-Subject: [PATCH] arm64: kernel: restrict /dev/mem read() calls to linear
- region
-In-Reply-To: <20170412082606.17151-1-ard.biesheuvel@linaro.org>
-References: <20170412082606.17151-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170412083342.GA6957@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Apr 2017 09:33:59 +0100
+Subject: "Consolidate get_dma_ops" breaks Xen on ARM
+In-Reply-To: <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
+References: <alpine.DEB.2.10.1704101713080.2759@sstabellini-ThinkPad-X260>
+ <CY1PR0401MB1536C1FF3C069BC88D1DB14581000@CY1PR0401MB1536.namprd04.prod.outlook.com>
+ <a758dfc6-2b00-e279-303c-ba1e27380e35@arm.com>
+ <20170411133649.GB27857@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
+Message-ID: <20170412083359.GA19019@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 09:26:06AM +0100, Ard Biesheuvel wrote:
-> When running lscpu on an AArch64 system that has SMBIOS version 2.0
-> tables, it will segfault in the following way:
+On Tue, Apr 11, 2017 at 04:39:09PM -0700, Stefano Stabellini wrote:
+> On Tue, 11 Apr 2017, Catalin Marinas wrote:
+> > On Tue, Apr 11, 2017 at 01:43:28PM +0100, Julien Grall wrote:
+> > > On 11/04/17 02:14, Bart Van Assche wrote:
+> > > > On 04/10/17 17:31, Stefano Stabellini wrote:
+> > > >> I think the reason is that, as you can see, if (dev && dev->dma_ops),
+> > > >> dev->dma_ops is returned, while before this changes, xen_dma_ops was
+> > > >> returned on Xen on ARM.
+> > > >>
+> > > >> Unfortunately DMA cannot work properly without using the appropriate
+> > > >> xen_dma_ops. See drivers/xen/swiotlb-xen.c and arch/arm/xen/mm.c for
+> > > >> more details. (The problem is easy to spot, but I wasn't CC'ed on the
+> > > >> patch.)
+> > > >>
+> > > >> I don't know how to solve this problem without introducing some sort of
+> > > >> if (xen()) in include/linux/dma-mapping.h.
+> > > > 
+> > > > Sorry but I don't have access to an ARM development system. Does your 
+> > > > comment apply to dev == NULL only, dev != NULL only or perhaps to both? 
+> > > > If your comment applies to dev != NULL only, can you check whether 
+> > > > adding something like set_dma_ops(dev, get_arch_dma_ops(NULL)) to the 
+> > > > appropriate ARM arch_setup_dma_ops() function is sufficient?
+> > > 
+> > > If I understand correctly, set_dma_ops will replace dev->dma_ops with
+> > > Xen DMA ops.
+[...]
+> > Yet another way would be for dom0 to always set dev->dma_ops to
+> > xen_dma_ops and preserve the real dma_ops somewhere under dev->archdata.
+> > You could intercept the arch_setup_dma_ops() function for this or use
+> > bus_register_notifier() (though I think the former is easier). The Xen
+> > code making use of the real dma_ops would have to dig them out from
+> > dev->archdata.
 > 
->   Unable to handle kernel paging request at virtual address ffff8000bfff0000
->   pgd = ffff8000f9615000
->   [ffff8000bfff0000] *pgd=0000000000000000
->   Internal error: Oops: 96000007 [#1] PREEMPT SMP
->   Modules linked in:
->   CPU: 0 PID: 1284 Comm: lscpu Not tainted 4.11.0-rc3+ #103
->   Hardware name: QEMU QEMU Virtual Machine, BIOS 0.0.0 02/06/2015
->   task: ffff8000fa78e800 task.stack: ffff8000f9780000
->   PC is at __arch_copy_to_user+0x90/0x220
->   LR is at read_mem+0xcc/0x140
-> 
-> This is caused by the fact that lspci issues a read() on /dev/mem at the
-> offset where it expects to find the SMBIOS structure array. However, this
-> region is classified as EFI_RUNTIME_SERVICE_DATA (as per the UEFI spec),
-> and so it is omitted from the linear mapping.
-> 
-> So let's restrict /dev/mem read/write access to those areas that are
-> covered by the linear region.
-> 
-> Reported-by: Alexander Graf <agraf@suse.de>
-> Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/mmap.c | 9 +++------
->  1 file changed, 3 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-> index 7b0d55756eb1..2956240d17d7 100644
-> --- a/arch/arm64/mm/mmap.c
-> +++ b/arch/arm64/mm/mmap.c
-> @@ -18,6 +18,7 @@
->  
->  #include <linux/elf.h>
->  #include <linux/fs.h>
-> +#include <linux/memblock.h>
->  #include <linux/mm.h>
->  #include <linux/mman.h>
->  #include <linux/export.h>
-> @@ -103,12 +104,8 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
->   */
->  int valid_phys_addr_range(phys_addr_t addr, size_t size)
->  {
-> -	if (addr < PHYS_OFFSET)
-> -		return 0;
-> -	if (addr + size > __pa(high_memory - 1) + 1)
-> -		return 0;
-> -
-> -	return 1;
-> +	return memblock_is_map_memory(addr) &&
-> +	       memblock_is_map_memory(addr + size - 1);
->  }
->  
->  /*
+> This is a good suggestion, Catalin. Thank you. See below. Is that what
+> you have in mind? Julien could you test it, please? If it is the right
+> approach, I'll submit the patch properly and rename __generic_dma_ops to
+> xen_generic_dma_ops or something.
 
-Does arch/arm/mm/mmap.c need the same treatment?
-
-Regards,
-Domenico
+It looks fine to me (subject to testing successfully).
 
 -- 
-3B10 0CA1 8674 ACBA B4FE  FCD2 CE5B CF17 9960 DE13
+Catalin
