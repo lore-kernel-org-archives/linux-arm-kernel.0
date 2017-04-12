@@ -1,61 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 12 Apr 2017 18:31:18 -0300
-Subject: [PATCH v2] ARM: dts: imx53-qsrb: Pulldown PMIC IRQ pin
-Message-ID: <1492032678-29572-1-git-send-email-festevam@gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 13 Apr 2017 08:30:40 +1000
+Subject: [PATCH v3 00/32] PCI: fix config and I/O Address space memory
+ mappings
+In-Reply-To: <20170412144109.GB6842@red-moon>
+References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
+ <1491917906.7236.7.camel@kernel.crashing.org>
+ <20170411140857.GA6821@red-moon>
+ <1491952371.7236.22.camel@kernel.crashing.org>
+ <20170412113124.GZ17774@n2100.armlinux.org.uk>
+ <1492005119.7236.62.camel@kernel.crashing.org>
+ <20170412141654.GA17774@n2100.armlinux.org.uk>
+ <20170412144109.GB6842@red-moon>
+Message-ID: <1492036240.7236.80.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, 2017-04-12 at 15:41 +0100, Lorenzo Pieralisi wrote:
+> > > At least we make the failure explicit, and the driver can take
+> > > alternate (possibly sub-optimal) action if it chooses to do so.
+> > 
+> > The same points apply to things like pgprot_writecombine(),
+> > pgprot_noncached(), pgprot_device().? Then there's also pgprot_nonposted()
+> > that this series also introduces.
 
-Currently the following errors are seen:
+No. pgprot_writecombine() silently falling back to simply non-cached is
+ok as we aren't "weakening" the ordering rules silently here. Something
+that is correct with writecombine will also work without. It's just an
+optimisation. Not correctness.
 
-[   14.015056] mc13xxx 0-0008: Failed to read IRQ status: -6
-[   27.321093] mc13xxx 0-0008: Failed to read IRQ status: -6
-[   27.411681] mc13xxx 0-0008: Failed to read IRQ status: -6
-[   27.456281] mc13xxx 0-0008: Failed to read IRQ status: -6
-[   30.527106] mc13xxx 0-0008: Failed to read IRQ status: -6
-[   36.596900] mc13xxx 0-0008: Failed to read IRQ status: -6
+Things like noncached() must of course be honored, and I don't think
+we have a case anywhere where it isn't.
 
-Also when reading the interrupts via 'cat /proc/interrupts' the
-PMIC GPIO interrupt counter does not stop increasing.
+My point with nopost() is that it's never ok to silently downgrade it.
+Code written with the assumption that there is no posting will be
+*incorrect* if posting happens. We do live with that "bug" today indeed
+but once we have that accessors we might start growing more code that
+relies on the specific attribute that things aren't posted and will be
+wrong on all the archs providing the default implementation.
 
-The reason for the storm of interrupts is that the PUS field of
-register IOMUXC_SW_PAD_CTL_PAD_CSI0_DAT5 is currently configured as:
-10 : 100k pullup
+This is why I insist that pgprot_nopost() if it exists globally, should
+return NULL when the semantic cannot be provided. That way there is a
+clear line in the sand. If the driver choses to operate with posted
+non-cached anyway, then make it an explicit driver choice.
 
-and the PMIC interrupt is being registered as IRQ_TYPE_LEVEL_HIGH type,
-which is the correct type as per the MC34708 datasheet.
+> > If ioremap_nopost() is not possible on an architecture, then
+> > pgprot_nonposted() won't be possible either - but you've made no
+> > mention of that so far.
 
-Use the default power on value for the IOMUX, which sets PUS field as:
-00: 360k pull down
+Right. It's not on most in fact.
 
-This prevents the spurious PMIC interrupts from happening.
+> > Just like the proposed ioremap_nopost(), pgprot_nonposted() is given a
+> > default implementation that uses pgprot_noncached().? Maybe we should
+> > also make pci_remap_iospace() fail if pgprot_nonposted() is not defined
+> > by the architecture?
 
-Commit e1ffceb078c6 ("ARM: imx53: qsrb: fix PMIC interrupt level")
-correctly described the irq type as IRQ_TYPE_LEVEL_HIGH, but
-missed to update the IOMUX of the PMIC GPIO as pull down.
+Or we *document* that mmap of IO space can result in something that is
+partially non-posted.
 
-Fixes: e1ffceb078c6 ("ARM: imx53: qsrb: fix PMIC interrupt level")
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Fix typo: s/seeing/seen in the commit log
-
- arch/arm/boot/dts/imx53-qsrb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx53-qsrb.dts b/arch/arm/boot/dts/imx53-qsrb.dts
-index de22158..4e103a9 100644
---- a/arch/arm/boot/dts/imx53-qsrb.dts
-+++ b/arch/arm/boot/dts/imx53-qsrb.dts
-@@ -23,7 +23,7 @@
- 	imx53-qsrb {
- 		pinctrl_pmic: pmicgrp {
- 			fsl,pins = <
--				MX53_PAD_CSI0_DAT5__GPIO5_23	0x1e4 /* IRQ */
-+				MX53_PAD_CSI0_DAT5__GPIO5_23	0x1c4 /* IRQ */
- 			>;
- 		};
- 	};
--- 
-2.7.4
+> Yes, I was about to mention that and you are right, I should deal with
+> that too unfortunately. BTW, I have not posted the drivers to make the
+> review easier (ie it would add 20 more patches to an already massive
+> patch series - that will be trimmed when the asm-generic include is
+> removed from arches according to this discussion).
+> 
+> Thanks,
+> Lorenzo
