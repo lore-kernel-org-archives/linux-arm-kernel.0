@@ -1,108 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Apr 2017 11:01:59 +0200
-Subject: [PATCH v2] ARM: dts: armada-38x: label USB and SATA nodes
-In-Reply-To: <20170408101626.14032-1-ralph.sennhauser@gmail.com> (Ralph
- Sennhauser's message of "Sat, 8 Apr 2017 12:16:26 +0200")
-References: <20170408101626.14032-1-ralph.sennhauser@gmail.com>
-Message-ID: <87k26qgfso.fsf@free-electrons.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 12 Apr 2017 12:09:32 +0300
+Subject: [PATCH v6 17/39] platform: add video-multiplexer subdevice driver
+In-Reply-To: <e7368555-1644-4e8f-f355-6b07dc020f90@gmail.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
+ <20170404124732.GD3288@valkosipuli.retiisi.org.uk>
+ <e7368555-1644-4e8f-f355-6b07dc020f90@gmail.com>
+Message-ID: <20170412090932.GS4192@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph,
- 
- On sam., avril 08 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
+Hi Steve,
 
-> Recently most nodes got labels to make them referenceable. The USB 3.0
-> nodes as well as the nodes for the SATA controllers were left out,
-> rectify the omission.
->
-> The labels "sataX" are already used by some boards for the SATA ports,
-> therefore use "ahciX" to label the SATA controller nodes.
->
-> To avoid potential confusion by labeling an USB3.0 controller "usb2" use
-> usb3_X as labels. This also coincides with the node names themselves
-> (usb at xxxxx vs usb3 at xxxxx).
->
-> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+On Tue, Apr 11, 2017 at 05:50:58PM -0700, Steve Longerbeam wrote:
+> 
+> 
+> On 04/04/2017 05:47 AM, Sakari Ailus wrote:
+> >Hi Steve, Philipp and Pavel,
+> >
+> >On Mon, Mar 27, 2017 at 05:40:34PM -0700, Steve Longerbeam wrote:
+> >>From: Philipp Zabel <p.zabel@pengutronix.de>
+> >>
+> >>This driver can handle SoC internal and external video bus multiplexers,
+> >>controlled either by register bit fields or by a GPIO. The subdevice
+> >>passes through frame interval and mbus configuration of the active input
+> >>to the output side.
+> >
+> >The MUX framework is already in linux-next. Could you use that instead of
+> >adding new driver + bindings that are not compliant with the MUX framework?
+> >I don't think it'd be much of a change in terms of code, using the MUX
+> >framework appears quite simple.
+> 
+> I would prefer to wait on this, and get what we have merged now so I can
+> unload all these patches first.
 
-Applied on mvebu/dt
+The DT bindings will be different for this one and if you were using a MUX,
+won't they? And you can't remove support for the existing bindings either,
+you have to continue to support them going forward.
 
-Thanks,
+> 
+> Also this is Philipp's driver, so again I would prefer to get this
+> merged as-is and then Philipp can address these issues in a future
+> patch. But I will add my comments below...
 
-Gregory
+I bet there will be more issues to handle if you were to do the changes
+later than now.
 
-> ---
->
-> Hi everybody,
->
-> Using satacX for controllers with satacXpY for ports might have been a
-> possiblity, since ahciX is already used similarly (to avoid a conflict
-> with current use of sataX) ahciX seems the better choice. Works well me
-> thinks.
->
-> The usb3_X labels still seem the best choice even though they aren't
-> perfectly consitent, however, I don't see an alternative which would fit
-> this requirement either.
->
-> Regards
-> Ralph
->
-> ---
->
-> Changes v1 -> v2:
->   * use ahciX instead of satacX for the SATA controller nodes (suggested
->     by Andrew Lunn)
->
->
->  arch/arm/boot/dts/armada-38x.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index ba27ec1..8b165c3 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -530,7 +530,7 @@
->  				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
->  			};
->  
-> -			sata at a8000 {
-> +			ahci0: sata at a8000 {
->  				compatible = "marvell,armada-380-ahci";
->  				reg = <0xa8000 0x2000>;
->  				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -546,7 +546,7 @@
->  				status = "disabled";
->  			};
->  
-> -			sata at e0000 {
-> +			ahci1: sata at e0000 {
->  				compatible = "marvell,armada-380-ahci";
->  				reg = <0xe0000 0x2000>;
->  				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -590,7 +590,7 @@
->  				status = "disabled";
->  			};
->  
-> -			usb3 at f0000 {
-> +			usb3_0: usb3 at f0000 {
->  				compatible = "marvell,armada-380-xhci";
->  				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
->  				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -598,7 +598,7 @@
->  				status = "disabled";
->  			};
->  
-> -			usb3 at f8000 {
-> +			usb3_1: usb3 at f8000 {
->  				compatible = "marvell,armada-380-xhci";
->  				reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
->  				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> -- 
-> 2.10.2
->
+...
+
+> >>+static int vidsw_s_stream(struct v4l2_subdev *sd, int enable)
+> >>+{
+> >>+	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> >>+	struct v4l2_subdev *upstream_sd;
+> >>+	struct media_pad *pad;
+> >>+
+> >>+	if (vidsw->active == -1) {
+> >>+		dev_err(sd->dev, "Can not start streaming on inactive mux\n");
+> >>+		return -EINVAL;
+> >>+	}
+> >>+
+> >>+	pad = media_entity_remote_pad(&sd->entity.pads[vidsw->active]);
+> >>+	if (!pad) {
+> >>+		dev_err(sd->dev, "Failed to find remote source pad\n");
+> >>+		return -ENOLINK;
+> >>+	}
+> >>+
+> >>+	if (!is_media_entity_v4l2_subdev(pad->entity)) {
+> >>+		dev_err(sd->dev, "Upstream entity is not a v4l2 subdev\n");
+> >>+		return -ENODEV;
+> >>+	}
+> >>+
+> >>+	upstream_sd = media_entity_to_v4l2_subdev(pad->entity);
+> >>+
+> >>+	return v4l2_subdev_call(upstream_sd, video, s_stream, enable);
+> >
+> >Now that we'll have more than two drivers involved in the same pipeline it
+> >becomes necessary to define the behaviour of s_stream() throughout the
+> >pipeline --- i.e. whose responsibility is it to call s_stream() on the
+> >sub-devices in the pipeline?
+> 
+> In the case of imx-media, the capture device calls set stream on the
+> whole pipeline in the start_streaming() callback. This subdev call is
+> actually a NOOP for imx-media, because the upstream entity has already
+> started streaming. Again I think this should be removed. It also
+> enforces a stream order that some MC drivers may have a problem with.
+
+What I want to say here is that the order in which the different devices in
+the pipeline need to be started may not be known in a driver for a
+particular part of the pipeline.
+
+In order to avoid trying to have a single point of decision making, the
+s_stream() op implemented in sub-device drivers should serve the purpose.
+I'll cc you for the documentation patch.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
