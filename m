@@ -1,61 +1,63 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 12 Apr 2017 22:06:40 +0530
-Subject: Testing kexec/kdump on ls2085ardb (arm64)
-In-Reply-To: <3fa4df10-86f9-5a6d-d78f-48acd38f873c@globallogic.com>
-References: <799fca3b-8d1c-c1d0-f3d7-e3b060f962fd@globallogic.com>
- <98f5b725-a4d4-c881-2b78-d369d6859acc@redhat.com>
- <3fa4df10-86f9-5a6d-d78f-48acd38f873c@globallogic.com>
-Message-ID: <b34ce5cb-82d3-a706-0a0b-98828ebb4417@redhat.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 12 Apr 2017 09:40:03 -0700
+Subject: [PATCH V14 02/10] ras: acpi/apei: cper: generic error data
+ entry v3 per ACPI 6.1
+In-Reply-To: <20170412133447.n2yft7v266v6k6gh@pd.tnic>
+References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
+ <1490729440-32591-3-git-send-email-tbaicar@codeaurora.org>
+ <20170412133447.n2yft7v266v6k6gh@pd.tnic>
+Message-ID: <1492015203.28586.1.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denys,
+On Wed, 2017-04-12 at 15:34 +0200, Borislav Petkov wrote:
+> On Tue, Mar 28, 2017 at 01:30:32PM -0600, Tyler Baicar wrote:
+> > Currently when a RAS error is reported it is not timestamped.
+[]
+> > diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+[]
+> > +#define acpi_hest_generic_data_error_length(gdata)	\
+> > +	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
+> > +#define acpi_hest_generic_data_size(gdata)		\
+> > +	((acpi_hest_generic_data_version(gdata) >= 3) ?	\
+> > +	sizeof(struct acpi_hest_generic_data_v300) :	\
+> > +	sizeof(struct acpi_hest_generic_data))
+> > +#define acpi_hest_generic_data_record_size(gdata)	\
+> > +	(acpi_hest_generic_data_size(gdata) +		\
+> > +	acpi_hest_generic_data_error_length(gdata))
+> > +#define acpi_hest_generic_data_next(gdata)		\
+> > +	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
+> 
+> This is one unreadable pile of too long names with a clearly redundant
+> and too long prefix. Please shorten it all.
 
-On Wednesday 12 April 2017 08:05 PM, Denys Zagorui wrote:
-> Hello, Pratyush
-> Thanks for your reply.
->
-> Could you describe how i can find out wich enable method used. One more
-> things, i made this tests on qemu, and it works. Logs attached.
->
+Naming is generally author's choice and internal
+consistency has value too.
 
- From your board log (log_for_com ):
+acpi_hest_generic<foo> is already used throughout this codebase
+in multiple files and paths.
 
-PSCI: PSCI does not exist
+> > @@ -73,3 +85,13 @@ static inline void ghes_edac_unregister(struct ghes *ghes)
+> >  {
+> >  }
+> >  #endif
+> > +
+> > +#define acpi_hest_generic_data_version(gdata)			\
+> > +	(gdata->revision >> 8)
+> > +
+> > +static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
+> 
+> Lemme try to shorten it:
+> 
+> static inline void *acpi_hest_get_payload(struct acpi_hest_gdata *d)
+> {
+> 	if (hest_gdata_ver(d) >= 3)
+> 		return (void *)(((struct acpi_hest_gdata_v3 *)d) + 1);
+> 	else
+> 		return d + 1;
+> }
+> 
+> Now this is much more readable IMO. You can actually see what's going
+> on. And you still know what the struct names are.
 
-
-and then
-
-[   60.561877] Can't kexec: CPUs are stuck in the kernel.
-
-Above message is coming from machine_kexec_prepare() when 
-cpus_are_stuck_in_kernel() returns true. See, its implementation. It 
-will return true if number of possible cpus is > 1 and cpu_die() is not 
-implemented.
-
-You can boot your first kernel with nr_cpus=1 in  kernel cmdline and 
-then you should be able to kexec to the second kernel from there.
-
-However, it can not be a solution. You should update your firmware with 
-psci implementation.
-
-For the time being you can have spin-table work aroudn like this [1], 
-but please note that spin-table is discouraged upstream [2].
-
-[1] 
-https://github.com/pratyushanand/linux/commit/a50e98635b7257c101f02f7ac488a4cb04187f6d
-[2] https://patchwork.kernel.org/patch/7873571/
-
-
- From your qemu log:
-
-[    0.000000] psci: probing for conduit method from DT.
-[    0.000000] psci: PSCIv0.2 detected in firmware.
-[    0.000000] psci: Using standard PSCI v0.2 function IDs
-[    0.000000] psci: Trusted OS migration not required
-
-
-and so it works :-)
-
-
-~Pratyush
+trivial: unnecessary cast to void *
