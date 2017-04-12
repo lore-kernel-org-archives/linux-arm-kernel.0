@@ -1,40 +1,45 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 12 Apr 2017 13:13:54 +0200
-Subject: [PATCH v4 12/18] arm64: allwinner: sun50i-a64: Add dt node for the
- syscon control module
+Date: Wed, 12 Apr 2017 13:13:58 +0200
+Subject: [PATCH v4 16/18] arm64: allwinner: bananapi-m64: Enable dwmac-sun8i
 In-Reply-To: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
 References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170412111400.2296-13-clabbe.montjoie@gmail.com>
+Message-ID: <20170412111400.2296-17-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner A64.
-
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock.
+The dwmac-sun8i  hardware is present on the BananaPi M64.
+It uses an external PHY rtl8211e via RGMII.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index c7f669f..0b0f4ab 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -129,6 +129,12 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 6872135..0c07c89 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -77,6 +77,21 @@
+ 	bias-pull-up;
+ };
  
-+		syscon: syscon at 01c00000 {
-+			compatible = "allwinner,sun8i-a64-system-controller",
-+				"syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
 +
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun50i-a64-mmc";
- 			reg = <0x01c0f000 0x1000>;
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
++	phy-mode = "rgmii";
++	phy-handle = <&ext_rgmii_phy>;
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
 -- 
 2.10.2
