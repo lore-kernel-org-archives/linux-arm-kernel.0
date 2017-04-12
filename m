@@ -1,126 +1,312 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 12 Apr 2017 20:51:31 +0200
-Subject: kvm/arm64: use-after-free in
- kvm_unmap_hva_handler/unmap_stage2_pmds
-In-Reply-To: <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
-References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
- <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
- <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
- <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
- <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
-Message-ID: <CAAeHK+yzzdQVvGQcuprTHEa7S9CPiAVYodD__jQ8a=CzA6RaZg@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 12 Apr 2017 20:58:56 +0200
+Subject: [PATCH v5 04/10] drm/stm: Add STM32 LTDC driver
+In-Reply-To: <87wpaqeks2.fsf@eliezer.anholt.net>
+References: <1490694293-18358-1-git-send-email-yannick.fertre@st.com>
+ <1490694293-18358-5-git-send-email-yannick.fertre@st.com>
+ <87wpaqeks2.fsf@eliezer.anholt.net>
+Message-ID: <CA+M3ks5Bnui3Hhqsi=YU4WXJw_3kMwHkWt0_GzMi1G+R48DDTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 8:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 12/04/17 17:19, Andrey Konovalov wrote:
+2017-04-11 22:45 GMT+02:00 Eric Anholt <eric@anholt.net>:
+> Yannick Fertre <yannick.fertre@st.com> writes:
 >
-> Hi Andrey,
->
->> Apparently this wasn't fixed, I've got this report again on
->> linux-next-c4e7b35a3 (Apr 11), which includes 8b3405e34 "kvm:
->> arm/arm64: Fix locking for kvm_free_stage2_pgd".
->
-> This looks like a different bug.
-
-Oh, OK.
-
->
+>> This controller provides output signals to interface directly a variety
+>> of LCD and TFT panels. These output signals are: RGB signals
+>> (up to 24bpp), vertical & horizontal synchronisations, data enable and
+>> the pixel clock.
 >>
->> I now have a way to reproduce it, so I can test proposed patches. I
->> don't have a simple C reproducer though.
+>> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+>> ---
+>>  drivers/gpu/drm/Kconfig      |    3 +-
+>>  drivers/gpu/drm/Makefile     |    1 +
+>>  drivers/gpu/drm/stm/Kconfig  |   16 +
+>>  drivers/gpu/drm/stm/Makefile |    7 +
+>>  drivers/gpu/drm/stm/drv.c    |  221 ++++++++
+>>  drivers/gpu/drm/stm/ltdc.c   | 1210 ++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/gpu/drm/stm/ltdc.h   |   40 ++
+>>  7 files changed, 1497 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/gpu/drm/stm/Kconfig
+>>  create mode 100644 drivers/gpu/drm/stm/Makefile
+>>  create mode 100644 drivers/gpu/drm/stm/drv.c
+>>  create mode 100644 drivers/gpu/drm/stm/ltdc.c
+>>  create mode 100644 drivers/gpu/drm/stm/ltdc.h
 >>
->> The bug happens when the following syzkaller program is executed:
+>> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+>> index 78d7fc0..dd5762a 100644
+>> --- a/drivers/gpu/drm/Kconfig
+>> +++ b/drivers/gpu/drm/Kconfig
+>> @@ -203,7 +203,6 @@ config DRM_VGEM
+>>         as used by Mesa's software renderer for enhanced performance.
+>>         If M is selected the module will be called vgem.
 >>
->> mmap(&(0x7f0000000000/0xc000)=nil, (0xc000), 0x3, 0x32, 0xffffffffffffffff, 0x0)
->> unshare(0x400)
->> perf_event_open(&(0x7f000002f000-0x78)={0x1, 0x78, 0x0, 0x0, 0x0, 0x0,
->> 0x0, 0x6, 0x0, 0x0, 0xd34, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
->> 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, 0x0, 0xffffffff,
->> 0xffffffffffffffff, 0x0)
->> r0 = openat$kvm(0xffffffffffffff9c,
->> &(0x7f000000c000-0x9)="2f6465762f6b766d00", 0x0, 0x0)
->> ioctl$TIOCSBRK(0xffffffffffffffff, 0x5427)
->> r1 = ioctl$KVM_CREATE_VM(r0, 0xae01, 0x0)
->> syz_kvm_setup_cpu$arm64(r1, 0xffffffffffffffff,
->> &(0x7f0000dc6000/0x18000)=nil, &(0x7f000000c000)=[{0x0,
->> &(0x7f000000c000)="5ba3c16f533efbed09f8221253c73763327fadce2371813b45dd7f7982f84a873e4ae89a6c2bd1af83a6024c36a1ff518318",
->> 0x32}], 0x1, 0x0, &(0x7f000000d000-0x10)=[@featur2={0x1, 0x3}], 0x1)
+>> -
 >
-> Is that the only thing the program does? Or is there anything running in
-> parallel?
+> Stray whitespace change.
+>
+> With this removed, the driver is:
+>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+>
+> Apologies for the delay in the second review offered.  The remainder of
+> my comments are little cleanups, all of which I think are optional and
+> fine to do after the code lands.
+>
+> You should probably update MAINTAINERS for your new driver.  If you'd
+> like to maintain this driver in the drm-misc small drivers collection
+> (https://01.org/linuxgraphics/gfx-docs/maintainer-tools/drm-misc.html),
+> send a follow-up patch to the list to add the MAINTAINERS entry, and I
+> can get that and patches 1-4 merged.  Once you have a few more patches
+> in, we can add you to the drm-misc committers crew so you can merge
+> directly after getting review.
 
-These calls are executed repeatedly and in random order. That's all.
-
-Except that I'm running the reproducer on a real arm board, so there's
-probably a bunch of stuff going on besides these calls.
-
->
->> ==================================================================
->> BUG: KASAN: use-after-free in arch_spin_is_locked
->> include/linux/compiler.h:254 [inline]
->> BUG: KASAN: use-after-free in unmap_stage2_range+0x990/0x9a8
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:295
->> Read of size 8 at addr ffff800004476730 by task syz-executor/13106
->>
->> CPU: 1 PID: 13106 Comm: syz-executor Not tainted
->> 4.11.0-rc6-next-20170411-xc2-11025-gc4e7b35a33d4-dirty #5
->> Hardware name: Hardkernel ODROID-C2 (DT)
->> Call trace:
->> [<ffff20000808fd08>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
->> [<ffff2000080903c0>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
->> [<ffff2000088df030>] __dump_stack lib/dump_stack.c:16 [inline]
->> [<ffff2000088df030>] dump_stack+0x110/0x168 lib/dump_stack.c:52
->> [<ffff200008406db8>] print_address_description+0x60/0x248 mm/kasan/report.c:252
->> [<ffff2000084072c8>] kasan_report_error mm/kasan/report.c:351 [inline]
->> [<ffff2000084072c8>] kasan_report+0x218/0x300 mm/kasan/report.c:408
->> [<ffff200008407428>] __asan_report_load8_noabort+0x18/0x20 mm/kasan/report.c:429
->> [<ffff2000080db1b8>] arch_spin_is_locked include/linux/compiler.h:254 [inline]
->
-> This is the assert on the spinlock, and the memory is gone.
->
->> [<ffff2000080db1b8>] unmap_stage2_range+0x990/0x9a8
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:295
->> [<ffff2000080db248>] kvm_free_stage2_pgd.part.16+0x30/0x98
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:842
->> [<ffff2000080ddfb8>] kvm_free_stage2_pgd
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:838 [inline]
->
-> But we've taken than lock here. There's only a handful of instructions
-> in between, and the memory can only go away if there is something
-> messing with us in parallel.
->
->> [<ffff2000080ddfb8>] kvm_arch_flush_shadow_all+0x40/0x58
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1895
->> [<ffff2000080c379c>] kvm_mmu_notifier_release+0x154/0x1d0
->> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:472
->> [<ffff2000083f2b60>] __mmu_notifier_release+0x1c0/0x3e0 mm/mmu_notifier.c:75
->> [<ffff2000083a1fb4>] mmu_notifier_release
->> include/linux/mmu_notifier.h:235 [inline]
->> [<ffff2000083a1fb4>] exit_mmap+0x21c/0x288 mm/mmap.c:2941
->> [<ffff20000810ecd4>] __mmput kernel/fork.c:888 [inline]
->> [<ffff20000810ecd4>] mmput+0xdc/0x2e0 kernel/fork.c:910
->> [<ffff20000811fda8>] exit_mm kernel/exit.c:557 [inline]
->> [<ffff20000811fda8>] do_exit+0x648/0x2020 kernel/exit.c:865
->> [<ffff2000081218b4>] do_group_exit+0xdc/0x260 kernel/exit.c:982
->> [<ffff20000813adf0>] get_signal+0x358/0xf58 kernel/signal.c:2318
->> [<ffff20000808de98>] do_signal+0x170/0xc10 arch/arm64/kernel/signal.c:370
->> [<ffff20000808edb4>] do_notify_resume+0xe4/0x120 arch/arm64/kernel/signal.c:421
->> [<ffff200008083e68>] work_pending+0x8/0x14
->
-> So we're being serviced with a signal. Do you know if this signal is
-> generated by your syzkaller program? We could be racing between do_exit
-> triggered by a fatal signal (this trace) and the closing of the two file
-> descriptors (vcpu and vm).
-
-I'm not sure.
+Since we are moving sti driver to drm-misc it makes sense to move all
+STMicroelectronic SoC display drivers to it.
 
 >
-> Paolo: does this look possible to you? I can't see what locking we have
-> that could prevent this race.
+> I'll also take this moment to plug something: Please feel welcome to
+> review other people's driver patches on the list.  You've built
+> something nice here, and probably learned a lot of lessons along the way
+> that you could share with others.  (I just found out about
+> of_reset_control in reviewing your code, and I wish I had known about it
+> back when I was landing vc4!)
 >
-> Thanks,
+>> diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
+>> new file mode 100644
+>> index 0000000..922f021
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/stm/ltdc.c
 >
-> M.
-> --
-> Jazz is not dead. It just smells funny...
+>> +static void ltdc_crtc_disable(struct drm_crtc *crtc)
+>> +{
+>> +     struct ltdc_device *ldev = crtc_to_ltdc(crtc);
+>> +     struct drm_pending_vblank_event *event = crtc->state->event;
+>> +
+>> +     DRM_DEBUG_DRIVER("\n");
+>> +
+>> +     if (!crtc->enabled) {
+>> +             DRM_DEBUG_DRIVER("already disabled\n");
+>> +             return;
+>> +     }
+>
+> I think this crtc->enabled is a given for the disable() being called.
+>
+>> +
+>> +     drm_crtc_vblank_off(crtc);
+>> +
+>> +     /* disable LTDC */
+>> +     reg_clear(ldev->regs, LTDC_GCR, GCR_LTDCEN);
+>> +
+>> +     /* disable IRQ */
+>> +     reg_clear(ldev->regs, LTDC_IER, IER_RRIE | IER_FUIE | IER_TERRIE);
+>> +
+>> +     /* immediately commit disable of layers before switching off LTDC */
+>> +     reg_set(ldev->regs, LTDC_SRCR, SRCR_IMR);
+>> +
+>> +     if (event) {
+>> +             crtc->state->event = NULL;
+>> +
+>> +             spin_lock_irq(&crtc->dev->event_lock);
+>> +             if (crtc->state->active && drm_crtc_vblank_get(crtc) == 0)
+>> +                     drm_crtc_arm_vblank_event(crtc, event);
+>> +             else
+>> +                     drm_crtc_send_vblank_event(crtc, event);
+>> +             spin_unlock_irq(&crtc->dev->event_lock);
+>> +     }
+>
+> I believe that we're guaranteed that crtc->state->event is NULL in the
+> disable call, since your atomic_flush() already armed or sent the event
+> and NULLed out the pointer.
+>
+>> +struct drm_connector *ltdc_rgb_connector_create(struct drm_device *ddev)
+>> +{
+>> +     struct drm_connector *connector;
+>> +     int err;
+>> +
+>> +     connector = devm_kzalloc(ddev->dev, sizeof(*connector), GFP_KERNEL);
+>> +     if (!connector) {
+>> +             DRM_ERROR("Failed to allocate connector\n");
+>> +             return NULL;
+>> +     }
+>> +
+>> +     connector->polled = DRM_CONNECTOR_POLL_HPD;
+>> +
+>> +     err = drm_connector_init(ddev, connector, &ltdc_rgb_connector_funcs,
+>> +                              DRM_MODE_CONNECTOR_LVDS);
+>
+> I think DRM_MODE_CONNECTOR_DPI (and _ENCODER_DPI) are slightly more
+> accurate descriptions, if I'm interpreting your pinmux setup right.
+> It's cosmetic, though.
+>
+>> +static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
+>> +{
+>> +     struct device *dev = ddev->dev;
+>> +     struct device_node *np = dev->of_node;
+>> +     struct device_node *entity, *port = NULL;
+>> +     struct drm_panel *panel = NULL;
+>> +
+>> +     DRM_DEBUG_DRIVER("\n");
+>> +
+>> +     /*
+>> +      * Parse ltdc node to get remote port and find RGB panel / HDMI slave
+>> +      * If a dsi or a bridge (hdmi, lvds...) is connected to ltdc,
+>> +      * a remote port & RGB panel will not be found.
+>> +      */
+>> +     for_each_endpoint_of_node(np, entity) {
+>> +             if (!of_device_is_available(entity))
+>> +                     continue;
+>> +
+>> +             port = of_graph_get_remote_port_parent(entity);
+>> +             if (port) {
+>> +                     panel = of_drm_find_panel(port);
+>> +                     of_node_put(port);
+>> +                     if (panel) {
+>> +                             DRM_DEBUG_DRIVER("remote panel %s\n",
+>> +                                              port->full_name);
+>> +                     } else {
+>> +                             DRM_DEBUG_DRIVER("panel missing\n");
+>> +                             of_node_put(entity);
+>> +                     }
+>> +             }
+>> +     }
+>
+> Future work: You may find the new drm_of_find_panel_or_bridge() useful
+> to drop this loop.
+>
+>> +
+>> +     return panel;
+>> +}
+>> +
+>> +int ltdc_load(struct drm_device *ddev)
+>> +{
+>> +     struct platform_device *pdev = to_platform_device(ddev->dev);
+>> +     struct ltdc_device *ldev = ddev->dev_private;
+>> +     struct device *dev = ddev->dev;
+>> +     struct device_node *np = dev->of_node;
+>> +     struct drm_encoder *encoder;
+>> +     struct drm_connector *connector = NULL;
+>> +     struct drm_crtc *crtc;
+>> +     struct reset_control *rstc;
+>> +     struct resource res;
+>> +     int irq, ret, i;
+>> +
+>> +     DRM_DEBUG_DRIVER("\n");
+>> +
+>> +     ldev->panel = ltdc_get_panel(ddev);
+>> +     if (!ldev->panel)
+>> +             return -EPROBE_DEFER;
+>> +
+>> +     rstc = of_reset_control_get(np, NULL);
+>> +
+>> +     mutex_init(&ldev->err_lock);
+>> +
+>> +     ldev->pixel_clk = devm_clk_get(dev, "lcd");
+>> +     if (IS_ERR(ldev->pixel_clk)) {
+>> +             DRM_ERROR("Unable to get lcd clock\n");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     if (clk_prepare_enable(ldev->pixel_clk)) {
+>> +             DRM_ERROR("Unable to prepare pixel clock\n");
+>> +             return -ENODEV;
+>> +     }
+>
+> Future work: You may want to move the pixel clock enable into the CRTC's
+> .enable() and disable in .disable().  It sounded in previous versions
+> like the HW uses that clock for all register accesses, so you'd need to
+> protect a couple of other places, but that should save power when the
+> device is off, right?
+>
+>> +
+>> +     if (of_address_to_resource(np, 0, &res)) {
+>> +             DRM_ERROR("Unable to get resource\n");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     ldev->regs = devm_ioremap_resource(dev, &res);
+>> +     if (IS_ERR(ldev->regs)) {
+>> +             DRM_ERROR("Unable to get ltdc registers\n");
+>> +             return PTR_ERR(ldev->regs);
+>> +     }
+>> +
+>> +     for (i = 0; i < MAX_IRQ; i++) {
+>> +             irq = platform_get_irq(pdev, i);
+>> +             if (irq < 0)
+>> +                     continue;
+>> +
+>> +             ret = devm_request_threaded_irq(dev, irq, ltdc_irq,
+>> +                                             ltdc_irq_thread, IRQF_ONESHOT,
+>> +                                             dev_name(dev), ddev);
+>> +             if (ret) {
+>> +                     DRM_ERROR("Failed to register LTDC interrupt\n");
+>> +                     return ret;
+>> +             }
+>> +     }
+>> +
+>> +     if (!IS_ERR(rstc))
+>> +             reset_control_deassert(rstc);
+>> +
+>> +     /* Disable interrupts */
+>> +     reg_clear(ldev->regs, LTDC_IER,
+>> +               IER_LIE | IER_RRIE | IER_FUIE | IER_TERRIE);
+>> +
+>> +     ret = ltdc_get_caps(ddev);
+>> +     if (ret) {
+>> +             DRM_ERROR("hardware identifier (0x%08x) not supported!\n",
+>> +                       ldev->caps.hw_version);
+>> +             return ret;
+>> +     }
+>> +
+>> +     DRM_INFO("ltdc hw version 0x%08x - ready\n", ldev->caps.hw_version);
+>> +
+>> +     if (ltdc_create_encoders(ddev)) {
+>> +             DRM_ERROR("Failed to create encoders\n");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     if (ldev->panel) {
+>> +             encoder = ltdc_rgb_encoder_find(ddev);
+>> +             if (!encoder) {
+>> +                     DRM_ERROR("Failed to find RGB encoder\n");
+>> +                     ret = -EINVAL;
+>> +                     goto err;
+>> +             }
+>
+> Given that ltdc_create_encoders() only does work if ldev->panel, its
+> body could probably be moved in here and then ltdc_rgb_encoder_find
+> could be dropped.
+>
+>> +
+>> +             connector = ltdc_rgb_connector_create(ddev);
+>> +             if (!connector) {
+>> +                     DRM_ERROR("Failed to create RGB connector\n");
+>> +                     ret = -EINVAL;
+>> +                     goto err;
+>> +             }
+>> +
+>> +             ret = drm_mode_connector_attach_encoder(connector, encoder);
+>> +             if (ret) {
+>> +                     DRM_ERROR("Failed to attach connector to encoder\n");
+>> +                     goto err;
+>> +             }
+>> +
+>> +             drm_panel_attach(ldev->panel, connector);
+>> +     }
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+
+
+
+-- 
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
