@@ -1,80 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 12 Apr 2017 17:19:32 +0200
-Subject: [PATCH v5 1/4] gpio: mvebu: Add limited PWM support
-In-Reply-To: <20170412163128.5c985a26@free-electrons.com>
-References: <20170409180931.4884-1-ralph.sennhauser@gmail.com>
- <20170409180931.4884-2-ralph.sennhauser@gmail.com>
- <20170412163128.5c985a26@free-electrons.com>
-Message-ID: <20170412151932.GE7023@lunn.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 12 Apr 2017 16:21:54 +0100
+Subject: [RFC PATCH 4/7] ACPICA: IORT: Add SMMuV3 model definitions.
+In-Reply-To: <CA+sq2CfXQAM-ooNRQBbYNYc_T=p2yrvA2FYD=2_=_-Z9kQwVcA@mail.gmail.com>
+References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
+ <1491921765-29475-5-git-send-email-linucherian@gmail.com>
+ <d60a1fcc-081e-03e8-3454-6802e830ddb9@arm.com>
+ <CA+sq2CfXQAM-ooNRQBbYNYc_T=p2yrvA2FYD=2_=_-Z9kQwVcA@mail.gmail.com>
+Message-ID: <20170412152154.GC6842@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 04:31:28PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Tue, Apr 11, 2017 at 10:27:55PM +0530, Sunil Kovvuri wrote:
+> On Tue, Apr 11, 2017 at 9:29 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > On 11/04/17 15:42, linucherian at gmail.com wrote:
+> >> From: Linu Cherian <linu.cherian@cavium.com>
+> >>
+> >> Add SMMuV3 model definitions.
+> >>
+> >> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+> >> ---
+> >>  include/acpi/actbl2.h | 5 +++++
+> >>  1 file changed, 5 insertions(+)
+> >>
+> >> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> >> index 2b4af07..9db67d6 100644
+> >> --- a/include/acpi/actbl2.h
+> >> +++ b/include/acpi/actbl2.h
+> >> @@ -778,6 +778,11 @@ struct acpi_iort_smmu {
+> >>  #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002   /* ARM Corelink MMU-400 */
+> >>  #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003   /* ARM Corelink MMU-500 */
+> >>
+> >> +#define ACPI_IORT_SMMU_V3               0x00000000      /* Generic SMMUv3 */
+> >> +#define ACPI_IORT_SMMU_CORELINK_MMU600  0x00000001      /* ARM Corelink MMU-600 */
+> >> +#define ACPI_IORT_SMMU_V3_HISILICON     0x00000002      /* HiSilicon SMMUv3 */
+> >> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000003      /* Cavium CN99xx SMMUv3 */
+> >
+> > None of those models are listed in the current IORT spec.
 > 
-> Sorry for the late feedback about this.
-> 
-> On Sun,  9 Apr 2017 20:09:27 +0200, Ralph Sennhauser wrote:
-> 
-> > +		gpio1: gpio at 18140 {
-> > +			compatible = "marvell,armada-370-xp-gpio";
-> > +			reg = <0x18140 0x40>, <0x181c8 0x08>;
-> 
-> One issue I see is that you have only two counters A and B. You
-> associate counter A with the first bank of GPIOs, and counter B with
-> the second bank of GPIOs.
-> 
-> Which means that if you need to PWM a GPIO from the third bank of
-> GPIOs, you can't, even if the HW allows it.
->
-> 
-> While I'm fine with not supporting all the HW features, but it's a bit
-> sad that this gets encoded into the DT.
-> 
-> But I guess the only way to make this possible would be to have a
-> single node for all GPIOs rather than one per bank? Or do we have a way
-> to have those counter A/B registers bound to a separate PWM driver, and
-> then the GPIO driver being smart enough to select the counter to be
-> used? Seems not easy to do though :-/
+> As mentioned in the cover letter, we are in the process of getting
+> model no added for our silicon in the soon to be published updated
+> IORT spec.
 
-Hi Thomas
+Good, so first get the IORT firmware bindings updated and then post
+patches to manage them, there is really no point in commenting on
+patches based on FW that can't be written.
 
-Yep. It was a compromise. By adding a new binding for the GPIO driver,
-this might be possible. But it did not seem worth such a major change.
-
-The prime use of this feature is for controlling a fan. So far, i've
-not seen any hardware with more than one fan, i.e. needs more than one
-PWM. Nor have i seen any hardware with the GPIO for the fan being on
-the third bank. A hardware manufacture could add multiple fans, but i
-doubt it, they make noise and fail. And if a manufacture does place a
-fan on the third bank, it can still be controlled as a plain GPIO fan,
-as we have been doing for the last few years.
-
-So i personally think it is an O.K. compromise.
-
-> > @@ -555,6 +842,10 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
-> >  		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ARMADAXP,
-> >  	},
-> >  	{
-> > +		.compatible = "marvell,armada-370-xp-gpio",
-> > +		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ORION,
-> 
-> Whum, what are you doing here?
-
-Since you are late to the discussion, you probably missed this part.
-
-Only 370 and XP have the hardware needed to do this. Kirkwood and
-Orion5x does not. It was requested a compatible string was added to
-indicate SoC has the needed hardware.
-
-The driver was extended when XP was added, due it is per CPU
-interrupts. However, that turned out to be broken. One CPU would
-enable the interrupt, and it was delivered to another, causing it to
-be missed. So XP was reverted to use the plan old ORION way of doing
-interrupts.
-
-So this patch adds in a new compatible string for 370 and XP, to
-indicate the PWM hardware is available, and keeps using the ORION way
-of handing interrupts.
-
-   Andrew
+Thanks,
+Lorenzo
