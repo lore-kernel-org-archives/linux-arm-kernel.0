@@ -1,215 +1,342 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Wed, 12 Apr 2017 11:25:31 -0500
-Subject: [PATCH v2 2/9] staging: fsl-dpaa2/eth: Add Ethernet driver overview
- document
+Date: Wed, 12 Apr 2017 11:25:35 -0500
+Subject: [PATCH v2 6/9] staging: fsl-dpaa2/eth: Add driver specific stats
 In-Reply-To: <20170412162538.25302-1-ruxandra.radulescu@nxp.com>
 References: <20170412162538.25302-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170412162538.25302-3-ruxandra.radulescu@nxp.com>
+Message-ID: <20170412162538.25302-7-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a README file describing the driver architecture, components
-and I/O interface.
+Add custom statistics to be reported via ethtool -S. These include
+driver specific per-cpu statistics as well as queue and channel
+counters.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
 ---
 v2: no changes
 
- drivers/staging/fsl-dpaa2/ethernet/README | 186 ++++++++++++++++++++++++++++++
- 1 file changed, 186 insertions(+)
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/README
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     | 42 ++++++++++++++++++-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     | 36 ++++++++++++++++
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 49 +++++++++++++++++++++-
+ 3 files changed, 123 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/README b/drivers/staging/fsl-dpaa2/ethernet/README
-new file mode 100644
-index 000000000000..410952ecf657
---- /dev/null
-+++ b/drivers/staging/fsl-dpaa2/ethernet/README
-@@ -0,0 +1,186 @@
-+Freescale DPAA2 Ethernet driver
-+===============================
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+index f13f72f3dd9a..67f007bdbe79 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+@@ -208,6 +208,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	void *vaddr;
+ 	struct sk_buff *skb;
+ 	struct rtnl_link_stats64 *percpu_stats;
++	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	struct device *dev = priv->net_dev->dev.parent;
+ 	struct dpaa2_fas *fas;
+ 	u32 status = 0;
+@@ -219,6 +220,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 	prefetch(vaddr + dpaa2_fd_get_offset(fd));
+ 
+ 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
++	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+ 
+ 	if (fd_format == dpaa2_fd_single) {
+ 		skb = build_linear_skb(priv, ch, fd, vaddr);
+@@ -227,6 +229,8 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
+ 				vaddr + dpaa2_fd_get_offset(fd);
+ 		skb = build_frag_skb(priv, ch, sgt);
+ 		skb_free_frag(vaddr);
++		percpu_extras->rx_sg_frames++;
++		percpu_extras->rx_sg_bytes += dpaa2_fd_get_len(fd);
+ 	} else {
+ 		/* We don't support any other format */
+ 		goto err_frame_format;
+@@ -291,6 +295,7 @@ static int consume_frames(struct dpaa2_eth_channel *ch)
+ 
+ 		fd = dpaa2_dq_fd(dq);
+ 		fq = (struct dpaa2_eth_fq *)dpaa2_dq_fqd_ctx(dq);
++		fq->stats.frames++;
+ 
+ 		fq->consume(priv, ch, fd, &ch->napi);
+ 		cleaned++;
+@@ -532,11 +537,13 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+ 	struct dpaa2_fd fd;
+ 	struct rtnl_link_stats64 *percpu_stats;
++	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	struct dpaa2_eth_fq *fq;
+ 	u16 queue_mapping;
+ 	int err, i;
+ 
+ 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
++	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+ 
+ 	if (unlikely(skb_headroom(skb) < DPAA2_ETH_NEEDED_HEADROOM(priv))) {
+ 		struct sk_buff *ns;
+@@ -563,10 +570,14 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 	/* Setup the FD fields */
+ 	memset(&fd, 0, sizeof(fd));
+ 
+-	if (skb_is_nonlinear(skb))
++	if (skb_is_nonlinear(skb)) {
+ 		err = build_sg_fd(priv, skb, &fd);
+-	else
++		percpu_extras->tx_sg_frames++;
++		percpu_extras->tx_sg_bytes += skb->len;
++	} else {
+ 		err = build_single_fd(priv, skb, &fd);
++	}
 +
-+This file provides documentation for the Freescale DPAA2 Ethernet driver.
+ 	if (unlikely(err)) {
+ 		percpu_stats->tx_dropped++;
+ 		goto err_build_fd;
+@@ -583,6 +594,7 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
+ 		if (err != -EBUSY)
+ 			break;
+ 	}
++	percpu_extras->tx_portal_busy += i;
+ 	if (unlikely(err < 0)) {
+ 		percpu_stats->tx_errors++;
+ 		/* Clean up everything, including freeing the skb */
+@@ -608,8 +620,13 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
+ 			      struct napi_struct *napi __always_unused)
+ {
+ 	struct rtnl_link_stats64 *percpu_stats;
++	struct dpaa2_eth_drv_stats *percpu_extras;
+ 	u32 status = 0;
+ 
++	percpu_extras = this_cpu_ptr(priv->percpu_extras);
++	percpu_extras->tx_conf_frames++;
++	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
 +
+ 	free_tx_fd(priv, fd, &status);
+ 
+ 	if (unlikely(status & DPAA2_ETH_TXCONF_ERR_MASK)) {
+@@ -814,13 +831,19 @@ static int refill_pool(struct dpaa2_eth_priv *priv,
+ static int pull_channel(struct dpaa2_eth_channel *ch)
+ {
+ 	int err;
++	int dequeues = -1;
+ 
+ 	/* Retry while portal is busy */
+ 	do {
+ 		err = dpaa2_io_service_pull_channel(NULL, ch->ch_id, ch->store);
++		dequeues++;
+ 		cpu_relax();
+ 	} while (err == -EBUSY);
+ 
++	ch->stats.dequeue_portal_busy += dequeues;
++	if (unlikely(err))
++		ch->stats.pull_err++;
 +
-+Contents
-+========
-+	Supported Platforms
-+	Architecture Overview
-+	Creating a Network Interface
-+	Features & Offloads
+ 	return err;
+ }
+ 
+@@ -868,6 +891,8 @@ static int dpaa2_eth_poll(struct napi_struct *napi, int budget)
+ 		} while (err == -EBUSY);
+ 	}
+ 
++	ch->stats.frames += cleaned;
 +
+ 	return cleaned;
+ }
+ 
+@@ -1320,6 +1345,10 @@ static void cdan_cb(struct dpaa2_io_notification_ctx *ctx)
+ 	struct dpaa2_eth_channel *ch;
+ 
+ 	ch = container_of(ctx, struct dpaa2_eth_channel, nctx);
 +
-+Supported Platforms
-+===================
-+This driver provides networking support for Freescale DPAA2 SoCs, e.g.
-+LS2080A, LS2088A, LS1088A.
++	/* Update NAPI statistics */
++	ch->stats.cdan++;
 +
+ 	napi_schedule_irqoff(&ch->napi);
+ }
+ 
+@@ -2345,6 +2374,12 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
+ 		err = -ENOMEM;
+ 		goto err_alloc_percpu_stats;
+ 	}
++	priv->percpu_extras = alloc_percpu(*priv->percpu_extras);
++	if (!priv->percpu_extras) {
++		dev_err(dev, "alloc_percpu(percpu_extras) failed\n");
++		err = -ENOMEM;
++		goto err_alloc_percpu_extras;
++	}
+ 
+ 	err = netdev_init(net_dev);
+ 	if (err)
+@@ -2387,6 +2422,8 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
+ err_csum:
+ 	unregister_netdev(net_dev);
+ err_netdev_init:
++	free_percpu(priv->percpu_extras);
++err_alloc_percpu_extras:
+ 	free_percpu(priv->percpu_stats);
+ err_alloc_percpu_stats:
+ 	del_ch_napi(priv);
+@@ -2425,6 +2462,7 @@ static int dpaa2_eth_remove(struct fsl_mc_device *ls_dev)
+ 
+ 	free_rings(priv);
+ 	free_percpu(priv->percpu_stats);
++	free_percpu(priv->percpu_extras);
+ 
+ 	del_ch_napi(priv);
+ 	free_dpbp(priv);
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+index b30231891eef..f2b0a60795fe 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+@@ -197,6 +197,38 @@ struct dpaa2_fas {
+  */
+ #define DPAA2_ETH_ENQUEUE_RETRIES	10
+ 
++/* Driver statistics, other than those in struct rtnl_link_stats64.
++ * These are usually collected per-CPU and aggregated by ethtool.
++ */
++struct dpaa2_eth_drv_stats {
++	__u64	tx_conf_frames;
++	__u64	tx_conf_bytes;
++	__u64	tx_sg_frames;
++	__u64	tx_sg_bytes;
++	__u64	rx_sg_frames;
++	__u64	rx_sg_bytes;
++	/* Enqueues retried due to portal busy */
++	__u64	tx_portal_busy;
++};
 +
-+Architecture Overview
-+=====================
-+Unlike regular NICs, in the DPAA2 architecture there is no single hardware block
-+representing network interfaces; instead, several separate hardware resources
-+concur to provide the networking functionality:
-+        - network interfaces
-+        - queues, channels
-+        - buffer pools
-+        - MAC/PHY
++/* Per-FQ statistics */
++struct dpaa2_eth_fq_stats {
++	/* Number of frames received on this queue */
++	__u64 frames;
++};
 +
-+All hardware resources are allocated and configured through the Management
-+Complex (MC) portals. MC abstracts most of these resources as DPAA2 objects
-+and exposes ABIs through which they can be configured and controlled. A few
-+hardware resources, like queues, do not have a corresponding MC object and
-+are treated as internal resources of other objects.
++/* Per-channel statistics */
++struct dpaa2_eth_ch_stats {
++	/* Volatile dequeues retried due to portal busy */
++	__u64 dequeue_portal_busy;
++	/* Number of CDANs; useful to estimate avg NAPI len */
++	__u64 cdan;
++	/* Number of frames received on queues from this channel */
++	__u64 frames;
++	/* Pull errors */
++	__u64 pull_err;
++};
 +
-+For a more detailed description of the DPAA2 architecture and its object
-+abstractions see:
-+	drivers/staging/fsl-mc/README.txt
+ /* Maximum number of queues associated with a DPNI */
+ #define DPAA2_ETH_MAX_RX_QUEUES		16
+ #define DPAA2_ETH_MAX_TX_QUEUES		NR_CPUS
+@@ -224,6 +256,7 @@ struct dpaa2_eth_fq {
+ 			struct dpaa2_eth_channel *,
+ 			const struct dpaa2_fd *,
+ 			struct napi_struct *);
++	struct dpaa2_eth_fq_stats stats;
+ };
+ 
+ struct dpaa2_eth_channel {
+@@ -236,6 +269,7 @@ struct dpaa2_eth_channel {
+ 	struct dpaa2_io_store *store;
+ 	struct dpaa2_eth_priv *priv;
+ 	int buf_count;
++	struct dpaa2_eth_ch_stats stats;
+ };
+ 
+ struct dpaa2_eth_hash_fields {
+@@ -275,6 +309,8 @@ struct dpaa2_eth_priv {
+ 
+ 	/* Standard statistics */
+ 	struct rtnl_link_stats64 __percpu *percpu_stats;
++	/* Extra stats, in addition to the ones known by the kernel */
++	struct dpaa2_eth_drv_stats __percpu *percpu_extras;
+ 
+ 	u16 mc_token;
+ 
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+index 4378956a5527..dd0cffa908ef 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+@@ -56,6 +56,23 @@ char dpaa2_ethtool_stats[][ETH_GSTRING_LEN] = {
+ 
+ #define DPAA2_ETH_NUM_STATS	ARRAY_SIZE(dpaa2_ethtool_stats)
+ 
++char dpaa2_ethtool_extras[][ETH_GSTRING_LEN] = {
++	/* per-cpu stats */
++	"tx conf frames",
++	"tx conf bytes",
++	"tx sg frames",
++	"tx sg bytes",
++	"rx sg frames",
++	"rx sg bytes",
++	"enqueue portal busy",
++	/* Channel stats */
++	"dequeue portal busy",
++	"channel pull errors",
++	"cdan",
++};
 +
-+Each Linux net device is built on top of a Datapath Network Interface (DPNI)
-+object and uses Buffer Pools (DPBPs), I/O Portals (DPIOs) and Concentrators
-+(DPCONs).
++#define DPAA2_ETH_NUM_EXTRA_STATS	ARRAY_SIZE(dpaa2_ethtool_extras)
 +
-+Configuration interface:
+ static void dpaa2_eth_get_drvinfo(struct net_device *net_dev,
+ 				  struct ethtool_drvinfo *drvinfo)
+ {
+@@ -147,6 +164,10 @@ static void dpaa2_eth_get_strings(struct net_device *netdev, u32 stringset,
+ 			strlcpy(p, dpaa2_ethtool_stats[i], ETH_GSTRING_LEN);
+ 			p += ETH_GSTRING_LEN;
+ 		}
++		for (i = 0; i < DPAA2_ETH_NUM_EXTRA_STATS; i++) {
++			strlcpy(p, dpaa2_ethtool_extras[i], ETH_GSTRING_LEN);
++			p += ETH_GSTRING_LEN;
++		}
+ 		break;
+ 	}
+ }
+@@ -155,7 +176,7 @@ static int dpaa2_eth_get_sset_count(struct net_device *net_dev, int sset)
+ {
+ 	switch (sset) {
+ 	case ETH_SS_STATS: /* ethtool_get_stats(), ethtool_get_drvinfo() */
+-		return DPAA2_ETH_NUM_STATS;
++		return DPAA2_ETH_NUM_STATS + DPAA2_ETH_NUM_EXTRA_STATS;
+ 	default:
+ 		return -EOPNOTSUPP;
+ 	}
+@@ -171,9 +192,14 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
+ 	int j, k, err;
+ 	int num_cnt;
+ 	union dpni_statistics dpni_stats;
++	u64 cdan = 0;
++	u64 portal_busy = 0, pull_err = 0;
+ 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
++	struct dpaa2_eth_drv_stats *extras;
++	struct dpaa2_eth_ch_stats *ch_stats;
+ 
+-	memset(data, 0, sizeof(u64) * DPAA2_ETH_NUM_STATS);
++	memset(data, 0,
++	       sizeof(u64) * (DPAA2_ETH_NUM_STATS + DPAA2_ETH_NUM_EXTRA_STATS));
+ 
+ 	/* Print standard counters, from DPNI statistics */
+ 	for (j = 0; j <= 2; j++) {
+@@ -197,6 +223,25 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
+ 		for (k = 0; k < num_cnt; k++)
+ 			*(data + i++) = dpni_stats.raw.counter[k];
+ 	}
 +
-+                 -----------------------
-+                | DPAA2 Ethernet Driver |
-+                 -----------------------
-+                     .      .      .
-+                     .      .      .
-+             . . . . .      .      . . . . . .
-+             .              .                .
-+             .              .                .
-+         ----------     ----------      -----------
-+        | DPBP API |   | DPNI API |    | DPCON API |
-+         ----------     ----------      -----------
-+             .              .                .             software
-+===========  .  ==========  .  ============  .  ===================
-+             .              .                .             hardware
-+         ------------------------------------------
-+        |            MC hardware portals           |
-+         ------------------------------------------
-+             .              .                .
-+             .              .                .
-+          ------         ------            -------
-+         | DPBP |       | DPNI |          | DPCON |
-+          ------         ------            -------
++	/* Print per-cpu extra stats */
++	for_each_online_cpu(k) {
++		extras = per_cpu_ptr(priv->percpu_extras, k);
++		for (j = 0; j < sizeof(*extras) / sizeof(__u64); j++)
++			*((__u64 *)data + i + j) += *((__u64 *)extras + j);
++	}
++	i += j;
 +
-+The DPNIs are network interfaces without a direct one-on-one mapping to PHYs.
-+DPBPs represent hardware buffer pools. Packet I/O is performed in the context
-+of DPCON objects, using DPIO portals for managing and communicating with the
-+hardware resources.
++	for (j = 0; j < priv->num_channels; j++) {
++		ch_stats = &priv->channel[j]->stats;
++		cdan += ch_stats->cdan;
++		portal_busy += ch_stats->dequeue_portal_busy;
++		pull_err += ch_stats->pull_err;
++	}
 +
-+Datapath (I/O) interface:
-+
-+         -----------------------------------------------
-+        |           DPAA2 Ethernet Driver               |
-+          -----------------------------------------------
-+          |          ^        ^         |            |
-+          |          |        |         |            |
-+   enqueue|   dequeue|   data |  dequeue|       seed |
-+    (Tx)  | (Rx, TxC)|  avail.|  request|     buffers|
-+          |          |  notify|         |            |
-+          |          |        |         |            |
-+          V          |        |         V            V
-+         -----------------------------------------------
-+        |                 DPIO Driver                   |
-+         -----------------------------------------------
-+          |          |        |         |            |          software
-+          |          |        |         |            |  ================
-+          |          |        |         |            |          hardware
-+         -----------------------------------------------
-+        |               I/O hardware portals            |
-+         -----------------------------------------------
-+          |          ^        ^         |            |
-+          |          |        |         |            |
-+          |          |        |         V            |
-+          V          |    ================           V
-+        ----------------------           |      -------------
-+ queues  ----------------------          |     | Buffer pool |
-+          ----------------------         |      -------------
-+                   =======================
-+                                Channel
-+
-+Datapath I/O (DPIO) portals provide enqueue and dequeue services, data
-+availability notifications and buffer pool management. DPIOs are shared between
-+all DPAA2 objects (and implicitly all DPAA2 kernel drivers) that work with data
-+frames, but must be affine to the CPUs for the purpose of traffic distribution.
-+
-+Frames are transmitted and received through hardware frame queues, which can be
-+grouped in channels for the purpose of hardware scheduling. The Ethernet driver
-+enqueues TX frames on egress queues and after transmission is complete a TX
-+confirmation frame is sent back to the CPU.
-+
-+When frames are available on ingress queues, a data availability notification
-+is sent to the CPU; notifications are raised per channel, so even if multiple
-+queues in the same channel have available frames, only one notification is sent.
-+After a channel fires a notification, is must be explicitly rearmed.
-+
-+Each network interface can have multiple Rx, Tx and confirmation queues affined
-+to CPUs, and one channel (DPCON) for each CPU that services at least one queue.
-+DPCONs are used to distribute ingress traffic to different CPUs via the cores'
-+affine DPIOs.
-+
-+The role of hardware buffer pools is storage of ingress frame data. Each network
-+interface has a privately owned buffer pool which it seeds with kernel allocated
-+buffers.
-+
-+
-+DPNIs are decoupled from PHYs; a DPNI can be connected to a PHY through a DPMAC
-+object or to another DPNI through an internal link, but the connection is
-+managed by MC and completely transparent to the Ethernet driver.
-+
-+     ---------     ---------     ---------
-+    | eth if1 |   | eth if2 |   | eth ifn |
-+     ---------     ---------     ---------
-+          .           .          .
-+          .           .          .
-+          .           .          .
-+         ---------------------------
-+        |   DPAA2 Ethernet Driver   |
-+         ---------------------------
-+          .           .          .
-+          .           .          .
-+          .           .          .
-+       ------      ------      ------            -------
-+      | DPNI |    | DPNI |    | DPNI |          | DPMAC |----+
-+       ------      ------      ------            -------     |
-+         |           |           |                  |        |
-+         |           |           |                  |      -----
-+          ===========             ==================      | PHY |
-+                                                           -----
-+
-+Creating a Network Interface
-+============================
-+A net device is created for each DPNI object probed on the MC bus. Each DPNI has
-+a number of properties which determine the network interface configuration
-+options and associated hardware resources.
-+
-+DPNI objects (and the other DPAA2 objects needed for a network interface) can be
-+added to a container on the MC bus in one of two ways: statically, through a
-+Datapath Layout Binary file (DPL) that is parsed by MC at boot time; or created
-+dynamically at runtime, via the DPAA2 objects APIs.
-+
-+
-+Features & Offloads
-+===================
-+Hardware checksum offloading is supported for TCP and UDP over IPv4/6 frames.
-+The checksum offloads can be independently configured on RX and TX through
-+ethtool.
-+
-+Hardware offload of unicast and multicast MAC filtering is supported on the
-+ingress path and permanently enabled.
-+
-+Scatter-gather frames are supported on both RX and TX paths. On TX, SG support
-+is configurable via ethtool; on RX it is always enabled.
-+
-+The DPAA2 hardware can process jumbo Ethernet frames of up to 10K bytes.
-+
-+The Ethernet driver defines a static flow hashing scheme that distributes
-+traffic based on a 5-tuple key: src IP, dst IP, IP proto, L4 src port,
-+L4 dst port. No user configuration is supported for now.
-+
-+Hardware specific statistics for the network interface as well as some
-+non-standard driver stats can be consulted through ethtool -S option.
++	*(data + i++) = portal_busy;
++	*(data + i++) = pull_err;
++	*(data + i++) = cdan;
+ }
+ 
+ static int dpaa2_eth_get_rxnfc(struct net_device *net_dev,
 -- 
 2.11.0
