@@ -1,118 +1,98 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Wed, 12 Apr 2017 12:24:28 +0530
-Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
-In-Reply-To: <1727318a-7ef8-1ea7-a657-241bbc96bc89@ti.com>
-References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
- <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
- <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
- <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
- <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
- <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
- <1727318a-7ef8-1ea7-a657-241bbc96bc89@ti.com>
-Message-ID: <CAEHZuqPMY+XKUDYK32-FGc9N=e_zsrexPo6nrLvFRE8QoVugMg@mail.gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 12 Apr 2017 09:03:09 +0200
+Subject: [PATCH] [media] imx: csi: retain current field order and
+ colorimetry setting as default
+In-Reply-To: <1491494481.2392.102.camel@pengutronix.de>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
+ <1491486929.2392.29.camel@pengutronix.de>
+ <0f9690f8-c7f6-59ff-9e3e-123af9972d4b@xs4all.nl>
+ <1491490451.2392.70.camel@pengutronix.de>
+ <59e72974-bfb0-6061-8b13-5f13f8723ba6@xs4all.nl>
+ <1491494481.2392.102.camel@pengutronix.de>
+Message-ID: <6c22519f-64f8-7213-d458-23470bdd5ecd@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 10, 2017 at 2:07 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Wednesday 05 April 2017 07:40 PM, Raviteja Garimella wrote:
->> Hi Kishon,
->>
->> On Wed, Apr 5, 2017 at 7:04 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi Ravi,
->>>
->>> On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
->>>> Hi Kishon,
->>>>
->>>> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>>>> Hi,
+On 04/06/2017 06:01 PM, Philipp Zabel wrote:
+> On Thu, 2017-04-06 at 17:43 +0200, Hans Verkuil wrote:
+>> On 04/06/2017 04:54 PM, Philipp Zabel wrote:
+>>> On Thu, 2017-04-06 at 16:20 +0200, Hans Verkuil wrote:
+>>>> On 04/06/2017 03:55 PM, Philipp Zabel wrote:
+>>>>> If the the field order is set to ANY in set_fmt, choose the currently
+>>>>> set field order. If the colorspace is set to DEFAULT, choose the current
+>>>>> colorspace.  If any of xfer_func, ycbcr_enc or quantization are set to
+>>>>> DEFAULT, either choose the current setting, or the default setting for the
+>>>>> new colorspace, if non-DEFAULT colorspace was given.
 >>>>>
->>>>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
->>>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
->>>>>> SoC. The phy can be configured to be in Device mode or Host
->>>>>> mode based on the type of cable connected to the port. The
->>>>>> driver registers to  extcon framework to get appropriate
->>>>>> connect events for Host/Device cables connect/disconnect
->>>>>> states based on VBUS and ID interrupts.
+>>>>> This allows to let field order and colorimetry settings be propagated
+>>>>> from upstream by calling media-ctl on the upstream entity source pad,
+>>>>> and then call media-ctl on the sink pad to manually set the input frame
+>>>>> interval, without changing the already set field order and colorimetry
+>>>>> information.
 >>>>>
->>>>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
->>>>> Northstar2.
+>>>>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>>>> ---
+>>>>> This is based on imx-media-staging-md-v14, and it is supposed to allow
+>>>>> configuring the pipeline with media-ctl like this:
 >>>>>
->>>>
->>>> Will do.
->>>>
->>>>> Sorry for not letting you know this earlier. But I feel the design of the
->>>>> driver should be changed. Extcon shouldn't be used here. The extcon
->>>>> notifications should be sent to the consumer driver and the consumer driver
->>>>> should be responsible for invoking the phy ops.
+>>>>> 1) media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY8_1X16/1920x1080]"
+>>>>> 2) media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY8_1X16/1920x108]"
+>>>>> 3) media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY8_1X16/1920x1080]"
+>>>>> 4) media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY8_1X16/1920x1080 at 1/60]"
+>>>>> 5) media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080 at 1/30]"
 >>>>>
+>>>>> Without having step 4) overwrite the colorspace and field order set on
+>>>>> 'ipu1_csi0':0 by the propagation in step 3).
+>>>>> ---
+>>>>>  drivers/staging/media/imx/imx-media-csi.c | 34 +++++++++++++++++++++++++++++++
+>>>>>  1 file changed, 34 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+>>>>> index 64dc454f6b371..d94ce1de2bf05 100644
+>>>>> --- a/drivers/staging/media/imx/imx-media-csi.c
+>>>>> +++ b/drivers/staging/media/imx/imx-media-csi.c
+>>>>> @@ -1325,6 +1325,40 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+>>>>>  	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
+>>>>>  
+>>>>>  	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
+>>>>> +
+>>>>> +	/* Retain current field setting as default */
+>>>>> +	if (sdformat->format.field == V4L2_FIELD_ANY)
+>>>>> +		sdformat->format.field = fmt->field;
 >>>>
->>>> The consumer drivers here would be a UDC driver (USB device
->>>> controller), EHCI and OHCI host controller drivers.
->>>> I was already suggested in UDC driver review to deal with extcon in Phy driver.
->>>>
->>>> This phy connects to 2 host controllers, and one device controller.
->>>> That's the design in Broadcom Northstar2
->>>> platform. The values of the VBUS and ID pins of this port are
->>>> determined based on the type of the cable (device cable
->>>> or host cable). And. phy has to be configured accordingly.
->>>>
->>>>> The phy ops being invoked during extcon events doesn't look right.
->>>>
->>>> Could you please elaborate on the concern, so that we can think of
->>>> mitigating those issues in this driver?
->>>> Since we are dealing with phy init/shutdown in this driver itself, are
->>>> you okay with moving the extcon handling code
->>>> out of phy ops ?
+>>>> sdformat->format.field should never be FIELD_ANY. If it is, then that's a
+>>>> subdev bug and I'm pretty sure FIELD_NONE was intended.
 >>>
->>> yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
->>> extcon events too. Can a phy which is initialized by a phy consumer (say your
->>> UDC invokes phy_init) can be shutdown by an extcon event?
->>>
->>> Maybe a clear explanation of when phy_ops here will be invoked and when it will
->>> set using extcon events might help.
->>>
+>>> This is the subdev. sdformat is passed in from userspace, so we have to
+>>> deal with it being set to ANY. I'm trying hard right now not to return
+>>> ANY though. The values in sdformat->format are applied to fmt down
+>>> below.
 >>
->> Say, we have a USB pendrive which is connected to the DRD port through
->> a host cable.
->> Now the PHY will be initialized to be in host mode.
->> When the pendrive is unplugged, and we now connect the NS2 device to
->> some linux PC,
->> now the PHY has to be shutdown, and re-initialized to be in Device mode.
->>
->> On unplug event, it is set neither to Host nor Device mode (basically
->> shutdown). Next time which ever cable is connected, the PHY is
->> initialized to the respective
->> mode.
->>
->> Please let me know if it's fine to do these initializations outside
->> phy ops, because those will
->> be irrelevant for phy consumers (the controllers) as it's anyways
->> dealt in the phy driver through
->> extcon.
->
-> Yes. We shouldn't add phy_ops just for the sake of it. I think this should be
-> made as a purely extcon driver (though there are a couple of bits that looks
-> like initializing PHY) and keep it in drivers/extcon.
->
+>> Do you have a git tree with this patch? It is really hard to review without
+>> having the full imx-media-csi.c source.
+> 
+> The patch applies on top of
+> 
+>   https://github.com/slongerbeam/mediatree.git imx-media-staging-md-v14
+> 
+> I have uploaded a branch
+> 
+>   git://git.pengutronix.de/git/pza/linux imx-media-staging-md-v14+color
+> 
+> with the patch applied on top.
+> 
+>> I think one problem is that it is not clearly defined how subdevs and colorspace
+>> information should work.
 
-Actually phy_ops would be required when we want phy to be shutdown/init
-during power management, where USB controllers would call them.
+Ah, having the full source helped.
 
-I reworked on this driver to address the concerns raised here. Please check
-PATCH v5 that I will submit shortly.
-If we want to dynamically change the mode of PHY either to be in host mode
-or device mode or idle, we don't have to do a full PHY init/power on (that
-earlier required doing a PHY PLL lock and other resets). We just have to
-program couple of register bits that are dedicated for this purpose.
-I made those changes, now we don't have to call phy ops in the driver.
-Phy_ops will be called only by the consumer drivers.
+Ignore my previous review, it was incorrect.
 
-Thanks,
-Ravi
+I'll have to think about this some more. I'll get back to this, but it may take some
+time since my vacation starts tomorrow. The spec is simply unclear about how to handle
+this so we have to come up with some guidelines.
 
-> Thanks
-> Kishon
+Regards,
+
+	Hans
