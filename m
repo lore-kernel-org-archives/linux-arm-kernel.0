@@ -1,85 +1,67 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 12 Apr 2017 18:51:26 +0200
-Subject: [PATCH V14 03/10] efi: parse ARM processor error
-In-Reply-To: <1490729440-32591-4-git-send-email-tbaicar@codeaurora.org>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
- <1490729440-32591-4-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170412165125.xzsovuficgbygkfp@pd.tnic>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 12 Apr 2017 17:56:53 +0100
+Subject: [RFC PATCH v2 0/6] Signal frame expansion support
+Message-ID: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 01:30:33PM -0600, Tyler Baicar wrote:
-> Add support for ARM Common Platform Error Record (CPER).
-> UEFI 2.6 specification adds support for ARM specific
-> processor error information to be reported as part of the
-> CPER records. This provides more detail on for processor error logs.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/cper.c | 133 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/cper.h        |  54 ++++++++++++++++++
->  2 files changed, 187 insertions(+)
-> 
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index 8fa4e23..56aa516 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -110,12 +110,15 @@ void cper_print_bits(const char *pfx, unsigned int bits,
->  static const char * const proc_type_strs[] = {
->  	"IA32/X64",
->  	"IA64",
-> +	"ARM",
->  };
->  
->  static const char * const proc_isa_strs[] = {
->  	"IA32",
->  	"IA64",
->  	"X64",
-> +	"ARM A32/T32",
-> +	"ARM A64",
->  };
->  
->  static const char * const proc_error_type_strs[] = {
-> @@ -139,6 +142,18 @@ void cper_print_bits(const char *pfx, unsigned int bits,
->  	"corrected",
->  };
->  
-> +static const char * const arm_reg_ctx_strs[] = {
-> +	"AArch32 general purpose registers",
-> +	"AArch32 EL1 context registers",
-> +	"AArch32 EL2 context registers",
-> +	"AArch32 secure context registers",
-> +	"AArch64 general purpose registers",
-> +	"AArch64 EL1 context registers",
-> +	"AArch64 EL2 context registers",
-> +	"AArch64 EL3 context registers",
-> +	"Misc. system register structure",
-> +};
+(Note: This is an arm64-specific series, but the concepts introduced may
+be of interest to other arches -- see in particular patch 6.)
 
-That...
+Blurb:
 
-> +
->  static void cper_print_proc_generic(const char *pfx,
->  				    const struct cper_sec_proc_generic *proc)
->  {
-> @@ -184,6 +199,114 @@ static void cper_print_proc_generic(const char *pfx,
->  		printk("%s""IP: 0x%016llx\n", pfx, proc->ip);
->  }
->  
-> +static void cper_print_proc_arm(const char *pfx,
-> +				const struct cper_sec_proc_arm *proc)
+An architecture advertises the maximum possible signal frame size via
+the MINSIGSTKSZ #define (mandated by POSIX).
 
-... and that function should go into:
+However, CPU architecture extensions may increase the amount of space
+required to store the interrupted context when a signal is delivered.
 
-#if defined(CONFIG_ARM64) || defined(CONFIG_ARM)
 
-Just put them close together so that you don't have too much ifdeffery.
+Eventually the amount of space needed in the signal frame may exceed
+MINSIGSTKSZ -- whether and when this happens is largely a matter of
+luck, depending on the initial guess for MINSIGSTKSZ and the evolution
+of that particular CPU architecture.  Unfortunately MINSIGSTKSZ cannot
+be changed without an ABI break, and POSIX provides no mechanism for
+migration.
+
+arm64 initially reserved 4KB of space in the signal frame for
+extensions, of which about 0.5KB is allocated to the FP/SIMD registers
+initially.
+
+Depending on the vector length supported by the hardware, SVE requires
+up to around 8KB of space to store the full SIMD register context, which
+is too large to fit in the existing frame.
+
+This series adds a mechanism for optionally enlarging the signal frame
+(patches 4-5) and reporting the actual maximum signal frame size to
+userspace (patch 6).  Patches 1-3 do some refactoring to support this
+change by abstracting the way signal frame records are allocated onto
+the user stack.
+
+Full backwards compatibility is not possible -- there is no way to hide
+the fact that the signal frame has grown -- so it is expected that
+support for new architecture extensions that can cause the signal frame
+to grow will be opt-in for userspace, in addition to using the extension
+mechanism defined by this series.
+
+[1] ARM Scalable Vector Extension
+https://community.arm.com/groups/processors/blog/2016/08/22/technology-update-the-scalable-vector-extension-sve-for-the-armv8-a-architecture
+https://developer.arm.com/docs/ddi0584/latest/arm-architecture-reference-manual-supplement-the-scalable-vector-extension-sve-for-armv8-a
+
+Dave Martin (6):
+  arm64: signal: Refactor sigcontext parsing in rt_sigreturn
+  arm64: signal: factor frame layout and population into separate passes
+  arm64: signal: factor out signal frame record allocation
+  arm64: signal: Allocate extra sigcontext space as needed
+  arm64: signal: Parse extra_context during sigreturn
+  arm64: signal: Report signal frame size to userspace via auxv
+
+ arch/arm64/include/asm/elf.h             |   5 +
+ arch/arm64/include/asm/processor.h       |   3 +
+ arch/arm64/include/uapi/asm/auxvec.h     |   3 +-
+ arch/arm64/include/uapi/asm/sigcontext.h |  50 ++++
+ arch/arm64/kernel/signal.c               | 389 ++++++++++++++++++++++++++++---
+ 5 files changed, 415 insertions(+), 35 deletions(-)
 
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+2.1.4
