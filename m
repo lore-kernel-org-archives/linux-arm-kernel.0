@@ -1,45 +1,47 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 12 Apr 2017 15:31:01 +0200
-Subject: [PATCH v2 3/7] includes: dt-bindings: Rename STM32F429 pinctrl DT
- bindings
-In-Reply-To: <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
-References: <1491568984-20169-1-git-send-email-alexandre.torgue@st.com>
- <1491568984-20169-4-git-send-email-alexandre.torgue@st.com>
- <20170410202736.zy7naw74hvrdmfzk@rob-hp-laptop>
-Message-ID: <800a68a4-d6ce-212b-5849-56c9d32f891a@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Apr 2017 14:34:54 +0100
+Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
+In-Reply-To: <c1dba250-a60c-febc-a5c3-5ba645a61ce0@linaro.org>
+References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+ <20170411140613.jvhzsvrxa4evwxjh@dell> <20170411211936.GT2078@mai>
+ <20170412080038.kk4vrjhvr3eao26q@dell>
+ <c1dba250-a60c-febc-a5c3-5ba645a61ce0@linaro.org>
+Message-ID: <20170412133454.cfywpavifwpoetwo@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, 12 Apr 2017, Daniel Lezcano wrote:
 
-On 04/10/2017 10:27 PM, Rob Herring wrote:
-> On Fri, Apr 07, 2017 at 02:43:00PM +0200, Alexandre TORGUE wrote:
->> STM32F4 MCU series is composed of several SOC (STM32F429, STM32F469, ...).
->> Most of muxing definition are identical. So to avoid to duplicate bindings
->> definition, this patch create common definitions.
->
-> This is a lot of churn. Some confirmation that the resultant dtb is the
-> same before and after would be nice. Perhaps the script you used to
-> convert this as well.
+> On 12/04/2017 10:00, Lee Jones wrote:
+> > On Tue, 11 Apr 2017, Daniel Lezcano wrote:
+> > 
+> >> On Tue, Apr 11, 2017 at 03:06:13PM +0100, Lee Jones wrote:
+> >>> On Sat, 08 Apr 2017, Daniel Lezcano wrote:
+> >>>
+> >>>> The hi655x multi function device is a PMIC providing regulators.
+> >>>>
+> >>>> The PMIC also provides a clock for the WiFi and the Bluetooth, let's implement
+> >>>> this clock in order to add it in the hi655x MFD and allow proper wireless
+> >>>> initialization.
+> >>>>
+> >>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> [ ... ]
+> 
+> >> Do you want to drop it from your tree or shall I resubmit a V3 without the mfd
+> >> change?
+> > 
+> > The latter please.
+> 
+> Ok.
+> 
+> What about the DT binding change?
 
-I tried to use fdtdump but it seems bugged. So I used directly dtc 
-binary to (re)generate dts files (before and after apply the series) and 
-I compared "pinmux" field in both case.
+If I haven't merged it already, you'll need to re-send that
+(separately) too.
 
-Example on stm32f469-disco:
-
-./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts 
-stm32f469-disco-after.dtb
-
-./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts 
-stm32f469-disco-before.dtb
-
-cat stm32f469-disco-after.dts | grep pinmux
-cat stm32f469-disco-before.dts | grep pinmux
-
-regards
-alex
-
->
-> Rob
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
