@@ -1,50 +1,48 @@
-From: rk@ti.com (Ravikumar Kattekola)
-Date: Wed, 12 Apr 2017 11:54:42 +0530
-Subject: [PATCH 1/1] ARM: dts: dra7: Reduce cpu thermal shutdown temperature
-Message-ID: <20170412062442.17736-1-rk@ti.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 12 Apr 2017 14:48:34 +0800
+Subject: [PATCHv3 00/14] arm_pmu: ACPI support
+In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <58EDCDC2.20706@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On dra7, as per TRM, the HW shutdown (TSHUT) temperature is hardcoded
-to 123C and cannot be modified by SW. This means when the temperature
-reaches 123C HW asserts TSHUT output which signals a warm reset.
-This reset is held until the temperature goes below the TSHUT low (105C).
+On 2017/4/11 16:39, Mark Rutland wrote:
+> Hi,
+>
+> This series implements ACPI support in the ARM PMU code. It borrows some code
+> from Jeremy's series [1], but takes a different approach to probing and
+> association, using the usual hotplug state machine, minimising external changes
+> required, and simplifying the relationship with the common arm_pmu code.
+>
+> The first few patches are preparatory cleanup/refactoring, with the latter half
+> of the series being specific to ACPI support.
+>
+> The series is based on Will's perf/updates branch [2]. I've pushed the whole
+> series out to the arm/perf/acpi branch [3] of my kernel.org repo.
+>
+> Due to the innards of the hotplug callback framework, it's not entirely
+> safe to register a PMU in a hotplug callback. Due to this, we can only
+> associated hotplugged CPUs with a PMU if a matching CPU was around at
+> probe time. A similar restriction already applies to DT systems. We may
+> be able to relax this with some future work.
+>
+> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+> are correctly associated, I've tested with the following:
+>
+>   $ taskset -c ${SOME_CPU_HERE} perf record \
+>     -e armv8_pmuv3_0/cpu_cycles/ \
+>     -e armv8_pmuv3_1/cpu_cycles/ \
+>     cat /proc/interrupts
+>  
+> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+> association logic. This has also been tested in a VM using PPIs; I do not have
+> access to a host machine which itself uses PPIs.
 
-While in SW, the thermal driver continuously monitors current temperature
-and takes decisions based on whether it reached an alert or a critical point.
-The intention of setting a SW critical point is to prevent force reset by HW
-and instead do an orderly_poweroff(). But if the SW critical temperature is
-greater than or equal to that of HW then it defeats the purpose. To address
-this and let SW take action before HW does keep the SW critical temperature
-less than HW TSHUT value.
+Hisilicon D03 using PPIs, I tested this patch set on D03 and basic perf events
+work well.
 
-The value for SW critical temperature was chosen as 120C just to ensure
-we give SW sometime before HW catches up.
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Document reference
-SPRUI30C ? DRA75x, DRA74x Technical Reference Manual - November 2016
-SPRUHZ6H - AM572x Technical Reference Manual - November 2016
-
-Tested on:
-DRA75x PG 2.0 Rev H EVM
-
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 57892f2..e714466 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -2017,4 +2017,8 @@
- 	coefficients = <0 2000>;
- };
- 
-+&cpu_crit {
-+	temperature = <120000>; /* milli Celsius */
-+};
-+
- /include/ "dra7xx-clocks.dtsi"
--- 
-2.8.0.GIT
+Thanks
+Hanjun
