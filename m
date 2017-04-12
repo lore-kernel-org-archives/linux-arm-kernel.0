@@ -1,23 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 12 Apr 2017 15:30:40 +0200
-Subject: [PATCH v2 2/2] dt-bindings: document: add firefly-rk3399 board
- support
-In-Reply-To: <1491384800-22412-2-git-send-email-kever.yang@rock-chips.com>
-References: <1491384800-22412-1-git-send-email-kever.yang@rock-chips.com>
- <1491384800-22412-2-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1796923.V976AENXzC@phil>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Wed, 12 Apr 2017 15:30:15 +0200
+Subject: [PATCH] serial: imx: Enable RTSD only when needed
+Message-ID: <20170412133015.23185-1-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kever,
+From: Nandor Han <nandor.han@ge.com>
 
-Am Mittwoch, 5. April 2017, 17:33:20 CEST schrieb Kever Yang:
-> Use "firefly,firefly-rk3399" compatible string for firefly-rk3399 board.
-> 
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+Currently, this IRQ is always enabled. Some devices might mux these pins
+to other I/Os, like I2C. This could lead to spurious interrupts.
 
-you forgot to send the binding in your v3 series, so I've applied this
-one for v4.13 with Rob's Ack.
+This commit makes this IRQ optional, by using the field have_rtscts.
 
+Signed-off-by: Nandor Han <nandor.han@ge.com>
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+---
+ drivers/tty/serial/imx.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Heiko
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index e3e152cb..6dd674f 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1294,7 +1294,9 @@ static int imx_startup(struct uart_port *port)
+ 		imx_enable_dma(sport);
+ 
+ 	temp = readl(sport->port.membase + UCR1);
+-	temp |= UCR1_RRDYEN | UCR1_RTSDEN | UCR1_UARTEN;
++	temp |= UCR1_RRDYEN | UCR1_UARTEN;
++	if (sport->have_rtscts)
++			temp |= UCR1_RTSDEN;
+ 
+ 	writel(temp, sport->port.membase + UCR1);
+ 
+-- 
+2.9.3
