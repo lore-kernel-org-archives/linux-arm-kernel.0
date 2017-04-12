@@ -1,44 +1,28 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 12 Apr 2017 14:27:59 -0300
-Subject: [PATCH v5 8/8] ARM: ux500: Add vendor prefix to tps61052 node
-In-Reply-To: <20170412172800.23035-1-javier@osg.samsung.com>
-References: <20170412172800.23035-1-javier@osg.samsung.com>
-Message-ID: <20170412172800.23035-9-javier@osg.samsung.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 12 Apr 2017 13:48:15 -0400
+Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
+ ACPI mode
+In-Reply-To: <855540a9-888d-6419-3add-d8b0dbb43029@codeaurora.org>
+References: <0dada57f-4215-4ced-482d-88203857e06d@codeaurora.org>
+ <20170412170433.GA7412@red-moon>
+ <855540a9-888d-6419-3add-d8b0dbb43029@codeaurora.org>
+Message-ID: <5f01eac0-37a2-392e-eb42-a9ac85a2eebc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tps61052 device node doesn't have a vendor prefix
-in its compatible string, fix it by adding one.
+On 4/12/2017 1:27 PM, Sinan Kaya wrote:
+> I am not a big fan of this. I wonder if we could not make it DT/ACPI
+> agnostic by simply setting the numa_node in the pci_bus->dev field,
+> and propagate it downstream a PCI hierarcy (as we do with sysdata)
+> in pci_alloc_child_bus().
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
+I didn't realize that we were pushing sysdata to the child buses. No
+issues then. 
 
----
+I was under the impression that sysdata only existed for the host bridge
+itself and was not shared with the rest of the bus.
 
-Changes in v5:
-- Add Rob Herring's Acked-by tag.
-- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
-
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-
- arch/arm/boot/dts/ste-hrefprev60.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index 5882a2606ac3..3f14b4df69b4 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -30,7 +30,7 @@
- 
- 		i2c at 80004000 {
- 			tps61052 at 33 {
--				compatible = "tps61052";
-+				compatible = "ti,tps61052";
- 				reg = <0x33>;
- 			};
- 
 -- 
-2.9.3
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
