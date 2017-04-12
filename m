@@ -1,312 +1,162 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 12 Apr 2017 20:58:56 +0200
-Subject: [PATCH v5 04/10] drm/stm: Add STM32 LTDC driver
-In-Reply-To: <87wpaqeks2.fsf@eliezer.anholt.net>
-References: <1490694293-18358-1-git-send-email-yannick.fertre@st.com>
- <1490694293-18358-5-git-send-email-yannick.fertre@st.com>
- <87wpaqeks2.fsf@eliezer.anholt.net>
-Message-ID: <CA+M3ks5Bnui3Hhqsi=YU4WXJw_3kMwHkWt0_GzMi1G+R48DDTQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 12 Apr 2017 14:11:38 -0500
+Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <20170412181034.GA3671@localhost>
+References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
+ <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
+ <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
+ <20170411071047.GA3610@localhost>
+ <20170411134125.GA31773@bhelgaas-glaptop.roam.corp.google.com>
+ <20170411152702.GA2910@localhost>
+ <20170412162118.GC25197@bhelgaas-glaptop.roam.corp.google.com>
+ <20170412181034.GA3671@localhost>
+Message-ID: <20170412191138.GH25197@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-04-11 22:45 GMT+02:00 Eric Anholt <eric@anholt.net>:
-> Yannick Fertre <yannick.fertre@st.com> writes:
->
->> This controller provides output signals to interface directly a variety
->> of LCD and TFT panels. These output signals are: RGB signals
->> (up to 24bpp), vertical & horizontal synchronisations, data enable and
->> the pixel clock.
->>
->> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
->> ---
->>  drivers/gpu/drm/Kconfig      |    3 +-
->>  drivers/gpu/drm/Makefile     |    1 +
->>  drivers/gpu/drm/stm/Kconfig  |   16 +
->>  drivers/gpu/drm/stm/Makefile |    7 +
->>  drivers/gpu/drm/stm/drv.c    |  221 ++++++++
->>  drivers/gpu/drm/stm/ltdc.c   | 1210 ++++++++++++++++++++++++++++++++++++++++++
->>  drivers/gpu/drm/stm/ltdc.h   |   40 ++
->>  7 files changed, 1497 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/gpu/drm/stm/Kconfig
->>  create mode 100644 drivers/gpu/drm/stm/Makefile
->>  create mode 100644 drivers/gpu/drm/stm/drv.c
->>  create mode 100644 drivers/gpu/drm/stm/ltdc.c
->>  create mode 100644 drivers/gpu/drm/stm/ltdc.h
->>
->> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
->> index 78d7fc0..dd5762a 100644
->> --- a/drivers/gpu/drm/Kconfig
->> +++ b/drivers/gpu/drm/Kconfig
->> @@ -203,7 +203,6 @@ config DRM_VGEM
->>         as used by Mesa's software renderer for enhanced performance.
->>         If M is selected the module will be called vgem.
->>
->> -
->
-> Stray whitespace change.
->
-> With this removed, the driver is:
->
-> Reviewed-by: Eric Anholt <eric@anholt.net>
->
-> Apologies for the delay in the second review offered.  The remainder of
-> my comments are little cleanups, all of which I think are optional and
-> fine to do after the code lands.
->
-> You should probably update MAINTAINERS for your new driver.  If you'd
-> like to maintain this driver in the drm-misc small drivers collection
-> (https://01.org/linuxgraphics/gfx-docs/maintainer-tools/drm-misc.html),
-> send a follow-up patch to the list to add the MAINTAINERS entry, and I
-> can get that and patches 1-4 merged.  Once you have a few more patches
-> in, we can add you to the drm-misc committers crew so you can merge
-> directly after getting review.
+On Wed, Apr 12, 2017 at 06:10:34PM +0000, Jayachandran C wrote:
+> On Wed, Apr 12, 2017 at 11:21:18AM -0500, Bjorn Helgaas wrote:
+> > On Tue, Apr 11, 2017 at 03:27:02PM +0000, Jayachandran C wrote:
+> > > On Tue, Apr 11, 2017 at 08:41:25AM -0500, Bjorn Helgaas wrote:
+> > > > [+cc Joerg]
+> > > > 
+> > > > On Tue, Apr 11, 2017 at 07:10:48AM +0000, Jayachandran C wrote:
+> > > > > On Mon, Apr 10, 2017 at 08:28:47PM -0500, Bjorn Helgaas wrote:
+> > > > > > Hi Jayachandran,
+> > > > > > 
+> > > > > > On Mon, Apr 03, 2017 at 01:15:04PM +0000, Jayachandran C wrote:
+> > > > > > > The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
+> > > > > > > topology is slightly unusual. For a multi-node system, it looks like:
+> > > > > > > 
+> > > > > > > [node level PCI bridges - one per node]
+> > > > > > >     [SoC PCI devices with MSI-X but no IOMMU]
+> > > > > > >     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
+> > > > > > >         [PCIe real root ports associated with IOMMU and GICv3 ITS]
+> > > > > > >             [External PCI devices connected to PCIe links]
+> > > > > > > 
+> > > > > > > The top two levels of bridges should have introduced aliases since they
+> > > > > > > are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
+> > > > > > > In the case of external PCIe devices, the "real" root ports are connected
+> > > > > > > to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
+> > > > > > > alias. The SoC PCI devices are directly connected to the GIC ITS, so the
+> > > > > > > node level bridges do not introduce an alias either.
+> > > > > > > 
+> > > > > > > To handle this quirk, we mark the real PCIe root ports and node level
+> > > > > > > PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
+> > > > > > > pci_for_each_dma_alias() works correctly for external PCIe devices and
+> > > > > > > SoC PCI devices.
+> > > > > > > 
+> > > > > > > For the current revision of Cavium ThunderX2, the VendorID and Device ID
+> > > > > > > are from Broadcom Vulcan (14e4:90XX).
+> > > > > > 
+> > > > > > Can you supply some text here about why we want to apply this patch?
+> > > > > > E.g., does it avoid making unnecessary IOMMU mappings, improve
+> > > > > > performance, avoid a crash, etc?
+> > > > > 
+> > > > > If this is for the commit message, I hope the following is ok:
+> > > > > 
+> > > > > "With this change, both MSI-X and IO virtualization work correctly on
+> > > > > Cavium ThunderX2. The GIC ITS driver gets the correct device ID to
+> > > > > configure MSI-X, the SMMUv3 driver gets the correct Stream IDs for PCI
+> > > > > devices, and the IOMMU groups are setup correctly."
+> > > > 
+> > > > This doesn't get at what the actual problem is.  I'm hoping for
+> > > > something like "without this change, we set up an IOMMU mapping for
+> > > > requestor ID X, but device DMA uses requestor ID Y because ...., which
+> > > > results in an IOMMU fault"
+> > > 
+> > > Ok. I hope this would be better:
+> > > 
+> > > "Without this change, the last alias seen while traversing the PCI
+> > > hierarchy will be used as the RID to generate the device ID for ITS
+> > > and stream ID for SMMU. This in turn causes the MSI-X generated by the
+> > > device to fail since the ITS expects to have translation tables based
+> > > on the actual PCIe RID and not the (irrelevant) alias. Similarly, the
+> > > device DMA also fails when SMMU is enabled due to incorrect value in
+> > > SMMU translation tables"
+> > 
+> > This description is true, but I don't think it addresses the real
+> > problem.  I think the real problem is that your IOMMU code doesn't
+> > handle aliases correctly, and by ignoring these invalid aliases, we
+> > happen to map an alias that works for the builtin devices.  But that's
+> > only because we got lucky (those devices use a single RID and they're
+> > not behind bridges that optionally take ownership).
+> > 
+> > It would make sense to me if we fixed the IOMMU code to map *all* the
+> > aliases, which should be enough to make your devices work.  If we then
+> > wanted to apply a patch like this on top, it would be simply an
+> > optimization that avoids unnecessary IOMMU mappings.
+> 
+> The issue that the IOMMU code does not handle valid aliases is
+> unrelated to what I am trying to fix. The quirk is to make sure
+> that invalid aliases are not seen on ThunderX2 while doing
+> pci_for_each_dma_alias().
+> 
+> The DMA and MSI-X requests leave the PCI/PCIe hierarchy at the point
+> where the SMMU (or ITS) is attached, i.e. at the bridge marked with
+> PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT. The quirk ensures that we don't look
+> for aliases above that point.
+> 
+> The toplevel bridge is marked PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT since
+> the on-chip devices are directly connected to the ITS (they do not
+> use SMMU).
+> 
+> The top two levels of bridges are not real PCI bridges but just
+> PCI bridge-like things that were added to tie the whole hierarchy
+> together for configuration and enumeration. They do not handle
+> PCI/PCIe transactions in the traditional sense.
+> 
+> I think my problem description is still not correct, maybe:
+> "The SMMU (and ITS) expects to device tables to use the RID seen
+> at the bridge they are associated with. Currently the
+> pci_for_each_dma_alias() code traverses beyond this point and
+> generates incorrect aliases due to the PCI and PCI/PCIe bridges
+> above. This causes MSI-X interrupts and device DMA to fail since
+> the SMMU and ITS tables to be setup with incorrect IDs"
 
-Since we are moving sti driver to drm-misc it makes sense to move all
-STMicroelectronic SoC display drivers to it.
+I haven't tried to figure out the MSI-X piece of this, but let me try
+to come up with a concrete DMA example.  Assume this topology:
 
->
-> I'll also take this moment to plug something: Please feel welcome to
-> review other people's driver patches on the list.  You've built
-> something nice here, and probably learned a lot of lessons along the way
-> that you could share with others.  (I just found out about
-> of_reset_control in reviewing your code, and I wish I had known about it
-> back when I was landing vc4!)
->
->> diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
->> new file mode 100644
->> index 0000000..922f021
->> --- /dev/null
->> +++ b/drivers/gpu/drm/stm/ltdc.c
->
->> +static void ltdc_crtc_disable(struct drm_crtc *crtc)
->> +{
->> +     struct ltdc_device *ldev = crtc_to_ltdc(crtc);
->> +     struct drm_pending_vblank_event *event = crtc->state->event;
->> +
->> +     DRM_DEBUG_DRIVER("\n");
->> +
->> +     if (!crtc->enabled) {
->> +             DRM_DEBUG_DRIVER("already disabled\n");
->> +             return;
->> +     }
->
-> I think this crtc->enabled is a given for the disable() being called.
->
->> +
->> +     drm_crtc_vblank_off(crtc);
->> +
->> +     /* disable LTDC */
->> +     reg_clear(ldev->regs, LTDC_GCR, GCR_LTDCEN);
->> +
->> +     /* disable IRQ */
->> +     reg_clear(ldev->regs, LTDC_IER, IER_RRIE | IER_FUIE | IER_TERRIE);
->> +
->> +     /* immediately commit disable of layers before switching off LTDC */
->> +     reg_set(ldev->regs, LTDC_SRCR, SRCR_IMR);
->> +
->> +     if (event) {
->> +             crtc->state->event = NULL;
->> +
->> +             spin_lock_irq(&crtc->dev->event_lock);
->> +             if (crtc->state->active && drm_crtc_vblank_get(crtc) == 0)
->> +                     drm_crtc_arm_vblank_event(crtc, event);
->> +             else
->> +                     drm_crtc_send_vblank_event(crtc, event);
->> +             spin_unlock_irq(&crtc->dev->event_lock);
->> +     }
->
-> I believe that we're guaranteed that crtc->state->event is NULL in the
-> disable call, since your atomic_flush() already armed or sent the event
-> and NULLed out the pointer.
->
->> +struct drm_connector *ltdc_rgb_connector_create(struct drm_device *ddev)
->> +{
->> +     struct drm_connector *connector;
->> +     int err;
->> +
->> +     connector = devm_kzalloc(ddev->dev, sizeof(*connector), GFP_KERNEL);
->> +     if (!connector) {
->> +             DRM_ERROR("Failed to allocate connector\n");
->> +             return NULL;
->> +     }
->> +
->> +     connector->polled = DRM_CONNECTOR_POLL_HPD;
->> +
->> +     err = drm_connector_init(ddev, connector, &ltdc_rgb_connector_funcs,
->> +                              DRM_MODE_CONNECTOR_LVDS);
->
-> I think DRM_MODE_CONNECTOR_DPI (and _ENCODER_DPI) are slightly more
-> accurate descriptions, if I'm interpreting your pinmux setup right.
-> It's cosmetic, though.
->
->> +static struct drm_panel *ltdc_get_panel(struct drm_device *ddev)
->> +{
->> +     struct device *dev = ddev->dev;
->> +     struct device_node *np = dev->of_node;
->> +     struct device_node *entity, *port = NULL;
->> +     struct drm_panel *panel = NULL;
->> +
->> +     DRM_DEBUG_DRIVER("\n");
->> +
->> +     /*
->> +      * Parse ltdc node to get remote port and find RGB panel / HDMI slave
->> +      * If a dsi or a bridge (hdmi, lvds...) is connected to ltdc,
->> +      * a remote port & RGB panel will not be found.
->> +      */
->> +     for_each_endpoint_of_node(np, entity) {
->> +             if (!of_device_is_available(entity))
->> +                     continue;
->> +
->> +             port = of_graph_get_remote_port_parent(entity);
->> +             if (port) {
->> +                     panel = of_drm_find_panel(port);
->> +                     of_node_put(port);
->> +                     if (panel) {
->> +                             DRM_DEBUG_DRIVER("remote panel %s\n",
->> +                                              port->full_name);
->> +                     } else {
->> +                             DRM_DEBUG_DRIVER("panel missing\n");
->> +                             of_node_put(entity);
->> +                     }
->> +             }
->> +     }
->
-> Future work: You may find the new drm_of_find_panel_or_bridge() useful
-> to drop this loop.
->
->> +
->> +     return panel;
->> +}
->> +
->> +int ltdc_load(struct drm_device *ddev)
->> +{
->> +     struct platform_device *pdev = to_platform_device(ddev->dev);
->> +     struct ltdc_device *ldev = ddev->dev_private;
->> +     struct device *dev = ddev->dev;
->> +     struct device_node *np = dev->of_node;
->> +     struct drm_encoder *encoder;
->> +     struct drm_connector *connector = NULL;
->> +     struct drm_crtc *crtc;
->> +     struct reset_control *rstc;
->> +     struct resource res;
->> +     int irq, ret, i;
->> +
->> +     DRM_DEBUG_DRIVER("\n");
->> +
->> +     ldev->panel = ltdc_get_panel(ddev);
->> +     if (!ldev->panel)
->> +             return -EPROBE_DEFER;
->> +
->> +     rstc = of_reset_control_get(np, NULL);
->> +
->> +     mutex_init(&ldev->err_lock);
->> +
->> +     ldev->pixel_clk = devm_clk_get(dev, "lcd");
->> +     if (IS_ERR(ldev->pixel_clk)) {
->> +             DRM_ERROR("Unable to get lcd clock\n");
->> +             return -ENODEV;
->> +     }
->> +
->> +     if (clk_prepare_enable(ldev->pixel_clk)) {
->> +             DRM_ERROR("Unable to prepare pixel clock\n");
->> +             return -ENODEV;
->> +     }
->
-> Future work: You may want to move the pixel clock enable into the CRTC's
-> .enable() and disable in .disable().  It sounded in previous versions
-> like the HW uses that clock for all register accesses, so you'd need to
-> protect a couple of other places, but that should save power when the
-> device is off, right?
->
->> +
->> +     if (of_address_to_resource(np, 0, &res)) {
->> +             DRM_ERROR("Unable to get resource\n");
->> +             return -ENODEV;
->> +     }
->> +
->> +     ldev->regs = devm_ioremap_resource(dev, &res);
->> +     if (IS_ERR(ldev->regs)) {
->> +             DRM_ERROR("Unable to get ltdc registers\n");
->> +             return PTR_ERR(ldev->regs);
->> +     }
->> +
->> +     for (i = 0; i < MAX_IRQ; i++) {
->> +             irq = platform_get_irq(pdev, i);
->> +             if (irq < 0)
->> +                     continue;
->> +
->> +             ret = devm_request_threaded_irq(dev, irq, ltdc_irq,
->> +                                             ltdc_irq_thread, IRQF_ONESHOT,
->> +                                             dev_name(dev), ddev);
->> +             if (ret) {
->> +                     DRM_ERROR("Failed to register LTDC interrupt\n");
->> +                     return ret;
->> +             }
->> +     }
->> +
->> +     if (!IS_ERR(rstc))
->> +             reset_control_deassert(rstc);
->> +
->> +     /* Disable interrupts */
->> +     reg_clear(ldev->regs, LTDC_IER,
->> +               IER_LIE | IER_RRIE | IER_FUIE | IER_TERRIE);
->> +
->> +     ret = ltdc_get_caps(ddev);
->> +     if (ret) {
->> +             DRM_ERROR("hardware identifier (0x%08x) not supported!\n",
->> +                       ldev->caps.hw_version);
->> +             return ret;
->> +     }
->> +
->> +     DRM_INFO("ltdc hw version 0x%08x - ready\n", ldev->caps.hw_version);
->> +
->> +     if (ltdc_create_encoders(ddev)) {
->> +             DRM_ERROR("Failed to create encoders\n");
->> +             return -EINVAL;
->> +     }
->> +
->> +     if (ldev->panel) {
->> +             encoder = ltdc_rgb_encoder_find(ddev);
->> +             if (!encoder) {
->> +                     DRM_ERROR("Failed to find RGB encoder\n");
->> +                     ret = -EINVAL;
->> +                     goto err;
->> +             }
->
-> Given that ltdc_create_encoders() only does work if ldev->panel, its
-> body could probably be moved in here and then ltdc_rgb_encoder_find
-> could be dropped.
->
->> +
->> +             connector = ltdc_rgb_connector_create(ddev);
->> +             if (!connector) {
->> +                     DRM_ERROR("Failed to create RGB connector\n");
->> +                     ret = -EINVAL;
->> +                     goto err;
->> +             }
->> +
->> +             ret = drm_mode_connector_attach_encoder(connector, encoder);
->> +             if (ret) {
->> +                     DRM_ERROR("Failed to attach connector to encoder\n");
->> +                     goto err;
->> +             }
->> +
->> +             drm_panel_attach(ldev->panel, connector);
->> +     }
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+  00:00.0 bridge to [bus 01-1e]
+  01:0a.0 bridge to [bus 04-05]
+  04:00.0 [14e4:9000 or 9084] bridge to [bus 05] (XLATE_ROOT)
+  05:00.0 endpoint
 
+Assume 05:00.0 generates a DMA request.  Assume the top two bridges
+are such that pci_for_each_dma_alias() includes them as well, so it
+iterates through 05:00.0, 01:0a.0, and 00:00.0.
 
+When the driver for 05:00.0 makes a DMA mapping, the current code
+apparently makes an IOMMU mapping for requester ID 00:00.0 because
+that's the last alias.  Obviously this doesn't work because the IOMMU
+at 04:00.0 will see a requester ID of 05:00.0, not 00:00.0.
 
--- 
-Benjamin Gaignard
+With this quirk, we'll omit 01:0a.0 and 00:00.0, so we'll make an
+IOMMU mapping for requester ID 05:00.0, which will work fine.  I think
+it would *also* work fine if we made IOMMU mappings for 05:00.0,
+01:0a.0, and 00:0.0.  The last two are unnecessary, but probably not
+harmful.
 
-Graphic Study Group
+Now assume 05:00 is a multi-function device that has a DMA alias
+quirk, e.g., see quirk_dma_func0_alias().  It has another function:
 
-Linaro.org ? Open source software for ARM SoCs
+  05:00.3 endpoint
 
-Follow Linaro: Facebook | Twitter | Blog
+DMA from 05:00.3 may use a requester ID of either 05:00.3 or 05:00.0.
+The driver makes a DMA mapping, pci_for_each_dma_alias() iterates
+through 05:00.3, 05:00.0, 01:0a.0, and 00:00.0, and we again map only
+00:00.0, which again doesn't work.
+
+With this quirk, we create a single mapping for 05:00.0.  That will
+work sometimes, but the device may also generate DMA with a requester
+ID of 05:00.3, and that won't work.
+
+If your on-chip device is, e.g., 01:04.0, pci_for_each_dma_alias()
+probably iterates through 01:04.0, 00:00.0.  Today we make an IOMMU
+mapping for 00:00.0, which doesn't work.  With this quirk, we'll
+ignore 00:00.0 and make a mapping for 01:04.0, which does work.  But I
+think if you made the IOMMU code add mappings for each of the aliases,
+i.e., for both 01:04.0 and 00:00.0, that device *would* work even
+without this quirk.
+
+Bjorn
