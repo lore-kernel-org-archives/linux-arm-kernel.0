@@ -1,164 +1,59 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 12 Apr 2017 15:10:44 +0800
-Subject: [PATCH 4/4] arm64: dts: rk3399: add pinctrl for some peripheral
-In-Reply-To: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
-References: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <1491981044-24635-4-git-send-email-kever.yang@rock-chips.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Wed, 12 Apr 2017 12:42:02 +0530
+Subject: [PATCH v5 0/3] Support for USB DRD Phy driver for NS2
+Message-ID: <1491981125-6859-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl for sdio, sdmmc, pcie, spdif, hdmi.
+Changes in v5:
+=============
+Removed references to phy_ops in the same driver by connect_work
+event handler to change the phy modes.
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+To support dynamically changing the mode of the phy, it does
+not require doing a phy reset/programming of PHY PLL. Changes
+are made to the connect_work routine to just program the required
+register bits to achieve this purpose.
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 113 +++++++++++++++++++++++++++++++
- 1 file changed, 113 insertions(+)
+<clip: as before>
+Changes in v4:
+=============
+Remove references to edev->name in debug prints.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 54a5340..0096c70 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1737,6 +1737,91 @@
- 			};
- 		};
- 
-+		sdio0 {
-+			sdio0_bus1: sdio0-bus1 {
-+				rockchip,pins =
-+					<2 RK_PC4 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_bus4: sdio0-bus4 {
-+				rockchip,pins =
-+					<2 RK_PC4 RK_FUNC_1 &pcfg_pull_up>,
-+					<2 RK_PC5 RK_FUNC_1 &pcfg_pull_up>,
-+					<2 RK_PC6 RK_FUNC_1 &pcfg_pull_up>,
-+					<2 RK_PC7 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_cmd: sdio0-cmd {
-+				rockchip,pins =
-+					<2 RK_PD0 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_clk: sdio0-clk {
-+				rockchip,pins =
-+					<2 RK_PD1 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+
-+			sdio0_cd: sdio0-cd {
-+				rockchip,pins =
-+					<2 RK_PD2 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_pwr: sdio0-pwr {
-+				rockchip,pins =
-+					<2 RK_PD3 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_bkpwr: sdio0-bkpwr {
-+				rockchip,pins =
-+					<2 RK_PD4 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_wp: sdio0-wp {
-+				rockchip,pins =
-+					<0 RK_PA3 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_int: sdio0-int {
-+				rockchip,pins =
-+					<0 RK_PA4 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+		};
-+
-+		sdmmc {
-+			sdmmc_bus1: sdmmc-bus1 {
-+				rockchip,pins =
-+					<4 RK_PB0 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdmmc_bus4: sdmmc-bus4 {
-+				rockchip,pins =
-+					<4 RK_PB0 RK_FUNC_1 &pcfg_pull_up>,
-+					<4 RK_PB1 RK_FUNC_1 &pcfg_pull_up>,
-+					<4 RK_PB2 RK_FUNC_1 &pcfg_pull_up>,
-+					<4 RK_PB3 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdmmc_clk: sdmmc-clk {
-+				rockchip,pins =
-+					<4 RK_PB4 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+
-+			sdmmc_cmd: sdmmc-cmd {
-+				rockchip,pins =
-+					<4 RK_PB5 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdmmc_cd: sdmcc-cd {
-+				rockchip,pins =
-+					<0 RK_PA7 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdmmc_wp: sdmmc-wp {
-+				rockchip,pins =
-+					<0 RK_PB0 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+		};
-+
- 		sleep {
- 			ap_pwroff: ap-pwroff {
- 				rockchip,pins = <1 RK_PA5 RK_FUNC_1 &pcfg_pull_none>;
-@@ -1752,6 +1837,11 @@
- 				rockchip,pins =
- 					<4 RK_PC5 RK_FUNC_1 &pcfg_pull_none>;
- 			};
-+
-+			spdif_bus_1: spdif-bus-1 {
-+				rockchip,pins =
-+					<3 RK_PC0 RK_FUNC_3 &pcfg_pull_none>;
-+			};
- 		};
- 
- 		spi0 {
-@@ -2011,6 +2101,19 @@
- 			};
- 		};
- 
-+		hdmi {
-+			hdmi_i2c_xfer: hdmi-i2c-xfer {
-+				rockchip,pins =
-+					<4 RK_PC1 RK_FUNC_3 &pcfg_pull_none>,
-+					<4 RK_PC0 RK_FUNC_3 &pcfg_pull_none>;
-+			};
-+
-+			hdmi_cec: hdmi-cec {
-+				rockchip,pins =
-+					<4 RK_PC7 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		pcie {
- 			pcie_clkreqn: pci-clkreqn {
- 				rockchip,pins =
-@@ -2021,6 +2124,16 @@
- 				rockchip,pins =
- 					<4 RK_PD0 RK_FUNC_1 &pcfg_pull_none>;
- 			};
-+
-+			pcie_clkreqn_cpm: pci-clkreqn-cpm {
-+				rockchip,pins =
-+					<2 RK_PD2 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+
-+			pcie_clkreqnb_cpm: pci-clkreqnb-cpm {
-+				rockchip,pins =
-+					<4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
- 		};
- 
- 	};
+Changes in v3:
+=============
+Remove unnecessary checks for poweron as suggested in review.
+
+Changes in v2:
+=============
+1. Initialize file operations .owner field with THIS_MODULE.
+2. Remove unnecessary gpio example in DT bindings documentation.
+   This is previously acked by Rob Herring <robh@kernel.org>
+
+Introduction for PATCH v1:
+
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
+
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
+
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy_v5
+
+Raviteja Garimella (3):
+  dt-bindings:phy:Add DT bindings documentation for NS2 USB DRD phy
+  phy:phy-bcm-ns2-usbdrd:Broadcom USB DRD Phy driver for Northstar2
+  DT nodes for Broadcom Northstar2 USB DRD Phy
+
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 595 +++++++++++++++++++++
+ 5 files changed, 653 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+
 -- 
-1.9.1
+2.1.0
