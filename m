@@ -1,342 +1,578 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Wed, 12 Apr 2017 11:25:35 -0500
-Subject: [PATCH v2 6/9] staging: fsl-dpaa2/eth: Add driver specific stats
+Date: Wed, 12 Apr 2017 11:25:30 -0500
+Subject: [PATCH v2 1/9] bus: fsl-mc: add DPCON object APIs
 In-Reply-To: <20170412162538.25302-1-ruxandra.radulescu@nxp.com>
 References: <20170412162538.25302-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170412162538.25302-7-ruxandra.radulescu@nxp.com>
+Message-ID: <20170412162538.25302-2-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add custom statistics to be reported via ethtool -S. These include
-driver specific per-cpu statistics as well as queue and channel
-counters.
+From: Ioana Radulescu <ruxandra.radulescu@freescale.com>
+
+This patch adds the command building/parsing wrapper functions
+for the DPCON object. The binary interface version is v3.2.
+
+A DPCON (DataPath Concentrator) is an aggregator object that
+allows ingress frames from multiple hardware queues to be seen
+as coming from a single source, from the CPU point of view.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
+Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
 ---
-v2: no changes
+v2: update #include paths since fsl-mc bus driver is still in staging
 
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     | 42 ++++++++++++++++++-
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     | 36 ++++++++++++++++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 49 +++++++++++++++++++++-
- 3 files changed, 123 insertions(+), 4 deletions(-)
+Note: The DPAA2 Ethernet driver is the first user of the DPCON objects,
+but they can also be used as building blocks by other DPAA2 drivers,
+so the API files are located for now under staging/fsl-mc/bus, along
+the other "common" MC object files.
 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index f13f72f3dd9a..67f007bdbe79 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -208,6 +208,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	void *vaddr;
- 	struct sk_buff *skb;
- 	struct rtnl_link_stats64 *percpu_stats;
-+	struct dpaa2_eth_drv_stats *percpu_extras;
- 	struct device *dev = priv->net_dev->dev.parent;
- 	struct dpaa2_fas *fas;
- 	u32 status = 0;
-@@ -219,6 +220,7 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	prefetch(vaddr + dpaa2_fd_get_offset(fd));
+ drivers/staging/fsl-mc/bus/Makefile    |   3 +-
+ drivers/staging/fsl-mc/bus/dpcon-cmd.h |  69 ++++---
+ drivers/staging/fsl-mc/bus/dpcon.c     | 317 +++++++++++++++++++++++++++++++++
+ drivers/staging/fsl-mc/include/dpcon.h | 115 ++++++++++++
+ 4 files changed, 480 insertions(+), 24 deletions(-)
+ create mode 100644 drivers/staging/fsl-mc/bus/dpcon.c
+ create mode 100644 drivers/staging/fsl-mc/include/dpcon.h
+
+diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
+index 577e9fab34ec..659eccf52a4f 100644
+--- a/drivers/staging/fsl-mc/bus/Makefile
++++ b/drivers/staging/fsl-mc/bus/Makefile
+@@ -17,7 +17,8 @@ mc-bus-driver-objs := fsl-mc-bus.o \
+ 		      fsl-mc-msi.o \
+ 		      irq-gic-v3-its-fsl-mc-msi.o \
+ 		      dpmcp.o \
+-		      dpbp.o
++		      dpbp.o \
++		      dpcon.o
  
- 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
-+	percpu_extras = this_cpu_ptr(priv->percpu_extras);
+ # MC DPIO driver
+ obj-$(CONFIG_FSL_MC_DPIO) += dpio/
+diff --git a/drivers/staging/fsl-mc/bus/dpcon-cmd.h b/drivers/staging/fsl-mc/bus/dpcon-cmd.h
+index d0a5e194c5e1..2bb66988ecf6 100644
+--- a/drivers/staging/fsl-mc/bus/dpcon-cmd.h
++++ b/drivers/staging/fsl-mc/bus/dpcon-cmd.h
+@@ -33,30 +33,53 @@
+ #define _FSL_DPCON_CMD_H
  
- 	if (fd_format == dpaa2_fd_single) {
- 		skb = build_linear_skb(priv, ch, fd, vaddr);
-@@ -227,6 +229,8 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 				vaddr + dpaa2_fd_get_offset(fd);
- 		skb = build_frag_skb(priv, ch, sgt);
- 		skb_free_frag(vaddr);
-+		percpu_extras->rx_sg_frames++;
-+		percpu_extras->rx_sg_bytes += dpaa2_fd_get_len(fd);
- 	} else {
- 		/* We don't support any other format */
- 		goto err_frame_format;
-@@ -291,6 +295,7 @@ static int consume_frames(struct dpaa2_eth_channel *ch)
- 
- 		fd = dpaa2_dq_fd(dq);
- 		fq = (struct dpaa2_eth_fq *)dpaa2_dq_fqd_ctx(dq);
-+		fq->stats.frames++;
- 
- 		fq->consume(priv, ch, fd, &ch->napi);
- 		cleaned++;
-@@ -532,11 +537,13 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
- 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
- 	struct dpaa2_fd fd;
- 	struct rtnl_link_stats64 *percpu_stats;
-+	struct dpaa2_eth_drv_stats *percpu_extras;
- 	struct dpaa2_eth_fq *fq;
- 	u16 queue_mapping;
- 	int err, i;
- 
- 	percpu_stats = this_cpu_ptr(priv->percpu_stats);
-+	percpu_extras = this_cpu_ptr(priv->percpu_extras);
- 
- 	if (unlikely(skb_headroom(skb) < DPAA2_ETH_NEEDED_HEADROOM(priv))) {
- 		struct sk_buff *ns;
-@@ -563,10 +570,14 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
- 	/* Setup the FD fields */
- 	memset(&fd, 0, sizeof(fd));
- 
--	if (skb_is_nonlinear(skb))
-+	if (skb_is_nonlinear(skb)) {
- 		err = build_sg_fd(priv, skb, &fd);
--	else
-+		percpu_extras->tx_sg_frames++;
-+		percpu_extras->tx_sg_bytes += skb->len;
-+	} else {
- 		err = build_single_fd(priv, skb, &fd);
-+	}
+ /* DPCON Version */
+-#define DPCON_VER_MAJOR				2
+-#define DPCON_VER_MINOR				1
++#define DPCON_VER_MAJOR				3
++#define DPCON_VER_MINOR				2
 +
- 	if (unlikely(err)) {
- 		percpu_stats->tx_dropped++;
- 		goto err_build_fd;
-@@ -583,6 +594,7 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
- 		if (err != -EBUSY)
- 			break;
- 	}
-+	percpu_extras->tx_portal_busy += i;
- 	if (unlikely(err < 0)) {
- 		percpu_stats->tx_errors++;
- 		/* Clean up everything, including freeing the skb */
-@@ -608,8 +620,13 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
- 			      struct napi_struct *napi __always_unused)
- {
- 	struct rtnl_link_stats64 *percpu_stats;
-+	struct dpaa2_eth_drv_stats *percpu_extras;
- 	u32 status = 0;
- 
-+	percpu_extras = this_cpu_ptr(priv->percpu_extras);
-+	percpu_extras->tx_conf_frames++;
-+	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
++/* Command versioning */
++#define DPCON_CMD_BASE_VERSION			1
++#define DPCON_CMD_ID_OFFSET			4
 +
- 	free_tx_fd(priv, fd, &status);
++#define DPCON_CMD(id)	(((id) << DPCON_CMD_ID_OFFSET) | DPCON_CMD_BASE_VERSION)
  
- 	if (unlikely(status & DPAA2_ETH_TXCONF_ERR_MASK)) {
-@@ -814,13 +831,19 @@ static int refill_pool(struct dpaa2_eth_priv *priv,
- static int pull_channel(struct dpaa2_eth_channel *ch)
- {
- 	int err;
-+	int dequeues = -1;
- 
- 	/* Retry while portal is busy */
- 	do {
- 		err = dpaa2_io_service_pull_channel(NULL, ch->ch_id, ch->store);
-+		dequeues++;
- 		cpu_relax();
- 	} while (err == -EBUSY);
- 
-+	ch->stats.dequeue_portal_busy += dequeues;
-+	if (unlikely(err))
-+		ch->stats.pull_err++;
+ /* Command IDs */
+-#define DPCON_CMDID_CLOSE				0x800
+-#define DPCON_CMDID_OPEN				0x808
+-#define DPCON_CMDID_CREATE				0x908
+-#define DPCON_CMDID_DESTROY				0x900
+-
+-#define DPCON_CMDID_ENABLE				0x002
+-#define DPCON_CMDID_DISABLE				0x003
+-#define DPCON_CMDID_GET_ATTR				0x004
+-#define DPCON_CMDID_RESET				0x005
+-#define DPCON_CMDID_IS_ENABLED				0x006
+-
+-#define DPCON_CMDID_SET_IRQ				0x010
+-#define DPCON_CMDID_GET_IRQ				0x011
+-#define DPCON_CMDID_SET_IRQ_ENABLE			0x012
+-#define DPCON_CMDID_GET_IRQ_ENABLE			0x013
+-#define DPCON_CMDID_SET_IRQ_MASK			0x014
+-#define DPCON_CMDID_GET_IRQ_MASK			0x015
+-#define DPCON_CMDID_GET_IRQ_STATUS			0x016
+-#define DPCON_CMDID_CLEAR_IRQ_STATUS			0x017
+-
+-#define DPCON_CMDID_SET_NOTIFICATION			0x100
++#define DPCON_CMDID_CLOSE			DPCON_CMD(0x800)
++#define DPCON_CMDID_OPEN			DPCON_CMD(0x808)
++#define DPCON_CMDID_GET_API_VERSION		DPCON_CMD(0xa08)
 +
- 	return err;
- }
- 
-@@ -868,6 +891,8 @@ static int dpaa2_eth_poll(struct napi_struct *napi, int budget)
- 		} while (err == -EBUSY);
- 	}
- 
-+	ch->stats.frames += cleaned;
++#define DPCON_CMDID_ENABLE			DPCON_CMD(0x002)
++#define DPCON_CMDID_DISABLE			DPCON_CMD(0x003)
++#define DPCON_CMDID_GET_ATTR			DPCON_CMD(0x004)
++#define DPCON_CMDID_RESET			DPCON_CMD(0x005)
++#define DPCON_CMDID_IS_ENABLED			DPCON_CMD(0x006)
 +
- 	return cleaned;
- }
- 
-@@ -1320,6 +1345,10 @@ static void cdan_cb(struct dpaa2_io_notification_ctx *ctx)
- 	struct dpaa2_eth_channel *ch;
- 
- 	ch = container_of(ctx, struct dpaa2_eth_channel, nctx);
++#define DPCON_CMDID_SET_NOTIFICATION		DPCON_CMD(0x100)
 +
-+	/* Update NAPI statistics */
-+	ch->stats.cdan++;
++struct dpcon_cmd_open {
++	__le32 dpcon_id;
++};
 +
- 	napi_schedule_irqoff(&ch->napi);
- }
++#define DPCON_ENABLE			1
++
++struct dpcon_rsp_is_enabled {
++	u8 enabled;
++};
++
++struct dpcon_rsp_get_attr {
++	/* response word 0 */
++	__le32 id;
++	__le16 qbman_ch_id;
++	u8 num_priorities;
++	u8 pad;
++};
++
++struct dpcon_cmd_set_notification {
++	/* cmd word 0 */
++	__le32 dpio_id;
++	u8 priority;
++	u8 pad[3];
++	/* cmd word 1 */
++	__le64 user_ctx;
++};
  
-@@ -2345,6 +2374,12 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
- 		err = -ENOMEM;
- 		goto err_alloc_percpu_stats;
- 	}
-+	priv->percpu_extras = alloc_percpu(*priv->percpu_extras);
-+	if (!priv->percpu_extras) {
-+		dev_err(dev, "alloc_percpu(percpu_extras) failed\n");
-+		err = -ENOMEM;
-+		goto err_alloc_percpu_extras;
-+	}
- 
- 	err = netdev_init(net_dev);
- 	if (err)
-@@ -2387,6 +2422,8 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
- err_csum:
- 	unregister_netdev(net_dev);
- err_netdev_init:
-+	free_percpu(priv->percpu_extras);
-+err_alloc_percpu_extras:
- 	free_percpu(priv->percpu_stats);
- err_alloc_percpu_stats:
- 	del_ch_napi(priv);
-@@ -2425,6 +2462,7 @@ static int dpaa2_eth_remove(struct fsl_mc_device *ls_dev)
- 
- 	free_rings(priv);
- 	free_percpu(priv->percpu_stats);
-+	free_percpu(priv->percpu_extras);
- 
- 	del_ch_napi(priv);
- 	free_dpbp(priv);
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index b30231891eef..f2b0a60795fe 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -197,6 +197,38 @@ struct dpaa2_fas {
-  */
- #define DPAA2_ETH_ENQUEUE_RETRIES	10
- 
-+/* Driver statistics, other than those in struct rtnl_link_stats64.
-+ * These are usually collected per-CPU and aggregated by ethtool.
+ #endif /* _FSL_DPCON_CMD_H */
+diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
+new file mode 100644
+index 000000000000..eb713578b817
+--- /dev/null
++++ b/drivers/staging/fsl-mc/bus/dpcon.c
+@@ -0,0 +1,317 @@
++/* Copyright 2013-2016 Freescale Semiconductor Inc.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * * Redistributions of source code must retain the above copyright
++ * notice, this list of conditions and the following disclaimer.
++ * * Redistributions in binary form must reproduce the above copyright
++ * notice, this list of conditions and the following disclaimer in the
++ * documentation and/or other materials provided with the distribution.
++ * * Neither the name of the above-listed copyright holders nor the
++ * names of any contributors may be used to endorse or promote products
++ * derived from this software without specific prior written permission.
++ *
++ *
++ * ALTERNATIVELY, this software may be distributed under the terms of the
++ * GNU General Public License ("GPL") as published by the Free Software
++ * Foundation, either version 2 of that License or (at your option) any
++ * later version.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
 + */
-+struct dpaa2_eth_drv_stats {
-+	__u64	tx_conf_frames;
-+	__u64	tx_conf_bytes;
-+	__u64	tx_sg_frames;
-+	__u64	tx_sg_bytes;
-+	__u64	rx_sg_frames;
-+	__u64	rx_sg_bytes;
-+	/* Enqueues retried due to portal busy */
-+	__u64	tx_portal_busy;
++#include "../include/mc-sys.h"
++#include "../include/mc-cmd.h"
++#include "../include/dpcon.h"
++
++#include "dpcon-cmd.h"
++
++/**
++ * dpcon_open() - Open a control session for the specified object
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @dpcon_id:	DPCON unique ID
++ * @token:	Returned token; use in subsequent API calls
++ *
++ * This function can be used to open a control session for an
++ * already created object; an object may have been declared in
++ * the DPL or by calling the dpcon_create() function.
++ * This function returns a unique authentication token,
++ * associated with the specific object ID and the specific MC
++ * portal; this token must be used in all subsequent commands for
++ * this specific object.
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_open(struct fsl_mc_io *mc_io,
++	       u32 cmd_flags,
++	       int dpcon_id,
++	       u16 *token)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_cmd_open *dpcon_cmd;
++	int err;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_OPEN,
++					  cmd_flags,
++					  0);
++	dpcon_cmd = (struct dpcon_cmd_open *)cmd.params;
++	dpcon_cmd->dpcon_id = cpu_to_le32(dpcon_id);
++
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
++
++	/* retrieve response parameters */
++	*token = mc_cmd_hdr_read_token(&cmd);
++
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_open);
++
++/**
++ * dpcon_close() - Close the control session of the object
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * After this function is called, no further operations are
++ * allowed on the object without opening a new control session.
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_close(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token)
++{
++	struct mc_command cmd = { 0 };
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_CLOSE,
++					  cmd_flags,
++					  token);
++
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_close);
++
++/**
++ * dpcon_enable() - Enable the DPCON
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_enable(struct fsl_mc_io *mc_io,
++		 u32 cmd_flags,
++		 u16 token)
++{
++	struct mc_command cmd = { 0 };
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_ENABLE,
++					  cmd_flags,
++					  token);
++
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_enable);
++
++/**
++ * dpcon_disable() - Disable the DPCON
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_disable(struct fsl_mc_io *mc_io,
++		  u32 cmd_flags,
++		  u16 token)
++{
++	struct mc_command cmd = { 0 };
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_DISABLE,
++					  cmd_flags,
++					  token);
++
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_disable);
++
++/**
++ * dpcon_is_enabled() -	Check if the DPCON is enabled.
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ * @en:		Returns '1' if object is enabled; '0' otherwise
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_is_enabled(struct fsl_mc_io *mc_io,
++		     u32 cmd_flags,
++		     u16 token,
++		     int *en)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_rsp_is_enabled *dpcon_rsp;
++	int err;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_IS_ENABLED,
++					  cmd_flags,
++					  token);
++
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
++
++	/* retrieve response parameters */
++	dpcon_rsp = (struct dpcon_rsp_is_enabled *)cmd.params;
++	*en = dpcon_rsp->enabled & DPCON_ENABLE;
++
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_is_enabled);
++
++/**
++ * dpcon_reset() - Reset the DPCON, returns the object to initial state.
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_reset(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token)
++{
++	struct mc_command cmd = { 0 };
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_RESET,
++					  cmd_flags, token);
++
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_reset);
++
++/**
++ * dpcon_get_attributes() - Retrieve DPCON attributes.
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ * @attr:	Object's attributes
++ *
++ * Return:	'0' on Success; Error code otherwise.
++ */
++int dpcon_get_attributes(struct fsl_mc_io *mc_io,
++			 u32 cmd_flags,
++			 u16 token,
++			 struct dpcon_attr *attr)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_rsp_get_attr *dpcon_rsp;
++	int err;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_GET_ATTR,
++					  cmd_flags,
++					  token);
++
++	/* send command to mc*/
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
++
++	/* retrieve response parameters */
++	dpcon_rsp = (struct dpcon_rsp_get_attr *)cmd.params;
++	attr->id = le32_to_cpu(dpcon_rsp->id);
++	attr->qbman_ch_id = le16_to_cpu(dpcon_rsp->qbman_ch_id);
++	attr->num_priorities = dpcon_rsp->num_priorities;
++
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_get_attributes);
++
++/**
++ * dpcon_set_notification() - Set DPCON notification destination
++ * @mc_io:	Pointer to MC portal's I/O object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @token:	Token of DPCON object
++ * @cfg:	Notification parameters
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_set_notification(struct fsl_mc_io *mc_io,
++			   u32 cmd_flags,
++			   u16 token,
++			   struct dpcon_notification_cfg *cfg)
++{
++	struct mc_command cmd = { 0 };
++	struct dpcon_cmd_set_notification *dpcon_cmd;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_SET_NOTIFICATION,
++					  cmd_flags,
++					  token);
++	dpcon_cmd = (struct dpcon_cmd_set_notification *)cmd.params;
++	dpcon_cmd->dpio_id = cpu_to_le32(cfg->dpio_id);
++	dpcon_cmd->priority = cfg->priority;
++	dpcon_cmd->user_ctx = cpu_to_le64(cfg->user_ctx);
++
++	/* send command to mc*/
++	return mc_send_command(mc_io, &cmd);
++}
++EXPORT_SYMBOL(dpcon_set_notification);
++
++/**
++ * dpcon_get_api_version - Get Data Path Concentrator API version
++ * @mc_io:	Pointer to MC portal's DPCON object
++ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
++ * @major_ver:	Major version of DPCON API
++ * @minor_ver:	Minor version of DPCON API
++ *
++ * Return:	'0' on Success; Error code otherwise
++ */
++int dpcon_get_api_version(struct fsl_mc_io *mc_io,
++			  u32 cmd_flags,
++			  u16 *major_ver,
++			  u16 *minor_ver)
++{
++	struct mc_command cmd = { 0 };
++	int err;
++
++	/* prepare command */
++	cmd.header = mc_encode_cmd_header(DPCON_CMDID_GET_API_VERSION,
++					  cmd_flags, 0);
++
++	/* send command to mc */
++	err = mc_send_command(mc_io, &cmd);
++	if (err)
++		return err;
++
++	/* retrieve response parameters */
++	mc_cmd_read_api_version(&cmd, major_ver, minor_ver);
++
++	return 0;
++}
++EXPORT_SYMBOL(dpcon_get_api_version);
+diff --git a/drivers/staging/fsl-mc/include/dpcon.h b/drivers/staging/fsl-mc/include/dpcon.h
+new file mode 100644
+index 000000000000..efa23906b364
+--- /dev/null
++++ b/drivers/staging/fsl-mc/include/dpcon.h
+@@ -0,0 +1,115 @@
++/* Copyright 2013-2016 Freescale Semiconductor Inc.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * * Redistributions of source code must retain the above copyright
++ * notice, this list of conditions and the following disclaimer.
++ * * Redistributions in binary form must reproduce the above copyright
++ * notice, this list of conditions and the following disclaimer in the
++ * documentation and/or other materials provided with the distribution.
++ * * Neither the name of the above-listed copyright holders nor the
++ * names of any contributors may be used to endorse or promote products
++ * derived from this software without specific prior written permission.
++ *
++ *
++ * ALTERNATIVELY, this software may be distributed under the terms of the
++ * GNU General Public License ("GPL") as published by the Free Software
++ * Foundation, either version 2 of that License or (at your option) any
++ * later version.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++#ifndef __FSL_DPCON_H
++#define __FSL_DPCON_H
++
++/* Data Path Concentrator API
++ * Contains initialization APIs and runtime control APIs for DPCON
++ */
++
++struct fsl_mc_io;
++
++/** General DPCON macros */
++
++/**
++ * Use it to disable notifications; see dpcon_set_notification()
++ */
++#define DPCON_INVALID_DPIO_ID		(int)(-1)
++
++int dpcon_open(struct fsl_mc_io *mc_io,
++	       u32 cmd_flags,
++	       int dpcon_id,
++	       u16 *token);
++
++int dpcon_close(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token);
++
++int dpcon_enable(struct fsl_mc_io *mc_io,
++		 u32 cmd_flags,
++		 u16 token);
++
++int dpcon_disable(struct fsl_mc_io *mc_io,
++		  u32 cmd_flags,
++		  u16 token);
++
++int dpcon_is_enabled(struct fsl_mc_io *mc_io,
++		     u32 cmd_flags,
++		     u16 token,
++		     int *en);
++
++int dpcon_reset(struct fsl_mc_io *mc_io,
++		u32 cmd_flags,
++		u16 token);
++
++/**
++ * struct dpcon_attr - Structure representing DPCON attributes
++ * @id: DPCON object ID
++ * @qbman_ch_id: Channel ID to be used by dequeue operation
++ * @num_priorities: Number of priorities for the DPCON channel (1-8)
++ */
++struct dpcon_attr {
++	int id;
++	u16 qbman_ch_id;
++	u8 num_priorities;
 +};
 +
-+/* Per-FQ statistics */
-+struct dpaa2_eth_fq_stats {
-+	/* Number of frames received on this queue */
-+	__u64 frames;
++int dpcon_get_attributes(struct fsl_mc_io *mc_io,
++			 u32 cmd_flags,
++			 u16 token,
++			 struct dpcon_attr *attr);
++
++/**
++ * struct dpcon_notification_cfg - Structure representing notification params
++ * @dpio_id:	DPIO object ID; must be configured with a notification channel;
++ *	to disable notifications set it to 'DPCON_INVALID_DPIO_ID';
++ * @priority:	Priority selection within the DPIO channel; valid values
++ *		are 0-7, depending on the number of priorities in that channel
++ * @user_ctx:	User context value provided with each CDAN message
++ */
++struct dpcon_notification_cfg {
++	int dpio_id;
++	u8 priority;
++	u64 user_ctx;
 +};
 +
-+/* Per-channel statistics */
-+struct dpaa2_eth_ch_stats {
-+	/* Volatile dequeues retried due to portal busy */
-+	__u64 dequeue_portal_busy;
-+	/* Number of CDANs; useful to estimate avg NAPI len */
-+	__u64 cdan;
-+	/* Number of frames received on queues from this channel */
-+	__u64 frames;
-+	/* Pull errors */
-+	__u64 pull_err;
-+};
++int dpcon_set_notification(struct fsl_mc_io *mc_io,
++			   u32 cmd_flags,
++			   u16 token,
++			   struct dpcon_notification_cfg *cfg);
 +
- /* Maximum number of queues associated with a DPNI */
- #define DPAA2_ETH_MAX_RX_QUEUES		16
- #define DPAA2_ETH_MAX_TX_QUEUES		NR_CPUS
-@@ -224,6 +256,7 @@ struct dpaa2_eth_fq {
- 			struct dpaa2_eth_channel *,
- 			const struct dpaa2_fd *,
- 			struct napi_struct *);
-+	struct dpaa2_eth_fq_stats stats;
- };
- 
- struct dpaa2_eth_channel {
-@@ -236,6 +269,7 @@ struct dpaa2_eth_channel {
- 	struct dpaa2_io_store *store;
- 	struct dpaa2_eth_priv *priv;
- 	int buf_count;
-+	struct dpaa2_eth_ch_stats stats;
- };
- 
- struct dpaa2_eth_hash_fields {
-@@ -275,6 +309,8 @@ struct dpaa2_eth_priv {
- 
- 	/* Standard statistics */
- 	struct rtnl_link_stats64 __percpu *percpu_stats;
-+	/* Extra stats, in addition to the ones known by the kernel */
-+	struct dpaa2_eth_drv_stats __percpu *percpu_extras;
- 
- 	u16 mc_token;
- 
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-index 4378956a5527..dd0cffa908ef 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
-@@ -56,6 +56,23 @@ char dpaa2_ethtool_stats[][ETH_GSTRING_LEN] = {
- 
- #define DPAA2_ETH_NUM_STATS	ARRAY_SIZE(dpaa2_ethtool_stats)
- 
-+char dpaa2_ethtool_extras[][ETH_GSTRING_LEN] = {
-+	/* per-cpu stats */
-+	"tx conf frames",
-+	"tx conf bytes",
-+	"tx sg frames",
-+	"tx sg bytes",
-+	"rx sg frames",
-+	"rx sg bytes",
-+	"enqueue portal busy",
-+	/* Channel stats */
-+	"dequeue portal busy",
-+	"channel pull errors",
-+	"cdan",
-+};
++int dpcon_get_api_version(struct fsl_mc_io *mc_io,
++			  u32 cmd_flags,
++			  u16 *major_ver,
++			  u16 *minor_ver);
 +
-+#define DPAA2_ETH_NUM_EXTRA_STATS	ARRAY_SIZE(dpaa2_ethtool_extras)
-+
- static void dpaa2_eth_get_drvinfo(struct net_device *net_dev,
- 				  struct ethtool_drvinfo *drvinfo)
- {
-@@ -147,6 +164,10 @@ static void dpaa2_eth_get_strings(struct net_device *netdev, u32 stringset,
- 			strlcpy(p, dpaa2_ethtool_stats[i], ETH_GSTRING_LEN);
- 			p += ETH_GSTRING_LEN;
- 		}
-+		for (i = 0; i < DPAA2_ETH_NUM_EXTRA_STATS; i++) {
-+			strlcpy(p, dpaa2_ethtool_extras[i], ETH_GSTRING_LEN);
-+			p += ETH_GSTRING_LEN;
-+		}
- 		break;
- 	}
- }
-@@ -155,7 +176,7 @@ static int dpaa2_eth_get_sset_count(struct net_device *net_dev, int sset)
- {
- 	switch (sset) {
- 	case ETH_SS_STATS: /* ethtool_get_stats(), ethtool_get_drvinfo() */
--		return DPAA2_ETH_NUM_STATS;
-+		return DPAA2_ETH_NUM_STATS + DPAA2_ETH_NUM_EXTRA_STATS;
- 	default:
- 		return -EOPNOTSUPP;
- 	}
-@@ -171,9 +192,14 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
- 	int j, k, err;
- 	int num_cnt;
- 	union dpni_statistics dpni_stats;
-+	u64 cdan = 0;
-+	u64 portal_busy = 0, pull_err = 0;
- 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
-+	struct dpaa2_eth_drv_stats *extras;
-+	struct dpaa2_eth_ch_stats *ch_stats;
- 
--	memset(data, 0, sizeof(u64) * DPAA2_ETH_NUM_STATS);
-+	memset(data, 0,
-+	       sizeof(u64) * (DPAA2_ETH_NUM_STATS + DPAA2_ETH_NUM_EXTRA_STATS));
- 
- 	/* Print standard counters, from DPNI statistics */
- 	for (j = 0; j <= 2; j++) {
-@@ -197,6 +223,25 @@ static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
- 		for (k = 0; k < num_cnt; k++)
- 			*(data + i++) = dpni_stats.raw.counter[k];
- 	}
-+
-+	/* Print per-cpu extra stats */
-+	for_each_online_cpu(k) {
-+		extras = per_cpu_ptr(priv->percpu_extras, k);
-+		for (j = 0; j < sizeof(*extras) / sizeof(__u64); j++)
-+			*((__u64 *)data + i + j) += *((__u64 *)extras + j);
-+	}
-+	i += j;
-+
-+	for (j = 0; j < priv->num_channels; j++) {
-+		ch_stats = &priv->channel[j]->stats;
-+		cdan += ch_stats->cdan;
-+		portal_busy += ch_stats->dequeue_portal_busy;
-+		pull_err += ch_stats->pull_err;
-+	}
-+
-+	*(data + i++) = portal_busy;
-+	*(data + i++) = pull_err;
-+	*(data + i++) = cdan;
- }
- 
- static int dpaa2_eth_get_rxnfc(struct net_device *net_dev,
++#endif /* __FSL_DPCON_H */
 -- 
 2.11.0
