@@ -1,75 +1,101 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 12 Apr 2017 13:27:28 -0400
-Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
- ACPI mode
-In-Reply-To: <20170412170433.GA7412@red-moon>
-References: <0dada57f-4215-4ced-482d-88203857e06d@codeaurora.org>
- <20170412170433.GA7412@red-moon>
-Message-ID: <855540a9-888d-6419-3add-d8b0dbb43029@codeaurora.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 12 Apr 2017 14:27:51 -0300
+Subject: [PATCH v5 0/8] mfd: Add OF device table to I2C drivers that are
+ missing it
+Message-ID: <20170412172800.23035-1-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hello,
 
-On 4/12/2017 1:04 PM, Lorenzo Pieralisi wrote:
-> On Sat, Apr 08, 2017 at 01:17:32PM -0400, Sinan Kaya wrote:
->> On 12/31/1969 7:00 PM, linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Sergey Temerkhanov wrote:
->>>  int pcibus_to_node(struct pci_bus *bus)  {
->>> -	return dev_to_node(&bus->dev);
->>> +	struct pci_config_window *cfg = bus->sysdata;
->>> +	struct acpi_device *adev = NULL;
->>> +	struct device *dev;
->>> +
->>> +	if (!acpi_disabled)
->>> +		adev = to_acpi_device(cfg->parent);
->>> +
->>
->> I see a problem here that NUMA node information is read from the
->> parent device.  PCI bus can have multiple levels of switches and
->> bridges. The NUMA information is only present on the host bridge.
->>
->> This code only works if the endpoint is directly connected to the root
->> port. 
-> 
-> That's not what this code does. This code retrieves the struct device
-> backing the ACPI device representing the PNP0A08 host bridge and its
-> dev->numa_node value (that was set in pci_acpi_scan_root()).
+This series add OF device ID tables to mfd I2C drivers whose devices are
+either used in Device Tree source files or are listed in binding docs as
+a compatible string.
 
-pcibus_to_node() gets called from two places. The first place is 
-pci_register_host_bridge() like you mentioned. 
+That's done because the plan is to change the I2C core to report proper OF
+modaliases instead of always reporting a MODALIAS=i2c:<foo> regardless if
+a device was registered via DT or using the legacy platform data mechanism.
 
-The second place is pci_device_add(). pci_device_add() gets called for
-every single device that is getting added to the system. 
+So these patches will make sure that mfd I2C drivers modules will continue
+to be autoloaded once the I2C core is changed to report proper OF modalias.
 
-> 
-> I am not a big fan of this. I wonder if we could not make it DT/ACPI
-> agnostic by simply setting the numa_node in the pci_bus->dev field,
-> and propagate it downstream a PCI hierarcy (as we do with sysdata)
-> in pci_alloc_child_bus().
+Users didn't have a vendor prefix in the used compatible strings, but since
+there wasn't a DT binding document for these drivers, it can be said that
+were working for mere luck and so this series fixes the users and add a DT
+binding doc for the drivers.
 
-Yeah, that's what I was going to ask next about how other arches solve
-this. Common solution to DT/ACPI is preferable as the issue exists in
-both places unless DT has some other mechanism hidden behind the scenes.
+Most patches can be applied independently, with the exception of patches
+2 to 4 that should be applied in the same tree to keep bisect-ability. I
+suggest these to go through the MFD subsystem tree.
 
-> 
-> This way pcibus_to_node() would become straightforward (ie as it
-> is now - provided the above is doable):
-> 
-> dev_to_node(&bus->dev);
-> 
-> This is suspiciously similar to the domain number song and dance
-> except that the NUMA node now is in the struct pci_bus->dev->numa_node
-> instead of struct pci_bus->domain_nr.
+Best regards,
+Javier
 
-I think this looks like the _CCA dance we are doing.
+Changes in v5:
+- Add missing properties for interrupts to DT binding doc (Rob Herring).
+- Add Rob Herring's Acked-by tag.
+- Add Aaro Koskinen's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Lee Jones <lee.jones@linaro.org>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Aaro Koskinen's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Aaro Koskinen's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Lee Jones <lee.jones@linaro.org>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Aaro Koskinen's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Aaro Koskinen's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
+- Add Lee Jones <lee.jones@linaro.org>'s Acked-by tag.
+- Add Rob Herring's Acked-by tag.
+- Add Acked-by: Tony Lindgren <tony@atomide.com>'s Acked-by tag.
 
-> 
-> Lorenzo
-> 
+Changes in v4:
+- Use "dt-bindings: mfd:" prefix in subject line (Rob Herring).
+- Add information about what functions the device serve (Lee Jones).
+- Avoid using MFD in Device Tree (Lee Jones).
+- Drop -mfd suffix in compatible string (Lee Jones).
+- Avoid using MFD in Device Tree (Lee Jones).
+- Use "dt-bindings: mfd:" prefix in subject line (Rob Herring).
+- Add information about what functions the device serve (Lee Jones).
 
-Sinan
+Changes in v3:
+- Add a vendor prefix to the compatible string (Rob Herring).
+- Add a vendor prefix to the compatible string (Rob Herring).
+
+Changes in v2:
+- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
+- Don't use of_match_ptr() to avoid build warning when CONFIG_OF is disabled.
+
+Javier Martinez Canillas (8):
+  dt-bindings: mfd: Add retu/tahvo ASIC chips bindings
+  mfd: retu: Drop -mfd suffix from I2C device ID name
+  mfd: retu: Add OF device ID table
+  ARM: dts: n8x0: Add vendor prefix to retu node
+  i2c: i2c-cbus-gpio: Add vendor prefix to retu node in example
+  dt-bindings: mfd: Add TI tps6105x chip bindings
+  mfd: tps6105x: Add OF device ID table
+  ARM: ux500: Add vendor prefix to tps61052 node
+
+ .../devicetree/bindings/i2c/i2c-cbus-gpio.txt      |  4 ++--
+ Documentation/devicetree/bindings/mfd/retu.txt     | 23 ++++++++++++++++++++++
+ Documentation/devicetree/bindings/mfd/tps6105x.txt | 17 ++++++++++++++++
+ arch/arm/boot/dts/omap2420-n8x0-common.dtsi        |  4 ++--
+ arch/arm/boot/dts/ste-hrefprev60.dtsi              |  2 +-
+ arch/arm/mach-omap1/board-nokia770.c               |  4 ++--
+ drivers/mfd/retu-mfd.c                             | 12 +++++++++--
+ drivers/mfd/tps6105x.c                             |  8 ++++++++
+ 8 files changed, 65 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/retu.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/tps6105x.txt
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.9.3
