@@ -1,51 +1,43 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 12 Apr 2017 10:33:49 +0800
-Subject: [RFC PATCH 4/7] ACPICA: IORT: Add SMMuV3 model definitions.
-In-Reply-To: <CA+sq2CfXQAM-ooNRQBbYNYc_T=p2yrvA2FYD=2_=_-Z9kQwVcA@mail.gmail.com>
-References: <1491921765-29475-1-git-send-email-linucherian@gmail.com>
- <1491921765-29475-5-git-send-email-linucherian@gmail.com>
- <d60a1fcc-081e-03e8-3454-6802e830ddb9@arm.com>
- <CA+sq2CfXQAM-ooNRQBbYNYc_T=p2yrvA2FYD=2_=_-Z9kQwVcA@mail.gmail.com>
-Message-ID: <e40bacb5-0341-dde8-eee7-894b199da7ca@linaro.org>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 12 Apr 2017 10:40:46 +0800
+Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
+In-Reply-To: <20170314105108.GA15248@leverpostej>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
+ <CAFpQJXUQm84-DTCAng1RQq-wv-nqw=+MTe=vGTL7Sw=yL2sd+A@mail.gmail.com>
+ <20170314105108.GA15248@leverpostej>
+Message-ID: <58ED93AE.3040605@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/4/12 0:57, Sunil Kovvuri wrote:
-> On Tue, Apr 11, 2017 at 9:29 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 11/04/17 15:42, linucherian at gmail.com wrote:
->>> From: Linu Cherian <linu.cherian@cavium.com>
->>>
->>> Add SMMuV3 model definitions.
->>>
->>> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
->>> ---
->>>  include/acpi/actbl2.h | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
->>> index 2b4af07..9db67d6 100644
->>> --- a/include/acpi/actbl2.h
->>> +++ b/include/acpi/actbl2.h
->>> @@ -778,6 +778,11 @@ struct acpi_iort_smmu {
->>>  #define ACPI_IORT_SMMU_CORELINK_MMU400  0x00000002   /* ARM Corelink MMU-400 */
->>>  #define ACPI_IORT_SMMU_CORELINK_MMU500  0x00000003   /* ARM Corelink MMU-500 */
->>>
->>> +#define ACPI_IORT_SMMU_V3               0x00000000      /* Generic SMMUv3 */
->>> +#define ACPI_IORT_SMMU_CORELINK_MMU600  0x00000001      /* ARM Corelink MMU-600 */
->>> +#define ACPI_IORT_SMMU_V3_HISILICON     0x00000002      /* HiSilicon SMMUv3 */
->>> +#define ACPI_IORT_SMMU_V3_CAVIUM_CN99XX 0x00000003      /* Cavium CN99xx SMMUv3 */
->>
->> None of those models are listed in the current IORT spec.
+On 2017/3/14 18:51, Mark Rutland wrote:
+> Hi Ganapatrao,
 >
-> As mentioned in the cover letter, we are in the process of getting
-> model no added for
-> our silicon in the soon to be published updated IORT spec. Meanwhile
-> we wanted to take
-> feedback on the errata patches from experts. Hence patches were
-> submitted as RFC.
+> On Tue, Mar 14, 2017 at 11:30:17AM +0530, Ganapatrao Kulkarni wrote:
+>>> +int __init armv8_pmu_driver_init(void)
+>>> +{
+>>> +       if (acpi_disabled)
+>>> +               return platform_driver_register(&armv8_pmu_driver);
+>>> +       else
+>>> +               return arm_pmu_acpi_probe(armv8_pmuv3_init);
+>> i think this function needs to be updated to
+>> probe SoC specific init (armv8_a53_pmu_init, armv8_vulcan_pmu_init
+>> etc)  as well.
+> Only exposing generic PMUv3 here was a deliberate decision, based on
+> prior discussions, so as to keep things consistent on ACPI platforms
+> regardless of which CPU types the PMU code is immediately aware of.
+>
+> I should have documented this better; sorry about that.
+>
+> All events which can be enumerated via the PMU ID registers will be
+> exposed via sysfs.
+>
+> Other events (e.g. those which are implementation defined) will not be
+> exposed via sysfs, but can still be used as raw events.
 
-Thanks. The name for Hisilicon SMMUv3 might be changed, we need to wait
-for the released IORT spec.
+Hmm, this means inconsistency of pmu events for system booted with
+ACPI and DT (DT may represent more events), is there any plan to support
+events not in generic PMUv3 for further steps in the future?
 
 Thanks
 Hanjun
