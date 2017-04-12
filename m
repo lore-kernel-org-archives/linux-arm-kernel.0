@@ -1,41 +1,98 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 12 Apr 2017 16:53:43 +0200
-Subject: [PATCH v2 2/3] power: supply: New driver for LEGO MINDSTORMS EV3
- battery
-In-Reply-To: <1491944723-32174-3-git-send-email-david@lechnology.com>
-References: <1491944723-32174-1-git-send-email-david@lechnology.com>
- <1491944723-32174-3-git-send-email-david@lechnology.com>
-Message-ID: <20170412145343.2bexmzmpovjvgoml@earth>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Apr 2017 08:02:45 -0700
+Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
+In-Reply-To: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170412150245.GK7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/08, Daniel Lezcano wrote:
+>  
+>  Example:
+>  	pmic: pmic at f8000000 {
+> @@ -24,4 +29,5 @@ Example:
+>  		interrupt-controller;
+>  		#interrupt-cells = <2>;
+>  		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+> +		clock-cells = <0>;
 
-On Tue, Apr 11, 2017 at 04:05:22PM -0500, David Lechner wrote:
-> This adds a new driver for the LEGO MINDSTORMS EV3 battery. The EV3 is
-> an embedded ARM device that can use 6 AA batteries or a special rechargeable
-> Li-ion battery pack. The rechargeable battery pack presses a special key
-> switch in the battery compartment to indicate that it is present.
-> 
-> The EV3 is only capable of monitoring battery voltage and current. The
-> charging circuit is built into the rechargeable battery pack and there is
-> no way to communicate with is, so we can't provide any information about
-> charging status.
-> 
-> When not using the rechargeable battery pack, it is most common to use
-> alkaline batteries to power the device, but it is also common for people to
-> use rechargeable NiMH batteries. Since there is not a way to automatically
-> differentiate between these, the technology property is made writable.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+Should be #clock-cells instead.
 
-Thanks, queued.
+>  	}
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 92c12b8..c19983a 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -36,6 +36,7 @@ obj-$(CONFIG_COMMON_CLK_PALMAS)		+= clk-palmas.o
+>  obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
+>  obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
+>  obj-$(CONFIG_COMMON_CLK_RK808)		+= clk-rk808.o
+> +obj-$(CONFIG_COMMON_CLK_HI655X)		+= clk-hi655x.o
+>  obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
+>  obj-$(CONFIG_COMMON_CLK_SCPI)           += clk-scpi.o
+>  obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
+> diff --git a/drivers/clk/clk-hi655x.c b/drivers/clk/clk-hi655x.c
+> new file mode 100644
+> index 0000000..b2bea32
+> --- /dev/null
+> +++ b/drivers/clk/clk-hi655x.c
+> @@ -0,0 +1,140 @@
+> +
+> +static int hi655x_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct device *parent = pdev->dev.parent;
+> +	struct hi655x_pmic *hi655x = dev_get_drvdata(parent);
+> +	struct clk_init_data *hi655x_clk_init;
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170412/db3d704e/attachment.sig>
+This can just go onto the stack? We don't need it around after
+probe.
+
+> +	struct hi655x_clk *hi655x_clk;
+> +	const char *clk_name = "hi655x-clk";
+> +	int ret;
+> +
+> +	hi655x_clk = devm_kzalloc(&pdev->dev, sizeof(*hi655x_clk), GFP_KERNEL);
+> +	if (!hi655x_clk)
+> +		return -ENOMEM;
+> +
+> +	hi655x_clk_init = devm_kzalloc(&pdev->dev, sizeof(*hi655x_clk_init),
+> +				       GFP_KERNEL);
+> +	if (!hi655x_clk_init)
+> +		return -ENOMEM;
+> +
+> +	of_property_read_string_index(parent->of_node, "clock-output-names",
+> +				      0, &clk_name);
+> +
+> +	hi655x_clk_init->name	= clk_name;
+> +	hi655x_clk_init->ops	= &hi655x_clk_ops;
+> +
+> +	hi655x_clk->clk_hw.init	= hi655x_clk_init;
+> +	hi655x_clk->hi655x	= hi655x;
+> +
+> +	platform_set_drvdata(pdev, hi655x_clk);
+> +
+> +	ret = devm_clk_hw_register(&pdev->dev, &hi655x_clk->clk_hw);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
+> +				     &hi655x_clk->clk_hw);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_hw_register_clkdev(&hi655x_clk->clk_hw, clk_name, NULL);
+
+Missed this last time. Do you use this clkdev lookup? The name is
+usually supposed to be based on what the device is expecting,
+instead of clk_name, and we would want some device name for the
+third argument here.
+
+> +	if (ret)
+> +		of_clk_del_provider(parent->of_node);
+> +
+> +	return ret;
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
