@@ -1,60 +1,228 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Apr 2017 23:45:55 +0100
-Subject: [PATCH v3 00/32] PCI: fix config and I/O Address space memory
- mappings
-In-Reply-To: <1492036240.7236.80.camel@kernel.crashing.org>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <1491917906.7236.7.camel@kernel.crashing.org>
- <20170411140857.GA6821@red-moon>
- <1491952371.7236.22.camel@kernel.crashing.org>
- <20170412113124.GZ17774@n2100.armlinux.org.uk>
- <1492005119.7236.62.camel@kernel.crashing.org>
- <20170412141654.GA17774@n2100.armlinux.org.uk>
- <20170412144109.GB6842@red-moon>
- <1492036240.7236.80.camel@kernel.crashing.org>
-Message-ID: <20170412224555.GB17774@n2100.armlinux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 12 Apr 2017 18:18:44 -0500
+Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <20170412204120.GA2231@localhost>
+References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
+ <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
+ <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
+ <20170411071047.GA3610@localhost>
+ <20170411134125.GA31773@bhelgaas-glaptop.roam.corp.google.com>
+ <20170411152702.GA2910@localhost>
+ <20170412162118.GC25197@bhelgaas-glaptop.roam.corp.google.com>
+ <20170412181034.GA3671@localhost>
+ <20170412191138.GH25197@bhelgaas-glaptop.roam.corp.google.com>
+ <20170412204120.GA2231@localhost>
+Message-ID: <20170412231844.GA28316@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 08:30:40AM +1000, Benjamin Herrenschmidt wrote:
-> My point with nopost() is that it's never ok to silently downgrade it.
-> Code written with the assumption that there is no posting will be
-> *incorrect* if posting happens. We do live with that "bug" today indeed
-> but once we have that accessors we might start growing more code that
-> relies on the specific attribute that things aren't posted and will be
-> wrong on all the archs providing the default implementation.
+On Wed, Apr 12, 2017 at 08:41:20PM +0000, Jayachandran C wrote:
+> On Wed, Apr 12, 2017 at 02:11:38PM -0500, Bjorn Helgaas wrote:
+> > On Wed, Apr 12, 2017 at 06:10:34PM +0000, Jayachandran C wrote:
+> > > On Wed, Apr 12, 2017 at 11:21:18AM -0500, Bjorn Helgaas wrote:
+> > > > On Tue, Apr 11, 2017 at 03:27:02PM +0000, Jayachandran C wrote:
+> > > > > On Tue, Apr 11, 2017 at 08:41:25AM -0500, Bjorn Helgaas wrote:
+> > > > > > [+cc Joerg]
+> > > > > > 
+> > > > > > On Tue, Apr 11, 2017 at 07:10:48AM +0000, Jayachandran C wrote:
+> > > > > > > On Mon, Apr 10, 2017 at 08:28:47PM -0500, Bjorn Helgaas wrote:
+> > > > > > > > Hi Jayachandran,
+> > > > > > > > 
+> > > > > > > > On Mon, Apr 03, 2017 at 01:15:04PM +0000, Jayachandran C wrote:
+> > > > > > > > > The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
+> > > > > > > > > topology is slightly unusual. For a multi-node system, it looks like:
+> > > > > > > > > 
+> > > > > > > > > [node level PCI bridges - one per node]
+> > > > > > > > >     [SoC PCI devices with MSI-X but no IOMMU]
+> > > > > > > > >     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
+> > > > > > > > >         [PCIe real root ports associated with IOMMU and GICv3 ITS]
+> > > > > > > > >             [External PCI devices connected to PCIe links]
+> > > > > > > > > 
+> > > > > > > > > The top two levels of bridges should have introduced aliases since they
+> > > > > > > > > are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
+> > > > > > > > > In the case of external PCIe devices, the "real" root ports are connected
+> > > > > > > > > to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
+> > > > > > > > > alias. The SoC PCI devices are directly connected to the GIC ITS, so the
+> > > > > > > > > node level bridges do not introduce an alias either.
+> > > > > > > > > 
+> > > > > > > > > To handle this quirk, we mark the real PCIe root ports and node level
+> > > > > > > > > PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
+> > > > > > > > > pci_for_each_dma_alias() works correctly for external PCIe devices and
+> > > > > > > > > SoC PCI devices.
+> > > > > > > > > 
+> > > > > > > > > For the current revision of Cavium ThunderX2, the VendorID and Device ID
+> > > > > > > > > are from Broadcom Vulcan (14e4:90XX).
+> > > > > > > > 
+> > > > > > > > Can you supply some text here about why we want to apply this patch?
+> > > > > > > > E.g., does it avoid making unnecessary IOMMU mappings, improve
+> > > > > > > > performance, avoid a crash, etc?
+> > > > > > > 
+> > > > > > > If this is for the commit message, I hope the following is ok:
+> > > > > > > 
+> > > > > > > "With this change, both MSI-X and IO virtualization work correctly on
+> > > > > > > Cavium ThunderX2. The GIC ITS driver gets the correct device ID to
+> > > > > > > configure MSI-X, the SMMUv3 driver gets the correct Stream IDs for PCI
+> > > > > > > devices, and the IOMMU groups are setup correctly."
+> > > > > > 
+> > > > > > This doesn't get at what the actual problem is.  I'm hoping for
+> > > > > > something like "without this change, we set up an IOMMU mapping for
+> > > > > > requestor ID X, but device DMA uses requestor ID Y because ...., which
+> > > > > > results in an IOMMU fault"
+> > > > > 
+> > > > > Ok. I hope this would be better:
+> > > > > 
+> > > > > "Without this change, the last alias seen while traversing the PCI
+> > > > > hierarchy will be used as the RID to generate the device ID for ITS
+> > > > > and stream ID for SMMU. This in turn causes the MSI-X generated by the
+> > > > > device to fail since the ITS expects to have translation tables based
+> > > > > on the actual PCIe RID and not the (irrelevant) alias. Similarly, the
+> > > > > device DMA also fails when SMMU is enabled due to incorrect value in
+> > > > > SMMU translation tables"
+> > > > 
+> > > > This description is true, but I don't think it addresses the real
+> > > > problem.  I think the real problem is that your IOMMU code doesn't
+> > > > handle aliases correctly, and by ignoring these invalid aliases, we
+> > > > happen to map an alias that works for the builtin devices.  But that's
+> > > > only because we got lucky (those devices use a single RID and they're
+> > > > not behind bridges that optionally take ownership).
+> > > > 
+> > > > It would make sense to me if we fixed the IOMMU code to map *all* the
+> > > > aliases, which should be enough to make your devices work.  If we then
+> > > > wanted to apply a patch like this on top, it would be simply an
+> > > > optimization that avoids unnecessary IOMMU mappings.
+> > > 
+> > > The issue that the IOMMU code does not handle valid aliases is
+> > > unrelated to what I am trying to fix. The quirk is to make sure
+> > > that invalid aliases are not seen on ThunderX2 while doing
+> > > pci_for_each_dma_alias().
+> > > 
+> > > The DMA and MSI-X requests leave the PCI/PCIe hierarchy at the point
+> > > where the SMMU (or ITS) is attached, i.e. at the bridge marked with
+> > > PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT. The quirk ensures that we don't look
+> > > for aliases above that point.
+> > > 
+> > > The toplevel bridge is marked PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT since
+> > > the on-chip devices are directly connected to the ITS (they do not
+> > > use SMMU).
+> > > 
+> > > The top two levels of bridges are not real PCI bridges but just
+> > > PCI bridge-like things that were added to tie the whole hierarchy
+> > > together for configuration and enumeration. They do not handle
+> > > PCI/PCIe transactions in the traditional sense.
+> > > 
+> > > I think my problem description is still not correct, maybe:
+> > > "The SMMU (and ITS) expects to device tables to use the RID seen
+> > > at the bridge they are associated with. Currently the
+> > > pci_for_each_dma_alias() code traverses beyond this point and
+> > > generates incorrect aliases due to the PCI and PCI/PCIe bridges
+> > > above. This causes MSI-X interrupts and device DMA to fail since
+> > > the SMMU and ITS tables to be setup with incorrect IDs"
+> > 
+> > I haven't tried to figure out the MSI-X piece of this, but let me try
+> > to come up with a concrete DMA example.  Assume this topology:
+> > 
+> >   00:00.0 bridge to [bus 01-1e]
+> >   01:0a.0 bridge to [bus 04-05]
+> >   04:00.0 [14e4:9000 or 9084] bridge to [bus 05] (XLATE_ROOT)
+> >   05:00.0 endpoint
+> > 
+> > Assume 05:00.0 generates a DMA request.  Assume the top two bridges
+> > are such that pci_for_each_dma_alias() includes them as well, so it
+> > iterates through 05:00.0, 01:0a.0, and 00:00.0.
+> > 
+> > When the driver for 05:00.0 makes a DMA mapping, the current code
+> > apparently makes an IOMMU mapping for requester ID 00:00.0 because
+> > that's the last alias.  Obviously this doesn't work because the IOMMU
+> > at 04:00.0 will see a requester ID of 05:00.0, not 00:00.0.
+> > 
+> > With this quirk, we'll omit 01:0a.0 and 00:00.0, so we'll make an
+> > IOMMU mapping for requester ID 05:00.0, which will work fine.  I think
+> > it would *also* work fine if we made IOMMU mappings for 05:00.0,
+> > 01:0a.0, and 00:0.0.  The last two are unnecessary, but probably not
+> > harmful.
+>  
+> Ok. The last two are not harmful but still incorrect. The bridges
+> 0:0.0 and 1:a.0 are outside the path with the PCI transactions takes
+> (they go from 4:0.0 to the SMMU).
 > 
-> This is why I insist that pgprot_nopost() if it exists globally, should
-> return NULL when the semantic cannot be provided.
-
-Now you're not talking sense.  pgprot_nopost() does _not_ return a pointer.
-You're talking here as if you're still talking about ioremap_nopost().
-So, I think you're confused.
-
-> > > Just like the proposed ioremap_nopost(), pgprot_nonposted() is given a
-> > > default implementation that uses pgprot_noncached().? Maybe we should
-> > > also make pci_remap_iospace() fail if pgprot_nonposted() is not defined
-> > > by the architecture?
+> > Now assume 05:00 is a multi-function device that has a DMA alias
+> > quirk, e.g., see quirk_dma_func0_alias().  It has another function:
+> > 
+> >   05:00.3 endpoint
+> > 
+> > DMA from 05:00.3 may use a requester ID of either 05:00.3 or 05:00.0.
+> > The driver makes a DMA mapping, pci_for_each_dma_alias() iterates
+> > through 05:00.3, 05:00.0, 01:0a.0, and 00:00.0, and we again map only
+> > 00:00.0, which again doesn't work.
+> > 
+> > With this quirk, we create a single mapping for 05:00.0.  That will
+> > work sometimes, but the device may also generate DMA with a requester
+> > ID of 05:00.3, and that won't work.
 > 
-> Or we *document* that mmap of IO space can result in something that is
-> partially non-posted.
+> Note that here, pci_for_each_dma_alias() works correctly with the quirk
+> and incorrectly without the quirk. With the quirk, the callback function
+> is involved on 05:00.3 and 05:00.0 as expected.
 
-Oh, so we _can_ provide an interface that has weaker semantics than it
-should provided we document it.
+With the quirk, pci_for_each_dma_alias() works correctly and iterates
+through 05:00.3 and 05:00.0.  But the IOMMU code only pay attention to
+the *last* alias, i.e., 05:00.0.  So this does not work.
 
-It's insane to have different behaviours from these two interfaces, yet
-you seem to have said exactly that in your reply.
+> Without the quirk the
+> call back is invoked on 05:00.3, 05:00.0, 01:0a.0, and 00:00.0, which
+> includes aliases that are not valid.
+> 
+> The idea behind the quirk is to get pci_for_each_dma_alias work correctly
+> on ThunderX2, and invoke the function only on the valid aliases. With the
+> quirk, the code using it - like the SMMU code - gets the correct aliases
+> to process, and do not have to deal with or filter out incorrect aliases.
+> 
+> I don't think it would be safe to assume that all callers of
+> pci_for_each_dma_alias will be ok to handle invalid aliases. Even in
+> the IOMMU case, the case which calculates stream IDs is one usage, the
+> usage for iommu groups also did not deal with invalid aliases correctly
+> when I tried it. Then there are the MSI cases too, I had done some work
+> on trying to filter out invalid aliases in the relevant code[1], but
+> in my opinion, getting pci_for_each_dma_alias() do the right thing is
+> the correct solution.
 
-It's actually worse than that - what you've just said is that it's okay
-for userspace to map IO space with weaker semantics than the PCI
-specification states, but it's not okay for kernel space to do that.
-Especially as userspace can't know what semantics its going to end up
-with, this seems to be a very strange stance to take.
+I agree, we should fix this and it sounds like it's more than just an
+optimization.  But I don't think the quirk is a complete fix, and the
+changelog needs a short sketch of this discussion to make it clear
+that this happens to fix some DMA faults, but others remain because
+the current IOMMU code only maps one of the valid aliases.
 
-I'd say that if we can't offer the no-posting behaviour that PCI
-specifies, then we shouldn't be exposing IO mappings to userspace.
+So I think the only thing we need to move forward on this is a revised
+changelog.  I propose something like this:
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+  On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
+  PCI topology is slightly unusual.  For a multi-node system, it looks
+  like:
+
+    00:00.0 [?? type] bridge to [bus 01-1e]
+    01:0a.0 [?? type] bridge to [bus 04-05]
+    04:00.0 [?? type] bridge to [bus 05] (ThunderX2 XLATE_ROOT)
+    05:00.0 endpoint
+
+  pci_for_each_dma_alias() assumes IOMMU translation is done at the
+  root of the PCI hierarchy.  It generates 05:00.0 and <BB:DD.F> as
+  DMA aliases for 05:00.0 because bus <BB> is a non-PCIe bus that
+  doesn't carry the Requester ID.
+
+  Because the ThunderX2 IOMMU is at 04:00.0, <BB:DD.F> is never a valid
+  Requester ID.  This quirk stops alias generation at the XLATE_ROOT
+  bridge so we won't generate <BB:DD.F>.
+
+  The current IOMMU code only maps the last alias (this is a separate
+  bug in itself).  Prior to this quirk, we only created IOMMU mappings
+  for the invalid Requester ID <BB:DD.F>, which never matched any DMA
+  transactions.
+  
+  With this quirk, we create IOMMU mappings for a valid Requester ID,
+  which fixes devices with no aliases but leaves devices with aliases
+  still broken.
+
+I don't know the details of what type of bridges those are
+(conventional PCI?  PCIe PCI-to-PCIe? etc?) and exactly what RIDs are
+involved.  It'd be nice if you could fill those in.
+
+Bjorn
