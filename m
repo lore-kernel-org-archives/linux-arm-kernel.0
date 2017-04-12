@@ -1,48 +1,136 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 12 Apr 2017 18:04:33 +0100
-Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
- ACPI mode
-In-Reply-To: <0dada57f-4215-4ced-482d-88203857e06d@codeaurora.org>
-References: <0dada57f-4215-4ced-482d-88203857e06d@codeaurora.org>
-Message-ID: <20170412170433.GA7412@red-moon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 12 Apr 2017 18:01:12 +0100
+Subject: [RFC PATCH v2 3/6] arm64: signal: factor out signal frame record
+ allocation
+In-Reply-To: <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
+References: <1492016239-19511-1-git-send-email-Dave.Martin@arm.com>
+ <1492016495-19689-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1492016495-19689-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 08, 2017 at 01:17:32PM -0400, Sinan Kaya wrote:
-> On 12/31/1969 7:00 PM, linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Sergey Temerkhanov wrote:
-> >  int pcibus_to_node(struct pci_bus *bus)  {
-> > -	return dev_to_node(&bus->dev);
-> > +	struct pci_config_window *cfg = bus->sysdata;
-> > +	struct acpi_device *adev = NULL;
-> > +	struct device *dev;
-> > +
-> > +	if (!acpi_disabled)
-> > +		adev = to_acpi_device(cfg->parent);
-> > +
-> 
-> I see a problem here that NUMA node information is read from the
-> parent device.  PCI bus can have multiple levels of switches and
-> bridges. The NUMA information is only present on the host bridge.
-> 
-> This code only works if the endpoint is directly connected to the root
-> port. 
+This patch factors out the allocator for signal frame optional
+records into a separate function, to ensure consistency and
+facilitate later expansion of the signal frame, so that the
+allocation mechanism can be elaborated more easily in future
+patches.
 
-That's not what this code does. This code retrieves the struct device
-backing the ACPI device representing the PNP0A08 host bridge and its
-dev->numa_node value (that was set in pci_acpi_scan_root()).
+No overrun checking is currently done, because the allocation is in
+user memory, and because the kernel statically does not attempt to
+allocate enough space in the signal frame yet for an overrun to
+occur.  This behaviour will be refined in future patches.
 
-I am not a big fan of this. I wonder if we could not make it DT/ACPI
-agnostic by simply setting the numa_node in the pci_bus->dev field,
-and propagate it downstream a PCI hierarcy (as we do with sysdata)
-in pci_alloc_child_bus().
+The approach taken in this patch to allocation of the terminator
+record is not very clean: this will also be replaced in subsequent
+patches.
 
-This way pcibus_to_node() would become straightforward (ie as it
-is now - provided the above is doable):
+For future extension, a table is added documenting the current
+static allocations in __reserved[].  This will be important for
+determining under what circumstances userspace may or may not see
+an expanded signal frame.
 
-dev_to_node(&bus->dev);
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/uapi/asm/sigcontext.h | 19 ++++++++++++++
+ arch/arm64/kernel/signal.c               | 43 ++++++++++++++++++++++++++------
+ 2 files changed, 55 insertions(+), 7 deletions(-)
 
-This is suspiciously similar to the domain number song and dance
-except that the NUMA node now is in the struct pci_bus->dev->numa_node
-instead of struct pci_bus->domain_nr.
-
-Lorenzo
+diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
+index ee469be..1328a2c 100644
+--- a/arch/arm64/include/uapi/asm/sigcontext.h
++++ b/arch/arm64/include/uapi/asm/sigcontext.h
+@@ -34,6 +34,25 @@ struct sigcontext {
+ };
+ 
+ /*
++ * Allocation of __reserved[]:
++ * (Note: records do not necessarily occur in the order shown here.)
++ *
++ *	size		description
++ *
++ *	0x210		fpsimd_context
++ *	 0x10		esr_context
++ *	 0x10		terminator (null _aarch64_ctx)
++ *
++ *	0xdd0		(reserved for future allocation)
++ *
++ * New records that can exceed this space need to be opt-in for userspace, so
++ * that an expanded signal frame is not generated unexpectedly.  The mechanism
++ * for opting in will depend on the extension that generates each new record.
++ * The above table documents the maximum set and sizes of records than can be
++ * generated when userspace does not opt in for any such extension.
++ */
++
++/*
+  * Header to be used at the beginning of structures extending the user
+  * context. Such structures must be placed after the rt_sigframe on the stack
+  * and be 16-byte aligned. The last structure must be a dummy one with the
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 6202753..47592af 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -75,6 +75,22 @@ static size_t sigframe_size(struct rt_sigframe_user_layout const *user)
+ 	return round_up(max(user->size, sizeof(struct rt_sigframe)), 16);
+ }
+ 
++/*
++ * Allocate space for an optional record of <size> bytes in the user
++ * signal frame.  The offset from the signal frame base address to the
++ * allocated block is assigned to *offset.
++ */
++static int sigframe_alloc(struct rt_sigframe_user_layout *user,
++			  unsigned long *offset, size_t size)
++{
++	size_t padded_size = round_up(size, 16);
++
++	*offset = user->size;
++	user->size += padded_size;
++
++	return 0;
++}
++
+ static void __user *apply_user_offset(
+ 	struct rt_sigframe_user_layout const *user, unsigned long offset)
+ {
+@@ -283,19 +299,32 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ /* Determine the layout of optional records in the signal frame */
+ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ {
+-	user->fpsimd_offset = user->size;
+-	user->size += round_up(sizeof(struct fpsimd_context), 16);
++	int err;
++
++	err = sigframe_alloc(user, &user->fpsimd_offset,
++			     sizeof(struct fpsimd_context));
++	if (err)
++		return err;
+ 
+ 	/* fault information, if valid */
+ 	if (current->thread.fault_code) {
+-		user->esr_offset = user->size;
+-		user->size += round_up(sizeof(struct esr_context), 16);
++		err = sigframe_alloc(user, &user->esr_offset,
++				     sizeof(struct esr_context));
++		if (err)
++			return err;
+ 	}
+ 
+-	/* set the "end" magic */
+-	user->end_offset = user->size;
++	/*
++	 * Allocate space for the terminator record.
++	 * HACK: here we undo the reservation of space for the end record.
++	 * This bodge should be replaced with a cleaner approach later on.
++	 */
++	user->limit = offsetof(struct rt_sigframe, uc.uc_mcontext.__reserved) +
++		sizeof(user->sigframe->uc.uc_mcontext.__reserved);
+ 
+-	return 0;
++	err = sigframe_alloc(user, &user->end_offset,
++			     sizeof(struct _aarch64_ctx));
++	return err;
+ }
+ 
+ 
+-- 
+2.1.4
