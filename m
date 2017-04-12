@@ -1,43 +1,70 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 12 Apr 2017 14:10:31 +0200
-Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
-In-Reply-To: <20170412080038.kk4vrjhvr3eao26q@dell>
-References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
- <20170411140613.jvhzsvrxa4evwxjh@dell> <20170411211936.GT2078@mai>
- <20170412080038.kk4vrjhvr3eao26q@dell>
-Message-ID: <c1dba250-a60c-febc-a5c3-5ba645a61ce0@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Apr 2017 14:39:08 +0200
+Subject: [PATCH v4 08/18] arm: sun8i: orangepi-pc: Enable dwmac-sun8i
+In-Reply-To: <20170412111400.2296-9-clabbe.montjoie@gmail.com>
+References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
+ <20170412111400.2296-9-clabbe.montjoie@gmail.com>
+Message-ID: <20170412123908.vho6eodh4p3t7fry@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2017 10:00, Lee Jones wrote:
-> On Tue, 11 Apr 2017, Daniel Lezcano wrote:
+Hi Corentin,
+
+On Wed, Apr 12, 2017 at 01:13:50PM +0200, Corentin Labbe wrote:
+> The dwmac-sun8i hardware is present on the Orange PI PC.
+> It uses the internal PHY.
 > 
->> On Tue, Apr 11, 2017 at 03:06:13PM +0100, Lee Jones wrote:
->>> On Sat, 08 Apr 2017, Daniel Lezcano wrote:
->>>
->>>> The hi655x multi function device is a PMIC providing regulators.
->>>>
->>>> The PMIC also provides a clock for the WiFi and the Bluetooth, let's implement
->>>> this clock in order to add it in the hi655x MFD and allow proper wireless
->>>> initialization.
->>>>
->>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-[ ... ]
-
->> Do you want to drop it from your tree or shall I resubmit a V3 without the mfd
->> change?
+> This patch create the needed emac node.
 > 
-> The latter please.
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> index f148111..746c25a 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> @@ -53,6 +53,7 @@
+>  
+>  	aliases {
+>  		serial0 = &uart0;
+> +		ethernet0 = &emac;
 
-Ok.
+Sorry for not spotting this earlier...
 
-What about the DT binding change?
+This should be ordered by alphabetical order, 
 
+>  	};
+>  
+>  	chosen {
+> @@ -184,3 +185,10 @@
+>  	/* USB VBUS is always on */
+>  	status = "okay";
+>  };
+> +
+> +&emac {
+> +	phy-handle = <&int_mii_phy>;
+> +	phy-mode = "mii";
+> +	allwinner,leds-active-low;
+> +	status = "okay";
+> +};
+
+And the node here as well.
+
+Almost all your other DT patches also have this issue, please fix it
+in all of them.
+
+Maxime
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170412/36268261/attachment.sig>
