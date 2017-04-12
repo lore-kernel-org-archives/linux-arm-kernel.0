@@ -1,92 +1,80 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Apr 2017 09:06:02 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 03/11] dt-bindings: add device tree
- binding for X-Powers AXP803 PMIC
-In-Reply-To: <20170411180844.9176B125521@relay.mailchannels.net>
-References: <20170411180844.9176B125521@relay.mailchannels.net>
-Message-ID: <20170412080602.f7cjeeht5r45cnvh@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Apr 2017 09:08:31 +0100
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+ <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+ <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
+ <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
+ <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
+Message-ID: <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Apr 2017, Icenowy Zheng wrote:
-
+On 11/04/17 18:52, Mason wrote:
+> On 11/04/2017 18:43, Marc Zyngier wrote:
 > 
-> 2017?4?12? ??12:29? Lee Jones <lee.jones@linaro.org>???
-> >
-> > On Tue, 11 Apr 2017, Chen-Yu Tsai wrote:
-> >
-> > > Hi,
-> > > 
-> > > On Tue, Apr 11, 2017 at 11:00 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> > > >
-> > > >
-> > > > On Tue, 11 Apr 2017, Lee Jones wrote:
-> > > >
-> > > >> On Sat, 08 Apr 2017, Icenowy Zheng wrote:
-> > > >>
-> > > >>> AXP803 is a PMIC produced by Shenzhen X-Powers, with either I2C or RSB
-> > > >>> bus.
-> > > >>>
-> > > >>> Add a compatible for it.
-> > > >>>
-> > > >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > >>> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> > > >>> ---
-> > > >>> Changes in v2:
-> > > >>> - Place AXP803 before AXP806/809.
-> > > >>> - Added Chen-Yu's ACK.
-> > > >>>
-> > > >>>? Documentation/devicetree/bindings/mfd/axp20x.txt | 5 +++--
-> > > >>>? 1 file changed, 3 insertions(+), 2 deletions(-)
-> > > >>
-> > > >>
-> > > >> For my own reference:
-> > > >>? Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> > > >
-> > > >
-> > > > Excuse me... Who will apply this patch?
-> >
-> > Excuse you?? Are you trying to be polite, or rude?
-> >
-> > I'm guessing due to the lagging '...', that it's the latter?
+>> On 11/04/17 17:26, Mason wrote:
+>>
+>>> Is there a function to map virq to the hwirq in any domain?
+>>
+>> Be more precise. If you want the hwirq associated with the view of a
+>> virq in a given domain, that's the hwirq field in the corresponding
+>> irq_data structure. Or are you after something else?
 > 
-> Oh sorry, I mean the former...
-
-Okay, no problem then.
-
-> > > > I think this patch should be applied by you as it's in bindings/mfd
-> > > > directory, however, if I'm wrong, please point out ;-)
-> > >
-> > > We need the DT maintainers to ack it first. :)
-> >
-> > We don't really need the DT Maintainers to get involved here.
-> >
-> > What I do need is either clear direction as to how this
-> > patch-set should be applied, or an indication of which patches are
-> > dependant on others and which are orthogonal and can be applied
-> > independently.
+> I registered an unmask method for my irq_chip.
+> (IIUC, I'm supposed to unmask a specific MSI in this callback.)
 > 
-> This patch is independent, although the regulator binding patch
-> depends on it.
+> # cat /proc/interrupts 
+>            CPU0       CPU1       
+>  30:          0          0    MSIfoo      0 Edge      aerdrv
+>  34:          0          0    MSIfoo 524288 Edge      xhci_hcd
+>  35:          0          0    MSIfoo 524289 Edge      xhci_hcd
+>  36:          0          0    MSIfoo 524290 Edge      xhci_hcd
 > 
-> The real driver patches will need the binding patches to be merged
-> first.
+> 
+> void foo_unmask(struct irq_data *data)
+> {
+> 	int xx,yy;
+> 	struct irq_domain *dom = data->domain;
+> 	printk("%s: irq_data=%p irq=%u hwirq=%lu chip=%p dom=%p pdata=%p data=%p\n",
+> 		__func__, data, data->irq, data->hwirq, data->chip, data->domain,
+> 		data->parent_data, data->chip_data);
+> 	printk("%s ops=%p data=%p parent=%p\n\n",
+> 		dom->name, dom->ops, dom->host_data, dom->parent);
+> 	printk("pcie=%p\n", dom->parent->host_data);
+> 	//dump_stack();
+> 	pci_msi_unmask_irq(data);
+> 	struct tango_pcie *pcie = data->domain->parent->host_data;
+> 	printk("\n%s: pcie=%p irq=%u hwirq=%lu\n\n",
+> 		__func__, pcie, data->irq, data->hwirq);
+> 	xx = irq_find_mapping(pcie->irq_domain, data->hwirq);
+> 	yy = irq_find_mapping(pcie->msi_domain, data->hwirq);
 
-Right, so Acking and not applying wasn't such a strange practice
-after all then. =;-)
+Do you realize that hwirq is *per domain*, and only makes sense to *one*
+irqchip? What you've written here doesn't make any sense.
 
-> And the dt patches depend on also the binding patches.
+> 	printk("xx=%d yy=%d\n", xx, yy);
+> }
+> 
+> so data->irq is the virq (30, 34, 35, 36)
+> and data->hwirq is the domain hwirq (0, 524288, 524289, 524290)
+> 
+> Is there a way to map hwirq 524288 to MSI 0, hwirq 524289 to MSI 1, etc?
 
-The issue I have now is; because your email client replies as a new
-mail i.e. non-threaded, now I have no reference to the patch-set.
+Why would you need to do such a thing?
+- In MSI domain: IRQ34 -> hwirq 524288
+- In foo domain: IRQ34 -> hwirq [whatever your driver has allocated]
 
-Since time is a valuable resource, I will not be dredging though my
-inbox looking for all your replies.
+The data is already there, at your fingertips. Just deal with with your
+"foo" irqchip.
 
-Please fix your client before replying to another mail.
-
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
