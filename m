@@ -1,37 +1,101 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 12 Apr 2017 18:46:00 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6qp: add specific compatible for GPC
-In-Reply-To: <20170412164600.16356-1-l.stach@pengutronix.de>
-References: <20170412164600.16356-1-l.stach@pengutronix.de>
-Message-ID: <20170412164600.16356-2-l.stach@pengutronix.de>
+Date: Wed, 12 Apr 2017 18:45:59 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6: adopt DT to new GPC binding
+Message-ID: <20170412164600.16356-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the more specific QuadPlus compatible to the GPC node, to trigger the
-required workarounds in the power domain code.
-
-In regard to the interrupt mapping the QuadPlus controller is fully
-compatible to the Quad one, so keep that compatible in place.
+Adopt the i.MX6Q/DL DT to the new and more flexible GPC binding.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qp.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+v2: adapt to changed domain supply name
+---
+ arch/arm/boot/dts/imx6q.dtsi   |  2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi | 37 ++++++++++++++++++++++++++-----------
+ 2 files changed, 27 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-index 59453f2ac4ba..299d863690c5 100644
---- a/arch/arm/boot/dts/imx6qp.dtsi
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -120,6 +120,10 @@
- 		     <0 119 IRQ_TYPE_LEVEL_HIGH>;
- };
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9a5d0b8c7b0..dd33849335b2 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -125,7 +125,7 @@
+ 			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
+ 				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
+ 			clock-names = "bus", "core";
+-			power-domains = <&gpc 1>;
++			power-domains = <&pd_pu>;
+ 		};
  
-+&gpc {
-+	compatible = "fsl,imx6qp-gpc", "fsl,imx6q-gpc";
-+};
+ 		ipu2: ipu at 02800000 {
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e426faa9c243..2c2af6737b0e 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -156,7 +156,7 @@
+ 				 <&clks IMX6QDL_CLK_GPU3D_CORE>,
+ 				 <&clks IMX6QDL_CLK_GPU3D_SHADER>;
+ 			clock-names = "bus", "core", "shader";
+-			power-domains = <&gpc 1>;
++			power-domains = <&pd_pu>;
+ 		};
+ 
+ 		gpu_2d: gpu at 00134000 {
+@@ -166,7 +166,7 @@
+ 			clocks = <&clks IMX6QDL_CLK_GPU2D_AXI>,
+ 				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
+ 			clock-names = "bus", "core";
+-			power-domains = <&gpc 1>;
++			power-domains = <&pd_pu>;
+ 		};
+ 
+ 		timer at 00a00600 {
+@@ -434,7 +434,7 @@
+ 				clocks = <&clks IMX6QDL_CLK_VPU_AXI>,
+ 					 <&clks IMX6QDL_CLK_MMDC_CH0_AXI>;
+ 				clock-names = "per", "ahb";
+-				power-domains = <&gpc 1>;
++				power-domains = <&pd_pu>;
+ 				resets = <&src 1>;
+ 				iram = <&ocram>;
+ 			};
+@@ -797,14 +797,29 @@
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-parent = <&intc>;
+-				pu-supply = <&reg_pu>;
+-				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+-					 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+-					 <&clks IMX6QDL_CLK_GPU2D_CORE>,
+-					 <&clks IMX6QDL_CLK_GPU2D_AXI>,
+-					 <&clks IMX6QDL_CLK_OPENVG_AXI>,
+-					 <&clks IMX6QDL_CLK_VPU_AXI>;
+-				#power-domain-cells = <1>;
++				clocks = <&clks IMX6QDL_CLK_IPG>;
++				clock-names = "ipg";
 +
- &ipu1 {
- 	compatible = "fsl,imx6qp-ipu", "fsl,imx6q-ipu";
- 	fsl,prg = <&prg1>;
++				pgc {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					power-domain at 0 {
++						reg = <0>;
++						#power-domain-cells = <0>;
++					};
++					pd_pu: power-domain at 1 {
++						reg = <1>;
++						#power-domain-cells = <0>;
++						power-supply = <&reg_pu>;
++						clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
++						         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
++						         <&clks IMX6QDL_CLK_GPU2D_CORE>,
++						         <&clks IMX6QDL_CLK_GPU2D_AXI>,
++						         <&clks IMX6QDL_CLK_OPENVG_AXI>,
++						         <&clks IMX6QDL_CLK_VPU_AXI>;
++					};
++				};
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
 -- 
 2.11.0
