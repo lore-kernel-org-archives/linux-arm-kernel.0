@@ -1,43 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Apr 2017 17:09:08 +0100
-Subject: [PATCH 3/8] arm64: defconfig: enable TCG_TPM and TCG_CRB
-In-Reply-To: <1492012980-11650-4-git-send-email-timur@codeaurora.org>
-References: <1492012980-11650-1-git-send-email-timur@codeaurora.org>
- <1492012980-11650-4-git-send-email-timur@codeaurora.org>
-Message-ID: <20170412160907.GA7153@leverpostej>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 12 Apr 2017 09:09:49 -0700
+Subject: [PATCH v5 3/3] DT nodes for Broadcom Northstar2 USB DRD Phy
+In-Reply-To: <1491981125-6859-4-git-send-email-raviteja.garimella@broadcom.com>
+References: <1491981125-6859-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1491981125-6859-4-git-send-email-raviteja.garimella@broadcom.com>
+Message-ID: <e77ee510-0598-a906-11a3-edefa601f2c4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 11:02:55AM -0500, Timur Tabi wrote:
-> Some ARM64 server systems have a Trusted Platform Module security chip
-> on the board, and the chip is used to validate the operating system,
-> among other things.
-> 
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  arch/arm64/configs/defconfig | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index a684c92..99e9964 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -240,6 +240,8 @@ CONFIG_SERIAL_XILINX_PS_UART=y
->  CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
->  CONFIG_SERIAL_MVEBU_UART=y
->  CONFIG_VIRTIO_CONSOLE=y
-> +CONFIG_TCG_TPM=y
-> +CONFIG_TCG_CRB=y
+On 04/12/2017 12:12 AM, Raviteja Garimella wrote:
+> This patch adds device tree nodes for USB Dual Role Device Phy for
+> Broadcom's Northstar2 SoC.
 
-I see there are patches queued in linux-next enabling some arm64 TPM CRB
-support, which I believe are related.
+The subject of this patch should be something like:
 
-As I have commented elsewhere [1], I think those have been taken
-prematurely, and I'm not sure it's a good idea to enable this just yet,
-due to that. There are spec issues to be addressed in the draft that is
-still open.
+arm64: dts: NS2: Add USB DRD PHY Device Tree node
 
-[1] https://lkml.kernel.org/r/20170411113652.GB32267 at leverpostej
+to be consistent with prior submissions done to the same file.
 
-Thanks,
-Mark.
+Depending on the fate of the patch series, I will either fix it up
+myself while applying, or please include this change in a respin.
+-- 
+Florian
