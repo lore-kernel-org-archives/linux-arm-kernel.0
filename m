@@ -1,26 +1,50 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 12 Apr 2017 14:11:25 +0800
-Subject: [PATCH 0/7] arm64: marvell: add cryptographic engine support for
- 7k/8k
-In-Reply-To: <87efwyj53q.fsf@free-electrons.com>
-References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
- <20170410093903.GA8035@gondor.apana.org.au>
- <87efwyj53q.fsf@free-electrons.com>
-Message-ID: <20170412061125.GA16699@gondor.apana.org.au>
+From: rk@ti.com (Ravikumar Kattekola)
+Date: Wed, 12 Apr 2017 11:54:42 +0530
+Subject: [PATCH 1/1] ARM: dts: dra7: Reduce cpu thermal shutdown temperature
+Message-ID: <20170412062442.17736-1-rk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 06:12:25PM +0200, Gregory CLEMENT wrote:
->
-> > I have no problems with the crypto bits.
-> 
-> Does it means that you agree that I apply the arm-soc related patches
-> (from 4 to 7) to my mvebu trees?
+On dra7, as per TRM, the HW shutdown (TSHUT) temperature is hardcoded
+to 123C and cannot be modified by SW. This means when the temperature
+reaches 123C HW asserts TSHUT output which signals a warm reset.
+This reset is held until the temperature goes below the TSHUT low (105C).
 
-Yes sure.
+While in SW, the thermal driver continuously monitors current temperature
+and takes decisions based on whether it reached an alert or a critical point.
+The intention of setting a SW critical point is to prevent force reset by HW
+and instead do an orderly_poweroff(). But if the SW critical temperature is
+greater than or equal to that of HW then it defeats the purpose. To address
+this and let SW take action before HW does keep the SW critical temperature
+less than HW TSHUT value.
 
-Thanks,
+The value for SW critical temperature was chosen as 120C just to ensure
+we give SW sometime before HW catches up.
+
+Document reference
+SPRUI30C ? DRA75x, DRA74x Technical Reference Manual - November 2016
+SPRUHZ6H - AM572x Technical Reference Manual - November 2016
+
+Tested on:
+DRA75x PG 2.0 Rev H EVM
+
+Signed-off-by: Ravikumar Kattekola <rk@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 57892f2..e714466 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -2017,4 +2017,8 @@
+ 	coefficients = <0 2000>;
+ };
+ 
++&cpu_crit {
++	temperature = <120000>; /* milli Celsius */
++};
++
+ /include/ "dra7xx-clocks.dtsi"
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.8.0.GIT
