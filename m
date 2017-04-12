@@ -1,79 +1,199 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Apr 2017 10:29:18 +0100
-Subject: [PATCH] arm64: kernel: restrict /dev/mem read() calls to linear
- region
-In-Reply-To: <20170412083342.GA6957@localhost>
-References: <20170412082606.17151-1-ard.biesheuvel@linaro.org>
- <20170412083342.GA6957@localhost>
-Message-ID: <20170412092918.GX17774@n2100.armlinux.org.uk>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Wed, 12 Apr 2017 10:36:22 +0100
+Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <e8ff3ab8-3bf8-d731-a987-3bb8442cfc0a@baylibre.com>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+ <a01a50d3-bb1b-2c56-2a15-30651fa2fac9@baylibre.com>
+ <936a53ee-2ed8-11e4-a860-744256676af9@collabora.com>
+ <8676554.1IW2xieEGM@diego>
+ <7a875b2d-f288-8136-de04-11e744f0118b@collabora.com>
+ <e8ff3ab8-3bf8-d731-a987-3bb8442cfc0a@baylibre.com>
+Message-ID: <92e0492a-bd17-0171-10a3-8af5044ba6cc@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 10:33:43AM +0200, Domenico Andreoli wrote:
-> On Wed, Apr 12, 2017 at 09:26:06AM +0100, Ard Biesheuvel wrote:
-> > When running lscpu on an AArch64 system that has SMBIOS version 2.0
-> > tables, it will segfault in the following way:
-> > 
-> >   Unable to handle kernel paging request at virtual address ffff8000bfff0000
-> >   pgd = ffff8000f9615000
-> >   [ffff8000bfff0000] *pgd=0000000000000000
-> >   Internal error: Oops: 96000007 [#1] PREEMPT SMP
-> >   Modules linked in:
-> >   CPU: 0 PID: 1284 Comm: lscpu Not tainted 4.11.0-rc3+ #103
-> >   Hardware name: QEMU QEMU Virtual Machine, BIOS 0.0.0 02/06/2015
-> >   task: ffff8000fa78e800 task.stack: ffff8000f9780000
-> >   PC is at __arch_copy_to_user+0x90/0x220
-> >   LR is at read_mem+0xcc/0x140
-> > 
-> > This is caused by the fact that lspci issues a read() on /dev/mem at the
-> > offset where it expects to find the SMBIOS structure array. However, this
-> > region is classified as EFI_RUNTIME_SERVICE_DATA (as per the UEFI spec),
-> > and so it is omitted from the linear mapping.
-> > 
-> > So let's restrict /dev/mem read/write access to those areas that are
-> > covered by the linear region.
-> > 
-> > Reported-by: Alexander Graf <agraf@suse.de>
-> > Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/mm/mmap.c | 9 +++------
-> >  1 file changed, 3 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm64/mm/mmap.c b/arch/arm64/mm/mmap.c
-> > index 7b0d55756eb1..2956240d17d7 100644
-> > --- a/arch/arm64/mm/mmap.c
-> > +++ b/arch/arm64/mm/mmap.c
-> > @@ -18,6 +18,7 @@
-> >  
-> >  #include <linux/elf.h>
-> >  #include <linux/fs.h>
-> > +#include <linux/memblock.h>
-> >  #include <linux/mm.h>
-> >  #include <linux/mman.h>
-> >  #include <linux/export.h>
-> > @@ -103,12 +104,8 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
-> >   */
-> >  int valid_phys_addr_range(phys_addr_t addr, size_t size)
-> >  {
-> > -	if (addr < PHYS_OFFSET)
-> > -		return 0;
-> > -	if (addr + size > __pa(high_memory - 1) + 1)
-> > -		return 0;
-> > -
-> > -	return 1;
-> > +	return memblock_is_map_memory(addr) &&
-> > +	       memblock_is_map_memory(addr + size - 1);
-> >  }
-> >  
-> >  /*
-> 
-> Does arch/arm/mm/mmap.c need the same treatment?
+Hi Neil,
 
-high_memory is supposed to be the virtual address of the end of the
-linearly mapped region.  ARM conforms to that.
+On 12/04/17 09:48, Neil Armstrong wrote:
+> Hi Guillaume,
+>
+> On 04/12/2017 10:25 AM, Guillaume Tucker wrote:
+>> Hi Heiko,
+>>
+>> On 11/04/17 21:52, Heiko St?bner wrote:
+>>> Hi Guillaume,
+>>>
+>>> Am Dienstag, 11. April 2017, 18:40:37 CEST schrieb Guillaume Tucker:
+>>>> On 03/04/17 09:12, Neil Armstrong wrote:
+>>>>> On 04/02/2017 09:59 AM, Guillaume Tucker wrote:
+>>>>>> +Optional:
+>>>>>> +
+>>>>>> +- clocks : Phandle to clock for the Mali Midgard device.
+>>>>>> +- clock-names : Shall be "clk_mali".
+>>>>>> +- mali-supply : Phandle to regulator for the Mali device. Refer to
+>>>>>> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+>>>>>> +- operating-points : Refer to
+>>>>>> Documentation/devicetree/bindings/power/opp.txt +  for details.
+>>>>>
+>>>>> Please add :
+>>>>>    * Must be one of the following:
+>>>>>       "arm,mali-t820"
+>>>>>
+>>>>>    * And, optionally, one of the vendor specific compatible:
+>>>>>       "amlogic,meson-gxm-mali"
+>>>>>
+>>>>> with my Ack for the amlogic platform.
+>>>>
+>>>> It seems to me that as long as the GPU architecture hasn't been
+>>>> modified (I don't think I've ever encountered such a case) then
+>>>> it has to be a standard ARM Mali type regardless of the SoC
+>>>> vendor.  So unless a Mali-T820 in the Amlogic S912 SoC is not the
+>>>> same as a T820 in a different SoC, please forgive me but I don't
+>>>> understand why a vendor compatible string is needed.  My main
+>>>> concern is that it's going to be very hard to keep that list
+>>>> up-to-date with all existing Midgard SoC variants.  If do we need
+>>>> to add vendor compatible strings to correctly describe the
+>>>> hardware then I'm happy to add the amlogic one in my patch v3; I
+>>>> would just like to understand why that's necessary.
+>>>
+>>> SoC vendors in most cases hook ip blocks into their socs in different
+>>> and often strange ways. After all it's not some discrete ic you solder
+>>> onto a board, but instead a part of the soc itself.
+>>
+>> Thanks for your explanation.  I see, it's really about special
+>> things that are not supported by the standard Midgard kernel
+>> driver.
+>>
+>>> So in most cases you will have some hooks outside the actual gpu iospace
+>>> that can be used to tune different things about how the gpu interacts with
+>>> the system. Which is probably also the reason the midgard kernel driver
+>>> has this ugly "platform" subdirectory for compile-time platform selection.
+>>
+>> I see the "platform" directory approach as an old and deprecated
+>> way of supporting platforms, upstreaming the dt bindings goes in
+>> the direction of using solely the device tree to describe the GPU
+>> hardware (i.e. CONFIG_MALI_PLATFORM_DEVICETREE).  If something
+>> quirky is needed in the platform, it should be possible to
+>> support it outside the GPU driver (platform devfreq etc...).
+>
+> If this was so simple...
+>
+> This is why the "vendor" compatible is optional.
+>
+> And on another side, the binding were written by ARM, are may not be
+> compatible with how the mainline Linux handles these uses-cases.
+>
+> ARM added some tweaks to handle some weird integration using DT properties,
+> but this should definitely go in platform specific code instead.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+OK, sorry I was approaching the issue from a completely different
+and somewhat more idealistic angle.  My impression is that if the
+driver was in mainline then it would be maintained in such a way
+that vendor compatible strings would not be required, but this is
+all hypothetical.
+
+So in practice, I think I now better understand why vendor
+compatible strings may still be needed.  And they're optional, so
+harmless to other platforms, so it's all fine with me :)
+
+>> Back to the original intent of enabling distros to make Mali GPU
+>> driver packages, when using the device tree you can have a single
+>> kernel driver package for all Midgard platforms.  When using the
+>> third-party platform sources approach, you need to make an extra
+>> package for each one of them.
+>
+> Well, if the midgard driver was maintained in community-driven way, all vendor
+> could actually push their platform code, but it's not the case and somehow
+> never will.
+>
+>>
+>> So if there is value in supporting platforms that absolutely
+>> require something special due to their hardware GPU integration,
+>> then yes I see why vendor dt bindings might be useful.  However
+>> it seems to me that this should really be an exception and
+>> avoided whenever possible.
+>
+> I understand you would avoid changing the (horrible) way the midgard
+> driver handles the DT...
+>
+> But ultimately, if we consider the eventual integration of the midgard
+> driver in mainline kernel (because why not ?), the driver would need
+> a complete re-write to conform the actual driver coding structure,
+> and so would also need to conform to the DT mainline rules.
+
+Yes, it's hard to have a discussion without a mainline driver to
+back things up.  So I understand the pragmatic approach here.
+
+>>> On my rk3288 for example we have [0] in the chromeos tree, that handles
+>>> the oddities of the midgard on the rk3288 used in a lot of Chromebooks.
+>>> There are soc-specific oddities of frequencies, frequency-scaling and
+>>> whatnot. And there are also more gpu-specific setting in syscon areas
+>>> of the soc (pmu and grf) that can also influence the gpus performance
+>>> and might need tweaking at some point.
+>>
+>> For the rk3288, this is purely a software implementation issue on
+>> the chromeos-3.14 branch.  With mainline kernel, you can use
+>> devfreq and no platform files at all (that's how I tested these
+>> dt bindings).  So as far as I know, there's no need for a vendor
+>> compatible string on rk3288.
+>>
+>>> That doesn't even take into account that there may even be differences
+>>> on how things are synthesized that we don't know about. See all the
+>>> variants of the dw_hdmi ip block (imx, rockchip, meson [more?]) .
+>>
+>> I'm not too familiar with that driver, just had a quick look and
+>> it seems to be a different issue as there's a kernel config for
+>> each platform to build separate driver modules.  And it looks
+>> like they are actually needed to cope with variants of the
+>> hardware inside the display processor block, unlike with the Mali
+>> GPU which in principle should always be the same.  I've run this
+>> Midgard driver without any platform files and using devfreq at
+>> least on rk3288 Firefly, Exynos 5422 ODROID-XU3 and Juno and they
+>> all have a vanilla Mali GPU hw block.  It's just wired
+>> differently in each SoC.
+>
+> Please, do not consider the "driver" in dt-bindings discussion, the
+> way it's implemented is irrelevant here, but the way the IP is
+> integrated is crucial.
+> And trust me, HW designers and integrators are very very creative
+> guys, and we *need* some platform code to handle integration corner
+> cases not handled by the "IP" driver.
+
+Sure, I know this happens...  I can't help but think that if
+something quirky is done in the SoC around the GPU then it
+shouldn't need to be fixed in the GPU driver.  But that's talking
+about the "driver" again, so not relevant.
+
+> In the case of "dw-hdmi", the "driver" acts like a "library" that
+> can be used differently among the various platforms.
+>
+> I can talk about the "meson" Amlogic integration, in this particular
+> case Amlogic used their owm PHY and wrapped all the stuff in a way
+> we need to handle the PHY+HDMI+Wrapper in a single block and then
+> connect it to the Video pipeline.
+>
+> For the midgard integration made by Amlogic, the vendor platform code
+> uses tweaks to start the IP and initialize the clocks.
+> And this code is part of the "amlogic,meson-gxm-mali" HW, not the
+> "arm,midgard".
+
+Can't this be done in the clock driver or some other early init
+stage of the SoC?  But again, that code is not in mainline so
+it's a non-issue.
+
+>>> So we really want to have the special compatibles in place, to be prepared
+>>> for the future per-soc oddities that always appear :-) .
+>>
+>> How about aiming for the ideal case where vendor-specific things
+>> are not needed and add them if and when they really become
+>> inevitable and worth the cost?
+>
+> Trust me, an amlogic compatible is needed ;-)
+
+Fair enough, will add the optional vendor compatible string in my
+patch v3 :)  Glad this was discussed though, thank you.
+
+Guillaume
+
+>>> [0] https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.14/drivers/gpu/arm/midgard/platform/rk/
