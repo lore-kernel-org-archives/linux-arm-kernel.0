@@ -1,108 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 12 Apr 2017 18:26:23 +0100
-Subject: [PATCH 2/2] arm64: acpi/pci: invoke _DSM whether to preserve
- firmware PCI setup
-In-Reply-To: <20170411163313.18577-3-ard.biesheuvel@linaro.org>
-References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
- <20170411163313.18577-3-ard.biesheuvel@linaro.org>
-Message-ID: <20170412172623.GA11570@red-moon>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 12 Apr 2017 13:27:28 -0400
+Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
+ ACPI mode
+In-Reply-To: <20170412170433.GA7412@red-moon>
+References: <0dada57f-4215-4ced-482d-88203857e06d@codeaurora.org>
+ <20170412170433.GA7412@red-moon>
+Message-ID: <855540a9-888d-6419-3add-d8b0dbb43029@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 05:33:13PM +0100, Ard Biesheuvel wrote:
-> On arm64 ACPI systems, we unconditionally reconfigure the entire PCI
-> hierarchy at boot. This is a departure from what is customary on ACPI
-> systems, and may break assumptions in some places (e.g., EFIFB), that
-> the kernel will leave BARs of enabled PCI devices where they are.
+Hi Lorenzo,
+
+On 4/12/2017 1:04 PM, Lorenzo Pieralisi wrote:
+> On Sat, Apr 08, 2017 at 01:17:32PM -0400, Sinan Kaya wrote:
+>> On 12/31/1969 7:00 PM, linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Sergey Temerkhanov wrote:
+>>>  int pcibus_to_node(struct pci_bus *bus)  {
+>>> -	return dev_to_node(&bus->dev);
+>>> +	struct pci_config_window *cfg = bus->sysdata;
+>>> +	struct acpi_device *adev = NULL;
+>>> +	struct device *dev;
+>>> +
+>>> +	if (!acpi_disabled)
+>>> +		adev = to_acpi_device(cfg->parent);
+>>> +
+>>
+>> I see a problem here that NUMA node information is read from the
+>> parent device.  PCI bus can have multiple levels of switches and
+>> bridges. The NUMA information is only present on the host bridge.
+>>
+>> This code only works if the endpoint is directly connected to the root
+>> port. 
 > 
-> Given that PCI already specifies a device specific ACPI method (_DSM)
-> for PCI root bridge nodes that tells us whether the firmware thinks
-> the configuration should be left alone, let's sidestep the entire
-> policy debate about whether the PCI configuration should be preserved
-> or not, and put it under the control of the firmware instead.
+> That's not what this code does. This code retrieves the struct device
+> backing the ACPI device representing the PNP0A08 host bridge and its
+> dev->numa_node value (that was set in pci_acpi_scan_root()).
+
+pcibus_to_node() gets called from two places. The first place is 
+pci_register_host_bridge() like you mentioned. 
+
+The second place is pci_device_add(). pci_device_add() gets called for
+every single device that is getting added to the system. 
+
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/pci.c  | 20 ++++++++++++++++++--
->  include/linux/pci-acpi.h |  7 ++++---
->  2 files changed, 22 insertions(+), 5 deletions(-)
+> I am not a big fan of this. I wonder if we could not make it DT/ACPI
+> agnostic by simply setting the numa_node in the pci_bus->dev field,
+> and propagate it downstream a PCI hierarcy (as we do with sysdata)
+> in pci_alloc_child_bus().
+
+Yeah, that's what I was going to ask next about how other arches solve
+this. Common solution to DT/ACPI is preferable as the issue exists in
+both places unless DT has some other mechanism hidden behind the scenes.
+
 > 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 4f0e3ebfea4b..c88e07e2eb84 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -185,6 +185,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	struct acpi_pci_generic_root_info *ri;
->  	struct pci_bus *bus, *child;
->  	struct acpi_pci_root_ops *root_ops;
-> +	union acpi_object *obj;
->  
->  	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
->  	if (!ri)
-> @@ -208,8 +209,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	if (!bus)
->  		return NULL;
->  
-> -	pci_bus_size_bridges(bus);
-> -	pci_bus_assign_resources(bus);
-> +	/*
-> +	 * Invoke the PCI device specific method (_DSM) #5 'Ignore PCI Boot
-> +	 * Configuration', which tells us whether the firmware wants us to
-> +	 * preserve the configuration of the PCI resource tree for this root
-> +	 * bridge.
-> +	 */
-> +	obj = acpi_evaluate_dsm(ACPI_HANDLE(bus->bridge), pci_acpi_dsm_uuid, 1,
-> +				IGNORE_PCI_BOOT_CONFIG_DSM, NULL);
-> +	if (obj && obj->type == ACPI_TYPE_INTEGER && obj->integer.value == 0) {
-> +		/* preserve existing resource assignment */
-> +		pci_bus_claim_resources(bus);
-
-Ok. By the PCI FW specs, we should also assign unassigned resources here
-(ie resources that can't be claimed). Furthermore, by the PCI FW spec,
-if !obj this is the path we should be taking (PCI firmware specification
-Rev 3.1, 4.6.5, Description: 0:)
-
-"...This situation is the same as the legacy situation where this
-_DSM is not provided."
-
-which makes me think that the PCI FW specification expects FW set-up
-to be claimed on boot, it is my interpretation.
-
-I wonder how many UEFI developers know this _DSM even exists. If we
-want to enforce it at least we should mandate its usage at SBSA level,
-it is a major change and I want to understand the reasons behind it,
-so far, as I said, I may see why this was needed on x86 but on ARM64
-I really don't.
-
-Lorenzo
-
-> +	} else {
-> +		/* reconfigure the resource tree from scratch */
-> +		pci_bus_size_bridges(bus);
-> +		pci_bus_assign_resources(bus);
-> +	}
-> +	ACPI_FREE(obj);
->  
->  	list_for_each_entry(child, &bus->children, node)
->  		pcie_bus_configure_settings(child);
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index 7a4e83a8c89c..308111489b83 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -106,9 +106,10 @@ static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
->  #endif
->  
->  extern const u8 pci_acpi_dsm_uuid[];
-> -#define DEVICE_LABEL_DSM	0x07
-> -#define RESET_DELAY_DSM		0x08
-> -#define FUNCTION_DELAY_DSM	0x09
-> +#define IGNORE_PCI_BOOT_CONFIG_DSM	0x05
-> +#define DEVICE_LABEL_DSM		0x07
-> +#define RESET_DELAY_DSM			0x08
-> +#define FUNCTION_DELAY_DSM		0x09
->  
->  #else	/* CONFIG_ACPI */
->  static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
-> -- 
-> 2.9.3
+> This way pcibus_to_node() would become straightforward (ie as it
+> is now - provided the above is doable):
 > 
+> dev_to_node(&bus->dev);
+> 
+> This is suspiciously similar to the domain number song and dance
+> except that the NUMA node now is in the struct pci_bus->dev->numa_node
+> instead of struct pci_bus->domain_nr.
+
+I think this looks like the _CCA dance we are doing.
+
+> 
+> Lorenzo
+> 
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
