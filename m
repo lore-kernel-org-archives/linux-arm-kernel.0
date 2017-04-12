@@ -1,71 +1,117 @@
 From: rajatja@google.com (Rajat Jain)
-Date: Wed, 12 Apr 2017 12:16:52 -0700
-Subject: [PATCH V8 2/5] PCI/ASPM: split pci_aspm_init() into two
-In-Reply-To: <1491627351-1111-3-git-send-email-okaya@codeaurora.org>
+Date: Wed, 12 Apr 2017 12:19:01 -0700
+Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
+In-Reply-To: <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
 References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <CACK8Z6EfUTDjCM=fmdHfWeu8UV5GN+i6PX9fKkR1H8K90TXozg@mail.gmail.com>
+ <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Apr 7, 2017 at 9:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Split pci_aspm_init() body into pci_aspm_init_upstream()
-> and pci_aspm_init_downstream() for bridge and endpoint
-> specific code behavior.
+> Now that we added a hook to be called from device_add, save the
+> default values from the HW registers early in the boot for further
+> reuse during hot device add/remove operations.
+>
+> If the link is down during boot, assume that we want to enable L0s
+> and L1 following hotplug insertion as well as L1SS if supported.
+
+IIUC, so far POLICY_DEFAULT meant that we'd just use & follow what
+BIOS has done, and play it safe (never try to be more opportunistic).
+With this change however, we'd be slightly overstepping and giving
+ourselves benefit of doubt if the BIOS could not enable ASPM states
+because the link was not up. This may be good, but I think we should
+call it out, and add some more elaborate comment on the POLICY_DEFAULT
+description (what to, and what not to expect in different situations).
+
+It is important because existing systems today, that used to boot
+without cards and later hotplugged them, didn't have ASPM states
+enabled. They will now suddenly start seeing all ASPM states enabled
+including L1 substates for the first time (if supported).
+
+My system is not hotplug capable (I have the EP soldered on board, so
+couldn't do much testing, except for sanity. Please feel free to use
+my Reviewed-by.
+
 >
 > Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/pci/pcie/aspm.c | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
+>  drivers/pci/pcie/aspm.c | 34 ++++++++++++++++++++++++++++++----
+>  1 file changed, 30 insertions(+), 4 deletions(-)
 >
 > diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-> index dc36717..a80d64b 100644
+> index e33f84b..c7da087 100644
 > --- a/drivers/pci/pcie/aspm.c
 > +++ b/drivers/pci/pcie/aspm.c
-> @@ -826,6 +826,16 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
->         return link;
->  }
+> @@ -505,8 +505,10 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+>          */
+>         if (dwreg.support & upreg.support & PCIE_LINK_STATE_L0S)
+>                 link->aspm_support |= ASPM_STATE_L0S;
+> -       if (dwreg.enabled & PCIE_LINK_STATE_L0S)
+> +       if (dwreg.enabled & PCIE_LINK_STATE_L0S) {
+>                 link->aspm_enabled |= ASPM_STATE_L0S_UP;
+> +               link->aspm_default |= ASPM_STATE_L0S_UP;
+> +       }
+>         if (upreg.enabled & PCIE_LINK_STATE_L0S)
+>                 link->aspm_enabled |= ASPM_STATE_L0S_DW;
+>         link->latency_up.l0s = calc_l0s_latency(upreg.latency_encoding_l0s);
+> @@ -542,9 +544,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+>         if (link->aspm_support & ASPM_STATE_L1SS)
+>                 aspm_calc_l1ss_info(link, &upreg, &dwreg);
 >
-> +static int pci_aspm_init_downstream(struct pci_dev *pdev)
-> +{
-> +       return 0;
-> +}
-> +
-> +static int pci_aspm_init_upstream(struct pci_dev *pdev)
-> +{
-> +       return 0;
-> +}
-> +
->  /*
->   * pci_aspm_init: Initiate PCI express link state.
->   * It is called from device_add for every single pci device.
-> @@ -833,7 +843,10 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
->   */
->  int pci_aspm_init(struct pci_dev *pdev)
+> -       /* Save default state */
+> -       link->aspm_default = link->aspm_enabled;
+> -
+>         /* Setup initial capable state. Will be updated later */
+>         link->aspm_capable = link->aspm_support;
+>         /*
+> @@ -835,11 +834,38 @@ static int pci_aspm_init_downstream(struct pci_dev *pdev)
+>  static int pci_aspm_init_upstream(struct pci_dev *pdev)
 >  {
-> -       return 0;
-> +       if (!pdev->has_secondary_link)
-> +               return pci_aspm_init_downstream(pdev);
-> +
-> +       return pci_aspm_init_upstream(pdev);
->  }
-
-Nit:
-
-if (x_flag())
-   return x();
-return y();
-
-May be better than
-
-if (!x_flag)
-    return y();
-return x();
-
-
+>         struct pcie_link_state *link;
+> +       struct aspm_register_info upreg;
+> +       u16 lnk_status;
+> +       bool ret;
 >
->  /*
+>         link = alloc_pcie_link_state(pdev);
+>         if (!link)
+>                 return -ENOMEM;
+>
+> +       pcie_capability_read_word(pdev, PCI_EXP_LNKSTA, &lnk_status);
+> +       ret = !!(lnk_status & PCI_EXP_LNKSTA_DLLLA);
+> +
+> +       if (ret) {
+> +               pcie_get_aspm_reg(pdev, &upreg);
+> +               if (upreg.enabled & PCIE_LINK_STATE_L0S)
+> +                       link->aspm_default |= ASPM_STATE_L0S_DW;
+> +               if (upreg.enabled & PCIE_LINK_STATE_L1)
+> +                       link->aspm_default |= ASPM_STATE_L1;
+> +               if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_1)
+> +                       link->aspm_default |= ASPM_STATE_L1_1;
+> +               if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_2)
+> +                       link->aspm_default |= ASPM_STATE_L1_2;
+> +               if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_1)
+> +                       link->aspm_default |= ASPM_STATE_L1_1_PCIPM;
+> +               if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
+> +                       link->aspm_default |= ASPM_STATE_L1_2_PCIPM;
+> +       } else {
+> +               if (!pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_L1SS))
+> +                       link->aspm_default = ASPM_STATE_L0S | ASPM_STATE_L1;
+> +               else
+> +                       link->aspm_default = ASPM_STATE_ALL;
+> +       }
+
+Optional: May be consider moving this code (more aptly) to
+pcie_aspm_cap_init() by adding a check for link-up before we start
+reading downstream registers there? I guess you'll need to move the
+call to pcie_aspm_cap_init() a little further up in
+pcie_aspm_init_link_state().
+
+> +
+>         return 0;
+>  }
+>
 > --
 > 1.9.1
 >
