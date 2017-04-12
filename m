@@ -1,87 +1,73 @@
 From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 12 Apr 2017 15:10:41 +0800
-Subject: [PATCH 1/4] arm64: dts: rk3399: add missing qos node
-Message-ID: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
+Date: Wed, 12 Apr 2017 15:10:42 +0800
+Subject: [PATCH 2/4] arm64: dts: rk3399: add power domain for some peripheral
+In-Reply-To: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
+References: <1491981044-24635-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <1491981044-24635-2-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add qos setting reg for some peripheral like sd, usb, pcie.
+Add power domain for sd, usb, edp.
 
 Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 ---
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 45 ++++++++++++++++++++++++++++----
- 1 file changed, 40 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 36 +++++++++++++++++++++++++++-----
+ 1 file changed, 31 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index f4f3c96..387ae34 100644
+index 387ae34..9d44c19 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -769,11 +769,6 @@
- 		status = "disabled";
- 	};
+@@ -947,6 +947,10 @@
+ 			};
  
--	qos_sd: qos at ffa74000 {
--		compatible = "syscon";
--		reg = <0x0 0xffa74000 0x0 0x20>;
--	};
--
- 	qos_emmc: qos at ffa58000 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffa58000 0x0 0x20>;
-@@ -784,6 +779,41 @@
- 		reg = <0x0 0xffa5c000 0x0 0x20>;
- 	};
- 
-+	qos_pcie: qos at ffa60080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa60080 0x0 0x20>;
-+	};
+ 			/* These power domains are grouped by VD_LOGIC */
++			pd_edp at RK3399_PD_EDP {
++				reg = <RK3399_PD_EDP>;
++				clocks = <&cru PCLK_EDP_CTRL>;
++			};
+ 			pd_emmc at RK3399_PD_EMMC {
+ 				reg = <RK3399_PD_EMMC>;
+ 				clocks = <&cru ACLK_EMMC>;
+@@ -958,11 +962,33 @@
+ 					 <&cru PCLK_GMAC>;
+ 				pm_qos = <&qos_gmac>;
+ 			};
+-			pd_sd at RK3399_PD_SD {
+-				reg = <RK3399_PD_SD>;
+-				clocks = <&cru HCLK_SDMMC>,
+-					 <&cru SCLK_SDMMC>;
+-				pm_qos = <&qos_sd>;
++			pd_perihp at RK3399_PD_PERIHP {
++				reg = <RK3399_PD_PERIHP>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				clocks = <&cru ACLK_PERIHP>;
++				pm_qos = <&qos_perihp>,
++					 <&qos_pcie>,
++					 <&qos_usb_host0>,
++					 <&qos_usb_host1>;
 +
-+	qos_usb_host0: qos at ffa60100 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa60100 0x0 0x20>;
-+	};
-+
-+	qos_usb_host1: qos at ffa60180 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa60180 0x0 0x20>;
-+	};
-+
-+	qos_usb_otg0: qos at ffa70000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa70000 0x0 0x20>;
-+	};
-+
-+	qos_usb_otg1: qos at ffa70080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa70080 0x0 0x20>;
-+	};
-+
-+	qos_sd: qos at ffa74000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa74000 0x0 0x20>;
-+	};
-+
-+	qos_sdioaudio: qos at ffa76000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa76000 0x0 0x20>;
-+	};
-+
- 	qos_hdcp: qos at ffa90000 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffa90000 0x0 0x20>;
-@@ -854,6 +884,11 @@
- 		reg = <0x0 0xffad0000 0x0 0x20>;
- 	};
- 
-+	qos_perihp: qos at ffad8080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffad8080 0x0 0x20>;
-+	};
-+
- 	qos_gpu: qos at ffae0000 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffae0000 0x0 0x20>;
++				pd_sd at RK3399_PD_SD {
++					reg = <RK3399_PD_SD>;
++					clocks = <&cru HCLK_SDMMC>,
++						 <&cru SCLK_SDMMC>;
++					pm_qos = <&qos_sd>;
++				};
++			};
++			pd_sdioaudio at RK3399_PD_SDIOAUDIO {
++				reg = <RK3399_PD_SDIOAUDIO>;
++				clocks = <&cru HCLK_SDIO>;
++				pm_qos = <&qos_sdioaudio>;
++			};
++			pd_usb3 at RK3399_PD_USB3 {
++				reg = <RK3399_PD_USB3>;
++				clocks = <&cru ACLK_USB3>;
++				pm_qos = <&qos_usb_otg0>,
++					 <&qos_usb_otg1>;
+ 			};
+ 			pd_vio at RK3399_PD_VIO {
+ 				reg = <RK3399_PD_VIO>;
 -- 
 1.9.1
