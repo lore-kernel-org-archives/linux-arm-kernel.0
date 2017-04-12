@@ -1,45 +1,79 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 12 Apr 2017 13:13:57 +0200
-Subject: [PATCH v4 15/18] arm: allwinner: pine64-plus: Enable dwmac-sun8i
+Date: Wed, 12 Apr 2017 13:13:55 +0200
+Subject: [PATCH v4 13/18] arm64: allwinner: sun50i-a64: add dwmac-sun8i
+ Ethernet driver
 In-Reply-To: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
 References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170412111400.2296-16-clabbe.montjoie@gmail.com>
+Message-ID: <20170412111400.2296-14-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i hardware is present on the pine64 plus.
-It uses an external PHY rtl8211e via RGMII.
+The dwmac-sun8i is an Ethernet MAC that supports 10/100/1000 Mbit
+connections. It is very similar to the device found in the Allwinner
+H3, but lacks the internal 100 Mbit PHY and its associated control
+bits.
+This adds the necessary bits to the Allwinner A64 SoC .dtsi, but keeps
+it disabled at this level.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 37 +++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-index 790d14d..dea76c2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-@@ -46,5 +46,20 @@
- 	model = "Pine64+";
- 	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 0b0f4ab..2569827 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -287,6 +287,23 @@
+ 				bias-pull-up;
+ 			};
  
--	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
-+	/* TODO: Camera, touchscreen, etc. */
-+};
++			rmii_pins: rmii_pins {
++				pins = "PD10", "PD11", "PD13", "PD14",
++						"PD17", "PD18", "PD19", "PD20",
++						"PD22", "PD23";
++				function = "emac";
++				drive-strength = <40>;
++			};
 +
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
++			rgmii_pins: rgmii_pins {
++				pins = "PD8", "PD9", "PD10", "PD11",
++						"PD12", "PD13", "PD15",
++						"PD16", "PD17", "PD18", "PD19",
++						"PD20", "PD21", "PD22", "PD23";
++				function = "emac";
++				drive-strength = <40>;
++			};
 +
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	status = "okay";
- };
+ 			uart0_pins_a: uart0 at 0 {
+ 				pins = "PB8", "PB9";
+ 				function = "uart0";
+@@ -391,6 +408,26 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun50i-a64-emac";
++			syscon = <&syscon>;
++			reg = <0x01c30000 0x100>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "macirq";
++			resets = <&ccu RST_BUS_EMAC>;
++			reset-names = "stmmaceth";
++			clocks = <&ccu CLK_BUS_EMAC>;
++			clock-names = "stmmaceth";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			mdio: mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.10.2
