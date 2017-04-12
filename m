@@ -1,224 +1,125 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 12 Apr 2017 18:19:36 +0200
-Subject: kvm/arm64: use-after-free in
- kvm_unmap_hva_handler/unmap_stage2_pmds
-In-Reply-To: <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
-References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
- <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
- <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
-Message-ID: <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 12 Apr 2017 11:21:18 -0500
+Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <20170411152702.GA2910@localhost>
+References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
+ <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
+ <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
+ <20170411071047.GA3610@localhost>
+ <20170411134125.GA31773@bhelgaas-glaptop.roam.corp.google.com>
+ <20170411152702.GA2910@localhost>
+Message-ID: <20170412162118.GC25197@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 5:57 PM, Paolo Bonzini <pbonzini@redhat.com> wrote:
->
->
-> On 14/03/2017 12:07, Suzuki K Poulose wrote:
->> On 10/03/17 13:34, Andrey Konovalov wrote:
->>> Hi,
->>>
->>> I've got the following error report while fuzzing the kernel with
->>> syzkaller.
->>>
->>> On linux-next commit 56b8bad5e066c23e8fa273ef5fba50bd3da2ace8 (Mar 8).
->>>
->>> Unfortunately I can't reproduce it.
->>>
->>> ==================================================================
->>> BUG: KASAN: use-after-free in put_page include/linux/compiler.h:243
->>> [inline]
->>> BUG: KASAN: use-after-free in unmap_stage2_pmds
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:240 [inline]
->>> BUG: KASAN: use-after-free in unmap_stage2_puds
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:269 [inline]
->>> BUG: KASAN: use-after-free in unmap_stage2_range+0x884/0x938
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:299
->>> Read of size 8 at addr ffff80004585c000 by task syz-executor/5176
->>
->>
->>> [<ffff2000080d9664>] put_page include/linux/compiler.h:243 [inline]
->>> [<ffff2000080d9664>] unmap_stage2_pmds
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:240 [inline]
->>> [<ffff2000080d9664>] unmap_stage2_puds
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:269 [inline]
->>> [<ffff2000080d9664>] unmap_stage2_range+0x884/0x938
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:299
->>> [<ffff2000080d9740>] kvm_unmap_hva_handler+0x28/0x38
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1556
->>> [<ffff2000080d7578>] handle_hva_to_gpa+0x140/0x250
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1547
->>> [<ffff2000080db858>] kvm_unmap_hva_range+0x60/0x80
->>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1579
->>> [<ffff2000080c12dc>]
->>> kvm_mmu_notifier_invalidate_range_start+0x194/0x278
->>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:357
->>> [<ffff2000083fea58>] __mmu_notifier_invalidate_range_start+0x1d0/0x2a0
->>> mm/mmu_notifier.c:199
->>> [<ffff200008395f44>] mmu_notifier_invalidate_range_start
->>> include/linux/mmu_notifier.h:282 [inline]
->>> [<ffff200008395f44>] unmap_vmas+0x12c/0x198 mm/memory.c:1372
->>> [<ffff2000083a8e00>] unmap_region+0x128/0x230 mm/mmap.c:2460
->>> [<ffff2000083ae6e0>] update_hiwater_vm include/linux/mm.h:1483 [inline]
->>> [<ffff2000083ae6e0>] remove_vma_list mm/mmap.c:2432 [inline]
->>> [<ffff2000083ae6e0>] do_munmap+0x598/0x9b0 mm/mmap.c:2662
->>> [<ffff2000083b14a0>] find_vma_links mm/mmap.c:495 [inline]
->>> [<ffff2000083b14a0>] mmap_region+0x138/0xc78 mm/mmap.c:1610
->>> [<ffff2000083b23ac>] is_file_hugepages include/linux/hugetlb.h:269
->>> [inline]
->>> [<ffff2000083b23ac>] do_mmap+0x3cc/0x848 mm/mmap.c:1446
->>> [<ffff200008369b0c>] do_mmap_pgoff include/linux/mm.h:2039 [inline]
->>> [<ffff200008369b0c>] vm_mmap_pgoff+0xec/0x120 mm/util.c:305
->>> [<ffff2000083ac558>] SYSC_mmap_pgoff mm/mmap.c:1475 [inline]
->>> [<ffff2000083ac558>] SyS_mmap_pgoff+0x220/0x420 mm/mmap.c:1458
->>> [<ffff20000808ecf0>] sys_mmap+0x58/0x80 arch/arm64/kernel/sys.c:37
->>> [<ffff200008083f70>] el0_svc_naked+0x24/0x28
->>>
->>
->> We hold kvm->mmu_lock, while manipulating the stage2 ranges. However, I
->> find that
->> we don't take the lock, when we do it f rom kvm_free_stage2_pgd(), which
->> could
->> potentially have caused a problem with an munmap of a memslot ?
->>
->> Lightly tested...
->>
->>
->> commit fa75684dbf0fe845cf8403517d6e0c2c3344a544
->> Author: Suzuki K Poulose <suzuki.poulose@arm.com>
->> Date:   Tue Mar 14 10:26:54 2017 +0000
->>
->>     kvm: arm: Fix locking for kvm_free_stage2_pgd
->>         In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while
->> calling
->>     unmap_stage2_range() on the entire memory range for the guest. This
->> could
->>     cause problems with other callers (e.g, munmap on a memslot) trying to
->>     unmap a range.
->>         Cc: Marc Zyngier <marc.zyngier@arm.com>
->>     Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>     Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index a07ce3e..7f97063 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
->>         if (kvm->arch.pgd == NULL)
->>                 return;
->>
->> +       spin_lock(&kvm->mmu_lock);
->>         unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
->> +       spin_unlock(&kvm->mmu_lock);
->> +
->>         /* Free the HW pgd, one page at a time */
->>         free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
->>         kvm->arch.pgd = NULL;
->
-> Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
->>
->>
->>
->>> The buggy address belongs to the page:
->>> page:ffff7e0001161700 count:0 mapcount:0 mapping:          (null)
->>> index:0x0
->>> flags: 0xfffc00000000000()
->>> raw: 0fffc00000000000 0000000000000000 0000000000000000 00000000ffffffff
->>> raw: ffff7e00018c9120 ffff7e0000ea8b60 0000000000000000 0000000000000000
->>> page dumped because: kasan: bad access detected
->>>
->>> Memory state around the buggy address:
->>>  ffff80004585bf00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>>  ffff80004585bf80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>>> ffff80004585c000: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>>                    ^
->>>  ffff80004585c080: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>>  ffff80004585c100: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>> ==================================================================
->>>
->>
+On Tue, Apr 11, 2017 at 03:27:02PM +0000, Jayachandran C wrote:
+> On Tue, Apr 11, 2017 at 08:41:25AM -0500, Bjorn Helgaas wrote:
+> > [+cc Joerg]
+> > 
+> > On Tue, Apr 11, 2017 at 07:10:48AM +0000, Jayachandran C wrote:
+> > > On Mon, Apr 10, 2017 at 08:28:47PM -0500, Bjorn Helgaas wrote:
+> > > > Hi Jayachandran,
+> > > > 
+> > > > On Mon, Apr 03, 2017 at 01:15:04PM +0000, Jayachandran C wrote:
+> > > > > The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
+> > > > > topology is slightly unusual. For a multi-node system, it looks like:
+> > > > > 
+> > > > > [node level PCI bridges - one per node]
+> > > > >     [SoC PCI devices with MSI-X but no IOMMU]
+> > > > >     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
+> > > > >         [PCIe real root ports associated with IOMMU and GICv3 ITS]
+> > > > >             [External PCI devices connected to PCIe links]
+> > > > > 
+> > > > > The top two levels of bridges should have introduced aliases since they
+> > > > > are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
+> > > > > In the case of external PCIe devices, the "real" root ports are connected
+> > > > > to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
+> > > > > alias. The SoC PCI devices are directly connected to the GIC ITS, so the
+> > > > > node level bridges do not introduce an alias either.
+> > > > > 
+> > > > > To handle this quirk, we mark the real PCIe root ports and node level
+> > > > > PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
+> > > > > pci_for_each_dma_alias() works correctly for external PCIe devices and
+> > > > > SoC PCI devices.
+> > > > > 
+> > > > > For the current revision of Cavium ThunderX2, the VendorID and Device ID
+> > > > > are from Broadcom Vulcan (14e4:90XX).
+> > > > 
+> > > > Can you supply some text here about why we want to apply this patch?
+> > > > E.g., does it avoid making unnecessary IOMMU mappings, improve
+> > > > performance, avoid a crash, etc?
+> > > 
+> > > If this is for the commit message, I hope the following is ok:
+> > > 
+> > > "With this change, both MSI-X and IO virtualization work correctly on
+> > > Cavium ThunderX2. The GIC ITS driver gets the correct device ID to
+> > > configure MSI-X, the SMMUv3 driver gets the correct Stream IDs for PCI
+> > > devices, and the IOMMU groups are setup correctly."
+> > 
+> > This doesn't get at what the actual problem is.  I'm hoping for
+> > something like "without this change, we set up an IOMMU mapping for
+> > requestor ID X, but device DMA uses requestor ID Y because ...., which
+> > results in an IOMMU fault"
+> 
+> Ok. I hope this would be better:
+> 
+> "Without this change, the last alias seen while traversing the PCI
+> hierarchy will be used as the RID to generate the device ID for ITS
+> and stream ID for SMMU. This in turn causes the MSI-X generated by the
+> device to fail since the ITS expects to have translation tables based
+> on the actual PCIe RID and not the (irrelevant) alias. Similarly, the
+> device DMA also fails when SMMU is enabled due to incorrect value in
+> SMMU translation tables"
 
-Hi,
+This description is true, but I don't think it addresses the real
+problem.  I think the real problem is that your IOMMU code doesn't
+handle aliases correctly, and by ignoring these invalid aliases, we
+happen to map an alias that works for the builtin devices.  But that's
+only because we got lucky (those devices use a single RID and they're
+not behind bridges that optionally take ownership).
 
-Apparently this wasn't fixed, I've got this report again on
-linux-next-c4e7b35a3 (Apr 11), which includes 8b3405e34 "kvm:
-arm/arm64: Fix locking for kvm_free_stage2_pgd".
+It would make sense to me if we fixed the IOMMU code to map *all* the
+aliases, which should be enough to make your devices work.  If we then
+wanted to apply a patch like this on top, it would be simply an
+optimization that avoids unnecessary IOMMU mappings.
 
-I now have a way to reproduce it, so I can test proposed patches. I
-don't have a simple C reproducer though.
+> > I suspect the reason this patch makes a difference is because the
+> > current pci_for_each_dma_alias() believes one of those top-level
+> > bridges is an alias, and the iterator produces it last, so that's the
+> > one you map.  The IOMMU is attached lower down, so that top-level
+> > bridge is not in fact an alias, but since you only look at the *last*
+> > one, you don't map the correct aliases from lower down in the tree.
+> 
+> Exactly. The IORT spec allows a range of RIDs to map to an SMMU, which
+> means that a PCI RC can multiple SMMUs, each handling a subset of RIDs.
+> 
+> In the case of Cavium ThunderX2, the RID which we should see on the RC
+> - if we follow the standard and factor in the aliasing introduced by the
+> PCI bridge and the PCI/PCIe bridge - is not the RID seen by the SMMU (or
+> ITS).
+> 
+> But, if we stop the traversal at the point where SMMU (or ITS) is
+> attached, we will get the correct RID as seen by these.
 
-The bug happens when the following syzkaller program is executed:
+There is a single "correct RID" for your builtin SATA and USB, but in
+general there is no single RID.
 
-mmap(&(0x7f0000000000/0xc000)=nil, (0xc000), 0x3, 0x32, 0xffffffffffffffff, 0x0)
-unshare(0x400)
-perf_event_open(&(0x7f000002f000-0x78)={0x1, 0x78, 0x0, 0x0, 0x0, 0x0,
-0x0, 0x6, 0x0, 0x0, 0xd34, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, 0x0, 0xffffffff,
-0xffffffffffffffff, 0x0)
-r0 = openat$kvm(0xffffffffffffff9c,
-&(0x7f000000c000-0x9)="2f6465762f6b766d00", 0x0, 0x0)
-ioctl$TIOCSBRK(0xffffffffffffffff, 0x5427)
-r1 = ioctl$KVM_CREATE_VM(r0, 0xae01, 0x0)
-syz_kvm_setup_cpu$arm64(r1, 0xffffffffffffffff,
-&(0x7f0000dc6000/0x18000)=nil, &(0x7f000000c000)=[{0x0,
-&(0x7f000000c000)="5ba3c16f533efbed09f8221253c73763327fadce2371813b45dd7f7982f84a873e4ae89a6c2bd1af83a6024c36a1ff518318",
-0x32}], 0x1, 0x0, &(0x7f000000d000-0x10)=[@featur2={0x1, 0x3}], 0x1)
+> > Stopping the iterator earlier happens to make the last alias be one of
+> > the correct ones, but it doesn't solve the problems of quirked devices
+> > that can use multiple requester IDs, and it doesn't solve the problem
+> > of PCIe-to-PCI bridges that optionally take ownership of transactions.
+>  
+> If these happen below the point where the SMMU is attached, we will
+> consider the last alias introduced, which should be ok. If they are
+> above, the alias introduced is not relevant.  Devices with multiple
+> aliases is not handled anywhere in ARM code, so I don't think we should
+> consider that here.
 
-==================================================================
-BUG: KASAN: use-after-free in arch_spin_is_locked
-include/linux/compiler.h:254 [inline]
-BUG: KASAN: use-after-free in unmap_stage2_range+0x990/0x9a8
-arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:295
-Read of size 8 at addr ffff800004476730 by task syz-executor/13106
+I think we *should* consider it here.  The multiple alias situation is
+generic PCIe, independent of ARM.  If you want to support arbitrary
+PCIe plugin devices, you have to handle it.  I think any device with a
+quirk that calls pci_add_dma_alias() will currently fail on your
+system.  And I think devices behind a bridge that optionally takes
+ownership of DMA transactions will also fail.
 
-CPU: 1 PID: 13106 Comm: syz-executor Not tainted
-4.11.0-rc6-next-20170411-xc2-11025-gc4e7b35a33d4-dirty #5
-Hardware name: Hardkernel ODROID-C2 (DT)
-Call trace:
-[<ffff20000808fd08>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
-[<ffff2000080903c0>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
-[<ffff2000088df030>] __dump_stack lib/dump_stack.c:16 [inline]
-[<ffff2000088df030>] dump_stack+0x110/0x168 lib/dump_stack.c:52
-[<ffff200008406db8>] print_address_description+0x60/0x248 mm/kasan/report.c:252
-[<ffff2000084072c8>] kasan_report_error mm/kasan/report.c:351 [inline]
-[<ffff2000084072c8>] kasan_report+0x218/0x300 mm/kasan/report.c:408
-[<ffff200008407428>] __asan_report_load8_noabort+0x18/0x20 mm/kasan/report.c:429
-[<ffff2000080db1b8>] arch_spin_is_locked include/linux/compiler.h:254 [inline]
-[<ffff2000080db1b8>] unmap_stage2_range+0x990/0x9a8
-arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:295
-[<ffff2000080db248>] kvm_free_stage2_pgd.part.16+0x30/0x98
-arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:842
-[<ffff2000080ddfb8>] kvm_free_stage2_pgd
-arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:838 [inline]
-[<ffff2000080ddfb8>] kvm_arch_flush_shadow_all+0x40/0x58
-arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1895
-[<ffff2000080c379c>] kvm_mmu_notifier_release+0x154/0x1d0
-arch/arm64/kvm/../../../virt/kvm/kvm_main.c:472
-[<ffff2000083f2b60>] __mmu_notifier_release+0x1c0/0x3e0 mm/mmu_notifier.c:75
-[<ffff2000083a1fb4>] mmu_notifier_release
-include/linux/mmu_notifier.h:235 [inline]
-[<ffff2000083a1fb4>] exit_mmap+0x21c/0x288 mm/mmap.c:2941
-[<ffff20000810ecd4>] __mmput kernel/fork.c:888 [inline]
-[<ffff20000810ecd4>] mmput+0xdc/0x2e0 kernel/fork.c:910
-[<ffff20000811fda8>] exit_mm kernel/exit.c:557 [inline]
-[<ffff20000811fda8>] do_exit+0x648/0x2020 kernel/exit.c:865
-[<ffff2000081218b4>] do_group_exit+0xdc/0x260 kernel/exit.c:982
-[<ffff20000813adf0>] get_signal+0x358/0xf58 kernel/signal.c:2318
-[<ffff20000808de98>] do_signal+0x170/0xc10 arch/arm64/kernel/signal.c:370
-[<ffff20000808edb4>] do_notify_resume+0xe4/0x120 arch/arm64/kernel/signal.c:421
-[<ffff200008083e68>] work_pending+0x8/0x14
-
-The buggy address belongs to the page:
-page:ffff7e0000111d80 count:0 mapcount:-127 mapping:          (null) index:0x0
-flags: 0xfffc00000000000()
-raw: 0fffc00000000000 0000000000000000 0000000000000000 00000000ffffff80
-raw: ffff7e00009698a0 ffff7e00008eefa0 0000000000000001 0000000000000000
-page dumped because: kasan: bad access detected
-
-Memory state around the buggy address:
- ffff800004476600: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
- ffff800004476680: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->ffff800004476700: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
-                                     ^
- ffff800004476780: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
- ffff800004476800: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
-==================================================================
+Bjorn
