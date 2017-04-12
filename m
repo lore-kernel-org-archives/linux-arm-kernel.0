@@ -1,80 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Apr 2017 09:08:31 +0100
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
- <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
- <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
- <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
- <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
-Message-ID: <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Apr 2017 10:23:07 +0200
+Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
+In-Reply-To: <20170412083404.76cda3b3@canb.auug.org.au> (Stephen Rothwell's
+ message of "Wed, 12 Apr 2017 08:34:04 +1000")
+References: <20170412083404.76cda3b3@canb.auug.org.au>
+Message-ID: <87a87mhw5w.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/17 18:52, Mason wrote:
-> On 11/04/2017 18:43, Marc Zyngier wrote:
-> 
->> On 11/04/17 17:26, Mason wrote:
->>
->>> Is there a function to map virq to the hwirq in any domain?
->>
->> Be more precise. If you want the hwirq associated with the view of a
->> virq in a given domain, that's the hwirq field in the corresponding
->> irq_data structure. Or are you after something else?
-> 
-> I registered an unmask method for my irq_chip.
-> (IIUC, I'm supposed to unmask a specific MSI in this callback.)
-> 
-> # cat /proc/interrupts 
->            CPU0       CPU1       
->  30:          0          0    MSIfoo      0 Edge      aerdrv
->  34:          0          0    MSIfoo 524288 Edge      xhci_hcd
->  35:          0          0    MSIfoo 524289 Edge      xhci_hcd
->  36:          0          0    MSIfoo 524290 Edge      xhci_hcd
-> 
-> 
-> void foo_unmask(struct irq_data *data)
-> {
-> 	int xx,yy;
-> 	struct irq_domain *dom = data->domain;
-> 	printk("%s: irq_data=%p irq=%u hwirq=%lu chip=%p dom=%p pdata=%p data=%p\n",
-> 		__func__, data, data->irq, data->hwirq, data->chip, data->domain,
-> 		data->parent_data, data->chip_data);
-> 	printk("%s ops=%p data=%p parent=%p\n\n",
-> 		dom->name, dom->ops, dom->host_data, dom->parent);
-> 	printk("pcie=%p\n", dom->parent->host_data);
-> 	//dump_stack();
-> 	pci_msi_unmask_irq(data);
-> 	struct tango_pcie *pcie = data->domain->parent->host_data;
-> 	printk("\n%s: pcie=%p irq=%u hwirq=%lu\n\n",
-> 		__func__, pcie, data->irq, data->hwirq);
-> 	xx = irq_find_mapping(pcie->irq_domain, data->hwirq);
-> 	yy = irq_find_mapping(pcie->msi_domain, data->hwirq);
+Hi Olof and Arnd,
+ 
+ On mer., avril 12 2017, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 
-Do you realize that hwirq is *per domain*, and only makes sense to *one*
-irqchip? What you've written here doesn't make any sense.
+> Hi all,
+>
+> Today's linux-next merge of the mvebu tree got a conflict in:
+>
+>   arch/arm64/configs/defconfig
+>
+> between commit:
+>
+>   3c9d36192802 ("arm64: set CONFIG_MMC_BCM2835=y in defconfig")
+>
+> from the arm-soc tree and commit:
+>
+>   6ff829553345 ("arm64: configs: enable SDHCI driver for Xenon")
+>
+> from the mvebu tree.
 
-> 	printk("xx=%d yy=%d\n", xx, yy);
-> }
-> 
-> so data->irq is the virq (30, 34, 35, 36)
-> and data->hwirq is the domain hwirq (0, 524288, 524289, 524290)
-> 
-> Is there a way to map hwirq 524288 to MSI 0, hwirq 524289 to MSI 1, etc?
+How do you want to proceed with this conflict?
 
-Why would you need to do such a thing?
-- In MSI domain: IRQ34 -> hwirq 524288
-- In foo domain: IRQ34 -> hwirq [whatever your driver has allocated]
+Do you want that I merged arm-soc/next/arm64 in my mvebu/defconfig64
+branch before applying my patch ?
 
-The data is already there, at your fingertips. Just deal with with your
-"foo" irqchip.
+Or do you prefer that I continue to base my branch on v4.11-rc1 and then
+you will take care of the conflict when pulling the branch?
 
-	M.
+Thanks,
+
+Gregory
+
+>
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
+>
+> BTW, that arm-soc commit has no Signed-off-by from its committer :-(
+>
+> -- 
+> Cheers,
+> Stephen Rothwell
+>
+> diff --cc arch/arm64/configs/defconfig
+> index ab4461b6b226,93b0aab959c0..000000000000
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@@ -402,7 -401,7 +402,8 @@@ CONFIG_MMC_DW_EXYNOS=
+>   CONFIG_MMC_DW_K3=y
+>   CONFIG_MMC_DW_ROCKCHIP=y
+>   CONFIG_MMC_SUNXI=y
+>  +CONFIG_MMC_BCM2835=y
+> + CONFIG_MMC_SDHCI_XENON=y
+>   CONFIG_NEW_LEDS=y
+>   CONFIG_LEDS_CLASS=y
+>   CONFIG_LEDS_GPIO=y
+
 -- 
-Jazz is not dead. It just smells funny...
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
