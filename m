@@ -1,85 +1,69 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Apr 2017 12:20:22 +0100
-Subject: [PATCH v3 04/32] asm-generic: add ioremap_nopost() remap interface
-In-Reply-To: <1491917983.7236.9.camel@kernel.crashing.org>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
- <1491917983.7236.9.camel@kernel.crashing.org>
-Message-ID: <20170412112022.GY17774@n2100.armlinux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 12 Apr 2017 16:57:19 +0530
+Subject: [PATCH v2] ARM: davinci: Add the clock for the CPPI 4.1 DMA engine
+In-Reply-To: <d73b5bf4-4772-4089-0e04-76275b6a00a3@baylibre.com>
+References: <20170405171750.16821-1-abailon@baylibre.com>
+ <e941f7f4-1904-a0c5-3ef0-973477087b2b@ti.com>
+ <dade7b1b-af0f-0f3e-26fc-4e845c451330@baylibre.com>
+ <d73b5bf4-4772-4089-0e04-76275b6a00a3@baylibre.com>
+Message-ID: <5578004a-682f-f135-a03c-eb41fa4d1426@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 11:39:43PM +1000, Benjamin Herrenschmidt wrote:
-> On Tue, 2017-04-11 at 13:28 +0100, Lorenzo Pieralisi wrote:
-> > +static inline void __iomem *ioremap_nopost(phys_addr_t offset,
-> > size_t size)
-> > +{
-> > +???????return ioremap_nocache(offset, size);
-> > +}
-> > +
+On Friday 07 April 2017 11:01 PM, Alexandre Bailon wrote:
 > 
-> No this is wrong as I explained.
 > 
-> This is a semantic that simply *cannot* be generically provided accross
-> architectures as a mapping attribute.
-> 
-> The solution to your problem lies elsewhere.
+> On 04/07/2017 06:15 PM, Alexandre Bailon wrote:
+>>
+>>
+>> On 04/07/2017 04:36 PM, Sekhar Nori wrote:
+>>> On Wednesday 05 April 2017 10:47 PM, Alexandre Bailon wrote:
+>>>> The CPPI 4.1 DMA is sharing its clock with the USB OTG,
+>>>> and most of the time, the clock will be enabled by USB.
+>>>> But during the init of the DMA, USB is not enabled (waiting for DMA),
+>>>> and then we must enable the clock before doing anything.
+>>>> Add the clock for the CPPI 4.1 DMA engine.
+>>>>
+>>>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>>>> ---
+>>>>   arch/arm/mach-davinci/da830.c | 6 ++++++
+>>>>   arch/arm/mach-davinci/da850.c | 6 ++++++
+>>>>   2 files changed, 12 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-davinci/da830.c
+>>>> b/arch/arm/mach-davinci/da830.c
+>>>> index 073c458..bd88470 100644
+>>>> --- a/arch/arm/mach-davinci/da830.c
+>>>> +++ b/arch/arm/mach-davinci/da830.c
+>>>> @@ -304,6 +304,11 @@ static struct clk usb20_clk = {
+>>>>       .gpsc        = 1,
+>>>>   };
+>>>>   +static struct clk cppi41_clk = {
+>>>> +    .name        = "cppi41",
+>>>> +    .parent        = &usb20_clk,
+>>>> +};
+>>>> +
+>>>>   static struct clk aemif_clk = {
+>>>>       .name        = "aemif",
+>>>>       .parent        = &pll0_sysclk3,
+>>>> @@ -413,6 +418,7 @@ static struct clk_lookup da830_clks[] = {
+>>>>       CLK("davinci-mcasp.1",    NULL,        &mcasp1_clk),
+>>>>       CLK("davinci-mcasp.2",    NULL,        &mcasp2_clk),
+>>>>       CLK("musb-da8xx",    "usb20",    &usb20_clk),
+>>>> +    CLK("cppi41-dmaengine",    NULL,        &cppi41_clk),
+>>> I dont see this device name being used in current linux-next. Is this
+>>> name accepted ?
+>> There is here a typo. The name should be cppi41-dma-engine.
+>> I will fix it.
+> Actually, it is not a typo. It would have be more logical to name it
+> cppi41-dma-engine
+> (like the driver name) but the name is correct.
+> The device name is not yet in linux-next as the device is created in
+> da8xx driver.
+> http://marc.info/?l=linux-usb&m=149080474124498&w=2
 
-I disagree.  Sure, it may not be supportable across all architectures,
-but we're not introducing something brand new here.
+Alright, applied this and sent a pull request. Made some minor changes
+to commit message text.
 
-What we're trying to do is to fix some _existing_ drivers that are
-already using ioremap() to map the PCI IO and configuration spaces.
-Maybe it would help if those drivers were part of this patch set,
-rather than the patch set just introducing a whole new architecture
-interface without really showing where the problem drivers are.
-
-The issue here is that if we make this new ioremap_nopost() fail by
-returning NULL if an architecture does not provide an implementation,
-then these drivers are going to start failing on such architectures.
-
-It is only safe to do that where we know for certain that the drivers
-are not used - but I don't think that's the case here (it's difficult
-to tell, because no drivers are updated in this series, so we don't
-know which are going to be affected.)
-
-So, the question is:
-
-- is it better to provide a default implementation which provides the
-  functionality that existing drivers are _already_ using, albiet not
-  entirely correctly.
-
-or:
-
-- is it better to break drivers on architectures when they're converted
-  to fix up this issue.
-
-What, I suppose, we could do is not bother with a default implementation,
-but instead litter drivers with:
-
-+#ifdef ioremap_post
-+	base = ioremap_post(...);
-+#else
-	base = ioremap(...);
-+#endif
-
-which gets around your objection - not providing a default that's weaker
-than required, but also not breaking the drivers.  The problem is that
-we end up littering drivers with ifdefs.
-
-However, I'm willing to bet that the architectures that you're saying
-will not be able to support the weaker semantic won't have any need to
-use these drivers, or if they do, the drivers will need the method of
-accessing stuff like PCI IO and configuration spaces radically altered.
-
-So, maybe the best solution is to not provide any kind of default
-implementation, add a HAVE_IOREMAP_POST Kconfig symbol, have architectures
-select that when they do provide ioremap_post(), and make the drivers
-depend on that (so we don't end up trying to build these drivers on
-architectures where they can never work.)  Down side to that is reduced
-build coverage.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Sekhar
