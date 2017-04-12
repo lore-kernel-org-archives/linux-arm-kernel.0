@@ -1,34 +1,37 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 13 Apr 2017 00:00:36 +0800
-Subject: [PATCH 2/6] regulator: anatop: only set supply regulator when it
- actually exists
-In-Reply-To: <20170412155336.vhhrftqmlxhti36n@sirena.org.uk>
-References: <1491962327-12477-1-git-send-email-aisheng.dong@nxp.com>
- <1491962327-12477-2-git-send-email-aisheng.dong@nxp.com>
- <20170411203124.y7cwyttqfu4a2aov@sirena.org.uk>
- <20170413071101.GA23163@b29396-OptiPlex-7040>
- <20170412155336.vhhrftqmlxhti36n@sirena.org.uk>
-Message-ID: <CAA+hA=QG7xwJrX0q3fyTEAHEcwJr-0z0T+MvC2ESDpBGrhQVRA@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 12 Apr 2017 11:02:52 -0500
+Subject: [PATCH 0/8] arm64: defconfig: enable several options useful for ARM64
+ server platforms
+Message-ID: <1492012980-11650-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 11:53 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Apr 13, 2017 at 03:11:01PM +0800, Dong Aisheng wrote:
->
->> You're absolutely right!
->> I did this because there're some where else did the same thing.
->> e.g. drivers/regulator/fixed.c.
->
->> But it's obviously none of any platform specific and is perfectly
->> to be handled in regulator core.
->
-> Did my patch solve the problems you were seeing?  I just wrote it
-> quickly last thing before I finished for the evening.
+ACPI-based ARM64 server platforms based, like the Qualcomm Datacenter
+Technologies QDF2400, need several features and drivers enabled for
+full functionality.  This patchset enables many of those features.
 
-It can solve the problem.
-But it breaks some thing and need a further tiny fix.
-I just replied the mail in your patch thread.
-Please check it!
+The first patch, "resynchronize the defconfig" refreshes the ARM64
+defconfig so that it's aligned with savedefconfig.  This needs to be
+done periodically, so that new patches avoid merge conflicts.  
 
-Regards
-Dong Aisheng
+If the first patch does not apply cleanly, I ask the maintainer to 
+refresh it himself manually, following the instructions in the commit
+message.  The remaining 7 patches should apply cleanly on top of that.
+
+Timur Tabi (8):
+  arm64: defconfig: resynchronize the defconfig
+  arm64: defconfig: enable ACPI_CPPC_CPUFREQ
+  arm64: defconfig: enable TCG_TPM and TCG_CRB
+  arm64: defconfig: enable BLK_DEV_NVME
+  arm64: defconfig: enable EFI_VARS and EFI_CAPSULE_LOADER
+  arm64: defconfig: enable support for PCIe hotplug
+  arm64: defconfig: enable APEI and GHES features
+  arm64: defconfig: enable EDAC options
+
+ arch/arm64/configs/defconfig | 114 +++++++++++++++++++++----------------------
+ 1 file changed, 56 insertions(+), 58 deletions(-)
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
