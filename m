@@ -1,55 +1,96 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Apr 2017 09:33:59 +0100
-Subject: "Consolidate get_dma_ops" breaks Xen on ARM
-In-Reply-To: <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
-References: <alpine.DEB.2.10.1704101713080.2759@sstabellini-ThinkPad-X260>
- <CY1PR0401MB1536C1FF3C069BC88D1DB14581000@CY1PR0401MB1536.namprd04.prod.outlook.com>
- <a758dfc6-2b00-e279-303c-ba1e27380e35@arm.com>
- <20170411133649.GB27857@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
-Message-ID: <20170412083359.GA19019@e104818-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 12 Apr 2017 10:36:15 +0200
+Subject: [PATCH 4/7] arm64: marvell: dts: add crypto engine description
+ for 7k/8k
+In-Reply-To: <20170329124432.27457-5-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Wed, 29 Mar 2017 14:44:29 +0200")
+References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
+ <20170329124432.27457-5-antoine.tenart@free-electrons.com>
+Message-ID: <8760iahvk0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 04:39:09PM -0700, Stefano Stabellini wrote:
-> On Tue, 11 Apr 2017, Catalin Marinas wrote:
-> > On Tue, Apr 11, 2017 at 01:43:28PM +0100, Julien Grall wrote:
-> > > On 11/04/17 02:14, Bart Van Assche wrote:
-> > > > On 04/10/17 17:31, Stefano Stabellini wrote:
-> > > >> I think the reason is that, as you can see, if (dev && dev->dma_ops),
-> > > >> dev->dma_ops is returned, while before this changes, xen_dma_ops was
-> > > >> returned on Xen on ARM.
-> > > >>
-> > > >> Unfortunately DMA cannot work properly without using the appropriate
-> > > >> xen_dma_ops. See drivers/xen/swiotlb-xen.c and arch/arm/xen/mm.c for
-> > > >> more details. (The problem is easy to spot, but I wasn't CC'ed on the
-> > > >> patch.)
-> > > >>
-> > > >> I don't know how to solve this problem without introducing some sort of
-> > > >> if (xen()) in include/linux/dma-mapping.h.
-> > > > 
-> > > > Sorry but I don't have access to an ARM development system. Does your 
-> > > > comment apply to dev == NULL only, dev != NULL only or perhaps to both? 
-> > > > If your comment applies to dev != NULL only, can you check whether 
-> > > > adding something like set_dma_ops(dev, get_arch_dma_ops(NULL)) to the 
-> > > > appropriate ARM arch_setup_dma_ops() function is sufficient?
-> > > 
-> > > If I understand correctly, set_dma_ops will replace dev->dma_ops with
-> > > Xen DMA ops.
-[...]
-> > Yet another way would be for dom0 to always set dev->dma_ops to
-> > xen_dma_ops and preserve the real dma_ops somewhere under dev->archdata.
-> > You could intercept the arch_setup_dma_ops() function for this or use
-> > bus_register_notifier() (though I think the former is easier). The Xen
-> > code making use of the real dma_ops would have to dig them out from
-> > dev->archdata.
-> 
-> This is a good suggestion, Catalin. Thank you. See below. Is that what
-> you have in mind? Julien could you test it, please? If it is the right
-> approach, I'll submit the patch properly and rename __generic_dma_ops to
-> xen_generic_dma_ops or something.
+Hi Antoine,
+ 
+ On mer., mars 29 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 
-It looks fine to me (subject to testing successfully).
+> Add the description of the crypto engine hardware block for the Marvell
+> Armada 7k and Armada 8k processors; for both the CP110 slave and master.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+
+Applied on mvebu/dt64, I fixed a merge conflict with the current
+mvebu/dt64 and I took this opportunity to fix the lines over 80
+characters for the interrupts.
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 15 +++++++++++++++
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 15 +++++++++++++++
+>  2 files changed, 30 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 9a2ce2ae49cd..7530a1b541c5 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -210,6 +210,21 @@
+>  				clocks = <&cpm_syscon0 1 25>;
+>  				status = "okay";
+>  			};
+> +
+> +			cpm_crypto: crypto at 800000 {
+> +				compatible = "inside-secure,safexcel-eip197";
+> +				reg = <0x800000 0x200000>;
+> +				interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
+> +					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "mem", "ring0", "ring1",
+> +						  "ring2", "ring3", "eip";
+> +				clocks = <&cpm_syscon0 1 26>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		cpm_pcie0: pcie at f2600000 {
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index c9dfa244ebb6..6110d39087a6 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -210,6 +210,21 @@
+>  				clocks = <&cps_syscon0 1 25>;
+>  				status = "okay";
+>  			};
+> +
+> +			cps_crypto: crypto at 800000 {
+> +				compatible = "inside-secure,safexcel-eip197";
+> +				reg = <0x800000 0x200000>;
+> +				interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
+> +					     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "mem", "ring0", "ring1",
+> +						  "ring2", "ring3", "eip";
+> +				clocks = <&cps_syscon0 1 26>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		cps_pcie0: pcie at f4600000 {
+> -- 
+> 2.11.0
+>
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
