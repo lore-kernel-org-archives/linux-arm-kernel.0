@@ -1,48 +1,118 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 12 Apr 2017 14:48:34 +0800
-Subject: [PATCHv3 00/14] arm_pmu: ACPI support
-In-Reply-To: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <58EDCDC2.20706@huawei.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Wed, 12 Apr 2017 12:24:28 +0530
+Subject: [PATCH v4 2/3] Broadcom USB DRD Phy driver for Northstar2
+In-Reply-To: <1727318a-7ef8-1ea7-a657-241bbc96bc89@ti.com>
+References: <1490704052-11314-1-git-send-email-raviteja.garimella@broadcom.com>
+ <1490704052-11314-3-git-send-email-raviteja.garimella@broadcom.com>
+ <8aa2cc42-6fdc-5574-4449-f05f6d5cbd38@ti.com>
+ <CAEHZuqMpHMDMVL6XMxrSPC3zeXZ=-Wx=xTSON_CruXnVC5PsdA@mail.gmail.com>
+ <5f6d688b-7bbc-7b3c-2be8-fcea7853aae3@ti.com>
+ <CAEHZuqM7YUxtN9F+5qqZ6HHBqLP0DuwotQv9ZyaN5UtrsN7j5A@mail.gmail.com>
+ <1727318a-7ef8-1ea7-a657-241bbc96bc89@ti.com>
+Message-ID: <CAEHZuqPMY+XKUDYK32-FGc9N=e_zsrexPo6nrLvFRE8QoVugMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/4/11 16:39, Mark Rutland wrote:
+Hi,
+
+On Mon, Apr 10, 2017 at 2:07 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
 > Hi,
 >
-> This series implements ACPI support in the ARM PMU code. It borrows some code
-> from Jeremy's series [1], but takes a different approach to probing and
-> association, using the usual hotplug state machine, minimising external changes
-> required, and simplifying the relationship with the common arm_pmu code.
+> On Wednesday 05 April 2017 07:40 PM, Raviteja Garimella wrote:
+>> Hi Kishon,
+>>
+>> On Wed, Apr 5, 2017 at 7:04 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi Ravi,
+>>>
+>>> On Wednesday 05 April 2017 06:30 PM, Raviteja Garimella wrote:
+>>>> Hi Kishon,
+>>>>
+>>>> On Wed, Apr 5, 2017 at 4:30 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Tuesday 28 March 2017 05:57 PM, Raviteja Garimella wrote:
+>>>>>> This is driver for USB DRD Phy used in Broadcom's Northstar2
+>>>>>> SoC. The phy can be configured to be in Device mode or Host
+>>>>>> mode based on the type of cable connected to the port. The
+>>>>>> driver registers to  extcon framework to get appropriate
+>>>>>> connect events for Host/Device cables connect/disconnect
+>>>>>> states based on VBUS and ID interrupts.
+>>>>>
+>>>>> $patch should be phy: phy-bcm-ns2-usbdrd: USB DRD Phy driver for Broadcoms
+>>>>> Northstar2.
+>>>>>
+>>>>
+>>>> Will do.
+>>>>
+>>>>> Sorry for not letting you know this earlier. But I feel the design of the
+>>>>> driver should be changed. Extcon shouldn't be used here. The extcon
+>>>>> notifications should be sent to the consumer driver and the consumer driver
+>>>>> should be responsible for invoking the phy ops.
+>>>>>
+>>>>
+>>>> The consumer drivers here would be a UDC driver (USB device
+>>>> controller), EHCI and OHCI host controller drivers.
+>>>> I was already suggested in UDC driver review to deal with extcon in Phy driver.
+>>>>
+>>>> This phy connects to 2 host controllers, and one device controller.
+>>>> That's the design in Broadcom Northstar2
+>>>> platform. The values of the VBUS and ID pins of this port are
+>>>> determined based on the type of the cable (device cable
+>>>> or host cable). And. phy has to be configured accordingly.
+>>>>
+>>>>> The phy ops being invoked during extcon events doesn't look right.
+>>>>
+>>>> Could you please elaborate on the concern, so that we can think of
+>>>> mitigating those issues in this driver?
+>>>> Since we are dealing with phy init/shutdown in this driver itself, are
+>>>> you okay with moving the extcon handling code
+>>>> out of phy ops ?
+>>>
+>>> yeah, For e.g., ns2_drd_phy_init is part of phy_ops and is being invoked from
+>>> extcon events too. Can a phy which is initialized by a phy consumer (say your
+>>> UDC invokes phy_init) can be shutdown by an extcon event?
+>>>
+>>> Maybe a clear explanation of when phy_ops here will be invoked and when it will
+>>> set using extcon events might help.
+>>>
+>>
+>> Say, we have a USB pendrive which is connected to the DRD port through
+>> a host cable.
+>> Now the PHY will be initialized to be in host mode.
+>> When the pendrive is unplugged, and we now connect the NS2 device to
+>> some linux PC,
+>> now the PHY has to be shutdown, and re-initialized to be in Device mode.
+>>
+>> On unplug event, it is set neither to Host nor Device mode (basically
+>> shutdown). Next time which ever cable is connected, the PHY is
+>> initialized to the respective
+>> mode.
+>>
+>> Please let me know if it's fine to do these initializations outside
+>> phy ops, because those will
+>> be irrelevant for phy consumers (the controllers) as it's anyways
+>> dealt in the phy driver through
+>> extcon.
 >
-> The first few patches are preparatory cleanup/refactoring, with the latter half
-> of the series being specific to ACPI support.
+> Yes. We shouldn't add phy_ops just for the sake of it. I think this should be
+> made as a purely extcon driver (though there are a couple of bits that looks
+> like initializing PHY) and keep it in drivers/extcon.
 >
-> The series is based on Will's perf/updates branch [2]. I've pushed the whole
-> series out to the arm/perf/acpi branch [3] of my kernel.org repo.
->
-> Due to the innards of the hotplug callback framework, it's not entirely
-> safe to register a PMU in a hotplug callback. Due to this, we can only
-> associated hotplugged CPUs with a PMU if a matching CPU was around at
-> probe time. A similar restriction already applies to DT systems. We may
-> be able to relax this with some future work.
->
-> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
-> are correctly associated, I've tested with the following:
->
->   $ taskset -c ${SOME_CPU_HERE} perf record \
->     -e armv8_pmuv3_0/cpu_cycles/ \
->     -e armv8_pmuv3_1/cpu_cycles/ \
->     cat /proc/interrupts
->  
-> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
-> association logic. This has also been tested in a VM using PPIs; I do not have
-> access to a host machine which itself uses PPIs.
 
-Hisilicon D03 using PPIs, I tested this patch set on D03 and basic perf events
-work well.
+Actually phy_ops would be required when we want phy to be shutdown/init
+during power management, where USB controllers would call them.
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+I reworked on this driver to address the concerns raised here. Please check
+PATCH v5 that I will submit shortly.
+If we want to dynamically change the mode of PHY either to be in host mode
+or device mode or idle, we don't have to do a full PHY init/power on (that
+earlier required doing a PHY PLL lock and other resets). We just have to
+program couple of register bits that are dedicated for this purpose.
+I made those changes, now we don't have to call phy ops in the driver.
+Phy_ops will be called only by the consumer drivers.
 
-Thanks
-Hanjun
+Thanks,
+Ravi
+
+> Thanks
+> Kishon
