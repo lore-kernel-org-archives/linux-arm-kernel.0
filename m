@@ -1,53 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 12 Apr 2017 10:38:03 +0200
-Subject: [PATCH 7/7] arm64: defconfig: enable the Safexcel crypto engine
- as a module
-In-Reply-To: <20170329124432.27457-8-antoine.tenart@free-electrons.com>
- (Antoine Tenart's message of "Wed, 29 Mar 2017 14:44:32 +0200")
-References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
- <20170329124432.27457-8-antoine.tenart@free-electrons.com>
-Message-ID: <87shleggwk.fsf@free-electrons.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Wed, 12 Apr 2017 16:35:07 +0800
+Subject: [PATCH v3 8/8] arm64: exception: check shared writable page in
+ SEI handler
+In-Reply-To: <58E7B6BD.3000401@arm.com>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+ <1490869877-118713-9-git-send-email-xiexiuqi@huawei.com>
+ <58E7B6BD.3000401@arm.com>
+Message-ID: <5b914702-7262-54d5-2f64-0521a04add03@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On mer., mars 29 2017, Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
+Hi James,
 
-> The Safexcel EIP197 cryptographic engine is used on some Marvell SoCs,
-> such as Armada 7040 and Armada 8040. Enable this driver as a module in
-> the ARM64 defconfig.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-Applied on mvebu/defconfig64
-
+On 2017/4/7 23:56, James Morse wrote:
+> Hi Xie XiuQi,
+> 
+> On 30/03/17 11:31, Xie XiuQi wrote:
+>> From: Wang Xiongfeng <wangxiongfeng2@huawei.com>
+>>
+>> Since SEI is asynchronous, the error data has been consumed. So we must
+>> suppose that all the memory data current process can write are
+>> contaminated. If the process doesn't have shared writable pages, the
+>> process will be killed, and the system will continue running normally.
+>> Otherwise, the system must be terminated, because the error has been
+>> propagated to other processes running on other cores, and recursively
+>> the error may be propagated to several another processes.
+> 
+> This is pretty complicated. We can't guarantee that another CPU hasn't modified
+> the page tables while we do this, (so its racy). We can't guarantee that the
+> corrupt data hasn't been sent over the network or written to disk in the mean
+> time (so its not enough).
+> 
+> The scenario you have is a write of corrupt data to memory where another CPU
+> reading it doesn't know the value is corrupt.
+> 
+> The hardware gives us quite a lot of help containing errors. The RAS
+> specification (DDI 0587A) describes your scenario as error propagation in '2.1.2
+> Architectural error propagation', and then classifies it in '2.1.3
+> Architecturally infected, containable and uncontainable' as uncontained because
+> the value is no longer in the general-purpose registers. For uncontained errors
+> we should panic().
+> 
+> We shouldn't need to try to track errors after we get a notification as the
+> hardware has done this for us.
+> 
+Thanks for your comments. I think what you said is reasonable. We will remove this
+patch and use AET fields of ESR_ELx to determine whether we should kill current
+process or just panic.
+> 
+> Firmware-first does complicate this if events like this are not delivered using
+> a synchronous external abort, as Linux may have PSTATE.A masked preventing
+> SError Interrupts from being taken. It looks like PSTATE.A is masked much more
+> often than is necessary. I will look into cleaning this up.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> .
+> 
 Thanks,
-
-Gregory
-
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index fece4d3c2095..76308fa2fa7a 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -519,6 +519,7 @@ CONFIG_MEMTEST=y
->  CONFIG_SECURITY=y
->  CONFIG_CRYPTO_ECHAINIV=y
->  CONFIG_CRYPTO_ANSI_CPRNG=y
-> +CONFIG_CRYPTO_DEV_SAFEXCEL=m
->  CONFIG_ARM64_CRYPTO=y
->  CONFIG_CRYPTO_SHA1_ARM64_CE=y
->  CONFIG_CRYPTO_SHA2_ARM64_CE=y
-> -- 
-> 2.11.0
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Wang Xiongfeng
