@@ -1,49 +1,62 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Wed, 12 Apr 2017 12:58:16 +0000
-Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
-In-Reply-To: <20170412113251.nfyk5sw6c5pnpmwr@sirena.org.uk>
-References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
- <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
- <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
- <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
- <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
- <20170411211040.htrcedus3c57fbed@sirena.org.uk>
- <86a179ad-7961-18f7-8050-25e0e584c77d@st.com>
- <20170412113251.nfyk5sw6c5pnpmwr@sirena.org.uk>
-Message-ID: <d886a9c7-ca46-f37a-0e82-6ed8d7a4e052@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Apr 2017 15:05:58 +0200
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <0468e2fb-5a7d-97ec-c51c-2436a13dda69@st.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+ <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+ <20170321155054.2f4cb921@free-electrons.com>
+ <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
+ <20170402233028.60acf612@free-electrons.com>
+ <0468e2fb-5a7d-97ec-c51c-2436a13dda69@st.com>
+Message-ID: <20170412150558.57c865e5@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hello,
 
-On 04/12/2017 01:32 PM, Mark Brown wrote:
-> On Wed, Apr 12, 2017 at 08:30:31AM +0000, Olivier MOYSAN wrote:
->> On 04/11/2017 11:10 PM, Mark Brown wrote:
->
->>> That sounds wrong, I'd expect this wiring to be done statically as part
->>> of the .dtsi for the SoC (or just grabbed as needed at runtime if
->>> things are flexbile enough) rather than being a configuration thing done
->>> per board...  I had thought that this was configuration reflecting
->>> different ways of taping out the IP with different feature sets, is that
->>> not the case?
->
->> This configuration is board dependent. The IP may be used as rx, tx or
->> fd depending on board. So I think it can make sense to have a DMA
->> configuration linked to board, and to set IP mode accordingly.
->
-> It is totally normal to just not use one direction in a given system, we
-> don't normally need to do anything special to handle things.  I'm a bit
-> confused as to what's different here and needs configuring?
->
+Thanks again for your answer, sorry for the delay, I was away from the
+spear600 board for a while.
 
-The IP does not provide an audio channel configured either as rx or tx.
-I agree, that in such case, the cpu driver does not generally need
-to worry about direction and there is nothing special required to handle it.
+On Mon, 3 Apr 2017 08:16:50 +0200, Giuseppe CAVALLARO wrote:
 
-Here the IP provides 2 channels, 1 tx and 1 rx,  which may be active or 
-not. The driver has to know which channel is used, and if both channels
-have to be managed. The affected registers depend on selected channel. 
-Moreover specific processing has to be performed if both channels are used.
+> I tested the SMSC on other platform (+ stmmac), not on SPEAr.
 
-BRs
-olivier
+OK. But I believe there might be a SPEAr specific issue here, which
+might explain why you don't reproduce the problem.
+
+> ok for reset, keep the radar on clock. Hmm, can you attach a piece of 
+> log file to see the failure?
+
+During the boot, nothing bad:
+
+libphy: Fixed MDIO Bus: probed
+stmmaceth e0800000.ethernet: no reset control found
+stmmac - user ID: 0x10, Synopsys ID: 0x32
+ Ring mode enabled
+ DMA HW capability register supported Normal descriptors
+libphy: stmmac: probed
+eth0: PHY ID 0007c0c4 at 31 IRQ POLL (stmmac-0:1f) active
+
+Then, when upping the interface:
+
+# ifconfig eth0 up
+eth0: device MAC address 00:30:d3:21:22:60
+stmmaceth e0800000.ethernet: Failed to reset the dma
+stmmac_hw_setup: DMA engine initialization failed
+stmmac_open: Hw setup failed
+SIOCSIFFLAGS: Device or resource busy
+
+As I said earlier, the "Failed to reset the dma" is because
+dwmac_dma_reset() returns -EBUSY because the DMA reset bit never
+clears. Again, we see the same behavior in U-Boot (DMA reset bit never
+clears), but Ethernet does work in U-Boot.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
