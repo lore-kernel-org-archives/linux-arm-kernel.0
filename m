@@ -1,44 +1,100 @@
 From: ruxandra.radulescu@nxp.com (Ioana Radulescu)
-Date: Wed, 12 Apr 2017 11:25:36 -0500
-Subject: [PATCH v2 7/9] staging: fsl-dpaa2/eth: Add trace points
+Date: Wed, 12 Apr 2017 11:25:34 -0500
+Subject: [PATCH v2 5/9] staging: fsl-dpaa2/eth: Add ethtool support
 In-Reply-To: <20170412162538.25302-1-ruxandra.radulescu@nxp.com>
 References: <20170412162538.25302-1-ruxandra.radulescu@nxp.com>
-Message-ID: <20170412162538.25302-8-ruxandra.radulescu@nxp.com>
+Message-ID: <20170412162538.25302-6-ruxandra.radulescu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add trace events in significant places of the data path.
-Useful for debuggging.
+Add support for several ethtool operations: show hardware statistics,
+get/set link settings, get hash configuration.
 
 Signed-off-by: Ioana Radulescu <ruxandra.radulescu@nxp.com>
+Signed-off-by: Bogdan Hamciuc <bogdan.hamciuc@nxp.com>
 ---
 v2: no changes
 
- drivers/staging/fsl-dpaa2/ethernet/Makefile        |   3 +
- .../staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h   | 185 +++++++++++++++++++++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |  21 +++
- drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |   2 +
- 4 files changed, 211 insertions(+)
- create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
+ drivers/staging/fsl-dpaa2/ethernet/Makefile        |   2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |   6 +
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |   6 +
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c | 234 +++++++++++++++++++++
+ 4 files changed, 247 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
 
 diff --git a/drivers/staging/fsl-dpaa2/ethernet/Makefile b/drivers/staging/fsl-dpaa2/ethernet/Makefile
-index 4327ebe803cb..77b0b74f835a 100644
+index 4897d39a1c21..4327ebe803cb 100644
 --- a/drivers/staging/fsl-dpaa2/ethernet/Makefile
 +++ b/drivers/staging/fsl-dpaa2/ethernet/Makefile
-@@ -5,3 +5,6 @@
+@@ -4,4 +4,4 @@
+ 
  obj-$(CONFIG_FSL_DPAA2_ETH) += fsl-dpaa2-eth.o
  
- fsl-dpaa2-eth-objs    := dpaa2-eth.o dpaa2-ethtool.o dpni.o
+-fsl-dpaa2-eth-objs    := dpaa2-eth.o dpni.o
++fsl-dpaa2-eth-objs    := dpaa2-eth.o dpaa2-ethtool.o dpni.o
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+index abd700e57aeb..f13f72f3dd9a 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
+@@ -46,6 +46,8 @@ MODULE_LICENSE("Dual BSD/GPL");
+ MODULE_AUTHOR("Freescale Semiconductor, Inc");
+ MODULE_DESCRIPTION("Freescale DPAA2 Ethernet Driver");
+ 
++const char dpaa2_eth_drv_version[] = "0.1";
 +
-+# Needed by the tracing framework
-+CFLAGS_dpaa2-eth.o := -I$(src)
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
+ static void validate_rx_csum(struct dpaa2_eth_priv *priv,
+ 			     u32 fd_status,
+ 			     struct sk_buff *skb)
+@@ -1929,6 +1931,8 @@ int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags)
+ 		key->extract.from_hdr.type = DPKG_FULL_FIELD;
+ 		key->extract.from_hdr.field = hash_fields[i].cls_field;
+ 		cls_cfg.num_extracts++;
++
++		priv->rx_hash_fields |= hash_fields[i].rxnfc_field;
+ 	}
+ 
+ 	dma_mem = kzalloc(DPAA2_CLASSIFIER_DMA_SIZE, GFP_DMA | GFP_KERNEL);
+@@ -2360,6 +2364,8 @@ static int dpaa2_eth_probe(struct fsl_mc_device *dpni_dev)
+ 	if (err)
+ 		goto err_alloc_rings;
+ 
++	net_dev->ethtool_ops = &dpaa2_ethtool_ops;
++
+ 	err = setup_irqs(dpni_dev);
+ 	if (err) {
+ 		netdev_warn(net_dev, "Failed to set link interrupt, fall back to polling\n");
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+index 7b194a47df2f..b30231891eef 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+@@ -281,6 +281,9 @@ struct dpaa2_eth_priv {
+ 	struct dpni_link_state link_state;
+ 	bool do_link_poll;
+ 	struct task_struct *poll_thread;
++
++	/* enabled ethtool hashing bits */
++	u64 rx_hash_fields;
+ };
+ 
+ /* default Rx hash options, set during probing */
+@@ -294,6 +297,9 @@ struct dpaa2_eth_priv {
+ /* Required by struct dpni_rx_tc_dist_cfg::key_cfg_iova */
+ #define DPAA2_CLASSIFIER_DMA_SIZE 256
+ 
++extern const struct ethtool_ops dpaa2_ethtool_ops;
++extern const char dpaa2_eth_drv_version[];
++
+ int dpaa2_eth_set_hash(struct net_device *net_dev, u64 flags);
+ 
+ static int dpaa2_eth_queue_count(struct dpaa2_eth_priv *priv)
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
 new file mode 100644
-index 000000000000..3b040e8d6a4e
+index 000000000000..4378956a5527
 --- /dev/null
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth-trace.h
-@@ -0,0 +1,185 @@
-+/* Copyright 2014-2015 Freescale Semiconductor Inc.
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-ethtool.c
+@@ -0,0 +1,234 @@
++/* Copyright 2014-2016 Freescale Semiconductor Inc.
++ * Copyright 2016 NXP
 + *
 + * Redistribution and use in source and binary forms, with or without
 + * modification, are permitted provided that the following conditions are met:
@@ -69,232 +125,207 @@ index 000000000000..3b040e8d6a4e
 + * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 + */
 +
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM	dpaa2_eth
-+
-+#if !defined(_DPAA2_ETH_TRACE_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _DPAA2_ETH_TRACE_H
-+
-+#include <linux/skbuff.h>
-+#include <linux/netdevice.h>
++#include "dpni.h"	/* DPNI_LINK_OPT_* */
 +#include "dpaa2-eth.h"
-+#include <linux/tracepoint.h>
 +
-+#define TR_FMT "[%s] fd: addr=0x%llx, len=%u, off=%u"
-+/* trace_printk format for raw buffer event class */
-+#define TR_BUF_FMT "[%s] vaddr=%p size=%zu dma_addr=%pad map_size=%zu bpid=%d"
++/* To be kept in sync with DPNI statistics */
++char dpaa2_ethtool_stats[][ETH_GSTRING_LEN] = {
++	"rx frames",
++	"rx bytes",
++	"rx mcast frames",
++	"rx mcast bytes",
++	"rx bcast frames",
++	"rx bcast bytes",
++	"tx frames",
++	"tx bytes",
++	"tx mcast frames",
++	"tx mcast bytes",
++	"tx bcast frames",
++	"tx bcast bytes",
++	"rx filtered frames",
++	"rx discarded frames",
++	"rx nobuffer discards",
++	"tx discarded frames",
++	"tx confirmed frames",
++};
 +
-+/* This is used to declare a class of events.
-+ * individual events of this type will be defined below.
++#define DPAA2_ETH_NUM_STATS	ARRAY_SIZE(dpaa2_ethtool_stats)
++
++static void dpaa2_eth_get_drvinfo(struct net_device *net_dev,
++				  struct ethtool_drvinfo *drvinfo)
++{
++	strlcpy(drvinfo->driver, KBUILD_MODNAME, sizeof(drvinfo->driver));
++	strlcpy(drvinfo->version, dpaa2_eth_drv_version,
++		sizeof(drvinfo->version));
++	strlcpy(drvinfo->fw_version, "N/A", sizeof(drvinfo->fw_version));
++	strlcpy(drvinfo->bus_info, dev_name(net_dev->dev.parent->parent),
++		sizeof(drvinfo->bus_info));
++}
++
++static int
++dpaa2_eth_get_link_ksettings(struct net_device *net_dev,
++			     struct ethtool_link_ksettings *link_settings)
++{
++	struct dpni_link_state state = {0};
++	int err = 0;
++	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
++
++	err = dpni_get_link_state(priv->mc_io, 0, priv->mc_token, &state);
++	if (err) {
++		netdev_err(net_dev, "ERROR %d getting link state", err);
++		goto out;
++	}
++
++	/* At the moment, we have no way of interrogating the DPMAC
++	 * from the DPNI side - and for that matter there may exist
++	 * no DPMAC at all. So for now we just don't report anything
++	 * beyond the DPNI attributes.
++	 */
++	if (state.options & DPNI_LINK_OPT_AUTONEG)
++		link_settings->base.autoneg = AUTONEG_ENABLE;
++	if (!(state.options & DPNI_LINK_OPT_HALF_DUPLEX))
++		link_settings->base.duplex = DUPLEX_FULL;
++	link_settings->base.speed = state.rate;
++
++out:
++	return err;
++}
++
++static int
++dpaa2_eth_set_link_ksettings(struct net_device *net_dev,
++			     const struct ethtool_link_ksettings *link_settings)
++{
++	struct dpni_link_cfg cfg = {0};
++	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
++	int err = 0;
++
++	netdev_dbg(net_dev, "Setting link parameters...");
++
++	/* Due to a temporary MC limitation, the DPNI must be down
++	 * in order to be able to change link settings. Taking steps to let
++	 * the user know that.
++	 */
++	if (netif_running(net_dev)) {
++		netdev_info(net_dev, "Sorry, interface must be brought down first.\n");
++		return -EACCES;
++	}
++
++	cfg.rate = link_settings->base.speed;
++	if (link_settings->base.autoneg == AUTONEG_ENABLE)
++		cfg.options |= DPNI_LINK_OPT_AUTONEG;
++	else
++		cfg.options &= ~DPNI_LINK_OPT_AUTONEG;
++	if (link_settings->base.duplex  == DUPLEX_HALF)
++		cfg.options |= DPNI_LINK_OPT_HALF_DUPLEX;
++	else
++		cfg.options &= ~DPNI_LINK_OPT_HALF_DUPLEX;
++
++	err = dpni_set_link_cfg(priv->mc_io, 0, priv->mc_token, &cfg);
++	if (err)
++		/* ethtool will be loud enough if we return an error; no point
++		 * in putting our own error message on the console by default
++		 */
++		netdev_dbg(net_dev, "ERROR %d setting link cfg", err);
++
++	return err;
++}
++
++static void dpaa2_eth_get_strings(struct net_device *netdev, u32 stringset,
++				  u8 *data)
++{
++	u8 *p = data;
++	int i;
++
++	switch (stringset) {
++	case ETH_SS_STATS:
++		for (i = 0; i < DPAA2_ETH_NUM_STATS; i++) {
++			strlcpy(p, dpaa2_ethtool_stats[i], ETH_GSTRING_LEN);
++			p += ETH_GSTRING_LEN;
++		}
++		break;
++	}
++}
++
++static int dpaa2_eth_get_sset_count(struct net_device *net_dev, int sset)
++{
++	switch (sset) {
++	case ETH_SS_STATS: /* ethtool_get_stats(), ethtool_get_drvinfo() */
++		return DPAA2_ETH_NUM_STATS;
++	default:
++		return -EOPNOTSUPP;
++	}
++}
++
++/** Fill in hardware counters, as returned by MC.
 + */
++static void dpaa2_eth_get_ethtool_stats(struct net_device *net_dev,
++					struct ethtool_stats *stats,
++					u64 *data)
++{
++	int i = 0;
++	int j, k, err;
++	int num_cnt;
++	union dpni_statistics dpni_stats;
++	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
 +
-+/* Store details about a frame descriptor */
-+DECLARE_EVENT_CLASS(dpaa2_eth_fd,
-+		    /* Trace function prototype */
-+		    TP_PROTO(struct net_device *netdev,
-+			     const struct dpaa2_fd *fd),
++	memset(data, 0, sizeof(u64) * DPAA2_ETH_NUM_STATS);
 +
-+		    /* Repeat argument list here */
-+		    TP_ARGS(netdev, fd),
++	/* Print standard counters, from DPNI statistics */
++	for (j = 0; j <= 2; j++) {
++		err = dpni_get_statistics(priv->mc_io, 0, priv->mc_token,
++					  j, &dpni_stats);
++		if (err != 0)
++			netdev_warn(net_dev, "dpni_get_stats(%d) failed", j);
++		switch (j) {
++		case 0:
++			num_cnt = sizeof(dpni_stats.page_0) / sizeof(u64);
++			break;
++		case 1:
++			num_cnt = sizeof(dpni_stats.page_1) / sizeof(u64);
++			break;
++		case 2:
++			num_cnt = sizeof(dpni_stats.page_2) / sizeof(u64);
++			break;
++		default:
++			break;
++		}
++		for (k = 0; k < num_cnt; k++)
++			*(data + i++) = dpni_stats.raw.counter[k];
++	}
++}
 +
-+		    /* A structure containing the relevant information we want
-+		     * to record. Declare name and type for each normal element,
-+		     * name, type and size for arrays. Use __string for variable
-+		     * length strings.
-+		     */
-+		    TP_STRUCT__entry(
-+				     __field(u64, fd_addr)
-+				     __field(u32, fd_len)
-+				     __field(u16, fd_offset)
-+				     __string(name, netdev->name)
-+		    ),
++static int dpaa2_eth_get_rxnfc(struct net_device *net_dev,
++			       struct ethtool_rxnfc *rxnfc, u32 *rule_locs)
++{
++	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
 +
-+		    /* The function that assigns values to the above declared
-+		     * fields
-+		     */
-+		    TP_fast_assign(
-+				   __entry->fd_addr = dpaa2_fd_get_addr(fd);
-+				   __entry->fd_len = dpaa2_fd_get_len(fd);
-+				   __entry->fd_offset = dpaa2_fd_get_offset(fd);
-+				   __assign_str(name, netdev->name);
-+		    ),
++	switch (rxnfc->cmd) {
++	case ETHTOOL_GRXFH:
++		/* we purposely ignore cmd->flow_type for now, because the
++		 * classifier only supports a single set of fields for all
++		 * protocols
++		 */
++		rxnfc->data = priv->rx_hash_fields;
++		break;
++	case ETHTOOL_GRXRINGS:
++		rxnfc->data = dpaa2_eth_queue_count(priv);
++		break;
++	default:
++		return -EOPNOTSUPP;
++	}
 +
-+		    /* This is what gets printed when the trace event is
-+		     * triggered.
-+		     */
-+		    TP_printk(TR_FMT,
-+			      __get_str(name),
-+			      __entry->fd_addr,
-+			      __entry->fd_len,
-+			      __entry->fd_offset)
-+);
++	return 0;
++}
 +
-+/* Now declare events of the above type. Format is:
-+ * DEFINE_EVENT(class, name, proto, args), with proto and args same as for class
-+ */
-+
-+/* Tx (egress) fd */
-+DEFINE_EVENT(dpaa2_eth_fd, dpaa2_tx_fd,
-+	     TP_PROTO(struct net_device *netdev,
-+		      const struct dpaa2_fd *fd),
-+
-+	     TP_ARGS(netdev, fd)
-+);
-+
-+/* Rx fd */
-+DEFINE_EVENT(dpaa2_eth_fd, dpaa2_rx_fd,
-+	     TP_PROTO(struct net_device *netdev,
-+		      const struct dpaa2_fd *fd),
-+
-+	     TP_ARGS(netdev, fd)
-+);
-+
-+/* Tx confirmation fd */
-+DEFINE_EVENT(dpaa2_eth_fd, dpaa2_tx_conf_fd,
-+	     TP_PROTO(struct net_device *netdev,
-+		      const struct dpaa2_fd *fd),
-+
-+	     TP_ARGS(netdev, fd)
-+);
-+
-+/* Log data about raw buffers. Useful for tracing DPBP content. */
-+TRACE_EVENT(dpaa2_eth_buf_seed,
-+	    /* Trace function prototype */
-+	    TP_PROTO(struct net_device *netdev,
-+		     /* virtual address and size */
-+		     void *vaddr,
-+		     size_t size,
-+		     /* dma map address and size */
-+		     dma_addr_t dma_addr,
-+		     size_t map_size,
-+		     /* buffer pool id, if relevant */
-+		     u16 bpid),
-+
-+	    /* Repeat argument list here */
-+	    TP_ARGS(netdev, vaddr, size, dma_addr, map_size, bpid),
-+
-+	    /* A structure containing the relevant information we want
-+	     * to record. Declare name and type for each normal element,
-+	     * name, type and size for arrays. Use __string for variable
-+	     * length strings.
-+	     */
-+	    TP_STRUCT__entry(
-+			     __field(void *, vaddr)
-+			     __field(size_t, size)
-+			     __field(dma_addr_t, dma_addr)
-+			     __field(size_t, map_size)
-+			     __field(u16, bpid)
-+			     __string(name, netdev->name)
-+	    ),
-+
-+	    /* The function that assigns values to the above declared
-+	     * fields
-+	     */
-+	    TP_fast_assign(
-+			   __entry->vaddr = vaddr;
-+			   __entry->size = size;
-+			   __entry->dma_addr = dma_addr;
-+			   __entry->map_size = map_size;
-+			   __entry->bpid = bpid;
-+			   __assign_str(name, netdev->name);
-+	    ),
-+
-+	    /* This is what gets printed when the trace event is
-+	     * triggered.
-+	     */
-+	    TP_printk(TR_BUF_FMT,
-+		      __get_str(name),
-+		      __entry->vaddr,
-+		      __entry->size,
-+		      &__entry->dma_addr,
-+		      __entry->map_size,
-+		      __entry->bpid)
-+);
-+
-+/* If only one event of a certain type needs to be declared, use TRACE_EVENT().
-+ * The syntax is the same as for DECLARE_EVENT_CLASS().
-+ */
-+
-+#endif /* _DPAA2_ETH_TRACE_H */
-+
-+/* This must be outside ifdef _DPAA2_ETH_TRACE_H */
-+#undef TRACE_INCLUDE_PATH
-+#define TRACE_INCLUDE_PATH .
-+#undef TRACE_INCLUDE_FILE
-+#define TRACE_INCLUDE_FILE	dpaa2-eth-trace
-+#include <trace/define_trace.h>
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-index 67f007bdbe79..6f9eed66c64d 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c
-@@ -42,6 +42,12 @@
- #include "../../fsl-mc/include/mc-sys.h"
- #include "dpaa2-eth.h"
- 
-+/* CREATE_TRACE_POINTS only needs to be defined once. Other dpa files
-+ * using trace events only need to #include <trace/events/sched.h>
-+ */
-+#define CREATE_TRACE_POINTS
-+#include "dpaa2-eth-trace.h"
-+
- MODULE_LICENSE("Dual BSD/GPL");
- MODULE_AUTHOR("Freescale Semiconductor, Inc");
- MODULE_DESCRIPTION("Freescale DPAA2 Ethernet Driver");
-@@ -213,6 +219,9 @@ static void dpaa2_eth_rx(struct dpaa2_eth_priv *priv,
- 	struct dpaa2_fas *fas;
- 	u32 status = 0;
- 
-+	/* Tracing point */
-+	trace_dpaa2_rx_fd(priv->net_dev, fd);
-+
- 	dma_unmap_single(dev, addr, DPAA2_ETH_RX_BUF_SIZE, DMA_FROM_DEVICE);
- 	vaddr = phys_to_virt(addr);
- 
-@@ -583,6 +592,9 @@ static int dpaa2_eth_tx(struct sk_buff *skb, struct net_device *net_dev)
- 		goto err_build_fd;
- 	}
- 
-+	/* Tracing point */
-+	trace_dpaa2_tx_fd(net_dev, &fd);
-+
- 	/* TxConf FQ selection primarily based on cpu affinity; this is
- 	 * non-migratable context, so it's safe to call smp_processor_id().
- 	 */
-@@ -623,6 +635,9 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
- 	struct dpaa2_eth_drv_stats *percpu_extras;
- 	u32 status = 0;
- 
-+	/* Tracing point */
-+	trace_dpaa2_tx_conf_fd(priv->net_dev, fd);
-+
- 	percpu_extras = this_cpu_ptr(priv->percpu_extras);
- 	percpu_extras->tx_conf_frames++;
- 	percpu_extras->tx_conf_bytes += dpaa2_fd_get_len(fd);
-@@ -707,6 +722,12 @@ static int add_bufs(struct dpaa2_eth_priv *priv, u16 bpid)
- 			goto err_map;
- 
- 		buf_array[i] = addr;
-+
-+		/* tracing point */
-+		trace_dpaa2_eth_buf_seed(priv->net_dev,
-+					 buf, DPAA2_ETH_BUF_RAW_SIZE,
-+					 addr, DPAA2_ETH_RX_BUF_SIZE,
-+					 bpid);
- 	}
- 
- release_bufs:
-diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-index f2b0a60795fe..c67cced55b72 100644
---- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-+++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
-@@ -43,6 +43,8 @@
- #include "dpni.h"
- #include "dpni-cmd.h"
- 
-+#include "dpaa2-eth-trace.h"
-+
- #define DPAA2_ETH_STORE_SIZE		16
- 
- /* Maximum number of scatter-gather entries in an ingress frame,
++const struct ethtool_ops dpaa2_ethtool_ops = {
++	.get_drvinfo = dpaa2_eth_get_drvinfo,
++	.get_link = ethtool_op_get_link,
++	.get_link_ksettings = dpaa2_eth_get_link_ksettings,
++	.set_link_ksettings = dpaa2_eth_set_link_ksettings,
++	.get_sset_count = dpaa2_eth_get_sset_count,
++	.get_ethtool_stats = dpaa2_eth_get_ethtool_stats,
++	.get_strings = dpaa2_eth_get_strings,
++	.get_rxnfc = dpaa2_eth_get_rxnfc,
++};
 -- 
 2.11.0
