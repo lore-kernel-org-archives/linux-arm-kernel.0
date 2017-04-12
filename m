@@ -1,44 +1,26 @@
-From: raviteja.garimella@broadcom.com (Raviteja Garimella)
-Date: Wed, 12 Apr 2017 12:42:05 +0530
-Subject: [PATCH v5 3/3] DT nodes for Broadcom Northstar2 USB DRD Phy
-In-Reply-To: <1491981125-6859-1-git-send-email-raviteja.garimella@broadcom.com>
-References: <1491981125-6859-1-git-send-email-raviteja.garimella@broadcom.com>
-Message-ID: <1491981125-6859-4-git-send-email-raviteja.garimella@broadcom.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 12 Apr 2017 09:42:57 +0200
+Subject: [PATCH v3 01/20] net: stmmac: export
+ stmmac_set_mac_addr/stmmac_get_mac_addr
+In-Reply-To: <9514c077-1738-ea49-ca18-fbc46bac6144@st.com>
+References: <20170403091444.29876-1-clabbe.montjoie@gmail.com>
+ <20170403091444.29876-2-clabbe.montjoie@gmail.com>
+ <9514c077-1738-ea49-ca18-fbc46bac6144@st.com>
+Message-ID: <20170412074257.GC11170@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree nodes for USB Dual Role Device Phy for
-Broadcom's Northstar2 SoC.
+On Mon, Apr 03, 2017 at 02:39:03PM +0200, Giuseppe CAVALLARO wrote:
+> Hello Alex
+> 
+> do you can check if this has to be done for ST platforms?
+> I do not remember that it was necessary when build as module so
+> I cannot expect this should be only for dwmac-sun8i.
+> 
+> Regards
+> peppe
+> 
 
-Signed-off-by: Raviteja Garimella <raviteja.garimella@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+dwmac-sun8i is simply the first "user" of stmmac_[sg]et_mac_addr outside of stmmac-objs
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index bcb03fc..c71f330 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -436,6 +436,20 @@
- 			};
- 		};
- 
-+		usbdrd_phy: phy at 66000960 {
-+			#phy-cells = <0>;
-+			compatible = "brcm,ns2-drd-phy";
-+			reg = <0x66000960 0x24>,
-+			      <0x67012800 0x4>,
-+			      <0x6501d148 0x4>,
-+			      <0x664d0700 0x4>;
-+			reg-names = "icfg", "rst-ctrl",
-+				    "crmu-ctrl", "usb2-strap";
-+			id-gpios = <&gpio_g 30 0>;
-+			vbus-gpios = <&gpio_g 31 0>;
-+			status = "disabled";
-+		};
-+
- 		pwm: pwm at 66010000 {
- 			compatible = "brcm,iproc-pwm";
- 			reg = <0x66010000 0x28>;
--- 
-2.1.0
+Regards
