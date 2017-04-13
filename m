@@ -1,92 +1,62 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 13 Apr 2017 15:04:19 +0100
-Subject: "Consolidate get_dma_ops" breaks Xen on ARM
-In-Reply-To: <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
-References: <alpine.DEB.2.10.1704101713080.2759@sstabellini-ThinkPad-X260>
- <CY1PR0401MB1536C1FF3C069BC88D1DB14581000@CY1PR0401MB1536.namprd04.prod.outlook.com>
- <a758dfc6-2b00-e279-303c-ba1e27380e35@arm.com>
- <20170411133649.GB27857@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
-Message-ID: <47808787-8067-ccc0-0ec6-de5e0d7597c8@arm.com>
+From: c.jayachandran@gmail.com (Jayachandran C.)
+Date: Thu, 13 Apr 2017 19:36:45 +0530
+Subject: [PATCHv3 13/14] arm64: pmuv3: handle !PMUv3 when probing
+In-Reply-To: <1491899997-32210-14-git-send-email-mark.rutland@arm.com>
+References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+ <1491899997-32210-14-git-send-email-mark.rutland@arm.com>
+Message-ID: <CA+7sy7AA+SX_YUNAgCL5tyBXGW+rUidaApN7D2g3O0maRNcKSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-Sorry for the late answer.
-
-On 12/04/17 00:39, Stefano Stabellini wrote:
-> On Tue, 11 Apr 2017, Catalin Marinas wrote:
->> On Tue, Apr 11, 2017 at 01:43:28PM +0100, Julien Grall wrote:
->>> On 11/04/17 02:14, Bart Van Assche wrote:
->>>> On 04/10/17 17:31, Stefano Stabellini wrote:
->>>>> I think the reason is that, as you can see, if (dev && dev->dma_ops),
->>>>> dev->dma_ops is returned, while before this changes, xen_dma_ops was
->>>>> returned on Xen on ARM.
->>>>>
->>>>> Unfortunately DMA cannot work properly without using the appropriate
->>>>> xen_dma_ops. See drivers/xen/swiotlb-xen.c and arch/arm/xen/mm.c for
->>>>> more details. (The problem is easy to spot, but I wasn't CC'ed on the
->>>>> patch.)
->>>>>
->>>>> I don't know how to solve this problem without introducing some sort of
->>>>> if (xen()) in include/linux/dma-mapping.h.
->>>>
->>>> Sorry but I don't have access to an ARM development system. Does your
->>>> comment apply to dev == NULL only, dev != NULL only or perhaps to both?
->>>> If your comment applies to dev != NULL only, can you check whether
->>>> adding something like set_dma_ops(dev, get_arch_dma_ops(NULL)) to the
->>>> appropriate ARM arch_setup_dma_ops() function is sufficient?
->>>
->>> If I understand correctly, set_dma_ops will replace dev->dma_ops with
->>> Xen DMA ops.
->>>
->>> However, Xen DMA ops will need in some places to call the device
->>> specific DMA ops (see __generic_dma_ops(...)). So I think replacing
->>> dev->dma_ops is not a solution here.
->>>
->>> The hackish patch below is fixing the problem for both ARM64 and ARM32.
->>>
->>> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
->>> index 0977317c6835..43a73ddeec7a 100644
->>> --- a/include/linux/dma-mapping.h
->>> +++ b/include/linux/dma-mapping.h
->>> @@ -174,6 +174,8 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
->>>  #include <asm/dma-mapping.h>
->>>  static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
->>>  {
->>> +       if (xen_initial_domain())
->>> +              return xen_dma_ops;
->>>         if (dev && dev->dma_ops)
->>>                 return dev->dma_ops;
->>>         return get_arch_dma_ops(dev ? dev->bus : NULL);
->>
->> If we do this, I guess there is no need to check for
->> xen_initial_domain() in the get_arch_dma_ops() function. Anyway, this
->> hunk would break the other architectures since xen_dma_ops is only
->> defined for arm and arm64.
->>
->>> It is not nice as this is common code, but I can't find a better solution
->>> so far. Any opinions?
->>
->> A different hack would be to avoid the generic get_dma_ops
->> implementation on arm with some #ifdef hacks above.
->>
->> Yet another way would be for dom0 to always set dev->dma_ops to
->> xen_dma_ops and preserve the real dma_ops somewhere under dev->archdata.
->> You could intercept the arch_setup_dma_ops() function for this or use
->> bus_register_notifier() (though I think the former is easier). The Xen
->> code making use of the real dma_ops would have to dig them out from
->> dev->archdata.
+On Tue, Apr 11, 2017 at 2:09 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
+> compatible PMU. Thus we need to consult ID registers during probe time.
 >
-> This is a good suggestion, Catalin. Thank you. See below. Is that what
-> you have in mind? Julien could you test it, please? If it is the right
-> approach, I'll submit the patch properly and rename __generic_dma_ops to
-> xen_generic_dma_ops or something.
+> This patch updates our PMUv3 probing code to test for the presence of
+> PMUv3 functionality before touching an PMUv3-specific registers, and
+> before updating the struct arm_pmu with PMUv3 data.
+>
+> When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 87 ++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 71 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 57ae9d9..53f2354 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -957,11 +957,26 @@ static int armv8_vulcan_map_event(struct perf_event *event)
+>                                 ARMV8_PMU_EVTYPE_EVENT);
+>  }
+>
+> +struct armv8pmu_probe_info {
+> +       struct arm_pmu *pmu;
+> +       bool present;
+> +};
+> +
+>  static void __armv8pmu_probe_pmu(void *info)
+>  {
+> -       struct arm_pmu *cpu_pmu = info;
+> +       struct armv8pmu_probe_info *probe = info;
+> +       struct arm_pmu *cpu_pmu = probe->pmu;
+> +       u64 dfr0, pmuver;
+>         u32 pmceid[2];
+>
+> +       dfr0 = read_sysreg(id_aa64dfr0_el1);
+> +       pmuver = cpuid_feature_extract_unsigned_field(dfr0,
+> +                       ID_AA64DFR0_PMUVER_SHIFT);
+> +       if (pmuver != 1)
+> +               return;
 
-This patch is fixing the bug I encountered.
+There is a problem here, the 8.1 spec allows PMUver value 4 for PMUv3
+"Performance Monitors extension System registers implemented, PMUv3,
+with a 16-bit evtCount field, and if EL2 is implemented, the addition
+of the MDCR_EL2.HPMD bit"
 
-Cheers,
+On Broadcom Vulcan/Cavium ThunderX2 the value of PMUver is 4 and this
+breaks (even the working DT case if I am not mistaken).
 
--- 
-Julien Grall
+JC.
