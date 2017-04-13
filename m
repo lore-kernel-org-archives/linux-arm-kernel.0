@@ -1,86 +1,86 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 13 Apr 2017 09:35:15 -0500
-Subject: [PATCH] tty: pl011: use "qdf2400_e44" as the earlycon name for
- QDF2400 E44
-In-Reply-To: <1492091708-30593-1-git-send-email-timur@codeaurora.org>
-References: <1492091708-30593-1-git-send-email-timur@codeaurora.org>
-Message-ID: <f546e63c-06a6-3027-8483-eb76f8b76c15@codeaurora.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 13 Apr 2017 22:37:27 +0800
+Subject: [RFC PATCH 2/3] clk: add managed version of clk_bulk_get
+In-Reply-To: <1491969809-20154-3-git-send-email-aisheng.dong@nxp.com>
+References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+ <1491969809-20154-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170413143727.GE24254@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
-
-
-On 04/13/2017 08:55 AM, Timur Tabi wrote:
-> Define a new early console name for Qualcomm Datacenter Technologies
-> QDF2400 SOCs affected by erratum 44, instead of piggy-backing on "pl011".
-> Previously, to enable traditional (non-SPCR) earlycon, the documentation
-> said to specify "earlycon=pl011,<address>,qdf2400_e44", but the code was
-> broken and this didn't actually work.
->
-> So instead, the method for specifying the E44 work-around with traditional
-> earlycon is "earlycon=qdf2400_e44,<address>".  Both methods of earlycon
-> are now enabled with the same function.
->
-> Fixes: e53e597fd4c4 ("tty: pl011: fix earlycon work-around for QDF2400 erratum 44")
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
-
-
+On Wed, Apr 12, 2017 at 12:03:28PM +0800, Dong Aisheng wrote:
+> This patch introduces the managed version of clk_bulk_get.
+> 
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Anson Huang <anson.huang@nxp.com>
+> Cc: Robin Gong <yibin.gong@nxp.com>
+> Cc: Bai Ping <ping.bai@nxp.com>
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: Octavian Purdila <octavian.purdila@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  drivers/tty/serial/amba-pl011.c | 31 +++++++++++++++++++++++--------
->  1 file changed, 23 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 2783539..0875f7d 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2470,19 +2470,34 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
->  	if (!device->port.membase)
->  		return -ENODEV;
->  
-> -	/* On QDF2400 SOCs affected by Erratum 44, the "qdf2400_e44" must
-> -	 * also be specified, e.g. "earlycon=pl011,<address>,qdf2400_e44".
-> -	 */
-> -	if (!strcmp(device->options, "qdf2400_e44"))
-> -		device->con->write = qdf2400_e44_early_write;
-> -	else
-> -		device->con->write = pl011_early_write;
-> +	device->con->write = pl011_early_write;
->  
->  	return 0;
+>  drivers/clk/clk-devres.c | 36 ++++++++++++++++++++++++++++++++++++
+>  include/linux/clk.h      | 22 +++++++++++++++++++++-
+>  2 files changed, 57 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+> index 3a218c3..c7fb31d 100644
+> --- a/drivers/clk/clk-devres.c
+> +++ b/drivers/clk/clk-devres.c
+> @@ -34,6 +34,42 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
 >  }
->  OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
->  OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
-> -EARLYCON_DECLARE(qdf2400_e44, pl011_early_console_setup);
-> +
-> +/*
-> + * On Qualcomm Datacenter Technologies QDF2400 SOCs affected by
-> + * Erratum 44, traditional earlycon can be enabled by specifying
-> + * "earlycon=qdf2400_e44,<address>".  Any options are ignored.
-> + *
-> + * Alternatively, you can just specify "earlycon", and the early console
-> + * will be enabled with the information from the SPCR table.  In this
-> + * case, the SPCR code will detect the need for the E44 work-around,
-> + * and set the console name to "qdf2400_e44".
-> + */
-> +static int __init
-> +qdf2400_e44_early_console_setup(struct earlycon_device *device,
-> +				const char *opt)
-> +{
-> +	if (!device->port.membase)
-> +		return -ENODEV;
-> +
-> +	device->con->write = qdf2400_e44_early_write;
-> +	return 0;
-> +}
-> +EARLYCON_DECLARE(qdf2400_e44, qdf2400_e44_early_console_setup);
+>  EXPORT_SYMBOL(devm_clk_get);
 >  
->  #else
->  #define AMBA_CONSOLE	NULL
+> +struct clk_bulk_devres {
+> +	struct clk_bulk_data *clks;
+> +	int num_clks;
+> +};
+> +
+> +static void devm_clk_bulk_release(struct device *dev, void *res)
+> +{
+> +	struct clk_bulk_devres *devres = res;
+> +
+> +	clk_bulk_put(devres->num_clks, devres->clks);
+> +}
+> +
+> +int devm_clk_bulk_get(struct device *dev, int num_clks,
+> +		      struct clk_bulk_data *clks)
+> +{
+> +	struct clk_bulk_devres *devres;
+> +	int ret;
+> +
+> +	devres = devres_alloc(devm_clk_bulk_release,
+> +			      sizeof(*devres), GFP_KERNEL);
+> +	if (!devres)
+> +		return -ENOMEM;
+> +
+> +	ret = clk_bulk_get(dev, num_clks, clks);
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+Another catch by 0day robot.
+
+   drivers/built-in.o: In function `devm_clk_bulk_get':
+>> (.text+0x1930e): undefined reference to `clk_bulk_get'
+   drivers/built-in.o: In function `devm_clk_bulk_release':
+>> clk-devres.c:(.text+0x19370): undefined reference to `clk_bulk_put'
+
+clk_bulk_get is defined in clkdev.c which depends on CONFIG_CLKDEV_LOOKUP.
+However, some platforms like m68k may not select CLKDEV_LOOKUP but
+select HAVE_CLK. Thus compiling devm_clk_bulk_get may cause a undefined
+reference to 'clk_bulk_get'.
+
+Since clk_bulk_get is built upon the platform specific clk_get api,
+clk_bulk_get can also be used by that platform accordingly.
+
+Then we probably could move clk_bulk_get into clk-devres.c as well which
+is controlled by common CONFIG_HAVE_CLK to benifit all platforms.
+
+Regards
+Dong Aisheng
