@@ -1,96 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 13 Apr 2017 15:35:30 +0800
-Subject: [PATCH 1/3] clk: sunxi-ng: Add clk notifier to gate then ungate
- PLL clocks
-In-Reply-To: <20170413070209.kjpv27fqc4o4znqs@lukather>
-References: <20170413021354.3258-1-wens@csie.org>
- <20170413021354.3258-2-wens@csie.org>
- <20170413070209.kjpv27fqc4o4znqs@lukather>
-Message-ID: <CAGb2v64z9+FyozKf=O4ASFrEgZoeGJVBSNR6NsnyP4dHgYZqfw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 13 Apr 2017 08:39:12 +0100
+Subject: [PATCH 1/2] drivers: pci: do not disregard parent resources
+ starting at 0x0
+In-Reply-To: <20170412132423.GA6584@red-moon>
+References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
+ <20170411163313.18577-2-ard.biesheuvel@linaro.org>
+ <20170412132423.GA6584@red-moon>
+Message-ID: <CAKv+Gu9JrU=-SZQcTtFfOP423gVTyM1w9yF=_J1uGd74ntpwLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 3:02 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
+On 12 April 2017 at 14:24, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> [+Yinghai, Bjorn]
 >
-> On Thu, Apr 13, 2017 at 10:13:52AM +0800, Chen-Yu Tsai wrote:
->> In common PLL designs, changes to the dividers take effect almost
->> immediately, while changes to the multipliers (implemented as
->> dividers in the feedback loop) take a few cycles to work into
->> the feedback loop for the PLL to stablize.
+> On Tue, Apr 11, 2017 at 05:33:12PM +0100, Ard Biesheuvel wrote:
+>> Commit f44116ae8818 ("PCI: Remove pci_find_parent_resource() use for
+>> allocation") updated the logic that iterates over all bus resources
+>> and compares them to a given resource, in order to decide whether one
+>> is the parent of the latter.
 >>
->> Sometimes when the PLL clock rate is changed, the decrease in the
->> divider is too much for the decrease in the multiplier to catch up.
->> The PLL clock rate will spike, and in some cases, might lock up
->> completely. This is especially the case if the divider changed is
->> the pre-divider, which affects the reference frequency.
+>> This change inadvertently causes pci_find_parent_resource() to disregard
+>> resources starting at address 0x0, resulting in an error such as the one
+>> below on ARM systems whose I/O window starts at 0x0.
 >>
->> This patch introduces a clk notifier callback that will gate and
->> then ungate a clk after a rate change, effectively resetting it,
->> so it continues to work, despite any possible lockups. Care must
->> be taken to reparent any consumers to other temporary clocks during
->> the rate change, and that this notifier callback must be the first
->> to be registered.
+>> pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff window]
+>> pci_bus 0000:00: root bus resource [io  0x0000-0xffff window]
+>> pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff window]
+>> pci_bus 0000:00: root bus resource [bus 00-0f]
+>> pci 0000:00:01.0: PCI bridge to [bus 01]
+>> pci 0000:00:02.0: PCI bridge to [bus 02]
+>> pci 0000:00:03.0: PCI bridge to [bus 03]
+>> pci 0000:00:03.0: can't claim BAR 13 [io  0x0000-0x0fff]: no compatible bridge window
+>> pci 0000:03:01.0: can't claim BAR 0 [io  0x0000-0x001f]: no compatible bridge window
 >>
->> This is intended to fix occasional lockups with cpufreq on newer
->> Allwinner SoCs, such as the A33 and the H3. Previously it was
->> thought that reparenting the cpu clock away from the PLL while
->> it stabilized was enough, as this worked quite well on the A31.
+>> While this never happens on x86, it is perfectly legal in general for a
+>> PCI MMIO or IO window to start at address 0x0, and it was supported in
+>> the code before commit f44116ae8818.
 >>
->> On the A33, hangs have been observed after cpufreq was recently
->> introduced. With the H3, a more thorough test [1] showed that
->> reparenting alone isn't enough. The system still locks up unless
->> the dividers are limited to 1.
+>> So let's drop the test for res->start != 0; resource_contains() already
+>> checks whether [start, end) completely covers the resource, and so it
+>> should be redundant.
 >>
->> A hunch was if the PLL was stuck in some unknown state, perhaps
->> gating then ungating it would bring it back to normal. Tests
->> done by Icenowy Zheng using Ondrej's test firmware shows this
->> to be a valid solution.
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg552501.html
->>
->> Reported-by: Ondrej Jirman <megous@megous.com>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> Tested-by: Icenowy Zheng <icenowy@aosc.io>
->> Tested-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> Fixes: f44116ae8818 ("PCI: Remove pci_find_parent_resource() use for allocation")
 >
-> Thanks for looking into this, and coming up with a clean solution, and
-> a great commit log.
+> I know this code fixes IO claiming on ARM/ARM64 (well, it fixes nothing
+> because we never claim resources on ARM/ARM64 apart from kvmtool and
+> generic host bridge), my _big_ worry is that it can cause endless
+> regressions on other arches, in any case I would be really really
+> careful about adding a Fixes: tag to it.
 >
-> However, I wondering, isn't that notifier just a re-implementation of
-> CLK_SET_RATE_GATE?
 
-They are not the same. AFAIK, CLK_SET_RATE_GATE tells the clk framework
-that this clk's rate cannot be changed if it is enabled (which means
-some one is using it). However the clk framework does nothing to
-actually handle it. It just returns an error. Any consumers are
-responsible for gating the clock before making changes. This is a nice
-thing to have, as it can prevent unintended changes to dot clocks or
-audio clocks used with active output streams. We could consider setting
-this for the audio and video PLLs.
+The patch is only 3 years old, and is obviously a regression given
+that the change in behavior described here occurs as a side effect.
+But given that my involvement with PCI is much more recent than that,
+it is very well possible that I am missing something here.
 
-Here we are dealing with the CPU PLL, which, for practical reasons,
-is always enabled as far as the clk framework is concerned. The
-reason being the OPPs are never low enough for the CPU clock to
-use any other parent. To have it disabled, we would have to kick
-consumers (the CPU clock in this case) to use other clocks, so it's
-safe, remember which ones we kicked, and then bring them back once
-everything is done.
-
-AFAIK, we, samsung, rockchip, meson, do the temporary reparenting
-using clk_notifiers to access the mux registers directly. As far
-as the clk framework is concerned, nothing has changed.
-
-I'm not saying it's not possible to support this in the core, but
-the core already has to do a lot of bookkeeping and recalculation
-when anything changes. Adding something transient into the process
-isn't helping. And the reparenting might temporarily violate any
-downstream requirements.
-
-For now, I think clk notifiers is the easier solution for these
-one off requirements that are pretty much contained in a small
-part of the system.
-
-Regards
-ChenYu
+-- 
+Ard.
