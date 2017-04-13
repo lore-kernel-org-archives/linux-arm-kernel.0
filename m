@@ -1,49 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Apr 2017 21:52:27 +0200
-Subject: [PATCH v2 10/22] ARM: dts: r7s72100: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <20170413182839.25381-11-javier@osg.samsung.com>
-References: <20170413182839.25381-1-javier@osg.samsung.com>
- <20170413182839.25381-11-javier@osg.samsung.com>
-Message-ID: <CAMuHMdWXbKK-BA8KwnQ=QOsLwYpHu0GfbW52NTFE1N9C-HfZ2Q@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 13 Apr 2017 16:55:15 -0300
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <CANMBJr4BWtU7SXEa0-4LFLx+ydVWas0Cx18kRn-=-Bz8pPZ=fg@mail.gmail.com>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-5-andrew.smirnov@gmail.com>
+ <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+ <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
+ <CANMBJr4BWtU7SXEa0-4LFLx+ydVWas0Cx18kRn-=-Bz8pPZ=fg@mail.gmail.com>
+Message-ID: <CAOMZO5BaKBsXean8-560HUuZbhjef9dpMNku0SRUVtkv+XsZ6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 8:28 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+On Thu, Apr 13, 2017 at 4:24 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+
+
+> Are you referring to the following patches?
 >
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> "dt-bindings: Add GPCv2 power gating driver"
+> "soc: imx: Add GPCv2 power gating driver"
 >
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
->
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> I've pulled these patches from Shawn's tree to test with, but still
+> not able to get anything functional. Is there another series I should
+> be looking at?
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Yes, these are the ones I was thinking about. Maybe Andrey can help to
+clarify then.
 
-> --- a/arch/arm/boot/dts/r7s72100-genmai.dts
-> +++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-> @@ -57,7 +57,7 @@
->         clock-frequency = <400000>;
->
->         eeprom at 50 {
-> -               compatible = "renesas,24c128";
-> +               compatible = "renesas,24c128","atmel,24c128";
-
-Missing space after comma.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
