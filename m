@@ -1,62 +1,162 @@
-From: prasannatsmkumar@gmail.com (PrasannaKumar Muralidharan)
-Date: Thu, 13 Apr 2017 14:09:45 +0530
-Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random generator
- on MT7623 SoC
-In-Reply-To: <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
-References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
- <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
-Message-ID: <CANc+2y4Oj-sbSKnsTSK+kRYNewp7Pj0fEk_=dqULxWG08L77Eg@mail.gmail.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Thu, 13 Apr 2017 16:44:27 +0800
+Subject: [PATCH v3 7/8] arm64: exception: handle asynchronous SError
+ interrupt
+In-Reply-To: <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+ <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <2b7dc4a7-9fe8-0a6e-46b6-dc75ab3d0e87@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Xiuqi,
 
-Mostly looks good, have few minor comments.
+On 2017/3/30 18:31, Xie XiuQi wrote:
+> Error Synchronization Barrier (ESB; part of the ARMv8.2 Extensions)
+> is used to synchronize Unrecoverable errors. That is, containable errors
+> architecturally consumed by the PE and not silently propagated.
+> 
+> With ESB it is generally possible to isolate an unrecoverable error
+> between two ESB instructions. So, it's possible to recovery from
 
-On 13 April 2017 at 12:35,  <sean.wang@mediatek.com> wrote:
-> +static bool mtk_rng_wait_ready(struct hwrng *rng, bool wait)
-> +{
-> +       struct mtk_rng *priv = to_mtk_rng(rng);
-> +       int ready;
+>  /* ISS field definitions for exceptions taken in to Hyp */
+>  #define ESR_ELx_CV		(UL(1) << 24)
+>  #define ESR_ELx_COND_SHIFT	(20)
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 43512d4..d8a7306 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -69,7 +69,14 @@
+>  #define BAD_FIQ		2
+>  #define BAD_ERROR	3
+>  
+> +	.arch_extension ras
 > +
-> +       ready = readl(priv->base + RNG_CTRL) & RNG_READY;
-> +       if (!ready && wait)
-> +               readl_poll_timeout_atomic(priv->base + RNG_CTRL, ready,
-> +                                         ready & RNG_READY, USEC_POLL,
-> +                                         TIMEOUT_POLL);
-> +       return !!ready;
-> +}
-
-Use readl_poll_timeout_atomic's return value or -EIO instead of
-!!ready. This will simplify mtk_rng_read.
-
-> +static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-> +{
-> +       struct mtk_rng *priv = to_mtk_rng(rng);
-> +       int retval = 0;
+>  	.macro	kernel_entry, el, regsize = 64
+> +#ifdef CONFIG_ARM64_ESB
+> +	.if	\el == 0
+> +	esb
+> +	.endif
+> +#endif
+>  	sub	sp, sp, #S_FRAME_SIZE
+>  	.if	\regsize == 32
+>  	mov	w0, w0				// zero upper 32 bits of x0
+> @@ -208,6 +215,7 @@ alternative_else_nop_endif
+>  #endif
+>  
+>  	.if	\el == 0
+> +	msr	daifset, #0xF			// Set flags
+>  	ldr	x23, [sp, #S_SP]		// load return stack pointer
+>  	msr	sp_el0, x23
+>  #ifdef CONFIG_ARM64_ERRATUM_845719
+> @@ -226,6 +234,15 @@ alternative_else_nop_endif
+>  
+>  	msr	elr_el1, x21			// set up the return data
+>  	msr	spsr_el1, x22
 > +
-> +       while (max >= sizeof(u32)) {
-> +               if (!mtk_rng_wait_ready(rng, wait))
-> +                       break;
+> +#ifdef CONFIG_ARM64_ESB
+> +	.if \el == 0
+> +	esb					// Error Synchronization Barrier
+> +	mrs	x21, disr_el1			// Check for deferred error
+> +	tbnz	x21, #31, el1_sei
+
+We may need to clear disr_el1.A after reading it because the hardware won't clear it.
+
+> +	.endif
+> +#endif
 > +
-> +               *(u32 *)buf = readl(priv->base + RNG_DATA);
-> +               retval += sizeof(u32);
-> +               buf += sizeof(u32);
-> +               max -= sizeof(u32);
-> +       }
+>  	ldp	x0, x1, [sp, #16 * 0]
+>  	ldp	x2, x3, [sp, #16 * 1]
+>  	ldp	x4, x5, [sp, #16 * 2]
+> @@ -318,7 +335,7 @@ ENTRY(vectors)
+>  	ventry	el1_sync_invalid		// Synchronous EL1t
+>  	ventry	el1_irq_invalid			// IRQ EL1t
+>  	ventry	el1_fiq_invalid			// FIQ EL1t
+> -	ventry	el1_error_invalid		// Error EL1t
+> +	ventry	el1_error			// Error EL1t
+>  
+>  	ventry	el1_sync			// Synchronous EL1h
+>  	ventry	el1_irq				// IRQ EL1h
+> @@ -328,7 +345,7 @@ ENTRY(vectors)
+>  	ventry	el0_sync			// Synchronous 64-bit EL0
+>  	ventry	el0_irq				// IRQ 64-bit EL0
+>  	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
+> -	ventry	el0_error_invalid		// Error 64-bit EL0
+> +	ventry	el0_error			// Error 64-bit EL0
+>  
+>  #ifdef CONFIG_COMPAT
+>  	ventry	el0_sync_compat			// Synchronous 32-bit EL0
+> @@ -508,12 +525,31 @@ el1_preempt:
+>  	ret	x24
+>  #endif
+>  
+> +	.align	6
+> +el1_error:
+> +	kernel_entry 1
+> +el1_sei:
+> +	/*
+> +	 * asynchronous SError interrupt from kernel
+> +	 */
+> +	mov	x0, sp
+> +	mrs	x1, esr_el1
+> +	mov	x2, #1				// exception level of SEI generated
+> +	b	do_sei
+> +ENDPROC(el1_error)
 > +
-> +       if (unlikely(wait && max))
-> +               dev_warn(priv->dev, "timeout might be not properly set\n");
+> +
+>  /*
+>   * EL0 mode handlers.
+>   */
+>  	.align	6
+>  el0_sync:
+>  	kernel_entry 0
+> +#ifdef CONFIG_ARM64_ESB
+> +	mrs     x26, disr_el1
+> +	tbnz    x26, #31, el0_sei		// check DISR.A
+> +	msr	daifclr, #0x4			// unmask SEI
+> +#endif
+>  	mrs	x25, esr_el1			// read the syndrome register
+>  	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
+>  	cmp	x24, #ESR_ELx_EC_SVC64		// SVC in 64-bit state
+> @@ -688,8 +724,38 @@ el0_inv:
+>  ENDPROC(el0_sync)
+>  
+>  	.align	6
+> +el0_error:
+> +	kernel_entry 0
+> +el0_sei:
+> +	/*
+> +	 * asynchronous SError interrupt from userspace
+> +	 */
+> +	ct_user_exit
+> +	mov	x0, sp
+> +	mrs	x1, esr_el1
+> +	mov	x2, #0
+> +	bl	do_sei
+> +	b	ret_to_user
+> +ENDPROC(el0_error)
+> +
+> +	.align	6
+>  el0_irq:
+>  	kernel_entry 0
+> +#ifdef CONFIG_ARM64_ESB
+> +	mrs     x26, disr_el1
+> +	tbz     x26, #31, el0_irq_naked          // check DISR.A
+> +
+> +	mov	x0, sp
+> +	mrs	x1, esr_el1
+> +	mov	x2, 0
+> +
+> +	/*
+> +	 * The SEI generated at EL0 is not affect this irq context,
+> +	 * so after sei handler, we continue process this irq.
+> +	 */
+> +	bl	do_sei
+> +	msr     daifclr, #0x4                   // unmask SEI
+> +#endif
+>  el0_irq_naked:
+>  	enable_dbg
+>  #ifdef CONFIG_TRACE_IRQFLAGS
 
-Is this really necessary? Better to choose proper timeout than
-providing this warning message. In rare cases if the timeout could
-occur due to some reason (may be a hardware fault) print appropriate
-warning message.
-
-> +       return retval || !wait ? retval : -EIO;
-> +}
-
-Set retavl to mtk_rng_wait_ready and return retval.
-
-Regards,
-Prasanna
+Thanks,
+Wang Xiongfeng
