@@ -1,29 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 13 Apr 2017 06:32:37 -0700
-Subject: [PATCH 3/8] ARM: dts: imx7s: Adjust anatop-enable-bit for 'reg_1p0d'
+Date: Thu, 13 Apr 2017 06:32:38 -0700
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
 In-Reply-To: <20170413133242.5068-1-andrew.smirnov@gmail.com>
 References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
-Message-ID: <20170413133242.5068-4-andrew.smirnov@gmail.com>
+Message-ID: <20170413133242.5068-5-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In PMU_REG_1P0Dn ENABLE_LINREG is bit 0. Bit 31 is called OVERRIDE and
-it serves the function of granting permission to GPC IP block to alter
-various bit-fields of the register. The reason why this property, that
-trickeld here from Freescale BSP, is set to 31 is because in the code
-it came from it is used in conjunction with a notifier handler for
-REGULATOR_EVENT_PRE_DO_ENABLE and REGULATOR_EVENT_PRE_DO_DISABLE
-events (not found in upstream kernel) that triggers GPC to start
-manipulating aforementioned other bitfields.
-
-Since:
-	a) none of the aforementioned machinery is implemented by
-	   upstream
-	b) using 'anatop-enable-bit' in that capacity is a bit of a
-	   semantic stretch
-
-simplify the situation by setting the value of 'anatop-enable-bit' to
-point to ENABLE_LINREG (same as i.MX6).
+Add node for GPC and specify as a parent interrupt controller for SoC bus.
 
 Cc: yurovsky at gmail.com
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -36,21 +20,74 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx7s.dtsi | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 22c9788..8fee299 100644
+index 8fee299..1a7058f 100644
 --- a/arch/arm/boot/dts/imx7s.dtsi
 +++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -516,7 +516,7 @@
- 					anatop-min-bit-val = <8>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1200000>;
--					anatop-enable-bit = <31>;
-+					anatop-enable-bit = <0>;
- 				};
- 			};
+@@ -42,6 +42,7 @@
+  */
  
+ #include <dt-bindings/clock/imx7d-clock.h>
++#include <dt-bindings/power/imx7-power.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -119,7 +120,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "simple-bus";
+-		interrupt-parent = <&intc>;
++		interrupt-parent = <&gpc>;
+ 		ranges;
+ 
+ 		funnel at 30041000 {
+@@ -301,6 +302,7 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			#interrupt-cells = <3>;
+ 			interrupt-controller;
++			interrupt-parent = <&intc>;
+ 			reg = <0x31001000 0x1000>,
+ 			      <0x31002000 0x2000>,
+ 			      <0x31004000 0x2000>,
+@@ -309,6 +311,7 @@
+ 
+ 		timer {
+ 			compatible = "arm,armv7-timer";
++			interrupt-parent = <&intc>;
+ 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -564,6 +567,28 @@
+ 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 				#reset-cells = <1>;
+ 			};
++
++			gpc: gpc at 303a0000 {
++				compatible = "fsl,imx7d-gpc";
++				reg = <0x303a0000 0x10000>;
++				interrupt-controller;
++				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++				#interrupt-cells = <3>;
++				interrupt-parent = <&intc>;
++				#power-domain-cells = <1>;
++
++				pgc {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					pgc_pcie_phy: pgc-pcie-phy-domain {
++						#power-domain-cells = <0>;
++
++						reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
++						power-supply = <&reg_1p0d>;
++					};
++				};
++			};
+ 		};
+ 
+ 		aips2: aips-bus at 30400000 {
 -- 
 2.9.3
