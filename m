@@ -1,22 +1,76 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 13 Apr 2017 02:43:07 -0400
-Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <2f6b5c29-c985-dbfc-8738-cbc9bd85e408@arm.com>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
- <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
- <b44e6df5-4840-ecb4-59c6-b4bc474ad28c@arm.com>
- <20170404115037.GA2401@localhost>
- <2f6b5c29-c985-dbfc-8738-cbc9bd85e408@arm.com>
-Message-ID: <1567687b-ef10-bd87-c1cd-6838de6cce13@redhat.com>
+From: wuchengli@google.com (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
+Date: Thu, 13 Apr 2017 14:50:08 +0800
+Subject: [PATCH] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
+In-Reply-To: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <CAOMLVLiLkZsBfezx6b9Xq=kyPjUZOXwHC4LfHh1=wy6Ynt=zSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2017 10:28 AM, Robin Murphy wrote:
+Reviewed-by: Wu-Cheng Li <wuchengli@chromium.org>
 
-> So (at the risk of Jon mooing at me)
-
-moooooooooooo
-
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+On Thu, Apr 13, 2017 at 12:18 PM, Minghsiu Tsai
+<minghsiu.tsai@mediatek.com> wrote:
+> From: Daniel Kurtz <djkurtz@chromium.org>
+>
+> Experiments show that the:
+>  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+>  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
+>
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>
+> ---
+>  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> index 13afe48..8ab7ca0 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> @@ -837,12 +837,12 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
+>         struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
+>         bool valid = false;
+>
+> -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> -               if (mtk_mdp_is_target_compose(s->target))
+> -                       valid = true;
+> -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+>                 if (mtk_mdp_is_target_crop(s->target))
+>                         valid = true;
+> +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+> +               if (mtk_mdp_is_target_compose(s->target))
+> +                       valid = true;
+>         }
+>         if (!valid) {
+>                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+> @@ -907,12 +907,12 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+>         int ret;
+>         bool valid = false;
+>
+> -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> -               if (s->target == V4L2_SEL_TGT_COMPOSE)
+> -                       valid = true;
+> -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+>                 if (s->target == V4L2_SEL_TGT_CROP)
+>                         valid = true;
+> +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+> +               if (s->target == V4L2_SEL_TGT_COMPOSE)
+> +                       valid = true;
+>         }
+>         if (!valid) {
+>                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+> @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+>         if (ret)
+>                 return ret;
+>
+> -       if (mtk_mdp_is_target_crop(s->target))
+> +       if (mtk_mdp_is_target_compose(s->target))
+>                 frame = &ctx->s_frame;
+>         else
+>                 frame = &ctx->d_frame;
+> --
+> 1.9.1
+>
