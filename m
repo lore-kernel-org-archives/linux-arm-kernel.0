@@ -1,323 +1,236 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Apr 2017 11:51:32 +0100
-Subject: [PATCH v3 7/8] arm64: exception: handle asynchronous SError
- interrupt
-In-Reply-To: <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <20170413105131.GD24027@leverpostej>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 13 Apr 2017 13:06:43 +0200
+Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random generator
+ on MT7623 SoC
+In-Reply-To: <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
+References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
+ <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170413110643.GA413@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello
 
-On Thu, Mar 30, 2017 at 06:31:07PM +0800, Xie XiuQi wrote:
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index f20c64a..22f9c90 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -106,6 +106,20 @@
->  #define ESR_ELx_AR 		(UL(1) << 14)
->  #define ESR_ELx_CM 		(UL(1) << 8)
+I have some minor comment below:
+
+On Thu, Apr 13, 2017 at 03:05:08PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> This patch adds support for hardware random generator on MT7623 SoC
+> and should also work on other similar Mediatek SoCs. Currently,
+> the driver is already tested successfully with rng-tools.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  drivers/char/hw_random/Kconfig   |  16 +++-
+>  drivers/char/hw_random/Makefile  |   2 +-
+>  drivers/char/hw_random/mtk-rng.c | 174 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 190 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/char/hw_random/mtk-rng.c
+> 
+> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+> index 0cafe08..af782ce 100644
+> --- a/drivers/char/hw_random/Kconfig
+> +++ b/drivers/char/hw_random/Kconfig
+> @@ -419,10 +419,24 @@ config HW_RANDOM_CAVIUM
+>           Generator hardware found on Cavium SoCs.
 >  
-> +#define ESR_Elx_DFSC_SEI	(0x11)
+>           To compile this driver as a module, choose M here: the
+> -         module will be called cavium_rng.
+> +         module will be called mtk-rng.
 
-We should probably have a definition for the uncategorized DFSC value,
-too.
+Unwanted change
 
-[...]
-
-> index 43512d4..d8a7306 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -69,7 +69,14 @@
->  #define BAD_FIQ		2
->  #define BAD_ERROR	3
 >  
-> +	.arch_extension ras
+>           If unsure, say Y.
+>  
+> +config HW_RANDOM_MTK
+> +	tristate "Mediatek Random Number Generator support"
+> +	depends on HW_RANDOM
+> +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> +	default y
+> +	---help---
+> +	  This driver provides kernel-side support for the Random Number
+> +	  Generator hardware found on Mediatek SoCs.
+> +
+> +	  To compile this driver as a module, choose M here. the
+> +	  module will be called mtk-rng.
+> +
+> +	  If unsure, say Y.
+> +
+>  endif # HW_RANDOM
+>  
+>  config UML_RANDOM
+> diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+> index 5f52b1e..68be716 100644
+> --- a/drivers/char/hw_random/Makefile
+> +++ b/drivers/char/hw_random/Makefile
+> @@ -1,7 +1,6 @@
+>  #
+>  # Makefile for HW Random Number Generator (RNG) device drivers.
+>  #
+> -
 
-Generally, arch_extension is a warning sign that code isn't going to
-work with contemporary assemblers, which we likely need to support.
+Another unwanted change
+
+>  obj-$(CONFIG_HW_RANDOM) += rng-core.o
+>  rng-core-y := core.o
+>  obj-$(CONFIG_HW_RANDOM_TIMERIOMEM) += timeriomem-rng.o
+> @@ -36,3 +35,4 @@ obj-$(CONFIG_HW_RANDOM_STM32) += stm32-rng.o
+>  obj-$(CONFIG_HW_RANDOM_PIC32) += pic32-rng.o
+>  obj-$(CONFIG_HW_RANDOM_MESON) += meson-rng.o
+>  obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
+> +obj-$(CONFIG_HW_RANDOM_MTK)	+= mtk-rng.o
+> diff --git a/drivers/char/hw_random/mtk-rng.c b/drivers/char/hw_random/mtk-rng.c
+> new file mode 100644
+> index 0000000..6561ee0
+> --- /dev/null
+> +++ b/drivers/char/hw_random/mtk-rng.c
+> @@ -0,0 +1,174 @@
+> +/*
+> + * Driver for Mediatek Hardware Random Number Generator
+> + *
+> + * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +#define MTK_RNG_DEV KBUILD_MODNAME
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/hw_random.h>
+> +#include <linux/io.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define USEC_POLL			2
+> +#define TIMEOUT_POLL			20
+> +
+> +#define RNG_CTRL			0x00
+> +#define  RNG_EN				BIT(0)
+> +#define  RNG_READY			BIT(31)
+
+Keep only one space between define and name
 
 > +
->  	.macro	kernel_entry, el, regsize = 64
-> +#ifdef CONFIG_ARM64_ESB
-> +	.if	\el == 0
-> +	esb
-
-Here, I think that we'll need to macro this such that we can build with
-existing toolchains.
-
-e.g. in <asm/assembler.h> we need something like:
-
-	#define HINT_IMM_ESB	16
-
-	.macro ESB
-	hint	#HINT_IMM_ESB
-	.endm
-
-> +	.endif
-> +#endif
->  	sub	sp, sp, #S_FRAME_SIZE
->  	.if	\regsize == 32
->  	mov	w0, w0				// zero upper 32 bits of x0
-> @@ -208,6 +215,7 @@ alternative_else_nop_endif
->  #endif
->  
->  	.if	\el == 0
-> +	msr	daifset, #0xF			// Set flags
-
-Elsewhere in head.S we use helpers to fiddle with DAIF bits.
-
-Please be consistent with that. Add an enable_all macro if we need one.
-
->  	ldr	x23, [sp, #S_SP]		// load return stack pointer
->  	msr	sp_el0, x23
->  #ifdef CONFIG_ARM64_ERRATUM_845719
-> @@ -226,6 +234,15 @@ alternative_else_nop_endif
->  
->  	msr	elr_el1, x21			// set up the return data
->  	msr	spsr_el1, x22
+> +#define RNG_DATA			0x08
 > +
-> +#ifdef CONFIG_ARM64_ESB
-> +	.if \el == 0
-> +	esb					// Error Synchronization Barrier
-> +	mrs	x21, disr_el1			// Check for deferred error
-
-We'll need an <asm/sysreg.h> definition for this register. With that, we
-can use mrs_s here.
-
-> +	tbnz	x21, #31, el1_sei
-> +	.endif
-> +#endif
+> +#define to_mtk_rng(p)	container_of(p, struct mtk_rng, rng)
 > +
->  	ldp	x0, x1, [sp, #16 * 0]
->  	ldp	x2, x3, [sp, #16 * 1]
->  	ldp	x4, x5, [sp, #16 * 2]
-> @@ -318,7 +335,7 @@ ENTRY(vectors)
->  	ventry	el1_sync_invalid		// Synchronous EL1t
->  	ventry	el1_irq_invalid			// IRQ EL1t
->  	ventry	el1_fiq_invalid			// FIQ EL1t
-> -	ventry	el1_error_invalid		// Error EL1t
-> +	ventry	el1_error			// Error EL1t
->  
->  	ventry	el1_sync			// Synchronous EL1h
->  	ventry	el1_irq				// IRQ EL1h
-> @@ -328,7 +345,7 @@ ENTRY(vectors)
->  	ventry	el0_sync			// Synchronous 64-bit EL0
->  	ventry	el0_irq				// IRQ 64-bit EL0
->  	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
-> -	ventry	el0_error_invalid		// Error 64-bit EL0
-> +	ventry	el0_error			// Error 64-bit EL0
->  
->  #ifdef CONFIG_COMPAT
->  	ventry	el0_sync_compat			// Synchronous 32-bit EL0
-> @@ -508,12 +525,31 @@ el1_preempt:
->  	ret	x24
->  #endif
->  
-> +	.align	6
-> +el1_error:
-> +	kernel_entry 1
-> +el1_sei:
-> +	/*
-> +	 * asynchronous SError interrupt from kernel
-> +	 */
-> +	mov	x0, sp
-> +	mrs	x1, esr_el1
-
-I don't think this is correct if we branched here from kernel_exit.
-Surely we want the DISR_EL1 value, and ESR_EL1 is unrelated?
-
-> +	mov	x2, #1				// exception level of SEI generated
-> +	b	do_sei
-
-You don't need to figure out the EL here. In do_sei() we can determine
-the exception level from the regs (e.g. using user_mode(regs)).
-
-> +ENDPROC(el1_error)
+> +struct mtk_rng {
+> +	struct device	*dev;
+> +	void __iomem *base;
+> +	struct clk *clk;
+> +	struct hwrng rng;
+> +};
 > +
+> +static int mtk_rng_init(struct hwrng *rng)
+> +{
+> +	struct mtk_rng *priv = to_mtk_rng(rng);
+> +	u32 val;
+> +	int err;
 > +
->  /*
->   * EL0 mode handlers.
->   */
->  	.align	6
->  el0_sync:
->  	kernel_entry 0
-> +#ifdef CONFIG_ARM64_ESB
-> +	mrs     x26, disr_el1
-> +	tbnz    x26, #31, el0_sei		// check DISR.A
-> +	msr	daifclr, #0x4			// unmask SEI
-> +#endif
-
-Why do we duplicate this across the EL0 handlers, rather than making it
-common in the el0 kernel_entry code?
-
->  	mrs	x25, esr_el1			// read the syndrome register
->  	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
->  	cmp	x24, #ESR_ELx_EC_SVC64		// SVC in 64-bit state
-> @@ -688,8 +724,38 @@ el0_inv:
->  ENDPROC(el0_sync)
->  
->  	.align	6
-> +el0_error:
-> +	kernel_entry 0
-> +el0_sei:
-> +	/*
-> +	 * asynchronous SError interrupt from userspace
-> +	 */
-> +	ct_user_exit
-> +	mov	x0, sp
-> +	mrs	x1, esr_el1
-
-As with el1_sei, I don't think this is correct if we branched to
-el0_sei. As far as I am aware, ESR_EL1 will contain whatever exception
-we took, and the value we want is in DISR_EL1.
-
-> +	mov	x2, #0
-
-This EL parameter can go.
-
-> +	bl	do_sei
-> +	b	ret_to_user
-> +ENDPROC(el0_error)
+> +	err = clk_prepare_enable(priv->clk);
+> +	if (err)
+> +		return err;
 > +
-> +	.align	6
->  el0_irq:
->  	kernel_entry 0
-> +#ifdef CONFIG_ARM64_ESB
-> +	mrs     x26, disr_el1
-> +	tbz     x26, #31, el0_irq_naked          // check DISR.A
+> +	val = readl(priv->base + RNG_CTRL);
+> +	val |= RNG_EN;
+> +	writel(val, priv->base + RNG_CTRL);
 > +
-> +	mov	x0, sp
-> +	mrs	x1, esr_el1
-> +	mov	x2, 0
-> +
-> +	/*
-> +	 * The SEI generated at EL0 is not affect this irq context,
-> +	 * so after sei handler, we continue process this irq.
-> +	 */
-> +	bl	do_sei
-> +	msr     daifclr, #0x4                   // unmask SEI
-
-This rough pattern is duplicated several times across the EL0 entry
-paths. I think it should be made common.
-
-> +#endif
->  el0_irq_naked:
->  	enable_dbg
->  #ifdef CONFIG_TRACE_IRQFLAGS
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index b6d6727..99be6d8 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -643,6 +643,34 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
->  		handler[reason], smp_processor_id(), esr,
->  		esr_get_class_string(esr));
->  
-> +	die("Oops - bad mode", regs, 0);
-> +	local_irq_disable();
-> +	panic("bad mode");
+> +	return 0;
 > +}
 > +
-> +static const char *sei_context[] = {
-> +	"userspace",			/* EL0 */
-> +	"kernel",			/* EL1 */
-> +};
-
-This should go. It's only used in one place, and would be clearer with
-the strings inline. More on that below.
-
-> +
-> +static const char *sei_severity[] = {
-
-Please name this for what it actually represents:
-
-static const char *esr_aet_str[] = {
-
-> +	[0 ... ESR_ELx_AET_MAX] =	"Unknown",
-
-For consistency with esr_class_str, please make this:
-
-	[0 ... ESR_ELx_AET_MAX] =	"UNRECOGNIZED AET",
-
-... which makes it clear that this isn't some AET value which reports an
-"Unknown" status.
-
-> +	[ESR_ELx_AET_UC]	=	"Uncontainable",
-> +	[ESR_ELx_AET_UEU]	=	"Unrecoverable",
-> +	[ESR_ELx_AET_UEO]	=	"Restartable",
-> +	[ESR_ELx_AET_UER]	=	"Recoverable",
-> +	[ESR_ELx_AET_CE]	=	"Corrected",
-> +};
-> +
-> +DEFINE_PER_CPU(int, sei_in_process);
-
-A previous patch added definition of this.
-
-> +asmlinkage void do_sei(struct pt_regs *regs, unsigned int esr, int el)
+> +static void mtk_rng_cleanup(struct hwrng *rng)
 > +{
-> +	int aet = ESR_ELx_AET(esr);
-
-The AET field is only valid when the DFSC is 0b010001, so we need to
-check that before we interpret AET.
-
-> +	console_verbose();
+> +	struct mtk_rng *priv = to_mtk_rng(rng);
+> +	u32 val;
 > +
-> +	pr_crit("Asynchronous SError interrupt detected on CPU%d, %s, %s\n",
-> +		smp_processor_id(), sei_context[el], sei_severity[aet]);
-
-We should dump the full ESR_ELx value, regardless of what automated
-decoding we do, so that we have a chance of debugging issues in the
-field.
-
-It would also be nice to align with how bad_mode reports this today.
-Please make this:
-
-	pr_crit("SError detected on CPU%d while in %s mode: code: 0x%08x -- %s\n",
-		smp_processor_id(), user_mode(regs) ? "user" : "kernel",
-		esr, esr_aet_str[aet]);
-
-... though it might be best to dump the raw SPSR rather than trying to
-say user/kernel, so that we can distinguish EL1/EL2 with VHE, etc.
-
+> +	val = readl(priv->base + RNG_CTRL);
+> +	val &= ~RNG_EN;
+> +	writel(val, priv->base + RNG_CTRL);
 > +
->  	/*
->  	 * In firmware first mode, we could assume firmware will only generate one
->  	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
-> @@ -653,9 +681,31 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
->  		this_cpu_dec(sei_in_process);
->  	}
->  
-> -	die("Oops - bad mode", regs, 0);
-> +	if (el == 0 && IS_ENABLED(CONFIG_ARM64_ESB) &&
-
-Please use user_mode(regs), and get rid of the el parameter to this
-function entirely.
-
-> +	    cpus_have_cap(ARM64_HAS_RAS_EXTN)) {
-> +		siginfo_t info;
-> +		void __user *pc = (void __user *)instruction_pointer(regs);
+> +	clk_disable_unprepare(priv->clk);
+> +}
 > +
-> +		if (aet >= ESR_ELx_AET_UEO)
-> +			return;
-
-We need to check the DFSC first, and 0b111 is a reserved value (which
-the ARM ARM doesn't define the recoverability of), so I don't think this
-is correct.
-
-We should probably test the DSFC, then switch on the AET value, so as to
-handle only the cases we are aware of.
-
+> +static bool mtk_rng_wait_ready(struct hwrng *rng, bool wait)
+> +{
+> +	struct mtk_rng *priv = to_mtk_rng(rng);
+> +	int ready;
 > +
-> +		if (aet == ESR_ELx_AET_UEU) {
-> +			info.si_signo = SIGILL;
-> +			info.si_errno = 0;
-> +			info.si_code  = ILL_ILLOPC;
-> +			info.si_addr  = pc;
+> +	ready = readl(priv->base + RNG_CTRL) & RNG_READY;
+> +	if (!ready && wait)
+> +		readl_poll_timeout_atomic(priv->base + RNG_CTRL, ready,
+> +					  ready & RNG_READY, USEC_POLL,
+> +					  TIMEOUT_POLL);
+> +	return !!ready;
+> +}
+> +
+> +static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
+> +{
+> +	struct mtk_rng *priv = to_mtk_rng(rng);
+> +	int retval = 0;
+> +
+> +	while (max >= sizeof(u32)) {
+> +		if (!mtk_rng_wait_ready(rng, wait))
+> +			break;
+> +
+> +		*(u32 *)buf = readl(priv->base + RNG_DATA);
+> +		retval += sizeof(u32);
+> +		buf += sizeof(u32);
+> +		max -= sizeof(u32);
+> +	}
+> +
+> +	if (unlikely(wait && max))
+> +		dev_warn(priv->dev, "timeout might be not properly set\n");
+> +
+> +	return retval || !wait ? retval : -EIO;
+> +}
+> +
+> +static int mtk_rng_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	int ret;
+> +	struct mtk_rng *priv;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "no iomem resource\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->dev = &pdev->dev;
+> +	priv->rng.name = pdev->name;
+> +	priv->rng.init = mtk_rng_init;
+> +	priv->rng.cleanup = mtk_rng_cleanup;
+> +	priv->rng.read = mtk_rng_read;
+> +
+> +	priv->clk = devm_clk_get(&pdev->dev, "rng");
+> +	if (IS_ERR(priv->clk)) {
+> +		ret = PTR_ERR(priv->clk);
+> +		dev_err(&pdev->dev, "no clock for device: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-An unrecoverable error is not necessarily a particular bad instruction,
-so I'm not sure this makes sense.
+You get that resource twice
 
-Thanks,
-Mark.
+Regards
+Corentin Labbe
