@@ -1,39 +1,89 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Thu, 13 Apr 2017 15:33:13 -0600
-Subject: [PATCH V14 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <20170413204744.iizyyi32v4hjt3fc@pd.tnic>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
- <1490729440-32591-3-git-send-email-tbaicar@codeaurora.org>
- <20170412133447.n2yft7v266v6k6gh@pd.tnic>
- <8a31ef45-68f6-d444-f174-4a485cccd696@codeaurora.org>
- <20170413204744.iizyyi32v4hjt3fc@pd.tnic>
-Message-ID: <faa953d1-61bd-4b53-af0d-1980d9b55d68@codeaurora.org>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 13 Apr 2017 14:35:25 -0700
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <CAOMZO5BjzSJws7zjJ5+aZkfeF+15twEu9zS3V+g6wQrtUiNyqQ@mail.gmail.com>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-5-andrew.smirnov@gmail.com>
+ <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+ <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
+ <CANMBJr4BWtU7SXEa0-4LFLx+ydVWas0Cx18kRn-=-Bz8pPZ=fg@mail.gmail.com>
+ <CAOMZO5BaKBsXean8-560HUuZbhjef9dpMNku0SRUVtkv+XsZ6w@mail.gmail.com>
+ <CANMBJr7We9uOyE6=BCWoe9L7xRKjOG6ScgtDGEgQ-hPawPeppg@mail.gmail.com>
+ <CAOMZO5BjzSJws7zjJ5+aZkfeF+15twEu9zS3V+g6wQrtUiNyqQ@mail.gmail.com>
+Message-ID: <CANMBJr4mci5LyuBNT50dupxSVz+t-5mhWv8a7LBvY4MgupomVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2017 2:47 PM, Borislav Petkov wrote:
-> On Thu, Apr 13, 2017 at 02:30:21PM -0600, Baicar, Tyler wrote:
->> I do not agree with this. The struct being passed to this function is
->> already named acpi_hest_generic_data in the existing code and all over this
->> code is named gdata not just d.
-> And I'm saying they're too long - the preexisting ones and the ones
-> you're adding - and impair readability. This whole driver is one
-> unreadable ugly pile and if I were the maintainer I would never allowed
-> it in its current form.
+On 13 April 2017 at 13:49, Fabio Estevam <festevam@gmail.com> wrote:
+> On Thu, Apr 13, 2017 at 5:13 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
 >
-> But I don't think it really has a maintainer - poor Rafael has to deal
-> with it because it is under drivers/acpi/ and that whole RAS firmware
-> crap got thrown over the wall at some point and now we're stuck with it.
+>> I've rebased this series on the next-20170413 for sanity sake, and
+>> realized there doesn't appear to be a way to select CONFIG_IMX_GPCV2.
+>> I forced it using 'default y' and configured with imx_v6_v7_defconfig.
+>> Now my board is booting. Before this series is applied, it may be good
+>> to have CONFIG_IMX_GPCV2 selected specifically for iMX7 platform,
+>> otherwise there will be boot regressions.
 >
-> So this is just my opinion since he asked me to take a look.
-Okay, that makes sense. I'd prefer to avoid completely re-writing the 
-existing code in this patch set :)
+> Something like this?
+>
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index f03ef43..fe99a48 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -253,6 +253,7 @@ config RENESAS_H8S_INTC
+>
+>  config IMX_GPCV2
+>   bool
+> + def_bool y if SOC_IMX7D
+>   select IRQ_DOMAIN
+>   help
+>    Enables the wakeup IRQs for IMX platforms with GPCv2 block
 
-Thanks,
-Tyler
+Exactly. LGTM.
 
+>> I'd encounter a backtrace with next-20170413 +  imx_v6_v7_defconfig +
+>> CONFIG_IMX_GPCV2=y
+>>
+>> Backtrace:
+>> [<c010c364>] (dump_backtrace) from [<c010c610>] (show_stack+0x18/0x1c)
+>
+> but prior to fixing the Kconfig we need to fix this backtrace you reported.
+
+I dug into this a bit, and lockdep is unhappy about spin locks not
+being initialized before use.
+
+The following patch fixes the backtrace on my board. I'll submit this
+patch in a moment.
+
+From: Tyler Baker <tyler.baker@linaro.org>
+Date: Thu, 13 Apr 2017 14:29:49 -0700
+Subject: [PATCH] irqchip/irq-imx-gpcv2: fix spinlock initialization
+
+Call raw_spin_lock_init() before the spinlocks are used to prevent a
+lockdep splat.
+
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+---
+ drivers/irqchip/irq-imx-gpcv2.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/irqchip/irq-imx-gpcv2.c b/drivers/irqchip/irq-imx-gpcv2.c
+index e13236f..9463f35 100644
+--- a/drivers/irqchip/irq-imx-gpcv2.c
++++ b/drivers/irqchip/irq-imx-gpcv2.c
+@@ -230,6 +230,8 @@ static int __init imx_gpcv2_irqchip_init(struct
+device_node *node,
+  return -ENOMEM;
+  }
+
++ raw_spin_lock_init(&cd->rlock);
++
+  cd->gpc_base = of_iomap(node, 0);
+  if (!cd->gpc_base) {
+  pr_err("fsl-gpcv2: unable to map gpc registers\n");
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.9.3
+
+Cheers,
+
+Tyler
