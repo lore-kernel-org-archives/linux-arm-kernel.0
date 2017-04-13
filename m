@@ -1,228 +1,385 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 12 Apr 2017 18:18:44 -0500
-Subject: [PATCH v4 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <20170412204120.GA2231@localhost>
-References: <1491225304-3559-1-git-send-email-jnair@caviumnetworks.com>
- <1491225304-3559-3-git-send-email-jnair@caviumnetworks.com>
- <20170411012847.GA15291@bhelgaas-glaptop.roam.corp.google.com>
- <20170411071047.GA3610@localhost>
- <20170411134125.GA31773@bhelgaas-glaptop.roam.corp.google.com>
- <20170411152702.GA2910@localhost>
- <20170412162118.GC25197@bhelgaas-glaptop.roam.corp.google.com>
- <20170412181034.GA3671@localhost>
- <20170412191138.GH25197@bhelgaas-glaptop.roam.corp.google.com>
- <20170412204120.GA2231@localhost>
-Message-ID: <20170412231844.GA28316@bhelgaas-glaptop.roam.corp.google.com>
+From: vikas.manocha@st.com (Vikas MANOCHA)
+Date: Thu, 13 Apr 2017 00:03:22 +0000
+Subject: [PATCH] ARM: dts: stm32f7: add STM32f769I & stm32f746 discovery
+ board support
+In-Reply-To: <e6592982-9c24-bfde-469b-770218bf88be@st.com>
+References: <1491613929-11485-1-git-send-email-vikas.manocha@st.com>
+ <6ea617a3-94bc-870f-dd52-a45ad45c6d26@st.com>
+ <6e07ebcf-4463-523f-ea24-5a176efb0779@st.com>
+ <e6592982-9c24-bfde-469b-770218bf88be@st.com>
+Message-ID: <e48d63b2d79249b3b0da4388b5e3dc2d@SFHDAG7NODE3.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 08:41:20PM +0000, Jayachandran C wrote:
-> On Wed, Apr 12, 2017 at 02:11:38PM -0500, Bjorn Helgaas wrote:
-> > On Wed, Apr 12, 2017 at 06:10:34PM +0000, Jayachandran C wrote:
-> > > On Wed, Apr 12, 2017 at 11:21:18AM -0500, Bjorn Helgaas wrote:
-> > > > On Tue, Apr 11, 2017 at 03:27:02PM +0000, Jayachandran C wrote:
-> > > > > On Tue, Apr 11, 2017 at 08:41:25AM -0500, Bjorn Helgaas wrote:
-> > > > > > [+cc Joerg]
-> > > > > > 
-> > > > > > On Tue, Apr 11, 2017 at 07:10:48AM +0000, Jayachandran C wrote:
-> > > > > > > On Mon, Apr 10, 2017 at 08:28:47PM -0500, Bjorn Helgaas wrote:
-> > > > > > > > Hi Jayachandran,
-> > > > > > > > 
-> > > > > > > > On Mon, Apr 03, 2017 at 01:15:04PM +0000, Jayachandran C wrote:
-> > > > > > > > > The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
-> > > > > > > > > topology is slightly unusual. For a multi-node system, it looks like:
-> > > > > > > > > 
-> > > > > > > > > [node level PCI bridges - one per node]
-> > > > > > > > >     [SoC PCI devices with MSI-X but no IOMMU]
-> > > > > > > > >     [PCI-PCIe "glue" bridges - upto 14, one per real port below]
-> > > > > > > > >         [PCIe real root ports associated with IOMMU and GICv3 ITS]
-> > > > > > > > >             [External PCI devices connected to PCIe links]
-> > > > > > > > > 
-> > > > > > > > > The top two levels of bridges should have introduced aliases since they
-> > > > > > > > > are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
-> > > > > > > > > In the case of external PCIe devices, the "real" root ports are connected
-> > > > > > > > > to the SMMU and the GIC ITS, so PCI-PCIe bridge does not introduce an
-> > > > > > > > > alias. The SoC PCI devices are directly connected to the GIC ITS, so the
-> > > > > > > > > node level bridges do not introduce an alias either.
-> > > > > > > > > 
-> > > > > > > > > To handle this quirk, we mark the real PCIe root ports and node level
-> > > > > > > > > PCI bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
-> > > > > > > > > pci_for_each_dma_alias() works correctly for external PCIe devices and
-> > > > > > > > > SoC PCI devices.
-> > > > > > > > > 
-> > > > > > > > > For the current revision of Cavium ThunderX2, the VendorID and Device ID
-> > > > > > > > > are from Broadcom Vulcan (14e4:90XX).
-> > > > > > > > 
-> > > > > > > > Can you supply some text here about why we want to apply this patch?
-> > > > > > > > E.g., does it avoid making unnecessary IOMMU mappings, improve
-> > > > > > > > performance, avoid a crash, etc?
-> > > > > > > 
-> > > > > > > If this is for the commit message, I hope the following is ok:
-> > > > > > > 
-> > > > > > > "With this change, both MSI-X and IO virtualization work correctly on
-> > > > > > > Cavium ThunderX2. The GIC ITS driver gets the correct device ID to
-> > > > > > > configure MSI-X, the SMMUv3 driver gets the correct Stream IDs for PCI
-> > > > > > > devices, and the IOMMU groups are setup correctly."
-> > > > > > 
-> > > > > > This doesn't get at what the actual problem is.  I'm hoping for
-> > > > > > something like "without this change, we set up an IOMMU mapping for
-> > > > > > requestor ID X, but device DMA uses requestor ID Y because ...., which
-> > > > > > results in an IOMMU fault"
-> > > > > 
-> > > > > Ok. I hope this would be better:
-> > > > > 
-> > > > > "Without this change, the last alias seen while traversing the PCI
-> > > > > hierarchy will be used as the RID to generate the device ID for ITS
-> > > > > and stream ID for SMMU. This in turn causes the MSI-X generated by the
-> > > > > device to fail since the ITS expects to have translation tables based
-> > > > > on the actual PCIe RID and not the (irrelevant) alias. Similarly, the
-> > > > > device DMA also fails when SMMU is enabled due to incorrect value in
-> > > > > SMMU translation tables"
-> > > > 
-> > > > This description is true, but I don't think it addresses the real
-> > > > problem.  I think the real problem is that your IOMMU code doesn't
-> > > > handle aliases correctly, and by ignoring these invalid aliases, we
-> > > > happen to map an alias that works for the builtin devices.  But that's
-> > > > only because we got lucky (those devices use a single RID and they're
-> > > > not behind bridges that optionally take ownership).
-> > > > 
-> > > > It would make sense to me if we fixed the IOMMU code to map *all* the
-> > > > aliases, which should be enough to make your devices work.  If we then
-> > > > wanted to apply a patch like this on top, it would be simply an
-> > > > optimization that avoids unnecessary IOMMU mappings.
-> > > 
-> > > The issue that the IOMMU code does not handle valid aliases is
-> > > unrelated to what I am trying to fix. The quirk is to make sure
-> > > that invalid aliases are not seen on ThunderX2 while doing
-> > > pci_for_each_dma_alias().
-> > > 
-> > > The DMA and MSI-X requests leave the PCI/PCIe hierarchy at the point
-> > > where the SMMU (or ITS) is attached, i.e. at the bridge marked with
-> > > PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT. The quirk ensures that we don't look
-> > > for aliases above that point.
-> > > 
-> > > The toplevel bridge is marked PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT since
-> > > the on-chip devices are directly connected to the ITS (they do not
-> > > use SMMU).
-> > > 
-> > > The top two levels of bridges are not real PCI bridges but just
-> > > PCI bridge-like things that were added to tie the whole hierarchy
-> > > together for configuration and enumeration. They do not handle
-> > > PCI/PCIe transactions in the traditional sense.
-> > > 
-> > > I think my problem description is still not correct, maybe:
-> > > "The SMMU (and ITS) expects to device tables to use the RID seen
-> > > at the bridge they are associated with. Currently the
-> > > pci_for_each_dma_alias() code traverses beyond this point and
-> > > generates incorrect aliases due to the PCI and PCI/PCIe bridges
-> > > above. This causes MSI-X interrupts and device DMA to fail since
-> > > the SMMU and ITS tables to be setup with incorrect IDs"
-> > 
-> > I haven't tried to figure out the MSI-X piece of this, but let me try
-> > to come up with a concrete DMA example.  Assume this topology:
-> > 
-> >   00:00.0 bridge to [bus 01-1e]
-> >   01:0a.0 bridge to [bus 04-05]
-> >   04:00.0 [14e4:9000 or 9084] bridge to [bus 05] (XLATE_ROOT)
-> >   05:00.0 endpoint
-> > 
-> > Assume 05:00.0 generates a DMA request.  Assume the top two bridges
-> > are such that pci_for_each_dma_alias() includes them as well, so it
-> > iterates through 05:00.0, 01:0a.0, and 00:00.0.
-> > 
-> > When the driver for 05:00.0 makes a DMA mapping, the current code
-> > apparently makes an IOMMU mapping for requester ID 00:00.0 because
-> > that's the last alias.  Obviously this doesn't work because the IOMMU
-> > at 04:00.0 will see a requester ID of 05:00.0, not 00:00.0.
-> > 
-> > With this quirk, we'll omit 01:0a.0 and 00:00.0, so we'll make an
-> > IOMMU mapping for requester ID 05:00.0, which will work fine.  I think
-> > it would *also* work fine if we made IOMMU mappings for 05:00.0,
-> > 01:0a.0, and 00:0.0.  The last two are unnecessary, but probably not
-> > harmful.
->  
-> Ok. The last two are not harmful but still incorrect. The bridges
-> 0:0.0 and 1:a.0 are outside the path with the PCI transactions takes
-> (they go from 4:0.0 to the SMMU).
+Hi Alex,
+
+> -----Original Message-----
+> From: Alexandre TORGUE
+> Sent: Tuesday, April 11, 2017 12:51 AM
+> To: Vikas MANOCHA <vikas.manocha@st.com>; Patrice CHOTARD <patrice.chotard@st.com>
+> Cc: open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; moderated list:ARM PORT
+> <linux-arm-kernel@lists.infradead.org>; open list <linux-kernel@vger.kernel.org>; Mark Rutland <mark.rutland@arm.com>; Maxime
+> Coquelin <mcoquelin.stm32@gmail.com>; Rob Herring <robh+dt@kernel.org>; Russell King <linux@armlinux.org.uk>
+> Subject: Re: [PATCH] ARM: dts: stm32f7: add STM32f769I & stm32f746 discovery board support
 > 
-> > Now assume 05:00 is a multi-function device that has a DMA alias
-> > quirk, e.g., see quirk_dma_func0_alias().  It has another function:
-> > 
-> >   05:00.3 endpoint
-> > 
-> > DMA from 05:00.3 may use a requester ID of either 05:00.3 or 05:00.0.
-> > The driver makes a DMA mapping, pci_for_each_dma_alias() iterates
-> > through 05:00.3, 05:00.0, 01:0a.0, and 00:00.0, and we again map only
-> > 00:00.0, which again doesn't work.
-> > 
-> > With this quirk, we create a single mapping for 05:00.0.  That will
-> > work sometimes, but the device may also generate DMA with a requester
-> > ID of 05:00.3, and that won't work.
+> Hi Vikas
 > 
-> Note that here, pci_for_each_dma_alias() works correctly with the quirk
-> and incorrectly without the quirk. With the quirk, the callback function
-> is involved on 05:00.3 and 05:00.0 as expected.
+> On 04/10/2017 08:40 PM, Vikas Manocha wrote:
+> > Thanks Alex,
+> >
+> > On 04/10/2017 12:23 AM, Alexandre Torgue wrote:
+> >> Hi
+> >>
+> >> On 04/08/2017 03:12 AM, Vikas Manocha wrote:
+> >>> Stm32f769I & stm32f746 are MCUs of stm32f7 family. Here are the
+> >>> major spces of the two boards:
+> >>>
+> >>> stm32f769I discovery board:
+> >>>     - Cortex-M7 core @216MHz
+> >>>     - 2MB mcu internal flash
+> >>>     - 512KB internal sram
+> >>>     - 16MB sdram memory
+> >>>     - 64MB qspi flash memory
+> >>>     - 4 inch wvga LCD-TFT Display
+> >>>
+> >>> stm32f746 discovery board:
+> >>>     - Cortex-M7 core @216MHz
+> >>>     - 1MB mcu internal flash
+> >>>     - 320KB internal sram
+> >>>     - 8MB sdram memory
+> >>>     - 16MB qspi flash memory
+> >>>     - 4.3 inch 480x272 LCD-TFT display
+> >>>
+> >>> Signed-off-by: Vikas Manocha <vikas.manocha@st.com>
+> >>> ---
+> >>>  arch/arm/boot/dts/Makefile            |   2 +
+> >>>  arch/arm/boot/dts/stm32f746-disco.dts | 101 ++++++++++++++++++++++++++++++++++
+> >>>  arch/arm/boot/dts/stm32f746.dtsi      |   2 +-
+> >>>  arch/arm/boot/dts/stm32f769-disco.dts | 101
+> >>> ++++++++++++++++++++++++++++++++++
+> >>>  4 files changed, 205 insertions(+), 1 deletion(-)  create mode
+> >>> 100644 arch/arm/boot/dts/stm32f746-disco.dts
+> >>>  create mode 100644 arch/arm/boot/dts/stm32f769-disco.dts
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>> index 0118084..a119f74 100644
+> >>> --- a/arch/arm/boot/dts/Makefile
+> >>> +++ b/arch/arm/boot/dts/Makefile
+> >>> @@ -763,6 +763,8 @@ dtb-$(CONFIG_ARCH_STI) += \
+> >>> dtb-$(CONFIG_ARCH_STM32)+= \
+> >>>      stm32f429-disco.dtb \
+> >>>      stm32f469-disco.dtb \
+> >>> +    stm32f746-disco.dtb \
+> >>> +    stm32f769-disco.dtb \
+> >>>      stm32429i-eval.dtb \
+> >>>      stm32746g-eval.dtb
+> >>>  dtb-$(CONFIG_MACH_SUN4I) += \
+> >>> diff --git a/arch/arm/boot/dts/stm32f746-disco.dts
+> >>> b/arch/arm/boot/dts/stm32f746-disco.dts
+> >>> new file mode 100644
+> >>> index 0000000..c0e313f
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/stm32f746-disco.dts
+> >>> @@ -0,0 +1,101 @@
+> >>> +/*
+> >>> + * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
+> >>> + *
+> >>> + * This file is dual-licensed: you can use it either under the
+> >>> +terms
+> >>> + * of the GPL or the X11 license, at your option. Note that this
+> >>> +dual
+> >>> + * licensing only applies to this file, and not this project as a
+> >>> + * whole.
+> >>> + *
+> >>> + *  a) This file is free software; you can redistribute it and/or
+> >>> + *     modify it under the terms of the GNU General Public License as
+> >>> + *     published by the Free Software Foundation; either version 2 of the
+> >>> + *     License, or (at your option) any later version.
+> >>> + *
+> >>> + *     This file is distributed in the hope that it will be useful,
+> >>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>> + *     GNU General Public License for more details.
+> >>> + *
+> >>> + * Or, alternatively,
+> >>> + *
+> >>> + *  b) Permission is hereby granted, free of charge, to any person
+> >>> + *     obtaining a copy of this software and associated documentation
+> >>> + *     files (the "Software"), to deal in the Software without
+> >>> + *     restriction, including without limitation the rights to use,
+> >>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >>> + *     sell copies of the Software, and to permit persons to whom the
+> >>> + *     Software is furnished to do so, subject to the following
+> >>> + *     conditions:
+> >>> + *
+> >>> + *     The above copyright notice and this permission notice shall be
+> >>> + *     included in all copies or substantial portions of the Software.
+> >>> + *
+> >>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >>> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >>> + */
+> >>> +
+> >>> +/dts-v1/;
+> >>> +#include "stm32f746.dtsi"
+> >>> +#include <dt-bindings/input/input.h>
+> >>> +
+> >>> +/ {
+> >>> +    model = "STMicroelectronics STM32F746-DISCO board";
+> >>> +    compatible = "st,stm32f746-disco", "st,stm32f746";
+> >>> +
+> >>> +    chosen {
+> >>> +        bootargs = "root=/dev/ram";
+> >>> +        stdout-path = "serial0:115200n8";
+> >>> +    };
+> >>> +
+> >>> +    memory {
+> >>> +        reg = <0xC0000000 0x800000>;
+> >>> +    };
+> >>> +
+> >>> +    aliases {
+> >>> +        serial0 = &usart1;
+> >>> +    };
+> >>> +
+> >>> +};
+> >>> +
+> >>> +&clk_hse {
+> >>> +    clock-frequency = <25000000>;
+> >>> +};
+> >>> +
+> >>> +&pinctrl {
+> >>
+> >>
+> >> Pin muxing is not defined in board file. Please move it into SOC dtsi file.
 
-With the quirk, pci_for_each_dma_alias() works correctly and iterates
-through 05:00.3 and 05:00.0.  But the IOMMU code only pay attention to
-the *last* alias, i.e., 05:00.0.  So this does not work.
+Ok, I will move pin muxing in the stm32f746.dtsi file as per current implementation & send V2.
 
-> Without the quirk the
-> call back is invoked on 05:00.3, 05:00.0, 01:0a.0, and 00:00.0, which
-> includes aliases that are not valid.
+> >
+> > Pin muxing used is different for different boards. e.g. usart1_rx pad is PA10 for stm32f769-disco board while it is PB7 for stm32f746-
+> disco board.
+> > The other possibilities for same pad (usart1_rx) is PB15. To make situation bit more complex, it is only available in f769 device.
+> >
+> > Putting in SOC dtsi file means having lot of combinations for different pins in separate groups.
+> > e.g. only for one instance of one ip (usart1), following groups might be required at one point of time:
+> >
+> > usart1_pa10_pa9 {..}
+> > usart1_pa10_pb14 {..}
+> > usart1_pa10_pb6 {..}
+> >
+> > usart1_pb7_pa9 {..}
+> > usart1_pb7_pb14 {..}
+> > usart1_pb7_pb6 {..}
+> >
+> > usart1_pb15_pa9 {..}
+> > usart1_pb15_pb14 {..}
+> > usart1_pb15_pb6 {..}
+> >
+> > In case of boards based on stm32f746 device, all the above mentioned groups with pb14 & pb15 will not be available.
+> > One solution (to avoid using not available groups) could be to have separate dtsi (or separate pinmux.dtsi) for different devices of
+> same family like one for stm32f746 & other for stm32f769. Still it does not resolve the need to have lot of groups combinations for
+> each instance of every peripheral in dtsi as mentioned above.
 > 
-> The idea behind the quirk is to get pci_for_each_dma_alias work correctly
-> on ThunderX2, and invoke the function only on the valid aliases. With the
-> quirk, the code using it - like the SMMU code - gets the correct aliases
-> to process, and do not have to deal with or filter out incorrect aliases.
+> Yes, it is what I want to have. I did the job on for STM32F4 (F429 / F469). You could have a look on ARM Linux patchwork:
+> https://patchwork.kernel.org/patch/9669433/
 > 
-> I don't think it would be safe to assume that all callers of
-> pci_for_each_dma_alias will be ok to handle invalid aliases. Even in
-> the IOMMU case, the case which calculates stream IDs is one usage, the
-> usage for iommu groups also did not deal with invalid aliases correctly
-> when I tried it. Then there are the MSI cases too, I had done some work
-> on trying to filter out invalid aliases in the relevant code[1], but
-> in my opinion, getting pci_for_each_dma_alias() do the right thing is
-> the correct solution.
+> To sum-up the implementation:
+> 
+> -Pinmuxing is defined in separate files which will be included in board dts file.
+> 
+> -We have a common pinmuxing file + a dedicated pinmuxing file per SOC.
+> 
+> Example for STMF469-disco:
+> stm32f4-pinctrl.dtsi --> stm32f469-pinctrl.dtsi --> stm32f469-disco.dts
+> 
+> stm32f4-pinctrl.dtsi contains common pinmuxing bindings between STM32F4 stm32f469-pinctrl.dtsi contains dedicated pinmuxing
+> bindings for
+> STM32F469 (ex: QSPI pins, gpio-ranges ...)
+> 
+> This implementation is under review.
 
-I agree, we should fix this and it sounds like it's more than just an
-optimization.  But I don't think the quirk is a complete fix, and the
-changelog needs a short sketch of this discussion to make it clear
-that this happens to fix some DMA faults, but others remain because
-the current IOMMU code only maps one of the valid aliases.
+Sounds good.
 
-So I think the only thing we need to move forward on this is a revised
-changelog.  I propose something like this:
+Cheers,
+Vikas
 
-  On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
-  PCI topology is slightly unusual.  For a multi-node system, it looks
-  like:
-
-    00:00.0 [?? type] bridge to [bus 01-1e]
-    01:0a.0 [?? type] bridge to [bus 04-05]
-    04:00.0 [?? type] bridge to [bus 05] (ThunderX2 XLATE_ROOT)
-    05:00.0 endpoint
-
-  pci_for_each_dma_alias() assumes IOMMU translation is done at the
-  root of the PCI hierarchy.  It generates 05:00.0 and <BB:DD.F> as
-  DMA aliases for 05:00.0 because bus <BB> is a non-PCIe bus that
-  doesn't carry the Requester ID.
-
-  Because the ThunderX2 IOMMU is at 04:00.0, <BB:DD.F> is never a valid
-  Requester ID.  This quirk stops alias generation at the XLATE_ROOT
-  bridge so we won't generate <BB:DD.F>.
-
-  The current IOMMU code only maps the last alias (this is a separate
-  bug in itself).  Prior to this quirk, we only created IOMMU mappings
-  for the invalid Requester ID <BB:DD.F>, which never matched any DMA
-  transactions.
-  
-  With this quirk, we create IOMMU mappings for a valid Requester ID,
-  which fixes devices with no aliases but leaves devices with aliases
-  still broken.
-
-I don't know the details of what type of bridges those are
-(conventional PCI?  PCIe PCI-to-PCIe? etc?) and exactly what RIDs are
-involved.  It'd be nice if you could fill those in.
-
-Bjorn
+> 
+> 
+> > It seems cleaner solution would be pin muxing in board dts file. Please let me know if there is some drawback of this approach. One
+> point which i can think of is : duplication of pinmux groups in different board dts files.
+> 
+> Pinmuxing in board file is currently not my choice. In the board file we only select the group to use.
+> 
+> Regards
+> Alex
+> 
+> 
+> >
+> > Cheers,
+> > Vikas
+> >
+> >>> +    usart1_pins: usart1 at 0    {
+> >>> +        pins1 {
+> >>> +            pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
+> >>> +                bias-disable;
+> >>> +                drive-push-pull;
+> >>> +                slew-rate = <2>;
+> >>> +        };
+> >>> +        pins2 {
+> >>> +            pinmux = <STM32F746_PB7_FUNC_USART1_RX>;
+> >>> +            bias-disable;
+> >>> +        };
+> >>> +    };
+> >>> +
+> >>> +    qspi_pins: qspi at 0 {
+> >>> +        pins {
+> >>> +            pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
+> >>> +                   <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
+> >>> +                   <STM32F746_PD11_FUNC_QUADSPI_BK1_IO0>,
+> >>> +                   <STM32F746_PD12_FUNC_QUADSPI_BK1_IO1>,
+> >>> +                   <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
+> >>> +                   <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
+> >>> +            slew-rate = <2>;
+> >>> +        };
+> >>> +    };
+> >>> +};
+> >>> +
+> >>> +&usart1 {
+> >>> +    pinctrl-0 = <&usart1_pins>;
+> >>> +    pinctrl-names = "default";
+> >>> +    status = "okay";
+> >>> +};
+> >>> diff --git a/arch/arm/boot/dts/stm32f746.dtsi
+> >>> b/arch/arm/boot/dts/stm32f746.dtsi
+> >>> index f321ffe..826700f 100644
+> >>> --- a/arch/arm/boot/dts/stm32f746.dtsi
+> >>> +++ b/arch/arm/boot/dts/stm32f746.dtsi
+> >>> @@ -178,7 +178,7 @@
+> >>>              interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
+> >>>          };
+> >>>
+> >>> -        pin-controller {
+> >>> +        pinctrl: pin-controller {
+> >>>              #address-cells = <1>;
+> >>>              #size-cells = <1>;
+> >>>              compatible = "st,stm32f746-pinctrl"; diff --git
+> >>> a/arch/arm/boot/dts/stm32f769-disco.dts
+> >>> b/arch/arm/boot/dts/stm32f769-disco.dts
+> >>> new file mode 100644
+> >>> index 0000000..5f8558e
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/stm32f769-disco.dts
+> >>> @@ -0,0 +1,101 @@
+> >>> +/*
+> >>> + * Copyright 2017 - Vikas MANOCHA <vikas.manocha@st.com>
+> >>> + *
+> >>> + * This file is dual-licensed: you can use it either under the
+> >>> +terms
+> >>> + * of the GPL or the X11 license, at your option. Note that this
+> >>> +dual
+> >>> + * licensing only applies to this file, and not this project as a
+> >>> + * whole.
+> >>> + *
+> >>> + *  a) This file is free software; you can redistribute it and/or
+> >>> + *     modify it under the terms of the GNU General Public License as
+> >>> + *     published by the Free Software Foundation; either version 2 of the
+> >>> + *     License, or (at your option) any later version.
+> >>> + *
+> >>> + *     This file is distributed in the hope that it will be useful,
+> >>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>> + *     GNU General Public License for more details.
+> >>> + *
+> >>> + * Or, alternatively,
+> >>> + *
+> >>> + *  b) Permission is hereby granted, free of charge, to any person
+> >>> + *     obtaining a copy of this software and associated documentation
+> >>> + *     files (the "Software"), to deal in the Software without
+> >>> + *     restriction, including without limitation the rights to use,
+> >>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >>> + *     sell copies of the Software, and to permit persons to whom the
+> >>> + *     Software is furnished to do so, subject to the following
+> >>> + *     conditions:
+> >>> + *
+> >>> + *     The above copyright notice and this permission notice shall be
+> >>> + *     included in all copies or substantial portions of the Software.
+> >>> + *
+> >>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >>> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >>> + */
+> >>> +
+> >>> +/dts-v1/;
+> >>> +#include "stm32f746.dtsi"
+> >>> +#include <dt-bindings/input/input.h>
+> >>> +
+> >>> +/ {
+> >>> +    model = "STMicroelectronics STM32F769-DISCO board";
+> >>> +    compatible = "st,stm32f769-disco", "st,stm32f7";
+> >>> +
+> >>> +    chosen {
+> >>> +        bootargs = "root=/dev/ram";
+> >>> +        stdout-path = "serial0:115200n8";
+> >>> +    };
+> >>> +
+> >>> +    memory {
+> >>> +        reg = <0xC0000000 0x1000000>;
+> >>> +    };
+> >>> +
+> >>> +    aliases {
+> >>> +        serial0 = &usart1;
+> >>> +    };
+> >>> +
+> >>> +};
+> >>> +
+> >>> +&clk_hse {
+> >>> +    clock-frequency = <25000000>;
+> >>> +};
+> >>> +
+> >>> +&pinctrl {
+> >>
+> >> same.
+> >>
+> >>> +    usart1_pins: usart1 at 0    {
+> >>> +        pins1 {
+> >>> +            pinmux = <STM32F746_PA9_FUNC_USART1_TX>;
+> >>> +                bias-disable;
+> >>> +                drive-push-pull;
+> >>> +                slew-rate = <2>;
+> >>> +        };
+> >>> +        pins2 {
+> >>> +            pinmux = <STM32F746_PA10_FUNC_USART1_RX>;
+> >>> +            bias-disable;
+> >>> +        };
+> >>> +    };
+> >>> +
+> >>> +    qspi_pins: qspi at 0 {
+> >>> +        pins {
+> >>> +            pinmux = <STM32F746_PB2_FUNC_QUADSPI_CLK>,
+> >>> +                   <STM32F746_PB6_FUNC_QUADSPI_BK1_NCS>,
+> >>> +                   <STM32F746_PC9_FUNC_QUADSPI_BK1_IO0>,
+> >>> +                   <STM32F746_PC10_FUNC_QUADSPI_BK1_IO1>,
+> >>> +                   <STM32F746_PD13_FUNC_QUADSPI_BK1_IO3>,
+> >>> +                   <STM32F746_PE2_FUNC_QUADSPI_BK1_IO2>;
+> >>> +            slew-rate = <2>;
+> >>> +        };
+> >>> +    };
+> >>> +};
+> >>> +
+> >>> +&usart1 {
+> >>> +    pinctrl-0 = <&usart1_pins>;
+> >>> +    pinctrl-names = "default";
+> >>> +    status = "okay";
+> >>> +};
+> >>>
+> >> .
+> >>
