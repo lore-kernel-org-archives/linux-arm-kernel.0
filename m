@@ -1,51 +1,55 @@
-From: dongbo4@huawei.com (dongbo (E))
-Date: Thu, 13 Apr 2017 20:33:52 +0800
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 13 Apr 2017 13:59:29 +0100
+Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
+In-Reply-To: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Bo <dongbo4@huawei.com>
+On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
+> From: Jiada Wang <jiada_wang@mentor.com>
+> 
+> v1:
+>   add Slave mode support in SPI core
+>   spidev create slave device when SPI controller work in slave mode
+>   spi-imx support to work in slave mode
 
-In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-the flag is propagated to its child processes, even the elf
-files are marked as not requiring executable stack. It may
-cause superfluous operations on some arch, e.g.
-__sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-also marked as PROT_EXEC.
+Adding Geert who also had a series doing this in progress that was
+getting very near to being merged.
 
-Signed-off-by: Dong Bo <dongbo4@huawei.com>
----
- fs/binfmt_elf.c       | 2 ++
- fs/binfmt_elf_fdpic.c | 2 ++
- 2 files changed, 4 insertions(+)
-
-diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
-index 5075fd5..c52e670 100644
---- a/fs/binfmt_elf.c
-+++ b/fs/binfmt_elf.c
-@@ -863,6 +863,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
- 	SET_PERSONALITY2(loc->elf_ex, &arch_state);
- 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
- 		current->personality |= READ_IMPLIES_EXEC;
-+	else
-+		current->personality &= ~READ_IMPLIES_EXEC;
-  	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
- 		current->flags |= PF_RANDOMIZE;
-diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
-index cf93a4f..c4bc4d0 100644
---- a/fs/binfmt_elf_fdpic.c
-+++ b/fs/binfmt_elf_fdpic.c
-@@ -354,6 +354,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
- 		set_personality(PER_LINUX);
- 	if (elf_read_implies_exec(&exec_params.hdr, executable_stack))
- 		current->personality |= READ_IMPLIES_EXEC;
-+	else
-+		current->personality &= ~READ_IMPLIES_EXEC;
-  	setup_new_exec(bprm);
- -- 1.9.1
-
-
-.
+> 
+> Jiada Wang (5):
+>   spi: core: add support to work in Slave mode
+>   spi: spidev: use different name for SPI controller slave mode device
+>   spi: imx: add selection for iMX53 and iMX6 controller
+>   ARM: dts: imx: change compatiblity for SPI controllers on imx53 later
+>     soc
+>   spi: imx: Add support for SPI Slave mode for imx53 and imx6 chips
+> 
+>  Documentation/devicetree/bindings/spi/spi-bus.txt |  27 ++-
+>  Documentation/spi/spi-summary                     |  19 +-
+>  arch/arm/boot/dts/imx53.dtsi                      |   4 +-
+>  arch/arm/boot/dts/imx6q.dtsi                      |   2 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi                    |   8 +-
+>  arch/arm/boot/dts/imx6sl.dtsi                     |   8 +-
+>  arch/arm/boot/dts/imx6sx.dtsi                     |   8 +-
+>  arch/arm/boot/dts/imx6ul.dtsi                     |   8 +-
+>  drivers/spi/Kconfig                               |  14 +-
+>  drivers/spi/spi-imx.c                             | 216 ++++++++++++++++++++--
+>  drivers/spi/spi.c                                 |  23 ++-
+>  drivers/spi/spidev.c                              |  15 +-
+>  include/linux/spi/spi.h                           |  15 ++
+>  13 files changed, 310 insertions(+), 57 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/739216d3/attachment.sig>
