@@ -1,62 +1,47 @@
-From: c.jayachandran@gmail.com (Jayachandran C.)
-Date: Thu, 13 Apr 2017 19:36:45 +0530
-Subject: [PATCHv3 13/14] arm64: pmuv3: handle !PMUv3 when probing
-In-Reply-To: <1491899997-32210-14-git-send-email-mark.rutland@arm.com>
-References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
- <1491899997-32210-14-git-send-email-mark.rutland@arm.com>
-Message-ID: <CA+7sy7AA+SX_YUNAgCL5tyBXGW+rUidaApN7D2g3O0maRNcKSw@mail.gmail.com>
+From: george.cherian@cavium.com (George Cherian)
+Date: Thu, 13 Apr 2017 07:25:01 +0000
+Subject: [PATCH] net: thunderx: Fix set_max_bgx_per_node for 81xx rgx
+Message-ID: <1492068301-1141-1-git-send-email-george.cherian@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 2:09 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> When probing via ACPI, we won't know up-front whether a CPU has a PMUv3
-> compatible PMU. Thus we need to consult ID registers during probe time.
->
-> This patch updates our PMUv3 probing code to test for the presence of
-> PMUv3 functionality before touching an PMUv3-specific registers, and
-> before updating the struct arm_pmu with PMUv3 data.
->
-> When a PMUv3-compatible PMU is not present, probing will return -ENODEV.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 87 ++++++++++++++++++++++++++++++++++--------
->  1 file changed, 71 insertions(+), 16 deletions(-)
->
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 57ae9d9..53f2354 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -957,11 +957,26 @@ static int armv8_vulcan_map_event(struct perf_event *event)
->                                 ARMV8_PMU_EVTYPE_EVENT);
->  }
->
-> +struct armv8pmu_probe_info {
-> +       struct arm_pmu *pmu;
-> +       bool present;
-> +};
-> +
->  static void __armv8pmu_probe_pmu(void *info)
->  {
-> -       struct arm_pmu *cpu_pmu = info;
-> +       struct armv8pmu_probe_info *probe = info;
-> +       struct arm_pmu *cpu_pmu = probe->pmu;
-> +       u64 dfr0, pmuver;
->         u32 pmceid[2];
->
-> +       dfr0 = read_sysreg(id_aa64dfr0_el1);
-> +       pmuver = cpuid_feature_extract_unsigned_field(dfr0,
-> +                       ID_AA64DFR0_PMUVER_SHIFT);
-> +       if (pmuver != 1)
-> +               return;
+Add the PCI_SUBSYS_DEVID_81XX_RGX and use the same to set
+the max bgx per node count.
 
-There is a problem here, the 8.1 spec allows PMUver value 4 for PMUv3
-"Performance Monitors extension System registers implemented, PMUv3,
-with a 16-bit evtCount field, and if EL2 is implemented, the addition
-of the MDCR_EL2.HPMD bit"
+This fixes the issue intoduced by following commit
+78aacb6f6 net: thunderx: Fix invalid mac addresses for node1 interfaces
+With this commit the max_bgx_per_node for 81xx is set as 2 instead of 3
+because of which num_vfs is always calculated as zero.
 
-On Broadcom Vulcan/Cavium ThunderX2 the value of PMUver is 4 and this
-breaks (even the working DT case if I am not mistaken).
+Signed-off-by: George Cherian <george.cherian@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 1 +
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-JC.
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 64a1095..a0ca68c 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -134,6 +134,7 @@ static void set_max_bgx_per_node(struct pci_dev *pdev)
+ 	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &sdevid);
+ 	switch (sdevid) {
+ 	case PCI_SUBSYS_DEVID_81XX_BGX:
++	case PCI_SUBSYS_DEVID_81XX_RGX:
+ 		max_bgx_per_node = MAX_BGX_PER_CN81XX;
+ 		break;
+ 	case PCI_SUBSYS_DEVID_83XX_BGX:
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index c5080f2c..6b7fe6fd 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -16,6 +16,7 @@
+ /* Subsystem device IDs */
+ #define PCI_SUBSYS_DEVID_88XX_BGX		0xA126
+ #define PCI_SUBSYS_DEVID_81XX_BGX		0xA226
++#define PCI_SUBSYS_DEVID_81XX_RGX		0xA254
+ #define PCI_SUBSYS_DEVID_83XX_BGX		0xA326
+ 
+ #define    MAX_BGX_THUNDER			8 /* Max 2 nodes, 4 per node */
+-- 
+2.1.4
