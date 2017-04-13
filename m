@@ -1,39 +1,50 @@
 From: jiada_wang@mentor.com (jiada_wang at mentor.com)
-Date: Thu, 13 Apr 2017 05:13:59 -0700
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-Message-ID: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+Date: Thu, 13 Apr 2017 05:14:01 -0700
+Subject: [PATCH RFC 2/5] spi: spidev: use different name for SPI controller
+ slave mode device
+In-Reply-To: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <1492085644-4195-3-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jiada Wang <jiada_wang@mentor.com>
 
-v1:
-  add Slave mode support in SPI core
-  spidev create slave device when SPI controller work in slave mode
-  spi-imx support to work in slave mode
+SPI bus controller has started to support to work in slave mode,
+for device SPI controller itself works in slave mode, use name
+'spidev[bus]-slv' as its name to differentiate from other
+SPI devices
 
-Jiada Wang (5):
-  spi: core: add support to work in Slave mode
-  spi: spidev: use different name for SPI controller slave mode device
-  spi: imx: add selection for iMX53 and iMX6 controller
-  ARM: dts: imx: change compatiblity for SPI controllers on imx53 later
-    soc
-  spi: imx: Add support for SPI Slave mode for imx53 and imx6 chips
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+---
+ drivers/spi/spidev.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
- Documentation/devicetree/bindings/spi/spi-bus.txt |  27 ++-
- Documentation/spi/spi-summary                     |  19 +-
- arch/arm/boot/dts/imx53.dtsi                      |   4 +-
- arch/arm/boot/dts/imx6q.dtsi                      |   2 +-
- arch/arm/boot/dts/imx6qdl.dtsi                    |   8 +-
- arch/arm/boot/dts/imx6sl.dtsi                     |   8 +-
- arch/arm/boot/dts/imx6sx.dtsi                     |   8 +-
- arch/arm/boot/dts/imx6ul.dtsi                     |   8 +-
- drivers/spi/Kconfig                               |  14 +-
- drivers/spi/spi-imx.c                             | 216 ++++++++++++++++++++--
- drivers/spi/spi.c                                 |  23 ++-
- drivers/spi/spidev.c                              |  15 +-
- include/linux/spi/spi.h                           |  15 ++
- 13 files changed, 310 insertions(+), 57 deletions(-)
-
+diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
+index 9e2e099..e2996fb 100644
+--- a/drivers/spi/spidev.c
++++ b/drivers/spi/spidev.c
+@@ -781,9 +781,18 @@ static int spidev_probe(struct spi_device *spi)
+ 		struct device *dev;
+ 
+ 		spidev->devt = MKDEV(SPIDEV_MAJOR, minor);
+-		dev = device_create(spidev_class, &spi->dev, spidev->devt,
+-				    spidev, "spidev%d.%d",
+-				    spi->master->bus_num, spi->chip_select);
++		if (spi->slave_mode)
++			dev = device_create(spidev_class, &spi->dev,
++					    spidev->devt, spidev,
++					    "spidev%d-slv",
++					    spi->master->bus_num);
++		else
++			dev = device_create(spidev_class, &spi->dev,
++					    spidev->devt, spidev,
++					    "spidev%d.%d",
++					    spi->master->bus_num,
++					    spi->chip_select);
++
+ 		status = PTR_ERR_OR_ZERO(dev);
+ 	} else {
+ 		dev_dbg(&spi->dev, "no minor number available!\n");
 -- 
 2.7.4
