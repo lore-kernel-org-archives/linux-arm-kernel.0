@@ -1,48 +1,97 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 13 Apr 2017 19:41:48 +0200 (CEST)
-Subject: [Bug] VCHIQ functional test broken
-In-Reply-To: <331235003.222371.1491934205807@email.1und1.de>
-References: <331235003.222371.1491934205807@email.1und1.de>
-Message-ID: <685482264.60263.1492105308873@email.1und1.de>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 13 Apr 2017 11:04:46 -0700 (PDT)
+Subject: "Consolidate get_dma_ops" breaks Xen on ARM
+In-Reply-To: <47808787-8067-ccc0-0ec6-de5e0d7597c8@arm.com>
+References: <alpine.DEB.2.10.1704101713080.2759@sstabellini-ThinkPad-X260>
+ <CY1PR0401MB1536C1FF3C069BC88D1DB14581000@CY1PR0401MB1536.namprd04.prod.outlook.com>
+ <a758dfc6-2b00-e279-303c-ba1e27380e35@arm.com>
+ <20170411133649.GB27857@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.10.1704111411350.2759@sstabellini-ThinkPad-X260>
+ <47808787-8067-ccc0-0ec6-de5e0d7597c8@arm.com>
+Message-ID: <alpine.DEB.2.10.1704131104380.2759@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 11. April 2017 um 20:10 geschrieben:
+On Thu, 13 Apr 2017, Julien Grall wrote:
+> Hi Stefano,
 > 
+> Sorry for the late answer.
 > 
-> Hi,
+> On 12/04/17 00:39, Stefano Stabellini wrote:
+> > On Tue, 11 Apr 2017, Catalin Marinas wrote:
+> > > On Tue, Apr 11, 2017 at 01:43:28PM +0100, Julien Grall wrote:
+> > > > On 11/04/17 02:14, Bart Van Assche wrote:
+> > > > > On 04/10/17 17:31, Stefano Stabellini wrote:
+> > > > > > I think the reason is that, as you can see, if (dev &&
+> > > > > > dev->dma_ops),
+> > > > > > dev->dma_ops is returned, while before this changes, xen_dma_ops was
+> > > > > > returned on Xen on ARM.
+> > > > > > 
+> > > > > > Unfortunately DMA cannot work properly without using the appropriate
+> > > > > > xen_dma_ops. See drivers/xen/swiotlb-xen.c and arch/arm/xen/mm.c for
+> > > > > > more details. (The problem is easy to spot, but I wasn't CC'ed on
+> > > > > > the
+> > > > > > patch.)
+> > > > > > 
+> > > > > > I don't know how to solve this problem without introducing some sort
+> > > > > > of
+> > > > > > if (xen()) in include/linux/dma-mapping.h.
+> > > > > 
+> > > > > Sorry but I don't have access to an ARM development system. Does your
+> > > > > comment apply to dev == NULL only, dev != NULL only or perhaps to
+> > > > > both?
+> > > > > If your comment applies to dev != NULL only, can you check whether
+> > > > > adding something like set_dma_ops(dev, get_arch_dma_ops(NULL)) to the
+> > > > > appropriate ARM arch_setup_dma_ops() function is sufficient?
+> > > > 
+> > > > If I understand correctly, set_dma_ops will replace dev->dma_ops with
+> > > > Xen DMA ops.
+> > > > 
+> > > > However, Xen DMA ops will need in some places to call the device
+> > > > specific DMA ops (see __generic_dma_ops(...)). So I think replacing
+> > > > dev->dma_ops is not a solution here.
+> > > > 
+> > > > The hackish patch below is fixing the problem for both ARM64 and ARM32.
+> > > > 
+> > > > diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> > > > index 0977317c6835..43a73ddeec7a 100644
+> > > > --- a/include/linux/dma-mapping.h
+> > > > +++ b/include/linux/dma-mapping.h
+> > > > @@ -174,6 +174,8 @@ int dma_mmap_from_coherent(struct device *dev,
+> > > > struct vm_area_struct *vma,
+> > > >  #include <asm/dma-mapping.h>
+> > > >  static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+> > > >  {
+> > > > +       if (xen_initial_domain())
+> > > > +              return xen_dma_ops;
+> > > >         if (dev && dev->dma_ops)
+> > > >                 return dev->dma_ops;
+> > > >         return get_arch_dma_ops(dev ? dev->bus : NULL);
+> > > 
+> > > If we do this, I guess there is no need to check for
+> > > xen_initial_domain() in the get_arch_dma_ops() function. Anyway, this
+> > > hunk would break the other architectures since xen_dma_ops is only
+> > > defined for arm and arm64.
+> > > 
+> > > > It is not nice as this is common code, but I can't find a better
+> > > > solution
+> > > > so far. Any opinions?
+> > > 
+> > > A different hack would be to avoid the generic get_dma_ops
+> > > implementation on arm with some #ifdef hacks above.
+> > > 
+> > > Yet another way would be for dom0 to always set dev->dma_ops to
+> > > xen_dma_ops and preserve the real dma_ops somewhere under dev->archdata.
+> > > You could intercept the arch_setup_dma_ops() function for this or use
+> > > bus_register_notifier() (though I think the former is easier). The Xen
+> > > code making use of the real dma_ops would have to dig them out from
+> > > dev->archdata.
+> > 
+> > This is a good suggestion, Catalin. Thank you. See below. Is that what
+> > you have in mind? Julien could you test it, please? If it is the right
+> > approach, I'll submit the patch properly and rename __generic_dma_ops to
+> > xen_generic_dma_ops or something.
 > 
-> recently i found that vchiq_test -f doesn't work anymore with current mainline (4.11-rc6) and linux-next (20170404) on my Raspberry Pi Zero. The issue is always reproducible, but the error behavior isn't deterministic. Sometimes vchiq_test hangs and sometimes i get an error message from vchiq_test like this (but never errors from the kernel):
-> 
-> $ vchiq_test -f 10
-> Functional test - iters:10
-> ======== iteration 1 ========
-> vchiq_test: 1502: expected callback reason VCHIQ_MESSAGE_AVAILABLE, got 1
-> vchiq_test: 1524: expected callback reason VCHIQ_BULK_TRANSMIT_DONE, got 5
-> vchiq_test: 863: func_error != 0
-> 
-> I didn't had the time to bisect, but at least 4.10 is safe.
-> 
+> This patch is fixing the bug I encountered.
 
-Okay, i've bisected this regression to this commit:
-
-00a19f3e25c0c40e0ec77f52d4841d23ad269169 is the first bad commit
-commit 00a19f3e25c0c40e0ec77f52d4841d23ad269169
-Author: Rabin Vincent <rabinv@axis.com>
-Date:   Tue Nov 8 09:21:19 2016 +0100
-
-    ARM: 8627/1: avoid cache flushing in flush_dcache_page()
-    
-    When the data cache is PIPT or VIPT non-aliasing, and cache operations
-    are broadcast by the hardware, we can always postpone the flush in
-    flush_dcache_page().  A similar change was done for ARM64 in commit
-    b5b6c9e9149d ("arm64: Avoid cache flushing in flush_dcache_page()").
-    
-    Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-    Signed-off-by: Rabin Vincent <rabinv@axis.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-It seems that staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm relies on the behavior of flush_dcache_page before this patch get applied. Any advices to fix this issues are appreciated.
-
-Regards
-Stefan
+I'll add your tested-by.
