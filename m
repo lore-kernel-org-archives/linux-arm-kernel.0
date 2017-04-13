@@ -1,120 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Apr 2017 11:27:49 +0200
-Subject: [PATCH 1/3] clk: sunxi-ng: Add clk notifier to gate then ungate
- PLL clocks
-In-Reply-To: <CAGb2v64z9+FyozKf=O4ASFrEgZoeGJVBSNR6NsnyP4dHgYZqfw@mail.gmail.com>
-References: <20170413021354.3258-1-wens@csie.org>
- <20170413021354.3258-2-wens@csie.org>
- <20170413070209.kjpv27fqc4o4znqs@lukather>
- <CAGb2v64z9+FyozKf=O4ASFrEgZoeGJVBSNR6NsnyP4dHgYZqfw@mail.gmail.com>
-Message-ID: <20170413092749.h5iyqqnuvy4odxwv@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Apr 2017 10:34:18 +0100
+Subject: kvm/arm64: use-after-free in
+ kvm_unmap_hva_handler/unmap_stage2_pmds
+In-Reply-To: <CAAeHK+yzzdQVvGQcuprTHEa7S9CPiAVYodD__jQ8a=CzA6RaZg@mail.gmail.com>
+References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
+ <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
+ <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
+ <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
+ <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
+ <CAAeHK+yzzdQVvGQcuprTHEa7S9CPiAVYodD__jQ8a=CzA6RaZg@mail.gmail.com>
+Message-ID: <20170413093418.GC24027@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 03:35:30PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Apr 13, 2017 at 3:02 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Chen-Yu,
+On Wed, Apr 12, 2017 at 08:51:31PM +0200, Andrey Konovalov wrote:
+> On Wed, Apr 12, 2017 at 8:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On 12/04/17 17:19, Andrey Konovalov wrote:
+
+> >> I now have a way to reproduce it, so I can test proposed patches. I
+> >> don't have a simple C reproducer though.
+> >>
+> >> The bug happens when the following syzkaller program is executed:
+> >>
+> >> mmap(&(0x7f0000000000/0xc000)=nil, (0xc000), 0x3, 0x32, 0xffffffffffffffff, 0x0)
+> >> unshare(0x400)
+> >> perf_event_open(&(0x7f000002f000-0x78)={0x1, 0x78, 0x0, 0x0, 0x0, 0x0,
+> >> 0x0, 0x6, 0x0, 0x0, 0xd34, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+> >> 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, 0x0, 0xffffffff,
+> >> 0xffffffffffffffff, 0x0)
+> >> r0 = openat$kvm(0xffffffffffffff9c,
+> >> &(0x7f000000c000-0x9)="2f6465762f6b766d00", 0x0, 0x0)
+> >> ioctl$TIOCSBRK(0xffffffffffffffff, 0x5427)
+> >> r1 = ioctl$KVM_CREATE_VM(r0, 0xae01, 0x0)
+> >> syz_kvm_setup_cpu$arm64(r1, 0xffffffffffffffff,
+> >> &(0x7f0000dc6000/0x18000)=nil, &(0x7f000000c000)=[{0x0,
+> >> &(0x7f000000c000)="5ba3c16f533efbed09f8221253c73763327fadce2371813b45dd7f7982f84a873e4ae89a6c2bd1af83a6024c36a1ff518318",
+> >> 0x32}], 0x1, 0x0, &(0x7f000000d000-0x10)=[@featur2={0x1, 0x3}], 0x1)
 > >
-> > On Thu, Apr 13, 2017 at 10:13:52AM +0800, Chen-Yu Tsai wrote:
-> >> In common PLL designs, changes to the dividers take effect almost
-> >> immediately, while changes to the multipliers (implemented as
-> >> dividers in the feedback loop) take a few cycles to work into
-> >> the feedback loop for the PLL to stablize.
-> >>
-> >> Sometimes when the PLL clock rate is changed, the decrease in the
-> >> divider is too much for the decrease in the multiplier to catch up.
-> >> The PLL clock rate will spike, and in some cases, might lock up
-> >> completely. This is especially the case if the divider changed is
-> >> the pre-divider, which affects the reference frequency.
-> >>
-> >> This patch introduces a clk notifier callback that will gate and
-> >> then ungate a clk after a rate change, effectively resetting it,
-> >> so it continues to work, despite any possible lockups. Care must
-> >> be taken to reparent any consumers to other temporary clocks during
-> >> the rate change, and that this notifier callback must be the first
-> >> to be registered.
-> >>
-> >> This is intended to fix occasional lockups with cpufreq on newer
-> >> Allwinner SoCs, such as the A33 and the H3. Previously it was
-> >> thought that reparenting the cpu clock away from the PLL while
-> >> it stabilized was enough, as this worked quite well on the A31.
-> >>
-> >> On the A33, hangs have been observed after cpufreq was recently
-> >> introduced. With the H3, a more thorough test [1] showed that
-> >> reparenting alone isn't enough. The system still locks up unless
-> >> the dividers are limited to 1.
-> >>
-> >> A hunch was if the PLL was stuck in some unknown state, perhaps
-> >> gating then ungating it would bring it back to normal. Tests
-> >> done by Icenowy Zheng using Ondrej's test firmware shows this
-> >> to be a valid solution.
-> >>
-> >> [1] http://www.spinics.net/lists/arm-kernel/msg552501.html
-> >>
-> >> Reported-by: Ondrej Jirman <megous@megous.com>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> Tested-by: Icenowy Zheng <icenowy@aosc.io>
-> >> Tested-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> >
-> > Thanks for looking into this, and coming up with a clean solution, and
-> > a great commit log.
-> >
-> > However, I wondering, isn't that notifier just a re-implementation of
-> > CLK_SET_RATE_GATE?
+> > Is that the only thing the program does? Or is there anything running in
+> > parallel?
 > 
-> They are not the same. AFAIK, CLK_SET_RATE_GATE tells the clk framework
-> that this clk's rate cannot be changed if it is enabled (which means
-> some one is using it). However the clk framework does nothing to
-> actually handle it. It just returns an error. Any consumers are
-> responsible for gating the clock before making changes. This is a nice
-> thing to have, as it can prevent unintended changes to dot clocks or
-> audio clocks used with active output streams. We could consider setting
-> this for the audio and video PLLs.
-
-Ah, you're right. I merged the two first patches and will send them
-for 4.11.
-
-> Here we are dealing with the CPU PLL, which, for practical reasons,
-> is always enabled as far as the clk framework is concerned. The
-> reason being the OPPs are never low enough for the CPU clock to
-> use any other parent. To have it disabled, we would have to kick
-> consumers (the CPU clock in this case) to use other clocks, so it's
-> safe, remember which ones we kicked, and then bring them back once
-> everything is done.
+> These calls are executed repeatedly and in random order. That's all.
 > 
-> AFAIK, we, samsung, rockchip, meson, do the temporary reparenting
-> using clk_notifiers to access the mux registers directly. As far
-> as the clk framework is concerned, nothing has changed.
-> 
-> I'm not saying it's not possible to support this in the core, but
-> the core already has to do a lot of bookkeeping and recalculation
-> when anything changes. Adding something transient into the process
-> isn't helping. And the reparenting might temporarily violate any
-> downstream requirements.
-> 
-> For now, I think clk notifiers is the easier solution for these
-> one off requirements that are pretty much contained in a small
-> part of the system.
+> Except that I'm running the reproducer on a real arm board, so there's
+> probably a bunch of stuff going on besides these calls.
 
-However, the third one is less urgent, since we don't have H3 cpufreq
-support yet, so we won't hit that case, and I'd like to have first a
-common function that register the notifiers since the order really
-matters, we don't want to have someone getting it wrong.
+I had a go at reproducing this on an arm64 board following [1], but so
+far I've had no luck. I've dumped the above into syz-kvm-bug, and I'm
+trying to reproduce the issue with:
 
-Since this is 4.13 material, there's no rush on that one though.
+	PATH=$PATH:$(pwd)/bin syz-execprog \
+		-executor $(pwd)/bin/syz-executor \
+		-cover=0 -repeat=0 -procs 16 \
+		syz-kvm-bug
 
-Thanks again!
-Maxime
+Just to check, is that the correct way to reproduce the problem with the
+above log?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/2f3b1b71/attachment-0001.sig>
+How quickly does that reproduce the problem for you?
+
+Thanks,
+Mark.
+
+[1] https://github.com/google/syzkaller/wiki/How-to-execute-syzkaller-programs
