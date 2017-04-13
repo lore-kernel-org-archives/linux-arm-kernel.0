@@ -1,45 +1,28 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 13 Apr 2017 06:32:42 -0700
-Subject: [PATCH 8/8] ARM: dts: imx7d-sdb: Enable PCIe peripheral
-In-Reply-To: <20170413133242.5068-1-andrew.smirnov@gmail.com>
-References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
-Message-ID: <20170413133242.5068-9-andrew.smirnov@gmail.com>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Thu, 13 Apr 2017 14:38:06 +0100
+Subject: [PATCH 2/4] net: macb: Add tsu_clk to device tree
+In-Reply-To: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+References: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+Message-ID: <1492090686-14778-1-git-send-email-rafalo@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCIe peripheral on this board.
-
-Cc: yurovsky at gmail.com
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
 ---
- arch/arm/boot/dts/imx7d-sdb.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/net/macb.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index e0ff276..f77e26a 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -352,6 +352,13 @@
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index 1506e94..27966ae 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -22,6 +22,7 @@ Required properties:
+ 	Required elements: 'pclk', 'hclk'
+ 	Optional elements: 'tx_clk'
+ 	Optional elements: 'rx_clk' applies to cdns,zynqmp-gem
++	Optional elements: 'tsu_clk'
+ - clocks: Phandles to input clocks.
  
-+&pcie {
-+	pinctrl-names = "default";
-+	reset-gpio = <&gpio_spi 1 GPIO_ACTIVE_LOW>;
-+	disable-gpio = <&gpio_spi 0 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &pwm1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm1>;
+ Optional properties for PHY child node:
 -- 
-2.9.3
+2.4.5
