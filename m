@@ -1,75 +1,28 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 13 Apr 2017 08:55:08 -0500
-Subject: [PATCH] tty: pl011: use "qdf2400_e44" as the earlycon name for
- QDF2400 E44
-Message-ID: <1492091708-30593-1-git-send-email-timur@codeaurora.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 13 Apr 2017 21:58:28 +0800
+Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
+In-Reply-To: <86200633-8349-f1c3-f4d8-a130a26381f7@gmail.com>
+References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+ <86200633-8349-f1c3-f4d8-a130a26381f7@gmail.com>
+Message-ID: <20170413135828.GA24254@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a new early console name for Qualcomm Datacenter Technologies
-QDF2400 SOCs affected by erratum 44, instead of piggy-backing on "pl011".
-Previously, to enable traditional (non-SPCR) earlycon, the documentation
-said to specify "earlycon=pl011,<address>,qdf2400_e44", but the code was
-broken and this didn't actually work.
+On Tue, Apr 11, 2017 at 10:01:29AM -0700, Florian Fainelli wrote:
+...
+> > This is a RFC patch intending to bring up the idea to discuss.
+> > 
+> > Comments are welcome and appreciated!
+> 
+> Thanks a lot for doing this, we have historically done something similar
+> on ARCH_BRCMSTB platforms in our downstream tree with a concept of a
+> "software" clock which has multiple parents (yikes), using the bulk
+> accessors would essentially allow us to remove part of this hack, so I
+> am all in favor of this!
 
-So instead, the method for specifying the E44 work-around with traditional
-earlycon is "earlycon=qdf2400_e44,<address>".  Both methods of earlycon
-are now enabled with the same function.
+Glad to see someone else has the same idea! :-)
 
-Fixes: e53e597fd4c4 ("tty: pl011: fix earlycon work-around for QDF2400 erratum 44")
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/tty/serial/amba-pl011.c | 31 +++++++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 8 deletions(-)
+Thanks for the supporting!
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 2783539..0875f7d 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2470,19 +2470,34 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	if (!device->port.membase)
- 		return -ENODEV;
- 
--	/* On QDF2400 SOCs affected by Erratum 44, the "qdf2400_e44" must
--	 * also be specified, e.g. "earlycon=pl011,<address>,qdf2400_e44".
--	 */
--	if (!strcmp(device->options, "qdf2400_e44"))
--		device->con->write = qdf2400_e44_early_write;
--	else
--		device->con->write = pl011_early_write;
-+	device->con->write = pl011_early_write;
- 
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
- OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
--EARLYCON_DECLARE(qdf2400_e44, pl011_early_console_setup);
-+
-+/*
-+ * On Qualcomm Datacenter Technologies QDF2400 SOCs affected by
-+ * Erratum 44, traditional earlycon can be enabled by specifying
-+ * "earlycon=qdf2400_e44,<address>".  Any options are ignored.
-+ *
-+ * Alternatively, you can just specify "earlycon", and the early console
-+ * will be enabled with the information from the SPCR table.  In this
-+ * case, the SPCR code will detect the need for the E44 work-around,
-+ * and set the console name to "qdf2400_e44".
-+ */
-+static int __init
-+qdf2400_e44_early_console_setup(struct earlycon_device *device,
-+				const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = qdf2400_e44_early_write;
-+	return 0;
-+}
-+EARLYCON_DECLARE(qdf2400_e44, qdf2400_e44_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards
+Dong Aisheng
