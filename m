@@ -1,76 +1,73 @@
-From: wuchengli@google.com (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
-Date: Thu, 13 Apr 2017 14:50:08 +0800
-Subject: [PATCH] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
-In-Reply-To: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <CAOMLVLiLkZsBfezx6b9Xq=kyPjUZOXwHC4LfHh1=wy6Ynt=zSQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 13 Apr 2017 09:02:09 +0200
+Subject: [PATCH 1/3] clk: sunxi-ng: Add clk notifier to gate then ungate
+ PLL clocks
+In-Reply-To: <20170413021354.3258-2-wens@csie.org>
+References: <20170413021354.3258-1-wens@csie.org>
+ <20170413021354.3258-2-wens@csie.org>
+Message-ID: <20170413070209.kjpv27fqc4o4znqs@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Wu-Cheng Li <wuchengli@chromium.org>
+Hi Chen-Yu,
 
-On Thu, Apr 13, 2017 at 12:18 PM, Minghsiu Tsai
-<minghsiu.tsai@mediatek.com> wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
->
-> Experiments show that the:
->  (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
->  (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
->
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
->
-> ---
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> index 13afe48..8ab7ca0 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> @@ -837,12 +837,12 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
->         struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
->         bool valid = false;
->
-> -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -               if (mtk_mdp_is_target_compose(s->target))
-> -                       valid = true;
-> -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
->                 if (mtk_mdp_is_target_crop(s->target))
->                         valid = true;
-> +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-> +               if (mtk_mdp_is_target_compose(s->target))
-> +                       valid = true;
->         }
->         if (!valid) {
->                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
-> @@ -907,12 +907,12 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->         int ret;
->         bool valid = false;
->
-> -       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
-> -               if (s->target == V4L2_SEL_TGT_COMPOSE)
-> -                       valid = true;
-> -       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
-> +       if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
->                 if (s->target == V4L2_SEL_TGT_CROP)
->                         valid = true;
-> +       } else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-> +               if (s->target == V4L2_SEL_TGT_COMPOSE)
-> +                       valid = true;
->         }
->         if (!valid) {
->                 mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
-> @@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
->         if (ret)
->                 return ret;
->
-> -       if (mtk_mdp_is_target_crop(s->target))
-> +       if (mtk_mdp_is_target_compose(s->target))
->                 frame = &ctx->s_frame;
->         else
->                 frame = &ctx->d_frame;
-> --
-> 1.9.1
->
+On Thu, Apr 13, 2017 at 10:13:52AM +0800, Chen-Yu Tsai wrote:
+> In common PLL designs, changes to the dividers take effect almost
+> immediately, while changes to the multipliers (implemented as
+> dividers in the feedback loop) take a few cycles to work into
+> the feedback loop for the PLL to stablize.
+> 
+> Sometimes when the PLL clock rate is changed, the decrease in the
+> divider is too much for the decrease in the multiplier to catch up.
+> The PLL clock rate will spike, and in some cases, might lock up
+> completely. This is especially the case if the divider changed is
+> the pre-divider, which affects the reference frequency.
+> 
+> This patch introduces a clk notifier callback that will gate and
+> then ungate a clk after a rate change, effectively resetting it,
+> so it continues to work, despite any possible lockups. Care must
+> be taken to reparent any consumers to other temporary clocks during
+> the rate change, and that this notifier callback must be the first
+> to be registered.
+> 
+> This is intended to fix occasional lockups with cpufreq on newer
+> Allwinner SoCs, such as the A33 and the H3. Previously it was
+> thought that reparenting the cpu clock away from the PLL while
+> it stabilized was enough, as this worked quite well on the A31.
+> 
+> On the A33, hangs have been observed after cpufreq was recently
+> introduced. With the H3, a more thorough test [1] showed that
+> reparenting alone isn't enough. The system still locks up unless
+> the dividers are limited to 1.
+> 
+> A hunch was if the PLL was stuck in some unknown state, perhaps
+> gating then ungating it would bring it back to normal. Tests
+> done by Icenowy Zheng using Ondrej's test firmware shows this
+> to be a valid solution.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg552501.html
+> 
+> Reported-by: Ondrej Jirman <megous@megous.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Tested-by: Icenowy Zheng <icenowy@aosc.io>
+> Tested-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+
+Thanks for looking into this, and coming up with a clean solution, and
+a great commit log.
+
+However, I wondering, isn't that notifier just a re-implementation of
+CLK_SET_RATE_GATE?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/076adcef/attachment.sig>
