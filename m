@@ -1,148 +1,232 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 13 Apr 2017 09:45:33 +0200
-Subject: [PATCH v5 1/4] gpio: mvebu: Add limited PWM support
-In-Reply-To: <20170412171121.GB11964@ulmo.ba.sec>
-References: <20170409180931.4884-1-ralph.sennhauser@gmail.com>
- <20170409180931.4884-2-ralph.sennhauser@gmail.com>
- <20170412171121.GB11964@ulmo.ba.sec>
-Message-ID: <20170413094533.68d47edd@gmail.com>
+From: glin@suse.com (Gary Lin)
+Date: Thu, 13 Apr 2017 15:47:28 +0800
+Subject: [PATCH v2] efi: Config options to assign versions in the PE-COFF
+ header
+In-Reply-To: <CAKv+Gu8ZS1rdDwLrspv_VnYHOfxkdxUpZe_h1Sw3-N2SBpeJ5g@mail.gmail.com>
+References: <20170413035827.9820-1-glin@suse.com>
+ <CAKv+Gu8ZS1rdDwLrspv_VnYHOfxkdxUpZe_h1Sw3-N2SBpeJ5g@mail.gmail.com>
+Message-ID: <20170413074728.5zglfjw2rxgc6lpj@GaryWorkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Apr 2017 19:11:21 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+On Thu, Apr 13, 2017 at 08:26:04AM +0100, Ard Biesheuvel wrote:
+> On 13 April 2017 at 04:58, Gary Lin <glin@suse.com> wrote:
+> > This commit adds the new config options to allow the user to modify the
+> > following fields in the PE-COFF header.
+> >
+> > UINT16 MajorOperatingSystemVersion
+> > UINT16 MinorOperatingSystemVersion
+> > UINT16 MajorImageVersion
+> > UINT16 MinorImageVersion
+> >
+> > Those fields are mainly for the executables or libraries in Windows NT
+> > or higher to specify the minimum supported Windows version and the
+> > version of the image itself.
+> >
+> > Given the fact that those fields are ignored in UEFI, we can safely reuse
+> > those fields for other purposes, e.g. Security Version(*).
+> >
+> > (*) https://github.com/lcp/shim/wiki/Security-Version
+> >
+> > v2 changes:
+> > - Modify the header direct instead of using an external script as
+> >   suggested by Ard Biesheuvel
+> > - Include arm and arm64
+> >
+> 
+> Thanks for the update. Could we put the Kconfig changes in
+> drivers/firmware/efi/Kconfig, rather than duplicating them 3 times?
 
-> On Sun, Apr 09, 2017 at 08:09:27PM +0200, Ralph Sennhauser wrote:
-> > From: Andrew Lunn <andrew@lunn.ch>
-> > 
-> > Armada 370/XP devices can 'blink' GPIO lines with a configurable on
-> > and off period. This can be modelled as a PWM.
-> > 
-> > However, there are only two sets of PWM configuration registers for
-> > all the GPIO lines. This driver simply allows a single GPIO line per
-> > GPIO chip of 32 lines to be used as a PWM. Attempts to use more
-> > return EBUSY.
-> > 
-> > Due to the interleaving of registers it is not simple to separate
-> > the PWM driver from the GPIO driver. Thus the GPIO driver has been
-> > extended with a PWM driver.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > URL: https://patchwork.ozlabs.org/patch/427287/
-> > URL: https://patchwork.ozlabs.org/patch/427295/
-> > [Ralph Sennhauser:
-> >   * Port forward
-> >   * Merge PWM portion into gpio-mvebu.c
-> >   * Switch to atomic PWM API
-> >   * Add new compatible string marvell,armada-370-xp-gpio
-> >   * Update and merge documentation patch
-> >   * Update MAINTAINERS]
-> > Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> > Tested-by: Andrew Lunn <andrew@lunn.ch>
+Sure. Will send a v3 to update Kconfig.
+
+Thanks,
+
+Gary Lin
+
+> 
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: "H. Peter Anvin" <hpa@zytor.com>
+> > Cc: Joey Lee <jlee@suse.com>
+> > Cc: Vojtech Pavlik <vojtech@suse.cz>
+> > Signed-off-by: Gary Lin <glin@suse.com>
 > > ---
-> >  .../devicetree/bindings/gpio/gpio-mvebu.txt        |  32 ++
-> >  MAINTAINERS                                        |   2 +
-> >  drivers/gpio/gpio-mvebu.c                          | 324
-> > ++++++++++++++++++++- 3 files changed, 346 insertions(+), 12
-> > deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt
-> > b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt index
-> > a6f3bec..fe49e9d 100644 ---
-> > a/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt +++
-> > b/Documentation/devicetree/bindings/gpio/gpio-mvebu.txt @@ -38,6
-> > +38,24 @@ Required properties:
-> >  - #gpio-cells: Should be two. The first cell is the pin number. The
-> >    second cell is reserved for flags, unused at the moment.
-> >  
-> > +Optional properties:
+> >  arch/arm/Kconfig                      | 24 ++++++++++++++++++++++++
+> >  arch/arm/boot/compressed/efi-header.S |  8 ++++----
+> >  arch/arm64/Kconfig                    | 24 ++++++++++++++++++++++++
+> >  arch/arm64/kernel/head.S              |  8 ++++----
+> >  arch/x86/Kconfig                      | 24 ++++++++++++++++++++++++
+> >  arch/x86/boot/header.S                |  8 ++++----
+> >  6 files changed, 84 insertions(+), 12 deletions(-)
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 0d4e71b42c77..4965ad2ccc23 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -2090,6 +2090,30 @@ config EFI
+> >           is only useful for kernels that may run on systems that have
+> >           UEFI firmware.
+> >
+> > +config EFI_MAJOR_OS
+> > +       hex "EFI Major OS Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> > +In order to use the gpio lines in PWM mode, some additional
-> > optional +properties are required. Only Armada 370 and XP support
-> > these properties. +
-> > +- compatible: Must contain "marvell,armada-370-xp-gpio"
+> > +config EFI_MINOR_OS
+> > +       hex "EFI Minor OS Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> > +- reg: an additional register set is needed, for the GPIO Blink
-> > +  Counter on/off registers.
+> > +config EFI_MAJOR_IMAGE
+> > +       hex "EFI Major Image Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> > +- reg-names: Must contain an entry "pwm" corresponding to the
-> > +  additional register range needed for pwm operation.
+> > +config EFI_MINOR_IMAGE
+> > +       hex "EFI Minor Image Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> > +- #pwm-cells: Should be two. The first cell is the GPIO line
-> > number. The
-> > +  second cell is the period in nanoseconds.
+> >  endmenu
+> >
+> >  menu "CPU Power Management"
+> > diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> > index 9d5dc4fda3c1..67715472a76f 100644
+> > --- a/arch/arm/boot/compressed/efi-header.S
+> > +++ b/arch/arm/boot/compressed/efi-header.S
+> > @@ -69,10 +69,10 @@ extra_header_fields:
+> >                 .long   0                       @ ImageBase
+> >                 .long   0x200                   @ SectionAlignment
+> >                 .long   0x200                   @ FileAlignment
+> > -               .short  0                       @ MajorOperatingSystemVersion
+> > -               .short  0                       @ MinorOperatingSystemVersion
+> > -               .short  0                       @ MajorImageVersion
+> > -               .short  0                       @ MinorImageVersion
+> > +               .short  CONFIG_EFI_MAJOR_OS     @ MajorOperatingSystemVersion
+> > +               .short  CONFIG_EFI_MINOR_OS     @ MinorOperatingSystemVersion
+> > +               .short  CONFIG_EFI_MAJOR_IMAGE  @ MajorImageVersion
+> > +               .short  CONFIG_EFI_MINOR_IMAGE  @ MinorImageVersion
+> >                 .short  0                       @ MajorSubsystemVersion
+> >                 .short  0                       @ MinorSubsystemVersion
+> >                 .long   0                       @ Win32VersionValue
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 3741859765cf..c782c422e58c 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -1033,6 +1033,30 @@ config EFI
+> >           allow the kernel to be booted as an EFI application. This
+> >           is only useful on systems that have UEFI firmware.
+> >
+> > +config EFI_MAJOR_OS
+> > +       hex "EFI Major OS Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> > +- clocks: Must be a phandle to the clock for the gpio controller.
+> > +config EFI_MINOR_OS
+> > +       hex "EFI Minor OS Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> >  Example:
-> >  
-> >  		gpio0: gpio at d0018100 {
-> > @@ -51,3 +69,17 @@ Example:
-> >  			#interrupt-cells = <2>;
-> >  			interrupts = <16>, <17>, <18>, <19>;
-> >  		};
+> > +config EFI_MAJOR_IMAGE
+> > +       hex "EFI Major Image Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
 > > +
-> > +		gpio1: gpio at 18140 {
-> > +			compatible = "marvell,armada-370-xp-gpio";
-> > +			reg = <0x18140 0x40>, <0x181c8 0x08>;
-> > +			reg-names = "gpio", "pwm";
-> > +			ngpios = <17>;
-> > +			gpio-controller;
-> > +			#gpio-cells = <2>;
-> > +			#pwm-cells = <2>;
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <2>;
-> > +			interrupts = <87>, <88>, <89>;
-> > +			clocks = <&coreclk 0>;
-> > +		};  
+> > +config EFI_MINOR_IMAGE
+> > +       hex "EFI Minor Image Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
+> > +
+> >  config DMI
+> >         bool "Enable support for SMBIOS (DMI) tables"
+> >         depends on EFI
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index 4fb6ccd886d1..9faa4b04d0ef 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -129,10 +129,10 @@ extra_header_fields:
+> >         .quad   0                               // ImageBase
+> >         .long   0x1000                          // SectionAlignment
+> >         .long   PECOFF_FILE_ALIGNMENT           // FileAlignment
+> > -       .short  0                               // MajorOperatingSystemVersion
+> > -       .short  0                               // MinorOperatingSystemVersion
+> > -       .short  0                               // MajorImageVersion
+> > -       .short  0                               // MinorImageVersion
+> > +       .short  CONFIG_EFI_MAJOR_OS             // MajorOperatingSystemVersion
+> > +       .short  CONFIG_EFI_MINOR_OS             // MinorOperatingSystemVersion
+> > +       .short  CONFIG_EFI_MAJOR_IMAGE          // MajorImageVersion
+> > +       .short  CONFIG_EFI_MINOR_IMAGE          // MinorImageVersion
+> >         .short  0                               // MajorSubsystemVersion
+> >         .short  0                               // MinorSubsystemVersion
+> >         .long   0                               // Win32VersionValue
+> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> > index 5bbdef151805..233933fde7dd 100644
+> > --- a/arch/x86/Kconfig
+> > +++ b/arch/x86/Kconfig
+> > @@ -1803,6 +1803,30 @@ config EFI_STUB
+> >
+> >           See Documentation/efi-stub.txt for more information.
+> >
+> > +config EFI_MAJOR_OS
+> > +       hex "EFI Major OS Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
+> > +
+> > +config EFI_MINOR_OS
+> > +       hex "EFI Minor OS Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
+> > +
+> > +config EFI_MAJOR_IMAGE
+> > +       hex "EFI Major Image Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
+> > +
+> > +config EFI_MINOR_IMAGE
+> > +       hex "EFI Minor Image Version"
+> > +       range 0x0 0xFFFF
+> > +       default "0x0"
+> > +       depends on EFI_STUB
+> > +
+> >  config EFI_MIXED
+> >         bool "EFI mixed-mode support"
+> >         depends on EFI_STUB && X86_64
+> > diff --git a/arch/x86/boot/header.S b/arch/x86/boot/header.S
+> > index 3dd5be33aaa7..863813007207 100644
+> > --- a/arch/x86/boot/header.S
+> > +++ b/arch/x86/boot/header.S
+> > @@ -156,10 +156,10 @@ extra_header_fields:
+> >  #endif
+> >         .long   0x20                            # SectionAlignment
+> >         .long   0x20                            # FileAlignment
+> > -       .word   0                               # MajorOperatingSystemVersion
+> > -       .word   0                               # MinorOperatingSystemVersion
+> > -       .word   0                               # MajorImageVersion
+> > -       .word   0                               # MinorImageVersion
+> > +       .word   CONFIG_EFI_MAJOR_OS             # MajorOperatingSystemVersion
+> > +       .word   CONFIG_EFI_MINOR_OS             # MinorOperatingSystemVersion
+> > +       .word   CONFIG_EFI_MAJOR_IMAGE          # MajorImageVersion
+> > +       .word   CONFIG_EFI_MINOR_IMAGE          # MinorImageVersion
+> >         .word   0                               # MajorSubsystemVersion
+> >         .word   0                               # MinorSubsystemVersion
+> >         .long   0                               # Win32VersionValue
+> > --
+> > 2.12.0
+> >
 > 
-> This is going to need an Acked-by from one of the device tree
-> maintainers. Rob and devicetree at vger.kernel.org are on Cc, but I
-> suspect nobody might look for the binding change "hidden" in this
-> patch.
-> 
-> Maybe best to split this off into a separate patch, or explicitly ping
-> Rob to look at this patch.
-
-Hi Thierry,
-
-Rob asked for the new compatible string so he did see it presumably. As
-you prefer to have an ACK by him I'll see to getting one for the driver
-(bindings part). The patch could be split but then one might want to
-split it even further. Like this the first patch in the series is a nice
-self contained package.
-
->
-<snip/>
-> 
-> > +
-> > +	mvpwm->clk_rate = clk_get_rate(mvchip->clk);
-> > +	if (!mvpwm->clk_rate) {
-> > +		dev_err(dev, "failed to get clock rate\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	mvpwm->chip.dev = dev;
-> > +	mvpwm->chip.ops = &mvebu_pwm_ops;
-> > +	mvpwm->chip.base = mvchip->chip.base;
-> > +	mvpwm->chip.npwm = mvchip->chip.ngpio;  
-> 
-> I still would've done this differently. If you use this with a PWM
-> user you have to hook it up via DT anyway, so it doesn't matter
-> whether you specify the PWM index or the GPIO via some other
-> property. The _only_ use-case where this might actually be an
-> advantage is if you request a PWM via the sysfs interface.
-
-Let me answer this in the other mail where you bring this up.
-
-> 
-<snip/>
-> All of my comments are effectively of a bikeshed nature, so from a PWM
-> perspective this is:
-> 
-> Acked-by: Thierry Reding <thierry.reding@gmail.com>
-
-Thanks for the detailed review and the ACK. Will work on all the
-mentioned bits for v6.
-
-Ralph
