@@ -1,51 +1,248 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Apr 2017 18:26:33 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.12 (#2)
-Message-ID: <87y3v4uvd2.fsf@free-electrons.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 14 Apr 2017 00:38:07 +0800
+Subject: [PATCH v2] arm64: allwinner: h5: add support for Orange Pi Prime board
+Message-ID: <20170413163807.28931-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Orange Pi Prime is a new Allwinner H5-based SBC by Xunlong.
 
-Here is the second pull request for dt64 for mvebu for v4.12.
+It's like a Orange Pi Plus 2E with H3 replaced with H5, eMMC replaced
+with onboard SPI NOR Flash and wireless card changed to Realtek
+RTL8723BS (with Bluetooth functionality).
 
-Gregory
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes since v1:
+- Fixed copyright holder.
 
-The following changes since commit 60894719241e2b3d6d202304de9ad33a8da3685c:
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../dts/allwinner/sun50i-h5-orangepi-prime.dts     | 205 +++++++++++++++++++++
+ 2 files changed, 206 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
 
-  arm64: marvell: dts: add PPv2.2 description to Armada 7K/8K (2017-03-23 17:46:23 +0100)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.12-2
-
-for you to fetch changes up to 7ba2ef7c7200e476ee2cede7bcffcf7749e02f5c:
-
-  arm64: marvell: dts: enable the crypto engine on the Armada 8040 DB (2017-04-12 10:36:30 +0200)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.12 (part 2)
-
-- crypto engine description for the Armada 7k/8k SoCs and the boards
-  using it
-- SDHCI description for the Armada 37xx and 7k/8k SoCs and the boards
-  using it
-
-----------------------------------------------------------------
-Antoine Tenart (3):
-      arm64: marvell: dts: add crypto engine description for 7k/8k
-      arm64: marvell: dts: enable the crypto engine on the Armada 7040 DB
-      arm64: marvell: dts: enable the crypto engine on the Armada 8040 DB
-
-Gregory CLEMENT (2):
-      arm64: dts: marvell: add eMMC support for Armada 37xx
-      arm64: dts: marvell: add sdhci support for Armada 7K/8K
-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     |  9 ++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 11 +++++++++
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 18 +++++++++++++++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 16 +++++++++++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 11 +++++++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 26 ++++++++++++++++++++++
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 16 +++++++++++++
- 7 files changed, 107 insertions(+)
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 244e8b7565f9..92a84eea6b96 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+new file mode 100644
+index 000000000000..28d92a612329
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+@@ -0,0 +1,205 @@
++/*
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * Based on sun50i-h5-orangepi-pc2.dts, which is:
++ *   Copyright (C) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun50i-h5.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "Xunlong Orange Pi Prime";
++	compatible = "xunlong,orangepi-prime", "allwinner,sun50i-h5";
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr {
++			label = "orangepi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		status {
++			label = "orangepi:red:status";
++			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	r-gpio-keys {
++		compatible = "gpio-keys";
++
++		sw4 {
++			label = "sw4";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	reg_usb0_vbus: usb0-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb0-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
++		status = "okay";
++	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&pio 2 14 GPIO_ACTIVE_LOW>; /* PC14 */
++	};
++};
++
++&codec {
++	allwinner,audio-routing =
++		"Line Out", "LINEOUT",
++		"MIC1", "Mic",
++		"Mic",  "MBIAS";
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usbphy {
++	/* USB Type-A ports' VBUS is always on */
++	usb0_id_det-gpios = <&pio 0 21 GPIO_ACTIVE_HIGH>; /* PA21 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	status = "okay";
++};
+-- 
+2.12.2
