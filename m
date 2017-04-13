@@ -1,87 +1,74 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Thu, 13 Apr 2017 17:42:56 -0600
-Subject: [PATCH] ARM: dma-mapping: add check for coherent DMA memory
- without struct page
-In-Reply-To: <20170413221055.GE17774@n2100.armlinux.org.uk>
-References: <20170413214756.21265-1-shuahkh@osg.samsung.com>
- <20170413221055.GE17774@n2100.armlinux.org.uk>
-Message-ID: <10ccf249-8f2e-a6b3-2536-b78b417300a9@osg.samsung.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 13 Apr 2017 20:46:55 -0300
+Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170413212059.unh2mfo2w4oc4t33@piout.net>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+ <20170413182839.25381-6-javier@osg.samsung.com>
+ <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
+ <dd93eb32-ca1e-5041-051e-c4f072f0f9a2@osg.samsung.com>
+ <20170413212059.unh2mfo2w4oc4t33@piout.net>
+Message-ID: <021d8065-9d7a-f9ef-a497-f9c467d1e6d8@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2017 04:10 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 13, 2017 at 03:47:56PM -0600, Shuah Khan wrote:
->> When coherent DMA memory without struct page is shared, importer
->> fails to find the page and runs into kernel page fault when it
->> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
->> in the sg_table.
+Hello Alexandre,
+
+On 04/13/2017 06:20 PM, Alexandre Belloni wrote:
+> On 13/04/2017 at 18:09:56 -0300, Javier Martinez Canillas wrote:
+>> Hello Peter,
 >>
->> Add a new dma_check_dev_coherent() interface to check if memory is
->> from the device coherent area. There is no way to tell where the
->> memory returned by dma_alloc_attrs() came from.
+>> On 04/13/2017 05:43 PM, Peter Rosin wrote:
+>>> On 2017-04-13 20:28, Javier Martinez Canillas wrote:
 >>
->> arm_dma_get_sgtable() checks for invalid pages, however this check
->> could pass even for memory obtained the coherent allocator. Add an
->> additional check to call dma_check_dev_coherent() to confirm that it
->> is indeed the coherent DMA memory and fail the sgtable creation with
->> -EINVAL.
-> 
-> Sorry, this doesn't make much sense to me.
-> 
-> pfn_valid(pfn) must *never* return true if 'pfn' does not have a struct
-> page associated with it.  If it returns true (so we allow
-> arm_dma_get_sgtable() to succeed) then we know we have a valid struct
-> page in the supplied scatterlist.
-> 
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> ---
->>  arch/arm/mm/dma-mapping.c   | 11 ++++++++---
->>  drivers/base/dma-coherent.c | 25 +++++++++++++++++++++++++
->>  include/linux/dma-mapping.h |  2 ++
->>  3 files changed, 35 insertions(+), 3 deletions(-)
+>> [snip]
 >>
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index 475811f..27c7d9a 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -954,9 +954,14 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
->>  	struct page *page;
->>  	int ret;
->>  
->> -	/* If the PFN is not valid, we do not have a struct page */
->> -	if (!pfn_valid(pfn))
->> -		return -ENXIO;
->> +	/*
->> +	 * If the PFN is not valid, we do not have a struct page
->> +	 * As this check can pass even for memory obtained through
->> +	 * the coherent allocator, do an additional check to determine
->> +	 * if this is coherent DMA memory.
->> +	 */
->> +	if (!pfn_valid(pfn) && dma_check_dev_coherent(dev, handle, cpu_addr))
->> +		return -EINVAL;
+>>>>  
+>>>>  	eeprom at 50 {
+>>>> -		compatible = "nxp,24c02";
+>>>> +		compatible = "nxp,24c02","atmel,24c02";
+>>>>  		reg = <0x50>;
+>>>>  		pagesize = <16>;
+>>>>  	};
+>>>>
+>>>
+>>> Sure, in principle. But not having a space after the commas is a real OCD
+>>> trigger for me. My spine is rotating... :-)
+>>>
+>>
+>> Right, Geert already pointed out. It's something I missed in my sed script
+>> so I got it wrong in all the DTS :(
+>>
+>> I'll fix my script and send a v2.
+>>
 > 
-> Right, so what this says is:
-> 
-> 	if we do not haev a valid PFN
-> 	_and_ if the memory is from the coherent section
-> 	_then_ fail
-> 
-> Why the extra check?  Under what circunstances do we end up with memory
-> where the PFN is valid, but we do not have a valid struct page.  It
-> seems to me that such a scenario is a bug in pfn_valid() and not
-> something that should be worked around like this.
+> That would be v3, right? ;)
 > 
 
-DMA_ATTR_NO_KERNEL_MAPPING case is the one I am concerned about.
-pfn_valid() would fail on this if I am understanding it correctly.
-A few drm drivers set this attr and use sg_table for passing buffers.
+err, right :)
 
-My reasoning behind adding this check is to not have this fail on
-NO_KERNEL_MAPPING cases. So I thought adding a restrictive check for
-just the per-device memory would help. However, I don't have a good
-understanding of the drm case, hence I could be trying to address a
-case that doesn't need to be addressed.
+>>> Anyway, with those whitespace fixes (and without them too, but please):
+>>> Acked-by: Peter Rosin <peda@axentia.se>
+>>>
+>>
+>> Thanks for the review!
+>>
+> 
+> I'd like to be copied on the first patches to ensure they are applied
+> before applying that one. (Also, it is probably too late for 4.12 anyway
 
-In any case, thanks for your patience and a quick reply.
+Ok, I'll copy you on the whole patch-set. But keep in mind that there is
+no strict order since $SUBJECT without the at24 OF table is a no-op (the
+match happens between first device in compatible string and I2C table).
 
--- Shuah
+> because we are past rc6).
+>
+
+Yes, there's no rush on applying these. I'm just posting all the patches
+needed to finally have a proper OF modalias reporting in the I2C core.
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
