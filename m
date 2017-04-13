@@ -1,81 +1,136 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 13 Apr 2017 10:22:28 +0200
-Subject: [PATCH v3] arm64: dts: rk3399: add support for firefly-rk3399
- board
-In-Reply-To: <6d1eb0cc-fe3b-a483-123c-8558096c0846@rock-chips.com>
-References: <1491796213-4115-1-git-send-email-kever.yang@rock-chips.com>
- <1642127.PiTFsmK4zh@phil>
- <6d1eb0cc-fe3b-a483-123c-8558096c0846@rock-chips.com>
-Message-ID: <11306035.2UDh49FpL9@diego>
+From: cyrille.pitchen@wedev4u.fr (Cyrille Pitchen)
+Date: Thu, 13 Apr 2017 10:24:58 +0200
+Subject: [PATCH v1 1/1] mtd: mtk-nor: set controller's address width
+ according to nor flash
+In-Reply-To: <1492051237.2866.36.camel@mhfsdcap03>
+References: <1491381462-21893-1-git-send-email-guochun.mao@mediatek.com>
+ <1491381462-21893-2-git-send-email-guochun.mao@mediatek.com>
+ <e9eafca3-41a0-7e88-996b-9d1c51f0c132@wedev4u.fr>
+ <1492051237.2866.36.camel@mhfsdcap03>
+Message-ID: <3cf1c63e-c56f-2f07-9d16-7ec346758dfa@wedev4u.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 13. April 2017, 12:00:19 CEST schrieb Kever Yang:
-> Hi Heiko,
+Hi Guochun,
+
+Le 13/04/2017 ? 04:40, Guochun Mao a ?crit :
+> Hi Cyrille,
 > 
-> On 04/12/2017 09:29 PM, Heiko Stuebner wrote:
-> > Hi Kever,
-> > 
-> > Am Montag, 10. April 2017, 11:50:13 CEST schrieb Kever Yang:
-> >> Firefly-rk3399 is a bord from T-Firefly, you can find detail about
-> >> it here:
-> >> http://en.t-firefly.com/en/firenow/Firefly_RK3399/
-> >> 
-> >> This patch add basic node for the board and make it able to bring
-> >> up.
-> >> 
-> >> Peripheral works:
-> >> - usb hub which connect to ehci controller;
-> >> - UART2 debug
-> >> - eMMC
-> >> - PCIe
-> >> 
-> >> Not work:
-> >> - USB 3.0 HOST, type-C port
-> >> - sdio, sd-card
-> >> 
-> >> Not test for other peripheral:
-> >> - HDMI
-> >> - Ethernet
-> >> - OPTICAL
-> >> - WiFi/BT
-> >> - MIPI CSI/DSI
-> >> - IR
-> >> - EDP/DP
-> >> 
-> >> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > 
-> > applied for 4.13, as we're a bit late for 4.12, with the following 
-changes:
-> Thanks for your help, I'm not familiar with the devices status on upstream
-> because not working on kernel upstream for a long time.
+> On Wed, 2017-04-12 at 22:57 +0200, Cyrille Pitchen wrote:
+>> Hi Guochun,
+>>
+>> Le 05/04/2017 ? 10:37, Guochun Mao a ?crit :
+>>> When nor's size larger than 16MByte, nor's address width maybe
+>>> set to 3 or 4, and controller should change address width according
+>>> to nor's setting.
+>>>
+>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>st
+
+Acked-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+
+>>> ---
+>>>  drivers/mtd/spi-nor/mtk-quadspi.c |   27 +++++++++++++++++++++++++++
+>>>  1 file changed, 27 insertions(+)
+>>>
+>>> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
+>>> index e661877..b637770 100644
+>>> --- a/drivers/mtd/spi-nor/mtk-quadspi.c
+>>> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+>>> @@ -104,6 +104,8 @@
+>>>  #define MTK_NOR_MAX_RX_TX_SHIFT		6
+>>>  /* can shift up to 56 bits (7 bytes) transfer by MTK_NOR_PRG_CMD */
+>>>  #define MTK_NOR_MAX_SHIFT		7
+>>> +/* nor controller 4-byte address mode enable bit */
+>>> +#define MTK_NOR_4B_ADDR_EN		BIT(4)
+>>>  
+>>>  /* Helpers for accessing the program data / shift data registers */
+>>>  #define MTK_NOR_PRG_REG(n)		(MTK_NOR_PRGDATA0_REG + 4 * (n))
+>>> @@ -230,10 +232,35 @@ static int mt8173_nor_write_buffer_disable(struct mt8173_nor *mt8173_nor)
+>>>  				  10000);
+>>>  }
+>>>  
+>>> +static void mt8173_nor_set_addr_width(struct mt8173_nor *mt8173_nor)
+>>> +{
+>>> +	u8 val;
+>>> +	struct spi_nor *nor = &mt8173_nor->nor;
+>>> +
+>>> +	val = readb(mt8173_nor->base + MTK_NOR_DUAL_REG);
+>>> +
+>>> +	switch (nor->addr_width) {
+>>> +	case 3:
+>>> +		val &= ~MTK_NOR_4B_ADDR_EN;
+>>> +		break;
+>>> +	case 4:
+>>> +		val |= MTK_NOR_4B_ADDR_EN;
+>>> +		break;
+>>> +	default:
+>>> +		dev_warn(mt8173_nor->dev, "Unexpected address width %u.\n",
+>>> +			 nor->addr_width);
+>>> +		break;
+>>> +	}
+>>> +
+>>> +	writeb(val, mt8173_nor->base + MTK_NOR_DUAL_REG);
+>>> +}
+>>> +
+>>>  static void mt8173_nor_set_addr(struct mt8173_nor *mt8173_nor, u32 addr)
+>>>  {
+>>>  	int i;
+>>>  
+>>> +	mt8173_nor_set_addr_width(mt8173_nor);
+>>> +
+>>>  	for (i = 0; i < 3; i++) {
+>>
+>> Should it be 'i < nor->addr_width' instead of 'i < 3' ?
+>> Does it work when accessing data after 128Mbit ?
 > 
-> > - commit subject
-> > - dropped status from backlight (as there is no disabled common node
-> > 
-> >    and it's specific to the firefly itself)
-> > 
-> > - quite some reordering of properties
-> > - reordered regulator nodes per their addresses: 0x1b < 0x40
-> > - dropped obsolete regulator-compatible properties
-> > - fixed gpio-irq on the mpu6500
-> > - dropped out-of-tree orientation properties of mpu6500
-> > 
-> >    --> please provide the optional "mount-matrix" in a follow-up patch
-> >    
-> >        see bindings/iio/imu/inv_mpu6050.txt
+> Yes, it can work.
 > 
-> Maybe we can drop this mpu6050 node first? I can't find binding file for it.
+> Let's see the whole function,
+> 
+> static void mt8173_nor_set_addr(struct mt8173_nor *mt8173_nor, u32 addr)
+> {
+>         int i;
+> 
+>         mt8173_nor_set_addr_width(mt8173_nor);
+> 
+>         for (i = 0; i < 3; i++) {
+>                 writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR0_REG
+> + i * 4);
+>                 addr >>= 8;
+>         }
+>         /* Last register is non-contiguous */
+>         writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR3_REG);
+> }
+> 
+> The nor controller has 4 registers for address.
+> This '3' indicates the number of contiguous address' registers
+> base + MTK_NOR_RADR0_REG(0x10)
+> base + MTK_NOR_RADR1_REG(0x14)
+> base + MTK_NOR_RADR2_REG(0x18),
+> but the last address register is non-contiguous,
+> it's base + MTK_NOR_RADR3_REG(0xc8)
+> 
+> mt8173_nor_set_addr will set addr into these 4 registers by Byte.
+> The bit MTK_NOR_4B_ADDR_EN will decide whether 3-byte(0x10,0x14,0x18)
+> or 4-byte(0x10,0x14,x018,0xc8) been sent to nor device.
+> and, it can access data after 128Mbit when sent 4-byte address.
 
-The binding (and driver in the kernel) is the same as for the mpu6050.
-So you can find the documentation in
-Documentation/devicetree/bindings/iio/imu/inv_mpu6050.txt
+Indeed, you're right. Sorry for the noise!
 
-Someone should add the other ids from 
-drivers/iio/imu/inv_mpu6050/inv_mpu_i2c.c
-to the binding.
-
-mount-matrix is optional, so the basic node itself can stay in the dt.
-
-
-Heiko
+> 
+> Best regards,
+> 
+> Guochun
+> 
+>>
+>> Best regards,
+>>
+>> Cyrille
+>>
+>>>  		writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR0_REG + i * 4);
+>>>  		addr >>= 8;
+>>>
+>>
+> 
+> 
+> 
