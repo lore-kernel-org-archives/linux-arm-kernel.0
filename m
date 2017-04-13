@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 15:28:30 -0300
-Subject: [PATCH v2 13/22] ARM: dts: uniphier: Add generic compatible string
- for I2C EEPROM
+Date: Thu, 13 Apr 2017 15:28:31 -0300
+Subject: [PATCH v2 14/22] ARM: dts: zynq: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <20170413182839.25381-1-javier@osg.samsung.com>
 References: <20170413182839.25381-1-javier@osg.samsung.com>
-Message-ID: <20170413182839.25381-14-javier@osg.samsung.com>
+Message-ID: <20170413182839.25381-15-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,49 +24,35 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Changes in v2: None
 
- arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
- arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/zynq-zc702.dts | 2 +-
+ arch/arm/boot/dts/zynq-zc706.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/uniphier-pro4-ace.dts b/arch/arm/boot/dts/uniphier-pro4-ace.dts
-index fefc89149234..783c76b6ce72 100644
---- a/arch/arm/boot/dts/uniphier-pro4-ace.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-ace.dts
-@@ -88,7 +88,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64","atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
- 	};
-diff --git a/arch/arm/boot/dts/uniphier-pro4-sanji.dts b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-index 6c63c8bad825..d65788c4835e 100644
---- a/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-@@ -83,7 +83,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64","atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
- 	};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-index cccc86658d20..f9bd35f7d0de 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-@@ -80,7 +80,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64","atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
- 	};
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 0cdad2cc8b78..75a36270a363 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -136,7 +136,7 @@
+ 			#size-cells = <0>;
+ 			reg = <2>;
+ 			eeprom at 54 {
+-				compatible = "at,24c08";
++				compatible = "at,24c08","atmel,24c08";
+ 				reg = <0x54>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index ad4bb06dba25..2ab92be483f9 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -92,7 +92,7 @@
+ 			#size-cells = <0>;
+ 			reg = <2>;
+ 			eeprom at 54 {
+-				compatible = "at,24c08";
++				compatible = "at,24c08","atmel,24c08";
+ 				reg = <0x54>;
+ 			};
+ 		};
 -- 
 2.9.3
