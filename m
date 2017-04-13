@@ -1,47 +1,82 @@
-From: george.cherian@cavium.com (George Cherian)
-Date: Thu, 13 Apr 2017 07:25:01 +0000
-Subject: [PATCH] net: thunderx: Fix set_max_bgx_per_node for 81xx rgx
-Message-ID: <1492068301-1141-1-git-send-email-george.cherian@cavium.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 13 Apr 2017 22:21:22 +0800
+Subject: [RFC PATCH 3/3] cpufreq: imx6q: refine clk operations
+In-Reply-To: <1491932908.31718.33.camel@nxp.com>
+References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+ <1491969809-20154-4-git-send-email-aisheng.dong@nxp.com>
+ <1491932908.31718.33.camel@nxp.com>
+Message-ID: <20170413142122.GC24254@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PCI_SUBSYS_DEVID_81XX_RGX and use the same to set
-the max bgx per node count.
+On Tue, Apr 11, 2017 at 08:48:28PM +0300, Leonard Crestez wrote:
+> On Wed, 2017-04-12 at 12:03 +0800, Dong Aisheng wrote:
+> > +static int num_clks;
+> > +static struct clk_bulk_data clks[] = {
+> > +	{ .id = "arm" },
+> > +	{ .id = "pll1_sys" },
+> > +	{ .id = "step" },
+> > +	{ .id = "pll1_sw" },
+> > +	{ .id = "pll2_pfd2_396m" },
+> > +	{ .id = "pll2_bus" },
+> > +	{ .id = "secondary_sel" },
+> > +};
+> 
+> The .id is only required for initialization, it seems strange to keep
+> it around runtime data.
 
-This fixes the issue intoduced by following commit
-78aacb6f6 net: thunderx: Fix invalid mac addresses for node1 interfaces
-With this commit the max_bgx_per_node for 81xx is set as 2 instead of 3
-because of which num_vfs is always calculated as zero.
+Well, this is mainly referencing how regulator bulk does the job.
 
-Signed-off-by: George Cherian <george.cherian@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 1 +
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 1 +
- 2 files changed, 2 insertions(+)
+> It might be better for this API to work with an
+> array of clk* and separate array of names (or clk_bulk_init_data if we
+> need flags). Variable references would be shorter and it would allow
+> more data to be const.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 64a1095..a0ca68c 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -134,6 +134,7 @@ static void set_max_bgx_per_node(struct pci_dev *pdev)
- 	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &sdevid);
- 	switch (sdevid) {
- 	case PCI_SUBSYS_DEVID_81XX_BGX:
-+	case PCI_SUBSYS_DEVID_81XX_RGX:
- 		max_bgx_per_node = MAX_BGX_PER_CN81XX;
- 		break;
- 	case PCI_SUBSYS_DEVID_83XX_BGX:
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index c5080f2c..6b7fe6fd 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -16,6 +16,7 @@
- /* Subsystem device IDs */
- #define PCI_SUBSYS_DEVID_88XX_BGX		0xA126
- #define PCI_SUBSYS_DEVID_81XX_BGX		0xA226
-+#define PCI_SUBSYS_DEVID_81XX_RGX		0xA254
- #define PCI_SUBSYS_DEVID_83XX_BGX		0xA326
- 
- #define    MAX_BGX_THUNDER			8 /* Max 2 nodes, 4 per node */
--- 
-2.1.4
+It also has side effect that we then need one more param for each API.
+Is that worth?
+
+> > -put_clk:
+> > -	if (!IS_ERR(arm_clk))
+> > -		clk_put(arm_clk);
+> > -	if (!IS_ERR(pll1_sys_clk))
+> > -		clk_put(pll1_sys_clk);
+> > -	if (!IS_ERR(pll1_sw_clk))
+> > -		clk_put(pll1_sw_clk);
+> > -	if (!IS_ERR(step_clk))
+> > -		clk_put(step_clk);
+> > -	if (!IS_ERR(pll2_pfd2_396m_clk))
+> > -		clk_put(pll2_pfd2_396m_clk);
+> > -	if (!IS_ERR(pll2_bus_clk))
+> > -		clk_put(pll2_bus_clk);
+> > -	if (!IS_ERR(secondary_sel_clk))
+> > -		clk_put(secondary_sel_clk);
+> > +
+> > +	clk_bulk_put(num_clks, clks);
+> > +put_node:
+> > ?	of_node_put(np);
+> > +
+> > ?	return ret;
+> > ?}
+> 
+> 
+> My subjective opinion is that a better way to clean this up would be to
+> have a single imx6q_cpufreq_clean function that takes all resources and
+> does stuff like:
+> 
+> if (!IS_ERR(clk)) clk_put(clk);
+> clk = NULL;
+> 
+> That function can be called from both _remove and failed _probe without
+> having to keep track of which resources have been allocated until then.
+> Just free and NULL all clocks/regulators and simplify control flow.
+> 
+
+I once thought of that way.
+
+Now i'd like to remove them rather than form them into a function
+which can't permanently fix the issue.
+
+But, if Maintainers dislike it, we could do that.
+
+Regards
+Dong Aisheng
