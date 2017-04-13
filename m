@@ -1,210 +1,68 @@
-From: oza.oza@broadcom.com (Oza Oza)
-Date: Thu, 13 Apr 2017 17:11:25 +0530
-Subject: [RFC PATCH] of: Fix DMA configuration for non-DT masters
-In-Reply-To: <b02ace9b-f8f3-269d-6db4-3c1b1ea1e816@arm.com>
-References: <67d1f46172599be243405f4341665fd0ef9ab969.1490726288.git.robin.murphy@arm.com>
- <CAMSpPPfJKKRkuDKxUgVBdg7vp7Ux5=PiHSxnMLc7-LMcCSatzg@mail.gmail.com>
- <CAMSpPPcSWxua_6ECZd4iEbTiAYk-KtapBDcOUxNdGaQkFF-LOQ@mail.gmail.com>
- <b02ace9b-f8f3-269d-6db4-3c1b1ea1e816@arm.com>
-Message-ID: <CAMSpPPcZQk8hM+TCFpPx_K86E9+XpwdRO+Ae15JTrfP74zSm=Q@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 13 Apr 2017 17:17:19 +0530
+Subject: [PATCH 1/2] phy: qcom-usb-hs: Replace the extcon API
+In-Reply-To: <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20170328043830epcas1p4069bda461ad648cfd6598905b7167e9f@epcas1p4.samsung.com>
+ <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <ade390be-3104-916c-5fac-780369763411@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 11:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 29/03/17 06:46, Oza Oza wrote:
->> On Wed, Mar 29, 2017 at 10:23 AM, Oza Oza <oza.oza@broadcom.com> wrote:
->>> On Wed, Mar 29, 2017 at 12:27 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->>>> For PCI masters not represented in DT, we pass the OF node of their
->>>> associated host bridge to of_dma_configure(), such that they can inherit
->>>> the appropriate DMA configuration from whatever is described there.
->>>> Unfortunately, whilst this has worked for the "dma-coherent" property,
->>>> it turns out to miss the case where the host bridge node has a non-empty
->>>> "dma-ranges", since nobody is expecting the 'device' to be a bus itself.
->>>>
->>>> It transpires, though, that the de-facto interface since the prototype
->>>> change in 1f5c69aa51f9 ("of: Move of_dma_configure() to device.c to help
->>>> re-use") is very clear-cut: either the master_np argument is redundant
->>>> with dev->of_node, or dev->of_node is NULL and master_np is the relevant
->>>> parent bus. Let's ratify that behaviour, then teach the whole
->>>> of_dma_configure() pipeline to cope with both cases properly.
->>>>
->>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->
-> [...]
->
->>>
->>> pci and memory mapped device world is different.
->
-> ???
->
-> No they aren't. There is nothing magic about PCI. PCI *is* a
-> memory-mapped bus.
->
-> The only PCI-specific aspect here is the Linux code path which passes a
-> host controller node into of_dma_configure() where the latter expects a
-> node for the actual endpoint device. It managed to work for
-> "dma-coherent", because that may appear either directly on a device node
-> or on any of its parent buses, but "dma-ranges" is *only* valid for DT
-> nodes representing buses, thus reveals that using a parent bus to stand
-> in for a device isn't actually correct. I only posted that horrible hack
-> patch to prove the point that having a child node to represent the
-> actual device is indeed sufficient to make of_dma_configure() work
-> correctly for PCI masters as-is (modulo the other issues).
->
->> of course if you talk
->>> from iommu perspective, all the master are same for IOMMU
->
-> I don't understand what you mean by that. There's nothing about IOMMUs
-> here, it's purely about parsing DT properties correctly.
->
->>> but the original intention of the patch is to try to solve 2 problems.
->>> please refer to https://lkml.org/lkml/2017/3/29/10
->
-> One patch should not solve two separate problems anyway. Taking a step
-> back, there are at least 3 things that this discussion has brought up:
->
-> 1) The way in which we call of_dma_configure() for PCI devices causes
-> the "dma-ranges" property on PCI host controllers to be ignored.
->
-> 2) of_dma_get_range() only considers the first entry in any "dma-ranges"
-> property.
->
-> 3) When of_dma_configure() does set a DMA mask, there is nothing on
-> arm64 and other architectures to prevent drivers overriding that with a
-> wider mask later.
->
-> Those are 3 separate problems, to solve with 3 or more separate patches,
-> and I have deliberately put the second and third to one side for the
-> moment. This patch fixes problem 1.
->
->>> 1) expose generic API for pci world clients to configure their
->>> dma-ranges. right now there is none.
->>> 2) same API can be used by IOMMU to derive dma_mask.
->>>
->>> while the current patch posted to handle dma-ranges for both memory
->>> mapped and pci devices, which I think is overdoing.
->
-> No, of_dma_configure() handles the "dma-ranges" property as it is
-> defined in the DT spec to describe the mapping between a child bus
-> address space and a parent bus address space. Whether those
-> memory-mapped parent and child buses are PCI, ISA, AMBA, HyperTransport,
-> or anything else is irrelevant other than for the encoding of the
-> address specifiers. All this patch does is sort out the cases where we
-> have a real device node to start at, from the cases where we don't and
-> so start directly at the device's parent bus node instead.
->
->>> besides we have different configuration of dma-ranges based on iommu
->>> is enabled or not enabled.
->
-> That doesn't sound right, unless you mean the firmware actually programs
-> the host controller's AXI bridge differently for system configurations
-> where the IOMMU is expected to be used or not? (and even then, I don't
-> really see why it would be necessary to do that...)
->
->>>  #define PCIE_DMA_RANGES dma-ranges = <0x43000000 0x00 0x80000000 0x00
->>> 0x80000000 0x00 0x80000000 \
->>>                                       0x43000000 0x08 0x00000000 0x08
->>> 0x00000000 0x08 0x00000000 \
->>>                                       0x43000000 0x80 0x00000000 0x80
->>> 0x00000000 0x40 0x00000000>;
->>> Not sure if this patch will consider above dma-ranges.
->>>
->>> my suggestion is to leave existing of_dma_get_range as is, and have
->>> new function for pci world as discussed in
->>> please refer to https://lkml.org/lkml/2017/3/29/10
->
-> And then we keep adding new functions to do the exact same thing for
-> every other discoverable bus type whose bridge is be described in DT? I
-> fail to see how that is in any way better than simply fixing the
-> existing code to work as it was intended to.
->
-> of_dma_get_ranges() uses of_translate_dma_address() just the same way as
-> existing PowerPC PCI code does, which further disproves your assertion
-> that parsing PCI addresses is somehow special - it's really only a
-> matter of getting the right number of address cells in order to to read
-> a child address to give to of_translate_dma_address() in the first
-> place. Incidentally, I now notice that the proposed
-> of_pci_get_dma_ranges() is incomplete as it doesn't use
-> of_translate_dma_address() or otherwise traverse upwards through the
-> dma-ranges of any further parent buses.
->
->>>
->>> Regards,
->>> Oza.
->>
->> also I see that, in case of multiple ranges of_dma_get_range doesnt handle that.
->> and also it is not meant to handle.
->
-> Yes, the existing code doesn't handle multiple dma-ranges entries,
-> because nobody's had the need to implement that so far, and this patch
-> does not change that because it's fixing a separate problem.
->
-> Now, of course of_dma_get_range() *should* be capable of handling
-> multiple entries regardless of this patch, and I'm going to write *that*
-> patch right now (it's going to be a case of adding a handful of lines
-> which probably won't even conflict with this one at all). If we had a
-> bunch of different range parsing functions, we'd then have to duplicate
-> the equivalent logic across all of them, which is clearly undesirable
-> when it can easily be avoided altogether.
->
-> Robin.
->
->> so with this patch will return wrong size and hence wrong dma_mask.
->> having said, I think it is better to separate pci world dma-ranges
->> function on of_pci.c
->>
->> for which my discussion with Rob already, (same thread)
->> https://lkml.org/lkml/2017/3/29/10
->> Waiting for Rob's viewpoint on this.
->>
->>
->> Regards,
->> Oza.
->>
->
+Hi Chanwoo,
 
-first of all the patch
+On Tuesday 28 March 2017 10:08 AM, Chanwoo Choi wrote:
+> This patch uses the resource-managed extcon API for extcon_register_notifier()
+> and replaces the deprecated extcon API as following:
+> - (deprecated) extcon_get_cable_state_() -> extcon_get_state()
+> 
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-https://lkml.org/lkml/2017/3/30/304
+I've missed merging this patch for the next merge window. If you want to take
+this yourself.
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-is not only to address the original problem of dma_mask but also to
-provide generic APIs
-to PCI RC drivers such as pcie-iproc.c or even rcar to get their dma-ranges.
-
-this API not only provides basis to retrieve the ranges but also it
-should have capability to handle
-inbound memory flags.
-
-having said that the PCI dma-ranges do differ slightly from
-traditional memory ranges.
-because it has got flags.
-
-now those flags could be IORESOURCE_CACHEABLE or anything else.
-our SOC will be having use of these flags in near future (although can
-not discuss details as of now).
-but in short we will need these flags to be taken care which were
-passed form DT.
-
-so PCIe iproc driver calls this function to get all teh information
-about dma-ranges.
-
-now if such function exists, other framework could also make use of it
-to get resources and figure out dma_mask.
-and in that case you really need not change of_dma_get_range.
-
-not only of_dma_get_range can hdnle PCI flags property but also it can
-not handle multiple ranges because finally it has only
-single *dma_addr, *paddr, *size  out parameters.
-so the burdon will be on API to fix the behavior as what to return
-rather than having Caller to choose what to do with the ranges.
-
-coming back to my current patch
-currently it does not do flag handling, but in near future I will have
-to add, but for that, this patch
-https://lkml.org/lkml/2017/3/30/304
-needs to bring under consideration to be ACKed.
-
-hope this explains the need of API.
-
-Regards,
-Oza.
+Thanks
+Kishon
+> ---
+>  drivers/phy/phy-qcom-usb-hs.c | 14 +++-----------
+>  1 file changed, 3 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
+> index 94dfbfd739c3..f630fa553b7d 100644
+> --- a/drivers/phy/phy-qcom-usb-hs.c
+> +++ b/drivers/phy/phy-qcom-usb-hs.c
+> @@ -156,12 +156,12 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+>  	}
+>  
+>  	if (uphy->vbus_edev) {
+> -		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
+> +		state = extcon_get_state(uphy->vbus_edev, EXTCON_USB);
+>  		/* setup initial state */
+>  		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
+>  					      uphy->vbus_edev);
+> -		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
+> -				&uphy->vbus_notify);
+> +		ret = devm_extcon_register_notifier(&ulpi->dev, uphy->vbus_edev,
+> +				EXTCON_USB, &uphy->vbus_notify);
+>  		if (ret)
+>  			goto err_ulpi;
+>  	}
+> @@ -180,16 +180,8 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+>  
+>  static int qcom_usb_hs_phy_power_off(struct phy *phy)
+>  {
+> -	int ret;
+>  	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
+>  
+> -	if (uphy->vbus_edev) {
+> -		ret = extcon_unregister_notifier(uphy->vbus_edev, EXTCON_USB,
+> -						 &uphy->vbus_notify);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	regulator_disable(uphy->v3p3);
+>  	regulator_disable(uphy->v1p8);
+>  	clk_disable_unprepare(uphy->sleep_clk);
+> 
