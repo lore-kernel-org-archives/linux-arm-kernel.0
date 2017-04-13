@@ -1,78 +1,128 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 13 Apr 2017 13:25:44 -0500
-Subject: [PATCH V8 2/5] PCI/ASPM: split pci_aspm_init() into two
-In-Reply-To: <CACK8Z6EfUTDjCM=fmdHfWeu8UV5GN+i6PX9fKkR1H8K90TXozg@mail.gmail.com>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-3-git-send-email-okaya@codeaurora.org>
- <CACK8Z6EfUTDjCM=fmdHfWeu8UV5GN+i6PX9fKkR1H8K90TXozg@mail.gmail.com>
-Message-ID: <CAErSpo4gduGVq2Na0tYbG77Pi23R-RMBvAcJueWrQTJCRsHYGw@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 13 Apr 2017 15:28:17 -0300
+Subject: [PATCH v2 00/22] eeprom: at24: Add OF device ID table
+Message-ID: <20170413182839.25381-1-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 2:16 PM, Rajat Jain <rajatja@google.com> wrote:
-> On Fri, Apr 7, 2017 at 9:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> Split pci_aspm_init() body into pci_aspm_init_upstream()
->> and pci_aspm_init_downstream() for bridge and endpoint
->> specific code behavior.
->>
->> Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/pci/pcie/aspm.c | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
->> index dc36717..a80d64b 100644
->> --- a/drivers/pci/pcie/aspm.c
->> +++ b/drivers/pci/pcie/aspm.c
->> @@ -826,6 +826,16 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
->>         return link;
->>  }
->>
->> +static int pci_aspm_init_downstream(struct pci_dev *pdev)
->> +{
->> +       return 0;
->> +}
->> +
->> +static int pci_aspm_init_upstream(struct pci_dev *pdev)
->> +{
->> +       return 0;
->> +}
->> +
->>  /*
->>   * pci_aspm_init: Initiate PCI express link state.
->>   * It is called from device_add for every single pci device.
->> @@ -833,7 +843,10 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
->>   */
->>  int pci_aspm_init(struct pci_dev *pdev)
->>  {
->> -       return 0;
->> +       if (!pdev->has_secondary_link)
->> +               return pci_aspm_init_downstream(pdev);
->> +
->> +       return pci_aspm_init_upstream(pdev);
->>  }
->
-> Nit:
->
-> if (x_flag())
->    return x();
-> return y();
->
-> May be better than
->
-> if (!x_flag)
->     return y();
-> return x();
+Hello Wolfram,
 
-I agree, and I made that change on my branch.  I also renamed these to
-pci_aspm_init_downstream_port() (for Root Ports and Switch Downstream
-Ports) and pci_aspm_init_upstream_port() (for Switch Upstream Ports
-and Endpoints) to try to match the terminology in the spec.
+This series is a follow-up to patch [0] that added an OF device ID table
+to the at24 EEPROM driver. As you suggested [1], this version instead of
+adding entries for every used <vendor,device> tuple, only adds a single
+entry for each chip type using the "atmel" vendor as a generic fallback.
 
-FWIW, your email didn't seem to make it to the list, Rajat.  Maybe
-some gmail weirdness?  I don't *see* anything wrong, but ...  I'm
-responding via gmail, so my response probably won't make it to the
-list either.
+The first patch adds the OF device ID table for the at24 driver and the
+next patches adds a generic fallback compatible string to each DTS that
+defines a compatible I2C EEPROM device node.
 
-Bjorn
+Patches can be applied independently since the DTS change without the
+driver change is a no-op and the OF device table won't be used without
+the DTS changes.
+
+[0]: https://lkml.org/lkml/2017/3/14/589
+[1]: https://lkml.org/lkml/2017/3/15/99
+
+Best regards,
+Javier
+
+Changes in v2:
+- Only add a single OF device ID entry for each device type (Wolfram Sang).
+
+Javier Martinez Canillas (22):
+  dt-bindings: i2c: eeprom: Document manufacturer used as generic
+    fallback
+  eeprom: at24: Add OF device ID table
+  ARM: dts: omap: Add generic compatible string for I2C EEPROM
+  ARM: dts: turris-omnia: Add generic compatible string for I2C EEPROM
+  ARM: dts: at91: Add generic compatible string for I2C EEPROM
+  ARM: dts: efm32: Add generic compatible string for I2C EEPROM
+  ARM: dts: imx: Add generic compatible string for I2C EEPROM
+  ARM: dts: keystone: Add generic compatible string for I2C EEPROM
+  ARM: dts: lpc18xx: Add generic compatible string for I2C EEPROM
+  ARM: dts: r7s72100: Add generic compatible string for I2C EEPROM
+  ARM: dts: koelsch: Add generic compatible string for I2C EEPROM
+  ARM: dts: socfpga: Add generic compatible string for I2C EEPROM
+  ARM: dts: uniphier: Add generic compatible string for I2C EEPROM
+  ARM: dts: zynq: Add generic compatible string for I2C EEPROM
+  arm64: dts: ls1043a: Add generic compatible string for I2C EEPROM
+  arm64: zynqmp: Add generic compatible string for I2C EEPROM
+  powerpc/5200: Add generic compatible string for I2C EEPROM
+  powerpc/fsl: Add generic compatible string for I2C EEPROM
+  powerpc/512x: Add generic compatible string for I2C EEPROM
+  powerpc/83xx: Add generic compatible string for I2C EEPROM
+  powerpc/5200: Add generic compatible string for I2C EEPROM
+  powerpc/44x: Add generic compatible string for I2C EEPROM
+
+ .../devicetree/bindings/eeprom/eeprom.txt          |  3 +-
+ arch/arm/boot/dts/am335x-baltos.dtsi               |  2 +-
+ arch/arm/boot/dts/am335x-base0033.dts              |  2 +-
+ arch/arm/boot/dts/am335x-bone-common.dtsi          | 10 ++--
+ arch/arm/boot/dts/am335x-nano.dts                  |  2 +-
+ arch/arm/boot/dts/am335x-pepper.dts                |  2 +-
+ arch/arm/boot/dts/am335x-shc.dts                   |  2 +-
+ arch/arm/boot/dts/am335x-sl50.dts                  |  2 +-
+ arch/arm/boot/dts/am437x-idk-evm.dts               |  2 +-
+ arch/arm/boot/dts/am437x-sk-evm.dts                |  2 +-
+ arch/arm/boot/dts/am43x-epos-evm.dts               |  2 +-
+ arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi    |  2 +-
+ arch/arm/boot/dts/armada-385-turris-omnia.dts      |  2 +-
+ arch/arm/boot/dts/at91-linea.dtsi                  |  2 +-
+ arch/arm/boot/dts/at91-tse850-3.dts                |  2 +-
+ arch/arm/boot/dts/efm32gg-dk3750.dts               |  2 +-
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi  |  2 +-
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    |  2 +-
+ arch/arm/boot/dts/imx28-evk.dts                    |  2 +-
+ arch/arm/boot/dts/imx53-tqma53.dtsi                |  2 +-
+ arch/arm/boot/dts/imx6q-cm-fx6.dts                 |  2 +-
+ arch/arm/boot/dts/imx6q-utilite-pro.dts            |  2 +-
+ arch/arm/boot/dts/keystone-k2e-evm.dts             |  2 +-
+ arch/arm/boot/dts/keystone-k2hk-evm.dts            |  2 +-
+ arch/arm/boot/dts/keystone-k2l-evm.dts             |  2 +-
+ arch/arm/boot/dts/lpc4337-ciaa.dts                 |  6 +-
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts           |  2 +-
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts        |  2 +-
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi                |  2 +-
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |  2 +-
+ arch/arm/boot/dts/omap3-sb-t35.dtsi                |  2 +-
+ arch/arm/boot/dts/omap4-var-som-om44.dtsi          |  2 +-
+ arch/arm/boot/dts/omap5-cm-t54.dts                 |  2 +-
+ arch/arm/boot/dts/omap5-sbc-t54.dts                |  2 +-
+ arch/arm/boot/dts/r7s72100-genmai.dts              |  2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts |  2 +-
+ arch/arm/boot/dts/uniphier-pro4-ace.dts            |  2 +-
+ arch/arm/boot/dts/uniphier-pro4-sanji.dts          |  2 +-
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts         |  2 +-
+ arch/arm/boot/dts/zynq-zc702.dts                   |  2 +-
+ arch/arm/boot/dts/zynq-zc706.dts                   |  2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  4 +-
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts        |  4 +-
+ arch/powerpc/boot/dts/digsy_mtc.dts                |  2 +-
+ arch/powerpc/boot/dts/fsl/b4qds.dtsi               |  8 +--
+ arch/powerpc/boot/dts/fsl/c293pcie.dts             |  2 +-
+ arch/powerpc/boot/dts/fsl/p1010rdb.dtsi            |  2 +-
+ arch/powerpc/boot/dts/fsl/p1023rdb.dts             |  2 +-
+ arch/powerpc/boot/dts/fsl/p2041rdb.dts             |  4 +-
+ arch/powerpc/boot/dts/fsl/p3041ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/p4080ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/p5020ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/p5040ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/t208xqds.dtsi            |  8 +--
+ arch/powerpc/boot/dts/fsl/t4240qds.dts             | 12 ++--
+ arch/powerpc/boot/dts/fsl/t4240rdb.dts             |  6 +-
+ arch/powerpc/boot/dts/mpc5121ads.dts               |  2 +-
+ arch/powerpc/boot/dts/mpc8308_p1m.dts              |  2 +-
+ arch/powerpc/boot/dts/mpc8349emitx.dts             |  2 +-
+ arch/powerpc/boot/dts/mpc8377_rdb.dts              |  2 +-
+ arch/powerpc/boot/dts/mpc8377_wlan.dts             |  2 +-
+ arch/powerpc/boot/dts/mpc8378_rdb.dts              |  2 +-
+ arch/powerpc/boot/dts/mpc8379_rdb.dts              |  2 +-
+ arch/powerpc/boot/dts/pcm030.dts                   |  2 +-
+ arch/powerpc/boot/dts/pcm032.dts                   |  2 +-
+ arch/powerpc/boot/dts/warp.dts                     |  2 +-
+ drivers/misc/eeprom/at24.c                         | 69 +++++++++++++++++++++-
+ 68 files changed, 162 insertions(+), 94 deletions(-)
+
+-- 
+2.9.3
