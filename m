@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 15:28:33 -0300
-Subject: [PATCH v2 16/22] arm64: zynqmp: Add generic compatible string for I2C
- EEPROM
+Date: Thu, 13 Apr 2017 15:28:32 -0300
+Subject: [PATCH v2 15/22] arm64: dts: ls1043a: Add generic compatible string
+ for I2C EEPROM
 In-Reply-To: <20170413182839.25381-1-javier@osg.samsung.com>
 References: <20170413182839.25381-1-javier@osg.samsung.com>
-Message-ID: <20170413182839.25381-17-javier@osg.samsung.com>
+Message-ID: <20170413182839.25381-16-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,30 +24,26 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Changes in v2: None
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index ef1b9e573af0..f19f4864cf60 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -55,7 +55,7 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 	eeprom at 54 {
--		compatible = "at,24c64";
-+		compatible = "at,24c64","atmel,24c64";
- 		reg = <0x54>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index c37110bc1506..d6551b95b662 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -75,11 +75,11 @@
+ 		reg = <0x4c>;
  	};
- };
-@@ -64,7 +64,7 @@
- 	status = "okay";
- 	clock-frequency = <400000>;
- 	eeprom at 55 {
--		compatible = "at,24c64";
-+		compatible = "at,24c64","atmel,24c64";
- 		reg = <0x55>;
+ 	eeprom at 52 {
+-		compatible = "at24,24c512";
++		compatible = "at24,24c512","atmel,24c512";
+ 		reg = <0x52>;
  	};
- };
+ 	eeprom at 53 {
+-		compatible = "at24,24c512";
++		compatible = "at24,24c512","atmel,24c512";
+ 		reg = <0x53>;
+ 	};
+ 	rtc at 68 {
 -- 
 2.9.3
