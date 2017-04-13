@@ -1,16 +1,14 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 13 Apr 2017 15:51:18 -0500
-Subject: [PATCH 3/8] arm64: defconfig: enable BLK_DEV_NVME
+Date: Thu, 13 Apr 2017 15:51:19 -0500
+Subject: [PATCH 4/8] [v2] arm64: defconfig: enable EFI_CAPSULE_LOADER
 In-Reply-To: <1492116683-26399-1-git-send-email-timur@codeaurora.org>
 References: <1492116683-26399-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1492116683-26399-4-git-send-email-timur@codeaurora.org>
+Message-ID: <1492116683-26399-5-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NVME is non-volatile storage media attached via PCIe. NVME devices
-typically have much higher potential throughput than other block
-devices, like SATA, NVME is a must-have requirement for ARM64 based
-servers.
+CONFIG_EFI_CAPSULE_LOADER allows the user to update the EFI firmware,
+which is useful on ARM64 server platforms.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
@@ -18,17 +16,17 @@ Signed-off-by: Timur Tabi <timur@codeaurora.org>
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 345f6d8..71bc81e 100644
+index 71bc81e..5c7082d 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -153,6 +153,7 @@ CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_NBD=m
- CONFIG_VIRTIO_BLK=y
-+CONFIG_BLK_DEV_NVME=m
- CONFIG_SRAM=y
- CONFIG_EEPROM_AT25=m
- # CONFIG_SCSI_PROC_FS is not set
+@@ -484,6 +484,7 @@ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_EFI_CAPSULE_LOADER=y
+ CONFIG_ACPI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
