@@ -1,53 +1,76 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 18:09:56 -0300
-Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
-References: <20170413182839.25381-1-javier@osg.samsung.com>
- <20170413182839.25381-6-javier@osg.samsung.com>
- <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
-Message-ID: <dd93eb32-ca1e-5041-051e-c4f072f0f9a2@osg.samsung.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 13 Apr 2017 14:19:54 -0700
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-5-andrew.smirnov@gmail.com>
+ <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+Message-ID: <CAHQ1cqF18Zx=k33z2XffQRZnXLct6Jcc1ETkbs6mzf+s-+nE=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
-
-On 04/13/2017 05:43 PM, Peter Rosin wrote:
-> On 2017-04-13 20:28, Javier Martinez Canillas wrote:
-
-[snip]
-
->>  
->>  	eeprom at 50 {
->> -		compatible = "nxp,24c02";
->> +		compatible = "nxp,24c02","atmel,24c02";
->>  		reg = <0x50>;
->>  		pagesize = <16>;
->>  	};
+On Thu, Apr 13, 2017 at 12:03 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+> Hi Andrey,
+>
+> On 13 April 2017 at 06:32, Andrey Smirnov <andrew.smirnov@gmail.com> wrote:
+>> Add node for GPC and specify as a parent interrupt controller for SoC bus.
 >>
-> 
-> Sure, in principle. But not having a space after the commas is a real OCD
-> trigger for me. My spine is rotating... :-)
+>> Cc: yurovsky at gmail.com
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/imx7s.dtsi | 27 ++++++++++++++++++++++++++-
+>>  1 file changed, 26 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+>> index 8fee299..1a7058f 100644
+>> --- a/arch/arm/boot/dts/imx7s.dtsi
+>> +++ b/arch/arm/boot/dts/imx7s.dtsi
+>> @@ -42,6 +42,7 @@
+>>   */
+>>[0
+>>  #include <dt-bindings/clock/imx7d-clock.h>
+>> +#include <dt-bindings/power/imx7-power.h>
+>>  #include <dt-bindings/gpio/gpio.h>
+>>  #include <dt-bindings/input/input.h>
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>> @@ -119,7 +120,7 @@
+>>                 #address-cells = <1>;
+>>                 #size-cells = <1>;
+>>                 compatible = "simple-bus";
+>> -               interrupt-parent = <&intc>;
+>> +               interrupt-parent = <&gpc>;
 >
+> I've been testing your GPC/PCIe patch sets against v4.11-rc5 on my
+> imx7d-cl-som-imx7, but hit a bit of a wall. When gpc is set as the
+> interrupt-parent for the soc, the kernel seems to hang and not produce
+> any output on the serial port[0]. I tried to enable earlyprintk, but
+> no luck getting a trace. Reversing this change, gets the board
+> booting[1], but obviously isn't using the gpc which is needed for PCIe
+> support as I understand it. I assume you've tested these changes on a
+> imx7d-sdb and are not seeing a similar issue? You can find the patches
+> I've picked on top of v4.11-rc5 here[2], any idea what might be the
+> issue?
 
-Right, Geert already pointed out. It's something I missed in my sed script
-so I got it wrong in all the DTS :(
+Hmm, this is something new and I don't think I've seen it(neither that
+nor the backtrace from your following e-mail). Here's the kernel tree
+as I've been testing it:
 
-I'll fix my script and send a v2.
- 
-> Anyway, with those whitespace fixes (and without them too, but please):
-> Acked-by: Peter Rosin <peda@axentia.se>
->
+https://github.com/ndreys/linux/commits/imx7d/pcie-support-v8
 
-Thanks for the review!
+note, however, that it is based on d0ec4e6 (tip of pci/next when I was
+rebasing) of git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git,
+which is not exactly v4.11-rc5
 
-> Cheers,
-> peda
-> 
-> 
+I'll rebase on top v4.11-r5 and see if I can get the same backtrace
+you are getting and see if I can fix it.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks and sorry for breaking things for you,
+Andrey Smirnov
