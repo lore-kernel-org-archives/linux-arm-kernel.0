@@ -1,28 +1,56 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 13 Apr 2017 21:58:28 +0800
-Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
-In-Reply-To: <86200633-8349-f1c3-f4d8-a130a26381f7@gmail.com>
+Date: Thu, 13 Apr 2017 22:02:25 +0800
+Subject: [RFC PATCH 1/3] clk: add clk_bulk_get accessories
+In-Reply-To: <1491931159.31718.16.camel@nxp.com>
 References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
- <86200633-8349-f1c3-f4d8-a130a26381f7@gmail.com>
-Message-ID: <20170413135828.GA24254@b29396-OptiPlex-7040>
+ <1491969809-20154-2-git-send-email-aisheng.dong@nxp.com>
+ <1491931159.31718.16.camel@nxp.com>
+Message-ID: <20170413140225.GB24254@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 10:01:29AM -0700, Florian Fainelli wrote:
-...
-> > This is a RFC patch intending to bring up the idea to discuss.
-> > 
-> > Comments are welcome and appreciated!
+On Tue, Apr 11, 2017 at 08:19:19PM +0300, Leonard Crestez wrote:
+> On Wed, 2017-04-12 at 12:03 +0800, Dong Aisheng wrote:
+> > +/**
+> > + * clk_bulk_enable - ungate a bulk of clocks
+> > + * @num_clks: the number of clk_bulk_data
+> > + * @clks: the clk_bulk_data table being ungated
+> > + *
+> > + * clk_bulk_enable must not sleep
+> > + * Returns 0 on success, -EERROR otherwise.
+> > + */
+> > +int clk_bulk_enable(int num_clks, struct clk_bulk_data *clks)
+> > +{
+> > +???????int ret;
+> > +???????int i;
+> > +
+> > +???????for (i = 0; i < num_clks; i++) {
+> > +???????????????ret = clk_enable(clks[i].clk);
+> > +???????????????if (ret) {
+> > +???????????????????????pr_err("Failed to enable clk '%s': %d\n",
+> > +???????????????????????????????clks[i].id, ret);
+> > +???????????????????????goto err;
+> > +???????????????}
+> > +???????}
+> > +
+> > +???????return 0;
+> > +
+> > +err:
+> > +???????while (--i >= 0)
+> > +???????????????clk_put(clks[i].clk);
 > 
-> Thanks a lot for doing this, we have historically done something similar
-> on ARCH_BRCMSTB platforms in our downstream tree with a concept of a
-> "software" clock which has multiple parents (yikes), using the bulk
-> accessors would essentially allow us to remove part of this hack, so I
-> am all in favor of this!
+> Shouldn't this be clk_disable?
+> 
 
-Glad to see someone else has the same idea! :-)
+Good catch!
+Will change in the formal version if Maintainer accepts this idea.
 
-Thanks for the supporting!
+> And you can probably use clk_bulk_disable(i, clks) instead
+
+Probably i'd prefer keep clk_disable to match with clk_enable
+to make things more clear.
+
+Thanks
 
 Regards
 Dong Aisheng
