@@ -1,232 +1,69 @@
-From: glin@suse.com (Gary Lin)
-Date: Thu, 13 Apr 2017 15:47:28 +0800
-Subject: [PATCH v2] efi: Config options to assign versions in the PE-COFF
- header
-In-Reply-To: <CAKv+Gu8ZS1rdDwLrspv_VnYHOfxkdxUpZe_h1Sw3-N2SBpeJ5g@mail.gmail.com>
-References: <20170413035827.9820-1-glin@suse.com>
- <CAKv+Gu8ZS1rdDwLrspv_VnYHOfxkdxUpZe_h1Sw3-N2SBpeJ5g@mail.gmail.com>
-Message-ID: <20170413074728.5zglfjw2rxgc6lpj@GaryWorkstation>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Thu, 13 Apr 2017 09:49:04 +0200
+Subject: [PATCH v5 0/4] gpio: mvebu: Add PWM fan support
+In-Reply-To: <20170412171656.GC11964@ulmo.ba.sec>
+References: <20170409180931.4884-1-ralph.sennhauser@gmail.com>
+ <20170412171656.GC11964@ulmo.ba.sec>
+Message-ID: <20170413094904.4fdd9b89@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 08:26:04AM +0100, Ard Biesheuvel wrote:
-> On 13 April 2017 at 04:58, Gary Lin <glin@suse.com> wrote:
-> > This commit adds the new config options to allow the user to modify the
-> > following fields in the PE-COFF header.
-> >
-> > UINT16 MajorOperatingSystemVersion
-> > UINT16 MinorOperatingSystemVersion
-> > UINT16 MajorImageVersion
-> > UINT16 MinorImageVersion
-> >
-> > Those fields are mainly for the executables or libraries in Windows NT
-> > or higher to specify the minimum supported Windows version and the
-> > version of the image itself.
-> >
-> > Given the fact that those fields are ignored in UEFI, we can safely reuse
-> > those fields for other purposes, e.g. Security Version(*).
-> >
-> > (*) https://github.com/lcp/shim/wiki/Security-Version
-> >
-> > v2 changes:
-> > - Modify the header direct instead of using an external script as
-> >   suggested by Ard Biesheuvel
-> > - Include arm and arm64
-> >
-> 
-> Thanks for the update. Could we put the Kconfig changes in
-> drivers/firmware/efi/Kconfig, rather than duplicating them 3 times?
+On Wed, 12 Apr 2017 19:16:56 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Sure. Will send a v3 to update Kconfig.
-
-Thanks,
-
-Gary Lin
-
-> 
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Ingo Molnar <mingo@redhat.com>
-> > Cc: "H. Peter Anvin" <hpa@zytor.com>
-> > Cc: Joey Lee <jlee@suse.com>
-> > Cc: Vojtech Pavlik <vojtech@suse.cz>
-> > Signed-off-by: Gary Lin <glin@suse.com>
+> On Sun, Apr 09, 2017 at 08:09:26PM +0200, Ralph Sennhauser wrote:
+> > Hi Therry,
+> > 
+> > Resending this as v5 with some minor changes since v4. What is
+> > missing is an ACK from you so Linus can merge the driver and
+> > Gregory the dts changes. For this driver to make it into 4.12 it
+> > would be nice to have it in next soon. I hope you can make some
+> > room in your schedule to have another look at this series.
+> > 
+> > Thanks
+> > Ralph
+> > 
 > > ---
-> >  arch/arm/Kconfig                      | 24 ++++++++++++++++++++++++
-> >  arch/arm/boot/compressed/efi-header.S |  8 ++++----
-> >  arch/arm64/Kconfig                    | 24 ++++++++++++++++++++++++
-> >  arch/arm64/kernel/head.S              |  8 ++++----
-> >  arch/x86/Kconfig                      | 24 ++++++++++++++++++++++++
-> >  arch/x86/boot/header.S                |  8 ++++----
-> >  6 files changed, 84 insertions(+), 12 deletions(-)
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 0d4e71b42c77..4965ad2ccc23 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -2090,6 +2090,30 @@ config EFI
-> >           is only useful for kernels that may run on systems that have
-> >           UEFI firmware.
-> >
-> > +config EFI_MAJOR_OS
-> > +       hex "EFI Major OS Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MINOR_OS
-> > +       hex "EFI Minor OS Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MAJOR_IMAGE
-> > +       hex "EFI Major Image Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MINOR_IMAGE
-> > +       hex "EFI Minor Image Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> >  endmenu
-> >
-> >  menu "CPU Power Management"
-> > diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-> > index 9d5dc4fda3c1..67715472a76f 100644
-> > --- a/arch/arm/boot/compressed/efi-header.S
-> > +++ b/arch/arm/boot/compressed/efi-header.S
-> > @@ -69,10 +69,10 @@ extra_header_fields:
-> >                 .long   0                       @ ImageBase
-> >                 .long   0x200                   @ SectionAlignment
-> >                 .long   0x200                   @ FileAlignment
-> > -               .short  0                       @ MajorOperatingSystemVersion
-> > -               .short  0                       @ MinorOperatingSystemVersion
-> > -               .short  0                       @ MajorImageVersion
-> > -               .short  0                       @ MinorImageVersion
-> > +               .short  CONFIG_EFI_MAJOR_OS     @ MajorOperatingSystemVersion
-> > +               .short  CONFIG_EFI_MINOR_OS     @ MinorOperatingSystemVersion
-> > +               .short  CONFIG_EFI_MAJOR_IMAGE  @ MajorImageVersion
-> > +               .short  CONFIG_EFI_MINOR_IMAGE  @ MinorImageVersion
-> >                 .short  0                       @ MajorSubsystemVersion
-> >                 .short  0                       @ MinorSubsystemVersion
-> >                 .long   0                       @ Win32VersionValue
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 3741859765cf..c782c422e58c 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -1033,6 +1033,30 @@ config EFI
-> >           allow the kernel to be booted as an EFI application. This
-> >           is only useful on systems that have UEFI firmware.
-> >
-> > +config EFI_MAJOR_OS
-> > +       hex "EFI Major OS Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MINOR_OS
-> > +       hex "EFI Minor OS Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MAJOR_IMAGE
-> > +       hex "EFI Major Image Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MINOR_IMAGE
-> > +       hex "EFI Minor Image Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> >  config DMI
-> >         bool "Enable support for SMBIOS (DMI) tables"
-> >         depends on EFI
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > index 4fb6ccd886d1..9faa4b04d0ef 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> > @@ -129,10 +129,10 @@ extra_header_fields:
-> >         .quad   0                               // ImageBase
-> >         .long   0x1000                          // SectionAlignment
-> >         .long   PECOFF_FILE_ALIGNMENT           // FileAlignment
-> > -       .short  0                               // MajorOperatingSystemVersion
-> > -       .short  0                               // MinorOperatingSystemVersion
-> > -       .short  0                               // MajorImageVersion
-> > -       .short  0                               // MinorImageVersion
-> > +       .short  CONFIG_EFI_MAJOR_OS             // MajorOperatingSystemVersion
-> > +       .short  CONFIG_EFI_MINOR_OS             // MinorOperatingSystemVersion
-> > +       .short  CONFIG_EFI_MAJOR_IMAGE          // MajorImageVersion
-> > +       .short  CONFIG_EFI_MINOR_IMAGE          // MinorImageVersion
-> >         .short  0                               // MajorSubsystemVersion
-> >         .short  0                               // MinorSubsystemVersion
-> >         .long   0                               // Win32VersionValue
-> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> > index 5bbdef151805..233933fde7dd 100644
-> > --- a/arch/x86/Kconfig
-> > +++ b/arch/x86/Kconfig
-> > @@ -1803,6 +1803,30 @@ config EFI_STUB
-> >
-> >           See Documentation/efi-stub.txt for more information.
-> >
-> > +config EFI_MAJOR_OS
-> > +       hex "EFI Major OS Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MINOR_OS
-> > +       hex "EFI Minor OS Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MAJOR_IMAGE
-> > +       hex "EFI Major Image Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> > +config EFI_MINOR_IMAGE
-> > +       hex "EFI Minor Image Version"
-> > +       range 0x0 0xFFFF
-> > +       default "0x0"
-> > +       depends on EFI_STUB
-> > +
-> >  config EFI_MIXED
-> >         bool "EFI mixed-mode support"
-> >         depends on EFI_STUB && X86_64
-> > diff --git a/arch/x86/boot/header.S b/arch/x86/boot/header.S
-> > index 3dd5be33aaa7..863813007207 100644
-> > --- a/arch/x86/boot/header.S
-> > +++ b/arch/x86/boot/header.S
-> > @@ -156,10 +156,10 @@ extra_header_fields:
-> >  #endif
-> >         .long   0x20                            # SectionAlignment
-> >         .long   0x20                            # FileAlignment
-> > -       .word   0                               # MajorOperatingSystemVersion
-> > -       .word   0                               # MinorOperatingSystemVersion
-> > -       .word   0                               # MajorImageVersion
-> > -       .word   0                               # MinorImageVersion
-> > +       .word   CONFIG_EFI_MAJOR_OS             # MajorOperatingSystemVersion
-> > +       .word   CONFIG_EFI_MINOR_OS             # MinorOperatingSystemVersion
-> > +       .word   CONFIG_EFI_MAJOR_IMAGE          # MajorImageVersion
-> > +       .word   CONFIG_EFI_MINOR_IMAGE          # MinorImageVersion
-> >         .word   0                               # MajorSubsystemVersion
-> >         .word   0                               # MinorSubsystemVersion
-> >         .long   0                               # Win32VersionValue
-> > --
-> > 2.12.0
-> >
+> > 
+> > Notes:
+> > 
+> >   About npwm = 1:
+> >     The only way I can think of to achieve that requires reading the
+> >     GPIO line from the device tree. This would prevent a user to
+> >     dynamically choose a line. Which is fine for the fan found on
+> > Mamba but let's take some development board with freely accessible
+> > GPIOs and suddenly we limit the use of this driver. Given the
+> > above, npwm = ngpio with only one usable at a time is a more
+> > accurate  
 > 
+> I think "accurate" is perhaps not the word I'd choose. "npwm" is
+> defined as "number of PWMs controlled by this chip", and that's
+> effectively just the one. It's implied that all PWMs exposed by a
+> chip can be used concurrently.
+
+I'm not native English so some terms might be off a tad in how I use
+them, replace accurate with what you think I meant ;).
+
+The "it's implied" sounds like a contract and EBUSY a violation thereof.
+
+> 
+> Anyway, I can see how npwm = ngpio might be more convenient, and if
+> that is what you want to do, I don't feel strongly enough to object.
+
+The goal is a pwm-fan driver for Mamba. So npwm=1 would work just fine
+from that stand point. It's indeed the sysfs case I had in mind which
+would be hampered. Whether to consider that one valid / desirable I
+don't want to judge. For me it's a hypothetical use case for others it
+might be real.
+
+For this series I want just this one device to work and getting the
+bindings right to not prevent others extending the driver later when
+they need.
+
+The driver which is under rework here is in use for 2 years, so I went
+with the feature set provided by it which is more than I need. It's a
+one of it's kind driver and I only have this single use case, so really
+your call.
+
+Thanks
+Ralph
