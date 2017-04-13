@@ -1,52 +1,151 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 13 Apr 2017 10:13:54 +0800
-Subject: [PATCH 3/3] clk: sunxi-ng: h3: gate then ungate PLL CPU clk after
- rate change
+Date: Thu, 13 Apr 2017 10:13:52 +0800
+Subject: [PATCH 1/3] clk: sunxi-ng: Add clk notifier to gate then ungate PLL
+ clocks
 In-Reply-To: <20170413021354.3258-1-wens@csie.org>
 References: <20170413021354.3258-1-wens@csie.org>
-Message-ID: <20170413021354.3258-4-wens@csie.org>
+Message-ID: <20170413021354.3258-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch utilizes the new PLL clk notifier to gate then ungate the
-PLL CPU clock after rate changes. This should prevent any system hangs
-resulting from cpufreq changes to the clk.
+In common PLL designs, changes to the dividers take effect almost
+immediately, while changes to the multipliers (implemented as
+dividers in the feedback loop) take a few cycles to work into
+the feedback loop for the PLL to stablize.
+
+Sometimes when the PLL clock rate is changed, the decrease in the
+divider is too much for the decrease in the multiplier to catch up.
+The PLL clock rate will spike, and in some cases, might lock up
+completely. This is especially the case if the divider changed is
+the pre-divider, which affects the reference frequency.
+
+This patch introduces a clk notifier callback that will gate and
+then ungate a clk after a rate change, effectively resetting it,
+so it continues to work, despite any possible lockups. Care must
+be taken to reparent any consumers to other temporary clocks during
+the rate change, and that this notifier callback must be the first
+to be registered.
+
+This is intended to fix occasional lockups with cpufreq on newer
+Allwinner SoCs, such as the A33 and the H3. Previously it was
+thought that reparenting the cpu clock away from the PLL while
+it stabilized was enough, as this worked quite well on the A31.
+
+On the A33, hangs have been observed after cpufreq was recently
+introduced. With the H3, a more thorough test [1] showed that
+reparenting alone isn't enough. The system still locks up unless
+the dividers are limited to 1.
+
+A hunch was if the PLL was stuck in some unknown state, perhaps
+gating then ungating it would bring it back to normal. Tests
+done by Icenowy Zheng using Ondrej's test firmware shows this
+to be a valid solution.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg552501.html
 
 Reported-by: Ondrej Jirman <megous@megous.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Tested-by: Icenowy Zheng <icenowy@aosc.io>
+Tested-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/clk/sunxi-ng/ccu_common.c | 49 +++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_common.h | 12 ++++++++++
+ 2 files changed, 61 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 4cbc1b701b7c..fc04ef2af1ac 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -1103,6 +1103,13 @@ static const struct sunxi_ccu_desc sun50i_h5_ccu_desc = {
- 	.num_resets	= ARRAY_SIZE(sun50i_h5_ccu_resets),
- };
+diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
+index 188fa50d0380..40aac316128f 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.c
++++ b/drivers/clk/sunxi-ng/ccu_common.c
+@@ -14,11 +14,13 @@
+  * GNU General Public License for more details.
+  */
  
-+static struct ccu_pll_nb sun8i_h3_pll_cpu_nb = {
-+	.common	= &pll_cpux_clk.common,
-+	/* copy from pll_cpux_clk */
-+	.enable	= BIT(31),
-+	.lock	= BIT(28),
++#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/iopoll.h>
+ #include <linux/slab.h>
+ 
+ #include "ccu_common.h"
++#include "ccu_gate.h"
+ #include "ccu_reset.h"
+ 
+ static DEFINE_SPINLOCK(ccu_lock);
+@@ -39,6 +41,53 @@ void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
+ 	WARN_ON(readl_relaxed_poll_timeout(addr, reg, reg & lock, 100, 70000));
+ }
+ 
++/*
++ * This clock notifier is called when the frequency of a PLL clock is
++ * changed. In common PLL designs, changes to the dividers take effect
++ * almost immediately, while changes to the multipliers (implemented
++ * as dividers in the feedback loop) take a few cycles to work into
++ * the feedback loop for the PLL to stablize.
++ *
++ * Sometimes when the PLL clock rate is changed, the decrease in the
++ * divider is too much for the decrease in the multiplier to catch up.
++ * The PLL clock rate will spike, and in some cases, might lock up
++ * completely.
++ *
++ * This notifier callback will gate and then ungate the clock,
++ * effectively resetting it, so it proceeds to work. Care must be
++ * taken to reparent consumers to other temporary clocks during the
++ * rate change, and that this notifier callback must be the first
++ * to be registered.
++ */
++static int ccu_pll_notifier_cb(struct notifier_block *nb,
++			       unsigned long event, void *data)
++{
++	struct ccu_pll_nb *pll = to_ccu_pll_nb(nb);
++	int ret = 0;
++
++	if (event != POST_RATE_CHANGE)
++		goto out;
++
++	ccu_gate_helper_disable(pll->common, pll->enable);
++
++	ret = ccu_gate_helper_enable(pll->common, pll->enable);
++	if (ret)
++		goto out;
++
++	ccu_helper_wait_for_lock(pll->common, pll->lock);
++
++out:
++	return notifier_from_errno(ret);
++}
++
++int ccu_pll_notifier_register(struct ccu_pll_nb *pll_nb)
++{
++	pll_nb->clk_nb.notifier_call = ccu_pll_notifier_cb;
++
++	return clk_notifier_register(pll_nb->common->hw.clk,
++				     &pll_nb->clk_nb);
++}
++
+ int sunxi_ccu_probe(struct device_node *node, void __iomem *reg,
+ 		    const struct sunxi_ccu_desc *desc)
+ {
+diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+index 73d81dc58fc5..d6fdd7a789aa 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.h
++++ b/drivers/clk/sunxi-ng/ccu_common.h
+@@ -83,6 +83,18 @@ struct sunxi_ccu_desc {
+ 
+ void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock);
+ 
++struct ccu_pll_nb {
++	struct notifier_block	clk_nb;
++	struct ccu_common	*common;
++
++	u32	enable;
++	u32	lock;
 +};
 +
- static struct ccu_mux_nb sun8i_h3_cpu_nb = {
- 	.common		= &cpux_clk.common,
- 	.cm		= &cpux_clk.mux,
-@@ -1130,6 +1137,10 @@ static void __init sunxi_h3_h5_ccu_init(struct device_node *node,
- 
- 	sunxi_ccu_probe(node, reg, desc);
- 
-+	/* Gate then ungate PLL CPU after any rate changes */
-+	ccu_pll_notifier_register(&sun8i_h3_pll_cpu_nb);
++#define to_ccu_pll_nb(_nb) container_of(_nb, struct ccu_pll_nb, clk_nb)
 +
-+	/* Reparent CPU during PLL CPU rate changes */
- 	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
- 				  &sun8i_h3_cpu_nb);
- }
++int ccu_pll_notifier_register(struct ccu_pll_nb *pll_nb);
++
+ int sunxi_ccu_probe(struct device_node *node, void __iomem *reg,
+ 		    const struct sunxi_ccu_desc *desc);
+ 
 -- 
 2.11.0
