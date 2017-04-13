@@ -1,387 +1,504 @@
-From: jiada_wang@mentor.com (jiada_wang at mentor.com)
-Date: Thu, 13 Apr 2017 05:14:04 -0700
-Subject: [PATCH RFC 5/5] spi: imx: Add support for SPI Slave mode for imx53
- and imx6 chips
-In-Reply-To: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <1492085644-4195-6-git-send-email-jiada_wang@mentor.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Thu, 13 Apr 2017 13:18:58 +0100
+Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
+ comments etc.
+In-Reply-To: <20170404092604.GB14898@arm.com>
+References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
+ <20170328065130.16019-2-takahiro.akashi@linaro.org>
+ <1491207492.6020.8.camel@infradead.org> <20170404054144.GG16309@linaro.org>
+ <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
+ <20170404073504.GI16309@linaro.org>
+ <1491291844.6218.25.camel@infradead.org> <20170404092604.GB14898@arm.com>
+Message-ID: <1492085938.20068.6.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiada Wang <jiada_wang@mentor.com>
+Less important than in user-visible messages, but still good practice as
+there's still no excuse for ARM64 code to look like it was written before
+1996.
 
-Previously i.MX SPI controller only works in Master mode.
-This patch adds support to work also in Slave mode.
-
-Currently SPI Slave mode support patch has the following limitations:
-1. The stale data in RXFIFO will be dropped when the Slave does any new
-   transfer.
-2. One transfer can be finished only after all transfer->len data been
-   transferred to master device
-3. Slave device only accepts transfer->len data. Any data longer than this
-   from master device will be dropped. Any data shorter than this from
-   master will cause SPI to stuck due to mentioned HW limitation 2.
-4. Only PIO transfer is supported in Slave mode.
-
-Following HW limitation applies:
-1.  ECSPI has a HW issue when works in Slave mode, after 64
-    words written to TXFIFO, even TXFIFO becomes empty,
-    ECSPI_TXDATA keeps shift out the last word data,
-    so we have to disable ECSPI when in slave mode after the
-    transfer completes
-2.  Due to Freescale errata ERR003775 "eCSPI: Burst completion by Chip
-    Select (SS) signal in Slave mode is not functional" burst size must
-    be set exactly to the size of the transfer. This limit SPI transaction
-    with maximum 2^12 bits.
-
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
 ---
- drivers/spi/spi-imx.c | 173 ++++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 159 insertions(+), 14 deletions(-)
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |  2 +-
+ .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      |  2 +-
+ arch/arm64/boot/dts/broadcom/ns2-xmc.dts           | 24 +++++++++++-----------
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  2 +-
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts      |  2 +-
+ arch/arm64/boot/dts/marvell/berlin4ct-stb.dts      |  2 +-
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |  2 +-
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  2 +-
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     |  2 +-
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  2 +-
+ arch/arm64/include/asm/assembler.h                 |  2 +-
+ arch/arm64/include/asm/boot.h                      |  4 ++--
+ arch/arm64/include/asm/elf.h                       |  2 +-
+ arch/arm64/include/asm/fixmap.h                    |  6 +++---
+ arch/arm64/kernel/head.S                           |  8 ++++----
+ arch/arm64/kernel/hyp-stub.S                       |  2 +-
+ arch/arm64/kernel/kaslr.c                          | 14 ++++++-------
+ arch/arm64/kernel/module-plts.c                    |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S                    | 18 ++++++++--------
+ arch/arm64/mm/mmu.c                                |  2 +-
+ arch/arm64/mm/proc.S                               |  2 +-
+ 22 files changed, 53 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index b2323b9..f6e1baa 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -53,9 +53,13 @@
- /* generic defines to abstract from the different register layouts */
- #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
- #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
-+#define MXC_INT_RDR	BIT(4) /* Receive date threshold interrupt */
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index df539e8..f70fb13 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -694,7 +694,7 @@
  
- /* The maximum  bytes that a sdma BD can transfer.*/
- #define MAX_SDMA_BD_BYTES  (1 << 15)
-+/* The maximum bytes that IMX53_ECSPI can transfer in slave mode.*/
-+#define MX53_MAX_TRANSFER_BYTES		512
-+
- struct spi_imx_config {
- 	unsigned int speed_hz;
- 	unsigned int bpw;
-@@ -79,6 +83,7 @@ struct spi_imx_devtype_data {
- 	void (*trigger)(struct spi_imx_data *);
- 	int (*rx_available)(struct spi_imx_data *);
- 	void (*reset)(struct spi_imx_data *);
-+	void (*disable)(struct spi_imx_data *);
- 	enum spi_imx_devtype devtype;
+ 	memory at 80000000 {
+ 		device_type = "memory";
+-		/* last 16MB of the first memory area is reserved for secure world use by firmware */
++		/* last 16MiB of the first memory area is reserved for secure world use by firmware */
+ 		reg = <0x00000000 0x80000000 0x0 0x7f000000>,
+ 		      <0x00000008 0x80000000 0x1 0x80000000>;
+ 	};
+diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+index e3a1711..38ece4b 100644
+--- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
++++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+@@ -60,7 +60,7 @@
+ 
+ 	memory at 80000000 {
+ 		device_type = "memory";
+-		reg = <0 0x80000000 0 0x80000000>; /* 2GB @ 2GB */
++		reg = <0 0x80000000 0 0x80000000>; /* 2GiB @ 2GiB */
+ 	};
+ 
+ 	gic: interrupt-controller at 2c001000 {
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
+index 99a2723..5908524 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
+@@ -87,36 +87,36 @@
+ 
+ 		partition at 0 {
+ 			label = "nboot";
+-			reg = <0x00000000 0x00280000>; /*  2.5MB */
++			reg = <0x00000000 0x00280000>; /*  2.5MiB */
+ 			read-only;
+ 		};
+ 
+ 		partition at 280000 {
+ 			label = "nenv";
+-			reg = <0x00280000 0x00040000>; /* 0.25MB */
++			reg = <0x00280000 0x00040000>; /* 0.25MiB */
+ 			read-only;
+ 		};
+ 
+ 		partition at 2c0000 {
+ 			label = "ndtb";
+-			reg = <0x002c0000 0x00040000>; /* 0.25MB */
++			reg = <0x002c0000 0x00040000>; /* 0.25MiB */
+ 			read-only;
+ 		};
+ 
+ 		partition at 300000 {
+ 			label = "nsystem";
+-			reg = <0x00300000 0x03d00000>; /*   61MB */
++			reg = <0x00300000 0x03d00000>; /*   61MiB */
+ 			read-only;
+ 		};
+ 
+ 		partition at 4000000 {
+ 			label = "nrootfs";
+-			reg = <0x04000000 0x06400000>; /*  100MB */
++			reg = <0x04000000 0x06400000>; /*  100MiB */
+ 		};
+ 
+ 		partition at 0a400000{
+ 			label = "ncustfs";
+-			reg = <0x0a400000 0x35c00000>; /*  860MB */
++			reg = <0x0a400000 0x35c00000>; /*  860MiB */
+ 		};
+ 	};
  };
+@@ -156,32 +156,32 @@
  
-@@ -104,6 +109,10 @@ struct spi_imx_data {
- 	const void *tx_buf;
- 	unsigned int txfifo; /* number of words pushed in tx FIFO */
+ 		partition at 0 {
+ 			label = "bl0";
+-			reg = <0x00000000 0x00080000>; /*  512KB */
++			reg = <0x00000000 0x00080000>; /*  512KiB */
+ 		};
  
-+	/* Slave mode */
-+	unsigned int slave_mode;
-+	unsigned int slave_burst;
-+
- 	/* DMA */
- 	bool usedma;
- 	u32 wml;
-@@ -156,6 +165,19 @@ static inline bool spi_imx_has_dmamode(struct spi_imx_data *d)
- 	}
- }
+ 		partition at 80000 {
+ 			label = "fip";
+-			reg = <0x00080000 0x00150000>; /* 1344KB */
++			reg = <0x00080000 0x00150000>; /* 1344KiB */
+ 		};
  
-+static bool spi_imx_has_slavemode(struct spi_master *master)
-+{
-+	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
-+
-+	switch (spi_imx->devtype_data->devtype) {
-+	case IMX51_ECSPI:
-+	case IMX53_ECSPI:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
- #define MXC_SPI_BUF_RX(type)						\
- static void spi_imx_buf_rx_##type(struct spi_imx_data *spi_imx)		\
- {									\
-@@ -285,6 +307,7 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- #define MX51_ECSPI_INT		0x10
- #define MX51_ECSPI_INT_TEEN		(1 <<  0)
- #define MX51_ECSPI_INT_RREN		(1 <<  3)
-+#define MX51_ECSPI_INT_RDREN		(1 <<  4)
+ 		partition at 1e0000 {
+ 			label = "env";
+-			reg = <0x001e0000 0x00010000>;/*    64KB */
++			reg = <0x001e0000 0x00010000>;/*    64KiB */
+ 		};
  
- #define MX51_ECSPI_DMA      0x14
- #define MX51_ECSPI_DMA_TX_WML(wml)	((wml) & 0x3f)
-@@ -301,6 +324,51 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- #define MX51_ECSPI_TESTREG	0x20
- #define MX51_ECSPI_TESTREG_LBC	BIT(31)
+ 		partition at 1f0000 {
+ 			label = "dtb";
+-			reg = <0x001f0000 0x00010000>; /*   64KB */
++			reg = <0x001f0000 0x00010000>; /*   64KiB */
+ 		};
  
-+static void mx53_ecspi_rx_slave(struct spi_imx_data *spi_imx)
-+{
-+	u32 val = be32_to_cpu(readl(spi_imx->base + MXC_CSPIRXDATA));
-+
-+	if (spi_imx->rx_buf) {
-+		int shift = spi_imx->slave_burst % sizeof(val);
-+
-+		if (shift) {
-+			memcpy(spi_imx->rx_buf,
-+			       ((u8 *)&val) + sizeof(val) - shift, shift);
-+		} else {
-+			*((u32 *)spi_imx->rx_buf) = val;
-+			shift = sizeof(val);
-+		}
-+
-+		spi_imx->rx_buf += shift;
-+		spi_imx->slave_burst -= shift;
-+	}
-+}
-+
-+static void mx53_ecspi_tx_slave(struct spi_imx_data *spi_imx)
-+{
-+	u32 val = 0;
-+	int shift = spi_imx->count % sizeof(val);
-+
-+	if (spi_imx->tx_buf) {
-+		if (shift) {
-+			memcpy(((u8 *)&val) + sizeof(val) - shift,
-+			       spi_imx->tx_buf, shift);
-+		} else {
-+			val = *((u32 *)spi_imx->tx_buf);
-+			shift = sizeof(val);
-+		}
-+		val = cpu_to_be32(val);
-+		spi_imx->tx_buf += shift;
-+	}
-+
-+	if (!shift)
-+		shift = sizeof(val);
-+
-+	spi_imx->count -= shift;
-+
-+	writel(val, spi_imx->base + MXC_CSPITXDATA);
-+}
-+
- /* MX51 eCSPI */
- static unsigned int mx51_ecspi_clkdiv(struct spi_imx_data *spi_imx,
- 				      unsigned int fspi, unsigned int *fres)
-@@ -350,6 +418,9 @@ static void mx51_ecspi_intctrl(struct spi_imx_data *spi_imx, int enable)
- 	if (enable & MXC_INT_RR)
- 		val |= MX51_ECSPI_INT_RREN;
+ 		partition at 200000 {
+ 			label = "kernel";
+-			reg = <0x00200000 0x00e00000>; /*   14MB */
++			reg = <0x00200000 0x00e00000>; /*   14MiB */
+ 		};
  
-+	if (enable & MXC_INT_RDR)
-+		val |= MX51_ECSPI_INT_RDREN;
-+
- 	writel(val, spi_imx->base + MX51_ECSPI_INT);
- }
- 
-@@ -362,6 +433,15 @@ static void mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
- 	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
- }
- 
-+static void __maybe_unused mx51_ecspi_disable(struct spi_imx_data *spi_imx)
-+{
-+	u32 ctrl;
-+
-+	ctrl = readl(spi_imx->base + MX51_ECSPI_CTRL);
-+	ctrl &= ~MX51_ECSPI_CTRL_ENABLE;
-+	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
-+}
-+
- static int mx51_ecspi_config(struct spi_device *spi,
- 			     struct spi_imx_config *config)
- {
-@@ -370,14 +450,13 @@ static int mx51_ecspi_config(struct spi_device *spi,
- 	u32 clk = config->speed_hz, delay, reg;
- 	u32 cfg = readl(spi_imx->base + MX51_ECSPI_CONFIG);
- 
--	/*
--	 * The hardware seems to have a race condition when changing modes. The
--	 * current assumption is that the selection of the channel arrives
--	 * earlier in the hardware than the mode bits when they are written at
--	 * the same time.
--	 * So set master mode for all channels as we do not support slave mode.
--	 */
--	ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
-+	writel(0, spi_imx->base + MX51_ECSPI_CTRL);
-+
-+	/* set Master or Slave mode */
-+	if (spi_imx->slave_mode)
-+		ctrl &= ~MX51_ECSPI_CTRL_MODE_MASK;
-+	else
-+		ctrl |= MX51_ECSPI_CTRL_MODE_MASK;
- 
- 	/* set clock speed */
- 	ctrl |= mx51_ecspi_clkdiv(spi_imx, config->speed_hz, &clk);
-@@ -386,9 +465,21 @@ static int mx51_ecspi_config(struct spi_device *spi,
- 	/* set chip select to use */
- 	ctrl |= MX51_ECSPI_CTRL_CS(spi->chip_select);
- 
--	ctrl |= (config->bpw - 1) << MX51_ECSPI_CTRL_BL_OFFSET;
-+	if (spi_imx->slave_mode && is_imx53_ecspi(spi_imx))
-+		ctrl |= (spi_imx->slave_burst * 8 - 1)
-+			<< MX51_ECSPI_CTRL_BL_OFFSET;
-+	else
-+		ctrl |= (config->bpw - 1) << MX51_ECSPI_CTRL_BL_OFFSET;
- 
--	cfg |= MX51_ECSPI_CONFIG_SBBCTRL(spi->chip_select);
-+	/*
-+	 * eCSPI burst completion by Chip Select signal in Slave mode
-+	 * is not functional, config SPI burst completed when
-+	 * BURST_LENGTH + 1 bits are received
-+	 */
-+	if (spi_imx->slave_mode && is_imx53_ecspi(spi_imx))
-+		cfg &= ~MX51_ECSPI_CONFIG_SBBCTRL(spi->chip_select);
-+	else
-+		cfg |= MX51_ECSPI_CONFIG_SBBCTRL(spi->chip_select);
- 
- 	if (spi->mode & SPI_CPHA)
- 		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(spi->chip_select);
-@@ -767,6 +858,7 @@ static struct spi_imx_devtype_data imx51_ecspi_devtype_data = {
- 	.trigger = mx51_ecspi_trigger,
- 	.rx_available = mx51_ecspi_rx_available,
- 	.reset = mx51_ecspi_reset,
-+	.disable = mx51_ecspi_disable,
- 	.devtype = IMX51_ECSPI,
+ 		partition at 1000000 {
+ 			label = "rootfs";
+-			reg = <0x01000000 0x01000000>; /*   16MB */
++			reg = <0x01000000 0x01000000>; /*   16MiB */
+ 		};
+ 	};
  };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index c37110b..71ce1f1 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -126,7 +126,7 @@
+ 	flash at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "n25q128a13", "jedec,spi-nor";  /* 16MB */
++		compatible = "n25q128a13", "jedec,spi-nor";  /* 16MiB */
+ 		reg = <0>;
+ 		spi-max-frequency = <1000000>; /* input clock */
+ 	};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e5935f2..43e549f 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -152,7 +152,7 @@
+ 	memory at 80000000 {
+ 		device_type = "memory";
+ 		reg = <0x00000000 0x80000000 0 0x80000000>;
+-		      /* DRAM space - 1, size : 2 GB DRAM */
++		      /* DRAM space - 1, size : 2 GiB DRAM */
+ 	};
  
-@@ -776,6 +868,7 @@ static struct spi_imx_devtype_data imx53_ecspi_devtype_data = {
- 	.trigger = mx51_ecspi_trigger,
- 	.rx_available = mx51_ecspi_rx_available,
- 	.reset = mx51_ecspi_reset,
-+	.disable = mx51_ecspi_disable,
- 	.devtype = IMX53_ECSPI,
+ 	sysclk: sysclk {
+diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+index fae6c69..4b3a5e2 100644
+--- a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
++++ b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+@@ -56,7 +56,7 @@
+ 
+ 	memory at 1000000 {
+ 		device_type = "memory";
+-		/* the first 16MB is for firmwares' usage */
++		/* the first 16MiB is for firmwares' usage */
+ 		reg = <0 0x01000000 0 0x7f000000>;
+ 	};
  };
+diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
+index d47edad..049018b 100644
+--- a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
++++ b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
+@@ -56,7 +56,7 @@
  
-@@ -838,14 +931,16 @@ static void spi_imx_push(struct spi_imx_data *spi_imx)
- 		spi_imx->txfifo++;
- 	}
+ 	memory at 1000000 {
+ 		device_type = "memory";
+-		/* the first 16MB is for firmwares' usage */
++		/* the first 16MiB is for firmwares' usage */
+ 		reg = <0 0x01000000 0 0x7f000000>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index c5f8f69..15f57e6 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -29,7 +29,7 @@
  
--	spi_imx->devtype_data->trigger(spi_imx);
-+	if (!spi_imx->slave_mode)
-+		spi_imx->devtype_data->trigger(spi_imx);
- }
+ 	memory at 48000000 {
+ 		device_type = "memory";
+-		/* first 128MB is reserved for secure area. */
++		/* first 128MiB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
  
- static irqreturn_t spi_imx_isr(int irq, void *dev_id)
- {
- 	struct spi_imx_data *spi_imx = dev_id;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 7a8986e..35f7cd2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -52,7 +52,7 @@
  
--	while (spi_imx->devtype_data->rx_available(spi_imx)) {
-+	while (spi_imx->txfifo &&
-+	       spi_imx->devtype_data->rx_available(spi_imx)) {
- 		spi_imx->rx(spi_imx);
- 		spi_imx->txfifo--;
- 	}
-@@ -927,6 +1022,8 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 	config.bpw = t ? t->bits_per_word : spi->bits_per_word;
- 	config.speed_hz  = t ? t->speed_hz : spi->max_speed_hz;
+ 	memory at 48000000 {
+ 		device_type = "memory";
+-		/* first 128MB is reserved for secure area. */
++		/* first 128MiB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
  
-+	spi_imx->slave_mode = spi->slave_mode;
-+
- 	if (!config.speed_hz)
- 		config.speed_hz = spi->max_speed_hz;
- 	if (!config.bpw)
-@@ -944,7 +1041,8 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 		spi_imx->tx = spi_imx_buf_tx_u32;
- 	}
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+index c3f064a..4d1295e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
+@@ -28,7 +28,7 @@
  
--	if (spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
-+	if (!spi->slave_mode &&
-+	    spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
- 		spi_imx->usedma = 1;
- 	else
- 		spi_imx->usedma = 0;
-@@ -956,6 +1054,12 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 			return ret;
- 	}
+ 	memory at 48000000 {
+ 		device_type = "memory";
+-		/* first 128MB is reserved for secure area. */
++		/* first 128MiB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
  
-+	if (is_imx53_ecspi(spi_imx) && spi_imx->slave_mode) {
-+		spi_imx->rx = mx53_ecspi_rx_slave;
-+		spi_imx->tx = mx53_ecspi_tx_slave;
-+		spi_imx->slave_burst = t->len;
-+	}
-+
- 	spi_imx->devtype_data->config(spi, &config);
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index c7f40f8..2a019a3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -28,7 +28,7 @@
  
- 	return 0;
-@@ -1117,16 +1221,46 @@ static int spi_imx_pio_transfer(struct spi_device *spi,
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
- 	unsigned long transfer_timeout;
- 	unsigned long timeout;
-+	int ret = transfer->len;
-+
-+	if (is_imx53_ecspi(spi_imx) && spi_imx->slave_mode &&
-+	    transfer->len > MX53_MAX_TRANSFER_BYTES) {
-+		pr_err("Transaction too big, max size is %d bytes\n",
-+		       MX53_MAX_TRANSFER_BYTES);
-+		return -EMSGSIZE;
-+	}
+ 	memory at 48000000 {
+ 		device_type = "memory";
+-		/* first 128MB is reserved for secure area. */
++		/* first 128MiB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x78000000>;
+ 	};
  
- 	spi_imx->tx_buf = transfer->tx_buf;
- 	spi_imx->rx_buf = transfer->rx_buf;
- 	spi_imx->count = transfer->len;
- 	spi_imx->txfifo = 0;
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 1b67c37..56094e2 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -165,7 +165,7 @@ lr	.req	x30		// link register
  
-+	if (spi_imx->slave_mode)
-+		spi_imx->slave_burst = spi_imx->count;
-+
- 	reinit_completion(&spi_imx->xfer_done);
+ /*
+  * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> where
+- * <symbol> is within the range +/- 4 GB of the PC when running
++ * <symbol> is within the range +/- 4 GiB of the PC when running
+  * in core kernel context. In module context, a movz/movk sequence
+  * is used, since modules may be loaded far away from the kernel
+  * when KASLR is in effect.
+diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+index ebf2481..95e26bc 100644
+--- a/arch/arm64/include/asm/boot.h
++++ b/arch/arm64/include/asm/boot.h
+@@ -6,14 +6,14 @@
  
- 	spi_imx_push(spi_imx);
+ /*
+  * arm64 requires the DTB to be 8 byte aligned and
+- * not exceed 2MB in size.
++ * not exceed 2MiB in size.
+  */
+ #define MIN_FDT_ALIGN		8
+ #define MAX_FDT_SIZE		SZ_2M
  
-+	if (spi_imx->slave_mode) {
-+		spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TE |
-+							MXC_INT_RDR);
-+
-+		if (wait_for_completion_interruptible(&spi_imx->xfer_done) < 0)
-+			ret = -EINTR;
-+
-+		/* ecspi has a HW issue when works in Slave mode,
-+		 * after 64 words writtern to TXFIFO, even TXFIFO becomes empty,
-+		 * ECSPI_TXDATA keeps shift out the last word data,
-+		 * so we have to disable ECSPI when in slave mode after the
-+		 * transfer completes
-+		 */
-+		if (spi_imx->devtype_data->disable)
-+			spi_imx->devtype_data->disable(spi_imx);
-+
-+		goto out;
-+	}
-+
- 	spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TE);
+ /*
+  * arm64 requires the kernel image to placed
+- * TEXT_OFFSET bytes beyond a 2 MB aligned base
++ * TEXT_OFFSET bytes beyond a 2 MiB aligned base
+  */
+ #define MIN_KIMG_ALIGN		SZ_2M
  
- 	transfer_timeout = spi_imx_calculate_timeout(spi_imx, transfer->len);
-@@ -1139,7 +1273,8 @@ static int spi_imx_pio_transfer(struct spi_device *spi,
- 		return -ETIMEDOUT;
- 	}
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 5d17004..28e63ff 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -156,7 +156,7 @@ struct linux_binprm;
+ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
+ 				       int uses_interp);
  
--	return transfer->len;
-+out:
-+	return ret;
- }
+-/* 1GB of VA */
++/* 1GiB of VA */
+ #ifdef CONFIG_COMPAT
+ #define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
+ 						0x7ff >> (PAGE_SHIFT - 12) : \
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index caf86be..7e90ab2 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -37,13 +37,13 @@ enum fixed_addresses {
+ 	FIX_HOLE,
  
- static int spi_imx_transfer(struct spi_device *spi,
-@@ -1147,6 +1282,10 @@ static int spi_imx_transfer(struct spi_device *spi,
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
+ 	/*
+-	 * Reserve a virtual window for the FDT that is 2 MB larger than the
++	 * Reserve a virtual window for the FDT that is 2 MiB larger than the
+ 	 * maximum supported size, and put it at the top of the fixmap region.
+ 	 * The additional space ensures that any FDT that does not exceed
+ 	 * MAX_FDT_SIZE can be mapped regardless of whether it crosses any
+-	 * 2 MB alignment boundaries.
++	 * 2 MiB alignment boundaries.
+ 	 *
+-	 * Keep this at the top so it remains 2 MB aligned.
++	 * Keep this at the top so it remains 2 MiB aligned.
+ 	 */
+ #define FIX_FDT_SIZE		(MAX_FDT_SIZE + SZ_2M)
+ 	FIX_FDT_END,
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4fb6ccd..067ddd6 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -45,11 +45,11 @@
+ #define __PHYS_OFFSET	(KERNEL_START - TEXT_OFFSET)
  
-+	/* flush rxfifo before transfer */
-+	while (spi_imx->devtype_data->rx_available(spi_imx))
-+		spi_imx->rx(spi_imx);
-+
- 	if (spi_imx->usedma)
- 		return spi_imx_dma_transfer(spi_imx, transfer);
- 	else
-@@ -1155,6 +1294,11 @@ static int spi_imx_transfer(struct spi_device *spi,
+ #if (TEXT_OFFSET & 0xfff) != 0
+-#error TEXT_OFFSET must be at least 4KB aligned
++#error TEXT_OFFSET must be at least 4KiB aligned
+ #elif (PAGE_OFFSET & 0x1fffff) != 0
+-#error PAGE_OFFSET must be at least 2MB aligned
++#error PAGE_OFFSET must be at least 2MiB aligned
+ #elif TEXT_OFFSET > 0x1fffff
+-#error TEXT_OFFSET must be less than 2MB
++#error TEXT_OFFSET must be less than 2MiB
+ #endif
  
- static int spi_imx_setup(struct spi_device *spi)
- {
-+	if (spi->slave_mode) {
-+		dev_dbg(&spi->dev, "%s: slave mode\n", __func__);
-+		return 0;
-+	}
-+
- 	dev_dbg(&spi->dev, "%s: mode %d, %u bpw, %d hz\n", __func__,
- 		 spi->mode, spi->bits_per_word, spi->max_speed_hz);
+ /*
+@@ -360,7 +360,7 @@ ENDPROC(preserve_boot_args)
+  * Setup the initial page tables. We only setup the barest amount which is
+  * required to get the kernel running. The following sections are required:
+  *   - identity mapping to enable the MMU (low address, TTBR0)
+- *   - first few MB of the kernel linear mapping to jump to once the MMU has
++ *   - first few MiB of the kernel linear mapping to jump to once the MMU has
+  *     been enabled
+  */
+ __create_page_tables:
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index d3b5f75..9585ea7 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -106,7 +106,7 @@ ENDPROC(\label)
+  * be called on each CPU.
+  *
+  * x0 must be the physical address of the new vector table, and must be
+- * 2KB aligned.
++ * 2KiB aligned.
+  *
+  * Before calling this, you must check that the stub hypervisor is installed
+  * everywhere, by waiting for any secondary CPUs to be brought up and then
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index d7e90d9..a5a3068 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -118,9 +118,9 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ 	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
+ 	 * kernel image offset from the seed. Let's place the kernel in the
+ 	 * lower half of the VMALLOC area (VA_BITS - 2).
+-	 * Even if we could randomize at page granularity for 16k and 64k pages,
+-	 * let's always round to 2 MB so we don't interfere with the ability to
+-	 * map using contiguous PTEs
++	 * Even if we could randomize at page granularity for 16KiB and 64KiB
++	 * pages, let's always round to 2 MiB so we don't interfere with the
++	 * ability to map using contiguous PTEs
+ 	 */
+ 	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
+ 	offset = seed & mask;
+@@ -129,10 +129,10 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ 	memstart_offset_seed = seed >> 48;
  
-@@ -1254,6 +1398,7 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	spi_imx->bitbang.master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
- 	if (is_imx35_cspi(spi_imx) || is_imx51_ecspi(spi_imx))
- 		spi_imx->bitbang.master->mode_bits |= SPI_LOOP;
-+	spi_imx->bitbang.master->has_slavemode = spi_imx_has_slavemode;
+ 	/*
+-	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
+-	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+-	 * happens, increase the KASLR offset by the size of the kernel image
+-	 * rounded up by SWAPPER_BLOCK_SIZE.
++	 * The kernel Image should not extend across a 1GiB/32MiB/512MiB
++	 * alignment boundary (for 4KiB/16KiB/64KiB granule kernels,
++	 * respectively). If this happens, increase the KASLR offset by
++	 * the size of the kernel image rounded up by SWAPPER_BLOCK_SIZE.
+ 	 */
+ 	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
+ 	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index 1ce90d8..0d66734 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -118,7 +118,7 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num)
+ 			 * We only have to consider branch targets that resolve
+ 			 * to undefined symbols. This is not simply a heuristic,
+ 			 * it is a fundamental limitation, since the PLT itself
+-			 * is part of the module, and needs to be within 128 MB
++			 * is part of the module, and needs to be within 128 MiB
+ 			 * as well, so modules can never grow beyond that limit.
+ 			 */
+ 			s = syms + ELF64_R_SYM(rela[i].r_info);
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index b8deffa..93b39d6 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -25,12 +25,12 @@ jiffies = jiffies_64;
  
- 	init_completion(&spi_imx->xfer_done);
+ #define HYPERVISOR_TEXT					\
+ 	/*						\
+-	 * Align to 4 KB so that			\
++	 * Align to 4 KiB so that			\
+ 	 * a) the HYP vector table is at its minimum	\
+ 	 *    alignment of 2048 bytes			\
+ 	 * b) the HYP init code will not cross a page	\
+ 	 *    boundary if its size does not exceed	\
+-	 *    4 KB (see related ASSERT() below)		\
++	 *    4 KiB (see related ASSERT() below)	\
+ 	 */						\
+ 	. = ALIGN(SZ_4K);				\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
+@@ -60,7 +60,7 @@ jiffies = jiffies_64;
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+  * FileAlignment, which we set to its minimum value of 0x200. 'stext'
+- * itself is 4 KB aligned, so padding out _edata to a 0x200 aligned
++ * itself is 4 KiB aligned, so padding out _edata to a 0x200 aligned
+  * boundary should be sufficient.
+  */
+ PECOFF_FILE_ALIGNMENT = 0x200;
+@@ -74,16 +74,16 @@ PECOFF_FILE_ALIGNMENT = 0x200;
  
+ #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+ /*
+- *  4 KB granule:   1 level 2 entry
+- * 16 KB granule: 128 level 3 entries, with contiguous bit
+- * 64 KB granule:  32 level 3 entries, with contiguous bit
++ *  4 KiB granule:   1 level 2 entry
++ * 16 KiB granule: 128 level 3 entries, with contiguous bit
++ * 64 KiB granule:  32 level 3 entries, with contiguous bit
+  */
+ #define SEGMENT_ALIGN			SZ_2M
+ #else
+ /*
+- *  4 KB granule:  16 level 3 entries, with contiguous bit
+- * 16 KB granule:   4 level 3 entries, without contiguous bit
+- * 64 KB granule:   1 level 3 entry
++ *  4 KiB granule:  16 level 3 entries, with contiguous bit
++ * 16 KiB granule:   4 level 3 entries, without contiguous bit
++ * 64 KiB granule:   1 level 3 entry
+  */
+ #define SEGMENT_ALIGN			SZ_64K
+ #endif
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d28dbcf..5d8b743 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -229,7 +229,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 		next = pud_addr_end(addr, end);
+ 
+ 		/*
+-		 * For 4K granule only, attempt to put down a 1GB block
++		 * For 4KiB granule only, attempt to put down a 1GiB block
+ 		 */
+ 		if (use_1G_block(addr, next, phys) && !page_mappings_only) {
+ 			pud_set_huge(pud, phys, prot);
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 877d42f..daba6ba 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -221,7 +221,7 @@ ENTRY(__cpu_setup)
+ 	bic	x0, x0, x5			// clear bits
+ 	orr	x0, x0, x6			// set bits
+ 	/*
+-	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
++	 * Set/prepare TCR and TTBR. We use 512GiB (39-bit) address range for
+ 	 * both user and kernel.
+ 	 */
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
 -- 
-2.7.4
+2.9.3
+
+-- 
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/6fa9d272/attachment.bin>
