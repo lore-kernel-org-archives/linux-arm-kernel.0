@@ -1,34 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 13 Apr 2017 19:00:16 -0300
-Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
-In-Reply-To: <CANMBJr4mci5LyuBNT50dupxSVz+t-5mhWv8a7LBvY4MgupomVQ@mail.gmail.com>
-References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
- <20170413133242.5068-5-andrew.smirnov@gmail.com>
- <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
- <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
- <CANMBJr4BWtU7SXEa0-4LFLx+ydVWas0Cx18kRn-=-Bz8pPZ=fg@mail.gmail.com>
- <CAOMZO5BaKBsXean8-560HUuZbhjef9dpMNku0SRUVtkv+XsZ6w@mail.gmail.com>
- <CANMBJr7We9uOyE6=BCWoe9L7xRKjOG6ScgtDGEgQ-hPawPeppg@mail.gmail.com>
- <CAOMZO5BjzSJws7zjJ5+aZkfeF+15twEu9zS3V+g6wQrtUiNyqQ@mail.gmail.com>
- <CANMBJr4mci5LyuBNT50dupxSVz+t-5mhWv8a7LBvY4MgupomVQ@mail.gmail.com>
-Message-ID: <CAOMZO5CdmpXXu0ZQ0VQFkhyTPtiK36mN5FajzSNi5t3oqedEYA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Apr 2017 23:10:55 +0100
+Subject: [PATCH] ARM: dma-mapping: add check for coherent DMA memory
+ without struct page
+In-Reply-To: <20170413214756.21265-1-shuahkh@osg.samsung.com>
+References: <20170413214756.21265-1-shuahkh@osg.samsung.com>
+Message-ID: <20170413221055.GE17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 6:35 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+On Thu, Apr 13, 2017 at 03:47:56PM -0600, Shuah Khan wrote:
+> When coherent DMA memory without struct page is shared, importer
+> fails to find the page and runs into kernel page fault when it
+> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
+> in the sg_table.
+> 
+> Add a new dma_check_dev_coherent() interface to check if memory is
+> from the device coherent area. There is no way to tell where the
+> memory returned by dma_alloc_attrs() came from.
+> 
+> arm_dma_get_sgtable() checks for invalid pages, however this check
+> could pass even for memory obtained the coherent allocator. Add an
+> additional check to call dma_check_dev_coherent() to confirm that it
+> is indeed the coherent DMA memory and fail the sgtable creation with
+> -EINVAL.
 
-> The following patch fixes the backtrace on my board. I'll submit this
-> patch in a moment.
->
-> From: Tyler Baker <tyler.baker@linaro.org>
-> Date: Thu, 13 Apr 2017 14:29:49 -0700
-> Subject: [PATCH] irqchip/irq-imx-gpcv2: fix spinlock initialization
->
-> Call raw_spin_lock_init() before the spinlocks are used to prevent a
-> lockdep splat.
->
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+Sorry, this doesn't make much sense to me.
 
-Yes, it makes sense:
+pfn_valid(pfn) must *never* return true if 'pfn' does not have a struct
+page associated with it.  If it returns true (so we allow
+arm_dma_get_sgtable() to succeed) then we know we have a valid struct
+page in the supplied scatterlist.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  arch/arm/mm/dma-mapping.c   | 11 ++++++++---
+>  drivers/base/dma-coherent.c | 25 +++++++++++++++++++++++++
+>  include/linux/dma-mapping.h |  2 ++
+>  3 files changed, 35 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 475811f..27c7d9a 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -954,9 +954,14 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  	struct page *page;
+>  	int ret;
+>  
+> -	/* If the PFN is not valid, we do not have a struct page */
+> -	if (!pfn_valid(pfn))
+> -		return -ENXIO;
+> +	/*
+> +	 * If the PFN is not valid, we do not have a struct page
+> +	 * As this check can pass even for memory obtained through
+> +	 * the coherent allocator, do an additional check to determine
+> +	 * if this is coherent DMA memory.
+> +	 */
+> +	if (!pfn_valid(pfn) && dma_check_dev_coherent(dev, handle, cpu_addr))
+> +		return -EINVAL;
+
+Right, so what this says is:
+
+	if we do not haev a valid PFN
+	_and_ if the memory is from the coherent section
+	_then_ fail
+
+Why the extra check?  Under what circunstances do we end up with memory
+where the PFN is valid, but we do not have a valid struct page.  It
+seems to me that such a scenario is a bug in pfn_valid() and not
+something that should be worked around like this.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
