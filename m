@@ -1,253 +1,222 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 13 Apr 2017 15:05:08 +0800
-Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random generator on
- MT7623 SoC
-In-Reply-To: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
-References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 13 Apr 2017 08:26:04 +0100
+Subject: [PATCH v2] efi: Config options to assign versions in the PE-COFF
+ header
+In-Reply-To: <20170413035827.9820-1-glin@suse.com>
+References: <20170413035827.9820-1-glin@suse.com>
+Message-ID: <CAKv+Gu8ZS1rdDwLrspv_VnYHOfxkdxUpZe_h1Sw3-N2SBpeJ5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On 13 April 2017 at 04:58, Gary Lin <glin@suse.com> wrote:
+> This commit adds the new config options to allow the user to modify the
+> following fields in the PE-COFF header.
+>
+> UINT16 MajorOperatingSystemVersion
+> UINT16 MinorOperatingSystemVersion
+> UINT16 MajorImageVersion
+> UINT16 MinorImageVersion
+>
+> Those fields are mainly for the executables or libraries in Windows NT
+> or higher to specify the minimum supported Windows version and the
+> version of the image itself.
+>
+> Given the fact that those fields are ignored in UEFI, we can safely reuse
+> those fields for other purposes, e.g. Security Version(*).
+>
+> (*) https://github.com/lcp/shim/wiki/Security-Version
+>
+> v2 changes:
+> - Modify the header direct instead of using an external script as
+>   suggested by Ard Biesheuvel
+> - Include arm and arm64
+>
 
-This patch adds support for hardware random generator on MT7623 SoC
-and should also work on other similar Mediatek SoCs. Currently,
-the driver is already tested successfully with rng-tools.
+Thanks for the update. Could we put the Kconfig changes in
+drivers/firmware/efi/Kconfig, rather than duplicating them 3 times?
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/char/hw_random/Kconfig   |  16 +++-
- drivers/char/hw_random/Makefile  |   2 +-
- drivers/char/hw_random/mtk-rng.c | 174 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 190 insertions(+), 2 deletions(-)
- create mode 100644 drivers/char/hw_random/mtk-rng.c
-
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 0cafe08..af782ce 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -419,10 +419,24 @@ config HW_RANDOM_CAVIUM
-          Generator hardware found on Cavium SoCs.
- 
-          To compile this driver as a module, choose M here: the
--         module will be called cavium_rng.
-+         module will be called mtk-rng.
- 
-          If unsure, say Y.
- 
-+config HW_RANDOM_MTK
-+	tristate "Mediatek Random Number Generator support"
-+	depends on HW_RANDOM
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	default y
-+	---help---
-+	  This driver provides kernel-side support for the Random Number
-+	  Generator hardware found on Mediatek SoCs.
-+
-+	  To compile this driver as a module, choose M here. the
-+	  module will be called mtk-rng.
-+
-+	  If unsure, say Y.
-+
- endif # HW_RANDOM
- 
- config UML_RANDOM
-diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-index 5f52b1e..68be716 100644
---- a/drivers/char/hw_random/Makefile
-+++ b/drivers/char/hw_random/Makefile
-@@ -1,7 +1,6 @@
- #
- # Makefile for HW Random Number Generator (RNG) device drivers.
- #
--
- obj-$(CONFIG_HW_RANDOM) += rng-core.o
- rng-core-y := core.o
- obj-$(CONFIG_HW_RANDOM_TIMERIOMEM) += timeriomem-rng.o
-@@ -36,3 +35,4 @@ obj-$(CONFIG_HW_RANDOM_STM32) += stm32-rng.o
- obj-$(CONFIG_HW_RANDOM_PIC32) += pic32-rng.o
- obj-$(CONFIG_HW_RANDOM_MESON) += meson-rng.o
- obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
-+obj-$(CONFIG_HW_RANDOM_MTK)	+= mtk-rng.o
-diff --git a/drivers/char/hw_random/mtk-rng.c b/drivers/char/hw_random/mtk-rng.c
-new file mode 100644
-index 0000000..6561ee0
---- /dev/null
-+++ b/drivers/char/hw_random/mtk-rng.c
-@@ -0,0 +1,174 @@
-+/*
-+ * Driver for Mediatek Hardware Random Number Generator
-+ *
-+ * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+#define MTK_RNG_DEV KBUILD_MODNAME
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/hw_random.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#define USEC_POLL			2
-+#define TIMEOUT_POLL			20
-+
-+#define RNG_CTRL			0x00
-+#define  RNG_EN				BIT(0)
-+#define  RNG_READY			BIT(31)
-+
-+#define RNG_DATA			0x08
-+
-+#define to_mtk_rng(p)	container_of(p, struct mtk_rng, rng)
-+
-+struct mtk_rng {
-+	struct device	*dev;
-+	void __iomem *base;
-+	struct clk *clk;
-+	struct hwrng rng;
-+};
-+
-+static int mtk_rng_init(struct hwrng *rng)
-+{
-+	struct mtk_rng *priv = to_mtk_rng(rng);
-+	u32 val;
-+	int err;
-+
-+	err = clk_prepare_enable(priv->clk);
-+	if (err)
-+		return err;
-+
-+	val = readl(priv->base + RNG_CTRL);
-+	val |= RNG_EN;
-+	writel(val, priv->base + RNG_CTRL);
-+
-+	return 0;
-+}
-+
-+static void mtk_rng_cleanup(struct hwrng *rng)
-+{
-+	struct mtk_rng *priv = to_mtk_rng(rng);
-+	u32 val;
-+
-+	val = readl(priv->base + RNG_CTRL);
-+	val &= ~RNG_EN;
-+	writel(val, priv->base + RNG_CTRL);
-+
-+	clk_disable_unprepare(priv->clk);
-+}
-+
-+static bool mtk_rng_wait_ready(struct hwrng *rng, bool wait)
-+{
-+	struct mtk_rng *priv = to_mtk_rng(rng);
-+	int ready;
-+
-+	ready = readl(priv->base + RNG_CTRL) & RNG_READY;
-+	if (!ready && wait)
-+		readl_poll_timeout_atomic(priv->base + RNG_CTRL, ready,
-+					  ready & RNG_READY, USEC_POLL,
-+					  TIMEOUT_POLL);
-+	return !!ready;
-+}
-+
-+static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-+{
-+	struct mtk_rng *priv = to_mtk_rng(rng);
-+	int retval = 0;
-+
-+	while (max >= sizeof(u32)) {
-+		if (!mtk_rng_wait_ready(rng, wait))
-+			break;
-+
-+		*(u32 *)buf = readl(priv->base + RNG_DATA);
-+		retval += sizeof(u32);
-+		buf += sizeof(u32);
-+		max -= sizeof(u32);
-+	}
-+
-+	if (unlikely(wait && max))
-+		dev_warn(priv->dev, "timeout might be not properly set\n");
-+
-+	return retval || !wait ? retval : -EIO;
-+}
-+
-+static int mtk_rng_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	int ret;
-+	struct mtk_rng *priv;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "no iomem resource\n");
-+		return -ENXIO;
-+	}
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->dev = &pdev->dev;
-+	priv->rng.name = pdev->name;
-+	priv->rng.init = mtk_rng_init;
-+	priv->rng.cleanup = mtk_rng_cleanup;
-+	priv->rng.read = mtk_rng_read;
-+
-+	priv->clk = devm_clk_get(&pdev->dev, "rng");
-+	if (IS_ERR(priv->clk)) {
-+		ret = PTR_ERR(priv->clk);
-+		dev_err(&pdev->dev, "no clock for device: %d\n", ret);
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
-+
-+	ret = devm_hwrng_register(&pdev->dev, &priv->rng);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register rng device: %d\n",
-+			ret);
-+		return ret;
-+	}
-+
-+	dev_info(&pdev->dev, "registered RNG driver\n");
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mtk_rng_match[] = {
-+	{ .compatible = "mediatek,mt7623-rng" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mtk_rng_match);
-+
-+static struct platform_driver mtk_rng_driver = {
-+	.probe          = mtk_rng_probe,
-+	.driver = {
-+		.name = MTK_RNG_DEV,
-+		.of_match_table = mtk_rng_match,
-+	},
-+};
-+
-+module_platform_driver(mtk_rng_driver);
-+
-+MODULE_DESCRIPTION("Mediatek Random Number Generator Driver");
-+MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
-+MODULE_LICENSE("GPL");
--- 
-1.9.1
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: Joey Lee <jlee@suse.com>
+> Cc: Vojtech Pavlik <vojtech@suse.cz>
+> Signed-off-by: Gary Lin <glin@suse.com>
+> ---
+>  arch/arm/Kconfig                      | 24 ++++++++++++++++++++++++
+>  arch/arm/boot/compressed/efi-header.S |  8 ++++----
+>  arch/arm64/Kconfig                    | 24 ++++++++++++++++++++++++
+>  arch/arm64/kernel/head.S              |  8 ++++----
+>  arch/x86/Kconfig                      | 24 ++++++++++++++++++++++++
+>  arch/x86/boot/header.S                |  8 ++++----
+>  6 files changed, 84 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 0d4e71b42c77..4965ad2ccc23 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2090,6 +2090,30 @@ config EFI
+>           is only useful for kernels that may run on systems that have
+>           UEFI firmware.
+>
+> +config EFI_MAJOR_OS
+> +       hex "EFI Major OS Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MINOR_OS
+> +       hex "EFI Minor OS Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MAJOR_IMAGE
+> +       hex "EFI Major Image Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MINOR_IMAGE
+> +       hex "EFI Minor Image Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+>  endmenu
+>
+>  menu "CPU Power Management"
+> diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> index 9d5dc4fda3c1..67715472a76f 100644
+> --- a/arch/arm/boot/compressed/efi-header.S
+> +++ b/arch/arm/boot/compressed/efi-header.S
+> @@ -69,10 +69,10 @@ extra_header_fields:
+>                 .long   0                       @ ImageBase
+>                 .long   0x200                   @ SectionAlignment
+>                 .long   0x200                   @ FileAlignment
+> -               .short  0                       @ MajorOperatingSystemVersion
+> -               .short  0                       @ MinorOperatingSystemVersion
+> -               .short  0                       @ MajorImageVersion
+> -               .short  0                       @ MinorImageVersion
+> +               .short  CONFIG_EFI_MAJOR_OS     @ MajorOperatingSystemVersion
+> +               .short  CONFIG_EFI_MINOR_OS     @ MinorOperatingSystemVersion
+> +               .short  CONFIG_EFI_MAJOR_IMAGE  @ MajorImageVersion
+> +               .short  CONFIG_EFI_MINOR_IMAGE  @ MinorImageVersion
+>                 .short  0                       @ MajorSubsystemVersion
+>                 .short  0                       @ MinorSubsystemVersion
+>                 .long   0                       @ Win32VersionValue
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 3741859765cf..c782c422e58c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1033,6 +1033,30 @@ config EFI
+>           allow the kernel to be booted as an EFI application. This
+>           is only useful on systems that have UEFI firmware.
+>
+> +config EFI_MAJOR_OS
+> +       hex "EFI Major OS Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MINOR_OS
+> +       hex "EFI Minor OS Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MAJOR_IMAGE
+> +       hex "EFI Major Image Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MINOR_IMAGE
+> +       hex "EFI Minor Image Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+>  config DMI
+>         bool "Enable support for SMBIOS (DMI) tables"
+>         depends on EFI
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 4fb6ccd886d1..9faa4b04d0ef 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -129,10 +129,10 @@ extra_header_fields:
+>         .quad   0                               // ImageBase
+>         .long   0x1000                          // SectionAlignment
+>         .long   PECOFF_FILE_ALIGNMENT           // FileAlignment
+> -       .short  0                               // MajorOperatingSystemVersion
+> -       .short  0                               // MinorOperatingSystemVersion
+> -       .short  0                               // MajorImageVersion
+> -       .short  0                               // MinorImageVersion
+> +       .short  CONFIG_EFI_MAJOR_OS             // MajorOperatingSystemVersion
+> +       .short  CONFIG_EFI_MINOR_OS             // MinorOperatingSystemVersion
+> +       .short  CONFIG_EFI_MAJOR_IMAGE          // MajorImageVersion
+> +       .short  CONFIG_EFI_MINOR_IMAGE          // MinorImageVersion
+>         .short  0                               // MajorSubsystemVersion
+>         .short  0                               // MinorSubsystemVersion
+>         .long   0                               // Win32VersionValue
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index 5bbdef151805..233933fde7dd 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -1803,6 +1803,30 @@ config EFI_STUB
+>
+>           See Documentation/efi-stub.txt for more information.
+>
+> +config EFI_MAJOR_OS
+> +       hex "EFI Major OS Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MINOR_OS
+> +       hex "EFI Minor OS Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MAJOR_IMAGE
+> +       hex "EFI Major Image Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+> +config EFI_MINOR_IMAGE
+> +       hex "EFI Minor Image Version"
+> +       range 0x0 0xFFFF
+> +       default "0x0"
+> +       depends on EFI_STUB
+> +
+>  config EFI_MIXED
+>         bool "EFI mixed-mode support"
+>         depends on EFI_STUB && X86_64
+> diff --git a/arch/x86/boot/header.S b/arch/x86/boot/header.S
+> index 3dd5be33aaa7..863813007207 100644
+> --- a/arch/x86/boot/header.S
+> +++ b/arch/x86/boot/header.S
+> @@ -156,10 +156,10 @@ extra_header_fields:
+>  #endif
+>         .long   0x20                            # SectionAlignment
+>         .long   0x20                            # FileAlignment
+> -       .word   0                               # MajorOperatingSystemVersion
+> -       .word   0                               # MinorOperatingSystemVersion
+> -       .word   0                               # MajorImageVersion
+> -       .word   0                               # MinorImageVersion
+> +       .word   CONFIG_EFI_MAJOR_OS             # MajorOperatingSystemVersion
+> +       .word   CONFIG_EFI_MINOR_OS             # MinorOperatingSystemVersion
+> +       .word   CONFIG_EFI_MAJOR_IMAGE          # MajorImageVersion
+> +       .word   CONFIG_EFI_MINOR_IMAGE          # MinorImageVersion
+>         .word   0                               # MajorSubsystemVersion
+>         .word   0                               # MinorSubsystemVersion
+>         .long   0                               # Win32VersionValue
+> --
+> 2.12.0
+>
