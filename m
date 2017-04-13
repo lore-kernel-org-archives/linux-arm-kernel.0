@@ -1,75 +1,87 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 13 Apr 2017 15:35:49 -0700
-Subject: [PATCH] ARM: zImage: fix warning in merge_fdt_bootargs()
-Message-ID: <20170413223549.18082-1-stillcompiling@gmail.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu, 13 Apr 2017 17:42:56 -0600
+Subject: [PATCH] ARM: dma-mapping: add check for coherent DMA memory
+ without struct page
+In-Reply-To: <20170413221055.GE17774@n2100.armlinux.org.uk>
+References: <20170413214756.21265-1-shuahkh@osg.samsung.com>
+ <20170413221055.GE17774@n2100.armlinux.org.uk>
+Message-ID: <10ccf249-8f2e-a6b3-2536-b78b417300a9@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc produces the following warning:
-arch/arm/boot/compressed/atags_to_fdt.c: In function 'merge_fdt_bootargs':
-arch/arm/boot/compressed/atags_to_fdt.c:98:1: warning: the frame size of
-1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+On 04/13/2017 04:10 PM, Russell King - ARM Linux wrote:
+> On Thu, Apr 13, 2017 at 03:47:56PM -0600, Shuah Khan wrote:
+>> When coherent DMA memory without struct page is shared, importer
+>> fails to find the page and runs into kernel page fault when it
+>> tries to dmabuf_ops_attach/map_sg/map_page the invalid page found
+>> in the sg_table.
+>>
+>> Add a new dma_check_dev_coherent() interface to check if memory is
+>> from the device coherent area. There is no way to tell where the
+>> memory returned by dma_alloc_attrs() came from.
+>>
+>> arm_dma_get_sgtable() checks for invalid pages, however this check
+>> could pass even for memory obtained the coherent allocator. Add an
+>> additional check to call dma_check_dev_coherent() to confirm that it
+>> is indeed the coherent DMA memory and fail the sgtable creation with
+>> -EINVAL.
+> 
+> Sorry, this doesn't make much sense to me.
+> 
+> pfn_valid(pfn) must *never* return true if 'pfn' does not have a struct
+> page associated with it.  If it returns true (so we allow
+> arm_dma_get_sgtable() to succeed) then we know we have a valid struct
+> page in the supplied scatterlist.
+> 
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  arch/arm/mm/dma-mapping.c   | 11 ++++++++---
+>>  drivers/base/dma-coherent.c | 25 +++++++++++++++++++++++++
+>>  include/linux/dma-mapping.h |  2 ++
+>>  3 files changed, 35 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 475811f..27c7d9a 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -954,9 +954,14 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+>>  	struct page *page;
+>>  	int ret;
+>>  
+>> -	/* If the PFN is not valid, we do not have a struct page */
+>> -	if (!pfn_valid(pfn))
+>> -		return -ENXIO;
+>> +	/*
+>> +	 * If the PFN is not valid, we do not have a struct page
+>> +	 * As this check can pass even for memory obtained through
+>> +	 * the coherent allocator, do an additional check to determine
+>> +	 * if this is coherent DMA memory.
+>> +	 */
+>> +	if (!pfn_valid(pfn) && dma_check_dev_coherent(dev, handle, cpu_addr))
+>> +		return -EINVAL;
+> 
+> Right, so what this says is:
+> 
+> 	if we do not haev a valid PFN
+> 	_and_ if the memory is from the coherent section
+> 	_then_ fail
+> 
+> Why the extra check?  Under what circunstances do we end up with memory
+> where the PFN is valid, but we do not have a valid struct page.  It
+> seems to me that such a scenario is a bug in pfn_valid() and not
+> something that should be worked around like this.
+> 
 
-Update merge_fdt_bootargs() so that instead of a 1k buffer on the
-stack, it calls fdt_appendprop_string()
+DMA_ATTR_NO_KERNEL_MAPPING case is the one I am concerned about.
+pfn_valid() would fail on this if I am understanding it correctly.
+A few drm drivers set this attr and use sg_table for passing buffers.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
----
-I tried testing this on my imx6 setup by adding bogus text to the
-command line, but it appears that with my (recent) uboot
-the codepath is not executed.
-So this could be regarded as little more than compile-tested.
+My reasoning behind adding this check is to not have this fail on
+NO_KERNEL_MAPPING cases. So I thought adding a restrictive check for
+just the per-device memory would help. However, I don't have a good
+understanding of the drm case, hence I could be trying to address a
+case that doesn't need to be addressed.
 
- arch/arm/boot/compressed/atags_to_fdt.c | 32 ++++++++------------------------
- 1 file changed, 8 insertions(+), 24 deletions(-)
+In any case, thanks for your patience and a quick reply.
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index 9448aa0..fefb30a 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -66,35 +66,19 @@ static uint32_t get_cell_size(const void *fdt)
- 	return cell_size;
- }
- 
--static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
-+static void merge_fdt_bootargs(void *fdt, const char *cmdline)
- {
--	char cmdline[COMMAND_LINE_SIZE];
- 	const char *fdt_bootargs;
--	char *ptr = cmdline;
-+	int offset = node_offset(fdt, "/chosen");
- 	int len = 0;
- 
--	/* copy the fdt command line into the buffer */
--	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
--	if (fdt_bootargs)
--		if (len < COMMAND_LINE_SIZE) {
--			memcpy(ptr, fdt_bootargs, len);
--			/* len is the length of the string
--			 * including the NULL terminator */
--			ptr += len - 1;
--		}
--
--	/* and append the ATAG_CMDLINE */
--	if (fdt_cmdline) {
--		len = strlen(fdt_cmdline);
--		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
--			*ptr++ = ' ';
--			memcpy(ptr, fdt_cmdline, len);
--			ptr += len;
--		}
-+	/* get the ftd command line length */
-+	fdt_bootargs = fdt_getprop(fdt, offset, "bootargs", &len);
-+	/* append the ATAG_CMDLINE if its not too big */
-+	if (cmdline && ((len + strlen(cmdline)) < (COMMAND_LINE_SIZE - 2))) {
-+		fdt_appendprop_string(fdt, offset, "bootargs", " ");
-+		fdt_appendprop_string(fdt, offset, "bootargs", cmdline);
- 	}
--	*ptr = '\0';
--
--	setprop_string(fdt, "/chosen", "bootargs", cmdline);
- }
- 
- /*
--- 
-2.9.3
+-- Shuah
