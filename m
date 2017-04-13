@@ -1,69 +1,98 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 13 Apr 2017 09:49:04 +0200
-Subject: [PATCH v5 0/4] gpio: mvebu: Add PWM fan support
-In-Reply-To: <20170412171656.GC11964@ulmo.ba.sec>
-References: <20170409180931.4884-1-ralph.sennhauser@gmail.com>
- <20170412171656.GC11964@ulmo.ba.sec>
-Message-ID: <20170413094904.4fdd9b89@gmail.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Thu, 13 Apr 2017 08:01:34 +0000
+Subject: [PATCH 1/2] dt-bindings: Document STM32 I2S bindings
+In-Reply-To: <20170412153831.r2urwvfseipfsrsi@sirena.org.uk>
+References: <1491493236-2574-1-git-send-email-olivier.moysan@st.com>
+ <1491493236-2574-2-git-send-email-olivier.moysan@st.com>
+ <20170410194832.iivnkyejtywbe2c7@rob-hp-laptop>
+ <20170411143250.3r7ys3rjshtxgaee@sirena.org.uk>
+ <73caede5-ea6f-8b2b-2270-227f7ef31823@st.com>
+ <20170411211040.htrcedus3c57fbed@sirena.org.uk>
+ <86a179ad-7961-18f7-8050-25e0e584c77d@st.com>
+ <20170412113251.nfyk5sw6c5pnpmwr@sirena.org.uk>
+ <d886a9c7-ca46-f37a-0e82-6ed8d7a4e052@st.com>
+ <20170412153831.r2urwvfseipfsrsi@sirena.org.uk>
+Message-ID: <a87748e4-21e7-f65a-5be1-fe4f60bdfbef@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Apr 2017 19:16:56 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+Hello Mark,
 
-> On Sun, Apr 09, 2017 at 08:09:26PM +0200, Ralph Sennhauser wrote:
-> > Hi Therry,
-> > 
-> > Resending this as v5 with some minor changes since v4. What is
-> > missing is an ACK from you so Linus can merge the driver and
-> > Gregory the dts changes. For this driver to make it into 4.12 it
-> > would be nice to have it in next soon. I hope you can make some
-> > room in your schedule to have another look at this series.
-> > 
-> > Thanks
-> > Ralph
-> > 
-> > ---
-> > 
-> > Notes:
-> > 
-> >   About npwm = 1:
-> >     The only way I can think of to achieve that requires reading the
-> >     GPIO line from the device tree. This would prevent a user to
-> >     dynamically choose a line. Which is fine for the fan found on
-> > Mamba but let's take some development board with freely accessible
-> > GPIOs and suddenly we limit the use of this driver. Given the
-> > above, npwm = ngpio with only one usable at a time is a more
-> > accurate  
-> 
-> I think "accurate" is perhaps not the word I'd choose. "npwm" is
-> defined as "number of PWMs controlled by this chip", and that's
-> effectively just the one. It's implied that all PWMs exposed by a
-> chip can be used concurrently.
+On 04/12/2017 05:38 PM, Mark Brown wrote:
+> On Wed, Apr 12, 2017 at 12:58:16PM +0000, Olivier MOYSAN wrote:
+>> On 04/12/2017 01:32 PM, Mark Brown wrote:
+>
+>>> It is totally normal to just not use one direction in a given system, we
+>>> don't normally need to do anything special to handle things.  I'm a bit
+>>> confused as to what's different here and needs configuring?
+>
+>> The IP does not provide an audio channel configured either as rx or tx.
+>> I agree, that in such case, the cpu driver does not generally need
+>> to worry about direction and there is nothing special required to handle it.
+>
+> No, that's not what I'm saying - such hardware would be extremely
+> unusual.
+>
+>> Here the IP provides 2 channels, 1 tx and 1 rx,  which may be active or
+>> not. The driver has to know which channel is used, and if both channels
+>> have to be managed. The affected registers depend on selected channel.
+>
+> This sounds like essentially every audio controller out there.  The
+> overwhelming majority of controllers do exactly as you describe and have
+> both directions in the same IP, this really doesn't seem at all unusual.
+> Off the top of my head I can only think of one SoC family which combines
+> multiple IPs to do bidirectional audio (though I didn't check).
+>
+> It really feels like there is something different here and I'm just
+> missing it.
+>
 
-I'm not native English so some terms might be off a tad in how I use
-them, replace accurate with what you think I meant ;).
+Yes, I think I need to give more details on design choices.
 
-The "it's implied" sounds like a contract and EBUSY a violation thereof.
+The IP provides 2 channels.
+I can see mainly 3 solutions to link dais to these channels:
 
-> 
-> Anyway, I can see how npwm = ngpio might be more convenient, and if
-> that is what you want to do, I don't feel strongly enough to object.
+1) 2 static dais NOT exclusive
+	- dai tx
+	- dai rx
+The IP exhibits a mode register, where you select mode TX, RX or FD.
+There are 2 two options to manage this register.
+option 1:
+	start first channel with mode RX or TX
+	when second channel is started, mode has to be changed to FD.
+	Transfers have to be stopped before changing configuration
+	registers, so this leads to cuts in audio stream.
+option 2:
+	start a first channel with mode FD.
+	In this case, we may have unpredictable behavior for the stream
+	which is not already started. probably underrun/overrun.
+So, this solution rises problem for full-duplex management.
 
-The goal is a pwm-fan driver for Mamba. So npwm=1 would work just fine
-from that stand point. It's indeed the sysfs case I had in mind which
-would be hampered. Whether to consider that one valid / desirable I
-don't want to judge. For me it's a hypothetical use case for others it
-might be real.
+2) 3 static dais exclusive
+	- dai tx
+	- dai rx
+	- dai rx-tx (fd)
+This is the current implementation.
+The choice of the dai is done at probe time. It is provided by DT 
+through sound-dai parameter.
+When dai fd is selected, after starting first stream, we assume that
+second stream will be started. In this case we wait for second stream
+to be available before enabling IP and starting transfers.
 
-For this series I want just this one device to work and getting the
-bindings right to not prevent others extending the driver later when
-they need.
+3) 1 dynamic dai
+	- dai rx or tx or fd (according to dma conf in IP node)
+Here the driver exposes only a single dai constructed from dma 
+configuration provided by IP DT node.
+This allows to get ride of sound-dai parameter.
+This was my suggestion after Rob comments on DT bindings.
 
-The driver which is under rework here is in use for 2 years, so I went
-with the feature set provided by it which is more than I need. It's a
-one of it's kind driver and I only have this single use case, so really
-your call.
+Hope this will help clarifying design constraints.
 
-Thanks
-Ralph
+>> Moreover specific processing has to be performed if both channels are used.
+>
+> Given that this case has to be supported anyway I'd be more inclined to
+> ask the question the other way around TBH.
+>
+
+Best regards
+olivier
