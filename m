@@ -1,66 +1,44 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 13 Apr 2017 12:03:41 -0700
-Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
-In-Reply-To: <20170413133242.5068-5-andrew.smirnov@gmail.com>
-References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
- <20170413133242.5068-5-andrew.smirnov@gmail.com>
-Message-ID: <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 13 Apr 2017 15:28:29 -0300
+Subject: [PATCH v2 12/22] ARM: dts: socfpga: Add generic compatible string for
+ I2C EEPROM
+In-Reply-To: <20170413182839.25381-1-javier@osg.samsung.com>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+Message-ID: <20170413182839.25381-13-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+The at24 driver allows to register I2C EEPROM chips using different vendor
+and devices, but the I2C subsystem does not take the vendor into account
+when matching using the I2C table since it only has device entries.
 
-On 13 April 2017 at 06:32, Andrey Smirnov <andrew.smirnov@gmail.com> wrote:
-> Add node for GPC and specify as a parent interrupt controller for SoC bus.
->
-> Cc: yurovsky at gmail.com
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->  arch/arm/boot/dts/imx7s.dtsi | 27 ++++++++++++++++++++++++++-
->  1 file changed, 26 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 8fee299..1a7058f 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -42,6 +42,7 @@
->   */
->[0
->  #include <dt-bindings/clock/imx7d-clock.h>
-> +#include <dt-bindings/power/imx7-power.h>
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/input/input.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> @@ -119,7 +120,7 @@
->                 #address-cells = <1>;
->                 #size-cells = <1>;
->                 compatible = "simple-bus";
-> -               interrupt-parent = <&intc>;
-> +               interrupt-parent = <&gpc>;
+But when matching using an OF table, both the vendor and device has to be
+taken into account so the driver defines only a set of compatible strings
+using the "atmel" vendor as a generic fallback for compatible I2C devices.
 
-I've been testing your GPC/PCIe patch sets against v4.11-rc5 on my
-imx7d-cl-som-imx7, but hit a bit of a wall. When gpc is set as the
-interrupt-parent for the soc, the kernel seems to hang and not produce
-any output on the serial port[0]. I tried to enable earlyprintk, but
-no luck getting a trace. Reversing this change, gets the board
-booting[1], but obviously isn't using the gpc which is needed for PCIe
-support as I understand it. I assume you've tested these changes on a
-imx7d-sdb and are not seeing a similar issue? You can find the patches
-I've picked on top of v4.11-rc5 here[2], any idea what might be the
-issue?
+So add this generic fallback to the device node compatible string to make
+the device to match the driver using the OF device ID table.
 
-Cheers,
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-Tyler
+Changes in v2: None
 
-[0] https://hastebin.com/zetohetuwi.coffeescript
-[1] https://hastebin.com/uvacuyicuh.sql
-[2] https://github.com/EmbeddedAndroid/linux/commits/tracking-ltd-imx-dev
+ arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+index 363ee62457fe..d61bba8d3937 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+@@ -294,7 +294,7 @@
+ 	clock-frequency = <100000>;
+ 
+ 	at24 at 50 {
+-		compatible = "at24,24c02";
++		compatible = "at24,24c02","atmel,24c02";
+ 		pagesize = <8>;
+ 		reg = <0x50>;
+ 	};
+-- 
+2.9.3
