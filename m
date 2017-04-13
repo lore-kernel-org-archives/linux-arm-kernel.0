@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Apr 2017 21:52:19 +0200
-Subject: [PATCH v2 11/22] ARM: dts: koelsch: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170413182839.25381-12-javier@osg.samsung.com>
+Date: Thu, 13 Apr 2017 21:52:27 +0200
+Subject: [PATCH v2 10/22] ARM: dts: r7s72100: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <20170413182839.25381-11-javier@osg.samsung.com>
 References: <20170413182839.25381-1-javier@osg.samsung.com>
- <20170413182839.25381-12-javier@osg.samsung.com>
-Message-ID: <CAMuHMdUsQP9QutaHAix+tmmofcr=xe_oKJzmeOqk1tUuZedVRg@mail.gmail.com>
+ <20170413182839.25381-11-javier@osg.samsung.com>
+Message-ID: <CAMuHMdWXbKK-BA8KwnQ=QOsLwYpHu0GfbW52NTFE1N9C-HfZ2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,14 +26,14 @@ On Thu, Apr 13, 2017 at 8:28 PM, Javier Martinez Canillas
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -702,7 +702,7 @@
->         };
+> --- a/arch/arm/boot/dts/r7s72100-genmai.dts
+> +++ b/arch/arm/boot/dts/r7s72100-genmai.dts
+> @@ -57,7 +57,7 @@
+>         clock-frequency = <400000>;
 >
 >         eeprom at 50 {
-> -               compatible = "renesas,24c02";
-> +               compatible = "renesas,24c02","atmel,24c02";
+> -               compatible = "renesas,24c128";
+> +               compatible = "renesas,24c128","atmel,24c128";
 
 Missing space after comma.
 
