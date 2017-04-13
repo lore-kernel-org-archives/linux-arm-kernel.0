@@ -1,188 +1,53 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Thu, 13 Apr 2017 14:04:21 -0700
-Subject: [PATCH 1/2] xen/arm,
- arm64: fix xen_dma_ops after 815dd18 "Consolidate get_dma_ops..."
-Message-ID: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 13 Apr 2017 18:09:56 -0300
+Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+ <20170413182839.25381-6-javier@osg.samsung.com>
+ <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
+Message-ID: <dd93eb32-ca1e-5041-051e-c4f072f0f9a2@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following commit:
+Hello Peter,
 
-  commit 815dd18788fe0d41899f51b91d0560279cf16b0d
-  Author: Bart Van Assche <bart.vanassche@sandisk.com>
-  Date:   Fri Jan 20 13:04:04 2017 -0800
+On 04/13/2017 05:43 PM, Peter Rosin wrote:
+> On 2017-04-13 20:28, Javier Martinez Canillas wrote:
 
-      treewide: Consolidate get_dma_ops() implementations
+[snip]
 
-rearranges get_dma_ops in a way that xen_dma_ops are not returned when
-running on Xen anymore, dev->dma_ops is returned instead (see
-arch/arm/include/asm/dma-mapping.h:get_arch_dma_ops and
-include/linux/dma-mapping.h:get_dma_ops).
+>>  
+>>  	eeprom at 50 {
+>> -		compatible = "nxp,24c02";
+>> +		compatible = "nxp,24c02","atmel,24c02";
+>>  		reg = <0x50>;
+>>  		pagesize = <16>;
+>>  	};
+>>
+> 
+> Sure, in principle. But not having a space after the commas is a real OCD
+> trigger for me. My spine is rotating... :-)
+>
 
-Fix the problem by storing dev->dma_ops in dev_archdata, and setting
-dev->dma_ops to xen_dma_ops. This way, xen_dma_ops is returned naturally
-by get_dma_ops. The Xen code can retrieve the original dev->dma_ops from
-dev_archdata when needed. It also allows us to remove __generic_dma_ops
-from common headers.
+Right, Geert already pointed out. It's something I missed in my sed script
+so I got it wrong in all the DTS :(
 
-Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
-Tested-by: Julien Grall <julien.grall@arm.com>
-Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: linux at armlinux.org.uk
-CC: catalin.marinas at arm.com
-CC: will.deacon at arm.com
-CC: boris.ostrovsky at oracle.com
-CC: jgross at suse.com
-CC: Julien Grall <julien.grall@arm.com>
----
- arch/arm/include/asm/device.h        |  3 +++
- arch/arm/include/asm/dma-mapping.h   | 12 +-----------
- arch/arm/mm/dma-mapping.c            |  7 +++++++
- arch/arm64/include/asm/device.h      |  3 +++
- arch/arm64/include/asm/dma-mapping.h | 13 +------------
- arch/arm64/mm/dma-mapping.c          |  7 +++++++
- include/xen/arm/page-coherent.h      |  8 ++++++++
- 7 files changed, 30 insertions(+), 23 deletions(-)
+I'll fix my script and send a v2.
+ 
+> Anyway, with those whitespace fixes (and without them too, but please):
+> Acked-by: Peter Rosin <peda@axentia.se>
+>
 
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index 220ba20..36ec9c8 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -16,6 +16,9 @@ struct dev_archdata {
- #ifdef CONFIG_ARM_DMA_USE_IOMMU
- 	struct dma_iommu_mapping	*mapping;
- #endif
-+#ifdef CONFIG_XEN
-+	const struct dma_map_ops *dev_dma_ops;
-+#endif
- 	bool dma_coherent;
- };
- 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 7166569..680d3f3 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -16,19 +16,9 @@
- extern const struct dma_map_ops arm_dma_ops;
- extern const struct dma_map_ops arm_coherent_dma_ops;
- 
--static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
--{
--	if (dev && dev->dma_ops)
--		return dev->dma_ops;
--	return &arm_dma_ops;
--}
--
- static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- {
--	if (xen_initial_domain())
--		return xen_dma_ops;
--	else
--		return __generic_dma_ops(NULL);
-+	return &arm_dma_ops;
- }
- 
- #define HAVE_ARCH_DMA_SUPPORTED 1
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 63eabb0..a614459 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2396,6 +2396,13 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 		dma_ops = arm_get_dma_map_ops(coherent);
- 
- 	set_dma_ops(dev, dma_ops);
-+
-+#ifdef CONFIG_XEN
-+	if (xen_initial_domain()) {
-+		dev->archdata.dev_dma_ops = dev->dma_ops;
-+		dev->dma_ops = xen_dma_ops;
-+	}
-+#endif
- }
- 
- void arch_teardown_dma_ops(struct device *dev)
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-index 73d5bab..5a5fa47 100644
---- a/arch/arm64/include/asm/device.h
-+++ b/arch/arm64/include/asm/device.h
-@@ -20,6 +20,9 @@ struct dev_archdata {
- #ifdef CONFIG_IOMMU_API
- 	void *iommu;			/* private IOMMU data */
- #endif
-+#ifdef CONFIG_XEN
-+	const struct dma_map_ops *dev_dma_ops;
-+#endif
- 	bool dma_coherent;
- };
- 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 505756c..5392dbe 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -27,11 +27,8 @@
- #define DMA_ERROR_CODE	(~(dma_addr_t)0)
- extern const struct dma_map_ops dummy_dma_ops;
- 
--static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
-+static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
- {
--	if (dev && dev->dma_ops)
--		return dev->dma_ops;
--
- 	/*
- 	 * We expect no ISA devices, and all other DMA masters are expected to
- 	 * have someone call arch_setup_dma_ops at device creation time.
-@@ -39,14 +36,6 @@ static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
- 	return &dummy_dma_ops;
- }
- 
--static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
--{
--	if (xen_initial_domain())
--		return xen_dma_ops;
--	else
--		return __generic_dma_ops(NULL);
--}
--
- void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 			const struct iommu_ops *iommu, bool coherent);
- #define arch_setup_dma_ops	arch_setup_dma_ops
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 81cdb2e..7f8b37e 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -977,4 +977,11 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 
- 	dev->archdata.dma_coherent = coherent;
- 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
-+
-+#ifdef CONFIG_XEN
-+	if (xen_initial_domain()) {
-+		dev->archdata.dev_dma_ops = dev->dma_ops;
-+		dev->dma_ops = xen_dma_ops;
-+	}
-+#endif
- }
-diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
-index 95ce6ac..b0a2bfc 100644
---- a/include/xen/arm/page-coherent.h
-+++ b/include/xen/arm/page-coherent.h
-@@ -2,8 +2,16 @@
- #define _ASM_ARM_XEN_PAGE_COHERENT_H
- 
- #include <asm/page.h>
-+#include <asm/dma-mapping.h>
- #include <linux/dma-mapping.h>
- 
-+static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
-+{
-+	if (dev && dev->archdata.dev_dma_ops)
-+		return dev->archdata.dev_dma_ops;
-+	return get_arch_dma_ops(NULL);
-+}
-+
- void __xen_dma_map_page(struct device *hwdev, struct page *page,
- 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
- 	     enum dma_data_direction dir, unsigned long attrs);
+Thanks for the review!
+
+> Cheers,
+> peda
+> 
+> 
+
+Best regards,
 -- 
-1.9.1
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
