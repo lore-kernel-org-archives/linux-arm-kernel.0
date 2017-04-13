@@ -1,64 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Apr 2017 11:59:38 +0200
-Subject: [GIT PULL] Allwinner clock fixes for 4.11, again
-Message-ID: <20170413095938.ac4zjp7ql6y76sst@lukather>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 13 Apr 2017 12:07:07 +0200
+Subject: [PATCH] [media] imx: csi: retain current field order and
+ colorimetry setting as default
+In-Reply-To: <6c22519f-64f8-7213-d458-23470bdd5ecd@xs4all.nl>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+ <1490661656-10318-22-git-send-email-steve_longerbeam@mentor.com>
+ <1491486929.2392.29.camel@pengutronix.de>
+ <0f9690f8-c7f6-59ff-9e3e-123af9972d4b@xs4all.nl>
+ <1491490451.2392.70.camel@pengutronix.de>
+ <59e72974-bfb0-6061-8b13-5f13f8723ba6@xs4all.nl>
+ <1491494481.2392.102.camel@pengutronix.de>
+ <6c22519f-64f8-7213-d458-23470bdd5ecd@xs4all.nl>
+Message-ID: <1492078027.2383.19.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On Wed, 2017-04-12 at 09:03 +0200, Hans Verkuil wrote:
+[...]
+> >> Do you have a git tree with this patch? It is really hard to review without
+> >> having the full imx-media-csi.c source.
+> > 
+> > The patch applies on top of
+> > 
+> >   https://github.com/slongerbeam/mediatree.git imx-media-staging-md-v14
+> > 
+> > I have uploaded a branch
+> > 
+> >   git://git.pengutronix.de/git/pza/linux imx-media-staging-md-v14+color
+> > 
+> > with the patch applied on top.
+> > 
+> >> I think one problem is that it is not clearly defined how subdevs and colorspace
+> >> information should work.
+> 
+> Ah, having the full source helped.
+> 
+> Ignore my previous review, it was incorrect.
 
-Here is another PR, without the patches that you didn't want as fixes.
+Ok.
 
-A few more fixes showed up in between, one of them being another build
-fix, the other one fixing random CPU crashes happening with CPUfreq
-since 4.11
+> I'll have to think about this some more. I'll get back to this, but it may take some
+> time since my vacation starts tomorrow. The spec is simply unclear about how to handle
+> this so we have to come up with some guidelines.
 
-Please merge it for one of 4.11-rc's, thanks!
-Maxime
+Yes, please. Until then, have a nice vacation.
 
-The following changes since commit b467e08a15563dede0d37d3233baa24fb97a7310:
-
-  clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git sunxi-clk-fixes-for-4.11-2-bis
-
-for you to fetch changes up to 372fa10172a2f9e1bfbc70778449628e82b72341:
-
-  clk: sunxi-ng: a33: gate then ungate PLL CPU clk after rate change (2017-04-13 11:22:04 +0200)
-
-----------------------------------------------------------------
-Allwinner clock fixes for 4.11
-
-Two build errors fixes for the sunxi-ng drivers.
-
-The two other patches fix random CPU crashes happening on the A33 since
-CPUFreq has been enabled in 4.11.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (2):
-      clk: sunxi-ng: Add clk notifier to gate then ungate PLL clocks
-      clk: sunxi-ng: a33: gate then ungate PLL CPU clk after rate change
-
-Tobias Regnery (2):
-      clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
-      clk: sunxi-ng: fix build failure in ccu-sun9i-a80 driver
-
- drivers/clk/sunxi-ng/Kconfig         |  2 ++
- drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 11 ++++++++
- drivers/clk/sunxi-ng/ccu_common.c    | 49 ++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_common.h    | 12 +++++++++
- 4 files changed, 74 insertions(+)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/97cfe53c/attachment.sig>
+regards
+Philipp
