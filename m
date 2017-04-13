@@ -1,55 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 13 Apr 2017 13:59:29 +0100
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 13 Apr 2017 15:22:15 +0200
+Subject: [PATCH v2] serial: 8250_early: Add earlycon support for Palmchip
+ UART
+In-Reply-To: <7a016ff6-08fc-2811-92e0-7c4603fa8586@sigmadesigns.com>
+References: <7a016ff6-08fc-2811-92e0-7c4603fa8586@sigmadesigns.com>
+Message-ID: <01ed348b-1057-9089-bca3-433c7d7f9881@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
-> From: Jiada Wang <jiada_wang@mentor.com>
-> 
-> v1:
->   add Slave mode support in SPI core
->   spidev create slave device when SPI controller work in slave mode
->   spi-imx support to work in slave mode
+On 10/04/2017 11:47, Marc Gonzalez wrote:
 
-Adding Geert who also had a series doing this in progress that was
-getting very near to being merged.
+> @@ -172,3 +179,20 @@ OF_EARLYCON_DECLARE(omap8250, "ti,omap3-uart", early_omap8250_setup);
+>  OF_EARLYCON_DECLARE(omap8250, "ti,omap4-uart", early_omap8250_setup);
+>  
+>  #endif
+> +
+> +#ifdef CONFIG_SERIAL_8250_RT288X
+> +
+> +unsigned int au_serial_in(struct uart_port *p, int offset);
+> +void au_serial_out(struct uart_port *p, int offset, int value);
 
+Hmmm, I'm thinking that putting declarations in a .c file might
+not be a very popular decision... ?
+
+Would there be a header, shared by 8250_early.c and 8250_port.c
+where it might be appropriate to declare au_serial_in/out?
+
+
+> +static int __init early_au_setup(struct earlycon_device *dev, const char *opt)
+> +{
+> +	dev->port.serial_in = au_serial_in;
+> +	dev->port.serial_out = au_serial_out;
+> +	dev->port.iotype = UPIO_AU;
+> +	dev->con->write = early_serial8250_write;
+> +	return 0;
+> +}
+> +OF_EARLYCON_DECLARE(palmchip, "ralink,rt2880-uart", early_au_setup);
+> +
+> +#endif
+> diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
+> index 080d5a59d0a7..1f08d22d1a80 100644
+> --- a/drivers/tty/serial/8250/8250_port.c
+> +++ b/drivers/tty/serial/8250/8250_port.c
+> @@ -313,7 +313,7 @@ static const s8 au_io_out_map[8] = {
+>  	-1,	/* UART_SCR (unmapped) */
+>  };
+>  
+> -static unsigned int au_serial_in(struct uart_port *p, int offset)
+> +unsigned int au_serial_in(struct uart_port *p, int offset)
+>  {
+>  	if (offset >= ARRAY_SIZE(au_io_in_map))
+>  		return UINT_MAX;
+> @@ -323,7 +323,7 @@ static unsigned int au_serial_in(struct uart_port *p, int offset)
+>  	return __raw_readl(p->membase + (offset << p->regshift));
+>  }
+>  
+> -static void au_serial_out(struct uart_port *p, int offset, int value)
+> +void au_serial_out(struct uart_port *p, int offset, int value)
+>  {
+>  	if (offset >= ARRAY_SIZE(au_io_out_map))
+>  		return;
 > 
-> Jiada Wang (5):
->   spi: core: add support to work in Slave mode
->   spi: spidev: use different name for SPI controller slave mode device
->   spi: imx: add selection for iMX53 and iMX6 controller
->   ARM: dts: imx: change compatiblity for SPI controllers on imx53 later
->     soc
->   spi: imx: Add support for SPI Slave mode for imx53 and imx6 chips
-> 
->  Documentation/devicetree/bindings/spi/spi-bus.txt |  27 ++-
->  Documentation/spi/spi-summary                     |  19 +-
->  arch/arm/boot/dts/imx53.dtsi                      |   4 +-
->  arch/arm/boot/dts/imx6q.dtsi                      |   2 +-
->  arch/arm/boot/dts/imx6qdl.dtsi                    |   8 +-
->  arch/arm/boot/dts/imx6sl.dtsi                     |   8 +-
->  arch/arm/boot/dts/imx6sx.dtsi                     |   8 +-
->  arch/arm/boot/dts/imx6ul.dtsi                     |   8 +-
->  drivers/spi/Kconfig                               |  14 +-
->  drivers/spi/spi-imx.c                             | 216 ++++++++++++++++++++--
->  drivers/spi/spi.c                                 |  23 ++-
->  drivers/spi/spidev.c                              |  15 +-
->  include/linux/spi/spi.h                           |  15 ++
->  13 files changed, 310 insertions(+), 57 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/739216d3/attachment.sig>
