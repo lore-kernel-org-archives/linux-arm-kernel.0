@@ -1,85 +1,69 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Thu, 13 Apr 2017 12:00:19 +0800
-Subject: [PATCH v3] arm64: dts: rk3399: add support for firefly-rk3399
- board
-In-Reply-To: <1642127.PiTFsmK4zh@phil>
-References: <1491796213-4115-1-git-send-email-kever.yang@rock-chips.com>
- <1642127.PiTFsmK4zh@phil>
-Message-ID: <6d1eb0cc-fe3b-a483-123c-8558096c0846@rock-chips.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Thu, 13 Apr 2017 12:18:50 +0800
+Subject: [PATCH] [media] mtk-mdp: Fix g_/s_selection capture/compose logic
+Message-ID: <1492057130-1194-1-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+From: Daniel Kurtz <djkurtz@chromium.org>
 
+Experiments show that the:
+ (1) mtk-mdp uses the _MPLANE form of CAPTURE/OUTPUT
+ (2) CAPTURE types use CROP targets, and OUTPUT types use COMPOSE targets
 
-On 04/12/2017 09:29 PM, Heiko Stuebner wrote:
-> Hi Kever,
->
-> Am Montag, 10. April 2017, 11:50:13 CEST schrieb Kever Yang:
->> Firefly-rk3399 is a bord from T-Firefly, you can find detail about
->> it here:
->> http://en.t-firefly.com/en/firenow/Firefly_RK3399/
->>
->> This patch add basic node for the board and make it able to bring
->> up.
->>
->> Peripheral works:
->> - usb hub which connect to ehci controller;
->> - UART2 debug
->> - eMMC
->> - PCIe
->>
->> Not work:
->> - USB 3.0 HOST, type-C port
->> - sdio, sd-card
->>
->> Not test for other peripheral:
->> - HDMI
->> - Ethernet
->> - OPTICAL
->> - WiFi/BT
->> - MIPI CSI/DSI
->> - IR
->> - EDP/DP
->>
->> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> applied for 4.13, as we're a bit late for 4.12, with the following changes:
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
 
-Thanks for your help, I'm not familiar with the devices status on upstream
-because not working on kernel upstream for a long time.
-> - commit subject
-> - dropped status from backlight (as there is no disabled common node
->    and it's specific to the firefly itself)
-> - quite some reordering of properties
-> - reordered regulator nodes per their addresses: 0x1b < 0x40
-> - dropped obsolete regulator-compatible properties
-> - fixed gpio-irq on the mpu6500
-> - dropped out-of-tree orientation properties of mpu6500
->    --> please provide the optional "mount-matrix" in a follow-up patch
->        see bindings/iio/imu/inv_mpu6050.txt
+---
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-Maybe we can drop this mpu6050 node first? I can't find binding file for it.
-> - dropped rockchip,i2s-broken-burst-len;
->    That change never made it into the mainline kernel
-> - fixed pcie pinctrl indentation
-> - dropped wireless-bluetooth uart-gpios pinctrl
-> - dropped supports-emmc property
->
-> Please try to be a bit more careful when porting stuff from device kernels
-> with respect to properties not found in the mainline kernel and please
-> also double-check in [0] that I didn't break anything.
-
-I have test this patch on my firefly-rk3399, it works fine with pwm2 
-regulator
-init in U-Boot.
-
-Thanks,
-- Kever
->
->
-> Thanks
-> Heiko
->
-> [0] https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=495a3c891a696b62465d71b1a125e3424352028b
->
->
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 13afe48..8ab7ca0 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -837,12 +837,12 @@ static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
+ 	struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
+ 	bool valid = false;
+ 
+-	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+-		if (mtk_mdp_is_target_compose(s->target))
+-			valid = true;
+-	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
++	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+ 		if (mtk_mdp_is_target_crop(s->target))
+ 			valid = true;
++	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
++		if (mtk_mdp_is_target_compose(s->target))
++			valid = true;
+ 	}
+ 	if (!valid) {
+ 		mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+@@ -907,12 +907,12 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+ 	int ret;
+ 	bool valid = false;
+ 
+-	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+-		if (s->target == V4L2_SEL_TGT_COMPOSE)
+-			valid = true;
+-	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
++	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
+ 		if (s->target == V4L2_SEL_TGT_CROP)
+ 			valid = true;
++	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
++		if (s->target == V4L2_SEL_TGT_COMPOSE)
++			valid = true;
+ 	}
+ 	if (!valid) {
+ 		mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+@@ -925,7 +925,7 @@ static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+ 	if (ret)
+ 		return ret;
+ 
+-	if (mtk_mdp_is_target_crop(s->target))
++	if (mtk_mdp_is_target_compose(s->target))
+ 		frame = &ctx->s_frame;
+ 	else
+ 		frame = &ctx->d_frame;
+-- 
+1.9.1
