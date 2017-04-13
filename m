@@ -1,17 +1,33 @@
 From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Thu, 13 Apr 2017 14:04:22 -0700
-Subject: [PATCH 2/2] xen/arm,
- arm64: rename __generic_dma_ops to xen_get_dma_ops
-In-Reply-To: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
-References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
-Message-ID: <1492117462-19886-2-git-send-email-sstabellini@kernel.org>
+Date: Thu, 13 Apr 2017 14:04:21 -0700
+Subject: [PATCH 1/2] xen/arm,
+ arm64: fix xen_dma_ops after 815dd18 "Consolidate get_dma_ops..."
+Message-ID: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that __generic_dma_ops is a xen specific function, rename it to
-xen_get_dma_ops. Change all the call sites appropriately.
+The following commit:
+
+  commit 815dd18788fe0d41899f51b91d0560279cf16b0d
+  Author: Bart Van Assche <bart.vanassche@sandisk.com>
+  Date:   Fri Jan 20 13:04:04 2017 -0800
+
+      treewide: Consolidate get_dma_ops() implementations
+
+rearranges get_dma_ops in a way that xen_dma_ops are not returned when
+running on Xen anymore, dev->dma_ops is returned instead (see
+arch/arm/include/asm/dma-mapping.h:get_arch_dma_ops and
+include/linux/dma-mapping.h:get_dma_ops).
+
+Fix the problem by storing dev->dma_ops in dev_archdata, and setting
+dev->dma_ops to xen_dma_ops. This way, xen_dma_ops is returned naturally
+by get_dma_ops. The Xen code can retrieve the original dev->dma_ops from
+dev_archdata when needed. It also allows us to remove __generic_dma_ops
+from common headers.
 
 Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+Tested-by: Julien Grall <julien.grall@arm.com>
+Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
 CC: linux at armlinux.org.uk
 CC: catalin.marinas at arm.com
 CC: will.deacon at arm.com
@@ -19,113 +35,154 @@ CC: boris.ostrovsky at oracle.com
 CC: jgross at suse.com
 CC: Julien Grall <julien.grall@arm.com>
 ---
- drivers/xen/swiotlb-xen.c       |  8 ++++----
- include/xen/arm/page-coherent.h | 20 ++++++++++----------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/device.h        |  3 +++
+ arch/arm/include/asm/dma-mapping.h   | 12 +-----------
+ arch/arm/mm/dma-mapping.c            |  7 +++++++
+ arch/arm64/include/asm/device.h      |  3 +++
+ arch/arm64/include/asm/dma-mapping.h | 13 +------------
+ arch/arm64/mm/dma-mapping.c          |  7 +++++++
+ include/xen/arm/page-coherent.h      |  8 ++++++++
+ 7 files changed, 30 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index e8cef1a..8dab0d3 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -693,8 +693,8 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
- 		     unsigned long attrs)
- {
- #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
--	if (__generic_dma_ops(dev)->mmap)
--		return __generic_dma_ops(dev)->mmap(dev, vma, cpu_addr,
-+	if (xen_get_dma_ops(dev)->mmap)
-+		return xen_get_dma_ops(dev)->mmap(dev, vma, cpu_addr,
- 						    dma_addr, size, attrs);
+diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+index 220ba20..36ec9c8 100644
+--- a/arch/arm/include/asm/device.h
++++ b/arch/arm/include/asm/device.h
+@@ -16,6 +16,9 @@ struct dev_archdata {
+ #ifdef CONFIG_ARM_DMA_USE_IOMMU
+ 	struct dma_iommu_mapping	*mapping;
  #endif
- 	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
-@@ -711,7 +711,7 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
- 			unsigned long attrs)
- {
- #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
--	if (__generic_dma_ops(dev)->get_sgtable) {
-+	if (xen_get_dma_ops(dev)->get_sgtable) {
- #if 0
- 	/*
- 	 * This check verifies that the page belongs to the current domain and
-@@ -721,7 +721,7 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
- 		unsigned long bfn = PHYS_PFN(dma_to_phys(dev, handle));
- 		BUG_ON (!page_is_ram(bfn));
- #endif
--		return __generic_dma_ops(dev)->get_sgtable(dev, sgt, cpu_addr,
-+		return xen_get_dma_ops(dev)->get_sgtable(dev, sgt, cpu_addr,
- 							   handle, size, attrs);
- 	}
- #endif
-diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
-index b0a2bfc..b1b4ecd 100644
---- a/include/xen/arm/page-coherent.h
-+++ b/include/xen/arm/page-coherent.h
-@@ -5,7 +5,7 @@
- #include <asm/dma-mapping.h>
- #include <linux/dma-mapping.h>
++#ifdef CONFIG_XEN
++	const struct dma_map_ops *dev_dma_ops;
++#endif
+ 	bool dma_coherent;
+ };
+ 
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 7166569..680d3f3 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -16,19 +16,9 @@
+ extern const struct dma_map_ops arm_dma_ops;
+ extern const struct dma_map_ops arm_coherent_dma_ops;
  
 -static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
-+static inline const struct dma_map_ops *xen_get_dma_ops(struct device *dev)
+-{
+-	if (dev && dev->dma_ops)
+-		return dev->dma_ops;
+-	return &arm_dma_ops;
+-}
+-
+ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
  {
- 	if (dev && dev->archdata.dev_dma_ops)
- 		return dev->archdata.dev_dma_ops;
-@@ -27,13 +27,13 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
- static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
- 		dma_addr_t *dma_handle, gfp_t flags, unsigned long attrs)
- {
--	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
-+	return xen_get_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
+-	if (xen_initial_domain())
+-		return xen_dma_ops;
+-	else
+-		return __generic_dma_ops(NULL);
++	return &arm_dma_ops;
  }
  
- static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
- 		void *cpu_addr, dma_addr_t dma_handle, unsigned long attrs)
- {
--	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
-+	xen_get_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
+ #define HAVE_ARCH_DMA_SUPPORTED 1
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 63eabb0..a614459 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2396,6 +2396,13 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 		dma_ops = arm_get_dma_map_ops(coherent);
+ 
+ 	set_dma_ops(dev, dma_ops);
++
++#ifdef CONFIG_XEN
++	if (xen_initial_domain()) {
++		dev->archdata.dev_dma_ops = dev->dma_ops;
++		dev->dma_ops = xen_dma_ops;
++	}
++#endif
  }
  
- static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
-@@ -57,7 +57,7 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
- 	 * specific function.
- 	 */
- 	if (local)
--		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
-+		xen_get_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
- 	else
- 		__xen_dma_map_page(hwdev, page, dev_addr, offset, size, dir, attrs);
- }
-@@ -75,8 +75,8 @@ static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
- 	 * specific function.
- 	 */
- 	if (pfn_valid(pfn)) {
--		if (__generic_dma_ops(hwdev)->unmap_page)
--			__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
-+		if (xen_get_dma_ops(hwdev)->unmap_page)
-+			xen_get_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
- 	} else
- 		__xen_dma_unmap_page(hwdev, handle, size, dir, attrs);
- }
-@@ -86,8 +86,8 @@ static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
+ void arch_teardown_dma_ops(struct device *dev)
+diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+index 73d5bab..5a5fa47 100644
+--- a/arch/arm64/include/asm/device.h
++++ b/arch/arm64/include/asm/device.h
+@@ -20,6 +20,9 @@ struct dev_archdata {
+ #ifdef CONFIG_IOMMU_API
+ 	void *iommu;			/* private IOMMU data */
+ #endif
++#ifdef CONFIG_XEN
++	const struct dma_map_ops *dev_dma_ops;
++#endif
+ 	bool dma_coherent;
+ };
+ 
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 505756c..5392dbe 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -27,11 +27,8 @@
+ #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+ extern const struct dma_map_ops dummy_dma_ops;
+ 
+-static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
++static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
  {
- 	unsigned long pfn = PFN_DOWN(handle);
- 	if (pfn_valid(pfn)) {
--		if (__generic_dma_ops(hwdev)->sync_single_for_cpu)
--			__generic_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
-+		if (xen_get_dma_ops(hwdev)->sync_single_for_cpu)
-+			xen_get_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
- 	} else
- 		__xen_dma_sync_single_for_cpu(hwdev, handle, size, dir);
+-	if (dev && dev->dma_ops)
+-		return dev->dma_ops;
+-
+ 	/*
+ 	 * We expect no ISA devices, and all other DMA masters are expected to
+ 	 * have someone call arch_setup_dma_ops at device creation time.
+@@ -39,14 +36,6 @@ static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
+ 	return &dummy_dma_ops;
  }
-@@ -97,8 +97,8 @@ static inline void xen_dma_sync_single_for_device(struct device *hwdev,
- {
- 	unsigned long pfn = PFN_DOWN(handle);
- 	if (pfn_valid(pfn)) {
--		if (__generic_dma_ops(hwdev)->sync_single_for_device)
--			__generic_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
-+		if (xen_get_dma_ops(hwdev)->sync_single_for_device)
-+			xen_get_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
- 	} else
- 		__xen_dma_sync_single_for_device(hwdev, handle, size, dir);
+ 
+-static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+-{
+-	if (xen_initial_domain())
+-		return xen_dma_ops;
+-	else
+-		return __generic_dma_ops(NULL);
+-}
+-
+ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 			const struct iommu_ops *iommu, bool coherent);
+ #define arch_setup_dma_ops	arch_setup_dma_ops
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 81cdb2e..7f8b37e 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -977,4 +977,11 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 
+ 	dev->archdata.dma_coherent = coherent;
+ 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
++
++#ifdef CONFIG_XEN
++	if (xen_initial_domain()) {
++		dev->archdata.dev_dma_ops = dev->dma_ops;
++		dev->dma_ops = xen_dma_ops;
++	}
++#endif
  }
+diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
+index 95ce6ac..b0a2bfc 100644
+--- a/include/xen/arm/page-coherent.h
++++ b/include/xen/arm/page-coherent.h
+@@ -2,8 +2,16 @@
+ #define _ASM_ARM_XEN_PAGE_COHERENT_H
+ 
+ #include <asm/page.h>
++#include <asm/dma-mapping.h>
+ #include <linux/dma-mapping.h>
+ 
++static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
++{
++	if (dev && dev->archdata.dev_dma_ops)
++		return dev->archdata.dev_dma_ops;
++	return get_arch_dma_ops(NULL);
++}
++
+ void __xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+ 	     enum dma_data_direction dir, unsigned long attrs);
 -- 
 1.9.1
