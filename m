@@ -1,20 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 13 Apr 2017 10:53:58 -0400 (EDT)
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170413.105358.633309964366964915.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 13 Apr 2017 10:03:49 -0500
+Subject: [PATCH v3 0/4] TI Bluetooth serdev support
+Message-ID: <20170413150353.7389-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Date: Thu, 13 Apr 2017 09:10:32 +0000
+This series adds serdev support to the HCI LL protocol used on TI BT
+modules and enables support on HiKey board with with the WL1835 module.
+With this the custom TI UIM daemon and btattach are no longer needed.
 
-> Wouldn't it be more correct to have this as a driver specific symbol
-> now and move it to a generic one later once we have other drivers
-> requiring it?
+The series is available on this git branch[1]. This version is rebased on 
+bluetooth-next tree containing its dependencies.
 
-No, it would not.
+Rob
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git ti-bluetooth
+
+Rob Herring (4):
+  dt-bindings: net: Add TI WiLink shared transport binding
+  bluetooth: hci_uart: remove unused hci_uart_init_tty
+  bluetooth: hci_uart: add LL protocol serdev driver support
+  arm64: dts: hikey: add WL1835 Bluetooth device node
+
+ .../devicetree/bindings/net/ti,wilink-st.txt       |  35 +++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   5 +
+ drivers/bluetooth/hci_ldisc.c                      |  19 --
+ drivers/bluetooth/hci_ll.c                         | 262 ++++++++++++++++++++-
+ drivers/bluetooth/hci_uart.h                       |   1 -
+ 5 files changed, 301 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/ti,wilink-st.txt
+
+-- 
+2.11.0
