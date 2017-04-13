@@ -1,214 +1,85 @@
-From: glin@suse.com (Gary Lin)
-Date: Thu, 13 Apr 2017 11:58:27 +0800
-Subject: [PATCH v2] efi: Config options to assign versions in the PE-COFF
- header
-Message-ID: <20170413035827.9820-1-glin@suse.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 13 Apr 2017 12:00:19 +0800
+Subject: [PATCH v3] arm64: dts: rk3399: add support for firefly-rk3399
+ board
+In-Reply-To: <1642127.PiTFsmK4zh@phil>
+References: <1491796213-4115-1-git-send-email-kever.yang@rock-chips.com>
+ <1642127.PiTFsmK4zh@phil>
+Message-ID: <6d1eb0cc-fe3b-a483-123c-8558096c0846@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the new config options to allow the user to modify the
-following fields in the PE-COFF header.
+Hi Heiko,
 
-UINT16 MajorOperatingSystemVersion
-UINT16 MinorOperatingSystemVersion
-UINT16 MajorImageVersion
-UINT16 MinorImageVersion
 
-Those fields are mainly for the executables or libraries in Windows NT
-or higher to specify the minimum supported Windows version and the
-version of the image itself.
+On 04/12/2017 09:29 PM, Heiko Stuebner wrote:
+> Hi Kever,
+>
+> Am Montag, 10. April 2017, 11:50:13 CEST schrieb Kever Yang:
+>> Firefly-rk3399 is a bord from T-Firefly, you can find detail about
+>> it here:
+>> http://en.t-firefly.com/en/firenow/Firefly_RK3399/
+>>
+>> This patch add basic node for the board and make it able to bring
+>> up.
+>>
+>> Peripheral works:
+>> - usb hub which connect to ehci controller;
+>> - UART2 debug
+>> - eMMC
+>> - PCIe
+>>
+>> Not work:
+>> - USB 3.0 HOST, type-C port
+>> - sdio, sd-card
+>>
+>> Not test for other peripheral:
+>> - HDMI
+>> - Ethernet
+>> - OPTICAL
+>> - WiFi/BT
+>> - MIPI CSI/DSI
+>> - IR
+>> - EDP/DP
+>>
+>> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> applied for 4.13, as we're a bit late for 4.12, with the following changes:
 
-Given the fact that those fields are ignored in UEFI, we can safely reuse
-those fields for other purposes, e.g. Security Version(*).
+Thanks for your help, I'm not familiar with the devices status on upstream
+because not working on kernel upstream for a long time.
+> - commit subject
+> - dropped status from backlight (as there is no disabled common node
+>    and it's specific to the firefly itself)
+> - quite some reordering of properties
+> - reordered regulator nodes per their addresses: 0x1b < 0x40
+> - dropped obsolete regulator-compatible properties
+> - fixed gpio-irq on the mpu6500
+> - dropped out-of-tree orientation properties of mpu6500
+>    --> please provide the optional "mount-matrix" in a follow-up patch
+>        see bindings/iio/imu/inv_mpu6050.txt
 
-(*) https://github.com/lcp/shim/wiki/Security-Version
+Maybe we can drop this mpu6050 node first? I can't find binding file for it.
+> - dropped rockchip,i2s-broken-burst-len;
+>    That change never made it into the mainline kernel
+> - fixed pcie pinctrl indentation
+> - dropped wireless-bluetooth uart-gpios pinctrl
+> - dropped supports-emmc property
+>
+> Please try to be a bit more careful when porting stuff from device kernels
+> with respect to properties not found in the mainline kernel and please
+> also double-check in [0] that I didn't break anything.
 
-v2 changes:
-- Modify the header direct instead of using an external script as
-  suggested by Ard Biesheuvel
-- Include arm and arm64
+I have test this patch on my firefly-rk3399, it works fine with pwm2 
+regulator
+init in U-Boot.
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: Joey Lee <jlee@suse.com>
-Cc: Vojtech Pavlik <vojtech@suse.cz>
-Signed-off-by: Gary Lin <glin@suse.com>
----
- arch/arm/Kconfig                      | 24 ++++++++++++++++++++++++
- arch/arm/boot/compressed/efi-header.S |  8 ++++----
- arch/arm64/Kconfig                    | 24 ++++++++++++++++++++++++
- arch/arm64/kernel/head.S              |  8 ++++----
- arch/x86/Kconfig                      | 24 ++++++++++++++++++++++++
- arch/x86/boot/header.S                |  8 ++++----
- 6 files changed, 84 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0d4e71b42c77..4965ad2ccc23 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2090,6 +2090,30 @@ config EFI
- 	  is only useful for kernels that may run on systems that have
- 	  UEFI firmware.
- 
-+config EFI_MAJOR_OS
-+	hex "EFI Major OS Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MINOR_OS
-+	hex "EFI Minor OS Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MAJOR_IMAGE
-+	hex "EFI Major Image Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MINOR_IMAGE
-+	hex "EFI Minor Image Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
- endmenu
- 
- menu "CPU Power Management"
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index 9d5dc4fda3c1..67715472a76f 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -69,10 +69,10 @@ extra_header_fields:
- 		.long	0			@ ImageBase
- 		.long	0x200			@ SectionAlignment
- 		.long	0x200			@ FileAlignment
--		.short	0			@ MajorOperatingSystemVersion
--		.short	0			@ MinorOperatingSystemVersion
--		.short	0			@ MajorImageVersion
--		.short	0			@ MinorImageVersion
-+		.short	CONFIG_EFI_MAJOR_OS	@ MajorOperatingSystemVersion
-+		.short	CONFIG_EFI_MINOR_OS	@ MinorOperatingSystemVersion
-+		.short	CONFIG_EFI_MAJOR_IMAGE	@ MajorImageVersion
-+		.short	CONFIG_EFI_MINOR_IMAGE	@ MinorImageVersion
- 		.short	0			@ MajorSubsystemVersion
- 		.short	0			@ MinorSubsystemVersion
- 		.long	0			@ Win32VersionValue
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3741859765cf..c782c422e58c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1033,6 +1033,30 @@ config EFI
- 	  allow the kernel to be booted as an EFI application. This
- 	  is only useful on systems that have UEFI firmware.
- 
-+config EFI_MAJOR_OS
-+	hex "EFI Major OS Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MINOR_OS
-+	hex "EFI Minor OS Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MAJOR_IMAGE
-+	hex "EFI Major Image Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MINOR_IMAGE
-+	hex "EFI Minor Image Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
- config DMI
- 	bool "Enable support for SMBIOS (DMI) tables"
- 	depends on EFI
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4fb6ccd886d1..9faa4b04d0ef 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -129,10 +129,10 @@ extra_header_fields:
- 	.quad	0				// ImageBase
- 	.long	0x1000				// SectionAlignment
- 	.long	PECOFF_FILE_ALIGNMENT		// FileAlignment
--	.short	0				// MajorOperatingSystemVersion
--	.short	0				// MinorOperatingSystemVersion
--	.short	0				// MajorImageVersion
--	.short	0				// MinorImageVersion
-+	.short	CONFIG_EFI_MAJOR_OS		// MajorOperatingSystemVersion
-+	.short	CONFIG_EFI_MINOR_OS		// MinorOperatingSystemVersion
-+	.short	CONFIG_EFI_MAJOR_IMAGE		// MajorImageVersion
-+	.short	CONFIG_EFI_MINOR_IMAGE		// MinorImageVersion
- 	.short	0				// MajorSubsystemVersion
- 	.short	0				// MinorSubsystemVersion
- 	.long	0				// Win32VersionValue
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 5bbdef151805..233933fde7dd 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -1803,6 +1803,30 @@ config EFI_STUB
- 
- 	  See Documentation/efi-stub.txt for more information.
- 
-+config EFI_MAJOR_OS
-+	hex "EFI Major OS Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MINOR_OS
-+	hex "EFI Minor OS Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MAJOR_IMAGE
-+	hex "EFI Major Image Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
-+config EFI_MINOR_IMAGE
-+	hex "EFI Minor Image Version"
-+	range 0x0 0xFFFF
-+	default "0x0"
-+	depends on EFI_STUB
-+
- config EFI_MIXED
- 	bool "EFI mixed-mode support"
- 	depends on EFI_STUB && X86_64
-diff --git a/arch/x86/boot/header.S b/arch/x86/boot/header.S
-index 3dd5be33aaa7..863813007207 100644
---- a/arch/x86/boot/header.S
-+++ b/arch/x86/boot/header.S
-@@ -156,10 +156,10 @@ extra_header_fields:
- #endif
- 	.long	0x20				# SectionAlignment
- 	.long	0x20				# FileAlignment
--	.word	0				# MajorOperatingSystemVersion
--	.word	0				# MinorOperatingSystemVersion
--	.word	0				# MajorImageVersion
--	.word	0				# MinorImageVersion
-+	.word	CONFIG_EFI_MAJOR_OS		# MajorOperatingSystemVersion
-+	.word	CONFIG_EFI_MINOR_OS		# MinorOperatingSystemVersion
-+	.word	CONFIG_EFI_MAJOR_IMAGE		# MajorImageVersion
-+	.word	CONFIG_EFI_MINOR_IMAGE		# MinorImageVersion
- 	.word	0				# MajorSubsystemVersion
- 	.word	0				# MinorSubsystemVersion
- 	.long	0				# Win32VersionValue
--- 
-2.12.0
+Thanks,
+- Kever
+>
+>
+> Thanks
+> Heiko
+>
+> [0] https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=495a3c891a696b62465d71b1a125e3424352028b
+>
+>
