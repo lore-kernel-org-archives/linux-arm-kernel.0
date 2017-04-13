@@ -1,68 +1,131 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 13 Apr 2017 22:43:25 +0200
-Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170413182839.25381-6-javier@osg.samsung.com>
-References: <20170413182839.25381-1-javier@osg.samsung.com>
- <20170413182839.25381-6-javier@osg.samsung.com>
-Message-ID: <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 13 Apr 2017 15:45:44 -0500
+Subject: [PATCH v4 1/2] ASoC: stm32: add bindings for SAI
+In-Reply-To: <1491925646-29113-2-git-send-email-olivier.moysan@st.com>
+References: <1491925646-29113-1-git-send-email-olivier.moysan@st.com>
+ <1491925646-29113-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <20170413204544.sq6i43s7naeoh3zj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-04-13 20:28, Javier Martinez Canillas wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+On Tue, Apr 11, 2017 at 05:47:25PM +0200, olivier moysan wrote:
+> This patch adds documentation of device tree bindings for the
+> STM32 SAI ASoC driver.
 > 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
-> 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: olivier moysan <olivier.moysan@st.com>
 > ---
+>  .../devicetree/bindings/sound/st,stm32-sai.txt     | 89 ++++++++++++++++++++++
+>  1 file changed, 89 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
 > 
-> Changes in v2: None
-> 
->  arch/arm/boot/dts/at91-linea.dtsi   | 2 +-
->  arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-linea.dtsi b/arch/arm/boot/dts/at91-linea.dtsi
-> index 0721c8472509..9a19080fd3bf 100644
-> --- a/arch/arm/boot/dts/at91-linea.dtsi
-> +++ b/arch/arm/boot/dts/at91-linea.dtsi
-> @@ -31,7 +31,7 @@
->  	status = "okay";
->  
->  	eeprom at 51 {
-> -		compatible = "st,24c64";
-> +		compatible = "st,24c64","atmel,24c64";
->  		reg = <0x51>;
->  		pagesize = <32>;
->  	};
-> diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-> index 7a68805a4eb5..6f005c14a6b0 100644
-> --- a/arch/arm/boot/dts/at91-tse850-3.dts
-> +++ b/arch/arm/boot/dts/at91-tse850-3.dts
-> @@ -239,7 +239,7 @@
->  	};
->  
->  	eeprom at 50 {
-> -		compatible = "nxp,24c02";
-> +		compatible = "nxp,24c02","atmel,24c02";
->  		reg = <0x50>;
->  		pagesize = <16>;
->  	};
-> 
+> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+> new file mode 100644
+> index 0000000..c59a3d7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+> @@ -0,0 +1,89 @@
+> +STMicroelectronics STM32 Serial Audio Interface (SAI).
+> +
+> +The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
+> +as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
+> +The SAI contains two independent audio sub-blocks. Each sub-block has
+> +its own clock generator and I/O lines controller.
+> +
+> +Required properties:
+> +  - compatible: Should be "st,stm32f4-sai"
+> +  - reg: Base address and size of SAI common register set.
+> +  - clocks: Must contain phandle and clock specifier pairs for each entry
+> +	in clock-names.
+> +  - clock-names: Must contain "x8k" and "x11k"
+> +	"x8k": SAI parent clock for sampling rates multiple of 8kHz.
+> +	"x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
+> +  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
+> +
+> +Optional properties:
+> +  - resets: Reference to a reset controller asserting the SAI
+> +
+> +SAI subnodes:
+> +Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+> +Subnode can be omitted for unsused sub-block.
+> +
+> +SAI subnodes required properties:
+> +  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
+> +	for SAI sub-block A or B respectively.
+> +  - reg: Base address and size of SAI sub-block register set.
+> +  - clocks: Must contain one phandle and clock specifier pair
+> +	for sai_ck which feeds the internal clock generator.
+> +  - clock-names: Must contain "sai_ck".
+> +  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
+> +  - dma-names: identifier string for each DMA request line
+> +	"tx": if sai sub-block is configured as playback DAI
+> +	"rx": if sai sub-block is configured as capture DAI
+> +  - pinctrl-names: should contain only value "default"
+> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+> +
+> +Example:
+> +sound_card {
+> +	compatible = "audio-graph-card";
+> +	dais = <&sai1b_port>;
+> +};
+> +
+> +sai1: sai1 at 40015800 {
+> +	compatible = "st,stm32f4-sai";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
 
-Sure, in principle. But not having a space after the commas is a real OCD
-trigger for me. My spine is rotating... :-)
+It's preferred if this is not empty and it limited to the address range 
+needed.
 
-Anyway, with those whitespace fixes (and without them too, but please):
-Acked-by: Peter Rosin <peda@axentia.se>
+> +	reg = <0x40015800 0x4>;
+> +	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
+> +	clock-names = "x8k", "x11k";
+> +	interrupts = <87>;
+> +
+> +	sai1b: audio-controller at 40015824 {
+> +		#sound-dai-cells = <0>;
+> +		compatible = "st,stm32-sai-sub-b";
+> +		reg = <0x40015824 0x1C>;
+> +		clocks = <&rcc 1 CLK_SAI2>;
+> +		clock-names = "sai_ck";
+> +		dmas = <&dma2 5 0 0x400 0x0>;
+> +		dma-names = "tx";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_sai1b>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			sai1b_port: port at 0 {
 
-Cheers,
-peda
+Need to document how many ports and endpoints.
+
+> +				reg = <0>;
+
+For a single port, you don't need a reg prop.
+
+> +				cpu_endpoint: endpoint {
+> +					remote-endpoint = <&codec_endpoint>;
+> +					audio-graph-card,format = "i2s";
+> +					audio-graph-card,bitclock-master = <&codec_endpoint>;
+> +					audio-graph-card,frame-master = <&codec_endpoint>;
+
+The prefix is gone now.
+
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +audio-codec {
+> +	codec_port: port {
+> +		codec_endpoint: endpoint {
+> +			remote-endpoint = <&cpu_endpoint>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
