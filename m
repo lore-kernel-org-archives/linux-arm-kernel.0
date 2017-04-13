@@ -1,89 +1,70 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 13 Apr 2017 10:53:00 +1000
-Subject: [PATCH v3 00/32] PCI: fix config and I/O Address space memory
- mappings
-In-Reply-To: <20170412224555.GB17774@n2100.armlinux.org.uk>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <1491917906.7236.7.camel@kernel.crashing.org>
- <20170411140857.GA6821@red-moon>
- <1491952371.7236.22.camel@kernel.crashing.org>
- <20170412113124.GZ17774@n2100.armlinux.org.uk>
- <1492005119.7236.62.camel@kernel.crashing.org>
- <20170412141654.GA17774@n2100.armlinux.org.uk>
- <20170412144109.GB6842@red-moon>
- <1492036240.7236.80.camel@kernel.crashing.org>
- <20170412224555.GB17774@n2100.armlinux.org.uk>
-Message-ID: <1492044780.7236.87.camel@kernel.crashing.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 13 Apr 2017 10:03:46 +0900
+Subject: [PATCH 1/2] phy: qcom-usb-hs: Replace the extcon API
+In-Reply-To: <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20170328043830epcas1p4069bda461ad648cfd6598905b7167e9f@epcas1p4.samsung.com>
+ <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <70e6a8f3-4426-4b63-75a2-e55616ec33f3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-12 at 23:45 +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 13, 2017 at 08:30:40AM +1000, Benjamin Herrenschmidt wrote:
-> > My point with nopost() is that it's never ok to silently downgrade it.
-> > Code written with the assumption that there is no posting will be
-> > *incorrect* if posting happens. We do live with that "bug" today indeed
-> > but once we have that accessors we might start growing more code that
-> > relies on the specific attribute that things aren't posted and will be
-> > wrong on all the archs providing the default implementation.
-> > 
-> > This is why I insist that pgprot_nopost() if it exists globally, should
-> > return NULL when the semantic cannot be provided.
+Hi Kishon,
+
+Could you please review these patches?
+
+
+On 2017? 03? 28? 13:38, Chanwoo Choi wrote:
+> This patch uses the resource-managed extcon API for extcon_register_notifier()
+> and replaces the deprecated extcon API as following:
+> - (deprecated) extcon_get_cable_state_() -> extcon_get_state()
 > 
-> Now you're not talking sense.??pgprot_nopost() does _not_ return a pointer.
-> You're talking here as if you're still talking about ioremap_nopost().
-> So, I think you're confused.
-
-Nah, just "typo", I meant ioremap_nopost.
-
-> > > > Just like the proposed ioremap_nopost(), pgprot_nonposted() is given a
-> > > > default implementation that uses pgprot_noncached().? Maybe we should
-> > > > also make pci_remap_iospace() fail if pgprot_nonposted() is not defined
-> > > > by the architecture?
-> > 
-> > Or we *document* that mmap of IO space can result in something that is
-> > partially non-posted.
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/phy/phy-qcom-usb-hs.c | 14 +++-----------
+>  1 file changed, 3 insertions(+), 11 deletions(-)
 > 
-> Oh, so we _can_ provide an interface that has weaker semantics than it
-> should provided we document it.
+> diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
+> index 94dfbfd739c3..f630fa553b7d 100644
+> --- a/drivers/phy/phy-qcom-usb-hs.c
+> +++ b/drivers/phy/phy-qcom-usb-hs.c
+> @@ -156,12 +156,12 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+>  	}
+>  
+>  	if (uphy->vbus_edev) {
+> -		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
+> +		state = extcon_get_state(uphy->vbus_edev, EXTCON_USB);
+>  		/* setup initial state */
+>  		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
+>  					      uphy->vbus_edev);
+> -		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
+> -				&uphy->vbus_notify);
+> +		ret = devm_extcon_register_notifier(&ulpi->dev, uphy->vbus_edev,
+> +				EXTCON_USB, &uphy->vbus_notify);
+>  		if (ret)
+>  			goto err_ulpi;
+>  	}
+> @@ -180,16 +180,8 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+>  
+>  static int qcom_usb_hs_phy_power_off(struct phy *phy)
+>  {
+> -	int ret;
+>  	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
+>  
+> -	if (uphy->vbus_edev) {
+> -		ret = extcon_unregister_notifier(uphy->vbus_edev, EXTCON_USB,
+> -						 &uphy->vbus_notify);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	regulator_disable(uphy->v3p3);
+>  	regulator_disable(uphy->v1p8);
+>  	clk_disable_unprepare(uphy->sleep_clk);
 > 
-> It's insane to have different behaviours from these two interfaces, yet
-> you seem to have said exactly that in your reply.
->
-> It's actually worse than that - what you've just said is that it's okay
-> for userspace to map IO space with weaker semantics than the PCI
-> specification states, but it's not okay for kernel space to do that.
 
-That is not what I'm saying. What I'm saying is that it's not ok to
-provide a generic mapping attribute that silently happens to be weaker
-than documented on some architectures.
 
-The PCI part is orthogonal. How do you handle PCI in absence of that
-attribute is a separate problem (which is probably a matter of just
-documenting things).
-
-BTW. Is config space also non-posted on Intel with mmconfig ? I didn't
-think they could do non posted MMIO stores, but maybe I'm wrong.
-
-> Especially as userspace can't know what semantics its going to end up
-> with, this seems to be a very strange stance to take.
-
-That's why we document that the userspace interface for *PCI* is
-relaxed.
-
-> I'd say that if we can't offer the no-posting behaviour that PCI
-> specifies, then we shouldn't be exposing IO mappings to userspace.
-
-I strongly disagree. We've been doing it for decades and it works
-fine in pretty much all cases.
-
-Note also that some platforms (including some powerpc afaik) do provide
-the non-posted behaviour, simply not as a mapping attribute. Internal
-fabrics aren't necessarily doing posted writes and some bridges will
-hold the response for non-posted requests.
-
-Anyway, I don't object to trying to improve compliance with the spec
-on arch that have such a mapping attribute. But I do object to having
-a generic mapping attribute (that isn't fundamentally a PCI thing) that
-silently downgrades to something weaker.
-
-Ben.
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
