@@ -1,33 +1,86 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 13 Apr 2017 22:25:27 +0800
-Subject: [RFC PATCH 1/3] clk: add clk_bulk_get accessories
-In-Reply-To: <1491969809-20154-2-git-send-email-aisheng.dong@nxp.com>
-References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
- <1491969809-20154-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170413142527.GD24254@b29396-OptiPlex-7040>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 13 Apr 2017 09:35:15 -0500
+Subject: [PATCH] tty: pl011: use "qdf2400_e44" as the earlycon name for
+ QDF2400 E44
+In-Reply-To: <1492091708-30593-1-git-send-email-timur@codeaurora.org>
+References: <1492091708-30593-1-git-send-email-timur@codeaurora.org>
+Message-ID: <f546e63c-06a6-3027-8483-eb76f8b76c15@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 12:03:27PM +0800, Dong Aisheng wrote:
-...
-> @@ -445,6 +543,12 @@ static inline struct clk *clk_get(struct device *dev, const char *id)
->  	return NULL;
->  }
+Hi Timur,
+
+
+On 04/13/2017 08:55 AM, Timur Tabi wrote:
+> Define a new early console name for Qualcomm Datacenter Technologies
+> QDF2400 SOCs affected by erratum 44, instead of piggy-backing on "pl011".
+> Previously, to enable traditional (non-SPCR) earlycon, the documentation
+> said to specify "earlycon=pl011,<address>,qdf2400_e44", but the code was
+> broken and this didn't actually work.
+>
+> So instead, the method for specifying the E44 work-around with traditional
+> earlycon is "earlycon=qdf2400_e44,<address>".  Both methods of earlycon
+> are now enabled with the same function.
+>
+> Fixes: e53e597fd4c4 ("tty: pl011: fix earlycon work-around for QDF2400 erratum 44")
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+
+Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
+
+
+> ---
+>  drivers/tty/serial/amba-pl011.c | 31 +++++++++++++++++++++++--------
+>  1 file changed, 23 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 2783539..0875f7d 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2470,19 +2470,34 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+>  	if (!device->port.membase)
+>  		return -ENODEV;
 >  
-> +static inline int clk_bulk_get(struct device *dev, int num_clks,
-> +			       struct clk_bulk_data *clks)
+> -	/* On QDF2400 SOCs affected by Erratum 44, the "qdf2400_e44" must
+> -	 * also be specified, e.g. "earlycon=pl011,<address>,qdf2400_e44".
+> -	 */
+> -	if (!strcmp(device->options, "qdf2400_e44"))
+> -		device->con->write = qdf2400_e44_early_write;
+> -	else
+> -		device->con->write = pl011_early_write;
+> +	device->con->write = pl011_early_write;
+>  
+>  	return 0;
+>  }
+>  OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+>  OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
+> -EARLYCON_DECLARE(qdf2400_e44, pl011_early_console_setup);
+> +
+> +/*
+> + * On Qualcomm Datacenter Technologies QDF2400 SOCs affected by
+> + * Erratum 44, traditional earlycon can be enabled by specifying
+> + * "earlycon=qdf2400_e44,<address>".  Any options are ignored.
+> + *
+> + * Alternatively, you can just specify "earlycon", and the early console
+> + * will be enabled with the information from the SPCR table.  In this
+> + * case, the SPCR code will detect the need for the E44 work-around,
+> + * and set the console name to "qdf2400_e44".
+> + */
+> +static int __init
+> +qdf2400_e44_early_console_setup(struct earlycon_device *device,
+> +				const char *opt)
 > +{
-> +	return NULL;
+> +	if (!device->port.membase)
+> +		return -ENODEV;
+> +
+> +	device->con->write = qdf2400_e44_early_write;
+> +	return 0;
+> +}
+> +EARLYCON_DECLARE(qdf2400_e44, qdf2400_e44_early_console_setup);
+>  
+>  #else
+>  #define AMBA_CONSOLE	NULL
 
-Here needs to be changed to 'return 0'.
-
-It's catched by 0day robot.
-
-include/linux/clk.h: In function 'clk_bulk_get':
-include/linux/stddef.h:7:14: warning: return makes integer from pointer without a cast [-Wint-conversion]
-#define NULL ((void *)0)
-
-Good job! Robot!
-
-Regards
-Dong Aisheng
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
