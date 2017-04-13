@@ -1,178 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 13 Apr 2017 15:48:00 -0500
-Subject: [PATCH V8 3/5] PCI/ASPM: add init hook to device_add
-In-Reply-To: <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170413204800.GB28316@bhelgaas-glaptop.roam.corp.google.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 13 Apr 2017 17:49:32 -0300
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <CANMBJr7We9uOyE6=BCWoe9L7xRKjOG6ScgtDGEgQ-hPawPeppg@mail.gmail.com>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-5-andrew.smirnov@gmail.com>
+ <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+ <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
+ <CANMBJr4BWtU7SXEa0-4LFLx+ydVWas0Cx18kRn-=-Bz8pPZ=fg@mail.gmail.com>
+ <CAOMZO5BaKBsXean8-560HUuZbhjef9dpMNku0SRUVtkv+XsZ6w@mail.gmail.com>
+ <CANMBJr7We9uOyE6=BCWoe9L7xRKjOG6ScgtDGEgQ-hPawPeppg@mail.gmail.com>
+Message-ID: <CAOMZO5BjzSJws7zjJ5+aZkfeF+15twEu9zS3V+g6wQrtUiNyqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+On Thu, Apr 13, 2017 at 5:13 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
 
-On Sat, Apr 08, 2017 at 12:55:49AM -0400, Sinan Kaya wrote:
-> For bridges, have pcie_aspm_init_link_state() allocate a link_state,
-> regardless of whether it currently has any children.
-> 
-> pcie_aspm_init_link_state(): Called for bridges (upstream end of
-> link) after all children have been enumerated.  No longer needs to
-> check aspm_support_enabled or pdev->has_secondary_link or the VIA
-> quirk: pci_aspm_init() already checked that stuff, so we only need
-> to check pdev->link_state here.
-> 
-> Now that we are calling alloc_pcie_link_state() from pci_aspm_init()
-> , get rid of pci_function_0 function and detect downstream link in
-> pci_aspm_init_upstream() instead when the function number is 0.
-> 
-> Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pcie/aspm.c | 72 ++++++++++++++++++++++++-------------------------
->  1 file changed, 36 insertions(+), 36 deletions(-)
-> 
-> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-> index a80d64b..e33f84b 100644
-> --- a/drivers/pci/pcie/aspm.c
-> +++ b/drivers/pci/pcie/aspm.c
-> @@ -422,20 +422,6 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
->  	}
->  }
->  
-> -/*
-> - * The L1 PM substate capability is only implemented in function 0 in a
-> - * multi function device.
-> - */
-> -static struct pci_dev *pci_function_0(struct pci_bus *linkbus)
-> -{
-> -	struct pci_dev *child;
-> -
-> -	list_for_each_entry(child, &linkbus->devices, bus_list)
-> -		if (PCI_FUNC(child->devfn) == 0)
-> -			return child;
-> -	return NULL;
-> -}
-> -
->  /* Calculate L1.2 PM substate timing parameters */
->  static void aspm_calc_l1ss_info(struct pcie_link_state *link,
->  				struct aspm_register_info *upreg,
-> @@ -798,7 +784,6 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
->  	INIT_LIST_HEAD(&link->children);
->  	INIT_LIST_HEAD(&link->link);
->  	link->pdev = pdev;
-> -	link->downstream = pci_function_0(pdev->subordinate);
->  
->  	/*
->  	 * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
-> @@ -828,11 +813,33 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
->  
->  static int pci_aspm_init_downstream(struct pci_dev *pdev)
->  {
-> +	struct pcie_link_state *link;
-> +	struct pci_dev *parent;
-> +
-> +	/*
-> +	 * The L1 PM substate capability is only implemented in function 0 in a
-> +	 * multi function device.
-> +	 */
-> +	if (PCI_FUNC(pdev->devfn) != 0)
-> +		return -EINVAL;
-> +
-> +	parent = pdev->bus->self;
-> +	if (!parent)
-> +		return -EINVAL;
-> +
-> +	link = parent->link_state;
-> +	link->downstream = pdev;
->  	return 0;
->  }
->  
->  static int pci_aspm_init_upstream(struct pci_dev *pdev)
->  {
-> +	struct pcie_link_state *link;
-> +
-> +	link = alloc_pcie_link_state(pdev);
-> +	if (!link)
-> +		return -ENOMEM;
+> I've rebased this series on the next-20170413 for sanity sake, and
+> realized there doesn't appear to be a way to select CONFIG_IMX_GPCV2.
+> I forced it using 'default y' and configured with imx_v6_v7_defconfig.
+> Now my board is booting. Before this series is applied, it may be good
+> to have CONFIG_IMX_GPCV2 selected specifically for iMX7 platform,
+> otherwise there will be boot regressions.
 
-This allocates the link_state when we enumerate a Downstream Port
-instead of when we enumerate a child device.  We want the link_state
-lifetime to match that of the Downstream Port, so this seems good.
+Something like this?
 
-But we shouldn't at the same time change the link_state deallocation
-so it happens when the Downstream Port is removed, not when the child
-device is removed?
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index f03ef43..fe99a48 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -253,6 +253,7 @@ config RENESAS_H8S_INTC
 
->  	return 0;
->  }
->  
-> @@ -843,6 +850,17 @@ static int pci_aspm_init_upstream(struct pci_dev *pdev)
->   */
->  int pci_aspm_init(struct pci_dev *pdev)
->  {
-> +	if (!aspm_support_enabled)
-> +		return 0;
-> +
-> +	if (!pci_is_pcie(pdev))
-> +		return -EINVAL;
-> +
-> +	/* VIA has a strange chipset, root port is under a bridge */
-> +	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
-> +	    pdev->bus->self)
-> +		return 0;
-> +
->  	if (!pdev->has_secondary_link)
->  		return pci_aspm_init_downstream(pdev);
->  
-> @@ -859,33 +877,16 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
->  	struct pcie_link_state *link;
->  	int blacklist = !!pcie_aspm_sanity_check(pdev);
->  
-> -	if (!aspm_support_enabled)
-> -		return;
-> -
-> -	if (pdev->link_state)
-> -		return;
-> -
-> -	/*
-> -	 * We allocate pcie_link_state for the component on the upstream
-> -	 * end of a Link, so there's nothing to do unless this device has a
-> -	 * Link on its secondary side.
-> -	 */
-> -	if (!pdev->has_secondary_link)
-> -		return;
-> -
-> -	/* VIA has a strange chipset, root port is under a bridge */
-> -	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
-> -	    pdev->bus->self)
-> +	if (!pdev->link_state)
->  		return;
->  
-> +	link = pdev->link_state;
->  	down_read(&pci_bus_sem);
->  	if (list_empty(&pdev->subordinate->devices))
->  		goto out;
->  
->  	mutex_lock(&aspm_lock);
-> -	link = alloc_pcie_link_state(pdev);
-> -	if (!link)
-> -		goto unlock;
-> +
->  	/*
->  	 * Setup initial ASPM state. Note that we need to configure
->  	 * upstream links also because capable state of them can be
-> @@ -910,7 +911,6 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
->  		pcie_set_clkpm(link, policy_to_clkpm_state(link));
->  	}
->  
-> -unlock:
->  	mutex_unlock(&aspm_lock);
->  out:
->  	up_read(&pci_bus_sem);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ config IMX_GPCV2
+  bool
++ def_bool y if SOC_IMX7D
+  select IRQ_DOMAIN
+  help
+   Enables the wakeup IRQs for IMX platforms with GPCv2 block
+
+>
+> I'd encounter a backtrace with next-20170413 +  imx_v6_v7_defconfig +
+> CONFIG_IMX_GPCV2=y
+>
+> Backtrace:
+> [<c010c364>] (dump_backtrace) from [<c010c610>] (show_stack+0x18/0x1c)
+
+but prior to fixing the Kconfig we need to fix this backtrace you reported.
+
+Thanks
