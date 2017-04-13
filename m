@@ -1,691 +1,343 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Apr 2017 12:55:58 -0600
-Subject: [PATCH 1/2] ARM: tegra: remove Whistler support
-Message-ID: <20170413185559.1939-1-swarren@wwwdotorg.org>
+Date: Thu, 13 Apr 2017 12:55:59 -0600
+Subject: [PATCH 2/2] ASoC: tegra: remove Whistler machine driver
+In-Reply-To: <20170413185559.1939-1-swarren@wwwdotorg.org>
+References: <20170413185559.1939-1-swarren@wwwdotorg.org>
+Message-ID: <20170413185559.1939-2-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Whistler is an ancient Tegra 2 reference board. I may have been the only
-person who ever used it with upstream software, and I've just recycled
-the board hardware. Hence, it makes sense to remove support from software.
+The previous patch removed Whistler board support. There's no need to
+keep around a Whistler-specific ASoC machine driver.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- Documentation/devicetree/bindings/arm/tegra.txt |   1 -
- arch/arm/boot/dts/Makefile                      |   3 +-
- arch/arm/boot/dts/tegra20-whistler.dts          | 636 ------------------------
- 3 files changed, 1 insertion(+), 639 deletions(-)
- delete mode 100644 arch/arm/boot/dts/tegra20-whistler.dts
+ .../bindings/sound/nvidia,tegra-audio-wm8753.txt   |  40 ----
+ sound/soc/tegra/Kconfig                            |  10 -
+ sound/soc/tegra/Makefile                           |   4 +-
+ sound/soc/tegra/tegra_wm8753.c                     | 219 ---------------------
+ 4 files changed, 1 insertion(+), 272 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
+ delete mode 100644 sound/soc/tegra/tegra_wm8753.c
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-index b5a4342c1d46..7f1411bbabf7 100644
---- a/Documentation/devicetree/bindings/arm/tegra.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra.txt
-@@ -29,7 +29,6 @@ board-specific compatible values:
-   nvidia,harmony
-   nvidia,seaboard
-   nvidia,ventana
--  nvidia,whistler
-   toradex,apalis_t30
-   toradex,apalis_t30-eval
-   toradex,apalis-tk1
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 011808490fed..3a38127ccb6e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -891,8 +891,7 @@ dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
- 	tegra20-seaboard.dtb \
- 	tegra20-tec.dtb \
- 	tegra20-trimslice.dtb \
--	tegra20-ventana.dtb \
--	tegra20-whistler.dtb
-+	tegra20-ventana.dtb
- dtb-$(CONFIG_ARCH_TEGRA_3x_SOC) += \
- 	tegra30-apalis-eval.dtb \
- 	tegra30-beaver.dtb \
-diff --git a/arch/arm/boot/dts/tegra20-whistler.dts b/arch/arm/boot/dts/tegra20-whistler.dts
+diff --git a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt b/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
 deleted file mode 100644
-index 1e06f854c8b4..000000000000
---- a/arch/arm/boot/dts/tegra20-whistler.dts
+index 96f6a57dd6b4..000000000000
+--- a/Documentation/devicetree/bindings/sound/nvidia,tegra-audio-wm8753.txt
 +++ /dev/null
-@@ -1,636 +0,0 @@
--/dts-v1/;
--
--#include <dt-bindings/input/input.h>
--#include "tegra20.dtsi"
--
--/ {
--	model = "NVIDIA Tegra20 Whistler evaluation board";
--	compatible = "nvidia,whistler", "nvidia,tegra20";
--
--	aliases {
--		rtc0 = "/i2c at 7000d000/max8907 at 3c";
--		rtc1 = "/rtc at 7000e000";
--		serial0 = &uarta;
--	};
--
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--
--	memory {
--		reg = <0x00000000 0x20000000>;
--	};
--
--	host1x at 50000000 {
--		hdmi at 54280000 {
--			status = "okay";
--
--			vdd-supply = <&hdmi_vdd_reg>;
--			pll-supply = <&hdmi_pll_reg>;
--
--			nvidia,ddc-i2c-bus = <&hdmi_ddc>;
--			nvidia,hpd-gpio = <&gpio TEGRA_GPIO(N, 7)
--				GPIO_ACTIVE_HIGH>;
--		};
--	};
--
--	pinmux at 70000014 {
--		pinctrl-names = "default";
--		pinctrl-0 = <&state_default>;
--
--		state_default: pinmux {
--			ata {
--				nvidia,pins = "ata", "atb", "ate", "gma", "gmb",
--					"gmc", "gmd", "gpu";
--				nvidia,function = "gmi";
--			};
--			atc {
--				nvidia,pins = "atc", "atd";
--				nvidia,function = "sdio4";
--			};
--			cdev1 {
--				nvidia,pins = "cdev1";
--				nvidia,function = "plla_out";
--			};
--			cdev2 {
--				nvidia,pins = "cdev2";
--				nvidia,function = "osc";
--			};
--			crtp {
--				nvidia,pins = "crtp";
--				nvidia,function = "crt";
--			};
--			csus {
--				nvidia,pins = "csus";
--				nvidia,function = "vi_sensor_clk";
--			};
--			dap1 {
--				nvidia,pins = "dap1";
--				nvidia,function = "dap1";
--			};
--			dap2 {
--				nvidia,pins = "dap2";
--				nvidia,function = "dap2";
--			};
--			dap3 {
--				nvidia,pins = "dap3";
--				nvidia,function = "dap3";
--			};
--			dap4 {
--				nvidia,pins = "dap4";
--				nvidia,function = "dap4";
--			};
--			ddc {
--				nvidia,pins = "ddc";
--				nvidia,function = "i2c2";
--			};
--			dta {
--				nvidia,pins = "dta", "dtb", "dtc", "dtd";
--				nvidia,function = "vi";
--			};
--			dte {
--				nvidia,pins = "dte";
--				nvidia,function = "rsvd1";
--			};
--			dtf {
--				nvidia,pins = "dtf";
--				nvidia,function = "i2c3";
--			};
--			gme {
--				nvidia,pins = "gme";
--				nvidia,function = "dap5";
--			};
--			gpu7 {
--				nvidia,pins = "gpu7";
--				nvidia,function = "rtck";
--			};
--			gpv {
--				nvidia,pins = "gpv";
--				nvidia,function = "pcie";
--			};
--			hdint {
--				nvidia,pins = "hdint", "pta";
--				nvidia,function = "hdmi";
--			};
--			i2cp {
--				nvidia,pins = "i2cp";
--				nvidia,function = "i2cp";
--			};
--			irrx {
--				nvidia,pins = "irrx", "irtx";
--				nvidia,function = "uartb";
--			};
--			kbca {
--				nvidia,pins = "kbca", "kbcc", "kbce", "kbcf";
--				nvidia,function = "kbc";
--			};
--			kbcb {
--				nvidia,pins = "kbcb", "kbcd";
--				nvidia,function = "sdio2";
--			};
--			lcsn {
--				nvidia,pins = "lcsn", "lsck", "lsda", "lsdi",
--					"spia", "spib", "spic";
--				nvidia,function = "spi3";
--			};
--			ld0 {
--				nvidia,pins = "ld0", "ld1", "ld2", "ld3", "ld4",
--					"ld5", "ld6", "ld7", "ld8", "ld9",
--					"ld10", "ld11", "ld12", "ld13", "ld14",
--					"ld15", "ld16", "ld17", "ldc", "ldi",
--					"lhp0", "lhp1", "lhp2", "lhs", "lm0",
--					"lm1", "lpp", "lpw0", "lpw1", "lpw2",
--					"lsc0", "lsc1", "lspi", "lvp0", "lvp1",
--					"lvs";
--				nvidia,function = "displaya";
--			};
--			owc {
--				nvidia,pins = "owc", "uac";
--				nvidia,function = "owr";
--			};
--			pmc {
--				nvidia,pins = "pmc";
--				nvidia,function = "pwr_on";
--			};
--			rm {
--				nvidia,pins = "rm";
--				nvidia,function = "i2c1";
--			};
--			sdb {
--				nvidia,pins = "sdb", "sdc", "sdd", "slxa",
--					"slxc", "slxd", "slxk";
--				nvidia,function = "sdio3";
--			};
--			sdio1 {
--				nvidia,pins = "sdio1";
--				nvidia,function = "sdio1";
--			};
--			spdi {
--				nvidia,pins = "spdi", "spdo";
--				nvidia,function = "rsvd2";
--			};
--			spid {
--				nvidia,pins = "spid", "spie", "spig", "spih";
--				nvidia,function = "spi2_alt";
--			};
--			spif {
--				nvidia,pins = "spif";
--				nvidia,function = "spi2";
--			};
--			uaa {
--				nvidia,pins = "uaa", "uab";
--				nvidia,function = "uarta";
--			};
--			uad {
--				nvidia,pins = "uad";
--				nvidia,function = "irda";
--			};
--			uca {
--				nvidia,pins = "uca", "ucb";
--				nvidia,function = "uartc";
--			};
--			uda {
--				nvidia,pins = "uda";
--				nvidia,function = "spi1";
--			};
--			conf_ata {
--				nvidia,pins = "ata", "atb", "atc", "ddc", "gma",
--					"gmb", "gmc", "gmd", "irrx", "irtx",
--					"kbca", "kbcb", "kbcc", "kbcd", "kbce",
--					"kbcf", "sdc", "sdd", "spie", "spig",
--					"spih", "uaa", "uab", "uad", "uca",
--					"ucb";
--				nvidia,pull = <TEGRA_PIN_PULL_UP>;
--				nvidia,tristate = <TEGRA_PIN_DISABLE>;
--			};
--			conf_atd {
--				nvidia,pins = "atd", "ate", "cdev1", "csus",
--					"dap1", "dap2", "dap3", "dap4", "dte",
--					"dtf", "gpu", "gpu7", "gpv", "i2cp",
--					"rm", "sdio1", "slxa", "slxc", "slxd",
--					"slxk", "spdi", "spdo", "uac", "uda";
--				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
--				nvidia,tristate = <TEGRA_PIN_DISABLE>;
--			};
--			conf_cdev2 {
--				nvidia,pins = "cdev2", "spia", "spib";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--			};
--			conf_ck32 {
--				nvidia,pins = "ck32", "ddrc", "lc", "pmca",
--					"pmcb", "pmcc", "pmcd", "xm2c",
--					"xm2d";
--				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
--			};
--			conf_crtp {
--				nvidia,pins = "crtp";
--				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--			};
--			conf_dta {
--				nvidia,pins = "dta", "dtb", "dtc", "dtd",
--					"spid", "spif";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_DISABLE>;
--			};
--			conf_gme {
--				nvidia,pins = "gme", "owc", "pta", "spic";
--				nvidia,pull = <TEGRA_PIN_PULL_UP>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--			};
--			conf_ld17_0 {
--				nvidia,pins = "ld17_0", "ld19_18", "ld21_20",
--					"ld23_22";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--			};
--			conf_ls {
--				nvidia,pins = "ls", "pmce";
--				nvidia,pull = <TEGRA_PIN_PULL_UP>;
--			};
--			drive_dap1 {
--				nvidia,pins = "drive_dap1";
--				nvidia,high-speed-mode = <TEGRA_PIN_DISABLE>;
--				nvidia,schmitt = <TEGRA_PIN_ENABLE>;
--				nvidia,low-power-mode = <TEGRA_PIN_LP_DRIVE_DIV_8>;
--				nvidia,pull-down-strength = <0>;
--				nvidia,pull-up-strength = <0>;
--				nvidia,slew-rate-rising = <TEGRA_PIN_SLEW_RATE_FASTEST>;
--				nvidia,slew-rate-falling = <TEGRA_PIN_SLEW_RATE_FASTEST>;
--			};
--		};
--	};
--
--	i2s at 70002800 {
--		status = "okay";
--	};
--
--	serial at 70006000 {
--		status = "okay";
--	};
--
--	hdmi_ddc: i2c at 7000c400 {
--		status = "okay";
--		clock-frequency = <100000>;
--	};
--
--	i2c at 7000d000 {
--		status = "okay";
--		clock-frequency = <100000>;
--
--		codec: codec at 1a {
--			compatible = "wlf,wm8753";
--			reg = <0x1a>;
--		};
--
--		tca6416: gpio at 20 {
--			compatible = "ti,tca6416";
--			reg = <0x20>;
--			gpio-controller;
--			#gpio-cells = <2>;
--		};
--
--		max8907 at 3c {
--			compatible = "maxim,max8907";
--			reg = <0x3c>;
--			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
--
--			maxim,system-power-controller;
--
--			mbatt-supply = <&usb0_vbus_reg>;
--			in-v1-supply = <&mbatt_reg>;
--			in-v2-supply = <&mbatt_reg>;
--			in-v3-supply = <&mbatt_reg>;
--			in1-supply = <&mbatt_reg>;
--			in2-supply = <&nvvdd_sv3_reg>;
--			in3-supply = <&mbatt_reg>;
--			in4-supply = <&mbatt_reg>;
--			in5-supply = <&mbatt_reg>;
--			in6-supply = <&mbatt_reg>;
--			in7-supply = <&mbatt_reg>;
--			in8-supply = <&mbatt_reg>;
--			in9-supply = <&mbatt_reg>;
--			in10-supply = <&mbatt_reg>;
--			in11-supply = <&mbatt_reg>;
--			in12-supply = <&mbatt_reg>;
--			in13-supply = <&mbatt_reg>;
--			in14-supply = <&mbatt_reg>;
--			in15-supply = <&mbatt_reg>;
--			in16-supply = <&mbatt_reg>;
--			in17-supply = <&nvvdd_sv3_reg>;
--			in18-supply = <&nvvdd_sv3_reg>;
--			in19-supply = <&mbatt_reg>;
--			in20-supply = <&mbatt_reg>;
--
--			regulators {
--				mbatt_reg: mbatt {
--					regulator-name = "vbat_pmu";
--					regulator-always-on;
--				};
--
--				sd1 {
--					regulator-name = "nvvdd_sv1,vdd_cpu_pmu";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1000000>;
--					regulator-always-on;
--				};
--
--				sd2 {
--					regulator-name = "nvvdd_sv2,vdd_core";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--					regulator-always-on;
--				};
--
--				nvvdd_sv3_reg: sd3 {
--					regulator-name = "nvvdd_sv3";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--				};
--
--				ldo1 {
--					regulator-name = "nvvdd_ldo1,vddio_rx_ddr,vcore_acc";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--					regulator-always-on;
--				};
--
--				ldo2 {
--					regulator-name = "nvvdd_ldo2,avdd_pll*";
--					regulator-min-microvolt = <1100000>;
--					regulator-max-microvolt = <1100000>;
--					regulator-always-on;
--				};
--
--				ldo3 {
--					regulator-name = "nvvdd_ldo3,vcom_1v8b";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--				};
--
--				ldo4 {
--					regulator-name = "nvvdd_ldo4,avdd_usb*";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--					regulator-always-on;
--				};
--
--				ldo5 {
--					regulator-name = "nvvdd_ldo5,vcore_mmc,avdd_lcd1,vddio_1wire";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--					regulator-always-on;
--				};
--
--				hdmi_pll_reg: ldo6 {
--					regulator-name = "nvvdd_ldo6,avdd_hdmi_pll";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo7 {
--					regulator-name = "nvvdd_ldo7,avddio_audio";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--					regulator-always-on;
--				};
--
--				ldo8 {
--					regulator-name = "nvvdd_ldo8,vcom_3v0,vcore_cmps";
--					regulator-min-microvolt = <3000000>;
--					regulator-max-microvolt = <3000000>;
--				};
--
--				ldo9 {
--					regulator-name = "nvvdd_ldo9,avdd_cam*";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--				};
--
--				ldo10 {
--					regulator-name = "nvvdd_ldo10,avdd_usb_ic_3v0";
--					regulator-min-microvolt = <3000000>;
--					regulator-max-microvolt = <3000000>;
--					regulator-always-on;
--				};
--
--				hdmi_vdd_reg: ldo11 {
--					regulator-name = "nvvdd_ldo11,vddio_pex_clk,vcom_33,avdd_hdmi";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--				};
--
--				ldo12 {
--					regulator-name = "nvvdd_ldo12,vddio_sdio";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--					regulator-always-on;
--				};
--
--				ldo13 {
--					regulator-name = "nvvdd_ldo13,vcore_phtn,vdd_af";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--				};
--
--				ldo14 {
--					regulator-name = "nvvdd_ldo14,avdd_vdac";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--				};
--
--				ldo15 {
--					regulator-name = "nvvdd_ldo15,vcore_temp,vddio_hdcp";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--				};
--
--				ldo16 {
--					regulator-name = "nvvdd_ldo16,vdd_dbrtr";
--					regulator-min-microvolt = <1300000>;
--					regulator-max-microvolt = <1300000>;
--				};
--
--				ldo17 {
--					regulator-name = "nvvdd_ldo17,vddio_mipi";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--				};
--
--				ldo18 {
--					regulator-name = "nvvdd_ldo18,vddio_vi,vcore_cam*";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo19 {
--					regulator-name = "nvvdd_ldo19,avdd_lcd2,vddio_lx";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--				};
--
--				ldo20 {
--					regulator-name = "nvvdd_ldo20,vddio_ddr_1v2,vddio_hsic,vcom_1v2";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--					regulator-always-on;
--				};
--
--				out5v {
--					regulator-name = "usb0_vbus_reg";
--				};
--
--				out33v {
--					regulator-name = "pmu_out3v3";
--				};
--
--				bbat {
--					regulator-name = "pmu_bbat";
--					regulator-min-microvolt = <2400000>;
--					regulator-max-microvolt = <2400000>;
--					regulator-always-on;
--				};
--
--				sdby {
--					regulator-name = "vdd_aon";
--					regulator-always-on;
--				};
--
--				vrtc {
--					regulator-name = "vrtc,pmu_vccadc";
--					regulator-always-on;
--				};
--			};
--		};
--	};
--
--	kbc at 7000e200 {
--		status = "okay";
--		nvidia,debounce-delay-ms = <20>;
--		nvidia,repeat-delay-ms = <160>;
--		nvidia,kbc-row-pins = <0 1 2>;
--		nvidia,kbc-col-pins = <16 17>;
--		wakeup-source;
--		linux,keymap = <MATRIX_KEY(0x00, 0x00, KEY_POWER)
--				MATRIX_KEY(0x01, 0x00, KEY_HOME)
--				MATRIX_KEY(0x01, 0x01, KEY_BACK)
--				MATRIX_KEY(0x02, 0x01, KEY_MENU)>;
--	};
--
--	pmc at 7000e400 {
--		nvidia,invert-interrupt;
--		nvidia,suspend-mode = <1>;
--		nvidia,cpu-pwr-good-time = <2000>;
--		nvidia,cpu-pwr-off-time = <1000>;
--		nvidia,core-pwr-good-time = <0 3845>;
--		nvidia,core-pwr-off-time = <93727>;
--		nvidia,core-power-req-active-high;
--		nvidia,sys-clock-req-active-high;
--		nvidia,combined-power-req;
--	};
--
--	usb at c5000000 {
--		status = "okay";
--	};
--
--	usb-phy at c5000000 {
--		status = "okay";
--		vbus-supply = <&vbus1_reg>;
--	};
--
--	usb at c5008000 {
--		status = "okay";
--	};
--
--	usb-phy at c5008000 {
--		status = "okay";
--		vbus-supply = <&vbus3_reg>;
--	};
--
--	sdhci at c8000400 {
--		status = "okay";
--		cd-gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
--		wp-gpios = <&gpio TEGRA_GPIO(V, 5) GPIO_ACTIVE_HIGH>;
--		bus-width = <8>;
--	};
--
--	sdhci at c8000600 {
--		status = "okay";
--		bus-width = <8>;
--		non-removable;
--	};
--
--	clocks {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		clk32k_in: clock at 0 {
--			compatible = "fixed-clock";
--			reg = <0>;
--			#clock-cells = <0>;
--			clock-frequency = <32768>;
--		};
--	};
--
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		usb0_vbus_reg: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb0_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			regulator-always-on;
--		};
--
--		vbus1_reg: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "vbus1";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			gpio = <&tca6416 0 0>; /* GPIO_PMU0 */
--			regulator-always-on;
--			regulator-boot-on;
--		};
--
--		vbus3_reg: regulator at 3 {
--			compatible = "regulator-fixed";
--			reg = <3>;
--			regulator-name = "vbus3";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			gpio = <&tca6416 1 0>; /* GPIO_PMU1 */
--			regulator-always-on;
--			regulator-boot-on;
--		};
--	};
--
--	sound {
--		compatible = "nvidia,tegra-audio-wm8753-whistler",
--			     "nvidia,tegra-audio-wm8753";
--		nvidia,model = "NVIDIA Tegra Whistler";
--
--		nvidia,audio-routing =
--			"Headphone Jack", "LOUT1",
--			"Headphone Jack", "ROUT1",
--			"MIC2", "Mic Jack",
--			"MIC2N", "Mic Jack";
--
--		nvidia,i2s-controller = <&tegra_i2s1>;
--		nvidia,audio-codec = <&codec>;
--
--		clocks = <&tegra_car TEGRA20_CLK_PLL_A>,
--			 <&tegra_car TEGRA20_CLK_PLL_A_OUT0>,
--			 <&tegra_car TEGRA20_CLK_CDEV1>;
--		clock-names = "pll_a", "pll_a_out0", "mclk";
--	};
+@@ -1,40 +0,0 @@
+-NVIDIA Tegra audio complex
+-
+-Required properties:
+-- compatible : "nvidia,tegra-audio-wm8753"
+-- clocks : Must contain an entry for each entry in clock-names.
+-  See ../clocks/clock-bindings.txt for details.
+-- clock-names : Must include the following entries:
+-  - pll_a
+-  - pll_a_out0
+-  - mclk (The Tegra cdev1/extern1 clock, which feeds the CODEC's mclk)
+-- nvidia,model : The user-visible name of this sound complex.
+-- nvidia,audio-routing : A list of the connections between audio components.
+-  Each entry is a pair of strings, the first being the connection's sink,
+-  the second being the connection's source. Valid names for sources and
+-  sinks are the WM8753's pins as documented in the binding for the WM8753,
+-  and the jacks on the board:
+-
+-  * Headphone Jack
+-  * Mic Jack
+-
+-- nvidia,i2s-controller : The phandle of the Tegra I2S1 controller
+-- nvidia,audio-codec : The phandle of the WM8753 audio codec
+-Example:
+-
+-sound {
+-	compatible = "nvidia,tegra-audio-wm8753-whistler",
+-		     "nvidia,tegra-audio-wm8753"
+-	nvidia,model = "tegra-wm8753-harmony";
+-
+-	nvidia,audio-routing =
+-		"Headphone Jack", "LOUT1",
+-		"Headphone Jack", "ROUT1";
+-
+-	nvidia,i2s-controller = <&i2s1>;
+-	nvidia,audio-codec = <&wm8753>;
+-
+-	clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 93>;
+-	clock-names = "pll_a", "pll_a_out0", "mclk";
 -};
+-
+diff --git a/sound/soc/tegra/Kconfig b/sound/soc/tegra/Kconfig
+index efbe8d4c019e..19e5d92bb7bc 100644
+--- a/sound/soc/tegra/Kconfig
++++ b/sound/soc/tegra/Kconfig
+@@ -71,16 +71,6 @@ config SND_SOC_TEGRA_RT5640
+ 	  Say Y or M here if you want to add support for SoC audio on Tegra
+ 	  boards using the RT5640 codec, such as Dalmore.
+ 
+-config SND_SOC_TEGRA_WM8753
+-	tristate "SoC Audio support for Tegra boards using a WM8753 codec"
+-	depends on SND_SOC_TEGRA && I2C && GPIOLIB
+-	select SND_SOC_TEGRA20_I2S if ARCH_TEGRA_2x_SOC
+-	select SND_SOC_TEGRA30_I2S if ARCH_TEGRA_3x_SOC
+-	select SND_SOC_WM8753
+-	help
+-	  Say Y or M here if you want to add support for SoC audio on Tegra
+-	  boards using the WM8753 codec, such as Whistler.
+-
+ config SND_SOC_TEGRA_WM8903
+ 	tristate "SoC Audio support for Tegra boards using a WM8903 codec"
+ 	depends on SND_SOC_TEGRA && I2C && GPIOLIB
+diff --git a/sound/soc/tegra/Makefile b/sound/soc/tegra/Makefile
+index f214a3fd0024..c85c34740aea 100644
+--- a/sound/soc/tegra/Makefile
++++ b/sound/soc/tegra/Makefile
+@@ -20,7 +20,6 @@ obj-$(CONFIG_SND_SOC_TEGRA30_I2S) += snd-soc-tegra30-i2s.o
+ # Tegra machine Support
+ snd-soc-tegra-rt5640-objs := tegra_rt5640.o
+ snd-soc-tegra-rt5677-objs := tegra_rt5677.o
+-snd-soc-tegra-wm8753-objs := tegra_wm8753.o
+ snd-soc-tegra-wm8903-objs := tegra_wm8903.o
+ snd-soc-tegra-wm9712-objs := tegra_wm9712.o
+ snd-soc-tegra-trimslice-objs := trimslice.o
+@@ -30,10 +29,9 @@ snd-soc-tegra-sgtl5000-objs := tegra_sgtl5000.o
+ 
+ obj-$(CONFIG_SND_SOC_TEGRA_RT5640) += snd-soc-tegra-rt5640.o
+ obj-$(CONFIG_SND_SOC_TEGRA_RT5677) += snd-soc-tegra-rt5677.o
+-obj-$(CONFIG_SND_SOC_TEGRA_WM8753) += snd-soc-tegra-wm8753.o
+ obj-$(CONFIG_SND_SOC_TEGRA_WM8903) += snd-soc-tegra-wm8903.o
+ obj-$(CONFIG_SND_SOC_TEGRA_WM9712) += snd-soc-tegra-wm9712.o
+ obj-$(CONFIG_SND_SOC_TEGRA_TRIMSLICE) += snd-soc-tegra-trimslice.o
+ obj-$(CONFIG_SND_SOC_TEGRA_ALC5632) += snd-soc-tegra-alc5632.o
+ obj-$(CONFIG_SND_SOC_TEGRA_MAX98090) += snd-soc-tegra-max98090.o
+-obj-$(CONFIG_SND_SOC_TEGRA_SGTL5000) += snd-soc-tegra-sgtl5000.o
+\ No newline at end of file
++obj-$(CONFIG_SND_SOC_TEGRA_SGTL5000) += snd-soc-tegra-sgtl5000.o
+diff --git a/sound/soc/tegra/tegra_wm8753.c b/sound/soc/tegra/tegra_wm8753.c
+deleted file mode 100644
+index bdedd1028569..000000000000
+--- a/sound/soc/tegra/tegra_wm8753.c
++++ /dev/null
+@@ -1,219 +0,0 @@
+-/*
+- * tegra_wm8753.c - Tegra machine ASoC driver for boards using WM8753 codec.
+- *
+- * Author: Stephen Warren <swarren@nvidia.com>
+- * Copyright (C) 2010-2012 - NVIDIA, Inc.
+- *
+- * Based on code copyright/by:
+- *
+- * (c) 2009, 2010 Nvidia Graphics Pvt. Ltd.
+- *
+- * Copyright 2007 Wolfson Microelectronics PLC.
+- * Author: Graeme Gregory
+- *         graeme.gregory at wolfsonmicro.com or linux at wolfsonmicro.com
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+- * 02110-1301 USA
+- *
+- */
+-
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/slab.h>
+-#include <linux/gpio.h>
+-#include <linux/of_gpio.h>
+-
+-#include <sound/core.h>
+-#include <sound/jack.h>
+-#include <sound/pcm.h>
+-#include <sound/pcm_params.h>
+-#include <sound/soc.h>
+-
+-#include "../codecs/wm8753.h"
+-
+-#include "tegra_asoc_utils.h"
+-
+-#define DRV_NAME "tegra-snd-wm8753"
+-
+-struct tegra_wm8753 {
+-	struct tegra_asoc_utils_data util_data;
+-};
+-
+-static int tegra_wm8753_hw_params(struct snd_pcm_substream *substream,
+-					struct snd_pcm_hw_params *params)
+-{
+-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+-	struct snd_soc_card *card = rtd->card;
+-	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(card);
+-	int srate, mclk;
+-	int err;
+-
+-	srate = params_rate(params);
+-	switch (srate) {
+-	case 11025:
+-	case 22050:
+-	case 44100:
+-	case 88200:
+-		mclk = 11289600;
+-		break;
+-	default:
+-		mclk = 12288000;
+-		break;
+-	}
+-
+-	err = tegra_asoc_utils_set_rate(&machine->util_data, srate, mclk);
+-	if (err < 0) {
+-		dev_err(card->dev, "Can't configure clocks\n");
+-		return err;
+-	}
+-
+-	err = snd_soc_dai_set_sysclk(codec_dai, WM8753_MCLK, mclk,
+-					SND_SOC_CLOCK_IN);
+-	if (err < 0) {
+-		dev_err(card->dev, "codec_dai clock not set\n");
+-		return err;
+-	}
+-
+-	return 0;
+-}
+-
+-static const struct snd_soc_ops tegra_wm8753_ops = {
+-	.hw_params = tegra_wm8753_hw_params,
+-};
+-
+-static const struct snd_soc_dapm_widget tegra_wm8753_dapm_widgets[] = {
+-	SND_SOC_DAPM_HP("Headphone Jack", NULL),
+-	SND_SOC_DAPM_MIC("Mic Jack", NULL),
+-};
+-
+-static struct snd_soc_dai_link tegra_wm8753_dai = {
+-	.name = "WM8753",
+-	.stream_name = "WM8753 PCM",
+-	.codec_dai_name = "wm8753-hifi",
+-	.ops = &tegra_wm8753_ops,
+-	.dai_fmt = SND_SOC_DAIFMT_I2S |
+-			SND_SOC_DAIFMT_NB_NF |
+-			SND_SOC_DAIFMT_CBS_CFS,
+-};
+-
+-static struct snd_soc_card snd_soc_tegra_wm8753 = {
+-	.name = "tegra-wm8753",
+-	.owner = THIS_MODULE,
+-	.dai_link = &tegra_wm8753_dai,
+-	.num_links = 1,
+-
+-	.dapm_widgets = tegra_wm8753_dapm_widgets,
+-	.num_dapm_widgets = ARRAY_SIZE(tegra_wm8753_dapm_widgets),
+-	.fully_routed = true,
+-};
+-
+-static int tegra_wm8753_driver_probe(struct platform_device *pdev)
+-{
+-	struct device_node *np = pdev->dev.of_node;
+-	struct snd_soc_card *card = &snd_soc_tegra_wm8753;
+-	struct tegra_wm8753 *machine;
+-	int ret;
+-
+-	machine = devm_kzalloc(&pdev->dev, sizeof(struct tegra_wm8753),
+-			       GFP_KERNEL);
+-	if (!machine) {
+-		dev_err(&pdev->dev, "Can't allocate tegra_wm8753 struct\n");
+-		return -ENOMEM;
+-	}
+-
+-	card->dev = &pdev->dev;
+-	platform_set_drvdata(pdev, card);
+-	snd_soc_card_set_drvdata(card, machine);
+-
+-	ret = snd_soc_of_parse_card_name(card, "nvidia,model");
+-	if (ret)
+-		goto err;
+-
+-	ret = snd_soc_of_parse_audio_routing(card, "nvidia,audio-routing");
+-	if (ret)
+-		goto err;
+-
+-	tegra_wm8753_dai.codec_of_node = of_parse_phandle(np,
+-			"nvidia,audio-codec", 0);
+-	if (!tegra_wm8753_dai.codec_of_node) {
+-		dev_err(&pdev->dev,
+-			"Property 'nvidia,audio-codec' missing or invalid\n");
+-		ret = -EINVAL;
+-		goto err;
+-	}
+-
+-	tegra_wm8753_dai.cpu_of_node = of_parse_phandle(np,
+-			"nvidia,i2s-controller", 0);
+-	if (!tegra_wm8753_dai.cpu_of_node) {
+-		dev_err(&pdev->dev,
+-			"Property 'nvidia,i2s-controller' missing or invalid\n");
+-		ret = -EINVAL;
+-		goto err;
+-	}
+-
+-	tegra_wm8753_dai.platform_of_node = tegra_wm8753_dai.cpu_of_node;
+-
+-	ret = tegra_asoc_utils_init(&machine->util_data, &pdev->dev);
+-	if (ret)
+-		goto err;
+-
+-	ret = snd_soc_register_card(card);
+-	if (ret) {
+-		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
+-			ret);
+-		goto err_fini_utils;
+-	}
+-
+-	return 0;
+-
+-err_fini_utils:
+-	tegra_asoc_utils_fini(&machine->util_data);
+-err:
+-	return ret;
+-}
+-
+-static int tegra_wm8753_driver_remove(struct platform_device *pdev)
+-{
+-	struct snd_soc_card *card = platform_get_drvdata(pdev);
+-	struct tegra_wm8753 *machine = snd_soc_card_get_drvdata(card);
+-
+-	snd_soc_unregister_card(card);
+-
+-	tegra_asoc_utils_fini(&machine->util_data);
+-
+-	return 0;
+-}
+-
+-static const struct of_device_id tegra_wm8753_of_match[] = {
+-	{ .compatible = "nvidia,tegra-audio-wm8753", },
+-	{},
+-};
+-
+-static struct platform_driver tegra_wm8753_driver = {
+-	.driver = {
+-		.name = DRV_NAME,
+-		.pm = &snd_soc_pm_ops,
+-		.of_match_table = tegra_wm8753_of_match,
+-	},
+-	.probe = tegra_wm8753_driver_probe,
+-	.remove = tegra_wm8753_driver_remove,
+-};
+-module_platform_driver(tegra_wm8753_driver);
+-
+-MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
+-MODULE_DESCRIPTION("Tegra+WM8753 machine ASoC driver");
+-MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:" DRV_NAME);
+-MODULE_DEVICE_TABLE(of, tegra_wm8753_of_match);
 -- 
 2.11.0
