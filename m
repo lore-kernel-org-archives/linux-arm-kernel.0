@@ -1,29 +1,48 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 13 Apr 2017 15:05:06 +0800
-Subject: [PATCH 0/2] hwrng: mtk: add support for hardware random generator on
- MT7623 SoC
-Message-ID: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
+Date: Thu, 13 Apr 2017 15:05:07 +0800
+Subject: [PATCH 1/2] dt-bindings: hwrng: Add Mediatek hardware random
+ generator bindings
+In-Reply-To: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
+References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
+Message-ID: <1492067108-14748-2-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-This patchset introduces support for Mediatek hardware random generator (RNG)
-Currently, the driver is already tested successfully with rng-tools on MT7623
-SoC. And it should also be workable on other similar Mediatek SoCs.
+Document the devicetree bindings for Mediatek random number
+generator which could be found on MT7623 SoC or other similar
+Mediatek SoCs.
 
-SoC that also works on other similar SoCs. 
-Sean Wang (2):
-  dt-bindings: hwrng: Add Mediatek hardware random generator bindings
-  hwrng: mtk: Add driver for hardware random generator on MT7623 SoC
-
- Documentation/devicetree/bindings/rng/mtk-rng.txt |  18 +++
- drivers/char/hw_random/Kconfig                    |  16 +-
- drivers/char/hw_random/Makefile                   |   2 +-
- drivers/char/hw_random/mtk-rng.c                  | 174 ++++++++++++++++++++++
- 4 files changed, 208 insertions(+), 2 deletions(-)
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ Documentation/devicetree/bindings/rng/mtk-rng.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/rng/mtk-rng.txt
- create mode 100644 drivers/char/hw_random/mtk-rng.c
 
+diff --git a/Documentation/devicetree/bindings/rng/mtk-rng.txt b/Documentation/devicetree/bindings/rng/mtk-rng.txt
+new file mode 100644
+index 0000000..a6d62a2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rng/mtk-rng.txt
+@@ -0,0 +1,18 @@
++Device-Tree bindings for Mediatek random number generator
++found in Mediatek SoC family
++
++Required properties:
++- compatible	    : Should be "mediatek,mt7623-rng"
++- clocks	    : list of clock specifiers, corresponding to
++		      entries in clock-names property;
++- clock-names	    : Should contain "rng" entries;
++- reg 		    : Specifies base physical address and size of the registers
++
++Example:
++
++rng: rng at 1020f000 {
++	compatible = "mediatek,mt7623-rng";
++	reg = <0 0x1020f000 0 0x1000>;
++	clocks = <&infracfg CLK_INFRA_TRNG>;
++	clock-names = "rng";
++};
 -- 
 1.9.1
