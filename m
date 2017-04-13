@@ -1,57 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Apr 2017 23:29:15 +0100
-Subject: [Bug] VCHIQ functional test broken
-In-Reply-To: <685482264.60263.1492105308873@email.1und1.de>
-References: <331235003.222371.1491934205807@email.1und1.de>
- <685482264.60263.1492105308873@email.1und1.de>
-Message-ID: <20170413222915.GF17774@n2100.armlinux.org.uk>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 13 Apr 2017 15:35:49 -0700
+Subject: [PATCH] ARM: zImage: fix warning in merge_fdt_bootargs()
+Message-ID: <20170413223549.18082-1-stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 07:41:48PM +0200, Stefan Wahren wrote:
-> > Stefan Wahren <stefan.wahren@i2se.com> hat am 11. April 2017 um 20:10 geschrieben:
-> > 
-> > 
-> > Hi,
-> > 
-> > recently i found that vchiq_test -f doesn't work anymore with current mainline (4.11-rc6) and linux-next (20170404) on my Raspberry Pi Zero. The issue is always reproducible, but the error behavior isn't deterministic. Sometimes vchiq_test hangs and sometimes i get an error message from vchiq_test like this (but never errors from the kernel):
-> > 
-> > $ vchiq_test -f 10
-> > Functional test - iters:10
-> > ======== iteration 1 ========
-> > vchiq_test: 1502: expected callback reason VCHIQ_MESSAGE_AVAILABLE, got 1
-> > vchiq_test: 1524: expected callback reason VCHIQ_BULK_TRANSMIT_DONE, got 5
-> > vchiq_test: 863: func_error != 0
-> > 
-> > I didn't had the time to bisect, but at least 4.10 is safe.
-> > 
-> 
-> Okay, i've bisected this regression to this commit:
-> 
-> 00a19f3e25c0c40e0ec77f52d4841d23ad269169 is the first bad commit
-> commit 00a19f3e25c0c40e0ec77f52d4841d23ad269169
-> Author: Rabin Vincent <rabinv@axis.com>
-> Date:   Tue Nov 8 09:21:19 2016 +0100
-> 
->     ARM: 8627/1: avoid cache flushing in flush_dcache_page()
->     
->     When the data cache is PIPT or VIPT non-aliasing, and cache operations
->     are broadcast by the hardware, we can always postpone the flush in
->     flush_dcache_page().  A similar change was done for ARM64 in commit
->     b5b6c9e9149d ("arm64: Avoid cache flushing in flush_dcache_page()").
->     
->     Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->     Signed-off-by: Rabin Vincent <rabinv@axis.com>
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> It seems that staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm
-> relies on the behavior of flush_dcache_page before this patch get
-> applied. Any advices to fix this issues are appreciated.
+gcc produces the following warning:
+arch/arm/boot/compressed/atags_to_fdt.c: In function 'merge_fdt_bootargs':
+arch/arm/boot/compressed/atags_to_fdt.c:98:1: warning: the frame size of
+1032 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-Any ideas why this causes a problem for this driver?  From what I can see,
-it doesn't make use of flush_dcache_page().
+Update merge_fdt_bootargs() so that instead of a 1k buffer on the
+stack, it calls fdt_appendprop_string()
 
+Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+---
+I tried testing this on my imx6 setup by adding bogus text to the
+command line, but it appears that with my (recent) uboot
+the codepath is not executed.
+So this could be regarded as little more than compile-tested.
+
+ arch/arm/boot/compressed/atags_to_fdt.c | 32 ++++++++------------------------
+ 1 file changed, 8 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index 9448aa0..fefb30a 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -66,35 +66,19 @@ static uint32_t get_cell_size(const void *fdt)
+ 	return cell_size;
+ }
+ 
+-static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
++static void merge_fdt_bootargs(void *fdt, const char *cmdline)
+ {
+-	char cmdline[COMMAND_LINE_SIZE];
+ 	const char *fdt_bootargs;
+-	char *ptr = cmdline;
++	int offset = node_offset(fdt, "/chosen");
+ 	int len = 0;
+ 
+-	/* copy the fdt command line into the buffer */
+-	fdt_bootargs = getprop(fdt, "/chosen", "bootargs", &len);
+-	if (fdt_bootargs)
+-		if (len < COMMAND_LINE_SIZE) {
+-			memcpy(ptr, fdt_bootargs, len);
+-			/* len is the length of the string
+-			 * including the NULL terminator */
+-			ptr += len - 1;
+-		}
+-
+-	/* and append the ATAG_CMDLINE */
+-	if (fdt_cmdline) {
+-		len = strlen(fdt_cmdline);
+-		if (ptr - cmdline + len + 2 < COMMAND_LINE_SIZE) {
+-			*ptr++ = ' ';
+-			memcpy(ptr, fdt_cmdline, len);
+-			ptr += len;
+-		}
++	/* get the ftd command line length */
++	fdt_bootargs = fdt_getprop(fdt, offset, "bootargs", &len);
++	/* append the ATAG_CMDLINE if its not too big */
++	if (cmdline && ((len + strlen(cmdline)) < (COMMAND_LINE_SIZE - 2))) {
++		fdt_appendprop_string(fdt, offset, "bootargs", " ");
++		fdt_appendprop_string(fdt, offset, "bootargs", cmdline);
+ 	}
+-	*ptr = '\0';
+-
+-	setprop_string(fdt, "/chosen", "bootargs", cmdline);
+ }
+ 
+ /*
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.3
