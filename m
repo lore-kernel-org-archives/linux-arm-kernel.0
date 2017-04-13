@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 15:28:22 -0300
-Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string for
+Date: Thu, 13 Apr 2017 15:28:23 -0300
+Subject: [PATCH v2 06/22] ARM: dts: efm32: Add generic compatible string for
  I2C EEPROM
 In-Reply-To: <20170413182839.25381-1-javier@osg.samsung.com>
 References: <20170413182839.25381-1-javier@osg.samsung.com>
-Message-ID: <20170413182839.25381-6-javier@osg.samsung.com>
+Message-ID: <20170413182839.25381-7-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,35 +24,21 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Changes in v2: None
 
- arch/arm/boot/dts/at91-linea.dtsi   | 2 +-
- arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/efm32gg-dk3750.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91-linea.dtsi b/arch/arm/boot/dts/at91-linea.dtsi
-index 0721c8472509..9a19080fd3bf 100644
---- a/arch/arm/boot/dts/at91-linea.dtsi
-+++ b/arch/arm/boot/dts/at91-linea.dtsi
-@@ -31,7 +31,7 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+index 98fc667d22c7..2f34491881ae 100644
+--- a/arch/arm/boot/dts/efm32gg-dk3750.dts
++++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+@@ -36,7 +36,7 @@
+ 			};
  
- 	eeprom at 51 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64","atmel,24c64";
- 		reg = <0x51>;
- 		pagesize = <32>;
- 	};
-diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-index 7a68805a4eb5..6f005c14a6b0 100644
---- a/arch/arm/boot/dts/at91-tse850-3.dts
-+++ b/arch/arm/boot/dts/at91-tse850-3.dts
-@@ -239,7 +239,7 @@
- 	};
- 
- 	eeprom at 50 {
--		compatible = "nxp,24c02";
-+		compatible = "nxp,24c02","atmel,24c02";
- 		reg = <0x50>;
- 		pagesize = <16>;
- 	};
+ 			eeprom at 50 {
+-				compatible = "microchip,24c02";
++				compatible = "microchip,24c02","atmel,24c02";
+ 				reg = <0x50>;
+ 				pagesize = <16>;
+ 			};
 -- 
 2.9.3
