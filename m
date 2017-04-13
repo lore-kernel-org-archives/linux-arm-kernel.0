@@ -1,14 +1,29 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 13 Apr 2017 06:32:40 -0700
-Subject: [PATCH 6/8] ARM: dts: imx7d-sdb: Add GPIO expander node
+Date: Thu, 13 Apr 2017 06:32:37 -0700
+Subject: [PATCH 3/8] ARM: dts: imx7s: Adjust anatop-enable-bit for 'reg_1p0d'
 In-Reply-To: <20170413133242.5068-1-andrew.smirnov@gmail.com>
 References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
-Message-ID: <20170413133242.5068-7-andrew.smirnov@gmail.com>
+Message-ID: <20170413133242.5068-4-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for U38, a 74LV595PW serial-in shift register that acts as a
-GPIO expander on the board.
+In PMU_REG_1P0Dn ENABLE_LINREG is bit 0. Bit 31 is called OVERRIDE and
+it serves the function of granting permission to GPC IP block to alter
+various bit-fields of the register. The reason why this property, that
+trickeld here from Freescale BSP, is set to 31 is because in the code
+it came from it is used in conjunction with a notifier handler for
+REGULATOR_EVENT_PRE_DO_ENABLE and REGULATOR_EVENT_PRE_DO_DISABLE
+events (not found in upstream kernel) that triggers GPC to start
+manipulating aforementioned other bitfields.
+
+Since:
+	a) none of the aforementioned machinery is implemented by
+	   upstream
+	b) using 'anatop-enable-bit' in that capacity is a bit of a
+	   semantic stretch
+
+simplify the situation by setting the value of 'anatop-enable-bit' to
+point to ENABLE_LINREG (same as i.MX6).
 
 Cc: yurovsky at gmail.com
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -21,57 +36,21 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx7d-sdb.dts | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/imx7s.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 5be01a1..e0ff276 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -52,6 +52,30 @@
- 		reg = <0x80000000 0x80000000>;
- 	};
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 22c9788..8fee299 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -516,7 +516,7 @@
+ 					anatop-min-bit-val = <8>;
+ 					anatop-min-voltage = <800000>;
+ 					anatop-max-voltage = <1200000>;
+-					anatop-enable-bit = <31>;
++					anatop-enable-bit = <0>;
+ 				};
+ 			};
  
-+	spi4 {
-+		compatible = "spi-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_spi1>;
-+		status = "okay";
-+		gpio-sck = <&gpio1 13 0>;
-+		gpio-mosi = <&gpio1 9 0>;
-+		cs-gpios = <&gpio1 12 0>;
-+		num-chipselects = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		gpio_spi: gpio_spi at 0 {
-+			compatible = "fairchild,74hc595";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <0>;
-+			registers-number = <1>;
-+			 /* Enable PERI_3V3, SENSOR_RST_B and HDMI_RST*/
-+			registers-default = /bits/ 8 <0x74>;
-+			spi-max-frequency = <100000>;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -642,5 +666,13 @@
- 		fsl,pins = <
- 			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
- 		>;
-+
-+		pinctrl_spi1: spi1grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
-+				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
-+				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
-+			>;
-+		};
- 	};
- };
 -- 
 2.9.3
