@@ -1,63 +1,49 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 13 Apr 2017 15:22:15 +0200
-Subject: [PATCH v2] serial: 8250_early: Add earlycon support for Palmchip
- UART
-In-Reply-To: <7a016ff6-08fc-2811-92e0-7c4603fa8586@sigmadesigns.com>
-References: <7a016ff6-08fc-2811-92e0-7c4603fa8586@sigmadesigns.com>
-Message-ID: <01ed348b-1057-9089-bca3-433c7d7f9881@free.fr>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 13 Apr 2017 06:32:34 -0700
+Subject: [PATCH 0/8] i.MX7 PCIe related device tree changes
+Message-ID: <20170413133242.5068-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2017 11:47, Marc Gonzalez wrote:
+Shawn, everyone:
 
-> @@ -172,3 +179,20 @@ OF_EARLYCON_DECLARE(omap8250, "ti,omap3-uart", early_omap8250_setup);
->  OF_EARLYCON_DECLARE(omap8250, "ti,omap4-uart", early_omap8250_setup);
->  
->  #endif
-> +
-> +#ifdef CONFIG_SERIAL_8250_RT288X
-> +
-> +unsigned int au_serial_in(struct uart_port *p, int offset);
-> +void au_serial_out(struct uart_port *p, int offset, int value);
+This series includes changes made to device-tree in order to support
+PCIe on i.MX7 platform. They include:
 
-Hmmm, I'm thinking that putting declarations in a .c file might
-not be a very popular decision... ?
+     - Bringing 'anatop-enable-bit' property of ANATOP regulators back
+       and extending it to all of the HW it is applicable to
 
-Would there be a header, shared by 8250_early.c and 8250_port.c
-where it might be appropriate to declare au_serial_in/out?
+     - Adding GPCv2 node for i.MX7 (which was missing, despite the
+       irqchip driver for it being in the tree for quite some time)
 
+     - Adding a PCIe node for i.MX7
 
-> +static int __init early_au_setup(struct earlycon_device *dev, const char *opt)
-> +{
-> +	dev->port.serial_in = au_serial_in;
-> +	dev->port.serial_out = au_serial_out;
-> +	dev->port.iotype = UPIO_AU;
-> +	dev->con->write = early_serial8250_write;
-> +	return 0;
-> +}
-> +OF_EARLYCON_DECLARE(palmchip, "ralink,rt2880-uart", early_au_setup);
-> +
-> +#endif
-> diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-> index 080d5a59d0a7..1f08d22d1a80 100644
-> --- a/drivers/tty/serial/8250/8250_port.c
-> +++ b/drivers/tty/serial/8250/8250_port.c
-> @@ -313,7 +313,7 @@ static const s8 au_io_out_map[8] = {
->  	-1,	/* UART_SCR (unmapped) */
->  };
->  
-> -static unsigned int au_serial_in(struct uart_port *p, int offset)
-> +unsigned int au_serial_in(struct uart_port *p, int offset)
->  {
->  	if (offset >= ARRAY_SIZE(au_io_in_map))
->  		return UINT_MAX;
-> @@ -323,7 +323,7 @@ static unsigned int au_serial_in(struct uart_port *p, int offset)
->  	return __raw_readl(p->membase + (offset << p->regshift));
->  }
->  
-> -static void au_serial_out(struct uart_port *p, int offset, int value)
-> +void au_serial_out(struct uart_port *p, int offset, int value)
->  {
->  	if (offset >= ARRAY_SIZE(au_io_out_map))
->  		return;
-> 
+     - Adding GPIO expander used by PCIe and enabling PCIe node from
+       above on i.MX7 based Sabre board
+
+As usual, feedback is welcome.
+
+Thanks,
+Andrey Smrinov
+
+Andrey Smirnov (8):
+  Revert "ARM: dts: imx: Remove unexistant property"
+  ARM: dts: imx6: Specify 'anatop-enable-bit' where appropriate
+  ARM: dts: imx7s: Adjust anatop-enable-bit for 'reg_1p0d'
+  ARM: dts: imx7s: Add node for GPC
+  ARM: dts: imx7s: Mark 'gpr' compatible with i.MX6 variant
+  ARM: dts: imx7d-sdb: Add GPIO expander node
+  ARM: dts: imx7d: Add node for PCIe controller
+  ARM: dts: imx7d-sdb: Enable PCIe peripheral
+
+ arch/arm/boot/dts/imx6qdl.dtsi  |  3 +++
+ arch/arm/boot/dts/imx6sl.dtsi   |  3 +++
+ arch/arm/boot/dts/imx6sx.dtsi   |  3 +++
+ arch/arm/boot/dts/imx6ul.dtsi   |  1 +
+ arch/arm/boot/dts/imx7d-sdb.dts | 39 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d.dtsi    | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7s.dtsi    | 31 +++++++++++++++++++++++++++++--
+ 7 files changed, 116 insertions(+), 2 deletions(-)
+
+-- 
+2.9.3
