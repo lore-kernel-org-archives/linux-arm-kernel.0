@@ -1,355 +1,53 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Thu, 13 Apr 2017 14:33:59 +0100
-Subject: [PATCH 1/4] net: macb: Add support for PTP timestamps in DMA
- descriptors
-Message-ID: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Apr 2017 14:45:24 +0100
+Subject: kvm/arm64: use-after-free in
+ kvm_unmap_hva_handler/unmap_stage2_pmds
+In-Reply-To: <CAAeHK+wJ4Xm+g22V_3fUqfMfP4V7m36FHYzVOFuxH8WbiFcenA@mail.gmail.com>
+References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
+ <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
+ <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
+ <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
+ <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
+ <CAAeHK+yzzdQVvGQcuprTHEa7S9CPiAVYodD__jQ8a=CzA6RaZg@mail.gmail.com>
+ <20170413093418.GC24027@leverpostej>
+ <CAAeHK+wJ4Xm+g22V_3fUqfMfP4V7m36FHYzVOFuxH8WbiFcenA@mail.gmail.com>
+Message-ID: <20170413134524.GF24027@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for PTP timestamps in
-DMA buffer descriptors. It checks capability at runtime
-and uses appropriate buffer descriptor.
+On Thu, Apr 13, 2017 at 01:53:13PM +0200, Andrey Konovalov wrote:
+> On Thu, Apr 13, 2017 at 11:34 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > I had a go at reproducing this on an arm64 board following [1], but so
+> > far I've had no luck. 
 
-Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
----
- drivers/net/ethernet/cadence/Kconfig |  10 ++-
- drivers/net/ethernet/cadence/macb.c  | 133 +++++++++++++++++++++++++++--------
- drivers/net/ethernet/cadence/macb.h  |  36 ++++++++--
- 3 files changed, 141 insertions(+), 38 deletions(-)
+[...]
 
-diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
-index 608bea1..427d65a 100644
---- a/drivers/net/ethernet/cadence/Kconfig
-+++ b/drivers/net/ethernet/cadence/Kconfig
-@@ -29,7 +29,15 @@ config MACB
- 	  support for the MACB/GEM chip.
- 
- 	  To compile this driver as a module, choose M here: the module
--	  will be called macb.
-+	  will be macb.
-+
-+config MACB_USE_HWSTAMP
-+	bool "Use IEEE 1588 hwstamp"
-+	depends on MACB
-+	default y
-+	imply PTP_1588_CLOCK
-+	---help---
-+	  Enable IEEE 1588 Precision Time Protocol (PTP) support for MACB.
- 
- config MACB_PCI
- 	tristate "Cadence PCI MACB/GEM support"
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 5cbd1e7..59d459b 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -79,33 +79,84 @@
- #define MACB_HALT_TIMEOUT	1230
- 
- /* DMA buffer descriptor might be different size
-- * depends on hardware configuration.
-+ * depends on hardware configuration:
-+ *
-+ * 1. dma address width 32 bits:
-+ *    word 1: 32 bit address of Data Buffer
-+ *    word 2: control
-+ *
-+ * 2. dma address width 64 bits:
-+ *    word 1: 32 bit address of Data Buffer
-+ *    word 2: control
-+ *    word 3: upper 32 bit address of Data Buffer
-+ *    word 4: unused
-+ *
-+ * 3. dma address width 32 bits with hardware timestamping:
-+ *    word 1: 32 bit address of Data Buffer
-+ *    word 2: control
-+ *    word 3: timestamp word 1
-+ *    word 4: timestamp word 2
-+ *
-+ * 4. dma address width 64 bits with hardware timestamping:
-+ *    word 1: 32 bit address of Data Buffer
-+ *    word 2: control
-+ *    word 3: upper 32 bit address of Data Buffer
-+ *    word 4: unused
-+ *    word 5: timestamp word 1
-+ *    word 6: timestamp word 2
-  */
- static unsigned int macb_dma_desc_get_size(struct macb *bp)
- {
--#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
--		return sizeof(struct macb_dma_desc) + sizeof(struct macb_dma_desc_64);
-+#ifdef MACB_EXT_DESC
-+	unsigned int desc_size;
-+
-+	switch (bp->hw_dma_cap) {
-+	case HW_DMA_CAP_64B:
-+		desc_size = sizeof(struct macb_dma_desc)
-+			+ sizeof(struct macb_dma_desc_64);
-+		break;
-+	case HW_DMA_CAP_PTP:
-+		desc_size = sizeof(struct macb_dma_desc)
-+			+ sizeof(struct macb_dma_desc_ptp);
-+		break;
-+	case HW_DMA_CAP_64B_PTP:
-+		desc_size = sizeof(struct macb_dma_desc)
-+			+ sizeof(struct macb_dma_desc_64)
-+			+ sizeof(struct macb_dma_desc_ptp);
-+		break;
-+	default:
-+		desc_size = sizeof(struct macb_dma_desc);
-+	}
-+	return desc_size;
- #endif
- 	return sizeof(struct macb_dma_desc);
- }
- 
--static unsigned int macb_adj_dma_desc_idx(struct macb *bp, unsigned int idx)
-+static unsigned int macb_adj_dma_desc_idx(struct macb *bp, unsigned int desc_idx)
- {
--#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--	/* Dma buffer descriptor is 4 words length (instead of 2 words)
--	 * for 64b GEM.
--	 */
--	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
--		idx <<= 1;
-+#ifdef MACB_EXT_DESC
-+	switch (bp->hw_dma_cap) {
-+	case HW_DMA_CAP_64B:
-+	case HW_DMA_CAP_PTP:
-+		desc_idx <<= 1;
-+		break;
-+	case HW_DMA_CAP_64B_PTP:
-+		desc_idx *= 3;
-+		break;
-+	default:
-+		break;
-+	}
-+	return desc_idx;
- #endif
--	return idx;
-+	return desc_idx;
- }
- 
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
- static struct macb_dma_desc_64 *macb_64b_desc(struct macb *bp, struct macb_dma_desc *desc)
- {
--	return (struct macb_dma_desc_64 *)((void *)desc + sizeof(struct macb_dma_desc));
-+	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
-+		return (struct macb_dma_desc_64 *)((void *)desc + sizeof(struct macb_dma_desc));
-+	return NULL;
- }
- #endif
- 
-@@ -600,7 +651,7 @@ static void macb_set_addr(struct macb *bp, struct macb_dma_desc *desc, dma_addr_
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
- 	struct macb_dma_desc_64 *desc_64;
- 
--	if (bp->hw_dma_cap == HW_DMA_CAP_64B) {
-+	if (bp->hw_dma_cap & HW_DMA_CAP_64B) {
- 		desc_64 = macb_64b_desc(bp, desc);
- 		desc_64->addrh = upper_32_bits(addr);
- 	}
-@@ -614,7 +665,7 @@ static dma_addr_t macb_get_addr(struct macb *bp, struct macb_dma_desc *desc)
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
- 	struct macb_dma_desc_64 *desc_64;
- 
--	if (bp->hw_dma_cap == HW_DMA_CAP_64B) {
-+	if (bp->hw_dma_cap & HW_DMA_CAP_64B) {
- 		desc_64 = macb_64b_desc(bp, desc);
- 		addr = ((u64)(desc_64->addrh) << 32);
- 	}
-@@ -713,7 +764,7 @@ static void macb_tx_error_task(struct work_struct *work)
- 	/* Reinitialize the TX desc queue */
- 	queue_writel(queue, TBQP, lower_32_bits(queue->tx_ring_dma));
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-+	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
- 		queue_writel(queue, TBQPH, upper_32_bits(queue->tx_ring_dma));
- #endif
- 	/* Make TX ring reflect state of hardware */
-@@ -1921,9 +1972,13 @@ static void macb_configure_dma(struct macb *bp)
- 			dmacfg &= ~GEM_BIT(TXCOEN);
- 
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--		if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-+		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
- 			dmacfg |= GEM_BIT(ADDR64);
- #endif
-+#ifdef CONFIG_MACB_USE_HWSTAMP
-+		if (bp->hw_dma_cap & HW_DMA_CAP_PTP)
-+			dmacfg |= GEM_BIT(RXEXT) | GEM_BIT(TXEXT);
-+#endif
- 		netdev_dbg(bp->dev, "Cadence configure DMA with 0x%08x\n",
- 			   dmacfg);
- 		gem_writel(bp, DMACFG, dmacfg);
-@@ -1971,14 +2026,15 @@ static void macb_init_hw(struct macb *bp)
- 	/* Initialize TX and RX buffers */
- 	macb_writel(bp, RBQP, lower_32_bits(bp->rx_ring_dma));
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-+	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
- 		macb_writel(bp, RBQPH, upper_32_bits(bp->rx_ring_dma));
- #endif
- 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
- 		queue_writel(queue, TBQP, lower_32_bits(queue->tx_ring_dma));
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--		if (bp->hw_dma_cap == HW_DMA_CAP_64B)
--			queue_writel(queue, TBQPH, upper_32_bits(queue->tx_ring_dma));
-+		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
-+			queue_writel(queue, TBQPH,
-+					upper_32_bits(queue->tx_ring_dma));
- #endif
- 
- 		/* Enable interrupts */
-@@ -2579,6 +2635,18 @@ static void macb_configure_caps(struct macb *bp,
- 		dcfg = gem_readl(bp, DCFG2);
- 		if ((dcfg & (GEM_BIT(RX_PKT_BUFF) | GEM_BIT(TX_PKT_BUFF))) == 0)
- 			bp->caps |= MACB_CAPS_FIFO_MODE;
-+		/* if HWSTAMP is configure and gem has the capability */
-+#ifdef CONFIG_MACB_USE_HWSTAMP
-+		bp->ptp_hw_support = false;
-+		if (gem_has_ptp(bp)) {
-+			if (!GEM_BFEXT(TSU, gem_readl(bp, DCFG5)))
-+				pr_err("GEM doesn't support hardware ptp.\n");
-+			else {
-+				pr_emerg("rozieblo: ptp_hw_support = true");
-+				bp->ptp_hw_support = true;
-+			}
-+		}
-+#endif
- 	}
- 
- 	dev_dbg(&bp->pdev->dev, "Cadence caps 0x%08x\n", bp->caps);
-@@ -2716,7 +2784,7 @@ static int macb_init(struct platform_device *pdev)
- 			queue->IMR  = GEM_IMR(hw_q - 1);
- 			queue->TBQP = GEM_TBQP(hw_q - 1);
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--			if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-+			if (bp->hw_dma_cap & HW_DMA_CAP_64B)
- 				queue->TBQPH = GEM_TBQPH(hw_q - 1);
- #endif
- 		} else {
-@@ -2727,7 +2795,7 @@ static int macb_init(struct platform_device *pdev)
- 			queue->IMR  = MACB_IMR;
- 			queue->TBQP = MACB_TBQP;
- #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--			if (bp->hw_dma_cap == HW_DMA_CAP_64B)
-+			if (bp->hw_dma_cap & HW_DMA_CAP_64B)
- 				queue->TBQPH = MACB_TBQPH;
- #endif
- 		}
-@@ -3307,19 +3375,24 @@ static int macb_probe(struct platform_device *pdev)
- 		bp->wol |= MACB_WOL_HAS_MAGIC_PACKET;
- 	device_init_wakeup(&pdev->dev, bp->wol & MACB_WOL_HAS_MAGIC_PACKET);
- 
--#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--	if (GEM_BFEXT(DAW64, gem_readl(bp, DCFG6))) {
--		dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
--		bp->hw_dma_cap = HW_DMA_CAP_64B;
--	} else
--		bp->hw_dma_cap = HW_DMA_CAP_32B;
--#endif
--
- 	spin_lock_init(&bp->lock);
- 
- 	/* setup capabilities */
- 	macb_configure_caps(bp, macb_config);
- 
-+#ifdef MACB_EXT_DESC
-+	bp->hw_dma_cap = HW_DMA_CAP_32B;
-+#endif
-+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-+	if (GEM_BFEXT(DAW64, gem_readl(bp, DCFG6))) {
-+		dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
-+		bp->hw_dma_cap |= HW_DMA_CAP_64B;
-+	}
-+#endif
-+#ifdef CONFIG_MACB_USE_HWSTAMP
-+	if (bp->ptp_hw_support)
-+		bp->hw_dma_cap |= HW_DMA_CAP_PTP;
-+#endif
- 	platform_set_drvdata(pdev, dev);
- 
- 	dev->irq = platform_get_irq(pdev, 0);
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index ec037b0..2606970 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -12,6 +12,10 @@
- 
- #include <linux/phy.h>
- 
-+#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) || defined(CONFIG_MACB_USE_HWSTAMP)
-+#define MACB_EXT_DESC
-+#endif
-+
- #define MACB_GREGS_NBR 16
- #define MACB_GREGS_VERSION 2
- #define MACB_MAX_QUEUES 8
-@@ -269,6 +273,10 @@
- #define GEM_RXBS_SIZE		8
- #define GEM_DDRP_OFFSET		24 /* disc_when_no_ahb */
- #define GEM_DDRP_SIZE		1
-+#define GEM_RXEXT_OFFSET	28 /* RX extended Buffer Descriptor mode */
-+#define GEM_RXEXT_SIZE		1
-+#define GEM_TXEXT_OFFSET	29 /* TX extended Buffer Descriptor mode */
-+#define GEM_TXEXT_SIZE		1
- #define GEM_ADDR64_OFFSET	30 /* Address bus width - 64b or 32b */
- #define GEM_ADDR64_SIZE		1
- 
-@@ -425,6 +433,11 @@
- #define GEM_TX_PKT_BUFF_OFFSET			21
- #define GEM_TX_PKT_BUFF_SIZE			1
- 
-+
-+/* Bitfields in DCFG5. */
-+#define GEM_TSU_OFFSET				8
-+#define GEM_TSU_SIZE				1
-+
- /* Bitfields in DCFG6. */
- #define GEM_PBUF_LSO_OFFSET			27
- #define GEM_PBUF_LSO_SIZE			1
-@@ -546,16 +559,21 @@ struct macb_dma_desc {
- 	u32	ctrl;
- };
- 
--#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--enum macb_hw_dma_cap {
--	HW_DMA_CAP_32B,
--	HW_DMA_CAP_64B,
--};
-+#ifdef MACB_EXT_DESC
-+#define HW_DMA_CAP_32B		0
-+#define HW_DMA_CAP_64B		(1 << 0)
-+#define HW_DMA_CAP_PTP		(1 << 1)
-+#define HW_DMA_CAP_64B_PTP	(HW_DMA_CAP_64B | HW_DMA_CAP_PTP)
- 
- struct macb_dma_desc_64 {
- 	u32 addrh;
- 	u32 resvd;
- };
-+
-+struct macb_dma_desc_ptp {
-+	u32	ts_1;
-+	u32	ts_2;
-+};
- #endif
- 
- /* DMA descriptor bitfields */
-@@ -954,8 +972,12 @@ struct macb {
- 	u32			wol;
- 
- 	struct macb_ptp_info	*ptp_info;	/* macb-ptp interface */
--#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
--	enum macb_hw_dma_cap hw_dma_cap;
-+#ifdef MACB_EXT_DESC
-+	uint8_t hw_dma_cap;
-+#endif
-+
-+#ifdef CONFIG_MACB_USE_HWSTAMP
-+	bool ptp_hw_support;
- #endif
- };
- 
--- 
-2.4.5
+> Hi Mark,
+> 
+> You assume that you have KASAN enabled.
+
+Yes; I have KASAN_OUTLINE enabled.
+
+> Since a few unintended line breaks were added in the email, here's the
+> program in plaintext:
+> https://gist.githubusercontent.com/xairy/69864355b5a64f74e7cb445b7325a7df/raw/bdbbbf177dbea13eac0a5ddfa9c3e6c32695b13b/kvm-arm-uaf-log
+
+Thanks!
+
+> I run it as:
+> # ./syz-execprog -repeat=0 -collide=false -sandbox=namespace ./kvm-arm-uaf-log
+
+Thanks again. Having the exact command was very helpful for
+sanity-checking my configuration.
+
+In the end, it turned out that in my filesystem, /dev/kvm was not
+accessible by the nobody user, so the executor couldn't open it, and
+none of the KVM paths were being triggered.
+
+> And it takes less than a second to trigger the bug.
+
+After having chomd'd /dev/kvm appropriately, I can also reproduce the
+issue within a second or two, running the same command.
+
+Thanks,
+Mark.
