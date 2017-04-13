@@ -1,7 +1,7 @@
 From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 13 Apr 2017 13:18:58 +0100
-Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
- comments etc.
+Date: Thu, 13 Apr 2017 13:17:47 +0100
+Subject: [PATCH 1/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
+ user-visible messages
 In-Reply-To: <20170404092604.GB14898@arm.com>
 References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
  <20170328065130.16019-2-takahiro.akashi@linaro.org>
@@ -9,487 +9,223 @@ References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
  <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
  <20170404073504.GI16309@linaro.org>
  <1491291844.6218.25.camel@infradead.org> <20170404092604.GB14898@arm.com>
-Message-ID: <1492085938.20068.6.camel@infradead.org>
+Message-ID: <1492085867.20068.4.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Less important than in user-visible messages, but still good practice as
-there's still no excuse for ARM64 code to look like it was written before
-1996.
+The IEC binary prefixes (Ki, Mi, Gi, etc.) were published over twenty
+years ago. We should use them consistently, especially in user-visible
+messages.
+
+Sure, it doesn't often matter, just as *most* typos and spelling or
+grammar mistakes don't often matter. But sometimes, such misuse really
+do actually introduce ambiguity, and we should avoid that.
+
+Conversely, there is absolutely no good reason *not* to be using the
+binary prefixes. Some people once claimed to find them "ugly", or that
+they would cause confusion. But those are purely down to unfamiliarity.
+
+The perceived ugliness, and the alleged confusion, will pass with use.
+
+The correctness, and the lack of ambiguity, will not.
+
+ARM64 in particular, as a new platform, has no excuse for not using the
+IEC prefixes which predate its existence by a decade and a half.
+
+What's worse is that some people are pointing at the existing errors and
+actually claiming that they want their *new* code to be deliberately
+wrong in order to be "consistent" with what's there.
+
+So let's fix the user-visible messages in all of arch/arm64 and nip
+*that* particular stupidity in the bud...
 
 Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi             |  2 +-
- .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      |  2 +-
- arch/arm64/boot/dts/broadcom/ns2-xmc.dts           | 24 +++++++++++-----------
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  2 +-
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  2 +-
- arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts      |  2 +-
- arch/arm64/boot/dts/marvell/berlin4ct-stb.dts      |  2 +-
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |  2 +-
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  2 +-
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     |  2 +-
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  2 +-
- arch/arm64/include/asm/assembler.h                 |  2 +-
- arch/arm64/include/asm/boot.h                      |  4 ++--
- arch/arm64/include/asm/elf.h                       |  2 +-
- arch/arm64/include/asm/fixmap.h                    |  6 +++---
- arch/arm64/kernel/head.S                           |  8 ++++----
- arch/arm64/kernel/hyp-stub.S                       |  2 +-
- arch/arm64/kernel/kaslr.c                          | 14 ++++++-------
- arch/arm64/kernel/module-plts.c                    |  2 +-
- arch/arm64/kernel/vmlinux.lds.S                    | 18 ++++++++--------
- arch/arm64/mm/mmu.c                                |  2 +-
- arch/arm64/mm/proc.S                               |  2 +-
- 22 files changed, 53 insertions(+), 53 deletions(-)
+ arch/arm64/Kconfig        | 22 +++++++++++-----------
+ arch/arm64/kernel/efi.c   |  2 +-
+ arch/arm64/kernel/setup.c |  2 +-
+ arch/arm64/mm/init.c      | 36 ++++++++++++++++++------------------
+ 4 files changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index df539e8..f70fb13 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -694,7 +694,7 @@
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3741859..9643223 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -442,7 +442,7 @@ config CAVIUM_ERRATUM_22375
+ 	  This implements two gicv3-its errata workarounds for ThunderX. Both
+ 	  with small impact affecting only ITS table allocation.
  
- 	memory at 80000000 {
- 		device_type = "memory";
--		/* last 16MB of the first memory area is reserved for secure world use by firmware */
-+		/* last 16MiB of the first memory area is reserved for secure world use by firmware */
- 		reg = <0x00000000 0x80000000 0x0 0x7f000000>,
- 		      <0x00000008 0x80000000 0x1 0x80000000>;
- 	};
-diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-index e3a1711..38ece4b 100644
---- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-+++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-@@ -60,7 +60,7 @@
+-	    erratum 22375: only alloc 8MB table size
++	    erratum 22375: only alloc 8MiB table size
+ 	    erratum 24313: ignore memory access type
  
- 	memory at 80000000 {
- 		device_type = "memory";
--		reg = <0 0x80000000 0 0x80000000>; /* 2GB @ 2GB */
-+		reg = <0 0x80000000 0 0x80000000>; /* 2GiB @ 2GiB */
- 	};
+ 	  The fixes are in ITS initialization and basically ignore memory access
+@@ -528,21 +528,21 @@ choice
+ 	  Page size (translation granule) configuration.
  
- 	gic: interrupt-controller at 2c001000 {
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
-index 99a2723..5908524 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
-@@ -87,36 +87,36 @@
+ config ARM64_4K_PAGES
+-	bool "4KB"
++	bool "4KiB"
+ 	help
+-	  This feature enables 4KB pages support.
++	  This feature enables 4KiB pages support.
  
- 		partition at 0 {
- 			label = "nboot";
--			reg = <0x00000000 0x00280000>; /*  2.5MB */
-+			reg = <0x00000000 0x00280000>; /*  2.5MiB */
- 			read-only;
- 		};
+ config ARM64_16K_PAGES
+-	bool "16KB"
++	bool "16KiB"
+ 	help
+-	  The system will use 16KB pages support. AArch32 emulation
+-	  requires applications compiled with 16K (or a multiple of 16K)
++	  The system will use 16KiB pages support. AArch32 emulation
++	  requires applications compiled with 16KiB (or a multiple of 16KiB)
+ 	  aligned segments.
  
- 		partition at 280000 {
- 			label = "nenv";
--			reg = <0x00280000 0x00040000>; /* 0.25MB */
-+			reg = <0x00280000 0x00040000>; /* 0.25MiB */
- 			read-only;
- 		};
+ config ARM64_64K_PAGES
+-	bool "64KB"
++	bool "64KiB"
+ 	help
+-	  This feature enables 64KB pages support (4KB by default)
++	  This feature enables 64KiB pages support (4KiB by default)
+ 	  allowing only two levels of page tables and faster TLB
+ 	  look-up. AArch32 emulation requires applications compiled
+ 	  with 64K aligned segments.
+@@ -1063,9 +1063,9 @@ config COMPAT
+ 	  the user helper functions, VFP support and the ptrace interface are
+ 	  handled appropriately by the kernel.
  
- 		partition at 2c0000 {
- 			label = "ndtb";
--			reg = <0x002c0000 0x00040000>; /* 0.25MB */
-+			reg = <0x002c0000 0x00040000>; /* 0.25MiB */
- 			read-only;
- 		};
+-	  If you use a page size other than 4KB (i.e, 16KB or 64KB), please be aware
+-	  that you will only be able to execute AArch32 binaries that were compiled
+-	  with page size aligned segments.
++	  If you use a page size other than 4KiB (i.e, 16KiB or 64KiB), please be
++	  aware that you will only be able to execute AArch32 binaries that were
++	  compiled with page size aligned segments.
  
- 		partition at 300000 {
- 			label = "nsystem";
--			reg = <0x00300000 0x03d00000>; /*   61MB */
-+			reg = <0x00300000 0x03d00000>; /*   61MiB */
- 			read-only;
- 		};
+ 	  If you want to execute 32-bit userspace applications, say Y.
  
- 		partition at 4000000 {
- 			label = "nrootfs";
--			reg = <0x04000000 0x06400000>; /*  100MB */
-+			reg = <0x04000000 0x06400000>; /*  100MiB */
- 		};
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 5d17f37..d80c11f 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -31,7 +31,7 @@ static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
+ 		return PROT_DEVICE_nGnRE;
  
- 		partition at 0a400000{
- 			label = "ncustfs";
--			reg = <0x0a400000 0x35c00000>; /*  860MB */
-+			reg = <0x0a400000 0x35c00000>; /*  860MiB */
- 		};
- 	};
- };
-@@ -156,32 +156,32 @@
- 
- 		partition at 0 {
- 			label = "bl0";
--			reg = <0x00000000 0x00080000>; /*  512KB */
-+			reg = <0x00000000 0x00080000>; /*  512KiB */
- 		};
- 
- 		partition at 80000 {
- 			label = "fip";
--			reg = <0x00080000 0x00150000>; /* 1344KB */
-+			reg = <0x00080000 0x00150000>; /* 1344KiB */
- 		};
- 
- 		partition at 1e0000 {
- 			label = "env";
--			reg = <0x001e0000 0x00010000>;/*    64KB */
-+			reg = <0x001e0000 0x00010000>;/*    64KiB */
- 		};
- 
- 		partition at 1f0000 {
- 			label = "dtb";
--			reg = <0x001f0000 0x00010000>; /*   64KB */
-+			reg = <0x001f0000 0x00010000>; /*   64KiB */
- 		};
- 
- 		partition at 200000 {
- 			label = "kernel";
--			reg = <0x00200000 0x00e00000>; /*   14MB */
-+			reg = <0x00200000 0x00e00000>; /*   14MiB */
- 		};
- 
- 		partition at 1000000 {
- 			label = "rootfs";
--			reg = <0x01000000 0x01000000>; /*   16MB */
-+			reg = <0x01000000 0x01000000>; /*   16MiB */
- 		};
- 	};
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index c37110b..71ce1f1 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -126,7 +126,7 @@
- 	flash at 0 {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		compatible = "n25q128a13", "jedec,spi-nor";  /* 16MB */
-+		compatible = "n25q128a13", "jedec,spi-nor";  /* 16MiB */
- 		reg = <0>;
- 		spi-max-frequency = <1000000>; /* input clock */
- 	};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index e5935f2..43e549f 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -152,7 +152,7 @@
- 	memory at 80000000 {
- 		device_type = "memory";
- 		reg = <0x00000000 0x80000000 0 0x80000000>;
--		      /* DRAM space - 1, size : 2 GB DRAM */
-+		      /* DRAM space - 1, size : 2 GiB DRAM */
- 	};
- 
- 	sysclk: sysclk {
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-index fae6c69..4b3a5e2 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-@@ -56,7 +56,7 @@
- 
- 	memory at 1000000 {
- 		device_type = "memory";
--		/* the first 16MB is for firmwares' usage */
-+		/* the first 16MiB is for firmwares' usage */
- 		reg = <0 0x01000000 0 0x7f000000>;
- 	};
- };
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-index d47edad..049018b 100644
---- a/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct-stb.dts
-@@ -56,7 +56,7 @@
- 
- 	memory at 1000000 {
- 		device_type = "memory";
--		/* the first 16MB is for firmwares' usage */
-+		/* the first 16MiB is for firmwares' usage */
- 		reg = <0 0x01000000 0 0x7f000000>;
- 	};
- };
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index c5f8f69..15f57e6 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -29,7 +29,7 @@
- 
- 	memory at 48000000 {
- 		device_type = "memory";
--		/* first 128MB is reserved for secure area. */
-+		/* first 128MiB is reserved for secure area. */
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
- 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 7a8986e..35f7cd2 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -52,7 +52,7 @@
- 
- 	memory at 48000000 {
- 		device_type = "memory";
--		/* first 128MB is reserved for secure area. */
-+		/* first 128MiB is reserved for secure area. */
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
- 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-index c3f064a..4d1295e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts
-@@ -28,7 +28,7 @@
- 
- 	memory at 48000000 {
- 		device_type = "memory";
--		/* first 128MB is reserved for secure area. */
-+		/* first 128MiB is reserved for secure area. */
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
- 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-index c7f40f8..2a019a3 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -28,7 +28,7 @@
- 
- 	memory at 48000000 {
- 		device_type = "memory";
--		/* first 128MB is reserved for secure area. */
-+		/* first 128MiB is reserved for secure area. */
- 		reg = <0x0 0x48000000 0x0 0x78000000>;
- 	};
- 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 1b67c37..56094e2 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -165,7 +165,7 @@ lr	.req	x30		// link register
- 
- /*
-  * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> where
-- * <symbol> is within the range +/- 4 GB of the PC when running
-+ * <symbol> is within the range +/- 4 GiB of the PC when running
-  * in core kernel context. In module context, a movz/movk sequence
-  * is used, since modules may be loaded far away from the kernel
-  * when KASLR is in effect.
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-index ebf2481..95e26bc 100644
---- a/arch/arm64/include/asm/boot.h
-+++ b/arch/arm64/include/asm/boot.h
-@@ -6,14 +6,14 @@
- 
- /*
-  * arm64 requires the DTB to be 8 byte aligned and
-- * not exceed 2MB in size.
-+ * not exceed 2MiB in size.
-  */
- #define MIN_FDT_ALIGN		8
- #define MAX_FDT_SIZE		SZ_2M
- 
- /*
-  * arm64 requires the kernel image to placed
-- * TEXT_OFFSET bytes beyond a 2 MB aligned base
-+ * TEXT_OFFSET bytes beyond a 2 MiB aligned base
-  */
- #define MIN_KIMG_ALIGN		SZ_2M
- 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 5d17004..28e63ff 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -156,7 +156,7 @@ struct linux_binprm;
- extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				       int uses_interp);
- 
--/* 1GB of VA */
-+/* 1GiB of VA */
- #ifdef CONFIG_COMPAT
- #define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
- 						0x7ff >> (PAGE_SHIFT - 12) : \
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index caf86be..7e90ab2 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -37,13 +37,13 @@ enum fixed_addresses {
- 	FIX_HOLE,
- 
- 	/*
--	 * Reserve a virtual window for the FDT that is 2 MB larger than the
-+	 * Reserve a virtual window for the FDT that is 2 MiB larger than the
- 	 * maximum supported size, and put it at the top of the fixmap region.
- 	 * The additional space ensures that any FDT that does not exceed
- 	 * MAX_FDT_SIZE can be mapped regardless of whether it crosses any
--	 * 2 MB alignment boundaries.
-+	 * 2 MiB alignment boundaries.
- 	 *
--	 * Keep this at the top so it remains 2 MB aligned.
-+	 * Keep this at the top so it remains 2 MiB aligned.
- 	 */
- #define FIX_FDT_SIZE		(MAX_FDT_SIZE + SZ_2M)
- 	FIX_FDT_END,
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4fb6ccd..067ddd6 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -45,11 +45,11 @@
- #define __PHYS_OFFSET	(KERNEL_START - TEXT_OFFSET)
- 
- #if (TEXT_OFFSET & 0xfff) != 0
--#error TEXT_OFFSET must be at least 4KB aligned
-+#error TEXT_OFFSET must be at least 4KiB aligned
- #elif (PAGE_OFFSET & 0x1fffff) != 0
--#error PAGE_OFFSET must be at least 2MB aligned
-+#error PAGE_OFFSET must be at least 2MiB aligned
- #elif TEXT_OFFSET > 0x1fffff
--#error TEXT_OFFSET must be less than 2MB
-+#error TEXT_OFFSET must be less than 2MiB
- #endif
- 
- /*
-@@ -360,7 +360,7 @@ ENDPROC(preserve_boot_args)
-  * Setup the initial page tables. We only setup the barest amount which is
-  * required to get the kernel running. The following sections are required:
-  *   - identity mapping to enable the MMU (low address, TTBR0)
-- *   - first few MB of the kernel linear mapping to jump to once the MMU has
-+ *   - first few MiB of the kernel linear mapping to jump to once the MMU has
-  *     been enabled
-  */
- __create_page_tables:
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index d3b5f75..9585ea7 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -106,7 +106,7 @@ ENDPROC(\label)
-  * be called on each CPU.
-  *
-  * x0 must be the physical address of the new vector table, and must be
-- * 2KB aligned.
-+ * 2KiB aligned.
-  *
-  * Before calling this, you must check that the stub hypervisor is installed
-  * everywhere, by waiting for any secondary CPUs to be brought up and then
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index d7e90d9..a5a3068 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -118,9 +118,9 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
- 	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
- 	 * kernel image offset from the seed. Let's place the kernel in the
- 	 * lower half of the VMALLOC area (VA_BITS - 2).
--	 * Even if we could randomize at page granularity for 16k and 64k pages,
--	 * let's always round to 2 MB so we don't interfere with the ability to
--	 * map using contiguous PTEs
-+	 * Even if we could randomize at page granularity for 16KiB and 64KiB
-+	 * pages, let's always round to 2 MiB so we don't interfere with the
-+	 * ability to map using contiguous PTEs
- 	 */
- 	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
- 	offset = seed & mask;
-@@ -129,10 +129,10 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
- 	memstart_offset_seed = seed >> 48;
- 
- 	/*
--	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
--	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
--	 * happens, increase the KASLR offset by the size of the kernel image
--	 * rounded up by SWAPPER_BLOCK_SIZE.
-+	 * The kernel Image should not extend across a 1GiB/32MiB/512MiB
-+	 * alignment boundary (for 4KiB/16KiB/64KiB granule kernels,
-+	 * respectively). If this happens, increase the KASLR offset by
-+	 * the size of the kernel image rounded up by SWAPPER_BLOCK_SIZE.
- 	 */
- 	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
- 	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index 1ce90d8..0d66734 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -118,7 +118,7 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num)
- 			 * We only have to consider branch targets that resolve
- 			 * to undefined symbols. This is not simply a heuristic,
- 			 * it is a fundamental limitation, since the PLT itself
--			 * is part of the module, and needs to be within 128 MB
-+			 * is part of the module, and needs to be within 128 MiB
- 			 * as well, so modules can never grow beyond that limit.
- 			 */
- 			s = syms + ELF64_R_SYM(rela[i].r_info);
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index b8deffa..93b39d6 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -25,12 +25,12 @@ jiffies = jiffies_64;
- 
- #define HYPERVISOR_TEXT					\
- 	/*						\
--	 * Align to 4 KB so that			\
-+	 * Align to 4 KiB so that			\
- 	 * a) the HYP vector table is at its minimum	\
- 	 *    alignment of 2048 bytes			\
- 	 * b) the HYP init code will not cross a page	\
- 	 *    boundary if its size does not exceed	\
--	 *    4 KB (see related ASSERT() below)		\
-+	 *    4 KiB (see related ASSERT() below)	\
- 	 */						\
- 	. = ALIGN(SZ_4K);				\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;	\
-@@ -60,7 +60,7 @@ jiffies = jiffies_64;
-  * The size of the PE/COFF section that covers the kernel image, which
-  * runs from stext to _edata, must be a round multiple of the PE/COFF
-  * FileAlignment, which we set to its minimum value of 0x200. 'stext'
-- * itself is 4 KB aligned, so padding out _edata to a 0x200 aligned
-+ * itself is 4 KiB aligned, so padding out _edata to a 0x200 aligned
-  * boundary should be sufficient.
-  */
- PECOFF_FILE_ALIGNMENT = 0x200;
-@@ -74,16 +74,16 @@ PECOFF_FILE_ALIGNMENT = 0x200;
- 
- #if defined(CONFIG_DEBUG_ALIGN_RODATA)
- /*
-- *  4 KB granule:   1 level 2 entry
-- * 16 KB granule: 128 level 3 entries, with contiguous bit
-- * 64 KB granule:  32 level 3 entries, with contiguous bit
-+ *  4 KiB granule:   1 level 2 entry
-+ * 16 KiB granule: 128 level 3 entries, with contiguous bit
-+ * 64 KiB granule:  32 level 3 entries, with contiguous bit
-  */
- #define SEGMENT_ALIGN			SZ_2M
- #else
- /*
-- *  4 KB granule:  16 level 3 entries, with contiguous bit
-- * 16 KB granule:   4 level 3 entries, without contiguous bit
-- * 64 KB granule:   1 level 3 entry
-+ *  4 KiB granule:  16 level 3 entries, with contiguous bit
-+ * 16 KiB granule:   4 level 3 entries, without contiguous bit
-+ * 64 KiB granule:   1 level 3 entry
-  */
- #define SEGMENT_ALIGN			SZ_64K
- #endif
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index d28dbcf..5d8b743 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -229,7 +229,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 		next = pud_addr_end(addr, end);
- 
+ 	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
+-		      "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
++		      "UEFI Runtime regions are not aligned to 64 KiB -- buggy firmware?"))
  		/*
--		 * For 4K granule only, attempt to put down a 1GB block
-+		 * For 4KiB granule only, attempt to put down a 1GiB block
+ 		 * If the region is not aligned to the page size of the OS, we
+ 		 * can not use strict permissions, since that would also affect
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 42274bd..86de05d 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -185,7 +185,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+ 	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+ 		pr_crit("\n"
+ 			"Error: invalid device tree blob at physical address %pa (virtual address 0x%p)\n"
+-			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
++			"The dtb must be 8-byte aligned and must not exceed 2 MiB in size\n"
+ 			"\nPlease check your bootloader.",
+ 			&dt_phys, dt_virt);
+ 
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index e19e065..85481b9 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -111,7 +111,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ 
+ 	memset(zone_size, 0, sizeof(zone_size));
+ 
+-	/* 4GB maximum for 32-bit only capable devices */
++	/* 4GiB maximum for 32-bit only capable devices */
+ #ifdef CONFIG_ZONE_DMA
+ 	max_dma = PFN_DOWN(arm64_dma_phys_limit);
+ 	zone_size[ZONE_DMA] = max_dma - min;
+@@ -182,7 +182,7 @@ static int __init early_mem(char *p)
+ 		return 1;
+ 
+ 	memory_limit = memparse(p, &p) & PAGE_MASK;
+-	pr_notice("Memory limited to %lldMB\n", memory_limit >> 20);
++	pr_notice("Memory limited to %lldMiB\n", memory_limit >> 20);
+ 
+ 	return 0;
+ }
+@@ -242,7 +242,7 @@ void __init arm64_memblock_init(void)
+ 		 * We can only add back the initrd memory if we don't end up
+ 		 * with more memory than we can address via the linear mapping.
+ 		 * It is up to the bootloader to position the kernel and the
+-		 * initrd reasonably close to each other (i.e., within 32 GB of
++		 * initrd reasonably close to each other (i.e., within 32 GiB of
+ 		 * each other) so that all granule/#levels combinations can
+ 		 * always access both.
  		 */
- 		if (use_1G_block(addr, next, phys) && !page_mappings_only) {
- 			pud_set_huge(pud, phys, prot);
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 877d42f..daba6ba 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -221,7 +221,7 @@ ENTRY(__cpu_setup)
- 	bic	x0, x0, x5			// clear bits
- 	orr	x0, x0, x6			// set bits
- 	/*
--	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
-+	 * Set/prepare TCR and TTBR. We use 512GiB (39-bit) address range for
- 	 * both user and kernel.
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+@@ -292,7 +292,7 @@ void __init arm64_memblock_init(void)
+ 
+ 	early_init_fdt_scan_reserved_mem();
+ 
+-	/* 4GB maximum for 32-bit only capable devices */
++	/* 4GiB maximum for 32-bit only capable devices */
+ 	if (IS_ENABLED(CONFIG_ZONE_DMA))
+ 		arm64_dma_phys_limit = max_zone_dma_phys();
+ 	else
+@@ -425,35 +425,35 @@ void __init mem_init(void)
+ 
+ 	pr_notice("Virtual kernel memory layout:\n");
+ #ifdef CONFIG_KASAN
+-	pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
++	pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GiB)\n",
+ 		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
+ #endif
+-	pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
++	pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MiB)\n",
+ 		MLM(MODULES_VADDR, MODULES_END));
+-	pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
++	pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GiB)\n",
+ 		MLG(VMALLOC_START, VMALLOC_END));
+-	pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++	pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KiB)\n",
+ 		MLK_ROUNDUP(_text, _etext));
+-	pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++	pr_notice("    .rodata : 0x%p" " - 0x%p" "   (%6ld KiB)\n",
+ 		MLK_ROUNDUP(__start_rodata, __init_begin));
+-	pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++	pr_notice("      .init : 0x%p" " - 0x%p" "   (%6ld KiB)\n",
+ 		MLK_ROUNDUP(__init_begin, __init_end));
+-	pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++	pr_notice("      .data : 0x%p" " - 0x%p" "   (%6ld KiB)\n",
+ 		MLK_ROUNDUP(_sdata, _edata));
+-	pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++	pr_notice("       .bss : 0x%p" " - 0x%p" "   (%6ld KiB)\n",
+ 		MLK_ROUNDUP(__bss_start, __bss_stop));
+-	pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
++	pr_notice("    fixed   : 0x%16lx - 0x%16lx   (%6ld KiB)\n",
+ 		MLK(FIXADDR_START, FIXADDR_TOP));
+-	pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
++	pr_notice("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MiB)\n",
+ 		MLM(PCI_IO_START, PCI_IO_END));
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
++	pr_notice("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GiB maximum)\n",
+ 		MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
+-	pr_notice("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
++	pr_notice("              0x%16lx - 0x%16lx   (%6ld MiB actual)\n",
+ 		MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
+ 		    (unsigned long)virt_to_page(high_memory)));
+ #endif
+-	pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
++	pr_notice("    memory  : 0x%16lx - 0x%16lx   (%6ld MiB)\n",
+ 		MLM(__phys_to_virt(memblock_start_of_DRAM()),
+ 		    (unsigned long)high_memory));
+ 
+@@ -523,7 +523,7 @@ __setup("keepinitrd", keepinitrd_setup);
+ static int dump_mem_limit(struct notifier_block *self, unsigned long v, void *p)
+ {
+ 	if (memory_limit != (phys_addr_t)ULLONG_MAX) {
+-		pr_emerg("Memory Limit: %llu MB\n", memory_limit >> 20);
++		pr_emerg("Memory Limit: %llu MiB\n", memory_limit >> 20);
+ 	} else {
+ 		pr_emerg("Memory Limit: none\n");
+ 	}
 -- 
 2.9.3
 
@@ -501,4 +237,4 @@ Name: smime.p7s
 Type: application/x-pkcs7-signature
 Size: 4938 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/6fa9d272/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/3df3fc9e/attachment-0001.bin>
