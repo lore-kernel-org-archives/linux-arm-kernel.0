@@ -1,17 +1,17 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 13 Apr 2017 06:32:36 -0700
-Subject: [PATCH 2/8] ARM: dts: imx6: Specify 'anatop-enable-bit' where
- appropriate
+Date: Thu, 13 Apr 2017 06:32:35 -0700
+Subject: [PATCH 1/8] Revert "ARM: dts: imx: Remove unexistant property"
 In-Reply-To: <20170413133242.5068-1-andrew.smirnov@gmail.com>
 References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
-Message-ID: <20170413133242.5068-3-andrew.smirnov@gmail.com>
+Message-ID: <20170413133242.5068-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ENABLE_LINREG bit is implemented by 3P0, 1P1 and 2P5 regulators on
-i.MX6. This property is present in similar code in Fresscale BSP and
-made its way upstream in imx6ul.dtsi, so this patch adds this property
-to the rest of i.MX6 family for completness.
+Commit ca7734a ("regulator: anatop: Add support for
+"anatop-enable-bit"") added code to support this particular binding
+and 'anatop-enable-bit' is no longer an unused property.
+
+This reverts commit 27958ccdf29e9971732e02494b48be54b0691269.
 
 Cc: yurovsky at gmail.com
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -24,94 +24,33 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
- arch/arm/boot/dts/imx6sl.dtsi  | 3 +++
- arch/arm/boot/dts/imx6sx.dtsi  | 3 +++
- 3 files changed, 9 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 1 +
+ arch/arm/boot/dts/imx7s.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e426faa..0576ef6 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -644,6 +644,7 @@
- 					anatop-min-bit-val = <4>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1375000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-3p0 {
-@@ -658,6 +659,7 @@
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index b9d7d2d..6da2b77 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -542,6 +542,7 @@
  					anatop-min-bit-val = <0>;
  					anatop-min-voltage = <2625000>;
  					anatop-max-voltage = <3400000>;
 +					anatop-enable-bit = <0>;
  				};
  
- 				regulator-2p5 {
-@@ -672,6 +674,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2100000>;
- 					anatop-max-voltage = <2875000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
  				reg_arm: regulator-vddcore {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index cc9572e..3243af4 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -530,6 +530,7 @@
- 					anatop-min-bit-val = <4>;
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index c4f12fd..22c9788 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -516,6 +516,7 @@
+ 					anatop-min-bit-val = <8>;
  					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1375000>;
-+					anatop-enable-bit = <0>;
+ 					anatop-max-voltage = <1200000>;
++					anatop-enable-bit = <31>;
  				};
+ 			};
  
- 				regulator-3p0 {
-@@ -544,6 +545,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2625000>;
- 					anatop-max-voltage = <3400000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-2p5 {
-@@ -558,6 +560,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2100000>;
- 					anatop-max-voltage = <2850000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				reg_arm: regulator-vddcore {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 3f1416b..f16b9df 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -587,6 +587,7 @@
- 					anatop-min-bit-val = <4>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1375000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-3p0 {
-@@ -601,6 +602,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2625000>;
- 					anatop-max-voltage = <3400000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-2p5 {
-@@ -615,6 +617,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2100000>;
- 					anatop-max-voltage = <2875000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				reg_arm: regulator-vddcore {
 -- 
 2.9.3
