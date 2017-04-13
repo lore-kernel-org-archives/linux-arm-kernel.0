@@ -1,14 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 13 Apr 2017 06:32:39 -0700
-Subject: [PATCH 5/8] ARM: dts: imx7s: Mark 'gpr' compatible with i.MX6 variant
+Date: Thu, 13 Apr 2017 06:32:42 -0700
+Subject: [PATCH 8/8] ARM: dts: imx7d-sdb: Enable PCIe peripheral
 In-Reply-To: <20170413133242.5068-1-andrew.smirnov@gmail.com>
 References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
-Message-ID: <20170413133242.5068-6-andrew.smirnov@gmail.com>
+Message-ID: <20170413133242.5068-9-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-List GPR block as compatible "fsl,imx6q-iomuxc-gpr" to support drivers
-requesting it that way (PCIe driver is one example).
+Enable PCIe peripheral on this board.
 
 Cc: yurovsky at gmail.com
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -21,22 +20,26 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx7d-sdb.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 1a7058f..cc23478 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -491,7 +491,8 @@
- 			};
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index e0ff276..f77e26a 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -352,6 +352,13 @@
+ 	};
+ };
  
- 			gpr: iomuxc-gpr at 30340000 {
--				compatible = "fsl,imx7d-iomuxc-gpr", "syscon";
-+				compatible = "fsl,imx7d-iomuxc-gpr",
-+					"fsl,imx6q-iomuxc-gpr", "syscon";
- 				reg = <0x30340000 0x10000>;
- 			};
- 
++&pcie {
++	pinctrl-names = "default";
++	reset-gpio = <&gpio_spi 1 GPIO_ACTIVE_LOW>;
++	disable-gpio = <&gpio_spi 0 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
 -- 
 2.9.3
