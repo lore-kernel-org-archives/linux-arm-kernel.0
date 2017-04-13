@@ -1,127 +1,131 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 13 Apr 2017 16:02:18 -0500
-Subject: [PATCH V8 3/5] PCI/ASPM: add init hook to device_add
-In-Reply-To: <20170413204800.GB28316@bhelgaas-glaptop.roam.corp.google.com>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
- <20170413204800.GB28316@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170413210218.GA24910@bhelgaas-glaptop.roam.corp.google.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 13 Apr 2017 14:04:22 -0700
+Subject: [PATCH 2/2] xen/arm,
+ arm64: rename __generic_dma_ops to xen_get_dma_ops
+In-Reply-To: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+Message-ID: <1492117462-19886-2-git-send-email-sstabellini@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 03:48:00PM -0500, Bjorn Helgaas wrote:
-> Hi Sinan,
-> 
-> On Sat, Apr 08, 2017 at 12:55:49AM -0400, Sinan Kaya wrote:
-> > For bridges, have pcie_aspm_init_link_state() allocate a link_state,
-> > regardless of whether it currently has any children.
-> > 
-> > pcie_aspm_init_link_state(): Called for bridges (upstream end of
-> > link) after all children have been enumerated.  No longer needs to
-> > check aspm_support_enabled or pdev->has_secondary_link or the VIA
-> > quirk: pci_aspm_init() already checked that stuff, so we only need
-> > to check pdev->link_state here.
-> > 
-> > Now that we are calling alloc_pcie_link_state() from pci_aspm_init()
-> > , get rid of pci_function_0 function and detect downstream link in
-> > pci_aspm_init_upstream() instead when the function number is 0.
-> > 
-> > Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > ---
-> >  drivers/pci/pcie/aspm.c | 72 ++++++++++++++++++++++++-------------------------
-> >  1 file changed, 36 insertions(+), 36 deletions(-)
-> > 
-> > diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-> > index a80d64b..e33f84b 100644
-> > --- a/drivers/pci/pcie/aspm.c
-> > +++ b/drivers/pci/pcie/aspm.c
-> > @@ -422,20 +422,6 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
-> >  	}
-> >  }
-> >  
-> > -/*
-> > - * The L1 PM substate capability is only implemented in function 0 in a
-> > - * multi function device.
-> > - */
-> > -static struct pci_dev *pci_function_0(struct pci_bus *linkbus)
-> > -{
-> > -	struct pci_dev *child;
-> > -
-> > -	list_for_each_entry(child, &linkbus->devices, bus_list)
-> > -		if (PCI_FUNC(child->devfn) == 0)
-> > -			return child;
-> > -	return NULL;
-> > -}
-> > -
-> >  /* Calculate L1.2 PM substate timing parameters */
-> >  static void aspm_calc_l1ss_info(struct pcie_link_state *link,
-> >  				struct aspm_register_info *upreg,
-> > @@ -798,7 +784,6 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
-> >  	INIT_LIST_HEAD(&link->children);
-> >  	INIT_LIST_HEAD(&link->link);
-> >  	link->pdev = pdev;
-> > -	link->downstream = pci_function_0(pdev->subordinate);
-> >  
-> >  	/*
-> >  	 * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
-> > @@ -828,11 +813,33 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
-> >  
-> >  static int pci_aspm_init_downstream(struct pci_dev *pdev)
-> >  {
-> > +	struct pcie_link_state *link;
-> > +	struct pci_dev *parent;
-> > +
-> > +	/*
-> > +	 * The L1 PM substate capability is only implemented in function 0 in a
-> > +	 * multi function device.
-> > +	 */
-> > +	if (PCI_FUNC(pdev->devfn) != 0)
-> > +		return -EINVAL;
-> > +
-> > +	parent = pdev->bus->self;
-> > +	if (!parent)
-> > +		return -EINVAL;
-> > +
-> > +	link = parent->link_state;
-> > +	link->downstream = pdev;
-> >  	return 0;
-> >  }
-> >  
-> >  static int pci_aspm_init_upstream(struct pci_dev *pdev)
-> >  {
-> > +	struct pcie_link_state *link;
-> > +
-> > +	link = alloc_pcie_link_state(pdev);
-> > +	if (!link)
-> > +		return -ENOMEM;
-> 
-> This allocates the link_state when we enumerate a Downstream Port
-> instead of when we enumerate a child device.  We want the link_state
-> lifetime to match that of the Downstream Port, so this seems good.
-> 
-> But we shouldn't at the same time change the link_state deallocation
-> so it happens when the Downstream Port is removed, not when the child
-> device is removed?
+Now that __generic_dma_ops is a xen specific function, rename it to
+xen_get_dma_ops. Change all the call sites appropriately.
 
-I do see that you change the deallocation in patch [5/5], but I think
-the deallocation change should be in the same patch as the allocation
-change.  Otherwise I think we have a use-after-free problem in this
-sequence:
+Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+CC: linux at armlinux.org.uk
+CC: catalin.marinas at arm.com
+CC: will.deacon at arm.com
+CC: boris.ostrovsky at oracle.com
+CC: jgross at suse.com
+CC: Julien Grall <julien.grall@arm.com>
+---
+ drivers/xen/swiotlb-xen.c       |  8 ++++----
+ include/xen/arm/page-coherent.h | 20 ++++++++++----------
+ 2 files changed, 14 insertions(+), 14 deletions(-)
 
-  # initial enumeration
-  pci_device_add(downstream_port)
-    pci_aspm_init(downstream_port)
-      alloc_pcie_link_state
-  pci_device_add(endpoint)
-    pci_aspm_init(endpoint)
-
-  # hot-remove endpoint
-  pci_stop_dev(endpoint)
-    pcie_aspm_exit_link_state(endpoint)
-      link = parent->link_state
-      free_link_state(link)
-
-  # hot-add endpoint
-  pci_aspm_init(endpoint)
-    link = parent->link_state     <--- use after free
+diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
+index e8cef1a..8dab0d3 100644
+--- a/drivers/xen/swiotlb-xen.c
++++ b/drivers/xen/swiotlb-xen.c
+@@ -693,8 +693,8 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+ 		     unsigned long attrs)
+ {
+ #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+-	if (__generic_dma_ops(dev)->mmap)
+-		return __generic_dma_ops(dev)->mmap(dev, vma, cpu_addr,
++	if (xen_get_dma_ops(dev)->mmap)
++		return xen_get_dma_ops(dev)->mmap(dev, vma, cpu_addr,
+ 						    dma_addr, size, attrs);
+ #endif
+ 	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+@@ -711,7 +711,7 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+ 			unsigned long attrs)
+ {
+ #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+-	if (__generic_dma_ops(dev)->get_sgtable) {
++	if (xen_get_dma_ops(dev)->get_sgtable) {
+ #if 0
+ 	/*
+ 	 * This check verifies that the page belongs to the current domain and
+@@ -721,7 +721,7 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
+ 		unsigned long bfn = PHYS_PFN(dma_to_phys(dev, handle));
+ 		BUG_ON (!page_is_ram(bfn));
+ #endif
+-		return __generic_dma_ops(dev)->get_sgtable(dev, sgt, cpu_addr,
++		return xen_get_dma_ops(dev)->get_sgtable(dev, sgt, cpu_addr,
+ 							   handle, size, attrs);
+ 	}
+ #endif
+diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
+index b0a2bfc..b1b4ecd 100644
+--- a/include/xen/arm/page-coherent.h
++++ b/include/xen/arm/page-coherent.h
+@@ -5,7 +5,7 @@
+ #include <asm/dma-mapping.h>
+ #include <linux/dma-mapping.h>
+ 
+-static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
++static inline const struct dma_map_ops *xen_get_dma_ops(struct device *dev)
+ {
+ 	if (dev && dev->archdata.dev_dma_ops)
+ 		return dev->archdata.dev_dma_ops;
+@@ -27,13 +27,13 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
+ static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+ 		dma_addr_t *dma_handle, gfp_t flags, unsigned long attrs)
+ {
+-	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
++	return xen_get_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
+ }
+ 
+ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+ 		void *cpu_addr, dma_addr_t dma_handle, unsigned long attrs)
+ {
+-	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
++	xen_get_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
+ }
+ 
+ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+@@ -57,7 +57,7 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	 * specific function.
+ 	 */
+ 	if (local)
+-		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
++		xen_get_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
+ 	else
+ 		__xen_dma_map_page(hwdev, page, dev_addr, offset, size, dir, attrs);
+ }
+@@ -75,8 +75,8 @@ static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ 	 * specific function.
+ 	 */
+ 	if (pfn_valid(pfn)) {
+-		if (__generic_dma_ops(hwdev)->unmap_page)
+-			__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
++		if (xen_get_dma_ops(hwdev)->unmap_page)
++			xen_get_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
+ 	} else
+ 		__xen_dma_unmap_page(hwdev, handle, size, dir, attrs);
+ }
+@@ -86,8 +86,8 @@ static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
+ {
+ 	unsigned long pfn = PFN_DOWN(handle);
+ 	if (pfn_valid(pfn)) {
+-		if (__generic_dma_ops(hwdev)->sync_single_for_cpu)
+-			__generic_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
++		if (xen_get_dma_ops(hwdev)->sync_single_for_cpu)
++			xen_get_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
+ 	} else
+ 		__xen_dma_sync_single_for_cpu(hwdev, handle, size, dir);
+ }
+@@ -97,8 +97,8 @@ static inline void xen_dma_sync_single_for_device(struct device *hwdev,
+ {
+ 	unsigned long pfn = PFN_DOWN(handle);
+ 	if (pfn_valid(pfn)) {
+-		if (__generic_dma_ops(hwdev)->sync_single_for_device)
+-			__generic_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
++		if (xen_get_dma_ops(hwdev)->sync_single_for_device)
++			xen_get_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
+ 	} else
+ 		__xen_dma_sync_single_for_device(hwdev, handle, size, dir);
+ }
+-- 
+1.9.1
