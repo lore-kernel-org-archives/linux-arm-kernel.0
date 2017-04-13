@@ -1,52 +1,51 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 13 Apr 2017 13:15:54 +0100
-Subject: [PATCH v34 04/14] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <20170404092604.GB14898@arm.com>
-References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
- <20170328065130.16019-2-takahiro.akashi@linaro.org>
- <1491207492.6020.8.camel@infradead.org> <20170404054144.GG16309@linaro.org>
- <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
- <20170404073504.GI16309@linaro.org>
- <1491291844.6218.25.camel@infradead.org> <20170404092604.GB14898@arm.com>
-Message-ID: <1492085754.20068.2.camel@infradead.org>
+From: dongbo4@huawei.com (dongbo (E))
+Date: Thu, 13 Apr 2017 20:33:52 +0800
+Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-04 at 10:26 +0100, Will Deacon wrote:
-> ?A
-> patch making arm64 consistent could be discussed separately, otherwise kdump
-> becomes the pedantic ISO guy trying to lead by example, but really everybody
-> ignores him because it's completely inconsequential and they also know he
-> went 35 versions without giving a monkey's.
+From: Dong Bo <dongbo4@huawei.com>
 
-I still don't see the logic there for *wanting* kdump to be wrong.
+In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+the flag is propagated to its child processes, even the elf
+files are marked as not requiring executable stack. It may
+cause superfluous operations on some arch, e.g.
+__sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+also marked as PROT_EXEC.
 
-Sure, kdump getting it right doesn't necessarily make a big difference
-in?itself.
+Signed-off-by: Dong Bo <dongbo4@huawei.com>
+---
+ fs/binfmt_elf.c       | 2 ++
+ fs/binfmt_elf_fdpic.c | 2 ++
+ 2 files changed, 4 insertions(+)
 
-But given that the error has been pointed out, what is the motivation
-for *wanting* the error to remain in the kdump code, instead of just
-fixing it? "Consistency" isn't an answer because we are *already*
-inconsistent ? some code gets it right, and other code doesn't.
+diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+index 5075fd5..c52e670 100644
+--- a/fs/binfmt_elf.c
++++ b/fs/binfmt_elf.c
+@@ -863,6 +863,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 	SET_PERSONALITY2(loc->elf_ex, &arch_state);
+ 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
+ 		current->personality |= READ_IMPLIES_EXEC;
++	else
++		current->personality &= ~READ_IMPLIES_EXEC;
+  	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
+ 		current->flags |= PF_RANDOMIZE;
+diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
+index cf93a4f..c4bc4d0 100644
+--- a/fs/binfmt_elf_fdpic.c
++++ b/fs/binfmt_elf_fdpic.c
+@@ -354,6 +354,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
+ 		set_personality(PER_LINUX);
+ 	if (elf_read_implies_exec(&exec_params.hdr, executable_stack))
+ 		current->personality |= READ_IMPLIES_EXEC;
++	else
++		current->personality &= ~READ_IMPLIES_EXEC;
+  	setup_new_exec(bprm);
+ -- 1.9.1
 
-We should converge towards *correctness* rather than deliberately
-adding more incorrect code.
 
-I've used my 'i' key more times just in?typing this email than it would
-have taken to just fix the problem the first time it was pointed out.
-
-> David, since you seem to be the most outraged, fancy sending a patch? ;)
-
-Coming up. In two parts ? user-visible messages, followed by cosmetic
-and less relevant stuff.
-
--- 
-dwmw2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170413/3273313d/attachment.bin>
+.
