@@ -1,65 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Apr 2017 10:34:18 +0100
-Subject: kvm/arm64: use-after-free in
- kvm_unmap_hva_handler/unmap_stage2_pmds
-In-Reply-To: <CAAeHK+yzzdQVvGQcuprTHEa7S9CPiAVYodD__jQ8a=CzA6RaZg@mail.gmail.com>
-References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
- <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
- <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
- <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
- <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
- <CAAeHK+yzzdQVvGQcuprTHEa7S9CPiAVYodD__jQ8a=CzA6RaZg@mail.gmail.com>
-Message-ID: <20170413093418.GC24027@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Apr 2017 10:42:58 +0100
+Subject: [PATCH 1/2] drivers: pci: do not disregard parent resources
+ starting at 0x0
+In-Reply-To: <CAKv+Gu9JrU=-SZQcTtFfOP423gVTyM1w9yF=_J1uGd74ntpwLw@mail.gmail.com>
+References: <20170411163313.18577-1-ard.biesheuvel@linaro.org>
+ <20170411163313.18577-2-ard.biesheuvel@linaro.org>
+ <20170412132423.GA6584@red-moon>
+ <CAKv+Gu9JrU=-SZQcTtFfOP423gVTyM1w9yF=_J1uGd74ntpwLw@mail.gmail.com>
+Message-ID: <20170413094258.GA12432@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 08:51:31PM +0200, Andrey Konovalov wrote:
-> On Wed, Apr 12, 2017 at 8:43 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On 12/04/17 17:19, Andrey Konovalov wrote:
-
-> >> I now have a way to reproduce it, so I can test proposed patches. I
-> >> don't have a simple C reproducer though.
-> >>
-> >> The bug happens when the following syzkaller program is executed:
-> >>
-> >> mmap(&(0x7f0000000000/0xc000)=nil, (0xc000), 0x3, 0x32, 0xffffffffffffffff, 0x0)
-> >> unshare(0x400)
-> >> perf_event_open(&(0x7f000002f000-0x78)={0x1, 0x78, 0x0, 0x0, 0x0, 0x0,
-> >> 0x0, 0x6, 0x0, 0x0, 0xd34, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-> >> 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, 0x0, 0xffffffff,
-> >> 0xffffffffffffffff, 0x0)
-> >> r0 = openat$kvm(0xffffffffffffff9c,
-> >> &(0x7f000000c000-0x9)="2f6465762f6b766d00", 0x0, 0x0)
-> >> ioctl$TIOCSBRK(0xffffffffffffffff, 0x5427)
-> >> r1 = ioctl$KVM_CREATE_VM(r0, 0xae01, 0x0)
-> >> syz_kvm_setup_cpu$arm64(r1, 0xffffffffffffffff,
-> >> &(0x7f0000dc6000/0x18000)=nil, &(0x7f000000c000)=[{0x0,
-> >> &(0x7f000000c000)="5ba3c16f533efbed09f8221253c73763327fadce2371813b45dd7f7982f84a873e4ae89a6c2bd1af83a6024c36a1ff518318",
-> >> 0x32}], 0x1, 0x0, &(0x7f000000d000-0x10)=[@featur2={0x1, 0x3}], 0x1)
+On Thu, Apr 13, 2017 at 08:39:12AM +0100, Ard Biesheuvel wrote:
+> On 12 April 2017 at 14:24, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > [+Yinghai, Bjorn]
 > >
-> > Is that the only thing the program does? Or is there anything running in
-> > parallel?
+> > On Tue, Apr 11, 2017 at 05:33:12PM +0100, Ard Biesheuvel wrote:
+> >> Commit f44116ae8818 ("PCI: Remove pci_find_parent_resource() use for
+> >> allocation") updated the logic that iterates over all bus resources
+> >> and compares them to a given resource, in order to decide whether one
+> >> is the parent of the latter.
+> >>
+> >> This change inadvertently causes pci_find_parent_resource() to disregard
+> >> resources starting at address 0x0, resulting in an error such as the one
+> >> below on ARM systems whose I/O window starts at 0x0.
+> >>
+> >> pci_bus 0000:00: root bus resource [mem 0x10000000-0x3efeffff window]
+> >> pci_bus 0000:00: root bus resource [io  0x0000-0xffff window]
+> >> pci_bus 0000:00: root bus resource [mem 0x8000000000-0xffffffffff window]
+> >> pci_bus 0000:00: root bus resource [bus 00-0f]
+> >> pci 0000:00:01.0: PCI bridge to [bus 01]
+> >> pci 0000:00:02.0: PCI bridge to [bus 02]
+> >> pci 0000:00:03.0: PCI bridge to [bus 03]
+> >> pci 0000:00:03.0: can't claim BAR 13 [io  0x0000-0x0fff]: no compatible bridge window
+> >> pci 0000:03:01.0: can't claim BAR 0 [io  0x0000-0x001f]: no compatible bridge window
+> >>
+> >> While this never happens on x86, it is perfectly legal in general for a
+> >> PCI MMIO or IO window to start at address 0x0, and it was supported in
+> >> the code before commit f44116ae8818.
+> >>
+> >> So let's drop the test for res->start != 0; resource_contains() already
+> >> checks whether [start, end) completely covers the resource, and so it
+> >> should be redundant.
+> >>
+> >> Fixes: f44116ae8818 ("PCI: Remove pci_find_parent_resource() use for allocation")
+> >
+> > I know this code fixes IO claiming on ARM/ARM64 (well, it fixes nothing
+> > because we never claim resources on ARM/ARM64 apart from kvmtool and
+> > generic host bridge), my _big_ worry is that it can cause endless
+> > regressions on other arches, in any case I would be really really
+> > careful about adding a Fixes: tag to it.
+> >
 > 
-> These calls are executed repeatedly and in random order. That's all.
-> 
-> Except that I'm running the reproducer on a real arm board, so there's
-> probably a bunch of stuff going on besides these calls.
+> The patch is only 3 years old, and is obviously a regression given
+> that the change in behavior described here occurs as a side effect.
 
-I had a go at reproducing this on an arm64 board following [1], but so
-far I've had no luck. I've dumped the above into syz-kvm-bug, and I'm
-trying to reproduce the issue with:
+I agree with you that res->start usage changed with f44116ae8818 but
+I am not sure you can call that a regression unless we prove there
+was some code relying on the previous behaviour (and it is not just
+x86).
 
-	PATH=$PATH:$(pwd)/bin syz-execprog \
-		-executor $(pwd)/bin/syz-executor \
-		-cover=0 -repeat=0 -procs 16 \
-		syz-kvm-bug
-
-Just to check, is that the correct way to reproduce the problem with the
-above log?
-
-How quickly does that reproduce the problem for you?
+Anyway, I am happy to put these two patches (with some tweaks on patch
+2) on a branch for testing on ARM64 ACPI platforms to see the best
+way forward.
 
 Thanks,
-Mark.
-
-[1] https://github.com/google/syzkaller/wiki/How-to-execute-syzkaller-programs
+Lorenzo
