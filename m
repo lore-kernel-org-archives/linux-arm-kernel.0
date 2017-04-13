@@ -1,131 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 13 Apr 2017 15:45:44 -0500
-Subject: [PATCH v4 1/2] ASoC: stm32: add bindings for SAI
-In-Reply-To: <1491925646-29113-2-git-send-email-olivier.moysan@st.com>
-References: <1491925646-29113-1-git-send-email-olivier.moysan@st.com>
- <1491925646-29113-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20170413204544.sq6i43s7naeoh3zj@rob-hp-laptop>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Thu, 13 Apr 2017 23:46:15 +0300
+Subject: [RFC 4/8] regulator: core: Check enabling bypass respects
+ constraints
+In-Reply-To: <20170407112212.gzv3p7ldkh62657m@sirena.org.uk>
+References: <cover.1490199005.git.leonard.crestez@nxp.com>
+ <1edff9bc610969b0c53fa1080d5db021c8e00b2d.1490199005.git.leonard.crestez@nxp.com>
+ <20170324125212.vikgekqxsnu7htzl@sirena.org.uk>
+ <1490704781.3546.57.camel@nxp.com>
+ <20170328164754.z2c2ttovs3sxbcos@sirena.org.uk>
+ <1490730595.15830.1.camel@nxp.com>
+ <20170406185202.uixxcv3dgucrddgc@sirena.org.uk>
+ <1491562312.9365.41.camel@nxp.com>
+ <20170407112212.gzv3p7ldkh62657m@sirena.org.uk>
+Message-ID: <1492116375.17723.15.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 11, 2017 at 05:47:25PM +0200, olivier moysan wrote:
-> This patch adds documentation of device tree bindings for the
-> STM32 SAI ASoC driver.
-> 
-> Signed-off-by: olivier moysan <olivier.moysan@st.com>
-> ---
->  .../devicetree/bindings/sound/st,stm32-sai.txt     | 89 ++++++++++++++++++++++
->  1 file changed, 89 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-> new file mode 100644
-> index 0000000..c59a3d7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-> @@ -0,0 +1,89 @@
-> +STMicroelectronics STM32 Serial Audio Interface (SAI).
-> +
-> +The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
-> +as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
-> +The SAI contains two independent audio sub-blocks. Each sub-block has
-> +its own clock generator and I/O lines controller.
-> +
-> +Required properties:
-> +  - compatible: Should be "st,stm32f4-sai"
-> +  - reg: Base address and size of SAI common register set.
-> +  - clocks: Must contain phandle and clock specifier pairs for each entry
-> +	in clock-names.
-> +  - clock-names: Must contain "x8k" and "x11k"
-> +	"x8k": SAI parent clock for sampling rates multiple of 8kHz.
-> +	"x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
-> +  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
-> +
-> +Optional properties:
-> +  - resets: Reference to a reset controller asserting the SAI
-> +
-> +SAI subnodes:
-> +Two subnodes corresponding to SAI sub-block instances A et B can be defined.
-> +Subnode can be omitted for unsused sub-block.
-> +
-> +SAI subnodes required properties:
-> +  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
-> +	for SAI sub-block A or B respectively.
-> +  - reg: Base address and size of SAI sub-block register set.
-> +  - clocks: Must contain one phandle and clock specifier pair
-> +	for sai_ck which feeds the internal clock generator.
-> +  - clock-names: Must contain "sai_ck".
-> +  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
-> +  - dma-names: identifier string for each DMA request line
-> +	"tx": if sai sub-block is configured as playback DAI
-> +	"rx": if sai sub-block is configured as capture DAI
-> +  - pinctrl-names: should contain only value "default"
-> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
-> +
-> +Example:
-> +sound_card {
-> +	compatible = "audio-graph-card";
-> +	dais = <&sai1b_port>;
-> +};
-> +
-> +sai1: sai1 at 40015800 {
-> +	compatible = "st,stm32f4-sai";
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
+On Fri, 2017-04-07 at 12:22 +0100, Mark Brown wrote:
+> On Fri, Apr 07, 2017 at 01:51:52PM +0300, Leonard Crestez wrote:
 
-It's preferred if this is not empty and it limited to the address range 
-needed.
+> > It currently seems to work how I expect but from your statement it's
+> > not clear if it's entirely intentional.
 
-> +	reg = <0x40015800 0x4>;
-> +	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
-> +	clock-names = "x8k", "x11k";
-> +	interrupts = <87>;
-> +
-> +	sai1b: audio-controller at 40015824 {
-> +		#sound-dai-cells = <0>;
-> +		compatible = "st,stm32-sai-sub-b";
-> +		reg = <0x40015824 0x1C>;
-> +		clocks = <&rcc 1 CLK_SAI2>;
-> +		clock-names = "sai_ck";
-> +		dmas = <&dma2 5 0 0x400 0x0>;
-> +		dma-names = "tx";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_sai1b>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			sai1b_port: port at 0 {
+> The current behaviour of bypassed regulators is intentional.
 
-Need to document how many ports and endpoints.
+I did not mean to imply that there is something wrong with bypassed
+regulators. I just wanted more information about how regulators (non-
+bypassed) pick their voltage when consumers allow a range.
 
-> +				reg = <0>;
+After some more reading through the code it seems that the driver
+itself receives the range (either through set_voltage or map_voltage)
+and gets to make the choice.
 
-For a single port, you don't need a reg prop.
+So it seems fine for my concerns, sorry to bother you.
 
-> +				cpu_endpoint: endpoint {
-> +					remote-endpoint = <&codec_endpoint>;
-> +					audio-graph-card,format = "i2s";
-> +					audio-graph-card,bitclock-master = <&codec_endpoint>;
-> +					audio-graph-card,frame-master = <&codec_endpoint>;
-
-The prefix is gone now.
-
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +audio-codec {
-> +	codec_port: port {
-> +		codec_endpoint: endpoint {
-> +			remote-endpoint = <&cpu_endpoint>;
-> +		};
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+--
+Regards,
+Leonard
