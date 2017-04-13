@@ -1,45 +1,24 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 13 Apr 2017 12:24:27 -0700
-Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
-In-Reply-To: <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
-References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
- <20170413133242.5068-5-andrew.smirnov@gmail.com>
- <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
- <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
-Message-ID: <CANMBJr4BWtU7SXEa0-4LFLx+ydVWas0Cx18kRn-=-Bz8pPZ=fg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 13 Apr 2017 14:44:51 -0500
+Subject: [PATCH v7 3/9] dt-bindings: perf: hisi: Add Devicetree bindings
+ for Hisilicon SoC PMU
+In-Reply-To: <1491303333-140338-1-git-send-email-anurup.m@huawei.com>
+References: <1491303333-140338-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20170413194451.jhi7c62iar5dqvyy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2017 at 12:18, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Apr 13, 2017 at 4:03 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
->
->> I've been testing your GPC/PCIe patch sets against v4.11-rc5 on my
->> imx7d-cl-som-imx7, but hit a bit of a wall. When gpc is set as the
->> interrupt-parent for the soc, the kernel seems to hang and not produce
->> any output on the serial port[0]. I tried to enable earlyprintk, but
->> no luck getting a trace. Reversing this change, gets the board
->> booting[1], but obviously isn't using the gpc which is needed for PCIe
->> support as I understand it. I assume you've tested these changes on a
->> imx7d-sdb and are not seeing a similar issue? You can find the patches
->> I've picked on top of v4.11-rc5 here[2], any idea what might be the
->> issue?
->
-> Thanks for the report.
+On Tue, Apr 04, 2017 at 06:55:33AM -0400, Anurup M wrote:
+> 1) Device tree bindings for Hisilicon SoC PMU.
+> 2) Add example for Hisilicon L3 cache and MN PMU.
+> 3) Add child nodes of L3C and MN in djtag bindings example.
+> 
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> ---
+>  .../devicetree/bindings/arm/hisilicon/djtag.txt    | 29 +++++++
+>  .../devicetree/bindings/arm/hisilicon/pmu.txt      | 93 ++++++++++++++++++++++
+>  2 files changed, 122 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
 
-No problem.
-
-> It seems this series depends on the drivers/soc/imx/gpcv2.c patches
-> that landed into linux-next.
-
-Are you referring to the following patches?
-
-"dt-bindings: Add GPCv2 power gating driver"
-"soc: imx: Add GPCv2 power gating driver"
-
-I've pulled these patches from Shawn's tree to test with, but still
-not able to get anything functional. Is there another series I should
-be looking at?
-
-Thanks,
-
-Tyler
+Acked-by: Rob Herring <robh@kernel.org>
