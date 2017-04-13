@@ -1,236 +1,210 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 13 Apr 2017 13:06:43 +0200
-Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random generator
- on MT7623 SoC
-In-Reply-To: <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
-References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
- <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170413110643.GA413@Red>
+From: oza.oza@broadcom.com (Oza Oza)
+Date: Thu, 13 Apr 2017 17:11:25 +0530
+Subject: [RFC PATCH] of: Fix DMA configuration for non-DT masters
+In-Reply-To: <b02ace9b-f8f3-269d-6db4-3c1b1ea1e816@arm.com>
+References: <67d1f46172599be243405f4341665fd0ef9ab969.1490726288.git.robin.murphy@arm.com>
+ <CAMSpPPfJKKRkuDKxUgVBdg7vp7Ux5=PiHSxnMLc7-LMcCSatzg@mail.gmail.com>
+ <CAMSpPPcSWxua_6ECZd4iEbTiAYk-KtapBDcOUxNdGaQkFF-LOQ@mail.gmail.com>
+ <b02ace9b-f8f3-269d-6db4-3c1b1ea1e816@arm.com>
+Message-ID: <CAMSpPPcZQk8hM+TCFpPx_K86E9+XpwdRO+Ae15JTrfP74zSm=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+On Wed, Mar 29, 2017 at 11:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 29/03/17 06:46, Oza Oza wrote:
+>> On Wed, Mar 29, 2017 at 10:23 AM, Oza Oza <oza.oza@broadcom.com> wrote:
+>>> On Wed, Mar 29, 2017 at 12:27 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>> For PCI masters not represented in DT, we pass the OF node of their
+>>>> associated host bridge to of_dma_configure(), such that they can inherit
+>>>> the appropriate DMA configuration from whatever is described there.
+>>>> Unfortunately, whilst this has worked for the "dma-coherent" property,
+>>>> it turns out to miss the case where the host bridge node has a non-empty
+>>>> "dma-ranges", since nobody is expecting the 'device' to be a bus itself.
+>>>>
+>>>> It transpires, though, that the de-facto interface since the prototype
+>>>> change in 1f5c69aa51f9 ("of: Move of_dma_configure() to device.c to help
+>>>> re-use") is very clear-cut: either the master_np argument is redundant
+>>>> with dev->of_node, or dev->of_node is NULL and master_np is the relevant
+>>>> parent bus. Let's ratify that behaviour, then teach the whole
+>>>> of_dma_configure() pipeline to cope with both cases properly.
+>>>>
+>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>
+> [...]
+>
+>>>
+>>> pci and memory mapped device world is different.
+>
+> ???
+>
+> No they aren't. There is nothing magic about PCI. PCI *is* a
+> memory-mapped bus.
+>
+> The only PCI-specific aspect here is the Linux code path which passes a
+> host controller node into of_dma_configure() where the latter expects a
+> node for the actual endpoint device. It managed to work for
+> "dma-coherent", because that may appear either directly on a device node
+> or on any of its parent buses, but "dma-ranges" is *only* valid for DT
+> nodes representing buses, thus reveals that using a parent bus to stand
+> in for a device isn't actually correct. I only posted that horrible hack
+> patch to prove the point that having a child node to represent the
+> actual device is indeed sufficient to make of_dma_configure() work
+> correctly for PCI masters as-is (modulo the other issues).
+>
+>> of course if you talk
+>>> from iommu perspective, all the master are same for IOMMU
+>
+> I don't understand what you mean by that. There's nothing about IOMMUs
+> here, it's purely about parsing DT properties correctly.
+>
+>>> but the original intention of the patch is to try to solve 2 problems.
+>>> please refer to https://lkml.org/lkml/2017/3/29/10
+>
+> One patch should not solve two separate problems anyway. Taking a step
+> back, there are at least 3 things that this discussion has brought up:
+>
+> 1) The way in which we call of_dma_configure() for PCI devices causes
+> the "dma-ranges" property on PCI host controllers to be ignored.
+>
+> 2) of_dma_get_range() only considers the first entry in any "dma-ranges"
+> property.
+>
+> 3) When of_dma_configure() does set a DMA mask, there is nothing on
+> arm64 and other architectures to prevent drivers overriding that with a
+> wider mask later.
+>
+> Those are 3 separate problems, to solve with 3 or more separate patches,
+> and I have deliberately put the second and third to one side for the
+> moment. This patch fixes problem 1.
+>
+>>> 1) expose generic API for pci world clients to configure their
+>>> dma-ranges. right now there is none.
+>>> 2) same API can be used by IOMMU to derive dma_mask.
+>>>
+>>> while the current patch posted to handle dma-ranges for both memory
+>>> mapped and pci devices, which I think is overdoing.
+>
+> No, of_dma_configure() handles the "dma-ranges" property as it is
+> defined in the DT spec to describe the mapping between a child bus
+> address space and a parent bus address space. Whether those
+> memory-mapped parent and child buses are PCI, ISA, AMBA, HyperTransport,
+> or anything else is irrelevant other than for the encoding of the
+> address specifiers. All this patch does is sort out the cases where we
+> have a real device node to start at, from the cases where we don't and
+> so start directly at the device's parent bus node instead.
+>
+>>> besides we have different configuration of dma-ranges based on iommu
+>>> is enabled or not enabled.
+>
+> That doesn't sound right, unless you mean the firmware actually programs
+> the host controller's AXI bridge differently for system configurations
+> where the IOMMU is expected to be used or not? (and even then, I don't
+> really see why it would be necessary to do that...)
+>
+>>>  #define PCIE_DMA_RANGES dma-ranges = <0x43000000 0x00 0x80000000 0x00
+>>> 0x80000000 0x00 0x80000000 \
+>>>                                       0x43000000 0x08 0x00000000 0x08
+>>> 0x00000000 0x08 0x00000000 \
+>>>                                       0x43000000 0x80 0x00000000 0x80
+>>> 0x00000000 0x40 0x00000000>;
+>>> Not sure if this patch will consider above dma-ranges.
+>>>
+>>> my suggestion is to leave existing of_dma_get_range as is, and have
+>>> new function for pci world as discussed in
+>>> please refer to https://lkml.org/lkml/2017/3/29/10
+>
+> And then we keep adding new functions to do the exact same thing for
+> every other discoverable bus type whose bridge is be described in DT? I
+> fail to see how that is in any way better than simply fixing the
+> existing code to work as it was intended to.
+>
+> of_dma_get_ranges() uses of_translate_dma_address() just the same way as
+> existing PowerPC PCI code does, which further disproves your assertion
+> that parsing PCI addresses is somehow special - it's really only a
+> matter of getting the right number of address cells in order to to read
+> a child address to give to of_translate_dma_address() in the first
+> place. Incidentally, I now notice that the proposed
+> of_pci_get_dma_ranges() is incomplete as it doesn't use
+> of_translate_dma_address() or otherwise traverse upwards through the
+> dma-ranges of any further parent buses.
+>
+>>>
+>>> Regards,
+>>> Oza.
+>>
+>> also I see that, in case of multiple ranges of_dma_get_range doesnt handle that.
+>> and also it is not meant to handle.
+>
+> Yes, the existing code doesn't handle multiple dma-ranges entries,
+> because nobody's had the need to implement that so far, and this patch
+> does not change that because it's fixing a separate problem.
+>
+> Now, of course of_dma_get_range() *should* be capable of handling
+> multiple entries regardless of this patch, and I'm going to write *that*
+> patch right now (it's going to be a case of adding a handful of lines
+> which probably won't even conflict with this one at all). If we had a
+> bunch of different range parsing functions, we'd then have to duplicate
+> the equivalent logic across all of them, which is clearly undesirable
+> when it can easily be avoided altogether.
+>
+> Robin.
+>
+>> so with this patch will return wrong size and hence wrong dma_mask.
+>> having said, I think it is better to separate pci world dma-ranges
+>> function on of_pci.c
+>>
+>> for which my discussion with Rob already, (same thread)
+>> https://lkml.org/lkml/2017/3/29/10
+>> Waiting for Rob's viewpoint on this.
+>>
+>>
+>> Regards,
+>> Oza.
+>>
+>
 
-I have some minor comment below:
+first of all the patch
 
-On Thu, Apr 13, 2017 at 03:05:08PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> This patch adds support for hardware random generator on MT7623 SoC
-> and should also work on other similar Mediatek SoCs. Currently,
-> the driver is already tested successfully with rng-tools.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  drivers/char/hw_random/Kconfig   |  16 +++-
->  drivers/char/hw_random/Makefile  |   2 +-
->  drivers/char/hw_random/mtk-rng.c | 174 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 190 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/char/hw_random/mtk-rng.c
-> 
-> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> index 0cafe08..af782ce 100644
-> --- a/drivers/char/hw_random/Kconfig
-> +++ b/drivers/char/hw_random/Kconfig
-> @@ -419,10 +419,24 @@ config HW_RANDOM_CAVIUM
->           Generator hardware found on Cavium SoCs.
->  
->           To compile this driver as a module, choose M here: the
-> -         module will be called cavium_rng.
-> +         module will be called mtk-rng.
+https://lkml.org/lkml/2017/3/30/304
 
-Unwanted change
+is not only to address the original problem of dma_mask but also to
+provide generic APIs
+to PCI RC drivers such as pcie-iproc.c or even rcar to get their dma-ranges.
 
->  
->           If unsure, say Y.
->  
-> +config HW_RANDOM_MTK
-> +	tristate "Mediatek Random Number Generator support"
-> +	depends on HW_RANDOM
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	default y
-> +	---help---
-> +	  This driver provides kernel-side support for the Random Number
-> +	  Generator hardware found on Mediatek SoCs.
-> +
-> +	  To compile this driver as a module, choose M here. the
-> +	  module will be called mtk-rng.
-> +
-> +	  If unsure, say Y.
-> +
->  endif # HW_RANDOM
->  
->  config UML_RANDOM
-> diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> index 5f52b1e..68be716 100644
-> --- a/drivers/char/hw_random/Makefile
-> +++ b/drivers/char/hw_random/Makefile
-> @@ -1,7 +1,6 @@
->  #
->  # Makefile for HW Random Number Generator (RNG) device drivers.
->  #
-> -
+this API not only provides basis to retrieve the ranges but also it
+should have capability to handle
+inbound memory flags.
 
-Another unwanted change
+having said that the PCI dma-ranges do differ slightly from
+traditional memory ranges.
+because it has got flags.
 
->  obj-$(CONFIG_HW_RANDOM) += rng-core.o
->  rng-core-y := core.o
->  obj-$(CONFIG_HW_RANDOM_TIMERIOMEM) += timeriomem-rng.o
-> @@ -36,3 +35,4 @@ obj-$(CONFIG_HW_RANDOM_STM32) += stm32-rng.o
->  obj-$(CONFIG_HW_RANDOM_PIC32) += pic32-rng.o
->  obj-$(CONFIG_HW_RANDOM_MESON) += meson-rng.o
->  obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
-> +obj-$(CONFIG_HW_RANDOM_MTK)	+= mtk-rng.o
-> diff --git a/drivers/char/hw_random/mtk-rng.c b/drivers/char/hw_random/mtk-rng.c
-> new file mode 100644
-> index 0000000..6561ee0
-> --- /dev/null
-> +++ b/drivers/char/hw_random/mtk-rng.c
-> @@ -0,0 +1,174 @@
-> +/*
-> + * Driver for Mediatek Hardware Random Number Generator
-> + *
-> + * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +#define MTK_RNG_DEV KBUILD_MODNAME
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/hw_random.h>
-> +#include <linux/io.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define USEC_POLL			2
-> +#define TIMEOUT_POLL			20
-> +
-> +#define RNG_CTRL			0x00
-> +#define  RNG_EN				BIT(0)
-> +#define  RNG_READY			BIT(31)
+now those flags could be IORESOURCE_CACHEABLE or anything else.
+our SOC will be having use of these flags in near future (although can
+not discuss details as of now).
+but in short we will need these flags to be taken care which were
+passed form DT.
 
-Keep only one space between define and name
+so PCIe iproc driver calls this function to get all teh information
+about dma-ranges.
 
-> +
-> +#define RNG_DATA			0x08
-> +
-> +#define to_mtk_rng(p)	container_of(p, struct mtk_rng, rng)
-> +
-> +struct mtk_rng {
-> +	struct device	*dev;
-> +	void __iomem *base;
-> +	struct clk *clk;
-> +	struct hwrng rng;
-> +};
-> +
-> +static int mtk_rng_init(struct hwrng *rng)
-> +{
-> +	struct mtk_rng *priv = to_mtk_rng(rng);
-> +	u32 val;
-> +	int err;
-> +
-> +	err = clk_prepare_enable(priv->clk);
-> +	if (err)
-> +		return err;
-> +
-> +	val = readl(priv->base + RNG_CTRL);
-> +	val |= RNG_EN;
-> +	writel(val, priv->base + RNG_CTRL);
-> +
-> +	return 0;
-> +}
-> +
-> +static void mtk_rng_cleanup(struct hwrng *rng)
-> +{
-> +	struct mtk_rng *priv = to_mtk_rng(rng);
-> +	u32 val;
-> +
-> +	val = readl(priv->base + RNG_CTRL);
-> +	val &= ~RNG_EN;
-> +	writel(val, priv->base + RNG_CTRL);
-> +
-> +	clk_disable_unprepare(priv->clk);
-> +}
-> +
-> +static bool mtk_rng_wait_ready(struct hwrng *rng, bool wait)
-> +{
-> +	struct mtk_rng *priv = to_mtk_rng(rng);
-> +	int ready;
-> +
-> +	ready = readl(priv->base + RNG_CTRL) & RNG_READY;
-> +	if (!ready && wait)
-> +		readl_poll_timeout_atomic(priv->base + RNG_CTRL, ready,
-> +					  ready & RNG_READY, USEC_POLL,
-> +					  TIMEOUT_POLL);
-> +	return !!ready;
-> +}
-> +
-> +static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-> +{
-> +	struct mtk_rng *priv = to_mtk_rng(rng);
-> +	int retval = 0;
-> +
-> +	while (max >= sizeof(u32)) {
-> +		if (!mtk_rng_wait_ready(rng, wait))
-> +			break;
-> +
-> +		*(u32 *)buf = readl(priv->base + RNG_DATA);
-> +		retval += sizeof(u32);
-> +		buf += sizeof(u32);
-> +		max -= sizeof(u32);
-> +	}
-> +
-> +	if (unlikely(wait && max))
-> +		dev_warn(priv->dev, "timeout might be not properly set\n");
-> +
-> +	return retval || !wait ? retval : -EIO;
-> +}
-> +
-> +static int mtk_rng_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	int ret;
-> +	struct mtk_rng *priv;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "no iomem resource\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->dev = &pdev->dev;
-> +	priv->rng.name = pdev->name;
-> +	priv->rng.init = mtk_rng_init;
-> +	priv->rng.cleanup = mtk_rng_cleanup;
-> +	priv->rng.read = mtk_rng_read;
-> +
-> +	priv->clk = devm_clk_get(&pdev->dev, "rng");
-> +	if (IS_ERR(priv->clk)) {
-> +		ret = PTR_ERR(priv->clk);
-> +		dev_err(&pdev->dev, "no clock for device: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+now if such function exists, other framework could also make use of it
+to get resources and figure out dma_mask.
+and in that case you really need not change of_dma_get_range.
 
-You get that resource twice
+not only of_dma_get_range can hdnle PCI flags property but also it can
+not handle multiple ranges because finally it has only
+single *dma_addr, *paddr, *size  out parameters.
+so the burdon will be on API to fix the behavior as what to return
+rather than having Caller to choose what to do with the ranges.
 
-Regards
-Corentin Labbe
+coming back to my current patch
+currently it does not do flag handling, but in near future I will have
+to add, but for that, this patch
+https://lkml.org/lkml/2017/3/30/304
+needs to bring under consideration to be ACKed.
+
+hope this explains the need of API.
+
+Regards,
+Oza.
