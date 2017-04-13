@@ -1,27 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 13 Apr 2017 16:53:26 +0100
-Subject: kvm/arm64: use-after-free in
- kvm_unmap_hva_handler/unmap_stage2_pmds
-In-Reply-To: <20170413155045.GA8387@e107814-lin.cambridge.arm.com>
-References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
- <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
- <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
- <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
- <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
- <88715300-ef58-e7bd-81f5-95e0b9c9c533@arm.com>
- <20170413155045.GA8387@e107814-lin.cambridge.arm.com>
-Message-ID: <06ab8c28-031b-772f-6371-e3453b4bdbbe@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 13 Apr 2017 18:25:28 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.12 (#2)
+Message-ID: <871ssww9zb.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/17 16:50, Suzuki K. Poulose wrote:
-> On Thu, Apr 13, 2017 at 10:17:54AM +0100, Suzuki K Poulose wrote:
->> On 12/04/17 19:43, Marc Zyngier wrote:
->>> On 12/04/17 17:19, Andrey Konovalov wrote:
+Hi,
 
-Please ignore the footer below, that was mistake from my side.
+Here is the second pull request for defconfig64 for mvebu for v4.12.
+There is a trivial merge conflict already solved by Stephen Rothwell
+there:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/500998.html
 
-> --
-> 2.7.4
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
->
+Gregory
+
+The following changes since commit 66e56302842e9971426bd7e504c4db4f88cbb037:
+
+  arm64: defconfig: enable MVPP2 (2017-03-23 17:50:13 +0100)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.12-2
+
+for you to fetch changes up to 10ebb57ffcbf062ff224585fefa274e703fc363d:
+
+  arm64: defconfig: enable the Safexcel crypto engine as a module (2017-04-12 15:35:16 +0200)
+
+----------------------------------------------------------------
+mvebu defconfig64 for 4.12 (part 2)
+
+Select two new drivers  for ARM64 mvebu SoCs:
+ - Xenon SDHCI controller on Armada 37xx and Armada 7K/8K
+ - Safexcel crypto engine on Armada 7K/8K
+
+----------------------------------------------------------------
+Antoine Tenart (1):
+      arm64: defconfig: enable the Safexcel crypto engine as a module
+
+Gregory CLEMENT (1):
+      arm64: configs: enable SDHCI driver for Xenon
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
