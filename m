@@ -1,36 +1,41 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Apr 2017 21:47:19 +0200
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
-Message-ID: <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
+Date: Thu, 13 Apr 2017 21:52:19 +0200
+Subject: [PATCH v2 11/22] ARM: dts: koelsch: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170413182839.25381-12-javier@osg.samsung.com>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+ <20170413182839.25381-12-javier@osg.samsung.com>
+Message-ID: <CAMuHMdUsQP9QutaHAix+tmmofcr=xe_oKJzmeOqk1tUuZedVRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 2:59 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
->> From: Jiada Wang <jiada_wang@mentor.com>
->>
->> v1:
->>   add Slave mode support in SPI core
->>   spidev create slave device when SPI controller work in slave mode
->>   spi-imx support to work in slave mode
+On Thu, Apr 13, 2017 at 8:28 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
 >
-> Adding Geert who also had a series doing this in progress that was
-> getting very near to being merged.
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Thank you!
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Actually my plan is to fix the last remaining issues and resubmit for v4.13.
+> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
+> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+> @@ -702,7 +702,7 @@
+>         };
+>
+>         eeprom at 50 {
+> -               compatible = "renesas,24c02";
+> +               compatible = "renesas,24c02","atmel,24c02";
 
-References:
-  - v2: https://lkml.org/lkml/2016/9/12/1065
-  - v1: https://lkml.org/lkml/2016/6/22/423
-
-BTW Jiada, what's your use case? Just spidev?
-
-Thx!
+Missing space after comma.
 
 Gr{oetje,eeting}s,
 
