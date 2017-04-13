@@ -1,34 +1,178 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 13 Apr 2017 22:47:45 +0200
-Subject: [PATCH V14 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <8a31ef45-68f6-d444-f174-4a485cccd696@codeaurora.org>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
- <1490729440-32591-3-git-send-email-tbaicar@codeaurora.org>
- <20170412133447.n2yft7v266v6k6gh@pd.tnic>
- <8a31ef45-68f6-d444-f174-4a485cccd696@codeaurora.org>
-Message-ID: <20170413204744.iizyyi32v4hjt3fc@pd.tnic>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 13 Apr 2017 15:48:00 -0500
+Subject: [PATCH V8 3/5] PCI/ASPM: add init hook to device_add
+In-Reply-To: <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170413204800.GB28316@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 02:30:21PM -0600, Baicar, Tyler wrote:
-> I do not agree with this. The struct being passed to this function is
-> already named acpi_hest_generic_data in the existing code and all over this
-> code is named gdata not just d.
+Hi Sinan,
 
-And I'm saying they're too long - the preexisting ones and the ones
-you're adding - and impair readability. This whole driver is one
-unreadable ugly pile and if I were the maintainer I would never allowed
-it in its current form.
+On Sat, Apr 08, 2017 at 12:55:49AM -0400, Sinan Kaya wrote:
+> For bridges, have pcie_aspm_init_link_state() allocate a link_state,
+> regardless of whether it currently has any children.
+> 
+> pcie_aspm_init_link_state(): Called for bridges (upstream end of
+> link) after all children have been enumerated.  No longer needs to
+> check aspm_support_enabled or pdev->has_secondary_link or the VIA
+> quirk: pci_aspm_init() already checked that stuff, so we only need
+> to check pdev->link_state here.
+> 
+> Now that we are calling alloc_pcie_link_state() from pci_aspm_init()
+> , get rid of pci_function_0 function and detect downstream link in
+> pci_aspm_init_upstream() instead when the function number is 0.
+> 
+> Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pcie/aspm.c | 72 ++++++++++++++++++++++++-------------------------
+>  1 file changed, 36 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+> index a80d64b..e33f84b 100644
+> --- a/drivers/pci/pcie/aspm.c
+> +++ b/drivers/pci/pcie/aspm.c
+> @@ -422,20 +422,6 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
+>  	}
+>  }
+>  
+> -/*
+> - * The L1 PM substate capability is only implemented in function 0 in a
+> - * multi function device.
+> - */
+> -static struct pci_dev *pci_function_0(struct pci_bus *linkbus)
+> -{
+> -	struct pci_dev *child;
+> -
+> -	list_for_each_entry(child, &linkbus->devices, bus_list)
+> -		if (PCI_FUNC(child->devfn) == 0)
+> -			return child;
+> -	return NULL;
+> -}
+> -
+>  /* Calculate L1.2 PM substate timing parameters */
+>  static void aspm_calc_l1ss_info(struct pcie_link_state *link,
+>  				struct aspm_register_info *upreg,
+> @@ -798,7 +784,6 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
+>  	INIT_LIST_HEAD(&link->children);
+>  	INIT_LIST_HEAD(&link->link);
+>  	link->pdev = pdev;
+> -	link->downstream = pci_function_0(pdev->subordinate);
+>  
+>  	/*
+>  	 * Root Ports and PCI/PCI-X to PCIe Bridges are roots of PCIe
+> @@ -828,11 +813,33 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
+>  
+>  static int pci_aspm_init_downstream(struct pci_dev *pdev)
+>  {
+> +	struct pcie_link_state *link;
+> +	struct pci_dev *parent;
+> +
+> +	/*
+> +	 * The L1 PM substate capability is only implemented in function 0 in a
+> +	 * multi function device.
+> +	 */
+> +	if (PCI_FUNC(pdev->devfn) != 0)
+> +		return -EINVAL;
+> +
+> +	parent = pdev->bus->self;
+> +	if (!parent)
+> +		return -EINVAL;
+> +
+> +	link = parent->link_state;
+> +	link->downstream = pdev;
+>  	return 0;
+>  }
+>  
+>  static int pci_aspm_init_upstream(struct pci_dev *pdev)
+>  {
+> +	struct pcie_link_state *link;
+> +
+> +	link = alloc_pcie_link_state(pdev);
+> +	if (!link)
+> +		return -ENOMEM;
 
-But I don't think it really has a maintainer - poor Rafael has to deal
-with it because it is under drivers/acpi/ and that whole RAS firmware
-crap got thrown over the wall at some point and now we're stuck with it.
+This allocates the link_state when we enumerate a Downstream Port
+instead of when we enumerate a child device.  We want the link_state
+lifetime to match that of the Downstream Port, so this seems good.
 
-So this is just my opinion since he asked me to take a look.
+But we shouldn't at the same time change the link_state deallocation
+so it happens when the Downstream Port is removed, not when the child
+device is removed?
 
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+>  	return 0;
+>  }
+>  
+> @@ -843,6 +850,17 @@ static int pci_aspm_init_upstream(struct pci_dev *pdev)
+>   */
+>  int pci_aspm_init(struct pci_dev *pdev)
+>  {
+> +	if (!aspm_support_enabled)
+> +		return 0;
+> +
+> +	if (!pci_is_pcie(pdev))
+> +		return -EINVAL;
+> +
+> +	/* VIA has a strange chipset, root port is under a bridge */
+> +	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
+> +	    pdev->bus->self)
+> +		return 0;
+> +
+>  	if (!pdev->has_secondary_link)
+>  		return pci_aspm_init_downstream(pdev);
+>  
+> @@ -859,33 +877,16 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+>  	struct pcie_link_state *link;
+>  	int blacklist = !!pcie_aspm_sanity_check(pdev);
+>  
+> -	if (!aspm_support_enabled)
+> -		return;
+> -
+> -	if (pdev->link_state)
+> -		return;
+> -
+> -	/*
+> -	 * We allocate pcie_link_state for the component on the upstream
+> -	 * end of a Link, so there's nothing to do unless this device has a
+> -	 * Link on its secondary side.
+> -	 */
+> -	if (!pdev->has_secondary_link)
+> -		return;
+> -
+> -	/* VIA has a strange chipset, root port is under a bridge */
+> -	if (pci_pcie_type(pdev) == PCI_EXP_TYPE_ROOT_PORT &&
+> -	    pdev->bus->self)
+> +	if (!pdev->link_state)
+>  		return;
+>  
+> +	link = pdev->link_state;
+>  	down_read(&pci_bus_sem);
+>  	if (list_empty(&pdev->subordinate->devices))
+>  		goto out;
+>  
+>  	mutex_lock(&aspm_lock);
+> -	link = alloc_pcie_link_state(pdev);
+> -	if (!link)
+> -		goto unlock;
+> +
+>  	/*
+>  	 * Setup initial ASPM state. Note that we need to configure
+>  	 * upstream links also because capable state of them can be
+> @@ -910,7 +911,6 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+>  		pcie_set_clkpm(link, policy_to_clkpm_state(link));
+>  	}
+>  
+> -unlock:
+>  	mutex_unlock(&aspm_lock);
+>  out:
+>  	up_read(&pci_bus_sem);
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
