@@ -1,44 +1,31 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 15:28:21 -0300
-Subject: [PATCH v2 04/22] ARM: dts: turris-omnia: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <20170413182839.25381-1-javier@osg.samsung.com>
-References: <20170413182839.25381-1-javier@osg.samsung.com>
-Message-ID: <20170413182839.25381-5-javier@osg.samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 13 Apr 2017 16:18:10 -0300
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-5-andrew.smirnov@gmail.com>
+ <CANMBJr5sFeVxVq2w2uUd-ehXi9SpaJ7W9S_PTS_VN25YZEdXvQ@mail.gmail.com>
+Message-ID: <CAOMZO5CgLP7P+Q2Mvzpnx6u5ryb1TjAvaj9xDKXpD+8fMmn7MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at24 driver allows to register I2C EEPROM chips using different vendor
-and devices, but the I2C subsystem does not take the vendor into account
-when matching using the I2C table since it only has device entries.
+On Thu, Apr 13, 2017 at 4:03 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
 
-But when matching using an OF table, both the vendor and device has to be
-taken into account so the driver defines only a set of compatible strings
-using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> I've been testing your GPC/PCIe patch sets against v4.11-rc5 on my
+> imx7d-cl-som-imx7, but hit a bit of a wall. When gpc is set as the
+> interrupt-parent for the soc, the kernel seems to hang and not produce
+> any output on the serial port[0]. I tried to enable earlyprintk, but
+> no luck getting a trace. Reversing this change, gets the board
+> booting[1], but obviously isn't using the gpc which is needed for PCIe
+> support as I understand it. I assume you've tested these changes on a
+> imx7d-sdb and are not seeing a similar issue? You can find the patches
+> I've picked on top of v4.11-rc5 here[2], any idea what might be the
+> issue?
 
-So add this generic fallback to the device node compatible string to make
-the device to match the driver using the OF device ID table.
+Thanks for the report.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+It seems this series depends on the drivers/soc/imx/gpcv2.c patches
+that landed into linux-next.
 
-Changes in v2: None
-
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index 28eede180e4f..4185f6b1ba44 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -171,7 +171,7 @@
- 			/* leds device (in STM32F0) at address 0x2b */
- 
- 			eeprom at 54 {
--				compatible = "at,24c64";
-+				compatible = "at,24c64","atmel,24c64";
- 				reg = <0x54>;
- 
- 				/* The EEPROM contains data for bootloader.
--- 
-2.9.3
+In this case, it would be better to re-send this series after
+4.12-rc11 is out to avoid the breakage.
