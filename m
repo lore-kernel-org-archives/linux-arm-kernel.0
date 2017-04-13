@@ -1,116 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Apr 2017 16:39:56 +0100
-Subject: [PATCH v2 2/2] [media] cec: Handle RC capability more elegantly
-In-Reply-To: <20170412153956.13329-1-lee.jones@linaro.org>
-References: <20170412153956.13329-1-lee.jones@linaro.org>
-Message-ID: <20170412153956.13329-2-lee.jones@linaro.org>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 13 Apr 2017 15:41:03 +0800
+Subject: [PATCH 6/6] regulator: anatop: set default voltage selector for
+ pcie
+In-Reply-To: <20170411204003.avoe5a6o52kx5on2@sirena.org.uk>
+References: <1491962327-12477-1-git-send-email-aisheng.dong@nxp.com>
+ <1491962327-12477-6-git-send-email-aisheng.dong@nxp.com>
+ <20170411204003.avoe5a6o52kx5on2@sirena.org.uk>
+Message-ID: <20170413074103.GC23163@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a user specifies the use of RC as a capability, they should
-really be enabling RC Core code.  If they do not we WARN() them
-of this and disable the capability for them.
+On Tue, Apr 11, 2017 at 09:40:03PM +0100, Mark Brown wrote:
+> On Wed, Apr 12, 2017 at 09:58:47AM +0800, Dong Aisheng wrote:
+> > Set the initial voltage selector for vddpcie in case it's disabled
+> > by default.
+> 
+> Why is this the only anatop regulator which can have this problem and
+> how do we know this is a good value?
 
-Once we know RC Core code has not been enabled, we can update
-the user's capabilities and use them as a term of reference for
-other RC-only calls.  This is preferable to having ugly #ifery
-scattered throughout C code.
+Anatop regulator has no separate gate bit.
+e.g.
+00000 Power gated off
+00001 Target core voltage = 0.725V
+...
+So it may have no valid default voltage in case it's disabled in
+bootloader.
+e.g. regulator_enable() may not work.
 
-Most of the functions are actually safe to call, since they
-sensibly check for a NULL RC pointer before they attempt to
-deference it.
+The default voltage 1.100v this patch sets is defined in reference
+manual.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/media/cec/cec-core.c | 21 +++++++++------------
- 1 file changed, 9 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/media/cec/cec-core.c b/drivers/media/cec/cec-core.c
-index cfe414a..c859dcf 100644
---- a/drivers/media/cec/cec-core.c
-+++ b/drivers/media/cec/cec-core.c
-@@ -208,9 +208,15 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 		return ERR_PTR(-EINVAL);
- 	if (WARN_ON(!available_las || available_las > CEC_MAX_LOG_ADDRS))
- 		return ERR_PTR(-EINVAL);
-+
-+	/* If RC Core is not available, remove driver-level capability */
-+	if (!IS_REACHABLE(CONFIG_RC_CORE))
-+		caps &= ~CEC_CAP_RC;
-+
- 	adap = kzalloc(sizeof(*adap), GFP_KERNEL);
- 	if (!adap)
- 		return ERR_PTR(-ENOMEM);
-+
- 	strlcpy(adap->name, name, sizeof(adap->name));
- 	adap->phys_addr = CEC_PHYS_ADDR_INVALID;
- 	adap->log_addrs.cec_version = CEC_OP_CEC_VERSION_2_0;
-@@ -237,7 +243,6 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 	if (!(caps & CEC_CAP_RC))
- 		return adap;
- 
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	/* Prepare the RC input device */
- 	adap->rc = rc_allocate_device(RC_DRIVER_SCANCODE);
- 	if (!adap->rc) {
-@@ -264,9 +269,7 @@ struct cec_adapter *cec_allocate_adapter(const struct cec_adap_ops *ops,
- 	adap->rc->priv = adap;
- 	adap->rc->map_name = RC_MAP_CEC;
- 	adap->rc->timeout = MS_TO_NS(100);
--#else
--	adap->capabilities &= ~CEC_CAP_RC;
--#endif
-+
- 	return adap;
- }
- EXPORT_SYMBOL_GPL(cec_allocate_adapter);
-@@ -285,7 +288,6 @@ int cec_register_adapter(struct cec_adapter *adap,
- 	adap->owner = parent->driver->owner;
- 	adap->devnode.dev.parent = parent;
- 
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	if (adap->capabilities & CEC_CAP_RC) {
- 		adap->rc->dev.parent = parent;
- 		res = rc_register_device(adap->rc);
-@@ -298,15 +300,13 @@ int cec_register_adapter(struct cec_adapter *adap,
- 			return res;
- 		}
- 	}
--#endif
- 
- 	res = cec_devnode_register(&adap->devnode, adap->owner);
- 	if (res) {
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 		/* Note: rc_unregister also calls rc_free */
- 		rc_unregister_device(adap->rc);
- 		adap->rc = NULL;
--#endif
-+
- 		return res;
- 	}
- 
-@@ -337,11 +337,10 @@ void cec_unregister_adapter(struct cec_adapter *adap)
- 	if (IS_ERR_OR_NULL(adap))
- 		return;
- 
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	/* Note: rc_unregister also calls rc_free */
- 	rc_unregister_device(adap->rc);
- 	adap->rc = NULL;
--#endif
-+
- 	debugfs_remove_recursive(adap->cec_dir);
- 	cec_devnode_unregister(&adap->devnode);
- }
-@@ -357,9 +356,7 @@ void cec_delete_adapter(struct cec_adapter *adap)
- 	kthread_stop(adap->kthread);
- 	if (adap->kthread_config)
- 		kthread_stop(adap->kthread_config);
--#if IS_REACHABLE(CONFIG_RC_CORE)
- 	rc_free_device(adap->rc);
--#endif
- 	kfree(adap);
- }
- EXPORT_SYMBOL_GPL(cec_delete_adapter);
--- 
-2.9.3
+Regards
+Dong Aisheng
