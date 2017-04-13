@@ -1,41 +1,33 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 13 Apr 2017 15:51:21 -0500
-Subject: [PATCH 6/8] arm64: defconfig: enable APEI and GHES features
+Date: Thu, 13 Apr 2017 15:51:22 -0500
+Subject: [PATCH 7/8] [v2] arm64: defconfig: enable EDAC options
 In-Reply-To: <1492116683-26399-1-git-send-email-timur@codeaurora.org>
 References: <1492116683-26399-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1492116683-26399-7-git-send-email-timur@codeaurora.org>
+Message-ID: <1492116683-26399-8-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 server platforms can support ACPI Platform Error Interface (APEI)
-and Generic Hardware Error Source (GHES) features, so enable them.
-
-Platforms which support the firmware-first RAS error reporting model
-require APEI and GHES functionality for the OS to receive and report
-error records provided by the platform.
-
-PCIe AER functionality is required for PCIe AER errors to be properly
-reported and recovered from.
+Enable EDAC (Error Detection and Correction) support for ARM64 server
+systems that feature it, so that user space applications can be
+notified of memory errors.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- arch/arm64/configs/defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 318c0aa..f24890d 100644
+index f24890d..fef2475 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -489,6 +489,9 @@ CONFIG_ARM_SCPI_PROTOCOL=y
- CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EFI_CAPSULE_LOADER=y
- CONFIG_ACPI=y
-+CONFIG_ACPI_APEI=y
-+CONFIG_ACPI_APEI_GHES=y
-+CONFIG_ACPI_APEI_PCIEAER=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
+@@ -419,6 +419,7 @@ CONFIG_LEDS_SYSCON=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_EDAC=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
