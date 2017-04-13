@@ -1,90 +1,68 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Thu, 13 Apr 2017 14:32:17 -0600
-Subject: [PATCH V14 03/10] efi: parse ARM processor error
-In-Reply-To: <20170412165125.xzsovuficgbygkfp@pd.tnic>
-References: <1490729440-32591-1-git-send-email-tbaicar@codeaurora.org>
- <1490729440-32591-4-git-send-email-tbaicar@codeaurora.org>
- <20170412165125.xzsovuficgbygkfp@pd.tnic>
-Message-ID: <c11b8966-f11d-38f9-044c-60a410feb7c8@codeaurora.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 13 Apr 2017 22:43:25 +0200
+Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170413182839.25381-6-javier@osg.samsung.com>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+ <20170413182839.25381-6-javier@osg.samsung.com>
+Message-ID: <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2017 10:51 AM, Borislav Petkov wrote:
-> On Tue, Mar 28, 2017 at 01:30:33PM -0600, Tyler Baicar wrote:
->> Add support for ARM Common Platform Error Record (CPER).
->> UEFI 2.6 specification adds support for ARM specific
->> processor error information to be reported as part of the
->> CPER records. This provides more detail on for processor error logs.
->>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Reviewed-by: James Morse <james.morse@arm.com>
->> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>   drivers/firmware/efi/cper.c | 133 ++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/cper.h        |  54 ++++++++++++++++++
->>   2 files changed, 187 insertions(+)
->>
->> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
->> index 8fa4e23..56aa516 100644
->> --- a/drivers/firmware/efi/cper.c
->> +++ b/drivers/firmware/efi/cper.c
->> @@ -110,12 +110,15 @@ void cper_print_bits(const char *pfx, unsigned int bits,
->>   static const char * const proc_type_strs[] = {
->>   	"IA32/X64",
->>   	"IA64",
->> +	"ARM",
->>   };
->>   
->>   static const char * const proc_isa_strs[] = {
->>   	"IA32",
->>   	"IA64",
->>   	"X64",
->> +	"ARM A32/T32",
->> +	"ARM A64",
->>   };
->>   
->>   static const char * const proc_error_type_strs[] = {
->> @@ -139,6 +142,18 @@ void cper_print_bits(const char *pfx, unsigned int bits,
->>   	"corrected",
->>   };
->>   
->> +static const char * const arm_reg_ctx_strs[] = {
->> +	"AArch32 general purpose registers",
->> +	"AArch32 EL1 context registers",
->> +	"AArch32 EL2 context registers",
->> +	"AArch32 secure context registers",
->> +	"AArch64 general purpose registers",
->> +	"AArch64 EL1 context registers",
->> +	"AArch64 EL2 context registers",
->> +	"AArch64 EL3 context registers",
->> +	"Misc. system register structure",
->> +};
-> That...
->
->> +
->>   static void cper_print_proc_generic(const char *pfx,
->>   				    const struct cper_sec_proc_generic *proc)
->>   {
->> @@ -184,6 +199,114 @@ static void cper_print_proc_generic(const char *pfx,
->>   		printk("%s""IP: 0x%016llx\n", pfx, proc->ip);
->>   }
->>   
->> +static void cper_print_proc_arm(const char *pfx,
->> +				const struct cper_sec_proc_arm *proc)
-> ... and that function should go into:
->
-> #if defined(CONFIG_ARM64) || defined(CONFIG_ARM)
->
-> Just put them close together so that you don't have too much ifdeffery.
-Hello Boris,
+On 2017-04-13 20:28, Javier Martinez Canillas wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
+> 
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> 
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> 
+> Changes in v2: None
+> 
+>  arch/arm/boot/dts/at91-linea.dtsi   | 2 +-
+>  arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-linea.dtsi b/arch/arm/boot/dts/at91-linea.dtsi
+> index 0721c8472509..9a19080fd3bf 100644
+> --- a/arch/arm/boot/dts/at91-linea.dtsi
+> +++ b/arch/arm/boot/dts/at91-linea.dtsi
+> @@ -31,7 +31,7 @@
+>  	status = "okay";
+>  
+>  	eeprom at 51 {
+> -		compatible = "st,24c64";
+> +		compatible = "st,24c64","atmel,24c64";
+>  		reg = <0x51>;
+>  		pagesize = <32>;
+>  	};
+> diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
+> index 7a68805a4eb5..6f005c14a6b0 100644
+> --- a/arch/arm/boot/dts/at91-tse850-3.dts
+> +++ b/arch/arm/boot/dts/at91-tse850-3.dts
+> @@ -239,7 +239,7 @@
+>  	};
+>  
+>  	eeprom at 50 {
+> -		compatible = "nxp,24c02";
+> +		compatible = "nxp,24c02","atmel,24c02";
+>  		reg = <0x50>;
+>  		pagesize = <16>;
+>  	};
+> 
 
-I will move them close together and add the ifdef.
+Sure, in principle. But not having a space after the commas is a real OCD
+trigger for me. My spine is rotating... :-)
 
-Thanks,
-Tyler
+Anyway, with those whitespace fixes (and without them too, but please):
+Acked-by: Peter Rosin <peda@axentia.se>
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Cheers,
+peda
