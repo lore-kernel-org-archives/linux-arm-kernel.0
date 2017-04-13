@@ -1,49 +1,57 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 13 Apr 2017 23:22:58 +0200
-Subject: [PATCH] ARM: dts: at91: use correct compatible for the gpio mux
- controller
-Message-ID: <1492118578-15356-1-git-send-email-peda@axentia.se>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 13 Apr 2017 23:20:59 +0200
+Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <dd93eb32-ca1e-5041-051e-c4f072f0f9a2@osg.samsung.com>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+ <20170413182839.25381-6-javier@osg.samsung.com>
+ <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
+ <dd93eb32-ca1e-5041-051e-c4f072f0f9a2@osg.samsung.com>
+Message-ID: <20170413212059.unh2mfo2w4oc4t33@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible string for a gpio based mux controller is "gpio-mux",
-and nothing else.
+On 13/04/2017 at 18:09:56 -0300, Javier Martinez Canillas wrote:
+> Hello Peter,
+> 
+> On 04/13/2017 05:43 PM, Peter Rosin wrote:
+> > On 2017-04-13 20:28, Javier Martinez Canillas wrote:
+> 
+> [snip]
+> 
+> >>  
+> >>  	eeprom at 50 {
+> >> -		compatible = "nxp,24c02";
+> >> +		compatible = "nxp,24c02","atmel,24c02";
+> >>  		reg = <0x50>;
+> >>  		pagesize = <16>;
+> >>  	};
+> >>
+> > 
+> > Sure, in principle. But not having a space after the commas is a real OCD
+> > trigger for me. My spine is rotating... :-)
+> >
+> 
+> Right, Geert already pointed out. It's something I missed in my sed script
+> so I got it wrong in all the DTS :(
+> 
+> I'll fix my script and send a v2.
+> 
 
-Fixes: 29dd89418007 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+That would be v3, right? ;)
 
-Hi!
+> > Anyway, with those whitespace fixes (and without them too, but please):
+> > Acked-by: Peter Rosin <peda@axentia.se>
+> >
+> 
+> Thanks for the review!
+> 
 
-The compatible string for the gpio based mux changed along the way (on
-request from Rob) but I failed to update the implementation in the
-gpio-mux driver when I made that change. Consequently, I didn't notice
-that I didn't update the compatible string here either, since it all
-continued to work in my tests...
+I'd like to be copied on the first patches to ensure they are applied
+before applying that one. (Also, it is probably too late for 4.12 anyway
+because we are past rc6).
 
-The compatible string in the gpio-mux driver is being fixed to match
-documentation, so this of course needs fixing too. No TSE-850 devices
-are affected, except for the one on my desk.
-
-Sorry for the churn.
-
-Cheers,
-peda
-
-diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-index 6a724cfb5389..168665e56a56 100644
---- a/arch/arm/boot/dts/at91-tse850-3.dts
-+++ b/arch/arm/boot/dts/at91-tse850-3.dts
-@@ -204,7 +204,7 @@
- 	};
- 
- 	mux: mux-controller {
--		compatible = "mux-gpio";
-+		compatible = "gpio-mux";
- 		#mux-control-cells = <0>;
- 
- 		mux-gpios = <&pioA 0 GPIO_ACTIVE_HIGH>,
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
