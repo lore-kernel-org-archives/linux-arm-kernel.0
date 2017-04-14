@@ -1,55 +1,83 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 14 Apr 2017 21:29:27 +0200
-Subject: [GIT PULL] Alpine DT for 4.12
-Message-ID: <20170414192927.yxgzedeq72bumitk@kwain>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Fri, 14 Apr 2017 13:29:42 -0600
+Subject: [PATCH 1/3] arm64: hugetlb: Fix huge_pte_offset to return
+ poisoned page table entries
+In-Reply-To: <20170412140459.21824-2-punit.agrawal@arm.com>
+References: <20170412140459.21824-1-punit.agrawal@arm.com>
+ <20170412140459.21824-2-punit.agrawal@arm.com>
+Message-ID: <a9377db2-715d-acba-bd5c-3b7b8e4d5db7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 4/12/2017 8:04 AM, Punit Agrawal wrote:
+> When memory failure is enabled, a poisoned hugepage pte is marked as a
+> swap entry. huge_pte_offset() does not return the poisoned page table
+> entries when it encounters PUD/PMD hugepages.
+>
+> This behaviour of huge_pte_offset() leads to error such as below when
+> munmap is called on poisoned hugepages.
+>
+> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
+>
+> Fix huge_pte_offset() to return the poisoned pte which is then
+> appropriately handled by the generic layer code.
+>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Steve Capper <steve.capper@arm.com>
+> Cc: David Woods <dwoods@mellanox.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-Please pull the following DT changes for the next merge window.
-
-Thanks!
-Antoine
-
-
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/atenart/linux.git tags/alpine-dt-for-4.12
-
-for you to fetch changes up to ffdc394e1b4285f8b85663f44f1cbd43003523a7:
-
-  ARM: dts: alpine: add valid clock-frequency values (2017-04-03 09:06:55 +0200)
-
-----------------------------------------------------------------
-Alpine DT changes for 4.12
-
-A bunch of clean up for Alpine device trees, nothing fancy.
-
-----------------------------------------------------------------
-Antoine Tenart (3):
-      ARM: dts: alpine: remove 0x's from the uart1 node unit address
-      ARM: dts: alpine: add spaces before the uart node units.
-      ARM: dts: alpine: add valid clock-frequency values
-
-Rob Herring (1):
-      ARM: dts: alpine: fix PCIe node name
-
- arch/arm/boot/dts/alpine.dtsi | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Thanks,
+Tyler
+> ---
+>   arch/arm64/mm/hugetlbpage.c | 20 +++++++++++++++-----
+>   1 file changed, 15 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 7514a000e361..5f1832165d69 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -143,15 +143,24 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+>   	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+>   	if (!pgd_present(*pgd))
+>   		return NULL;
+> -	pud = pud_offset(pgd, addr);
+> -	if (!pud_present(*pud))
+> -		return NULL;
+>   
+> -	if (pud_huge(*pud))
+> +	pud = pud_offset(pgd, addr);
+> +	/*
+> +	 * In case of HW Poisoning, a hugepage pud/pmd can contain
+> +	 * poisoned entries. Poisoned entries are marked as swap
+> +	 * entries.
+> +	 *
+> +	 * For puds/pmds that are not present, check to see if it
+> +	 * could be a swap entry (!present and !none).
+> +	 */
+> +	if ((!pte_present(pud_pte(*pud)) && !pud_none(*pud)) || pud_huge(*pud))
+>   		return (pte_t *)pud;
+> +
+>   	pmd = pmd_offset(pud, addr);
+> -	if (!pmd_present(*pmd))
+> +	if (pmd_none(*pmd))
+>   		return NULL;
+> +	if (!pmd_present(*pmd) && !pmd_none(*pmd))
+> +		return (pte_t *)pmd;
+>   
+>   	if (pte_cont(pmd_pte(*pmd))) {
+>   		pmd = pmd_offset(
+> @@ -160,6 +169,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+>   	}
+>   	if (pmd_huge(*pmd))
+>   		return (pte_t *)pmd;
+> +
+>   	pte = pte_offset_kernel(pmd, addr);
+>   	if (pte_present(*pte) && pte_cont(*pte)) {
+>   		pte = pte_offset_kernel(
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/34134387/attachment.sig>
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
