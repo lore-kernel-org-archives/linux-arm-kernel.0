@@ -1,123 +1,66 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 14 Apr 2017 11:14:52 +0800
-Subject: [PATCH v2 07/22] ARM: dts: imx: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170413182839.25381-8-javier@osg.samsung.com>
-References: <20170413182839.25381-1-javier@osg.samsung.com>
- <20170413182839.25381-8-javier@osg.samsung.com>
-Message-ID: <20170414031451.GE14915@dragon>
+Date: Fri, 14 Apr 2017 11:28:54 +0800
+Subject: [PATCH 3/8] ARM: dts: imx7s: Adjust anatop-enable-bit for
+ 'reg_1p0d'
+In-Reply-To: <20170413133242.5068-4-andrew.smirnov@gmail.com>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-4-andrew.smirnov@gmail.com>
+Message-ID: <20170414032853.GF14915@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 03:28:24PM -0300, Javier Martinez Canillas wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+On Thu, Apr 13, 2017 at 06:32:37AM -0700, Andrey Smirnov wrote:
+> In PMU_REG_1P0Dn ENABLE_LINREG is bit 0. Bit 31 is called OVERRIDE and
+> it serves the function of granting permission to GPC IP block to alter
+> various bit-fields of the register. The reason why this property, that
+> trickeld here from Freescale BSP, is set to 31 is because in the code
+> it came from it is used in conjunction with a notifier handler for
+> REGULATOR_EVENT_PRE_DO_ENABLE and REGULATOR_EVENT_PRE_DO_DISABLE
+> events (not found in upstream kernel) that triggers GPC to start
+> manipulating aforementioned other bitfields.
 > 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> Since:
+> 	a) none of the aforementioned machinery is implemented by
+> 	   upstream
+> 	b) using 'anatop-enable-bit' in that capacity is a bit of a
+> 	   semantic stretch
 > 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
+> simplify the situation by setting the value of 'anatop-enable-bit' to
+> point to ENABLE_LINREG (same as i.MX6).
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: yurovsky at gmail.com
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-I wouldn't apply it before driver and bindings change get accepted.
-Ping me when that happens.
+Since patch 1 ~ 3 are all about adding anatop-enable-bit, can we squash
+them into one patch?
 
 Shawn
 
 > ---
+>  arch/arm/boot/dts/imx7s.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Changes in v2: None
-> 
->  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi | 2 +-
->  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi   | 2 +-
->  arch/arm/boot/dts/imx28-evk.dts                   | 2 +-
->  arch/arm/boot/dts/imx53-tqma53.dtsi               | 2 +-
->  arch/arm/boot/dts/imx6q-cm-fx6.dts                | 2 +-
->  arch/arm/boot/dts/imx6q-utilite-pro.dts           | 2 +-
->  6 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-> index 4f3e0f473581..61e741092efa 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-> @@ -40,7 +40,7 @@
->  	status = "okay";
->  
->  	at24 at 52 {
-> -		compatible = "at,24c32";
-> +		compatible = "at,24c32","atmel,24c32";
->  		pagesize = <32>;
->  		reg = <0x52>;
->  	};
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> index 82fec935ce83..5b6b651af18f 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> @@ -193,7 +193,7 @@
->  	status = "okay";
->  
->  	at24 at 52 {
-> -		compatible = "at,24c32";
-> +		compatible = "at,24c32","atmel,24c32";
->  		pagesize = <32>;
->  		reg = <0x52>;
->  	};
-> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-> index a5ba669b4eaa..5ab990ac36b4 100644
-> --- a/arch/arm/boot/dts/imx28-evk.dts
-> +++ b/arch/arm/boot/dts/imx28-evk.dts
-> @@ -203,7 +203,7 @@
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 22c9788..8fee299 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -516,7 +516,7 @@
+>  					anatop-min-bit-val = <8>;
+>  					anatop-min-voltage = <800000>;
+>  					anatop-max-voltage = <1200000>;
+> -					anatop-enable-bit = <31>;
+> +					anatop-enable-bit = <0>;
 >  				};
->  
->  				at24 at 51 {
-> -					compatible = "at24,24c32";
-> +					compatible = "at24,24c32","atmel,24c32";
->  					pagesize = <32>;
->  					reg = <0x51>;
->  				};
-> diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi b/arch/arm/boot/dts/imx53-tqma53.dtsi
-> index 85972f2201c2..c8bc0522a1e9 100644
-> --- a/arch/arm/boot/dts/imx53-tqma53.dtsi
-> +++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
-> @@ -272,7 +272,7 @@
->  	};
->  
->  	eeprom: 24c64 at 50 {
-> -		compatible = "at,24c64";
-> +		compatible = "at,24c64","atmel,24c64";
->  		pagesize = <32>;
->  		reg = <0x50>;
->  	};
-> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-> index 66cac5328b86..8cf478c67f83 100644
-> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-> @@ -215,7 +215,7 @@
->  	clock-frequency = <100000>;
->  
->  	eeprom at 50 {
-> -		compatible = "at24,24c02";
-> +		compatible = "at24,24c02","atmel,24c02";
->  		reg = <0x50>;
->  		pagesize = <16>;
->  	};
-> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> index 69bdd82ce21f..644889d813d0 100644
-> --- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> @@ -128,7 +128,7 @@
->  			#size-cells = <0>;
->  
->  			eeprom at 50 {
-> -				compatible = "at24,24c02";
-> +				compatible = "at24,24c02","atmel,24c02";
->  				reg = <0x50>;
->  				pagesize = <16>;
 >  			};
+>  
 > -- 
 > 2.9.3
 > 
