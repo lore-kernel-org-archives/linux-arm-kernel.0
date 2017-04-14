@@ -1,149 +1,156 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:27 +0200
-Subject: [PATCH v5 15/22] KVM: arm64: vgic-its: vgic_its_alloc_ite/device
+Date: Fri, 14 Apr 2017 12:15:13 +0200
+Subject: [PATCH v5 01/22] KVM: arm/arm64: Add ITS save/restore API
+ documentation
 In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-16-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two new helpers to allocate an its ite and an its device.
-This will avoid duplication on restore path.
+Add description for how to access ITS registers and how to save/restore
+ITS tables into/from memory.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 ---
-
 v4 -> v5:
-- add Marc's A-b
+- take into account Christoffer's comments
+- pending table save on GICV3 side now
 
 v3 -> v4:
-- fix allocation
-- add comment about its_lock mutex hold
+- take into account Peter's comments:
+  - typos
+  - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
+  - add a validity bit in DTE
+  - document all fields in CTE and ITE
+  - document ABI revision
+- take into account Andre's comments:
+  - document restrictions about GITS_CREADR writing and GITS_IIDR
+  - document -EBUSY error if one or more VCPUS are runnning
+  - document 64b registers only can be accessed with 64b access
+- itt_addr field matches bits [51:8] of the itt_addr
 
 v1 -> v2:
-- report itt_size fix and remove ITE_SIZE
-- s/itte/ite/g
+- DTE and ITE now are 8 bytes
+- DTE and ITE now indexed by deviceid/eventid
+- use ITE name instead of ITTE
+- mentions ITT_addr matches bits [51:8] of the actual address
+- mentions LE layout
 ---
- virt/kvm/arm/vgic/vgic-its.c | 73 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 50 insertions(+), 23 deletions(-)
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 99 ++++++++++++++++++++++
+ 1 file changed, 99 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 55267ab..56c5123 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -742,6 +742,27 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- 	kfree(collection);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static int vgic_its_alloc_ite(struct its_device *device,
-+			       struct its_ite **itep,
-+			       struct its_collection *collection,
-+			       u32 lpi_id, u32 event_id)
-+{
-+	struct its_ite *ite;
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index 6081a5b..b5f010d 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -32,7 +32,106 @@ Groups:
+     KVM_DEV_ARM_VGIC_CTRL_INIT
+       request the initialization of the ITS, no additional parameter in
+       kvm_device_attr.addr.
 +
-+	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
-+	if (!ite)
-+		return -ENOMEM;
++    KVM_DEV_ARM_ITS_SAVE_TABLES
++      save the ITS table data into guest RAM, at the location provisioned
++      by the guest in corresponding registers/table entries.
 +
-+	ite->event_id	= event_id;
-+	ite->collection = collection;
-+	ite->lpi = lpi_id;
++      The layout of the tables in guest memory defines an ABI. The entries
++      are laid out in little endian format as described in the last paragraph.
 +
-+	list_add_tail(&ite->ite_list, &device->itt_head);
-+	*itep = ite;
-+	return 0;
-+}
++    KVM_DEV_ARM_ITS_RESTORE_TABLES
++      restore the ITS tables from guest RAM to ITS internal structures.
 +
- /*
-  * The MAPTI and MAPI commands map LPIs to ITTEs.
-  * Must be called with its_lock mutex held.
-@@ -755,7 +776,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	struct its_ite *ite;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
--	int lpi_nr;
-+	int lpi_nr, ret;
- 	struct vgic_irq *irq;
- 
- 	device = find_its_device(its, device_id);
-@@ -785,19 +806,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
- 	}
- 
--	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
--	if (!ite) {
-+	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
-+	if (ret) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
--		return -ENOMEM;
-+		return ret;
- 	}
- 
--	ite->event_id	= event_id;
--	list_add_tail(&ite->ite_list, &device->itt_head);
--
--	ite->collection = collection;
--	ite->lpi = lpi_nr;
--
- 	irq = vgic_add_lpi(kvm, lpi_nr);
- 	if (IS_ERR(irq)) {
- 		if (new_coll)
-@@ -836,6 +851,29 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
- 	kfree(device);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static int vgic_its_alloc_device(struct vgic_its *its,
-+				 struct its_device **devp,
-+				 u32 device_id, gpa_t itt_addr,
-+				 u8 nb_eventid_bits)
-+{
-+	struct its_device *device;
++      The GICV3 must be restored before the ITS and all ITS registers but
++      the GITS_CTLR must be restored before restoring the ITS tables.
 +
-+	device = kzalloc(sizeof(*device), GFP_KERNEL);
-+	if (!device)
-+		return -ENOMEM;
++      The GITS_IIDR read-only register must also be restored before
++      the table restore as the IIDR revision field encodes the ABI revision.
 +
-+	device->device_id = device_id;
-+	device->itt_addr = itt_addr;
-+	device->nb_eventid_bits = nb_eventid_bits;
-+	INIT_LIST_HEAD(&device->itt_head);
+   Errors:
+     -ENXIO:  ITS not properly configured as required prior to setting
+              this attribute
+     -ENOMEM: Memory shortage when allocating ITS internal data
++    -EINVAL: Inconsistent restored data
++    -EFAULT: Invalid guest ram access
++    -EBUSY:  One or more VCPUS are running
 +
-+	list_add_tail(&device->dev_list, &its->device_list);
-+	*devp = device;
++  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
++  Attributes:
++      The attr field of kvm_device_attr encodes the offset of the
++      ITS register, relative to the ITS control frame base address
++      (ITS_base).
 +
-+	return 0;
-+}
++      kvm_device_attr.addr points to a __u64 value whatever the width
++      of the addressed register (32/64 bits). 64 bit registers can only
++      be accessed with full length.
 +
- /*
-  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
-  * Must be called with the its_lock mutex held.
-@@ -872,19 +910,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	if (!valid)
- 		return 0;
- 
--	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
--	if (!device)
--		return -ENOMEM;
--
--	device->device_id = device_id;
--	device->nb_eventid_bits = nb_eventid_bits;
--	device->itt_addr = itt_addr;
--
--	INIT_LIST_HEAD(&device->itt_head);
--
--	list_add_tail(&device->dev_list, &its->device_list);
--
--	return 0;
-+	return vgic_its_alloc_device(its, &device, device_id,
-+				     itt_addr, nb_eventid_bits);
- }
- 
- /*
++      Writes to read-only registers are ignored by the kernel except for:
++      - GITS_READR. It needs to be restored otherwise commands in the queue
++        will be re-executed after restoring CWRITER. GITS_READR must be restored
++        before restoring the GITS_CTLR which is likely to enable the ITS.
++        Also it needs to be restored after GITS_CBASER since a write to
++        GITS_CBASER resets GITS_CREADR.
++      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
++        In the future we might implement direct injection of virtual LPIS.
++        This will require an upgrade of the table layout and an evolution of
++        the ABI. GITS_IIDR must be restored before the table restoration.
++
++      For other registers, getting or setting a register has the same
++      effect as reading/writing the register on real hardware.
++  Errors:
++    -ENXIO: Offset does not correspond to any supported register
++    -EFAULT: Invalid user pointer for attr->addr
++    -EINVAL: Offset is not 64-bit aligned
++    -EBUSY: one or more VCPUS are running
++
++ ITS Table ABI REV0:
++ -------------------
++
++ Revision 0 of the ABI only supports physical LPIs.
++
++ The device table and ITT are indexed by the deviceid and eventid,
++ respectively. The collection table is not indexed by collectionid:
++ CTE are written in the table in the order of collection creation. All
++ entries are 8 bytes.
++
++ Device Table Entry (DTE):
++
++ bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
++ values:   | V |   next    | ITT_addr |  Size   |
++
++ where;
++ - V indicates whether the entry is valid. If not, other fields
++   are not meaningful.
++ - next: equals to 0 if this entry is the last one; otherwise it
++   corresponds to the deviceid offset to the next DTE, capped by
++   2^14 -1.
++ - ITT_addr matches bits [51:8] of the ITT address (256B aligned).
++ - Size specifies the supported number of bits for the deviceid,
++   minus one
++
++ Collection Table Entry (CTE):
++
++ bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
++ values:   | V |    RES0    |  RDBase   |    ICID     |
++
++ where:
++ - V indicates whether the entry is valid. If not, other fields are
++   not meaningful.
++ - RES0: reserved field with Should-Be-Zero-or-Preserved behavior.
++ - RDBase is the PE number (GICR_TYPER.Processor_Number semantic),
++ - ICID is the collection ID
++
++ Interrupt Translation Entry (ITE):
++
++ bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
++ values:   |    next   |   pINTID  |  ICID    |
++
++ where:
++ - next: equals to 0 if this entry is the last one; otherwise it corresponds
++   to the eventid offset to the next ITE capped by 2^16 -1.
++ - pINTID is the physical LPI ID; if zero, it means the entry is not valid
++   and other fields are not meaningful.
++ - ICID is the collection ID
++
 -- 
 2.5.5
