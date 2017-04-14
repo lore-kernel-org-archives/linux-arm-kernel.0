@@ -1,56 +1,66 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 14 Apr 2017 14:19:37 +0900
-Subject: [PATCH 1/3] dt-bindings: Add support for samsung s6e3ha2 edge panel
- binding
-In-Reply-To: <1492147179-7824-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <1492147179-7824-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170414051959epcas5p3917fe7adbc17a42bf0450a46b2baf55d@epcas5p3.samsung.com>
-Message-ID: <1492147179-7824-2-git-send-email-hoegeun.kwon@samsung.com>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Thu, 13 Apr 2017 22:39:30 -0700
+Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
+In-Reply-To: <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
+References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
+ <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
+ <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
+Message-ID: <58F06092.9080409@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Samsung s6e3ha2 edge is a 5.65" 1600x2560 AMOLED panel connected
-using MIPI-DSI interfaces.
+Hello Geert
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
----
- .../bindings/display/panel/samsung,s6e3ha2-e.txt   | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
+On 04/13/2017 12:47 PM, Geert Uytterhoeven wrote:
+> On Thu, Apr 13, 2017 at 2:59 PM, Mark Brown<broonie@kernel.org>  wrote:
+>> On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
+>>> From: Jiada Wang<jiada_wang@mentor.com>
+>>>
+>>> v1:
+>>>    add Slave mode support in SPI core
+>>>    spidev create slave device when SPI controller work in slave mode
+>>>    spi-imx support to work in slave mode
+>> Adding Geert who also had a series doing this in progress that was
+>> getting very near to being merged.
+> Thank you!
+>
+> Actually my plan is to fix the last remaining issues and resubmit for v4.13.
+I noticed your patch set for SPI slave support,
+(I am sure you can find out some of the change
+in this patch set is based on your work).
+we have similar requirement to add slave mode support to ecspi IP on 
+imx6 Soc.
 
-diff --git a/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
-new file mode 100644
-index 0000000..09c65f6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
-@@ -0,0 +1,28 @@
-+Samsung S6E3HA2 5.65" 1600x2560 AMOLED panel
-+
-+Required properties:
-+  - compatible: "samsung,s6e3ha2-e"
-+  - reg: the virtual channel number of a DSI peripheral
-+  - vdd3-supply: I/O voltage supply
-+  - vci-supply: voltage supply for analog circuits
-+  - reset-gpios: a GPIO spec for the reset pin (active low)
-+  - enable-gpios: a GPIO spec for the panel enable pin (active high)
-+
-+Optional properties:
-+  - te-gpios: a GPIO spec for the tearing effect synchronization signal
-+    gpio pin (active high)
-+
-+Example:
-+&dsi {
-+	...
-+
-+	panel at 0 {
-+		compatible = "samsung,s6e3ha2-e";
-+		reg = <0>;
-+		vdd3-supply = <&ldo27_reg>;
-+		vci-supply = <&ldo28_reg>;
-+		reset-gpios = <&gpg0 0 GPIO_ACTIVE_LOW>;
-+		enable-gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>;
-+		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
-+	};
-+};
--- 
-1.9.1
+Our use case is to use spidev as an interface to communicate with 
+external SPI master devices.
+meanwhile the SPI bus controller can also act as master device to send 
+data to other
+SPI slave devices on the board.
+
+I found in your implementation, SPI bus controller is limited to either 
+work in master mode or
+slave mode, is there any reasoning to not configure SPI mode based on 
+SPI devices use case?
+
+
+Thanks,
+Jiada
+
+> References:
+>    - v2: https://lkml.org/lkml/2016/9/12/1065
+>    - v1: https://lkml.org/lkml/2016/6/22/423
+>
+> BTW Jiada, what's your use case? Just spidev?
+>
+> Thx!
+>
+> Gr{oetje,eeting}s,
+>
+>                          Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                  -- Linus Torvalds
