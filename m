@@ -1,48 +1,401 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 14 Apr 2017 14:03:44 +0800
-Subject: [PATCH 3/4] net: macb: Add hardware PTP support
-In-Reply-To: <1492090763-15686-1-git-send-email-rafalo@cadence.com>
-Message-ID: <201704141429.nTfzVN8r%fengguang.wu@intel.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Fri, 14 Apr 2017 15:03:22 +0800
+Subject: [PATCH v3 7/8] arm64: exception: handle asynchronous SError
+ interrupt
+In-Reply-To: <20170413105131.GD24027@leverpostej>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+ <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
+ <20170413105131.GD24027@leverpostej>
+Message-ID: <3cc182eb-0011-bc4d-460b-2ef4910c0f41@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
+Hi Mark,
 
-[auto build test ERROR on net-next/master]
-[also build test ERROR on v4.11-rc6 next-20170413]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks for your comments.
 
-url:    https://github.com/0day-ci/linux/commits/Rafal-Ozieblo/net-macb-Add-support-for-PTP-timestamps-in-DMA-descriptors/20170414-001330
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 2017/4/13 18:51, Mark Rutland wrote:
+> Hi,
+>
+> On Thu, Mar 30, 2017 at 06:31:07PM +0800, Xie XiuQi wrote:
+>> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+>> index f20c64a..22f9c90 100644
+>> --- a/arch/arm64/include/asm/esr.h
+>> +++ b/arch/arm64/include/asm/esr.h
+>> @@ -106,6 +106,20 @@
+>>  #define ESR_ELx_AR 		(UL(1) << 14)
+>>  #define ESR_ELx_CM 		(UL(1) << 8)
+>>
+>> +#define ESR_Elx_DFSC_SEI	(0x11)
+>
+> We should probably have a definition for the uncategorized DFSC value,
+> too.
+>
 
-Note: the linux-review/Rafal-Ozieblo/net-macb-Add-support-for-PTP-timestamps-in-DMA-descriptors/20170414-001330 HEAD 3b878618e04f866388fd62f6c44752e50b15658a builds fine.
-      It only hurts bisectibility.
+Will do, thanks.
 
-All errors (new ones prefixed by >>):
+How about "#define ESR_Elx_DFSC_UNCATEGORIZED	(0)" ?
 
-   drivers/built-in.o: In function `macb_interrupt':
->> kfifo_buf.c:(.text+0xeabd8): undefined reference to `macb_ptp_int'
->> kfifo_buf.c:(.text+0xeac6c): undefined reference to `gem_ptp_txstamp'
-   drivers/built-in.o: In function `gem_rx':
->> kfifo_buf.c:(.text+0xebbd8): undefined reference to `gem_ptp_rxstamp'
->> drivers/built-in.o:(.data+0xa5e0): undefined reference to `gem_ptp_init'
->> drivers/built-in.o:(.data+0xa5e4): undefined reference to `gem_ptp_remove'
->> drivers/built-in.o:(.data+0xa5f4): undefined reference to `gem_get_hwtst'
->> drivers/built-in.o:(.data+0xa5f8): undefined reference to `gem_set_hwtst'
+> [...]
+>
+>> index 43512d4..d8a7306 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -69,7 +69,14 @@
+>>  #define BAD_FIQ		2
+>>  #define BAD_ERROR	3
+>>
+>> +	.arch_extension ras
+>
+> Generally, arch_extension is a warning sign that code isn't going to
+> work with contemporary assemblers, which we likely need to support.
+>
+>> +
+>>  	.macro	kernel_entry, el, regsize = 64
+>> +#ifdef CONFIG_ARM64_ESB
+>> +	.if	\el == 0
+>> +	esb
+>
+> Here, I think that we'll need to macro this such that we can build with
+> existing toolchains.
+>
+> e.g. in <asm/assembler.h> we need something like:
+>
+> 	#define HINT_IMM_ESB	16
+>
+> 	.macro ESB
+> 	hint	#HINT_IMM_ESB
+> 	.endm
+>
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22468 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/7e8e6b3b/attachment-0001.gz>
+Good, thanks for your suggestion. I'll use this macro in next versin.
+
+>> +	.endif
+>> +#endif
+>>  	sub	sp, sp, #S_FRAME_SIZE
+>>  	.if	\regsize == 32
+>>  	mov	w0, w0				// zero upper 32 bits of x0
+>> @@ -208,6 +215,7 @@ alternative_else_nop_endif
+>>  #endif
+>>
+>>  	.if	\el == 0
+>> +	msr	daifset, #0xF			// Set flags
+>
+> Elsewhere in head.S we use helpers to fiddle with DAIF bits.
+>
+> Please be consistent with that. Add an enable_all macro if we need one.
+
+OK, I'll do it refer to head.S.
+
+>
+>>  	ldr	x23, [sp, #S_SP]		// load return stack pointer
+>>  	msr	sp_el0, x23
+>>  #ifdef CONFIG_ARM64_ERRATUM_845719
+>> @@ -226,6 +234,15 @@ alternative_else_nop_endif
+>>
+>>  	msr	elr_el1, x21			// set up the return data
+>>  	msr	spsr_el1, x22
+>> +
+>> +#ifdef CONFIG_ARM64_ESB
+>> +	.if \el == 0
+>> +	esb					// Error Synchronization Barrier
+>> +	mrs	x21, disr_el1			// Check for deferred error
+>
+> We'll need an <asm/sysreg.h> definition for this register. With that, we
+> can use mrs_s here.
+
+OK, thanks.
+
+>
+>> +	tbnz	x21, #31, el1_sei
+>> +	.endif
+>> +#endif
+>> +
+>>  	ldp	x0, x1, [sp, #16 * 0]
+>>  	ldp	x2, x3, [sp, #16 * 1]
+>>  	ldp	x4, x5, [sp, #16 * 2]
+>> @@ -318,7 +335,7 @@ ENTRY(vectors)
+>>  	ventry	el1_sync_invalid		// Synchronous EL1t
+>>  	ventry	el1_irq_invalid			// IRQ EL1t
+>>  	ventry	el1_fiq_invalid			// FIQ EL1t
+>> -	ventry	el1_error_invalid		// Error EL1t
+>> +	ventry	el1_error			// Error EL1t
+>>
+>>  	ventry	el1_sync			// Synchronous EL1h
+>>  	ventry	el1_irq				// IRQ EL1h
+>> @@ -328,7 +345,7 @@ ENTRY(vectors)
+>>  	ventry	el0_sync			// Synchronous 64-bit EL0
+>>  	ventry	el0_irq				// IRQ 64-bit EL0
+>>  	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
+>> -	ventry	el0_error_invalid		// Error 64-bit EL0
+>> +	ventry	el0_error			// Error 64-bit EL0
+>>
+>>  #ifdef CONFIG_COMPAT
+>>  	ventry	el0_sync_compat			// Synchronous 32-bit EL0
+>> @@ -508,12 +525,31 @@ el1_preempt:
+>>  	ret	x24
+>>  #endif
+>>
+>> +	.align	6
+>> +el1_error:
+>> +	kernel_entry 1
+>> +el1_sei:
+>> +	/*
+>> +	 * asynchronous SError interrupt from kernel
+>> +	 */
+>> +	mov	x0, sp
+>> +	mrs	x1, esr_el1
+>
+> I don't think this is correct if we branched here from kernel_exit.
+> Surely we want the DISR_EL1 value, and ESR_EL1 is unrelated?
+
+Yes, indeed. I'll change it in next version.
+
+>
+>> +	mov	x2, #1				// exception level of SEI generated
+>> +	b	do_sei
+>
+> You don't need to figure out the EL here. In do_sei() we can determine
+> the exception level from the regs (e.g. using user_mode(regs)).
+
+Yes, you're right. I'll fix it.
+
+>
+>> +ENDPROC(el1_error)
+>> +
+>> +
+>>  /*
+>>   * EL0 mode handlers.
+>>   */
+>>  	.align	6
+>>  el0_sync:
+>>  	kernel_entry 0
+>> +#ifdef CONFIG_ARM64_ESB
+>> +	mrs     x26, disr_el1
+>> +	tbnz    x26, #31, el0_sei		// check DISR.A
+>> +	msr	daifclr, #0x4			// unmask SEI
+>> +#endif
+>
+> Why do we duplicate this across the EL0 handlers, rather than making it
+> common in the el0 kernel_entry code?
+
+It's different between el0_sync and el0_irq. If sei come from el0_sync,
+the context is the same process, so we could just return to user space
+after do_sei, instead of continue the syscall. The process may be killed
+very likely, it's not necessary to continue the system call.
+
+However, if sei come from el0_irq, in the irq context which is not related
+the current process, we should continue the irq handler after do_sei.
+
+So I think we should handle these two situation differently. If I'm wrong,
+please correct me, Thanks.
+
+>
+>>  	mrs	x25, esr_el1			// read the syndrome register
+>>  	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
+>>  	cmp	x24, #ESR_ELx_EC_SVC64		// SVC in 64-bit state
+>> @@ -688,8 +724,38 @@ el0_inv:
+>>  ENDPROC(el0_sync)
+>>
+>>  	.align	6
+>> +el0_error:
+>> +	kernel_entry 0
+>> +el0_sei:
+>> +	/*
+>> +	 * asynchronous SError interrupt from userspace
+>> +	 */
+>> +	ct_user_exit
+>> +	mov	x0, sp
+>> +	mrs	x1, esr_el1
+>
+> As with el1_sei, I don't think this is correct if we branched to
+> el0_sei. As far as I am aware, ESR_EL1 will contain whatever exception
+> we took, and the value we want is in DISR_EL1.
+
+Will fix, thanks.
+
+>
+>> +	mov	x2, #0
+>
+> This EL parameter can go.
+>
+>> +	bl	do_sei
+>> +	b	ret_to_user
+>> +ENDPROC(el0_error)
+>> +
+>> +	.align	6
+>>  el0_irq:
+>>  	kernel_entry 0
+>> +#ifdef CONFIG_ARM64_ESB
+>> +	mrs     x26, disr_el1
+>> +	tbz     x26, #31, el0_irq_naked          // check DISR.A
+>> +
+>> +	mov	x0, sp
+>> +	mrs	x1, esr_el1
+>> +	mov	x2, 0
+>> +
+>> +	/*
+>> +	 * The SEI generated at EL0 is not affect this irq context,
+>> +	 * so after sei handler, we continue process this irq.
+>> +	 */
+>> +	bl	do_sei
+>> +	msr     daifclr, #0x4                   // unmask SEI
+>
+> This rough pattern is duplicated several times across the EL0 entry
+> paths. I think it should be made common.
+
+I agree, I'll do it in next version, thanks.
+
+>
+>> +#endif
+>>  el0_irq_naked:
+>>  	enable_dbg
+>>  #ifdef CONFIG_TRACE_IRQFLAGS
+>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>> index b6d6727..99be6d8 100644
+>> --- a/arch/arm64/kernel/traps.c
+>> +++ b/arch/arm64/kernel/traps.c
+>> @@ -643,6 +643,34 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+>>  		handler[reason], smp_processor_id(), esr,
+>>  		esr_get_class_string(esr));
+>>
+>> +	die("Oops - bad mode", regs, 0);
+>> +	local_irq_disable();
+>> +	panic("bad mode");
+>> +}
+>> +
+>> +static const char *sei_context[] = {
+>> +	"userspace",			/* EL0 */
+>> +	"kernel",			/* EL1 */
+>> +};
+>
+> This should go. It's only used in one place, and would be clearer with
+> the strings inline. More on that below.
+>
+
+OK, thanks.
+
+>> +
+>> +static const char *sei_severity[] = {
+>
+> Please name this for what it actually represents:
+>
+> static const char *esr_aet_str[] = {
+>
+>> +	[0 ... ESR_ELx_AET_MAX] =	"Unknown",
+>
+> For consistency with esr_class_str, please make this:
+>
+> 	[0 ... ESR_ELx_AET_MAX] =	"UNRECOGNIZED AET",
+>
+> ... which makes it clear that this isn't some AET value which reports an
+> "Unknown" status.
+>
+
+OK, thanks.
+
+>> +	[ESR_ELx_AET_UC]	=	"Uncontainable",
+>> +	[ESR_ELx_AET_UEU]	=	"Unrecoverable",
+>> +	[ESR_ELx_AET_UEO]	=	"Restartable",
+>> +	[ESR_ELx_AET_UER]	=	"Recoverable",
+>> +	[ESR_ELx_AET_CE]	=	"Corrected",
+>> +};
+>> +
+>> +DEFINE_PER_CPU(int, sei_in_process);
+>
+> A previous patch added definition of this.
+>
+
+I'll remote it, thanks.
+
+>> +asmlinkage void do_sei(struct pt_regs *regs, unsigned int esr, int el)
+>> +{
+>> +	int aet = ESR_ELx_AET(esr);
+>
+> The AET field is only valid when the DFSC is 0b010001, so we need to
+> check that before we interpret AET.
+>
+
+Will fix.
+
+>> +	console_verbose();
+>> +
+>> +	pr_crit("Asynchronous SError interrupt detected on CPU%d, %s, %s\n",
+>> +		smp_processor_id(), sei_context[el], sei_severity[aet]);
+>
+> We should dump the full ESR_ELx value, regardless of what automated
+> decoding we do, so that we have a chance of debugging issues in the
+> field.
+>
+> It would also be nice to align with how bad_mode reports this today.
+> Please make this:
+>
+> 	pr_crit("SError detected on CPU%d while in %s mode: code: 0x%08x -- %s\n",
+> 		smp_processor_id(), user_mode(regs) ? "user" : "kernel",
+> 		esr, esr_aet_str[aet]);
+>
+> ... though it might be best to dump the raw SPSR rather than trying to
+> say user/kernel, so that we can distinguish EL1/EL2 with VHE, etc.
+>
+
+OK, I'll modify in next version.
+
+>> +
+>>  	/*
+>>  	 * In firmware first mode, we could assume firmware will only generate one
+>>  	 * of cper records at a time. There is no risk for one cpu to parse ghes table.
+>> @@ -653,9 +681,31 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+>>  		this_cpu_dec(sei_in_process);
+>>  	}
+>>
+>> -	die("Oops - bad mode", regs, 0);
+>> +	if (el == 0 && IS_ENABLED(CONFIG_ARM64_ESB) &&
+>
+> Please use user_mode(regs), and get rid of the el parameter to this
+> function entirely.
+>
+
+Will fix.
+
+>> +	    cpus_have_cap(ARM64_HAS_RAS_EXTN)) {
+>> +		siginfo_t info;
+>> +		void __user *pc = (void __user *)instruction_pointer(regs);
+>> +
+>> +		if (aet >= ESR_ELx_AET_UEO)
+>> +			return;
+>
+> We need to check the DFSC first, and 0b111 is a reserved value (which
+> the ARM ARM doesn't define the recoverability of), so I don't think this
+> is correct.
+>
+> We should probably test the DSFC, then switch on the AET value, so as to
+> handle only the cases we are aware of.
+
+Will fix.
+
+>
+>> +
+>> +		if (aet == ESR_ELx_AET_UEU) {
+>> +			info.si_signo = SIGILL;
+>> +			info.si_errno = 0;
+>> +			info.si_code  = ILL_ILLOPC;
+>> +			info.si_addr  = pc;
+>
+> An unrecoverable error is not necessarily a particular bad instruction,
+> so I'm not sure this makes sense.
+>
+
+Generally, a SEI is generated when PE consumes an uncorrectable error.
+So, may be we could send a SIGBUS instead.
+
+I'm not sure too. Any other suggestion?
+
+> Thanks,
+> Mark.
+>
+> .
+>
+
+-- 
+Thanks,
+Xie XiuQi
