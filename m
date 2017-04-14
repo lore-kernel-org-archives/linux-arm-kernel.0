@@ -1,228 +1,150 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:26 +0200
-Subject: [PATCH v5 14/22] KVM: arm64: vgic-its:
- KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
+Date: Fri, 14 Apr 2017 12:15:28 +0200
+Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for table
+ lookup
 In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-15-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-17-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new attributes in KVM_DEV_ARM_VGIC_GRP_CTRL group:
-- KVM_DEV_ARM_ITS_SAVE_TABLES: saves the ITS tables into guest RAM
-- KVM_DEV_ARM_ITS_RESTORE_TABLES: restores them into VGIC internal
-  structures.
+Add a generic lookup_table() helper whose role consists in
+scanning a contiguous table located in guest RAM and applying
+a callback on each entry. Entries can be handled as linked lists
+since the callback may return an offset to the next entry and
+also tell that an entry is the last one.
 
-We hold the vcpus lock during the save and restore to make
-sure no vcpu is running.
+Helper functions also are added to compute the device/event ID
+offset to the next DTE/ITE.
 
-At this stage the functionality is not yet implemented. Only
-the skeleton is put in place.
+compute_next_devid_offset, compute_next_eventid_offset and
+lookup_table will become static in subsequent patches
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-
 v4 -> v5:
-- use KVM_DEV_ARM_ITS_SAVE_TABLES and KVM_DEV_ARM_ITS_RESTORE_TABLES
-- rename *flush* into *save*
-- call its_sync_lpi_pending_table at the end of restore
-- use abi framework
+- use kvm_read_guest
 
 v3 -> v4:
-- pass kvm struct handle to vgic_its_flush/restore_pending_tables
-- take the kvm lock and vcpu locks
-- ABI revision check
-- check attr->attr is null
-
-v1 -> v2:
-- remove useless kvm parameter
+- remove static to avoid compilation warning
+- correct size computation in looup_table()
+- defines now encode the number of bits used for devid and eventid offsets
+- use BIT() - 1 to encode the max offets
 ---
- arch/arm/include/uapi/asm/kvm.h   |   4 +-
- arch/arm64/include/uapi/asm/kvm.h |   4 +-
- virt/kvm/arm/vgic/vgic-its.c      | 108 ++++++++++++++++++++++++++++++++++++--
- 3 files changed, 110 insertions(+), 6 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 4beb83b..8e6563c 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -199,7 +199,9 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
- #define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
--#define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
-+#define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
-+#define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
-+#define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 7e8dd69..1e35115 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -219,7 +219,9 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
- #define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
--#define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
-+#define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
-+#define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
-+#define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
- 
- /* Device Control API on vcpu fd */
- #define KVM_ARM_VCPU_PMU_V3_CTRL	0
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index de1ed6d..55267ab 100644
+index 56c5123..c22b35d 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1648,12 +1648,68 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+@@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+ 
+ #define VITS_TYPER_IDBITS 16
+ #define VITS_TYPER_DEVBITS 16
++#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
++#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
+ 
+ /*
+  * Finds and returns a collection in the ITS collection table.
+@@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 	return ret;
  }
  
- /**
-+ * vgic_its_save_device_tables - Save the device table and all ITT
-+ * into guest RAM
-+ */
-+static int vgic_its_save_device_tables(struct vgic_its *its)
++u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
 +{
-+	return -ENXIO;
++	struct list_head *e = &dev->dev_list;
++	struct its_device *next;
++	u32 next_offset;
++
++	if (e->next == h)
++		return 0;
++	next = list_entry(e->next, struct its_device, dev_list);
++	next_offset = next->device_id - dev->device_id;
++
++	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
++}
++
++u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
++{
++	struct list_head *e = &ite->ite_list;
++	struct its_ite *next;
++	u32 next_offset;
++
++	if (e->next == h)
++		return 0;
++	next = list_entry(e->next, struct its_ite, ite_list);
++	next_offset = next->event_id - ite->event_id;
++
++	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
 +}
 +
 +/**
-+ * vgic_its_restore_device_tables - Restore the device table and all ITT
-+ * from guest RAM to internal data structs
++ * entry_fn_t - Callback called on a table entry restore path
++ * @its: its handle
++ * @id: id of the entry
++ * @entry: pointer to the entry
++ * @opaque: pointer to an opaque data
++ * @next_offset: minimal ID offset to the next entry. 0 if this
++ * entry is the last one, 1 if the entry is invalid, >= 1 if an
++ * entry's next_offset field was truly decoded
++ *
++ * Return: < 0 on error, 0 otherwise
 + */
-+static int vgic_its_restore_device_tables(struct vgic_its *its)
-+{
-+	return -ENXIO;
-+}
++typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
++			  void *opaque, u32 *next_offset);
 +
 +/**
-+ * vgic_its_save_collection_table - Save the collection table into
-+ * guest RAM
++ * lookup_table - scan a contiguous table in guest RAM and applies a function
++ * to each entry
++ *
++ * @its: its handle
++ * @base: base gpa of the table
++ * @size: size of the table in bytes
++ * @esz: entry size in bytes
++ * @start_id: first entry's ID
++ * @fn: function to apply on each entry
++ *
++ * Return: < 0 on error, 1 if last element identified, 0 otherwise
 + */
-+static int vgic_its_save_collection_table(struct vgic_its *its)
++int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
++		 int start_id, entry_fn_t fn, void *opaque)
 +{
-+	return -ENXIO;
-+}
-+
-+/**
-+ * vgic_its_restore_collection_table - reads the collection table
-+ * in guest memory and restores the ITS internal state. Requires the
-+ * BASER registers to be restored before.
-+ */
-+static int vgic_its_restore_collection_table(struct vgic_its *its)
-+{
-+	return -ENXIO;
-+}
-+
-+/**
-  * vgic_its_save_tables_v0 - Save the ITS tables into guest ARM
-  * according to v0 ABI
-  */
- static int vgic_its_save_tables_v0(struct vgic_its *its)
- {
--	return -ENXIO;
++	void *entry = kzalloc(esz, GFP_KERNEL);
 +	struct kvm *kvm = its->dev->kvm;
++	unsigned long len = size;
++	u32 id = start_id;
++	gpa_t gpa = base;
 +	int ret;
 +
-+	mutex_lock(&kvm->lock);
++	while (len > 0) {
++		u32 next_offset;
++		size_t byte_offset;
 +
-+	if (!lock_all_vcpus(kvm)) {
-+		mutex_unlock(&kvm->lock);
-+		return -EBUSY;
-+	}
-+
-+	ret = vgic_its_save_device_tables(its);
-+	if (ret)
-+		goto out;
-+
-+	ret = vgic_its_save_collection_table(its);
-+
-+out:
-+	unlock_all_vcpus(kvm);
-+	mutex_unlock(&kvm->lock);
-+	return ret;
- }
- 
- /**
-@@ -1663,7 +1719,41 @@ static int vgic_its_save_tables_v0(struct vgic_its *its)
-  */
- static int vgic_its_restore_tables_v0(struct vgic_its *its)
- {
--	return -ENXIO;
-+	struct kvm *kvm = its->dev->kvm;
-+	struct kvm_vcpu *vcpu;
-+	int ret, c;
-+
-+	mutex_lock(&kvm->lock);
-+
-+	if (!lock_all_vcpus(kvm)) {
-+		mutex_unlock(&kvm->lock);
-+		return -EBUSY;
-+	}
-+
-+	ret = vgic_its_restore_collection_table(its);
-+	if (ret)
-+		goto out;
-+
-+	ret = vgic_its_restore_device_tables(its);
-+
-+	kvm_for_each_vcpu(c, vcpu, kvm) {
-+		ret = its_sync_lpi_pending_table(vcpu);
++		ret = kvm_read_guest(kvm, gpa, entry, esz);
 +		if (ret)
-+			break;
++			goto out;
++
++		ret = fn(its, id, entry, opaque, &next_offset);
++		if (ret < 0 || (!ret && !next_offset))
++			goto out;
++
++		byte_offset = next_offset * esz;
++		id += next_offset;
++		gpa += byte_offset;
++		len -= byte_offset;
 +	}
++	kfree(entry);
++	return 0;
 +
 +out:
-+	unlock_all_vcpus(kvm);
-+	mutex_unlock(&kvm->lock);
++	kfree(entry);
++	return (ret < 0 ? ret : 1);
++}
 +
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * On restore path, MSI injections can happen before the
-+	 * first VCPU run so let's complete the GIC init here.
-+	 */
-+	return kvm_vgic_map_resources(its->dev->kvm);
- }
- 
- static int vgic_its_commit_v0(struct vgic_its *its)
-@@ -1718,6 +1808,10 @@ static int vgic_its_has_attr(struct kvm_device *dev,
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
- 			return 0;
-+		case KVM_DEV_ARM_ITS_SAVE_TABLES:
-+			return 0;
-+		case KVM_DEV_ARM_ITS_RESTORE_TABLES:
-+			return 0;
- 		}
- 		break;
- 	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
-@@ -1753,14 +1847,20 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 
- 		return 0;
- 	}
--	case KVM_DEV_ARM_VGIC_GRP_CTRL:
-+	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
-+		const struct vgic_its_abi *abi = vgic_its_get_abi(its);
-+
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
- 			its->initialized = true;
- 
- 			return 0;
-+		case KVM_DEV_ARM_ITS_SAVE_TABLES:
-+			return abi->save_tables(its);
-+		case KVM_DEV_ARM_ITS_RESTORE_TABLES:
-+			return abi->restore_tables(its);
- 		}
--		break;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
- 		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
- 		u64 reg;
+ /**
+  * vgic_its_save_device_tables - Save the device table and all ITT
+  * into guest RAM
 -- 
 2.5.5
