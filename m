@@ -1,54 +1,42 @@
-From: yannick.fertre@st.com (Yannick FERTRE)
-Date: Fri, 14 Apr 2017 09:59:07 +0000
-Subject: [PATCH v6 5/9] [media] add maintainers for DRM STM driver
-In-Reply-To: <9c4d57de-95f2-e07e-82fb-a7d81bc1d5f7@baylibre.com>
-References: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
- <1492157455-2283-6-git-send-email-yannick.fertre@st.com>
- <9c4d57de-95f2-e07e-82fb-a7d81bc1d5f7@baylibre.com>
-Message-ID: <814e6f82-928f-56b8-e896-3e31379eb41b@st.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 14 Apr 2017 12:07:05 +0200
+Subject: [PATCH] ARM: dts: at91: use correct compatible for the gpio mux
+ controller
+In-Reply-To: <1492118578-15356-1-git-send-email-peda@axentia.se>
+References: <1492118578-15356-1-git-send-email-peda@axentia.se>
+Message-ID: <20170414100705.tiltc433lidqzcr2@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
-This tag is not link to drm driver.
-Sorry for this mistake, I'll push a new patch.
+On 13/04/2017 at 23:22:58 +0200, Peter Rosin wrote:
+> The compatible string for a gpio based mux controller is "gpio-mux",
+> and nothing else.
+> 
+> Fixes: 29dd89418007 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
+>  arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Hi!
+> 
+> The compatible string for the gpio based mux changed along the way (on
+> request from Rob) but I failed to update the implementation in the
+> gpio-mux driver when I made that change. Consequently, I didn't notice
+> that I didn't update the compatible string here either, since it all
+> continued to work in my tests...
+> 
+> The compatible string in the gpio-mux driver is being fixed to match
+> documentation, so this of course needs fixing too. No TSE-850 devices
+> are affected, except for the one on my desk.
+> 
+> Sorry for the churn.
+> 
 
-Yannick
+So, I folded that one in the previous one and updated my pull request.
+Hopefully this will be OK.
 
-On 04/14/2017 11:07 AM, Neil Armstrong wrote:
-> On 04/14/2017 10:10 AM, Yannick Fertre wrote:
->> Add Philippe Cornu and myself as maintainers.
->>
->> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
->> ---
->>  MAINTAINERS | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index c36dfae..84cf73f 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -4424,6 +4424,15 @@ S:	Maintained
->>  F:	drivers/gpu/drm/sti
->>  F:	Documentation/devicetree/bindings/display/st,stih4xx.txt
->>
->> +DRM DRIVERS FOR STM
->> +M:	Yannick Fertre <yannick.fertre@st.com>
->> +M:	Philippe Cornu <philippe.cornu@st.com>
->> +L:	dri-devel at lists.freedesktop.org
->> +T:	git git://anongit.freedesktop.org/drm/drm-misc
->> +S:	Maintained
->> +F:	drivers/gpu/drm/stm
->> +F:	Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
->> +
->>  DRM DRIVER FOR TDFX VIDEO CARDS
->>  S:	Orphan / Obsolete
->>  F:	drivers/gpu/drm/tdfx/
->>
->
-> Hi Yannick,
->
-> why the [media] tag in the subject ?
->
-> Neil
->
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
