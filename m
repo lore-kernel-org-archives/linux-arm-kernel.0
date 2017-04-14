@@ -1,83 +1,246 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Fri, 14 Apr 2017 13:29:42 -0600
-Subject: [PATCH 1/3] arm64: hugetlb: Fix huge_pte_offset to return
- poisoned page table entries
-In-Reply-To: <20170412140459.21824-2-punit.agrawal@arm.com>
-References: <20170412140459.21824-1-punit.agrawal@arm.com>
- <20170412140459.21824-2-punit.agrawal@arm.com>
-Message-ID: <a9377db2-715d-acba-bd5c-3b7b8e4d5db7@codeaurora.org>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Sat, 15 Apr 2017 02:40:09 +0800
+Subject: [PATCH v24 06/11] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <20170414184014.8524-1-fu.wei@linaro.org>
+References: <20170414184014.8524-1-fu.wei@linaro.org>
+Message-ID: <20170414184014.8524-7-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2017 8:04 AM, Punit Agrawal wrote:
-> When memory failure is enabled, a poisoned hugepage pte is marked as a
-> swap entry. huge_pte_offset() does not return the poisoned page table
-> entries when it encounters PUD/PMD hugepages.
->
-> This behaviour of huge_pte_offset() leads to error such as below when
-> munmap is called on poisoned hugepages.
->
-> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
->
-> Fix huge_pte_offset() to return the poisoned pte which is then
-> appropriately handled by the generic layer code.
->
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: David Woods <dwoods@mellanox.com>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+From: Fu Wei <fu.wei@linaro.org>
 
-Thanks,
-Tyler
-> ---
->   arch/arm64/mm/hugetlbpage.c | 20 +++++++++++++++-----
->   1 file changed, 15 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 7514a000e361..5f1832165d69 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -143,15 +143,24 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
->   	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
->   	if (!pgd_present(*pgd))
->   		return NULL;
-> -	pud = pud_offset(pgd, addr);
-> -	if (!pud_present(*pud))
-> -		return NULL;
->   
-> -	if (pud_huge(*pud))
-> +	pud = pud_offset(pgd, addr);
-> +	/*
-> +	 * In case of HW Poisoning, a hugepage pud/pmd can contain
-> +	 * poisoned entries. Poisoned entries are marked as swap
-> +	 * entries.
-> +	 *
-> +	 * For puds/pmds that are not present, check to see if it
-> +	 * could be a swap entry (!present and !none).
-> +	 */
-> +	if ((!pte_present(pud_pte(*pud)) && !pud_none(*pud)) || pud_huge(*pud))
->   		return (pte_t *)pud;
-> +
->   	pmd = pmd_offset(pud, addr);
-> -	if (!pmd_present(*pmd))
-> +	if (pmd_none(*pmd))
->   		return NULL;
-> +	if (!pmd_present(*pmd) && !pmd_none(*pmd))
-> +		return (pte_t *)pmd;
->   
->   	if (pte_cont(pmd_pte(*pmd))) {
->   		pmd = pmd_offset(
-> @@ -160,6 +169,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
->   	}
->   	if (pmd_huge(*pmd))
->   		return (pte_t *)pmd;
-> +
->   	pte = pte_offset_kernel(pmd, addr);
->   	if (pte_present(*pte) && pte_cont(*pte)) {
->   		pte = pte_offset_kernel(
+This patch adds support for parsing arch timer info in GTDT,
+provides some kernel APIs to parse all the PPIs and
+always-on info in GTDT and export them.
 
+By this driver, we can simplify arm_arch_timer drivers, and
+separate the ACPI GTDT knowledge from it.
+
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/Kconfig          |   1 +
+ drivers/acpi/arm64/Kconfig  |   3 +
+ drivers/acpi/arm64/Makefile |   1 +
+ drivers/acpi/arm64/gtdt.c   | 157 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h        |   6 ++
+ 5 files changed, 168 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3741859..7e2baec 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -2,6 +2,7 @@ config ARM64
+ 	def_bool y
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
++	select ACPI_GTDT if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ACPI_MCFG if ACPI
+ 	select ACPI_SPCR_TABLE if ACPI
+diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+index 4616da4..5a6f80f 100644
+--- a/drivers/acpi/arm64/Kconfig
++++ b/drivers/acpi/arm64/Kconfig
+@@ -4,3 +4,6 @@
+ 
+ config ACPI_IORT
+ 	bool
++
++config ACPI_GTDT
++	bool
+diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
+index 72331f2..1017def 100644
+--- a/drivers/acpi/arm64/Makefile
++++ b/drivers/acpi/arm64/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ACPI_IORT) 	+= iort.o
++obj-$(CONFIG_ACPI_GTDT) 	+= gtdt.o
+diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
+new file mode 100644
+index 0000000..3d95af8
+--- /dev/null
++++ b/drivers/acpi/arm64/gtdt.c
+@@ -0,0 +1,157 @@
++/*
++ * ARM Specific GTDT table Support
++ *
++ * Copyright (C) 2016, Linaro Ltd.
++ * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
++ *         Fu Wei <fu.wei@linaro.org>
++ *         Hanjun Guo <hanjun.guo@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/acpi.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++
++#include <clocksource/arm_arch_timer.h>
++
++#undef pr_fmt
++#define pr_fmt(fmt) "ACPI GTDT: " fmt
++
++/**
++ * struct acpi_gtdt_descriptor - Store the key info of GTDT for all functions
++ * @gtdt:	The pointer to the struct acpi_table_gtdt of GTDT table.
++ * @gtdt_end:	The pointer to the end of GTDT table.
++ * @platform_timer:	The pointer to the start of Platform Timer Structure
++ *
++ * The struct store the key info of GTDT table, it should be initialized by
++ * acpi_gtdt_init.
++ */
++struct acpi_gtdt_descriptor {
++	struct acpi_table_gtdt *gtdt;
++	void *gtdt_end;
++	void *platform_timer;
++};
++
++static struct acpi_gtdt_descriptor acpi_gtdt_desc __initdata;
++
++static int __init map_gt_gsi(u32 interrupt, u32 flags)
++{
++	int trigger, polarity;
++
++	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
++			: ACPI_LEVEL_SENSITIVE;
++
++	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
++			: ACPI_ACTIVE_HIGH;
++
++	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
++}
++
++/**
++ * acpi_gtdt_map_ppi() - Map the PPIs of per-cpu arch_timer.
++ * @type:	the type of PPI.
++ *
++ * Note: Secure state is not managed by the kernel on ARM64 systems.
++ * So we only handle the non-secure timer PPIs,
++ * ARCH_TIMER_PHYS_SECURE_PPI is treated as invalid type.
++ *
++ * Return: the mapped PPI value, 0 if error.
++ */
++int __init acpi_gtdt_map_ppi(int type)
++{
++	struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
++
++	switch (type) {
++	case ARCH_TIMER_PHYS_NONSECURE_PPI:
++		return map_gt_gsi(gtdt->non_secure_el1_interrupt,
++				  gtdt->non_secure_el1_flags);
++	case ARCH_TIMER_VIRT_PPI:
++		return map_gt_gsi(gtdt->virtual_timer_interrupt,
++				  gtdt->virtual_timer_flags);
++
++	case ARCH_TIMER_HYP_PPI:
++		return map_gt_gsi(gtdt->non_secure_el2_interrupt,
++				  gtdt->non_secure_el2_flags);
++	default:
++		pr_err("Failed to map timer interrupt: invalid type.\n");
++	}
++
++	return 0;
++}
++
++/**
++ * acpi_gtdt_c3stop() - Got c3stop info from GTDT according to the type of PPI.
++ * @type:	the type of PPI.
++ *
++ * Return: true if the timer HW state is lost when a CPU enters an idle state,
++ * false otherwise
++ */
++bool __init acpi_gtdt_c3stop(int type)
++{
++	struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
++
++	switch (type) {
++	case ARCH_TIMER_PHYS_NONSECURE_PPI:
++		return !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
++
++	case ARCH_TIMER_VIRT_PPI:
++		return !(gtdt->virtual_timer_flags & ACPI_GTDT_ALWAYS_ON);
++
++	case ARCH_TIMER_HYP_PPI:
++		return !(gtdt->non_secure_el2_flags & ACPI_GTDT_ALWAYS_ON);
++
++	default:
++		pr_err("Failed to get c3stop info: invalid type.\n");
++	}
++
++	return false;
++}
++
++/**
++ * acpi_gtdt_init() - Get the info of GTDT table to prepare for further init.
++ * @table:			The pointer to GTDT table.
++ * @platform_timer_count:	It points to a integer variable which is used
++ *				for storing the number of platform timers.
++ *				This pointer could be NULL, if the caller
++ *				doesn't need this info.
++ *
++ * Return: 0 if success, -EINVAL if error.
++ */
++int __init acpi_gtdt_init(struct acpi_table_header *table,
++			  int *platform_timer_count)
++{
++	void *platform_timer;
++	struct acpi_table_gtdt *gtdt;
++
++	gtdt = container_of(table, struct acpi_table_gtdt, header);
++	acpi_gtdt_desc.gtdt = gtdt;
++	acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
++	acpi_gtdt_desc.platform_timer = NULL;
++	if (platform_timer_count)
++		*platform_timer_count = 0;
++
++	if (table->revision < 2) {
++		pr_warn("Revision:%d doesn't support Platform Timers.\n",
++			table->revision);
++		return 0;
++	}
++
++	if (!gtdt->platform_timer_count) {
++		pr_debug("No Platform Timer.\n");
++		return 0;
++	}
++
++	platform_timer = (void *)gtdt + gtdt->platform_timer_offset;
++	if (platform_timer < (void *)table + sizeof(struct acpi_table_gtdt)) {
++		pr_err(FW_BUG "invalid timer data.\n");
++		return -EINVAL;
++	}
++	acpi_gtdt_desc.platform_timer = platform_timer;
++	if (platform_timer_count)
++		*platform_timer_count = gtdt->platform_timer_count;
++
++	return 0;
++}
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 9b05886..4b5c146 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -595,6 +595,12 @@ enum acpi_reconfig_event  {
+ int acpi_reconfig_notifier_register(struct notifier_block *nb);
+ int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
+ 
++#ifdef CONFIG_ACPI_GTDT
++int acpi_gtdt_init(struct acpi_table_header *table, int *platform_timer_count);
++int acpi_gtdt_map_ppi(int type);
++bool acpi_gtdt_c3stop(int type);
++#endif
++
+ #else	/* !CONFIG_ACPI */
+ 
+ #define acpi_disabled 1
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.9.3
