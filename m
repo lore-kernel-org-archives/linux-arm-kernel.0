@@ -1,140 +1,133 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Thu, 13 Apr 2017 20:48:48 -0400
-Subject: [PATCH 2/2] xen/arm,arm64: rename __generic_dma_ops to
- xen_get_dma_ops
-In-Reply-To: <1492117462-19886-2-git-send-email-sstabellini@kernel.org>
-References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
- <1492117462-19886-2-git-send-email-sstabellini@kernel.org>
-Message-ID: <a61c9f25-37fb-2c30-f723-e18560a03e26@oracle.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 13 Apr 2017 22:04:24 -0300
+Subject: [PATCH v3 00/21] eeprom: at24: Add OF device ID table
+Message-ID: <20170414010445.21727-1-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Wolfram,
 
+This series is a follow-up to patch [0] that added an OF device ID table
+to the at24 EEPROM driver. As you suggested [1], this version instead of
+adding entries for every used <vendor,device> tuple, only adds a single
+entry for each chip type using the "atmel" vendor as a generic fallback.
 
-On 04/13/2017 05:04 PM, Stefano Stabellini wrote:
-> Now that __generic_dma_ops is a xen specific function, rename it to
-> xen_get_dma_ops. Change all the call sites appropriately.
->
-> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
-> CC: linux at armlinux.org.uk
-> CC: catalin.marinas at arm.com
-> CC: will.deacon at arm.com
-> CC: boris.ostrovsky at oracle.com
-> CC: jgross at suse.com
-> CC: Julien Grall <julien.grall@arm.com>
+The first patch adds the OF device ID table for the at24 driver and the
+next patches adds a generic fallback compatible string to each DTS that
+defines a compatible I2C EEPROM device node.
 
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Patches can be applied independently since the DTS change without the
+driver change is a no-op and the OF device table won't be used without
+the DTS changes.
 
-(+Konrad)
+[0]: https://lkml.org/lkml/2017/3/14/589
+[1]: https://lkml.org/lkml/2017/3/15/99
 
+Best regards,
+Javier
 
-> ---
->  drivers/xen/swiotlb-xen.c       |  8 ++++----
->  include/xen/arm/page-coherent.h | 20 ++++++++++----------
->  2 files changed, 14 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-> index e8cef1a..8dab0d3 100644
-> --- a/drivers/xen/swiotlb-xen.c
-> +++ b/drivers/xen/swiotlb-xen.c
-> @@ -693,8 +693,8 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
->  		     unsigned long attrs)
->  {
->  #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-> -	if (__generic_dma_ops(dev)->mmap)
-> -		return __generic_dma_ops(dev)->mmap(dev, vma, cpu_addr,
-> +	if (xen_get_dma_ops(dev)->mmap)
-> +		return xen_get_dma_ops(dev)->mmap(dev, vma, cpu_addr,
->  						    dma_addr, size, attrs);
->  #endif
->  	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
-> @@ -711,7 +711,7 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
->  			unsigned long attrs)
->  {
->  #if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-> -	if (__generic_dma_ops(dev)->get_sgtable) {
-> +	if (xen_get_dma_ops(dev)->get_sgtable) {
->  #if 0
->  	/*
->  	 * This check verifies that the page belongs to the current domain and
-> @@ -721,7 +721,7 @@ void xen_swiotlb_unmap_page(struct device *hwdev, dma_addr_t dev_addr,
->  		unsigned long bfn = PHYS_PFN(dma_to_phys(dev, handle));
->  		BUG_ON (!page_is_ram(bfn));
->  #endif
-> -		return __generic_dma_ops(dev)->get_sgtable(dev, sgt, cpu_addr,
-> +		return xen_get_dma_ops(dev)->get_sgtable(dev, sgt, cpu_addr,
->  							   handle, size, attrs);
->  	}
->  #endif
-> diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
-> index b0a2bfc..b1b4ecd 100644
-> --- a/include/xen/arm/page-coherent.h
-> +++ b/include/xen/arm/page-coherent.h
-> @@ -5,7 +5,7 @@
->  #include <asm/dma-mapping.h>
->  #include <linux/dma-mapping.h>
->
-> -static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
-> +static inline const struct dma_map_ops *xen_get_dma_ops(struct device *dev)
->  {
->  	if (dev && dev->archdata.dev_dma_ops)
->  		return dev->archdata.dev_dma_ops;
-> @@ -27,13 +27,13 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
->  static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
->  		dma_addr_t *dma_handle, gfp_t flags, unsigned long attrs)
->  {
-> -	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
-> +	return xen_get_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
->  }
->
->  static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
->  		void *cpu_addr, dma_addr_t dma_handle, unsigned long attrs)
->  {
-> -	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
-> +	xen_get_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
->  }
->
->  static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
-> @@ -57,7 +57,7 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
->  	 * specific function.
->  	 */
->  	if (local)
-> -		__generic_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
-> +		xen_get_dma_ops(hwdev)->map_page(hwdev, page, offset, size, dir, attrs);
->  	else
->  		__xen_dma_map_page(hwdev, page, dev_addr, offset, size, dir, attrs);
->  }
-> @@ -75,8 +75,8 @@ static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
->  	 * specific function.
->  	 */
->  	if (pfn_valid(pfn)) {
-> -		if (__generic_dma_ops(hwdev)->unmap_page)
-> -			__generic_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
-> +		if (xen_get_dma_ops(hwdev)->unmap_page)
-> +			xen_get_dma_ops(hwdev)->unmap_page(hwdev, handle, size, dir, attrs);
->  	} else
->  		__xen_dma_unmap_page(hwdev, handle, size, dir, attrs);
->  }
-> @@ -86,8 +86,8 @@ static inline void xen_dma_sync_single_for_cpu(struct device *hwdev,
->  {
->  	unsigned long pfn = PFN_DOWN(handle);
->  	if (pfn_valid(pfn)) {
-> -		if (__generic_dma_ops(hwdev)->sync_single_for_cpu)
-> -			__generic_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
-> +		if (xen_get_dma_ops(hwdev)->sync_single_for_cpu)
-> +			xen_get_dma_ops(hwdev)->sync_single_for_cpu(hwdev, handle, size, dir);
->  	} else
->  		__xen_dma_sync_single_for_cpu(hwdev, handle, size, dir);
->  }
-> @@ -97,8 +97,8 @@ static inline void xen_dma_sync_single_for_device(struct device *hwdev,
->  {
->  	unsigned long pfn = PFN_DOWN(handle);
->  	if (pfn_valid(pfn)) {
-> -		if (__generic_dma_ops(hwdev)->sync_single_for_device)
-> -			__generic_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
-> +		if (xen_get_dma_ops(hwdev)->sync_single_for_device)
-> +			xen_get_dma_ops(hwdev)->sync_single_for_device(hwdev, handle, size, dir);
->  	} else
->  		__xen_dma_sync_single_for_device(hwdev, handle, size, dir);
->  }
->
+Changes in v3:
+- Fix wrong .data values for "atmel,24c02" and "atmel,24c64" entries.
+- Add Peter Rosin acked-by tag.
+- Add Geert Uytterhoeven reviewed-by tag.
+- Add Geert Uytterhoeven reviewed-by tag.
+
+Changes in v2:
+- Only add a single OF device ID entry for each device type (Wolfram Sang).
+
+Javier Martinez Canillas (21):
+  dt-bindings: i2c: eeprom: Document manufacturer used as generic
+    fallback
+  eeprom: at24: Add OF device ID table
+  ARM: dts: omap: Add generic compatible string for I2C EEPROM
+  ARM: dts: turris-omnia: Add generic compatible string for I2C EEPROM
+  ARM: dts: at91: Add generic compatible string for I2C EEPROM
+  ARM: dts: efm32: Add generic compatible string for I2C EEPROM
+  ARM: dts: imx: Add generic compatible string for I2C EEPROM
+  ARM: dts: keystone: Add generic compatible string for I2C EEPROM
+  ARM: dts: lpc18xx: Add generic compatible string for I2C EEPROM
+  ARM: dts: r7s72100: Add generic compatible string for I2C EEPROM
+  ARM: dts: koelsch: Add generic compatible string for I2C EEPROM
+  ARM: dts: socfpga: Add generic compatible string for I2C EEPROM
+  ARM: dts: uniphier: Add generic compatible string for I2C EEPROM
+  ARM: dts: zynq: Add generic compatible string for I2C EEPROM
+  arm64: dts: ls1043a: Add generic compatible string for I2C EEPROM
+  arm64: zynqmp: Add generic compatible string for I2C EEPROM
+  powerpc/5200: Add generic compatible string for I2C EEPROM
+  powerpc/fsl: Add generic compatible string for I2C EEPROM
+  powerpc/512x: Add generic compatible string for I2C EEPROM
+  powerpc/83xx: Add generic compatible string for I2C EEPROM
+  powerpc/44x: Add generic compatible string for I2C EEPROM
+
+ .../devicetree/bindings/eeprom/eeprom.txt          |  3 +-
+ arch/arm/boot/dts/am335x-baltos.dtsi               |  2 +-
+ arch/arm/boot/dts/am335x-base0033.dts              |  2 +-
+ arch/arm/boot/dts/am335x-bone-common.dtsi          | 10 ++--
+ arch/arm/boot/dts/am335x-nano.dts                  |  2 +-
+ arch/arm/boot/dts/am335x-pepper.dts                |  2 +-
+ arch/arm/boot/dts/am335x-shc.dts                   |  2 +-
+ arch/arm/boot/dts/am335x-sl50.dts                  |  2 +-
+ arch/arm/boot/dts/am437x-idk-evm.dts               |  2 +-
+ arch/arm/boot/dts/am437x-sk-evm.dts                |  2 +-
+ arch/arm/boot/dts/am43x-epos-evm.dts               |  2 +-
+ arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi    |  2 +-
+ arch/arm/boot/dts/armada-385-turris-omnia.dts      |  2 +-
+ arch/arm/boot/dts/at91-linea.dtsi                  |  2 +-
+ arch/arm/boot/dts/at91-tse850-3.dts                |  2 +-
+ arch/arm/boot/dts/efm32gg-dk3750.dts               |  2 +-
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi  |  2 +-
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    |  2 +-
+ arch/arm/boot/dts/imx28-evk.dts                    |  2 +-
+ arch/arm/boot/dts/imx53-tqma53.dtsi                |  2 +-
+ arch/arm/boot/dts/imx6q-cm-fx6.dts                 |  2 +-
+ arch/arm/boot/dts/imx6q-utilite-pro.dts            |  2 +-
+ arch/arm/boot/dts/keystone-k2e-evm.dts             |  2 +-
+ arch/arm/boot/dts/keystone-k2hk-evm.dts            |  2 +-
+ arch/arm/boot/dts/keystone-k2l-evm.dts             |  2 +-
+ arch/arm/boot/dts/lpc4337-ciaa.dts                 |  6 +-
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts           |  2 +-
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts        |  2 +-
+ arch/arm/boot/dts/omap3-cm-t3x.dtsi                |  2 +-
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |  2 +-
+ arch/arm/boot/dts/omap3-sb-t35.dtsi                |  2 +-
+ arch/arm/boot/dts/omap4-var-som-om44.dtsi          |  2 +-
+ arch/arm/boot/dts/omap5-cm-t54.dts                 |  2 +-
+ arch/arm/boot/dts/omap5-sbc-t54.dts                |  2 +-
+ arch/arm/boot/dts/r7s72100-genmai.dts              |  2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts |  2 +-
+ arch/arm/boot/dts/uniphier-pro4-ace.dts            |  2 +-
+ arch/arm/boot/dts/uniphier-pro4-sanji.dts          |  2 +-
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts         |  2 +-
+ arch/arm/boot/dts/zynq-zc702.dts                   |  2 +-
+ arch/arm/boot/dts/zynq-zc706.dts                   |  2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  4 +-
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts        |  4 +-
+ arch/powerpc/boot/dts/digsy_mtc.dts                |  2 +-
+ arch/powerpc/boot/dts/fsl/b4qds.dtsi               |  8 +--
+ arch/powerpc/boot/dts/fsl/c293pcie.dts             |  2 +-
+ arch/powerpc/boot/dts/fsl/p1010rdb.dtsi            |  2 +-
+ arch/powerpc/boot/dts/fsl/p1023rdb.dts             |  2 +-
+ arch/powerpc/boot/dts/fsl/p2041rdb.dts             |  4 +-
+ arch/powerpc/boot/dts/fsl/p3041ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/p4080ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/p5020ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/p5040ds.dts              |  4 +-
+ arch/powerpc/boot/dts/fsl/t208xqds.dtsi            |  8 +--
+ arch/powerpc/boot/dts/fsl/t4240qds.dts             | 12 ++--
+ arch/powerpc/boot/dts/fsl/t4240rdb.dts             |  6 +-
+ arch/powerpc/boot/dts/mpc5121ads.dts               |  2 +-
+ arch/powerpc/boot/dts/mpc8308_p1m.dts              |  2 +-
+ arch/powerpc/boot/dts/mpc8349emitx.dts             |  2 +-
+ arch/powerpc/boot/dts/mpc8377_rdb.dts              |  2 +-
+ arch/powerpc/boot/dts/mpc8377_wlan.dts             |  2 +-
+ arch/powerpc/boot/dts/mpc8378_rdb.dts              |  2 +-
+ arch/powerpc/boot/dts/mpc8379_rdb.dts              |  2 +-
+ arch/powerpc/boot/dts/pcm030.dts                   |  2 +-
+ arch/powerpc/boot/dts/pcm032.dts                   |  2 +-
+ arch/powerpc/boot/dts/warp.dts                     |  2 +-
+ drivers/misc/eeprom/at24.c                         | 65 +++++++++++++++++++++-
+ 68 files changed, 158 insertions(+), 94 deletions(-)
+
+-- 
+2.9.3
