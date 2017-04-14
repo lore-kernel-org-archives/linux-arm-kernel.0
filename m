@@ -1,46 +1,50 @@
-From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Fri, 14 Apr 2017 14:16:36 +0200
-Subject: [PATCH V5 2/2] thermal: broadcom: add Northstar thermal driver
-In-Reply-To: <20170407044218.GA12447@localhost.localdomain>
-References: <20170331201124.656-1-zajec5@gmail.com>
- <20170403154829.29780-1-zajec5@gmail.com>
- <20170403154829.29780-2-zajec5@gmail.com>
- <20170407044218.GA12447@localhost.localdomain>
-Message-ID: <6dd2617d-a8a8-d7a4-53a4-7ebcb274573c@milecki.pl>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 14 Apr 2017 13:43:15 +0100
+Subject: [PATCH] drivers/of_iommu: ignore SMMU DT nodes with status 'disabled'
+Message-ID: <20170414124315.2401-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2017 06:42 AM, Eduardo Valentin wrote:
-> On Mon, Apr 03, 2017 at 05:48:29PM +0200, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> Northstar is a SoC family commonly used in home routers. This commit
->> adds a driver for checking CPU temperature. As Northstar Plus seems to
->> also have this IP block this new symbol gets ARCH_BCM_IPROC dependency.
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
->
-> If no objection, I am applying this series.
+DT nodes may have a status property, and if they do, such nodes should
+only be considered present if the status property is set to 'okay'.
 
-Cool, hopefully there aren't any more objections :) Once applied should I
-expect this in
-https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/log/?h=next
-?
+Currently, we call the init function of IOMMUs described by the device
+tree without taking this into account, which may result in the output
+below on systems where some SMMUs may be legally disabled.
 
-That would allow me to move bcm2835_thermal.c to the broadcom subdir.
+ Failed to initialise IOMMU /smb/smmu at e0200000
+ Failed to initialise IOMMU /smb/smmu at e0c00000
+ arm-smmu e0a00000.smmu: probing hardware configuration...
+ arm-smmu e0a00000.smmu: SMMUv1 with:
+ arm-smmu e0a00000.smmu:  stage 2 translation
+ arm-smmu e0a00000.smmu:  coherent table walk
+ arm-smmu e0a00000.smmu:  stream matching with 32 register groups, mask 0x7fff
+ arm-smmu e0a00000.smmu:  8 context banks (8 stage-2 only)
+ arm-smmu e0a00000.smmu:  Supported page sizes: 0x60211000
+ arm-smmu e0a00000.smmu:  Stage-2: 40-bit IPA -> 40-bit PA
+ Failed to initialise IOMMU /smb/smmu at e0600000
+ Failed to initialise IOMMU /smb/smmu at e0800000
 
+Since this is not an error condition, only call the init function if
+the device is enabled, which also inhibits the spurious error messages.
 
->> +const struct thermal_zone_of_device_ops ns_thermal_ops = {
->
-> minor correction here:
->
-> -const struct thermal_zone_of_device_ops ns_thermal_ops = {
-> +static const struct thermal_zone_of_device_ops ns_thermal_ops = {
->
-> but I am applying this already in my tree.
->
->> +	.get_temp = ns_thermal_get_temp,
->> +};
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/iommu/of_iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thank you!
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 2683e9fc0dcf..2dd1206e6c0d 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -183,7 +183,7 @@ static int __init of_iommu_init(void)
+ 	for_each_matching_node_and_match(np, matches, &match) {
+ 		const of_iommu_init_fn init_fn = match->data;
+ 
+-		if (init_fn(np))
++		if (of_device_is_available(np) && init_fn(np))
+ 			pr_err("Failed to initialise IOMMU %s\n",
+ 				of_node_full_name(np));
+ 	}
+-- 
+2.9.3
