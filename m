@@ -1,63 +1,31 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 14 Apr 2017 10:10:49 +0200
-Subject: [PATCH v6 3/9] dt-bindings: display: Add STM32 LTDC driver
+Date: Fri, 14 Apr 2017 10:10:54 +0200
+Subject: [PATCH v6 8/9] ARM: configs: stm32: Add DRM support in STM32 defconfig
 In-Reply-To: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
 References: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1492157455-2283-4-git-send-email-yannick.fertre@st.com>
+Message-ID: <1492157455-2283-9-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the STM32 LTDC
-(Lcd-Tft Display Controller).
+This patch adds DRM (Direct Rendering Manager) support
+in stm32_defconfig file
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- .../devicetree/bindings/display/st,stm32-ltdc.txt  | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+ arch/arm/configs/stm32_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-new file mode 100644
-index 0000000..8e14769
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-@@ -0,0 +1,36 @@
-+* STMicroelectronics STM32 lcd-tft display controller
-+
-+- ltdc: lcd-tft display controller host
-+  must be a sub-node of st-display-subsystem
-+  Required properties:
-+  - compatible: "st,stm32-ltdc"
-+  - reg: Physical base address of the IP registers and length of memory mapped region.
-+  - clocks: A list of phandle + clock-specifier pairs, one for each
-+    entry in 'clock-names'.
-+  - clock-names: A list of clock names. For ltdc it should contain:
-+      - "lcd" for the clock feeding the output pixel clock & IP clock.
-+  - resets: reset to be used by the device (defined by use of RCC macro).
-+  Required nodes:
-+    - Video port for RGB output.
-+
-+Example:
-+
-+/ {
-+	...
-+	soc {
-+	...
-+		ltdc: display-controller at 40016800 {
-+			compatible = "st,stm32-ltdc";
-+			reg = <0x40016800 0x200>;
-+			interrupts = <88>, <89>;
-+			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
-+			clocks = <&rcc 1 CLK_LCD>;
-+			clock-names = "lcd";
-+
-+			port {
-+				ltdc_out_rgb: endpoint {
-+				};
-+			};
-+		};
-+	};
-+};
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index a9d8e3c..c2ff2e7 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -48,6 +48,7 @@ CONFIG_SERIAL_STM32=y
+ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
++CONFIG_DRM=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
 -- 
 1.9.1
