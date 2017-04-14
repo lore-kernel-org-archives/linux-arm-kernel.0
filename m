@@ -1,45 +1,58 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:14 +0200
-Subject: [PATCH v5 02/22] KVM: arm/arm64: Add GICV3 pending table save API
- documentation
+Date: Fri, 14 Apr 2017 12:15:18 +0200
+Subject: [PATCH v5 06/22] KVM: arm/arm64: vgic: expose (un)lock_all_vcpus
 In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-3-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-7-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description for how to save GICV3 LPI pending bit into
-guest RAM pending tables.
+We need to use those helpers in vgic-its.c so let's
+expose them in the private vgic header.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 ---
-v5: creation
----
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-index c1a2461..9293b45 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-@@ -167,11 +167,17 @@ Groups:
-     KVM_DEV_ARM_VGIC_CTRL_INIT
-       request the initialization of the VGIC, no additional parameter in
-       kvm_device_attr.addr.
-+    KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-+      save all LPI pending bits into guest RAM pending tables.
+v4 -> v5:
+- Add Marc's A-b
+---
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 4 ++--
+ virt/kvm/arm/vgic/vgic.h            | 3 +++
+ 2 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index d181d2b..859bfa8 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -259,13 +259,13 @@ static void unlock_vcpus(struct kvm *kvm, int vcpu_lock_idx)
+ 	}
+ }
+ 
+-static void unlock_all_vcpus(struct kvm *kvm)
++void unlock_all_vcpus(struct kvm *kvm)
+ {
+ 	unlock_vcpus(kvm, atomic_read(&kvm->online_vcpus) - 1);
+ }
+ 
+ /* Returns true if all vcpus were locked, false otherwise */
+-static bool lock_all_vcpus(struct kvm *kvm)
++bool lock_all_vcpus(struct kvm *kvm)
+ {
+ 	struct kvm_vcpu *tmp_vcpu;
+ 	int c;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 6cf557e..b87f1c6 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -184,4 +184,7 @@ int vgic_init(struct kvm *kvm);
+ int vgic_debug_init(struct kvm *kvm);
+ int vgic_debug_destroy(struct kvm *kvm);
+ 
++bool lock_all_vcpus(struct kvm *kvm);
++void unlock_all_vcpus(struct kvm *kvm);
 +
-+      The first kB of the pending table is not altered by this operation.
-   Errors:
-     -ENXIO: VGIC not properly configured as required prior to calling
-      this attribute
-     -ENODEV: no online VCPU
-     -ENOMEM: memory shortage when allocating vgic internal data
-+    -EFAULT: Invalid guest ram access
-+    -EBUSY:  One or more VCPUS are running
- 
- 
-   KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+ #endif
 -- 
 2.5.5
