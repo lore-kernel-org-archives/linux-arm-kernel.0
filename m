@@ -1,47 +1,38 @@
 From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 14 Apr 2017 17:40:55 +0200
-Subject: [PATCH v6 4/4] ARM: dts: armada-xp: Use pwm-fan rather than gpio-fan
+Date: Fri, 14 Apr 2017 17:40:54 +0200
+Subject: [PATCH v6 3/4] ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
 In-Reply-To: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
 References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170414154056.32055-5-ralph.sennhauser@gmail.com>
+Message-ID: <20170414154056.32055-4-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Lunn <andrew@lunn.ch>
 
-The mvebu GPIO driver can also perform PWM on some pins. Use the pwm-fan
-driver to control the fan of the WRT1900AC, giving us finer grained control
-over its speed and hence noise.
+Now that the GPIO driver also supports PWM operation, enable the PWM
+framework and fan driver in mvebu_v7_defconfig.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-URL: https://patchwork.ozlabs.org/patch/427291/
-[Ralph Sennhauser: drop flags paramter from pwms, no longer used]
+URL: https://patchwork.ozlabs.org/patch/427297/
+[Ralph Sennhauser: add fan driver to defconfig]
 Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/configs/mvebu_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index 9efcf59..6d705f5 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -308,13 +308,11 @@
- 		};
- 	};
- 
--	gpio_fan {
-+	pwm_fan {
- 		/* SUNON HA4010V4-0000-C99 */
--		compatible = "gpio-fan";
--		gpios = <&gpio0 24 0>;
- 
--		gpio-fan,speed-map = <0    0
--				      4500 1>;
-+		compatible = "pwm-fan";
-+		pwms = <&gpio0 24 4000>;
- 	};
- 
- 	dsa {
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index f1a0e25..6955370 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -135,6 +135,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_MV_XOR=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_MEMORY=y
++CONFIG_PWM=y
++CONFIG_SENSORS_PWM_FAN=y
+ CONFIG_EXT4_FS=y
+ CONFIG_ISO9660_FS=y
+ CONFIG_JOLIET=y
 -- 
 2.10.2
