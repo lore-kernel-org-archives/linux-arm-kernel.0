@@ -1,109 +1,66 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 14 Apr 2017 20:34:32 +0530
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
-Message-ID: <1492182272-31132-1-git-send-email-bharatku@xilinx.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 14 Apr 2017 08:16:16 -0700
+Subject: [PATCH V5 2/2] thermal: broadcom: add Northstar thermal driver
+In-Reply-To: <6dd2617d-a8a8-d7a4-53a4-7ebcb274573c@milecki.pl>
+References: <20170331201124.656-1-zajec5@gmail.com>
+ <20170403154829.29780-1-zajec5@gmail.com>
+ <20170403154829.29780-2-zajec5@gmail.com>
+ <20170407044218.GA12447@localhost.localdomain>
+ <6dd2617d-a8a8-d7a4-53a4-7ebcb274573c@milecki.pl>
+Message-ID: <20170414151613.GA24429@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Adding spinlock for protecting legacy mask register
-- Few wifi end points which only support legacy interrupts,
-performs hardware reset functionalities after disabling interrupts
-by invoking disable_irq and then re-enable using enable_irq, they
-enable hardware interrupts first and then virtual irq line later.
-- The legacy irq line goes low only after DEASSERT_INTx is
-received.As the legacy irq line is high immediately after hardware
-interrupts are enabled but virq of EP is still in disabled state
-and EP handler is never executed resulting no DEASSERT_INTx.If dummy
-irq chip is used, interrutps are not masked and system is
-hanging with CPU stall.
-- Adding irq chip functions instead of dummy irq chip for legacy
-interrupts.
-- Legacy interrupts are level sensitive, so using handle_level_irq
-is more appropriate as it is masks interrupts until End point handles
-interrupts and unmasks interrutps after End point handler is executed.
-- Legacy interrupts are level triggered, virtual irq line of End
-Point shows as edge in /proc/interrupts.
-- Setting irq flags of virtual irq line of EP to level triggered
-at the time of mapping.
+Hello Rafal,
 
-Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
----
- drivers/pci/host/pcie-xilinx-nwl.c | 45 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+), 1 deletion(-)
+On Fri, Apr 14, 2017 at 02:16:36PM +0200, Rafa? Mi?ecki wrote:
+> On 04/07/2017 06:42 AM, Eduardo Valentin wrote:
+> >On Mon, Apr 03, 2017 at 05:48:29PM +0200, Rafa? Mi?ecki wrote:
+> >>From: Rafa? Mi?ecki <rafal@milecki.pl>
+> >>
+> >>Northstar is a SoC family commonly used in home routers. This commit
+> >>adds a driver for checking CPU temperature. As Northstar Plus seems to
+> >>also have this IP block this new symbol gets ARCH_BCM_IPROC dependency.
+> >>
+> >>Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> >>Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> >
+> >If no objection, I am applying this series.
+> 
+> Cool, hopefully there aren't any more objections :) Once applied should I
+> expect this in
+> https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/log/?h=next
+> ?
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 43eaa4a..36f4fb4 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -184,6 +184,7 @@ struct nwl_pcie {
- 	u8 root_busno;
- 	struct nwl_msi msi;
- 	struct irq_domain *legacy_irq_domain;
-+	raw_spinlock_t leg_mask_lock;
- };
- 
- static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-@@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
-+static void nwl_mask_leg_irq(struct irq_data *data)
-+{
-+	struct irq_desc *desc = irq_to_desc(data->irq);
-+	struct nwl_pcie *pcie;
-+	unsigned long flags;
-+	u32 mask;
-+	u32 val;
-+
-+	pcie = irq_desc_get_chip_data(desc);
-+	mask = 1 << (data->hwirq - 1);
-+	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-+	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-+	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
-+	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-+}
-+
-+static void nwl_unmask_leg_irq(struct irq_data *data)
-+{
-+	struct irq_desc *desc = irq_to_desc(data->irq);
-+	struct nwl_pcie *pcie;
-+	unsigned long flags;
-+	u32 mask;
-+	u32 val;
-+
-+	pcie = irq_desc_get_chip_data(desc);
-+	mask = 1 << (data->hwirq - 1);
-+	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-+	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-+	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
-+	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-+}
-+
-+static struct irq_chip nwl_leg_irq_chip = {
-+	.name = "nwl_pcie:legacy",
-+	.irq_enable = nwl_unmask_leg_irq,
-+	.irq_disable = nwl_mask_leg_irq,
-+	.irq_mask = nwl_mask_leg_irq,
-+	.irq_unmask = nwl_unmask_leg_irq,
-+};
-+
- static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
- 			  irq_hw_number_t hwirq)
- {
--	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-+	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
-+	irq_set_status_flags(irq, IRQ_LEVEL);
- 
- 	return 0;
- }
-@@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
- 		return -ENOMEM;
- 	}
- 
-+	raw_spin_lock_init(&pcie->leg_mask_lock);
- 	nwl_pcie_init_msi_irq_domain(pcie);
- 	return 0;
- }
--- 
-2.1.1
+They were already applied, but in my #linus branch. Now they are also in
+my #next branch. The #linus branch goes to the coming merge window. The
+#next branch goes to linux-next testing. Your change is now on
+linux-next test, kernelci testing, and for the coming merge windown.
+
+> 
+> That would allow me to move bcm2835_thermal.c to the broadcom subdir.
+> 
+> 
+
+Please send the patch.
+
+> >>+const struct thermal_zone_of_device_ops ns_thermal_ops = {
+> >
+> >minor correction here:
+> >
+> >-const struct thermal_zone_of_device_ops ns_thermal_ops = {
+> >+static const struct thermal_zone_of_device_ops ns_thermal_ops = {
+> >
+> >but I am applying this already in my tree.
+> >
+> >>+	.get_temp = ns_thermal_get_temp,
+> >>+};
+> 
+> Thank you!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/d7a4f133/attachment.sig>
