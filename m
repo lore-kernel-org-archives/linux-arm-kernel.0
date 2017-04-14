@@ -1,42 +1,52 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 13 Apr 2017 21:19:17 -0400
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 13 Apr 2017 20:30:54 -0500
 Subject: [PATCH V8 3/5] PCI/ASPM: add init hook to device_add
-In-Reply-To: <20170413210218.GA24910@bhelgaas-glaptop.roam.corp.google.com>
+In-Reply-To: <76b74ad0-0c7f-a366-89d6-dc87ac315bc5@codeaurora.org>
 References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
  <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
  <20170413204800.GB28316@bhelgaas-glaptop.roam.corp.google.com>
  <20170413210218.GA24910@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <76b74ad0-0c7f-a366-89d6-dc87ac315bc5@codeaurora.org>
+ <76b74ad0-0c7f-a366-89d6-dc87ac315bc5@codeaurora.org>
+Message-ID: <CAErSpo6OgQODbJGAyVRp5Y7ifDjmmvRtVbXKbGXBJcYsQJr9OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2017 5:02 PM, Bjorn Helgaas wrote:
-> I do see that you change the deallocation in patch [5/5], but I think
-> the deallocation change should be in the same patch as the allocation
-> change.  Otherwise I think we have a use-after-free problem in this
-> sequence:
+On Thu, Apr 13, 2017 at 8:19 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 4/13/2017 5:02 PM, Bjorn Helgaas wrote:
+>> I do see that you change the deallocation in patch [5/5], but I think
+>> the deallocation change should be in the same patch as the allocation
+>> change.  Otherwise I think we have a use-after-free problem in this
+>> sequence:
+>
+> Sure, I'll reorder. As you can see here, link will be only removed if
+> root port is being removed.
+>
+> Without this, we'll hit the use after free issue you mentioned.
+>
+>         if (pdev->has_secondary_link) {
+>                 link = pdev->link_state;
+>                 down_read(&pci_bus_sem);
+>                 mutex_lock(&aspm_lock);
+>
+>                 list_del(&link->sibling);
+>                 list_del(&link->link);
+>
+>                 /* Clock PM is for endpoint device */
+>                 free_link_state(link);
+>                 mutex_unlock(&aspm_lock);
+>                 up_read(&pci_bus_sem);
+>                 return;
+>         }
 
-Sure, I'll reorder. As you can see here, link will be only removed if
-root port is being removed.
+Right, but this "pdev->has_secondary_link" check is in your new code
+and doesn't show up until patch [5/5].
 
-Without this, we'll hit the use after free issue you mentioned.
+As of *this* patch [3/5], the link is removed when the endpoint is
+removed, so we could hit the use-after-free.
 
-	if (pdev->has_secondary_link) {
-		link = pdev->link_state;
-		down_read(&pci_bus_sem);
-		mutex_lock(&aspm_lock);
+Granted, we'll only be susceptible to this while bisecting because
+normally all the patches will be applied.  But I think this patch will
+make more sense and be easier to review if it makes the link_state
+lifetime match the Port's lifetime.
 
-		list_del(&link->sibling);
-		list_del(&link->link);
-
-		/* Clock PM is for endpoint device */
-		free_link_state(link);
-		mutex_unlock(&aspm_lock);
-		up_read(&pci_bus_sem);
-		return;
-	}  
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Bjorn
