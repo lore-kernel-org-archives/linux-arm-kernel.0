@@ -1,41 +1,32 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 14 Apr 2017 10:10:52 +0200
-Subject: [PATCH v6 6/9] ARM: dts: stm32: Add ltdc support on stm32f429 MCU
+Date: Fri, 14 Apr 2017 10:10:55 +0200
+Subject: [PATCH v6 9/9] ARM: configs: stm32: Add simple panel support in STM32
+ defconfig
 In-Reply-To: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
 References: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1492157455-2283-7-git-send-email-yannick.fertre@st.com>
+Message-ID: <1492157455-2283-10-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add LTDC (Lcd-tft Display Controller) support.
+This patch adds simple panel support in stm32_defconfig file
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/configs/stm32_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index ee0da97..23debd9 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -543,7 +543,17 @@
- 			reg = <0x40007000 0x400>;
- 		};
- 
--		pin-controller {
-+		ltdc: display-controller at 40016800 {
-+			compatible = "st,stm32-ltdc";
-+			reg = <0x40016800 0x200>;
-+			interrupts = <88>, <89>;
-+			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
-+			clocks = <&rcc 1 CLK_LCD>;
-+			clock-names = "lcd";
-+			status = "disabled";
-+		};
-+
-+		pinctrl: pin-controller {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "st,stm32f429-pinctrl";
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index c2ff2e7..0d38263 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -49,6 +49,8 @@ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+ CONFIG_DRM=y
++CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
 -- 
 1.9.1
