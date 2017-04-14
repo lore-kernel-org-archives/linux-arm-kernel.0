@@ -1,38 +1,41 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 14 Apr 2017 12:13:35 +0200
-Subject: [PATCH v7 5/9] MAINTAINERS: add maintainers for DRM STM driver
+Date: Fri, 14 Apr 2017 12:13:36 +0200
+Subject: [PATCH v7 6/9] ARM: dts: stm32: Add ltdc support on stm32f429 MCU
 In-Reply-To: <1492164819-10513-1-git-send-email-yannick.fertre@st.com>
 References: <1492164819-10513-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1492164819-10513-6-git-send-email-yannick.fertre@st.com>
+Message-ID: <1492164819-10513-7-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Philippe Cornu and myself as maintainers.
+Add LTDC (Lcd-tft Display Controller) support.
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/stm32f429.dtsi | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c36dfae..84cf73f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4424,6 +4424,15 @@ S:	Maintained
- F:	drivers/gpu/drm/sti
- F:	Documentation/devicetree/bindings/display/st,stih4xx.txt
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index ee0da97..23debd9 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -543,7 +543,17 @@
+ 			reg = <0x40007000 0x400>;
+ 		};
  
-+DRM DRIVERS FOR STM
-+M:	Yannick Fertre <yannick.fertre@st.com>
-+M:	Philippe Cornu <philippe.cornu@st.com>
-+L:	dri-devel at lists.freedesktop.org
-+T:	git git://anongit.freedesktop.org/drm/drm-misc
-+S:	Maintained
-+F:	drivers/gpu/drm/stm
-+F:	Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+-		pin-controller {
++		ltdc: display-controller at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
++			status = "disabled";
++		};
 +
- DRM DRIVER FOR TDFX VIDEO CARDS
- S:	Orphan / Obsolete
- F:	drivers/gpu/drm/tdfx/
++		pinctrl: pin-controller {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32f429-pinctrl";
 -- 
 1.9.1
