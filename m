@@ -1,214 +1,50 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 14 Apr 2017 17:40:53 +0200
-Subject: [PATCH v6 2/4] ARM: dts: mvebu: Add PWM properties to .dtsi files
-In-Reply-To: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
-References: <20170414154056.32055-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170414154056.32055-3-ralph.sennhauser@gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Fri, 14 Apr 2017 08:45:13 -0700
+Subject: [PATCH 8/8] ARM: dts: imx7d-sdb: Enable PCIe peripheral
+In-Reply-To: <20170414035102.GI14915@dragon>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-9-andrew.smirnov@gmail.com>
+ <20170414035102.GI14915@dragon>
+Message-ID: <CAHQ1cqFSpEzaEytjJXXdZAxGOdmqH1PSSUkRkjgviJoftWgGww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+On Thu, Apr 13, 2017 at 8:51 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Apr 13, 2017 at 06:32:42AM -0700, Andrey Smirnov wrote:
+>> Enable PCIe peripheral on this board.
+>>
+>> Cc: yurovsky at gmail.com
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/imx7d-sdb.dts | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+>> index e0ff276..f77e26a 100644
+>> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+>> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+>> @@ -352,6 +352,13 @@
+>>       };
+>>  };
+>>
+>> +&pcie {
+>> +     pinctrl-names = "default";
+>> +     reset-gpio = <&gpio_spi 1 GPIO_ACTIVE_LOW>;
+>> +     disable-gpio = <&gpio_spi 0 GPIO_ACTIVE_LOW>;
+>
+> I do not see this disable-gpio is documented or supported.
+>
 
-Add properties to the GPIO nodes to allow them to be also used as PWM
-lines.
+My bad, didn't notice it when taking the code from downstream tree.
+Will remove in v2.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-URL: https://patchwork.ozlabs.org/patch/427294/
-[Ralph Sennhauser: Add new compatible string marvell,armada-370-xp-gpio]
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/armada-370.dtsi        | 19 ++++++++++++++-----
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 16 ++++++++++++----
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 19 ++++++++++++++-----
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 19 ++++++++++++++-----
- 4 files changed, 54 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index cc011c8..5e815cc 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -137,29 +137,38 @@
- 			};
- 
- 			gpio0: gpio at 18100 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18100 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18100 0x40>, <0x181c0 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <82>, <83>, <84>, <85>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio1: gpio at 18140 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18140 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18140 0x40>, <0x181c8 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <87>, <88>, <89>, <90>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio2: gpio at 18180 {
--				compatible = "marvell,orion-gpio";
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
- 				reg = <0x18180 0x40>;
- 				ngpios = <2>;
- 				gpio-controller;
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index 07c5090..f77168c9 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -202,25 +202,33 @@
- 
- 		internal-regs {
- 			gpio0: gpio at 18100 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18100 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18100 0x40>, <0x181c0 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <82>, <83>, <84>, <85>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio1: gpio at 18140 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18140 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18140 0x40>, <0x181c8 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <17>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <87>, <88>, <89>;
-+				clocks = <&coreclk 0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index 64e936a..0ecfaf4 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -285,29 +285,38 @@
- 
- 		internal-regs {
- 			gpio0: gpio at 18100 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18100 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18100 0x40>, <0x181c0 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <82>, <83>, <84>, <85>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio1: gpio at 18140 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18140 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18140 0x40>, <0x181c8 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <87>, <88>, <89>, <90>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio2: gpio at 18180 {
--				compatible = "marvell,orion-gpio";
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
- 				reg = <0x18180 0x40>;
- 				ngpios = <3>;
- 				gpio-controller;
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index d1383dd..670ece4c 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -323,29 +323,38 @@
- 
- 		internal-regs {
- 			gpio0: gpio at 18100 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18100 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18100 0x40>, <0x181c0 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <82>, <83>, <84>, <85>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio1: gpio at 18140 {
--				compatible = "marvell,orion-gpio";
--				reg = <0x18140 0x40>;
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
-+				reg = <0x18140 0x40>, <0x181c8 0x08>;
-+				reg-names = "gpio", "pwm";
- 				ngpios = <32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				#pwm-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				interrupts = <87>, <88>, <89>, <90>;
-+				clocks = <&coreclk 0>;
- 			};
- 
- 			gpio2: gpio at 18180 {
--				compatible = "marvell,orion-gpio";
-+				compatible = "marvell,armada-370-xp-gpio",
-+					     "marvell,orion-gpio";
- 				reg = <0x18180 0x40>;
- 				ngpios = <3>;
- 				gpio-controller;
--- 
-2.10.2
+Thanks,
+Andrey Smirnov
