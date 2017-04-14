@@ -1,31 +1,47 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Fri, 14 Apr 2017 14:19:39 +0900
-Subject: [PATCH 3/3] arm64: dts: exynos: Add support for S6E3HA2 edge panel
- device on TM2e board
+Date: Fri, 14 Apr 2017 14:19:37 +0900
+Subject: [PATCH 1/3] dt-bindings: Add support for samsung s6e3ha2 edge panel
+ binding
 In-Reply-To: <1492147179-7824-1-git-send-email-hoegeun.kwon@samsung.com>
 References: <1492147179-7824-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170414051959epcas1p3a246070b065129c4ffbf94736cde321a@epcas1p3.samsung.com>
-Message-ID: <1492147179-7824-4-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170414051959epcas5p3917fe7adbc17a42bf0450a46b2baf55d@epcas5p3.samsung.com>
+Message-ID: <1492147179-7824-2-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the panel device tree node for S6E3HA2 edge display
-controller to TM2e dts.
+The Samsung s6e3ha2 edge is a 5.65" 1600x2560 AMOLED panel connected
+using MIPI-DSI interfaces.
 
 Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ .../bindings/display/panel/samsung,s6e3ha2-e.txt   | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-index 694717a..79f22f7 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-@@ -52,6 +52,18 @@
- 	assigned-clock-rates = <278000000>, <400000000>;
- };
- 
+diff --git a/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
+new file mode 100644
+index 0000000..09c65f6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
+@@ -0,0 +1,28 @@
++Samsung S6E3HA2 5.65" 1600x2560 AMOLED panel
++
++Required properties:
++  - compatible: "samsung,s6e3ha2-e"
++  - reg: the virtual channel number of a DSI peripheral
++  - vdd3-supply: I/O voltage supply
++  - vci-supply: voltage supply for analog circuits
++  - reset-gpios: a GPIO spec for the reset pin (active low)
++  - enable-gpios: a GPIO spec for the panel enable pin (active high)
++
++Optional properties:
++  - te-gpios: a GPIO spec for the tearing effect synchronization signal
++    gpio pin (active high)
++
++Example:
 +&dsi {
++	...
++
 +	panel at 0 {
 +		compatible = "samsung,s6e3ha2-e";
 +		reg = <0>;
@@ -36,9 +52,5 @@ index 694717a..79f22f7 100644
 +		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
 +	};
 +};
-+
- &ldo31_reg {
- 	regulator-name = "TSP_VDD_1.8V_AP";
- 	regulator-min-microvolt = <1800000>;
 -- 
 1.9.1
