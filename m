@@ -1,42 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 14 Apr 2017 12:07:05 +0200
-Subject: [PATCH] ARM: dts: at91: use correct compatible for the gpio mux
- controller
-In-Reply-To: <1492118578-15356-1-git-send-email-peda@axentia.se>
-References: <1492118578-15356-1-git-send-email-peda@axentia.se>
-Message-ID: <20170414100705.tiltc433lidqzcr2@piout.net>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Fri, 14 Apr 2017 12:13:31 +0200
+Subject: [PATCH v7 1/9] drm/cma: Update DEFINE_DRM_GEM_CMA_FOPS to add
+ get_unmapped_area
+In-Reply-To: <1492164819-10513-1-git-send-email-yannick.fertre@st.com>
+References: <1492164819-10513-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1492164819-10513-2-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/2017 at 23:22:58 +0200, Peter Rosin wrote:
-> The compatible string for a gpio based mux controller is "gpio-mux",
-> and nothing else.
-> 
-> Fixes: 29dd89418007 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Hi!
-> 
-> The compatible string for the gpio based mux changed along the way (on
-> request from Rob) but I failed to update the implementation in the
-> gpio-mux driver when I made that change. Consequently, I didn't notice
-> that I didn't update the compatible string here either, since it all
-> continued to work in my tests...
-> 
-> The compatible string in the gpio-mux driver is being fixed to match
-> documentation, so this of course needs fixing too. No TSE-850 devices
-> are affected, except for the one on my desk.
-> 
-> Sorry for the churn.
-> 
+Missing field get_unmapped_area which is necessary with device without MMU
 
-So, I folded that one in the previous one and updated my pull request.
-Hopefully this will be OK.
+Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+---
+ include/drm/drm_gem_cma_helper.h | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/include/drm/drm_gem_cma_helper.h b/include/drm/drm_gem_cma_helper.h
+index f962d33..7320b14 100644
+--- a/include/drm/drm_gem_cma_helper.h
++++ b/include/drm/drm_gem_cma_helper.h
+@@ -50,6 +50,7 @@ struct drm_gem_cma_object {
+ 		.read		= drm_read,\
+ 		.llseek		= noop_llseek,\
+ 		.mmap		= drm_gem_cma_mmap,\
++		.get_unmapped_area	= drm_gem_cma_get_unmapped_area,\
+ 	}
+ 
+ /* free GEM object */
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
