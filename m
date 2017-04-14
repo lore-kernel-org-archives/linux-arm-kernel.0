@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:38 -0300
-Subject: [PATCH v3 14/21] ARM: dts: zynq: Add generic compatible string for
- I2C EEPROM
+Date: Thu, 13 Apr 2017 22:04:40 -0300
+Subject: [PATCH v3 16/21] arm64: zynqmp: Add generic compatible string for I2C
+ EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-15-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-17-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,35 +25,30 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/zynq-zc702.dts | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 0cdad2cc8b78..9aae7e061d19 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -136,7 +136,7 @@
- 			#size-cells = <0>;
- 			reg = <2>;
- 			eeprom at 54 {
--				compatible = "at,24c08";
-+				compatible = "at,24c08", "atmel,24c08";
- 				reg = <0x54>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index ad4bb06dba25..ff0fca1c41c8 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -92,7 +92,7 @@
- 			#size-cells = <0>;
- 			reg = <2>;
- 			eeprom at 54 {
--				compatible = "at,24c08";
-+				compatible = "at,24c08", "atmel,24c08";
- 				reg = <0x54>;
- 			};
- 		};
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+index ef1b9e573af0..9f29f99984f7 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+@@ -55,7 +55,7 @@
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+ 	eeprom at 54 {
+-		compatible = "at,24c64";
++		compatible = "at,24c64", "atmel,24c64";
+ 		reg = <0x54>;
+ 	};
+ };
+@@ -64,7 +64,7 @@
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+ 	eeprom at 55 {
+-		compatible = "at,24c64";
++		compatible = "at,24c64", "atmel,24c64";
+ 		reg = <0x55>;
+ 	};
+ };
 -- 
 2.9.3
