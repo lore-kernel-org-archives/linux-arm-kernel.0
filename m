@@ -1,34 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Apr 2017 07:17:35 -0700
-Subject: [PATCH v3 03/21] ARM: dts: omap: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170414010445.21727-4-javier@osg.samsung.com>
-References: <20170414010445.21727-1-javier@osg.samsung.com>
- <20170414010445.21727-4-javier@osg.samsung.com>
-Message-ID: <20170414141734.GR5339@atomide.com>
+Date: Fri, 14 Apr 2017 07:20:10 -0700
+Subject: [PATCH V2] PM / OPP: Use - instead of @ for DT entries
+In-Reply-To: <70e7c7ee13722ab9c73cb073f88502eaf1ada5f5.1491816050.git.viresh.kumar@linaro.org>
+References: <70e7c7ee13722ab9c73cb073f88502eaf1ada5f5.1491816050.git.viresh.kumar@linaro.org>
+Message-ID: <20170414142010.GS5339@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Javier Martinez Canillas <javier@osg.samsung.com> [170413 18:08]:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+* Viresh Kumar <viresh.kumar@linaro.org> [170410 02:24]:
+> Compiling the DT file with W=1, DTC warns like follows:
 > 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> unit name, but no reg property
 > 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
+> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> "reg" property.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Looks good to me assuming this will get merged in a single series:
+Looks good to me too:
 
 Acked-by: Tony Lindgren <tony@atomide.com>
-
-Or if you want me to pick this patch separately, let me know.
-
-Regards,
-
-Tony
