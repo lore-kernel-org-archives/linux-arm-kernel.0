@@ -1,66 +1,246 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 14 Apr 2017 11:28:54 +0800
-Subject: [PATCH 3/8] ARM: dts: imx7s: Adjust anatop-enable-bit for
- 'reg_1p0d'
-In-Reply-To: <20170413133242.5068-4-andrew.smirnov@gmail.com>
-References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
- <20170413133242.5068-4-andrew.smirnov@gmail.com>
-Message-ID: <20170414032853.GF14915@dragon>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 14 Apr 2017 11:38:45 +0800
+Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random
+ generator on MT7623 SoC
+In-Reply-To: <20170413110643.GA413@Red>
+References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
+ <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
+ <20170413110643.GA413@Red>
+Message-ID: <1492141125.6147.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 06:32:37AM -0700, Andrey Smirnov wrote:
-> In PMU_REG_1P0Dn ENABLE_LINREG is bit 0. Bit 31 is called OVERRIDE and
-> it serves the function of granting permission to GPC IP block to alter
-> various bit-fields of the register. The reason why this property, that
-> trickeld here from Freescale BSP, is set to 31 is because in the code
-> it came from it is used in conjunction with a notifier handler for
-> REGULATOR_EVENT_PRE_DO_ENABLE and REGULATOR_EVENT_PRE_DO_DISABLE
-> events (not found in upstream kernel) that triggers GPC to start
-> manipulating aforementioned other bitfields.
-> 
-> Since:
-> 	a) none of the aforementioned machinery is implemented by
-> 	   upstream
-> 	b) using 'anatop-enable-bit' in that capacity is a bit of a
-> 	   semantic stretch
-> 
-> simplify the situation by setting the value of 'anatop-enable-bit' to
-> point to ENABLE_LINREG (same as i.MX6).
-> 
-> Cc: yurovsky at gmail.com
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Hi Corentin,
 
-Since patch 1 ~ 3 are all about adding anatop-enable-bit, can we squash
-them into one patch?
+I all agree and appreciate your careful reviewing. 
 
-Shawn
+They will be added into the next one.
 
-> ---
->  arch/arm/boot/dts/imx7s.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+	Sean
+
+On Thu, 2017-04-13 at 13:06 +0200, Corentin Labbe wrote:
+> Hello
 > 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 22c9788..8fee299 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -516,7 +516,7 @@
->  					anatop-min-bit-val = <8>;
->  					anatop-min-voltage = <800000>;
->  					anatop-max-voltage = <1200000>;
-> -					anatop-enable-bit = <31>;
-> +					anatop-enable-bit = <0>;
->  				};
->  			};
->  
-> -- 
-> 2.9.3
+> I have some minor comment below:
 > 
+> On Thu, Apr 13, 2017 at 03:05:08PM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > This patch adds support for hardware random generator on MT7623 SoC
+> > and should also work on other similar Mediatek SoCs. Currently,
+> > the driver is already tested successfully with rng-tools.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  drivers/char/hw_random/Kconfig   |  16 +++-
+> >  drivers/char/hw_random/Makefile  |   2 +-
+> >  drivers/char/hw_random/mtk-rng.c | 174 +++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 190 insertions(+), 2 deletions(-)
+> >  create mode 100644 drivers/char/hw_random/mtk-rng.c
+> > 
+> > diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+> > index 0cafe08..af782ce 100644
+> > --- a/drivers/char/hw_random/Kconfig
+> > +++ b/drivers/char/hw_random/Kconfig
+> > @@ -419,10 +419,24 @@ config HW_RANDOM_CAVIUM
+> >           Generator hardware found on Cavium SoCs.
+> >  
+> >           To compile this driver as a module, choose M here: the
+> > -         module will be called cavium_rng.
+> > +         module will be called mtk-rng.
+> 
+> Unwanted change
+> 
+> >  
+> >           If unsure, say Y.
+> >  
+> > +config HW_RANDOM_MTK
+> > +	tristate "Mediatek Random Number Generator support"
+> > +	depends on HW_RANDOM
+> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +	default y
+> > +	---help---
+> > +	  This driver provides kernel-side support for the Random Number
+> > +	  Generator hardware found on Mediatek SoCs.
+> > +
+> > +	  To compile this driver as a module, choose M here. the
+> > +	  module will be called mtk-rng.
+> > +
+> > +	  If unsure, say Y.
+> > +
+> >  endif # HW_RANDOM
+> >  
+> >  config UML_RANDOM
+> > diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+> > index 5f52b1e..68be716 100644
+> > --- a/drivers/char/hw_random/Makefile
+> > +++ b/drivers/char/hw_random/Makefile
+> > @@ -1,7 +1,6 @@
+> >  #
+> >  # Makefile for HW Random Number Generator (RNG) device drivers.
+> >  #
+> > -
+> 
+> Another unwanted change
+> 
+> >  obj-$(CONFIG_HW_RANDOM) += rng-core.o
+> >  rng-core-y := core.o
+> >  obj-$(CONFIG_HW_RANDOM_TIMERIOMEM) += timeriomem-rng.o
+> > @@ -36,3 +35,4 @@ obj-$(CONFIG_HW_RANDOM_STM32) += stm32-rng.o
+> >  obj-$(CONFIG_HW_RANDOM_PIC32) += pic32-rng.o
+> >  obj-$(CONFIG_HW_RANDOM_MESON) += meson-rng.o
+> >  obj-$(CONFIG_HW_RANDOM_CAVIUM) += cavium-rng.o cavium-rng-vf.o
+> > +obj-$(CONFIG_HW_RANDOM_MTK)	+= mtk-rng.o
+> > diff --git a/drivers/char/hw_random/mtk-rng.c b/drivers/char/hw_random/mtk-rng.c
+> > new file mode 100644
+> > index 0000000..6561ee0
+> > --- /dev/null
+> > +++ b/drivers/char/hw_random/mtk-rng.c
+> > @@ -0,0 +1,174 @@
+> > +/*
+> > + * Driver for Mediatek Hardware Random Number Generator
+> > + *
+> > + * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +#define MTK_RNG_DEV KBUILD_MODNAME
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/err.h>
+> > +#include <linux/hw_random.h>
+> > +#include <linux/io.h>
+> > +#include <linux/iopoll.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +#define USEC_POLL			2
+> > +#define TIMEOUT_POLL			20
+> > +
+> > +#define RNG_CTRL			0x00
+> > +#define  RNG_EN				BIT(0)
+> > +#define  RNG_READY			BIT(31)
+> 
+> Keep only one space between define and name
+> 
+> > +
+> > +#define RNG_DATA			0x08
+> > +
+> > +#define to_mtk_rng(p)	container_of(p, struct mtk_rng, rng)
+> > +
+> > +struct mtk_rng {
+> > +	struct device	*dev;
+> > +	void __iomem *base;
+> > +	struct clk *clk;
+> > +	struct hwrng rng;
+> > +};
+> > +
+> > +static int mtk_rng_init(struct hwrng *rng)
+> > +{
+> > +	struct mtk_rng *priv = to_mtk_rng(rng);
+> > +	u32 val;
+> > +	int err;
+> > +
+> > +	err = clk_prepare_enable(priv->clk);
+> > +	if (err)
+> > +		return err;
+> > +
+> > +	val = readl(priv->base + RNG_CTRL);
+> > +	val |= RNG_EN;
+> > +	writel(val, priv->base + RNG_CTRL);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void mtk_rng_cleanup(struct hwrng *rng)
+> > +{
+> > +	struct mtk_rng *priv = to_mtk_rng(rng);
+> > +	u32 val;
+> > +
+> > +	val = readl(priv->base + RNG_CTRL);
+> > +	val &= ~RNG_EN;
+> > +	writel(val, priv->base + RNG_CTRL);
+> > +
+> > +	clk_disable_unprepare(priv->clk);
+> > +}
+> > +
+> > +static bool mtk_rng_wait_ready(struct hwrng *rng, bool wait)
+> > +{
+> > +	struct mtk_rng *priv = to_mtk_rng(rng);
+> > +	int ready;
+> > +
+> > +	ready = readl(priv->base + RNG_CTRL) & RNG_READY;
+> > +	if (!ready && wait)
+> > +		readl_poll_timeout_atomic(priv->base + RNG_CTRL, ready,
+> > +					  ready & RNG_READY, USEC_POLL,
+> > +					  TIMEOUT_POLL);
+> > +	return !!ready;
+> > +}
+> > +
+> > +static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
+> > +{
+> > +	struct mtk_rng *priv = to_mtk_rng(rng);
+> > +	int retval = 0;
+> > +
+> > +	while (max >= sizeof(u32)) {
+> > +		if (!mtk_rng_wait_ready(rng, wait))
+> > +			break;
+> > +
+> > +		*(u32 *)buf = readl(priv->base + RNG_DATA);
+> > +		retval += sizeof(u32);
+> > +		buf += sizeof(u32);
+> > +		max -= sizeof(u32);
+> > +	}
+> > +
+> > +	if (unlikely(wait && max))
+> > +		dev_warn(priv->dev, "timeout might be not properly set\n");
+> > +
+> > +	return retval || !wait ? retval : -EIO;
+> > +}
+> > +
+> > +static int mtk_rng_probe(struct platform_device *pdev)
+> > +{
+> > +	struct resource *res;
+> > +	int ret;
+> > +	struct mtk_rng *priv;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (!res) {
+> > +		dev_err(&pdev->dev, "no iomem resource\n");
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> > +	if (!priv)
+> > +		return -ENOMEM;
+> > +
+> > +	priv->dev = &pdev->dev;
+> > +	priv->rng.name = pdev->name;
+> > +	priv->rng.init = mtk_rng_init;
+> > +	priv->rng.cleanup = mtk_rng_cleanup;
+> > +	priv->rng.read = mtk_rng_read;
+> > +
+> > +	priv->clk = devm_clk_get(&pdev->dev, "rng");
+> > +	if (IS_ERR(priv->clk)) {
+> > +		ret = PTR_ERR(priv->clk);
+> > +		dev_err(&pdev->dev, "no clock for device: %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> 
+> You get that resource twice
+> 
+> Regards
+> Corentin Labbe
