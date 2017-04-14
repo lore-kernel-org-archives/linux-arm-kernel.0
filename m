@@ -1,56 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 14 Apr 2017 08:58:50 +0900
-Subject: [PATCH v2 05/22] ARM: dts: at91: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170413212059.unh2mfo2w4oc4t33@piout.net>
-References: <20170413182839.25381-1-javier@osg.samsung.com>
- <20170413182839.25381-6-javier@osg.samsung.com>
- <869a0f44-6c97-2109-776b-6da9b86c732a@axentia.se>
- <dd93eb32-ca1e-5041-051e-c4f072f0f9a2@osg.samsung.com>
- <20170413212059.unh2mfo2w4oc4t33@piout.net>
-Message-ID: <20170413235850.GA6944@verge.net.au>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 13 Apr 2017 19:19:11 -0500
+Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
+References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
+ <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 11:20:59PM +0200, Alexandre Belloni wrote:
-> On 13/04/2017 at 18:09:56 -0300, Javier Martinez Canillas wrote:
-> > Hello Peter,
-> > 
-> > On 04/13/2017 05:43 PM, Peter Rosin wrote:
-> > > On 2017-04-13 20:28, Javier Martinez Canillas wrote:
-> > 
-> > [snip]
-> > 
-> > >>  
-> > >>  	eeprom at 50 {
-> > >> -		compatible = "nxp,24c02";
-> > >> +		compatible = "nxp,24c02","atmel,24c02";
-> > >>  		reg = <0x50>;
-> > >>  		pagesize = <16>;
-> > >>  	};
-> > >>
-> > > 
-> > > Sure, in principle. But not having a space after the commas is a real OCD
-> > > trigger for me. My spine is rotating... :-)
-> > >
-> > 
-> > Right, Geert already pointed out. It's something I missed in my sed script
-> > so I got it wrong in all the DTS :(
-> > 
-> > I'll fix my script and send a v2.
-> > 
-> 
-> That would be v3, right? ;)
-> 
-> > > Anyway, with those whitespace fixes (and without them too, but please):
-> > > Acked-by: Peter Rosin <peda@axentia.se>
-> > >
-> > 
-> > Thanks for the review!
-> > 
-> 
-> I'd like to be copied on the first patches to ensure they are applied
-> before applying that one. (Also, it is probably too late for 4.12 anyway
-> because we are past rc6).
+I tentatively applied both patches to pci/host-thunder for v4.12.
 
-Ditto
+However, I am concerned about the topology here:
+
+On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
+> On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
+> PCI topology is slightly unusual.  For a multi-node system, it looks
+> like:
+> 
+>     00:00.0 [PCI] bridge to [bus 01-1e]
+>     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
+>     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
+>     03:00.0 PCIe Endpoint
+
+A root port normally has a single PCIe link leading downstream.
+According to this, 02:00.0 is a root port that has the usual
+downstream link leading to 03:00.0, but it also has an upstream link
+to 01:0a.0.
+
+Maybe this example is omitting details that are not relevant to DMA
+aliases?  The PCIe capability only contains one set of link-related
+registers, so I don't know how we could manage a single device that
+has two links.
+
+A device with two links would break things like ASPM.  In
+set_pcie_port_type(), for example, we have this comment:
+
+   * A Root Port or a PCI-to-PCIe bridge is always the upstream end
+   * of a Link.  No PCIe component has two Links.  Two Links are
+   * connected by a Switch that has a Port on each Link and internal
+   * logic to connect the two Ports.
+
+The topology above breaks these assumptions, which will make
+pdev->has_secondary_link incorrect, which means ASPM won't work
+correctly.
+
+What am I missing?
+
+Bjorn
