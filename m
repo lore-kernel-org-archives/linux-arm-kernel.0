@@ -1,40 +1,45 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 14 Apr 2017 15:10:38 -0400
-Subject: [PATCH V8 1/5] PCI/ASPM: introduce pci_aspm_init() and add to
- pci_init_capabilities()
-In-Reply-To: <20170413205125.GC28316@bhelgaas-glaptop.roam.corp.google.com>
+Date: Fri, 14 Apr 2017 15:12:35 -0400
+Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
+In-Reply-To: <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
 References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-2-git-send-email-okaya@codeaurora.org>
- <20170413205125.GC28316@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <f6e9637d-8c5e-3363-d448-b910ca53e046@codeaurora.org>
+ <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
+ <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
+Message-ID: <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2017 4:51 PM, Bjorn Helgaas wrote:
-> I think these can go in drivers/pci/pci.h instead of the public
-> include/linux/pci.h.  There's no ASPM section in drivers/pci/pci.h
-> yet, but I think we should add one.
+Bjorn,
+
+On 4/12/2017 3:19 PM, Rajat Jain wrote:
+> On Fri, Apr 7, 2017 at 9:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> Now that we added a hook to be called from device_add, save the
+>> default values from the HW registers early in the boot for further
+>> reuse during hot device add/remove operations.
+>>
+>> If the link is down during boot, assume that we want to enable L0s
+>> and L1 following hotplug insertion as well as L1SS if supported.
 > 
-> It looks like the following things from include/linux/pci-aspm.h could
-> be moved there as well, since they're only used by the PCI core:
+> IIUC, so far POLICY_DEFAULT meant that we'd just use & follow what
+> BIOS has done, and play it safe (never try to be more opportunistic).
+> With this change however, we'd be slightly overstepping and giving
+> ourselves benefit of doubt if the BIOS could not enable ASPM states
+> because the link was not up. This may be good, but I think we should
+> call it out, and add some more elaborate comment on the POLICY_DEFAULT
+> description (what to, and what not to expect in different situations).
 > 
->   void pcie_aspm_init_link_state(struct pci_dev *pdev);
->   void pcie_aspm_exit_link_state(struct pci_dev *pdev);
->   void pcie_aspm_pm_state_change(struct pci_dev *pdev);
->   void pcie_aspm_powersave_config_link(struct pci_dev *pdev);
->   void pcie_aspm_create_sysfs_dev_files(struct pci_dev *pdev);
->   void pcie_aspm_remove_sysfs_dev_files(struct pci_dev *pdev);
-> 
-> This would be a separate patch.
+> It is important because existing systems today, that used to boot
+> without cards and later hotplugged them, didn't have ASPM states
+> enabled. They will now suddenly start seeing all ASPM states enabled
+> including L1 substates for the first time (if supported).
 > 
 
-Sure, let me work on this.
+Rajat has a good point here. Would you like me to update the ASPM document
+with this new behavior for hotplug?
 
->>  #else
->>  static inline bool pcie_aspm_support_enabled(void) { return false; }
->> +static inline int pci_aspm_init(struct pci_dev *pdev) { return -ENODEV; }
->>  #endif
+Do you have another behavior preference when it comes this?
 
+Sinan
 
 -- 
 Sinan Kaya
