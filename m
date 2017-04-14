@@ -1,63 +1,198 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:24 +0200
-Subject: [PATCH v5 12/22] KVM: arm64: vgic-its: Interpret MAPD ITT_addr field
+Date: Fri, 14 Apr 2017 12:15:29 +0200
+Subject: [PATCH v5 17/22] KVM: arm64: vgic-its: Collection table save/restore
 In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-13-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-18-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now the MAPD ITT_addr had been ignored. We will need it
-for save/restore. Let's record it in the its_device struct.
+The save path copies the collection entries into guest RAM
+at the GPA specified in the BASER register. This obviously
+requires the BASER to be set. The last written element is a
+dummy collection table entry.
+
+We do not index by collection ID as the collection entry
+can fit into 8 bytes while containing the collection ID.
+
+On restore path we re-allocate the collection objects.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 v4 -> v5:
-- its_cmd_get_ittaddr macro now returns the actual ITT GPA
+- add macros for field encoding/decoding
+- use abi->cte_esz
+- rename flush into save
+- check the target_addr is valid
 
 v3 -> v4:
-- in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
-- correct ittaddr bitmask to support 48bit GPA
+- replaced u64 *ptr by gpa_t gpa
+- check the collection does not exist before allocating it
+
+v1 -> v2:
+- reword commit message and directly use 8 as entry size
+- no kvm parameter anymore
+- add helper for flush/restore cte
+- table size computed here
+- add le64/cpu conversions
 ---
- virt/kvm/arm/vgic/vgic-its.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h     |   9 ++++
+ 2 files changed, 116 insertions(+), 2 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 0f3c8f3..757598d 100644
+index c22b35d..484e541 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -106,6 +106,7 @@ struct its_device {
- 	/* the head for the list of ITTEs */
- 	struct list_head itt_head;
- 	u32 nb_eventid_bits;
-+	gpa_t itt_addr;
- 	u32 device_id;
- };
+@@ -1785,13 +1785,97 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+ 	return -ENXIO;
+ }
  
-@@ -569,6 +570,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
- #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
- #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
- #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-+#define its_cmd_get_ittaddr(cmd)	(its_cmd_mask_field(cmd, 2,  8, 47) << 8)
- #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
- #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
++static int vgic_its_save_cte(struct vgic_its *its,
++			     struct its_collection *collection,
++			     gpa_t gpa, int esz)
++{
++	u64 val;
++	int ret;
++
++	val = (1ULL << KVM_ITS_CTE_VALID_SHIFT |
++	       ((u64)collection->target_addr << KVM_ITS_CTE_RDBASE_SHIFT) |
++	       collection->collection_id);
++	val = cpu_to_le64(val);
++	ret = kvm_write_guest(its->dev->kvm, gpa, &val, esz);
++	return ret;
++}
++
++static int vgic_its_restore_cte(struct vgic_its *its, gpa_t gpa,
++				int esz, bool *valid)
++{
++	struct its_collection *collection;
++	struct kvm *kvm = its->dev->kvm;
++	u32 target_addr;
++	u32 coll_id;
++	u64 val;
++	int ret;
++
++	*valid = false;
++
++	ret = kvm_read_guest(kvm, gpa, &val, esz);
++	if (ret)
++		return ret;
++	val = le64_to_cpu(val);
++	*valid = val & KVM_ITS_CTE_VALID_MASK;
++
++	if (!*valid)
++		return 0;
++
++	target_addr = (u32)(val >> KVM_ITS_CTE_RDBASE_SHIFT);
++	coll_id = val & KVM_ITS_CTE_ICID_MASK;
++
++	if (target_addr >= atomic_read(&kvm->online_vcpus))
++		return -EINVAL;
++
++	collection = find_collection(its, coll_id);
++	if (collection)
++		return -EEXIST;
++	ret = vgic_its_alloc_collection(its, &collection, coll_id);
++	if (ret)
++		return ret;
++	collection->target_addr = target_addr;
++	return 0;
++}
++
+ /**
+  * vgic_its_save_collection_table - Save the collection table into
+  * guest RAM
+  */
+ static int vgic_its_save_collection_table(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++	struct its_collection *collection;
++	u64 val;
++	gpa_t gpa;
++	size_t max_size, filled = 0;
++	int ret, cte_esz = abi->cte_esz;
++
++	gpa = BASER_ADDRESS(its->baser_coll_table);
++	if (!gpa)
++		return 0;
++
++	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++
++	list_for_each_entry(collection, &its->collection_list, coll_list) {
++		if (filled == max_size)
++			return -ENOSPC;
++		ret = vgic_its_save_cte(its, collection, gpa, cte_esz);
++		if (ret)
++			return ret;
++		gpa += cte_esz;
++		filled += cte_esz;
++	}
++
++	if (filled == max_size)
++		return 0;
++
++	/*
++	 * table is not fully filled, add a last dummy element
++	 * with valid bit unset
++	 */
++	val = 0;
++	ret = kvm_write_guest(its->dev->kvm, gpa, &val, cte_esz);
++	return ret;
+ }
  
-@@ -840,6 +842,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	bool valid = its_cmd_get_validbit(its_cmd);
- 	u8 nb_eventid_bits = its_cmd_get_size(its_cmd);
-+	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
- 	struct its_device *device;
+ /**
+@@ -1801,7 +1885,28 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
+  */
+ static int vgic_its_restore_collection_table(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
++	size_t max_size, read = 0;
++	gpa_t gpa;
++	int ret, cte_esz = abi->cte_esz;
++
++	gpa = BASER_ADDRESS(its->baser_coll_table);
++
++	if (!gpa)
++		return 0;
++
++	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++
++	while (read < max_size) {
++		bool valid;
++
++		ret = vgic_its_restore_cte(its, gpa, cte_esz, &valid);
++		if (!valid || ret)
++			break;
++		gpa += cte_esz;
++		read += cte_esz;
++	}
++	return ret;
+ }
  
- 	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-@@ -871,6 +874,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ /**
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index b87f1c6..56e57c1 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -73,6 +73,15 @@
+ 				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
+ 				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
  
- 	device->device_id = device_id;
- 	device->nb_eventid_bits = nb_eventid_bits;
-+	device->itt_addr = itt_addr;
- 
- 	INIT_LIST_HEAD(&device->itt_head);
- 
++/*
++ * As per Documentation/virtual/kvm/devices/arm-vgic-its.txt,
++ * below macros are defined for ITS table entry encoding.
++ */
++#define KVM_ITS_CTE_VALID_SHIFT		63
++#define KVM_ITS_CTE_VALID_MASK		BIT_ULL(63)
++#define KVM_ITS_CTE_RDBASE_SHIFT	16
++#define KVM_ITS_CTE_ICID_MASK		GENMASK_ULL(15, 0)
++
+ static inline bool irq_is_pending(struct vgic_irq *irq)
+ {
+ 	if (irq->config == VGIC_CONFIG_EDGE)
 -- 
 2.5.5
