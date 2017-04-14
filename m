@@ -1,25 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 14 Apr 2017 22:51:10 +0200
-Subject: [PATCH 0/2] ADC support for SPEAr600
-Message-ID: <1492203072-27771-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 14 Apr 2017 22:51:12 +0200
+Subject: [PATCH 2/2] clk: spear: fix ADC clock definition on SPEAr600
+In-Reply-To: <1492203072-27771-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1492203072-27771-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1492203072-27771-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+There is no SPEAr600 device named "adc". Instead, the description of the
+ADC was recently added to the Device Tree, and the device name is
+"d820b000.adc", so we should associate the ADC gatable clock to this
+device name.
 
-This set of two patches add support for the ADC of the SPEAr600, using
-the existing spear_adc driver. Only a Device Tree description and a
-minor clock fix are needed to make the ADC work.
-
-Thomas
-
-Thomas Petazzoni (2):
-  arm: spear6xx: add DT description of the ADC on SPEAr600
-  clk: spear: fix ADC clock definition on SPEAr600
-
- arch/arm/boot/dts/spear600.dtsi    | 8 ++++++++
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
  drivers/clk/spear/spear6xx_clock.c | 2 +-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
+index 7c9383c..f911d9f 100644
+--- a/drivers/clk/spear/spear6xx_clock.c
++++ b/drivers/clk/spear/spear6xx_clock.c
+@@ -313,7 +313,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
+ 	/* clock derived from apb clk */
+ 	clk = clk_register_gate(NULL, "adc_clk", "apb_clk", 0, PERIP1_CLK_ENB,
+ 			ADC_CLK_ENB, 0, &_lock);
+-	clk_register_clkdev(clk, NULL, "adc");
++	clk_register_clkdev(clk, NULL, "d820b000.adc");
+ 
+ 	clk = clk_register_fixed_factor(NULL, "gpio0_clk", "apb_clk", 0, 1, 1);
+ 	clk_register_clkdev(clk, NULL, "f0100000.gpio");
 -- 
 2.7.4
