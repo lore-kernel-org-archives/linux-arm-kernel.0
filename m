@@ -1,140 +1,97 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:12 +0200
-Subject: [PATCH v5 00/22] vITS save/restore
-Message-ID: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+Date: Fri, 14 Apr 2017 12:15:20 +0200
+Subject: [PATCH v5 08/22] KVM: arm64: vgic-its: Implement
+ vgic_mmio_uaccess_write_its_creadr
+In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-9-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series specifies and implements an API aimed at saving and restoring
-the state of the in-kernel emulated ITS device.
+GITS_CREADR needs to be restored so let's implement the associated
+uaccess_write_its callback. The write only is allowed if the its
+is disabled.
 
-The ITS is programmed through registers and tables. Those latter
-are allocated by the guest. Their base address is programmed in
-registers or table entries before the ITS is enabled.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-The ITS is free to use some of them to flush its internal caches. This
-is likely to be used when entering low power state.
-
-Therefore, for save/restore use case, it looks natural to use this
-guest RAM allocated space to save the table related data. However,
-currently, The ITS in-kernel emulated device does not use all of those
-tables and for those it uses, it does not always sync them with its
-cached data. Additional sync must happen for:
-- the collection table
-- the device table
-- the per-device translation tables
-- the LPI pending tables.
-
-The LPI configation table and the command queues do not need extra
-syncs.
-
-Best Regards
-
-Eric
-
-Git: complete series available at
-https://github.com/eauger/linux/tree/v4.11-rc6-its-mig-v5
-
-* Testing:
-- on Cavium ThunderX using a virtio-net-pci guest,
-  virsh save/restore commands and virt-manager live migration.
-  Tested with 1 and 2 stage device table.
-
-History:
+---
 v4 -> v5:
-- user API changes:
-  - ITS table save/restore triggered through ITS KVM device
-    KVM_DEV_ARM_VGIC_GRP_CTRL group, KVM_DEV_ARM_ITS_SAVE_TABLES,
-    KVM_DEV_ARM_ITS_RESTORE_TABLES
-  - RDIST pending table flush triggered through GICV3 KVM device
-    KVM_DEV_ARM_VGIC_GRP_CTRL/KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-- Introduce an ABI infrastructure, entry size report using this infra
-- IIDR reports ABI chosen set by userspace if any
-- pending table save moved to vgic-v3.c
-- use optimisation in pending table save
-- check target_addr when restore cte
-- pending table sync called from restore_tables
-- added KVM: arm64: vgic-its: Fix pending table sync
-- simplify loopup_table and use kvm_read_guest()
-- sort the device and ITE list on save
-- add defines for shifts and masks, GIC_ENCODE_SZ macro
+- keep Stalled bit
+- vgic_mmio_uaccess_write_its_creadr can now return an error
 
 v3 -> v4:
-- update the DTE format (ITT_addr 52 bit support, validity bit addition)
-- Document ABI revision and implement check
-- iidr save/restore (including a new patch for iidr user write access)
-- changed locking: kvm lock + vcpu lock
-- fix nb_eventid_bits mixup
-- 2 new patches aiming at exposing next_segment() and lock_all_vcpus()
-- rework errror handling of lookup_table functions
+- REGISTER_ITS_DESC_UACCESS now introduced in this patch
+- we now check the its is disabled
+---
+ virt/kvm/arm/vgic/vgic-its.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
 
-- I took into account all Andre's comments/suggestions except:
-  - trigger the save/restore of pending tables from GICV3 KVM device
-    instead of ITS KVM device
-  - implement ITS flush/restore in KVM_DEV_ARM_VGIC_GRP_CTRL
-    ITS group
-
-See the ML replies for current justifications. In case other people
-strongly disagree of course I will change the code.
-
-v2 -> v3:
-- fix restore ITS ITT_addr bit masking
-
-v1 -> v2:
-- rebased on Vijaya's v11
-- all entries now are 8 byte large
-- devid/eventid indexing for device table and ITT
-- support 2 stage device table
-- common infra to read indexed tables
-- add cpu <-> le64 conversions
-- itte renamed into ite
-- do not care anymore about pending table 1st KB
-  (not needed at the moment for coarse mapping)
-
-RFC v1
-- creation
-
-
-
-Eric Auger (22):
-  KVM: arm/arm64: Add ITS save/restore API documentation
-  KVM: arm/arm64: Add GICV3 pending table save API documentation
-  KVM: arm/arm64: vgic-its: rename itte into ite
-  arm/arm64: vgic: turn vgic_find_mmio_region into public
-  KVM: arm64: vgic-its: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
-  KVM: arm/arm64: vgic: expose (un)lock_all_vcpus
-  KVM: arm64: vgic-its: Implement vgic_its_has_attr_regs and
-    attr_regs_access
-  KVM: arm64: vgic-its: Implement vgic_mmio_uaccess_write_its_creadr
-  KVM: arm64: vgic-its: Introduce migration ABI infrastructure
-  KVM: arm64: vgic-its: Implement vgic_mmio_uaccess_write_its_iidr
-  KVM: arm64: vgic-its: Interpret MAPD Size field and check related
-    errors
-  KVM: arm64: vgic-its: Interpret MAPD ITT_addr field
-  KVM: arm64: vgic-its: Check the device id matches TYPER DEVBITS range
-  KVM: arm64: vgic-its: KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
-  KVM: arm64: vgic-its: vgic_its_alloc_ite/device
-  KVM: arm64: vgic-its: Add infrastructure for table lookup
-  KVM: arm64: vgic-its: Collection table save/restore
-  KVM: arm64: vgic-its: vgic_its_check_id returns the entry's GPA
-  KVM: arm64: vgic-its: ITT save and restore
-  KVM: arm64: vgic-its: Device table save/restore
-  KVM: arm64: vgic-its: Fix pending table sync
-  KVM: arm64: vgic-v3: KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
-
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |   99 ++
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt  |    6 +
- arch/arm/include/uapi/asm/kvm.h                    |    6 +-
- arch/arm64/include/uapi/asm/kvm.h                  |    6 +-
- include/kvm/arm_vgic.h                             |    3 +
- include/linux/irqchip/arm-gic-v3.h                 |   12 +
- virt/kvm/arm/vgic/vgic-its.c                       | 1126 +++++++++++++++++---
- virt/kvm/arm/vgic/vgic-kvm-device.c                |   24 +-
- virt/kvm/arm/vgic/vgic-mmio.c                      |   11 +-
- virt/kvm/arm/vgic/vgic-mmio.h                      |   14 +-
- virt/kvm/arm/vgic/vgic-v3.c                        |   54 +
- virt/kvm/arm/vgic/vgic.h                           |   24 +
- 12 files changed, 1251 insertions(+), 134 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index a9a2c12..79ed1c2 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1213,6 +1213,33 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
+ 	return extract_bytes(its->creadr, addr & 0x7, len);
+ }
+ 
++static int vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
++					      struct vgic_its *its,
++					      gpa_t addr, unsigned int len,
++					      unsigned long val)
++{
++	int ret = 0;
++	u32 reg;
++
++	mutex_lock(&its->cmd_lock);
++
++	if (its->enabled) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	reg = update_64bit_reg(its->creadr, addr & 7, len, val);
++	if (ITS_CMD_OFFSET(reg) >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	its->creadr = reg;
++out:
++	mutex_unlock(&its->cmd_lock);
++	return ret;
++}
++
+ #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
+ static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
+ 					      struct vgic_its *its,
+@@ -1317,6 +1344,16 @@ static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+ 	.its_write = wr,					\
+ }
+ 
++#define REGISTER_ITS_DESC_UACCESS(off, rd, wr, uwr, length, acc)\
++{								\
++	.reg_offset = off,					\
++	.len = length,						\
++	.access_flags = acc,					\
++	.its_read = rd,						\
++	.its_write = wr,					\
++	.uaccess_its_write = uwr,				\
++}
++
+ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+ 			      gpa_t addr, unsigned int len, unsigned long val)
+ {
+@@ -1339,8 +1376,9 @@ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CWRITER,
+ 		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+-	REGISTER_ITS_DESC(GITS_CREADR,
+-		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
++	REGISTER_ITS_DESC_UACCESS(GITS_CREADR,
++		vgic_mmio_read_its_creadr, its_mmio_write_wi,
++		vgic_mmio_uaccess_write_its_creadr, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_BASER,
+ 		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
 -- 
 2.5.5
