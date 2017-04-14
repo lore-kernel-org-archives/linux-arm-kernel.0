@@ -1,115 +1,48 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Fri, 14 Apr 2017 13:29:24 +0800
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable more drivers for LS1021A
-Message-ID: <1492147764-17981-1-git-send-email-b18965@freescale.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 14 Apr 2017 14:03:44 +0800
+Subject: [PATCH 3/4] net: macb: Add hardware PTP support
+In-Reply-To: <1492090763-15686-1-git-send-email-rafalo@cadence.com>
+Message-ID: <201704141429.nTfzVN8r%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables more drivers for LS1021A, such as FlexCAN, IFC, SATA,
-DCU, RTC, CAAM and Virtualization.
+Hi Rafal,
 
-Signed-off-by: Alison Wang <alison.wang@nxp.com>
+[auto build test ERROR on net-next/master]
+[also build test ERROR on v4.11-rc6 next-20170413]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Rafal-Ozieblo/net-macb-Add-support-for-PTP-timestamps-in-DMA-descriptors/20170414-001330
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+Note: the linux-review/Rafal-Ozieblo/net-macb-Add-support-for-PTP-timestamps-in-DMA-descriptors/20170414-001330 HEAD 3b878618e04f866388fd62f6c44752e50b15658a builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `macb_interrupt':
+>> kfifo_buf.c:(.text+0xeabd8): undefined reference to `macb_ptp_int'
+>> kfifo_buf.c:(.text+0xeac6c): undefined reference to `gem_ptp_txstamp'
+   drivers/built-in.o: In function `gem_rx':
+>> kfifo_buf.c:(.text+0xebbd8): undefined reference to `gem_ptp_rxstamp'
+>> drivers/built-in.o:(.data+0xa5e0): undefined reference to `gem_ptp_init'
+>> drivers/built-in.o:(.data+0xa5e4): undefined reference to `gem_ptp_remove'
+>> drivers/built-in.o:(.data+0xa5f4): undefined reference to `gem_get_hwtst'
+>> drivers/built-in.o:(.data+0xa5f8): undefined reference to `gem_set_hwtst'
+
 ---
- arch/arm/configs/multi_v7_defconfig | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 8f6167e..f7124af 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -174,6 +174,7 @@ CONFIG_CAN_AT91=m
- CONFIG_CAN_RCAR=m
- CONFIG_CAN_XILINXCAN=y
- CONFIG_CAN_MCP251X=y
-+CONFIG_CAN_FLEXCAN=y
- CONFIG_NET_DSA_BCM_SF2=m
- CONFIG_B53=m
- CONFIG_B53_SPI_DRIVER=m
-@@ -199,19 +200,27 @@ CONFIG_SUNXI_RSB=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_GEOMETRY=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_STAA=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_DATAFLASH=y
-+CONFIG_MTD_SST25L=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_DENALI_DT=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
- CONFIG_MTD_NAND_DAVINCI=y
-+CONFIG_MTD_NAND_FSL_IFC=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_SPI_FSL_QUADSPI=m
- CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=65536
-+CONFIG_BLK_DEV_RAM_SIZE=262144
- CONFIG_VIRTIO_BLK=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-@@ -233,6 +242,9 @@ CONFIG_AHCI_ST=y
- CONFIG_AHCI_IMX=y
- CONFIG_AHCI_SUNXI=y
- CONFIG_AHCI_TEGRA=y
-+CONFIG_AHCI_QORIQ=y
-+CONFIG_SATA_SIL24=y
-+CONFIG_CHR_DEV_SG=y
- CONFIG_SATA_HIGHBANK=y
- CONFIG_SATA_MV=y
- CONFIG_SATA_RCAR=y
-@@ -266,6 +278,7 @@ CONFIG_BROADCOM_PHY=y
- CONFIG_ICPLUS_PHY=y
- CONFIG_REALTEK_PHY=y
- CONFIG_MICREL_PHY=y
-+CONFIG_NATIONAL_PHY=y
- CONFIG_FIXED_PHY=y
- CONFIG_USB_PEGASUS=y
- CONFIG_USB_RTL8152=m
-@@ -359,7 +372,7 @@ CONFIG_I2C_DIGICOLOR=m
- CONFIG_I2C_EMEV2=m
- CONFIG_I2C_GPIO=m
- CONFIG_I2C_EXYNOS5=y
--CONFIG_I2C_IMX=m
-+CONFIG_I2C_IMX=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_RK3X=y
-@@ -609,6 +622,9 @@ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_DRM_STI=m
- CONFIG_DRM_VC4=y
-+CONFIG_DRM_FSL_DCU=y
-+CONFIG_DRM_SII902X=y
-+CONFIG_LOGO=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_EFI=y
- CONFIG_FB_WM8505=y
-@@ -756,6 +772,7 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_AC100=y
- CONFIG_RTC_DRV_AS3722=y
- CONFIG_RTC_DRV_DS1307=y
-+CONFIG_RTC_DRV_DS3232=y
- CONFIG_RTC_DRV_HYM8563=m
- CONFIG_RTC_DRV_MAX8907=y
- CONFIG_RTC_DRV_MAX8998=m
-@@ -956,8 +973,11 @@ CONFIG_CRYPTO_GHASH_ARM_CE=m
- CONFIG_CRYPTO_DEV_ATMEL_AES=m
- CONFIG_CRYPTO_DEV_ATMEL_TDES=m
- CONFIG_CRYPTO_DEV_ATMEL_SHA=m
-+CONFIG_CRYPTO_DEV_FSL_CAAM=m
- CONFIG_VIDEO_VIVID=m
- CONFIG_VIRTIO=y
- CONFIG_VIRTIO_PCI=y
- CONFIG_VIRTIO_PCI_LEGACY=y
- CONFIG_VIRTIO_MMIO=y
-+CONFIG_VIRTUALIZATION=y
-+CONFIG_VHOST_NET=y
--- 
-2.1.0.27.g96db324
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22468 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/7e8e6b3b/attachment-0001.gz>
