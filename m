@@ -1,96 +1,92 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 14 Apr 2017 11:58:16 +0800
-Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random
- generator on MT7623 SoC
-In-Reply-To: <CANc+2y4Oj-sbSKnsTSK+kRYNewp7Pj0fEk_=dqULxWG08L77Eg@mail.gmail.com>
-References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
- <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
- <CANc+2y4Oj-sbSKnsTSK+kRYNewp7Pj0fEk_=dqULxWG08L77Eg@mail.gmail.com>
-Message-ID: <1492142296.6147.19.camel@mtkswgap22>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 14 Apr 2017 10:27:21 +0530
+Subject: [PATCH 1/2] phy: qcom-usb-hs: Replace the extcon API
+In-Reply-To: <58F01B29.10304@samsung.com>
+References: <CGME20170328043830epcas1p4069bda461ad648cfd6598905b7167e9f@epcas1p4.samsung.com>
+ <1490675909-2533-1-git-send-email-cw00.choi@samsung.com>
+ <ade390be-3104-916c-5fac-780369763411@ti.com> <58F01B29.10304@samsung.com>
+Message-ID: <ce558e27-54ee-2e51-93bd-c88b624dbbe2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi Chanwoo,
 
-Hi PrasannaKumar,
-
-Add my comments inline
-
-
-On Thu, 2017-04-13 at 14:09 +0530, PrasannaKumar Muralidharan wrote:
-> Hi Sean,
+On Friday 14 April 2017 06:13 AM, Chanwoo Choi wrote:
+> Hi Kishon,
 > 
-> Mostly looks good, have few minor comments.
+> On 2017? 04? 13? 20:47, Kishon Vijay Abraham I wrote:
+>> Hi Chanwoo,
+>>
+>> On Tuesday 28 March 2017 10:08 AM, Chanwoo Choi wrote:
+>>> This patch uses the resource-managed extcon API for extcon_register_notifier()
+>>> and replaces the deprecated extcon API as following:
+>>> - (deprecated) extcon_get_cable_state_() -> extcon_get_state()
+>>>
+>>> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
+>> I've missed merging this patch for the next merge window. If you want to take
+>> this yourself.
+>> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 > 
-> On 13 April 2017 at 12:35,  <sean.wang@mediatek.com> wrote:
-> > +static bool mtk_rng_wait_ready(struct hwrng *rng, bool wait)
-> > +{
-> > +       struct mtk_rng *priv = to_mtk_rng(rng);
-> > +       int ready;
-> > +
-> > +       ready = readl(priv->base + RNG_CTRL) & RNG_READY;
-> > +       if (!ready && wait)
-> > +               readl_poll_timeout_atomic(priv->base + RNG_CTRL, ready,
-> > +                                         ready & RNG_READY, USEC_POLL,
-> > +                                         TIMEOUT_POLL);
-> > +       return !!ready;
-> > +}
-> 
-> Use readl_poll_timeout_atomic's return value or -EIO instead of
-> !!ready. This will simplify mtk_rng_read.
-> 
+> I already posted the pull-request to GregKH for extcon subsystem.
+> So, if possible, I hope you handle these patches.
+> Even if these patches are not merged to 4.12-rc1, I'm ok. 
+> Just I want to handle them on your tree for next time.
 
-!!ready provided is in order to let blocking/non-blocking case could
-share same code path. And readl_poll_timeout_atomic only handles
-blocking case.
+Sure, I'll take them then.
 
-
-
-> > +static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
-> > +{
-> > +       struct mtk_rng *priv = to_mtk_rng(rng);
-> > +       int retval = 0;
-> > +
-> > +       while (max >= sizeof(u32)) {
-> > +               if (!mtk_rng_wait_ready(rng, wait))
-> > +                       break;
-> > +
-> > +               *(u32 *)buf = readl(priv->base + RNG_DATA);
-> > +               retval += sizeof(u32);
-> > +               buf += sizeof(u32);
-> > +               max -= sizeof(u32);
-> > +       }
-> > +
-> > +       if (unlikely(wait && max))
-> > +               dev_warn(priv->dev, "timeout might be not properly set\n");
-> 
-> Is this really necessary? Better to choose proper timeout than
-> providing this warning message. In rare cases if the timeout could
-> occur due to some reason (may be a hardware fault) print appropriate
-> warning message.
-
-It is good, I will choose the proper timeout and remove the log in the
-next one.
+Thanks
+Kishon
 
 > 
-> > +       return retval || !wait ? retval : -EIO;
-> > +}
+>>
+>> Thanks
+>> Kishon
+>>> ---
+>>>  drivers/phy/phy-qcom-usb-hs.c | 14 +++-----------
+>>>  1 file changed, 3 insertions(+), 11 deletions(-)
+>>>
+>>> diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
+>>> index 94dfbfd739c3..f630fa553b7d 100644
+>>> --- a/drivers/phy/phy-qcom-usb-hs.c
+>>> +++ b/drivers/phy/phy-qcom-usb-hs.c
+>>> @@ -156,12 +156,12 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+>>>  	}
+>>>  
+>>>  	if (uphy->vbus_edev) {
+>>> -		state = extcon_get_cable_state_(uphy->vbus_edev, EXTCON_USB);
+>>> +		state = extcon_get_state(uphy->vbus_edev, EXTCON_USB);
+>>>  		/* setup initial state */
+>>>  		qcom_usb_hs_phy_vbus_notifier(&uphy->vbus_notify, state,
+>>>  					      uphy->vbus_edev);
+>>> -		ret = extcon_register_notifier(uphy->vbus_edev, EXTCON_USB,
+>>> -				&uphy->vbus_notify);
+>>> +		ret = devm_extcon_register_notifier(&ulpi->dev, uphy->vbus_edev,
+>>> +				EXTCON_USB, &uphy->vbus_notify);
+>>>  		if (ret)
+>>>  			goto err_ulpi;
+>>>  	}
+>>> @@ -180,16 +180,8 @@ static int qcom_usb_hs_phy_power_on(struct phy *phy)
+>>>  
+>>>  static int qcom_usb_hs_phy_power_off(struct phy *phy)
+>>>  {
+>>> -	int ret;
+>>>  	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
+>>>  
+>>> -	if (uphy->vbus_edev) {
+>>> -		ret = extcon_unregister_notifier(uphy->vbus_edev, EXTCON_USB,
+>>> -						 &uphy->vbus_notify);
+>>> -		if (ret)
+>>> -			return ret;
+>>> -	}
+>>> -
+>>>  	regulator_disable(uphy->v3p3);
+>>>  	regulator_disable(uphy->v1p8);
+>>>  	clk_disable_unprepare(uphy->sleep_clk);
+>>>
+>>
+>>
+>>
 > 
-> Set retavl to mtk_rng_wait_ready and return retval.
 > 
-
-Maybe i didn't get your points exactly. Adding some explanation about
-thoughts here.
-
-"return retval || !wait ? retval : -EIO;" I use can also help handling
-the both cases in one line which i think is elegant enough. 
-
-And retval is accumulated with each round if some data's existing in
-hardware, so we don't return the value from mtk_rng_wait_ready().
-
-
-> Regards,
-> Prasanna
-
-thanks for all your reviewing and suggestion
-
-	Sean
