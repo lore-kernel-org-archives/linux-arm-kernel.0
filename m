@@ -1,85 +1,33 @@
-From: prasannatsmkumar@gmail.com (PrasannaKumar Muralidharan)
-Date: Fri, 14 Apr 2017 10:27:51 +0530
-Subject: [PATCH 2/2] hwrng: mtk: Add driver for hardware random generator
- on MT7623 SoC
-In-Reply-To: <1492142296.6147.19.camel@mtkswgap22>
-References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
- <1492067108-14748-3-git-send-email-sean.wang@mediatek.com>
- <CANc+2y4Oj-sbSKnsTSK+kRYNewp7Pj0fEk_=dqULxWG08L77Eg@mail.gmail.com>
- <1492142296.6147.19.camel@mtkswgap22>
-Message-ID: <CANc+2y4yrSbSqS5Ga6WXjQ9s9RkiptJ5XsN8EczS0wehxAXfGw@mail.gmail.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Fri, 14 Apr 2017 14:19:36 +0900
+Subject: [PATCH 0/3] Add support for the S6E3HA2 edge panel on TM2e board
+References: <CGME20170414051958epcas5p379f82e72e9239fdea0b99de88c4c39f1@epcas5p3.samsung.com>
+Message-ID: <1492147179-7824-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2017 at 09:28, Sean Wang <sean.wang@mediatek.com> wrote:
->
-> Hi PrasannaKumar,
->
-> Add my comments inline
->
->>
->> Use readl_poll_timeout_atomic's return value or -EIO instead of
->> !!ready. This will simplify mtk_rng_read.
->>
->
-> !!ready provided is in order to let blocking/non-blocking case could
-> share same code path. And readl_poll_timeout_atomic only handles
-> blocking case.
+The purpose of this patch is add support for S6E3HA2 edge AMOLED panel
+on the TM2e board. The panel has 1600x2560 resolution in 5.65"
+physical panel in the TM2e device.
 
-Missed this point. Makes sense. My previous comment about return value
-in mtk_rng_read is invalid as I based it on a wrong assumption.
+The S6E3HA2 edge panel(5.65") is simliar to the previous S6E3HA2
+panel(5.7"), but resolution and some command message are different. So
+it can be distinguished as a compatiblitiy string.
 
->
->> > +static int mtk_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
->> > +{
->> > +       struct mtk_rng *priv = to_mtk_rng(rng);
->> > +       int retval = 0;
->> > +
->> > +       while (max >= sizeof(u32)) {
->> > +               if (!mtk_rng_wait_ready(rng, wait))
->> > +                       break;
->> > +
->> > +               *(u32 *)buf = readl(priv->base + RNG_DATA);
->> > +               retval += sizeof(u32);
->> > +               buf += sizeof(u32);
->> > +               max -= sizeof(u32);
->> > +       }
->> > +
->> > +       if (unlikely(wait && max))
->> > +               dev_warn(priv->dev, "timeout might be not properly set\n");
->>
->> Is this really necessary? Better to choose proper timeout than
->> providing this warning message. In rare cases if the timeout could
->> occur due to some reason (may be a hardware fault) print appropriate
->> warning message.
->
-> It is good, I will choose the proper timeout and remove the log in the
-> next one.
->
->>
->> > +       return retval || !wait ? retval : -EIO;
->> > +}
->>
->> Set retavl to mtk_rng_wait_ready and return retval.
->>
->
-> Maybe i didn't get your points exactly. Adding some explanation about
-> thoughts here.
->
-> "return retval || !wait ? retval : -EIO;" I use can also help handling
-> the both cases in one line which i think is elegant enough.
->
-> And retval is accumulated with each round if some data's existing in
-> hardware, so we don't return the value from mtk_rng_wait_ready().
+Best regards,
+Hoegeun
 
-retval can be 0 only when mkt_rng_wait_ready fails, returning 0 when
-wait is true is confusing. Expected return value when 0 bytes is read
-from device and wait is true is not clearly documented.
+Hoegeun Kwon (3):
+  dt-bindings: Add support for samsung s6e3ha2 edge panel binding
+  drm/panel: s6e3ha2: Add support for S6eHEA2 edge panel on TM2e board
+  arm64: dts: exynos: Add support for S6E3HA2 edge panel device on TM2e
+    board
 
-"return retval || !wait ? retval : -EIO;" is also fine.
+ .../bindings/display/panel/samsung,s6e3ha2-e.txt   | 28 ++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 12 +++++
+ drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 62 +++++++++++++++++++---
+ 3 files changed, 96 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2-e.txt
 
-Overall the code looks good to me. You can add:
-Reviewed-by: PrasannaKumar Muralidharan <prasannatsmkumar@gmail.com>.
-
-Regards,
-PrasannaKumar
+-- 
+1.9.1
