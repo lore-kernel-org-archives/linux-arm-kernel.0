@@ -1,53 +1,68 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 14 Apr 2017 21:15:54 +0800
-Subject: [PATCH 1/2] arm64: allwinner: a64: add EHCI0/OHCI0 nodes to A64 DTSI
-Message-ID: <20170414131555.9431-1-icenowy@aosc.io>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 14 Apr 2017 21:20:03 +0800
+Subject: [PATCH] ARM32: Support mremap() for sigpage/vDSO
+In-Reply-To: <20170414101033.4780-1-dsafonov@virtuozzo.com>
+Message-ID: <201704142137.ph5puyyo%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 SoC features a pair of EHCI/OHCI controllers that can be
-set to wire to USB0 port (the OTG-capable one), which can be used to
-provide a better performance in host mode.
+Hi Dmitry,
 
-Add their device tree nodes.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.11-rc6 next-20170413]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+url:    https://github.com/0day-ci/linux/commits/Dmitry-Safonov/ARM32-Support-mremap-for-sigpage-vDSO/20170414-190018
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All warnings (new ones prefixed by >>):
+
+   arch/arm/kernel/vdso.c: In function 'vdso_mremap':
+>> arch/arm/kernel/vdso.c:69:28: warning: assignment makes integer from pointer without a cast [-Wint-conversion]
+     current->mm->context.vdso = (void __user *)new_vma->vm_start;
+                               ^
+
+vim +69 arch/arm/kernel/vdso.c
+
+    53		.name = "[vvar]",
+    54		.pages = &vdso_data_page,
+    55	};
+    56	
+    57	static int vdso_mremap(const struct vm_special_mapping *sm,
+    58			struct vm_area_struct *new_vma)
+    59	{
+    60		unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+    61		unsigned long vdso_size;
+    62	
+    63		/* without VVAR page */
+    64		vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
+    65	
+    66		if (vdso_size != new_size)
+    67			return -EINVAL;
+    68	
+  > 69		current->mm->context.vdso = (void __user *)new_vma->vm_start;
+    70	
+    71		return 0;
+    72	}
+    73	
+    74	static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
+    75		.name = "[vdso]",
+    76		.mremap = vdso_mremap,
+    77	};
+
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index c7f669f5884f..65a344d9cea4 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -204,6 +204,28 @@
- 			#phy-cells = <1>;
- 		};
- 
-+		ehci0: usb at 01c1a000 {
-+			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
-+			reg = <0x01c1a000 0x100>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_OHCI0>,
-+				 <&ccu CLK_BUS_EHCI0>,
-+				 <&ccu CLK_USB_OHCI0>;
-+			resets = <&ccu RST_BUS_OHCI0>,
-+				 <&ccu RST_BUS_EHCI0>;
-+			status = "disabled";
-+		};
-+
-+		ohci0: usb at 01c1a400 {
-+			compatible = "allwinner,sun50i-a64-ohci", "generic-ohci";
-+			reg = <0x01c1a400 0x100>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_OHCI0>,
-+				 <&ccu CLK_USB_OHCI0>;
-+			resets = <&ccu RST_BUS_OHCI0>;
-+			status = "disabled";
-+		};
-+
- 		ehci1: usb at 01c1b000 {
- 			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
- 			reg = <0x01c1b000 0x100>;
--- 
-2.12.2
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 20767 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/e61d08a5/attachment-0001.gz>
