@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:34 -0300
-Subject: [PATCH v3 10/21] ARM: dts: r7s72100: Add generic compatible string
- for I2C EEPROM
+Date: Thu, 13 Apr 2017 22:04:35 -0300
+Subject: [PATCH v3 11/21] ARM: dts: koelsch: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-11-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-12-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,21 +29,21 @@ Changes in v3:
 
 Changes in v2: None
 
- arch/arm/boot/dts/r7s72100-genmai.dts | 2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index 52a7b586bac7..b0db621ff176 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -57,7 +57,7 @@
- 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 001e6116c47c..dc8ed02de707 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -702,7 +702,7 @@
+ 	};
  
  	eeprom at 50 {
--		compatible = "renesas,24c128";
-+		compatible = "renesas,24c128", "atmel,24c128";
+-		compatible = "renesas,24c02";
++		compatible = "renesas,24c02", "atmel,24c02";
  		reg = <0x50>;
- 		pagesize = <64>;
+ 		pagesize = <16>;
  	};
 -- 
 2.9.3
