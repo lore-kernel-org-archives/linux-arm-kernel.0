@@ -1,23 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 14 Apr 2017 17:42:57 +0530
-Subject: [PATCH v2 3/3] ARM: dts: da850: Add node for LEGO MINDSTORMS EV3
- Battery
-In-Reply-To: <1491944723-32174-4-git-send-email-david@lechnology.com>
-References: <1491944723-32174-1-git-send-email-david@lechnology.com>
- <1491944723-32174-4-git-send-email-david@lechnology.com>
-Message-ID: <61a1c7b3-8f6f-db49-a7b8-1390efba6033@ti.com>
+From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Fri, 14 Apr 2017 14:16:36 +0200
+Subject: [PATCH V5 2/2] thermal: broadcom: add Northstar thermal driver
+In-Reply-To: <20170407044218.GA12447@localhost.localdomain>
+References: <20170331201124.656-1-zajec5@gmail.com>
+ <20170403154829.29780-1-zajec5@gmail.com>
+ <20170403154829.29780-2-zajec5@gmail.com>
+ <20170407044218.GA12447@localhost.localdomain>
+Message-ID: <6dd2617d-a8a8-d7a4-53a4-7ebcb274573c@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On 04/07/2017 06:42 AM, Eduardo Valentin wrote:
+> On Mon, Apr 03, 2017 at 05:48:29PM +0200, Rafa? Mi?ecki wrote:
+>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>
+>> Northstar is a SoC family commonly used in home routers. This commit
+>> adds a driver for checking CPU temperature. As Northstar Plus seems to
+>> also have this IP block this new symbol gets ARCH_BCM_IPROC dependency.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>
+> If no objection, I am applying this series.
 
-On Wednesday 12 April 2017 02:35 AM, David Lechner wrote:
-> This adds a new node to the LEGO MINDSTORMS EV3 device tree for the battery.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+Cool, hopefully there aren't any more objections :) Once applied should I
+expect this in
+https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/log/?h=next
+?
 
-I am done sending my pull requests for v4.12. So I added this to my
-queue for v4.13
+That would allow me to move bcm2835_thermal.c to the broadcom subdir.
 
-Thanks,
-Sekhar
+
+>> +const struct thermal_zone_of_device_ops ns_thermal_ops = {
+>
+> minor correction here:
+>
+> -const struct thermal_zone_of_device_ops ns_thermal_ops = {
+> +static const struct thermal_zone_of_device_ops ns_thermal_ops = {
+>
+> but I am applying this already in my tree.
+>
+>> +	.get_temp = ns_thermal_get_temp,
+>> +};
+
+Thank you!
