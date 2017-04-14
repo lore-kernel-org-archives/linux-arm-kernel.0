@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:36 -0300
-Subject: [PATCH v3 12/21] ARM: dts: socfpga: Add generic compatible string for
+Date: Thu, 13 Apr 2017 22:04:38 -0300
+Subject: [PATCH v3 14/21] ARM: dts: zynq: Add generic compatible string for
  I2C EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-13-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-15-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,21 +25,35 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/zynq-zc702.dts | 2 +-
+ arch/arm/boot/dts/zynq-zc706.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-index 363ee62457fe..24f566d81667 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-@@ -294,7 +294,7 @@
- 	clock-frequency = <100000>;
- 
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "at24,24c02", "atmel,24c02";
- 		pagesize = <8>;
- 		reg = <0x50>;
- 	};
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 0cdad2cc8b78..9aae7e061d19 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -136,7 +136,7 @@
+ 			#size-cells = <0>;
+ 			reg = <2>;
+ 			eeprom at 54 {
+-				compatible = "at,24c08";
++				compatible = "at,24c08", "atmel,24c08";
+ 				reg = <0x54>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index ad4bb06dba25..ff0fca1c41c8 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -92,7 +92,7 @@
+ 			#size-cells = <0>;
+ 			reg = <2>;
+ 			eeprom at 54 {
+-				compatible = "at,24c08";
++				compatible = "at,24c08", "atmel,24c08";
+ 				reg = <0x54>;
+ 			};
+ 		};
 -- 
 2.9.3
