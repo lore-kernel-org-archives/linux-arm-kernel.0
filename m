@@ -1,66 +1,100 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 14 Apr 2017 08:16:16 -0700
-Subject: [PATCH V5 2/2] thermal: broadcom: add Northstar thermal driver
-In-Reply-To: <6dd2617d-a8a8-d7a4-53a4-7ebcb274573c@milecki.pl>
-References: <20170331201124.656-1-zajec5@gmail.com>
- <20170403154829.29780-1-zajec5@gmail.com>
- <20170403154829.29780-2-zajec5@gmail.com>
- <20170407044218.GA12447@localhost.localdomain>
- <6dd2617d-a8a8-d7a4-53a4-7ebcb274573c@milecki.pl>
-Message-ID: <20170414151613.GA24429@localhost.localdomain>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Fri, 14 Apr 2017 08:19:44 -0700
+Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
+In-Reply-To: <20170414034005.GG14915@dragon>
+References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
+ <20170413133242.5068-5-andrew.smirnov@gmail.com>
+ <20170414034005.GG14915@dragon>
+Message-ID: <CAHQ1cqGYs2h1ZFBC4WBYbyAMsctURwOzQmQB+B6nz=wmR0fYoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rafal,
+On Thu, Apr 13, 2017 at 8:40 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Apr 13, 2017 at 06:32:38AM -0700, Andrey Smirnov wrote:
+>> Add node for GPC and specify as a parent interrupt controller for SoC bus.
+>>
+>> Cc: yurovsky at gmail.com
+>> Cc: Sascha Hauer <kernel@pengutronix.de>
+>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/imx7s.dtsi | 27 ++++++++++++++++++++++++++-
+>>  1 file changed, 26 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+>> index 8fee299..1a7058f 100644
+>> --- a/arch/arm/boot/dts/imx7s.dtsi
+>> +++ b/arch/arm/boot/dts/imx7s.dtsi
+>> @@ -42,6 +42,7 @@
+>>   */
+>>
+>>  #include <dt-bindings/clock/imx7d-clock.h>
+>> +#include <dt-bindings/power/imx7-power.h>
+>>  #include <dt-bindings/gpio/gpio.h>
+>>  #include <dt-bindings/input/input.h>
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>> @@ -119,7 +120,7 @@
+>>               #address-cells = <1>;
+>>               #size-cells = <1>;
+>>               compatible = "simple-bus";
+>> -             interrupt-parent = <&intc>;
+>> +             interrupt-parent = <&gpc>;
+>>               ranges;
+>>
+>>               funnel at 30041000 {
+>> @@ -301,6 +302,7 @@
+>>                       interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>>                       #interrupt-cells = <3>;
+>>                       interrupt-controller;
+>> +                     interrupt-parent = <&intc>;
+>>                       reg = <0x31001000 0x1000>,
+>>                             <0x31002000 0x2000>,
+>>                             <0x31004000 0x2000>,
+>> @@ -309,6 +311,7 @@
+>>
+>>               timer {
+>>                       compatible = "arm,armv7-timer";
+>> +                     interrupt-parent = <&intc>;
+>>                       interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>>                                    <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>>                                    <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+>> @@ -564,6 +567,28 @@
+>>                               interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+>>                               #reset-cells = <1>;
+>>                       };
+>> +
+>> +                     gpc: gpc at 303a0000 {
+>> +                             compatible = "fsl,imx7d-gpc";
+>> +                             reg = <0x303a0000 0x10000>;
+>> +                             interrupt-controller;
+>> +                             interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+>> +                             #interrupt-cells = <3>;
+>> +                             interrupt-parent = <&intc>;
+>> +                             #power-domain-cells = <1>;
+>> +
+>> +                             pgc {
+>> +                                     #address-cells = <1>;
+>> +                                     #size-cells = <0>;
+>> +
+>> +                                     pgc_pcie_phy: pgc-pcie-phy-domain {
+>
+> The node name should be something generic and has a unit-address when
+> there is a 'reg' property in the node.
+>
 
-On Fri, Apr 14, 2017 at 02:16:36PM +0200, Rafa? Mi?ecki wrote:
-> On 04/07/2017 06:42 AM, Eduardo Valentin wrote:
-> >On Mon, Apr 03, 2017 at 05:48:29PM +0200, Rafa? Mi?ecki wrote:
-> >>From: Rafa? Mi?ecki <rafal@milecki.pl>
-> >>
-> >>Northstar is a SoC family commonly used in home routers. This commit
-> >>adds a driver for checking CPU temperature. As Northstar Plus seems to
-> >>also have this IP block this new symbol gets ARCH_BCM_IPROC dependency.
-> >>
-> >>Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> >>Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> >
-> >If no objection, I am applying this series.
-> 
-> Cool, hopefully there aren't any more objections :) Once applied should I
-> expect this in
-> https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git/log/?h=next
-> ?
+I'll change it to pgc-power-domain at 0, let me know if you want
+something different.
 
-They were already applied, but in my #linus branch. Now they are also in
-my #next branch. The #linus branch goes to the coming merge window. The
-#next branch goes to linux-next testing. Your change is now on
-linux-next test, kernelci testing, and for the coming merge windown.
+>> +                                             #power-domain-cells = <0>;
+>> +
+>
+> Drop this newline.
+>
 
-> 
-> That would allow me to move bcm2835_thermal.c to the broadcom subdir.
-> 
-> 
-
-Please send the patch.
-
-> >>+const struct thermal_zone_of_device_ops ns_thermal_ops = {
-> >
-> >minor correction here:
-> >
-> >-const struct thermal_zone_of_device_ops ns_thermal_ops = {
-> >+static const struct thermal_zone_of_device_ops ns_thermal_ops = {
-> >
-> >but I am applying this already in my tree.
-> >
-> >>+	.get_temp = ns_thermal_get_temp,
-> >>+};
-> 
-> Thank you!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/d7a4f133/attachment.sig>
+OK. Will do in v2.
