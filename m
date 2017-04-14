@@ -1,45 +1,66 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 14 Apr 2017 11:07:16 +0200
-Subject: [PATCH v6 5/9] [media] add maintainers for DRM STM driver
-In-Reply-To: <1492157455-2283-6-git-send-email-yannick.fertre@st.com>
-References: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
- <1492157455-2283-6-git-send-email-yannick.fertre@st.com>
-Message-ID: <9c4d57de-95f2-e07e-82fb-a7d81bc1d5f7@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Apr 2017 10:46:44 +0100
+Subject: [PATCH] arm: dma: fix sharing of coherent DMA memory without
+ struct page
+In-Reply-To: <6d0c3e3c-8d1b-89bb-1392-6ffc7d8073c1@samsung.com>
+References: <CGME20170405160251epcas4p14cc5d5f6064c84b133b9e280ac987a93@epcas4p1.samsung.com>
+ <20170405160242.14195-1-shuahkh@osg.samsung.com>
+ <e49715a3-b925-79ad-7d1d-ce2cb5673a97@samsung.com>
+ <3afd77e5-2a98-42fd-b5c9-cbf4c32baa4f@osg.samsung.com>
+ <6d0c3e3c-8d1b-89bb-1392-6ffc7d8073c1@samsung.com>
+Message-ID: <20170414094643.GG17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2017 10:10 AM, Yannick Fertre wrote:
-> Add Philippe Cornu and myself as maintainers.
+On Fri, Apr 14, 2017 at 09:56:07AM +0200, Marek Szyprowski wrote:
+> >>This would be however quite large task, especially taking into account
+> >>all current users of DMA-buf framework...
+> >Yeah it will be a large task.
 > 
-> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
-> ---
->  MAINTAINERS | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c36dfae..84cf73f 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4424,6 +4424,15 @@ S:	Maintained
->  F:	drivers/gpu/drm/sti
->  F:	Documentation/devicetree/bindings/display/st,stih4xx.txt
->  
-> +DRM DRIVERS FOR STM
-> +M:	Yannick Fertre <yannick.fertre@st.com>
-> +M:	Philippe Cornu <philippe.cornu@st.com>
-> +L:	dri-devel at lists.freedesktop.org
-> +T:	git git://anongit.freedesktop.org/drm/drm-misc
-> +S:	Maintained
-> +F:	drivers/gpu/drm/stm
-> +F:	Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
-> +
->  DRM DRIVER FOR TDFX VIDEO CARDS
->  S:	Orphan / Obsolete
->  F:	drivers/gpu/drm/tdfx/
-> 
+> Maybe once scatterlist are switched to pfns, changing dmabuf internal
+> memory representation to pfn array might be much easier.
 
-Hi Yannick,
+Switching to a PFN array won't work either as we have no cross-arch
+way to translate PFNs to a DMA address and vice versa.  Yes, we have
+them in ARM, but they are an _implementation detail_ of ARM's
+DMA API support, they are not for use by drivers.
 
-why the [media] tag in the subject ?
+So, the very first problem that needs solving is this:
 
-Neil
+  How do we go from a coherent DMA allocation for device X to a set
+  of DMA addresses for device Y.
+
+Essentially, we need a way of remapping the DMA buffer for use with
+another device, and returning a DMA address suitable for that device.
+This could well mean that we need to deal with setting up an IOMMU
+mapping.  My guess is that this needs to happen at the DMA coherent
+API level - the DMA coherent API needs to be augmented with support
+for this.  I'll call this "DMA coherent remap".
+
+We then need to think about how to pass this through the dma-buf API.
+dma_map_sg() is done by the exporter, who should know what kind of
+memory is being exported.  The exporter can avoid calling dma_map_sg()
+if it knows in advance that it is exporting DMA coherent memory.
+Instead, the exporter can simply create a scatterlist with the DMA
+address and DMA length prepopulated with the results of the DMA
+coherent remap operation above.
+
+What the scatterlist can't carry in this case is a set of valid
+struct page pointers, and an importer must not walk the scatterlist
+expecting to get at the virtual address parameters or struct page
+pointers.
+
+On the mmap() side of things, remember that DMA coherent allocations
+may require special mapping into userspace, and which can only be
+mapped by the DMA coherent mmap support.  kmap etc will also need to
+be different.  So it probably makes sense for DMA coherent dma-buf
+exports to use a completely separate set of dma_buf_ops from the
+streaming version.
+
+I think this is the easiest approach to solving the problem without
+needing massive driver changes all over the kernel.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
