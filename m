@@ -1,47 +1,109 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Fri, 14 Apr 2017 07:33:49 -0700
-Subject: [PATCH 3/8] ARM: dts: imx7s: Adjust anatop-enable-bit for
- 'reg_1p0d'
-In-Reply-To: <20170414032853.GF14915@dragon>
-References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
- <20170413133242.5068-4-andrew.smirnov@gmail.com>
- <20170414032853.GF14915@dragon>
-Message-ID: <CAHQ1cqFpc5fqa5MvZ6sMyr-Q_ZbBsLvbatrNpV3Y_G1sogc=FA@mail.gmail.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Fri, 14 Apr 2017 20:34:32 +0530
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
+Message-ID: <1492182272-31132-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 8:28 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Apr 13, 2017 at 06:32:37AM -0700, Andrey Smirnov wrote:
->> In PMU_REG_1P0Dn ENABLE_LINREG is bit 0. Bit 31 is called OVERRIDE and
->> it serves the function of granting permission to GPC IP block to alter
->> various bit-fields of the register. The reason why this property, that
->> trickeld here from Freescale BSP, is set to 31 is because in the code
->> it came from it is used in conjunction with a notifier handler for
->> REGULATOR_EVENT_PRE_DO_ENABLE and REGULATOR_EVENT_PRE_DO_DISABLE
->> events (not found in upstream kernel) that triggers GPC to start
->> manipulating aforementioned other bitfields.
->>
->> Since:
->>       a) none of the aforementioned machinery is implemented by
->>          upstream
->>       b) using 'anatop-enable-bit' in that capacity is a bit of a
->>          semantic stretch
->>
->> simplify the situation by setting the value of 'anatop-enable-bit' to
->> point to ENABLE_LINREG (same as i.MX6).
->>
->> Cc: yurovsky at gmail.com
->> Cc: Sascha Hauer <kernel@pengutronix.de>
->> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->
-> Since patch 1 ~ 3 are all about adding anatop-enable-bit, can we squash
-> them into one patch?
+- Adding spinlock for protecting legacy mask register
+- Few wifi end points which only support legacy interrupts,
+performs hardware reset functionalities after disabling interrupts
+by invoking disable_irq and then re-enable using enable_irq, they
+enable hardware interrupts first and then virtual irq line later.
+- The legacy irq line goes low only after DEASSERT_INTx is
+received.As the legacy irq line is high immediately after hardware
+interrupts are enabled but virq of EP is still in disabled state
+and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+irq chip is used, interrutps are not masked and system is
+hanging with CPU stall.
+- Adding irq chip functions instead of dummy irq chip for legacy
+interrupts.
+- Legacy interrupts are level sensitive, so using handle_level_irq
+is more appropriate as it is masks interrupts until End point handles
+interrupts and unmasks interrutps after End point handler is executed.
+- Legacy interrupts are level triggered, virtual irq line of End
+Point shows as edge in /proc/interrupts.
+- Setting irq flags of virtual irq line of EP to level triggered
+at the time of mapping.
 
-OK. Will do in v2.
+Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+---
+ drivers/pci/host/pcie-xilinx-nwl.c | 45 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 44 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 43eaa4a..36f4fb4 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -184,6 +184,7 @@ struct nwl_pcie {
+ 	u8 root_busno;
+ 	struct nwl_msi msi;
+ 	struct irq_domain *legacy_irq_domain;
++	raw_spinlock_t leg_mask_lock;
+ };
+ 
+ static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
+@@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
++static void nwl_mask_leg_irq(struct irq_data *data)
++{
++	struct irq_desc *desc = irq_to_desc(data->irq);
++	struct nwl_pcie *pcie;
++	unsigned long flags;
++	u32 mask;
++	u32 val;
++
++	pcie = irq_desc_get_chip_data(desc);
++	mask = 1 << (data->hwirq - 1);
++	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
++	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
++	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
++	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
++}
++
++static void nwl_unmask_leg_irq(struct irq_data *data)
++{
++	struct irq_desc *desc = irq_to_desc(data->irq);
++	struct nwl_pcie *pcie;
++	unsigned long flags;
++	u32 mask;
++	u32 val;
++
++	pcie = irq_desc_get_chip_data(desc);
++	mask = 1 << (data->hwirq - 1);
++	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
++	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
++	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
++	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
++}
++
++static struct irq_chip nwl_leg_irq_chip = {
++	.name = "nwl_pcie:legacy",
++	.irq_enable = nwl_unmask_leg_irq,
++	.irq_disable = nwl_mask_leg_irq,
++	.irq_mask = nwl_mask_leg_irq,
++	.irq_unmask = nwl_unmask_leg_irq,
++};
++
+ static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
+ 			  irq_hw_number_t hwirq)
+ {
+-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
++	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
++	irq_set_status_flags(irq, IRQ_LEVEL);
+ 
+ 	return 0;
+ }
+@@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+ 		return -ENOMEM;
+ 	}
+ 
++	raw_spin_lock_init(&pcie->leg_mask_lock);
+ 	nwl_pcie_init_msi_irq_domain(pcie);
+ 	return 0;
+ }
+-- 
+2.1.1
