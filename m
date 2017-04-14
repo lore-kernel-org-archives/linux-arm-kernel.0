@@ -1,15 +1,16 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 14 Apr 2017 11:40:06 +0800
-Subject: [PATCH 4/8] ARM: dts: imx7s: Add node for GPC
-In-Reply-To: <20170413133242.5068-5-andrew.smirnov@gmail.com>
+Date: Fri, 14 Apr 2017 11:47:00 +0800
+Subject: [PATCH 6/8] ARM: dts: imx7d-sdb: Add GPIO expander node
+In-Reply-To: <20170413133242.5068-7-andrew.smirnov@gmail.com>
 References: <20170413133242.5068-1-andrew.smirnov@gmail.com>
- <20170413133242.5068-5-andrew.smirnov@gmail.com>
-Message-ID: <20170414034005.GG14915@dragon>
+ <20170413133242.5068-7-andrew.smirnov@gmail.com>
+Message-ID: <20170414034659.GH14915@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 06:32:38AM -0700, Andrey Smirnov wrote:
-> Add node for GPC and specify as a parent interrupt controller for SoC bus.
+On Thu, Apr 13, 2017 at 06:32:40AM -0700, Andrey Smirnov wrote:
+> Add node for U38, a 74LV595PW serial-in shift register that acts as a
+> GPIO expander on the board.
 > 
 > Cc: yurovsky at gmail.com
 > Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -22,84 +23,67 @@ On Thu, Apr 13, 2017 at 06:32:38AM -0700, Andrey Smirnov wrote:
 > Cc: linux-arm-kernel at lists.infradead.org
 > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
->  arch/arm/boot/dts/imx7s.dtsi | 27 ++++++++++++++++++++++++++-
->  1 file changed, 26 insertions(+), 1 deletion(-)
+>  arch/arm/boot/dts/imx7d-sdb.dts | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 8fee299..1a7058f 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -42,6 +42,7 @@
->   */
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+> index 5be01a1..e0ff276 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -52,6 +52,30 @@
+>  		reg = <0x80000000 0x80000000>;
+>  	};
 >  
->  #include <dt-bindings/clock/imx7d-clock.h>
-> +#include <dt-bindings/power/imx7-power.h>
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/input/input.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> @@ -119,7 +120,7 @@
->  		#address-cells = <1>;
->  		#size-cells = <1>;
+> +	spi4 {
+> +		compatible = "spi-gpio";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_spi1>;
+> +		status = "okay";
+
+The 'status' is not needed in this case.
+
+> +		gpio-sck = <&gpio1 13 0>;
+> +		gpio-mosi = <&gpio1 9 0>;
+> +		cs-gpios = <&gpio1 12 0>;
+> +		num-chipselects = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		gpio_spi: gpio_spi at 0 {
+
+gpio-expander might be a better node name?
+
+> +			compatible = "fairchild,74hc595";
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			reg = <0>;
+> +			registers-number = <1>;
+> +			 /* Enable PERI_3V3, SENSOR_RST_B and HDMI_RST*/
+> +			registers-default = /bits/ 8 <0x74>;
+
+I do not see this property is documented or supported by kernel.
+
+> +			spi-max-frequency = <100000>;
+> +		};
+> +	};
+> +
+>  	regulators {
 >  		compatible = "simple-bus";
-> -		interrupt-parent = <&intc>;
-> +		interrupt-parent = <&gpc>;
->  		ranges;
->  
->  		funnel at 30041000 {
-> @@ -301,6 +302,7 @@
->  			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->  			#interrupt-cells = <3>;
->  			interrupt-controller;
-> +			interrupt-parent = <&intc>;
->  			reg = <0x31001000 0x1000>,
->  			      <0x31002000 0x2000>,
->  			      <0x31004000 0x2000>,
-> @@ -309,6 +311,7 @@
->  
->  		timer {
->  			compatible = "arm,armv7-timer";
-> +			interrupt-parent = <&intc>;
->  			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->  				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
->  				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> @@ -564,6 +567,28 @@
->  				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
->  				#reset-cells = <1>;
->  			};
+>  		#address-cells = <1>;
+> @@ -642,5 +666,13 @@
+>  		fsl,pins = <
+>  			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
+>  		>;
 > +
-> +			gpc: gpc at 303a0000 {
-> +				compatible = "fsl,imx7d-gpc";
-> +				reg = <0x303a0000 0x10000>;
-> +				interrupt-controller;
-> +				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> +				#interrupt-cells = <3>;
-> +				interrupt-parent = <&intc>;
-> +				#power-domain-cells = <1>;
-> +
-> +				pgc {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +
-> +					pgc_pcie_phy: pgc-pcie-phy-domain {
-
-The node name should be something generic and has a unit-address when
-there is a 'reg' property in the node.
-
-> +						#power-domain-cells = <0>;
-> +
-
-Drop this newline.
-
-Shawn
-
-> +						reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
-> +						power-supply = <&reg_1p0d>;
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		aips2: aips-bus at 30400000 {
+> +		pinctrl_spi1: spi1grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
+> +				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
+> +				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
+> +			>;
+> +		};
+>  	};
+>  };
 > -- 
 > 2.9.3
 > 
