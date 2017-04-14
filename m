@@ -1,248 +1,128 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:34 +0200
-Subject: [PATCH v5 22/22] KVM: arm64: vgic-v3:
- KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
+Date: Fri, 14 Apr 2017 12:15:17 +0200
+Subject: [PATCH v5 05/22] KVM: arm64: vgic-its: KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+ group
 In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-23-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-6-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new attribute to GICV3 KVM device
-KVM_DEV_ARM_VGIC_GRP_CTRL group. This Allows the userspace to
-flush all GICR pending tables into guest RAM. At the moment
-we do not offer any restore control as the sync is implicit.
+The ITS KVM device exposes a new KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+group which allows the userspace to save/restore ITS registers.
 
-As we need the PENDBASER_ADDRESS() in vgic-v3, let's move its
-definition in the irqchip header. We restore the full length
-of the field, ie [51:16]. Same for PROPBASER_ADDRESS with full
-field length of [51:12].
+At this stage the get/set/has operations are not yet implemented.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 ---
 v4 -> v5:
-- move pending table save code/ctrl into VGICv3 instead of ITS
-- remove useless gpa_t cast
-- use the same optimization as in its_sync_lpi_pending_table
+- Add Marc's A-b
 
 v3 -> v4:
-- remove the wrong comment about locking
-- pass kvm struct instead of its handle
-- add comment about restore method
-- remove GITR_PENDABASER.PTZ check
-- continue if target_vcpu == NULL
-- new locking strategy
-
-v1 -> v2:
-- do not care about the 1st KB which should be zeroed according to
-  the spec.
+- added Andre's R-b
 ---
- arch/arm/include/uapi/asm/kvm.h     |  1 +
- arch/arm64/include/uapi/asm/kvm.h   |  1 +
- include/linux/irqchip/arm-gic-v3.h  |  2 ++
- virt/kvm/arm/vgic/vgic-its.c        |  6 ++---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 20 ++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c         | 54 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |  1 +
- 7 files changed, 81 insertions(+), 4 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h   |  1 +
+ arch/arm64/include/uapi/asm/kvm.h |  1 +
+ virt/kvm/arm/vgic/vgic-its.c      | 36 +++++++++++++++++++++++++++++++++++-
+ 3 files changed, 37 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 8e6563c..78fe803 100644
+index 6ebd3e6..4beb83b 100644
 --- a/arch/arm/include/uapi/asm/kvm.h
 +++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -202,6 +202,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
- #define   KVM_DEV_ARM_ITS_SAVE_TABLES		1
- #define   KVM_DEV_ARM_ITS_RESTORE_TABLES	2
-+#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
- 
- /* KVM_IRQ_LINE irq field index values */
- #define KVM_ARM_IRQ_TYPE_SHIFT		24
+@@ -192,6 +192,7 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+ #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
+ #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
++#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS	8
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+ 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
 diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 1e35115..8a3758a 100644
+index c286035..7e8dd69 100644
 --- a/arch/arm64/include/uapi/asm/kvm.h
 +++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -222,6 +222,7 @@ struct kvm_arch_memory_slot {
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT		0
- #define   KVM_DEV_ARM_ITS_SAVE_TABLES           1
- #define   KVM_DEV_ARM_ITS_RESTORE_TABLES        2
-+#define   KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES	3
- 
- /* Device Control API on vcpu fd */
- #define KVM_ARM_VCPU_PMU_V3_CTRL	0
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 0c6798c..9d3932f 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -158,6 +158,7 @@
- #define GICR_PROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, RaWaWb)
- 
- #define GICR_PROPBASER_IDBITS_MASK			(0x1f)
-+#define GICR_PROPBASER_ADDRESS(x)    ((x) & GENMASK_ULL(51, 12))
- 
- #define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
- #define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
-@@ -183,6 +184,7 @@
- #define GICR_PENDBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, RaWaWb)
- 
- #define GICR_PENDBASER_PTZ				BIT_ULL(62)
-+#define GICR_PENDBASER_ADDRESS(x)    ((x) & GENMASK_ULL(51, 16))
- 
- /*
-  * Re-Distributor registers, offsets from SGI_base
+@@ -212,6 +212,7 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+ #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
+ #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
++#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS 8
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+ 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index be848be..745c245 100644
+index 3ffcbbe..f687e91 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -189,8 +189,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
-  */
- #define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
- #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
--#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
--#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
- 
- #define GIC_LPI_OFFSET 8192
- 
-@@ -227,7 +225,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 			     struct kvm_vcpu *filter_vcpu)
- {
--	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
-+	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
- 	int ret;
- 
-@@ -339,7 +337,7 @@ static u32 max_lpis_propbaser(u64 propbaser)
-  */
- static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- {
--	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-+	gpa_t pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
- 	struct vgic_irq *irq;
- 	int last_byte_offset = -1;
- 	int ret = 0;
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 859bfa8..d48743c 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -580,6 +580,24 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
- 		reg = tmp32;
- 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
-+		int ret;
-+
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
-+			mutex_lock(&dev->kvm->lock);
-+
-+			if (!lock_all_vcpus(dev->kvm)) {
-+				mutex_unlock(&dev->kvm->lock);
-+				return -EBUSY;
-+			}
-+			ret = vgic_v3_save_pending_tables(dev->kvm);
-+			unlock_all_vcpus(dev->kvm);
-+			mutex_unlock(&dev->kvm->lock);
-+			return ret;
-+		}
-+		break;
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -658,6 +676,8 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
- 			return 0;
-+		case KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES:
-+			return 0;
- 		}
- 	}
- 	return -ENXIO;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index be0f4c3..1f0977f 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -15,6 +15,7 @@
- #include <linux/irqchip/arm-gic-v3.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+//#include <linux/bitops.h>
- #include <kvm/arm_vgic.h>
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_asm.h>
-@@ -252,6 +253,59 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+@@ -1466,6 +1466,19 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ 	kfree(its);
  }
  
-+/**
-+ * vgic_its_save_pending_tables - Save the pending tables into guest RAM
-+ * kvm lock and all vcpu lock must be held
-+ */
-+int vgic_v3_save_pending_tables(struct kvm *kvm)
++int vgic_its_has_attr_regs(struct kvm_device *dev,
++			   struct kvm_device_attr *attr)
 +{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	int last_byte_offset = -1;
-+	struct vgic_irq *irq;
-+	int ret;
-+
-+	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		int byte_offset, bit_nr;
-+		struct kvm_vcpu *vcpu;
-+		gpa_t pendbase, ptr;
-+		bool stored;
-+		u8 val;
-+
-+		vcpu = irq->target_vcpu;
-+		if (!vcpu)
-+			continue;
-+
-+		pendbase = GICR_PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-+
-+		byte_offset = irq->intid / BITS_PER_BYTE;
-+		bit_nr = irq->intid % BITS_PER_BYTE;
-+		ptr = pendbase + byte_offset;
-+
-+		if (byte_offset != last_byte_offset) {
-+			ret = kvm_read_guest(kvm, ptr, &val, 1);
-+			if (ret)
-+				return ret;
-+			last_byte_offset = byte_offset;
-+		}
-+
-+		stored = val & bit_nr;
-+		if (stored == irq->pending_latch)
-+			continue;
-+
-+		if (irq->pending_latch)
-+			val |= 1 << bit_nr;
-+		else
-+			val &= ~(1 << bit_nr);
-+
-+		ret = kvm_write_guest(kvm, ptr, &val, 1);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
++	return -ENXIO;
 +}
 +
++int vgic_its_attr_regs_access(struct kvm_device *dev,
++			      struct kvm_device_attr *attr,
++			      u64 *reg, bool is_write)
++{
++	return -ENXIO;
++}
 +
- /* check for overlapping regions and for regions crossing the end of memory */
- static bool vgic_v3_check_base(struct kvm *kvm)
+ static int vgic_its_has_attr(struct kvm_device *dev,
+ 			     struct kvm_device_attr *attr)
  {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 9bc52ef..535c2fc 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -177,6 +177,7 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
-+int vgic_v3_save_pending_tables(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+@@ -1482,6 +1495,8 @@ static int vgic_its_has_attr(struct kvm_device *dev,
+ 			return 0;
+ 		}
+ 		break;
++	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
++		return vgic_its_has_attr_regs(dev, attr);
+ 	}
+ 	return -ENXIO;
+ }
+@@ -1521,6 +1536,15 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+ 			return 0;
+ 		}
+ 		break;
++	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 reg;
++
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		return vgic_its_attr_regs_access(dev, attr, &reg, true);
++	}
+ 	}
+ 	return -ENXIO;
+ }
+@@ -1541,10 +1565,20 @@ static int vgic_its_get_attr(struct kvm_device *dev,
+ 		if (copy_to_user(uaddr, &addr, sizeof(addr)))
+ 			return -EFAULT;
+ 		break;
++	}
++	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 reg;
++		int ret;
++
++		ret = vgic_its_attr_regs_access(dev, attr, &reg, false);
++		if (ret)
++			return ret;
++		return put_user(reg, uaddr);
++	}
+ 	default:
+ 		return -ENXIO;
+ 	}
+-	}
  
- int vgic_register_its_iodevs(struct kvm *kvm);
+ 	return 0;
+ }
 -- 
 2.5.5
