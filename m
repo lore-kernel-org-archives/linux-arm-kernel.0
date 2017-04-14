@@ -1,79 +1,100 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 14 Apr 2017 10:28:58 +0200
-Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
- mmaping code
-In-Reply-To: <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
-References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
- <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <a9b645bc-0991-555f-93d4-9e2f5d1fefa4@samsung.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Fri, 14 Apr 2017 10:31:12 +0200
+Subject: [PATCH v2 1/2] drm: dw-hdmi: add specific I2S and AHB functions for
+ stream handling
+In-Reply-To: <20170414083113.4255-1-romain.perier@collabora.com>
+References: <20170414083113.4255-1-romain.perier@collabora.com>
+Message-ID: <20170414083113.4255-2-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently, CTS+N is forced to zero as a workaround of the IP block for
+i.MX platforms. This is requested in the datasheet of the corresponding
+IP for AHB mode only. However, we have seen that it introduces glitches
+or delays when playing a sound on HDMI for I2S mode. This proves that we
+cannot keep the current functions for handling audio stream as-is if
+these contain workaround that are specific to a mode.
 
-Gently ping.
+This commit introduces two callbacks, one for each variant.
+dw_hdmi_setup defines the right function depending on the detected
+variant. Then, the exported functions dw_hdmi_audio_enable and
+dw_hdmi_audio_disable calls the corresponding callbacks
 
-Regards
-Andrzej
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
-On 31.03.2017 13:02, Andrzej Hajda wrote:
-> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
-> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable should not
-> use it and take advantage of contiguous nature of the allocation.
->
-> Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> ---
-> Hi Robin, Geert,
->
-> In this version of the patch I have replaced temporal pages and
-> iommu_dma_mmap with remap_pfn_range or rather its simplified version
-> vm_iomap_memory.
-> Unfortunately I have not find nice helper for sgtable creation, so I
-> left sg allocation inside _iommu_mmap_attrs.
->
-> As the fixing of DMA_ATTR_FORCE_CONTIGUOUS related crashes has higher
-> priority I have focused only on it in this patch.
->
-> Regards
-> Andrzej
-> ---
->  arch/arm64/mm/dma-mapping.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index f7b5401..41c7c36 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -703,6 +703,10 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->  	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
->  		return ret;
->  
-> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
-> +		return vm_iomap_memory(vma,
-> +				page_to_phys(vmalloc_to_page(cpu_addr)), size);
-> +
->  	area = find_vm_area(cpu_addr);
->  	if (WARN_ON(!area || !area->pages))
->  		return -ENXIO;
-> @@ -715,8 +719,19 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
->  			       size_t size, unsigned long attrs)
->  {
->  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> -	struct vm_struct *area = find_vm_area(cpu_addr);
-> +	struct vm_struct *area;
-> +
-> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-> +
-> +		if (!ret)
-> +			sg_set_page(sgt->sgl, vmalloc_to_page(cpu_addr),
-> +				    PAGE_ALIGN(size), 0);
->  
-> +		return ret;
-> +	}
-> +
-> +	area = find_vm_area(cpu_addr);
->  	if (WARN_ON(!area || !area->pages))
->  		return -ENXIO;
->  
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index 4b6f216..5b328c0 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -173,6 +173,8 @@ struct dw_hdmi {
+ 
+ 	unsigned int reg_shift;
+ 	struct regmap *regm;
++	void (*enable_audio)(struct dw_hdmi *hdmi);
++	void (*disable_audio)(struct dw_hdmi *hdmi);
+ };
+ 
+ #define HDMI_IH_PHY_STAT0_RX_SENSE \
+@@ -542,13 +544,29 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+ 
++void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
++{
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++}
++
++void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
++{
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
++}
++
++void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
++{
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++}
++
+ void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
+ {
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&hdmi->audio_lock, flags);
+ 	hdmi->audio_enable = true;
+-	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++	if (hdmi->enable_audio)
++		hdmi->enable_audio(hdmi);
+ 	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
+@@ -559,7 +577,8 @@ void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
+ 
+ 	spin_lock_irqsave(&hdmi->audio_lock, flags);
+ 	hdmi->audio_enable = false;
+-	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
++	if (hdmi->disable_audio)
++		hdmi->disable_audio(hdmi);
+ 	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
+@@ -2404,6 +2423,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		audio.irq = irq;
+ 		audio.hdmi = hdmi;
+ 		audio.eld = hdmi->connector.eld;
++		hdmi->enable_audio = dw_hdmi_ahb_audio_enable;
++		hdmi->disable_audio = dw_hdmi_ahb_audio_disable;
+ 
+ 		pdevinfo.name = "dw-hdmi-ahb-audio";
+ 		pdevinfo.data = &audio;
+@@ -2416,6 +2437,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
+ 		audio.hdmi	= hdmi;
+ 		audio.write	= hdmi_writeb;
+ 		audio.read	= hdmi_readb;
++		hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
+ 
+ 		pdevinfo.name = "dw-hdmi-i2s-audio";
+ 		pdevinfo.data = &audio;
+-- 
+2.9.3
