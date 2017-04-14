@@ -1,47 +1,123 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 14 Apr 2017 11:08:42 +0800
-Subject: [PATCH v2] ARM: dts: imx53-qsrb: Pulldown PMIC IRQ pin
-In-Reply-To: <1492032678-29572-1-git-send-email-festevam@gmail.com>
-References: <1492032678-29572-1-git-send-email-festevam@gmail.com>
-Message-ID: <20170414030841.GD14915@dragon>
+Date: Fri, 14 Apr 2017 11:14:52 +0800
+Subject: [PATCH v2 07/22] ARM: dts: imx: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170413182839.25381-8-javier@osg.samsung.com>
+References: <20170413182839.25381-1-javier@osg.samsung.com>
+ <20170413182839.25381-8-javier@osg.samsung.com>
+Message-ID: <20170414031451.GE14915@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 06:31:18PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu, Apr 13, 2017 at 03:28:24PM -0300, Javier Martinez Canillas wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
 > 
-> Currently the following errors are seen:
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
 > 
-> [   14.015056] mc13xxx 0-0008: Failed to read IRQ status: -6
-> [   27.321093] mc13xxx 0-0008: Failed to read IRQ status: -6
-> [   27.411681] mc13xxx 0-0008: Failed to read IRQ status: -6
-> [   27.456281] mc13xxx 0-0008: Failed to read IRQ status: -6
-> [   30.527106] mc13xxx 0-0008: Failed to read IRQ status: -6
-> [   36.596900] mc13xxx 0-0008: Failed to read IRQ status: -6
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
 > 
-> Also when reading the interrupts via 'cat /proc/interrupts' the
-> PMIC GPIO interrupt counter does not stop increasing.
-> 
-> The reason for the storm of interrupts is that the PUS field of
-> register IOMUXC_SW_PAD_CTL_PAD_CSI0_DAT5 is currently configured as:
-> 10 : 100k pullup
-> 
-> and the PMIC interrupt is being registered as IRQ_TYPE_LEVEL_HIGH type,
-> which is the correct type as per the MC34708 datasheet.
-> 
-> Use the default power on value for the IOMUX, which sets PUS field as:
-> 00: 360k pull down
-> 
-> This prevents the spurious PMIC interrupts from happening.
-> 
-> Commit e1ffceb078c6 ("ARM: imx53: qsrb: fix PMIC interrupt level")
-> correctly described the irq type as IRQ_TYPE_LEVEL_HIGH, but
-> missed to update the IOMUX of the PMIC GPIO as pull down.
-> 
-> Fixes: e1ffceb078c6 ("ARM: imx53: qsrb: fix PMIC interrupt level")
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
-> Changes since v1:
-> - Fix typo: s/seeing/seen in the commit log
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Okay, replaced with this one.
+I wouldn't apply it before driver and bindings change get accepted.
+Ping me when that happens.
+
+Shawn
+
+> ---
+> 
+> Changes in v2: None
+> 
+>  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi | 2 +-
+>  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi   | 2 +-
+>  arch/arm/boot/dts/imx28-evk.dts                   | 2 +-
+>  arch/arm/boot/dts/imx53-tqma53.dtsi               | 2 +-
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts                | 2 +-
+>  arch/arm/boot/dts/imx6q-utilite-pro.dts           | 2 +-
+>  6 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
+> index 4f3e0f473581..61e741092efa 100644
+> --- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
+> @@ -40,7 +40,7 @@
+>  	status = "okay";
+>  
+>  	at24 at 52 {
+> -		compatible = "at,24c32";
+> +		compatible = "at,24c32","atmel,24c32";
+>  		pagesize = <32>;
+>  		reg = <0x52>;
+>  	};
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> index 82fec935ce83..5b6b651af18f 100644
+> --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> @@ -193,7 +193,7 @@
+>  	status = "okay";
+>  
+>  	at24 at 52 {
+> -		compatible = "at,24c32";
+> +		compatible = "at,24c32","atmel,24c32";
+>  		pagesize = <32>;
+>  		reg = <0x52>;
+>  	};
+> diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+> index a5ba669b4eaa..5ab990ac36b4 100644
+> --- a/arch/arm/boot/dts/imx28-evk.dts
+> +++ b/arch/arm/boot/dts/imx28-evk.dts
+> @@ -203,7 +203,7 @@
+>  				};
+>  
+>  				at24 at 51 {
+> -					compatible = "at24,24c32";
+> +					compatible = "at24,24c32","atmel,24c32";
+>  					pagesize = <32>;
+>  					reg = <0x51>;
+>  				};
+> diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi b/arch/arm/boot/dts/imx53-tqma53.dtsi
+> index 85972f2201c2..c8bc0522a1e9 100644
+> --- a/arch/arm/boot/dts/imx53-tqma53.dtsi
+> +++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
+> @@ -272,7 +272,7 @@
+>  	};
+>  
+>  	eeprom: 24c64 at 50 {
+> -		compatible = "at,24c64";
+> +		compatible = "at,24c64","atmel,24c64";
+>  		pagesize = <32>;
+>  		reg = <0x50>;
+>  	};
+> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> index 66cac5328b86..8cf478c67f83 100644
+> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> @@ -215,7 +215,7 @@
+>  	clock-frequency = <100000>;
+>  
+>  	eeprom at 50 {
+> -		compatible = "at24,24c02";
+> +		compatible = "at24,24c02","atmel,24c02";
+>  		reg = <0x50>;
+>  		pagesize = <16>;
+>  	};
+> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> index 69bdd82ce21f..644889d813d0 100644
+> --- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> @@ -128,7 +128,7 @@
+>  			#size-cells = <0>;
+>  
+>  			eeprom at 50 {
+> -				compatible = "at24,24c02";
+> +				compatible = "at24,24c02","atmel,24c02";
+>  				reg = <0x50>;
+>  				pagesize = <16>;
+>  			};
+> -- 
+> 2.9.3
+> 
