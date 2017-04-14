@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:28 -0300
-Subject: [PATCH v3 04/21] ARM: dts: turris-omnia: Add generic compatible
- string for I2C EEPROM
+Date: Thu, 13 Apr 2017 22:04:29 -0300
+Subject: [PATCH v3 05/21] ARM: dts: at91: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-5-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-6-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,26 +20,44 @@ So add this generic fallback to the device node compatible string to make
 the device to match the driver using the OF device ID table.
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Acked-by: Peter Rosin <peda@axentia.se>
+
 ---
 
-Changes in v3: None
+Changes in v3:
+- Add Peter Rosin acked-by tag.
+
 Changes in v2: None
 
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/at91-linea.dtsi   | 2 +-
+ arch/arm/boot/dts/at91-tse850-3.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index 28eede180e4f..f24058737a13 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -171,7 +171,7 @@
- 			/* leds device (in STM32F0) at address 0x2b */
+diff --git a/arch/arm/boot/dts/at91-linea.dtsi b/arch/arm/boot/dts/at91-linea.dtsi
+index 0721c8472509..9bf9aaeff3e8 100644
+--- a/arch/arm/boot/dts/at91-linea.dtsi
++++ b/arch/arm/boot/dts/at91-linea.dtsi
+@@ -31,7 +31,7 @@
+ 	status = "okay";
  
- 			eeprom at 54 {
--				compatible = "at,24c64";
-+				compatible = "at,24c64", "atmel,24c64";
- 				reg = <0x54>;
+ 	eeprom at 51 {
+-		compatible = "st,24c64";
++		compatible = "st,24c64", "atmel,24c64";
+ 		reg = <0x51>;
+ 		pagesize = <32>;
+ 	};
+diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
+index 7a68805a4eb5..e760e5982565 100644
+--- a/arch/arm/boot/dts/at91-tse850-3.dts
++++ b/arch/arm/boot/dts/at91-tse850-3.dts
+@@ -239,7 +239,7 @@
+ 	};
  
- 				/* The EEPROM contains data for bootloader.
+ 	eeprom at 50 {
+-		compatible = "nxp,24c02";
++		compatible = "nxp,24c02", "atmel,24c02";
+ 		reg = <0x50>;
+ 		pagesize = <16>;
+ 	};
 -- 
 2.9.3
