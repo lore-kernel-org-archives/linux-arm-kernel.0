@@ -1,214 +1,156 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Sat, 15 Apr 2017 02:40:12 +0800
-Subject: [PATCH v24 09/11] acpi/arm64: Add memory-mapped timer support in GTDT
- driver
+Date: Sat, 15 Apr 2017 02:40:14 +0800
+Subject: [PATCH v24 11/11] acpi/arm64: Add SBSA Generic Watchdog support in
+ GTDT driver
 In-Reply-To: <20170414184014.8524-1-fu.wei@linaro.org>
 References: <20170414184014.8524-1-fu.wei@linaro.org>
-Message-ID: <20170414184014.8524-10-fu.wei@linaro.org>
+Message-ID: <20170414184014.8524-12-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-On platforms booting with ACPI, architected memory-mapped timers'
-configuration data is provided by firmware through the ACPI GTDT
-static table.
+This driver adds support for parsing SBSA Generic Watchdog timer
+in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
+and creating a platform device with that information.
 
-The clocksource architected timer kernel driver requires a firmware
-interface to collect timer configuration and configure its driver.
-this infrastructure is present for device tree systems, but it is
-missing on systems booting with ACPI.
-
-Implement the kernel infrastructure required to parse the static
-ACPI GTDT table so that the architected timer clocksource driver can
-make use of it on systems booting with ACPI, therefore enabling
-the corresponding timers configuration.
+This allows the operating system to obtain device data from the
+resource of platform device. The platform device named "sbsa-gwdt"
+can be used by the ARM SBSA Generic Watchdog driver.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/acpi/arm64/gtdt.c | 144 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi.h      |   1 +
- 2 files changed, 145 insertions(+)
+ drivers/acpi/arm64/gtdt.c | 103 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
 diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index 3d95af8..c9ef9c2 100644
+index c9ef9c2..6ba47ea 100644
 --- a/drivers/acpi/arm64/gtdt.c
 +++ b/drivers/acpi/arm64/gtdt.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/acpi.h>
+@@ -15,6 +15,7 @@
  #include <linux/init.h>
-+#include <linux/irqdomain.h>
+ #include <linux/irqdomain.h>
  #include <linux/kernel.h>
++#include <linux/platform_device.h>
  
  #include <clocksource/arm_arch_timer.h>
-@@ -37,6 +38,28 @@ struct acpi_gtdt_descriptor {
  
- static struct acpi_gtdt_descriptor acpi_gtdt_desc __initdata;
+@@ -60,6 +61,17 @@ static inline bool is_timer_block(void *platform_timer)
+ 	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
+ }
  
-+static inline void *next_platform_timer(void *platform_timer)
++static inline bool is_non_secure_watchdog(void *platform_timer)
 +{
 +	struct acpi_gtdt_header *gh = platform_timer;
++	struct acpi_gtdt_watchdog *wd = platform_timer;
 +
-+	platform_timer += gh->length;
-+	if (platform_timer < acpi_gtdt_desc.gtdt_end)
-+		return platform_timer;
++	if (gh->type != ACPI_GTDT_TYPE_WATCHDOG)
++		return false;
 +
-+	return NULL;
-+}
-+
-+#define for_each_platform_timer(_g)				\
-+	for (_g = acpi_gtdt_desc.platform_timer; _g;	\
-+	     _g = next_platform_timer(_g))
-+
-+static inline bool is_timer_block(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
++	return !(wd->timer_flags & ACPI_GTDT_WATCHDOG_SECURE);
 +}
 +
  static int __init map_gt_gsi(u32 interrupt, u32 flags)
  {
  	int trigger, polarity;
-@@ -155,3 +178,124 @@ int __init acpi_gtdt_init(struct acpi_table_header *table,
+@@ -299,3 +311,94 @@ int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
  
  	return 0;
  }
 +
-+static int __init gtdt_parse_timer_block(struct acpi_gtdt_timer_block *block,
-+					 struct arch_timer_mem *timer_mem)
-+{
-+	int i;
-+	struct arch_timer_mem_frame *frame;
-+	struct acpi_gtdt_timer_entry *gtdt_frame;
-+
-+	if (!block->timer_count) {
-+		pr_err(FW_BUG "GT block present, but frame count is zero.");
-+		return -ENODEV;
-+	}
-+
-+	if (block->timer_count > ARCH_TIMER_MEM_MAX_FRAMES) {
-+		pr_err(FW_BUG "GT block lists %d frames, ACPI spec only allows 8\n",
-+		       block->timer_count);
-+		return -EINVAL;
-+	}
-+
-+	timer_mem->cntctlbase = (phys_addr_t)block->block_address;
-+	/*
-+	 * The CNTCTLBase frame is 4KB (register offsets 0x000 - 0xFFC).
-+	 * See ARM DDI 0487A.k_iss10775, page I1-5129, Table I1-3
-+	 * "CNTCTLBase memory map".
-+	 */
-+	timer_mem->size = SZ_4K;
-+
-+	gtdt_frame = (void *)block + block->timer_offset;
-+	if (gtdt_frame + block->timer_count != (void *)block + block->header.length)
-+		return -EINVAL;
-+
-+	/*
-+	 * Get the GT timer Frame data for every GT Block Timer
-+	 */
-+	for (i = 0; i < block->timer_count; i++, gtdt_frame++) {
-+		if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
-+			continue;
-+
-+		if (!gtdt_frame->base_address || !gtdt_frame->timer_interrupt)
-+			goto error;
-+
-+		frame = &timer_mem->frame[gtdt_frame->frame_number];
-+		frame->phys_irq = map_gt_gsi(gtdt_frame->timer_interrupt,
-+					     gtdt_frame->timer_flags);
-+		if (frame->phys_irq <= 0) {
-+			pr_warn("failed to map physical timer irq in frame %d.\n",
-+				gtdt_frame->frame_number);
-+			goto error;
-+		}
-+
-+		if (gtdt_frame->virtual_timer_interrupt) {
-+			frame->virt_irq =
-+				map_gt_gsi(gtdt_frame->virtual_timer_interrupt,
-+					   gtdt_frame->virtual_timer_flags);
-+			if (frame->virt_irq <= 0) {
-+				pr_warn("failed to map virtual timer irq in frame %d.\n",
-+					gtdt_frame->frame_number);
-+				goto error;
-+			}
-+		} else {
-+			frame->virt_irq = 0;
-+			pr_debug("virtual timer in frame %d not implemented.\n",
-+				 gtdt_frame->frame_number);
-+		}
-+
-+		frame->cntbase = gtdt_frame->base_address;
-+		/*
-+		 * The CNTBaseN frame is 4KB (register offsets 0x000 - 0xFFC).
-+		 * See ARM DDI 0487A.k_iss10775, page I1-5130, Table I1-4
-+		 * "CNTBaseN memory map".
-+		 */
-+		frame->size = SZ_4K;
-+		frame->valid = true;
-+	}
-+
-+	return 0;
-+
-+error:
-+	for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
-+		frame = &timer_mem->frame[i];
-+		if (frame->phys_irq > 0)
-+			acpi_unregister_irq(frame->phys_irq);
-+		if (frame->virt_irq > 0)
-+			acpi_unregister_irq(frame->virt_irq);
-+	}
-+	return -EINVAL;
-+}
-+
-+/**
-+ * acpi_arch_timer_mem_init() - Get the info of all GT blocks in GTDT table.
-+ * @timer_mem:	The pointer to the array of struct arch_timer_mem for returning
-+ *		the result of parsing. The element number of this array should
-+ *		be platform_timer_count(the total number of platform timers).
-+ * @timer_count: It points to a integer variable which is used for storing the
-+ *		number of GT blocks we have parsed.
-+ *
-+ * Return: 0 if success, -EINVAL/-ENODEV if error.
++/*
++ * Initialize a SBSA generic Watchdog platform device info from GTDT
 + */
-+int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
-+				    int *timer_count)
++static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
++					int index)
 +{
-+	int ret;
-+	void *platform_timer;
++	struct platform_device *pdev;
++	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
 +
-+	*timer_count = 0;
-+	for_each_platform_timer(platform_timer) {
-+		if (is_timer_block(platform_timer)) {
-+			ret = gtdt_parse_timer_block(platform_timer, timer_mem);
-+			if (ret)
-+				return ret;
-+			timer_mem++;
-+			(*timer_count)++;
-+		}
++	/*
++	 * According to SBSA specification the size of refresh and control
++	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
++	 */
++	struct resource res[] = {
++		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
++		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
++		DEFINE_RES_IRQ(irq),
++	};
++	int nr_res = ARRAY_SIZE(res);
++
++	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
++		 wd->refresh_frame_address, wd->control_frame_address,
++		 wd->timer_interrupt, wd->timer_flags);
++
++	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
++		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
++		acpi_unregister_gsi(wd->timer_interrupt);
++		return -EINVAL;
 +	}
 +
-+	if (*timer_count)
-+		pr_info("found %d memory-mapped timer block(s).\n",
-+			*timer_count);
++	if (irq <= 0) {
++		pr_warn("failed to map the Watchdog interrupt.\n");
++		nr_res--;
++	}
++
++	/*
++	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
++	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
++	 * The platform driver can get device info below by matching this name.
++	 */
++	pdev = platform_device_register_simple("sbsa-gwdt", index, res, nr_res);
++	if (IS_ERR(pdev)) {
++		acpi_unregister_gsi(wd->timer_interrupt);
++		return PTR_ERR(pdev);
++	}
 +
 +	return 0;
 +}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 728d1ed..4b1ab65 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -606,6 +606,7 @@ int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
- int acpi_gtdt_init(struct acpi_table_header *table, int *platform_timer_count);
- int acpi_gtdt_map_ppi(int type);
- bool acpi_gtdt_c3stop(int type);
-+int acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem, int *timer_count);
- #endif
- 
- #else	/* !CONFIG_ACPI */
++
++static int __init gtdt_sbsa_gwdt_init(void)
++{
++	void *platform_timer;
++	struct acpi_table_header *table;
++	int ret, timer_count, gwdt_count = 0;
++
++	if (acpi_disabled)
++		return 0;
++
++	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
++		return -EINVAL;
++
++	/*
++	 * Note: Even though the global variable acpi_gtdt_desc has been
++	 * initialized by acpi_gtdt_init() while initializing the arch timers,
++	 * when we call this function to get SBSA watchdogs info from GTDT, the
++	 * pointers stashed in it are stale (since they are early temporary
++	 * mappings carried out before acpi_permanent_mmap is set) and we need
++	 * to re-initialize them with permanent mapped pointer values to let the
++	 * GTDT parsing possible.
++	 */
++	ret = acpi_gtdt_init(table, &timer_count);
++	if (ret || !timer_count)
++		return ret;
++
++	for_each_platform_timer(platform_timer) {
++		if (is_non_secure_watchdog(platform_timer)) {
++			ret = gtdt_import_sbsa_gwdt(platform_timer, gwdt_count);
++			if (ret)
++				break;
++			gwdt_count++;
++		}
++	}
++
++	if (gwdt_count)
++		pr_info("found %d SBSA generic Watchdog(s).\n", gwdt_count);
++
++	return ret;
++}
++
++device_initcall(gtdt_sbsa_gwdt_init);
 -- 
 2.9.3
