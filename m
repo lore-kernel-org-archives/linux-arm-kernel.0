@@ -1,14 +1,16 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 14 Apr 2017 11:06:54 +0800
-Subject: [PATCH] ARM: dts: imx53-qsrb: Pulldown PMIC IRQ pin
-In-Reply-To: <1492020275-29654-1-git-send-email-fabio.estevam@nxp.com>
-References: <1492020275-29654-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20170414030652.GC14915@dragon>
+Date: Fri, 14 Apr 2017 11:08:42 +0800
+Subject: [PATCH v2] ARM: dts: imx53-qsrb: Pulldown PMIC IRQ pin
+In-Reply-To: <1492032678-29572-1-git-send-email-festevam@gmail.com>
+References: <1492032678-29572-1-git-send-email-festevam@gmail.com>
+Message-ID: <20170414030841.GD14915@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 03:04:35PM -0300, Fabio Estevam wrote:
-> Currently the following errors are seeing:
+On Wed, Apr 12, 2017 at 06:31:18PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Currently the following errors are seen:
 > 
 > [   14.015056] mc13xxx 0-0008: Failed to read IRQ status: -6
 > [   27.321093] mc13xxx 0-0008: Failed to read IRQ status: -6
@@ -34,9 +36,12 @@ On Wed, Apr 12, 2017 at 03:04:35PM -0300, Fabio Estevam wrote:
 > 
 > Commit e1ffceb078c6 ("ARM: imx53: qsrb: fix PMIC interrupt level")
 > correctly described the irq type as IRQ_TYPE_LEVEL_HIGH, but
-> missed to update the IOMUX of the PMIC GPIO to pull down.
+> missed to update the IOMUX of the PMIC GPIO as pull down.
 > 
 > Fixes: e1ffceb078c6 ("ARM: imx53: qsrb: fix PMIC interrupt level")
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+> Changes since v1:
+> - Fix typo: s/seeing/seen in the commit log
 
-Applied, thanks.
+Okay, replaced with this one.
