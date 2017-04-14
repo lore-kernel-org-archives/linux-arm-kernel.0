@@ -1,71 +1,73 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:16 +0200
-Subject: [PATCH v5 04/22] arm/arm64: vgic: turn vgic_find_mmio_region into
- public
-In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-5-git-send-email-eric.auger@redhat.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 14 Apr 2017 19:07:32 +0800
+Subject: [PATCH net-next] net: mvneta: fix failed to suspend if WOL is enabled
+Message-ID: <20170414110732.3100-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We plan to use vgic_find_mmio_region in vgic-its.c so let's
-turn it into a public function.
+Recently, suspend/resume and WOL support are added into mvneta driver.
+If we enable WOL, then we get some error as below on Marvell BG4CT
+platforms during suspend:
 
-Also let's take the opportunity to rename the region parameter
-into regions to emphasize this latter is an array of regions.
+[  184.149723] dpm_run_callback(): mdio_bus_suspend+0x0/0x50 returns -16
+[  184.149727] PM: Device f7b62004.mdio-mi:00 failed to suspend: error -16
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+-16 means -EBUSY, phy_suspend() will return -EBUSY if it finds the
+device has WOL enabled.
 
+We fix this issue by properly setting the netdev's power.can_wakeup
+and power.wakeup, i.e
+
+1. in mvneta_mdio_probe(), call device_set_wakeup_capable() to set
+power.can_wakeup if the phy support WOL.
+
+2. in mvneta_ethtool_set_wol(), call device_set_wakeup_enable() to
+set power.wakeup if WOL has been successfully enabled in phy.
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
-v4 -> v5:
-- add Marc's A-b
+ drivers/net/ethernet/marvell/mvneta.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-v3 -> v4:
-- rename region parameter into regions
-- add Andre's R-b
----
- virt/kvm/arm/vgic/vgic-mmio.c | 11 +++++------
- virt/kvm/arm/vgic/vgic-mmio.h |  5 +++++
- 2 files changed, 10 insertions(+), 6 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 2a5db13..1c17b2a 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -446,13 +446,12 @@ static int match_region(const void *key, const void *elt)
- 	return 0;
- }
- 
--/* Find the proper register handler entry given a certain address offset. */
--static const struct vgic_register_region *
--vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
--		      unsigned int offset)
-+const struct vgic_register_region *
-+vgic_find_mmio_region(const struct vgic_register_region *regions,
-+		      int nr_regions, unsigned int offset)
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 34a3686d2ce6..0992db47070f 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -3318,6 +3318,7 @@ static void mvneta_adjust_link(struct net_device *ndev)
+ static int mvneta_mdio_probe(struct mvneta_port *pp)
  {
--	return bsearch((void *)(uintptr_t)offset, region, nr_regions,
--		       sizeof(region[0]), match_region);
-+	return bsearch((void *)(uintptr_t)offset, regions, nr_regions,
-+		       sizeof(regions[0]), match_region);
+ 	struct phy_device *phy_dev;
++	struct ethtool_wolinfo wol = { .cmd = ETHTOOL_GWOL };
+ 
+ 	phy_dev = of_phy_connect(pp->dev, pp->phy_node, mvneta_adjust_link, 0,
+ 				 pp->phy_interface);
+@@ -3326,6 +3327,9 @@ static int mvneta_mdio_probe(struct mvneta_port *pp)
+ 		return -ENODEV;
+ 	}
+ 
++	phy_ethtool_get_wol(phy_dev, &wol);
++	device_set_wakeup_capable(&pp->dev->dev, !!wol.supported);
++
+ 	phy_dev->supported &= PHY_GBIT_FEATURES;
+ 	phy_dev->advertising = phy_dev->supported;
+ 
+@@ -3942,10 +3946,16 @@ static void mvneta_ethtool_get_wol(struct net_device *dev,
+ static int mvneta_ethtool_set_wol(struct net_device *dev,
+ 				  struct ethtool_wolinfo *wol)
+ {
++	int ret;
++
+ 	if (!dev->phydev)
+ 		return -EOPNOTSUPP;
+ 
+-	return phy_ethtool_set_wol(dev->phydev, wol);
++	ret = phy_ethtool_set_wol(dev->phydev, wol);
++	if (!ret)
++		device_set_wakeup_enable(&dev->dev, !!wol->wolopts);
++
++	return ret;
  }
  
- void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 98bb566..6eec91b 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -192,4 +192,9 @@ u64 vgic_sanitise_shareability(u64 reg);
- u64 vgic_sanitise_field(u64 reg, u64 field_mask, int field_shift,
- 			u64 (*sanitise_fn)(u64));
- 
-+/* Find the proper register handler entry given a certain address offset */
-+const struct vgic_register_region *
-+vgic_find_mmio_region(const struct vgic_register_region *regions,
-+		      int nr_regions, unsigned int offset);
-+
- #endif
+ static const struct net_device_ops mvneta_netdev_ops = {
 -- 
-2.5.5
+2.11.0
