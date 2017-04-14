@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:37 -0300
-Subject: [PATCH v3 13/21] ARM: dts: uniphier: Add generic compatible string
+Date: Thu, 13 Apr 2017 22:04:39 -0300
+Subject: [PATCH v3 15/21] arm64: dts: ls1043a: Add generic compatible string
  for I2C EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-14-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-16-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,49 +25,26 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
- arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/uniphier-pro4-ace.dts b/arch/arm/boot/dts/uniphier-pro4-ace.dts
-index fefc89149234..b9a4919d7c93 100644
---- a/arch/arm/boot/dts/uniphier-pro4-ace.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-ace.dts
-@@ -88,7 +88,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64", "atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index c37110bc1506..5389eae627e5 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -75,11 +75,11 @@
+ 		reg = <0x4c>;
  	};
-diff --git a/arch/arm/boot/dts/uniphier-pro4-sanji.dts b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-index 6c63c8bad825..3950baa8d55d 100644
---- a/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-+++ b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
-@@ -83,7 +83,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64", "atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
+ 	eeprom at 52 {
+-		compatible = "at24,24c512";
++		compatible = "at24,24c512", "atmel,24c512";
+ 		reg = <0x52>;
  	};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-index cccc86658d20..afba587ffbbc 100644
---- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-@@ -80,7 +80,7 @@
- 	status = "okay";
- 
- 	eeprom at 54 {
--		compatible = "st,24c64";
-+		compatible = "st,24c64", "atmel,24c64";
- 		reg = <0x54>;
- 		pagesize = <32>;
+ 	eeprom at 53 {
+-		compatible = "at24,24c512";
++		compatible = "at24,24c512", "atmel,24c512";
+ 		reg = <0x53>;
  	};
+ 	rtc at 68 {
 -- 
 2.9.3
