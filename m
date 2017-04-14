@@ -1,31 +1,41 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 14 Apr 2017 10:10:47 +0200
-Subject: [PATCH v6 1/9] drm/cma: Update DEFINE_DRM_GEM_CMA_FOPS to add
- get_unmapped_area
+Date: Fri, 14 Apr 2017 10:10:52 +0200
+Subject: [PATCH v6 6/9] ARM: dts: stm32: Add ltdc support on stm32f429 MCU
 In-Reply-To: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
 References: <1492157455-2283-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1492157455-2283-2-git-send-email-yannick.fertre@st.com>
+Message-ID: <1492157455-2283-7-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Missing field get_unmapped_area which is necessary with device without MMU
+Add LTDC (Lcd-tft Display Controller) support.
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- include/drm/drm_gem_cma_helper.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stm32f429.dtsi | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/include/drm/drm_gem_cma_helper.h b/include/drm/drm_gem_cma_helper.h
-index f962d33..7320b14 100644
---- a/include/drm/drm_gem_cma_helper.h
-+++ b/include/drm/drm_gem_cma_helper.h
-@@ -50,6 +50,7 @@ struct drm_gem_cma_object {
- 		.read		= drm_read,\
- 		.llseek		= noop_llseek,\
- 		.mmap		= drm_gem_cma_mmap,\
-+		.get_unmapped_area	= drm_gem_cma_get_unmapped_area,\
- 	}
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index ee0da97..23debd9 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -543,7 +543,17 @@
+ 			reg = <0x40007000 0x400>;
+ 		};
  
- /* free GEM object */
+-		pin-controller {
++		ltdc: display-controller at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
++			status = "disabled";
++		};
++
++		pinctrl: pin-controller {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32f429-pinctrl";
 -- 
 1.9.1
