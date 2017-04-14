@@ -1,74 +1,63 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 14 Apr 2017 12:13:32 +0200
-Subject: [PATCH v7 2/9] drm/fb-cma-helper: Add drm_fb_cma_get_gem_addr()
+Date: Fri, 14 Apr 2017 12:13:33 +0200
+Subject: [PATCH v7 3/9] dt-bindings: display: Add STM32 LTDC driver
 In-Reply-To: <1492164819-10513-1-git-send-email-yannick.fertre@st.com>
 References: <1492164819-10513-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1492164819-10513-3-git-send-email-yannick.fertre@st.com>
+Message-ID: <1492164819-10513-4-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add function drm_fb_cma_get_gem_addr() which return the physical address
-of framebuffer (1st pixel). This function will usually be called by plane
-callback (atomic_update).
+This patch adds documentation of device tree bindings for the STM32 LTDC
+(Lcd-Tft Display Controller).
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- drivers/gpu/drm/drm_fb_cma_helper.c | 27 +++++++++++++++++++++++++++
- include/drm/drm_fb_cma_helper.h     |  4 ++++
- 2 files changed, 31 insertions(+)
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
 
-diff --git a/drivers/gpu/drm/drm_fb_cma_helper.c b/drivers/gpu/drm/drm_fb_cma_helper.c
-index 50abd1f..d2b77b0 100644
---- a/drivers/gpu/drm/drm_fb_cma_helper.c
-+++ b/drivers/gpu/drm/drm_fb_cma_helper.c
-@@ -260,6 +260,33 @@ struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
- EXPORT_SYMBOL_GPL(drm_fb_cma_get_gem_obj);
- 
- /**
-+ * drm_fb_cma_get_gem_addr() - Get physical address for framebuffer
-+ * @fb: The framebuffer
-+ * @state: Which state of drm plane
-+ * @plane: Which plane
-+ * Return the CMA GEM address for given framebuffer.
-+ *
-+ * This function will usually be called from the PLANE callback functions.
-+ */
-+dma_addr_t drm_fb_cma_get_gem_addr(struct drm_framebuffer *fb,
-+				   struct drm_plane_state *state,
-+				   unsigned int plane)
-+{
-+	struct drm_fb_cma *fb_cma = to_fb_cma(fb);
-+	dma_addr_t paddr;
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+new file mode 100644
+index 0000000..8e14769
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -0,0 +1,36 @@
++* STMicroelectronics STM32 lcd-tft display controller
 +
-+	if (plane >= 4)
-+		return 0;
++- ltdc: lcd-tft display controller host
++  must be a sub-node of st-display-subsystem
++  Required properties:
++  - compatible: "st,stm32-ltdc"
++  - reg: Physical base address of the IP registers and length of memory mapped region.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For ltdc it should contain:
++      - "lcd" for the clock feeding the output pixel clock & IP clock.
++  - resets: reset to be used by the device (defined by use of RCC macro).
++  Required nodes:
++    - Video port for RGB output.
 +
-+	paddr = fb_cma->obj[plane]->paddr + fb->offsets[plane];
-+	paddr += fb->format->cpp[plane] * (state->src_x >> 16);
-+	paddr += fb->pitches[plane] * (state->src_y >> 16);
++Example:
 +
-+	return paddr;
-+}
-+EXPORT_SYMBOL_GPL(drm_fb_cma_get_gem_addr);
++/ {
++	...
++	soc {
++	...
++		ltdc: display-controller at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
 +
-+/**
-  * drm_fb_cma_prepare_fb() - Prepare CMA framebuffer
-  * @plane: Which plane
-  * @state: Plane state attach fence to
-diff --git a/include/drm/drm_fb_cma_helper.h b/include/drm/drm_fb_cma_helper.h
-index a5ecc0a..199a63f 100644
---- a/include/drm/drm_fb_cma_helper.h
-+++ b/include/drm/drm_fb_cma_helper.h
-@@ -41,6 +41,10 @@ struct drm_framebuffer *drm_fb_cma_create(struct drm_device *dev,
- struct drm_gem_cma_object *drm_fb_cma_get_gem_obj(struct drm_framebuffer *fb,
- 	unsigned int plane);
- 
-+dma_addr_t drm_fb_cma_get_gem_addr(struct drm_framebuffer *fb,
-+				   struct drm_plane_state *state,
-+				   unsigned int plane);
-+
- int drm_fb_cma_prepare_fb(struct drm_plane *plane,
- 			  struct drm_plane_state *state);
- 
++			port {
++				ltdc_out_rgb: endpoint {
++				};
++			};
++		};
++	};
++};
 -- 
 1.9.1
