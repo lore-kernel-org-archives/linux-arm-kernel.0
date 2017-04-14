@@ -1,155 +1,140 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:19 +0200
-Subject: [PATCH v5 07/22] KVM: arm64: vgic-its: Implement
- vgic_its_has_attr_regs and attr_regs_access
-In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-8-git-send-email-eric.auger@redhat.com>
+Date: Fri, 14 Apr 2017 12:15:12 +0200
+Subject: [PATCH v5 00/22] vITS save/restore
+Message-ID: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
-upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-group becomes functional.
+This series specifies and implements an API aimed at saving and restoring
+the state of the in-kernel emulated ITS device.
 
-At least GITS_CREADR and GITS_IIDR require to differentiate a guest write
-action from a user access. As such let's introduce a new uaccess_its_write
-vgic_register_region callback.
+The ITS is programmed through registers and tables. Those latter
+are allocated by the guest. Their base address is programmed in
+registers or table entries before the ITS is enabled.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+The ITS is free to use some of them to flush its internal caches. This
+is likely to be used when entering low power state.
 
----
+Therefore, for save/restore use case, it looks natural to use this
+guest RAM allocated space to save the table related data. However,
+currently, The ITS in-kernel emulated device does not use all of those
+tables and for those it uses, it does not always sync them with its
+cached data. Additional sync must happen for:
+- the collection table
+- the device table
+- the per-device translation tables
+- the LPI pending tables.
+
+The LPI configation table and the command queues do not need extra
+syncs.
+
+Best Regards
+
+Eric
+
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.11-rc6-its-mig-v5
+
+* Testing:
+- on Cavium ThunderX using a virtio-net-pci guest,
+  virsh save/restore commands and virt-manager live migration.
+  Tested with 1 and 2 stage device table.
+
+History:
 v4 -> v5:
-- use GITS_TYPER instead of offset 0x8
-- uaccess_its_write now can return an error
+- user API changes:
+  - ITS table save/restore triggered through ITS KVM device
+    KVM_DEV_ARM_VGIC_GRP_CTRL group, KVM_DEV_ARM_ITS_SAVE_TABLES,
+    KVM_DEV_ARM_ITS_RESTORE_TABLES
+  - RDIST pending table flush triggered through GICV3 KVM device
+    KVM_DEV_ARM_VGIC_GRP_CTRL/KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
+- Introduce an ABI infrastructure, entry size report using this infra
+- IIDR reports ABI chosen set by userspace if any
+- pending table save moved to vgic-v3.c
+- use optimisation in pending table save
+- check target_addr when restore cte
+- pending table sync called from restore_tables
+- added KVM: arm64: vgic-its: Fix pending table sync
+- simplify loopup_table and use kvm_read_guest()
+- sort the device and ITE list on save
+- add defines for shifts and masks, GIC_ENCODE_SZ macro
 
 v3 -> v4:
-- remove changes to the REGISTER_ITS_DESC macro. This will be handled in
-  subsequent patch with the introduction of a new REGISTER_ITS_DESC_UACCESS
-  macro
-- fix IIDR access and add a comment wrt full length access
-- handle endianness
-- add kvm lock and vcpus lock
----
- virt/kvm/arm/vgic/vgic-its.c  | 79 +++++++++++++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-mmio.h |  9 +++--
- 2 files changed, 84 insertions(+), 4 deletions(-)
+- update the DTE format (ITT_addr 52 bit support, validity bit addition)
+- Document ABI revision and implement check
+- iidr save/restore (including a new patch for iidr user write access)
+- changed locking: kvm lock + vcpu lock
+- fix nb_eventid_bits mixup
+- 2 new patches aiming at exposing next_segment() and lock_all_vcpus()
+- rework errror handling of lookup_table functions
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index f687e91..a9a2c12 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1469,14 +1469,89 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
- int vgic_its_has_attr_regs(struct kvm_device *dev,
- 			   struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	const struct vgic_register_region *region;
-+	struct vgic_io_device iodev = {
-+		.regions = its_registers,
-+		.nr_regions = ARRAY_SIZE(its_registers),
-+	};
-+	gpa_t offset = attr->attr;
-+
-+	region = vgic_find_mmio_region(iodev.regions,
-+				       iodev.nr_regions,
-+				       offset);
-+	if (!region)
-+		return -ENXIO;
-+
-+	return 0;
- }
- 
- int vgic_its_attr_regs_access(struct kvm_device *dev,
- 			      struct kvm_device_attr *attr,
- 			      u64 *reg, bool is_write)
- {
--	return -ENXIO;
-+	const struct vgic_register_region *region;
-+	struct vgic_io_device iodev = {
-+		.regions = its_registers,
-+		.nr_regions = ARRAY_SIZE(its_registers),
-+	};
-+	struct vgic_its *its = dev->private;
-+	gpa_t addr, offset = attr->attr;
-+	unsigned int len;
-+	unsigned long data = 0;
-+	int ret = 0;
-+
-+	/*
-+	 * Among supported registers, only GITS_CTLR (0x0) and GITS_IIDR (0x4)
-+	 * are 32 bits. Others are 64 bits.
-+	 */
-+	if ((offset < GITS_TYPER && offset & 0x3) ||
-+	    (offset >= GITS_TYPER && offset & 0x7))
-+		return -EINVAL;
-+
-+	mutex_lock(&dev->kvm->lock);
-+
-+	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	region = vgic_find_mmio_region(iodev.regions,
-+				       iodev.nr_regions,
-+				       offset);
-+	if (!region) {
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	if (!lock_all_vcpus(dev->kvm)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	addr = its->vgic_its_base + offset;
-+
-+	/*
-+	 * Only full length register accesses are supported although
-+	 * the architecture spec theoretically allows upper/lower 32
-+	 * bits to be accessed independently
-+	 */
-+	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
-+
-+	if (is_write) {
-+		data = vgic_data_mmio_bus_to_host(reg, len);
-+		if (region->uaccess_its_write)
-+			ret = region->uaccess_its_write(dev->kvm, its, addr,
-+							len, data);
-+		else
-+			region->its_write(dev->kvm, its, addr, len, data);
-+	} else {
-+		data = region->its_read(dev->kvm, its, addr, len);
-+		vgic_data_host_to_mmio_bus(reg, len, data);
-+	}
-+	unlock_all_vcpus(dev->kvm);
-+out:
-+	mutex_unlock(&dev->kvm->lock);
-+	return ret;
- }
- 
- static int vgic_its_has_attr(struct kvm_device *dev,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 6eec91b..ea4171a 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -36,8 +36,13 @@ struct vgic_register_region {
- 	};
- 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
- 				      unsigned int len);
--	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
--			      unsigned int len, unsigned long val);
-+	union {
-+		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
-+				      unsigned int len, unsigned long val);
-+		int (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
-+					 gpa_t addr, unsigned int len,
-+					 unsigned long val);
-+	};
- };
- 
- extern struct kvm_io_device_ops kvm_io_gic_ops;
+- I took into account all Andre's comments/suggestions except:
+  - trigger the save/restore of pending tables from GICV3 KVM device
+    instead of ITS KVM device
+  - implement ITS flush/restore in KVM_DEV_ARM_VGIC_GRP_CTRL
+    ITS group
+
+See the ML replies for current justifications. In case other people
+strongly disagree of course I will change the code.
+
+v2 -> v3:
+- fix restore ITS ITT_addr bit masking
+
+v1 -> v2:
+- rebased on Vijaya's v11
+- all entries now are 8 byte large
+- devid/eventid indexing for device table and ITT
+- support 2 stage device table
+- common infra to read indexed tables
+- add cpu <-> le64 conversions
+- itte renamed into ite
+- do not care anymore about pending table 1st KB
+  (not needed at the moment for coarse mapping)
+
+RFC v1
+- creation
+
+
+
+Eric Auger (22):
+  KVM: arm/arm64: Add ITS save/restore API documentation
+  KVM: arm/arm64: Add GICV3 pending table save API documentation
+  KVM: arm/arm64: vgic-its: rename itte into ite
+  arm/arm64: vgic: turn vgic_find_mmio_region into public
+  KVM: arm64: vgic-its: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
+  KVM: arm/arm64: vgic: expose (un)lock_all_vcpus
+  KVM: arm64: vgic-its: Implement vgic_its_has_attr_regs and
+    attr_regs_access
+  KVM: arm64: vgic-its: Implement vgic_mmio_uaccess_write_its_creadr
+  KVM: arm64: vgic-its: Introduce migration ABI infrastructure
+  KVM: arm64: vgic-its: Implement vgic_mmio_uaccess_write_its_iidr
+  KVM: arm64: vgic-its: Interpret MAPD Size field and check related
+    errors
+  KVM: arm64: vgic-its: Interpret MAPD ITT_addr field
+  KVM: arm64: vgic-its: Check the device id matches TYPER DEVBITS range
+  KVM: arm64: vgic-its: KVM_DEV_ARM_ITS_SAVE/RESTORE_TABLES
+  KVM: arm64: vgic-its: vgic_its_alloc_ite/device
+  KVM: arm64: vgic-its: Add infrastructure for table lookup
+  KVM: arm64: vgic-its: Collection table save/restore
+  KVM: arm64: vgic-its: vgic_its_check_id returns the entry's GPA
+  KVM: arm64: vgic-its: ITT save and restore
+  KVM: arm64: vgic-its: Device table save/restore
+  KVM: arm64: vgic-its: Fix pending table sync
+  KVM: arm64: vgic-v3: KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES
+
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt |   99 ++
+ Documentation/virtual/kvm/devices/arm-vgic-v3.txt  |    6 +
+ arch/arm/include/uapi/asm/kvm.h                    |    6 +-
+ arch/arm64/include/uapi/asm/kvm.h                  |    6 +-
+ include/kvm/arm_vgic.h                             |    3 +
+ include/linux/irqchip/arm-gic-v3.h                 |   12 +
+ virt/kvm/arm/vgic/vgic-its.c                       | 1126 +++++++++++++++++---
+ virt/kvm/arm/vgic/vgic-kvm-device.c                |   24 +-
+ virt/kvm/arm/vgic/vgic-mmio.c                      |   11 +-
+ virt/kvm/arm/vgic/vgic-mmio.h                      |   14 +-
+ virt/kvm/arm/vgic/vgic-v3.c                        |   54 +
+ virt/kvm/arm/vgic/vgic.h                           |   24 +
+ 12 files changed, 1251 insertions(+), 134 deletions(-)
+
 -- 
 2.5.5
