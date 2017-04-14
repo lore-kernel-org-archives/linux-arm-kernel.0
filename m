@@ -1,73 +1,169 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 14 Apr 2017 15:42:31 +0800
-Subject: [PATCH 3/4] net: macb: Add hardware PTP support
-In-Reply-To: <1492090763-15686-1-git-send-email-rafalo@cadence.com>
-Message-ID: <201704141535.hrXAVwQy%fengguang.wu@intel.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 14 Apr 2017 09:43:25 +0200
+Subject: [PATCH 1/4] net: macb: Add support for PTP timestamps in DMA
+ descriptors
+In-Reply-To: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+References: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+Message-ID: <20170414074325.GA1660@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
+On Thu, Apr 13, 2017 at 02:33:59PM +0100, Rafal Ozieblo wrote:
+> @@ -1921,9 +1972,13 @@ static void macb_configure_dma(struct macb *bp)
+>  			dmacfg &= ~GEM_BIT(TXCOEN);
+>  
+>  #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -		if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+> +		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+>  			dmacfg |= GEM_BIT(ADDR64);
+>  #endif
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +		if (bp->hw_dma_cap & HW_DMA_CAP_PTP)
+> +			dmacfg |= GEM_BIT(RXEXT) | GEM_BIT(TXEXT);
+> +#endif
+>  		netdev_dbg(bp->dev, "Cadence configure DMA with 0x%08x\n",
+>  			   dmacfg);
+>  		gem_writel(bp, DMACFG, dmacfg);
+> @@ -1971,14 +2026,15 @@ static void macb_init_hw(struct macb *bp)
+>  	/* Initialize TX and RX buffers */
+>  	macb_writel(bp, RBQP, lower_32_bits(bp->rx_ring_dma));
+>  #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -	if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+> +	if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+>  		macb_writel(bp, RBQPH, upper_32_bits(bp->rx_ring_dma));
+>  #endif
+>  	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
+>  		queue_writel(queue, TBQP, lower_32_bits(queue->tx_ring_dma));
+>  #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -		if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+> -			queue_writel(queue, TBQPH, upper_32_bits(queue->tx_ring_dma));
+> +		if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+> +			queue_writel(queue, TBQPH,
+> +					upper_32_bits(queue->tx_ring_dma));
 
-[auto build test ERROR on net-next/master]
-[also build test ERROR on v4.11-rc6 next-20170413]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Align arg3 with arg1 please.
 
-url:    https://github.com/0day-ci/linux/commits/Rafal-Ozieblo/net-macb-Add-support-for-PTP-timestamps-in-DMA-descriptors/20170414-001330
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+>  #endif
+>  
+>  		/* Enable interrupts */
+> @@ -2579,6 +2635,18 @@ static void macb_configure_caps(struct macb *bp,
+>  		dcfg = gem_readl(bp, DCFG2);
+>  		if ((dcfg & (GEM_BIT(RX_PKT_BUFF) | GEM_BIT(TX_PKT_BUFF))) == 0)
+>  			bp->caps |= MACB_CAPS_FIFO_MODE;
+> +		/* if HWSTAMP is configure and gem has the capability */
 
-Note: the linux-review/Rafal-Ozieblo/net-macb-Add-support-for-PTP-timestamps-in-DMA-descriptors/20170414-001330 HEAD 3b878618e04f866388fd62f6c44752e50b15658a builds fine.
-      It only hurts bisectibility.
+This comment is redundant.  We can see that clearly in the code already.
 
-All errors (new ones prefixed by >>):
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +		bp->ptp_hw_support = false;
 
-   drivers/built-in.o: In function `gem_ptp_do_rxstamp':
->> drivers/net/ethernet/cadence/macb.h:1108: undefined reference to `gem_ptp_rxstamp'
-   drivers/net/ethernet/cadence/macb.h:1108:(.text+0x264604): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `gem_ptp_rxstamp'
-   drivers/built-in.o: In function `gem_ptp_do_txstamp':
->> drivers/net/ethernet/cadence/macb.h:1100: undefined reference to `gem_ptp_txstamp'
-   drivers/net/ethernet/cadence/macb.h:1100:(.text+0x266564): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `gem_ptp_txstamp'
-   drivers/built-in.o: In function `macb_interrupt':
->> drivers/net/ethernet/cadence/macb.c:1332: undefined reference to `macb_ptp_int'
-   drivers/net/ethernet/cadence/macb.c:1332:(.text+0x2666ac): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `macb_ptp_int'
-   drivers/built-in.o:(.data+0x93fc8): undefined reference to `gem_ptp_init'
-   drivers/built-in.o:(.data+0x93fd0): undefined reference to `gem_ptp_remove'
-   drivers/built-in.o:(.data+0x93ff0): undefined reference to `gem_get_hwtst'
-   drivers/built-in.o:(.data+0x93ff8): undefined reference to `gem_set_hwtst'
+No need to clear this again.  (The struct was cleared after
+allocation, right?)
 
-vim +1108 drivers/net/ethernet/cadence/macb.h
+> +		if (gem_has_ptp(bp)) {
 
-  1094	void macb_ptp_int(struct macb_queue *queue, u32 status);
-  1095	static inline int gem_ptp_do_txstamp(struct macb_queue *queue, struct sk_buff *skb, struct macb_dma_desc *desc)
-  1096	{
-  1097		if (queue->bp->tstamp_config.tx_type == TSTAMP_DISABLED)
-  1098			return -ENOTSUPP;
-  1099	
-> 1100		return gem_ptp_txstamp(queue, skb, desc);
-  1101	}
-  1102	
-  1103	static inline void gem_ptp_do_rxstamp(struct macb *bp, struct sk_buff *skb, struct macb_dma_desc *desc)
-  1104	{
-  1105		if (bp->tstamp_config.rx_filter == TSTAMP_DISABLED)
-  1106			return;
-  1107	
-> 1108		gem_ptp_rxstamp(bp, skb, desc);
-  1109	}
-  1110	int gem_get_hwtst(struct net_device *dev, struct ifreq *rq);
-  1111	int gem_set_hwtst(struct net_device *dev, struct ifreq *ifr, int cmd);
+Why not drop the #idef:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 34537 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170414/343318b5/attachment-0001.gz>
+		if (IS_ENABLED(CONFIG_MACB_USE_HWSTAMP) && gem_has_ptp(bp)) ...
+
+> +			if (!GEM_BFEXT(TSU, gem_readl(bp, DCFG5)))
+> +				pr_err("GEM doesn't support hardware ptp.\n");
+> +			else {
+> +				pr_emerg("rozieblo: ptp_hw_support = true");
+
+pr_emerg?
+
+> +				bp->ptp_hw_support = true;
+> +			}
+
+Proper if/else CodingStyle please.
+
+> +		}
+> +#endif
+>  	}
+>  
+>  	dev_dbg(&bp->pdev->dev, "Cadence caps 0x%08x\n", bp->caps);
+
+> @@ -2716,7 +2784,7 @@ static int macb_init(struct platform_device *pdev)
+>  			queue->IMR  = GEM_IMR(hw_q - 1);
+>  			queue->TBQP = GEM_TBQP(hw_q - 1);
+>  #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -			if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+> +			if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+>  				queue->TBQPH = GEM_TBQPH(hw_q - 1);
+>  #endif
+>  		} else {
+> @@ -2727,7 +2795,7 @@ static int macb_init(struct platform_device *pdev)
+>  			queue->IMR  = MACB_IMR;
+>  			queue->TBQP = MACB_TBQP;
+>  #ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -			if (bp->hw_dma_cap == HW_DMA_CAP_64B)
+> +			if (bp->hw_dma_cap & HW_DMA_CAP_64B)
+>  				queue->TBQPH = MACB_TBQPH;
+>  #endif
+>  		}
+
+> @@ -3307,19 +3375,24 @@ static int macb_probe(struct platform_device *pdev)
+>  		bp->wol |= MACB_WOL_HAS_MAGIC_PACKET;
+>  	device_init_wakeup(&pdev->dev, bp->wol & MACB_WOL_HAS_MAGIC_PACKET);
+>  
+> -#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -	if (GEM_BFEXT(DAW64, gem_readl(bp, DCFG6))) {
+> -		dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
+> -		bp->hw_dma_cap = HW_DMA_CAP_64B;
+> -	} else
+> -		bp->hw_dma_cap = HW_DMA_CAP_32B;
+> -#endif
+> -
+>  	spin_lock_init(&bp->lock);
+>  
+>  	/* setup capabilities */
+>  	macb_configure_caps(bp, macb_config);
+>  
+> +#ifdef MACB_EXT_DESC
+> +	bp->hw_dma_cap = HW_DMA_CAP_32B;
+> +#endif
+> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> +	if (GEM_BFEXT(DAW64, gem_readl(bp, DCFG6))) {
+> +		dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
+> +		bp->hw_dma_cap |= HW_DMA_CAP_64B;
+> +	}
+> +#endif
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +	if (bp->ptp_hw_support)
+> +		bp->hw_dma_cap |= HW_DMA_CAP_PTP;
+
+So bp->ptp_hw_support is a waste of storage.  You can test for
+(!GEM_BFEXT(TSU, gem_readl(bp, DCFG5))) directly here, or return a
+flag from macb_configure_caps(), or set the hw_dma_cap flag in that
+function, ...
+
+> +#endif
+>  	platform_set_drvdata(pdev, dev);
+>  
+>  	dev->irq = platform_get_irq(pdev, 0);
+
+> @@ -954,8 +972,12 @@ struct macb {
+>  	u32			wol;
+>  
+>  	struct macb_ptp_info	*ptp_info;	/* macb-ptp interface */
+> -#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> -	enum macb_hw_dma_cap hw_dma_cap;
+> +#ifdef MACB_EXT_DESC
+> +	uint8_t hw_dma_cap;
+> +#endif
+> +
+> +#ifdef CONFIG_MACB_USE_HWSTAMP
+> +	bool ptp_hw_support;
+
+Remove this, please.
+
+Thanks,
+Richard
+
+>  #endif
+>  };
+>  
+> -- 
+> 2.4.5
+> 
