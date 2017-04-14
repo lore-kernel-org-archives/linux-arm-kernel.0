@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:32 -0300
-Subject: [PATCH v3 08/21] ARM: dts: keystone: Add generic compatible string
- for I2C EEPROM
+Date: Thu, 13 Apr 2017 22:04:33 -0300
+Subject: [PATCH v3 09/21] ARM: dts: lpc18xx: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-9-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-10-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,48 +25,60 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/keystone-k2e-evm.dts  | 2 +-
- arch/arm/boot/dts/keystone-k2hk-evm.dts | 2 +-
- arch/arm/boot/dts/keystone-k2l-evm.dts  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/lpc4337-ciaa.dts          | 6 +++---
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 2 +-
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
-index ae1ebe7ee021..8c79caae9c1b 100644
---- a/arch/arm/boot/dts/keystone-k2e-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
-@@ -69,7 +69,7 @@
+diff --git a/arch/arm/boot/dts/lpc4337-ciaa.dts b/arch/arm/boot/dts/lpc4337-ciaa.dts
+index 7c16d639a1b4..beddaba85393 100644
+--- a/arch/arm/boot/dts/lpc4337-ciaa.dts
++++ b/arch/arm/boot/dts/lpc4337-ciaa.dts
+@@ -174,17 +174,17 @@
+ 	clock-frequency = <400000>;
  
- &i2c0 {
- 	dtt at 50 {
--		compatible = "at,24c1024";
-+		compatible = "at,24c1024", "atmel,24c1024";
+ 	eeprom at 50 {
+-		compatible = "microchip,24c512";
++		compatible = "microchip,24c512", "atmel,24c512";
  		reg = <0x50>;
  	};
- };
-diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-index 2156ff92d08f..7c6916a11b18 100644
---- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-@@ -145,7 +145,7 @@
  
- &i2c0 {
- 	dtt at 50 {
--		compatible = "at,24c1024";
-+		compatible = "at,24c1024", "atmel,24c1024";
- 		reg = <0x50>;
+ 	eeprom at 51 {
+-		compatible = "microchip,24c02";
++		compatible = "microchip,24c02", "atmel,24c02";
+ 		reg = <0x51>;
+ 	};
+ 
+ 	eeprom at 54 {
+-		compatible = "microchip,24c512";
++		compatible = "microchip,24c512", "atmel,24c512";
+ 		reg = <0x54>;
  	};
  };
-diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
-index 056b42f99d7a..685a236a57f4 100644
---- a/arch/arm/boot/dts/keystone-k2l-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
-@@ -42,7 +42,7 @@
+diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+index 874c75d44013..8b973f537d3a 100644
+--- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
++++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+@@ -429,7 +429,7 @@
+ 	};
  
- &i2c0 {
- 	dtt at 50 {
--		compatible = "at,24c1024";
-+		compatible = "at,24c1024", "atmel,24c1024";
+ 	eeprom at 50 {
+-		compatible = "nxp,24c02";
++		compatible = "nxp,24c02", "atmel,24c02";
  		reg = <0x50>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+index 9b5fad622522..02b23fa29d75 100644
+--- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
++++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+@@ -490,7 +490,7 @@
+ 	};
+ 
+ 	eeprom at 57 {
+-		compatible = "microchip,24c64";
++		compatible = "microchip,24c64", "atmel,24c64";
+ 		reg = <0x57>;
  	};
  };
 -- 
