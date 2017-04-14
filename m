@@ -1,91 +1,133 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:22 +0200
-Subject: [PATCH v5 10/22] KVM: arm64: vgic-its: Implement
- vgic_mmio_uaccess_write_its_iidr
-In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-11-git-send-email-eric.auger@redhat.com>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Fri, 14 Apr 2017 13:10:33 +0300
+Subject: [PATCH] ARM32: Support mremap() for sigpage/vDSO
+Message-ID: <20170414101033.4780-1-dsafonov@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GITS_IIDR revision field is used to encode the migration ABI
-revision. So we need to restore it to check the table layout is
-readable by the destination.
+CRIU restores application mappings on the same place where they
+were before Checkpoint. That means, that we need to move vDSO
+and sigpage during restore on exactly the same place where
+they were before C/R.
 
-By writing the IIDR, userspace thus force the ABI revision to be
-used and this msut be less or equal than the max revision KVM supports.
+Make mremap() code update mm->context.{sigpage,vdso} pointers
+during VMA move. Sigpage is used for landing after handling
+a signal - if the pointer is not updated during moving, the
+application might crash on any signal after mremap().
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+vDSO pointer on ARM32 is used only for setting auxv at this moment,
+update it during mremap() in case of future usage.
 
+Without those updates, current work of CRIU on ARM32 is not reliable.
+Historically, we error Checkpointing if we find vDSO page on ARM32
+and suggest user to disable CONFIG_VDSO.
+But that's not correct - it goes from x86 where signal processing
+is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
+with `CONFIG_VDSO=n'.
+
+Looks like C/R was working by luck - because userspace on ARM32 at
+this moment always sets SA_RESTORER (and sigpage is not used in
+that case).
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+Cc: Christopher Covington <cov@codeaurora.org>
+Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
 ---
-v4 -> v5
-- rename user_revision into abi_rev and REV into MAX_ABI_REV
-- IIDR reports abi_rev set by userspace if any.
-- If value set by userspace exceeds the max supported revision, an
-  error is reported.
-- add some defines
+ arch/arm/kernel/process.c |  8 ++++++++
+ arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
+ arch/x86/entry/vdso/vma.c |  3 ---
+ mm/mmap.c                 |  4 ++++
+ 4 files changed, 30 insertions(+), 3 deletions(-)
 
-v4: creation
----
- include/linux/irqchip/arm-gic-v3.h |  4 ++++
- virt/kvm/arm/vgic/vgic-its.c       | 23 ++++++++++++++++++++---
- 2 files changed, 24 insertions(+), 3 deletions(-)
-
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 9648bad..54c20bd 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -241,6 +241,10 @@
- #define GITS_TYPER_PTA			(1UL << 19)
- #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 939e8b58c59d..1e6039cac68d 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -404,9 +404,17 @@ static unsigned long sigpage_addr(const struct mm_struct *mm,
+ static struct page *signal_page;
+ extern struct page *get_signal_page(void);
  
-+#define GITS_IIDR_REV_SHIFT		12
-+#define GITS_IIDR_REV(r)		(((r) >> GITS_IIDR_REV_SHIFT) & 0xf)
-+#define GITS_IIDR_PRODUCTID_SHIFT	24
-+
- #define GITS_CBASER_VALID			(1ULL << 63)
- #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
- #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 69ecfe4..1b5797e 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -401,7 +401,23 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
- 					     struct vgic_its *its,
- 					     gpa_t addr, unsigned int len)
- {
--	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+	return (PRODUCT_ID_KVM << GITS_IIDR_PRODUCTID_SHIFT) |
-+	       (its->abi_rev << GITS_IIDR_REV_SHIFT) | IMPLEMENTER_ARM;
++static int sigpage_mremap(const struct vm_special_mapping *sm,
++		struct vm_area_struct *new_vma)
++{
++	current->mm->context.sigpage = new_vma->vm_start;
++	return 0;
 +}
 +
-+static int vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
-+					    struct vgic_its *its,
-+					    gpa_t addr, unsigned int len,
-+					    unsigned long val)
+ static const struct vm_special_mapping sigpage_mapping = {
+ 	.name = "[sigpage]",
+ 	.pages = &signal_page,
++	.mremap = sigpage_mremap,
+ };
+ 
+ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index 53cf86cf2d1a..27777d26aeac 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -54,8 +54,26 @@ static const struct vm_special_mapping vdso_data_mapping = {
+ 	.pages = &vdso_data_page,
+ };
+ 
++static int vdso_mremap(const struct vm_special_mapping *sm,
++		struct vm_area_struct *new_vma)
 +{
-+	u64 tmp = 0;
++	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
++	unsigned long vdso_size;
 +
-+	tmp = update_64bit_reg(tmp, addr & 3, len, val);
-+	tmp = GITS_IIDR_REV(tmp);
++	/* without VVAR page */
++	vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
 +
-+	if (tmp > MAX_ABI_REV)
++	if (vdso_size != new_size)
 +		return -EINVAL;
-+	return vgic_its_set_abi(its, tmp);
++
++	current->mm->context.vdso = (void __user *)new_vma->vm_start;
++
++	return 0;
++}
++
+ static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
+ 	.name = "[vdso]",
++	.mremap = vdso_mremap,
+ };
+ 
+ struct elfinfo {
+diff --git a/arch/x86/entry/vdso/vma.c b/arch/x86/entry/vdso/vma.c
+index 226ca70dc6bd..363730caa60e 100644
+--- a/arch/x86/entry/vdso/vma.c
++++ b/arch/x86/entry/vdso/vma.c
+@@ -77,9 +77,6 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
+ 	if (image->size != new_size)
+ 		return -EINVAL;
+ 
+-	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
+-		return -EFAULT;
+-
+ 	vdso_fix_landing(image, new_vma);
+ 	current->mm->context.vdso = (void __user *)new_vma->vm_start;
+ 
+diff --git a/mm/mmap.c b/mm/mmap.c
+index bfbe8856d134..534aef99cfe9 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -3152,8 +3152,12 @@ static int special_mapping_mremap(struct vm_area_struct *new_vma)
+ {
+ 	struct vm_special_mapping *sm = new_vma->vm_private_data;
+ 
++	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
++		return -EFAULT;
++
+ 	if (sm->mremap)
+ 		return sm->mremap(sm, new_vma);
++
+ 	return 0;
  }
  
- static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
-@@ -1382,8 +1398,9 @@ static struct vgic_register_region its_registers[] = {
- 	REGISTER_ITS_DESC(GITS_CTLR,
- 		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
- 		VGIC_ACCESS_32bit),
--	REGISTER_ITS_DESC(GITS_IIDR,
--		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
-+	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
-+		vgic_mmio_read_its_iidr, its_mmio_write_wi,
-+		vgic_mmio_uaccess_write_its_iidr, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_TYPER,
- 		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
 -- 
-2.5.5
+2.12.2
