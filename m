@@ -1,10 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:27 -0300
-Subject: [PATCH v3 03/21] ARM: dts: omap: Add generic compatible string for
- I2C EEPROM
+Date: Thu, 13 Apr 2017 22:04:28 -0300
+Subject: [PATCH v3 04/21] ARM: dts: turris-omnia: Add generic compatible
+ string for I2C EEPROM
 In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
 References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-4-javier@osg.samsung.com>
+Message-ID: <20170414010445.21727-5-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,281 +25,21 @@ Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/boot/dts/am335x-baltos.dtsi            |  2 +-
- arch/arm/boot/dts/am335x-base0033.dts           |  2 +-
- arch/arm/boot/dts/am335x-bone-common.dtsi       | 10 +++++-----
- arch/arm/boot/dts/am335x-nano.dts               |  2 +-
- arch/arm/boot/dts/am335x-pepper.dts             |  2 +-
- arch/arm/boot/dts/am335x-shc.dts                |  2 +-
- arch/arm/boot/dts/am335x-sl50.dts               |  2 +-
- arch/arm/boot/dts/am437x-idk-evm.dts            |  2 +-
- arch/arm/boot/dts/am437x-sk-evm.dts             |  2 +-
- arch/arm/boot/dts/am43x-epos-evm.dts            |  2 +-
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  2 +-
- arch/arm/boot/dts/omap3-cm-t3x.dtsi             |  2 +-
- arch/arm/boot/dts/omap3-gta04.dtsi              |  2 +-
- arch/arm/boot/dts/omap3-sb-t35.dtsi             |  2 +-
- arch/arm/boot/dts/omap4-var-som-om44.dtsi       |  2 +-
- arch/arm/boot/dts/omap5-cm-t54.dts              |  2 +-
- arch/arm/boot/dts/omap5-sbc-t54.dts             |  2 +-
- 17 files changed, 21 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/armada-385-turris-omnia.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
-index d42b98f15e8b..6ca780d0623f 100644
---- a/arch/arm/boot/dts/am335x-baltos.dtsi
-+++ b/arch/arm/boot/dts/am335x-baltos.dtsi
-@@ -255,7 +255,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+index 28eede180e4f..f24058737a13 100644
+--- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
++++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+@@ -171,7 +171,7 @@
+ 			/* leds device (in STM32F0) at address 0x2b */
  
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "at24,24c02", "atmel,24c02";
- 		pagesize = <8>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/am335x-base0033.dts b/arch/arm/boot/dts/am335x-base0033.dts
-index c2bee452dab8..062067251106 100644
---- a/arch/arm/boot/dts/am335x-base0033.dts
-+++ b/arch/arm/boot/dts/am335x-base0033.dts
-@@ -89,7 +89,7 @@
+ 			eeprom at 54 {
+-				compatible = "at,24c64";
++				compatible = "at,24c64", "atmel,24c64";
+ 				reg = <0x54>;
  
- &i2c0 {
- 	eeprom: eeprom at 50 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x50>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index bf6b26abe35b..49c8c9409ce3 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -232,7 +232,7 @@
- 	};
- 
- 	baseboard_eeprom: baseboard_eeprom at 50 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x50>;
- 
- 		#address-cells = <1>;
-@@ -251,7 +251,7 @@
- 	clock-frequency = <100000>;
- 
- 	cape_eeprom0: cape_eeprom0 at 54 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x54>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -261,7 +261,7 @@
- 	};
- 
- 	cape_eeprom1: cape_eeprom1 at 55 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x55>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -271,7 +271,7 @@
- 	};
- 
- 	cape_eeprom2: cape_eeprom2 at 56 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x56>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -281,7 +281,7 @@
- 	};
- 
- 	cape_eeprom3: cape_eeprom3 at 57 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x57>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm/boot/dts/am335x-nano.dts b/arch/arm/boot/dts/am335x-nano.dts
-index 807494bc722b..946d7069f417 100644
---- a/arch/arm/boot/dts/am335x-nano.dts
-+++ b/arch/arm/boot/dts/am335x-nano.dts
-@@ -224,7 +224,7 @@
- 	};
- 
- 	eeprom at 53 {
--		compatible = "microchip,24c02";
-+		compatible = "microchip,24c02", "atmel,24c02";
- 		reg = <0x53>;
- 		pagesize = <8>;
- 	};
-diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-index 30e2f8770aaf..368cef158a19 100644
---- a/arch/arm/boot/dts/am335x-pepper.dts
-+++ b/arch/arm/boot/dts/am335x-pepper.dts
-@@ -67,7 +67,7 @@
- 	};
- 
- 	eeprom: eeprom at 50 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x50>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/am335x-shc.dts b/arch/arm/boot/dts/am335x-shc.dts
-index bf8727a19ece..6a14b8478af0 100644
---- a/arch/arm/boot/dts/am335x-shc.dts
-+++ b/arch/arm/boot/dts/am335x-shc.dts
-@@ -188,7 +188,7 @@
- 	};
- 
- 	at24 at 50 {
--		compatible = "at24,24c32";
-+		compatible = "at24,24c32", "atmel,24c32";
- 		pagesize = <32>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/am335x-sl50.dts b/arch/arm/boot/dts/am335x-sl50.dts
-index c5d2589c55fc..d03678de140c 100644
---- a/arch/arm/boot/dts/am335x-sl50.dts
-+++ b/arch/arm/boot/dts/am335x-sl50.dts
-@@ -309,7 +309,7 @@
- 	};
- 
- 	eeprom: eeprom at 50 {
--		compatible = "at,24c256";
-+		compatible = "at,24c256", "atmel,24c256";
- 		reg = <0x50>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/am437x-idk-evm.dts b/arch/arm/boot/dts/am437x-idk-evm.dts
-index c1f7f9336e64..6c831663a75f 100644
---- a/arch/arm/boot/dts/am437x-idk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-idk-evm.dts
-@@ -339,7 +339,7 @@
- 	clock-frequency = <400000>;
- 
- 	at24 at 50 {
--		compatible = "at24,24c256";
-+		compatible = "at24,24c256", "atmel,24c256";
- 		pagesize = <64>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/am437x-sk-evm.dts b/arch/arm/boot/dts/am437x-sk-evm.dts
-index 4dc54bee2f36..1531b295336e 100644
---- a/arch/arm/boot/dts/am437x-sk-evm.dts
-+++ b/arch/arm/boot/dts/am437x-sk-evm.dts
-@@ -511,7 +511,7 @@
- 	};
- 
- 	at24 at 50 {
--		compatible = "at24,24c256";
-+		compatible = "at24,24c256", "atmel,24c256";
- 		pagesize = <64>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 9acd4ccdec4e..ca9b11375298 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -477,7 +477,7 @@
- 	};
- 
- 	at24 at 50 {
--		compatible = "at24,24c256";
-+		compatible = "at24,24c256", "atmel,24c256";
- 		pagesize = <64>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-index 585d792a8fdd..6af022540300 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-@@ -388,7 +388,7 @@
- 	};
- 
- 	eeprom: eeprom at 50 {
--		compatible = "at,24c32";
-+		compatible = "at,24c32", "atmel,24c32";
- 		reg = <0x50>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x.dtsi b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-index 57b9a028a49a..d960f1b3b4b1 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x.dtsi
-@@ -188,7 +188,7 @@
- 	clock-frequency = <400000>;
- 
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "at24,24c02", "atmel,24c02";
- 		pagesize = <16>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index b3a8b1f24499..430ab832783b 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -418,7 +418,7 @@
- 
- 	/* RFID EEPROM */
- 	m24lr64 at 50 {
--		compatible = "at,24c64";
-+		compatible = "at,24c64", "atmel,24c64";
- 		reg = <0x50>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-sb-t35.dtsi b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-index 73643fabde5d..e54091fbd40b 100644
---- a/arch/arm/boot/dts/omap3-sb-t35.dtsi
-+++ b/arch/arm/boot/dts/omap3-sb-t35.dtsi
-@@ -90,7 +90,7 @@
- 	clock-frequency = <400000>;
- 
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "at24,24c02", "atmel,24c02";
- 		pagesize = <16>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/omap4-var-som-om44.dtsi b/arch/arm/boot/dts/omap4-var-som-om44.dtsi
-index 758b6eb7ae43..6500bfc8d130 100644
---- a/arch/arm/boot/dts/omap4-var-som-om44.dtsi
-+++ b/arch/arm/boot/dts/omap4-var-som-om44.dtsi
-@@ -241,7 +241,7 @@
- 	};
- 
- 	eeprom at 50 {
--		compatible = "microchip,24c32";
-+		compatible = "microchip,24c32", "atmel,24c32";
- 		reg = <0x50>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
-index b153f604932a..e0e31bfbf0e0 100644
---- a/arch/arm/boot/dts/omap5-cm-t54.dts
-+++ b/arch/arm/boot/dts/omap5-cm-t54.dts
-@@ -404,7 +404,7 @@
- 	clock-frequency = <400000>;
- 
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "at24,24c02", "atmel,24c02";
- 		pagesize = <16>;
- 		reg = <0x50>;
- 	};
-diff --git a/arch/arm/boot/dts/omap5-sbc-t54.dts b/arch/arm/boot/dts/omap5-sbc-t54.dts
-index 337bbbc01a35..efc70f80abae 100644
---- a/arch/arm/boot/dts/omap5-sbc-t54.dts
-+++ b/arch/arm/boot/dts/omap5-sbc-t54.dts
-@@ -44,7 +44,7 @@
- 	clock-frequency = <400000>;
- 
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "at24,24c02", "atmel,24c02";
- 		pagesize = <16>;
- 		reg = <0x50>;
- 	};
+ 				/* The EEPROM contains data for bootloader.
 -- 
 2.9.3
