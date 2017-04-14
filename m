@@ -1,23 +1,40 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 14 Apr 2017 15:10:02 -0400
-Subject: [PATCH V8 2/5] PCI/ASPM: split pci_aspm_init() into two
-In-Reply-To: <CAErSpo4gduGVq2Na0tYbG77Pi23R-RMBvAcJueWrQTJCRsHYGw@mail.gmail.com>
+Date: Fri, 14 Apr 2017 15:10:38 -0400
+Subject: [PATCH V8 1/5] PCI/ASPM: introduce pci_aspm_init() and add to
+ pci_init_capabilities()
+In-Reply-To: <20170413205125.GC28316@bhelgaas-glaptop.roam.corp.google.com>
 References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-3-git-send-email-okaya@codeaurora.org>
- <CACK8Z6EfUTDjCM=fmdHfWeu8UV5GN+i6PX9fKkR1H8K90TXozg@mail.gmail.com>
- <CAErSpo4gduGVq2Na0tYbG77Pi23R-RMBvAcJueWrQTJCRsHYGw@mail.gmail.com>
-Message-ID: <04c89a56-5e33-22e7-8665-cd94ac56d920@codeaurora.org>
+ <1491627351-1111-2-git-send-email-okaya@codeaurora.org>
+ <20170413205125.GC28316@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <f6e9637d-8c5e-3363-d448-b910ca53e046@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2017 2:25 PM, Bjorn Helgaas wrote:
-> I agree, and I made that change on my branch.  I also renamed these to
-> pci_aspm_init_downstream_port() (for Root Ports and Switch Downstream
-> Ports) and pci_aspm_init_upstream_port() (for Switch Upstream Ports
-> and Endpoints) to try to match the terminology in the spec.
+On 4/13/2017 4:51 PM, Bjorn Helgaas wrote:
+> I think these can go in drivers/pci/pci.h instead of the public
+> include/linux/pci.h.  There's no ASPM section in drivers/pci/pci.h
+> yet, but I think we should add one.
+> 
+> It looks like the following things from include/linux/pci-aspm.h could
+> be moved there as well, since they're only used by the PCI core:
+> 
+>   void pcie_aspm_init_link_state(struct pci_dev *pdev);
+>   void pcie_aspm_exit_link_state(struct pci_dev *pdev);
+>   void pcie_aspm_pm_state_change(struct pci_dev *pdev);
+>   void pcie_aspm_powersave_config_link(struct pci_dev *pdev);
+>   void pcie_aspm_create_sysfs_dev_files(struct pci_dev *pdev);
+>   void pcie_aspm_remove_sysfs_dev_files(struct pci_dev *pdev);
+> 
+> This would be a separate patch.
+> 
 
-OK. I reordered and renamed the functions according to your suggestions
-on my local copy too.
+Sure, let me work on this.
+
+>>  #else
+>>  static inline bool pcie_aspm_support_enabled(void) { return false; }
+>> +static inline int pci_aspm_init(struct pci_dev *pdev) { return -ENODEV; }
+>>  #endif
+
 
 -- 
 Sinan Kaya
