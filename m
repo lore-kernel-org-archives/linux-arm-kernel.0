@@ -1,66 +1,115 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Thu, 13 Apr 2017 22:39:30 -0700
-Subject: [PATCH RFC 0/5] *** SPI Slave mode support ***
-In-Reply-To: <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
-References: <1492085644-4195-1-git-send-email-jiada_wang@mentor.com>
- <20170413125929.dygodgj6c35ydh5p@sirena.org.uk>
- <CAMuHMdUm=90ddNWM5KWqT+W0hqZ-QO6vPHj5OisbYquDYq1ZmA@mail.gmail.com>
-Message-ID: <58F06092.9080409@mentor.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Fri, 14 Apr 2017 13:29:24 +0800
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable more drivers for LS1021A
+Message-ID: <1492147764-17981-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert
+This patch enables more drivers for LS1021A, such as FlexCAN, IFC, SATA,
+DCU, RTC, CAAM and Virtualization.
 
-On 04/13/2017 12:47 PM, Geert Uytterhoeven wrote:
-> On Thu, Apr 13, 2017 at 2:59 PM, Mark Brown<broonie@kernel.org>  wrote:
->> On Thu, Apr 13, 2017 at 05:13:59AM -0700, jiada_wang at mentor.com wrote:
->>> From: Jiada Wang<jiada_wang@mentor.com>
->>>
->>> v1:
->>>    add Slave mode support in SPI core
->>>    spidev create slave device when SPI controller work in slave mode
->>>    spi-imx support to work in slave mode
->> Adding Geert who also had a series doing this in progress that was
->> getting very near to being merged.
-> Thank you!
->
-> Actually my plan is to fix the last remaining issues and resubmit for v4.13.
-I noticed your patch set for SPI slave support,
-(I am sure you can find out some of the change
-in this patch set is based on your work).
-we have similar requirement to add slave mode support to ecspi IP on 
-imx6 Soc.
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
-Our use case is to use spidev as an interface to communicate with 
-external SPI master devices.
-meanwhile the SPI bus controller can also act as master device to send 
-data to other
-SPI slave devices on the board.
-
-I found in your implementation, SPI bus controller is limited to either 
-work in master mode or
-slave mode, is there any reasoning to not configure SPI mode based on 
-SPI devices use case?
-
-
-Thanks,
-Jiada
-
-> References:
->    - v2: https://lkml.org/lkml/2016/9/12/1065
->    - v1: https://lkml.org/lkml/2016/6/22/423
->
-> BTW Jiada, what's your use case? Just spidev?
->
-> Thx!
->
-> Gr{oetje,eeting}s,
->
->                          Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 8f6167e..f7124af 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -174,6 +174,7 @@ CONFIG_CAN_AT91=m
+ CONFIG_CAN_RCAR=m
+ CONFIG_CAN_XILINXCAN=y
+ CONFIG_CAN_MCP251X=y
++CONFIG_CAN_FLEXCAN=y
+ CONFIG_NET_DSA_BCM_SF2=m
+ CONFIG_B53=m
+ CONFIG_B53_SPI_DRIVER=m
+@@ -199,19 +200,27 @@ CONFIG_SUNXI_RSB=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_STAA=y
+ CONFIG_MTD_M25P80=y
++CONFIG_MTD_DATAFLASH=y
++CONFIG_MTD_SST25L=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_DENALI_DT=y
+ CONFIG_MTD_NAND_ATMEL=y
+ CONFIG_MTD_NAND_BRCMNAND=y
+ CONFIG_MTD_NAND_VF610_NFC=y
+ CONFIG_MTD_NAND_DAVINCI=y
++CONFIG_MTD_NAND_FSL_IFC=y
+ CONFIG_MTD_SPI_NOR=y
+ CONFIG_SPI_FSL_QUADSPI=m
+ CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=65536
++CONFIG_BLK_DEV_RAM_SIZE=262144
+ CONFIG_VIRTIO_BLK=y
+ CONFIG_AD525X_DPOT=y
+ CONFIG_AD525X_DPOT_I2C=y
+@@ -233,6 +242,9 @@ CONFIG_AHCI_ST=y
+ CONFIG_AHCI_IMX=y
+ CONFIG_AHCI_SUNXI=y
+ CONFIG_AHCI_TEGRA=y
++CONFIG_AHCI_QORIQ=y
++CONFIG_SATA_SIL24=y
++CONFIG_CHR_DEV_SG=y
+ CONFIG_SATA_HIGHBANK=y
+ CONFIG_SATA_MV=y
+ CONFIG_SATA_RCAR=y
+@@ -266,6 +278,7 @@ CONFIG_BROADCOM_PHY=y
+ CONFIG_ICPLUS_PHY=y
+ CONFIG_REALTEK_PHY=y
+ CONFIG_MICREL_PHY=y
++CONFIG_NATIONAL_PHY=y
+ CONFIG_FIXED_PHY=y
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_RTL8152=m
+@@ -359,7 +372,7 @@ CONFIG_I2C_DIGICOLOR=m
+ CONFIG_I2C_EMEV2=m
+ CONFIG_I2C_GPIO=m
+ CONFIG_I2C_EXYNOS5=y
+-CONFIG_I2C_IMX=m
++CONFIG_I2C_IMX=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_RIIC=y
+ CONFIG_I2C_RK3X=y
+@@ -609,6 +622,9 @@ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_STI=m
+ CONFIG_DRM_VC4=y
++CONFIG_DRM_FSL_DCU=y
++CONFIG_DRM_SII902X=y
++CONFIG_LOGO=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FB_EFI=y
+ CONFIG_FB_WM8505=y
+@@ -756,6 +772,7 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_AC100=y
+ CONFIG_RTC_DRV_AS3722=y
+ CONFIG_RTC_DRV_DS1307=y
++CONFIG_RTC_DRV_DS3232=y
+ CONFIG_RTC_DRV_HYM8563=m
+ CONFIG_RTC_DRV_MAX8907=y
+ CONFIG_RTC_DRV_MAX8998=m
+@@ -956,8 +973,11 @@ CONFIG_CRYPTO_GHASH_ARM_CE=m
+ CONFIG_CRYPTO_DEV_ATMEL_AES=m
+ CONFIG_CRYPTO_DEV_ATMEL_TDES=m
+ CONFIG_CRYPTO_DEV_ATMEL_SHA=m
++CONFIG_CRYPTO_DEV_FSL_CAAM=m
+ CONFIG_VIDEO_VIVID=m
+ CONFIG_VIRTIO=y
+ CONFIG_VIRTIO_PCI=y
+ CONFIG_VIRTIO_PCI_LEGACY=y
+ CONFIG_VIRTIO_MMIO=y
++CONFIG_VIRTUALIZATION=y
++CONFIG_VHOST_NET=y
+-- 
+2.1.0.27.g96db324
