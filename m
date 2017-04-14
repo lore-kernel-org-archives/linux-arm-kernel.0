@@ -1,50 +1,42 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 13 Apr 2017 22:04:39 -0300
-Subject: [PATCH v3 15/21] arm64: dts: ls1043a: Add generic compatible string
- for I2C EEPROM
-In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
-References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170414010445.21727-16-javier@osg.samsung.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 13 Apr 2017 21:19:17 -0400
+Subject: [PATCH V8 3/5] PCI/ASPM: add init hook to device_add
+In-Reply-To: <20170413210218.GA24910@bhelgaas-glaptop.roam.corp.google.com>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <1491627351-1111-4-git-send-email-okaya@codeaurora.org>
+ <20170413204800.GB28316@bhelgaas-glaptop.roam.corp.google.com>
+ <20170413210218.GA24910@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <76b74ad0-0c7f-a366-89d6-dc87ac315bc5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at24 driver allows to register I2C EEPROM chips using different vendor
-and devices, but the I2C subsystem does not take the vendor into account
-when matching using the I2C table since it only has device entries.
+On 4/13/2017 5:02 PM, Bjorn Helgaas wrote:
+> I do see that you change the deallocation in patch [5/5], but I think
+> the deallocation change should be in the same patch as the allocation
+> change.  Otherwise I think we have a use-after-free problem in this
+> sequence:
 
-But when matching using an OF table, both the vendor and device has to be
-taken into account so the driver defines only a set of compatible strings
-using the "atmel" vendor as a generic fallback for compatible I2C devices.
+Sure, I'll reorder. As you can see here, link will be only removed if
+root port is being removed.
 
-So add this generic fallback to the device node compatible string to make
-the device to match the driver using the OF device ID table.
+Without this, we'll hit the use after free issue you mentioned.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+	if (pdev->has_secondary_link) {
+		link = pdev->link_state;
+		down_read(&pci_bus_sem);
+		mutex_lock(&aspm_lock);
 
-Changes in v3: None
-Changes in v2: None
+		list_del(&link->sibling);
+		list_del(&link->link);
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+		/* Clock PM is for endpoint device */
+		free_link_state(link);
+		mutex_unlock(&aspm_lock);
+		up_read(&pci_bus_sem);
+		return;
+	}  
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index c37110bc1506..5389eae627e5 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -75,11 +75,11 @@
- 		reg = <0x4c>;
- 	};
- 	eeprom at 52 {
--		compatible = "at24,24c512";
-+		compatible = "at24,24c512", "atmel,24c512";
- 		reg = <0x52>;
- 	};
- 	eeprom at 53 {
--		compatible = "at24,24c512";
-+		compatible = "at24,24c512", "atmel,24c512";
- 		reg = <0x53>;
- 	};
- 	rtc at 68 {
 -- 
-2.9.3
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
