@@ -1,150 +1,77 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Fri, 14 Apr 2017 12:15:28 +0200
-Subject: [PATCH v5 16/22] KVM: arm64: vgic-its: Add infrastructure for table
- lookup
+Date: Fri, 14 Apr 2017 12:15:30 +0200
+Subject: [PATCH v5 18/22] KVM: arm64: vgic-its: vgic_its_check_id returns the
+ entry's GPA
 In-Reply-To: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
 References: <1492164934-988-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1492164934-988-17-git-send-email-eric.auger@redhat.com>
+Message-ID: <1492164934-988-19-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic lookup_table() helper whose role consists in
-scanning a contiguous table located in guest RAM and applying
-a callback on each entry. Entries can be handled as linked lists
-since the callback may return an offset to the next entry and
-also tell that an entry is the last one.
-
-Helper functions also are added to compute the device/event ID
-offset to the next DTE/ITE.
-
-compute_next_devid_offset, compute_next_eventid_offset and
-lookup_table will become static in subsequent patches
+As vgic_its_check_id() computes the device/collection entry's
+GPA, let's return it so that new callers can retrieve it easily.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-v4 -> v5:
-- use kvm_read_guest
-
 v3 -> v4:
-- remove static to avoid compilation warning
-- correct size computation in looup_table()
-- defines now encode the number of bits used for devid and eventid offsets
-- use BIT() - 1 to encode the max offets
+- check eaddr is not NULL to allow passing NULL eaddr parameter
+  to vgic_its_check_id
+
+v2: new
 ---
- virt/kvm/arm/vgic/vgic-its.c | 93 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 56c5123..c22b35d 100644
+index 484e541..35b2ca1 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -195,6 +195,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+@@ -645,7 +645,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+  * is actually valid (covered by a memslot and guest accessible).
+  * For this we have to read the respective first level entry.
+  */
+-static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
++static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
++			      gpa_t *eaddr)
+ {
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 	int index;
+@@ -665,6 +666,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ 		addr = BASER_ADDRESS(baser) + id * esz;
+ 		gfn = addr >> PAGE_SHIFT;
  
- #define VITS_TYPER_IDBITS 16
- #define VITS_TYPER_DEVBITS 16
-+#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
-+#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
++		if (eaddr)
++			*eaddr = addr;
+ 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+ 	}
  
- /*
-  * Finds and returns a collection in the ITS collection table.
-@@ -1674,6 +1676,97 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
- 	return ret;
+@@ -697,6 +700,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id)
+ 	indirect_ptr += index * esz;
+ 	gfn = indirect_ptr >> PAGE_SHIFT;
+ 
++	if (eaddr)
++		*eaddr = indirect_ptr;
+ 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
  }
  
-+u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
-+{
-+	struct list_head *e = &dev->dev_list;
-+	struct its_device *next;
-+	u32 next_offset;
-+
-+	if (e->next == h)
-+		return 0;
-+	next = list_entry(e->next, struct its_device, dev_list);
-+	next_offset = next->device_id - dev->device_id;
-+
-+	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
-+}
-+
-+u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
-+{
-+	struct list_head *e = &ite->ite_list;
-+	struct its_ite *next;
-+	u32 next_offset;
-+
-+	if (e->next == h)
-+		return 0;
-+	next = list_entry(e->next, struct its_ite, ite_list);
-+	next_offset = next->event_id - ite->event_id;
-+
-+	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
-+}
-+
-+/**
-+ * entry_fn_t - Callback called on a table entry restore path
-+ * @its: its handle
-+ * @id: id of the entry
-+ * @entry: pointer to the entry
-+ * @opaque: pointer to an opaque data
-+ * @next_offset: minimal ID offset to the next entry. 0 if this
-+ * entry is the last one, 1 if the entry is invalid, >= 1 if an
-+ * entry's next_offset field was truly decoded
-+ *
-+ * Return: < 0 on error, 0 otherwise
-+ */
-+typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
-+			  void *opaque, u32 *next_offset);
-+
-+/**
-+ * lookup_table - scan a contiguous table in guest RAM and applies a function
-+ * to each entry
-+ *
-+ * @its: its handle
-+ * @base: base gpa of the table
-+ * @size: size of the table in bytes
-+ * @esz: entry size in bytes
-+ * @start_id: first entry's ID
-+ * @fn: function to apply on each entry
-+ *
-+ * Return: < 0 on error, 1 if last element identified, 0 otherwise
-+ */
-+int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+		 int start_id, entry_fn_t fn, void *opaque)
-+{
-+	void *entry = kzalloc(esz, GFP_KERNEL);
-+	struct kvm *kvm = its->dev->kvm;
-+	unsigned long len = size;
-+	u32 id = start_id;
-+	gpa_t gpa = base;
-+	int ret;
-+
-+	while (len > 0) {
-+		u32 next_offset;
-+		size_t byte_offset;
-+
-+		ret = kvm_read_guest(kvm, gpa, entry, esz);
-+		if (ret)
-+			goto out;
-+
-+		ret = fn(its, id, entry, opaque, &next_offset);
-+		if (ret < 0 || (!ret && !next_offset))
-+			goto out;
-+
-+		byte_offset = next_offset * esz;
-+		id += next_offset;
-+		gpa += byte_offset;
-+		len -= byte_offset;
-+	}
-+	kfree(entry);
-+	return 0;
-+
-+out:
-+	kfree(entry);
-+	return (ret < 0 ? ret : 1);
-+}
-+
- /**
-  * vgic_its_save_device_tables - Save the device table and all ITT
-  * into guest RAM
+@@ -706,7 +711,7 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+ {
+ 	struct its_collection *collection;
+ 
+-	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
++	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, NULL))
+ 		return E_ITS_MAPC_COLLECTION_OOR;
+ 
+ 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+@@ -889,7 +894,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+ 	struct its_device *device;
+ 
+-	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
++	if (!vgic_its_check_id(its, its->baser_device_table, device_id, NULL))
+ 		return E_ITS_MAPD_DEVICE_OOR;
+ 
+ 	if (valid && nb_eventid_bits > VITS_TYPER_IDBITS)
 -- 
 2.5.5
