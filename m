@@ -1,51 +1,97 @@
-From: cphealy@gmail.com (Chris Healy)
-Date: Sat, 15 Apr 2017 22:45:07 -0700
-Subject: [PATCH v2] arm: imx6: zii: Add i210 PCIe interface to the device tree
-Message-ID: <1492321507-7174-1-git-send-email-cphealy@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 16 Apr 2017 09:04:46 +0100
+Subject: [PATCH] Remove ARM errata Workarounds 458693 and 460075
+In-Reply-To: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
+References: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
+Message-ID: <20170416080446.GI17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board has an Intel i210 Ethernet controller on its PCIe bus. Add a
-device tree node for this.
+On Sat, Apr 15, 2017 at 07:06:06PM -0500, Nisal Menuka wrote:
+> According to ARM, these errata exist only in a version of Cortex-A8
+> (r2p0) which was never built. Therefore, I believe there are no platforms
+> where this workaround should be enabled.
+> link :http://infocenter.arm.com/help/index.jsp?topic=
+> /com.arm.doc.faqs/ka15634.html
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Chris Healy <cphealy@gmail.com>
----
+These were submitted by ARM Ltd back in 2009 - if the silicon was never
+built, there would've been no reason to submit them.  Maybe Catalin can
+shed some light on this, being the commit author who introduced these?
 
-This patch is against for-next of Shawn Guo's tree.
+> Signed-off-by: Nisal Menuka <nisalmenuka23@gmail.com>
+> ---
+>  arch/arm/Kconfig      | 27 ---------------------------
+>  arch/arm/mm/proc-v7.S | 14 --------------
+>  2 files changed, 41 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 0d4e71b..d527963 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1005,33 +1005,6 @@ config ARM_ERRATA_430973
+>  	  Note that setting specific bits in the ACTLR register may not be
+>  	  available in non-secure mode.
+>  
+> -config ARM_ERRATA_458693
+> -	bool "ARM errata: Processor deadlock when a false hazard is created"
+> -	depends on CPU_V7
+> -	depends on !ARCH_MULTIPLATFORM
+> -	help
+> -	  This option enables the workaround for the 458693 Cortex-A8 (r2p0)
+> -	  erratum. For very specific sequences of memory operations, it is
+> -	  possible for a hazard condition intended for a cache line to instead
+> -	  be incorrectly associated with a different cache line. This false
+> -	  hazard might then cause a processor deadlock. The workaround enables
+> -	  the L1 caching of the NEON accesses and disables the PLD instruction
+> -	  in the ACTLR register. Note that setting specific bits in the ACTLR
+> -	  register may not be available in non-secure mode.
+> -
+> -config ARM_ERRATA_460075
+> -	bool "ARM errata: Data written to the L2 cache can be overwritten with stale data"
+> -	depends on CPU_V7
+> -	depends on !ARCH_MULTIPLATFORM
+> -	help
+> -	  This option enables the workaround for the 460075 Cortex-A8 (r2p0)
+> -	  erratum. Any asynchronous access to the L2 cache may encounter a
+> -	  situation in which recent store transactions to the L2 cache are lost
+> -	  and overwritten with stale memory contents from external memory. The
+> -	  workaround disables the write-allocate mode for the L2 cache via the
+> -	  ACTLR register. Note that setting specific bits in the ACTLR register
+> -	  may not be available in non-secure mode.
+> -
+>  config ARM_ERRATA_742230
+>  	bool "ARM errata: DMB operation may be faulty"
+>  	depends on CPU_V7 && SMP
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index d00d52c..43a4a12 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -306,20 +306,6 @@ __ca8_errata:
+>  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
+>  	mcreq	p15, 0, r0, c1, c0, 1		@ write aux control register
+>  #endif
+> -#ifdef CONFIG_ARM_ERRATA_458693
+> -	teq	r6, #0x20			@ only present in r2p0
+> -	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
+> -	orreq	r0, r0, #(1 << 5)		@ set L1NEON to 1
+> -	orreq	r0, r0, #(1 << 9)		@ set PLDNOP to 1
+> -	mcreq	p15, 0, r0, c1, c0, 1		@ write aux control register
+> -#endif
+> -#ifdef CONFIG_ARM_ERRATA_460075
+> -	teq	r6, #0x20			@ only present in r2p0
+> -	mrceq	p15, 1, r0, c9, c0, 2		@ read L2 cache aux ctrl register
+> -	tsteq	r0, #1 << 22
+> -	orreq	r0, r0, #(1 << 22)		@ set the Write Allocate disable bit
+> -	mcreq	p15, 1, r0, c9, c0, 2		@ write the L2 cache aux ctrl register
+> -#endif
+>  	b	__errata_finish
+>  
+>  __ca9_errata:
+> -- 
+> 2.7.4
+> 
 
-Since v1, this version fixes the spacing by using git send-email instead of gmail
-to send the patch.
-
-Thanks,
-
-Chris Healy
----
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-index 5d94b5e..8375c43 100644
---- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-@@ -572,6 +572,18 @@
- 	pinctrl-0 = <&pinctrl_pcie>;
- 	reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
- 	status = "okay";
-+
-+	host at 0 {
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		reg = <0 0 0 0 0>;
-+		device_type = "pci";
-+
-+		i210: i210 at 0 {
-+			reg = <0 0 0 0 0>;
-+			device_type = "pci";
-+		};
-+       };
- };
- 
- &usdhc2 {
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
