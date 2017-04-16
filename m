@@ -1,105 +1,154 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:27:03 +0200
-Subject: [PATCH 13/29] arm64: arch_timer: Move clocksource_counter and co
- around
+Date: Sun, 16 Apr 2017 22:27:02 +0200
+Subject: [PATCH 12/29] arm64: arch_timer: Allows a CPU-specific erratum to
+ only affect a subset of CPUs
 In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
  <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-13-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-12-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-In order to access clocksource_counter from the errata handling code,
-move it (together with the related structures and functions) towards
-the top of the file.
+Instead of applying a CPU-specific workaround to all CPUs in the system,
+allow it to only affect a subset of them (typical big-little case).
+
+This is done by turning the erratum pointer into a per-CPU variable.
 
 Acked-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 62 ++++++++++++++++++------------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+ arch/arm64/include/asm/arch_timer.h  | 31 ++++++++++++++++----------
+ drivers/clocksource/arm_arch_timer.c | 42 +++++++++++++++++++++++++-----------
+ 2 files changed, 50 insertions(+), 23 deletions(-)
 
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 01917b4..6bd1a9a 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -25,6 +25,7 @@
+ #include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/jump_label.h>
++#include <linux/smp.h>
+ #include <linux/types.h>
+ 
+ #include <clocksource/arm_arch_timer.h>
+@@ -55,17 +56,25 @@ struct arch_timer_erratum_workaround {
+ 	int (*set_next_event_virt)(unsigned long, struct clock_event_device *);
+ };
+ 
+-extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
+-
+-#define arch_timer_reg_read_stable(reg) 		\
+-({							\
+-	u64 _val;					\
+-	if (needs_unstable_timer_counter_workaround() &&		\
+-	    timer_unstable_counter_workaround->read_##reg)		\
+-		_val = timer_unstable_counter_workaround->read_##reg();	\
+-	else						\
+-		_val = read_sysreg(reg);		\
+-	_val;						\
++DECLARE_PER_CPU(const struct arch_timer_erratum_workaround *,
++		timer_unstable_counter_workaround);
++
++#define arch_timer_reg_read_stable(reg)					\
++({									\
++	u64 _val;							\
++	if (needs_unstable_timer_counter_workaround()) {		\
++		const struct arch_timer_erratum_workaround *wa;		\
++		preempt_disable();					\
++		wa = __this_cpu_read(timer_unstable_counter_workaround); \
++		if (wa && wa->read_##reg)				\
++			_val = wa->read_##reg();			\
++		else							\
++			_val = read_sysreg(reg);			\
++		preempt_enable();					\
++	} else {							\
++		_val = read_sysreg(reg);				\
++	}								\
++	_val;								\
+ })
+ 
+ /*
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 4551587..395f5d9 100644
+index a0c9ee8..4551587 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -158,6 +158,37 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
- 	return val;
+@@ -235,7 +235,8 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
+ #endif
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
++DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
++	       timer_unstable_counter_workaround);
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+ 
+ DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
+@@ -338,9 +339,18 @@ arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
  }
  
-+/*
-+ * Default to cp15 based access because arm64 uses this function for
-+ * sched_clock() before DT is probed and the cp15 method is guaranteed
-+ * to exist on arm64. arm doesn't use this before DT is probed so even
-+ * if we don't have the cp15 accessors we won't have a problem.
-+ */
-+u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+ static
+-void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
++void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa,
++				  bool local)
+ {
+-	timer_unstable_counter_workaround = wa;
++	int i;
 +
-+static u64 arch_counter_read(struct clocksource *cs)
-+{
-+	return arch_timer_read_counter();
-+}
++	if (local) {
++		__this_cpu_write(timer_unstable_counter_workaround, wa);
++	} else {
++		for_each_possible_cpu(i)
++			per_cpu(timer_unstable_counter_workaround, i) = wa;
++	}
 +
-+static u64 arch_counter_read_cc(const struct cyclecounter *cc)
-+{
-+	return arch_timer_read_counter();
-+}
-+
-+static struct clocksource clocksource_counter = {
-+	.name	= "arch_sys_counter",
-+	.rating	= 400,
-+	.read	= arch_counter_read,
-+	.mask	= CLOCKSOURCE_MASK(56),
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static struct cyclecounter cyclecounter __ro_after_init = {
-+	.read	= arch_counter_read_cc,
-+	.mask	= CLOCKSOURCE_MASK(56),
-+};
-+
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -742,37 +773,6 @@ static u64 arch_counter_get_cntvct_mem(void)
- 	return ((u64) vct_hi << 32) | vct_lo;
+ 	static_branch_enable(&arch_timer_read_ool_enabled);
  }
  
--/*
-- * Default to cp15 based access because arm64 uses this function for
-- * sched_clock() before DT is probed and the cp15 method is guaranteed
-- * to exist on arm64. arm doesn't use this before DT is probed so even
-- * if we don't have the cp15 accessors we won't have a problem.
-- */
--u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
--
--static u64 arch_counter_read(struct clocksource *cs)
--{
--	return arch_timer_read_counter();
--}
--
--static u64 arch_counter_read_cc(const struct cyclecounter *cc)
--{
--	return arch_timer_read_counter();
--}
--
--static struct clocksource clocksource_counter = {
--	.name	= "arch_sys_counter",
--	.rating	= 400,
--	.read	= arch_counter_read,
--	.mask	= CLOCKSOURCE_MASK(56),
--	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
--static struct cyclecounter cyclecounter __ro_after_init = {
--	.read	= arch_counter_read_cc,
--	.mask	= CLOCKSOURCE_MASK(56),
--};
--
- static struct arch_timer_kvm_info arch_timer_kvm_info;
+@@ -369,14 +379,17 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 		return;
  
- struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
+ 	if (needs_unstable_timer_counter_workaround()) {
+-		if (wa != timer_unstable_counter_workaround)
++		const struct arch_timer_erratum_workaround *__wa;
++		__wa = __this_cpu_read(timer_unstable_counter_workaround);
++		if (__wa && wa != __wa)
+ 			pr_warn("Can't enable workaround for %s (clashes with %s\n)",
+-				wa->desc,
+-				timer_unstable_counter_workaround->desc);
+-		return;
++				wa->desc, __wa->desc);
++
++		if (__wa)
++			return;
+ 	}
+ 
+-	arch_timer_enable_workaround(wa);
++	arch_timer_enable_workaround(wa, local);
+ 	pr_info("Enabling %s workaround for %s\n",
+ 		local ? "local" : "global", wa->desc);
+ }
+@@ -384,10 +397,15 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ #define erratum_handler(fn, r, ...)					\
+ ({									\
+ 	bool __val;							\
+-	if (needs_unstable_timer_counter_workaround() &&		\
+-	    timer_unstable_counter_workaround->fn) {			\
+-		r = timer_unstable_counter_workaround->fn(__VA_ARGS__);	\
+-		__val = true;						\
++	if (needs_unstable_timer_counter_workaround()) {		\
++		const struct arch_timer_erratum_workaround *__wa;	\
++		__wa = __this_cpu_read(timer_unstable_counter_workaround); \
++		if (__wa && __wa->fn) {					\
++			r = __wa->fn(__VA_ARGS__);			\
++			__val = true;					\
++		} else {						\
++			__val = false;					\
++		}							\
+ 	} else {							\
+ 		__val = false;						\
+ 	}								\
 -- 
 2.7.4
