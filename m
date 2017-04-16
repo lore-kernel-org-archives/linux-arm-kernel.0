@@ -1,43 +1,87 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:27:16 +0200
-Subject: [PATCH 26/29] ARM: dts: rockchip: disable arm-global-timer for rk3188
+Date: Sun, 16 Apr 2017 22:27:06 +0200
+Subject: [PATCH 16/29] arm64: arch_timer: Workaround for Cortex-A73 erratum
+ 858921
 In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
  <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-26-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-16-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Kochetkov <al.kochet@gmail.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-The clocksource and the sched_clock provided by the arm_global_timer
-are quite unstable because their rates depend on the cpu frequency.
+Cortex-A73 (all versions) counter read can return a wrong value
+when the counter crosses a 32bit boundary.
 
-On the other side, the arm_global_timer has a higher rating than the
-rockchip_timer, it will be selected by default by the time framework
-while we want to use the stable rockchip clocksource.
+The workaround involves performing the read twice, and to return
+one or the other depending on whether a transition has taken place.
 
-Let's disable the arm_global_timer in order to have the rockchip
-clocksource selected by default.
-
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/dts/rk3188.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/Kconfig          | 11 +++++++++++
+ drivers/clocksource/arm_arch_timer.c | 19 +++++++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 8428fae..1aff4ad2 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -546,6 +546,7 @@
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 3356ab8..af80a7c 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -366,6 +366,17 @@ config HISILICON_ERRATUM_161010101
+ 	  161010101. The workaround will be active if the hisilicon,erratum-161010101
+ 	  property is found in the timer node.
  
- &global_timer {
- 	interrupts = <GIC_PPI 11 0xf04>;
-+	status = "disabled";
++config ARM64_ERRATUM_858921
++	bool "Workaround for Cortex-A73 erratum 858921"
++	default y
++	select ARM_ARCH_TIMER_OOL_WORKAROUND
++	depends on ARM_ARCH_TIMER && ARM64
++	help
++	  This option enables a workaround applicable to Cortex-A73
++	  (all versions), whose counter may return incorrect values.
++	  The workaround will be dynamically enabled when an affected
++	  core is detected.
++
+ config ARM_GLOBAL_TIMER
+ 	bool "Support for the ARM global timer" if COMPILE_TEST
+ 	select CLKSRC_OF if OF
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index f8adea2..8459d19 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -266,6 +266,17 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_ARM64_ERRATUM_858921
++static u64 notrace arm64_858921_read_cntvct_el0(void)
++{
++	u64 old, new;
++
++	old = read_sysreg(cntvct_el0);
++	new = read_sysreg(cntvct_el0);
++	return (((old ^ new) >> 32) & 1) ? old : new;
++}
++#endif
++
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+ DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
+ 	       timer_unstable_counter_workaround);
+@@ -331,6 +342,14 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.set_next_event_virt = erratum_set_next_event_tval_virt,
+ 	},
+ #endif
++#ifdef CONFIG_ARM64_ERRATUM_858921
++	{
++		.match_type = ate_match_local_cap_id,
++		.id = (void *)ARM64_WORKAROUND_858921,
++		.desc = "ARM erratum 858921",
++		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
++	},
++#endif
  };
  
- &local_timer {
+ typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
 -- 
 2.7.4
