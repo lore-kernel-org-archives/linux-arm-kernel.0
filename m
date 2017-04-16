@@ -1,410 +1,111 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:27:14 +0200
-Subject: [PATCH 24/29] clocksource/drivers/rockchip_timer: Implement
- clocksource timer
+Date: Sun, 16 Apr 2017 22:27:07 +0200
+Subject: [PATCH 17/29] arm64: arch_timer: Allow erratum matching with ACPI OEM
+ information
 In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
  <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-24-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-17-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Kochetkov <al.kochet@gmail.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-The clock supplying the arm-global-timer on the rk3188 is coming from the
-the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-the cpu frequency making this timer unsuitable as a stable clocksource
-and sched clock.
+Just as we're able to identify a broken platform using some DT
+information, let's enable a way to spot the offenders with ACPI.
 
-The rk3188, rk3288 and following socs share a separate timer block already
-handled by the rockchip-timer driver. Therefore adapt this driver to also
-be able to act as clocksource and sched clock on rk3188.
+The difference is that we can only match on some OEM info instead
+of implementation-specific properties. So in order to avoid the
+insane multiplication of errata structures, we allow an array
+of OEM descriptions to be attached to an erratum structure.
 
-In order to test clocksource you can run following commands and check
-how much time it take in real. On rk3188 it take about ~45 seconds.
-
-    cpufreq-set -f 1.6GHZ
-    date; sleep 60; date
-
-In order to use the patch you need to declare two timers in the dts
-file. The first timer will be initialized as clockevent provider
-and the second one as clocksource. The clockevent must be from
-alive subsystem as it used as backup for the local timers at sleep
-time.
-
-The patch does not break compatibility with older device tree files.
-The older device tree files contain only one timer. The timer
-will be initialized as clockevent, as expected.
-
-rk3288 (and probably anything newer) is irrelevant to this patch,
-as it has the arch timer interface. This patch may be useful
-for Cortex-A9/A5 based parts.
-
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Tested-by: dann frazier <dann.frazier@canonical.com>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/Kconfig          |   1 +
- drivers/clocksource/rockchip_timer.c | 218 +++++++++++++++++++++++++----------
- 2 files changed, 158 insertions(+), 61 deletions(-)
+ arch/arm64/include/asm/arch_timer.h  |  1 +
+ drivers/clocksource/arm_arch_timer.c | 34 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 3356ab8..483f3b1 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -81,6 +81,7 @@ config ROCKCHIP_TIMER
- 	bool "Rockchip timer driver" if COMPILE_TEST
- 	depends on ARM || ARM64
- 	select CLKSRC_OF
-+	select CLKSRC_MMIO
- 	help
- 	  Enables the support for the rockchip timer driver.
- 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index 23e267a..49c02be 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -11,6 +11,8 @@
- #include <linux/clockchips.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -19,6 +21,8 @@
- 
- #define TIMER_LOAD_COUNT0	0x00
- #define TIMER_LOAD_COUNT1	0x04
-+#define TIMER_CURRENT_VALUE0	0x08
-+#define TIMER_CURRENT_VALUE1	0x0C
- #define TIMER_CONTROL_REG3288	0x10
- #define TIMER_CONTROL_REG3399	0x1c
- #define TIMER_INT_STATUS	0x18
-@@ -29,103 +33,118 @@
- #define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
- #define TIMER_INT_UNMASK			(1 << 2)
- 
--struct bc_timer {
--	struct clock_event_device ce;
-+struct rk_timer {
- 	void __iomem *base;
- 	void __iomem *ctrl;
-+	struct clk *clk;
-+	struct clk *pclk;
- 	u32 freq;
-+	int irq;
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 6bd1a9a..74d08e4 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -41,6 +41,7 @@ extern struct static_key_false arch_timer_read_ool_enabled;
+ enum arch_timer_erratum_match_type {
+ 	ate_match_dt,
+ 	ate_match_local_cap_id,
++	ate_match_acpi_oem_info,
  };
  
--static struct bc_timer bc_timer;
--
--static inline struct bc_timer *rk_timer(struct clock_event_device *ce)
--{
--	return container_of(ce, struct bc_timer, ce);
--}
-+struct rk_clkevt {
-+	struct clock_event_device ce;
-+	struct rk_timer timer;
+ struct clock_event_device;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 8459d19..887f6d0 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -190,6 +190,12 @@ static struct cyclecounter cyclecounter __ro_after_init = {
+ 	.mask	= CLOCKSOURCE_MASK(56),
+ };
+ 
++struct ate_acpi_oem_info {
++	char oem_id[ACPI_OEM_ID_SIZE + 1];
++	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
++	u32 oem_revision;
 +};
- 
--static inline void __iomem *rk_base(struct clock_event_device *ce)
--{
--	return rk_timer(ce)->base;
--}
-+static struct rk_clkevt *rk_clkevt;
-+static struct rk_timer *rk_clksrc;
- 
--static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-+static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
- {
--	return rk_timer(ce)->ctrl;
-+	return &container_of(ce, struct rk_clkevt, ce)->timer;
- }
- 
--static inline void rk_timer_disable(struct clock_event_device *ce)
-+static inline void rk_timer_disable(struct rk_timer *timer)
- {
--	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
-+	writel_relaxed(TIMER_DISABLE, timer->ctrl);
- }
- 
--static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
-+static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
- {
--	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       rk_ctrl(ce));
-+	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
- }
- 
- static void rk_timer_update_counter(unsigned long cycles,
--				    struct clock_event_device *ce)
-+				    struct rk_timer *timer)
- {
--	writel_relaxed(cycles, rk_base(ce) + TIMER_LOAD_COUNT0);
--	writel_relaxed(0, rk_base(ce) + TIMER_LOAD_COUNT1);
-+	writel_relaxed(cycles, timer->base + TIMER_LOAD_COUNT0);
-+	writel_relaxed(0, timer->base + TIMER_LOAD_COUNT1);
- }
- 
--static void rk_timer_interrupt_clear(struct clock_event_device *ce)
-+static void rk_timer_interrupt_clear(struct rk_timer *timer)
- {
--	writel_relaxed(1, rk_base(ce) + TIMER_INT_STATUS);
-+	writel_relaxed(1, timer->base + TIMER_INT_STATUS);
- }
- 
- static inline int rk_timer_set_next_event(unsigned long cycles,
- 					  struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
--	rk_timer_update_counter(cycles, ce);
--	rk_timer_enable(ce, TIMER_MODE_USER_DEFINED_COUNT);
-+	struct rk_timer *timer = rk_timer(ce);
 +
-+	rk_timer_disable(timer);
-+	rk_timer_update_counter(cycles, timer);
-+	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT |
-+			       TIMER_INT_UNMASK);
- 	return 0;
+ #ifdef CONFIG_FSL_ERRATUM_A008585
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -371,6 +377,28 @@ bool arch_timer_check_local_cap_erratum(const struct arch_timer_erratum_workarou
+ 	return this_cpu_has_cap((uintptr_t)wa->id);
  }
  
- static int rk_timer_shutdown(struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
-+	struct rk_timer *timer = rk_timer(ce);
 +
-+	rk_timer_disable(timer);
- 	return 0;
- }
- 
- static int rk_timer_set_periodic(struct clock_event_device *ce)
- {
--	rk_timer_disable(ce);
--	rk_timer_update_counter(rk_timer(ce)->freq / HZ - 1, ce);
--	rk_timer_enable(ce, TIMER_MODE_FREE_RUNNING);
-+	struct rk_timer *timer = rk_timer(ce);
-+
-+	rk_timer_disable(timer);
-+	rk_timer_update_counter(timer->freq / HZ - 1, timer);
-+	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING | TIMER_INT_UNMASK);
- 	return 0;
- }
- 
- static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- {
- 	struct clock_event_device *ce = dev_id;
-+	struct rk_timer *timer = rk_timer(ce);
- 
--	rk_timer_interrupt_clear(ce);
-+	rk_timer_interrupt_clear(timer);
- 
- 	if (clockevent_state_oneshot(ce))
--		rk_timer_disable(ce);
-+		rk_timer_disable(timer);
- 
- 	ce->event_handler(ce);
- 
- 	return IRQ_HANDLED;
- }
- 
--static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
-+static u64 notrace rk_timer_sched_read(void)
++static
++bool arch_timer_check_acpi_oem_erratum(const struct arch_timer_erratum_workaround *wa,
++				       const void *arg)
 +{
-+	return ~readl_relaxed(rk_clksrc->base + TIMER_CURRENT_VALUE0);
-+}
++	static const struct ate_acpi_oem_info empty_oem_info = {};
++	const struct ate_acpi_oem_info *info = wa->id;
++	const struct acpi_table_header *table = arg;
 +
-+static int __init
-+rk_timer_probe(struct rk_timer *timer, struct device_node *np)
- {
--	struct clock_event_device *ce = &bc_timer.ce;
- 	struct clk *timer_clk;
- 	struct clk *pclk;
- 	int ret = -EINVAL, irq;
-+	u32 ctrl_reg = TIMER_CONTROL_REG3288;
- 
--	bc_timer.base = of_iomap(np, 0);
--	if (!bc_timer.base) {
-+	timer->base = of_iomap(np, 0);
-+	if (!timer->base) {
- 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
- 		return -ENXIO;
- 	}
--	bc_timer.ctrl = bc_timer.base + ctrl_reg;
++	/* Iterate over the ACPI OEM info array, looking for a match */
++	while (memcmp(info, &empty_oem_info, sizeof(*info))) {
++		if (!memcmp(info->oem_id, table->oem_id, ACPI_OEM_ID_SIZE) &&
++		    !memcmp(info->oem_table_id, table->oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
++		    info->oem_revision == table->oem_revision)
++			return true;
 +
-+	if (of_device_is_compatible(np, "rockchip,rk3399-timer"))
-+		ctrl_reg = TIMER_CONTROL_REG3399;
-+
-+	timer->ctrl = timer->base + ctrl_reg;
- 
- 	pclk = of_clk_get_by_name(np, "pclk");
- 	if (IS_ERR(pclk)) {
-@@ -139,6 +158,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		pr_err("Failed to enable pclk for '%s'\n", TIMER_NAME);
- 		goto out_unmap;
- 	}
-+	timer->pclk = pclk;
- 
- 	timer_clk = of_clk_get_by_name(np, "timer");
- 	if (IS_ERR(timer_clk)) {
-@@ -152,8 +172,9 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		pr_err("Failed to enable timer clock\n");
- 		goto out_timer_clk;
- 	}
-+	timer->clk = timer_clk;
- 
--	bc_timer.freq = clk_get_rate(timer_clk);
-+	timer->freq = clk_get_rate(timer_clk);
- 
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
-@@ -161,51 +182,126 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
- 		pr_err("Failed to map interrupts for '%s'\n", TIMER_NAME);
- 		goto out_irq;
- 	}
-+	timer->irq = irq;
-+
-+	rk_timer_interrupt_clear(timer);
-+	rk_timer_disable(timer);
-+	return 0;
-+
-+out_irq:
-+	clk_disable_unprepare(timer_clk);
-+out_timer_clk:
-+	clk_disable_unprepare(pclk);
-+out_unmap:
-+	iounmap(timer->base);
-+
-+	return ret;
-+}
-+
-+static void __init rk_timer_cleanup(struct rk_timer *timer)
-+{
-+	clk_disable_unprepare(timer->clk);
-+	clk_disable_unprepare(timer->pclk);
-+	iounmap(timer->base);
-+}
-+
-+static int __init rk_clkevt_init(struct device_node *np)
-+{
-+	struct clock_event_device *ce;
-+	int ret = -EINVAL;
-+
-+	rk_clkevt = kzalloc(sizeof(struct rk_clkevt), GFP_KERNEL);
-+	if (!rk_clkevt) {
-+		ret = -ENOMEM;
-+		goto out;
-+	}
- 
-+	ret = rk_timer_probe(&rk_clkevt->timer, np);
-+	if (ret)
-+		goto out_probe;
-+
-+	ce = &rk_clkevt->ce;
- 	ce->name = TIMER_NAME;
- 	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 		       CLOCK_EVT_FEAT_DYNIRQ;
- 	ce->set_next_event = rk_timer_set_next_event;
- 	ce->set_state_shutdown = rk_timer_shutdown;
- 	ce->set_state_periodic = rk_timer_set_periodic;
--	ce->irq = irq;
-+	ce->irq = rk_clkevt->timer.irq;
- 	ce->cpumask = cpu_possible_mask;
- 	ce->rating = 250;
- 
--	rk_timer_interrupt_clear(ce);
--	rk_timer_disable(ce);
--
--	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
-+	ret = request_irq(rk_clkevt->timer.irq, rk_timer_interrupt, IRQF_TIMER,
-+			  TIMER_NAME, ce);
- 	if (ret) {
--		pr_err("Failed to initialize '%s': %d\n", TIMER_NAME, ret);
-+		pr_err("Failed to initialize '%s': %d\n",
-+			TIMER_NAME, ret);
- 		goto out_irq;
- 	}
- 
--	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
--
-+	clockevents_config_and_register(&rk_clkevt->ce,
-+					rk_clkevt->timer.freq, 1, UINT_MAX);
- 	return 0;
- 
- out_irq:
--	clk_disable_unprepare(timer_clk);
--out_timer_clk:
--	clk_disable_unprepare(pclk);
--out_unmap:
--	iounmap(bc_timer.base);
--
-+	rk_timer_cleanup(&rk_clkevt->timer);
-+out_probe:
-+	kfree(rk_clkevt);
-+out:
-+	/* Leave rk_clkevt not NULL to prevent future init */
-+	rk_clkevt = ERR_PTR(ret);
- 	return ret;
- }
- 
--static int __init rk3288_timer_init(struct device_node *np)
-+static int __init rk_clksrc_init(struct device_node *np)
- {
--	return rk_timer_init(np, TIMER_CONTROL_REG3288);
-+	int ret = -EINVAL;
-+
-+	rk_clksrc = kzalloc(sizeof(struct rk_timer), GFP_KERNEL);
-+	if (!rk_clksrc) {
-+		ret = -ENOMEM;
-+		goto out;
++		info++;
 +	}
 +
-+	ret = rk_timer_probe(rk_clksrc, np);
-+	if (ret)
-+		goto out_probe;
++	return false;
++}
 +
-+	rk_timer_update_counter(UINT_MAX, rk_clksrc);
-+	rk_timer_enable(rk_clksrc, 0);
-+
-+	ret = clocksource_mmio_init(rk_clksrc->base + TIMER_CURRENT_VALUE0,
-+		TIMER_NAME, rk_clksrc->freq, 250, 32,
-+		clocksource_mmio_readl_down);
-+	if (ret) {
-+		pr_err("Failed to register clocksource");
-+		goto out_clocksource;
-+	}
-+
-+	sched_clock_register(rk_timer_sched_read, 32, rk_clksrc->freq);
-+	return 0;
-+
-+out_clocksource:
-+	rk_timer_cleanup(rk_clksrc);
-+out_probe:
-+	kfree(rk_clksrc);
-+out:
-+	/* Leave rk_clksrc not NULL to prevent future init */
-+	rk_clksrc = ERR_PTR(ret);
-+	return ret;
- }
+ static const struct arch_timer_erratum_workaround *
+ arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
+ 			  ate_match_fn_t match_fn,
+@@ -431,6 +459,9 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 		match_fn = arch_timer_check_local_cap_erratum;
+ 		local = true;
+ 		break;
++	case ate_match_acpi_oem_info:
++		match_fn = arch_timer_check_acpi_oem_erratum;
++		break;
+ 	default:
+ 		WARN_ON(1);
+ 		return;
+@@ -1277,6 +1308,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 	/* Always-on capability */
+ 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
  
--static int __init rk3399_timer_init(struct device_node *np)
-+static int __init rk_timer_init(struct device_node *np)
- {
--	return rk_timer_init(np, TIMER_CONTROL_REG3399);
-+	if (!rk_clkevt)
-+		return rk_clkevt_init(np);
++	/* Check for globally applicable workarounds */
++	arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table);
 +
-+	if (!rk_clksrc)
-+		return rk_clksrc_init(np);
-+
-+	pr_err("Too many timer definitions for '%s'\n", TIMER_NAME);
-+	return -EINVAL;
+ 	arch_timer_init();
+ 	return 0;
  }
- 
--CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
--		       rk3288_timer_init);
--CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
--		       rk3399_timer_init);
-+CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer", rk_timer_init);
-+CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer", rk_timer_init);
 -- 
 2.7.4
