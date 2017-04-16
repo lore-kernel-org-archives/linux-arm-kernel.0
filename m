@@ -1,169 +1,166 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:26:58 +0200
-Subject: [PATCH 08/29] arm64: arch_timer: Move arch_timer_reg_read/write around
+Date: Sun, 16 Apr 2017 22:26:59 +0200
+Subject: [PATCH 09/29] arm64: arch_timer: Get rid of erratum_workaround_set_sne
 In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
  <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-9-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-As we're about to move things around, let's start with the low
-level read/write functions. This allows us to use these functions
-in the errata handling code without having to use forward declaration
-of static functions.
+Let's move the handling of workarounds affecting set_next_event
+to the affected function, instead of overriding the pointers
+as an afterthough. Yes, this is an extra indirection on the
+erratum handling path, but the HW is busted anyway.
+
+This will allow for some more flexibility later.
 
 Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 124 +++++++++++++++++------------------
- 1 file changed, 62 insertions(+), 62 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 90 ++++++++++++++++--------------------
+ 1 file changed, 41 insertions(+), 49 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 532e47fa..b5c83cc 100644
+index b5c83cc..2c02e25 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -96,6 +96,68 @@ early_param("clocksource.arm_arch_timer.evtstrm", early_evtstrm_cfg);
-  * Architected system timer support.
-  */
+@@ -241,6 +241,38 @@ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+ DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
+ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
  
-+static __always_inline
-+void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
-+			  struct clock_event_device *clk)
++static void erratum_set_next_event_tval_generic(const int access, unsigned long evt,
++						struct clock_event_device *clk)
 +{
-+	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			writel_relaxed(val, timer->base + CNTP_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			writel_relaxed(val, timer->base + CNTP_TVAL);
-+			break;
-+		}
-+	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			writel_relaxed(val, timer->base + CNTV_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			writel_relaxed(val, timer->base + CNTV_TVAL);
-+			break;
-+		}
-+	} else {
-+		arch_timer_reg_write_cp15(access, reg, val);
-+	}
++	unsigned long ctrl;
++	u64 cval = evt + arch_counter_get_cntvct();
++
++	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
++	ctrl |= ARCH_TIMER_CTRL_ENABLE;
++	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
++
++	if (access == ARCH_TIMER_PHYS_ACCESS)
++		write_sysreg(cval, cntp_cval_el0);
++	else
++		write_sysreg(cval, cntv_cval_el0);
++
++	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
 +}
 +
-+static __always_inline
-+u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
-+			struct clock_event_device *clk)
++static int erratum_set_next_event_tval_virt(unsigned long evt,
++					    struct clock_event_device *clk)
 +{
-+	u32 val;
-+
-+	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			val = readl_relaxed(timer->base + CNTP_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			val = readl_relaxed(timer->base + CNTP_TVAL);
-+			break;
-+		}
-+	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			val = readl_relaxed(timer->base + CNTV_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			val = readl_relaxed(timer->base + CNTV_TVAL);
-+			break;
-+		}
-+	} else {
-+		val = arch_timer_reg_read_cp15(access, reg);
-+	}
-+
-+	return val;
++	erratum_set_next_event_tval_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
++	return 0;
 +}
 +
++static int erratum_set_next_event_tval_phys(unsigned long evt,
++					    struct clock_event_device *clk)
++{
++	erratum_set_next_event_tval_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
++	return 0;
++}
++
+ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
  #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -287,68 +349,6 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 	{
+@@ -347,6 +379,9 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 
+ #else
  #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
++#define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
++#define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
++#define needs_unstable_timer_counter_workaround()	({false;})
  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
  
--static __always_inline
--void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
--			  struct clock_event_device *clk)
--{
--	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			writel_relaxed(val, timer->base + CNTP_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			writel_relaxed(val, timer->base + CNTP_TVAL);
--			break;
--		}
--	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			writel_relaxed(val, timer->base + CNTV_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			writel_relaxed(val, timer->base + CNTV_TVAL);
--			break;
--		}
--	} else {
--		arch_timer_reg_write_cp15(access, reg, val);
--	}
--}
--
--static __always_inline
--u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
--			struct clock_event_device *clk)
--{
--	u32 val;
--
--	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			val = readl_relaxed(timer->base + CNTP_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			val = readl_relaxed(timer->base + CNTP_TVAL);
--			break;
--		}
--	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			val = readl_relaxed(timer->base + CNTV_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			val = readl_relaxed(timer->base + CNTV_TVAL);
--			break;
--		}
--	} else {
--		val = arch_timer_reg_read_cp15(access, reg);
--	}
--
--	return val;
--}
--
  static __always_inline irqreturn_t timer_handler(const int access,
- 					struct clock_event_device *evt)
+@@ -436,43 +471,12 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
+ 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+ }
+ 
+-#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-static __always_inline void erratum_set_next_event_generic(const int access,
+-		unsigned long evt, struct clock_event_device *clk)
+-{
+-	unsigned long ctrl;
+-	u64 cval = evt + arch_counter_get_cntvct();
+-
+-	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
+-	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+-	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
+-
+-	if (access == ARCH_TIMER_PHYS_ACCESS)
+-		write_sysreg(cval, cntp_cval_el0);
+-	else if (access == ARCH_TIMER_VIRT_ACCESS)
+-		write_sysreg(cval, cntv_cval_el0);
+-
+-	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+-}
+-
+-static int erratum_set_next_event_virt(unsigned long evt,
+-					   struct clock_event_device *clk)
+-{
+-	erratum_set_next_event_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
+-	return 0;
+-}
+-
+-static int erratum_set_next_event_phys(unsigned long evt,
+-					   struct clock_event_device *clk)
+-{
+-	erratum_set_next_event_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
+-	return 0;
+-}
+-#endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+-
+ static int arch_timer_set_next_event_virt(unsigned long evt,
+ 					  struct clock_event_device *clk)
  {
++	if (needs_unstable_timer_counter_workaround())
++		return erratum_set_next_event_tval_virt(evt, clk);
++
+ 	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
+ 	return 0;
+ }
+@@ -480,6 +484,9 @@ static int arch_timer_set_next_event_virt(unsigned long evt,
+ static int arch_timer_set_next_event_phys(unsigned long evt,
+ 					  struct clock_event_device *clk)
+ {
++	if (needs_unstable_timer_counter_workaround())
++		return erratum_set_next_event_tval_phys(evt, clk);
++
+ 	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
+ 	return 0;
+ }
+@@ -498,19 +505,6 @@ static int arch_timer_set_next_event_phys_mem(unsigned long evt,
+ 	return 0;
+ }
+ 
+-static void erratum_workaround_set_sne(struct clock_event_device *clk)
+-{
+-#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
+-		return;
+-
+-	if (arch_timer_uses_ppi == VIRT_PPI)
+-		clk->set_next_event = erratum_set_next_event_virt;
+-	else
+-		clk->set_next_event = erratum_set_next_event_phys;
+-#endif
+-}
+-
+ static void __arch_timer_setup(unsigned type,
+ 			       struct clock_event_device *clk)
+ {
+@@ -541,8 +535,6 @@ static void __arch_timer_setup(unsigned type,
+ 		}
+ 
+ 		arch_timer_check_ool_workaround(ate_match_local_cap_id, NULL);
+-
+-		erratum_workaround_set_sne(clk);
+ 	} else {
+ 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
+ 		clk->name = "arch_mem_timer";
 -- 
 2.7.4
