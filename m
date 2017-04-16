@@ -1,120 +1,87 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:27:05 +0200
-Subject: [PATCH 15/29] arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround
- is enabled
-In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20170416202542.GV2078@mai>
- <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-15-git-send-email-daniel.lezcano@linaro.org>
+Date: Sun, 16 Apr 2017 22:57:13 +0200
+Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
+In-Reply-To: <20170412150245.GK7065@codeaurora.org>
+References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
+ <20170412150245.GK7065@codeaurora.org>
+Message-ID: <20170416205713.GW2078@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, Apr 12, 2017 at 08:02:45AM -0700, Stephen Boyd wrote:
+> On 04/08, Daniel Lezcano wrote:
+> >  
+> >  Example:
+> >  	pmic: pmic at f8000000 {
+> > @@ -24,4 +29,5 @@ Example:
+> >  		interrupt-controller;
+> >  		#interrupt-cells = <2>;
+> >  		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+> > +		clock-cells = <0>;
+> 
+> Should be #clock-cells instead.
 
-Userspace being allowed to use read CNTVCT_EL0 anytime (and not
-only in the VDSO), we need to enable trapping whenever a cntvct
-workaround is enabled on a given CPU.
+Ok.
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++-----------
- 1 file changed, 32 insertions(+), 13 deletions(-)
+> > +static int hi655x_clk_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *parent = pdev->dev.parent;
+> > +	struct hi655x_pmic *hi655x = dev_get_drvdata(parent);
+> > +	struct clk_init_data *hi655x_clk_init;
+> 
+> This can just go onto the stack? We don't need it around after
+> probe.
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5c114da..f8adea2 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -83,6 +83,7 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
- static bool arch_timer_c3stop;
- static bool arch_timer_mem_use_virtual;
- static bool arch_counter_suspend_stop;
-+static bool vdso_default = true;
+Agree.
  
- static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
- 
-@@ -383,6 +384,17 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
- 	}
- 
- 	static_branch_enable(&arch_timer_read_ool_enabled);
-+
-+	/*
-+	 * Don't use the vdso fastpath if errata require using the
-+	 * out-of-line counter accessor. We may change our mind pretty
-+	 * late in the game (with a per-CPU erratum, for example), so
-+	 * change both the default value and the vdso itself.
-+	 */
-+	if (wa->read_cntvct_el0) {
-+		clocksource_counter.archdata.vdso_direct = false;
-+		vdso_default = false;
-+	}
- }
- 
- static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
-@@ -443,11 +455,19 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 	__val;								\
- })
- 
-+static bool arch_timer_this_cpu_has_cntvct_wa(void)
-+{
-+	const struct arch_timer_erratum_workaround *wa;
-+
-+	wa = __this_cpu_read(timer_unstable_counter_workaround);
-+	return wa && wa->read_cntvct_el0;
-+}
- #else
- #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
- #define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
- #define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
- #define erratum_handler(fn, r, ...)			({false;})
-+#define arch_timer_this_cpu_has_cntvct_wa()		({false;})
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
- 
- static __always_inline irqreturn_t timer_handler(const int access,
-@@ -660,15 +680,23 @@ static void arch_counter_set_user_access(void)
- {
- 	u32 cntkctl = arch_timer_get_cntkctl();
- 
--	/* Disable user access to the timers and the physical counter */
-+	/* Disable user access to the timers and both counters */
- 	/* Also disable virtual event stream */
- 	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
- 			| ARCH_TIMER_USR_VT_ACCESS_EN
-+		        | ARCH_TIMER_USR_VCT_ACCESS_EN
- 			| ARCH_TIMER_VIRT_EVT_EN
- 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
- 
--	/* Enable user access to the virtual counter */
--	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
-+	/*
-+	 * Enable user access to the virtual counter if it doesn't
-+	 * need to be workaround. The vdso may have been already
-+	 * disabled though.
-+	 */
-+	if (arch_timer_this_cpu_has_cntvct_wa())
-+		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
-+	else
-+		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
- 
- 	arch_timer_set_cntkctl(cntkctl);
- }
-@@ -791,16 +819,7 @@ static void __init arch_counter_register(unsigned type)
- 		else
- 			arch_timer_read_counter = arch_counter_get_cntpct;
- 
--		clocksource_counter.archdata.vdso_direct = true;
--
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--		/*
--		 * Don't use the vdso fastpath if errata require using
--		 * the out-of-line counter accessor.
--		 */
--		if (static_branch_unlikely(&arch_timer_read_ool_enabled))
--			clocksource_counter.archdata.vdso_direct = false;
--#endif
-+		clocksource_counter.archdata.vdso_direct = vdso_default;
- 	} else {
- 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
- 	}
+> > +	struct hi655x_clk *hi655x_clk;
+> > +	const char *clk_name = "hi655x-clk";
+> > +	int ret;
+> > +
+> > +	hi655x_clk = devm_kzalloc(&pdev->dev, sizeof(*hi655x_clk), GFP_KERNEL);
+> > +	if (!hi655x_clk)
+> > +		return -ENOMEM;
+> > +
+> > +	hi655x_clk_init = devm_kzalloc(&pdev->dev, sizeof(*hi655x_clk_init),
+> > +				       GFP_KERNEL);
+> > +	if (!hi655x_clk_init)
+> > +		return -ENOMEM;
+> > +
+> > +	of_property_read_string_index(parent->of_node, "clock-output-names",
+> > +				      0, &clk_name);
+> > +
+> > +	hi655x_clk_init->name	= clk_name;
+> > +	hi655x_clk_init->ops	= &hi655x_clk_ops;
+> > +
+> > +	hi655x_clk->clk_hw.init	= hi655x_clk_init;
+> > +	hi655x_clk->hi655x	= hi655x;
+> > +
+> > +	platform_set_drvdata(pdev, hi655x_clk);
+> > +
+> > +	ret = devm_clk_hw_register(&pdev->dev, &hi655x_clk->clk_hw);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
+> > +				     &hi655x_clk->clk_hw);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = clk_hw_register_clkdev(&hi655x_clk->clk_hw, clk_name, NULL);
+> 
+> Missed this last time. Do you use this clkdev lookup? The name is
+> usually supposed to be based on what the device is expecting,
+> instead of clk_name, and we would want some device name for the
+> third argument here.
+
+I'm not sure to get your comment. Are you saying the clk_name should be the
+third argument?
+
+
 -- 
-2.7.4
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
