@@ -1,83 +1,437 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 16 Apr 2017 20:08:38 +0800
-Subject: [PATCH v4 00/11] Initial Allwinner Display Engine 2.0 Support
-Message-ID: <20170416120849.54542-1-icenowy@aosc.io>
+Date: Sun, 16 Apr 2017 20:08:40 +0800
+Subject: [PATCH v4 02/11] clk: sunxi-ng: add support for DE2 CCU
+In-Reply-To: <20170416120849.54542-1-icenowy@aosc.io>
+References: <20170416120849.54542-1-icenowy@aosc.io>
+Message-ID: <20170416120849.54542-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is the initial patchset for Allwinner DE2 support.
+The "Display Engine 2.0" in Allwinner newer SoCs contains a clock
+management unit for its subunits, like the DE CCU in A80.
 
-It contains the support of clocks in DE2 and the mixers in DE2.
+Add a sunxi-ng style driver for it.
 
-The SoC used to develop this patchset is V3s, as V3s is the simplest
-one of the SoCs that have DE2.
-(Allwinner V3s features only one mixer, although its clock control
-unit contains support for second mixer's clock; and its only video
-output is RGB LCD, which is already supported in our TCON driver)
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v4:
+- Fixed the inconsistence between mixer_div clocks' number and real clock.
+Changes in v2:
+- Rename sunxi-de2-ccu to sun8i-de2-ccu.
 
-The last patch is only a testing patch, it shouldn't be merged; and
-for the patch to be really usable, the RFC fix of the TCON driver [1]
-is needed.
-
-No HDMI, TV encoder or other internal bridges' support is included
-in this patchset, which makes it currently not usable on H3.
-
-Thanks to Jean-Francois Moine and Jernej Skrabec for their efforts
-to discover the internal of DE2!
-
-[1] https://lists.freedesktop.org/archives/dri-devel/2016-December/126264.html
-
-Icenowy Zheng (11):
-  dt-bindings: add binding for the Allwinner DE2 CCU
-  clk: sunxi-ng: add support for DE2 CCU
-  dt-bindings: add bindings for DE2 on V3s SoC
-  drm/sun4i: return only planes for layers created
-  drm/sun4i: abstract a engine type
-  drm/sun4i: add support for Allwinner DE2 mixers
-  drm/sun4i: Add compatible string for V3s display engine
-  drm/sun4i: tcon: add support for V3s TCON
-  ARM: dts: sun8i: add DE2 nodes for V3s SoC
-  ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
-  [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of Lichee Pi Zero
-
- .../devicetree/bindings/clock/sun8i-de2.txt        |  31 ++
- .../bindings/display/sunxi/sun4i-drm.txt           |  29 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |  36 ++
- arch/arm/boot/dts/sun8i-v3s.dtsi                   |  96 ++++++
- drivers/clk/sunxi-ng/Kconfig                       |   5 +
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 218 ++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-de2.h               |  28 ++
- drivers/gpu/drm/sun4i/Kconfig                      |  20 ++
- drivers/gpu/drm/sun4i/Makefile                     |  10 +-
- drivers/gpu/drm/sun4i/sun4i_backend.c              |  26 +-
- drivers/gpu/drm/sun4i/sun4i_backend.h              |   5 -
- drivers/gpu/drm/sun4i/sun4i_crtc.c                 |  35 +-
- drivers/gpu/drm/sun4i/sun4i_crtc.h                 |   8 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c                  |   4 +-
- drivers/gpu/drm/sun4i/sun4i_drv.h                  |   3 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c                |  18 +-
- drivers/gpu/drm/sun4i/sun4i_layer.h                |   7 +-
- drivers/gpu/drm/sun4i/sun4i_tcon.c                 |   7 +-
- drivers/gpu/drm/sun4i/sun4i_tv.c                   |  11 +-
- drivers/gpu/drm/sun4i/sun8i_layer.c                | 142 ++++++++
- drivers/gpu/drm/sun4i/sun8i_layer.h                |  36 ++
- drivers/gpu/drm/sun4i/sun8i_mixer.c                | 381 +++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h                | 131 +++++++
- drivers/gpu/drm/sun4i/sunxi_engine.h               |  35 ++
- include/dt-bindings/clock/sun8i-de2.h              |  54 +++
- include/dt-bindings/reset/sun8i-de2.h              |  50 +++
- 27 files changed, 1371 insertions(+), 56 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+ drivers/clk/sunxi-ng/Kconfig          |   5 +
+ drivers/clk/sunxi-ng/Makefile         |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c  | 218 ++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h  |  28 +++++
+ include/dt-bindings/clock/sun8i-de2.h |  54 +++++++++
+ include/dt-bindings/reset/sun8i-de2.h |  50 ++++++++
+ 6 files changed, 356 insertions(+)
  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.h
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
- create mode 100644 drivers/gpu/drm/sun4i/sunxi_engine.h
  create mode 100644 include/dt-bindings/clock/sun8i-de2.h
  create mode 100644 include/dt-bindings/reset/sun8i-de2.h
 
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index fbd3f8cd5c22..7c7f55dc7f65 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -140,6 +140,11 @@ config SUN8I_V3S_CCU
+ 	default MACH_SUN8I
+ 	depends on MACH_SUN8I || COMPILE_TEST
+ 
++config SUN8I_DE2_CCU
++	bool "Support for the Allwinner SoCs DE2 CCU"
++	select SUNXI_CCU_DIV
++	select SUNXI_CCU_GATE
++
+ config SUN9I_A80_CCU
+ 	bool "Support for the Allwinner A80 CCU"
+ 	select SUNXI_CCU_DIV
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 0ec02fe14c50..be616279450e 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
+ obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
+ obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
+ obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
++obj-$(CONFIG_SUN8I_DE2_CCU)	+= ccu-sun8i-de2.o
+ obj-$(CONFIG_SUN8I_R_CCU)	+= ccu-sun8i-r.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-de.o
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+new file mode 100644
+index 000000000000..30fe42635635
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -0,0 +1,218 @@
++/*
++ * Copyright (c) 2017 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
++
++#include "ccu_common.h"
++#include "ccu_div.h"
++#include "ccu_gate.h"
++#include "ccu_reset.h"
++
++#include "ccu-sun8i-de2.h"
++
++static SUNXI_CCU_GATE(bus_mixer0_clk,	"bus-mixer0",	"bus-de",
++		      0x04, BIT(0), 0);
++static SUNXI_CCU_GATE(bus_mixer1_clk,	"bus-mixer1",	"bus-de",
++		      0x04, BIT(1), 0);
++static SUNXI_CCU_GATE(bus_wb_clk,	"bus-wb",	"bus-de",
++		      0x04, BIT(2), 0);
++
++static SUNXI_CCU_GATE(mixer0_clk,	"mixer0",	"mixer0-div",
++		      0x00, BIT(0), CLK_SET_RATE_PARENT);
++static SUNXI_CCU_GATE(mixer1_clk,	"mixer1",	"mixer1-div",
++		      0x00, BIT(1), CLK_SET_RATE_PARENT);
++static SUNXI_CCU_GATE(wb_clk,		"wb",		"wb-div",
++		      0x00, BIT(2), CLK_SET_RATE_PARENT);
++
++static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
++		   CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
++		   CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
++		   CLK_SET_RATE_PARENT);
++
++static struct ccu_common *sunxi_de2_clks[] = {
++	&mixer0_clk.common,
++	&mixer1_clk.common,
++	&wb_clk.common,
++
++	&bus_mixer0_clk.common,
++	&bus_mixer1_clk.common,
++	&bus_wb_clk.common,
++
++	&mixer0_div_clk.common,
++	&mixer1_div_clk.common,
++	&wb_div_clk.common,
++};
++
++static struct clk_hw_onecell_data sunxi_de2_hw_clks = {
++	.hws	= {
++		[CLK_MIXER0]		= &mixer0_clk.common.hw,
++		[CLK_MIXER1]		= &mixer1_clk.common.hw,
++		[CLK_WB]		= &wb_clk.common.hw,
++
++		[CLK_BUS_MIXER0]	= &bus_mixer0_clk.common.hw,
++		[CLK_BUS_MIXER1]	= &bus_mixer1_clk.common.hw,
++		[CLK_BUS_WB]		= &bus_wb_clk.common.hw,
++
++		[CLK_MIXER0_DIV]	= &mixer0_div_clk.common.hw,
++		[CLK_MIXER1_DIV]	= &mixer1_div_clk.common.hw,
++		[CLK_WB_DIV]		= &wb_div_clk.common.hw,
++	},
++	.num	= CLK_NUMBER,
++};
++
++static struct ccu_reset_map sun8i_a83t_de2_resets[] = {
++	[RST_MIXER0]	= { 0x08, BIT(0) },
++	/*
++	 * For A83T, H3 and R40, mixer1 reset line is shared with wb, so
++	 * only RST_WB is exported here.
++	 */
++	[RST_WB]	= { 0x08, BIT(2) },
++};
++
++static struct ccu_reset_map sun50i_a64_de2_resets[] = {
++	[RST_MIXER0]	= { 0x08, BIT(0) },
++	[RST_MIXER1]	= { 0x08, BIT(1) },
++	[RST_WB]	= { 0x08, BIT(2) },
++};
++
++static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
++	.ccu_clks	= sunxi_de2_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sunxi_de2_clks),
++
++	.hw_clks	= &sunxi_de2_hw_clks,
++
++	.resets		= sun8i_a83t_de2_resets,
++	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
++};
++
++static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
++	.ccu_clks	= sunxi_de2_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sunxi_de2_clks),
++
++	.hw_clks	= &sunxi_de2_hw_clks,
++
++	.resets		= sun50i_a64_de2_resets,
++	.num_resets	= ARRAY_SIZE(sun50i_a64_de2_resets),
++};
++
++static int sunxi_de2_clk_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct clk *bus_clk, *mod_clk;
++	struct reset_control *rstc;
++	void __iomem *reg;
++	const struct sunxi_ccu_desc *ccu_desc;
++	int ret;
++
++	ccu_desc = of_device_get_match_data(&pdev->dev);
++	if (!ccu_desc)
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
++
++	bus_clk = devm_clk_get(&pdev->dev, "bus");
++	if (IS_ERR(bus_clk)) {
++		ret = PTR_ERR(bus_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "Couldn't get bus clk: %d\n", ret);
++		return ret;
++	}
++
++	mod_clk = devm_clk_get(&pdev->dev, "mod");
++	if (IS_ERR(mod_clk)) {
++		ret = PTR_ERR(mod_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "Couldn't get mod clk: %d\n", ret);
++		return ret;
++	}
++
++	rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
++	if (IS_ERR(rstc)) {
++		ret = PTR_ERR(bus_clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev,
++				"Couldn't get reset control: %d\n", ret);
++		return ret;
++	}
++
++	/* The clocks need to be enabled for us to access the registers */
++	ret = clk_prepare_enable(bus_clk);
++	if (ret) {
++		dev_err(&pdev->dev, "Couldn't enable bus clk: %d\n", ret);
++		return ret;
++	}
++
++	ret = clk_prepare_enable(mod_clk);
++	if (ret) {
++		dev_err(&pdev->dev, "Couldn't enable mod clk: %d\n", ret);
++		return ret;
++	}
++
++	/* The reset control needs to be asserted for the controls to work */
++	ret = reset_control_deassert(rstc);
++	if (ret) {
++		dev_err(&pdev->dev,
++			"Couldn't deassert reset control: %d\n", ret);
++		goto err_disable_clk;
++	}
++
++	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, ccu_desc);
++	if (ret)
++		goto err_assert_reset;
++
++	return 0;
++
++err_assert_reset:
++	reset_control_assert(rstc);
++err_disable_clk:
++	clk_disable_unprepare(bus_clk);
++	return ret;
++}
++
++static const struct of_device_id sunxi_de2_clk_ids[] = {
++	{
++		.compatible = "allwinner,sun8i-a83t-de2-clk",
++		.data = &sun8i_a83t_de2_clk_desc,
++	},
++	{
++		.compatible = "allwinner,sun50i-h5-de2-clk",
++		.data = &sun50i_a64_de2_clk_desc,
++	},
++	/*
++	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
++	 * DE2 really working.
++	 * So there's currently no A64 compatible here.
++	 * H5 shares the same reset line with A64, so here H5 is using the
++	 * clock description of A64.
++	 */
++	{ }
++};
++
++static struct platform_driver sunxi_de2_clk_driver = {
++	.probe	= sunxi_de2_clk_probe,
++	.driver	= {
++		.name	= "sunxi-de2-clks",
++		.of_match_table	= sunxi_de2_clk_ids,
++	},
++};
++builtin_platform_driver(sunxi_de2_clk_driver);
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+new file mode 100644
+index 000000000000..530c006e0ae9
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright 2016 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _CCU_SUN8I_DE2_H_
++#define _CCU_SUN8I_DE2_H_
++
++#include <dt-bindings/clock/sun8i-de2.h>
++#include <dt-bindings/reset/sun8i-de2.h>
++
++/* Intermediary clock dividers are not exported */
++#define CLK_MIXER0_DIV	3
++#define CLK_MIXER1_DIV	4
++#define CLK_WB_DIV	5
++
++#define CLK_NUMBER	(CLK_WB + 1)
++
++#endif /* _CCU_SUN8I_DE2_H_ */
+diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+new file mode 100644
+index 000000000000..982c6d18c75b
+--- /dev/null
++++ b/include/dt-bindings/clock/sun8i-de2.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#ifndef _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
++#define _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
++
++#define CLK_BUS_MIXER0		0
++#define CLK_BUS_MIXER1		1
++#define CLK_BUS_WB		2
++
++#define CLK_MIXER0		6
++#define CLK_MIXER1		7
++#define CLK_WB			8
++
++#endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+new file mode 100644
+index 000000000000..52af2dc55376
+--- /dev/null
++++ b/include/dt-bindings/reset/sun8i-de2.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#ifndef _DT_BINDINGS_RESET_SUN8I_DE2_H_
++#define _DT_BINDINGS_RESET_SUN8I_DE2_H_
++
++#define RST_MIXER0	0
++#define RST_MIXER1	1
++#define RST_WB		2
++
++#endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
 -- 
 2.12.2
