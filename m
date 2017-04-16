@@ -1,126 +1,59 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 17 Apr 2017 05:00:00 +0800
-Subject: [PATCH 4/5] ARM: sun8i: h3: add operating-points-v2 table for CPU
-In-Reply-To: <20170416205740.b5pk3kcxwaegij6g@lukather>
-References: <20170408185025.53841-1-icenowy@aosc.io>
- <20170408185025.53841-5-icenowy@aosc.io>
- <20170411091346.mcwyskezadabsobn@lukather>
- <b37490ed1282f45542168701dea332bb@aosc.io>
- <20170416205740.b5pk3kcxwaegij6g@lukather>
-Message-ID: <40F4D1F2-EA59-4BD1-9A00-4C0AA7FED9D3@aosc.io>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Apr 2017 08:12:23 +0900
+Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
+ comments etc.
+In-Reply-To: <1492085938.20068.6.camel@infradead.org>
+References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
+ <20170328065130.16019-2-takahiro.akashi@linaro.org>
+ <1491207492.6020.8.camel@infradead.org>
+ <20170404054144.GG16309@linaro.org>
+ <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
+ <20170404073504.GI16309@linaro.org>
+ <1491291844.6218.25.camel@infradead.org>
+ <20170404092604.GB14898@arm.com>
+ <1492085938.20068.6.camel@infradead.org>
+Message-ID: <20170416231223.GA31693@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[Cc linux-renesas-soc]
 
+On Thu, Apr 13, 2017 at 01:18:58PM +0100, David Woodhouse wrote:
+> Less important than in user-visible messages, but still good practice as
+> there's still no excuse for ARM64 code to look like it was written before
+> 1996.
+> 
+> Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
 
-? 2017?4?17? GMT+08:00 ??4:57:40, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
->On Tue, Apr 11, 2017 at 09:28:55PM +0800, icenowy at aosc.io wrote:
->> ? 2017-04-11 17:13?Maxime Ripard ???
->> > On Sun, Apr 09, 2017 at 02:50:24AM +0800, Icenowy Zheng wrote:
->> > > The CPU on Allwinner H3 can do dynamic frequency scaling.
->> > > 
->> > > Add a DVFS table based on the one tweaked by Armbian developers,
->which
->> > > are proven to work stably on BSP kernels.
->> > > 
->> > > Frequencies higher than 1008MHz are temporarily dropped in the
->> > > table, as
->> > > they may lead to over voltage on boards without proper regulator
->> > > settings or over temperature on boards with proper regulator
->settings.
->> > > They will be added back once regulator settings are ready and
->thermal
->> > > sensor driver is merged.
->> > > 
->> > > In order to satisfy all different regulators (SY8106A which is
->50mV
->> > > per
->> > > level, SY8113B which have two states: 1.1V and 1.3V, and some
->board
->> > > with
->> > > non-tweakable regulators), all the OPPs are defined with a range
->> > > which has
->> > > the target value as the minimum allowed value, and 1.3V (the
->highest
->> > > VDD-CPUX voltage suggested by the datasheet) as the maximum
->allowed
->> > > value.
->> > > It's proven to work well with a board with SY8113B.
->> > > 
->> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> > > ---
->> > >  arch/arm/boot/dts/sun8i-h3.dtsi | 38
->> > > +++++++++++++++++++++++++++++++++++++-
->> > >  1 file changed, 37 insertions(+), 1 deletion(-)
->> > > 
->> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
->> > > b/arch/arm/boot/dts/sun8i-h3.dtsi
->> > > index b36f9f423c39..a0cee17fe44b 100644
->> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> > > @@ -43,32 +43,68 @@
->> > >  #include "sunxi-h3-h5.dtsi"
->> > > 
->> > >  / {
->> > > +	cpu0_opp_table: opp_table0 {
->> > > +		compatible = "operating-points-v2";
->> > > +		opp-shared;
->> > > +
->> > > +		opp at 480000000 {
->> > > +			opp-hz = /bits/ 64 <480000000>;
->> > > +			opp-microvolt = <980000 980000 1300000>;
->> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
->> > > +		};
->> > > +
->> > > +		opp at 648000000 {
->> > > +			opp-hz = /bits/ 64 <816000000>;
->> > > +			opp-microvolt = <1020000 1020000 1300000>;
->> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
->> > > +		};
->> > > +
->> > > +		opp at 912000000 {
->> > > +			opp-hz = /bits/ 64 <960000000>;
->> > > +			opp-microvolt = <1080000 1080000 1300000>;
->> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
->> > > +		};
->> > > +
->> > > +		opp at 1008000000 {
->> > > +			opp-hz = /bits/ 64 <1008000000>;
->> > > +			opp-microvolt = <1140000 1140000 1300000>;
->> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
->> > > +		};
->> > > +	};
->> > > +
->> > 
->> > From your serie, I guess you never actually tested those OPPs on
->any
->> > board without SY8113B, right?
->> 
->> Yes. But I will test them on an Orange Pi PC (newly got) soon.
->
->The orange pi pc also uses the SY8113B.
+Hi David,
 
-I remember in H3 Orange Pi's only One, Lite and Zero uses SY8113B, and PC is SY8106A.
+I'd be happy to take the Renesas portions of this change if they were
+broken out into a separate patch. The reason I would prefer a separate
+patch is to avoid the possibility of conflicts, even trivial ones.
 
->
->> (After all PLL_CPUX-related things are well fixed)
->> 
->> P.S. how to implement such a thing:
->> 
->> - Before tweaking CPUX clock, first switch it to osc24M
->>   (implemented yet)
->> - Before tweaking PLL_CPUX clock (triggered by tweaking CPUX
->>   clock), first gate it
->> - After tweaking PLL_CPUX clock, ungate it and wait it to be stable
->> - After tweaking PLL_CPUX clock, change CPUX mux back to PLL_CPUX
->>   (implemented yet)
->> 
->> I think notifiers on PLL_CPUX can be used to implement the second
->> and third part?
->
->Do you still have any issues with the code we merged?
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi             |  2 +-
+>  .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      |  2 +-
+>  arch/arm64/boot/dts/broadcom/ns2-xmc.dts           | 24 +++++++++++-----------
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |  2 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  2 +-
+>  arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts      |  2 +-
+>  arch/arm64/boot/dts/marvell/berlin4ct-stb.dts      |  2 +-
+>  arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |  2 +-
+>  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  2 +-
+>  arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     |  2 +-
+>  arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  2 +-
+>  arch/arm64/include/asm/assembler.h                 |  2 +-
+>  arch/arm64/include/asm/boot.h                      |  4 ++--
+>  arch/arm64/include/asm/elf.h                       |  2 +-
+>  arch/arm64/include/asm/fixmap.h                    |  6 +++---
+>  arch/arm64/kernel/head.S                           |  8 ++++----
+>  arch/arm64/kernel/hyp-stub.S                       |  2 +-
+>  arch/arm64/kernel/kaslr.c                          | 14 ++++++-------
+>  arch/arm64/kernel/module-plts.c                    |  2 +-
+>  arch/arm64/kernel/vmlinux.lds.S                    | 18 ++++++++--------
+>  arch/arm64/mm/mmu.c                                |  2 +-
+>  arch/arm64/mm/proc.S                               |  2 +-
+>  22 files changed, 53 insertions(+), 53 deletions(-)
 
-Chen-Yu's? I tested it and it has no issue at all.
-
->
->Maxime
+...
