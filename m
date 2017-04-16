@@ -1,39 +1,105 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:27:01 +0200
-Subject: [PATCH 11/29] arm64: arch_timer: Make workaround methods optional
+Date: Sun, 16 Apr 2017 22:27:03 +0200
+Subject: [PATCH 13/29] arm64: arch_timer: Move clocksource_counter and co
+ around
 In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
  <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-11-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-13-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Not all errata need to workaround all access types. Allow them to
-be optional.
+In order to access clocksource_counter from the errata handling code,
+move it (together with the related structures and functions) towards
+the top of the file.
 
 Acked-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 62 ++++++++++++++++++------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index cc1e081..01917b4 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -60,8 +60,9 @@ extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workar
- #define arch_timer_reg_read_stable(reg) 		\
- ({							\
- 	u64 _val;					\
--	if (needs_unstable_timer_counter_workaround())		\
--		_val = timer_unstable_counter_workaround->read_##reg();\
-+	if (needs_unstable_timer_counter_workaround() &&		\
-+	    timer_unstable_counter_workaround->read_##reg)		\
-+		_val = timer_unstable_counter_workaround->read_##reg();	\
- 	else						\
- 		_val = read_sysreg(reg);		\
- 	_val;						\
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 4551587..395f5d9 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -158,6 +158,37 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
+ 	return val;
+ }
+ 
++/*
++ * Default to cp15 based access because arm64 uses this function for
++ * sched_clock() before DT is probed and the cp15 method is guaranteed
++ * to exist on arm64. arm doesn't use this before DT is probed so even
++ * if we don't have the cp15 accessors we won't have a problem.
++ */
++u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++
++static u64 arch_counter_read(struct clocksource *cs)
++{
++	return arch_timer_read_counter();
++}
++
++static u64 arch_counter_read_cc(const struct cyclecounter *cc)
++{
++	return arch_timer_read_counter();
++}
++
++static struct clocksource clocksource_counter = {
++	.name	= "arch_sys_counter",
++	.rating	= 400,
++	.read	= arch_counter_read,
++	.mask	= CLOCKSOURCE_MASK(56),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static struct cyclecounter cyclecounter __ro_after_init = {
++	.read	= arch_counter_read_cc,
++	.mask	= CLOCKSOURCE_MASK(56),
++};
++
+ #ifdef CONFIG_FSL_ERRATUM_A008585
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -742,37 +773,6 @@ static u64 arch_counter_get_cntvct_mem(void)
+ 	return ((u64) vct_hi << 32) | vct_lo;
+ }
+ 
+-/*
+- * Default to cp15 based access because arm64 uses this function for
+- * sched_clock() before DT is probed and the cp15 method is guaranteed
+- * to exist on arm64. arm doesn't use this before DT is probed so even
+- * if we don't have the cp15 accessors we won't have a problem.
+- */
+-u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+-
+-static u64 arch_counter_read(struct clocksource *cs)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+-static u64 arch_counter_read_cc(const struct cyclecounter *cc)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+-static struct clocksource clocksource_counter = {
+-	.name	= "arch_sys_counter",
+-	.rating	= 400,
+-	.read	= arch_counter_read,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-static struct cyclecounter cyclecounter __ro_after_init = {
+-	.read	= arch_counter_read_cc,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-};
+-
+ static struct arch_timer_kvm_info arch_timer_kvm_info;
+ 
+ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 -- 
 2.7.4
