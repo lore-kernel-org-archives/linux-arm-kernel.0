@@ -1,87 +1,120 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:57:13 +0200
-Subject: [PATCH V2] clk: hi6220: Add the hi655x's pmic clock
-In-Reply-To: <20170412150245.GK7065@codeaurora.org>
-References: <1491683412-12237-1-git-send-email-daniel.lezcano@linaro.org>
- <20170412150245.GK7065@codeaurora.org>
-Message-ID: <20170416205713.GW2078@mai>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 16 Apr 2017 22:57:40 +0200
+Subject: [PATCH 4/5] ARM: sun8i: h3: add operating-points-v2 table for CPU
+In-Reply-To: <b37490ed1282f45542168701dea332bb@aosc.io>
+References: <20170408185025.53841-1-icenowy@aosc.io>
+ <20170408185025.53841-5-icenowy@aosc.io>
+ <20170411091346.mcwyskezadabsobn@lukather>
+ <b37490ed1282f45542168701dea332bb@aosc.io>
+Message-ID: <20170416205740.b5pk3kcxwaegij6g@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 12, 2017 at 08:02:45AM -0700, Stephen Boyd wrote:
-> On 04/08, Daniel Lezcano wrote:
-> >  
-> >  Example:
-> >  	pmic: pmic at f8000000 {
-> > @@ -24,4 +29,5 @@ Example:
-> >  		interrupt-controller;
-> >  		#interrupt-cells = <2>;
-> >  		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> > +		clock-cells = <0>;
+On Tue, Apr 11, 2017 at 09:28:55PM +0800, icenowy at aosc.io wrote:
+> ? 2017-04-11 17:13?Maxime Ripard ???
+> > On Sun, Apr 09, 2017 at 02:50:24AM +0800, Icenowy Zheng wrote:
+> > > The CPU on Allwinner H3 can do dynamic frequency scaling.
+> > > 
+> > > Add a DVFS table based on the one tweaked by Armbian developers, which
+> > > are proven to work stably on BSP kernels.
+> > > 
+> > > Frequencies higher than 1008MHz are temporarily dropped in the
+> > > table, as
+> > > they may lead to over voltage on boards without proper regulator
+> > > settings or over temperature on boards with proper regulator settings.
+> > > They will be added back once regulator settings are ready and thermal
+> > > sensor driver is merged.
+> > > 
+> > > In order to satisfy all different regulators (SY8106A which is 50mV
+> > > per
+> > > level, SY8113B which have two states: 1.1V and 1.3V, and some board
+> > > with
+> > > non-tweakable regulators), all the OPPs are defined with a range
+> > > which has
+> > > the target value as the minimum allowed value, and 1.3V (the highest
+> > > VDD-CPUX voltage suggested by the datasheet) as the maximum allowed
+> > > value.
+> > > It's proven to work well with a board with SY8113B.
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > ---
+> > >  arch/arm/boot/dts/sun8i-h3.dtsi | 38
+> > > +++++++++++++++++++++++++++++++++++++-
+> > >  1 file changed, 37 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > index b36f9f423c39..a0cee17fe44b 100644
+> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > @@ -43,32 +43,68 @@
+> > >  #include "sunxi-h3-h5.dtsi"
+> > > 
+> > >  / {
+> > > +	cpu0_opp_table: opp_table0 {
+> > > +		compatible = "operating-points-v2";
+> > > +		opp-shared;
+> > > +
+> > > +		opp at 480000000 {
+> > > +			opp-hz = /bits/ 64 <480000000>;
+> > > +			opp-microvolt = <980000 980000 1300000>;
+> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> > > +		};
+> > > +
+> > > +		opp at 648000000 {
+> > > +			opp-hz = /bits/ 64 <816000000>;
+> > > +			opp-microvolt = <1020000 1020000 1300000>;
+> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> > > +		};
+> > > +
+> > > +		opp at 912000000 {
+> > > +			opp-hz = /bits/ 64 <960000000>;
+> > > +			opp-microvolt = <1080000 1080000 1300000>;
+> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> > > +		};
+> > > +
+> > > +		opp at 1008000000 {
+> > > +			opp-hz = /bits/ 64 <1008000000>;
+> > > +			opp-microvolt = <1140000 1140000 1300000>;
+> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> > > +		};
+> > > +	};
+> > > +
+> > 
+> > From your serie, I guess you never actually tested those OPPs on any
+> > board without SY8113B, right?
 > 
-> Should be #clock-cells instead.
+> Yes. But I will test them on an Orange Pi PC (newly got) soon.
 
-Ok.
+The orange pi pc also uses the SY8113B.
 
-> > +static int hi655x_clk_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *parent = pdev->dev.parent;
-> > +	struct hi655x_pmic *hi655x = dev_get_drvdata(parent);
-> > +	struct clk_init_data *hi655x_clk_init;
+> (After all PLL_CPUX-related things are well fixed)
 > 
-> This can just go onto the stack? We don't need it around after
-> probe.
-
-Agree.
- 
-> > +	struct hi655x_clk *hi655x_clk;
-> > +	const char *clk_name = "hi655x-clk";
-> > +	int ret;
-> > +
-> > +	hi655x_clk = devm_kzalloc(&pdev->dev, sizeof(*hi655x_clk), GFP_KERNEL);
-> > +	if (!hi655x_clk)
-> > +		return -ENOMEM;
-> > +
-> > +	hi655x_clk_init = devm_kzalloc(&pdev->dev, sizeof(*hi655x_clk_init),
-> > +				       GFP_KERNEL);
-> > +	if (!hi655x_clk_init)
-> > +		return -ENOMEM;
-> > +
-> > +	of_property_read_string_index(parent->of_node, "clock-output-names",
-> > +				      0, &clk_name);
-> > +
-> > +	hi655x_clk_init->name	= clk_name;
-> > +	hi655x_clk_init->ops	= &hi655x_clk_ops;
-> > +
-> > +	hi655x_clk->clk_hw.init	= hi655x_clk_init;
-> > +	hi655x_clk->hi655x	= hi655x;
-> > +
-> > +	platform_set_drvdata(pdev, hi655x_clk);
-> > +
-> > +	ret = devm_clk_hw_register(&pdev->dev, &hi655x_clk->clk_hw);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	ret = of_clk_add_hw_provider(parent->of_node, of_clk_hw_simple_get,
-> > +				     &hi655x_clk->clk_hw);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	ret = clk_hw_register_clkdev(&hi655x_clk->clk_hw, clk_name, NULL);
+> P.S. how to implement such a thing:
 > 
-> Missed this last time. Do you use this clkdev lookup? The name is
-> usually supposed to be based on what the device is expecting,
-> instead of clk_name, and we would want some device name for the
-> third argument here.
+> - Before tweaking CPUX clock, first switch it to osc24M
+>   (implemented yet)
+> - Before tweaking PLL_CPUX clock (triggered by tweaking CPUX
+>   clock), first gate it
+> - After tweaking PLL_CPUX clock, ungate it and wait it to be stable
+> - After tweaking PLL_CPUX clock, change CPUX mux back to PLL_CPUX
+>   (implemented yet)
+> 
+> I think notifiers on PLL_CPUX can be used to implement the second
+> and third part?
 
-I'm not sure to get your comment. Are you saying the clk_name should be the
-third argument?
+Do you still have any issues with the code we merged?
 
+Maxime
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170416/c0044ce5/attachment-0001.sig>
