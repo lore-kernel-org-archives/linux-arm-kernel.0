@@ -1,97 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 16 Apr 2017 09:04:46 +0100
-Subject: [PATCH] Remove ARM errata Workarounds 458693 and 460075
-In-Reply-To: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
-References: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
-Message-ID: <20170416080446.GI17774@n2100.armlinux.org.uk>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 16 Apr 2017 20:08:38 +0800
+Subject: [PATCH v4 00/11] Initial Allwinner Display Engine 2.0 Support
+Message-ID: <20170416120849.54542-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 15, 2017 at 07:06:06PM -0500, Nisal Menuka wrote:
-> According to ARM, these errata exist only in a version of Cortex-A8
-> (r2p0) which was never built. Therefore, I believe there are no platforms
-> where this workaround should be enabled.
-> link :http://infocenter.arm.com/help/index.jsp?topic=
-> /com.arm.doc.faqs/ka15634.html
+This patchset is the initial patchset for Allwinner DE2 support.
 
-These were submitted by ARM Ltd back in 2009 - if the silicon was never
-built, there would've been no reason to submit them.  Maybe Catalin can
-shed some light on this, being the commit author who introduced these?
+It contains the support of clocks in DE2 and the mixers in DE2.
 
-> Signed-off-by: Nisal Menuka <nisalmenuka23@gmail.com>
-> ---
->  arch/arm/Kconfig      | 27 ---------------------------
->  arch/arm/mm/proc-v7.S | 14 --------------
->  2 files changed, 41 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 0d4e71b..d527963 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1005,33 +1005,6 @@ config ARM_ERRATA_430973
->  	  Note that setting specific bits in the ACTLR register may not be
->  	  available in non-secure mode.
->  
-> -config ARM_ERRATA_458693
-> -	bool "ARM errata: Processor deadlock when a false hazard is created"
-> -	depends on CPU_V7
-> -	depends on !ARCH_MULTIPLATFORM
-> -	help
-> -	  This option enables the workaround for the 458693 Cortex-A8 (r2p0)
-> -	  erratum. For very specific sequences of memory operations, it is
-> -	  possible for a hazard condition intended for a cache line to instead
-> -	  be incorrectly associated with a different cache line. This false
-> -	  hazard might then cause a processor deadlock. The workaround enables
-> -	  the L1 caching of the NEON accesses and disables the PLD instruction
-> -	  in the ACTLR register. Note that setting specific bits in the ACTLR
-> -	  register may not be available in non-secure mode.
-> -
-> -config ARM_ERRATA_460075
-> -	bool "ARM errata: Data written to the L2 cache can be overwritten with stale data"
-> -	depends on CPU_V7
-> -	depends on !ARCH_MULTIPLATFORM
-> -	help
-> -	  This option enables the workaround for the 460075 Cortex-A8 (r2p0)
-> -	  erratum. Any asynchronous access to the L2 cache may encounter a
-> -	  situation in which recent store transactions to the L2 cache are lost
-> -	  and overwritten with stale memory contents from external memory. The
-> -	  workaround disables the write-allocate mode for the L2 cache via the
-> -	  ACTLR register. Note that setting specific bits in the ACTLR register
-> -	  may not be available in non-secure mode.
-> -
->  config ARM_ERRATA_742230
->  	bool "ARM errata: DMB operation may be faulty"
->  	depends on CPU_V7 && SMP
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index d00d52c..43a4a12 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -306,20 +306,6 @@ __ca8_errata:
->  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
->  	mcreq	p15, 0, r0, c1, c0, 1		@ write aux control register
->  #endif
-> -#ifdef CONFIG_ARM_ERRATA_458693
-> -	teq	r6, #0x20			@ only present in r2p0
-> -	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
-> -	orreq	r0, r0, #(1 << 5)		@ set L1NEON to 1
-> -	orreq	r0, r0, #(1 << 9)		@ set PLDNOP to 1
-> -	mcreq	p15, 0, r0, c1, c0, 1		@ write aux control register
-> -#endif
-> -#ifdef CONFIG_ARM_ERRATA_460075
-> -	teq	r6, #0x20			@ only present in r2p0
-> -	mrceq	p15, 1, r0, c9, c0, 2		@ read L2 cache aux ctrl register
-> -	tsteq	r0, #1 << 22
-> -	orreq	r0, r0, #(1 << 22)		@ set the Write Allocate disable bit
-> -	mcreq	p15, 1, r0, c9, c0, 2		@ write the L2 cache aux ctrl register
-> -#endif
->  	b	__errata_finish
->  
->  __ca9_errata:
-> -- 
-> 2.7.4
-> 
+The SoC used to develop this patchset is V3s, as V3s is the simplest
+one of the SoCs that have DE2.
+(Allwinner V3s features only one mixer, although its clock control
+unit contains support for second mixer's clock; and its only video
+output is RGB LCD, which is already supported in our TCON driver)
+
+The last patch is only a testing patch, it shouldn't be merged; and
+for the patch to be really usable, the RFC fix of the TCON driver [1]
+is needed.
+
+No HDMI, TV encoder or other internal bridges' support is included
+in this patchset, which makes it currently not usable on H3.
+
+Thanks to Jean-Francois Moine and Jernej Skrabec for their efforts
+to discover the internal of DE2!
+
+[1] https://lists.freedesktop.org/archives/dri-devel/2016-December/126264.html
+
+Icenowy Zheng (11):
+  dt-bindings: add binding for the Allwinner DE2 CCU
+  clk: sunxi-ng: add support for DE2 CCU
+  dt-bindings: add bindings for DE2 on V3s SoC
+  drm/sun4i: return only planes for layers created
+  drm/sun4i: abstract a engine type
+  drm/sun4i: add support for Allwinner DE2 mixers
+  drm/sun4i: Add compatible string for V3s display engine
+  drm/sun4i: tcon: add support for V3s TCON
+  ARM: dts: sun8i: add DE2 nodes for V3s SoC
+  ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
+  [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of Lichee Pi Zero
+
+ .../devicetree/bindings/clock/sun8i-de2.txt        |  31 ++
+ .../bindings/display/sunxi/sun4i-drm.txt           |  29 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |  36 ++
+ arch/arm/boot/dts/sun8i-v3s.dtsi                   |  96 ++++++
+ drivers/clk/sunxi-ng/Kconfig                       |   5 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 218 ++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h               |  28 ++
+ drivers/gpu/drm/sun4i/Kconfig                      |  20 ++
+ drivers/gpu/drm/sun4i/Makefile                     |  10 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c              |  26 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.h              |   5 -
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 |  35 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.h                 |   8 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   4 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c                |  18 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |   7 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |   7 +-
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   |  11 +-
+ drivers/gpu/drm/sun4i/sun8i_layer.c                | 142 ++++++++
+ drivers/gpu/drm/sun4i/sun8i_layer.h                |  36 ++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                | 381 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                | 131 +++++++
+ drivers/gpu/drm/sun4i/sunxi_engine.h               |  35 ++
+ include/dt-bindings/clock/sun8i-de2.h              |  54 +++
+ include/dt-bindings/reset/sun8i-de2.h              |  50 +++
+ 27 files changed, 1371 insertions(+), 56 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_layer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
+ create mode 100644 drivers/gpu/drm/sun4i/sunxi_engine.h
+ create mode 100644 include/dt-bindings/clock/sun8i-de2.h
+ create mode 100644 include/dt-bindings/reset/sun8i-de2.h
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.12.2
