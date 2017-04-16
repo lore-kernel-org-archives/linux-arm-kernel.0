@@ -1,50 +1,138 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 17 Apr 2017 18:40:08 +0200
-Subject: [PATCH V2] PM / OPP: Use - instead of @ for DT entries
-In-Reply-To: <22966574.2zMrIUgKz4@aspire.rjw.lan>
-References: <70e7c7ee13722ab9c73cb073f88502eaf1ada5f5.1491816050.git.viresh.kumar@linaro.org>
- <CAK7LNAQ7Uf1Jkj64-Ykdk5TSeWvkq7=BaqUMJo6KqrN7BhYvsQ@mail.gmail.com>
- <22966574.2zMrIUgKz4@aspire.rjw.lan>
-Message-ID: <6048149.VQXQ7HobDf@aspire.rjw.lan>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 16 Apr 2017 20:08:47 +0800
+Subject: [PATCH v4 09/11] ARM: dts: sun8i: add DE2 nodes for V3s SoC
+In-Reply-To: <20170416120849.54542-1-icenowy@aosc.io>
+References: <20170416120849.54542-1-icenowy@aosc.io>
+Message-ID: <20170416120849.54542-10-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 17, 2017 06:35:25 PM Rafael J. Wysocki wrote:
-> On Monday, April 17, 2017 11:07:51 AM Masahiro Yamada wrote:
-> > 2017-04-15 7:47 GMT+09:00 Rafael J. Wysocki <rjw@rjwysocki.net>:
-> > > On Monday, April 10, 2017 02:51:35 PM Viresh Kumar wrote:
-> > >> Compiling the DT file with W=1, DTC warns like follows:
-> > >>
-> > >> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-> > >> unit name, but no reg property
-> > >>
-> > >> Fix this by replacing '@' with '-' as the OPP nodes will never have a
-> > >> "reg" property.
-> > >>
-> > >> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > >> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > >> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
-> > >> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > >> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > >
-> > > OK, so any ACKs from the DT side?  Rob?
-> > >
-> > > Thanks,
-> > > Rafael
-> > 
-> > 
-> > 
-> > I see Rob's Acked-by.
-> > 
-> > https://lkml.org/lkml/2017/4/13/648
-> 
-> Indeed.  Thanks!
+Allwinner V3s SoC features a "Display Engine 2.0" with only one TCON
+which have RGB LCD output.
 
-But it doesn't apply on top of -rc7 for me, so I guess there is new 4.12-candidate
-material in the DTS tree that conflicts with this, in which case it is better to route
-it through the DTS tree IMO.
+Add device nodes for it as well as the TCON.
 
-Thanks,
-Rafael
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v4:
+- Dropped leading 0's in unit name.
+Changes in v3:
+- Change the size of de2_clocks regs according to the binding example.
+
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 87 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+index 71075969e5e6..ae23746731a8 100644
+--- a/arch/arm/boot/dts/sun8i-v3s.dtsi
++++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+@@ -41,6 +41,10 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/sun8i-v3s-ccu.h>
++#include <dt-bindings/clock/sun8i-de2.h>
++#include <dt-bindings/reset/sun8i-v3s-ccu.h>
++#include <dt-bindings/reset/sun8i-de2.h>
+ 
+ / {
+ 	#address-cells = <1>;
+@@ -59,6 +63,12 @@
+ 		};
+ 	};
+ 
++	de: display-engine {
++		compatible = "allwinner,sun8i-v3s-display-engine";
++		allwinner,pipelines = <&de2_mixer0>;
++		status = "disabled";
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -93,6 +103,83 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		de2_clocks: clock at 1000000 {
++			compatible = "allwinner,sun50i-h5-de2-clk";
++			reg = <0x01000000 0x100000>;
++			clocks = <&ccu CLK_DE>,
++				 <&ccu CLK_BUS_DE>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		de2_mixer0: mixer at 1100000 {
++			compatible = "allwinner,sun8i-v3s-de2-mixer";
++			reg = <0x01100000 0x100000>;
++			clocks = <&de2_clocks CLK_MIXER0>,
++				 <&de2_clocks CLK_BUS_MIXER0>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&de2_clocks RST_MIXER0>;
++			assigned-clocks = <&de2_clocks CLK_MIXER0>;
++			assigned-clock-rates = <150000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					mixer0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_mixer0>;
++					};
++				};
++			};
++		};
++
++		tcon0: lcd-controller at 1c0c000 {
++			compatible = "allwinner,sun8i-v3s-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>,
++				 <&ccu CLK_TCON0>;
++			clock-names = "ahb",
++				      "tcon-ch0";
++			clock-output-names = "tcon-pixel-clock";
++			resets = <&ccu RST_BUS_TCON0>;
++			reset-names = "lcd";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
++
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+-- 
+2.12.2
