@@ -1,41 +1,35 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 16 Apr 2017 20:08:48 +0800
-Subject: [PATCH v4 10/11] ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
+Date: Sun, 16 Apr 2017 20:08:45 +0800
+Subject: [PATCH v4 07/11] drm/sun4i: Add compatible string for V3s display
+ engine
 In-Reply-To: <20170416120849.54542-1-icenowy@aosc.io>
 References: <20170416120849.54542-1-icenowy@aosc.io>
-Message-ID: <20170416120849.54542-11-icenowy@aosc.io>
+Message-ID: <20170416120849.54542-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s SoC features a set of pins that have functionality of RGB
-LCD, the pins are at different pin ban than other SoCs.
+Allwinner V3s features the new "Display Engine 2.0", which can now also
+be driven with our subdrivers in sun4i-drm.
 
-Add pinctrl node for them.
+Add the compatible string for in sun4i_drv.c, in order to make the
+display engine and its components probed.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index ae23746731a8..ac783a8a4fd3 100644
---- a/arch/arm/boot/dts/sun8i-v3s.dtsi
-+++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -297,6 +297,15 @@
- 				function = "i2c0";
- 			};
- 
-+			lcd_rgb666_pins: lcd_rgb666 at 0 {
-+				pins = "PE0", "PE1", "PE2", "PE3", "PE4",
-+				       "PE5", "PE6", "PE7", "PE8", "PE9",
-+				       "PE10", "PE11", "PE12", "PE13", "PE14",
-+				       "PE15", "PE16", "PE17", "PE18", "PE19",
-+				       "PE23", "PE24";
-+				function = "lcd";
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 8ddd72cd5873..68c0b754cdb5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -294,6 +294,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
+ 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
++	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
 -- 
 2.12.2
