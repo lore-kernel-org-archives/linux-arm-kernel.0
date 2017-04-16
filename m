@@ -1,111 +1,120 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:27:07 +0200
-Subject: [PATCH 17/29] arm64: arch_timer: Allow erratum matching with ACPI OEM
- information
+Date: Sun, 16 Apr 2017 22:27:05 +0200
+Subject: [PATCH 15/29] arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround
+ is enabled
 In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
  <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1492374441-23336-17-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-15-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Just as we're able to identify a broken platform using some DT
-information, let's enable a way to spot the offenders with ACPI.
-
-The difference is that we can only match on some OEM info instead
-of implementation-specific properties. So in order to avoid the
-insane multiplication of errata structures, we allow an array
-of OEM descriptions to be attached to an erratum structure.
+Userspace being allowed to use read CNTVCT_EL0 anytime (and not
+only in the VDSO), we need to enable trapping whenever a cntvct
+workaround is enabled on a given CPU.
 
 Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Tested-by: dann frazier <dann.frazier@canonical.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h  |  1 +
- drivers/clocksource/arm_arch_timer.c | 34 ++++++++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 45 +++++++++++++++++++++++++-----------
+ 1 file changed, 32 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 6bd1a9a..74d08e4 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -41,6 +41,7 @@ extern struct static_key_false arch_timer_read_ool_enabled;
- enum arch_timer_erratum_match_type {
- 	ate_match_dt,
- 	ate_match_local_cap_id,
-+	ate_match_acpi_oem_info,
- };
- 
- struct clock_event_device;
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 8459d19..887f6d0 100644
+index 5c114da..f8adea2 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -190,6 +190,12 @@ static struct cyclecounter cyclecounter __ro_after_init = {
- 	.mask	= CLOCKSOURCE_MASK(56),
- };
+@@ -83,6 +83,7 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
+ static bool arch_counter_suspend_stop;
++static bool vdso_default = true;
  
-+struct ate_acpi_oem_info {
-+	char oem_id[ACPI_OEM_ID_SIZE + 1];
-+	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-+	u32 oem_revision;
-+};
-+
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -371,6 +377,28 @@ bool arch_timer_check_local_cap_erratum(const struct arch_timer_erratum_workarou
- 	return this_cpu_has_cap((uintptr_t)wa->id);
- }
+ static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
  
+@@ -383,6 +384,17 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
+ 	}
+ 
+ 	static_branch_enable(&arch_timer_read_ool_enabled);
 +
-+static
-+bool arch_timer_check_acpi_oem_erratum(const struct arch_timer_erratum_workaround *wa,
-+				       const void *arg)
-+{
-+	static const struct ate_acpi_oem_info empty_oem_info = {};
-+	const struct ate_acpi_oem_info *info = wa->id;
-+	const struct acpi_table_header *table = arg;
-+
-+	/* Iterate over the ACPI OEM info array, looking for a match */
-+	while (memcmp(info, &empty_oem_info, sizeof(*info))) {
-+		if (!memcmp(info->oem_id, table->oem_id, ACPI_OEM_ID_SIZE) &&
-+		    !memcmp(info->oem_table_id, table->oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
-+		    info->oem_revision == table->oem_revision)
-+			return true;
-+
-+		info++;
++	/*
++	 * Don't use the vdso fastpath if errata require using the
++	 * out-of-line counter accessor. We may change our mind pretty
++	 * late in the game (with a per-CPU erratum, for example), so
++	 * change both the default value and the vdso itself.
++	 */
++	if (wa->read_cntvct_el0) {
++		clocksource_counter.archdata.vdso_direct = false;
++		vdso_default = false;
 +	}
-+
-+	return false;
-+}
-+
- static const struct arch_timer_erratum_workaround *
- arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
- 			  ate_match_fn_t match_fn,
-@@ -431,6 +459,9 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 		match_fn = arch_timer_check_local_cap_erratum;
- 		local = true;
- 		break;
-+	case ate_match_acpi_oem_info:
-+		match_fn = arch_timer_check_acpi_oem_erratum;
-+		break;
- 	default:
- 		WARN_ON(1);
- 		return;
-@@ -1277,6 +1308,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Always-on capability */
- 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
- 
-+	/* Check for globally applicable workarounds */
-+	arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table);
-+
- 	arch_timer_init();
- 	return 0;
  }
+ 
+ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
+@@ -443,11 +455,19 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 	__val;								\
+ })
+ 
++static bool arch_timer_this_cpu_has_cntvct_wa(void)
++{
++	const struct arch_timer_erratum_workaround *wa;
++
++	wa = __this_cpu_read(timer_unstable_counter_workaround);
++	return wa && wa->read_cntvct_el0;
++}
+ #else
+ #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+ #define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
+ #define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
+ #define erratum_handler(fn, r, ...)			({false;})
++#define arch_timer_this_cpu_has_cntvct_wa()		({false;})
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
+ static __always_inline irqreturn_t timer_handler(const int access,
+@@ -660,15 +680,23 @@ static void arch_counter_set_user_access(void)
+ {
+ 	u32 cntkctl = arch_timer_get_cntkctl();
+ 
+-	/* Disable user access to the timers and the physical counter */
++	/* Disable user access to the timers and both counters */
+ 	/* Also disable virtual event stream */
+ 	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
+ 			| ARCH_TIMER_USR_VT_ACCESS_EN
++		        | ARCH_TIMER_USR_VCT_ACCESS_EN
+ 			| ARCH_TIMER_VIRT_EVT_EN
+ 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+ 
+-	/* Enable user access to the virtual counter */
+-	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
++	/*
++	 * Enable user access to the virtual counter if it doesn't
++	 * need to be workaround. The vdso may have been already
++	 * disabled though.
++	 */
++	if (arch_timer_this_cpu_has_cntvct_wa())
++		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
++	else
++		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+ 
+ 	arch_timer_set_cntkctl(cntkctl);
+ }
+@@ -791,16 +819,7 @@ static void __init arch_counter_register(unsigned type)
+ 		else
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
+ 
+-		clocksource_counter.archdata.vdso_direct = true;
+-
+-#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-		/*
+-		 * Don't use the vdso fastpath if errata require using
+-		 * the out-of-line counter accessor.
+-		 */
+-		if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+-			clocksource_counter.archdata.vdso_direct = false;
+-#endif
++		clocksource_counter.archdata.vdso_direct = vdso_default;
+ 	} else {
+ 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+ 	}
 -- 
 2.7.4
