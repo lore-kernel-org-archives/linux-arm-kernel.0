@@ -1,64 +1,90 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 16 Apr 2017 20:08:39 +0800
-Subject: [PATCH v4 01/11] dt-bindings: add binding for the Allwinner DE2 CCU
+Date: Sun, 16 Apr 2017 20:08:41 +0800
+Subject: [PATCH v4 03/11] dt-bindings: add bindings for DE2 on V3s SoC
 In-Reply-To: <20170416120849.54542-1-icenowy@aosc.io>
 References: <20170416120849.54542-1-icenowy@aosc.io>
-Message-ID: <20170416120849.54542-2-icenowy@aosc.io>
+Message-ID: <20170416120849.54542-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner "Display Engine 2.0" contains some clock controls in it.
+Allwinner V3s SoC have a display engine which have a different pipeline
+with older SoCs.
 
-In order to add them as clock drivers, we need a device tree binding.
-Add the binding here.
+Add document for it (new compatibles and the new "mixer" part).
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes in v4:
-- Dropped the leading 0 in clock at 1000000 .
+- Removed the refactor at TCON chapter.
+
 Changes in v3:
-- Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
+- Remove the description of having a BE directly as allwinner,pipeline.
 
- .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+ .../bindings/display/sunxi/sun4i-drm.txt           | 29 ++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-new file mode 100644
-index 000000000000..15a60bd7dcf3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-@@ -0,0 +1,31 @@
-+Allwinner Display Engine 2.0 Clock Control Binding
-+--------------------------------------------------
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 57a8d0610062..7da80e26d61b 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -31,6 +31,7 @@ Required properties:
+    * allwinner,sun6i-a31-tcon
+    * allwinner,sun6i-a31s-tcon
+    * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+  - clocks: phandles to the clocks feeding the TCON. Three are needed:
+@@ -52,7 +53,7 @@ Required properties:
+   second the block connected to the TCON channel 1 (usually the TV
+   encoder)
+ 
+-On SoCs other than the A33, there is one more clock required:
++On SoCs other than the A33 and V3s, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
+ 
+ DRC
+@@ -138,6 +139,26 @@ Required properties:
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoints, the second one the outputs
+ 
++Display Engine 2.0 Mixer
++------------------------
 +
-+Required properties :
-+- compatible: must contain one of the following compatibles:
-+		- "allwinner,sun8i-a83t-de2-clk"
-+		- "allwinner,sun50i-a64-de2-clk"
-+		- "allwinner,sun50i-h5-de2-clk"
++The DE2 mixer have many functionalities, currently only layer blending is
++supported.
 +
-+- reg: Must contain the registers base address and length
-+- clocks: phandle to the clocks feeding the display engine subsystem.
-+	  Three are needed:
-+  - "mod": the display engine module clock
-+  - "bus": the bus clock for the whole display engine subsystem
-+- clock-names: Must contain the clock names described just above
-+- resets: phandle to the reset control for the display engine subsystem.
-+- #clock-cells : must contain 1
-+- #reset-cells : must contain 1
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun8i-v3s-de2-mixer
++  - reg: base address and size of the memory-mapped region.
++  - clocks: phandles to the clocks feeding the frontend and backend
++    * bus: the backend interface clock
++    * ram: the backend DRAM clock
++  - clock-names: the clock names mentioned above
++  - resets: phandles to the reset controllers driving the backend
 +
-+Example:
-+de2_clocks: clock at 1000000 {
-+	compatible = "allwinner,sun50i-a64-de2-clk";
-+	reg = <0x01000000 0x100000>;
-+	clocks = <&ccu CLK_DE>,
-+		 <&ccu CLK_BUS_DE>;
-+	clock-names = "mod",
-+		      "bus";
-+	resets = <&ccu RST_BUS_DE>;
-+	#clock-cells = <1>;
-+	#reset-cells = <1>;
-+};
++- ports: A ports node with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt. The
++  first port should be the input endpoints, the second one the output
++
+ 
+ Display Engine Pipeline
+ -----------------------
+@@ -152,9 +173,13 @@ Required properties:
+     * allwinner,sun6i-a31-display-engine
+     * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun8i-a33-display-engine
++    * allwinner,sun8i-v3s-display-engine
+ 
+   - allwinner,pipelines: list of phandle to the display engine
+-    frontends available.
++    pipeline entry point. For SoCs with original DE (currently
++    all SoCs supported by display engine except V3s), this
++    phandle should be a display frontend; for SoCs with DE2,
++    this phandle should be a mixer.
+ 
+ Example:
+ 
 -- 
 2.12.2
