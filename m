@@ -1,64 +1,71 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 16 Apr 2017 22:26:51 +0200
-Subject: [PATCH 01/29] arm64: Allow checking of a CPU-local erratum
-In-Reply-To: <20170416202542.GV2078@mai>
+Date: Sun, 16 Apr 2017 22:26:52 +0200
+Subject: [PATCH 02/29] arm64: Add CNTVCT_EL0 trap handler
+In-Reply-To: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170416202542.GV2078@mai>
-Message-ID: <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492374441-23336-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-this_cpu_has_cap() only checks the feature array, and not the errata
-one. In order to be able to check for a CPU-local erratum, allow it
-to inspect the latter as well.
-
-This is consistent with cpus_have_cap()'s behaviour, which includes
-errata already.
+Since people seem to make a point in breaking the userspace visible
+counter, we have no choice but to trap the access. Add the required
+handler.
 
 Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/esr.h |  2 ++
+ arch/arm64/kernel/traps.c    | 14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index abda8e8..6eb77ae 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1090,20 +1090,29 @@ static void __init setup_feature_capabilities(void)
-  * Check if the current CPU has a given feature capability.
-  * Should be called from non-preemptible context.
-  */
--bool this_cpu_has_cap(unsigned int cap)
-+static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-+			       unsigned int cap)
- {
- 	const struct arm64_cpu_capabilities *caps;
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index d14c478..ad42e79 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -175,6 +175,8 @@
+ #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
+ 					 ESR_ELx_SYS64_ISS_DIR_READ)
  
- 	if (WARN_ON(preemptible()))
- 		return false;
++#define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
++					 ESR_ELx_SYS64_ISS_DIR_READ)
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
  
--	for (caps = arm64_features; caps->desc; caps++)
-+	for (caps = cap_array; caps->desc; caps++)
- 		if (caps->capability == cap && caps->matches)
- 			return caps->matches(caps, SCOPE_LOCAL_CPU);
- 
- 	return false;
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e52be6a..1de444e 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -505,6 +505,14 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ 	regs->pc += 4;
  }
  
-+extern const struct arm64_cpu_capabilities arm64_errata[];
-+
-+bool this_cpu_has_cap(unsigned int cap)
++static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
 +{
-+	return (__this_cpu_has_cap(arm64_features, cap) ||
-+		__this_cpu_has_cap(arm64_errata, cap));
++	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++
++	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
++	regs->pc += 4;
 +}
 +
- void __init setup_cpu_features(void)
- {
- 	u32 cwg;
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -523,6 +531,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
+ 		.handler = ctr_read_handler,
+ 	},
++	{
++		/* Trap read access to CNTVCT_EL0 */
++		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
++		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
++		.handler = cntvct_read_handler,
++	},
+ 	{},
+ };
+ 
 -- 
 2.7.4
