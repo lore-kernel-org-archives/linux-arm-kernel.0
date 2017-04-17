@@ -1,40 +1,196 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Apr 2017 14:46:38 +0200
-Subject: [PATCH v2 0/7] ARM: SPEAr600 updates
-Message-ID: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 17 Apr 2017 14:46:40 +0200
+Subject: [PATCH v2 2/7] arm: spear6xx: use node labels in spear600-evb.dts
+In-Reply-To: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1492433205-13376-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Mike, Stephen,
+Now that we have introduced node labels in spear600.dtsi, we can use
+them for spear600-evb.dts.
 
-Here are a set of patches touching the support of the SPEAr600
-platform, for which the platform maintained Viresh Kumar has Acked the
-patches, but would like the arm-soc and clk maintainers to pick up the
-patches directly, see
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/501653.html.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/boot/dts/spear600-evb.dts | 156 ++++++++++++++++++-------------------
+ 1 file changed, 76 insertions(+), 80 deletions(-)
 
-Arnd, Olof, could you pick patches 1 to 6 directly in your arm-soc tree ?
-
-Mike, Stephen, could you pick patch 7 directly in your clk tree ?
-
-Thanks a lot,
-
-Thomas Petazzoni
-
-Thomas Petazzoni (7):
-  arm: spear6xx: add labels to various nodes in spear600.dtsi
-  arm: spear6xx: use node labels in spear600-evb.dts
-  arm: spear6xx: fix spaces in spear600-evb.dts
-  arm: spear6xx: switch spear600-evb to the new flash partition DT
-    binding
-  arm: spear6xx: remove unneeded pinctrl properties in spear600-evb
-  arm: spear6xx: add DT description of the ADC on SPEAr600
-  clk: spear: fix ADC clock definition on SPEAr600
-
- arch/arm/boot/dts/spear600-evb.dts | 148 ++++++++++++++++++-------------------
- arch/arm/boot/dts/spear600.dtsi    |  28 ++++---
- drivers/clk/spear/spear6xx_clock.c |   2 +-
- 3 files changed, 91 insertions(+), 87 deletions(-)
-
+diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+index d865a89..375eb61 100644
+--- a/arch/arm/boot/dts/spear600-evb.dts
++++ b/arch/arm/boot/dts/spear600-evb.dts
+@@ -22,95 +22,91 @@
+ 		device_type = "memory";
+ 		reg = <0 0x10000000>;
+ 	};
++};
+ 
+-	ahb {
+-		clcd at fc200000 {
+-			status = "okay";
+-		};
++&clcd {
++	status = "okay";
++};
+ 
+-		dma at fc400000 {
+-			status = "okay";
+-		};
++&dmac {
++	status = "okay";
++};
+ 
+-		ehci at e1800000 {
+-			status = "okay";
+-		};
++&ehci_usb0 {
++	status = "okay";
++};
+ 
+-		ehci at e2000000 {
+-			status = "okay";
+-		};
++&ehci_usb1 {
++	status = "okay";
++};
+ 
+-		gmac: ethernet at e0800000 {
+-			phy-mode = "gmii";
+-			status = "okay";
+-		};
++&gmac {
++	phy-mode = "gmii";
++	status = "okay";
++};
+ 
+-		ohci at e1900000 {
+-			status = "okay";
+-		};
++&ohci_usb0 {
++	status = "okay";
++};
+ 
+-		ohci at e2100000 {
+-			status = "okay";
+-		};
++&ohci_usb1 {
++	status = "okay";
++};
+ 
+-		smi: flash at fc000000 {
+-			status = "okay";
+-			clock-rate=<50000000>;
+-
+-			flash at f8000000 {
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				reg = <0xf8000000 0x800000>;
+-				st,smi-fast-mode;
+-
+-				partition at 0 {
+-					label = "xloader";
+-					reg = <0x0 0x10000>;
+-				};
+-				partition at 10000 {
+-					label = "u-boot";
+-					reg = <0x10000 0x50000>;
+-				};
+-				partition at 60000 {
+-					label = "environment";
+-					reg = <0x60000 0x10000>;
+-				};
+-				partition at 70000 {
+-					label = "dtb";
+-					reg = <0x70000 0x10000>;
+-				};
+-				partition at 80000 {
+-					label = "linux";
+-					reg = <0x80000 0x310000>;
+-				};
+-				partition at 390000 {
+-					label = "rootfs";
+-					reg = <0x390000 0x0>;
+-				};
+-			};
+-		};
++&smi {
++	status = "okay";
++	clock-rate=<50000000>;
++
++	flash at f8000000 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0xf8000000 0x800000>;
++		st,smi-fast-mode;
+ 
+-		apb {
+-			serial at d0000000 {
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <>;
+-			};
+-
+-			serial at d0080000 {
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <>;
+-			};
+-
+-			rtc at fc900000 {
+-			       status = "okay";
+-			};
+-
+-			i2c at d0200000 {
+-				clock-frequency = <400000>;
+-				status = "okay";
+-			};
++		partition at 0 {
++			label = "xloader";
++			reg = <0x0 0x10000>;
++		};
++		partition at 10000 {
++			label = "u-boot";
++			reg = <0x10000 0x50000>;
++		};
++		partition at 60000 {
++			label = "environment";
++			reg = <0x60000 0x10000>;
++		};
++		partition at 70000 {
++			label = "dtb";
++			reg = <0x70000 0x10000>;
++		};
++		partition at 80000 {
++			label = "linux";
++			reg = <0x80000 0x310000>;
++		};
++		partition at 390000 {
++			label = "rootfs";
++			reg = <0x390000 0x0>;
+ 		};
+ 	};
+ };
++
++&uart0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <>;
++};
++
++&uart1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <>;
++};
++
++&rtc {
++	status = "okay";
++};
++
++&i2c {
++	clock-frequency = <400000>;
++	status = "okay";
++};
 -- 
 2.7.4
