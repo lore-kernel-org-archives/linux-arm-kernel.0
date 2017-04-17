@@ -1,35 +1,44 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Apr 2017 14:46:45 +0200
-Subject: [PATCH v2 7/7] clk: spear: fix ADC clock definition on SPEAr600
+Date: Mon, 17 Apr 2017 14:46:43 +0200
+Subject: [PATCH v2 5/7] arm: spear6xx: remove unneeded pinctrl properties in
+ spear600-evb
 In-Reply-To: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1492433205-13376-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1492433205-13376-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no SPEAr600 device named "adc". Instead, the description of the
-ADC was recently added to the Device Tree, and the device name is
-"d820b000.adc", so we should associate the ADC gatable clock to this
-device name.
+The spear6xx doesn't have a pinctrl driver, since the pinmux is globally
+defined through a single register, generally configured by the
+firmware/bootloader.
+
+Therefore, the pinctrl related properties in spear600-evb.dts are not
+necessary.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clk/spear/spear6xx_clock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/spear600-evb.dts | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
-index 7c9383c..f911d9f 100644
---- a/drivers/clk/spear/spear6xx_clock.c
-+++ b/drivers/clk/spear/spear6xx_clock.c
-@@ -313,7 +313,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
- 	/* clock derived from apb clk */
- 	clk = clk_register_gate(NULL, "adc_clk", "apb_clk", 0, PERIP1_CLK_ENB,
- 			ADC_CLK_ENB, 0, &_lock);
--	clk_register_clkdev(clk, NULL, "adc");
-+	clk_register_clkdev(clk, NULL, "d820b000.adc");
+diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+index f36603f..c67e76c 100644
+--- a/arch/arm/boot/dts/spear600-evb.dts
++++ b/arch/arm/boot/dts/spear600-evb.dts
+@@ -96,14 +96,10 @@
  
- 	clk = clk_register_fixed_factor(NULL, "gpio0_clk", "apb_clk", 0, 1, 1);
- 	clk_register_clkdev(clk, NULL, "f0100000.gpio");
+ &uart0 {
+ 	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <>;
+ };
+ 
+ &uart1 {
+ 	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <>;
+ };
+ 
+ &rtc {
 -- 
 2.7.4
