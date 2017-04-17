@@ -1,381 +1,72 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Mon, 17 Apr 2017 15:11:52 -0500
-Subject: [PATCH v3 3/4] bluetooth: hci_uart: add LL protocol serdev driver
- support
-In-Reply-To: <20170413150353.7389-4-robh@kernel.org>
-References: <20170413150353.7389-1-robh@kernel.org>
- <20170413150353.7389-4-robh@kernel.org>
-Message-ID: <CAHCN7xLNcD1rmifEOyPhG2rpB_C81hsyzV9W2q6kCQkKa69sZg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 17 Apr 2017 22:34:01 +0200
+Subject: Microphone gain on N900
+In-Reply-To: <defb507c-0f4b-7dfe-817b-cb488f289aa3@bitmer.com>
+References: <20170226202831.GA31405@amd> <201702272053.37882@pali>
+ <4435ddd2-ca0e-b05d-727d-9f38416c0f97@bitmer.com>
+ <20170302142822.GA30427@amd>
+ <defb507c-0f4b-7dfe-817b-cb488f289aa3@bitmer.com>
+Message-ID: <20170417203400.GA14505@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 10:03 AM, Rob Herring <robh@kernel.org> wrote:
-> Turns out that the LL protocol and the TI-ST are the same thing AFAICT.
-> The TI-ST adds firmware loading, GPIO control, and shared access for
-> NFC, FM radio, etc. For now, we're only implementing what is needed for
-> BT. This mirrors other drivers like BCM and Intel, but uses the new
-> serdev bus.
->
-> The firmware loading is greatly simplified by using existing
-> infrastructure to send commands. It may be a bit slower than the
-> original code using synchronous functions, but the real bottleneck is
-> likely doing firmware load at 115.2kbps.
+Hi!
 
-I am using pdata-quirks to drive my wl1283 Bluetooth on a DM3730.  I
-have the Bluetooth set to 3000000 baud in pdata quirks.  Looking at
-the binding, I don't see an option to set the baudrate.  Is there (or
-will there) be a way to set the baud rate of the Bluetooth?
+> >>>> v4.10 works quite nicely on N900, but I still have problems with
+> >>>> audio. Even GSM calls would be usable, if I had reasonable volume on
+> >>>> microphone and speaker... but I don't.
+> >>>>
+> >>>> Both speaker and microphone are too quiet. I can get louder output by
+> >>>> plugging headset -- good. I can hear the other side nicely, but am
+> >>>> too quiet for them. Unfortunately, even if I plug in wired headset,
+> >>>> internal microphone is still used.
+> >>>>
+> >> For me these settings provide reasonable playback and capture volumes
+> >> using v4.10.1:
+> >>
+> >> amixer -D hw:0 set PCM 100%
+> >> amixer -D hw:0 set 'Line DAC' 80% on
+> >> amixer -D hw:0 set 'Line' on
+> >> amixer -D hw:0 set 'Left Line Mixer DACL1' on
+> >> amixer -D hw:0 set 'Right Line Mixer DACR1' on
+> >> amixer -D hw:0 set 'Jack Function' 'Headphone'
+> >> amixer -D hw:0 set 'TPA6130A2 Headphone' 80%
+> >>
+> >> amixer -D hw:0 set 'Jack Function' 'Headset'
+> >> amixer -D hw:0 set 'AGC' off
+> >> amixer -D hw:0 set 'Input Select' 'ADC'
+> >> amixer -D hw:0 set 'Left PGA Mixer Line1L' on
+> >> amixer -D hw:0 set 'Left Line1L Mux' 'differential'
+> >> amixer -D hw:0 set 'Right PGA Mixer Line1L' on
+> >> amixer -D hw:0 set 'Right Line1L Mux' 'differential'
+> >> amixer -D hw:0 set 'ADC HPF Cut-off' '0.0045xFs' 'disabled'
+> >> amixer -D hw:0 set PGA 50% on
+> >> amixer -D hw:0 cset iface=MIXER,name='PGA Capture Switch',index=0 on
+> > 
+> > This seems to correspond to volumes I have had before. They are enough
+> > for phone call in quiet environment, but not really for normal usage.
+> > 
+> > Do you have settings where microphone on wired headset works?
+> > 
+> Those settings above. They are set after putting all volumes to 0 and
+> muted. I'm using the Nokia WH-205 headset that came with the phone.
 
-adam
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Marcel Holtmann <marcel@holtmann.org>
-> Cc: Gustavo Padovan <gustavo@padovan.org>
-> Cc: Johan Hedberg <johan.hedberg@gmail.com>
-> Cc: linux-bluetooth at vger.kernel.org
-> ---
-> v3:
-> - rebase on bluetooth-next
-> - Add explicit of.h include
-> v2:
-> - Use IS_ENABLED() to fix module build
->
->  drivers/bluetooth/hci_ll.c | 262 ++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 261 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/bluetooth/hci_ll.c b/drivers/bluetooth/hci_ll.c
-> index 02692fe30279..485e8eb04542 100644
-> --- a/drivers/bluetooth/hci_ll.c
-> +++ b/drivers/bluetooth/hci_ll.c
-> @@ -34,20 +34,24 @@
->  #include <linux/sched.h>
->  #include <linux/types.h>
->  #include <linux/fcntl.h>
-> +#include <linux/firmware.h>
->  #include <linux/interrupt.h>
->  #include <linux/ptrace.h>
->  #include <linux/poll.h>
->
->  #include <linux/slab.h>
-> -#include <linux/tty.h>
->  #include <linux/errno.h>
->  #include <linux/string.h>
->  #include <linux/signal.h>
->  #include <linux/ioctl.h>
-> +#include <linux/of.h>
-> +#include <linux/serdev.h>
->  #include <linux/skbuff.h>
-> +#include <linux/ti_wilink_st.h>
->
->  #include <net/bluetooth/bluetooth.h>
->  #include <net/bluetooth/hci_core.h>
-> +#include <linux/gpio/consumer.h>
->
->  #include "hci_uart.h"
->
-> @@ -76,6 +80,12 @@ struct hcill_cmd {
->         u8 cmd;
->  } __packed;
->
-> +struct ll_device {
-> +       struct hci_uart hu;
-> +       struct serdev_device *serdev;
-> +       struct gpio_desc *enable_gpio;
-> +};
-> +
->  struct ll_struct {
->         unsigned long rx_state;
->         unsigned long rx_count;
-> @@ -136,6 +146,9 @@ static int ll_open(struct hci_uart *hu)
->
->         hu->priv = ll;
->
-> +       if (hu->serdev)
-> +               serdev_device_open(hu->serdev);
-> +
->         return 0;
->  }
->
-> @@ -164,6 +177,13 @@ static int ll_close(struct hci_uart *hu)
->
->         kfree_skb(ll->rx_skb);
->
-> +       if (hu->serdev) {
-> +               struct ll_device *lldev = serdev_device_get_drvdata(hu->serdev);
-> +               gpiod_set_value_cansleep(lldev->enable_gpio, 0);
-> +
-> +               serdev_device_close(hu->serdev);
-> +       }
-> +
->         hu->priv = NULL;
->
->         kfree(ll);
-> @@ -505,9 +525,245 @@ static struct sk_buff *ll_dequeue(struct hci_uart *hu)
->         return skb_dequeue(&ll->txq);
->  }
->
-> +#if IS_ENABLED(CONFIG_SERIAL_DEV_BUS)
-> +static int read_local_version(struct hci_dev *hdev)
-> +{
-> +       int err = 0;
-> +       unsigned short version = 0;
-> +       struct sk_buff *skb;
-> +       struct hci_rp_read_local_version *ver;
-> +
-> +       skb = __hci_cmd_sync(hdev, HCI_OP_READ_LOCAL_VERSION, 0, NULL, HCI_INIT_TIMEOUT);
-> +       if (IS_ERR(skb)) {
-> +               bt_dev_err(hdev, "Reading TI version information failed (%ld)",
-> +                          PTR_ERR(skb));
-> +               err = PTR_ERR(skb);
-> +               goto out;
-> +       }
-> +       if (skb->len != sizeof(*ver)) {
-> +               err = -EILSEQ;
-> +               goto out;
-> +       }
-> +
-> +       ver = (struct hci_rp_read_local_version *)skb->data;
-> +       if (le16_to_cpu(ver->manufacturer) != 13) {
-> +               err = -ENODEV;
-> +               goto out;
-> +       }
-> +
-> +       version = le16_to_cpu(ver->lmp_subver);
-> +
-> +out:
-> +       if (err) bt_dev_err(hdev, "Failed to read TI version info: %d", err);
-> +       kfree_skb(skb);
-> +       return err ? err : version;
-> +}
-> +
-> +/**
-> + * download_firmware -
-> + *     internal function which parses through the .bts firmware
-> + *     script file intreprets SEND, DELAY actions only as of now
-> + */
-> +static int download_firmware(struct ll_device *lldev)
-> +{
-> +       unsigned short chip, min_ver, maj_ver;
-> +       int version, err, len;
-> +       unsigned char *ptr, *action_ptr;
-> +       unsigned char bts_scr_name[40]; /* 40 char long bts scr name? */
-> +       const struct firmware *fw;
-> +       struct sk_buff *skb;
-> +       struct hci_command *cmd;
-> +
-> +       version = read_local_version(lldev->hu.hdev);
-> +       if (version < 0)
-> +               return version;
-> +
-> +       chip = (version & 0x7C00) >> 10;
-> +       min_ver = (version & 0x007F);
-> +       maj_ver = (version & 0x0380) >> 7;
-> +       if (version & 0x8000)
-> +               maj_ver |= 0x0008;
-> +
-> +       snprintf(bts_scr_name, sizeof(bts_scr_name),
-> +                "ti-connectivity/TIInit_%d.%d.%d.bts",
-> +                chip, maj_ver, min_ver);
-> +
-> +       err = request_firmware(&fw, bts_scr_name, &lldev->serdev->dev);
-> +       if (err || !fw->data || !fw->size) {
-> +               bt_dev_err(lldev->hu.hdev, "request_firmware failed(errno %d) for %s",
-> +                          err, bts_scr_name);
-> +               return -EINVAL;
-> +       }
-> +       ptr = (void *)fw->data;
-> +       len = fw->size;
-> +       /* bts_header to remove out magic number and
-> +        * version
-> +        */
-> +       ptr += sizeof(struct bts_header);
-> +       len -= sizeof(struct bts_header);
-> +
-> +       while (len > 0 && ptr) {
-> +               bt_dev_dbg(lldev->hu.hdev, " action size %d, type %d ",
-> +                          ((struct bts_action *)ptr)->size,
-> +                          ((struct bts_action *)ptr)->type);
-> +
-> +               action_ptr = &(((struct bts_action *)ptr)->data[0]);
-> +
-> +               switch (((struct bts_action *)ptr)->type) {
-> +               case ACTION_SEND_COMMAND:       /* action send */
-> +                       bt_dev_dbg(lldev->hu.hdev, "S");
-> +                       cmd = (struct hci_command *)action_ptr;
-> +                       if (cmd->opcode == 0xff36) {
-> +                               /* ignore remote change
-> +                                * baud rate HCI VS command */
-> +                               bt_dev_warn(lldev->hu.hdev, "change remote baud rate command in firmware");
-> +                               break;
-> +                       }
-> +                       if (cmd->prefix != 1)
-> +                               bt_dev_dbg(lldev->hu.hdev, "command type %d\n", cmd->prefix);
-> +
-> +                       skb = __hci_cmd_sync(lldev->hu.hdev, cmd->opcode, cmd->plen, &cmd->speed, HCI_INIT_TIMEOUT);
-> +                       if (IS_ERR(skb)) {
-> +                               bt_dev_err(lldev->hu.hdev, "send command failed\n");
-> +                               goto out_rel_fw;
-> +                       }
-> +                       kfree_skb(skb);
-> +                       break;
-> +               case ACTION_WAIT_EVENT:  /* wait */
-> +                       /* no need to wait as command was synchronous */
-> +                       bt_dev_dbg(lldev->hu.hdev, "W");
-> +                       break;
-> +               case ACTION_DELAY:      /* sleep */
-> +                       bt_dev_info(lldev->hu.hdev, "sleep command in scr");
-> +                       mdelay(((struct bts_action_delay *)action_ptr)->msec);
-> +                       break;
-> +               }
-> +               len -= (sizeof(struct bts_action) +
-> +                       ((struct bts_action *)ptr)->size);
-> +               ptr += sizeof(struct bts_action) +
-> +                       ((struct bts_action *)ptr)->size;
-> +       }
-> +
-> +out_rel_fw:
-> +       /* fw download complete */
-> +       release_firmware(fw);
-> +       return err;
-> +}
-> +
-> +static int ll_setup(struct hci_uart *hu)
-> +{
-> +       int err, retry = 3;
-> +       struct ll_device *lldev;
-> +       struct serdev_device *serdev = hu->serdev;
-> +       u32 speed;
-> +
-> +       if (!serdev)
-> +               return 0;
-> +
-> +       lldev = serdev_device_get_drvdata(serdev);
-> +
-> +       serdev_device_set_flow_control(serdev, true);
-> +
-> +       do {
-> +               /* Configure BT_EN to HIGH state */
-> +               gpiod_set_value_cansleep(lldev->enable_gpio, 0);
-> +               msleep(5);
-> +               gpiod_set_value_cansleep(lldev->enable_gpio, 1);
-> +               msleep(100);
-> +
-> +               err = download_firmware(lldev);
-> +               if (!err)
-> +                       break;
-> +
-> +               /* Toggle BT_EN and retry */
-> +               bt_dev_err(hu->hdev, "download firmware failed, retrying...");
-> +       } while (retry--);
-> +
-> +       if (err)
-> +               return err;
-> +
-> +       /* Operational speed if any */
-> +       if (hu->oper_speed)
-> +               speed = hu->oper_speed;
-> +       else if (hu->proto->oper_speed)
-> +               speed = hu->proto->oper_speed;
-> +       else
-> +               speed = 0;
-> +
-> +       if (speed) {
-> +               struct sk_buff *skb = __hci_cmd_sync(hu->hdev, 0xff36, sizeof(speed), &speed, HCI_INIT_TIMEOUT);
-> +               if (!IS_ERR(skb)) {
-> +                       kfree_skb(skb);
-> +                       serdev_device_set_baudrate(serdev, speed);
-> +               }
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct hci_uart_proto llp;
-> +
-> +static int hci_ti_probe(struct serdev_device *serdev)
-> +{
-> +       struct hci_uart *hu;
-> +       struct ll_device *lldev;
-> +       u32 max_speed = 3000000;
-> +
-> +       lldev = devm_kzalloc(&serdev->dev, sizeof(struct ll_device), GFP_KERNEL);
-> +       if (!lldev)
-> +               return -ENOMEM;
-> +       hu = &lldev->hu;
-> +
-> +       serdev_device_set_drvdata(serdev, lldev);
-> +       lldev->serdev = hu->serdev = serdev;
-> +
-> +       lldev->enable_gpio = devm_gpiod_get_optional(&serdev->dev, "enable", GPIOD_OUT_LOW);
-> +       if (IS_ERR(lldev->enable_gpio))
-> +               return PTR_ERR(lldev->enable_gpio);
-> +
-> +       of_property_read_u32(serdev->dev.of_node, "max-speed", &max_speed);
-> +       hci_uart_set_speeds(hu, 115200, max_speed);
-> +
-> +       return hci_uart_register_device(hu, &llp);
-> +}
-> +
-> +static void hci_ti_remove(struct serdev_device *serdev)
-> +{
-> +       struct ll_device *lldev = serdev_device_get_drvdata(serdev);
-> +       struct hci_uart *hu = &lldev->hu;
-> +       struct hci_dev *hdev = hu->hdev;
-> +
-> +       cancel_work_sync(&hu->write_work);
-> +
-> +       hci_unregister_dev(hdev);
-> +       hci_free_dev(hdev);
-> +       hu->proto->close(hu);
-> +}
-> +
-> +static const struct of_device_id hci_ti_of_match[] = {
-> +       { .compatible = "ti,wl1831-st" },
-> +       { .compatible = "ti,wl1835-st" },
-> +       { .compatible = "ti,wl1837-st" },
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(of, hci_ti_of_match);
-> +
-> +static struct serdev_device_driver hci_ti_drv = {
-> +       .driver         = {
-> +               .name   = "hci-ti",
-> +               .of_match_table = of_match_ptr(hci_ti_of_match),
-> +       },
-> +       .probe  = hci_ti_probe,
-> +       .remove = hci_ti_remove,
-> +};
-> +#else
-> +#define ll_setup NULL
-> +#endif
-> +
->  static const struct hci_uart_proto llp = {
->         .id             = HCI_UART_LL,
->         .name           = "LL",
-> +       .setup          = ll_setup,
->         .open           = ll_open,
->         .close          = ll_close,
->         .recv           = ll_recv,
-> @@ -518,10 +774,14 @@ static const struct hci_uart_proto llp = {
->
->  int __init ll_init(void)
->  {
-> +       serdev_device_driver_register(&hci_ti_drv);
-> +
->         return hci_uart_register_proto(&llp);
->  }
->
->  int __exit ll_deinit(void)
->  {
-> +       serdev_device_driver_unregister(&hci_ti_drv);
-> +
->         return hci_uart_unregister_proto(&llp);
->  }
-> --
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I just wanted to say thank you. I finally got to testing those
+settings again, and this time headset microphone definitely works.
+
+Loopback using arecord | aplay now produces reasonable volume of
+audio. (Unfortunately, I still have some problems somewhere in the
+audio<->GSM path :-( ).
+
+Best regards,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170417/4432e410/attachment.sig>
