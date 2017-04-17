@@ -1,61 +1,43 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 17 Apr 2017 16:52:22 +0530
-Subject: [PATCH] net: thunderx: Fix set_max_bgx_per_node for 81xx rgx
-In-Reply-To: <1492068301-1141-1-git-send-email-george.cherian@cavium.com>
-References: <1492068301-1141-1-git-send-email-george.cherian@cavium.com>
-Message-ID: <CA+sq2CeGUWFpLWVbBLdJ9856=J256MY1R5H6rXNavvxSf4wrGg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 17 Apr 2017 13:54:49 +0200
+Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
+ comments etc.
+In-Reply-To: <20170416231223.GA31693@verge.net.au>
+References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
+ <20170328065130.16019-2-takahiro.akashi@linaro.org>
+ <1491207492.6020.8.camel@infradead.org>
+ <20170404054144.GG16309@linaro.org>
+ <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
+ <20170404073504.GI16309@linaro.org> <1491291844.6218.25.camel@infradead.org>
+ <20170404092604.GB14898@arm.com> <1492085938.20068.6.camel@infradead.org>
+ <20170416231223.GA31693@verge.net.au>
+Message-ID: <CAMuHMdXTgCEesv3imtnzs6Mcnkp22KW_rx0Jiv3_zce7bR3AVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 12:55 PM, George Cherian
-<george.cherian@cavium.com> wrote:
-> Add the PCI_SUBSYS_DEVID_81XX_RGX and use the same to set
-> the max bgx per node count.
+On Mon, Apr 17, 2017 at 1:12 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Apr 13, 2017 at 01:18:58PM +0100, David Woodhouse wrote:
+>> Less important than in user-visible messages, but still good practice as
+>> there's still no excuse for ARM64 code to look like it was written before
+>> 1996.
+>>
+>> Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
 >
-> This fixes the issue intoduced by following commit
-> 78aacb6f6 net: thunderx: Fix invalid mac addresses for node1 interfaces
-> With this commit the max_bgx_per_node for 81xx is set as 2 instead of 3
-> because of which num_vfs is always calculated as zero.
+> Hi David,
 >
-> Signed-off-by: George Cherian <george.cherian@cavium.com>
-> ---
->  drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 1 +
->  drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> index 64a1095..a0ca68c 100644
-> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> @@ -134,6 +134,7 @@ static void set_max_bgx_per_node(struct pci_dev *pdev)
->         pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &sdevid);
->         switch (sdevid) {
->         case PCI_SUBSYS_DEVID_81XX_BGX:
-> +       case PCI_SUBSYS_DEVID_81XX_RGX:
->                 max_bgx_per_node = MAX_BGX_PER_CN81XX;
->                 break;
->         case PCI_SUBSYS_DEVID_83XX_BGX:
-> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-> index c5080f2c..6b7fe6fd 100644
-> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-> @@ -16,6 +16,7 @@
->  /* Subsystem device IDs */
->  #define PCI_SUBSYS_DEVID_88XX_BGX              0xA126
->  #define PCI_SUBSYS_DEVID_81XX_BGX              0xA226
-> +#define PCI_SUBSYS_DEVID_81XX_RGX              0xA254
->  #define PCI_SUBSYS_DEVID_83XX_BGX              0xA326
->
->  #define    MAX_BGX_THUNDER                     8 /* Max 2 nodes, 4 per node */
-> --
-> 2.1.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I'd be happy to take the Renesas portions of this change if they were
+> broken out into a separate patch. The reason I would prefer a separate
+> patch is to avoid the possibility of conflicts, even trivial ones.
 
-Looks good, thanks.
+s/possibility/reality/, unless this series goes in before v4.12-rc1.
 
-Sunil.
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
