@@ -1,94 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Apr 2017 14:46:42 +0200
-Subject: [PATCH v2 4/7] arm: spear6xx: switch spear600-evb to the new flash
- partition DT binding
-In-Reply-To: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1492433205-13376-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 17 Apr 2017 14:46:38 +0200
+Subject: [PATCH v2 0/7] ARM: SPEAr600 updates
+Message-ID: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit moves spear600-evb.dts to use the new flash partition Device
-Tree binding documented in
-Documentation/devicetree/bindings/mtd/partition.txt.
+Arnd, Olof, Mike, Stephen,
 
-As this Device Tree binding document says: "For backwards compatibility
-partitions as direct subnodes of the mtd device are supported. This use
-is discouraged."
+Here are a set of patches touching the support of the SPEAr600
+platform, for which the platform maintained Viresh Kumar has Acked the
+patches, but would like the arm-soc and clk maintainers to pick up the
+patches directly, see
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/501653.html.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/boot/dts/spear600-evb.dts | 54 ++++++++++++++++++++------------------
- 1 file changed, 29 insertions(+), 25 deletions(-)
+Arnd, Olof, could you pick patches 1 to 6 directly in your arm-soc tree ?
 
-diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
-index 32a44b6..f36603f 100644
---- a/arch/arm/boot/dts/spear600-evb.dts
-+++ b/arch/arm/boot/dts/spear600-evb.dts
-@@ -58,34 +58,38 @@
- 	clock-rate = <50000000>;
- 
- 	flash at f8000000 {
--		#address-cells = <1>;
--		#size-cells = <1>;
- 		reg = <0xf8000000 0x800000>;
- 		st,smi-fast-mode;
- 
--		partition at 0 {
--			label = "xloader";
--			reg = <0x0 0x10000>;
--		};
--		partition at 10000 {
--			label = "u-boot";
--			reg = <0x10000 0x50000>;
--		};
--		partition at 60000 {
--			label = "environment";
--			reg = <0x60000 0x10000>;
--		};
--		partition at 70000 {
--			label = "dtb";
--			reg = <0x70000 0x10000>;
--		};
--		partition at 80000 {
--			label = "linux";
--			reg = <0x80000 0x310000>;
--		};
--		partition at 390000 {
--			label = "rootfs";
--			reg = <0x390000 0x0>;
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "xloader";
-+				reg = <0x0 0x10000>;
-+			};
-+			partition at 10000 {
-+				label = "u-boot";
-+				reg = <0x10000 0x50000>;
-+			};
-+			partition at 60000 {
-+				label = "environment";
-+				reg = <0x60000 0x10000>;
-+			};
-+			partition at 70000 {
-+				label = "dtb";
-+				reg = <0x70000 0x10000>;
-+			};
-+			partition at 80000 {
-+				label = "linux";
-+				reg = <0x80000 0x310000>;
-+			};
-+			partition at 390000 {
-+				label = "rootfs";
-+				reg = <0x390000 0x0>;
-+			};
- 		};
- 	};
- };
+Mike, Stephen, could you pick patch 7 directly in your clk tree ?
+
+Thanks a lot,
+
+Thomas Petazzoni
+
+Thomas Petazzoni (7):
+  arm: spear6xx: add labels to various nodes in spear600.dtsi
+  arm: spear6xx: use node labels in spear600-evb.dts
+  arm: spear6xx: fix spaces in spear600-evb.dts
+  arm: spear6xx: switch spear600-evb to the new flash partition DT
+    binding
+  arm: spear6xx: remove unneeded pinctrl properties in spear600-evb
+  arm: spear6xx: add DT description of the ADC on SPEAr600
+  clk: spear: fix ADC clock definition on SPEAr600
+
+ arch/arm/boot/dts/spear600-evb.dts | 148 ++++++++++++++++++-------------------
+ arch/arm/boot/dts/spear600.dtsi    |  28 ++++---
+ drivers/clk/spear/spear6xx_clock.c |   2 +-
+ 3 files changed, 91 insertions(+), 87 deletions(-)
+
 -- 
 2.7.4
