@@ -1,176 +1,61 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 17 Apr 2017 19:15:41 +0800
-Subject: [PATCH] arm64: allwinner: h5: add support for NanoPi NEO2 board
-Message-ID: <20170417111541.2838-1-icenowy@aosc.io>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 17 Apr 2017 16:52:22 +0530
+Subject: [PATCH] net: thunderx: Fix set_max_bgx_per_node for 81xx rgx
+In-Reply-To: <1492068301-1141-1-git-send-email-george.cherian@cavium.com>
+References: <1492068301-1141-1-git-send-email-george.cherian@cavium.com>
+Message-ID: <CA+sq2CeGUWFpLWVbBLdJ9856=J256MY1R5H6rXNavvxSf4wrGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NanoPi NEO2 is a board with the same size factor with the original
-NanoPi NEO by FriendlyELEC.
+On Thu, Apr 13, 2017 at 12:55 PM, George Cherian
+<george.cherian@cavium.com> wrote:
+> Add the PCI_SUBSYS_DEVID_81XX_RGX and use the same to set
+> the max bgx per node count.
+>
+> This fixes the issue intoduced by following commit
+> 78aacb6f6 net: thunderx: Fix invalid mac addresses for node1 interfaces
+> With this commit the max_bgx_per_node for 81xx is set as 2 instead of 3
+> because of which num_vfs is always calculated as zero.
+>
+> Signed-off-by: George Cherian <george.cherian@cavium.com>
+> ---
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 1 +
+>  drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index 64a1095..a0ca68c 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -134,6 +134,7 @@ static void set_max_bgx_per_node(struct pci_dev *pdev)
+>         pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &sdevid);
+>         switch (sdevid) {
+>         case PCI_SUBSYS_DEVID_81XX_BGX:
+> +       case PCI_SUBSYS_DEVID_81XX_RGX:
+>                 max_bgx_per_node = MAX_BGX_PER_CN81XX;
+>                 break;
+>         case PCI_SUBSYS_DEVID_83XX_BGX:
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+> index c5080f2c..6b7fe6fd 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+> @@ -16,6 +16,7 @@
+>  /* Subsystem device IDs */
+>  #define PCI_SUBSYS_DEVID_88XX_BGX              0xA126
+>  #define PCI_SUBSYS_DEVID_81XX_BGX              0xA226
+> +#define PCI_SUBSYS_DEVID_81XX_RGX              0xA254
+>  #define PCI_SUBSYS_DEVID_83XX_BGX              0xA326
+>
+>  #define    MAX_BGX_THUNDER                     8 /* Max 2 nodes, 4 per node */
+> --
+> 2.1.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-It has a H5 instead of H3 on NanoPi NEO, and the ethernet is upgraded to
-1Gbps (with external RTL8211E PHY).
+Looks good, thanks.
 
-Add support for this board.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   | 134 +++++++++++++++++++++
- 2 files changed, 135 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 92a84eea6b96..546720096aef 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-new file mode 100644
-index 000000000000..f6d71b0d482a
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-@@ -0,0 +1,134 @@
-+/*
-+ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "FriendlyARM NanoPi NEO 2";
-+	compatible = "friendlyarm,nanopi-neo2", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr {
-+			label = "nanopi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "nanopi:blue:status";
-+			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	reg_usb0_vbus: usb0-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb0-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
-+		status = "okay";
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB Type-A port's VBUS is always on */
-+	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	status = "okay";
-+};
--- 
-2.12.2
+Sunil.
