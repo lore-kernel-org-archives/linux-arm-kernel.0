@@ -1,55 +1,44 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 17 Apr 2017 19:57:36 +0800
-Subject: [PATCH v3 01/12] arm64: allwinner: a64: enable RSB on A64
+Date: Mon, 17 Apr 2017 19:57:37 +0800
+Subject: [PATCH v3 02/12] arm64: allwinner: a64: add NMI controller on A64
 In-Reply-To: <20170417115747.7300-1-icenowy@aosc.io>
 References: <20170417115747.7300-1-icenowy@aosc.io>
-Message-ID: <20170417115747.7300-2-icenowy@aosc.io>
+Message-ID: <20170417115747.7300-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
+Allwinner A64 SoC features a NMI controller, which is usually connected
+to the AXP PMIC.
 
-Add it and its pinmux.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
 Changes in v2:
-- Removed bonus properties in pio node.
 - Added Chen-Yu's ACK.
 
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index c7f669f5884f..05ec9fc5e81f 100644
+index 05ec9fc5e81f..53c18ca372ea 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -422,6 +422,25 @@
- 			#gpio-cells = <3>;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-+
-+			r_rsb_pins: rsb at 0 {
-+				pins = "PL0", "PL1";
-+				function = "s_rsb";
-+			};
+@@ -403,6 +403,14 @@
+ 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		nmi_intc: interrupt-controller at 01f00c0c {
++			compatible = "allwinner,sun6i-a31-sc-nmi";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x01f00c0c 0x38>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 +		};
 +
-+		r_rsb: rsb at 1f03400 {
-+			compatible = "allwinner,sun8i-a23-rsb";
-+			reg = <0x01f03400 0x400>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&r_ccu 6>;
-+			clock-frequency = <3000000>;
-+			resets = <&r_ccu 2>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&r_rsb_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 	};
- };
+ 		r_ccu: clock at 1f01400 {
+ 			compatible = "allwinner,sun50i-a64-r-ccu";
+ 			reg = <0x01f01400 0x100>;
 -- 
 2.12.2
