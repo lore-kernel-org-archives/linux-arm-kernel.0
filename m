@@ -1,87 +1,43 @@
-From: andy.tang@nxp.com (Andy Tang)
-Date: Mon, 17 Apr 2017 01:37:22 +0000
-Subject: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
-In-Reply-To: <DB6PR0402MB283701D478A1678D28894C77F30A0@DB6PR0402MB2837.eurprd04.prod.outlook.com>
-References: <1489977443-33582-1-git-send-email-andy.tang@nxp.com>
- <DB6PR0402MB283701D478A1678D28894C77F30A0@DB6PR0402MB2837.eurprd04.prod.outlook.com>
-Message-ID: <DB6PR0402MB28375B80DB12F7461F86E138F3060@DB6PR0402MB2837.eurprd04.prod.outlook.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 17 Apr 2017 11:07:51 +0900
+Subject: [PATCH V2] PM / OPP: Use - instead of @ for DT entries
+In-Reply-To: <2765521.jPoRkFTblf@aspire.rjw.lan>
+References: <70e7c7ee13722ab9c73cb073f88502eaf1ada5f5.1491816050.git.viresh.kumar@linaro.org>
+ <2765521.jPoRkFTblf@aspire.rjw.lan>
+Message-ID: <CAK7LNAQ7Uf1Jkj64-Ykdk5TSeWvkq7=BaqUMJo6KqrN7BhYvsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen and Michael,
+2017-04-15 7:47 GMT+09:00 Rafael J. Wysocki <rjw@rjwysocki.net>:
+> On Monday, April 10, 2017 02:51:35 PM Viresh Kumar wrote:
+>> Compiling the DT file with W=1, DTC warns like follows:
+>>
+>> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+>> unit name, but no reg property
+>>
+>> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+>> "reg" property.
+>>
+>> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+>
+> OK, so any ACKs from the DT side?  Rob?
+>
+> Thanks,
+> Rafael
 
-This patch set has been pending for more than two months since it was first sent.
-I have not received any response from you until now.
 
-Could you give some comments on it?
 
-Regards,
-Andy
+I see Rob's Acked-by.
 
------Original Message-----
-From: Andy Tang 
-Sent: Wednesday, April 05, 2017 2:16 PM
-To: mturquette at baylibre.com; sboyd at codeaurora.org
-Cc: robh+dt at kernel.org; mark.rutland at arm.com; linux-clk at vger.kernel.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Scott Wood <oss@buserror.net>
-Subject: RE: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
+https://lkml.org/lkml/2017/4/13/648
 
-Hello 
 
-Do you have any comments on this patch set which was acked by Rob?
-
-Regards,
-Andy
-
-> -----Original Message-----
-> From: Yuantian Tang [mailto:andy.tang at nxp.com]
-> Sent: Monday, March 20, 2017 10:37 AM
-> To: mturquette at baylibre.com
-> Cc: sboyd at codeaurora.org; robh+dt at kernel.org; mark.rutland at arm.com; 
-> linux-clk at vger.kernel.org; devicetree at vger.kernel.org; linux- 
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Scott 
-> Wood <oss@buserror.net>; Andy Tang <andy.tang@nxp.com>
-> Subject: [PATCH 1/2 v2] dt-bindings: qoriq-clock: Add coreclk
-> 
-> From: Scott Wood <oss@buserror.net>
-> 
-> ls1012a has separate input root clocks for core PLLs versus the 
-> platform PLL, with the latter described as sysclk in the hw docs.
-> Update the qoriq-clock binding to allow a second input clock, named 
-> "coreclk".  If present, this clock will be used for the core PLLs.
-> 
-> Signed-off-by: Scott Wood <oss@buserror.net>
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> v2:
-> 	-- change the author to Scott
->  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> index aa3526f..119cafd 100644
-> --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> @@ -56,6 +56,11 @@ Optional properties:
->  - clocks: If clock-frequency is not specified, sysclk may be provided
->  	as an input clock.  Either clock-frequency or clocks must be
->  	provided.
-> +	A second input clock, called "coreclk", may be provided if
-> +	core PLLs are based on a different input clock from the
-> +	platform PLL.
-> +- clock-names: Required if a coreclk is present.  Valid names are
-> +	"sysclk" and "coreclk".
-> 
->  2. Clock Provider
-> 
-> @@ -72,6 +77,7 @@ second cell is the clock index for the specified type.
->  	2	hwaccel		index (n in CLKCGnHWACSR)
->  	3	fman		0 for fm1, 1 for fm2
->  	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
-> +	5	coreclk		must be 0
-> 
->  3. Example
-> 
-> --
-> 2.1.0.27.g96db324
+-- 
+Best Regards
+Masahiro Yamada
