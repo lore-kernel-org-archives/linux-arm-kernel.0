@@ -1,196 +1,115 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Apr 2017 14:46:40 +0200
-Subject: [PATCH v2 2/7] arm: spear6xx: use node labels in spear600-evb.dts
+Date: Mon, 17 Apr 2017 14:46:39 +0200
+Subject: [PATCH v2 1/7] arm: spear6xx: add labels to various nodes in
+ spear600.dtsi
 In-Reply-To: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1492433205-13376-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1492433205-13376-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have introduced node labels in spear600.dtsi, we can use
-them for spear600-evb.dts.
+Having labels allows to more easily reference nodes in .dts files
+including spear600.dtsi.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/spear600-evb.dts | 156 ++++++++++++++++++-------------------
- 1 file changed, 76 insertions(+), 80 deletions(-)
+ arch/arm/boot/dts/spear600.dtsi | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
-index d865a89..375eb61 100644
---- a/arch/arm/boot/dts/spear600-evb.dts
-+++ b/arch/arm/boot/dts/spear600-evb.dts
-@@ -22,95 +22,91 @@
- 		device_type = "memory";
- 		reg = <0 0x10000000>;
- 	};
-+};
+diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+index 9f60a7b..8459286 100644
+--- a/arch/arm/boot/dts/spear600.dtsi
++++ b/arch/arm/boot/dts/spear600.dtsi
+@@ -49,7 +49,7 @@
+ 			#interrupt-cells = <1>;
+ 		};
  
--	ahb {
 -		clcd at fc200000 {
--			status = "okay";
--		};
-+&clcd {
-+	status = "okay";
-+};
++		clcd: clcd at fc200000 {
+ 			compatible = "arm,pl110", "arm,primecell";
+ 			reg = <0xfc200000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -57,7 +57,7 @@
+ 			status = "disabled";
+ 		};
  
 -		dma at fc400000 {
--			status = "okay";
--		};
-+&dmac {
-+	status = "okay";
-+};
++		dmac: dma at fc400000 {
+ 			compatible = "arm,pl080", "arm,primecell";
+ 			reg = <0xfc400000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -97,7 +97,7 @@
+ 			status = "disabled";
+ 		};
  
 -		ehci at e1800000 {
--			status = "okay";
--		};
-+&ehci_usb0 {
-+	status = "okay";
-+};
++		ehci_usb0: ehci at e1800000 {
+ 			compatible = "st,spear600-ehci", "usb-ehci";
+ 			reg = <0xe1800000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -105,7 +105,7 @@
+ 			status = "disabled";
+ 		};
  
 -		ehci at e2000000 {
--			status = "okay";
--		};
-+&ehci_usb1 {
-+	status = "okay";
-+};
- 
--		gmac: ethernet at e0800000 {
--			phy-mode = "gmii";
--			status = "okay";
--		};
-+&gmac {
-+	phy-mode = "gmii";
-+	status = "okay";
-+};
++		ehci_usb1: ehci at e2000000 {
+ 			compatible = "st,spear600-ehci", "usb-ehci";
+ 			reg = <0xe2000000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -113,7 +113,7 @@
+ 			status = "disabled";
+ 		};
  
 -		ohci at e1900000 {
--			status = "okay";
--		};
-+&ohci_usb0 {
-+	status = "okay";
-+};
++		ohci_usb0: ohci at e1900000 {
+ 			compatible = "st,spear600-ohci", "usb-ohci";
+ 			reg = <0xe1900000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -121,7 +121,7 @@
+ 			status = "disabled";
+ 		};
  
 -		ohci at e2100000 {
--			status = "okay";
--		};
-+&ohci_usb1 {
-+	status = "okay";
-+};
++		ohci_usb1: ohci at e2100000 {
+ 			compatible = "st,spear600-ohci", "usb-ohci";
+ 			reg = <0xe2100000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -135,7 +135,7 @@
+ 			compatible = "simple-bus";
+ 			ranges = <0xd0000000 0xd0000000 0x30000000>;
  
--		smi: flash at fc000000 {
--			status = "okay";
--			clock-rate=<50000000>;
--
--			flash at f8000000 {
--				#address-cells = <1>;
--				#size-cells = <1>;
--				reg = <0xf8000000 0x800000>;
--				st,smi-fast-mode;
--
--				partition at 0 {
--					label = "xloader";
--					reg = <0x0 0x10000>;
--				};
--				partition at 10000 {
--					label = "u-boot";
--					reg = <0x10000 0x50000>;
--				};
--				partition at 60000 {
--					label = "environment";
--					reg = <0x60000 0x10000>;
--				};
--				partition at 70000 {
--					label = "dtb";
--					reg = <0x70000 0x10000>;
--				};
--				partition at 80000 {
--					label = "linux";
--					reg = <0x80000 0x310000>;
--				};
--				partition at 390000 {
--					label = "rootfs";
--					reg = <0x390000 0x0>;
--				};
--			};
--		};
-+&smi {
-+	status = "okay";
-+	clock-rate=<50000000>;
-+
-+	flash at f8000000 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0xf8000000 0x800000>;
-+		st,smi-fast-mode;
- 
--		apb {
 -			serial at d0000000 {
--				status = "okay";
--				pinctrl-names = "default";
--				pinctrl-0 = <>;
--			};
--
++			uart0: serial at d0000000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0xd0000000 0x1000>;
+ 				interrupt-parent = <&vic0>;
+@@ -143,7 +143,7 @@
+ 				status = "disabled";
+ 			};
+ 
 -			serial at d0080000 {
--				status = "okay";
--				pinctrl-names = "default";
--				pinctrl-0 = <>;
--			};
--
--			rtc at fc900000 {
--			       status = "okay";
--			};
--
++			uart1: serial at d0080000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0xd0080000 0x1000>;
+ 				interrupt-parent = <&vic0>;
+@@ -181,7 +181,7 @@
+ 				interrupts = <4>;
+ 			};
+ 
 -			i2c at d0200000 {
--				clock-frequency = <400000>;
--				status = "okay";
--			};
-+		partition at 0 {
-+			label = "xloader";
-+			reg = <0x0 0x10000>;
-+		};
-+		partition at 10000 {
-+			label = "u-boot";
-+			reg = <0x10000 0x50000>;
-+		};
-+		partition at 60000 {
-+			label = "environment";
-+			reg = <0x60000 0x10000>;
-+		};
-+		partition at 70000 {
-+			label = "dtb";
-+			reg = <0x70000 0x10000>;
-+		};
-+		partition at 80000 {
-+			label = "linux";
-+			reg = <0x80000 0x310000>;
-+		};
-+		partition at 390000 {
-+			label = "rootfs";
-+			reg = <0x390000 0x0>;
- 		};
- 	};
- };
-+
-+&uart0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <>;
-+};
-+
-+&uart1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <>;
-+};
-+
-+&rtc {
-+	status = "okay";
-+};
-+
-+&i2c {
-+	clock-frequency = <400000>;
-+	status = "okay";
-+};
++			i2c: i2c at d0200000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				compatible = "snps,designware-i2c";
+@@ -191,7 +191,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			rtc at fc900000 {
++			rtc: rtc at fc900000 {
+ 				compatible = "st,spear600-rtc";
+ 				reg = <0xfc900000 0x1000>;
+ 				interrupts = <10>;
 -- 
 2.7.4
