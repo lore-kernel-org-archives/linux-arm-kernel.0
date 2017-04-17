@@ -1,63 +1,33 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 17 Apr 2017 19:57:47 +0800
-Subject: [PATCH v3 12/12] arm64: allwinner: a64: enable Wi-Fi for Pine64
-In-Reply-To: <20170417115747.7300-1-icenowy@aosc.io>
-References: <20170417115747.7300-1-icenowy@aosc.io>
-Message-ID: <20170417115747.7300-13-icenowy@aosc.io>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 17 Apr 2017 14:46:41 +0200
+Subject: [PATCH v2 3/7] arm: spear6xx: fix spaces in spear600-evb.dts
+In-Reply-To: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1492433205-13376-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Wi-Fi module of Pine64 is powered via DLDO4 and ELDO1 (the latter
-one provides I/O voltage).
+This commit fixes a minor coding style issue in spear600-evb.dts:
+missing spaces around equal sign.
 
-Add device node for it.
-
-Although the Wi-Fi module is an external module which should be inserted
-to a header, according to my personal talk with TL Lim, he does not want
-this header to be used as GPIO (so it's with 2.0mm pitch, not 2.54mm as
-other GPIO headers).
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
-Changes in v3:
-- Added explaination on 2.0mm pitch.
+ arch/arm/boot/dts/spear600-evb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 7da074f95065..9d90bb32aa87 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -64,6 +64,11 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-+	};
- };
+diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+index 375eb61..32a44b6 100644
+--- a/arch/arm/boot/dts/spear600-evb.dts
++++ b/arch/arm/boot/dts/spear600-evb.dts
+@@ -55,7 +55,7 @@
  
- &ehci1 {
-@@ -91,6 +96,17 @@
+ &smi {
  	status = "okay";
- };
+-	clock-rate=<50000000>;
++	clock-rate = <50000000>;
  
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&reg_dldo4>;
-+	vqmmc-supply = <&reg_eldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	non-removable;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
+ 	flash at f8000000 {
+ 		#address-cells = <1>;
 -- 
-2.12.2
+2.7.4
