@@ -1,43 +1,146 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 17 Apr 2017 11:07:51 +0900
-Subject: [PATCH V2] PM / OPP: Use - instead of @ for DT entries
-In-Reply-To: <2765521.jPoRkFTblf@aspire.rjw.lan>
-References: <70e7c7ee13722ab9c73cb073f88502eaf1ada5f5.1491816050.git.viresh.kumar@linaro.org>
- <2765521.jPoRkFTblf@aspire.rjw.lan>
-Message-ID: <CAK7LNAQ7Uf1Jkj64-Ykdk5TSeWvkq7=BaqUMJo6KqrN7BhYvsQ@mail.gmail.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Mon, 17 Apr 2017 11:08:26 +0800
+Subject: [PATCH v3 1/8] trace: ras: add ARM processor error information
+ trace event
+In-Reply-To: <32ca4e7e-eb5e-a4ff-33d6-68d06e9242fb@codeaurora.org>
+References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
+ <1490869877-118713-11-git-send-email-xiexiuqi@huawei.com>
+ <32ca4e7e-eb5e-a4ff-33d6-68d06e9242fb@codeaurora.org>
+Message-ID: <6c0d2652-71ba-aefc-d6cd-5cc9a0b0d729@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-04-15 7:47 GMT+09:00 Rafael J. Wysocki <rjw@rjwysocki.net>:
-> On Monday, April 10, 2017 02:51:35 PM Viresh Kumar wrote:
->> Compiling the DT file with W=1, DTC warns like follows:
+Hi Tyler,
+
+Thanks for your comments and testing.
+
+On 2017/4/15 4:36, Baicar, Tyler wrote:
+> On 3/30/2017 4:31 AM, Xie XiuQi wrote:
+>> Add a new trace event for ARM processor error information, so that
+>> the user will know what error occurred. With this information the
+>> user may take appropriate action.
 >>
->> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
->> unit name, but no reg property
+>> These trace events are consistent with the ARM processor error
+>> information table which defined in UEFI 2.6 spec section N.2.4.4.1.
 >>
->> Fix this by replacing '@' with '-' as the OPP nodes will never have a
->> "reg" property.
+>> ---
+>> v2: add trace enabled condition as Steven's suggestion.
+>>      fix a typo.
+>> ---
 >>
->> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Suggested-by: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
->> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> OK, so any ACKs from the DT side?  Rob?
->
+>> Cc: Steven Rostedt <rostedt@goodmis.org>
+>> Cc: Tyler Baicar <tbaicar@codeaurora.org>
+>> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+>> ---
+> ...
+>>   +#define ARM_PROC_ERR_TYPE    \
+>> +    EM ( CPER_ARM_INFO_TYPE_CACHE, "cache error" )    \
+>> +    EM ( CPER_ARM_INFO_TYPE_TLB,  "TLB error" )    \
+>> +    EM ( CPER_ARM_INFO_TYPE_BUS, "bus error" )    \
+>> +    EMe ( CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" )
+>> +
+>> +#define ARM_PROC_ERR_FLAGS    \
+>> +    EM ( CPER_ARM_INFO_FLAGS_FIRST, "First error captured" )    \
+>> +    EM ( CPER_ARM_INFO_FLAGS_LAST,  "Last error captured" )    \
+>> +    EM ( CPER_ARM_INFO_FLAGS_PROPAGATED, "Propagated" )    \
+>> +    EMe ( CPER_ARM_INFO_FLAGS_OVERFLOW, "Overflow" )
+>> +
+> Hello Xie XiuQi,
+> 
+> This isn't compiling for me because of these definitions. Here you are using ARM_*, but below in the TP_printk you are using ARCH_*. The compiler complains the ARCH_* ones are undefined:
+> 
+> ./include/trace/../../include/ras/ras_event.h:278:37: error: 'ARCH_PROC_ERR_TYPE' undeclared (first use in this function)
+>      __print_symbolic(__entry->type, ARCH_PROC_ERR_TYPE),
+> ./include/trace/../../include/ras/ras_event.h:280:38: error: 'ARCH_PROC_ERR_FLAGS' undeclared (first use in this function)
+>      __print_symbolic(__entry->flags, ARCH_PROC_ERR_FLAGS),
+
+Sorry, it's a typo. It should be ARM_xxx.
+
+> 
+>> +/*
+>> + * First define the enums in MM_ACTION_RESULT to be exported to userspace
+>> + * via TRACE_DEFINE_ENUM().
+>> + */
+>> +#undef EM
+>> +#undef EMe
+>> +#define EM(a, b) TRACE_DEFINE_ENUM(a);
+>> +#define EMe(a, b)    TRACE_DEFINE_ENUM(a);
+>> +
+>> +ARM_PROC_ERR_TYPE
+>> +ARM_PROC_ERR_FLAGS
+> Are the above two lines supposed to be here?
+>> +
+>> +/*
+>> + * Now redefine the EM() and EMe() macros to map the enums to the strings
+>> + * that will be printed in the output.
+>> + */
+>> +#undef EM
+>> +#undef EMe
+>> +#define EM(a, b)        { a, b },
+>> +#define EMe(a, b)    { a, b }
+>> +
+>> +TRACE_EVENT(arm_proc_err,
+> I think it would be better to keep this similar to the naming of the current RAS trace events (right now we have mc_event, arm_event, aer_event, etc.). I would suggest using "arm_err_info_event" since this is handling the error information structures of the arm errors.
+>> +
+>> +    TP_PROTO(const struct cper_arm_err_info *err),
+>> +
+>> +    TP_ARGS(err),
+>> +
+>> +    TP_STRUCT__entry(
+>> +        __field(u8, type)
+>> +        __field(u16, multiple_error)
+>> +        __field(u8, flags)
+>> +        __field(u64, error_info)
+>> +        __field(u64, virt_fault_addr)
+>> +        __field(u64, physical_fault_addr)
+> Validation bits should also be a part of this structure that way user space tools will know which of these fields are valid.
+
+Could we use the default value to check the validation which we have checked in TP_fast_assign?
+
+>> +    ),
+>> +
+>> +    TP_fast_assign(
+>> +        __entry->type = err->type;
+>> +
+>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
+>> +            __entry->multiple_error = err->multiple_error;
+>> +        else
+>> +            __entry->multiple_error = ~0;
+>> +
+>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
+>> +            __entry->flags = err->flags;
+>> +        else
+>> +            __entry->flags = ~0;
+>> +
+>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
+>> +            __entry->error_info = err->error_info;
+>> +        else
+>> +            __entry->error_info = 0ULL;
+>> +
+>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
+>> +            __entry->virt_fault_addr = err->virt_fault_addr;
+>> +        else
+>> +            __entry->virt_fault_addr = 0ULL;
+>> +
+>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
+>> +            __entry->physical_fault_addr = err->physical_fault_addr;
+>> +        else
+>> +            __entry->physical_fault_addr = 0ULL;
+>> +    ),
+>> +
+>> +    TP_printk("ARM Processor Error: type %s; count: %u; flags: %s;"
+> I think the "ARM Processor Error:" part of this should just be removed. Here's the output with this removed and the trace event renamed to arm_err_info_event. I think this looks much cleaner and matches the style used with the arm_event.
+> 
+>           <idle>-0     [020] .ns.   366.592434: arm_event: affinity level: 2; MPIDR: 0000000000000000; MIDR: 00000000510f8000; running state: 1; PSCI state: 0
+>           <idle>-0     [020] .ns.   366.592437: arm_err_info_event: type cache error; count: 0; flags: 0x3; error info: 0000000000c20058; virtual address: 0000000000000000; physical address: 0000000000000000
+
+I agree. It looks much better.
+
+> 
 > Thanks,
-> Rafael
-
-
-
-I see Rob's Acked-by.
-
-https://lkml.org/lkml/2017/4/13/648
-
+> Tyler
+> 
 
 -- 
-Best Regards
-Masahiro Yamada
+Thanks,
+Xie XiuQi
