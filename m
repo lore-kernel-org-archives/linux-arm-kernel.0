@@ -1,132 +1,52 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 17 Apr 2017 11:18:43 -0600
-Subject: [PATCH v3 1/8] trace: ras: add ARM processor error information
- trace event
-In-Reply-To: <8aa30f6a-d18d-1cce-57dc-08efb52d822e@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-11-git-send-email-xiexiuqi@huawei.com>
- <32ca4e7e-eb5e-a4ff-33d6-68d06e9242fb@codeaurora.org>
- <6c0d2652-71ba-aefc-d6cd-5cc9a0b0d729@huawei.com>
- <8aa30f6a-d18d-1cce-57dc-08efb52d822e@huawei.com>
-Message-ID: <f8ef4306-fd69-d8a3-3ca6-86be2825cab3@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 17 Apr 2017 19:19:26 +0200
+Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for the
+ pmic mfd
+In-Reply-To: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/2017 9:16 PM, Xie XiuQi wrote:
-> On 2017/4/17 11:08, Xie XiuQi wrote:
->>> On 3/30/2017 4:31 AM, Xie XiuQi wrote:
->>>> Add a new trace event for ARM processor error information, so that
->>>> the user will know what error occurred. With this information the
->>>> user may take appropriate action.
->>>>
->>>> These trace events are consistent with the ARM processor error
->>>> information table which defined in UEFI 2.6 spec section N.2.4.4.1.
->>>>
->>>> ---
->>>> v2: add trace enabled condition as Steven's suggestion.
->>>>       fix a typo.
->>>> ---
->>>>
->>>> Cc: Steven Rostedt <rostedt@goodmis.org>
->>>> Cc: Tyler Baicar <tbaicar@codeaurora.org>
->>>> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
->>>> ---
->>>
-...
->>>> +/*
->>>> + * First define the enums in MM_ACTION_RESULT to be exported to userspace
->>>> + * via TRACE_DEFINE_ENUM().
->>>> + */
->>>> +#undef EM
->>>> +#undef EMe
->>>> +#define EM(a, b) TRACE_DEFINE_ENUM(a);
->>>> +#define EMe(a, b)    TRACE_DEFINE_ENUM(a);
->>>> +
->>>> +ARM_PROC_ERR_TYPE
->>>> +ARM_PROC_ERR_FLAGS
->>> Are the above two lines supposed to be here?
->>>> +
->>>> +/*
->>>> + * Now redefine the EM() and EMe() macros to map the enums to the strings
->>>> + * that will be printed in the output.
->>>> + */
->>>> +#undef EM
->>>> +#undef EMe
->>>> +#define EM(a, b)        { a, b },
->>>> +#define EMe(a, b)    { a, b }
->>>> +
->>>> +TRACE_EVENT(arm_proc_err,
->>> I think it would be better to keep this similar to the naming of the current RAS trace events (right now we have mc_event, arm_event, aer_event, etc.). I would suggest using "arm_err_info_event" since this is handling the error information structures of the arm errors.
->>>> +
->>>> +    TP_PROTO(const struct cper_arm_err_info *err),
->>>> +
->>>> +    TP_ARGS(err),
->>>> +
->>>> +    TP_STRUCT__entry(
->>>> +        __field(u8, type)
->>>> +        __field(u16, multiple_error)
->>>> +        __field(u8, flags)
->>>> +        __field(u64, error_info)
->>>> +        __field(u64, virt_fault_addr)
->>>> +        __field(u64, physical_fault_addr)
->>> Validation bits should also be a part of this structure that way user space tools will know which of these fields are valid.
->> Could we use the default value to check the validation which we have checked in TP_fast_assign?
-Yes, true...I guess we really don't need the validation bits then.
->>>> +    ),
->>>> +
->>>> +    TP_fast_assign(
->>>> +        __entry->type = err->type;
->>>> +
->>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
->>>> +            __entry->multiple_error = err->multiple_error;
->>>> +        else
->>>> +            __entry->multiple_error = ~0;
->>>> +
->>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
->>>> +            __entry->flags = err->flags;
->>>> +        else
->>>> +            __entry->flags = ~0;
->>>> +
->>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
->>>> +            __entry->error_info = err->error_info;
->>>> +        else
->>>> +            __entry->error_info = 0ULL;
->>>> +
->>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
->>>> +            __entry->virt_fault_addr = err->virt_fault_addr;
->>>> +        else
->>>> +            __entry->virt_fault_addr = 0ULL;
->>>> +
->>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
->>>> +            __entry->physical_fault_addr = err->physical_fault_addr;
->>>> +        else
->>>> +            __entry->physical_fault_addr = 0ULL;
->>>> +    ),
->>>> +
->>>> +    TP_printk("ARM Processor Error: type %s; count: %u; flags: %s;"
->>> I think the "ARM Processor Error:" part of this should just be removed. Here's the output with this removed and the trace event renamed to arm_err_info_event. I think this looks much cleaner and matches the style used with the arm_event.
->>>
->>>            <idle>-0     [020] .ns.   366.592434: arm_event: affinity level: 2; MPIDR: 0000000000000000; MIDR: 00000000510f8000; running state: 1; PSCI state: 0
->>>            <idle>-0     [020] .ns.   366.592437: arm_err_info_event: type cache error; count: 0; flags: 0x3; error info: 0000000000c20058; virtual address: 0000000000000000; physical address: 0000000000000000
-> As this section is ARM Processor Error Section, how about use arm_proc_err_event?
-This is not for the ARM Processor Error Section, that is what the 
-arm_event is handling. What you are adding this trace support for here 
-is called the ARM Processor Error Information (UEFI 2.6 spec section 
-N.2.4.4.1). So I think your trace event here should be called 
-arm_err_info_event. This will also be consistent with the other two 
-trace events that I'm planning on adding:
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
+ 2 files changed, 7 insertions(+)
 
-arm_ctx_info_event: ARM Processor Context Information (UEFI 2.6 section 
-N.2.4.4.2)
-arm_vendor_info_event: This is the "Vendor Specific Error Information" 
-in the ARM Processor Error Section (Table 260). It's possible I may just 
-add this into the arm_event trace event, but I haven't looked into it 
-enough yet.
-
-Thanks,
-Tyler
-
+diff --git a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+index 0548569..9630ac0 100644
+--- a/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
++++ b/Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt
+@@ -16,6 +16,11 @@ Required properties:
+ - reg:                  Base address of PMIC on Hi6220 SoC.
+ - interrupt-controller: Hi655x has internal IRQs (has own IRQ domain).
+ - pmic-gpios:           The GPIO used by PMIC IRQ.
++- #clock-cells:		From common clock binding; shall be set to 0
++
++Optional properties:
++- clock-output-names: From common clock binding to override the
++  default output clock name
+ 
+ Example:
+ 	pmic: pmic at f8000000 {
+@@ -24,4 +29,5 @@ Example:
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
++		#clock-cells = <0>;
+ 	}
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index dba3c13..e0496f7 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -325,6 +325,7 @@
+ 	pmic: pmic at f8000000 {
+ 		compatible = "hisilicon,hi655x-pmic";
+ 		reg = <0x0 0xf8000000 0x0 0x1000>;
++		#clock-cells = <0>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+1.9.1
