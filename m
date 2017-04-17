@@ -1,44 +1,49 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 17 Apr 2017 19:57:37 +0800
-Subject: [PATCH v3 02/12] arm64: allwinner: a64: add NMI controller on A64
+Date: Mon, 17 Apr 2017 19:57:38 +0800
+Subject: [PATCH v3 03/12] dt-bindings: make AXP20X compatible strings one per
+ line
 In-Reply-To: <20170417115747.7300-1-icenowy@aosc.io>
 References: <20170417115747.7300-1-icenowy@aosc.io>
-Message-ID: <20170417115747.7300-3-icenowy@aosc.io>
+Message-ID: <20170417115747.7300-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 SoC features a NMI controller, which is usually connected
-to the AXP PMIC.
+In the binding documentation of AXP20X mfd, the compatible strings used
+to be listed for three per line, which leads to some mess when trying to
+add AXP803 compatible string (as we have already AXP806 and AXP809
+compatibles, which is after AXP803 in ascending order).
 
-Add support for it.
+Make the compatible strings one per line, so that inserting a new
+compatible string will be directly a new line.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
-Changes in v2:
-- Added Chen-Yu's ACK.
+New patch in v3.
 
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 05ec9fc5e81f..53c18ca372ea 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -403,6 +403,14 @@
- 				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index b41d2601c6ba..a3e813f6060a 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -9,9 +9,14 @@ axp223 (X-Powers)
+ axp809 (X-Powers)
  
-+		nmi_intc: interrupt-controller at 01f00c0c {
-+			compatible = "allwinner,sun6i-a31-sc-nmi";
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x01f00c0c 0x38>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		r_ccu: clock at 1f01400 {
- 			compatible = "allwinner,sun50i-a64-r-ccu";
- 			reg = <0x01f01400 0x100>;
+ Required properties:
+-- compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
+-	      "x-powers,axp809"
++- compatible: should be one of:
++    * "x-powers,axp152"
++    * "x-powers,axp202"
++    * "x-powers,axp209"
++    * "x-powers,axp221"
++    * "x-powers,axp223"
++    * "x-powers,axp806"
++    * "x-powers,axp809"
+ - reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
 -- 
 2.12.2
