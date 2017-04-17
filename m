@@ -1,166 +1,123 @@
-From: kimran@codeaurora.org (Imran Khan)
-Date: Mon, 17 Apr 2017 13:05:09 +0530
-Subject: [PATCH] Revert "arm64: Increase the max granular size"
-In-Reply-To: <725F073F-025B-48B9-9935-24EFEBF2B7DC@caviumnetworks.com>
-References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
- <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
- <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
- <CAPub14-sFgx=oCHzJPb9h9b_V0rbn5UAMDNJ-yTkjhz38JPqMQ@mail.gmail.com>
- <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
- <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
- <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
- <CADAEsF_Hr=mPspvuPsQtKWiSDu6oCjfyy0rGwWrF9EJo-ZO1JA@mail.gmail.com>
- <08fa98de-760b-15bc-5220-fa449b08c118@codeaurora.org>
- <725F073F-025B-48B9-9935-24EFEBF2B7DC@caviumnetworks.com>
-Message-ID: <93d2819a-95b1-6606-74d4-0bc0a64db29e@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Apr 2017 09:46:19 +0200
+Subject: [PATCH 4/5] ARM: sun8i: h3: add operating-points-v2 table for CPU
+In-Reply-To: <40F4D1F2-EA59-4BD1-9A00-4C0AA7FED9D3@aosc.io>
+References: <20170408185025.53841-1-icenowy@aosc.io>
+ <20170408185025.53841-5-icenowy@aosc.io>
+ <20170411091346.mcwyskezadabsobn@lukather>
+ <b37490ed1282f45542168701dea332bb@aosc.io>
+ <20170416205740.b5pk3kcxwaegij6g@lukather>
+ <40F4D1F2-EA59-4BD1-9A00-4C0AA7FED9D3@aosc.io>
+Message-ID: <20170417074619.ilxkrdavmcoeno2v@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/12/2017 7:30 PM, Chalamarla, Tirumalesh wrote:
+On Mon, Apr 17, 2017 at 05:00:00AM +0800, Icenowy Zheng wrote:
 > 
 > 
-> On 4/11/17, 10:13 PM, "linux-arm-kernel on behalf of Imran Khan" <linux-arm-kernel-bounces at lists.infradead.org on behalf of kimran@codeaurora.org> wrote:
+> ? 2017?4?17? GMT+08:00 ??4:57:40, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Tue, Apr 11, 2017 at 09:28:55PM +0800, icenowy at aosc.io wrote:
+> >> ? 2017-04-11 17:13?Maxime Ripard ???
+> >> > On Sun, Apr 09, 2017 at 02:50:24AM +0800, Icenowy Zheng wrote:
+> >> > > The CPU on Allwinner H3 can do dynamic frequency scaling.
+> >> > > 
+> >> > > Add a DVFS table based on the one tweaked by Armbian developers,
+> >which
+> >> > > are proven to work stably on BSP kernels.
+> >> > > 
+> >> > > Frequencies higher than 1008MHz are temporarily dropped in the
+> >> > > table, as
+> >> > > they may lead to over voltage on boards without proper regulator
+> >> > > settings or over temperature on boards with proper regulator
+> >settings.
+> >> > > They will be added back once regulator settings are ready and
+> >thermal
+> >> > > sensor driver is merged.
+> >> > > 
+> >> > > In order to satisfy all different regulators (SY8106A which is
+> >50mV
+> >> > > per
+> >> > > level, SY8113B which have two states: 1.1V and 1.3V, and some
+> >board
+> >> > > with
+> >> > > non-tweakable regulators), all the OPPs are defined with a range
+> >> > > which has
+> >> > > the target value as the minimum allowed value, and 1.3V (the
+> >highest
+> >> > > VDD-CPUX voltage suggested by the datasheet) as the maximum
+> >allowed
+> >> > > value.
+> >> > > It's proven to work well with a board with SY8113B.
+> >> > > 
+> >> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> > > ---
+> >> > >  arch/arm/boot/dts/sun8i-h3.dtsi | 38
+> >> > > +++++++++++++++++++++++++++++++++++++-
+> >> > >  1 file changed, 37 insertions(+), 1 deletion(-)
+> >> > > 
+> >> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+> >> > > b/arch/arm/boot/dts/sun8i-h3.dtsi
+> >> > > index b36f9f423c39..a0cee17fe44b 100644
+> >> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> >> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> >> > > @@ -43,32 +43,68 @@
+> >> > >  #include "sunxi-h3-h5.dtsi"
+> >> > > 
+> >> > >  / {
+> >> > > +	cpu0_opp_table: opp_table0 {
+> >> > > +		compatible = "operating-points-v2";
+> >> > > +		opp-shared;
+> >> > > +
+> >> > > +		opp at 480000000 {
+> >> > > +			opp-hz = /bits/ 64 <480000000>;
+> >> > > +			opp-microvolt = <980000 980000 1300000>;
+> >> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> >> > > +		};
+> >> > > +
+> >> > > +		opp at 648000000 {
+> >> > > +			opp-hz = /bits/ 64 <816000000>;
+> >> > > +			opp-microvolt = <1020000 1020000 1300000>;
+> >> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> >> > > +		};
+> >> > > +
+> >> > > +		opp at 912000000 {
+> >> > > +			opp-hz = /bits/ 64 <960000000>;
+> >> > > +			opp-microvolt = <1080000 1080000 1300000>;
+> >> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> >> > > +		};
+> >> > > +
+> >> > > +		opp at 1008000000 {
+> >> > > +			opp-hz = /bits/ 64 <1008000000>;
+> >> > > +			opp-microvolt = <1140000 1140000 1300000>;
+> >> > > +			clock-latency-ns = <244144>; /* 8 32k periods */
+> >> > > +		};
+> >> > > +	};
+> >> > > +
+> >> > 
+> >> > From your serie, I guess you never actually tested those OPPs on
+> >any
+> >> > board without SY8113B, right?
+> >> 
+> >> Yes. But I will test them on an Orange Pi PC (newly got) soon.
+> >
+> >The orange pi pc also uses the SY8113B.
 > 
->     On 4/7/2017 7:36 AM, Ganesh Mahendran wrote:
->     > 2017-04-06 23:58 GMT+08:00 Catalin Marinas <catalin.marinas@arm.com>:
->     >> On Thu, Apr 06, 2017 at 12:52:13PM +0530, Imran Khan wrote:
->     >>> On 4/5/2017 10:13 AM, Imran Khan wrote:
->     >>>>> We may have to revisit this logic and consider L1_CACHE_BYTES the
->     >>>>> _minimum_ of cache line sizes in arm64 systems supported by the kernel.
->     >>>>> Do you have any benchmarks on Cavium boards that would show significant
->     >>>>> degradation with 64-byte L1_CACHE_BYTES vs 128?
->     >>>>>
->     >>>>> For non-coherent DMA, the simplest is to make ARCH_DMA_MINALIGN the
->     >>>>> _maximum_ of the supported systems:
->     >>>>>
->     >>>>> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
->     >>>>> index 5082b30bc2c0..4b5d7b27edaf 100644
->     >>>>> --- a/arch/arm64/include/asm/cache.h
->     >>>>> +++ b/arch/arm64/include/asm/cache.h
->     >>>>> @@ -18,17 +18,17 @@
->     >>>>>
->     >>>>>  #include <asm/cachetype.h>
->     >>>>>
->     >>>>> -#define L1_CACHE_SHIFT         7
->     >>>>> +#define L1_CACHE_SHIFT         6
->     >>>>>  #define L1_CACHE_BYTES         (1 << L1_CACHE_SHIFT)
->     >>>>>
->     >>>>>  /*
->     >>>>>   * Memory returned by kmalloc() may be used for DMA, so we must make
->     >>>>> - * sure that all such allocations are cache aligned. Otherwise,
->     >>>>> - * unrelated code may cause parts of the buffer to be read into the
->     >>>>> - * cache before the transfer is done, causing old data to be seen by
->     >>>>> - * the CPU.
->     >>>>> + * sure that all such allocations are aligned to the maximum *known*
->     >>>>> + * cache line size on ARMv8 systems. Otherwise, unrelated code may cause
->     >>>>> + * parts of the buffer to be read into the cache before the transfer is
->     >>>>> + * done, causing old data to be seen by the CPU.
->     >>>>>   */
->     >>>>> -#define ARCH_DMA_MINALIGN      L1_CACHE_BYTES
->     >>>>> +#define ARCH_DMA_MINALIGN      (128)
->     >>>>>
->     >>>>>  #ifndef __ASSEMBLY__
->     >>>>>
->     >>>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->     >>>>> index 392c67eb9fa6..30bafca1aebf 100644
->     >>>>> --- a/arch/arm64/kernel/cpufeature.c
->     >>>>> +++ b/arch/arm64/kernel/cpufeature.c
->     >>>>> @@ -976,9 +976,9 @@ void __init setup_cpu_features(void)
->     >>>>>         if (!cwg)
->     >>>>>                 pr_warn("No Cache Writeback Granule information, assuming
->     >>>>> cache line size %d\n",
->     >>>>>                         cls);
->     >>>>> -       if (L1_CACHE_BYTES < cls)
->     >>>>> -               pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
->     >>>>> -                       L1_CACHE_BYTES, cls);
->     >>>>> +       if (ARCH_DMA_MINALIGN < cls)
->     >>>>> +               pr_warn("ARCH_DMA_MINALIGN smaller than the Cache Writeback Granule (%d < %d)\n",
->     >>>>> +                       ARCH_DMA_MINALIGN, cls);
->     >>>>>  }
->     >>>>>
->     >>>>>  static bool __maybe_unused
->     >>>>
->     >>>> This change was discussed at: [1] but was not concluded as apparently no one
->     >>>> came back with test report and numbers. After including this change in our
->     >>>> local kernel we are seeing significant throughput improvement. For example with:
->     >>>>
->     >>>> iperf -c 192.168.1.181 -i 1 -w 128K -t 60
->     >>>>
->     >>>> The average throughput is improving by about 30% (230Mbps from 180Mbps).
->     >>>> Could you please let us know if this change can be included in upstream kernel.
->     >>>>
->     >>>> [1]: https://groups.google.com/forum/#!topic/linux.kernel/P40yDB90ePs
->     >>>
->     >>> Could you please provide some feedback about the above mentioned query ?
->     >>
->     >> Do you have an explanation on the performance variation when
->     >> L1_CACHE_BYTES is changed? We'd need to understand how the network stack
->     >> is affected by L1_CACHE_BYTES, in which context it uses it (is it for
->     >> non-coherent DMA?).
->     > 
->     > network stack use SKB_DATA_ALIGN to align.
->     > ---
->     > #define SKB_DATA_ALIGN(X) (((X) + (SMP_CACHE_BYTES - 1)) & \
->     > ~(SMP_CACHE_BYTES - 1))
->     > 
->     > #define SMP_CACHE_BYTES L1_CACHE_BYTES
->     > ---
->     > I think this is the reason of performance regression.
->     > 
->     
->     Yes this is the reason for performance regression. Due to increases L1 cache alignment the 
->     object is coming from next kmalloc slab and skb->truesize is changing from 2304 bytes to 
->     4352 bytes. This in turn increases sk_wmem_alloc which causes queuing of less send buffers.
->     
-> We tried different benchmarks and found none which really affects with Cache line change. If there is no correctness issue,
-> I think we are fine with reverting the patch.
-> 
-So, can we revert the patch that makes L1_CACHE_SHIFT 7 or should the patch suggested by Catalin should be mainlined.
-We have verified the throughput degradation on 3.18 and 4.4 but I am afraid that this issue will be seen on other
-kernels too.
-> Though I still think it is beneficiary to do some more investigation for the perf loss, who knows 32 bit align or no align might 
-> Give even more perf benefit. 
-> 
-Which perf loss you are referring to here. Did you mean throughput loss here or some other perf benchmarking ?
+> I remember in H3 Orange Pi's only One, Lite and Zero uses SY8113B,
+> and PC is SY8106A.
 
-Thanks,
-Imran
+Ah, my bad, I confused the two.
 
-> 
-> Thanks,
-> Tirumalesh.  
->     >>
->     >> The Cavium guys haven't shown any numbers (IIUC) to back the
->     >> L1_CACHE_BYTES performance improvement but I would not revert the
->     >> original commit since ARCH_DMA_MINALIGN definitely needs to cover the
->     >> maximum available cache line size, which is 128 for them.
->     > 
->     > how about define L1_CACHE_SHIFT like below:
->     > ---
->     > #ifdef CONFIG_ARM64_L1_CACHE_SHIFT
->     > #define L1_CACHE_SHIFT CONFIG_ARM64_L1_CACHE_SHIFT
->     > #else
->     > #define L1_CACHE_SHIFT 7
->     > endif
->     > ---
->     > 
->     > Thanks
->     > 
->     >>
->     >> --
->     >> Catalin
->     
->     
->     -- 
->     QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a\nmember of the Code Aurora Forum, hosted by The Linux Foundation
->     
->     _______________________________________________
->     linux-arm-kernel mailing list
->     linux-arm-kernel at lists.infradead.org
->     http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->     
-> 
-
+Thanks!
+Maxime
 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a\nmember of the Code Aurora Forum, hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170417/516cd3a6/attachment-0001.sig>
