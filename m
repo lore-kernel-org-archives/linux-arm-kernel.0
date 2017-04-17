@@ -1,102 +1,90 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 17 Apr 2017 15:37:16 -0700
-Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
-In-Reply-To: <172093673.40121.1492427140661@email.1und1.de>
-References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
- <172093673.40121.1492427140661@email.1und1.de>
-Message-ID: <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+From: nrg02771@nifty.com (nrg02771 at nifty.com)
+Date: Tue, 18 Apr 2017 07:39:16 +0900 (JST)
+Subject: Increase stack size to 16KB
+Message-ID: <828135836.20701492468756240.nrg02771@nifty.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, all,
 
-On Mon, Apr 17, 2017 at 4:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Hi,
->
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Oktober 2016 um 21:34 geschrieben:
->>
->>
->> I inspired by this issue [1] i build up a slightly modified setup with a
->> Raspberry Pi B (mainline kernel 4.9rc3), a powered 7 port USB hub and 5 Prolific
->> PL2303 USB to serial convertors. I modified the usb_test for dwc2 [2], which
->> only tries to open all ttyUSB devices one after the other.
->>
->> Unfortunately the complete system stuck after opening the first ttyUSB device (
->> heartbeat LED stop blinking, no reaction to debug UART). The only way to
->> reanimate the system is to powerdown the USB hub with the USB to serial
->> convertors.
->>
->> [1] - https://github.com/raspberrypi/linux/issues/1692
->> [2] - https://gist.github.com/lategoodbye/dd0d30af27b6f101b03d5923b279dbaa
->
-> since this issue still exists with 4.11 (even without or with microframe scheduler enabled), i want to ask some additional questions:
->
-> Is this issue reproducible with other dwc2 platforms than bcm2835?
+I want to increase stack size to 16KB on freescale 32bit arm system.
 
-+Edmund Szeto, who I seem to remember emailing me about similar
-questions in the past.
+I'm using the following environment.
+CPU: freescale imx6dl 32bit
+Kernel:3.14.28-1.0.0
 
+I modified the following kernel source code to increase stack size.
+I confirmed kernel work fine, but after mounted rootfs, init process
+dose not work with the following error message.
+ I confirmed init process created without error, but it seems when
+executing init process the error occurs.
+Is it possible to increase stack size to 16KB with 32bit arm freescale
+environment?
 
-> Does the soft lockup also occurs after opening the second serial convertor or later?
+I confirmed OMAP arm 32bit environment work fine with the same modification.
 
-I don't have serial converters easily available to me, but back in the
-day when I was stressing things out on rk3288 I never saw anything
-this bad.  ...of course, on rk3288 we've got 4 A17 cores running
-really fast, so possibly just being slower is what causes your
-problems here?
+Can I have any advice?
 
-I will make the following observations:
+Best Regards,
+Akira Matsui
 
-1. With dwc2 you often end up in the situation where you need to
-service an interrupt every 125 uS.  If servicing that interrupt takes
-anywhere near 125 uS in the common case then you'll be in trouble.
-
-===
-
-2. When I was testing on rk3288 (on kernel 3.14) I did see occasions
-where uvc_video_complete() could sometimes take > 125 uS.  It's been a
-long time now, but if I remember correctly this had to do with the
-fact that the URB buffers were allocated in a way where you had to
-access them non-cached and this was super duper slow.  In my
-particular case I could "fix" it by adjusting UVC_MAX_PACKETS
-(crosreview.com/321932).  ...and I had some timing code in
-crosreview.com/321980.
-
-Again, it was a long time ago, but elsewhere I have written down:
-
------
-
-Specifically:
-* The USB "complete" functions are called with local interrupts
-disabled.  Specifically see __usb_hcd_giveback_urb().
-* I see calls to uvc_video_complete() that easily take > 125us.
-
-Unfortunately the interrupts disabled while uvc_video_complete() is
-called are always the interrupts for the same CPU that's dealing with
-the normal dwc2 USB interrupts.
-
---
-
-Ugh.  This may be the memcpy() as others have found:
-
-http://www.spinics.net/lists/linux-usb/msg83581.html
-
-...looks like the issue is that the driver is allocating memory that's
-supposed to be DMA coherent and copying from this memory is slow.
-
------
-
-You could probably pick my timing patch and then see if you're
-actually hitting cases like this, I guess?
-
-===
-
-3. Are you running CPUFreq by chance?
-
-...back in the day we had a bug on rk3288 where we were temporarily
-running the CPU as slow as 8 MHz for a short while during a CPUFreq
-transition.  If you happened to get a dwc2 interrupt while at this
-speed then you were in trouble.
+--------- Error Message --------------------
+...
+EXT3-fs (mmcblk3p2): using internal journal
+EXT3-fs (mmcblk3p2): recovery complete
+EXT3-fs (mmcblk3p2): mounted filesystem with ordered data mode
+VFS: Mounted root (ext3 filesystem) on device 179:2.
+devtmpfs: mounted
+Freeing unused kernel memory: 324K (80c68000 - 80cb9000)
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
 
--Doug
+----------- kernel modification ------------------
+I defined original macro CONFIG_DEBUG_STACK_16K.
+
+?arch/arm/include/asm/thread_info.h
+
+#ifdef CONFIG_DEBUG_STACK_16K
+#define THREAD_SIZE_ORDER      2
+#define THREAD_SIZE            16384
+#define THREAD_START_SP                (THREAD_SIZE - 16)
+#else
+#define THREAD_SIZE_ORDER 1
+#define THREAD_SIZE 8192
+#define THREAD_START_SP (THREAD_SIZE - 8)
+#endif
+
+?arch/arm/kernel/entry-header.S
+...
+#ifdef CONFIG_DEBUG_STACK_16K
+mov     ?rd, sp, lsr #14
+        mov     ?rd, ?rd, lsl #14
+#else
+mov ?rd, sp, lsr #13
+mov ?rd, ?rd, lsl #13
+#endif
+
+...
+#ifdef CONFIG_DEBUG_STACK_16K
+lsr     ?rd, ?rd, #14
+        mov     ?rd, ?rd, lsl #14
+#else
+lsr ?rd, ?rd, #13
+mov ?rd, ?rd, lsl #13
+#endif
+
+?arch/arm/mm/proc-macros.S
+/*
+ * act_mm - get current->active_mm
+ */
+.macro act_mm, rd
+#ifdef CONFIG_DEBUG_STACK_16K
+mov ?rd, sp, lsr #12 + THREAD_SIZE_ORDER
+    mov ?rd, ?rd, lsl #12 + THREAD_SIZE_ORDER
+#else
+bic ?rd, sp, #8128
+bic ?rd, ?rd, #63
+#endif
+ldr ?rd, [?rd, #TI_TASK]
+ldr ?rd, [?rd, #TSK_ACTIVE_MM]
+.endm
