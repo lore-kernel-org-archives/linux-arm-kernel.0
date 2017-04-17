@@ -1,35 +1,79 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 17 Apr 2017 13:48:09 -0400 (EDT)
-Subject: [PATCH net-next] net: mvneta: fix failed to suspend if WOL is
- enabled
-In-Reply-To: <20170414110732.3100-1-jszhang@marvell.com>
-References: <20170414110732.3100-1-jszhang@marvell.com>
-Message-ID: <20170417.134809.952428725665734201.davem@davemloft.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 17 Apr 2017 13:50:01 -0400
+Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
+In-Reply-To: <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
+ <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
+ <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
+ <20170414214452.GA21870@bhelgaas-glaptop.roam.corp.google.com>
+ <66168dde-7719-6f74-3f06-8e4724dd2918@codeaurora.org>
+ <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
+Message-ID: <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
-Date: Fri, 14 Apr 2017 19:07:32 +0800
+On 4/17/2017 12:38 PM, Bjorn Helgaas wrote:
+>> Like you said, what do we do by default is the question. Should we opt
+>> for safe like we are doing, or try to save some power.
+> I think safety is paramount.  Every user should be able to boot safely
+> without any kernel parameters.  We don't want users to have a problem
+> booting and then have to search for a workaround like booting with
+> "pcie_aspm=off".  Most users will never do that.
+> 
 
-> Recently, suspend/resume and WOL support are added into mvneta driver.
-> If we enable WOL, then we get some error as below on Marvell BG4CT
-> platforms during suspend:
-> 
-> [  184.149723] dpm_run_callback(): mdio_bus_suspend+0x0/0x50 returns -16
-> [  184.149727] PM: Device f7b62004.mdio-mi:00 failed to suspend: error -16
-> 
-> -16 means -EBUSY, phy_suspend() will return -EBUSY if it finds the
-> device has WOL enabled.
-> 
-> We fix this issue by properly setting the netdev's power.can_wakeup
-> and power.wakeup, i.e
-> 
-> 1. in mvneta_mdio_probe(), call device_set_wakeup_capable() to set
-> power.can_wakeup if the phy support WOL.
-> 
-> 2. in mvneta_ethtool_set_wol(), call device_set_wakeup_enable() to
-> set power.wakeup if WOL has been successfully enabled in phy.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+OK, no problem with leaving the behavior as it is.
 
-Applied.
+My initial approach was #2. We knew this way that user had full control
+over the ASPM policy by changing the BIOS option. Then, Mayurkumar
+complained that ASPM is not enabled following a hotplug insertion to an
+empty slot. That's when I switched to #3 as it sounded like a good thing
+to have for us.
+
+> Here's a long-term strawman proposal, see what you think:
+> 
+>   - Deprecate CONFIG_PCIEASPM_DEFAULT, CONFIG_PCIEASPM_POWERSAVE, etc.
+>   - Default aspm_policy is POLICY_DEFAULT always.
+>   - POLICY_DEFAULT means Linux doesn't touch anything: if BIOS enabled
+> ASPM, we leave it that way; we leave ASPM disabled on hot-added
+> devices.
+
+I can easily see people complaining the other way around. There
+could be some boot FW that doesn't know what ASPM is and this particular
+system could rely on the compile time option for enabling power options.
+Maybe, a command line option will be required for them to keep the existing
+behavior.
+
+>   - Deprecate kernel boot parameters (possibly keep pcie_aspm=off for
+> debugging use).
+>   - Use /sys/module/pcie_aspm/parameters/policy for run-time
+> system-wide  control, including for future hot-added devices.
+>   - Remove CONFIG_PCIEASPM_DEBUG and enable that code always, so we
+> have fine-grained run-time control.
+> 
+
+Runtime control sounds like a better plan. We need hooks into the system
+power management policy.
+
+>> Maybe, we are missing a HPP option from the PCI spec.
+> That's an interesting idea.  _HPX does have provision for manipulating
+> Link Control bits (see ACPI r5.0, sec 6.2.8.3), but I don't think very
+> many systems implement it.  And there's currently no connection
+> between program_hpp_type2() and aspm.c, so I'm a little worried that
+> we might have issues if a system did implement an _HPX that sets any
+> of the ASPM bits.
+
+I looked at the spec some more. These are there to restore the register
+settings following hotplug insertion. I agree it won't play nice with ASPM
+as the control bits need to be enabled in coordination with the upstream
+device.
+
+I think the right approach is to let the userspace feed the required
+policy to the kernel like you suggested. Then, it needs to be per port
+via link_state to have the most flexibility. 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
