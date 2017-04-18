@@ -1,50 +1,43 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 18 Apr 2017 19:04:50 +0200
-Subject: [patch V2 08/24] hwtracing/coresight-etm3x: Use
- cpuhp_setup_state_nocalls_cpuslocked()
+Date: Tue, 18 Apr 2017 19:04:53 +0200
+Subject: [patch V2 11/24] ARM/hw_breakpoint: Use cpuhp_setup_state_cpuslocked()
 References: <20170418170442.665445272@linutronix.de>
-Message-ID: <20170418170553.026838125@linutronix.de>
+Message-ID: <20170418170553.274229815@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-etm_probe() holds get_online_cpus() while invoking
-cpuhp_setup_state_nocalls().
+arch_hw_breakpoint_init() holds get_online_cpus() while registerring the
+hotplug callbacks.
 
-cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
-correct, but prevents the conversion of the hotplug locking to a percpu
-rwsem.
+cpuhp_setup_state() invokes get_online_cpus() as well. This is correct, but
+prevents the conversion of the hotplug locking to a percpu rwsem.
 
-Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested call.
+Use cpuhp_setup_state_cpuslocked() to avoid the nested call.
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -803,12 +803,12 @@ static int etm_probe(struct amba_device
- 		dev_err(dev, "ETM arch init failed\n");
- 
- 	if (!etm_count++) {
--		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
--					  "arm/coresight:starting",
--					  etm_starting_cpu, etm_dying_cpu);
--		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
--						"arm/coresight:online",
--						etm_online_cpu, NULL);
-+		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
-+						     "arm/coresight:starting",
-+						     etm_starting_cpu, etm_dying_cpu);
-+		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
-+							   "arm/coresight:online",
-+							   etm_online_cpu, NULL);
- 		if (ret < 0)
- 			goto err_arch_supported;
- 		hp_online = ret;
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -1098,8 +1098,9 @@ static int __init arch_hw_breakpoint_ini
+ 	 * assume that a halting debugger will leave the world in a nice state
+ 	 * for us.
+ 	 */
+-	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm/hw_breakpoint:online",
+-				dbg_reset_online, NULL);
++	ret = cpuhp_setup_state_cpuslocked(CPUHP_AP_ONLINE_DYN,
++					   "arm/hw_breakpoint:online",
++					   dbg_reset_online, NULL);
+ 	unregister_undef_hook(&debug_reg_hook);
+ 	if (WARN_ON(ret < 0) || !cpumask_empty(&debug_err_mask)) {
+ 		core_num_brps = 0;
