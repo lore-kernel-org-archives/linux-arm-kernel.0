@@ -1,126 +1,78 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Tue, 18 Apr 2017 17:05:22 -0600
-Subject: [PATCH V15 10/11] trace, ras: add ARM processor error trace event
-In-Reply-To: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1492556723-9189-11-git-send-email-tbaicar@codeaurora.org>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Wed, 19 Apr 2017 01:18:00 +0200
+Subject: [PATCH 4/4] mmc: pxamci: Fix race condition between pxamci_dma_irq()
+ and pxamci_irq()
+In-Reply-To: <cover.1492492523.git.petr.cvek@tul.cz>
+References: <cover.1492492523.git.petr.cvek@tul.cz>
+Message-ID: <31e332fa-f152-1eff-39fb-91f332b84757@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there are trace events for the various RAS
-errors with the exception of ARM processor type errors.
-Add a new trace event for such errors so that the user
-will know when they occur. These trace events are
-consistent with the ARM processor error section type
-defined in UEFI 2.6 spec section N.2.4.4.
+The data write requests may require an FIFO flush when the DMA transaction
+ends. This is handled by a DMA callback pxamci_dma_irq(). After flushing
+the FIFO the MCI controller generates the DATA_TRAN_DONE interrupt.
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
+Problem is the DATA_TRAN_DONE interrupt will be generated when the write
+data length is divisible by the FIFO size (no flush is required). And in
+this case the DMA callback can be called long time after the
+DATA_TRAN_DONE interrupt (as the DMA callback is realised by a tasklet,
+it can even stack). When the DMA callback is finally called there can
+already be a different type of the transaction (another data read or write
+request).
+
+The dmaengine_tx_status() will be called for a wrong DMA transaction and
+in some case it returns DMA_IN_PROGRESS, which the code recognize as
+an error and ends a running DMA and halts the MCI controller.
+
+The problem presents itself under heavy (interrupt) load with a high MCI
+traffic with this message:
+
+	mmc0: DMA error on tx channel
+
+The fix must obey these situations:
+ - Any command will erase the FIFO
+ - Data writes divisible by the FIFO size will (probably) automatically
+   generate a DATA_TRAN_DONE interrupt
+ - Data writes with a nonzero FIFO remainder must be flushed and then MCI
+   generates a DATA_TRAN_DONE interrupt
+ - Data reads do not require a flush but they will generate
+   a DATA_TRAN_DONE interrupt
+
+The fix changes the DATA_TRAN_DONE interrupt enable from read/write
+requests to read requests. The DATA_TRAN_DONE interrupt for a write
+request is enabled in the DMA callback, this assures  a DATA_TRAN_DONE
+interrupt will be always called after a callback (with or without an FIFO
+flush).
+
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
 ---
- drivers/acpi/apei/ghes.c    |  8 +++++++-
- drivers/firmware/efi/cper.c |  1 +
- drivers/ras/ras.c           |  1 +
- include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 54 insertions(+), 1 deletion(-)
+ drivers/mmc/host/pxamci.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 3d9f63b..612deb3 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -518,7 +518,13 @@ static void ghes_do_proc(struct ghes *ghes,
- 		}
- #endif
- #ifdef CONFIG_RAS
--		else if (trace_unknown_sec_event_enabled()) {
-+		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
-+			 trace_arm_event_enabled()) {
-+			struct cper_sec_proc_arm *arm_err;
-+
-+			arm_err = acpi_hest_get_payload(gdata);
-+			trace_arm_event(arm_err);
-+		} else if (trace_unknown_sec_event_enabled()) {
- 			void *unknown_err = acpi_hest_get_payload(gdata);
+diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
+index 570735a10127..08713bb6c716 100644
+--- a/drivers/mmc/host/pxamci.c
++++ b/drivers/mmc/host/pxamci.c
+@@ -335,7 +335,9 @@ static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
  
- 			trace_unknown_sec_event(&sec_type,
-diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index 610d31a..650e0f6 100644
---- a/drivers/firmware/efi/cper.c
-+++ b/drivers/firmware/efi/cper.c
-@@ -35,6 +35,7 @@
- #include <linux/printk.h>
- #include <linux/bcd.h>
- #include <acpi/ghes.h>
-+#include <ras/ras_event.h>
+ 	pxamci_disable_irq(host, END_CMD_RES);
+ 	if (host->data && !cmd->error) {
+-		pxamci_enable_irq(host, DATA_TRAN_DONE);
++		if (host->data->flags & MMC_DATA_READ)
++			pxamci_enable_irq(host, DATA_TRAN_DONE);
++
+ 		/*
+ 		 * workaround for erratum #91, if doing write
+ 		 * enable DMA late
+@@ -585,6 +587,9 @@ static void pxamci_dma_irq(void *param)
  
- #define INDENT_SP	" "
- 
-diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-index fb2500b..8ba5a94 100644
---- a/drivers/ras/ras.c
-+++ b/drivers/ras/ras.c
-@@ -28,3 +28,4 @@ static int __init ras_init(void)
- #endif
- EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
- EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-+EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 5861b6f..13befad 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -162,6 +162,51 @@
- );
- 
- /*
-+ * ARM Processor Events Report
-+ *
-+ * This event is generated when hardware detects an ARM processor error
-+ * has occurred. UEFI 2.6 spec section N.2.4.4.
-+ */
-+TRACE_EVENT(arm_event,
+ 	if (likely(status == DMA_COMPLETE)) {
+ 		writel(BUF_PART_FULL, host->base + MMC_PRTBUF);
 +
-+	TP_PROTO(const struct cper_sec_proc_arm *proc),
-+
-+	TP_ARGS(proc),
-+
-+	TP_STRUCT__entry(
-+		__field(u64, mpidr)
-+		__field(u64, midr)
-+		__field(u32, running_state)
-+		__field(u32, psci_state)
-+		__field(u8, affinity)
-+	),
-+
-+	TP_fast_assign(
-+		if (proc->validation_bits & CPER_ARM_VALID_AFFINITY_LEVEL)
-+			__entry->affinity = proc->affinity_level;
-+		else
-+			__entry->affinity = ~0;
-+		if (proc->validation_bits & CPER_ARM_VALID_MPIDR)
-+			__entry->mpidr = proc->mpidr;
-+		else
-+			__entry->mpidr = 0ULL;
-+		__entry->midr = proc->midr;
-+		if (proc->validation_bits & CPER_ARM_VALID_RUNNING_STATE) {
-+			__entry->running_state = proc->running_state;
-+			__entry->psci_state = proc->psci_state;
-+		} else {
-+			__entry->running_state = ~0;
-+			__entry->psci_state = ~0;
-+		}
-+	),
-+
-+	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
-+		  "running state: %d; PSCI state: %d",
-+		  __entry->affinity, __entry->mpidr, __entry->midr,
-+		  __entry->running_state, __entry->psci_state)
-+);
-+
-+/*
-  * Unknown Section Report
-  *
-  * This event is generated when hardware detected a hardware
++		/* NOTICE pxamci_irq() is dependent on pxamci_dma_irq() */
++		pxamci_enable_irq(host, DATA_TRAN_DONE);
+ 	} else {
+ 		pr_err("%s: Invalid DMA status %i\n", mmc_hostname(host->mmc),
+ 			status);
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.11.0
