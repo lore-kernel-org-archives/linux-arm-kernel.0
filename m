@@ -1,59 +1,34 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 18 Apr 2017 15:05:48 -0500
-Subject: [Query] Enabling parent device clock from resume_noirq
-In-Reply-To: <62cd5ee0-3f0c-5e65-5f64-0c91a2a6f1e6@ti.com>
-References: <62cd5ee0-3f0c-5e65-5f64-0c91a2a6f1e6@ti.com>
-Message-ID: <4c6e91e4-35fa-2fde-7915-fb922ec22567@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 18 Apr 2017 13:08:44 -0700
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+ <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+Message-ID: <CAD=FV=UB4KRvmrRKmRCTU3BoLV858bGPTQigWnvPYFxhHkEq4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-pm
+Hi,
 
-On 04/18/2017 01:07 AM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> resume_noirq callbacks are used in PCIe core to restore PCI state (this
-> accesses PCI module). So the clocks of PCI module has to be enabled before
-> resume_noirq.
-> 
-> The clocks for the PCI module in DRA7xx is provided by PIPE3 PHY device which
-> in turn gets it's clock from OCP2SCP device. During resume_noirq callbacks,
-> pm_runtime is disabled, so pm_runtime_get_sync is ineffective. However
-> pm_runtime can be enabled using pm_runtime_force_resume. Now the problem is
-> adding pm_runtime_force_resume() in resume_noirq callback of pci-dra7xx driver
-> will enable only the pm_runtime of PCI device but not PIPE3 PHY or OCP2SCP.
-> Adding pm_runtime_force_resume() in resume_noirq callback of PIPE3 PHY driver
-> or OCP2SCP driver will not help if the resume_noirq callbacks in PIP3PHY driver
-> and OCP2SCP driver are invoked after the resume_noirq of pci-dra7xx driver.
-> 
-> How to enable the pm_runtime of parent devices in resume_noirq callback? Does
-> existing pm_runtime framework has support for that?
-> 
+On Tue, Apr 18, 2017 at 1:07 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> 1. With dwc2 you often end up in the situation where you need to
+>> service an interrupt every 125 uS.  If servicing that interrupt takes
+>> anywhere near 125 uS in the common case then you'll be in trouble.
+>
+> I will try to measure this with a logic analyzer.
 
-Most probably you've hit the issue described in [1].
-In general, if pci-dra7xx is consumer of  PIPE3 PHY device and 
-PIPE3 PHY device is child of OCP2SCP then suspend/resume order should be
-- pci-dra7xx
-- PIPE3 PHY
-- OCP2SCP
- and resume
-- OCP2SCP
-- PIPE3 PHY
-- pci-dra7xx
-and in this case  pm_runtime_force_x() might work.
+Why a logic analyzer?  I'd think that "ftrace" would be your friend
+here.  If you configure it just right you ought to be able to figure
+out exactly what your kernel is doing.
 
-Hence, approach [1] was not accepted (personally I still like it) and
-"Functional dependencies tracking support" was introduced instead by commit 9ed9895 [2]
-you can try it.
+...or, if you don't want to learn ftrace (it's cool and worth it, but
+there's some time) you can just use "trace_printk" to get a fairly
+low-over head printout to a memory buffer.  You can put that printout
+in various places in the code and figure out what's taking so long.
+In fact, that's exactly how the patch at
+<https://chromium-review.googlesource.com/c/321980/4/drivers/usb/core/hcd.c>
+works.
 
-But, as per code, I'm not sure that Functional dependencies properly tracked in 
-pm_runtime_force_x() functions.
-
-PS: you can try to reorder device's nodes in DT and place PCI node after "ocp2scp" :P
-
-[1] "driver core: Ensure proper suspend/resume ordering"
- https://patchwork.kernel.org/patch/7153201/
-[2] https://patchwork.kernel.org/patch/9404547/
--- 
-regards,
--grygorii
+-Doug
