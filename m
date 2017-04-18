@@ -1,227 +1,119 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 18 Apr 2017 10:04:22 +0200
-Subject: [PATCH 2/7] crypto: inside-secure: add SafeXcel EIP197 crypto
- engine driver
-In-Reply-To: <5a016e1e-1443-158a-5ced-58dcb4ad63cc@arm.com>
-References: <20170329124432.27457-1-antoine.tenart@free-electrons.com>
- <20170329124432.27457-3-antoine.tenart@free-electrons.com>
- <5a016e1e-1443-158a-5ced-58dcb4ad63cc@arm.com>
-Message-ID: <20170418080422.55k63czpmnuqn7ku@kwain>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 18 Apr 2017 10:07:34 +0200
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+ <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+Message-ID: <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Am 18.04.2017 um 00:37 schrieb Doug Anderson:
+> Hi,
+>
+> On Mon, Apr 17, 2017 at 4:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Hi,
+>>
+>>> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Oktober 2016 um 21:34 geschrieben:
+>>>
+>>>
+>>> I inspired by this issue [1] i build up a slightly modified setup with a
+>>> Raspberry Pi B (mainline kernel 4.9rc3), a powered 7 port USB hub and 5 Prolific
+>>> PL2303 USB to serial convertors. I modified the usb_test for dwc2 [2], which
+>>> only tries to open all ttyUSB devices one after the other.
+>>>
+>>> Unfortunately the complete system stuck after opening the first ttyUSB device (
+>>> heartbeat LED stop blinking, no reaction to debug UART). The only way to
+>>> reanimate the system is to powerdown the USB hub with the USB to serial
+>>> convertors.
+>>>
+>>> [1] - https://github.com/raspberrypi/linux/issues/1692
+>>> [2] - https://gist.github.com/lategoodbye/dd0d30af27b6f101b03d5923b279dbaa
+>> since this issue still exists with 4.11 (even without or with microframe scheduler enabled), i want to ask some additional questions:
+>>
+>> Is this issue reproducible with other dwc2 platforms than bcm2835?
+> +Edmund Szeto, who I seem to remember emailing me about similar
+> questions in the past.
+>
+>
+>> Does the soft lockup also occurs after opening the second serial convertor or later?
+> I don't have serial converters easily available to me, but back in the
+> day when I was stressing things out on rk3288 I never saw anything
+> this bad.  ...of course, on rk3288 we've got 4 A17 cores running
+> really fast, so possibly just being slower is what causes your
+> problems here?
 
-On Wed, Apr 12, 2017 at 02:54:13PM +0100, Robin Murphy wrote:
-> 
-> Bit of a drive-by, but since I have it in my head that crypto drivers
-> are a hotspot for dodgy DMA usage (in part due to the hardware often
-> being a bit esoteric with embedded RAMs and such), this caught my eye
-> and I thought I'd give this a quick once-over to check for anything
-> smelly. Unfortunately, I was not disappointed... ;)
+The downstream kernel of the Raspberry Pi foundation with it's
+out-of-tree dwc_otg driver is able to handle 8 serial converter on a RPI
+B. I would be happy to get at least 2 or 3 working on mainline.
 
-:-)
+>
+> I will make the following observations:
+>
+> 1. With dwc2 you often end up in the situation where you need to
+> service an interrupt every 125 uS.  If servicing that interrupt takes
+> anywhere near 125 uS in the common case then you'll be in trouble.
 
-> On 29/03/17 13:44, Antoine Tenart wrote:
-> [...]
-> > diff --git a/drivers/crypto/inside-secure/safexcel.c b/drivers/crypto/inside-secure/safexcel.c
-> > new file mode 100644
-> > index 000000000000..00f3f2c85d05
-> > --- /dev/null
-> > +++ b/drivers/crypto/inside-secure/safexcel.c
-> [...]
-> > +int safexcel_invalidate_cache(struct crypto_async_request *async,
-> > +			      struct safexcel_context *ctx,
-> > +			      struct safexcel_crypto_priv *priv,
-> > +			      dma_addr_t ctxr_dma, int ring,
-> > +			      struct safexcel_request *request)
-> > +{
-> > +	struct safexcel_command_desc *cdesc;
-> > +	struct safexcel_result_desc *rdesc;
-> > +	phys_addr_t ctxr_phys;
-> > +	int ret = 0;
-> > +
-> > +	ctxr_phys = dma_to_phys(priv->dev, ctxr_dma);
-> 
-> No no no. This is a SWIOTLB-specific (or otherwise arch-private,
-> depending on implementation) helper, not a DMA API function, and should
-> not be called directly by drivers. There is no guarantee it will give
-> the result you expect, or even compile, in all cases (if the kbuild
-> robot hasn't already revealed via the COMPILE_TEST dependency).
-> 
-> That said, AFAICS ctxr_phys ends up in a descriptor which is given to
-> the device, so trying to use a physical address is wrong and it should
-> still be the DMA address anyway.
+I will try to measure this with a logic analyzer.
 
-I see. The cryptographic engine should always use dma addresses. I'll
-update the descriptors structure members from "phys" to "dma" as well.
+>
+> ===
+>
+> 2. When I was testing on rk3288 (on kernel 3.14) I did see occasions
+> where uvc_video_complete() could sometimes take > 125 uS.  It's been a
+> long time now, but if I remember correctly this had to do with the
+> fact that the URB buffers were allocated in a way where you had to
+> access them non-cached and this was super duper slow.  In my
+> particular case I could "fix" it by adjusting UVC_MAX_PACKETS
+> (crosreview.com/321932).  ...and I had some timing code in
+> crosreview.com/321980.
+>
+> Again, it was a long time ago, but elsewhere I have written down:
+>
+> -----
+>
+> Specifically:
+> * The USB "complete" functions are called with local interrupts
+> disabled.  Specifically see __usb_hcd_giveback_urb().
+> * I see calls to uvc_video_complete() that easily take > 125us.
+>
+> Unfortunately the interrupts disabled while uvc_video_complete() is
+> called are always the interrupts for the same CPU that's dealing with
+> the normal dwc2 USB interrupts.
+>
+> --
+>
+> Ugh.  This may be the memcpy() as others have found:
+>
+> http://www.spinics.net/lists/linux-usb/msg83581.html
+>
+> ...looks like the issue is that the driver is allocating memory that's
+> supposed to be DMA coherent and copying from this memory is slow.
+>
+> -----
+>
+> You could probably pick my timing patch and then see if you're
+> actually hitting cases like this, I guess?
+>
+> ===
+>
+> 3. Are you running CPUFreq by chance?
+>
+> ...back in the day we had a bug on rk3288 where we were temporarily
+> running the CPU as slow as 8 MHz for a short while during a CPUFreq
+> transition.  If you happened to get a dwc2 interrupt while at this
+> speed then you were in trouble.
 
-> [...]
-> > +static int safexcel_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct resource *res;
-> > +	struct safexcel_crypto_priv *priv;
-> > +	int i, ret;
-> > +
-> > +	priv = devm_kzalloc(dev, sizeof(struct safexcel_crypto_priv),
-> > +			    GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	priv->dev = dev;
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	priv->base = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(priv->base)) {
-> > +		dev_err(dev, "failed to get resource\n");
-> > +		return PTR_ERR(priv->base);
-> > +	}
-> > +
-> > +	priv->clk = of_clk_get(dev->of_node, 0);
-> > +	if (!IS_ERR(priv->clk)) {
-> > +		ret = clk_prepare_enable(priv->clk);
-> > +		if (ret) {
-> > +			dev_err(dev, "unable to enable clk (%d)\n", ret);
-> > +			return ret;
-> > +		}
-> > +	} else {
-> > +		/* The clock isn't mandatory */
-> > +		if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +	}
-> 
-> You should call dma_set_mask_and_coherent() before any DMA API calls,
-> both to confirm DMA really is going to work all, and also (since this IP
-> apparently supports >32-bit addresses) to describe the full inherent
-> addressing capability, not least to avoid wasting time/space with
-> unnecessary bounce buffering otherwise.
+There is no CPUFreq driver for bcm2835 in mainline and i hope the GPU
+firmware doesn't play with the core frequency during runtime.
 
-OK, I'll add a call to this helper before using DMA API calls.
+I also use the bcm2835_defconfig, which does have anything disabled
+under kernel hacking.
 
-> > +
-> > +err_pool:
-> > +	dma_pool_destroy(priv->context_pool);
-> 
-> You used dmam_pool_create(), so not only is an explicit destroy
-> unnecessary, but doing so with the non-managed version is actively
-> harmful, since devres would end up double-freeing the pool after you return.
+Thanks
+Stefan
 
-I saw this and fixed it in my local version.
-
-> > +struct safexcel_token {
-> > +	u32 packet_length:17;
-> > +	u8 stat:2;
-> > +	u16 instructions:9;
-> > +	u8 opcode:4;
-> > +} __packed;
-> 
-> Using bitfields in hardware descriptors seems pretty risky, since you've
-> no real guarantee two compilers will lay them out the same way (or that
-> either would be correct WRT what the hardware expects). I'd be more
-> inclined to construct all these fields with explicit masking and shifting.
-
-Hmm, I'm not sure to follow you here. If I use bitfields in a __packed
-structure, we should be safe. Why would the compiler have a different
-behaviour?
-
-> > +static int safexcel_aes_send(struct crypto_async_request *async,
-> > +			     int ring, struct safexcel_request *request,
-> > +			     int *commands, int *results)
-> > +{
-> > +	struct ablkcipher_request *req = ablkcipher_request_cast(async);
-> > +	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
-> > +	struct safexcel_crypto_priv *priv = ctx->priv;
-> > +	struct safexcel_command_desc *cdesc;
-> > +	struct safexcel_result_desc *rdesc;
-> > +	struct scatterlist *sg;
-> > +	phys_addr_t ctxr_phys;
-> > +	int nr_src, nr_dst, n_cdesc = 0, n_rdesc = 0, queued = req->nbytes;
-> > +	int i, ret = 0;
-> > +
-> > +	request->req = &req->base;
-> > +
-> > +	if (req->src == req->dst) {
-> > +		nr_src = sg_nents_for_len(req->src, req->nbytes);
-> > +		nr_dst = nr_src;
-> > +
-> > +		if (dma_map_sg(priv->dev, req->src, nr_src, DMA_BIDIRECTIONAL) <= 0)
-> 
-> Nit: you only need to check for zero/nonzero to determine failure
-> (similarly below) - dma_map_sg() cannot return negative values.
-
-OK.
-
-> Bigger complaint: you should not ignore the successful return value and
-> rely on it being equal to nr_src - please see the description of
-> dma_map_sg() in Documenatation/DMA-API.txt
-
-OK, I'll have a look at it and fix this.
-
-> > +	/* command descriptors */
-> > +	for_each_sg(req->src, sg, nr_src, i) {
-> > +		phys_addr_t sg_phys = dma_to_phys(priv->dev, sg_dma_address(sg));
-> > +		int len = sg_dma_len(sg);
-> 
-> If dma_map_sg() coalesced any entries into the same mapping such that
-> count < nents, these could well give bogus values toward the end of the
-> list once i >= count(if you're lucky, at least len might be 0).
-
-OK, I'll fix this.
-
-> > +	/* Add a command descriptor for the cached data, if any */
-> > +	if (cache_len) {
-> > +		ctx->base.cache_dma = dma_map_single(priv->dev, req->cache,
-> 
-> This is pretty dodgy, since req->cache is inside a live data structure,
-> adjoining parts of which are updated whilst still mapped (the update of
-> req->processed below). You just about get away without data corruption
-> since we *probably* don't invalidate anything when unmapping
-> DMA_TO_DEVICE, and the coherency hardware *probably* doesn't do anything
-> crazy, but you've no real guarantee of that - any DMA buffer should
-> really be separately kmalloced. "That's a nice dirty cache line you've
-> got there, it'd be a shame if anything were to happen to it..."
-
-OK, good to know.
-
-> > +	rdr->base = dmam_alloc_coherent(priv->dev,
-> > +					rdr->offset * EIP197_DEFAULT_RING_SIZE,
-> > +					&rdr->base_dma, GFP_KERNEL);
-> > +	if (!rdr->base) {
-> > +		dmam_free_coherent(priv->dev,
-> > +				   cdr->offset * EIP197_DEFAULT_RING_SIZE,
-> > +				   cdr->base, cdr->base_dma);
-> 
-> Returning an error here will abort your probe routine, so devres will
-> clean these up there and then - there's no need to do free anything
-> explicitly. That's rather the point of using devm_*() to begin with.
-
-Sure.
-
-> > +	dmam_free_coherent(priv->dev,
-> > +			   cdr->offset * EIP197_DEFAULT_RING_SIZE,
-> > +			   cdr->base, cdr->base_dma);
-> > +	dmam_free_coherent(priv->dev,
-> > +			   rdr->offset * EIP197_DEFAULT_RING_SIZE,
-> > +			   rdr->base, rdr->base_dma);
-> > +}
-> 
-> Again, this is only called at device teardown, so the whole function is
-> redundant.
-
-OK, I'll remove these.
-
-Thanks for the review!
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/2a1b30cf/attachment-0001.sig>
+>
+>
+> -Doug
