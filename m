@@ -1,34 +1,40 @@
-From: jthumshirn@suse.de (Johannes Thumshirn)
-Date: Tue, 18 Apr 2017 16:10:50 +0200
-Subject: [PATCH] ARM: Fix rd_size declaration
-In-Reply-To: <1492524472.2628.3.camel@sandisk.com>
-References: <20170417231003.7178-1-bart.vanassche@sandisk.com>
- <20170418073526.GA6056@linux-x5ow.site>
- <1492524472.2628.3.camel@sandisk.com>
-Message-ID: <20170418141050.GG6056@linux-x5ow.site>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Apr 2017 15:13:12 +0100
+Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
+ comments etc.
+In-Reply-To: <CAMuHMdXTgCEesv3imtnzs6Mcnkp22KW_rx0Jiv3_zce7bR3AVQ@mail.gmail.com>
+References: <20170328065130.16019-2-takahiro.akashi@linaro.org>
+ <1491207492.6020.8.camel@infradead.org>
+ <20170404054144.GG16309@linaro.org>
+ <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
+ <20170404073504.GI16309@linaro.org>
+ <1491291844.6218.25.camel@infradead.org>
+ <20170404092604.GB14898@arm.com>
+ <1492085938.20068.6.camel@infradead.org>
+ <20170416231223.GA31693@verge.net.au>
+ <CAMuHMdXTgCEesv3imtnzs6Mcnkp22KW_rx0Jiv3_zce7bR3AVQ@mail.gmail.com>
+Message-ID: <20170418141312.GD27592@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 02:07:53PM +0000, Bart Van Assche wrote:
-> Hello Johannes,
+On Mon, Apr 17, 2017 at 01:54:49PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Apr 17, 2017 at 1:12 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Apr 13, 2017 at 01:18:58PM +0100, David Woodhouse wrote:
+> >> Less important than in user-visible messages, but still good practice as
+> >> there's still no excuse for ARM64 code to look like it was written before
+> >> 1996.
+> >>
+> >> Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
+> >
+> > Hi David,
+> >
+> > I'd be happy to take the Renesas portions of this change if they were
+> > broken out into a separate patch. The reason I would prefer a separate
+> > patch is to avoid the possibility of conflicts, even trivial ones.
 > 
-> Thanks for the review. But are you aware that with the current content an
-> include guard is overkill because it is safe to evaluate the "extern unsigned
-> long rd_size" declaration multiple times?
+> s/possibility/reality/, unless this series goes in before v4.12-rc1.
 
-Yes I am. But once someone does changes to this header and forgets the include
-guard as well it may cause errors.
+Maybe the arm-soc guys can take both patches on top of the other series
+they pull, in which case, for both patches:
 
-I am aware that this is rather cosmetic than needed, that's why I declared it
-as a nit.
-
-Byte,
-	Johannes
-
--- 
-Johannes Thumshirn                                          Storage
-jthumshirn at suse.de                                +49 911 74053 689
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
-Key fingerprint = EC38 9CAB C2C4 F25D 8600 D0D0 0393 969D 2D76 0850
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
