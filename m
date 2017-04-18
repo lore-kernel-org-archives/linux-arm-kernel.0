@@ -1,106 +1,111 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Tue, 18 Apr 2017 11:37:01 -0700 (PDT)
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <b6cd0d59-9569-2958-9cc7-c971139881f4@suse.com>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
- <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
- <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
- <20170406142710.GE4372@olila.local.net-space.pl>
- <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
- <20170406152040.GH4372@olila.local.net-space.pl>
- <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
- <20170406160653.GJ4372@olila.local.net-space.pl>
- <c23a6d11-cde8-7690-9676-537b5f17b967@suse.com>
- <20170406164309.GM4372@olila.local.net-space.pl>
- <b6cd0d59-9569-2958-9cc7-c971139881f4@suse.com>
-Message-ID: <alpine.DEB.2.10.1704181135580.31486@sstabellini-ThinkPad-X260>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 18 Apr 2017 20:57:04 +0200
+Subject: [PATCHv3 08/14] drivers/perf: arm_pmu: split cpu-local irq
+ request/free
+In-Reply-To: <20170418183316.GM17866@leverpostej>
+References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+ <1491899997-32210-9-git-send-email-mark.rutland@arm.com>
+ <CAMuHMdVV4qMyYTYN92TE4fsrxo66WK-Gd001YbJZok2txOH4ig@mail.gmail.com>
+ <20170418183316.GM17866@leverpostej>
+Message-ID: <CAMuHMdVs+JQ3-Lj=TyN5Zi9fAhJROuc7upgFKmCwXVaA8eb1WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Apr 2017, Juergen Gross wrote:
-> On 06/04/17 18:43, Daniel Kiper wrote:
-> > On Thu, Apr 06, 2017 at 06:22:44PM +0200, Juergen Gross wrote:
-> >> On 06/04/17 18:06, Daniel Kiper wrote:
-> >>> Hi Julien,
-> >>>
-> >>> On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
-> >>>> Hi Daniel,
-> >>>>
-> >>>> On 06/04/17 16:20, Daniel Kiper wrote:
-> >>>>> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
-> >>>>>> On 06/04/17 16:27, Daniel Kiper wrote:
-> >>>>>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
-> >>>>>>>> Hi Juergen,
-> >>>>>>>>
-> >>>>>>>> On 06/04/17 07:23, Juergen Gross wrote:
-> >>>>>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
-> >>>>>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
-> >>>>>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
-> >>>>>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
-> >>>>>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
-> >>>>>>>>>>
-> >>>>>>>>>> (+Daniel)
-> >>>>>>>>>>
-> >>>>>>>>>> This could be a problem for x86 as well, at least theoretically.
-> >>>>>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
-> >>>>>>>>>>
-> >>>>>>>>>> So I think we should have a similar routine there.
-> >>>>>>>>>
-> >>>>>>>>> +1
-> >>>>>>>>>
-> >>>>>>>>> I don't see any problem with such a routine added, in contrast to
-> >>>>>>>>> potential "reboots" instead of power off without it.
-> >>>>>>>>>
-> >>>>>>>>> So I think this dummy xen_efi_reset_system() should be added to
-> >>>>>>>>> drivers/xen/efi.c instead.
-> >>>>>>>>
-> >>>>>>>> I will resend the patch during day with xen_efi_reset_system moved
-> >>>>>>>> to common code and implement the x86 counterpart (thought, I will
-> >>>>>>>> not be able to test it).
-> >>>>>>>
-> >>>>>>> I think that this is ARM specific issue. On x86 machine_restart() calls
-> >>>>>>> xen_restart(). Hence, everything works. So, I think that it should be
-> >>>>>>> fixed only for ARM. Anyway, please CC me when you send a patch.
-> >>>>>>
-> >>>>>> What about xen_machine_power_off() (as stated in Boris' mail)?
-> >>>>>
-> >>>>> Guys what do you think about that:
-> >>>>>
-> >>>>> --- a/drivers/firmware/efi/reboot.c
-> >>>>> +++ b/drivers/firmware/efi/reboot.c
-> >>>>> @@ -55,7 +55,7 @@ static void efi_power_off(void)
-> >>>>>
-> >>>>> static int __init efi_shutdown_init(void)
-> >>>>> {
-> >>>>> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
-> >>>>> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
-> >>>>>                return -ENODEV;
-> >>>>>
-> >>>>>        if (efi_poweroff_required())
-> >>>>>
-> >>>>>
-> >>>>> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
-> >>>>>
-> >>>>> I hope that tweaks for both files should solve our problem.
-> >>>>
-> >>>> This sounds good for power off (I haven't tried to power off DOM0
-> >>>> yet). But this will not solve the restart problem (see
-> >>>> machine_restart in arch/arm64/kernel/process.c) which call directly
-> >>>> efi_reboot.
-> >>>
-> >>> Hmmm... It seems to me that efi.reset_system override with empty function
-> >>> in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
-> >>> One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
-> >>> for arch/arm64/kernel/efi.c. Does it make sense?
-> >>
-> >> I still think the empty function should be in drivers/xen/efi.c and we
-> >> should use it in arch/x86/xen/efi.c, too.
-> > 
-> > If you wish we can go that way too. Though I thing that we should fix
-> > drivers/firmware/efi/reboot.c:efi_shutdown_init() too. Just in case.
-> 
-> Sure, go ahead. I won't object.
+Hi Mark,
 
-For the Xen on ARM side, the original patch that started this thread
-(20170405181417.15985-1-julien.grall at arm.com) is good to go, right?
+On Tue, Apr 18, 2017 at 8:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Tue, Apr 11, 2017 at 10:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Currently we have functions to request/free all IRQs for a given PMU.
+>> > While this works today, this won't work for ACPI, where we don't know
+>> > the full set of IRQs up front, and need to request them separately.
+>> >
+>> > To enable supporting ACPI, this patch splits out the cpu-local
+>> > request/free into new functions, allowing us to request/free individual
+>> > IRQs.
+>> >
+>> > As this makes it possible/necessary to request a PPI once per cpu, an
+>> > additional check is added to detect mismatched PPIs. This shouldn't
+>> > matter for the DT / platform case, as we check this when parsing.
+>> >
+>> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> > Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+>> > Cc: Will Deacon <will.deacon@arm.com>
+>>
+>> This patch causes warnings during PSCI system suspend on R-Car Gen3.
+>>
+>> On R-Car M3-W (Dual CA57):
+>>
+>>     Disabling non-boot CPUs ...
+>>    +IRQ15 no longer affine to CPU1
+>>     CPU1: shutdown
+>>     psci: CPU1 killed.
+>>
+>> On R-Car H3 (Quad CA57):
+>>
+>>     Disabling non-boot CPUs ...
+>>    +IRQ15 no longer affine to CPU1
+>>     CPU1: shutdown
+>>     psci: CPU1 killed.
+>>    +IRQ16 no longer affine to CPU2
+>>     CPU2: shutdown
+>>     psci: CPU2 killed.
+>>    +IRQ17 no longer affine to CPU3
+>>     CPU3: shutdown
+>>     psci: CPU3 killed.
+>>
+>> Unfortunately it can't be reverted easily.
+>>
+>> Do you have any clue?
+>
+> Not presently. I'm somewhat surprised that this patch would have that
+> effect -- I would imagine that the rework this is based on is more
+> likely to. e.g. commit:
+>
+>   c09adab01e4aeecf ("drivers/perf: arm_pmu: split irq request from enable")
+
+Bummer. You're right. It's actually due to that commit.
+
+I searched in my gmail for a patch with the specific title, and blindly
+replied to the first match, not noticing that was not the right patch.
+Sorry for that.
+
+> Just to check, you definitely don't see these warnings immediately prior
+> to applying this patch?
+>
+> My best guess otherwise is that prior to this patch, the PMU IRQ
+> request was failing earlier, and we bailed out.
+>
+> Can you dump a dmesg before and after this patch, and see if the arm_pmu
+> driver dumps anything?
+
+On R-Car Gen3, there's no change in PMU related messages.
+Actual PMU messages are:
+
+    hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7
+counters available
+    hw perfevents: /soc/pmu_a53: failed to probe PMU!
+    hw perfevents: /soc/pmu_a53: failed to register PMU devices!
+
+The last two are due to the CA53 cores being described in DT, but not
+enabled in the firmware.
+
+On SH-Mobile AG5 (sh73a0/kzm9g), it recently (not due to the bad commit)
+started printing:
+
+   +hw perfevents: no interrupt-affinity property for /pmu, guessing.
+    hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7 counters available
+
+which looks related.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
