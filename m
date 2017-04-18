@@ -1,44 +1,92 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Tue, 18 Apr 2017 13:23:28 +0300
-Subject: [PATCH] i2c: designware: do not show SDA hold time warning when
- not needed
-In-Reply-To: <20170418095939.68788787@free-electrons.com>
-References: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1492502087.24567.47.camel@linux.intel.com>
- <20170418095939.68788787@free-electrons.com>
-Message-ID: <7b011e1e-8fa3-07c4-6688-5e258fd64dbd@linux.intel.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Apr 2017 11:30:57 +0100
+Subject: kvm/arm64: use-after-free in
+ kvm_unmap_hva_handler/unmap_stage2_pmds
+In-Reply-To: <20170418090845.GC17866@leverpostej>
+References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
+ <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
+ <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
+ <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
+ <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
+ <88715300-ef58-e7bd-81f5-95e0b9c9c533@arm.com>
+ <20170413155045.GA8387@e107814-lin.cambridge.arm.com>
+ <20170418083230.GA17866@leverpostej> <20170418090845.GC17866@leverpostej>
+Message-ID: <716307d8-5713-a832-7a1f-a805356fbf46@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2017 10:59 AM, Thomas Petazzoni wrote:
-> Hello,
->
-> On Tue, 18 Apr 2017 10:54:47 +0300, Andy Shevchenko wrote:
->> On Fri, 2017-04-14 at 22:53 +0200, Thomas Petazzoni wrote:
->>> When the I2C controller IP block has a revision too old to be able to
->>> configure the SDA hold time, the driver currently displays a
->>> warning. However, it does so unconditionally, even if no SDA hold time
->>> has been configured through the Device Tree. This causes useless
->>> warnings when running the system, so only show the warning if a SDA
->>> hold time was specified.
+On 18/04/17 10:08, Mark Rutland wrote:
+> On Tue, Apr 18, 2017 at 09:32:31AM +0100, Mark Rutland wrote:
+>> Hi Suzuki,
 >>
->> As far as I understand the warning it would be better to keep it in
->> either way, though you may shift it to debug level.
+>> On Thu, Apr 13, 2017 at 04:50:46PM +0100, Suzuki K. Poulose wrote:
+>>> kvm: Hold reference to the user address space
+>>>
+>>> The core KVM code, uses mmgrab/mmdrop to pin the mm struct of the user
+>>> application. mmgrab only guarantees that the mm struct is available,
+>>> while the "real address space" (see Documentation/vm/active_mm.txt) may
+>>> be destroyed. Since the KVM depends on the user space page tables for
+>>> the Guest pages, we should instead do an mmget/mmput. Even though
+>>> mmget/mmput is not encouraged for uses with unbounded time, the KVM
+>>> is fine to do so, as we are doing it from the context of the same process.
+>>>
+>>> This also prevents the race condition where mmu_notifier_release() could
+>>> be called in parallel and one instance could end up using a free'd kvm
+>>> instance.
+>>>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Paolo Bonzin <pbonzini@redhat.com>
+>>> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>> Cc: andreyknvl at google.com
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  virt/kvm/kvm_main.c | 6 +++---
+>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+>>> index 88257b3..555712e 100644
+>>> --- a/virt/kvm/kvm_main.c
+>>> +++ b/virt/kvm/kvm_main.c
+>>> @@ -613,7 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+>>>  		return ERR_PTR(-ENOMEM);
+>>>
+>>>  	spin_lock_init(&kvm->mmu_lock);
+>>> -	mmgrab(current->mm);
+>>> +	mmget(current->mm);
+>>>  	kvm->mm = current->mm;
+>>>  	kvm_eventfd_init(kvm);
+>>>  	mutex_init(&kvm->lock);
+>>> @@ -685,7 +685,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+>>>  	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
+>>>  		kvm_free_memslots(kvm, kvm->memslots[i]);
+>>>  	kvm_arch_free_vm(kvm);
+>>> -	mmdrop(current->mm);
+>>> +	mmput(current->mm);
+>>>  	return ERR_PTR(r);
+>>>  }
+>>>
+>>> @@ -747,7 +747,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
+>>>  	kvm_arch_free_vm(kvm);
+>>>  	preempt_notifier_dec();
+>>>  	hardware_disable_all();
+>>> -	mmdrop(mm);
+>>> +	mmput(mm);
+>>>  }
 >>
->> Wolfram, Jarkko, thoughts?
->
-> Why show a message when the user has not requested a custom SDA hold
-> time? Getting a warning about something you haven't requested seems
-> really odd.
->
-> I think it makes a lot more sense to keep it at the warning level
-> (because it's important to get this message if you configure a custom
-> SDA hold time), but only show it when appropriate.
->
-I guess warning over debug level could have slightly better chance to 
-prevent someone not adding needless "i2c-sda-hold-time-ns" property in a 
-hardware that doesn't support SDA hold time. But needless spamming have 
-negative value so this is worth to fix. (I would do this as a single 
-liner by else if ()).
+>>
+>> As a heads-up, I'm seeing what looks to be a KVM memory leak with this
+>> patch applied atop of next-20170411.
+>>
+>> I don't yet know if this is a problem with next-20170411 or this patch
+>> in particular -- I will try to track that down. In the mean time, info
+>> dump below.
 
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+This is indeed a side effect of the new patch. The VCPU doesn't get released
+completely, due to an mmap count held on the VCPU fd, even when we close the
+VCPU fd. This keeps the refcount on the KVM instance which in turn holds the
+mmap count (with the new patch). So the mmap count on VCPU will never get
+released due to the circular dependency here. :-(
+
+Suzuki
