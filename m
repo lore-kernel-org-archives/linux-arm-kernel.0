@@ -1,36 +1,37 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 18 Apr 2017 09:17:22 +0800
-Subject: [PATCH 2/2] arm64: dts: hi6220: add acpu_sctrl
-In-Reply-To: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1492478242-16146-2-git-send-email-zhangfei.gao@linaro.org>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 18 Apr 2017 09:27:29 +0800
+Subject: [PATCH v8 10/15] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <9556e737-a9d8-f751-2872-6fabce86fa48@codeaurora.org>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+ <1484744105-53140-11-git-send-email-guohanjun@huawei.com>
+ <838d8504-b6f0-2475-f4b1-9761ecd9f573@codeaurora.org>
+ <9556e737-a9d8-f751-2872-6fabce86fa48@codeaurora.org>
+Message-ID: <58F56B81.3090608@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add acpu_sctrl clock node
+Hi Sinan,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On 2017/4/18 6:01, Sinan Kaya wrote:
+> On 4/17/2017 5:44 PM, Sinan Kaya wrote:
+>> Any idea what happened to the change in this function during merge?
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=ae7c18380495ac5c14a614fdb6c452c3bf9148ac
+>>
+> I realized that there is a V9 out there. I'm catching up with the work. 
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.12&id=e6db07d0f3b6da1f8cfd485776bfefa4fcdbfc45
+>
+> seems to be fixing the issue. 
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 470461d..710cc34 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -262,6 +262,12 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		acpu_sctrl: acpu_sctrl at f7032000 {
-+			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
-+			reg = <0x0 0xf6504000 0x0 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
- 		medianoc_ade: medianoc_ade at f4520000 {
- 			compatible = "syscon";
- 			reg = <0x0 0xf4520000 0x0 0x4000>;
--- 
-2.7.4
+Patches were merged via two trees:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git/log/?h=irq/core
+https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core&ofs=50
+
+So please try to merge those two trees and have a try (we tested
+those patches on our platform and works), if any issues please let
+me know.
+
+Thanks
+Hanjun
