@@ -1,236 +1,91 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 18 Apr 2017 13:41:30 -0700
-Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
-In-Reply-To: <186569458.91967.1492547106553@email.1und1.de>
-References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
- <172093673.40121.1492427140661@email.1und1.de>
- <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
- <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
- <186569458.91967.1492547106553@email.1und1.de>
-Message-ID: <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 18 Apr 2017 15:48:15 -0500
+Subject: [v4.9-rt PATCH] ARM: mm: remove tasklist locking from
+ update_sections_early()
+Message-ID: <20170418204815.9001-1-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan,
+The below backtrace can be observed on -rt kernel with CONFIG_DEBUG_RODATA
+option enabled:
 
-On Tue, Apr 18, 2017 at 1:25 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Hi,
->
-> [add Johan]
->
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. April 2017 um 10:07 geschrieben:
->>
->>
->> Am 18.04.2017 um 00:37 schrieb Doug Anderson:
->> > Hi,
->> >
->> > On Mon, Apr 17, 2017 at 4:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->> >> Hi,
->> >>
->> >>> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Oktober 2016 um 21:34 geschrieben:
->> >>>
->> >>>
->> >>> I inspired by this issue [1] i build up a slightly modified setup with a
->> >>> Raspberry Pi B (mainline kernel 4.9rc3), a powered 7 port USB hub and 5 Prolific
->> >>> PL2303 USB to serial convertors. I modified the usb_test for dwc2 [2], which
->> >>> only tries to open all ttyUSB devices one after the other.
->> >>>
->> >>> Unfortunately the complete system stuck after opening the first ttyUSB device (
->> >>> heartbeat LED stop blinking, no reaction to debug UART). The only way to
->> >>> reanimate the system is to powerdown the USB hub with the USB to serial
->> >>> convertors.
->> >>>
->> >>> [1] - https://github.com/raspberrypi/linux/issues/1692
->> >>> [2] - https://gist.github.com/lategoodbye/dd0d30af27b6f101b03d5923b279dbaa
->> >> since this issue still exists with 4.11 (even without or with microframe scheduler enabled), i want to ask some additional questions:
->> >>
->> >> Is this issue reproducible with other dwc2 platforms than bcm2835?
->> > +Edmund Szeto, who I seem to remember emailing me about similar
->> > questions in the past.
->> >
->> >
->> >> Does the soft lockup also occurs after opening the second serial convertor or later?
->> > I don't have serial converters easily available to me, but back in the
->> > day when I was stressing things out on rk3288 I never saw anything
->> > this bad.  ...of course, on rk3288 we've got 4 A17 cores running
->> > really fast, so possibly just being slower is what causes your
->> > problems here?
->>
->> The downstream kernel of the Raspberry Pi foundation with it's
->> out-of-tree dwc_otg driver is able to handle 8 serial converter on a RPI
->> B. I would be happy to get at least 2 or 3 working on mainline.
->>
->> >
->> > I will make the following observations:
->> >
->> > 1. With dwc2 you often end up in the situation where you need to
->> > service an interrupt every 125 uS.  If servicing that interrupt takes
->> > anywhere near 125 uS in the common case then you'll be in trouble.
->>
->> I will try to measure this with a logic analyzer.
->>
->
-> i took GPIO17 to measure _dwc2_hcd_irq and GPIO18 to measure _dwc2_hcd_urb_enqueue (patch against 4.11rc1 below).
->
-> So i made my observations for 3 test cases:
->
-> 1) no serial converter connected (idle)
-> 2) 1 FTDI serial converter connected
-> 3) 1 PL2303 serial converter connected
->
-> case   | ksoftirq cpu     | mean duration | max duration  | max duration | urb_enqueue  |
->        |                  | hcd_irq       | hcd_irq       | urb_enqueue  | within 10 sec|
-> -------+------------------+---------------+---------------+--------------+--------------+
-> idle   | 0.0%             | 2 us          | 16.5 us       |     12 us    | 5            |
-> FTDI   | 25.0%            | 8.5 us        | 18.0 us       |  31000 us    | ~ 400        |
-> PL2303 | top doesn't work | 8.5 us        | 22.5 us       | 900000 us    | 4            |
+ BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:993
+ in_atomic(): 1, irqs_disabled(): 128, pid: 14, name: migration/0
+ 1 lock held by migration/0/14:
+  #0:  (tasklist_lock){+.+...}, at: [<c01183e8>] update_sections_early+0x24/0xdc
+ irq event stamp: 38
+ hardirqs last  enabled at (37): [<c08f6f7c>] _raw_spin_unlock_irq+0x24/0x68
+ hardirqs last disabled at (38): [<c01fdfe8>] multi_cpu_stop+0xd8/0x138
+ softirqs last  enabled at (0): [<c01303ec>] copy_process.part.5+0x238/0x1b64
+ softirqs last disabled at (0): [<  (null)>]   (null)
+ Preemption disabled at: [<c01fe244>] cpu_stopper_thread+0x80/0x10c
+ CPU: 0 PID: 14 Comm: migration/0 Not tainted 4.9.21-rt16-02220-g49e319c #15
+ Hardware name: Generic DRA74X (Flattened Device Tree)
+ [<c0112014>] (unwind_backtrace) from [<c010d370>] (show_stack+0x10/0x14)
+ [<c010d370>] (show_stack) from [<c049beb8>] (dump_stack+0xa8/0xd4)
+ [<c049beb8>] (dump_stack) from [<c01631a0>] (___might_sleep+0x1bc/0x2ac)
+ [<c01631a0>] (___might_sleep) from [<c08f7244>] (__rt_spin_lock+0x1c/0x30)
+ [<c08f7244>] (__rt_spin_lock) from [<c08f77a4>] (rt_read_lock+0x54/0x68)
+ [<c08f77a4>] (rt_read_lock) from [<c01183e8>] (update_sections_early+0x24/0xdc)
+ [<c01183e8>] (update_sections_early) from [<c01184b0>] (__fix_kernmem_perms+0x10/0x1c)
+ [<c01184b0>] (__fix_kernmem_perms) from [<c01fe010>] (multi_cpu_stop+0x100/0x138)
+ [<c01fe010>] (multi_cpu_stop) from [<c01fe24c>] (cpu_stopper_thread+0x88/0x10c)
+ [<c01fe24c>] (cpu_stopper_thread) from [<c015edc4>] (smpboot_thread_fn+0x174/0x31c)
+ [<c015edc4>] (smpboot_thread_fn) from [<c015a988>] (kthread+0xf0/0x108)
+ [<c015a988>] (kthread) from [<c0108818>] (ret_from_fork+0x14/0x3c)
+ Freeing unused kernel memory: 1024K (c0d00000 - c0e00000)
 
-It's hard to know for sure that all of this time is really in
-urb_enqueue().  Possible we could have task switched out and been
-blocked elsewhere.  Using ftrace to get more fine-grained timings
-would be useful.  ktime_get(), ktime_sub(), and ktime_to_us() are your
-friends here if you want to use trace_printk.
+The stop_machine() is called with cpus = NULL from fix_kernmem_perms() and
+mark_rodata_ro() which means only one CPU will execute
+update_sections_early() while all other CPUs will spin and wait. Hence,
+it's safe to remove tasklist locking from update_sections_early(). As part of
+this change also mark functions which are local to this module as static
+to simplify code analize in the future.
 
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Laura Abbott <labbott@redhat.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ arch/arm/mm/init.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-> So it seems the serial USB driver has also an impact. In the analyzer trace the FTDI triggers many smaller urb_enqueue calls in the opposite to the PL2303 which only has few but huge calls.
->
-> Additional notes:
-> After closing the serial connection to the FTDI the system is usable as before. In case of PL2303 i need to disconnect the converter in order to get a usable system.
->
-> Why do they behave so differently?
-> Are these results of a overload?
-> Doug, can you point me to your timing patch?
-
-I did in the previous message, but basically take a look at:
-
-https://chromium-review.googlesource.com/c/321980/4/drivers/usb/core/hcd.c#1668
-
-I never posted this upstream since it was just a test patch.
-
->
-> Thanks
-> Stefan
->
-> PS: My hacky patches for measuring
->
-> diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
-> index 1a7e830..aa490c3 100644
-> --- a/drivers/usb/dwc2/core.h
-> +++ b/drivers/usb/dwc2/core.h
-> @@ -930,6 +930,9 @@ struct dwc2_hsotg {
->         struct dentry *debug_root;
->         struct debugfs_regset32 *regset;
->
-> +       int gpio_17;
-> +       int gpio_18;
-> +
->         /* DWC OTG HW Release versions */
->  #define DWC2_CORE_REV_2_71a    0x4f54271a
->  #define DWC2_CORE_REV_2_90a    0x4f54290a
-> diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
-> index a73722e..97271c8 100644
-> --- a/drivers/usb/dwc2/hcd.c
-> +++ b/drivers/usb/dwc2/hcd.c
-> @@ -45,6 +45,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio.h>
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/usb.h>
-> @@ -4595,13 +4596,17 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
->         bool qh_allocated = false;
->         struct dwc2_qtd *qtd;
->
-> +       gpio_set_value(hsotg->gpio_18, 1);
-> +
->         if (dbg_urb(urb)) {
->                 dev_vdbg(hsotg->dev, "DWC OTG HCD URB Enqueue\n");
->                 dwc2_dump_urb_info(hcd, urb, "urb_enqueue");
->         }
->
-> -       if (!ep)
-> +       if (!ep) {
-> +               gpio_set_value(hsotg->gpio_18, 0);
->                 return -EINVAL;
-> +       }
->
->         if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS ||
->             usb_pipetype(urb->pipe) == PIPE_INTERRUPT) {
-> @@ -4628,8 +4633,10 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
->
->         dwc2_urb = dwc2_hcd_urb_alloc(hsotg, urb->number_of_packets,
->                                       mem_flags);
-> -       if (!dwc2_urb)
-> +       if (!dwc2_urb) {
-> +               gpio_set_value(hsotg->gpio_18, 0);
->                 return -ENOMEM;
-> +       }
->
->         dwc2_hcd_urb_set_pipeinfo(hsotg, dwc2_urb, usb_pipedevice(urb->pipe),
->                                   usb_pipeendpoint(urb->pipe), ep_type,
-> @@ -4705,6 +4712,8 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
->
->         spin_unlock_irqrestore(&hsotg->lock, flags);
->
-> +       gpio_set_value(hsotg->gpio_18, 0);
-> +
->         return 0;
->
->  fail3:
-> @@ -4732,6 +4741,8 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
->  fail0:
->         kfree(dwc2_urb);
->
-> +       gpio_set_value(hsotg->gpio_18, 0);
-> +
->         return retval;
->  }
->
-> @@ -4825,8 +4836,15 @@ static void _dwc2_hcd_endpoint_reset(struct usb_hcd *hcd,
->  static irqreturn_t _dwc2_hcd_irq(struct usb_hcd *hcd)
->  {
->         struct dwc2_hsotg *hsotg = dwc2_hcd_to_hsotg(hcd);
-> +       irqreturn_t ret;
->
-> -       return dwc2_handle_hcd_intr(hsotg);
-> +       gpio_set_value(hsotg->gpio_17, 1);
-> +
-> +       ret = dwc2_handle_hcd_intr(hsotg);
-> +
-> +       gpio_set_value(hsotg->gpio_17, 0);
-> +
-> +       return ret;
->  }
->
->  /*
-> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
-> index 9564bc7..e3f8a8a 100644
-> --- a/drivers/usb/dwc2/platform.c
-> +++ b/drivers/usb/dwc2/platform.c
-> @@ -35,6 +35,7 @@
->   */
->
->  #include <linux/kernel.h>
-> +#include <linux/gpio.h>
->  #include <linux/module.h>
->  #include <linux/slab.h>
->  #include <linux/clk.h>
-> @@ -404,6 +405,16 @@ static int dwc2_driver_probe(struct platform_device *dev)
->                 return hsotg->irq;
->         }
->
-> +       hsotg->gpio_17 = 475;
-> +       retval = devm_gpio_request_one(hsotg->dev, hsotg->gpio_17,  GPIOF_OUT_INIT_LOW, "gpio_17");
-> +       if (retval)
-> +               pr_warn("Unable to request GPIO17: %d\n", retval);
-> +
-> +       hsotg->gpio_18 = 476;
-> +       retval = devm_gpio_request_one(hsotg->dev, hsotg->gpio_18,  GPIOF_OUT_INIT_LOW, "gpio_18");
-> +       if (retval)
-> +               pr_warn("Unable to request GPIO18: %d\n", retval);
-> +
->         dev_dbg(hsotg->dev, "registering common handler for irq%d\n",
->                 hsotg->irq);
->         retval = devm_request_irq(hsotg->dev, hsotg->irq,
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 370581a..a77953a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -693,30 +693,28 @@ static void update_sections_early(struct section_perm perms[], int n)
+ {
+ 	struct task_struct *t, *s;
+ 
+-	read_lock(&tasklist_lock);
+ 	for_each_process(t) {
+ 		if (t->flags & PF_KTHREAD)
+ 			continue;
+ 		for_each_thread(t, s)
+ 			set_section_perms(perms, n, true, s->mm);
+ 	}
+-	read_unlock(&tasklist_lock);
+ 	set_section_perms(perms, n, true, current->active_mm);
+ 	set_section_perms(perms, n, true, &init_mm);
+ }
+ 
+-int __fix_kernmem_perms(void *unused)
++static int __fix_kernmem_perms(void *unused)
+ {
+ 	update_sections_early(nx_perms, ARRAY_SIZE(nx_perms));
+ 	return 0;
+ }
+ 
+-void fix_kernmem_perms(void)
++static void fix_kernmem_perms(void)
+ {
+ 	stop_machine(__fix_kernmem_perms, NULL, NULL);
+ }
+ 
+-int __mark_rodata_ro(void *unused)
++static int __mark_rodata_ro(void *unused)
+ {
+ 	update_sections_early(ro_perms, ARRAY_SIZE(ro_perms));
+ 	return 0;
+-- 
+2.10.1
