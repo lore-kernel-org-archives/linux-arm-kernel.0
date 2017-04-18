@@ -1,44 +1,48 @@
-From: jthumshirn@suse.de (Johannes Thumshirn)
-Date: Tue, 18 Apr 2017 09:35:26 +0200
-Subject: [PATCH] ARM: Fix rd_size declaration
-In-Reply-To: <20170417231003.7178-1-bart.vanassche@sandisk.com>
-References: <20170417231003.7178-1-bart.vanassche@sandisk.com>
-Message-ID: <20170418073526.GA6056@linux-x5ow.site>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 18 Apr 2017 09:34:18 +0200
+Subject: [PATCH v6 3/6] ARM: dtsi: axp209: add battery power supply subnode
+In-Reply-To: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
+References: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170418073421.31351-4-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 04:10:03PM -0700, Bart Van Assche wrote:
-> The global variable 'rd_size' is declared as 'int' in source file
-> arch/arm/kernel/atags_parse.c and as 'unsigned long' in
-> drivers/block/brd.c. Fix this inconsistency.
-> 
-> Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Jens Axboe <axboe@kernel.dk>
-> Cc: Jan Kara <jack@suse.cz>
-> Cc: <yanaijie@huawei.com>
-> Cc: <zhaohongjiang@huawei.com>
-> Cc: <miaoxie@huawei.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-block at vger.kernel.org
-> ---
-> diff --git a/include/linux/brd.h b/include/linux/brd.h
-> new file mode 100644
-> index 000000000000..dbb0f92fefc8
-> --- /dev/null
-> +++ b/include/linux/brd.h
-> @@ -0,0 +1 @@
-> +extern unsigned long rd_size;
+The X-Powers AXP209 PMIC exposes battery supply various data such as
+the battery status (charging, discharging, full, dead), current max
+limit, current current, battery capacity (in percentage), voltage max
+and min limits, current voltage, and battery capacity (in Ah).
 
-Small nit, can you add an include guard here as well?
+This adds the battery power supply subnode for AXP20X PMIC.
 
-Thanks,
-	Johannes
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
 
+v2:
+ - changed DT node name from battery_power_supply to
+ battery-power-supply,
+ - removed io-channels and io-channel-names from DT (the IIO mapping is
+ done in the IIO ADC driver now),
+
+ arch/arm/boot/dts/axp209.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
+index 9677dd5cf6b6..3c8fa26e87b7 100644
+--- a/arch/arm/boot/dts/axp209.dtsi
++++ b/arch/arm/boot/dts/axp209.dtsi
+@@ -64,6 +64,11 @@
+ 		#gpio-cells = <2>;
+ 	};
+ 
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp209-battery-power-supply";
++		status = "disabled";
++	};
++
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <1500>;
 -- 
-Johannes Thumshirn                                          Storage
-jthumshirn at suse.de                                +49 911 74053 689
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
-Key fingerprint = EC38 9CAB C2C4 F25D 8600 D0D0 0393 969D 2D76 0850
+2.11.0
