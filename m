@@ -1,33 +1,28 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 17 Apr 2017 18:31:56 -0700
-Subject: arm64: Question about warnings due to unspecified ASM operand width
-Message-ID: <20170418013156.GB105296@google.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 18 Apr 2017 09:33:34 +0800
+Subject: [PATCH v8 10/15] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <f6656f75-68f6-99a5-bc65-781d5ed83f48@codeaurora.org>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+ <1484744105-53140-11-git-send-email-guohanjun@huawei.com>
+ <838d8504-b6f0-2475-f4b1-9761ecd9f573@codeaurora.org>
+ <9556e737-a9d8-f751-2872-6fabce86fa48@codeaurora.org>
+ <58F56B81.3090608@huawei.com>
+ <f6656f75-68f6-99a5-bc65-781d5ed83f48@codeaurora.org>
+Message-ID: <58F56CEE.1070702@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2017/4/18 9:30, Sinan Kaya wrote:
+> On 4/17/2017 9:27 PM, Hanjun Guo wrote:
+>> Patches were merged via two trees:
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git/log/?h=irq/core
+>> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core&ofs=50
+>>
+>> So please try to merge those two trees and have a try (we tested
+>> those patches on our platform and works), if any issues please let
+>> me know.
+> Yeah, I figure that out eventually. No issues. I finished my testing
+> today.
 
-During my work on improving support for kernel builds with clang I
-came across a bunch of warnings on arm64 builds about the width of
-operands in assembly not being specified:
-
-arch/arm64/include/asm/arch_timer.h:92:46: error: value size does
-      not match register size specified by the constraint and modifier [-Werror,-Wasm-operand-widths]
-        asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
-
-I understand that this is usually not a problem and might even be
-desired to give the compiler more flexiblity in the use of the
-available registers.
-
-My goal is to eventually build the kernel without warnings, not
-necessarily fixing all of them, warnings can also be disabled, e.g.
-in case of spurious warnings or a high number of occurrences that is
-too expensive to fix.
-
-Before delving into 'fixing' these 'asm-operand-widths' warnings I'd
-be interested to know if this is actually desirable or if it is
-preferred to keep the operand width unspecified in certain cases.
-
-Thanks
-
-Matthias
+Great, thank you :)
