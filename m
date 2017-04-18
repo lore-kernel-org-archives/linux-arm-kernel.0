@@ -1,253 +1,124 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 18 Apr 2017 18:10:26 +0800
-Subject: [PATCH 09/11] drm/sun4i: Support two display pipelines
-In-Reply-To: <20170418095741.dfay2drvyiwpmlyl@lukather>
-References: <20170309100534.14023-1-wens@csie.org>
- <20170309100534.14023-10-wens@csie.org>
- <20170309103636.j5jtjhwjztzchr6u@lukather>
- <CAGb2v66gFtEiESQHC9sU-XmNOoR3gCJAyQ+ZWozQmuvtWaaJMQ@mail.gmail.com>
- <20170309144009.kgixcnrjg4cot6ut@lukather>
- <CAGb2v64fmMj-YX+A-Gm_T7U=dr9J6ekwX4thqD7zegoqGMdSFQ@mail.gmail.com>
- <20170418095741.dfay2drvyiwpmlyl@lukather>
-Message-ID: <CAGb2v64etokrb2at8Z9mpRfLhQO_2BcypZBF_rG7sVSRKiW1KQ@mail.gmail.com>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Tue, 18 Apr 2017 18:13:10 +0800
+Subject: [PATCH v2 2/3] ARM64: dts: mediatek: Enable mmc3 for supporting sdio
+ feature
+In-Reply-To: <1492510391-704-1-git-send-email-yong.mao@mediatek.com>
+References: <1492510391-704-1-git-send-email-yong.mao@mediatek.com>
+Message-ID: <1492510391-704-3-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 5:57 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> On Sat, Apr 08, 2017 at 01:30:55AM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Thu, Mar 9, 2017 at 10:40 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Thu, Mar 09, 2017 at 07:20:30PM +0800, Chen-Yu Tsai wrote:
->> >> On Thu, Mar 9, 2017 at 6:36 PM, Maxime Ripard
->> >> <maxime.ripard@free-electrons.com> wrote:
->> >> > Hi,
->> >> >
->> >> > On Thu, Mar 09, 2017 at 06:05:32PM +0800, Chen-Yu Tsai wrote:
->> >> >> Some Allwinner SoCs have two display pipelines (frontend -> backend ->
->> >> >> tcon).
->> >> >>
->> >> >> Previously we only supported one pipeline. This patch extends the
->> >> >> current driver to support two. It extends the tcon and backend pointers
->> >> >> in sun4i_drv into arrays, and makes the related bind functions store
->> >> >> the pointer into said arrays based on the id fetched from the device
->> >> >> tree. In the case of the tcons, it falls back to a first come order
->> >> >> if no encoders that can be used for differentiating the tcons are
->> >> >> defined. The driver's depth-first traversal of the of graph, coupled
->> >> >> with the increasing address ordering of the of graph endpoints, and
->> >> >> the fact that tcon0 should always be enabled for the tcon/encoder
->> >> >> mux to be accessible, means that tcon1 would always come after tcon0.
->> >> >>
->> >> >> Assignment of the device structure into sun4i_drv is moved to the end
->> >> >> of the bind function, when all possible error checks have passed.
->> >> >>
->> >> >> This patch also drops a trailing 0 in one of the backend probe messages.
->> >> >>
->> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> >> ---
->> >> >>  drivers/gpu/drm/sun4i/sun4i_backend.c |  9 +++++++--
->> >> >>  drivers/gpu/drm/sun4i/sun4i_drv.c     |  2 +-
->> >> >>  drivers/gpu/drm/sun4i/sun4i_drv.h     |  6 ++++--
->> >> >>  drivers/gpu/drm/sun4i/sun4i_tcon.c    | 25 +++++++++++++++++--------
->> >> >>  4 files changed, 29 insertions(+), 13 deletions(-)
->> >> >>
->> >> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
->> >> >> index f3c92d54c8e4..8d22efd5a9cc 100644
->> >> >> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
->> >> >> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
->> >> >> @@ -350,12 +350,15 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
->> >> >>       if (!backend)
->> >> >>               return -ENOMEM;
->> >> >>       dev_set_drvdata(dev, backend);
->> >> >> -     drv->backend = backend;
->> >> >>
->> >> >>       backend->id = sun4i_backend_of_get_id(dev->of_node);
->> >> >>       if (backend->id < 0)
->> >> >>               return backend->id;
->> >> >>
->> >> >> +     /* We only support SUN4I_DRM_MAX_PIPELINES number of backends */
->> >> >> +     if (backend->id >= SUN4I_DRM_MAX_PIPELINES)
->> >> >> +             return -EINVAL;
->> >> >> +
->> >> >>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> >> >>       regs = devm_ioremap_resource(dev, res);
->> >> >>       if (IS_ERR(regs))
->> >> >> @@ -364,7 +367,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
->> >> >>       backend->regs = devm_regmap_init_mmio(dev, regs,
->> >> >>                                             &sun4i_backend_regmap_config);
->> >> >>       if (IS_ERR(backend->regs)) {
->> >> >> -             dev_err(dev, "Couldn't create the backend0 regmap\n");
->> >> >> +             dev_err(dev, "Couldn't create the backend regmap\n");
->> >> >>               return PTR_ERR(backend->regs);
->> >> >>       }
->> >> >>
->> >> >> @@ -413,6 +416,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
->> >> >>               }
->> >> >>       }
->> >> >>
->> >> >> +     drv->backend[backend->id] = backend;
->> >> >> +
->> >> >>       /* Reset the registers */
->> >> >>       for (i = 0x800; i < 0x1000; i += 4)
->> >> >>               regmap_write(backend->regs, i, 0);
->> >> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >> >> index 767bbadcc85d..c15ecb8343d7 100644
->> >> >> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >> >> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
->> >> >> @@ -271,7 +271,7 @@ static int sun4i_drv_probe(struct platform_device *pdev)
->> >> >>       struct device_node *np = pdev->dev.of_node;
->> >> >>       int i, count = 0;
->> >> >>
->> >> >> -     for (i = 0;; i++) {
->> >> >> +     for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++) {
->> >> >>               struct device_node *pipeline = of_parse_phandle(np,
->> >> >>                                                               "allwinner,pipelines",
->> >> >>                                                               i);
->> >> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
->> >> >> index 5df50126ff52..ec1c08af47e1 100644
->> >> >> --- a/drivers/gpu/drm/sun4i/sun4i_drv.h
->> >> >> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
->> >> >> @@ -16,9 +16,11 @@
->> >> >>  #include <linux/clk.h>
->> >> >>  #include <linux/regmap.h>
->> >> >>
->> >> >> +#define SUN4I_DRM_MAX_PIPELINES              2
->> >> >> +
->> >> >>  struct sun4i_drv {
->> >> >> -     struct sun4i_backend    *backend;
->> >> >> -     struct sun4i_tcon       *tcon;
->> >> >> +     struct sun4i_backend    *backend[SUN4I_DRM_MAX_PIPELINES];
->> >> >> +     struct sun4i_tcon       *tcon[SUN4I_DRM_MAX_PIPELINES];
->> >> >>
->> >> >>       struct drm_fbdev_cma    *fbdev;
->> >> >>  };
->> >> >> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> >> index b774c9a50c55..7749c3133f38 100644
->> >> >> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> >> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
->> >> >> @@ -532,7 +532,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
->> >> >>       if (!tcon)
->> >> >>               return -ENOMEM;
->> >> >>       dev_set_drvdata(dev, tcon);
->> >> >> -     drv->tcon = tcon;
->> >> >>       tcon->drm = drm;
->> >> >>       tcon->dev = dev;
->> >> >>       tcon->quirks = of_device_get_match_data(dev);
->> >> >> @@ -540,14 +539,22 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
->> >> >>       /* This can fail if the DT does not have any downstream encoders. */
->> >> >>       tcon->id = sun4i_tcon_of_get_id(dev->of_node);
->> >> >>       if (tcon->id < 0) {
->> >> >> -             /*
->> >> >> -              * TODO We currently support only 1 TCON, so we can
->> >> >> -              * safely set this to 0. This should be revisited
->> >> >> -              * when we add support for multiple pipelines.
->> >> >> -              */
->> >> >> -             tcon->id = 0;
->> >> >> +             int i;
->> >> >> +
->> >> >> +             /* find the first empty tcon in sun4i_drv */
->> >> >> +             for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++)
->> >> >> +                     if (!drv->tcon[i])
->> >> >> +                             tcon->id = i;
->> >> >> +
->> >> >> +             /* bail out if that failed */
->> >> >> +             if (tcon->id < 0)
->> >> >> +                     return tcon->id;
->> >> >>       }
->> >> >>
->> >> >> +     /* We only support SUN4I_DRM_MAX_PIPELINES number of tcons */
->> >> >> +     if (tcon->id >= SUN4I_DRM_MAX_PIPELINES)
->> >> >> +             return -EINVAL;
->> >> >> +
->> >> >>       tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
->> >> >>       if (IS_ERR(tcon->lcd_rst)) {
->> >> >>               dev_err(dev, "Couldn't get our reset line\n");
->> >> >> @@ -588,7 +595,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
->> >> >>               goto err_free_dotclock;
->> >> >>       }
->> >> >>
->> >> >> -     tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
->> >> >> +     tcon->crtc = sun4i_crtc_init(drm, drv->backend[tcon->id], tcon);
->> >> >
->> >> > I'm not a big fan of those IDs. The heuristic seems to be a bit
->> >> > fragile since we really never enforced any order in our bindings.
->> >>
->> >> Yes. I seem to have forgotten that bit which I had intended to add.
->> >> The endpoint IDs would ideally match the actual mux values used.
->> >
->> > That works for me, but the binding documentation would need to be
->> > amended.
->> >
->> >> On the TCON side that's not doable, so we might have to just require
->> >> them being in an increasing order.
->> >
->> > What are you planning to use those IDs on for the TCON?
->>
->> This reply sat in my draft box for way too long.
->>
->> As mentioned, the IDs on the TCON side are for the IDing the TV encoders.
->> I think having the IDs for the same type of encoder be increasing, such
->> that the endpoint for TV encoder 1 has a higher ID than the one for TV
->> encoder 0 should be enough. There aren't any other instances where we
->> have 2 or more of the same type. Or we could just add some kind of index
->> property to the TV encoder node. This is for the A20 by the way.
->
-> Sorry if I'm missing a bit of context here, but I still don't get
-> *why* you would need to ID them. So far, your explanation seems to
-> have been "so that we can ID them", which is pretty circular to me :)
+From: yong mao <yong.mao@mediatek.com>
 
-The mux controls for the TCON output path to the TV/HDMI/MIPI encoders,
-and the TV encoder outputs, reside in the address space of the first TCON
-and TV encoder, respectively. That's why we need to ID them, to access
-the mux controls in the right block to setup the display pipeline.
+Add description of mmc3 for supporting sdio feature
 
->> >> > You seem to use it for two things:
->> >> >  - to match a TCON to its backend in our code
->> >> >  - to not step on each others' toes when registering the backends/tcons
->> >> >
->> >> > I think the second could be easily addressed using a linked list, and
->> >> > the first one by storing the of_node. Then we just need to follow the
->> >> > OF graph to our input of_node, and then iterate through our registered
->> >> > backend list to find the one with the same of_node.
->> >>
->> >> Yes that would work for the above purposes.
->> >>
->> >> For getting the first TCON to access the mux registers, it kind of falls
->> >> short. We also need something like this for the TV encoders on A10/A20.
->> >> They too have a mux, which seems to be in the first TV encoder. This
->> >> controls how the 8 DACs are mapped to the 4 external pins.
->> >
->> > How are those pins muxed between the two? Can't we just create a
->> > connector that would be usable for both encoders?
->>
->> They are freely muxable. However if you want VGA output, you need 3 pins
->> for RGB from the same TV encoder, plus H/V sync from it's upstream TCON.
->
-> (you don't really need hsync and vsync on VGA, those are optional signals)
+Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   77 +++++++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
 
-Really? I think you are confusing VGA with the broader "component RGB video".
-AFAIK most monitors need separate sync signals.
-
-See https://en.wikipedia.org/wiki/Component_video#RGB_analog_component_video
-
->> And you have one pin left that you can use for composite, which would
->> likely be fed from the other TCON, as you need interlaced YUV data,
->> which is like the opposite of VGA.
->
-> I'm not sure how these muxers should be implemented in DRM. One
-> trivial way would be to have a small pinctrl driver in the TCON driver
-> to deal with that, and switch states in both TV encoders at runtime
-> (if needed, statically otherwise).
->
-> Or maybe we can do something simpler, I don't know.
-
-Pinctrl or pinctrl like seems to be a good solution. The lines are routed
-on the board so it doesn't make sense to have something runtime configurable.
-We just need to know which pins are in the same group, and what kind of
-signals they each expect.
-
-ChenYu
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 1c3634f..fb8fa5c 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -68,6 +68,14 @@
+ 		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
++
++	sdio_fixed_3v3: regulator at 2 {
++		compatible = "regulator-fixed";
++		regulator-name = "3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pio 85 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &cec {
+@@ -156,6 +164,25 @@
+ 	vqmmc-supply = <&mt6397_vmc_reg>;
+ };
+ 
++&mmc3 {
++	status = "okay";
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&mmc3_pins_default>;
++	pinctrl-1 = <&mmc3_pins_uhs>;
++	bus-width = <4>;
++	max-frequency = <200000000>;
++	cap-sd-highspeed;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
++	mediatek,clk-pad-delay = <5>;
++	keep-power-in-suspend;
++	enable-sdio-wakeup;
++	cap-sdio-irq;
++	vmmc-supply = <&sdio_fixed_3v3>;
++	vqmmc-supply = <&mt6397_vgp3_reg>;
++	non-removable;
++};
++
+ &pio {
+ 	disp_pwm0_pins: disp_pwm0_pins {
+ 		pins1 {
+@@ -261,6 +288,56 @@
+ 		};
+ 	};
+ 
++	mmc3_pins_default: mmc3default {
++		pins_dat {
++			pinmux = <MT8173_PIN_22_MSDC3_DAT0__FUNC_MSDC3_DAT0>,
++				 <MT8173_PIN_23_MSDC3_DAT1__FUNC_MSDC3_DAT1>,
++				 <MT8173_PIN_24_MSDC3_DAT2__FUNC_MSDC3_DAT2>,
++				 <MT8173_PIN_25_MSDC3_DAT3__FUNC_MSDC3_DAT3>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_cmd {
++			pinmux = <MT8173_PIN_27_MSDC3_CMD__FUNC_MSDC3_CMD>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_clk {
++			pinmux = <MT8173_PIN_26_MSDC3_CLK__FUNC_MSDC3_CLK>;
++			bias-pull-down;
++			drive-strength = <MTK_DRIVE_8mA>;
++		};
++	};
++
++	mmc3_pins_uhs: mmc3 {
++		pins_dat {
++			pinmux = <MT8173_PIN_22_MSDC3_DAT0__FUNC_MSDC3_DAT0>,
++				 <MT8173_PIN_23_MSDC3_DAT1__FUNC_MSDC3_DAT1>,
++				 <MT8173_PIN_24_MSDC3_DAT2__FUNC_MSDC3_DAT2>,
++				 <MT8173_PIN_25_MSDC3_DAT3__FUNC_MSDC3_DAT3>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_cmd {
++			pinmux = <MT8173_PIN_27_MSDC3_CMD__FUNC_MSDC3_CMD>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
++
++		pins_clk {
++			pinmux = <MT8173_PIN_26_MSDC3_CLK__FUNC_MSDC3_CLK>;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
++		};
++	};
++
+ 	usb_id_pins_float: usb_iddig_pull_up {
+ 		pins_iddig {
+ 			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
+-- 
+1.7.9.5
