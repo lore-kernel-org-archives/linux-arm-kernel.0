@@ -1,102 +1,66 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 18 Apr 2017 22:35:02 +0530
-Subject: [PATCH] Revert "arm64: Increase the max granular size"
-In-Reply-To: <20170418144839.GF27592@e104818-lin.cambridge.arm.com>
-References: <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
- <CAPub14-sFgx=oCHzJPb9h9b_V0rbn5UAMDNJ-yTkjhz38JPqMQ@mail.gmail.com>
- <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
- <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
- <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
- <CADAEsF_Hr=mPspvuPsQtKWiSDu6oCjfyy0rGwWrF9EJo-ZO1JA@mail.gmail.com>
- <08fa98de-760b-15bc-5220-fa449b08c118@codeaurora.org>
- <725F073F-025B-48B9-9935-24EFEBF2B7DC@caviumnetworks.com>
- <93d2819a-95b1-6606-74d4-0bc0a64db29e@codeaurora.org>
- <CA+sq2CeTZyTrc3kC-kJEyrT5Tt5Wr47F=OVaCHwMRZk96qo4HA@mail.gmail.com>
- <20170418144839.GF27592@e104818-lin.cambridge.arm.com>
-Message-ID: <CA+sq2Ccf9K=to7rFAmWqWe-oXqNOGhZ+UQKui+ea+rSkR2pcbg@mail.gmail.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Tue, 18 Apr 2017 19:11:21 +0200
+Subject: Panic in arch_hw_breakpoint_init() on Cortex-A9 (SPEAr1340)
+In-Reply-To: <20170418130326.GE17866@leverpostej>
+References: <1492512268.28092.8.camel@v3.sk>
+ <20170418130326.GE17866@leverpostej>
+Message-ID: <1492535481.28092.14.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 8:18 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Mon, Apr 17, 2017 at 04:08:52PM +0530, Sunil Kovvuri wrote:
->> >>     >> Do you have an explanation on the performance variation when
->> >>     >> L1_CACHE_BYTES is changed? We'd need to understand how the network stack
->> >>     >> is affected by L1_CACHE_BYTES, in which context it uses it (is it for
->> >>     >> non-coherent DMA?).
->> >>     >
->> >>     > network stack use SKB_DATA_ALIGN to align.
->> >>     > ---
->> >>     > #define SKB_DATA_ALIGN(X) (((X) + (SMP_CACHE_BYTES - 1)) & \
->> >>     > ~(SMP_CACHE_BYTES - 1))
->> >>     >
->> >>     > #define SMP_CACHE_BYTES L1_CACHE_BYTES
->> >>     > ---
->> >>     > I think this is the reason of performance regression.
->> >>     >
->> >>
->> >>     Yes this is the reason for performance regression. Due to increases L1 cache alignment the
->> >>     object is coming from next kmalloc slab and skb->truesize is changing from 2304 bytes to
->> >>     4352 bytes. This in turn increases sk_wmem_alloc which causes queuing of less send buffers.
->>
->> With what traffic did you check 'skb->truesize' ?
->> Increase from 2304 to 4352 bytes doesn't seem to be real. I checked
->> with ICMP pkts with maximum
->> size possible with 1500byte MTU and I don't see such a bump. If the
->> bump is observed with Iperf
->> sending TCP packets then I suggest to check if TSO is playing a part over here.
->
-> I haven't checked truesize but I added some printks to __alloc_skb() (on
-> a Juno platform) and the size argument to this function is 1720 on many
-> occasions. With sizeof(struct skb_shared_info) of 320, the actual data
-> allocation is exactly 2048 when using 64 byte L1_CACHE_SIZE. With a
-> 128 byte cache size, it goes slightly over 2K, hence the 4K slab
-> allocation.
+On Tue, 2017-04-18 at 14:03 +0100, Mark Rutland wrote:
+> On Tue, Apr 18, 2017 at 12:44:28PM +0200, Lubomir Rintel wrote:
+> > Hi,
+> 
+> Hi,
+> 
+> > I'm getting a crash that looks awfully lot like what ddc37832a1 [ARM:
+> > 8634/1: hw_breakpoint: blacklist Scorpion CPUs] aims to fix.
+> 
+> Just to check, have you successfully booted a kernel on this board
+> before? i.e. is this a new crash?
 
-Understood but still in my opinion this '4K slab allocation' cannot be
-considered as
-an issue with cache line size, there are many network drivers out
-there which do
-receive buffer or page recycling to minimize (sometimes almost to
-zero) the cost
-of buffer allocation.
+I've now checked, and it doesn't seem like it ever worked when
+PERF_EVENTS (and in turn HAVE_HW_BREAKPOINT) is enabled. The crash look
+the same up to 4.7; the previous versions also crash as soon as I
+enable the options but for some reason I don't get an oops on the
+console even with earlyprintk enabled (the machine reboots with panic=
+argument, so there's just possibly just something wrong with the
+console).
 
->The 1720 figure surprised me a bit as well since I was
-> expecting something close to 1500.
->
-> The thing that worries me is that skb->data may be used as a buffer to
-> DMA into. If that's the case, skb_shared_info is wrongly aligned based
-> on SMP_CACHE_BYTES only and can lead to corruption on a non-DMA-coherent
-> platform. It should really be ARCH_DMA_MINALIGN.
+> > My hardware doesn't use a Scorpion CPU though -- it uses a Cortex-A9
+> > (cpuid=0x412fc091).
+> > 
+> > [????0.157000] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> > [????0.157000] Modules linked in:
+> > [????0.157000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-0.rc3.git0.2.spear2.fc26.armv7hl #1
+> > [????0.157000] Hardware name: ST SPEAr1340 SoC with Flattened Device Tree
+> > [????0.157000] task: ef102b80 task.stack: ef0fa000
+> > [????0.157000] PC is at arch_hw_breakpoint_init+0x130/0x2a0
+> > [????0.157000] LR is at arch_hw_breakpoint_init+0x7c/0x2a0
+> > [????0.157000] pc : [<c0e0538c>]????lr : [<c0e052d8>]????psr: 60000013
+> 
+> It would be helpful to know which specific access that is.
+> 
+> Can you figure that out with addr2line, e.g.
+> 
+> ?$ addr2line -ife vmlinux c0e0538c
 
-I didn't get this, if you see __alloc_skb()
+Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc7 #21
+Hardware name: ST SPEAr1340 SoC with Flattened Device Tree
+task: ef058000 task.stack: ef04c000
+PC is at arch_hw_breakpoint_init+0x9c/0x2a4
+LR is at arch_hw_breakpoint_init+0x84/0x2a4
+pc : [<c0905504>]????lr : [<c09054ec>]????psr: 60000013
 
-229         size = SKB_DATA_ALIGN(size);
-230         size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+$ addr2line -ife vmlinux c0905504
+core_has_os_save_restore
+/home/lkundrak/spear/linux/arch/arm/kernel/hw_breakpoint.c:920
+arch_hw_breakpoint_init
+/home/lkundrak/spear/linux/arch/arm/kernel/hw_breakpoint.c:1082
 
-both DMA buffer and skb_shared_info are aligned to a cacheline separately,
-considering 128byte alignment guarantees 64byte alignment as well, how
-will this
-lead to corruption ?
-
-And if platform is non-DMA-coherent then again it's the driver which
-should take
-of coherency by using appropriate map/unmap APIs and should avoid any cacheline
-sharing btw DMA buffer and skb_shared_info.
-
->
-> IIUC, the Cavium platform has coherent DMA, so it shouldn't be an issue
-> if we go back to 64 byte cache lines.
-
-Yes, Cavium platform is DMA coherent and there is no issue with reverting back
-to 64byte cachelines. But do we want to do this because some platform has a
-performance issue and this is an easy way to solve it. IMHO there seems
-to be many ways to solve performance degradation within the driver itself, and
-if those doesn't work then probably it makes sense to revert this.
-
->However, we don't really have an
-> easy way to check (maybe taint the kernel if CWG is different from
-> ARCH_DMA_MINALIGN *and* the non-coherent DMA API is called).
->
-> --
-> Catalin
+> 
+> Thanks,
+> Mark
