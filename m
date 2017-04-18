@@ -1,86 +1,123 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Apr 2017 19:48:59 +0100
-Subject: [PATCH 4/5] Hot-remove implementation for arm64
-In-Reply-To: <20170418182125.GL17866@leverpostej>
-References: <cover.1491920513.git.ar@linux.vnet.ibm.com>
- <897973dd5d3fc91c70aba4b44350099a61c3a12c.1491920513.git.ar@linux.vnet.ibm.com>
- <20170411171210.GD32267@leverpostej> <20170414140158.GA17950@samekh>
- <20170418182125.GL17866@leverpostej>
-Message-ID: <CAKv+Gu9YYoFmFwpVgrOvD+eMHAKPmG_zgTz5f7JMT6iGqgLHGw@mail.gmail.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Tue, 18 Apr 2017 20:51:36 +0200
+Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
+In-Reply-To: <alpine.DEB.2.10.1704181145420.31486@sstabellini-ThinkPad-X260>
+References: <20170405181417.15985-1-julien.grall@arm.com>
+ <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
+ <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
+ <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
+ <20170406142710.GE4372@olila.local.net-space.pl>
+ <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
+ <20170406152040.GH4372@olila.local.net-space.pl>
+ <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
+ <20170406160653.GJ4372@olila.local.net-space.pl>
+ <c23a6d11-cde8-7690-9676-537b5f17b967@suse.com>
+ <20170406164309.GM4372@olila.local.net-space.pl>
+ <b6cd0d59-9569-2958-9cc7-c971139881f4@suse.com>
+ <alpine.DEB.2.10.1704181135580.31486@sstabellini-ThinkPad-X260>
+ <fcc5ac4b-ed82-b5dd-a848-9ac9a3572853@suse.com>
+ <alpine.DEB.2.10.1704181145420.31486@sstabellini-ThinkPad-X260>
+Message-ID: <b9238471-6957-8720-9c98-37a5a32776d2@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2017 at 19:21, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Apr 14, 2017 at 03:01:58PM +0100, Andrea Reale wrote:
->> I guess it is likely that I might have made assumptions that are true
->> for x86_64 but do not hold for arm64. Whenever you feel this is the
->> case, I would be really grateful if you could help identify them.
->
-> Sure thing.
->
->> On Tue, Apr 11, 2017 at 06:12:11PM +0100, Mark Rutland wrote:
->> > On Tue, Apr 11, 2017 at 03:55:42PM +0100, Andrea Reale wrote:
->
->> > > +static void  free_pagetable(struct page *page, int order, bool direct)
->> >
->> > This "direct" parameter needs a better name, and a description in a
->> > comment block above this function.
+On 18/04/17 20:46, Stefano Stabellini wrote:
+> On Tue, 18 Apr 2017, Juergen Gross wrote:
+>> On 18/04/17 20:37, Stefano Stabellini wrote:
+>>> On Thu, 6 Apr 2017, Juergen Gross wrote:
+>>>> On 06/04/17 18:43, Daniel Kiper wrote:
+>>>>> On Thu, Apr 06, 2017 at 06:22:44PM +0200, Juergen Gross wrote:
+>>>>>> On 06/04/17 18:06, Daniel Kiper wrote:
+>>>>>>> Hi Julien,
+>>>>>>>
+>>>>>>> On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
+>>>>>>>> Hi Daniel,
+>>>>>>>>
+>>>>>>>> On 06/04/17 16:20, Daniel Kiper wrote:
+>>>>>>>>> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
+>>>>>>>>>> On 06/04/17 16:27, Daniel Kiper wrote:
+>>>>>>>>>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
+>>>>>>>>>>>> Hi Juergen,
+>>>>>>>>>>>>
+>>>>>>>>>>>> On 06/04/17 07:23, Juergen Gross wrote:
+>>>>>>>>>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
+>>>>>>>>>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
+>>>>>>>>>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
+>>>>>>>>>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
+>>>>>>>>>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> (+Daniel)
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> This could be a problem for x86 as well, at least theoretically.
+>>>>>>>>>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
+>>>>>>>>>>>>>>
+>>>>>>>>>>>>>> So I think we should have a similar routine there.
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> +1
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> I don't see any problem with such a routine added, in contrast to
+>>>>>>>>>>>>> potential "reboots" instead of power off without it.
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> So I think this dummy xen_efi_reset_system() should be added to
+>>>>>>>>>>>>> drivers/xen/efi.c instead.
+>>>>>>>>>>>>
+>>>>>>>>>>>> I will resend the patch during day with xen_efi_reset_system moved
+>>>>>>>>>>>> to common code and implement the x86 counterpart (thought, I will
+>>>>>>>>>>>> not be able to test it).
+>>>>>>>>>>>
+>>>>>>>>>>> I think that this is ARM specific issue. On x86 machine_restart() calls
+>>>>>>>>>>> xen_restart(). Hence, everything works. So, I think that it should be
+>>>>>>>>>>> fixed only for ARM. Anyway, please CC me when you send a patch.
+>>>>>>>>>>
+>>>>>>>>>> What about xen_machine_power_off() (as stated in Boris' mail)?
+>>>>>>>>>
+>>>>>>>>> Guys what do you think about that:
+>>>>>>>>>
+>>>>>>>>> --- a/drivers/firmware/efi/reboot.c
+>>>>>>>>> +++ b/drivers/firmware/efi/reboot.c
+>>>>>>>>> @@ -55,7 +55,7 @@ static void efi_power_off(void)
+>>>>>>>>>
+>>>>>>>>> static int __init efi_shutdown_init(void)
+>>>>>>>>> {
+>>>>>>>>> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
+>>>>>>>>> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
+>>>>>>>>>                return -ENODEV;
+>>>>>>>>>
+>>>>>>>>>        if (efi_poweroff_required())
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
+>>>>>>>>>
+>>>>>>>>> I hope that tweaks for both files should solve our problem.
+>>>>>>>>
+>>>>>>>> This sounds good for power off (I haven't tried to power off DOM0
+>>>>>>>> yet). But this will not solve the restart problem (see
+>>>>>>>> machine_restart in arch/arm64/kernel/process.c) which call directly
+>>>>>>>> efi_reboot.
+>>>>>>>
+>>>>>>> Hmmm... It seems to me that efi.reset_system override with empty function
+>>>>>>> in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
+>>>>>>> One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
+>>>>>>> for arch/arm64/kernel/efi.c. Does it make sense?
+>>>>>>
+>>>>>> I still think the empty function should be in drivers/xen/efi.c and we
+>>>>>> should use it in arch/x86/xen/efi.c, too.
+>>>>>
+>>>>> If you wish we can go that way too. Though I thing that we should fix
+>>>>> drivers/firmware/efi/reboot.c:efi_shutdown_init() too. Just in case.
+>>>>
+>>>> Sure, go ahead. I won't object.
+>>>
+>>> For the Xen on ARM side, the original patch that started this thread
+>>> (20170405181417.15985-1-julien.grall at arm.com) is good to go, right?
+>>>
 >>
->> The name direct is inherited directly from the x86_64 hot remove code.
->> It serves to distinguish if we are removing either a pagetable page that
->> is mapping to the direct mapping space (I think it is called also linear
->> mapping area somewhere else) or a pagetable page or a data page
->> from vmemmap.
->
-> FWIW, I've largely heard the folk call that the "linear mapping", and
-> x86 folk call that the "direct mapping". The two are interchangeable.
->
->> In this specific set of functions, the flag is needed because the various
->> alloc_init_p*d used for allocating entries for direct memory mapping
->> rely on pgd_pgtable_alloc, which in its turn calls  pgtable_page_ctor;
->> hence, we need to call the dtor.
->
-> AFAICT, that's not true for the arm64 linear map, since that's created
-> with our early_pgtable_alloc(), which doesn't call pgtable_page_ctor().
->
-> Judging by commit:
->
->   1378dc3d4ba07ccd ("arm64: mm: run pgtable_page_ctor() on non-swapper
->                      translation table pages")
->
-> ... we only do this for non-swapper page tables.
->
->> On the contrary, vmemmap entries are created using vmemmap_alloc_block
->> (from within vmemmap_populate), which does not call pgtable_page_ctor
->> when allocating pages.
->>
->> I am not sure I understand why the pgtable_page_ctor is not called when
->> allocating vmemmap page tables, but that's the current situation.
->
-> From a quick scan, I see that it's necessary to use pgtable_page_ctor()
-> for pages that will be used for userspace page tables, but it's not
-> clear to me if it's ever necessary for pages used for kernel page
-> tables.
->
-> If it is, we appear to have a bug on arm64.
->
-> Laura, Ard, thoughts?
->
+>> As I said: the dummy xen_efi_reset_system() should be in
+>> drivers/xen/efi.c
+> 
+> OK. Who is working on it?
 
-The generic apply_to_page_range() will expect the PTE lock to be
-initialized for page table pages that are not part of init_mm. For
-arm64, that is precisely efi_mm as far as I am aware. For EFI, the
-locking is unnecessary but does no harm (the permissions are set once
-via apply_to_page_range() at boot), so I added this call when adding
-support for strict permissions in EFI rt services mappings.
+Didn't Julien say he would do it?
 
-So I think it is appropriate for create_pgd_mapping() to be in charge
-of calling the ctor(). We simply have no destroy_pgd_mapping()
-counterpart that would be the place for the dtor() call, given that we
-never take down EFI rt services mappings.
 
-Whether it makes sense or not to lock/unlock in apply_to_page_range()
-is something I did not spend any brain cycles on at the time.
-
--- 
-Ard.
+Juergen
