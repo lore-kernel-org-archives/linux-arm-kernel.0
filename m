@@ -1,42 +1,42 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 18 Apr 2017 13:53:30 +0100
-Subject: [PATCH] ARM: V7M: Do not corrupt vector table around
- v7m_invalidate_l1 call
-In-Reply-To: <1490861391-35484-1-git-send-email-vladimir.murzin@arm.com>
+Date: Tue, 18 Apr 2017 13:54:11 +0100
+Subject: [PATCH] ARM: V7M: Preserve registers across switch from Thread to
+ Handler mode
+In-Reply-To: <1490861391-35484-2-git-send-email-vladimir.murzin@arm.com>
 References: <1490861391-35484-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <827cff66-33df-b1fd-842d-fa98cb69e326@arm.com>
+ <1490861391-35484-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <6bcd6703-c912-1955-afec-2bca962bb43f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 30/03/17 09:09, Vladimir Murzin wrote:
-> We save/restore registers around v7m_invalidate_l1 to address pointed
-> by r12, which is vector table, so the first eight entries are
-> overwritten with a garbage. We already have stack setup at that stage,
-> so use it to save/restore register.
+> According to ARMv7 ARM, when exception is taken content of r0-r3, r12
+> is unknown (see ExceptionTaken() pseudocode). Even though existent
+> implementations keep these register unchanged, preserve them to be in
+> line with architecture.
 > 
-> Fixes: 6a8146f420be ("ARM: 8609/1: V7M: Add support for the Cortex-M7 processor")
+> Reported-by: Dobromir Stefanov <dobromir.stefanov@arm.com>
 > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > ---
->  arch/arm/mm/proc-v7m.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mm/proc-v7m.S | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
 > diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-> index 8dea616..5049777 100644
+> index 5049777..47a5acc 100644
 > --- a/arch/arm/mm/proc-v7m.S
 > +++ b/arch/arm/mm/proc-v7m.S
-> @@ -147,10 +147,10 @@ __v7m_setup_cont:
+> @@ -135,9 +135,11 @@ __v7m_setup_cont:
+>  	dsb
+>  	mov	r6, lr			@ save LR
+>  	ldr	sp, =init_thread_union + THREAD_START_SP
+> +	stmia	sp, {r0-r3, r12}
+>  	cpsie	i
+>  	svc	#0
+>  1:	cpsid	i
+> +	ldmia	sp, {r0-r3, r12}
+>  	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
+>  	mov	lr, r6			@ restore LR
 >  
->  	@ Configure caches (if implemented)
->  	teq     r8, #0
-> -	stmneia	r12, {r0-r6, lr}	@ v7m_invalidate_l1 touches r0-r6
-> +	stmneia	sp, {r0-r6, lr}		@ v7m_invalidate_l1 touches r0-r6
->  	blne	v7m_invalidate_l1
->  	teq     r8, #0			@ re-evalutae condition
-> -	ldmneia	r12, {r0-r6, lr}
-> +	ldmneia	sp, {r0-r6, lr}
->  
->  	@ Configure the System Control Register to ensure 8-byte stack alignment
->  	@ Note the STKALIGN bit is either RW or RAO.
 > 
 
 Ok for patch tracker?
