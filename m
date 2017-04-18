@@ -1,35 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 18 Apr 2017 12:20:20 +0300
-Subject: [PATCH/RFT] sata: rcar_sata: Reset SATA PHY on resume
-In-Reply-To: <1492498973-2969-1-git-send-email-horms+renesas@verge.net.au>
-References: <1492498973-2969-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <308de569-b3a7-8909-c07c-6d39cab5b287@cogentembedded.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 18 Apr 2017 17:22:02 +0800
+Subject: [PATCH 2/3] ARM: sun8i: a83t: Drop leading zeroes from device
+ node addresses
+In-Reply-To: <20170418090329.odixwybrkqvp2o7z@lukather>
+References: <20170418042205.27894-1-wens@csie.org>
+ <20170418042205.27894-3-wens@csie.org>
+ <20170418090329.odixwybrkqvp2o7z@lukather>
+Message-ID: <CAGb2v664r+Wt9zrSK2GudMYRkp9N+QpdbEMdWEobx-HxS38Ovw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 4/18/2017 10:02 AM, Simon Horman wrote:
-
-> In the case where power is cut on suspend the SATA PHY state needs to be
-> suspended on resume.
+On Tue, Apr 18, 2017 at 5:03 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Apr 18, 2017 at 12:22:04PM +0800, Chen-Yu Tsai wrote:
+>> Kbuild now complains about leading zeroes in the address portion of
+>> device node names.
+>>
+>> Get rid of them.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a83t.dtsi | 10 +++++-----
+>>  1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> index 913aacafe8d5..82cb87f21b96 100644
+>> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+>> @@ -162,7 +162,7 @@
+>>               #size-cells = <1>;
+>>               ranges;
+>>
+>> -             pio: pinctrl at 01c20800 {
+>> +             pio: pinctrl at 1c20800 {
 >
-> This is the case on the Salvator-X board with the r8a7795 or r8a7796 SoC.
-> In that environment it has been observed that SATA partitions cannot not be
-> accessed on resume.
->
-> Based on work by Khiem Nguyen.
->
-> Cc: Khiem Nguyen <khiem.nguyen.xt@rvc.renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> * Compile and boot tested only
-> ---
->  drivers/ata/sata_rcar.c | 9 +--------
->  1 file changed, 1 insertion(+), 8 deletions(-)
+> As far as I know this breaks Uboot's auto-addition of stdout-path
 
-    Why the scope prefix in the subject is not just "sata_rcar: "? :-)
+You're right. It breaks as Uboot has the path to the uarts hard-coded.
+That sucks. And from what I can tell, it's not easily solvable by just
+switching to serial alias based references. CONS_INDEX won't line up
+on the A23/A33 Q8 tablets.
 
-[...]
+Maybe we can just keep the uart device node the same for now, but fix
+all the other ones. We can come back and fix the uart later once we
+figure out how to fix Uboot.
 
-MBR, Sergei
+Regards
+ChenYu
