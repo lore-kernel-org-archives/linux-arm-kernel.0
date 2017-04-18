@@ -1,39 +1,44 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 18 Apr 2017 13:19:29 +0300
-Subject: et8ek8 camera on Nokia N900: trying to understand what is going
- on with modes
-In-Reply-To: <20170412211159.GA2313@amd>
-References: <20170412211159.GA2313@amd>
-Message-ID: <20170418101929.GG7456@valkosipuli.retiisi.org.uk>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Tue, 18 Apr 2017 13:23:28 +0300
+Subject: [PATCH] i2c: designware: do not show SDA hold time warning when
+ not needed
+In-Reply-To: <20170418095939.68788787@free-electrons.com>
+References: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1492502087.24567.47.camel@linux.intel.com>
+ <20170418095939.68788787@free-electrons.com>
+Message-ID: <7b011e1e-8fa3-07c4-6688-5e258fd64dbd@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On 04/18/2017 10:59 AM, Thomas Petazzoni wrote:
+> Hello,
+>
+> On Tue, 18 Apr 2017 10:54:47 +0300, Andy Shevchenko wrote:
+>> On Fri, 2017-04-14 at 22:53 +0200, Thomas Petazzoni wrote:
+>>> When the I2C controller IP block has a revision too old to be able to
+>>> configure the SDA hold time, the driver currently displays a
+>>> warning. However, it does so unconditionally, even if no SDA hold time
+>>> has been configured through the Device Tree. This causes useless
+>>> warnings when running the system, so only show the warning if a SDA
+>>> hold time was specified.
+>>
+>> As far as I understand the warning it would be better to keep it in
+>> either way, though you may shift it to debug level.
+>>
+>> Wolfram, Jarkko, thoughts?
+>
+> Why show a message when the user has not requested a custom SDA hold
+> time? Getting a warning about something you haven't requested seems
+> really odd.
+>
+> I think it makes a lot more sense to keep it at the warning level
+> (because it's important to get this message if you configure a custom
+> SDA hold time), but only show it when appropriate.
+>
+I guess warning over debug level could have slightly better chance to 
+prevent someone not adding needless "i2c-sda-hold-time-ns" property in a 
+hardware that doesn't support SDA hold time. But needless spamming have 
+negative value so this is worth to fix. (I would do this as a single 
+liner by else if ()).
 
-On Wed, Apr 12, 2017 at 11:11:59PM +0200, Pavel Machek wrote:
-> Hi!
-> 
-> 5Mpix mode does not work on N900, which is something I'd like to
-> understand. et8ek8_mode contains huge tables of register settings and
-> parameter values, but it seems that they are not really independend.
-> 
-> To test that theory, I started with checking values against each
-> other.
-> 
-> This is the work so far, it is neither complete nor completely working
-> at the moment. Perhaps someone wants to play...
-
-You might seek to try lowering the pixel clock on the sensor to see whether
-it makes any difference. I don't think there's been any changes to how the
-sensor is programmed since the original software was shipped with the
-device. That doesn't apply to the SoC and the clock tree in the SoC however.
-I wonder if there could be changes in clock frequencies and how the ISP is
-clocked. The omap3isp driver has changed heavily as well.
-
-Just my 5 Euro cents (they have no smaller coins around here).
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
