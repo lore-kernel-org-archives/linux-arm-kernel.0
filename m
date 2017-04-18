@@ -1,36 +1,67 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 19 Apr 2017 08:43:36 +1000
-Subject: [PATCH v3 04/32] asm-generic: add ioremap_nopost() remap interface
-In-Reply-To: <20170418154937.GA1006@red-moon>
-References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
- <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
- <1491917983.7236.9.camel@kernel.crashing.org>
- <20170412112022.GY17774@n2100.armlinux.org.uk>
- <20170418154937.GA1006@red-moon>
-Message-ID: <1492555416.25766.97.camel@kernel.crashing.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 18 Apr 2017 15:47:39 -0700
+Subject: [PATCH 2/2] hwmon: (brcmstb) Add driver for Broadcom STB DPFE
+In-Reply-To: <f8c99c6f-8c53-0d0e-0712-d001c1e45f75@gmail.com>
+References: <20170418201702.57019-1-code@mmayer.net>
+ <20170418201702.57019-3-code@mmayer.net>
+ <20170418205839.GA3554@roeck-us.net>
+ <f8c99c6f-8c53-0d0e-0712-d001c1e45f75@gmail.com>
+Message-ID: <20170418224739.GA24376@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-04-18 at 16:49 +0100, Lorenzo Pieralisi wrote:
-> I can do that yes, which already means I have to know if eg microblaze
-> (drivers/pci/host/pcie-xilinx.c) can provide a mapping with nonposted
-> writes semantics, otherwise it is a dead-end.
+Hi Florian,
+
+On Tue, Apr 18, 2017 at 03:29:55PM -0700, Florian Fainelli wrote:
+> Hey Guenter,
 > 
-> Another option would be going back to what v1 did, namely, to implement
-> a pci_remap_cfgspace() interface (it is the _nopost() suffix that stirred
-> debate - nobody would object to having a default pci_remap_cfgspace()
-> implementation that defaults to ioremap_nocache(), I know Bjorn does not
-> like it to be PCI specific, just adding an option on the table to make
-> progress).
+> On 04/18/2017 01:58 PM, Guenter Roeck wrote:
+> > Hi Markus,
+> > 
+> > On Tue, Apr 18, 2017 at 01:17:02PM -0700, Markus Mayer wrote:
+> >> From: Markus Mayer <mmayer@broadcom.com>
+> >>
+> >> This driver allows access to DRAM properties, such as the refresh rate,
+> >> via the Broadcom STB DDR PHY Front End (DPFE). The refresh rate can be
+> >> used as indirect indicator of the DRAM temperature.
+> >>
+> >> The driver also allows setting of the sampling interval.
+> >>
+> >> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> >> ---
+> > [ ... ]
+> > 
+> >> +
+> >> +static SENSOR_DEVICE_ATTR(dpfe_info, 0444, show_info, NULL, 1000);
+> >> +static SENSOR_DEVICE_ATTR(dpfe_refresh, 0644, show_refresh, store_refresh,
+> >> +			  1000);
+> >> +static SENSOR_DEVICE_ATTR(dpfe_vendor, 0444, show_vendor, NULL, 1000);
+> >> +static struct attribute *dpfe_attrs[] = {
+> >> +	&sensor_dev_attr_dpfe_info.dev_attr.attr,
+> >> +	&sensor_dev_attr_dpfe_refresh.dev_attr.attr,
+> >> +	&sensor_dev_attr_dpfe_vendor.dev_attr.attr,
+> >> +	NULL
+> >> +};
+> >> +ATTRIBUTE_GROUPS(dpfe);
+> >> +
+> > 
+> > There is not a single standard hwmon attribute. I don't know how
+> > to classify this driver, and where it should reside, but it is not
+> > a hwmon driver. 
+> 
+> This is a driver that talks to an embedded CPU running firmware which is
+> capable of giving various informations about the DRAM chip being
+> populated, including a temperature trend (hotter or cooler). We thought
+> initially we would be able to expose the actual temperature, but this in
+> turn required a lot more knowledge about the DRAM chip that we wish we
+> knew about. That is sort of where and why this driver was proposed for
+> hwmon.
+> 
+> Which subsystem do you think would be best for this driver drivers/misc/
+> or drivers/soc/bcm/brcmstb/ maybe?
 
-Well, it boils down again to the fact that a mapping attribute isn't
-sufficient.
+Both should work. I would probably try misc first and let Greg tell me
+which way to go ;-).
 
-Let's say I'm microblaze and I can't do non-posted mapping. Then the
-Host Bridge driver needs to *know* that so it can implement a different
-workaround, such as reading back from some bridge register after every
-config write which ensures the previous write reached its destination
-for example, or whatever other IP specific mechanism.
-
-Cheers,
-Ben.
+Thanks,
+Guenter
