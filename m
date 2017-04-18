@@ -1,27 +1,18 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Apr 2017 07:35:22 +0200
-Subject: [PATCH] arm64: dts: allwinner: pine64: Add remaining UART aliases
-In-Reply-To: <20170414190804.21865-1-afaerber@suse.de>
-References: <20170414190804.21865-1-afaerber@suse.de>
-Message-ID: <20170418053522.ebkimevucq57y2km@lukather>
+Date: Tue, 18 Apr 2017 07:36:04 +0200
+Subject: [PATCH] ARM: sunxi: h3/h5: fix the compatible of R_CCU
+In-Reply-To: <20170417103449.31910-1-icenowy@aosc.io>
+References: <20170417103449.31910-1-icenowy@aosc.io>
+Message-ID: <20170418053604.5nkxjnlnrcepn6x7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 09:08:04PM +0200, Andreas F?rber wrote:
-> Enabling uart2 node currently leads to a /dev/ttyS1 device, with ttyS0..4
-> always present, causing confusion on the user's part.
+On Mon, Apr 17, 2017 at 06:34:49PM +0800, Icenowy Zheng wrote:
+> The R_CCU of H3/H5 currently wrongly used A64 R_CCU compatible.
 > 
-> dtc cannot resolve an overlay's &uart2 reference for strings, only for
-> phandles, so it would need to hardcode the full node path.
+> Fix it by changing it to the correct H3 compatible.
 > 
-> Avoid this and enforce reliable numbering by adding serialX aliases for:
-> 
-> UART1 - on Wifi/BT connector
-> UART2 - on Pi-2 connector
-> UART3 - on Euler connector
-> UART4 - on Euler connector
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
 Applied, thanks
 
@@ -37,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/c26970a1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/205d4c6a/attachment.sig>
