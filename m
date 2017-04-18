@@ -1,40 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Apr 2017 14:03:26 +0100
-Subject: Panic in arch_hw_breakpoint_init() on Cortex-A9 (SPEAr1340)
-In-Reply-To: <1492512268.28092.8.camel@v3.sk>
-References: <1492512268.28092.8.camel@v3.sk>
-Message-ID: <20170418130326.GE17866@leverpostej>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 18 Apr 2017 13:25:44 +0000
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 12:44:28PM +0200, Lubomir Rintel wrote:
-> Hi,
-
-Hi,
-
-> I'm getting a crash that looks awfully lot like what ddc37832a1 [ARM:
-> 8634/1: hw_breakpoint: blacklist Scorpion CPUs] aims to fix.
-
-Just to check, have you successfully booted a kernel on this board
-before? i.e. is this a new crash?
-
-> My hardware doesn't use a Scorpion CPU though -- it uses a Cortex-A9
-> (cpuid=0x412fc091).
+From: Gabriele Paoloni
+> Sent: 13 April 2017 10:11
+> > > Till now only the Intel ixgbe could support enable
+> > > Relaxed ordering in the drivers for special architecture,
+> > > but the ARCH_WANT_RELAX_ORDER is looks like a general name
+> > > for all arch, so rename to a specific name for intel
+> > > card looks more appropriate.
+> > >
+> > > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> >
+> > This is not a driver specific facility.
+> >
+> > Any driver can test this symbol and act accordingly.
+> >
+> > Just because IXGBE is the first and only user, doesn't mean
+> > the facility is driver specific.
 > 
-> [????0.157000] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
-> [????0.157000] Modules linked in:
-> [????0.157000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-0.rc3.git0.2.spear2.fc26.armv7hl #1
-> [????0.157000] Hardware name: ST SPEAr1340 SoC with Flattened Device Tree
-> [????0.157000] task: ef102b80 task.stack: ef0fa000
-> [????0.157000] PC is at arch_hw_breakpoint_init+0x130/0x2a0
-> [????0.157000] LR is at arch_hw_breakpoint_init+0x7c/0x2a0
-> [????0.157000] pc : [<c0e0538c>]????lr : [<c0e052d8>]????psr: 60000013
+> 
+> Please correct me if I am wrong but my understanding is that the standard
+> way to enable/disable relaxed ordering is to set/clear bit 4 of the Device
+> Control Register (PCI_EXP_DEVCTL_RELAX_EN 0x0010 /* Enable relaxed
+> ordering */).
+> Now I have looked up for all drivers either enabling or disabling relaxed
+> ordering and none of them seems to need a symbol to decide whether to
+> enable it or not.
+> Also it seems to me enabling/disabling relaxed ordering is never bound to the
+> host architecture.
+> 
+> So why this should be (or it is expected to be) a generic symbol?
+> Wouldn't it be more correct to have this as a driver specific symbol now and
+> move it to a generic one later once we have other drivers requiring it?
 
-It would be helpful to know which specific access that is.
+'Relaxed ordering' is a bit in the TLP header.
+A device (like the ixgbe hardware) can set it for some transactions and
+still have the transactions 'ordered enough' for the driver to work.
+(If all transactions have 'relaxed ordering' set then I suspect it is
+almost impossible to write a working driver.)
+The host side could (probably does) have a bit to enable 'relaxed ordering',
+it could also enforce stronger ordering than required by the PCIe spec
+(eg keeping reads in order).
 
-Can you figure that out with addr2line, e.g.
+Clearly, on some sparc64 systems, ixgbe needs to use 'relaxed ordering'.
+To me this requires two separate bits be enabled:
+1) to the ixgbe driver to generate the 'relaxed' TLP.
+2) to the host to actually act on them.
+If the ixgbe driver works when both are enabled why have options to
+disable either (except for bug-finding)?
 
- $ addr2line -ife vmlinux c0e0538c
-
-Thanks,
-Mark
+	David
