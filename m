@@ -1,14 +1,13 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 18 Apr 2017 08:01:31 -0700
-Subject: [PATCH v2 5/7] ARM: dts: imx7d-sdb: Add GPIO expander node
+Date: Tue, 18 Apr 2017 08:01:29 -0700
+Subject: [PATCH v2 3/7] ARM: dts: imx7s: Add node for GPC
 In-Reply-To: <20170418150133.31679-1-andrew.smirnov@gmail.com>
 References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
-Message-ID: <20170418150133.31679-6-andrew.smirnov@gmail.com>
+Message-ID: <20170418150133.31679-4-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for U38, a 74LV595PW serial-in shift register that acts as a
-GPIO expander on the board.
+Add node for GPC and specify as a parent interrupt controller for SoC bus.
 
 Cc: yurovsky at gmail.com
 Cc: Dong Aisheng <aisheng.dong@nxp.com>
@@ -23,54 +22,73 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx7d-sdb.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/imx7s.dtsi | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 5be01a1..d6f2dda 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -52,6 +52,27 @@
- 		reg = <0x80000000 0x80000000>;
- 	};
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 7148eac..5ba1289 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -42,6 +42,7 @@
+  */
  
-+	spi4 {
-+		compatible = "spi-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_spi4>;
-+		gpio-sck = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-+		gpio-mosi = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		cs-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+		num-chipselects = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		extended_io: gpio-expander at 0 {
-+			compatible = "fairchild,74hc595";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			reg = <0>;
-+			registers-number = <1>;
-+			spi-max-frequency = <100000>;
-+		};
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
+ #include <dt-bindings/clock/imx7d-clock.h>
++#include <dt-bindings/power/imx7-power.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -119,7 +120,7 @@
  		#address-cells = <1>;
-@@ -642,5 +663,13 @@
- 		fsl,pins = <
- 			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
- 		>;
+ 		#size-cells = <1>;
+ 		compatible = "simple-bus";
+-		interrupt-parent = <&intc>;
++		interrupt-parent = <&gpc>;
+ 		ranges;
+ 
+ 		funnel at 30041000 {
+@@ -301,6 +302,7 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			#interrupt-cells = <3>;
+ 			interrupt-controller;
++			interrupt-parent = <&intc>;
+ 			reg = <0x31001000 0x1000>,
+ 			      <0x31002000 0x2000>,
+ 			      <0x31004000 0x2000>,
+@@ -309,6 +311,7 @@
+ 
+ 		timer {
+ 			compatible = "arm,armv7-timer";
++			interrupt-parent = <&intc>;
+ 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+ 				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -565,6 +568,27 @@
+ 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 				#reset-cells = <1>;
+ 			};
 +
-+		pinctrl_spi4: spi4grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
-+				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
-+				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
-+			>;
-+		};
- 	};
- };
++			gpc: gpc at 303a0000 {
++				compatible = "fsl,imx7d-gpc";
++				reg = <0x303a0000 0x10000>;
++				interrupt-controller;
++				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++				#interrupt-cells = <3>;
++				interrupt-parent = <&intc>;
++				#power-domain-cells = <1>;
++
++				pgc {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					pgc_pcie_phy: pgc-power-domain at IMX7_POWER_DOMAIN_PCIE_PHY {
++						#power-domain-cells = <0>;
++						reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
++						power-supply = <&reg_1p0d>;
++					};
++				};
++			};
+ 		};
+ 
+ 		aips2: aips-bus at 30400000 {
 -- 
 2.9.3
