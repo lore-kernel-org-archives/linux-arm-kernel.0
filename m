@@ -1,111 +1,71 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 18 Apr 2017 20:57:04 +0200
-Subject: [PATCHv3 08/14] drivers/perf: arm_pmu: split cpu-local irq
- request/free
-In-Reply-To: <20170418183316.GM17866@leverpostej>
-References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
- <1491899997-32210-9-git-send-email-mark.rutland@arm.com>
- <CAMuHMdVV4qMyYTYN92TE4fsrxo66WK-Gd001YbJZok2txOH4ig@mail.gmail.com>
- <20170418183316.GM17866@leverpostej>
-Message-ID: <CAMuHMdVs+JQ3-Lj=TyN5Zi9fAhJROuc7upgFKmCwXVaA8eb1WQ@mail.gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 18 Apr 2017 12:23:17 -0700
+Subject: arm64: Question about warnings due to unspecified ASM operand
+ width
+In-Reply-To: <CAKv+Gu-ThWK_OCO6A9+6wi3b52_UT5_Da3juO3N2f1PqrHDjFw@mail.gmail.com>
+References: <20170418013156.GB105296@google.com>
+ <CAKv+Gu-ThWK_OCO6A9+6wi3b52_UT5_Da3juO3N2f1PqrHDjFw@mail.gmail.com>
+Message-ID: <20170418192317.GC128305@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hoi Ard,
 
-On Tue, Apr 18, 2017 at 8:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Tue, Apr 11, 2017 at 10:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Currently we have functions to request/free all IRQs for a given PMU.
->> > While this works today, this won't work for ACPI, where we don't know
->> > the full set of IRQs up front, and need to request them separately.
->> >
->> > To enable supporting ACPI, this patch splits out the cpu-local
->> > request/free into new functions, allowing us to request/free individual
->> > IRQs.
->> >
->> > As this makes it possible/necessary to request a PPI once per cpu, an
->> > additional check is added to detect mismatched PPIs. This shouldn't
->> > matter for the DT / platform case, as we check this when parsing.
->> >
->> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->> > Tested-by: Jeremy Linton <jeremy.linton@arm.com>
->> > Cc: Will Deacon <will.deacon@arm.com>
->>
->> This patch causes warnings during PSCI system suspend on R-Car Gen3.
->>
->> On R-Car M3-W (Dual CA57):
->>
->>     Disabling non-boot CPUs ...
->>    +IRQ15 no longer affine to CPU1
->>     CPU1: shutdown
->>     psci: CPU1 killed.
->>
->> On R-Car H3 (Quad CA57):
->>
->>     Disabling non-boot CPUs ...
->>    +IRQ15 no longer affine to CPU1
->>     CPU1: shutdown
->>     psci: CPU1 killed.
->>    +IRQ16 no longer affine to CPU2
->>     CPU2: shutdown
->>     psci: CPU2 killed.
->>    +IRQ17 no longer affine to CPU3
->>     CPU3: shutdown
->>     psci: CPU3 killed.
->>
->> Unfortunately it can't be reverted easily.
->>
->> Do you have any clue?
+Thanks for your reply!
+
+El Tue, Apr 18, 2017 at 03:29:39PM +0100 Ard Biesheuvel ha dit:
+
+> On 18 April 2017 at 02:31, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > Hi,
+> >
+> > During my work on improving support for kernel builds with clang I
+> > came across a bunch of warnings on arm64 builds about the width of
+> > operands in assembly not being specified:
+> >
+> > arch/arm64/include/asm/arch_timer.h:92:46: error: value size does
+> >       not match register size specified by the constraint and modifier [-Werror,-Wasm-operand-widths]
+> >         asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
+> >
+> > I understand that this is usually not a problem and might even be
+> > desired to give the compiler more flexiblity in the use of the
+> > available registers.
+> >
+> > My goal is to eventually build the kernel without warnings, not
+> > necessarily fixing all of them, warnings can also be disabled, e.g.
+> > in case of spurious warnings or a high number of occurrences that is
+> > too expensive to fix.
+> >
+> > Before delving into 'fixing' these 'asm-operand-widths' warnings I'd
+> > be interested to know if this is actually desirable or if it is
+> > preferred to keep the operand width unspecified in certain cases.
+> >
+> 
 >
-> Not presently. I'm somewhat surprised that this patch would have that
-> effect -- I would imagine that the rework this is based on is more
-> likely to. e.g. commit:
->
->   c09adab01e4aeecf ("drivers/perf: arm_pmu: split irq request from enable")
+> The root cause is that Clang infers the size of the register from the
+> size of the operand, while GCC always uses an xN register for a %
+> placeholder.
+> 
+> With msr/mrs instructions, we can only use xN registers
 
-Bummer. You're right. It's actually due to that commit.
+Good to know, thanks!
 
-I searched in my gmail for a patch with the specific title, and blindly
-replied to the first match, not noticing that was not the right patch.
-Sorry for that.
+> and so the only way to fix this is to ensure that we always use
+> 64-bit operands even for 32-bit system registers. This may be
+> possible in most cases, but assigning 32-bit struct fields becomes a
+> bit painful this way, and 'fixing' what is arguably not broken to
+> begin with may not be something Catalin is eager to accept.
 
-> Just to check, you definitely don't see these warnings immediately prior
-> to applying this patch?
->
-> My best guess otherwise is that prior to this patch, the PMU IRQ
-> request was failing earlier, and we bailed out.
->
-> Can you dump a dmesg before and after this patch, and see if the arm_pmu
-> driver dumps anything?
+I'm not sure this would be an issue. Clang does not warn about 32-bit
+operands used with 64-bit registers, but about the register type not
+being specified at all. I think we should be fine with specifying xN
+registers for msr/mrs instructions.
 
-On R-Car Gen3, there's no change in PMU related messages.
-Actual PMU messages are:
+> Do you know if there is a rationale behind this disparity?
 
-    hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7
-counters available
-    hw perfevents: /soc/pmu_a53: failed to probe PMU!
-    hw perfevents: /soc/pmu_a53: failed to register PMU devices!
+No, I don't know the rationale behind the register allocation for %
+placeholders. I tend to see it as an 'implementation' detail as long
+as it doesn't cause trouble.
 
-The last two are due to the CA53 cores being described in DT, but not
-enabled in the firmware.
+Cheers
 
-On SH-Mobile AG5 (sh73a0/kzm9g), it recently (not due to the bad commit)
-started printing:
-
-   +hw perfevents: no interrupt-affinity property for /pmu, guessing.
-    hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7 counters available
-
-which looks related.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Matthias
