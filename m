@@ -1,79 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Apr 2017 16:58:41 +0100
-Subject: [PATCH v24 08/11] acpi: Introduce acpi_unregister_irq function
-In-Reply-To: <20170414184014.8524-9-fu.wei@linaro.org>
-References: <20170414184014.8524-1-fu.wei@linaro.org>
- <20170414184014.8524-9-fu.wei@linaro.org>
-Message-ID: <20170418155841.GK17866@leverpostej>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 18 Apr 2017 11:31:29 -0500
+Subject: [PATCH v3 04/32] asm-generic: add ioremap_nopost() remap interface
+In-Reply-To: <20170418154937.GA1006@red-moon>
+References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
+ <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
+ <1491917983.7236.9.camel@kernel.crashing.org>
+ <20170412112022.GY17774@n2100.armlinux.org.uk>
+ <20170418154937.GA1006@red-moon>
+Message-ID: <CAErSpo484QD+VD92vCHgDcPZFkC7YPyaCxmDpAwqRRF0wJrnfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 15, 2017 at 02:40:11AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
-> 
-> This patch introduces acpi_unregister_irq function to free a
-> linux IRQ number<->GSI mapping by a given linux IRQ number.
-> 
-> Even we have successfully registered the GSI, when some error occurs, we
-> may need to unmap it for freeing the IRQ resource. But in some cases, we
-> only have IRQ, but not GSI.
-> 
-> This patch is the preparation for memory-mapped timer support in GTDT
-> driver.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  drivers/acpi/irq.c   | 10 ++++++++++
->  include/linux/acpi.h |  7 +++++++
->  2 files changed, 17 insertions(+)
+On Tue, Apr 18, 2017 at 10:49 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Apr 12, 2017 at 12:20:22PM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Apr 11, 2017 at 11:39:43PM +1000, Benjamin Herrenschmidt wrote:
+>> > On Tue, 2017-04-11 at 13:28 +0100, Lorenzo Pieralisi wrote:
+>> > > +static inline void __iomem *ioremap_nopost(phys_addr_t offset,
+>> > > size_t size)
+>> > > +{
+>> > > +       return ioremap_nocache(offset, size);
+>> > > +}
+>> > > +
+>> >
+>> > No this is wrong as I explained.
+>> >
+>> > This is a semantic that simply *cannot* be generically provided accross
+>> > architectures as a mapping attribute.
+>> >
+>> > The solution to your problem lies elsewhere.
+>>
+>> I disagree.  Sure, it may not be supportable across all architectures,
+>> but we're not introducing something brand new here.
+>>
+>> What we're trying to do is to fix some _existing_ drivers that are
+>> already using ioremap() to map the PCI IO and configuration spaces.
+>> Maybe it would help if those drivers were part of this patch set,
+>> rather than the patch set just introducing a whole new architecture
+>> interface without really showing where the problem drivers are.
+>>
+>> The issue here is that if we make this new ioremap_nopost() fail by
+>> returning NULL if an architecture does not provide an implementation,
+>> then these drivers are going to start failing on such architectures.
+>>
+>> It is only safe to do that where we know for certain that the drivers
+>> are not used - but I don't think that's the case here (it's difficult
+>> to tell, because no drivers are updated in this series, so we don't
+>> know which are going to be affected.)
+>>
+>> So, the question is:
+>>
+>> - is it better to provide a default implementation which provides the
+>>   functionality that existing drivers are _already_ using, albiet not
+>>   entirely correctly.
+>>
+>> or:
+>>
+>> - is it better to break drivers on architectures when they're converted
+>>   to fix up this issue.
+>>
+>> What, I suppose, we could do is not bother with a default implementation,
+>> but instead litter drivers with:
+>>
+>> +#ifdef ioremap_post
+>> +     base = ioremap_post(...);
+>> +#else
+>>       base = ioremap(...);
+>> +#endif
+>>
+>> which gets around your objection - not providing a default that's weaker
+>> than required, but also not breaking the drivers.  The problem is that
+>> we end up littering drivers with ifdefs.
+>>
+>> However, I'm willing to bet that the architectures that you're saying
+>> will not be able to support the weaker semantic won't have any need to
+>> use these drivers, or if they do, the drivers will need the method of
+>> accessing stuff like PCI IO and configuration spaces radically altered.
+>>
+>> So, maybe the best solution is to not provide any kind of default
+>> implementation, add a HAVE_IOREMAP_POST Kconfig symbol, have architectures
+>> select that when they do provide ioremap_post(), and make the drivers
+>> depend on that (so we don't end up trying to build these drivers on
+>> architectures where they can never work.)  Down side to that is reduced
+>> build coverage.
+>
+> I can do that yes, which already means I have to know if eg microblaze
+> (drivers/pci/host/pcie-xilinx.c) can provide a mapping with nonposted
+> writes semantics, otherwise it is a dead-end.
+>
+> Another option would be going back to what v1 did, namely, to implement
+> a pci_remap_cfgspace() interface (it is the _nopost() suffix that stirred
+> debate - nobody would object to having a default pci_remap_cfgspace()
+> implementation that defaults to ioremap_nocache(), I know Bjorn does not
+> like it to be PCI specific, just adding an option on the table to make
+> progress).
 
-This will need comments/acks from the ACPI folk.
+The reason I objected to pci_remap_cfgspace() was that I thought
+ioremap_nopost() was implementable across arches.  That turned out not
+to be true, so I'm fine with calling it pci_remap_cfgspace().  Maybe
+it's worth a note in the default implementation that arches should
+override it with a non-postable version if they can.
 
-Lorenzo, do you prefer this to direct use of irq_dispose_mapping() in
-the GTDT parsing code?
-
-Thanks,
-Mark.
-
-> diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
-> index 830299a..59de777 100644
-> --- a/drivers/acpi/irq.c
-> +++ b/drivers/acpi/irq.c
-> @@ -85,6 +85,16 @@ void acpi_unregister_gsi(u32 gsi)
->  EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
->  
->  /**
-> + * acpi_unregister_irq() - Free a linux IRQ number<->GSI mapping
-> + * @irq: linux IRQ number
-> + */
-> +void acpi_unregister_irq(int irq)
-> +{
-> +	irq_dispose_mapping(irq);
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_unregister_irq);
-> +
-> +/**
->   * acpi_get_irq_source_fwhandle() - Retrieve fwhandle from IRQ resource source.
->   * @source: acpi_resource_source to use for the lookup.
->   *
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 4b5c146..728d1ed 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -336,6 +336,13 @@ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
->   */
->  void acpi_unregister_gsi (u32 gsi);
->  
-> +/*
-> + * This function undoes the effect of one call to acpi_register_gsi().
-> + * The irq should be the return value of acpi_register_gsi().
-> + * If the irq is valid, free a linux IRQ number<->GSI mapping.
-> + */
-> +void acpi_unregister_irq(int irq);
-> +
->  struct pci_dev;
->  
->  int acpi_pci_irq_enable (struct pci_dev *dev);
-> -- 
-> 2.9.3
-> 
+Bjorn
