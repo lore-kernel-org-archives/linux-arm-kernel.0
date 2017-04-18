@@ -1,118 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Apr 2017 16:35:02 +0100
-Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
- ASM_EXPORT
-In-Reply-To: <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
-References: <20170405183458.193068-1-mka@chromium.org>
- <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
-Message-ID: <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 18 Apr 2017 16:49:37 +0100
+Subject: [PATCH v3 04/32] asm-generic: add ioremap_nopost() remap interface
+In-Reply-To: <20170412112022.GY17774@n2100.armlinux.org.uk>
+References: <20170411122923.6285-1-lorenzo.pieralisi@arm.com>
+ <20170411122923.6285-5-lorenzo.pieralisi@arm.com>
+ <1491917983.7236.9.camel@kernel.crashing.org>
+ <20170412112022.GY17774@n2100.armlinux.org.uk>
+Message-ID: <20170418154937.GA1006@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2017 at 15:47, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
-> On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
->> The operand is an integer constant, make the constness explicit by
->> adding the modifier. This is needed for clang to generate valid code
->> and also works with gcc.
->
-> Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
-> only use for syntax checking (and hence I don't care if it is the latest and
-> greatest) and this commit breaks it:
->
-> arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
-> operand prefix '%c'
->   asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
->
-> I'm currently reverting this change locally so I can continue to use the old
-> toolchain:
->
-> $ aarch64-linux-gnu-gcc --version
-> aarch64-linux-gnu-gcc (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro
-> GCC 2013.11) 4.8.3 20131202 (prerelease)
-> Copyright (C) 2013 Free Software Foundation, Inc.
->
-> $ aarch64-linux-gnu-as --version
-> GNU assembler (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC
-> 2013.11) 2.24.0.20131220
-> Copyright 2013 Free Software Foundation, Inc.
->
-> Maybe it is finally too old and nobody cares, but I thought it worth a mention.
->
+On Wed, Apr 12, 2017 at 12:20:22PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Apr 11, 2017 at 11:39:43PM +1000, Benjamin Herrenschmidt wrote:
+> > On Tue, 2017-04-11 at 13:28 +0100, Lorenzo Pieralisi wrote:
+> > > +static inline void __iomem *ioremap_nopost(phys_addr_t offset,
+> > > size_t size)
+> > > +{
+> > > +???????return ioremap_nocache(offset, size);
+> > > +}
+> > > +
+> > 
+> > No this is wrong as I explained.
+> > 
+> > This is a semantic that simply *cannot* be generically provided accross
+> > architectures as a mapping attribute.
+> > 
+> > The solution to your problem lies elsewhere.
+> 
+> I disagree.  Sure, it may not be supportable across all architectures,
+> but we're not introducing something brand new here.
+> 
+> What we're trying to do is to fix some _existing_ drivers that are
+> already using ioremap() to map the PCI IO and configuration spaces.
+> Maybe it would help if those drivers were part of this patch set,
+> rather than the patch set just introducing a whole new architecture
+> interface without really showing where the problem drivers are.
+> 
+> The issue here is that if we make this new ioremap_nopost() fail by
+> returning NULL if an architecture does not provide an implementation,
+> then these drivers are going to start failing on such architectures.
+> 
+> It is only safe to do that where we know for certain that the drivers
+> are not used - but I don't think that's the case here (it's difficult
+> to tell, because no drivers are updated in this series, so we don't
+> know which are going to be affected.)
+> 
+> So, the question is:
+> 
+> - is it better to provide a default implementation which provides the
+>   functionality that existing drivers are _already_ using, albiet not
+>   entirely correctly.
+> 
+> or:
+> 
+> - is it better to break drivers on architectures when they're converted
+>   to fix up this issue.
+> 
+> What, I suppose, we could do is not bother with a default implementation,
+> but instead litter drivers with:
+> 
+> +#ifdef ioremap_post
+> +	base = ioremap_post(...);
+> +#else
+> 	base = ioremap(...);
+> +#endif
+> 
+> which gets around your objection - not providing a default that's weaker
+> than required, but also not breaking the drivers.  The problem is that
+> we end up littering drivers with ifdefs.
+> 
+> However, I'm willing to bet that the architectures that you're saying
+> will not be able to support the weaker semantic won't have any need to
+> use these drivers, or if they do, the drivers will need the method of
+> accessing stuff like PCI IO and configuration spaces radically altered.
+> 
+> So, maybe the best solution is to not provide any kind of default
+> implementation, add a HAVE_IOREMAP_POST Kconfig symbol, have architectures
+> select that when they do provide ioremap_post(), and make the drivers
+> depend on that (so we don't end up trying to build these drivers on
+> architectures where they can never work.)  Down side to that is reduced
+> build coverage.
 
-Thanks for the report. I think we care more about GCC 4.8 than about
-Clang, which argues for reverting this patch.
+I can do that yes, which already means I have to know if eg microblaze
+(drivers/pci/host/pcie-xilinx.c) can provide a mapping with nonposted
+writes semantics, otherwise it is a dead-end.
 
-I understand these issues must be frustrating if you are working on
-this stuff, but to me, it is not entirely obvious why we want to
-support Clang in the first place (i.e., what does it buy you if your
-distro/environment is not already using Clang for userland), and why
-the burden is on Linux to make modifications to support Clang,
-especially when it comes to GCC extensions such as inline assembly
-syntax.
+Another option would be going back to what v1 did, namely, to implement
+a pci_remap_cfgspace() interface (it is the _nopost() suffix that stirred
+debate - nobody would object to having a default pci_remap_cfgspace()
+implementation that defaults to ioremap_nocache(), I know Bjorn does not
+like it to be PCI specific, just adding an option on the table to make
+progress).
 
-It is ultimately up to the maintainers to decide what to do with this
-patch, but my vote would be to revert it, especially given that the %c
-placeholder prefix is not documented anywhere, and appears to simply
-trigger some GCC internals that happen to do the right thing in this
-case.
-
-However, the I -> i change is arguably an improvement, and considering
-that the following
-
-asm("foo: .long %0" :: "i"(some value))
-
-doesn't compile with clang either, I suggest you (Matthias) file a bug
-against Clang to get this fixed, and we can propose another patch just
-for the I->i change.
-
--- 
-Ard.
-
-
->>
->> Also change the constraint of the operand from 'I' ("Integer constant
->> that is valid as an immediate operand in an ADD instruction", AArch64)
->> to 'i' ("An immediate integer operand").
->>
->> Based-on-patch-from: Greg Hackmann <ghackmann@google.com>
->> Signed-off-by: Greg Hackmann <ghackmann@google.com>
->> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
->> ---
->> Changes in v2:
->> - Changed operand constraint from I to i
->> - Updated commit message
->> - Changed 'From' tag to 'Based-on-patch-from'
->>
->>  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
->>  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
->> index aefda9868627..6b520e3f3ab1 100644
->> --- a/arch/arm64/crypto/sha1-ce-glue.c
->> +++ b/arch/arm64/crypto/sha1-ce-glue.c
->> @@ -18,7 +18,7 @@
->>  #include <linux/module.h>
->>
->>  #define ASM_EXPORT(sym, val) \
->> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
->> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
->>
->>  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
->>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
->> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
->> index 7cd587564a41..e3abe11de48c 100644
->> --- a/arch/arm64/crypto/sha2-ce-glue.c
->> +++ b/arch/arm64/crypto/sha2-ce-glue.c
->> @@ -18,7 +18,7 @@
->>  #include <linux/module.h>
->>
->>  #define ASM_EXPORT(sym, val) \
->> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
->> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
->>
->>  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
->>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
->> --
->> 2.12.2.715.g7642488e1d-goog
->>
+Thanks,
+Lorenzo
