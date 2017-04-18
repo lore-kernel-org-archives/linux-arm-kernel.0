@@ -1,36 +1,59 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 18 Apr 2017 21:01:52 +0100
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
- <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
- <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
-Message-ID: <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 18 Apr 2017 15:05:48 -0500
+Subject: [Query] Enabling parent device clock from resume_noirq
+In-Reply-To: <62cd5ee0-3f0c-5e65-5f64-0c91a2a6f1e6@ti.com>
+References: <62cd5ee0-3f0c-5e65-5f64-0c91a2a6f1e6@ti.com>
+Message-ID: <4c6e91e4-35fa-2fde-7915-fb922ec22567@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
->> From: Dong Bo <dongbo4@huawei.com>
->>
->> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
->> the flag is propagated to its child processes, even the elf
->> files are marked as not requiring executable stack. It may
->> cause superfluous operations on some arch, e.g.
->> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
->> also marked as PROT_EXEC.
++ linux-pm
 
-> That's affecting most architectures with a risk of ABI breakage. We
-> could do it on arm64 only, though I'm not yet clear on the ABI
-> implications (at a first look, there shouldn't be any).
+On 04/18/2017 01:07 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> resume_noirq callbacks are used in PCIe core to restore PCI state (this
+> accesses PCI module). So the clocks of PCI module has to be enabled before
+> resume_noirq.
+> 
+> The clocks for the PCI module in DRA7xx is provided by PIPE3 PHY device which
+> in turn gets it's clock from OCP2SCP device. During resume_noirq callbacks,
+> pm_runtime is disabled, so pm_runtime_get_sync is ineffective. However
+> pm_runtime can be enabled using pm_runtime_force_resume. Now the problem is
+> adding pm_runtime_force_resume() in resume_noirq callback of pci-dra7xx driver
+> will enable only the pm_runtime of PCI device but not PIPE3 PHY or OCP2SCP.
+> Adding pm_runtime_force_resume() in resume_noirq callback of PIPE3 PHY driver
+> or OCP2SCP driver will not help if the resume_noirq callbacks in PIP3PHY driver
+> and OCP2SCP driver are invoked after the resume_noirq of pci-dra7xx driver.
+> 
+> How to enable the pm_runtime of parent devices in resume_noirq callback? Does
+> existing pm_runtime framework has support for that?
+> 
 
-Is there a reason why it isn't just straightforwardly a bug
-(which we could fix) to make READ_IMPLIES_EXEC propagate to
-child processes? AFAICT this should be per-process: just because
-init happens not to have been (re)compiled to permit non-executable
-stacks doesn't mean every process on the system needs to have
-an executable stack. Behaviour shouldn't be variable across
-architectures either, I would hope.
+Most probably you've hit the issue described in [1].
+In general, if pci-dra7xx is consumer of  PIPE3 PHY device and 
+PIPE3 PHY device is child of OCP2SCP then suspend/resume order should be
+- pci-dra7xx
+- PIPE3 PHY
+- OCP2SCP
+ and resume
+- OCP2SCP
+- PIPE3 PHY
+- pci-dra7xx
+and in this case  pm_runtime_force_x() might work.
 
-thanks
--- PMM
+Hence, approach [1] was not accepted (personally I still like it) and
+"Functional dependencies tracking support" was introduced instead by commit 9ed9895 [2]
+you can try it.
+
+But, as per code, I'm not sure that Functional dependencies properly tracked in 
+pm_runtime_force_x() functions.
+
+PS: you can try to reorder device's nodes in DT and place PCI node after "ocp2scp" :P
+
+[1] "driver core: Ensure proper suspend/resume ordering"
+ https://patchwork.kernel.org/patch/7153201/
+[2] https://patchwork.kernel.org/patch/9404547/
+-- 
+regards,
+-grygorii
