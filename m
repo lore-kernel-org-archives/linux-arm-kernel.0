@@ -1,44 +1,35 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 18 Apr 2017 14:27:47 +0900
-Subject: [PATCH/RFT] ARM: dts: silk: Enable UHS-I SDR-50
-Message-ID: <1492493267-20807-1-git-send-email-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Apr 2017 07:34:58 +0200
+Subject: [PATCH] arm64: dts: allwinner: a64: Add UART2 pin nodes
+In-Reply-To: <20170414171320.19743-1-afaerber@suse.de>
+References: <20170414171320.19743-1-afaerber@suse.de>
+Message-ID: <20170418053458.phcbp4da3vatejpg@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI1.
+On Fri, Apr 14, 2017 at 07:13:20PM +0200, Andreas F?rber wrote:
+> UART2 is exposed on the Pi connector of Pine64. Make a pinctrl node
+> available at the SoC level, to simplify enabling UART2 via DT overlay.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-* Compile tested only; no access to silk board
----
- arch/arm/boot/dts/r8a7794-silk.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Applied, thanks!
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 4cb5278d104d..b0ef8ea75c29 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -226,6 +226,13 @@
- 	du1_pins: du1 {
- 		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_clk0_out";
- 		function = "du1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
- 	};
- 
- 	ssi_pins: sound {
-@@ -343,6 +350,7 @@
- 	vmmc-supply = <&vcc_sdhi1>;
- 	vqmmc-supply = <&vccq_sdhi1>;
- 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
+Could you also create the node in the pine64 DTS (with an explicit
+status = "disabled" in there) so that the overlay would be even easier
+to make ?
+
+Thanks,
+Maxime
+
 -- 
-2.7.0.rc3.207.g0ac5344
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/ffcc2c87/attachment.sig>
