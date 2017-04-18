@@ -1,73 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Apr 2017 20:54:26 +0100
-Subject: arm64: Question about warnings due to unspecified ASM operand
- width
-In-Reply-To: <20170418192317.GC128305@google.com>
-References: <20170418013156.GB105296@google.com>
- <CAKv+Gu-ThWK_OCO6A9+6wi3b52_UT5_Da3juO3N2f1PqrHDjFw@mail.gmail.com>
- <20170418192317.GC128305@google.com>
-Message-ID: <CAKv+Gu93akm8UbxnGT6COmRTMcPJXnctzWKkBZgOnwUHXO1PTw@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 18 Apr 2017 22:54:52 +0300
+Subject: [GIT PULL] bcm2835-dt-next-2017-03-30
+In-Reply-To: <20170330191343.31647-1-eric@anholt.net>
+References: <20170330191343.31647-1-eric@anholt.net>
+Message-ID: <20170418195452.prp2ortwv7u3hfok@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2017 at 20:23, Matthias Kaehlcke <mka@chromium.org> wrote:
-> Hoi Ard,
->
-> Thanks for your reply!
->
-> El Tue, Apr 18, 2017 at 03:29:39PM +0100 Ard Biesheuvel ha dit:
->
->> On 18 April 2017 at 02:31, Matthias Kaehlcke <mka@chromium.org> wrote:
->> > Hi,
->> >
->> > During my work on improving support for kernel builds with clang I
->> > came across a bunch of warnings on arm64 builds about the width of
->> > operands in assembly not being specified:
->> >
->> > arch/arm64/include/asm/arch_timer.h:92:46: error: value size does
->> >       not match register size specified by the constraint and modifier [-Werror,-Wasm-operand-widths]
->> >         asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
->> >
->> > I understand that this is usually not a problem and might even be
->> > desired to give the compiler more flexiblity in the use of the
->> > available registers.
->> >
->> > My goal is to eventually build the kernel without warnings, not
->> > necessarily fixing all of them, warnings can also be disabled, e.g.
->> > in case of spurious warnings or a high number of occurrences that is
->> > too expensive to fix.
->> >
->> > Before delving into 'fixing' these 'asm-operand-widths' warnings I'd
->> > be interested to know if this is actually desirable or if it is
->> > preferred to keep the operand width unspecified in certain cases.
->> >
->>
->>
->> The root cause is that Clang infers the size of the register from the
->> size of the operand, while GCC always uses an xN register for a %
->> placeholder.
->>
->> With msr/mrs instructions, we can only use xN registers
->
-> Good to know, thanks!
->
->> and so the only way to fix this is to ensure that we always use
->> 64-bit operands even for 32-bit system registers. This may be
->> possible in most cases, but assigning 32-bit struct fields becomes a
->> bit painful this way, and 'fixing' what is arguably not broken to
->> begin with may not be something Catalin is eager to accept.
->
-> I'm not sure this would be an issue. Clang does not warn about 32-bit
-> operands used with 64-bit registers, but about the register type not
-> being specified at all. I think we should be fine with specifying xN
-> registers for msr/mrs instructions.
->
+Hi Eric, Florian,
 
-It appears this was actually fixed in Clang. Formerly, it would
-implicitly use %w for 32-bit operands, which breaks if the
-instructions (such as msr/mrs, but there are more) don't support it.
+On Thu, Mar 30, 2017 at 12:13:43PM -0700, Eric Anholt wrote:
+> Here's the pull request for those changes I'd misplaced from 4.11.
+> This may be my last PR of the cycle.  The only change I have left on
+> my radar for 4.12 is
+> http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/006097.html
 
-Now it uses x registers for unqualified placeholders, and only issues a warning.
+Any chance of getting these fixes into 4.12-rc1?
 
-So we'd need to update all templates to use explicit qualifiers. I
-don't think that should be a problem for anyone.
+Thanks,
+baruch
+
+> 
+> The following changes since commit 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
+> 
+>   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-30
+> 
+> for you to fetch changes up to 10b6c0c2e2bb8cd1be682f8d36ef597e3419cb88:
+> 
+>   ARM: dts: bcm2835: add index to the ethernet alias (2017-03-27 10:10:39 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings back bcm2835 DT fixups from Baruch Siach that
+> got misplaced after a PR for 4.11 got rejected.
+> 
+> ----------------------------------------------------------------
+> Baruch Siach (4):
+>       ARM: dts: bcm2835: fix uart0 pinctrl node names
+>       ARM: dts: bcm2835: fix i2c0 pins
+>       ARM: dts: bcm2835: fix uart0/uart1 pins
+>       ARM: dts: bcm2835: add index to the ethernet alias
+> 
+>  arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi |  2 +-
+>  arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi |  2 +-
+>  arch/arm/boot/dts/bcm283x.dtsi              | 22 +++++++++++++---------
+>  3 files changed, 15 insertions(+), 11 deletions(-)
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
