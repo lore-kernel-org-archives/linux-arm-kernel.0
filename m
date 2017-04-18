@@ -1,40 +1,168 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Wed, 19 Apr 2017 01:17:33 +0200
-Subject: [PATCH 3/4] mmc: pxamci: Disable DATA_TRAN_DONE interrupt sooner
-In-Reply-To: <cover.1492492523.git.petr.cvek@tul.cz>
-References: <cover.1492492523.git.petr.cvek@tul.cz>
-Message-ID: <04139c1a-cee8-f64c-4b0e-2e3c472169a3@tul.cz>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Tue, 18 Apr 2017 17:05:21 -0600
+Subject: [PATCH V15 09/11] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
+In-Reply-To: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1492556723-9189-10-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the DATA_TRAN_DONE interrupt as soon as possible in the handler.
+UEFI spec allows for non-standard section in Common Platform Error
+Record. This is defined in section N.2.3 of UEFI version 2.5.
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+Currently if the CPER section's type (UUID) does not match with
+any section type that the kernel knows how to parse, trace event
+is not generated for such section. And thus user is not able to know
+happening of such hardware error, including error record of
+non-standard section.
+
+This commit generates a trace event which contains raw error data
+for unrecognized CPER section.
+
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Tested-by: Shiju Jose <shiju.jose@huawei.com>
 ---
- drivers/mmc/host/pxamci.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/acpi/apei/ghes.c | 27 +++++++++++++++++++++++----
+ drivers/ras/ras.c        |  1 +
+ include/ras/ras_event.h  | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 48c26d848e9f..570735a10127 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -354,6 +354,8 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
- 	struct mmc_data *data = host->data;
- 	struct dma_chan *chan;
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index b91123f..3d9f63b 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -45,11 +45,13 @@
+ #include <linux/aer.h>
+ #include <linux/nmi.h>
+ #include <linux/sched/clock.h>
++#include <linux/uuid.h>
  
-+	pxamci_disable_irq(host, DATA_TRAN_DONE);
+ #include <acpi/actbl1.h>
+ #include <acpi/ghes.h>
+ #include <acpi/apei.h>
+ #include <asm/tlbflush.h>
++#include <ras/ras_event.h>
+ 
+ #include "apei-internal.h"
+ 
+@@ -461,12 +463,21 @@ static void ghes_do_proc(struct ghes *ghes,
+ {
+ 	int sev, sec_sev;
+ 	struct acpi_hest_generic_data *gdata;
++	uuid_le sec_type;
++	uuid_le *fru_id = &NULL_UUID_LE;
++	char *fru_text = "";
+ 
+ 	sev = ghes_severity(estatus->error_severity);
+ 	apei_estatus_for_each_section(estatus, gdata) {
+ 		sec_sev = ghes_severity(gdata->error_severity);
+-		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+-				 CPER_SEC_PLATFORM_MEM)) {
++		sec_type = *(uuid_le *)gdata->section_type;
 +
- 	if (!data) {
- 		pr_err("%s: Missing data structure\n",
- 			mmc_hostname(host->mmc));
-@@ -389,8 +391,6 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
- 	else
- 		data->bytes_xfered = 0;
++		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
++			fru_id = (uuid_le *)gdata->fru_id;
++		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
++			fru_text = gdata->fru_text;
++
++		if (!uuid_le_cmp(sec_type, CPER_SEC_PLATFORM_MEM)) {
+ 			struct cper_sec_mem_err *mem_err;
+ 			mem_err = acpi_hest_get_payload(gdata);
+ 			ghes_edac_report_mem_error(ghes, sev, mem_err);
+@@ -475,8 +486,7 @@ static void ghes_do_proc(struct ghes *ghes,
+ 			ghes_handle_memory_failure(gdata, sev);
+ 		}
+ #ifdef CONFIG_ACPI_APEI_PCIEAER
+-		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+-				      CPER_SEC_PCIE)) {
++		else if (!uuid_le_cmp(sec_type, CPER_SEC_PCIE)) {
+ 			struct cper_sec_pcie *pcie_err;
+ 			pcie_err = acpi_hest_get_payload(gdata);
+ 			if (sev == GHES_SEV_RECOVERABLE &&
+@@ -507,6 +517,15 @@ static void ghes_do_proc(struct ghes *ghes,
  
--	pxamci_disable_irq(host, DATA_TRAN_DONE);
--
- 	host->data = NULL;
- 	if (host->mrq->stop) {
- 		pxamci_stop_clock(host);
+ 		}
+ #endif
++#ifdef CONFIG_RAS
++		else if (trace_unknown_sec_event_enabled()) {
++			void *unknown_err = acpi_hest_get_payload(gdata);
++
++			trace_unknown_sec_event(&sec_type,
++					fru_id, fru_text, sec_sev,
++					unknown_err, gdata->error_data_length);
++		}
++#endif
+ 	}
+ }
+ 
+diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+index b67dd36..fb2500b 100644
+--- a/drivers/ras/ras.c
++++ b/drivers/ras/ras.c
+@@ -27,3 +27,4 @@ static int __init ras_init(void)
+ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
+ #endif
+ EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
++EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
+diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+index 1791a12..5861b6f 100644
+--- a/include/ras/ras_event.h
++++ b/include/ras/ras_event.h
+@@ -162,6 +162,51 @@
+ );
+ 
+ /*
++ * Unknown Section Report
++ *
++ * This event is generated when hardware detected a hardware
++ * error event, which may be of non-standard section as defined
++ * in UEFI spec appendix "Common Platform Error Record", or may
++ * be of sections for which TRACE_EVENT is not defined.
++ *
++ */
++TRACE_EVENT(unknown_sec_event,
++
++	TP_PROTO(const uuid_le *sec_type,
++		 const uuid_le *fru_id,
++		 const char *fru_text,
++		 const u8 sev,
++		 const u8 *err,
++		 const u32 len),
++
++	TP_ARGS(sec_type, fru_id, fru_text, sev, err, len),
++
++	TP_STRUCT__entry(
++		__array(char, sec_type, 16)
++		__array(char, fru_id, 16)
++		__string(fru_text, fru_text)
++		__field(u8, sev)
++		__field(u32, len)
++		__dynamic_array(u8, buf, len)
++	),
++
++	TP_fast_assign(
++		memcpy(__entry->sec_type, sec_type, sizeof(uuid_le));
++		memcpy(__entry->fru_id, fru_id, sizeof(uuid_le));
++		__assign_str(fru_text, fru_text);
++		__entry->sev = sev;
++		__entry->len = len;
++		memcpy(__get_dynamic_array(buf), err, len);
++	),
++
++	TP_printk("severity: %d; sec type:%pU; FRU: %pU %s; data len:%d; raw data:%s",
++		  __entry->sev, __entry->sec_type,
++		  __entry->fru_id, __get_str(fru_text),
++		  __entry->len,
++		  __print_hex(__get_dynamic_array(buf), __entry->len))
++);
++
++/*
+  * PCIe AER Trace event
+  *
+  * These events are generated when hardware detects a corrected or
 -- 
-2.11.0
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
