@@ -1,41 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Apr 2017 15:21:26 +0100
-Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
- "Consolidate get_dma_ops..."
-In-Reply-To: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
-References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
-Message-ID: <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 18 Apr 2017 15:29:39 +0100
+Subject: arm64: Question about warnings due to unspecified ASM operand
+ width
+In-Reply-To: <20170418013156.GB105296@google.com>
+References: <20170418013156.GB105296@google.com>
+Message-ID: <CAKv+Gu-ThWK_OCO6A9+6wi3b52_UT5_Da3juO3N2f1PqrHDjFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 02:04:21PM -0700, Stefano Stabellini wrote:
-> The following commit:
-> 
->   commit 815dd18788fe0d41899f51b91d0560279cf16b0d
->   Author: Bart Van Assche <bart.vanassche@sandisk.com>
->   Date:   Fri Jan 20 13:04:04 2017 -0800
-> 
->       treewide: Consolidate get_dma_ops() implementations
-> 
-> rearranges get_dma_ops in a way that xen_dma_ops are not returned when
-> running on Xen anymore, dev->dma_ops is returned instead (see
-> arch/arm/include/asm/dma-mapping.h:get_arch_dma_ops and
-> include/linux/dma-mapping.h:get_dma_ops).
-> 
-> Fix the problem by storing dev->dma_ops in dev_archdata, and setting
-> dev->dma_ops to xen_dma_ops. This way, xen_dma_ops is returned naturally
-> by get_dma_ops. The Xen code can retrieve the original dev->dma_ops from
-> dev_archdata when needed. It also allows us to remove __generic_dma_ops
-> from common headers.
-> 
-> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
-> Tested-by: Julien Grall <julien.grall@arm.com>
-> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> CC: linux at armlinux.org.uk
-> CC: catalin.marinas at arm.com
-> CC: will.deacon at arm.com
-> CC: boris.ostrovsky at oracle.com
-> CC: jgross at suse.com
-> CC: Julien Grall <julien.grall@arm.com>
+On 18 April 2017 at 02:31, Matthias Kaehlcke <mka@chromium.org> wrote:
+> Hi,
+>
+> During my work on improving support for kernel builds with clang I
+> came across a bunch of warnings on arm64 builds about the width of
+> operands in assembly not being specified:
+>
+> arch/arm64/include/asm/arch_timer.h:92:46: error: value size does
+>       not match register size specified by the constraint and modifier [-Werror,-Wasm-operand-widths]
+>         asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
+>
+> I understand that this is usually not a problem and might even be
+> desired to give the compiler more flexiblity in the use of the
+> available registers.
+>
+> My goal is to eventually build the kernel without warnings, not
+> necessarily fixing all of them, warnings can also be disabled, e.g.
+> in case of spurious warnings or a high number of occurrences that is
+> too expensive to fix.
+>
+> Before delving into 'fixing' these 'asm-operand-widths' warnings I'd
+> be interested to know if this is actually desirable or if it is
+> preferred to keep the operand width unspecified in certain cases.
+>
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Hi Matthias,
+
+The root cause is that Clang infers the size of the register from the
+size of the operand, while GCC always uses an xN register for a %
+placeholder.
+
+With msr/mrs instructions, we can only use xN registers, and so the
+only way to fix this is to ensure that we always use 64-bit operands
+even for 32-bit system registers. This may be possible in most cases,
+but assigning 32-bit struct fields becomes a bit painful this way, and
+'fixing' what is arguably not broken to begin with may not be
+something Catalin is eager to accept.
+
+Do you know if there is a rationale behind this disparity?
+
+-- 
+Ard.
