@@ -1,56 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 18 Apr 2017 16:04:07 +0200
-Subject: [PATCH V2] PM / OPP: Use - instead of @ for DT entries
-In-Reply-To: <20170418051526.GN28191@vireshk-i7>
-References: <70e7c7ee13722ab9c73cb073f88502eaf1ada5f5.1491816050.git.viresh.kumar@linaro.org>
- <6048149.VQXQ7HobDf@aspire.rjw.lan> <20170418051526.GN28191@vireshk-i7>
-Message-ID: <2454410.F8dveLU6q9@aspire.rjw.lan>
+From: jthumshirn@suse.de (Johannes Thumshirn)
+Date: Tue, 18 Apr 2017 16:10:50 +0200
+Subject: [PATCH] ARM: Fix rd_size declaration
+In-Reply-To: <1492524472.2628.3.camel@sandisk.com>
+References: <20170417231003.7178-1-bart.vanassche@sandisk.com>
+ <20170418073526.GA6056@linux-x5ow.site>
+ <1492524472.2628.3.camel@sandisk.com>
+Message-ID: <20170418141050.GG6056@linux-x5ow.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 18, 2017 10:45:26 AM Viresh Kumar wrote:
-> On 17-04-17, 18:40, Rafael J. Wysocki wrote:
-> > On Monday, April 17, 2017 06:35:25 PM Rafael J. Wysocki wrote:
-> > > On Monday, April 17, 2017 11:07:51 AM Masahiro Yamada wrote:
-> > > > 2017-04-15 7:47 GMT+09:00 Rafael J. Wysocki <rjw@rjwysocki.net>:
-> > > > > On Monday, April 10, 2017 02:51:35 PM Viresh Kumar wrote:
-> > > > >> Compiling the DT file with W=1, DTC warns like follows:
-> > > > >>
-> > > > >> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-> > > > >> unit name, but no reg property
-> > > > >>
-> > > > >> Fix this by replacing '@' with '-' as the OPP nodes will never have a
-> > > > >> "reg" property.
-> > > > >>
-> > > > >> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > > > >> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > > > >> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > > > >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > > > >> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
-> > > > >> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > > > >> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > > > >
-> > > > > OK, so any ACKs from the DT side?  Rob?
-> > > > >
-> > > > > Thanks,
-> > > > > Rafael
-> > > > 
-> > > > 
-> > > > 
-> > > > I see Rob's Acked-by.
-> > > > 
-> > > > https://lkml.org/lkml/2017/4/13/648
-> > > 
-> > > Indeed.  Thanks!
-> > 
-> > But it doesn't apply on top of -rc7 for me, so I guess there is new 4.12-candidate
-> > material in the DTS tree that conflicts with this, in which case it is better to route
-> > it through the DTS tree IMO.
+On Tue, Apr 18, 2017 at 02:07:53PM +0000, Bart Van Assche wrote:
+> Hello Johannes,
 > 
-> Yes a minor conflict. I have sent the rebased version now, see if you
-> want to apply it directly or want arm-soc guys to do it.
+> Thanks for the review. But are you aware that with the current content an
+> include guard is overkill because it is safe to evaluate the "extern unsigned
+> long rd_size" declaration multiple times?
 
-I'm going to apply the rebased one.
+Yes I am. But once someone does changes to this header and forgets the include
+guard as well it may cause errors.
 
-Thanks,
-Rafael
+I am aware that this is rather cosmetic than needed, that's why I declared it
+as a nit.
+
+Byte,
+	Johannes
+
+-- 
+Johannes Thumshirn                                          Storage
+jthumshirn at suse.de                                +49 911 74053 689
+SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
+Key fingerprint = EC38 9CAB C2C4 F25D 8600 D0D0 0393 969D 2D76 0850
