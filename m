@@ -1,50 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 18 Apr 2017 19:04:51 +0200
-Subject: [patch V2 09/24] hwtracing/coresight-etm4x: Use
- cpuhp_setup_state_nocalls_cpuslocked()
-References: <20170418170442.665445272@linutronix.de>
-Message-ID: <20170418170553.108514162@linutronix.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 18 Apr 2017 21:01:52 +0100
+Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+ <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+ <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+Message-ID: <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
+>> From: Dong Bo <dongbo4@huawei.com>
+>>
+>> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+>> the flag is propagated to its child processes, even the elf
+>> files are marked as not requiring executable stack. It may
+>> cause superfluous operations on some arch, e.g.
+>> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+>> also marked as PROT_EXEC.
 
-etm_probe4() holds get_online_cpus() while invoking
-cpuhp_setup_state_nocalls().
+> That's affecting most architectures with a risk of ABI breakage. We
+> could do it on arm64 only, though I'm not yet clear on the ABI
+> implications (at a first look, there shouldn't be any).
 
-cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
-correct, but prevents the conversion of the hotplug locking to a percpu
-rwsem.
+Is there a reason why it isn't just straightforwardly a bug
+(which we could fix) to make READ_IMPLIES_EXEC propagate to
+child processes? AFAICT this should be per-process: just because
+init happens not to have been (re)compiled to permit non-executable
+stacks doesn't mean every process on the system needs to have
+an executable stack. Behaviour shouldn't be variable across
+architectures either, I would hope.
 
-Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested call.
-
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-
----
- drivers/hwtracing/coresight/coresight-etm4x.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -990,12 +990,12 @@ static int etm4_probe(struct amba_device
- 		dev_err(dev, "ETM arch init failed\n");
- 
- 	if (!etm4_count++) {
--		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
--					  "arm/coresight4:starting",
--					  etm4_starting_cpu, etm4_dying_cpu);
--		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
--						"arm/coresight4:online",
--						etm4_online_cpu, NULL);
-+		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
-+						     "arm/coresight4:starting",
-+						     etm4_starting_cpu, etm4_dying_cpu);
-+		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
-+							   "arm/coresight4:online",
-+							   etm4_online_cpu, NULL);
- 		if (ret < 0)
- 			goto err_arch_supported;
- 		hp_online = ret;
+thanks
+-- PMM
