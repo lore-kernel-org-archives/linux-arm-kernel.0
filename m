@@ -1,31 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 18 Apr 2017 17:16:53 +0800
-Subject: [PATCH 3/3] ARM: sun8i: a83t: Rename pinmux setting names
-In-Reply-To: <20170418090447.dcxinewczubf26b7@lukather>
-References: <20170418042205.27894-1-wens@csie.org>
- <20170418042205.27894-4-wens@csie.org>
- <20170418090447.dcxinewczubf26b7@lukather>
-Message-ID: <CAGb2v65is5iyzXYvJMF7QLWXBdMBpemEm2kmyTnytx7V30M7Og@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 18 Apr 2017 12:20:20 +0300
+Subject: [PATCH/RFT] sata: rcar_sata: Reset SATA PHY on resume
+In-Reply-To: <1492498973-2969-1-git-send-email-horms+renesas@verge.net.au>
+References: <1492498973-2969-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <308de569-b3a7-8909-c07c-6d39cab5b287@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 5:04 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Apr 18, 2017 at 12:22:05PM +0800, Chen-Yu Tsai wrote:
->> The pinmux setting nodes all have an address element in their node
->> names, however the pinctrl node does not have #address-cells.
->>
->> Rename the existing pinmux setting nodes and labels in sun8i-a83t.dtsi,
->> dropping identifiers for functions that only have one possible setting,
->> and using the pingroup name if the function is identically available on
->> different pingroups.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> Applied, and I really like the new names.
->
-> Would you make the same patch for everyone?
+Hello.
 
-I can. No guarantees on the schedule though.
+On 4/18/2017 10:02 AM, Simon Horman wrote:
 
-ChenYu
+> In the case where power is cut on suspend the SATA PHY state needs to be
+> suspended on resume.
+>
+> This is the case on the Salvator-X board with the r8a7795 or r8a7796 SoC.
+> In that environment it has been observed that SATA partitions cannot not be
+> accessed on resume.
+>
+> Based on work by Khiem Nguyen.
+>
+> Cc: Khiem Nguyen <khiem.nguyen.xt@rvc.renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> * Compile and boot tested only
+> ---
+>  drivers/ata/sata_rcar.c | 9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+
+    Why the scope prefix in the subject is not just "sata_rcar: "? :-)
+
+[...]
+
+MBR, Sergei
