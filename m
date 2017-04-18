@@ -1,85 +1,55 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 18 Apr 2017 15:33:06 +0900
-Subject: [PATCH/RFT] ARM: dts: porter: Enable UHS-I SDR-50 and SDR-104
-Message-ID: <1492497186-30379-1-git-send-email-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Apr 2017 09:00:16 +0200
+Subject: [PATCH v3 02/12] arm64: allwinner: a64: add NMI controller on A64
+In-Reply-To: <20170417115747.7300-3-icenowy@aosc.io>
+References: <20170417115747.7300-1-icenowy@aosc.io>
+ <20170417115747.7300-3-icenowy@aosc.io>
+Message-ID: <20170418070016.qsng3qtk76bqxyc5@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,2}.
-And the sd-uhs-sdr104 property to SDHI0.
+On Mon, Apr 17, 2017 at 07:57:37PM +0800, Icenowy Zheng wrote:
+> Allwinner A64 SoC features a NMI controller, which is usually connected
+> to the AXP PMIC.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes in v2:
+> - Added Chen-Yu's ACK.
+> 
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 05ec9fc5e81f..53c18ca372ea 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -403,6 +403,14 @@
+>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> +		nmi_intc: interrupt-controller at 01f00c0c {
+> +			compatible = "allwinner,sun6i-a31-sc-nmi";
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			reg = <0x01f00c0c 0x38>;
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
---
-Testing failed:
-- SDHI0: mmc0: error -110 whilst initialising SD card
-- It is unclear if this is something to do with my hardware/firmware
-  environment or software problem.
-  + SD card CID: 035344534c33324780aa9c34de010600
-Untested:
-- SDHI2: Untested due to no card present in remotely accessed board
----
- arch/arm/boot/dts/r8a7791-porter.dts | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
+The base address is not correct, and there's uncertainty on whether
+this is this particular controller or not. Did you even test this?
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index 95da5cb9d37a..a0fb8dca3c86 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -160,11 +160,25 @@
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi0_pins_uhs: sd0_uhs {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+		power-source = <1800>;
- 	};
- 
- 	sdhi2_pins: sd2 {
- 		groups = "sdhi2_data4", "sdhi2_ctrl";
- 		function = "sdhi2";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi2_pins_uhs: sd2_uhs {
-+		groups = "sdhi2_data4", "sdhi2_ctrl";
-+		function = "sdhi2";
-+		power-source = <1800>;
- 	};
- 
- 	qspi_pins: qspi {
-@@ -238,22 +252,27 @@
- 
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi0>;
- 	vqmmc-supply = <&vccq_sdhi0>;
- 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	status = "okay";
- };
- 
- &sdhi2 {
- 	pinctrl-0 = <&sdhi2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi2_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi2>;
- 	vqmmc-supply = <&vccq_sdhi2>;
- 	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
+Maxime
+
 -- 
-2.7.0.rc3.207.g0ac5344
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/c98803e0/attachment.sig>
