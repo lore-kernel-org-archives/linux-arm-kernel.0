@@ -1,60 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 18 Apr 2017 12:56:31 -0700
-Subject: [GIT PULL] bcm2835-dt-next-2017-03-30
-In-Reply-To: <20170418195452.prp2ortwv7u3hfok@tarshish>
-References: <20170330191343.31647-1-eric@anholt.net>
- <20170418195452.prp2ortwv7u3hfok@tarshish>
-Message-ID: <809f5427-77dd-941c-ebc6-0deeff974105@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 18 Apr 2017 19:04:51 +0200
+Subject: [patch V2 09/24] hwtracing/coresight-etm4x: Use
+ cpuhp_setup_state_nocalls_cpuslocked()
+References: <20170418170442.665445272@linutronix.de>
+Message-ID: <20170418170553.108514162@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2017 12:54 PM, Baruch Siach wrote:
-> Hi Eric, Florian,
-> 
-> On Thu, Mar 30, 2017 at 12:13:43PM -0700, Eric Anholt wrote:
->> Here's the pull request for those changes I'd misplaced from 4.11.
->> This may be my last PR of the cycle.  The only change I have left on
->> my radar for 4.12 is
->> http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/006097.html
-> 
-> Any chance of getting these fixes into 4.12-rc1?
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-I will merge Eric's PR in the next few days, and we'll see from there.
+etm_probe4() holds get_online_cpus() while invoking
+cpuhp_setup_state_nocalls().
 
-> 
-> Thanks,
-> baruch
-> 
->>
->> The following changes since commit 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
->>
->>   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
->>
->> are available in the git repository at:
->>
->>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-30
->>
->> for you to fetch changes up to 10b6c0c2e2bb8cd1be682f8d36ef597e3419cb88:
->>
->>   ARM: dts: bcm2835: add index to the ethernet alias (2017-03-27 10:10:39 -0700)
->>
->> ----------------------------------------------------------------
->> This pull request brings back bcm2835 DT fixups from Baruch Siach that
->> got misplaced after a PR for 4.11 got rejected.
->>
->> ----------------------------------------------------------------
->> Baruch Siach (4):
->>       ARM: dts: bcm2835: fix uart0 pinctrl node names
->>       ARM: dts: bcm2835: fix i2c0 pins
->>       ARM: dts: bcm2835: fix uart0/uart1 pins
->>       ARM: dts: bcm2835: add index to the ethernet alias
->>
->>  arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi |  2 +-
->>  arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi |  2 +-
->>  arch/arm/boot/dts/bcm283x.dtsi              | 22 +++++++++++++---------
->>  3 files changed, 15 insertions(+), 11 deletions(-)
-> 
+cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
+correct, but prevents the conversion of the hotplug locking to a percpu
+rwsem.
 
+Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested call.
 
--- 
-Florian
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -990,12 +990,12 @@ static int etm4_probe(struct amba_device
+ 		dev_err(dev, "ETM arch init failed\n");
+ 
+ 	if (!etm4_count++) {
+-		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
+-					  "arm/coresight4:starting",
+-					  etm4_starting_cpu, etm4_dying_cpu);
+-		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+-						"arm/coresight4:online",
+-						etm4_online_cpu, NULL);
++		cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
++						     "arm/coresight4:starting",
++						     etm4_starting_cpu, etm4_dying_cpu);
++		ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
++							   "arm/coresight4:online",
++							   etm4_online_cpu, NULL);
+ 		if (ret < 0)
+ 			goto err_arch_supported;
+ 		hp_online = ret;
