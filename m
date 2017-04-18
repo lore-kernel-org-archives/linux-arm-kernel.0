@@ -1,55 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Apr 2017 09:00:16 +0200
-Subject: [PATCH v3 02/12] arm64: allwinner: a64: add NMI controller on A64
-In-Reply-To: <20170417115747.7300-3-icenowy@aosc.io>
-References: <20170417115747.7300-1-icenowy@aosc.io>
- <20170417115747.7300-3-icenowy@aosc.io>
-Message-ID: <20170418070016.qsng3qtk76bqxyc5@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 18 Apr 2017 16:02:53 +0900
+Subject: [PATCH/RFT] sata: rcar_sata: Reset SATA PHY on resume
+Message-ID: <1492498973-2969-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 07:57:37PM +0800, Icenowy Zheng wrote:
-> Allwinner A64 SoC features a NMI controller, which is usually connected
-> to the AXP PMIC.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v2:
-> - Added Chen-Yu's ACK.
-> 
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 05ec9fc5e81f..53c18ca372ea 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -403,6 +403,14 @@
->  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
->  		};
->  
-> +		nmi_intc: interrupt-controller at 01f00c0c {
-> +			compatible = "allwinner,sun6i-a31-sc-nmi";
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			reg = <0x01f00c0c 0x38>;
+In the case where power is cut on suspend the SATA PHY state needs to be
+suspended on resume.
 
-The base address is not correct, and there's uncertainty on whether
-this is this particular controller or not. Did you even test this?
+This is the case on the Salvator-X board with the r8a7795 or r8a7796 SoC.
+In that environment it has been observed that SATA partitions cannot not be
+accessed on resume.
 
-Maxime
+Based on work by Khiem Nguyen.
 
+Cc: Khiem Nguyen <khiem.nguyen.xt@rvc.renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+* Compile and boot tested only
+---
+ drivers/ata/sata_rcar.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+diff --git a/drivers/ata/sata_rcar.c b/drivers/ata/sata_rcar.c
+index 5d38245a7a73..4f4f7788a6cf 100644
+--- a/drivers/ata/sata_rcar.c
++++ b/drivers/ata/sata_rcar.c
+@@ -969,16 +969,9 @@ static int sata_rcar_resume(struct device *dev)
+ {
+ 	struct ata_host *host = dev_get_drvdata(dev);
+ 	struct sata_rcar_priv *priv = host->private_data;
+-	void __iomem *base = priv->base;
+ 
+ 	clk_prepare_enable(priv->clk);
+-
+-	/* ack and mask */
+-	iowrite32(0, base + SATAINTSTAT_REG);
+-	iowrite32(0x7ff, base + SATAINTMASK_REG);
+-	/* enable interrupts */
+-	iowrite32(ATAPI_INT_ENABLE_SATAINT, base + ATAPI_INT_ENABLE_REG);
+-
++	sata_rcar_init_controller(host);
+ 	ata_host_resume(host);
+ 
+ 	return 0;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/c98803e0/attachment.sig>
+2.7.0.rc3.207.g0ac5344
