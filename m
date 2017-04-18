@@ -1,104 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Apr 2017 10:08:46 +0100
-Subject: kvm/arm64: use-after-free in
- kvm_unmap_hva_handler/unmap_stage2_pmds
-In-Reply-To: <20170418083230.GA17866@leverpostej>
-References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
- <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
- <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
- <CAAeHK+x8udHKq9xa1zkTO6ax5E8Dk32HYWfaT05FMchL2cr48g@mail.gmail.com>
- <1050c9d8-5813-5df9-29e5-3ab6e61b5de6@arm.com>
- <88715300-ef58-e7bd-81f5-95e0b9c9c533@arm.com>
- <20170413155045.GA8387@e107814-lin.cambridge.arm.com>
- <20170418083230.GA17866@leverpostej>
-Message-ID: <20170418090845.GC17866@leverpostej>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 18 Apr 2017 10:15:08 +0100
+Subject: [PATCH v2 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <20170404020056.d7osj7rmog22xbjd@rob-hp-laptop>
+References: <cover.1491118230.git.guillaume.tucker@collabora.com>
+ <db45d0d68957d699f13a0d92f4f84d8ebfd0270e.1491118230.git.guillaume.tucker@collabora.com>
+ <20170404020056.d7osj7rmog22xbjd@rob-hp-laptop>
+Message-ID: <b8cf7acd-83e9-49fb-0800-19a76b8dcce5@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 09:32:31AM +0100, Mark Rutland wrote:
-> Hi Suzuki,
-> 
-> On Thu, Apr 13, 2017 at 04:50:46PM +0100, Suzuki K. Poulose wrote:
-> > kvm: Hold reference to the user address space
-> > 
-> > The core KVM code, uses mmgrab/mmdrop to pin the mm struct of the user
-> > application. mmgrab only guarantees that the mm struct is available,
-> > while the "real address space" (see Documentation/vm/active_mm.txt) may
-> > be destroyed. Since the KVM depends on the user space page tables for
-> > the Guest pages, we should instead do an mmget/mmput. Even though
-> > mmget/mmput is not encouraged for uses with unbounded time, the KVM
-> > is fine to do so, as we are doing it from the context of the same process.
-> > 
-> > This also prevents the race condition where mmu_notifier_release() could
-> > be called in parallel and one instance could end up using a free'd kvm
-> > instance.
-> > 
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Paolo Bonzin <pbonzini@redhat.com>
-> > Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > Cc: andreyknvl at google.com
-> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > ---
-> >  virt/kvm/kvm_main.c | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> > index 88257b3..555712e 100644
-> > --- a/virt/kvm/kvm_main.c
-> > +++ b/virt/kvm/kvm_main.c
-> > @@ -613,7 +613,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
-> >  		return ERR_PTR(-ENOMEM);
-> >  
-> >  	spin_lock_init(&kvm->mmu_lock);
-> > -	mmgrab(current->mm);
-> > +	mmget(current->mm);
-> >  	kvm->mm = current->mm;
-> >  	kvm_eventfd_init(kvm);
-> >  	mutex_init(&kvm->lock);
-> > @@ -685,7 +685,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
-> >  	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
-> >  		kvm_free_memslots(kvm, kvm->memslots[i]);
-> >  	kvm_arch_free_vm(kvm);
-> > -	mmdrop(current->mm);
-> > +	mmput(current->mm);
-> >  	return ERR_PTR(r);
-> >  }
-> >  
-> > @@ -747,7 +747,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
-> >  	kvm_arch_free_vm(kvm);
-> >  	preempt_notifier_dec();
-> >  	hardware_disable_all();
-> > -	mmdrop(mm);
-> > +	mmput(mm);
-> >  }
-> 
-> 
-> As a heads-up, I'm seeing what looks to be a KVM memory leak with this
-> patch applied atop of next-20170411.
-> 
-> I don't yet know if this is a problem with next-20170411 or this patch
-> in particular -- I will try to track that down. In the mean time, info
-> dump below.
-> 
-> I left syzkaller running over the weekend using this kernel on the host,
-> and OOM kicked in after it had been running for a short while. Almost
-> all of my memory is in use, but judging by top, almost none of this is
-> associated with processes.
+Hi Rob,
 
-FWIW, it seems easy enough to trigger this leak with kvmtool. Start a
-guest that'll allocate a tonne of memory:
+On 04/04/17 03:00, Rob Herring wrote:
+> On Sun, Apr 02, 2017 at 08:59:44AM +0100, Guillaume Tucker wrote:
+>> The ARM Mali Midgard GPU family is present in a number of SoCs
+>> from many different vendors such as Samsung Exynos and Rockchip.
+>>
+>> Import the device tree bindings documentation from the r16p0
+>> release of the Mali Midgard GPU kernel driver:
+>>
+>>   https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
+>>
+>> The following optional bindings have been omitted in this initial
+>> version as they are only used in very specific cases:
+>>
+>>   * snoop_enable_smc
+>>   * snoop_disable_smc
+>>   * jm_config
+>>   * power_model
+>>   * system-coherency
+>>   * ipa-model
+>>
+>> The example has been simplified accordingly.
+>>
+>> The compatible string definition has been limited to
+>> "arm,mali-midgard" to avoid checkpatch.pl warnings and to match
+>> what the driver actually expects (as of r16p0 out-of-tree).
+>>
+>> CC: John Reitan <john.reitan@arm.com>
+>> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+>> ---
+>>  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 53 ++++++++++++++++++++++
+>>  1 file changed, 53 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> new file mode 100644
+>> index 000000000000..da8fc6d21bbf
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> @@ -0,0 +1,53 @@
+>> +#
+>> +# (C) COPYRIGHT 2013-2016 ARM Limited.
+>> +# Copyright (C) 2017 Collabora Ltd
+>> +#
+>> +# This program is free software and is provided to you under the terms of the
+>> +# GNU General Public License version 2 as published by the Free Software
+>> +# Foundation, and any use by you of this program is subject to the terms
+>> +# of such GNU licence.
+>> +#
+>> +
+>> +
+>> +ARM Mali Midgard GPU
+>> +====================
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : Should be "arm,mali-midgard".
+>
+> As Neil said...
 
-$ lkvm run --console virtio -m 4096 --kernel Image \
-  -p "memtest=1 console=hvc0,38400 earlycon=uart,mmio,0x3f8"
+Sure; as discussed in my previous emails.
 
-... then kill this with a SIGKILL from your favourite process management
-tool.
+>> +- reg : Physical base address of the device and length of the register area.
+>> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
+>> +- interrupt-names : Contains the names of IRQ resources in the order they were
+>> +  provided in the interrupts property. Must contain: "JOB, "MMU", "GPU".
+>> +
+>> +Optional:
+>> +
+>> +- clocks : Phandle to clock for the Mali Midgard device.
+>> +- clock-names : Shall be "clk_mali".
+>
+> "clk_" is redundant. Actually, if there is only 1 clock, then just drop
+> names. But there's not at least a core and bus clock?
 
-Also, if the guest exits normally, everything appears to be cleaned up
-correctly. So it looks like this is in some way related to our fatal
-signal handling.
+Only one clock needs to be provided with the Midgard GPU
+architecture.  It shares the same bus and system memory as the
+CPU.  So I'll remove clock-names in patch v3.
+
+>> +- mali-supply : Phandle to regulator for the Mali device. Refer to
+>> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+>> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
+>> +  for details.
+>
+> Is this going to be sufficient vs. operating-points-v2? Or should it be
+> a power domain with OPPs?
+
+In principle, switching to operating-points-v2 should be very
+straightforward.  I have smoke-tested the driver with an
+operating-points-v2 table and a phandle to it inside the gpu node
+in place of operating-points and it seems to be working fine.  At
+least it parsed the OPPs and got initialised correctly.
+
+My understanding is that operating-points (v1) are not deprecated
+so we could keep the bindings as-is, but please let me know
+otherwise and I can try to address that in my next patch version.
+In the documentation, it should only be the case of replacing
+operating-points with operating-points-v2.
+
+>> +
+>> +Example for a Mali-T602:
+>> +
+>> +gpu at 0xfc010000 {
+>
+> Drop the '0x'.
+
+OK, I'm also updating the example with lower-case IRQ names, no
+clock-names etc...
 
 Thanks,
-Mark.
+Guillaume
