@@ -1,78 +1,62 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Wed, 19 Apr 2017 01:18:00 +0200
-Subject: [PATCH 4/4] mmc: pxamci: Fix race condition between pxamci_dma_irq()
- and pxamci_irq()
-In-Reply-To: <cover.1492492523.git.petr.cvek@tul.cz>
-References: <cover.1492492523.git.petr.cvek@tul.cz>
-Message-ID: <31e332fa-f152-1eff-39fb-91f332b84757@tul.cz>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 18 Apr 2017 16:32:34 -0700
+Subject: [PATCH] ARM: dts: bcm-cygnus: Add 911360's V3D device.
+Message-ID: <20170418233234.13374-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The data write requests may require an FIFO flush when the DMA transaction
-ends. This is handled by a DMA callback pxamci_dma_irq(). After flushing
-the FIFO the MCI controller generates the DATA_TRAN_DONE interrupt.
+This loads the VC4 driver on the 911360_entphn platform (with the
+corresponding series sent to dri-devel), which is supported by master
+of the Mesa tree.
 
-Problem is the DATA_TRAN_DONE interrupt will be generated when the write
-data length is divisible by the FIFO size (no flush is required). And in
-this case the DMA callback can be called long time after the
-DATA_TRAN_DONE interrupt (as the DMA callback is realised by a tasklet,
-it can even stack). When the DMA callback is finally called there can
-already be a different type of the transaction (another data read or write
-request).
-
-The dmaengine_tx_status() will be called for a wrong DMA transaction and
-in some case it returns DMA_IN_PROGRESS, which the code recognize as
-an error and ends a running DMA and halts the MCI controller.
-
-The problem presents itself under heavy (interrupt) load with a high MCI
-traffic with this message:
-
-	mmc0: DMA error on tx channel
-
-The fix must obey these situations:
- - Any command will erase the FIFO
- - Data writes divisible by the FIFO size will (probably) automatically
-   generate a DATA_TRAN_DONE interrupt
- - Data writes with a nonzero FIFO remainder must be flushed and then MCI
-   generates a DATA_TRAN_DONE interrupt
- - Data reads do not require a flush but they will generate
-   a DATA_TRAN_DONE interrupt
-
-The fix changes the DATA_TRAN_DONE interrupt enable from read/write
-requests to read requests. The DATA_TRAN_DONE interrupt for a write
-request is enabled in the DMA callback, this assures  a DATA_TRAN_DONE
-interrupt will be always called after a callback (with or without an FIFO
-flush).
-
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/mmc/host/pxamci.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm-cygnus.dtsi      | 13 +++++++++++++
+ arch/arm/boot/dts/bcm911360_entphn.dts |  8 ++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 570735a10127..08713bb6c716 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -335,7 +335,9 @@ static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index f52750c6d3ed..907a5e843364 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -406,6 +406,19 @@
+ 			status = "disabled";
+ 		};
  
- 	pxamci_disable_irq(host, END_CMD_RES);
- 	if (host->data && !cmd->error) {
--		pxamci_enable_irq(host, DATA_TRAN_DONE);
-+		if (host->data->flags & MMC_DATA_READ)
-+			pxamci_enable_irq(host, DATA_TRAN_DONE);
++		v3d: v3d at 180a2000 {
++			compatible = "brcm,cygnus-v3d";
++			reg = <0x180a2000 0x1000>;
++			clocks = <&mipipll BCM_CYGNUS_MIPIPLL_CH2_V3D>;
++			clock-names = "v3d_clk";
++			interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
 +
- 		/*
- 		 * workaround for erratum #91, if doing write
- 		 * enable DMA late
-@@ -585,6 +587,9 @@ static void pxamci_dma_irq(void *param)
++		vc4: gpu {
++			compatible = "brcm,cygnus-vc4";
++		};
++
+ 		adc: adc at 180a6000 {
+ 			compatible = "brcm,iproc-static-adc";
+ 			#io-channel-cells = <1>;
+diff --git a/arch/arm/boot/dts/bcm911360_entphn.dts b/arch/arm/boot/dts/bcm911360_entphn.dts
+index 8b3800f46288..037621c13290 100644
+--- a/arch/arm/boot/dts/bcm911360_entphn.dts
++++ b/arch/arm/boot/dts/bcm911360_entphn.dts
+@@ -57,6 +57,14 @@
+ 	};
+ };
  
- 	if (likely(status == DMA_COMPLETE)) {
- 		writel(BUF_PART_FULL, host->base + MMC_PRTBUF);
++&v3d {
++	assigned-clocks =
++		<&mipipll BCM_CYGNUS_MIPIPLL>,
++		<&mipipll BCM_CYGNUS_MIPIPLL_CH2_V3D>;
++	assigned-clock-rates = <525000000>, <300000000>;
++	status = "okay";
++};
 +
-+		/* NOTICE pxamci_irq() is dependent on pxamci_dma_irq() */
-+		pxamci_enable_irq(host, DATA_TRAN_DONE);
- 	} else {
- 		pr_err("%s: Invalid DMA status %i\n", mmc_hostname(host->mmc),
- 			status);
+ &uart3 {
+ 	status = "okay";
+ };
 -- 
 2.11.0
