@@ -1,32 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Apr 2017 07:37:11 +0200
-Subject: [PATCH v3 01/12] arm64: allwinner: a64: enable RSB on A64
-In-Reply-To: <20170417115747.7300-2-icenowy@aosc.io>
-References: <20170417115747.7300-1-icenowy@aosc.io>
- <20170417115747.7300-2-icenowy@aosc.io>
-Message-ID: <20170418053711.5qa3vhc7v6rqp3sf@lukather>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 18 Apr 2017 07:53:13 +0200
+Subject: [PATCH v2 1/3] dt-bindings: Add support for samsung s6e3hf2 panel
+In-Reply-To: <1492408934-22096-2-git-send-email-hoegeun.kwon@samsung.com>
+References: <1492408934-22096-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170417060218epcas1p1dd328b9af56638f30fa6f350a81fce45@epcas1p1.samsung.com>
+ <1492408934-22096-2-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <42f1ab45-9903-9255-de95-ce29bdbffff8@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 07:57:36PM +0800, Icenowy Zheng wrote:
-> Allwinner A64 have a RSB controller like the one on A23/A33 SoCs.
-> 
-> Add it and its pinmux.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+On 17.04.2017 08:02, Hoegeun Kwon wrote:
+> The samsung s6e3hf2 panel is a 5.65" 1600x2560 AMOLED panel connected
+> using MIPI-DSI interfaces.
+>
+> The s6e3hf2 is add to samsung,s6e3ha2.txt binding because it is a
+> panel similar to the s6e3ha2. So add the compatible string and
+> comments.
+>
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Applied, thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170418/e4788787/attachment.sig>
+ --
+Regards
+Andrzej
