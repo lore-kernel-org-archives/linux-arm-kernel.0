@@ -1,42 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Apr 2017 09:59:39 +0200
-Subject: [PATCH] i2c: designware: do not show SDA hold time warning when
- not needed
-In-Reply-To: <1492502087.24567.47.camel@linux.intel.com>
-References: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1492502087.24567.47.camel@linux.intel.com>
-Message-ID: <20170418095939.68788787@free-electrons.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 18 Apr 2017 17:03:04 +0900
+Subject: [PATCH v2 2/3] drm/panel: s6e3ha2: Add support for s6e3hf2 panel
+ on TM2e board
+In-Reply-To: <5b3031ca-2847-fbc0-36f3-7e0a6cd3e0b3@samsung.com>
+References: <1492408934-22096-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170417060219epcas5p4726fab1b7a58ac3d832e2be86873a37d@epcas5p4.samsung.com>
+ <1492408934-22096-3-git-send-email-hoegeun.kwon@samsung.com>
+ <5b3031ca-2847-fbc0-36f3-7e0a6cd3e0b3@samsung.com>
+Message-ID: <58F5C838.7080807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Tue, 18 Apr 2017 10:54:47 +0300, Andy Shevchenko wrote:
-> On Fri, 2017-04-14 at 22:53 +0200, Thomas Petazzoni wrote:
-> > When the I2C controller IP block has a revision too old to be able to
-> > configure the SDA hold time, the driver currently displays a
-> > warning. However, it does so unconditionally, even if no SDA hold time
-> > has been configured through the Device Tree. This causes useless
-> > warnings when running the system, so only show the warning if a SDA
-> > hold time was specified.  
+
+2017? 04? 18? 14:55? Andrzej Hajda ?(?) ? ?:
+> On 17.04.2017 08:02, Hoegeun Kwon wrote:
+>> This patch supports TM2e panel and the panel has 1600x2560 resolution
+>> in 5.65" physical.
+>>
+>> This identify panel type with compatibility string, also invoke
+>> display mode that matches the type. So add the check code for s6e3ha2
+>> compatibility and s6e3hf2 type and select the drm_display_mode of
+>> default and edge type.
+>>
+>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+Reviewed-by: Inki Dae <inki.dae@samsung.com>
+
+Thanks,
+Inki Dae
+
 > 
-> As far as I understand the warning it would be better to keep it in
-> either way, though you may shift it to debug level.
+>  --
+> Regards
+> Andrzej
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Wolfram, Jarkko, thoughts?
-
-Why show a message when the user has not requested a custom SDA hold
-time? Getting a warning about something you haven't requested seems
-really odd.
-
-I think it makes a lot more sense to keep it at the warning level
-(because it's important to get this message if you configure a custom
-SDA hold time), but only show it when appropriate.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> 
+> 
