@@ -1,35 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Apr 2017 16:57:25 +0100
-Subject: [PATCH] Remove ARM errata Workarounds 458693 and 460075
-In-Reply-To: <20170416080446.GI17774@n2100.armlinux.org.uk>
-References: <1492301166-10292-1-git-send-email-nisalmenuka23@gmail.com>
- <20170416080446.GI17774@n2100.armlinux.org.uk>
-Message-ID: <20170418155725.GG27592@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Apr 2017 16:58:41 +0100
+Subject: [PATCH v24 08/11] acpi: Introduce acpi_unregister_irq function
+In-Reply-To: <20170414184014.8524-9-fu.wei@linaro.org>
+References: <20170414184014.8524-1-fu.wei@linaro.org>
+ <20170414184014.8524-9-fu.wei@linaro.org>
+Message-ID: <20170418155841.GK17866@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 16, 2017 at 09:04:46AM +0100, Russell King - ARM Linux wrote:
-> On Sat, Apr 15, 2017 at 07:06:06PM -0500, Nisal Menuka wrote:
-> > According to ARM, these errata exist only in a version of Cortex-A8
-> > (r2p0) which was never built. Therefore, I believe there are no platforms
-> > where this workaround should be enabled.
-> > link :http://infocenter.arm.com/help/index.jsp?topic=
-> > /com.arm.doc.faqs/ka15634.html
+On Sat, Apr 15, 2017 at 02:40:11AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> These were submitted by ARM Ltd back in 2009 - if the silicon was never
-> built, there would've been no reason to submit them.  Maybe Catalin can
-> shed some light on this, being the commit author who introduced these?
+> This patch introduces acpi_unregister_irq function to free a
+> linux IRQ number<->GSI mapping by a given linux IRQ number.
+> 
+> Even we have successfully registered the GSI, when some error occurs, we
+> may need to unmap it for freeing the IRQ resource. But in some cases, we
+> only have IRQ, but not GSI.
+> 
+> This patch is the preparation for memory-mapped timer support in GTDT
+> driver.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/acpi/irq.c   | 10 ++++++++++
+>  include/linux/acpi.h |  7 +++++++
+>  2 files changed, 17 insertions(+)
 
-We normally try not to submit errata workarounds for revisions that are
-not going to be built/deployed. It's possible that at the time there
-were plans for r2p0 to be licensed and built (not just FPGA) but I don't
-really remember the details. The A8 errata document indeed states that
-r1p0 and r2p0 are obsolete but this can mean many things (like not
-available to license).
+This will need comments/acks from the ACPI folk.
 
-I'll try to see if any of the A8 past product managers know anything
-about this. In the meantime, I would leave them in (no run-time
-overhead).
+Lorenzo, do you prefer this to direct use of irq_dispose_mapping() in
+the GTDT parsing code?
 
--- 
-Catalin
+Thanks,
+Mark.
+
+> diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
+> index 830299a..59de777 100644
+> --- a/drivers/acpi/irq.c
+> +++ b/drivers/acpi/irq.c
+> @@ -85,6 +85,16 @@ void acpi_unregister_gsi(u32 gsi)
+>  EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+>  
+>  /**
+> + * acpi_unregister_irq() - Free a linux IRQ number<->GSI mapping
+> + * @irq: linux IRQ number
+> + */
+> +void acpi_unregister_irq(int irq)
+> +{
+> +	irq_dispose_mapping(irq);
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_unregister_irq);
+> +
+> +/**
+>   * acpi_get_irq_source_fwhandle() - Retrieve fwhandle from IRQ resource source.
+>   * @source: acpi_resource_source to use for the lookup.
+>   *
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 4b5c146..728d1ed 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -336,6 +336,13 @@ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
+>   */
+>  void acpi_unregister_gsi (u32 gsi);
+>  
+> +/*
+> + * This function undoes the effect of one call to acpi_register_gsi().
+> + * The irq should be the return value of acpi_register_gsi().
+> + * If the irq is valid, free a linux IRQ number<->GSI mapping.
+> + */
+> +void acpi_unregister_irq(int irq);
+> +
+>  struct pci_dev;
+>  
+>  int acpi_pci_irq_enable (struct pci_dev *dev);
+> -- 
+> 2.9.3
+> 
