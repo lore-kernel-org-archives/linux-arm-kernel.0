@@ -1,130 +1,258 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Tue, 18 Apr 2017 10:22:05 +0800
-Subject: [PATCH v3 1/8] trace: ras: add ARM processor error information
- trace event
-In-Reply-To: <f8ef4306-fd69-d8a3-3ca6-86be2825cab3@codeaurora.org>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-11-git-send-email-xiexiuqi@huawei.com>
- <32ca4e7e-eb5e-a4ff-33d6-68d06e9242fb@codeaurora.org>
- <6c0d2652-71ba-aefc-d6cd-5cc9a0b0d729@huawei.com>
- <8aa30f6a-d18d-1cce-57dc-08efb52d822e@huawei.com>
- <f8ef4306-fd69-d8a3-3ca6-86be2825cab3@codeaurora.org>
-Message-ID: <6de4c208-b4c7-282c-12ec-8863cadb7c60@huawei.com>
+From: glin@suse.com (Gary Lin)
+Date: Tue, 18 Apr 2017 12:09:59 +0800
+Subject: [PATCH v2] efi: Config options to assign versions in the PE-COFF
+ header
+In-Reply-To: <CAK-u0Q=cxHpFw9_LsPgabPGFAs1A9FD3=Kk_y9Djyo4v78OdEw@mail.gmail.com>
+References: <20170413035827.9820-1-glin@suse.com>
+ <CAKv+Gu8ZS1rdDwLrspv_VnYHOfxkdxUpZe_h1Sw3-N2SBpeJ5g@mail.gmail.com>
+ <20170413074728.5zglfjw2rxgc6lpj@GaryWorkstation>
+ <CAK-u0Q=cxHpFw9_LsPgabPGFAs1A9FD3=Kk_y9Djyo4v78OdEw@mail.gmail.com>
+Message-ID: <20170418040959.vgyfwumfsm4eecrq@GaryWorkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-On 2017/4/18 1:18, Baicar, Tyler wrote:
-> On 4/16/2017 9:16 PM, Xie XiuQi wrote:
->> On 2017/4/17 11:08, Xie XiuQi wrote:
->>>> On 3/30/2017 4:31 AM, Xie XiuQi wrote:
->>>>> Add a new trace event for ARM processor error information, so that
->>>>> the user will know what error occurred. With this information the
->>>>> user may take appropriate action.
->>>>>
->>>>> These trace events are consistent with the ARM processor error
->>>>> information table which defined in UEFI 2.6 spec section N.2.4.4.1.
->>>>>
->>>>> ---
->>>>> v2: add trace enabled condition as Steven's suggestion.
->>>>>       fix a typo.
->>>>> ---
->>>>>
->>>>> Cc: Steven Rostedt <rostedt@goodmis.org>
->>>>> Cc: Tyler Baicar <tbaicar@codeaurora.org>
->>>>> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
->>>>> ---
->>>>
-> ...
->>>>> +/*
->>>>> + * First define the enums in MM_ACTION_RESULT to be exported to userspace
->>>>> + * via TRACE_DEFINE_ENUM().
->>>>> + */
->>>>> +#undef EM
->>>>> +#undef EMe
->>>>> +#define EM(a, b) TRACE_DEFINE_ENUM(a);
->>>>> +#define EMe(a, b)    TRACE_DEFINE_ENUM(a);
->>>>> +
->>>>> +ARM_PROC_ERR_TYPE
->>>>> +ARM_PROC_ERR_FLAGS
->>>> Are the above two lines supposed to be here?
->>>>> +
->>>>> +/*
->>>>> + * Now redefine the EM() and EMe() macros to map the enums to the strings
->>>>> + * that will be printed in the output.
->>>>> + */
->>>>> +#undef EM
->>>>> +#undef EMe
->>>>> +#define EM(a, b)        { a, b },
->>>>> +#define EMe(a, b)    { a, b }
->>>>> +
->>>>> +TRACE_EVENT(arm_proc_err,
->>>> I think it would be better to keep this similar to the naming of the current RAS trace events (right now we have mc_event, arm_event, aer_event, etc.). I would suggest using "arm_err_info_event" since this is handling the error information structures of the arm errors.
->>>>> +
->>>>> +    TP_PROTO(const struct cper_arm_err_info *err),
->>>>> +
->>>>> +    TP_ARGS(err),
->>>>> +
->>>>> +    TP_STRUCT__entry(
->>>>> +        __field(u8, type)
->>>>> +        __field(u16, multiple_error)
->>>>> +        __field(u8, flags)
->>>>> +        __field(u64, error_info)
->>>>> +        __field(u64, virt_fault_addr)
->>>>> +        __field(u64, physical_fault_addr)
->>>> Validation bits should also be a part of this structure that way user space tools will know which of these fields are valid.
->>> Could we use the default value to check the validation which we have checked in TP_fast_assign?
-> Yes, true...I guess we really don't need the validation bits then.
->>>>> +    ),
->>>>> +
->>>>> +    TP_fast_assign(
->>>>> +        __entry->type = err->type;
->>>>> +
->>>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
->>>>> +            __entry->multiple_error = err->multiple_error;
->>>>> +        else
->>>>> +            __entry->multiple_error = ~0;
->>>>> +
->>>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
->>>>> +            __entry->flags = err->flags;
->>>>> +        else
->>>>> +            __entry->flags = ~0;
->>>>> +
->>>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
->>>>> +            __entry->error_info = err->error_info;
->>>>> +        else
->>>>> +            __entry->error_info = 0ULL;
->>>>> +
->>>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
->>>>> +            __entry->virt_fault_addr = err->virt_fault_addr;
->>>>> +        else
->>>>> +            __entry->virt_fault_addr = 0ULL;
->>>>> +
->>>>> +        if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
->>>>> +            __entry->physical_fault_addr = err->physical_fault_addr;
->>>>> +        else
->>>>> +            __entry->physical_fault_addr = 0ULL;
->>>>> +    ),
->>>>> +
->>>>> +    TP_printk("ARM Processor Error: type %s; count: %u; flags: %s;"
->>>> I think the "ARM Processor Error:" part of this should just be removed. Here's the output with this removed and the trace event renamed to arm_err_info_event. I think this looks much cleaner and matches the style used with the arm_event.
->>>>
->>>>            <idle>-0     [020] .ns.   366.592434: arm_event: affinity level: 2; MPIDR: 0000000000000000; MIDR: 00000000510f8000; running state: 1; PSCI state: 0
->>>>            <idle>-0     [020] .ns.   366.592437: arm_err_info_event: type cache error; count: 0; flags: 0x3; error info: 0000000000c20058; virtual address: 0000000000000000; physical address: 0000000000000000
->> As this section is ARM Processor Error Section, how about use arm_proc_err_event?
-> This is not for the ARM Processor Error Section, that is what the arm_event is handling. What you are adding this trace support for here is called the ARM Processor Error Information (UEFI 2.6 spec section N.2.4.4.1). So I think your trace event here should be called arm_err_info_event. This will also be consistent with the other two trace events that I'm planning on adding:
+On Mon, Apr 17, 2017 at 11:09:38AM -0700, Roy Franz (HPE) wrote:
+> On Thu, Apr 13, 2017 at 12:47 AM, Gary Lin <glin@suse.com> wrote:
+> > On Thu, Apr 13, 2017 at 08:26:04AM +0100, Ard Biesheuvel wrote:
+> >> On 13 April 2017 at 04:58, Gary Lin <glin@suse.com> wrote:
+> >> > This commit adds the new config options to allow the user to modify the
+> >> > following fields in the PE-COFF header.
+> >> >
+> >> > UINT16 MajorOperatingSystemVersion
+> >> > UINT16 MinorOperatingSystemVersion
+> >> > UINT16 MajorImageVersion
+> >> > UINT16 MinorImageVersion
+> >> >
+> >> > Those fields are mainly for the executables or libraries in Windows NT
+> >> > or higher to specify the minimum supported Windows version and the
+> >> > version of the image itself.
+> >> >
+> >> > Given the fact that those fields are ignored in UEFI, we can safely reuse
+> >> > those fields for other purposes, e.g. Security Version(*).
+> >> >
+> >> > (*) https://github.com/lcp/shim/wiki/Security-Version
+> >> >
+> >> > v2 changes:
+> >> > - Modify the header direct instead of using an external script as
+> >> >   suggested by Ard Biesheuvel
+> >> > - Include arm and arm64
+> >> >
+> >>
+> >> Thanks for the update. Could we put the Kconfig changes in
+> >> drivers/firmware/efi/Kconfig, rather than duplicating them 3 times?
+> >
+> > Sure. Will send a v3 to update Kconfig.
+> >
+> > Thanks,
+> >
+> > Gary Lin
 > 
-> arm_ctx_info_event: ARM Processor Context Information (UEFI 2.6 section N.2.4.4.2)
-> arm_vendor_info_event: This is the "Vendor Specific Error Information" in the ARM Processor Error Section (Table 260). It's possible I may just add this into the arm_event trace event, but I haven't looked into it enough yet.
+> I think it would be nice to have a comment in the code (or maybe help
+> in the kconfig, or Documentation/efi-stub.txt) that indicates the
+> expected use of these variables, as the field names and PE/COFF spec
+> won't help here.
 > 
+Agree. Since HPA has the concern about using the PE/COFF header, I just
+raised the issue to UEFI forum and wait for the response. I'll update the
+patch and document after sorting out the problem.
 
-OK, I see. Thanks for your explanation.
+Thanks,
+
+Gary Lin
 
 > Thanks,
-> Tyler
+> Roy
 > 
-
--- 
-Thanks,
-Xie XiuQi
+> >
+> >>
+> >> > Cc: Russell King <linux@armlinux.org.uk>
+> >> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> >> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> > Cc: Will Deacon <will.deacon@arm.com>
+> >> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> >> > Cc: Ingo Molnar <mingo@redhat.com>
+> >> > Cc: "H. Peter Anvin" <hpa@zytor.com>
+> >> > Cc: Joey Lee <jlee@suse.com>
+> >> > Cc: Vojtech Pavlik <vojtech@suse.cz>
+> >> > Signed-off-by: Gary Lin <glin@suse.com>
+> >> > ---
+> >> >  arch/arm/Kconfig                      | 24 ++++++++++++++++++++++++
+> >> >  arch/arm/boot/compressed/efi-header.S |  8 ++++----
+> >> >  arch/arm64/Kconfig                    | 24 ++++++++++++++++++++++++
+> >> >  arch/arm64/kernel/head.S              |  8 ++++----
+> >> >  arch/x86/Kconfig                      | 24 ++++++++++++++++++++++++
+> >> >  arch/x86/boot/header.S                |  8 ++++----
+> >> >  6 files changed, 84 insertions(+), 12 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> > index 0d4e71b42c77..4965ad2ccc23 100644
+> >> > --- a/arch/arm/Kconfig
+> >> > +++ b/arch/arm/Kconfig
+> >> > @@ -2090,6 +2090,30 @@ config EFI
+> >> >           is only useful for kernels that may run on systems that have
+> >> >           UEFI firmware.
+> >> >
+> >> > +config EFI_MAJOR_OS
+> >> > +       hex "EFI Major OS Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MINOR_OS
+> >> > +       hex "EFI Minor OS Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MAJOR_IMAGE
+> >> > +       hex "EFI Major Image Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MINOR_IMAGE
+> >> > +       hex "EFI Minor Image Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> >  endmenu
+> >> >
+> >> >  menu "CPU Power Management"
+> >> > diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+> >> > index 9d5dc4fda3c1..67715472a76f 100644
+> >> > --- a/arch/arm/boot/compressed/efi-header.S
+> >> > +++ b/arch/arm/boot/compressed/efi-header.S
+> >> > @@ -69,10 +69,10 @@ extra_header_fields:
+> >> >                 .long   0                       @ ImageBase
+> >> >                 .long   0x200                   @ SectionAlignment
+> >> >                 .long   0x200                   @ FileAlignment
+> >> > -               .short  0                       @ MajorOperatingSystemVersion
+> >> > -               .short  0                       @ MinorOperatingSystemVersion
+> >> > -               .short  0                       @ MajorImageVersion
+> >> > -               .short  0                       @ MinorImageVersion
+> >> > +               .short  CONFIG_EFI_MAJOR_OS     @ MajorOperatingSystemVersion
+> >> > +               .short  CONFIG_EFI_MINOR_OS     @ MinorOperatingSystemVersion
+> >> > +               .short  CONFIG_EFI_MAJOR_IMAGE  @ MajorImageVersion
+> >> > +               .short  CONFIG_EFI_MINOR_IMAGE  @ MinorImageVersion
+> >> >                 .short  0                       @ MajorSubsystemVersion
+> >> >                 .short  0                       @ MinorSubsystemVersion
+> >> >                 .long   0                       @ Win32VersionValue
+> >> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> > index 3741859765cf..c782c422e58c 100644
+> >> > --- a/arch/arm64/Kconfig
+> >> > +++ b/arch/arm64/Kconfig
+> >> > @@ -1033,6 +1033,30 @@ config EFI
+> >> >           allow the kernel to be booted as an EFI application. This
+> >> >           is only useful on systems that have UEFI firmware.
+> >> >
+> >> > +config EFI_MAJOR_OS
+> >> > +       hex "EFI Major OS Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MINOR_OS
+> >> > +       hex "EFI Minor OS Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MAJOR_IMAGE
+> >> > +       hex "EFI Major Image Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MINOR_IMAGE
+> >> > +       hex "EFI Minor Image Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> >  config DMI
+> >> >         bool "Enable support for SMBIOS (DMI) tables"
+> >> >         depends on EFI
+> >> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> >> > index 4fb6ccd886d1..9faa4b04d0ef 100644
+> >> > --- a/arch/arm64/kernel/head.S
+> >> > +++ b/arch/arm64/kernel/head.S
+> >> > @@ -129,10 +129,10 @@ extra_header_fields:
+> >> >         .quad   0                               // ImageBase
+> >> >         .long   0x1000                          // SectionAlignment
+> >> >         .long   PECOFF_FILE_ALIGNMENT           // FileAlignment
+> >> > -       .short  0                               // MajorOperatingSystemVersion
+> >> > -       .short  0                               // MinorOperatingSystemVersion
+> >> > -       .short  0                               // MajorImageVersion
+> >> > -       .short  0                               // MinorImageVersion
+> >> > +       .short  CONFIG_EFI_MAJOR_OS             // MajorOperatingSystemVersion
+> >> > +       .short  CONFIG_EFI_MINOR_OS             // MinorOperatingSystemVersion
+> >> > +       .short  CONFIG_EFI_MAJOR_IMAGE          // MajorImageVersion
+> >> > +       .short  CONFIG_EFI_MINOR_IMAGE          // MinorImageVersion
+> >> >         .short  0                               // MajorSubsystemVersion
+> >> >         .short  0                               // MinorSubsystemVersion
+> >> >         .long   0                               // Win32VersionValue
+> >> > diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> >> > index 5bbdef151805..233933fde7dd 100644
+> >> > --- a/arch/x86/Kconfig
+> >> > +++ b/arch/x86/Kconfig
+> >> > @@ -1803,6 +1803,30 @@ config EFI_STUB
+> >> >
+> >> >           See Documentation/efi-stub.txt for more information.
+> >> >
+> >> > +config EFI_MAJOR_OS
+> >> > +       hex "EFI Major OS Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MINOR_OS
+> >> > +       hex "EFI Minor OS Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MAJOR_IMAGE
+> >> > +       hex "EFI Major Image Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> > +config EFI_MINOR_IMAGE
+> >> > +       hex "EFI Minor Image Version"
+> >> > +       range 0x0 0xFFFF
+> >> > +       default "0x0"
+> >> > +       depends on EFI_STUB
+> >> > +
+> >> >  config EFI_MIXED
+> >> >         bool "EFI mixed-mode support"
+> >> >         depends on EFI_STUB && X86_64
+> >> > diff --git a/arch/x86/boot/header.S b/arch/x86/boot/header.S
+> >> > index 3dd5be33aaa7..863813007207 100644
+> >> > --- a/arch/x86/boot/header.S
+> >> > +++ b/arch/x86/boot/header.S
+> >> > @@ -156,10 +156,10 @@ extra_header_fields:
+> >> >  #endif
+> >> >         .long   0x20                            # SectionAlignment
+> >> >         .long   0x20                            # FileAlignment
+> >> > -       .word   0                               # MajorOperatingSystemVersion
+> >> > -       .word   0                               # MinorOperatingSystemVersion
+> >> > -       .word   0                               # MajorImageVersion
+> >> > -       .word   0                               # MinorImageVersion
+> >> > +       .word   CONFIG_EFI_MAJOR_OS             # MajorOperatingSystemVersion
+> >> > +       .word   CONFIG_EFI_MINOR_OS             # MinorOperatingSystemVersion
+> >> > +       .word   CONFIG_EFI_MAJOR_IMAGE          # MajorImageVersion
+> >> > +       .word   CONFIG_EFI_MINOR_IMAGE          # MinorImageVersion
+> >> >         .word   0                               # MajorSubsystemVersion
+> >> >         .word   0                               # MinorSubsystemVersion
+> >> >         .long   0                               # Win32VersionValue
+> >> > --
+> >> > 2.12.0
+> >> >
+> >>
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
