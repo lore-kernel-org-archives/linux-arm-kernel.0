@@ -1,40 +1,41 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Apr 2017 15:13:12 +0100
-Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
- comments etc.
-In-Reply-To: <CAMuHMdXTgCEesv3imtnzs6Mcnkp22KW_rx0Jiv3_zce7bR3AVQ@mail.gmail.com>
-References: <20170328065130.16019-2-takahiro.akashi@linaro.org>
- <1491207492.6020.8.camel@infradead.org>
- <20170404054144.GG16309@linaro.org>
- <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
- <20170404073504.GI16309@linaro.org>
- <1491291844.6218.25.camel@infradead.org>
- <20170404092604.GB14898@arm.com>
- <1492085938.20068.6.camel@infradead.org>
- <20170416231223.GA31693@verge.net.au>
- <CAMuHMdXTgCEesv3imtnzs6Mcnkp22KW_rx0Jiv3_zce7bR3AVQ@mail.gmail.com>
-Message-ID: <20170418141312.GD27592@e104818-lin.cambridge.arm.com>
+Date: Tue, 18 Apr 2017 15:21:26 +0100
+Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
+ "Consolidate get_dma_ops..."
+In-Reply-To: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+Message-ID: <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 01:54:49PM +0200, Geert Uytterhoeven wrote:
-> On Mon, Apr 17, 2017 at 1:12 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Apr 13, 2017 at 01:18:58PM +0100, David Woodhouse wrote:
-> >> Less important than in user-visible messages, but still good practice as
-> >> there's still no excuse for ARM64 code to look like it was written before
-> >> 1996.
-> >>
-> >> Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
-> >
-> > Hi David,
-> >
-> > I'd be happy to take the Renesas portions of this change if they were
-> > broken out into a separate patch. The reason I would prefer a separate
-> > patch is to avoid the possibility of conflicts, even trivial ones.
+On Thu, Apr 13, 2017 at 02:04:21PM -0700, Stefano Stabellini wrote:
+> The following commit:
 > 
-> s/possibility/reality/, unless this series goes in before v4.12-rc1.
+>   commit 815dd18788fe0d41899f51b91d0560279cf16b0d
+>   Author: Bart Van Assche <bart.vanassche@sandisk.com>
+>   Date:   Fri Jan 20 13:04:04 2017 -0800
+> 
+>       treewide: Consolidate get_dma_ops() implementations
+> 
+> rearranges get_dma_ops in a way that xen_dma_ops are not returned when
+> running on Xen anymore, dev->dma_ops is returned instead (see
+> arch/arm/include/asm/dma-mapping.h:get_arch_dma_ops and
+> include/linux/dma-mapping.h:get_dma_ops).
+> 
+> Fix the problem by storing dev->dma_ops in dev_archdata, and setting
+> dev->dma_ops to xen_dma_ops. This way, xen_dma_ops is returned naturally
+> by get_dma_ops. The Xen code can retrieve the original dev->dma_ops from
+> dev_archdata when needed. It also allows us to remove __generic_dma_ops
+> from common headers.
+> 
+> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+> Tested-by: Julien Grall <julien.grall@arm.com>
+> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+> CC: linux at armlinux.org.uk
+> CC: catalin.marinas at arm.com
+> CC: will.deacon at arm.com
+> CC: boris.ostrovsky at oracle.com
+> CC: jgross at suse.com
+> CC: Julien Grall <julien.grall@arm.com>
 
-Maybe the arm-soc guys can take both patches on top of the other series
-they pull, in which case, for both patches:
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
