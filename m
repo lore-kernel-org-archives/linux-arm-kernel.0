@@ -1,32 +1,58 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 19 Apr 2017 00:20:32 +0200
-Subject: [PATCH] ARM: dts: rockchip: reuse firefly dtsi
-In-Reply-To: <20170418121527.3155-1-eddie.cai.linux@gmail.com>
-References: <20170418121527.3155-1-eddie.cai.linux@gmail.com>
-Message-ID: <746291609.ssvjv54Vin@phil>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 18 Apr 2017 15:29:55 -0700
+Subject: [PATCH 2/2] hwmon: (brcmstb) Add driver for Broadcom STB DPFE
+In-Reply-To: <20170418205839.GA3554@roeck-us.net>
+References: <20170418201702.57019-1-code@mmayer.net>
+ <20170418201702.57019-3-code@mmayer.net> <20170418205839.GA3554@roeck-us.net>
+Message-ID: <f8c99c6f-8c53-0d0e-0712-d001c1e45f75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+Hey Guenter,
 
-Am Dienstag, 18. April 2017, 20:15:27 CEST schrieb Eddie Cai:
-> firefly reload is very similar with firefly board, so reuse firefly dtsi
+On 04/18/2017 01:58 PM, Guenter Roeck wrote:
+> Hi Markus,
 > 
-> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 310 ------------------
->  arch/arm/boot/dts/rk3288-firefly-reload.dts       | 368 ++--------------------
+> On Tue, Apr 18, 2017 at 01:17:02PM -0700, Markus Mayer wrote:
+>> From: Markus Mayer <mmayer@broadcom.com>
+>>
+>> This driver allows access to DRAM properties, such as the refresh rate,
+>> via the Broadcom STB DDR PHY Front End (DPFE). The refresh rate can be
+>> used as indirect indicator of the DRAM temperature.
+>>
+>> The driver also allows setting of the sampling interval.
+>>
+>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+>> ---
+> [ ... ]
+> 
+>> +
+>> +static SENSOR_DEVICE_ATTR(dpfe_info, 0444, show_info, NULL, 1000);
+>> +static SENSOR_DEVICE_ATTR(dpfe_refresh, 0644, show_refresh, store_refresh,
+>> +			  1000);
+>> +static SENSOR_DEVICE_ATTR(dpfe_vendor, 0444, show_vendor, NULL, 1000);
+>> +static struct attribute *dpfe_attrs[] = {
+>> +	&sensor_dev_attr_dpfe_info.dev_attr.attr,
+>> +	&sensor_dev_attr_dpfe_refresh.dev_attr.attr,
+>> +	&sensor_dev_attr_dpfe_vendor.dev_attr.attr,
+>> +	NULL
+>> +};
+>> +ATTRIBUTE_GROUPS(dpfe);
+>> +
+> 
+> There is not a single standard hwmon attribute. I don't know how
+> to classify this driver, and where it should reside, but it is not
+> a hwmon driver. 
 
-I would disagree and remember having a similar discussion when the reload-
-support was initially submitted. Please keep in mind that the firefly-
-reload is a som+baseboard combination, so somebody could (or maybe
-already has) create a completely different baseboard for the som that
-does not have any similarities with the original firefly.
-The previous firefly being a real single board.
+This is a driver that talks to an embedded CPU running firmware which is
+capable of giving various informations about the DRAM chip being
+populated, including a temperature trend (hotter or cooler). We thought
+initially we would be able to expose the actual temperature, but this in
+turn required a lot more knowledge about the DRAM chip that we wish we
+knew about. That is sort of where and why this driver was proposed for
+hwmon.
 
-We also don't combine rock2 and firefly and other boards following the
-general rk3288 design guidelines :-) and the original firefly and reload are
-very different boards if you look at them.
-
-
-Heiko
+Which subsystem do you think would be best for this driver drivers/misc/
+or drivers/soc/bcm/brcmstb/ maybe?
+-- 
+Florian
