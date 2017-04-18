@@ -1,53 +1,81 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 18 Apr 2017 10:54:47 +0300
-Subject: [PATCH] i2c: designware: do not show SDA hold time warning when
- not needed
-In-Reply-To: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1492203192-28025-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1492502087.24567.47.camel@linux.intel.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 18 Apr 2017 09:56:28 +0200
+Subject: [PATCH v2 3/3] arm64: dts: exynos: Add support for s6e3hf2 panel
+ device on TM2e board
+In-Reply-To: <f2acb724-ba41-175c-061a-7be765cc1939@samsung.com>
+References: <1492408934-22096-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170417060220epcas5p42f6ed43d9db94779382e84a129b9da2d@epcas5p4.samsung.com>
+ <1492408934-22096-4-git-send-email-hoegeun.kwon@samsung.com>
+ <b9bfcdd9-5576-34c3-6c7d-556b6c81946d@samsung.com>
+ <f2acb724-ba41-175c-061a-7be765cc1939@samsung.com>
+Message-ID: <94152d85-5fb0-f5dc-045d-e6ee6c009f42@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-04-14 at 22:53 +0200, Thomas Petazzoni wrote:
-> When the I2C controller IP block has a revision too old to be able to
-> configure the SDA hold time, the driver currently displays a
-> warning. However, it does so unconditionally, even if no SDA hold time
-> has been configured through the Device Tree. This causes useless
-> warnings when running the system, so only show the warning if a SDA
-> hold time was specified.
+On 18.04.2017 09:44, Hoegeun Kwon wrote:
+> On 04/18/2017 03:00 PM, Andrzej Hajda wrote:
+>> On 17.04.2017 08:02, Hoegeun Kwon wrote:
+>>> This patch add the panel device tree node for s6e3hf2 display
+>>> controller to TM2e dts.
+>>>
+>>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>> Maybe it would be good to remove te-gpios property - tm2/tm2e uses
+>> hardware trigger, so it is not necessary and generates useless interrupts.
+> Thanks for your review.
+>
+> I agree, but I thinks remove the te-gpio property after your patch [1] 
+> has been merged.
 
-As far as I understand the warning it would be better to keep it in
-either way, though you may shift it to debug level.
+Patch [1] has been merged about month ago :)
 
-Wolfram, Jarkko, thoughts?
+Regards
+Andrzej
 
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> ?drivers/i2c/busses/i2c-designware-core.c | 5 +++--
-> ?1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-designware-core.c
-> b/drivers/i2c/busses/i2c-designware-core.c
-> index 7a3faa5..7f9da6e 100644
-> --- a/drivers/i2c/busses/i2c-designware-core.c
-> +++ b/drivers/i2c/busses/i2c-designware-core.c
-> @@ -436,8 +436,9 @@ int i2c_dw_init(struct dw_i2c_dev *dev)
-> ?			dev->sda_hold_time |= 1 <<
-> DW_IC_SDA_HOLD_RX_SHIFT;
-> ?		dw_writel(dev, dev->sda_hold_time, DW_IC_SDA_HOLD);
-> ?	} else {
-> -		dev_warn(dev->dev,
-> -			"Hardware too old to adjust SDA hold
-> time.\n");
-> +		if (dev->sda_hold_time)
-> +			dev_warn(dev->dev,
-> +				?"Hardware too old to adjust SDA hold
-> time.\n");
-> ?	}
-> ?
-> ?	/* Configure Tx/Rx FIFO threshold levels */
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+>
+>
+> [1] https://patchwork.kernel.org/patch/9625383/
+>
+> Best regards,
+> Hoegeun
+>
+>> Beside this:
+>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+>>   --
+>> Regards
+>> Andrzej
+>>> ---
+>>>   arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 12 ++++++++++++
+>>>   1 file changed, 12 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+>>> index 694717a..98ad094 100644
+>>> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+>>> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+>>> @@ -52,6 +52,18 @@
+>>>   	assigned-clock-rates = <278000000>, <400000000>;
+>>>   };
+>>>   
+>>> +&dsi {
+>>> +	panel at 0 {
+>>> +		compatible = "samsung,s6e3hf2";
+>>> +		reg = <0>;
+>>> +		vdd3-supply = <&ldo27_reg>;
+>>> +		vci-supply = <&ldo28_reg>;
+>>> +		reset-gpios = <&gpg0 0 GPIO_ACTIVE_LOW>;
+>>> +		enable-gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>;
+>>> +		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
+>>> +	};
+>>> +};
+>>> +
+>>>   &ldo31_reg {
+>>>   	regulator-name = "TSP_VDD_1.8V_AP";
+>>>   	regulator-min-microvolt = <1800000>;
+>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
