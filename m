@@ -1,88 +1,37 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Apr 2017 10:09:49 +0200
-Subject: [PATCH v6 17/39] platform: add video-multiplexer subdevice driver
-In-Reply-To: <20170414203216.GA10920@amd>
-References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
- <1490661656-10318-18-git-send-email-steve_longerbeam@mentor.com>
- <20170404124732.GD3288@valkosipuli.retiisi.org.uk>
- <1492091578.2383.39.camel@pengutronix.de> <20170414203216.GA10920@amd>
-Message-ID: <1492502989.2432.23.camel@pengutronix.de>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Tue, 18 Apr 2017 17:27:39 +0900
+Subject: [PATCH v2 3/3] arm64: dts: exynos: Add support for s6e3hf2
+ panel device on TM2e board
+In-Reply-To: <94152d85-5fb0-f5dc-045d-e6ee6c009f42@samsung.com>
+References: <1492408934-22096-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170417060220epcas5p42f6ed43d9db94779382e84a129b9da2d@epcas5p4.samsung.com>
+ <1492408934-22096-4-git-send-email-hoegeun.kwon@samsung.com>
+ <b9bfcdd9-5576-34c3-6c7d-556b6c81946d@samsung.com>
+ <f2acb724-ba41-175c-061a-7be765cc1939@samsung.com>
+ <94152d85-5fb0-f5dc-045d-e6ee6c009f42@samsung.com>
+Message-ID: <fe6129d5-2501-5685-c11f-aa910b39c10e@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On 04/18/2017 04:56 PM, Andrzej Hajda wrote:
+> On 18.04.2017 09:44, Hoegeun Kwon wrote:
+>> On 04/18/2017 03:00 PM, Andrzej Hajda wrote:
+>>> On 17.04.2017 08:02, Hoegeun Kwon wrote:
+>>>> This patch add the panel device tree node for s6e3hf2 display
+>>>> controller to TM2e dts.
+>>>>
+>>>> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+>>> Maybe it would be good to remove te-gpios property - tm2/tm2e uses
+>>> hardware trigger, so it is not necessary and generates useless interrupts.
+>> Thanks for your review.
+>>
+>> I agree, but I thinks remove the te-gpio property after your patch [1]
+>> has been merged.
+> Patch [1] has been merged about month ago :)
 
-On Fri, 2017-04-14 at 22:32 +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > > The MUX framework is already in linux-next. Could you use that instead of
-> > > adding new driver + bindings that are not compliant with the MUX framework?
-> > > I don't think it'd be much of a change in terms of code, using the MUX
-> > > framework appears quite simple.
-> > 
-> > It is not quite clear to me how to design the DT bindings for this. Just
-> > splitting the video-multiplexer driver from the mux-mmio / mux-gpio
-> > would make it necessary to keep the video-multiplexer node to describe
-> > the of-graph bindings. But then we have two different nodes in the DT
-> > that describe the same hardware:
-> > 
-> > 	mux: mux {
-> > 		compatible = "mux-gpio";
-> > 		mux-gpios = <&gpio 0>, <&gpio 1>;
-> > 		#mux-control-cells = <0>;
-> > 	}
-> > 
-> > 	video-multiplexer {
-> > 		compatible = "video-multiplexer"
-> > 		mux-controls = <&mux>;
-> > 
-> > 		ports {
-> > 			/* ... */
-> > 		}
-> > 	}
-> > 
-> > It would feel more natural to have the ports in the mux node, but then
-> > how would the video-multiplexer driver be instanciated, and how would it
-> > get to the of-graph nodes?
-> 
-> Device tree representation and code used to implement the muxing
-> driver should be pretty independend, no? Yes, one piece of hardware
-> should have one entry in the device tree,
+Ah..., My mistake.... :)
 
-I agree.
+I will send ver3 patchset without te-gpio property.
 
->  so it should be something like:
-> 
->  	video-multiplexer {
->  		compatible = "video-multiplexer-gpio"	
->  		mux-gpios = <&gpio 0>, <&gpio 1>;
->  		#mux-control-cells = <0>;
-> 
->  		mux-controls = <&mux>;
->  
->  		ports {
->  			/* ... */
->  		}
->  	}
-
-That self-referencing mux-controls property looks a bit superfluous:
-
-	mux: video-multiplexer {
-		mux-controls = <&mux>;
-	};
-
-Other than that, I'm completely fine with splitting the compatible into
-something like video-mux-gpio and video-mux-mmio and reusing the
-mux-gpios property for video-mux-gpio.
-
-> You should be able to use code in drivers/mux as a library...
-
-This is a good idea in principle, but this requires some rework of the
-mux subsystem, and that subsystem hasn't even landed yet. For now I'd
-like to focus on getting the DT bindings right.
-
-I'd honestly prefer to not add this rework as a requirement for the i.MX
-media drivers to get into staging.
-
-regards
-Philipp
+Best regards,
+Hoegeun
