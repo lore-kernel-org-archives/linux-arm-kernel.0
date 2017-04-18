@@ -1,29 +1,46 @@
-From: w.egorov@phytec.de (Wadim Egorov)
-Date: Tue, 18 Apr 2017 17:01:41 +0200
-Subject: [PATCH v2 1/3] ARM: dts: rockchip: Add support for phyCORE-RK3288
- SoM
-In-Reply-To: <CAFLEztSQ1-WU7KAXzuB66htXiaQN4wd=XmM5XtjZcoONt77XmQ@mail.gmail.com>
-References: <1491483866-18368-1-git-send-email-w.egorov@phytec.de>
- <CAFLEztSQ1-WU7KAXzuB66htXiaQN4wd=XmM5XtjZcoONt77XmQ@mail.gmail.com>
-Message-ID: <381e11bc-649d-ddf2-4a28-f72a264204c3@phytec.de>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 18 Apr 2017 08:01:33 -0700
+Subject: [PATCH v2 7/7] ARM: dts: imx7d-sdb: Enable PCIe peripheral
+In-Reply-To: <20170418150133.31679-1-andrew.smirnov@gmail.com>
+References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
+Message-ID: <20170418150133.31679-8-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable PCIe peripheral on this board.
 
->> +&i2c0 {
->> +       status = "okay";
->> +       clock-frequency = <400000>;
->> +
->> +       rk818: pmic at 1c {
->> +               compatible = "rockchip,rk818";
->> +               reg = <0x1c>;
->> +               interrupt-parent = <&gpio0>;
->> +               interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&pmic_int>;
->> +               rockchip,system-power-controller;
->> +               wakeup-source;
->> +               #clock-cells = <1>;
->> +
-> I think you miss  "clock-output-names = "xin32k" here.
-Yes, thanks for catching that. I will fix this later.
+Cc: yurovsky at gmail.com
+Cc: Dong Aisheng <aisheng.dong@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index d6f2dda..65dda66 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -349,6 +349,12 @@
+ 	};
+ };
+ 
++&pcie {
++	pinctrl-names = "default";
++	reset-gpio = <&extended_io 1 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
+-- 
+2.9.3
