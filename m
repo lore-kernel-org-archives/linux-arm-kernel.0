@@ -1,15 +1,14 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 18 Apr 2017 08:01:27 -0700
-Subject: [PATCH v2 1/7] ARM: dts: i.MX: Reintroduce 'anatop-enable-bit' where
- appropriate
+Date: Tue, 18 Apr 2017 08:01:31 -0700
+Subject: [PATCH v2 5/7] ARM: dts: imx7d-sdb: Add GPIO expander node
 In-Reply-To: <20170418150133.31679-1-andrew.smirnov@gmail.com>
 References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
-Message-ID: <20170418150133.31679-2-andrew.smirnov@gmail.com>
+Message-ID: <20170418150133.31679-6-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that support for 'anatop-enable-bit' has been added to ANADIG
-driver, reintroduce 'anatop-enable-bit' for all applicable LDOs.
+Add node for U38, a 74LV595PW serial-in shift register that acts as a
+GPIO expander on the board.
 
 Cc: yurovsky at gmail.com
 Cc: Dong Aisheng <aisheng.dong@nxp.com>
@@ -24,120 +23,54 @@ Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
- arch/arm/boot/dts/imx6sl.dtsi  | 3 +++
- arch/arm/boot/dts/imx6sx.dtsi  | 3 +++
- arch/arm/boot/dts/imx6ul.dtsi  | 1 +
- arch/arm/boot/dts/imx7s.dtsi   | 1 +
- 5 files changed, 11 insertions(+)
+ arch/arm/boot/dts/imx7d-sdb.dts | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 6d7bf64..ec398ea 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -643,6 +643,7 @@
- 					anatop-min-bit-val = <4>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1375000>;
-+					anatop-enable-bit = <0>;
- 				};
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 5be01a1..d6f2dda 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -52,6 +52,27 @@
+ 		reg = <0x80000000 0x80000000>;
+ 	};
  
- 				regulator-3p0 {
-@@ -657,6 +658,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2625000>;
- 					anatop-max-voltage = <3400000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-2p5 {
-@@ -671,6 +673,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2100000>;
- 					anatop-max-voltage = <2875000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				reg_arm: regulator-vddcore {
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index cc9572e..3243af4 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -530,6 +530,7 @@
- 					anatop-min-bit-val = <4>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1375000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-3p0 {
-@@ -544,6 +545,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2625000>;
- 					anatop-max-voltage = <3400000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-2p5 {
-@@ -558,6 +560,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2100000>;
- 					anatop-max-voltage = <2850000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				reg_arm: regulator-vddcore {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index dd4ec85..97199ee 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -586,6 +586,7 @@
- 					anatop-min-bit-val = <4>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1375000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-3p0 {
-@@ -600,6 +601,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2625000>;
- 					anatop-max-voltage = <3400000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				regulator-2p5 {
-@@ -614,6 +616,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2100000>;
- 					anatop-max-voltage = <2875000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				reg_arm: regulator-vddcore {
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index b9d7d2d..6da2b77 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -542,6 +542,7 @@
- 					anatop-min-bit-val = <0>;
- 					anatop-min-voltage = <2625000>;
- 					anatop-max-voltage = <3400000>;
-+					anatop-enable-bit = <0>;
- 				};
- 
- 				reg_arm: regulator-vddcore {
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 5d3a43b..7148eac 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -517,6 +517,7 @@
- 					anatop-min-bit-val = <8>;
- 					anatop-min-voltage = <800000>;
- 					anatop-max-voltage = <1200000>;
-+					anatop-enable-bit = <0>;
- 				};
- 			};
- 
++	spi4 {
++		compatible = "spi-gpio";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_spi4>;
++		gpio-sck = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++		gpio-mosi = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		cs-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++		num-chipselects = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		extended_io: gpio-expander at 0 {
++			compatible = "fairchild,74hc595";
++			gpio-controller;
++			#gpio-cells = <2>;
++			reg = <0>;
++			registers-number = <1>;
++			spi-max-frequency = <100000>;
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -642,5 +663,13 @@
+ 		fsl,pins = <
+ 			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x110b0
+ 		>;
++
++		pinctrl_spi4: spi4grp {
++			fsl,pins = <
++				MX7D_PAD_GPIO1_IO09__GPIO1_IO9	0x59
++				MX7D_PAD_GPIO1_IO12__GPIO1_IO12	0x59
++				MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x59
++			>;
++		};
+ 	};
+ };
 -- 
 2.9.3
