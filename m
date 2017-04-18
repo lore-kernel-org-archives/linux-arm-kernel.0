@@ -1,41 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Apr 2017 12:38:49 +0100
-Subject: arm64: Question about warnings due to unspecified ASM operand
- width
-In-Reply-To: <20170418013156.GB105296@google.com>
-References: <20170418013156.GB105296@google.com>
-Message-ID: <20170418113849.GC27592@e104818-lin.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 18 Apr 2017 19:58:21 +0800
+Subject: [linux-sunxi] [PATCH v3 09/12] mfd: axp20x: add axp20x-regulator
+ cell for AXP803
+In-Reply-To: <6D57E4F4-DD87-400F-A21B-85778434AADC@aosc.io>
+References: <20170417115747.7300-1-icenowy@aosc.io>
+ <20170417115747.7300-10-icenowy@aosc.io>
+ <CAGb2v648fhGSjWoVYRxU+_kF5fhbnhmY2mQG16ORtBHf7pGx5w@mail.gmail.com>
+ <6D57E4F4-DD87-400F-A21B-85778434AADC@aosc.io>
+Message-ID: <CAGb2v67=iHeTRSzOa-hH+wcQuRAPsGk=sPAqead_Au6ekW_P5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 06:31:56PM -0700, Matthias Kaehlcke wrote:
-> During my work on improving support for kernel builds with clang I
-> came across a bunch of warnings on arm64 builds about the width of
-> operands in assembly not being specified:
-> 
-> arch/arm64/include/asm/arch_timer.h:92:46: error: value size does
->       not match register size specified by the constraint and modifier [-Werror,-Wasm-operand-widths]
->         asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
+On Tue, Apr 18, 2017 at 6:55 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>
+>
+> ? 2017?4?18? GMT+08:00 ??6:38:09, Chen-Yu Tsai <wens@csie.org> ??:
+>>On Mon, Apr 17, 2017 at 7:57 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>>> As axp20x-regulator now supports AXP803, add a cell for it.
+>>>
+>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> ---
+>>> Changes in v3:
+>>> - Make the new cell one-liner.
+>>>
+>>>  drivers/mfd/axp20x.c | 3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>>> index 1dc6235778eb..431b7f118606 100644
+>>> --- a/drivers/mfd/axp20x.c
+>>> +++ b/drivers/mfd/axp20x.c
+>>> @@ -848,7 +848,8 @@ static struct mfd_cell axp803_cells[] = {
+>>>                 .name                   = "axp20x-pek",
+>>>                 .num_resources          =
+>>ARRAY_SIZE(axp803_pek_resources),
+>>>                 .resources              = axp803_pek_resources,
+>>> -       }
+>>> +       },
+>>> +       {       .name                   = "axp20x-regulator" }
+>>
+>>It's best to have a trailing comma, so we don't have to change the line
+>>again when we add more cells, like you just did with the previous line.
+>
+> Should I also add it in previous mfd patch? (and remove the addition of the comma in this patch)
 
-I think the first step would be to test it against a newer kernel. The
-above code disappeared in 4.9 in favour of dedicated read_sysreg()
-macros which shouldn't give this warning (u64 __val).
+Since Lee already said he merged it, I suggest you keep it the way it is,
+unless he says otherwise. Or your new patches might not apply correctly,
+and you waste time doing one more round.
 
-> I understand that this is usually not a problem and might even be
-> desired to give the compiler more flexiblity in the use of the
-> available registers.
+Maintainers don't always push the latest branches, for a number of reasons.
+Sometimes it's because the merge window is closed, and you're not supposed
+to put anything that's not for the next release into -next. Other times it
+might because they are still working through their backlog. Or they may
+have just forgotten.
 
-I don't think arm64 would benefit from such ambiguity, so we should
-rather fix them. In practice there is no issue since the compiler cannot
-allocate two 32-bit variables in a 64-bit register.
-
-> Before delving into 'fixing' these 'asm-operand-widths' warnings I'd
-> be interested to know if this is actually desirable or if it is
-> preferred to keep the operand width unspecified in certain cases.
-
-I'm not aware of a desirable ambiguity here.
-
-Thanks.
-
--- 
-Catalin
+ChenYu
