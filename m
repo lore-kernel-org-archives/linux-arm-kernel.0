@@ -1,41 +1,28 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Tue, 18 Apr 2017 17:40:34 +0900
-Subject: [PATCH v3 1/3] dt-bindings: Add support for samsung s6e3hf2 panel
-In-Reply-To: <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <1492504836-19225-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170418084047epcas5p440464afa8770d07253f42f362764059b@epcas5p4.samsung.com>
-Message-ID: <1492504836-19225-2-git-send-email-hoegeun.kwon@samsung.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Tue, 18 Apr 2017 16:30:55 +0800
+Subject: [PATCH] ARM: configs: Add multi_v7_lpae.config to support ARM_LPAE
+Message-ID: <1492504255-9418-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung s6e3hf2 panel is a 5.65" 1600x2560 AMOLED panel connected
-using MIPI-DSI interfaces.
+As some ARMv7 platforms need to enable ARM_LPAE to access memory beyond
+the 4GB limit, this patch is to add multi_v7_lpae.config to support the
+Large Physical Address Extension. The building will use
+multi_v7_defconfig + multi_v7_lpae.config as the defconfig.
 
-The s6e3hf2 is add to samsung,s6e3ha2.txt binding because it is a
-panel similar to the s6e3ha2. So add the compatible string and
-comments.
-
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
 ---
- Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/configs/multi_v7_lpae.config | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 arch/arm/configs/multi_v7_lpae.config
 
-diff --git a/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
-index 18854f4..4acea25 100644
---- a/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
-+++ b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
-@@ -1,7 +1,10 @@
- Samsung S6E3HA2 5.7" 1440x2560 AMOLED panel
-+Samsung S6E3HF2 5.65" 1600x2560 AMOLED panel
- 
- Required properties:
--  - compatible: "samsung,s6e3ha2"
-+  - compatible: should be one of:
-+    "samsung,s6e3ha2",
-+    "samsung,s6e3hf2".
-   - reg: the virtual channel number of a DSI peripheral
-   - vdd3-supply: I/O voltage supply
-   - vci-supply: voltage supply for analog circuits
+diff --git a/arch/arm/configs/multi_v7_lpae.config b/arch/arm/configs/multi_v7_lpae.config
+new file mode 100644
+index 0000000..cd13d2d
+--- /dev/null
++++ b/arch/arm/configs/multi_v7_lpae.config
+@@ -0,0 +1,2 @@
++# Support for the Large Physical Address Extension
++CONFIG_ARM_LPAE=y
 -- 
-1.9.1
+2.1.0.27.g96db324
