@@ -1,55 +1,26 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 18 Apr 2017 22:54:52 +0300
-Subject: [GIT PULL] bcm2835-dt-next-2017-03-30
-In-Reply-To: <20170330191343.31647-1-eric@anholt.net>
-References: <20170330191343.31647-1-eric@anholt.net>
-Message-ID: <20170418195452.prp2ortwv7u3hfok@tarshish>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 18 Apr 2017 15:55:24 -0400 (EDT)
+Subject: [PATCH v2 net-next] drivers: net: xgene-v2: Extend ethtool
+ statistics
+In-Reply-To: <1492472875-32385-1-git-send-email-isubramanian@apm.com>
+References: <1492472875-32385-1-git-send-email-isubramanian@apm.com>
+Message-ID: <20170418.155524.509380512589251718.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric, Florian,
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Mon, 17 Apr 2017 16:47:55 -0700
 
-On Thu, Mar 30, 2017 at 12:13:43PM -0700, Eric Anholt wrote:
-> Here's the pull request for those changes I'd misplaced from 4.11.
-> This may be my last PR of the cycle.  The only change I have left on
-> my radar for 4.12 is
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/006097.html
+> This patch adds extended statistics reporting to ethtool.
+> 
+> In summary, this patch,
+> 
+>    - adds ethtool.h with the statistics register definitions
+>    - adds 'struct xge_gstrings_extd_stats' to gather extended stats
+>    - modifies xge_get_strings(), get_sset_count() and
+>      get_ethtool_stats() accordingly
+>    - moves 'struct xge_gstrings_stats' to ethtool.h
+> 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 
-Any chance of getting these fixes into 4.12-rc1?
-
-Thanks,
-baruch
-
-> 
-> The following changes since commit 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
-> 
->   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-30
-> 
-> for you to fetch changes up to 10b6c0c2e2bb8cd1be682f8d36ef597e3419cb88:
-> 
->   ARM: dts: bcm2835: add index to the ethernet alias (2017-03-27 10:10:39 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings back bcm2835 DT fixups from Baruch Siach that
-> got misplaced after a PR for 4.11 got rejected.
-> 
-> ----------------------------------------------------------------
-> Baruch Siach (4):
->       ARM: dts: bcm2835: fix uart0 pinctrl node names
->       ARM: dts: bcm2835: fix i2c0 pins
->       ARM: dts: bcm2835: fix uart0/uart1 pins
->       ARM: dts: bcm2835: add index to the ethernet alias
-> 
->  arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi |  2 +-
->  arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi |  2 +-
->  arch/arm/boot/dts/bcm283x.dtsi              | 22 +++++++++++++---------
->  3 files changed, 15 insertions(+), 11 deletions(-)
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Applied, thanks.
