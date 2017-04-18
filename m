@@ -1,92 +1,118 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 18 Apr 2017 09:24:47 -0600
-Subject: [PATCH v6 5/8] coresight: use const for device_node structures
-In-Reply-To: <1491485461-22800-6-git-send-email-leo.yan@linaro.org>
-References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
- <1491485461-22800-6-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170418152447.GB22806@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 18 Apr 2017 16:35:02 +0100
+Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
+ ASM_EXPORT
+In-Reply-To: <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
+References: <20170405183458.193068-1-mka@chromium.org>
+ <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
+Message-ID: <CAKv+Gu_DHBT=2YA9h+ao3pZXgEV5KsO9ia+J90wtLuDX=a4+eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 09:30:58PM +0800, Leo Yan wrote:
-> Almost low level functions from open firmware have used const to
-> qualify device_node structures, so add const for device_node
-> parameters in of_coresight related functions.
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+On 18 April 2017 at 15:47, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+> On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+>> The operand is an integer constant, make the constness explicit by
+>> adding the modifier. This is needed for clang to generate valid code
+>> and also works with gcc.
+>
+> Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
+> only use for syntax checking (and hence I don't care if it is the latest and
+> greatest) and this commit breaks it:
+>
+> arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
+> operand prefix '%c'
+>   asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+>
+> I'm currently reverting this change locally so I can continue to use the old
+> toolchain:
+>
+> $ aarch64-linux-gnu-gcc --version
+> aarch64-linux-gnu-gcc (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro
+> GCC 2013.11) 4.8.3 20131202 (prerelease)
+> Copyright (C) 2013 Free Software Foundation, Inc.
+>
+> $ aarch64-linux-gnu-as --version
+> GNU assembler (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC
+> 2013.11) 2.24.0.20131220
+> Copyright 2013 Free Software Foundation, Inc.
+>
+> Maybe it is finally too old and nobody cares, but I thought it worth a mention.
+>
 
-I agree with these changes but the patch needs to be split up - please see
-below.
+Thanks for the report. I think we care more about GCC 4.8 than about
+Clang, which argues for reverting this patch.
 
-> ---
->  drivers/hwtracing/coresight/of_coresight.c | 6 +++---
->  include/linux/coresight.h                  | 8 ++++----
->  2 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index 78d2399..46eec0f 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -52,7 +52,7 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
->  			       endpoint, of_dev_node_match);
->  }
->  
-> -static void of_coresight_get_ports(struct device_node *node,
-> +static void of_coresight_get_ports(const struct device_node *node,
->  				   int *nr_inport, int *nr_outport)
+I understand these issues must be frustrating if you are working on
+this stuff, but to me, it is not entirely obvious why we want to
+support Clang in the first place (i.e., what does it buy you if your
+distro/environment is not already using Clang for userland), and why
+the burden is on Linux to make modifications to support Clang,
+especially when it comes to GCC extensions such as inline assembly
+syntax.
 
-Move this to a patch by itself as it is not related to this driver.
+It is ultimately up to the maintainers to decide what to do with this
+patch, but my vote would be to revert it, especially given that the %c
+placeholder prefix is not documented anywhere, and appears to simply
+trigger some GCC internals that happen to do the right thing in this
+case.
 
->  {
->  	struct device_node *ep = NULL;
-> @@ -101,7 +101,7 @@ static int of_coresight_alloc_memory(struct device *dev,
->  	return 0;
->  }
->  
-> -int of_coresight_get_cpu(struct device_node *node)
-> +int of_coresight_get_cpu(const struct device_node *node)
+However, the I -> i change is arguably an improvement, and considering
+that the following
 
-Move this to the previous patch in this set.  There is not need to undo what you
-just did there.
+asm("foo: .long %0" :: "i"(some value))
 
->  {
->  	int cpu;
->  	bool found;
-> @@ -128,7 +128,7 @@ int of_coresight_get_cpu(struct device_node *node)
->  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
->  
->  struct coresight_platform_data *of_get_coresight_platform_data(
-> -				struct device *dev, struct device_node *node)
-> +			struct device *dev, const struct device_node *node)
+doesn't compile with clang either, I suggest you (Matthias) file a bug
+against Clang to get this fixed, and we can propose another patch just
+for the I->i change.
 
-Same here, move this to a new patch (the same one as of_coresight_get_ports()).
+-- 
+Ard.
 
->  {
->  	int i = 0, ret = 0;
->  	struct coresight_platform_data *pdata;
-> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-> index bf96678..4915254 100644
-> --- a/include/linux/coresight.h
-> +++ b/include/linux/coresight.h
-> @@ -263,13 +263,13 @@ static inline int coresight_timeout(void __iomem *addr, u32 offset,
->  #endif
->  
->  #ifdef CONFIG_OF
-> -extern int of_coresight_get_cpu(struct device_node *node);
-> +extern int of_coresight_get_cpu(const struct device_node *node);
->  extern struct coresight_platform_data *of_get_coresight_platform_data(
-> -				struct device *dev, struct device_node *node);
-> +	struct device *dev, const struct device_node *node);
->  #else
-> -static inline int of_coresight_get_cpu(struct device_node *node) { return 0; }
-> +static inline int of_coresight_get_cpu(const struct device_node *node) { return 0; }
->  static inline struct coresight_platform_data *of_get_coresight_platform_data(
-> -	struct device *dev, struct device_node *node) { return NULL; }
-> +	struct device *dev, const struct device_node *node) { return NULL; }
->  #endif
->  
->  #ifdef CONFIG_PID_NS
-> -- 
-> 2.7.4
-> 
+
+>>
+>> Also change the constraint of the operand from 'I' ("Integer constant
+>> that is valid as an immediate operand in an ADD instruction", AArch64)
+>> to 'i' ("An immediate integer operand").
+>>
+>> Based-on-patch-from: Greg Hackmann <ghackmann@google.com>
+>> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+>> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+>> ---
+>> Changes in v2:
+>> - Changed operand constraint from I to i
+>> - Updated commit message
+>> - Changed 'From' tag to 'Based-on-patch-from'
+>>
+>>  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
+>>  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
+>>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+>> index aefda9868627..6b520e3f3ab1 100644
+>> --- a/arch/arm64/crypto/sha1-ce-glue.c
+>> +++ b/arch/arm64/crypto/sha1-ce-glue.c
+>> @@ -18,7 +18,7 @@
+>>  #include <linux/module.h>
+>>
+>>  #define ASM_EXPORT(sym, val) \
+>> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+>> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+>>
+>>  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
+>>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+>> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+>> index 7cd587564a41..e3abe11de48c 100644
+>> --- a/arch/arm64/crypto/sha2-ce-glue.c
+>> +++ b/arch/arm64/crypto/sha2-ce-glue.c
+>> @@ -18,7 +18,7 @@
+>>  #include <linux/module.h>
+>>
+>>  #define ASM_EXPORT(sym, val) \
+>> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+>> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+>>
+>>  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
+>>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+>> --
+>> 2.12.2.715.g7642488e1d-goog
+>>
