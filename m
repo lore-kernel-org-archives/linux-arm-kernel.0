@@ -1,44 +1,40 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 18 Apr 2017 13:54:11 +0100
-Subject: [PATCH] ARM: V7M: Preserve registers across switch from Thread to
- Handler mode
-In-Reply-To: <1490861391-35484-2-git-send-email-vladimir.murzin@arm.com>
-References: <1490861391-35484-1-git-send-email-vladimir.murzin@arm.com>
- <1490861391-35484-2-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <6bcd6703-c912-1955-afec-2bca962bb43f@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Apr 2017 14:03:26 +0100
+Subject: Panic in arch_hw_breakpoint_init() on Cortex-A9 (SPEAr1340)
+In-Reply-To: <1492512268.28092.8.camel@v3.sk>
+References: <1492512268.28092.8.camel@v3.sk>
+Message-ID: <20170418130326.GE17866@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/17 09:09, Vladimir Murzin wrote:
-> According to ARMv7 ARM, when exception is taken content of r0-r3, r12
-> is unknown (see ExceptionTaken() pseudocode). Even though existent
-> implementations keep these register unchanged, preserve them to be in
-> line with architecture.
-> 
-> Reported-by: Dobromir Stefanov <dobromir.stefanov@arm.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm/mm/proc-v7m.S | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-> index 5049777..47a5acc 100644
-> --- a/arch/arm/mm/proc-v7m.S
-> +++ b/arch/arm/mm/proc-v7m.S
-> @@ -135,9 +135,11 @@ __v7m_setup_cont:
->  	dsb
->  	mov	r6, lr			@ save LR
->  	ldr	sp, =init_thread_union + THREAD_START_SP
-> +	stmia	sp, {r0-r3, r12}
->  	cpsie	i
->  	svc	#0
->  1:	cpsid	i
-> +	ldmia	sp, {r0-r3, r12}
->  	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
->  	mov	lr, r6			@ restore LR
->  
-> 
+On Tue, Apr 18, 2017 at 12:44:28PM +0200, Lubomir Rintel wrote:
+> Hi,
 
-Ok for patch tracker?
+Hi,
 
-Vladimir
+> I'm getting a crash that looks awfully lot like what ddc37832a1 [ARM:
+> 8634/1: hw_breakpoint: blacklist Scorpion CPUs] aims to fix.
+
+Just to check, have you successfully booted a kernel on this board
+before? i.e. is this a new crash?
+
+> My hardware doesn't use a Scorpion CPU though -- it uses a Cortex-A9
+> (cpuid=0x412fc091).
+> 
+> [????0.157000] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> [????0.157000] Modules linked in:
+> [????0.157000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-0.rc3.git0.2.spear2.fc26.armv7hl #1
+> [????0.157000] Hardware name: ST SPEAr1340 SoC with Flattened Device Tree
+> [????0.157000] task: ef102b80 task.stack: ef0fa000
+> [????0.157000] PC is at arch_hw_breakpoint_init+0x130/0x2a0
+> [????0.157000] LR is at arch_hw_breakpoint_init+0x7c/0x2a0
+> [????0.157000] pc : [<c0e0538c>]????lr : [<c0e052d8>]????psr: 60000013
+
+It would be helpful to know which specific access that is.
+
+Can you figure that out with addr2line, e.g.
+
+ $ addr2line -ife vmlinux c0e0538c
+
+Thanks,
+Mark
