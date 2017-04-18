@@ -1,114 +1,53 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 18 Apr 2017 14:55:39 +0900
-Subject: [PATCH/RFT 2/2] ARM: dts: gose: Enable UHS-I SDR-50 and SDR-104
-In-Reply-To: <1492494939-24568-1-git-send-email-horms+renesas@verge.net.au>
-References: <1492494939-24568-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1492494939-24568-3-git-send-email-horms+renesas@verge.net.au>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 18 Apr 2017 08:00:14 +0200
+Subject: [PATCH v2 3/3] arm64: dts: exynos: Add support for s6e3hf2 panel
+ device on TM2e board
+In-Reply-To: <1492408934-22096-4-git-send-email-hoegeun.kwon@samsung.com>
+References: <1492408934-22096-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170417060220epcas5p42f6ed43d9db94779382e84a129b9da2d@epcas5p4.samsung.com>
+ <1492408934-22096-4-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <b9bfcdd9-5576-34c3-6c7d-556b6c81946d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
-And the sd-uhs-sdr104 property to SDHI0.
+On 17.04.2017 08:02, Hoegeun Kwon wrote:
+> This patch add the panel device tree node for s6e3hf2 display
+> controller to TM2e dts.
+>
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-* Verified:
-  - SDR104 for SDHI0
-  - SDR50 for SDHI1
-  - Results comprable to those listed for other Renesas R-Car Gen2 boards on
-    http://elinux.org/Tests:SD-SDHI-SDR104
-* Untested:
-  - SDR50 for SDHI3
-    + HS C4 card present in slot on board which I access remotely
----
- arch/arm/boot/dts/r8a7793-gose.dts | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+Maybe it would be good to remove te-gpios property - tm2/tm2e uses
+hardware trigger, so it is not necessary and generates useless interrupts.
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 806c93f6ae8b..95e51b79c1d7 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -348,16 +348,37 @@
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi0_pins_uhs: sd0_uhs {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+		power-source = <1800>;
- 	};
- 
- 	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
- 	};
- 
- 	sdhi2_pins: sd2 {
- 		groups = "sdhi2_data4", "sdhi2_ctrl";
- 		function = "sdhi2";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi2_pins_uhs: sd2_uhs {
-+		groups = "sdhi2_data4", "sdhi2_ctrl";
-+		function = "sdhi2";
-+		power-source = <1800>;
- 	};
- 
- 	qspi_pins: qspi {
-@@ -416,33 +437,40 @@
- 
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi0>;
- 	vqmmc-supply = <&vccq_sdhi0>;
- 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	status = "okay";
- };
- 
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi1>;
- 	vqmmc-supply = <&vccq_sdhi1>;
- 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
- &sdhi2 {
- 	pinctrl-0 = <&sdhi2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi2_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi2>;
- 	vqmmc-supply = <&vccq_sdhi2>;
- 	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
--- 
-2.7.0.rc3.207.g0ac5344
+Beside this:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+ --
+Regards
+Andrzej
+> ---
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+> index 694717a..98ad094 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+> @@ -52,6 +52,18 @@
+>  	assigned-clock-rates = <278000000>, <400000000>;
+>  };
+>  
+> +&dsi {
+> +	panel at 0 {
+> +		compatible = "samsung,s6e3hf2";
+> +		reg = <0>;
+> +		vdd3-supply = <&ldo27_reg>;
+> +		vci-supply = <&ldo28_reg>;
+> +		reset-gpios = <&gpg0 0 GPIO_ACTIVE_LOW>;
+> +		enable-gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>;
+> +		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+>  &ldo31_reg {
+>  	regulator-name = "TSP_VDD_1.8V_AP";
+>  	regulator-min-microvolt = <1800000>;
