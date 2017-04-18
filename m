@@ -1,168 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 18 Apr 2017 15:20:09 +0800
-Subject: [linux-sunxi] [PATCH v3 10/12] arm64: allwinner: a64: add DTSI
- file for AXP803 PMIC
-In-Reply-To: <20170417115747.7300-11-icenowy@aosc.io>
-References: <20170417115747.7300-1-icenowy@aosc.io>
- <20170417115747.7300-11-icenowy@aosc.io>
-Message-ID: <CAGb2v64DRQeKAkBiVCLTpsGGi3vSYzztthmgCt1z6HeCRb0PHQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 18 Apr 2017 09:22:24 +0200
+Subject: [PATCH/RFT] ARM: dts: silk: Enable UHS-I SDR-50
+In-Reply-To: <1492493267-20807-1-git-send-email-horms+renesas@verge.net.au>
+References: <1492493267-20807-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdV_L_Fpm0=WQkHgVn123G4X+cUSxECqw4yi3TYvdSSGCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Apr 17, 2017 at 7:57 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> As nearly all A64 boards are using AXP803 PMIC, add a DTSI file for it,
-> like the old DTSI files for AXP20x/22x, for the common parts of the
-> PMIC.
+On Tue, Apr 18, 2017 at 7:27 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI1.
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->  arch/arm64/boot/dts/allwinner/axp803.dtsi | 150 ++++++++++++++++++++++++++++++
->  1 file changed, 150 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/axp803.dtsi
+> * Compile tested only; no access to silk board
+> ---
+>  arch/arm/boot/dts/r8a7794-silk.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-> new file mode 100644
-> index 000000000000..f0e53a7fffbd
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-> @@ -0,0 +1,150 @@
-> +/*
-> + * Copyright 2017 Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
+> diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+> index 4cb5278d104d..b0ef8ea75c29 100644
+> --- a/arch/arm/boot/dts/r8a7794-silk.dts
+> +++ b/arch/arm/boot/dts/r8a7794-silk.dts
+> @@ -226,6 +226,13 @@
+>         du1_pins: du1 {
+>                 groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_clk0_out";
+>                 function = "du1";
+> +               power-source = <3300>;
+> +       };
 > +
-> +/*
-> + * AXP803 Integrated Power Management Chip
-> + * http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
-> + */
-> +
-> +&axp803 {
-> +       interrupt-controller;
-> +       #interrupt-cells = <1>;
-> +
-> +       regulators {
-> +               /* Default work frequency for buck regulators */
-> +               x-powers,dcdc-freq = <3000>;
-> +
-> +               reg_dcdc1: dcdc1 {
-> +                       regulator-name = "dcdc1";
-> +               };
-> +
-> +               reg_dcdc2: dcdc2 {
-> +                       regulator-name = "dcdc2";
-> +               };
-> +
-> +               reg_dcdc3: dcdc3 {
-> +                       regulator-name = "dcdc3";
-> +               };
-> +
-> +               reg_dcdc4: dcdc4 {
-> +                       regulator-name = "dcdc4";
-> +               };
-> +
-> +               reg_dcdc5: dcdc5 {
-> +                       regulator-name = "dcdc5";
-> +               };
-> +
-> +               reg_dcdc6: dcdc6 {
-> +                       regulator-name = "dcdc6";
-> +               };
-> +
-> +               reg_dc1sw: dc1sw {
-> +                       regulator-name = "dc1sw";
-> +               };
-> +
-> +               reg_aldo1: aldo1 {
-> +                       regulator-name = "aldo1";
-> +               };
-> +
-> +               reg_aldo2: aldo2 {
-> +                       regulator-name = "aldo2";
-> +               };
-> +
-> +               reg_aldo3: aldo3 {
-> +                       regulator-name = "aldo3";
-> +               };
-> +
-> +               reg_dldo1: dldo1 {
-> +                       regulator-name = "dldo1";
-> +               };
-> +
-> +               reg_dldo2: dldo2 {
-> +                       regulator-name = "dldo2";
-> +               };
-> +
-> +               reg_dldo3: dldo3 {
-> +                       regulator-name = "dldo3";
-> +               };
-> +
-> +               reg_dldo4: dldo4 {
-> +                       regulator-name = "dldo4";
-> +               };
-> +
-> +               reg_eldo1: eldo1 {
-> +                       regulator-name = "eldo1";
-> +               };
-> +
-> +               reg_eldo2: eldo2 {
-> +                       regulator-name = "eldo2";
-> +               };
-> +
-> +               reg_eldo3: eldo3 {
-> +                       regulator-name = "eldo3";
-> +               };
-> +
-> +               reg_fldo1: fldo1 {
-> +                       regulator-name = "fldo1";
-> +               };
-> +
-> +               reg_fldo2: fldo2 {
-> +                       regulator-name = "fldo2";
-> +               };
-> +
-> +               reg_ldo_io0: ldo_io0 {
-> +                       regulator-name = "ldo_io0";
+> +       sdhi1_pins_uhs: sd1_uhs {
+> +               groups = "sdhi1_data4", "sdhi1_ctrl";
+> +               function = "sdhi1";
+> +               power-source = <1800>;
 
-Please use hyphens instead of underscores for the node name,
-and preferably, for the regulator name as well.
+Shouldn't this be inserted right after the existing sdhi1_pins?
+Yes, the list is only partially sorted.
 
-ChenYu
+>         };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
