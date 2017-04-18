@@ -1,71 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Apr 2017 18:01:18 +0100
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
- <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
-Message-ID: <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 18 Apr 2017 22:35:02 +0530
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <20170418144839.GF27592@e104818-lin.cambridge.arm.com>
+References: <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
+ <CAPub14-sFgx=oCHzJPb9h9b_V0rbn5UAMDNJ-yTkjhz38JPqMQ@mail.gmail.com>
+ <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
+ <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
+ <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
+ <CADAEsF_Hr=mPspvuPsQtKWiSDu6oCjfyy0rGwWrF9EJo-ZO1JA@mail.gmail.com>
+ <08fa98de-760b-15bc-5220-fa449b08c118@codeaurora.org>
+ <725F073F-025B-48B9-9935-24EFEBF2B7DC@caviumnetworks.com>
+ <93d2819a-95b1-6606-74d4-0bc0a64db29e@codeaurora.org>
+ <CA+sq2CeTZyTrc3kC-kJEyrT5Tt5Wr47F=OVaCHwMRZk96qo4HA@mail.gmail.com>
+ <20170418144839.GF27592@e104818-lin.cambridge.arm.com>
+Message-ID: <CA+sq2Ccf9K=to7rFAmWqWe-oXqNOGhZ+UQKui+ea+rSkR2pcbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
-> From: Dong Bo <dongbo4@huawei.com>
-> 
-> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-> the flag is propagated to its child processes, even the elf
-> files are marked as not requiring executable stack. It may
-> cause superfluous operations on some arch, e.g.
-> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-> also marked as PROT_EXEC.
-> 
-> Signed-off-by: Dong Bo <dongbo4@huawei.com>
-> ---
->  fs/binfmt_elf.c       | 2 ++
->  fs/binfmt_elf_fdpic.c | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
-> index 5075fd5..c52e670 100644
-> --- a/fs/binfmt_elf.c
-> +++ b/fs/binfmt_elf.c
-> @@ -863,6 +863,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
->  	SET_PERSONALITY2(loc->elf_ex, &arch_state);
->  	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
->  		current->personality |= READ_IMPLIES_EXEC;
-> +	else
-> +		current->personality &= ~READ_IMPLIES_EXEC;
->   	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
->  		current->flags |= PF_RANDOMIZE;
-> diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
-> index cf93a4f..c4bc4d0 100644
-> --- a/fs/binfmt_elf_fdpic.c
-> +++ b/fs/binfmt_elf_fdpic.c
-> @@ -354,6 +354,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
->  		set_personality(PER_LINUX);
->  	if (elf_read_implies_exec(&exec_params.hdr, executable_stack))
->  		current->personality |= READ_IMPLIES_EXEC;
-> +	else
-> +		current->personality &= ~READ_IMPLIES_EXEC;
->   	setup_new_exec(bprm);
+On Tue, Apr 18, 2017 at 8:18 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Mon, Apr 17, 2017 at 04:08:52PM +0530, Sunil Kovvuri wrote:
+>> >>     >> Do you have an explanation on the performance variation when
+>> >>     >> L1_CACHE_BYTES is changed? We'd need to understand how the network stack
+>> >>     >> is affected by L1_CACHE_BYTES, in which context it uses it (is it for
+>> >>     >> non-coherent DMA?).
+>> >>     >
+>> >>     > network stack use SKB_DATA_ALIGN to align.
+>> >>     > ---
+>> >>     > #define SKB_DATA_ALIGN(X) (((X) + (SMP_CACHE_BYTES - 1)) & \
+>> >>     > ~(SMP_CACHE_BYTES - 1))
+>> >>     >
+>> >>     > #define SMP_CACHE_BYTES L1_CACHE_BYTES
+>> >>     > ---
+>> >>     > I think this is the reason of performance regression.
+>> >>     >
+>> >>
+>> >>     Yes this is the reason for performance regression. Due to increases L1 cache alignment the
+>> >>     object is coming from next kmalloc slab and skb->truesize is changing from 2304 bytes to
+>> >>     4352 bytes. This in turn increases sk_wmem_alloc which causes queuing of less send buffers.
+>>
+>> With what traffic did you check 'skb->truesize' ?
+>> Increase from 2304 to 4352 bytes doesn't seem to be real. I checked
+>> with ICMP pkts with maximum
+>> size possible with 1500byte MTU and I don't see such a bump. If the
+>> bump is observed with Iperf
+>> sending TCP packets then I suggest to check if TSO is playing a part over here.
+>
+> I haven't checked truesize but I added some printks to __alloc_skb() (on
+> a Juno platform) and the size argument to this function is 1720 on many
+> occasions. With sizeof(struct skb_shared_info) of 320, the actual data
+> allocation is exactly 2048 when using 64 byte L1_CACHE_SIZE. With a
+> 128 byte cache size, it goes slightly over 2K, hence the 4K slab
+> allocation.
 
-That's affecting most architectures with a risk of ABI breakage. We
-could do it on arm64 only, though I'm not yet clear on the ABI
-implications (at a first look, there shouldn't be any). This follows the
-x86_64 approach but unfortunately we haven't done it on arm64 from the
-start:
+Understood but still in my opinion this '4K slab allocation' cannot be
+considered as
+an issue with cache line size, there are many network drivers out
+there which do
+receive buffer or page recycling to minimize (sometimes almost to
+zero) the cost
+of buffer allocation.
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 5d1700425efe..5941e7f6ae60 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -142,6 +142,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- ({									\
- 	clear_bit(TIF_32BIT, &current->mm->context.flags);		\
- 	clear_thread_flag(TIF_32BIT);					\
-+	current->personality &= ~READ_IMPLIES_EXEC;			\
- })
- 
- /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+>The 1720 figure surprised me a bit as well since I was
+> expecting something close to 1500.
+>
+> The thing that worries me is that skb->data may be used as a buffer to
+> DMA into. If that's the case, skb_shared_info is wrongly aligned based
+> on SMP_CACHE_BYTES only and can lead to corruption on a non-DMA-coherent
+> platform. It should really be ARCH_DMA_MINALIGN.
 
--- 
-Catalin
+I didn't get this, if you see __alloc_skb()
+
+229         size = SKB_DATA_ALIGN(size);
+230         size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+both DMA buffer and skb_shared_info are aligned to a cacheline separately,
+considering 128byte alignment guarantees 64byte alignment as well, how
+will this
+lead to corruption ?
+
+And if platform is non-DMA-coherent then again it's the driver which
+should take
+of coherency by using appropriate map/unmap APIs and should avoid any cacheline
+sharing btw DMA buffer and skb_shared_info.
+
+>
+> IIUC, the Cavium platform has coherent DMA, so it shouldn't be an issue
+> if we go back to 64 byte cache lines.
+
+Yes, Cavium platform is DMA coherent and there is no issue with reverting back
+to 64byte cachelines. But do we want to do this because some platform has a
+performance issue and this is an easy way to solve it. IMHO there seems
+to be many ways to solve performance degradation within the driver itself, and
+if those doesn't work then probably it makes sense to revert this.
+
+>However, we don't really have an
+> easy way to check (maybe taint the kernel if CWG is different from
+> ARCH_DMA_MINALIGN *and* the non-coherent DMA API is called).
+>
+> --
+> Catalin
