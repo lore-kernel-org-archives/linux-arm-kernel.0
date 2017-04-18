@@ -1,218 +1,778 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 18 Apr 2017 22:25:06 +0200 (CEST)
-Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
-In-Reply-To: <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
-References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
- <172093673.40121.1492427140661@email.1und1.de>
- <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
- <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
-Message-ID: <186569458.91967.1492547106553@email.1und1.de>
+From: code@mmayer.net (Markus Mayer)
+Date: Tue, 18 Apr 2017 13:17:02 -0700
+Subject: [PATCH 2/2] hwmon: (brcmstb) Add driver for Broadcom STB DPFE
+In-Reply-To: <20170418201702.57019-1-code@mmayer.net>
+References: <20170418201702.57019-1-code@mmayer.net>
+Message-ID: <20170418201702.57019-3-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Markus Mayer <mmayer@broadcom.com>
 
-[add Johan]
+This driver allows access to DRAM properties, such as the refresh rate,
+via the Broadcom STB DDR PHY Front End (DPFE). The refresh rate can be
+used as indirect indicator of the DRAM temperature.
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. April 2017 um 10:07 geschrieben:
-> 
-> 
-> Am 18.04.2017 um 00:37 schrieb Doug Anderson:
-> > Hi,
-> >
-> > On Mon, Apr 17, 2017 at 4:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> >> Hi,
-> >>
-> >>> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Oktober 2016 um 21:34 geschrieben:
-> >>>
-> >>>
-> >>> I inspired by this issue [1] i build up a slightly modified setup with a
-> >>> Raspberry Pi B (mainline kernel 4.9rc3), a powered 7 port USB hub and 5 Prolific
-> >>> PL2303 USB to serial convertors. I modified the usb_test for dwc2 [2], which
-> >>> only tries to open all ttyUSB devices one after the other.
-> >>>
-> >>> Unfortunately the complete system stuck after opening the first ttyUSB device (
-> >>> heartbeat LED stop blinking, no reaction to debug UART). The only way to
-> >>> reanimate the system is to powerdown the USB hub with the USB to serial
-> >>> convertors.
-> >>>
-> >>> [1] - https://github.com/raspberrypi/linux/issues/1692
-> >>> [2] - https://gist.github.com/lategoodbye/dd0d30af27b6f101b03d5923b279dbaa
-> >> since this issue still exists with 4.11 (even without or with microframe scheduler enabled), i want to ask some additional questions:
-> >>
-> >> Is this issue reproducible with other dwc2 platforms than bcm2835?
-> > +Edmund Szeto, who I seem to remember emailing me about similar
-> > questions in the past.
-> >
-> >
-> >> Does the soft lockup also occurs after opening the second serial convertor or later?
-> > I don't have serial converters easily available to me, but back in the
-> > day when I was stressing things out on rk3288 I never saw anything
-> > this bad.  ...of course, on rk3288 we've got 4 A17 cores running
-> > really fast, so possibly just being slower is what causes your
-> > problems here?
-> 
-> The downstream kernel of the Raspberry Pi foundation with it's
-> out-of-tree dwc_otg driver is able to handle 8 serial converter on a RPI
-> B. I would be happy to get at least 2 or 3 working on mainline.
-> 
-> >
-> > I will make the following observations:
-> >
-> > 1. With dwc2 you often end up in the situation where you need to
-> > service an interrupt every 125 uS.  If servicing that interrupt takes
-> > anywhere near 125 uS in the common case then you'll be in trouble.
-> 
-> I will try to measure this with a logic analyzer.
-> 
+The driver also allows setting of the sampling interval.
 
-i took GPIO17 to measure _dwc2_hcd_irq and GPIO18 to measure _dwc2_hcd_urb_enqueue (patch against 4.11rc1 below).
+Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+---
+ MAINTAINERS                  |   8 +
+ drivers/hwmon/Kconfig        |  13 +
+ drivers/hwmon/Makefile       |   1 +
+ drivers/hwmon/brcmstb-dpfe.c | 689 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 711 insertions(+)
+ create mode 100644 drivers/hwmon/brcmstb-dpfe.c
 
-So i made my observations for 3 test cases:
-
-1) no serial converter connected (idle)
-2) 1 FTDI serial converter connected
-3) 1 PL2303 serial converter connected
-
-case   | ksoftirq cpu     | mean duration | max duration  | max duration | urb_enqueue  |
-       |                  | hcd_irq       | hcd_irq       | urb_enqueue  | within 10 sec|
--------+------------------+---------------+---------------+--------------+--------------+
-idle   | 0.0%             | 2 us          | 16.5 us       |     12 us    | 5            |
-FTDI   | 25.0%            | 8.5 us        | 18.0 us       |  31000 us    | ~ 400        |
-PL2303 | top doesn't work | 8.5 us        | 22.5 us       | 900000 us    | 4            |
-
-So it seems the serial USB driver has also an impact. In the analyzer trace the FTDI triggers many smaller urb_enqueue calls in the opposite to the PL2303 which only has few but huge calls.
-
-Additional notes:
-After closing the serial connection to the FTDI the system is usable as before. In case of PL2303 i need to disconnect the converter in order to get a usable system.
-
-Why do they behave so differently?
-Are these results of a overload?
-Doug, can you point me to your timing patch?
-
-Thanks
-Stefan
-
-PS: My hacky patches for measuring
-
-diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
-index 1a7e830..aa490c3 100644
---- a/drivers/usb/dwc2/core.h
-+++ b/drivers/usb/dwc2/core.h
-@@ -930,6 +930,9 @@ struct dwc2_hsotg {
- 	struct dentry *debug_root;
- 	struct debugfs_regset32 *regset;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 676c139..d2d0495 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2825,6 +2825,14 @@ S:	Maintained
+ F:	Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-cpu-freq.txt
+ F:	drivers/cpufreq/brcmstb*
  
-+	int gpio_17;
-+	int gpio_18;
++BROADCOM STB DPFE HWMON DRIVER
++M:	Markus Mayer <mmayer@broadcom.com>
++M:	bcm-kernel-feedback-list at broadcom.com
++L:	linux-hwmon at vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/hwmon/brcmstb*
++F:	drivers/hwmon/brcmstb*
 +
- 	/* DWC OTG HW Release versions */
- #define DWC2_CORE_REV_2_71a	0x4f54271a
- #define DWC2_CORE_REV_2_90a	0x4f54290a
-diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
-index a73722e..97271c8 100644
---- a/drivers/usb/dwc2/hcd.c
-+++ b/drivers/usb/dwc2/hcd.c
-@@ -45,6 +45,7 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/delay.h>
-+#include <linux/gpio.h>
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/usb.h>
-@@ -4595,13 +4596,17 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
- 	bool qh_allocated = false;
- 	struct dwc2_qtd *qtd;
+ BROADCOM SPECIFIC AMBA DRIVER (BCMA)
+ M:	Rafa? Mi?ecki <zajec5@gmail.com>
+ L:	linux-wireless at vger.kernel.org
+diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+index 0649d53f3..54bb55c 100644
+--- a/drivers/hwmon/Kconfig
++++ b/drivers/hwmon/Kconfig
+@@ -355,6 +355,19 @@ config SENSORS_ATXP1
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called atxp1.
  
-+	gpio_set_value(hsotg->gpio_18, 1);
++config SENSORS_BRCMSTB_DPFE
++	tristate "BRCMSTB DPFE driver"
++	depends on ARCH_BRCMSTB
++	default y
++	help
++	  If you say yes here you get support for the Broadcom set-top box
++	  DDR PHY Front End (DPFE) interface.
 +
- 	if (dbg_urb(urb)) {
- 		dev_vdbg(hsotg->dev, "DWC OTG HCD URB Enqueue\n");
- 		dwc2_dump_urb_info(hcd, urb, "urb_enqueue");
- 	}
- 
--	if (!ep)
-+	if (!ep) {
-+		gpio_set_value(hsotg->gpio_18, 0);
- 		return -EINVAL;
++	  The driver allows one to query the DRAM refresh rate, which in turn,
++	  provides an indirect means for deriving the DRAM temperature.
++
++	  If in doubt, say N.
++
+ config SENSORS_DS620
+ 	tristate "Dallas Semiconductor DS620"
+ 	depends on I2C
+diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+index 5509edf..cec13ec 100644
+--- a/drivers/hwmon/Makefile
++++ b/drivers/hwmon/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_SENSORS_ATK0110)	+= asus_atk0110.o
+ # Native drivers
+ # asb100, then w83781d go first, as they can override other drivers' addresses.
+ obj-$(CONFIG_SENSORS_ASB100)	+= asb100.o
++obj-$(CONFIG_SENSORS_BRCMSTB_DPFE) += brcmstb-dpfe.o
+ obj-$(CONFIG_SENSORS_W83627HF)	+= w83627hf.o
+ obj-$(CONFIG_SENSORS_W83792D)	+= w83792d.o
+ obj-$(CONFIG_SENSORS_W83793)	+= w83793.o
+diff --git a/drivers/hwmon/brcmstb-dpfe.c b/drivers/hwmon/brcmstb-dpfe.c
+new file mode 100644
+index 0000000..01abea8
+--- /dev/null
++++ b/drivers/hwmon/brcmstb-dpfe.c
+@@ -0,0 +1,689 @@
++/*
++ * Temperature sensor driver for Broadcom set top box SoCs
++ *
++ * Copyright (c) 2017 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/delay.h>
++#include <linux/firmware.h>
++#include <linux/hwmon.h>
++#include <linux/hwmon-sysfs.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++
++#define DRVNAME			"brcmstb-dpfe"
++#define FIRMWARE_NAME		"dpfe.bin"
++#define DT_COMPAT_DMEM		"brcm,dpfe-dmem"
++#define DT_COMPAT_IMEM		"brcm,dpfe-imem"
++
++/* DCPU register offsets */
++#define REG_DCPU_RESET		0x0
++#define REG_TO_DCPU_MBOX	0x10
++#define REG_TO_HOST_MBOX	0x14
++
++/* Message RAM */
++#define DCPU_MSG_RAM(x)		(0x100 + (x) * sizeof(u32))
++
++/* DRAM Info Offsets & Masks */
++#define DRAM_INFO_INTERVAL	0x0
++#define DRAM_INFO_MR4		0x4
++#define DRAM_INFO_ERROR		0x8
++#define DRAM_INFO_MASK		0xff
++
++/* DRAM MR4 Offsets & Masks */
++#define DRAM_MR4_REFRESH	0x0	/* Refresh rate */
++#define DRAM_MR4_SR_ABORT	0x3	/* Self Refresh Abort */
++#define DRAM_MR4_PPRE		0x4	/* Post-package repair entry/exit */
++#define DRAM_MR4_TH_OFFS	0x5	/* Thermal Offset; vendor specific */
++#define DRAM_MR4_TUF		0x7	/* Temperature Update Flag */
++
++#define DRAM_MR4_REFRESH_MASK	0x7
++#define DRAM_MR4_SR_ABORT_MASK	0x1
++#define DRAM_MR4_PPRE_MASK	0x1
++#define DRAM_MR4_TH_OFFS_MASK	0x3
++#define DRAM_MR4_TUF_MASK	0x1
++
++/* DRAM Vendor Offsets & Masks */
++#define DRAM_VENDOR_MR5		0x0
++#define DRAM_VENDOR_MR6		0x4
++#define DRAM_VENDOR_MR7		0x8
++#define DRAM_VENDOR_MR8		0xc
++#define DRAM_VENDOR_ERROR	0x10
++#define DRAM_VENDOR_MASK	0xff
++
++/* Reset register bits & masks */
++#define DCPU_RESET_SHIFT	0x0
++#define DCPU_RESET_MASK		0x1
++#define DCPU_CLK_DISABLE_SHIFT	0x2
++
++/* DCPU return codes */
++#define DCPU_RET_SUCCESS	0x00000001
++#define DCPU_RET_ERR_HEADER	0x80000001
++#define DCPU_RET_ERR_INVAL	0x80000002
++#define DCPU_RET_ERR_CHKSUM	0x80000004
++#define DCPU_RET_ERR_OTHER	0x80000008
++
++/* Firmware magic */
++#define DPFE_BE_MAGIC		0xfe1010fe
++#define DPFE_LE_MAGIC		0xfe0101fe
++
++/* Error codes */
++#define ERR_INVALID_MAGIC	-1
++#define ERR_INVALID_SIZE	-2
++#define ERR_INVALID_CHKSUM	-3
++
++/* Message types */
++#define DPFE_MSG_TYPE_COMMAND	1
++#define DPFE_MSG_TYPE_RESPONSE	2
++
++#define DELAY_LOOP_MAX		200000
++
++enum dpfe_msg_fields {
++	MSG_HEADER,
++	MSG_COMMAND,
++	MSG_ARG_COUNT,
++	MSG_ARG0,
++	MSG_CHKSUM,
++	MSG_FIELD_MAX /* Last entry */
++};
++
++enum dpfe_commands {
++	DPFE_CMD_GET_INFO,
++	DPFE_CMD_GET_REFRESH,
++	DPFE_CMD_GET_VENDOR,
++	DPFE_CMD_MAX /* Last entry */
++};
++
++struct dpfe_msg {
++	u32 header;
++	u32 command;
++	u32 arg_count;
++	u32 arg0;
++	u32 chksum; /* This is the sum of all other entries. */
++};
++
++/*
++ * Format of the binary firmware file:
++ *
++ *   entry
++ *      0    header
++ *              value:  0xfe0101fe  <== little endian
++ *                      0xfe1010fe  <== big endian
++ *      1    sequence:
++ *              [31:16] total segments on this build
++ *              [15:0]  this segment sequence.
++ *      2    FW version
++ *      3    IMEM byte size
++ *      4    DMEM byte size
++ *           IMEM
++ *           DMEM
++ *      last checksum ==> sum of everything
++ */
++struct dpfe_firmware_header {
++	u32 magic;
++	u32 sequence;
++	u32 version;
++	u32 imem_size;
++	u32 dmem_size;
++};
++
++/* Things we only need during initialization. */
++struct init_data {
++	void __iomem *dmem;
++	void __iomem *imem;
++	unsigned int dmem_len;
++	unsigned int imem_len;
++	unsigned int chksum;
++	bool is_big_endian;
++};
++
++/* Things we need for as long as we are active. */
++struct private_data {
++	void __iomem *regs;
++	void __iomem *dmem;
++	struct mutex lock;
++};
++
++/* List of supported firmware commands */
++const u32 dpfe_commands[DPFE_CMD_MAX][MSG_FIELD_MAX] = {
++	[DPFE_CMD_GET_INFO] = {
++		[MSG_HEADER] = DPFE_MSG_TYPE_COMMAND,
++		[MSG_COMMAND] = 1,
++		[MSG_ARG_COUNT] = 1,
++		[MSG_ARG0] = 1,
++		[MSG_CHKSUM] = 4,
++	},
++	[DPFE_CMD_GET_REFRESH] = {
++		[MSG_HEADER] = DPFE_MSG_TYPE_COMMAND,
++		[MSG_COMMAND] = 2,
++		[MSG_ARG_COUNT] = 1,
++		[MSG_ARG0] = 1,
++		[MSG_CHKSUM] = 5,
++	},
++	[DPFE_CMD_GET_VENDOR] = {
++		[MSG_HEADER] = DPFE_MSG_TYPE_COMMAND,
++		[MSG_COMMAND] = 2,
++		[MSG_ARG_COUNT] = 1,
++		[MSG_ARG0] = 2,
++		[MSG_CHKSUM] = 6,
++	},
++};
++
++static u32 dpfe_readl(const void __iomem *addr)
++{
++	return le32_to_cpu(readl_relaxed(addr));
++}
++
++static void dpfe_writel(u32 value, void __iomem *addr)
++{
++	writel_relaxed(cpu_to_le32(value), addr);
++}
++
++static void __iomem *__map_region(const char *name)
++{
++	struct device_node *np;
++	void __iomem *ptr;
++
++	np = of_find_compatible_node(NULL, NULL, name);
++	if (!np)
++		return NULL;
++
++	ptr = of_iomap(np, 0);
++	of_node_put(np);
++
++	return ptr;
++}
++
++static void __disable_dcpu(void __iomem *regs)
++{
++	u32 val;
++
++	/* Check if DCPU is running */
++	val = dpfe_readl(regs + REG_DCPU_RESET);
++	if (!(val & DCPU_RESET_MASK)) {
++		/* Put DCPU in reset */
++		val |= (1 << DCPU_RESET_SHIFT);
++		dpfe_writel(val, regs + REG_DCPU_RESET);
 +	}
- 
- 	if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS ||
- 	    usb_pipetype(urb->pipe) == PIPE_INTERRUPT) {
-@@ -4628,8 +4633,10 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
- 
- 	dwc2_urb = dwc2_hcd_urb_alloc(hsotg, urb->number_of_packets,
- 				      mem_flags);
--	if (!dwc2_urb)
-+	if (!dwc2_urb) {
-+		gpio_set_value(hsotg->gpio_18, 0);
- 		return -ENOMEM;
++}
++
++static void __enable_dcpu(void __iomem *regs)
++{
++	u32 val;
++
++	/* Clear mailbox registers. */
++	dpfe_writel(0, regs + REG_TO_DCPU_MBOX);
++	dpfe_writel(0, regs + REG_TO_HOST_MBOX);
++
++	/* Disable DCPU clock gating */
++	val = dpfe_readl(regs + REG_DCPU_RESET);
++	val &= ~(1 << DCPU_CLK_DISABLE_SHIFT);
++	dpfe_writel(val, regs + REG_DCPU_RESET);
++
++	/* Take DCPU out of reset */
++	val = dpfe_readl(regs + REG_DCPU_RESET);
++	val &= ~(1 << DCPU_RESET_SHIFT);
++	dpfe_writel(val, regs + REG_DCPU_RESET);
++}
++
++static unsigned int get_msg_chksum(const u32 msg[])
++{
++	unsigned int sum = 0;
++	unsigned int i;
++
++	/* Don't include the last field in the checksum. */
++	for (i = 0; i < MSG_FIELD_MAX - 1; i++)
++		sum += msg[i];
++
++	return sum;
++}
++
++static int __send_command(struct private_data *priv, unsigned int cmd,
++			  u32 result[])
++{
++	const u32 *msg = dpfe_commands[cmd];
++	void __iomem *regs = priv->regs;
++	unsigned int i, chksum;
++	int ret = 0;
++	u32 resp;
++
++	if (cmd >= DPFE_CMD_MAX)
++		return -1;
++
++	mutex_lock(&priv->lock);
++
++	/* Write command and arguments to message area */
++	for (i = 0; i < MSG_FIELD_MAX; i++)
++		dpfe_writel(msg[i], regs + DCPU_MSG_RAM(i));
++
++	/* Tell DCPU there is a command waiting */
++	dpfe_writel(1, regs + REG_TO_DCPU_MBOX);
++
++	/* Wait for DCPU to process the command */
++	for (i = 0; i < DELAY_LOOP_MAX; i++) {
++		/* Read response code */
++		resp = dpfe_readl(regs + REG_TO_HOST_MBOX);
++		if (resp > 0)
++			break;
++		udelay(5);
 +	}
- 
- 	dwc2_hcd_urb_set_pipeinfo(hsotg, dwc2_urb, usb_pipedevice(urb->pipe),
- 				  usb_pipeendpoint(urb->pipe), ep_type,
-@@ -4705,6 +4712,8 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
- 
- 	spin_unlock_irqrestore(&hsotg->lock, flags);
- 
-+	gpio_set_value(hsotg->gpio_18, 0);
++	if (i == DELAY_LOOP_MAX)
++		ret = -ETIMEDOUT;
 +
- 	return 0;
- 
- fail3:
-@@ -4732,6 +4741,8 @@ static int _dwc2_hcd_urb_enqueue(struct usb_hcd *hcd, struct urb *urb,
- fail0:
- 	kfree(dwc2_urb);
- 
-+	gpio_set_value(hsotg->gpio_18, 0);
++	/* Read response data */
++	for (i = 0; i < MSG_FIELD_MAX; i++)
++		result[i] = dpfe_readl(regs + DCPU_MSG_RAM(i));
 +
- 	return retval;
- }
- 
-@@ -4825,8 +4836,15 @@ static void _dwc2_hcd_endpoint_reset(struct usb_hcd *hcd,
- static irqreturn_t _dwc2_hcd_irq(struct usb_hcd *hcd)
- {
- 	struct dwc2_hsotg *hsotg = dwc2_hcd_to_hsotg(hcd);
-+	irqreturn_t ret;
- 
--	return dwc2_handle_hcd_intr(hsotg);
-+	gpio_set_value(hsotg->gpio_17, 1);
++	/* Tell DCPU we are done */
++	dpfe_writel(0, regs + REG_TO_HOST_MBOX);
 +
-+	ret = dwc2_handle_hcd_intr(hsotg);
++	mutex_unlock(&priv->lock);
 +
-+	gpio_set_value(hsotg->gpio_17, 0);
++	if (!ret) {
++		/* Verify response */
++		chksum = get_msg_chksum(result);
++		if (chksum != result[MSG_CHKSUM])
++			ret = -1;
++	}
++
++	if (!ret) {
++		switch (resp) {
++		case DCPU_RET_SUCCESS:
++			break;
++		case DCPU_RET_ERR_HEADER:
++		case DCPU_RET_ERR_INVAL:
++		case DCPU_RET_ERR_CHKSUM:
++		case DCPU_RET_ERR_OTHER:
++			ret = -1;
++			break;
++		}
++	}
 +
 +	return ret;
- }
- 
- /*
-diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
-index 9564bc7..e3f8a8a 100644
---- a/drivers/usb/dwc2/platform.c
-+++ b/drivers/usb/dwc2/platform.c
-@@ -35,6 +35,7 @@
-  */
- 
- #include <linux/kernel.h>
-+#include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
-@@ -404,6 +405,16 @@ static int dwc2_driver_probe(struct platform_device *dev)
- 		return hsotg->irq;
- 	}
- 
-+	hsotg->gpio_17 = 475;
-+	retval = devm_gpio_request_one(hsotg->dev, hsotg->gpio_17,  GPIOF_OUT_INIT_LOW, "gpio_17");
-+	if (retval)
-+		pr_warn("Unable to request GPIO17: %d\n", retval);
-+	
-+	hsotg->gpio_18 = 476;
-+	retval = devm_gpio_request_one(hsotg->dev, hsotg->gpio_18,  GPIOF_OUT_INIT_LOW, "gpio_18");
-+	if (retval)
-+		pr_warn("Unable to request GPIO18: %d\n", retval);
++}
 +
- 	dev_dbg(hsotg->dev, "registering common handler for irq%d\n",
- 		hsotg->irq);
- 	retval = devm_request_irq(hsotg->dev, hsotg->irq,
++/* Ensure that the firmware file loaded meets all the requirements. */
++static int __verify_firmware(struct init_data *init,
++			     const struct firmware *fw)
++{
++	const struct dpfe_firmware_header *header = (void *)fw->data;
++	unsigned int dmem_size, imem_size, total_size;
++	bool is_big_endian = false;
++	const u32 *chksum;
++
++	if (header->magic == DPFE_BE_MAGIC)
++		is_big_endian = true;
++	else if (header->magic != DPFE_LE_MAGIC)
++		return ERR_INVALID_MAGIC;
++
++	if (is_big_endian) {
++		dmem_size = be32_to_cpu(header->dmem_size);
++		imem_size = be32_to_cpu(header->imem_size);
++	} else {
++		dmem_size = header->dmem_size;
++		imem_size = header->imem_size;
++	}
++
++	/* Data and instruction sections are 32 bit words. */
++	if ((dmem_size % sizeof(u32)) != 0 || (imem_size % sizeof(u32)) != 0)
++		return ERR_INVALID_SIZE;
++
++	/*
++	 * The header + the data section + the instruction section + the
++	 * checksum must be equal to the total firmware size.
++	 */
++	total_size = dmem_size + imem_size + sizeof(*header) + sizeof(*chksum);
++	if (total_size != fw->size)
++		return ERR_INVALID_SIZE;
++
++	/* The checksum comes at the very end. */
++	chksum = (void *)fw->data + sizeof(*header) + dmem_size + imem_size;
++
++	init->is_big_endian = is_big_endian;
++	init->dmem_len = dmem_size;
++	init->imem_len = imem_size;
++	init->chksum = (is_big_endian) ? be32_to_cpu(*chksum) : *chksum;
++
++	return 0;
++}
++
++/* Verify checksum by reading back the firmware from co-processor RAM. */
++static int __verify_fw_checksum(struct init_data *init,
++			     const struct dpfe_firmware_header *header,
++			     u32 checksum)
++{
++	u32 magic, sequence, version, sum;
++	u32 __iomem *dmem = init->dmem;
++	u32 __iomem *imem = init->imem;
++	unsigned int i;
++
++	if (init->is_big_endian) {
++		magic = be32_to_cpu(header->magic);
++		sequence = be32_to_cpu(header->sequence);
++		version = be32_to_cpu(header->version);
++	} else {
++		magic = header->magic;
++		sequence = header->sequence;
++		version = header->version;
++	}
++
++	sum = magic + sequence + version + init->dmem_len + init->imem_len;
++
++	for (i = 0; i < init->dmem_len / sizeof(u32); i++)
++		sum += dpfe_readl(dmem + i);
++
++	for (i = 0; i < init->imem_len / sizeof(u32); i++)
++		sum += dpfe_readl(imem + i);
++
++	return (sum == checksum) ? 0 : -1;
++}
++
++static int __write_firmware(u32 __iomem *mem, const u32 *fw,
++			    unsigned int size, bool is_big_endian)
++{
++	unsigned int i;
++
++	/* Convert size to 32-bit words. */
++	size /= sizeof(u32);
++
++	/* It is recommended to clear the firmware area first. */
++	for (i = 0; i < size; i++)
++		dpfe_writel(0, mem + i);
++
++	/* Now copy it. */
++	if (is_big_endian) {
++		for (i = 0; i < size; i++)
++			dpfe_writel(be32_to_cpu(fw[i]), mem + i);
++	} else {
++		for (i = 0; i < size; i++)
++			dpfe_writel(fw[i], mem + i);
++	}
++
++	return 0;
++}
++
++static int brcmstb_hwmon_download_firwmare(struct platform_device *pdev,
++					   struct init_data *init)
++{
++	const struct dpfe_firmware_header *header;
++	unsigned int dmem_size, imem_size;
++	struct device *dev = &pdev->dev;
++	bool is_big_endian = false;
++	struct private_data *priv;
++	const struct firmware *fw;
++	const u32 *dmem, *imem;
++	const void *fw_blob;
++	int ret;
++
++	ret = request_firmware(&fw, FIRMWARE_NAME, dev);
++	/* request_firmware() prints its own error messages. */
++	if (ret)
++		return ret;
++
++	priv = platform_get_drvdata(pdev);
++
++	ret = __verify_firmware(init, fw);
++	if (ret)
++		return -EFAULT;
++
++	__disable_dcpu(priv->regs);
++
++	is_big_endian = init->is_big_endian;
++	dmem_size = init->dmem_len;
++	imem_size = init->imem_len;
++
++	/* At the beginning of the firmware blob is a header. */
++	header = (struct dpfe_firmware_header *)fw->data;
++	/* Void pointer to the beginning of the actual firmware. */
++	fw_blob = fw->data + sizeof(*header);
++	/* IMEM comes right after the header. */
++	imem = fw_blob;
++	/* DMEM follows after IMEM. */
++	dmem = fw_blob + imem_size;
++
++	ret = __write_firmware(init->dmem, dmem, dmem_size, is_big_endian);
++	if (ret)
++		return ret;
++	ret = __write_firmware(init->imem, imem, imem_size, is_big_endian);
++	if (ret)
++		return ret;
++
++	ret = __verify_fw_checksum(init, header, init->chksum);
++	if (ret)
++		return ret;
++
++	__enable_dcpu(priv->regs);
++
++	return 0;
++}
++
++static ssize_t generic_show(unsigned int command, u32 response[],
++			    struct device *dev, char *buf)
++{
++	struct private_data *priv;
++	int ret;
++
++	priv = dev_get_drvdata(dev);
++
++	ret = __send_command(priv, command, response);
++	if (ret)
++		return sprintf(buf, "error %d\n", ret);
++
++	return 0;
++}
++
++static ssize_t show_info(struct device *dev, struct device_attribute *devattr,
++			 char *buf)
++{
++	u32 response[MSG_FIELD_MAX];
++	unsigned int info;
++	int ret;
++
++	ret = generic_show(DPFE_CMD_GET_INFO, response, dev, buf);
++	if (ret)
++		return ret;
++
++	info = response[MSG_ARG0];
++
++	return sprintf(buf, "%u.%u.%u.%u\n",
++		       (info >> 24) & 0xff,
++		       (info >> 16) & 0xff,
++		       (info >> 8) & 0xff,
++		       info & 0xff);
++}
++
++static ssize_t show_refresh(struct device *dev,
++			    struct device_attribute *devattr, char *buf)
++{
++	u32 response[MSG_FIELD_MAX];
++	void __iomem *info;
++	struct private_data *priv;
++	unsigned int offset;
++	u8 refresh, sr_abort, ppre, thermal_offs, tuf;
++	u32 mr4;
++	int ret;
++
++	ret = generic_show(DPFE_CMD_GET_REFRESH, response, dev, buf);
++	if (ret)
++		return ret;
++
++	priv = dev_get_drvdata(dev);
++	offset = response[MSG_ARG0];
++	info = priv->dmem + offset;
++
++	mr4 = dpfe_readl(info + DRAM_INFO_MR4) & DRAM_INFO_MASK;
++
++	refresh = (mr4 >> DRAM_MR4_REFRESH) & DRAM_MR4_REFRESH_MASK;
++	sr_abort = (mr4 >> DRAM_MR4_SR_ABORT) & DRAM_MR4_SR_ABORT_MASK;
++	ppre = (mr4 >> DRAM_MR4_PPRE) & DRAM_MR4_PPRE_MASK;
++	thermal_offs = (mr4 >> DRAM_MR4_TH_OFFS) & DRAM_MR4_TH_OFFS_MASK;
++	tuf = (mr4 >> DRAM_MR4_TUF) & DRAM_MR4_TUF_MASK;
++
++	return sprintf(buf, "%#x %#x %#x %#x %#x %#x %#x\n",
++		       dpfe_readl(info + DRAM_INFO_INTERVAL),
++		       refresh, sr_abort, ppre, thermal_offs, tuf,
++		       dpfe_readl(info + DRAM_INFO_ERROR));
++}
++
++static ssize_t store_refresh(struct device *dev, struct device_attribute *attr,
++			  const char *buf, size_t count)
++{
++	u32 response[MSG_FIELD_MAX];
++	struct private_data *priv;
++	void __iomem *info;
++	unsigned int offset;
++	unsigned long val;
++	int ret;
++
++	if (kstrtoul(buf, 0, &val) < 0)
++		return -EINVAL;
++
++	priv = dev_get_drvdata(dev);
++
++	ret = __send_command(priv, DPFE_CMD_GET_REFRESH, response);
++	if (ret)
++		return ret;
++
++	offset = response[MSG_ARG0];
++	info = priv->dmem + offset + DRAM_MR4_REFRESH;
++	dpfe_writel(val, info);
++
++	return count;
++}
++
++
++static ssize_t show_vendor(struct device *dev, struct device_attribute *devattr,
++			 char *buf)
++{
++	u32 response[MSG_FIELD_MAX];
++	struct private_data *priv;
++	void __iomem *info;
++	unsigned int offset;
++	int ret;
++
++	ret = generic_show(DPFE_CMD_GET_VENDOR, response, dev, buf);
++	if (ret)
++		return ret;
++
++	offset = response[MSG_ARG0];
++	priv = dev_get_drvdata(dev);
++	info = priv->dmem + offset;
++
++	return sprintf(buf, "%#x %#x %#x %#x %#x\n",
++		       dpfe_readl(info + DRAM_VENDOR_MR5) & DRAM_VENDOR_MASK,
++		       dpfe_readl(info + DRAM_VENDOR_MR6) & DRAM_VENDOR_MASK,
++		       dpfe_readl(info + DRAM_VENDOR_MR7) & DRAM_VENDOR_MASK,
++		       dpfe_readl(info + DRAM_VENDOR_MR8) & DRAM_VENDOR_MASK,
++		       dpfe_readl(info + DRAM_VENDOR_ERROR));
++}
++
++static SENSOR_DEVICE_ATTR(dpfe_info, 0444, show_info, NULL, 1000);
++static SENSOR_DEVICE_ATTR(dpfe_refresh, 0644, show_refresh, store_refresh,
++			  1000);
++static SENSOR_DEVICE_ATTR(dpfe_vendor, 0444, show_vendor, NULL, 1000);
++static struct attribute *dpfe_attrs[] = {
++	&sensor_dev_attr_dpfe_info.dev_attr.attr,
++	&sensor_dev_attr_dpfe_refresh.dev_attr.attr,
++	&sensor_dev_attr_dpfe_vendor.dev_attr.attr,
++	NULL
++};
++ATTRIBUTE_GROUPS(dpfe);
++
++static int brcmstb_hwmon_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device *hwmon_dev = NULL;
++	struct private_data *priv;
++	struct init_data init;
++	struct resource *res;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	mutex_init(&priv->lock);
++	platform_set_drvdata(pdev, priv);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->regs = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->regs)) {
++		dev_err(dev, "couldn't map DT entry brcm,dpfe-cpu\n");
++		return -ENODEV;
++	}
++
++	init.dmem = __map_region(DT_COMPAT_DMEM);
++	if (!init.dmem) {
++		dev_err(dev, "Couldn't map %s\n", DT_COMPAT_DMEM);
++		return -ENOENT;
++	}
++	init.imem = __map_region(DT_COMPAT_IMEM);
++	if (init.imem) {
++		ret = brcmstb_hwmon_download_firwmare(pdev, &init);
++	} else {
++		ret = -ENOENT;
++		dev_err(dev, "Couldn't map %s\n", DT_COMPAT_IMEM);
++	}
++
++	/* We don't need IMEM after initialization. */
++	iounmap(init.imem);
++
++	if (!ret) {
++		hwmon_dev = devm_hwmon_device_register_with_groups(dev,
++			"brcmstb_dpfe", priv, dpfe_groups);
++		if (IS_ERR(hwmon_dev))
++			ret = PTR_ERR(hwmon_dev);
++	}
++
++	if (ret) {
++		iounmap(init.dmem);
++		dev_err(dev, "failed to initialize -- error %d\n", ret);
++	} else {
++		priv->dmem = init.dmem;
++		dev_info(dev, "registered.\n");
++	}
++
++	return ret;
++}
++
++static int brcmstb_hwmon_remove(struct platform_device *pdev)
++{
++	struct private_data *priv;
++
++	priv = platform_get_drvdata(pdev);
++	iounmap(priv->dmem);
++
++	return 0;
++}
++
++static const struct of_device_id brcmstb_hwmon_of_match[] = {
++	{ .compatible = "brcm,dpfe-cpu", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, brcmstb_hwmon_of_match);
++
++static struct platform_driver brcmstb_hwmon_driver = {
++	.driver	= {
++		.name = DRVNAME,
++		.of_match_table = brcmstb_hwmon_of_match,
++	},
++	.probe = brcmstb_hwmon_probe,
++	.remove = brcmstb_hwmon_remove,
++};
++
++module_platform_driver(brcmstb_hwmon_driver);
++
++MODULE_AUTHOR("Markus Mayer <mmayer@broadcom.com>");
++MODULE_DESCRIPTION("BRCMSTB Hardware Monitoring");
++MODULE_LICENSE("GPL");
+-- 
+2.7.4
