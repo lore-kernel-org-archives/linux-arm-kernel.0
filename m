@@ -1,251 +1,274 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Tue, 18 Apr 2017 17:05:18 -0600
-Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for ARMv8
+Date: Tue, 18 Apr 2017 17:05:23 -0600
+Subject: [PATCH V15 11/11] arm/arm64: KVM: add guest SEA support
 In-Reply-To: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
 References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1492556723-9189-12-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM APEI extension proposal added SEA (Synchronous External Abort)
-notification type for ARMv8.
-Add a new GHES error source handling function for SEA. If an error
-source's notification type is SEA, then this function can be registered
-into the SEA exception handler. That way GHES will parse and report
-SEA exceptions when they occur.
-An SEA can interrupt code that had interrupts masked and is treated as
-an NMI. To aid this the page of address space for mapping APEI buffers
-while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
-changed to use the helper methods to find the prot_t to map with in
-the same way as ghes_ioremap_pfn_irq().
+Currently external aborts are unsupported by the guest abort
+handling. Add handling for SEAs so that the host kernel reports
+SEAs which occur in the guest kernel.
+
+When an SEA occurs in the guest kernel, the guest exits and is
+routed to kvm_handle_guest_abort(). Prior to this patch, a print
+message of an unsupported FSC would be printed and nothing else
+would happen. With this patch, the code gets routed to the APEI
+handling of SEAs in the host kernel to report the SEA information.
 
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Reviewed-by: James Morse <james.morse@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/Kconfig        |  2 ++
- arch/arm64/mm/fault.c     | 13 +++++++++
- drivers/acpi/apei/Kconfig | 15 ++++++++++
- drivers/acpi/apei/ghes.c  | 70 +++++++++++++++++++++++++++++++++++++++++++----
- include/acpi/ghes.h       |  7 +++++
- 5 files changed, 101 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_arm.h       | 10 ++++++++++
+ arch/arm/include/asm/system_misc.h   |  5 +++++
+ arch/arm/kvm/mmu.c                   | 35 ++++++++++++++++++++++++++++++++---
+ arch/arm64/include/asm/kvm_arm.h     | 10 ++++++++++
+ arch/arm64/include/asm/system_misc.h |  2 ++
+ arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++--
+ drivers/acpi/apei/ghes.c             | 13 +++++++------
+ include/acpi/ghes.h                  |  2 +-
+ 8 files changed, 88 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 3741859..36226c2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -18,6 +18,7 @@ config ARM64
- 	select ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_HAS_STRICT_MODULE_RWX
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-+	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_SUPPORTS_NUMA_BALANCING
-@@ -92,6 +93,7 @@ config ARM64
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
-+	select HAVE_NMI if ACPI_APEI_SEA
- 	select HAVE_PATA_PLATFORM
- 	select HAVE_PERF_EVENTS
- 	select HAVE_PERF_REGS
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index a3f0b3d..ebf020b 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -187,6 +187,16 @@
+ #define FSC_FAULT	(0x04)
+ #define FSC_ACCESS	(0x08)
+ #define FSC_PERM	(0x0c)
++#define FSC_SEA		(0x10)
++#define FSC_SEA_TTW0	(0x14)
++#define FSC_SEA_TTW1	(0x15)
++#define FSC_SEA_TTW2	(0x16)
++#define FSC_SEA_TTW3	(0x17)
++#define FSC_SECC	(0x18)
++#define FSC_SECC_TTW0	(0x1c)
++#define FSC_SECC_TTW1	(0x1d)
++#define FSC_SECC_TTW2	(0x1e)
++#define FSC_SECC_TTW3	(0x1f)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~0xf)
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index a3d61ad..8c4a89f 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -22,6 +22,11 @@
+ 
+ extern unsigned int user_debug;
+ 
++static inline int handle_guest_sea(phys_addr_t addr, unsigned int esr)
++{
++	return -1;
++}
++
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_ARM_SYSTEM_MISC_H */
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 582a972..fd11855 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -29,6 +29,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/virt.h>
++#include <asm/system_misc.h>
+ 
+ #include "trace.h"
+ 
+@@ -1418,6 +1419,24 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 		kvm_set_pfn_accessed(pfn);
+ }
+ 
++static bool is_abort_sea(unsigned long fault_status) {
++	switch (fault_status) {
++	case FSC_SEA:
++	case FSC_SEA_TTW0:
++	case FSC_SEA_TTW1:
++	case FSC_SEA_TTW2:
++	case FSC_SEA_TTW3:
++	case FSC_SECC:
++	case FSC_SECC_TTW0:
++	case FSC_SECC_TTW1:
++	case FSC_SECC_TTW2:
++	case FSC_SECC_TTW3:
++		return true;
++	default:
++		return false;
++	}
++}
++
+ /**
+  * kvm_handle_guest_abort - handles all 2nd stage aborts
+  * @vcpu:	the VCPU pointer
+@@ -1440,19 +1459,29 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	gfn_t gfn;
+ 	int ret, idx;
+ 
++	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
++
++	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
++
++	/*
++	 * The host kernel will handle the synchronous external abort. There
++	 * is no need to pass the error into the guest.
++	 */
++	if (is_abort_sea(fault_status)) {
++		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
++			return 1;
++	}
++
+ 	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+ 	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
+ 		kvm_inject_vabt(vcpu);
+ 		return 1;
+ 	}
+ 
+-	fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+-
+ 	trace_kvm_guest_fault(*vcpu_pc(vcpu), kvm_vcpu_get_hsr(vcpu),
+ 			      kvm_vcpu_get_hfar(vcpu), fault_ipa);
+ 
+ 	/* Check the stage-2 fault is trans. fault or write fault */
+-	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+ 	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+ 	    fault_status != FSC_ACCESS) {
+ 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 6e99978..61d694c 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -204,6 +204,16 @@
+ #define FSC_FAULT	ESR_ELx_FSC_FAULT
+ #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+ #define FSC_PERM	ESR_ELx_FSC_PERM
++#define FSC_SEA		ESR_ELx_FSC_EXTABT
++#define FSC_SEA_TTW0	(0x14)
++#define FSC_SEA_TTW1	(0x15)
++#define FSC_SEA_TTW2	(0x16)
++#define FSC_SEA_TTW3	(0x17)
++#define FSC_SECC	(0x18)
++#define FSC_SECC_TTW0	(0x1c)
++#define FSC_SECC_TTW1	(0x1d)
++#define FSC_SECC_TTW2	(0x1e)
++#define FSC_SECC_TTW3	(0x1f)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~UL(0xf))
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index bc81243..95aa442 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -56,6 +56,8 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 	__show_ratelimited;						\
+ })
+ 
++int handle_guest_sea(phys_addr_t addr, unsigned int esr);
++
+ #endif	/* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_SYSTEM_MISC_H */
 diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index b74d8b7..10013ff 100644
+index 10013ff..a8c5d11 100644
 --- a/arch/arm64/mm/fault.c
 +++ b/arch/arm64/mm/fault.c
-@@ -42,6 +42,8 @@
- #include <asm/pgtable.h>
- #include <asm/tlbflush.h>
- 
-+#include <acpi/ghes.h>
-+
- struct fault_info {
- 	int	(*fn)(unsigned long addr, unsigned int esr,
- 		      struct pt_regs *regs);
-@@ -518,6 +520,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
- 		inf->name, esr, addr);
- 
-+	/*
-+	 * Synchronous aborts may interrupt code which had interrupts masked.
-+	 * Before calling out into the wider kernel tell the interested
-+	 * subsystems.
-+	 */
-+	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-+		nmi_enter();
-+		ghes_notify_sea();
-+		nmi_exit();
-+	}
-+
- 	info.si_signo = SIGBUS;
- 	info.si_errno = 0;
- 	info.si_code  = 0;
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index b0140c8..de14d49 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -39,6 +39,21 @@ config ACPI_APEI_PCIEAER
- 	  PCIe AER errors may be reported via APEI firmware first mode.
- 	  Turn on this option to enable the corresponding support.
- 
-+config ACPI_APEI_SEA
-+	bool "APEI Synchronous External Abort logging/recovering support"
-+	depends on ARM64 && ACPI_APEI_GHES
-+	default y
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEA (Synchronous External Abort).
-+	  SEA happens with certain faults of data abort or instruction
-+	  abort synchronous exceptions on ARMv8 systems. If a system
-+	  supports firmware first handling of SEA, the platform analyzes
-+	  and handles hardware error notifications from SEA, and it may then
-+	  form a HW error record for the OS to parse and handle. This
-+	  option allows the OS to look for such hardware error record, and
-+	  take appropriate action.
-+
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index dfb7dd2..2d387f8 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -115,11 +115,7 @@
-  * Two virtual pages are used, one for IRQ/PROCESS context, the other for
-  * NMI context (optionally).
-  */
--#ifdef CONFIG_HAVE_ACPI_APEI_NMI
- #define GHES_IOREMAP_PAGES           2
--#else
--#define GHES_IOREMAP_PAGES           1
--#endif
- #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
- #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
- 
-@@ -158,10 +154,14 @@ static void ghes_ioremap_exit(void)
- static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
+@@ -515,6 +515,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
  {
- 	unsigned long vaddr;
-+	phys_addr_t paddr;
-+	pgprot_t prot;
+ 	struct siginfo info;
+ 	const struct fault_info *inf;
++	int ret = 0;
  
- 	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
--	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
--			   pfn << PAGE_SHIFT, PAGE_KERNEL);
-+
-+	paddr = pfn << PAGE_SHIFT;
-+	prot = arch_apei_get_mem_attribute(paddr);
-+	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+ 	inf = esr_to_fault_info(esr);
+ 	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+@@ -527,7 +528,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 	 */
+ 	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+ 		nmi_enter();
+-		ghes_notify_sea();
++		ret = ghes_notify_sea();
+ 		nmi_exit();
+ 	}
  
- 	return (void __iomem *)vaddr;
+@@ -540,7 +541,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 		info.si_addr  = (void __user *)addr;
+ 	arm64_notify_die("", regs, &info, esr);
+ 
+-	return 0;
++	return ret;
  }
-@@ -771,6 +771,50 @@ static int ghes_notify_sci(struct notifier_block *this,
- 	.notifier_call = ghes_notify_sci,
+ 
+ static const struct fault_info fault_info[] = {
+@@ -611,6 +612,24 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
  };
  
-+#ifdef CONFIG_ACPI_APEI_SEA
-+static LIST_HEAD(ghes_sea);
-+
-+void ghes_notify_sea(void)
-+{
-+	struct ghes *ghes;
-+
-+	/*
-+	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-+	 * rcu_read_lock().
-+	 */
-+	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-+		ghes_proc(ghes);
-+	}
-+}
-+
-+static void ghes_sea_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sea);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sea_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEA */
-+static inline void ghes_sea_add(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+
-+static inline void ghes_sea_remove(struct ghes *ghes)
-+{
-+	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
-+	       ghes->generic->header.source_id);
-+}
-+#endif /* CONFIG_ACPI_APEI_SEA */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
  /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1016,6 +1060,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_EXTERNAL:
- 	case ACPI_HEST_NOTIFY_SCI:
- 		break;
-+	case ACPI_HEST_NOTIFY_SEA:
-+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
-+				generic->header.source_id);
-+			rc = -ENOTSUPP;
-+			goto err;
-+		}
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1081,6 +1133,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 		list_add_rcu(&ghes->list, &ghes_sci);
- 		mutex_unlock(&ghes_list_mutex);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEA:
-+		ghes_sea_add(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1124,6 +1179,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 		mutex_unlock(&ghes_list_mutex);
- 		synchronize_rcu();
- 		break;
-+	case ACPI_HEST_NOTIFY_SEA:
-+		ghes_sea_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
++ * Handle Synchronous External Aborts that occur in a guest kernel.
++ *
++ * The return value will be zero if the SEA was successfully handled
++ * and non-zero if there was an error processing the error or there was
++ * no error to process.
++ */
++int handle_guest_sea(phys_addr_t addr, unsigned int esr)
++{
++	int ret = -ENOENT;
++
++	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
++		ret = ghes_notify_sea();
++	}
++
++	return ret;
++}
++
++/*
+  * Dispatch a data abort to the relevant handler.
+  */
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 612deb3..d286248 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -812,17 +812,18 @@ static int ghes_notify_sci(struct notifier_block *this,
+ #ifdef CONFIG_ACPI_APEI_SEA
+ static LIST_HEAD(ghes_sea);
+ 
+-void ghes_notify_sea(void)
++int ghes_notify_sea(void)
+ {
+ 	struct ghes *ghes;
++	int ret = -ENOENT;
+ 
+-	/*
+-	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+-	 * rcu_read_lock().
+-	 */
++	rcu_read_lock();
+ 	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+-		ghes_proc(ghes);
++		if(!ghes_proc(ghes))
++			ret = 0;
+ 	}
++	rcu_read_unlock();
++	return ret;
+ }
+ 
+ static void ghes_sea_add(struct ghes *ghes)
 diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index b89361a..ef0040893 100644
+index ef0040893..09e0b65 100644
 --- a/include/acpi/ghes.h
 +++ b/include/acpi/ghes.h
-@@ -1,3 +1,6 @@
-+#ifndef GHES_H
-+#define GHES_H
-+
- #include <acpi/apei.h>
- #include <acpi/hed.h>
- 
-@@ -95,3 +98,7 @@ static inline void *acpi_hest_get_payload(struct acpi_hest_generic_data *gdata)
- 
+@@ -99,6 +99,6 @@ static inline void *acpi_hest_get_payload(struct acpi_hest_generic_data *gdata)
  	return gdata + 1;
  }
-+
-+void ghes_notify_sea(void);
-+
-+#endif /* GHES_H */
+ 
+-void ghes_notify_sea(void);
++int ghes_notify_sea(void);
+ 
+ #endif /* GHES_H */
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
