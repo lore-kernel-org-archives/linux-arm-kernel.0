@@ -1,52 +1,88 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Apr 2017 15:29:39 +0100
-Subject: arm64: Question about warnings due to unspecified ASM operand
- width
-In-Reply-To: <20170418013156.GB105296@google.com>
-References: <20170418013156.GB105296@google.com>
-Message-ID: <CAKv+Gu-ThWK_OCO6A9+6wi3b52_UT5_Da3juO3N2f1PqrHDjFw@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 18 Apr 2017 10:47:36 -0400
+Subject: [PATCH v2] crypto: arm64/sha: Add constant operand modifier to
+ ASM_EXPORT
+In-Reply-To: <20170405183458.193068-1-mka@chromium.org>
+References: <20170405183458.193068-1-mka@chromium.org>
+Message-ID: <CAP=VYLpejcYwXUMtCCkXmjXw=T1tBJLn21aVi-9v_VGmEinjRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2017 at 02:31, Matthias Kaehlcke <mka@chromium.org> wrote:
-> Hi,
->
-> During my work on improving support for kernel builds with clang I
-> came across a bunch of warnings on arm64 builds about the width of
-> operands in assembly not being specified:
->
-> arch/arm64/include/asm/arch_timer.h:92:46: error: value size does
->       not match register size specified by the constraint and modifier [-Werror,-Wasm-operand-widths]
->         asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
->
-> I understand that this is usually not a problem and might even be
-> desired to give the compiler more flexiblity in the use of the
-> available registers.
->
-> My goal is to eventually build the kernel without warnings, not
-> necessarily fixing all of them, warnings can also be disabled, e.g.
-> in case of spurious warnings or a high number of occurrences that is
-> too expensive to fix.
->
-> Before delving into 'fixing' these 'asm-operand-widths' warnings I'd
-> be interested to know if this is actually desirable or if it is
-> preferred to keep the operand width unspecified in certain cases.
->
+On Wed, Apr 5, 2017 at 2:34 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> The operand is an integer constant, make the constness explicit by
+> adding the modifier. This is needed for clang to generate valid code
+> and also works with gcc.
 
-Hi Matthias,
+Actually it doesn't work with all gcc.  I've got an older arm64 toolchain that I
+only use for syntax checking (and hence I don't care if it is the latest and
+greatest) and this commit breaks it:
 
-The root cause is that Clang infers the size of the register from the
-size of the operand, while GCC always uses an xN register for a %
-placeholder.
+arch/arm64/crypto/sha1-ce-glue.c:21:2: error: invalid 'asm': invalid
+operand prefix '%c'
+  asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
 
-With msr/mrs instructions, we can only use xN registers, and so the
-only way to fix this is to ensure that we always use 64-bit operands
-even for 32-bit system registers. This may be possible in most cases,
-but assigning 32-bit struct fields becomes a bit painful this way, and
-'fixing' what is arguably not broken to begin with may not be
-something Catalin is eager to accept.
+I'm currently reverting this change locally so I can continue to use the old
+toolchain:
 
-Do you know if there is a rationale behind this disparity?
+$ aarch64-linux-gnu-gcc --version
+aarch64-linux-gnu-gcc (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro
+GCC 2013.11) 4.8.3 20131202 (prerelease)
+Copyright (C) 2013 Free Software Foundation, Inc.
 
--- 
-Ard.
+$ aarch64-linux-gnu-as --version
+GNU assembler (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC
+2013.11) 2.24.0.20131220
+Copyright 2013 Free Software Foundation, Inc.
+
+Maybe it is finally too old and nobody cares, but I thought it worth a mention.
+
+Paul.
+--
+
+>
+> Also change the constraint of the operand from 'I' ("Integer constant
+> that is valid as an immediate operand in an ADD instruction", AArch64)
+> to 'i' ("An immediate integer operand").
+>
+> Based-on-patch-from: Greg Hackmann <ghackmann@google.com>
+> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> ---
+> Changes in v2:
+> - Changed operand constraint from I to i
+> - Updated commit message
+> - Changed 'From' tag to 'Based-on-patch-from'
+>
+>  arch/arm64/crypto/sha1-ce-glue.c | 2 +-
+>  arch/arm64/crypto/sha2-ce-glue.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/crypto/sha1-ce-glue.c b/arch/arm64/crypto/sha1-ce-glue.c
+> index aefda9868627..6b520e3f3ab1 100644
+> --- a/arch/arm64/crypto/sha1-ce-glue.c
+> +++ b/arch/arm64/crypto/sha1-ce-glue.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/module.h>
+>
+>  #define ASM_EXPORT(sym, val) \
+> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+>
+>  MODULE_DESCRIPTION("SHA1 secure hash using ARMv8 Crypto Extensions");
+>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+> index 7cd587564a41..e3abe11de48c 100644
+> --- a/arch/arm64/crypto/sha2-ce-glue.c
+> +++ b/arch/arm64/crypto/sha2-ce-glue.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/module.h>
+>
+>  #define ASM_EXPORT(sym, val) \
+> -       asm(".globl " #sym "; .set " #sym ", %0" :: "I"(val));
+> +       asm(".globl " #sym "; .set " #sym ", %c0" :: "i"(val));
+>
+>  MODULE_DESCRIPTION("SHA-224/SHA-256 secure hash using ARMv8 Crypto Extensions");
+>  MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+> --
+> 2.12.2.715.g7642488e1d-goog
+>
