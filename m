@@ -1,60 +1,77 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 18 Apr 2017 11:27:02 -0700
-Subject: [PATCHv4 00/12] Ion cleanup in preparation for moving out of staging
-Message-ID: <1492540034-5466-1-git-send-email-labbott@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Apr 2017 19:33:16 +0100
+Subject: [PATCHv3 08/14] drivers/perf: arm_pmu: split cpu-local irq
+ request/free
+In-Reply-To: <CAMuHMdVV4qMyYTYN92TE4fsrxo66WK-Gd001YbJZok2txOH4ig@mail.gmail.com>
+References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
+ <1491899997-32210-9-git-send-email-mark.rutland@arm.com>
+ <CAMuHMdVV4qMyYTYN92TE4fsrxo66WK-Gd001YbJZok2txOH4ig@mail.gmail.com>
+Message-ID: <20170418183316.GM17866@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 18, 2017 at 07:25:28PM +0200, Geert Uytterhoeven wrote:
+> Hi Mark,
 
-This is v4 of the series to cleanup to Ion. Greg took some of the patches
-that weren't CMA related already. There was a minor bisectability problem
-with the CMA APIs so this is a new version to address that. I also
-addressed some minor comments on the patch to collapse header files.
+Hi Geert,
+
+> On Tue, Apr 11, 2017 at 10:39 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Currently we have functions to request/free all IRQs for a given PMU.
+> > While this works today, this won't work for ACPI, where we don't know
+> > the full set of IRQs up front, and need to request them separately.
+> >
+> > To enable supporting ACPI, this patch splits out the cpu-local
+> > request/free into new functions, allowing us to request/free individual
+> > IRQs.
+> >
+> > As this makes it possible/necessary to request a PPI once per cpu, an
+> > additional check is added to detect mismatched PPIs. This shouldn't
+> > matter for the DT / platform case, as we check this when parsing.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> 
+> This patch causes warnings during PSCI system suspend on R-Car Gen3.
+> 
+> On R-Car M3-W (Dual CA57):
+> 
+>     Disabling non-boot CPUs ...
+>    +IRQ15 no longer affine to CPU1
+>     CPU1: shutdown
+>     psci: CPU1 killed.
+> 
+> On R-Car H3 (Quad CA57):
+> 
+>     Disabling non-boot CPUs ...
+>    +IRQ15 no longer affine to CPU1
+>     CPU1: shutdown
+>     psci: CPU1 killed.
+>    +IRQ16 no longer affine to CPU2
+>     CPU2: shutdown
+>     psci: CPU2 killed.
+>    +IRQ17 no longer affine to CPU3
+>     CPU3: shutdown
+>     psci: CPU3 killed.
+> 
+> Unfortunately it can't be reverted easily.
+> 
+> Do you have any clue?
+
+Not presently. I'm somewhat surprised that this patch would have that
+effect -- I would imagine that the rework this is based on is more
+likely to. e.g. commit:
+
+  c09adab01e4aeecf ("drivers/perf: arm_pmu: split irq request from enable")
+
+Just to check, you definitely don't see these warnings immediately prior
+to applying this patch?
+
+My best guess otherwise is that prior to this patch, the PMU IRQ
+request was failing earlier, and we bailed out.
+
+Can you dump a dmesg before and after this patch, and see if the arm_pmu
+driver dumps anything?
 
 Thanks,
-Laura
-
-Laura Abbott (12):
-  cma: Store a name in the cma structure
-  cma: Introduce cma_for_each_area
-  staging: android: ion: Use CMA APIs directly
-  staging: android: ion: Stop butchering the DMA address
-  staging: android: ion: Break the ABI in the name of forward progress
-  staging: android: ion: Get rid of ion_phys_addr_t
-  staging: android: ion: Collapse internal header files
-  staging: android: ion: Rework heap registration/enumeration
-  staging: android: ion: Drop ion_map_kernel interface
-  staging: android: ion: Remove ion_handle and ion_client
-  staging: android: ion: Set query return value
-  staging/android: Update Ion TODO list
-
- arch/powerpc/kvm/book3s_hv_builtin.c            |   3 +-
- drivers/base/dma-contiguous.c                   |   5 +-
- drivers/staging/android/TODO                    |  21 +-
- drivers/staging/android/ion/Kconfig             |  32 +
- drivers/staging/android/ion/Makefile            |  11 +-
- drivers/staging/android/ion/compat_ion.c        | 152 -----
- drivers/staging/android/ion/compat_ion.h        |  29 -
- drivers/staging/android/ion/ion-ioctl.c         |  55 +-
- drivers/staging/android/ion/ion.c               | 812 ++----------------------
- drivers/staging/android/ion/ion.h               | 386 ++++++++---
- drivers/staging/android/ion/ion_carveout_heap.c |  21 +-
- drivers/staging/android/ion/ion_chunk_heap.c    |  16 +-
- drivers/staging/android/ion/ion_cma_heap.c      | 120 ++--
- drivers/staging/android/ion/ion_heap.c          |  68 --
- drivers/staging/android/ion/ion_page_pool.c     |   3 +-
- drivers/staging/android/ion/ion_priv.h          | 453 -------------
- drivers/staging/android/ion/ion_system_heap.c   |  39 +-
- drivers/staging/android/uapi/ion.h              |  36 +-
- include/linux/cma.h                             |   6 +-
- mm/cma.c                                        |  31 +-
- mm/cma.h                                        |   1 +
- mm/cma_debug.c                                  |   2 +-
- 22 files changed, 524 insertions(+), 1778 deletions(-)
- delete mode 100644 drivers/staging/android/ion/compat_ion.c
- delete mode 100644 drivers/staging/android/ion/compat_ion.h
- delete mode 100644 drivers/staging/android/ion/ion_priv.h
-
--- 
-2.7.4
+Mark.
