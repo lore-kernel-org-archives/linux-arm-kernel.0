@@ -1,34 +1,32 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 18 Apr 2017 13:08:44 -0700
-Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
-In-Reply-To: <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
-References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
- <172093673.40121.1492427140661@email.1und1.de>
- <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
- <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
-Message-ID: <CAD=FV=UB4KRvmrRKmRCTU3BoLV858bGPTQigWnvPYFxhHkEq4w@mail.gmail.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Tue, 18 Apr 2017 13:17:00 -0700
+Subject: [PATCH 0/2] HWMON driver for Broadcom STB DPFE
+Message-ID: <20170418201702.57019-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Markus Mayer <mmayer@broadcom.com>
 
-On Tue, Apr 18, 2017 at 1:07 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->> 1. With dwc2 you often end up in the situation where you need to
->> service an interrupt every 125 uS.  If servicing that interrupt takes
->> anywhere near 125 uS in the common case then you'll be in trouble.
->
-> I will try to measure this with a logic analyzer.
+This series introduces a driver to interact with the Broadcom STB DDR
+PHY Front End (DPFE), specifically to communicate with the DCPU that is
+part of the DDR PHY and which is running its own firmware.
 
-Why a logic analyzer?  I'd think that "ftrace" would be your friend
-here.  If you configure it just right you ought to be able to figure
-out exactly what your kernel is doing.
+The DCPU provides information such as DRAM refresh rate, which can be
+used as indirect indicator for the DRAM temperature (the higher the
+refresh rate, the hotter the RAM).
 
-...or, if you don't want to learn ftrace (it's cool and worth it, but
-there's some time) you can just use "trace_printk" to get a fairly
-low-over head printout to a memory buffer.  You can put that printout
-in various places in the code and figure out what's taking so long.
-In fact, that's exactly how the patch at
-<https://chromium-review.googlesource.com/c/321980/4/drivers/usb/core/hcd.c>
-works.
+Markus Mayer (2):
+  dt/bindings: Add bindings for Broadcom STB DRAM Sensors
+  hwmon: (brcmstb) Add driver for Broadcom STB DPFE
 
--Doug
+ .../devicetree/bindings/hwmon/brcmstb-dpfe.txt     |  68 ++
+ MAINTAINERS                                        |   8 +
+ drivers/hwmon/Kconfig                              |  13 +
+ drivers/hwmon/Makefile                             |   1 +
+ drivers/hwmon/brcmstb-dpfe.c                       | 689 +++++++++++++++++++++
+ 5 files changed, 779 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/brcmstb-dpfe.txt
+ create mode 100644 drivers/hwmon/brcmstb-dpfe.c
+
+-- 
+2.7.4
