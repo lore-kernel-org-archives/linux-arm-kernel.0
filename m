@@ -1,97 +1,329 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 18 Apr 2017 18:57:58 +0100
-Subject: [PATCH 1/2] arm64: dts: juno: fix few unit address format warnings
-Message-ID: <1492538279-16405-1-git-send-email-sudeep.holla@arm.com>
+Date: Tue, 18 Apr 2017 18:57:59 +0100
+Subject: [PATCH 2/2] arm64: dts: juno: add information about L1 and L2 caches
+In-Reply-To: <1492538279-16405-1-git-send-email-sudeep.holla@arm.com>
+References: <1492538279-16405-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1492538279-16405-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following set of warnings on juno.
+Commit a8d4636f96ad ("arm64: cacheinfo: Remove CCSIDR-based cache
+information probing") removed mechanism to extract cache information
+based on CCSIDR register as the architecture explicitly states no
+inference about the actual sizes of caches based on CCSIDR registers.
 
- smb at 08000000 unit name should not have leading 0s
- sysctl at 020000 simple-bus unit address format error, expected "20000"
- apbregs at 010000 simple-bus unit address format error, expected "10000"
- mmci at 050000 simple-bus unit address format error, expected "50000"
- kmi at 060000 simple-bus unit address format error, expected "60000"
- kmi at 070000 simple-bus unit address format error, expected "70000"
- wdt at 0f0000 simple-bus unit address format error, expected "f0000"
+Commit 9a802431c527 ("arm64: cacheinfo: add support to override cache
+levels via device tree") had already provided options to override cache
+information from the device tree.
 
+This patch adds the information about L1 and L2 caches on all variants
+of Juno platform.
+
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Liviu Dudau <liviu.dudau@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi        |  2 +-
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/arm/juno-r1.dts | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r2.dts | 42 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts    | 42 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 126 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 8ffaff2043d0..bfe7d683a42e 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -699,7 +699,7 @@
- 		      <0x00000008 0x80000000 0x1 0x80000000>;
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index 0033c59a64b5..0e8943ab94d7 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -89,6 +89,12 @@
+ 			reg = <0x0 0x0>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0xc000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <256>;
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -100,6 +106,12 @@
+ 			reg = <0x0 0x1>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0xc000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <256>;
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -111,6 +123,12 @@
+ 			reg = <0x0 0x100>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -122,6 +140,12 @@
+ 			reg = <0x0 0x101>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -133,6 +157,12 @@
+ 			reg = <0x0 0x102>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -144,6 +174,12 @@
+ 			reg = <0x0 0x103>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -152,10 +188,16 @@
+
+ 		A57_L2: l2-cache0 {
+ 			compatible = "cache";
++			cache-size = <0x200000>;
++			cache-line-size = <64>;
++			cache-sets = <2048>;
+ 		};
+
+ 		A53_L2: l2-cache1 {
+ 			compatible = "cache";
++			cache-size = <0x100000>;
++			cache-line-size = <64>;
++			cache-sets = <1024>;
+ 		};
  	};
 
--	smb at 08000000 {
-+	smb at 8000000 {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
- 		#size-cells = <1>;
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index 098601657f82..2ac43221ddb6 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -137,7 +137,7 @@
- 				#size-cells = <1>;
- 				ranges = <0 3 0 0x200000>;
+diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+index 218d0e4736a8..405e2fba025b 100644
+--- a/arch/arm64/boot/dts/arm/juno-r2.dts
++++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+@@ -89,6 +89,12 @@
+ 			reg = <0x0 0x0>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0xc000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <256>;
+ 			next-level-cache = <&A72_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -100,6 +106,12 @@
+ 			reg = <0x0 0x1>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0xc000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <256>;
+ 			next-level-cache = <&A72_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -111,6 +123,12 @@
+ 			reg = <0x0 0x100>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -122,6 +140,12 @@
+ 			reg = <0x0 0x101>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -133,6 +157,12 @@
+ 			reg = <0x0 0x102>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -144,6 +174,12 @@
+ 			reg = <0x0 0x103>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -152,10 +188,16 @@
 
--				v2m_sysctl: sysctl at 020000 {
-+				v2m_sysctl: sysctl at 20000 {
- 					compatible = "arm,sp810", "arm,primecell";
- 					reg = <0x020000 0x1000>;
- 					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
-@@ -148,7 +148,7 @@
- 					assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
- 				};
+ 		A72_L2: l2-cache0 {
+ 			compatible = "cache";
++			cache-size = <0x200000>;
++			cache-line-size = <64>;
++			cache-sets = <2048>;
+ 		};
 
--				apbregs at 010000 {
-+				apbregs at 10000 {
- 					compatible = "syscon", "simple-mfd";
- 					reg = <0x010000 0x1000>;
+ 		A53_L2: l2-cache1 {
+ 			compatible = "cache";
++			cache-size = <0x100000>;
++			cache-line-size = <64>;
++			cache-sets = <1024>;
+ 		};
+ 	};
 
-@@ -216,7 +216,7 @@
- 					};
- 				};
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index bb2820ef3d5b..0220494c9b80 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -88,6 +88,12 @@
+ 			reg = <0x0 0x0>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0xc000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <256>;
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -99,6 +105,12 @@
+ 			reg = <0x0 0x1>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0xc000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <256>;
+ 			next-level-cache = <&A57_L2>;
+ 			clocks = <&scpi_dvfs 0>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -110,6 +122,12 @@
+ 			reg = <0x0 0x100>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -121,6 +139,12 @@
+ 			reg = <0x0 0x101>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -132,6 +156,12 @@
+ 			reg = <0x0 0x102>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -143,6 +173,12 @@
+ 			reg = <0x0 0x103>;
+ 			device_type = "cpu";
+ 			enable-method = "psci";
++			i-cache-size = <0x8000>;
++			i-cache-line-size = <64>;
++			i-cache-sets = <256>;
++			d-cache-size = <0x8000>;
++			d-cache-line-size = <64>;
++			d-cache-sets = <128>;
+ 			next-level-cache = <&A53_L2>;
+ 			clocks = <&scpi_dvfs 1>;
+ 			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+@@ -151,10 +187,16 @@
 
--				mmci at 050000 {
-+				mmci at 50000 {
- 					compatible = "arm,pl180", "arm,primecell";
- 					reg = <0x050000 0x1000>;
- 					interrupts = <5>;
-@@ -228,7 +228,7 @@
- 					clock-names = "mclk", "apb_pclk";
- 				};
+ 		A57_L2: l2-cache0 {
+ 			compatible = "cache";
++			cache-size = <0x200000>;
++			cache-line-size = <64>;
++			cache-sets = <2048>;
+ 		};
 
--				kmi at 060000 {
-+				kmi at 60000 {
- 					compatible = "arm,pl050", "arm,primecell";
- 					reg = <0x060000 0x1000>;
- 					interrupts = <8>;
-@@ -236,7 +236,7 @@
- 					clock-names = "KMIREFCLK", "apb_pclk";
- 				};
+ 		A53_L2: l2-cache1 {
+ 			compatible = "cache";
++			cache-size = <0x100000>;
++			cache-line-size = <64>;
++			cache-sets = <1024>;
+ 		};
+ 	};
 
--				kmi at 070000 {
-+				kmi at 70000 {
- 					compatible = "arm,pl050", "arm,primecell";
- 					reg = <0x070000 0x1000>;
- 					interrupts = <8>;
-@@ -244,7 +244,7 @@
- 					clock-names = "KMIREFCLK", "apb_pclk";
- 				};
-
--				wdt at 0f0000 {
-+				wdt at f0000 {
- 					compatible = "arm,sp805", "arm,primecell";
- 					reg = <0x0f0000 0x10000>;
- 					interrupts = <7>;
 --
 2.7.4
