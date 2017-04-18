@@ -1,91 +1,72 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Tue, 18 Apr 2017 17:05:19 -0600
-Subject: [PATCH V15 07/11] acpi: apei: panic OS with fatal error status block
-In-Reply-To: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1492556723-9189-8-git-send-email-tbaicar@codeaurora.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 19 Apr 2017 07:13:27 +0800
+Subject: [PATCH v6 5/8] coresight: use const for device_node structures
+In-Reply-To: <20170418152447.GB22806@linaro.org>
+References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
+ <1491485461-22800-6-git-send-email-leo.yan@linaro.org>
+ <20170418152447.GB22806@linaro.org>
+Message-ID: <20170418231327.GA8524@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+Hi Mathieu,
 
-Even if an error status block's severity is fatal, the kernel does not
-honor the severity level and panic.
+On Tue, Apr 18, 2017 at 09:24:47AM -0600, Mathieu Poirier wrote:
+> On Thu, Apr 06, 2017 at 09:30:58PM +0800, Leo Yan wrote:
+> > Almost low level functions from open firmware have used const to
+> > qualify device_node structures, so add const for device_node
+> > parameters in of_coresight related functions.
+> > 
+> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> 
+> I agree with these changes but the patch needs to be split up - please see
+> below.
+> 
+> > ---
+> >  drivers/hwtracing/coresight/of_coresight.c | 6 +++---
+> >  include/linux/coresight.h                  | 8 ++++----
+> >  2 files changed, 7 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+> > index 78d2399..46eec0f 100644
+> > --- a/drivers/hwtracing/coresight/of_coresight.c
+> > +++ b/drivers/hwtracing/coresight/of_coresight.c
+> > @@ -52,7 +52,7 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
+> >  			       endpoint, of_dev_node_match);
+> >  }
+> >  
+> > -static void of_coresight_get_ports(struct device_node *node,
+> > +static void of_coresight_get_ports(const struct device_node *node,
+> >  				   int *nr_inport, int *nr_outport)
+> 
+> Move this to a patch by itself as it is not related to this driver.
+> 
+> >  {
+> >  	struct device_node *ep = NULL;
+> > @@ -101,7 +101,7 @@ static int of_coresight_alloc_memory(struct device *dev,
+> >  	return 0;
+> >  }
+> >  
+> > -int of_coresight_get_cpu(struct device_node *node)
+> > +int of_coresight_get_cpu(const struct device_node *node)
+> 
+> Move this to the previous patch in this set.  There is not need to undo what you
+> just did there.
+> 
+> >  {
+> >  	int cpu;
+> >  	bool found;
+> > @@ -128,7 +128,7 @@ int of_coresight_get_cpu(struct device_node *node)
+> >  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+> >  
+> >  struct coresight_platform_data *of_get_coresight_platform_data(
+> > -				struct device *dev, struct device_node *node)
+> > +			struct device *dev, const struct device_node *node)
+> 
+> Same here, move this to a new patch (the same one as of_coresight_get_ports()).
 
-With the firmware first model, the platform could inform the OS about a
-fatal hardware error through the non-NMI GHES notification type. The OS
-should panic when a hardware error record is received with this
-severity.
+Yeah, this is better than my form. Will change.
 
-Call panic() after CPER data in error status block is printed if
-severity is fatal, before each error section is handled.
-
-Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Reviewed-by: James Morse <james.morse@arm.com>
----
- drivers/acpi/apei/ghes.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 2d387f8..b91123f 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -134,6 +134,8 @@
- static struct ghes_estatus_cache *ghes_estatus_caches[GHES_ESTATUS_CACHES_SIZE];
- static atomic_t ghes_estatus_cache_alloced;
- 
-+static int ghes_panic_timeout __read_mostly = 30;
-+
- static int ghes_ioremap_init(void)
- {
- 	ghes_ioremap_area = __get_vm_area(PAGE_SIZE * GHES_IOREMAP_PAGES,
-@@ -692,6 +694,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
- 	return apei_write(val, &generic_v2->read_ack_register);
- }
- 
-+static void __ghes_call_panic(void)
-+{
-+	if (panic_timeout == 0)
-+		panic_timeout = ghes_panic_timeout;
-+	panic("Fatal hardware error!");
-+}
-+
- static int ghes_proc(struct ghes *ghes)
- {
- 	int rc;
-@@ -699,6 +708,10 @@ static int ghes_proc(struct ghes *ghes)
- 	rc = ghes_read_estatus(ghes, 0);
- 	if (rc)
- 		goto out;
-+	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
-+		__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
-+		__ghes_call_panic();
-+	}
- 	if (!ghes_estatus_cached(ghes->estatus)) {
- 		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
- 			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
-@@ -835,8 +848,6 @@ static inline void ghes_sea_remove(struct ghes *ghes)
- 
- static LIST_HEAD(ghes_nmi);
- 
--static int ghes_panic_timeout	__read_mostly = 30;
--
- static void ghes_proc_in_irq(struct irq_work *irq_work)
- {
- 	struct llist_node *llnode, *next;
-@@ -929,9 +940,7 @@ static void __ghes_panic(struct ghes *ghes)
- 	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
- 
- 	/* reboot to log the error! */
--	if (panic_timeout == 0)
--		panic_timeout = ghes_panic_timeout;
--	panic("Fatal hardware error!");
-+	__ghes_call_panic();
- }
- 
- static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thanks,
+Leo Yan
