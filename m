@@ -1,95 +1,51 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 18 Apr 2017 11:27:11 -0700
-Subject: [PATCHv4 09/12] staging: android: ion: Drop ion_map_kernel interface
+Date: Tue, 18 Apr 2017 11:27:14 -0700
+Subject: [PATCHv4 12/12] staging/android: Update Ion TODO list
 In-Reply-To: <1492540034-5466-1-git-send-email-labbott@redhat.com>
 References: <1492540034-5466-1-git-send-email-labbott@redhat.com>
-Message-ID: <1492540034-5466-10-git-send-email-labbott@redhat.com>
+Message-ID: <1492540034-5466-13-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody uses this interface externally. Drop it.
+Most of the items have been taken care of by a clean up series. Remove
+the completed items and add a few new ones.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- drivers/staging/android/ion/ion.c | 59 ---------------------------------------
- 1 file changed, 59 deletions(-)
+ drivers/staging/android/TODO | 21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-index 7d40233..5a82bea 100644
---- a/drivers/staging/android/ion/ion.c
-+++ b/drivers/staging/android/ion/ion.c
-@@ -424,22 +424,6 @@ static void *ion_buffer_kmap_get(struct ion_buffer *buffer)
- 	return vaddr;
- }
+diff --git a/drivers/staging/android/TODO b/drivers/staging/android/TODO
+index 8f3ac37..5f14247 100644
+--- a/drivers/staging/android/TODO
++++ b/drivers/staging/android/TODO
+@@ -7,23 +7,10 @@ TODO:
  
--static void *ion_handle_kmap_get(struct ion_handle *handle)
--{
--	struct ion_buffer *buffer = handle->buffer;
--	void *vaddr;
--
--	if (handle->kmap_cnt) {
--		handle->kmap_cnt++;
--		return buffer->vaddr;
--	}
--	vaddr = ion_buffer_kmap_get(buffer);
--	if (IS_ERR(vaddr))
--		return vaddr;
--	handle->kmap_cnt++;
--	return vaddr;
--}
--
- static void ion_buffer_kmap_put(struct ion_buffer *buffer)
- {
- 	buffer->kmap_cnt--;
-@@ -462,49 +446,6 @@ static void ion_handle_kmap_put(struct ion_handle *handle)
- 		ion_buffer_kmap_put(buffer);
- }
  
--void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle)
--{
--	struct ion_buffer *buffer;
--	void *vaddr;
--
--	mutex_lock(&client->lock);
--	if (!ion_handle_validate(client, handle)) {
--		pr_err("%s: invalid handle passed to map_kernel.\n",
--		       __func__);
--		mutex_unlock(&client->lock);
--		return ERR_PTR(-EINVAL);
--	}
--
--	buffer = handle->buffer;
--
--	if (!handle->buffer->heap->ops->map_kernel) {
--		pr_err("%s: map_kernel is not implemented by this heap.\n",
--		       __func__);
--		mutex_unlock(&client->lock);
--		return ERR_PTR(-ENODEV);
--	}
--
--	mutex_lock(&buffer->lock);
--	vaddr = ion_handle_kmap_get(handle);
--	mutex_unlock(&buffer->lock);
--	mutex_unlock(&client->lock);
--	return vaddr;
--}
--EXPORT_SYMBOL(ion_map_kernel);
--
--void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle)
--{
--	struct ion_buffer *buffer;
--
--	mutex_lock(&client->lock);
--	buffer = handle->buffer;
--	mutex_lock(&buffer->lock);
--	ion_handle_kmap_put(handle);
--	mutex_unlock(&buffer->lock);
--	mutex_unlock(&client->lock);
--}
--EXPORT_SYMBOL(ion_unmap_kernel);
--
- static struct mutex debugfs_mutex;
- static struct rb_root *ion_root_client;
- static int is_client_alive(struct ion_client *client)
+ ion/
+- - Remove ION_IOC_SYNC: Flushing for devices should be purely a kernel internal
+-   interface on top of dma-buf. flush_for_device needs to be added to dma-buf
+-   first.
+- - Remove ION_IOC_CUSTOM: Atm used for cache flushing for cpu access in some
+-   vendor trees. Should be replaced with an ioctl on the dma-buf to expose the
+-   begin/end_cpu_access hooks to userspace.
+- - Clarify the tricks ion plays with explicitly managing coherency behind the
+-   dma api's back (this is absolutely needed for high-perf gpu drivers): Add an
+-   explicit coherency management mode to flush_for_device to be used by drivers
+-   which want to manage caches themselves and which indicates whether cpu caches
+-   need flushing.
+- - With those removed there's probably no use for ION_IOC_IMPORT anymore either
+-   since ion would just be the central allocator for shared buffers.
+- - Add dt-binding to expose cma regions as ion heaps, with the rule that any
+-   such cma regions must already be used by some device for dma. I.e. ion only
+-   exposes existing cma regions and doesn't reserve unecessarily memory when
+-   booting a system which doesn't use ion.
++ - Add dt-bindings for remaining heaps (chunk and carveout heaps). This would
++   involve putting appropriate bindings in a memory node for Ion to find.
++ - Split /dev/ion up into multiple nodes (e.g. /dev/ion/heap0)
++ - Better test framework (integration with VGEM was suggested)
+ 
+ Please send patches to Greg Kroah-Hartman <greg@kroah.com> and Cc:
+ Arve Hj?nnev?g <arve@android.com> and Riley Andrews <riandrews@android.com>
 -- 
 2.7.4
