@@ -1,45 +1,42 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 18 Apr 2017 08:01:26 -0700
-Subject: [PATCH v2 0/7] i.MX7 PCIe related device tree changes
-Message-ID: <20170418150133.31679-1-andrew.smirnov@gmail.com>
+Date: Tue, 18 Apr 2017 08:01:28 -0700
+Subject: [PATCH v2 2/7] ARM: imx: Select GPCv2 for i.MX7
+In-Reply-To: <20170418150133.31679-1-andrew.smirnov@gmail.com>
+References: <20170418150133.31679-1-andrew.smirnov@gmail.com>
+Message-ID: <20170418150133.31679-3-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn, everyone:
+GPCv2 IP block is a part of i.MX7 SoC. Select it to make corresponding
+driver availible to support DT changes following this patch.
 
-This is second version of the series that includes changes made to
-device-tree in order to support PCIe on i.MX7 platform.
+Cc: yurovsky at gmail.com
+Cc: Dong Aisheng <aisheng.dong@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/mach-imx/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since [v1]:
-
-	- All 'anatop-enable-bit' patches are squashed into one
-
-	- Added patch to enable GPCv2 driver on i.MX7
-
-	- Dropped accidentally introduced unsupported DT properties
-
-	- A number of node renaming for readability/clarity purpose
-
-[v1] http://lkml.kernel.org/r/20170413133242.5068-1-andrew.smirnov at gmail.com
-
-Andrey Smirnov (7):
-  ARM: dts: i.MX: Reintroduce 'anatop-enable-bit' where appropriate
-  ARM: imx: Select GPCv2 for i.MX7
-  ARM: dts: imx7s: Add node for GPC
-  ARM: dts: imx7s: Mark 'gpr' compatible with i.MX6 variant
-  ARM: dts: imx7d-sdb: Add GPIO expander node
-  ARM: dts: imx7d: Add node for PCIe controller
-  ARM: dts: imx7d-sdb: Enable PCIe peripheral
-
- arch/arm/boot/dts/imx6qdl.dtsi  |  3 +++
- arch/arm/boot/dts/imx6sl.dtsi   |  3 +++
- arch/arm/boot/dts/imx6sx.dtsi   |  3 +++
- arch/arm/boot/dts/imx6ul.dtsi   |  1 +
- arch/arm/boot/dts/imx7d-sdb.dts | 35 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx7d.dtsi    | 37 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx7s.dtsi    | 30 ++++++++++++++++++++++++++++--
- arch/arm/mach-imx/Kconfig       |  1 +
- 8 files changed, 111 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 936c59d..1a4ea3a 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -532,6 +532,7 @@ config SOC_IMX7D
+ 	bool "i.MX7 Dual support"
+ 	select PINCTRL_IMX7D
+ 	select ARM_GIC
++	select IMX_GPCV2
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select HAVE_IMX_ANATOP
+ 	select HAVE_IMX_MMDC
 -- 
 2.9.3
