@@ -1,45 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Apr 2017 20:31:49 +0100
-Subject: [PATCH v3] arm64: dts: rk3399: add support for firefly-rk3399
- board
-In-Reply-To: <1491796213-4115-1-git-send-email-kever.yang@rock-chips.com>
-References: <1491796213-4115-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <20170418203149.1c68ed88@why.wild-wind.fr.eu.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 18 Apr 2017 21:32:19 +0200
+Subject: [PATCH] arm64: dts: allwinner: a64: Add UART2 pin nodes
+In-Reply-To: <20170418053458.phcbp4da3vatejpg@lukather>
+References: <20170414171320.19743-1-afaerber@suse.de>
+ <20170418053458.phcbp4da3vatejpg@lukather>
+Message-ID: <81e89b9b-1b1c-42f7-eabc-e262cfd99735@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Apr 2017 11:50:13 +0800
-Kever Yang <kever.yang@rock-chips.com> wrote:
-
-> Firefly-rk3399 is a bord from T-Firefly, you can find detail about
-> it here:
-> http://en.t-firefly.com/en/firenow/Firefly_RK3399/
+Am 18.04.2017 um 07:34 schrieb Maxime Ripard:
+> On Fri, Apr 14, 2017 at 07:13:20PM +0200, Andreas F?rber wrote:
+>> UART2 is exposed on the Pi connector of Pine64. Make a pinctrl node
+>> available at the SoC level, to simplify enabling UART2 via DT overlay.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > 
-> This patch add basic node for the board and make it able to bring
-> up.
-> 
-> Peripheral works:
-> - usb hub which connect to ehci controller;
-> - UART2 debug
-> - eMMC
-> - PCIe
-> 
-> Not work:
-> - USB 3.0 HOST, type-C port
-> - sdio, sd-card
-> 
-> Not test for other peripheral:
+> Applied, thanks!
 
-[...]
+Thanks, that was fast.
 
-> - Ethernet
+> Could you also create the node in the pine64 DTS (with an explicit
+> status = "disabled" in there) so that the overlay would be even easier
+> to make ?
 
-[...]
+Makes sense. I went ahead and did it for all UART nodes then - careful,
+final patch is neither build- nor runtime-tested yet.
 
-FWIW, I've tested the Ethernet port, which seems to work nicely.
+Cheers,
+Andreas
 
-Thanks,
-
-	M.
 -- 
-Without deviation from the norm, progress is not possible.
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
