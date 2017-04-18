@@ -1,72 +1,61 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 19 Apr 2017 07:13:27 +0800
-Subject: [PATCH v6 5/8] coresight: use const for device_node structures
-In-Reply-To: <20170418152447.GB22806@linaro.org>
-References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
- <1491485461-22800-6-git-send-email-leo.yan@linaro.org>
- <20170418152447.GB22806@linaro.org>
-Message-ID: <20170418231327.GA8524@leoy-linaro>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Wed, 19 Apr 2017 01:16:00 +0200
+Subject: [PATCH 0/4] mmc: pxamci: better error handling + fix a race condition
+Message-ID: <12f3d97d-4e32-9144-3d71-cbc0a4bfb2c5@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+Hi,
 
-On Tue, Apr 18, 2017 at 09:24:47AM -0600, Mathieu Poirier wrote:
-> On Thu, Apr 06, 2017 at 09:30:58PM +0800, Leo Yan wrote:
-> > Almost low level functions from open firmware have used const to
-> > qualify device_node structures, so add const for device_node
-> > parameters in of_coresight related functions.
-> > 
-> > Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> 
-> I agree with these changes but the patch needs to be split up - please see
-> below.
-> 
-> > ---
-> >  drivers/hwtracing/coresight/of_coresight.c | 6 +++---
-> >  include/linux/coresight.h                  | 8 ++++----
-> >  2 files changed, 7 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> > index 78d2399..46eec0f 100644
-> > --- a/drivers/hwtracing/coresight/of_coresight.c
-> > +++ b/drivers/hwtracing/coresight/of_coresight.c
-> > @@ -52,7 +52,7 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
-> >  			       endpoint, of_dev_node_match);
-> >  }
-> >  
-> > -static void of_coresight_get_ports(struct device_node *node,
-> > +static void of_coresight_get_ports(const struct device_node *node,
-> >  				   int *nr_inport, int *nr_outport)
-> 
-> Move this to a patch by itself as it is not related to this driver.
-> 
-> >  {
-> >  	struct device_node *ep = NULL;
-> > @@ -101,7 +101,7 @@ static int of_coresight_alloc_memory(struct device *dev,
-> >  	return 0;
-> >  }
-> >  
-> > -int of_coresight_get_cpu(struct device_node *node)
-> > +int of_coresight_get_cpu(const struct device_node *node)
-> 
-> Move this to the previous patch in this set.  There is not need to undo what you
-> just did there.
-> 
-> >  {
-> >  	int cpu;
-> >  	bool found;
-> > @@ -128,7 +128,7 @@ int of_coresight_get_cpu(struct device_node *node)
-> >  EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
-> >  
-> >  struct coresight_platform_data *of_get_coresight_platform_data(
-> > -				struct device *dev, struct device_node *node)
-> > +			struct device *dev, const struct device_node *node)
-> 
-> Same here, move this to a new patch (the same one as of_coresight_get_ports()).
+This patchset deals with a very rare race condition [1] in the PXA MCI
+driver which was introduced by using the DMA callback tasklet after
+converting the driver for the usage of the kernel DMA engine. The consequent
+(and not strictly relevant) changes in the driver v4.7-v4.10 caused the bug
+to manifest, but only under a heavy load.
 
-Yeah, this is better than my form. Will change.
+The PXA27x SoC is a little bit weird because when a DMA fills the write FIFO
+you must manually flush it. This is done in the callback of the DMA. After
+the flush a MCI interrupt is generated and the code continues.
+
+The problem is the read FIFO and the writes of the data sizes divisible by 32
+the MCI interrupt is generated immediately after end of the DMA. The driver
+trusted the DMA callback to spinlock the IRQ before MCI interrupt handler is
+called but it is not a valid solution as the DMA callback is using a tasklet
+which can be delayed for a very long time (during testing there was a few
+cases of a multiple tasklet scheduling before finally the tasklet started).
+
+The patchset makes the MCI interrupt dependent on the callback in a way that
+the interrupt is enabled only in the callback. The read path interrupt enable
+stays at the same place (before starting the DMA), it has been only restricted
+for the data read path.
+
+The patchset clarifies the code a little and adds a few error reports.
+
+The fix should not make the operation slower as the only slowdown may be
+in the case of write && weird length of data && heavy load (when the tasklet
+is delayed anyway).
+
+The patchset has been tested on the HTC Magician (PXA27x). I suggest a test
+on a different SoC (driver seems to be compatible with PXA300+). Any
+incompatibility can be probably fixed by something like cpu_is_pxa300().
+
+References:
+
+[1] "[BUG] dmaengine: pxa_dma: + mmc: pxamci: race condition with DMA error
+    on tx channel"
+    https://www.spinics.net/lists/linux-mmc/msg42899.html
 
 Thanks,
-Leo Yan
+
+Petr Cvek (4):
+  mmc: pxamci: Use the right flags for DMA callback init
+  mmc: pxamci: Enhance error checking
+  mmc: pxamci: Disable DATA_TRAN_DONE interrupt sooner
+  mmc: pxamci: Fix race condition between pxamci_dma_irq() and
+    pxamci_irq()
+
+ drivers/mmc/host/pxamci.c | 46 +++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 33 insertions(+), 13 deletions(-)
+
+-- 
+2.11.0
