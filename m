@@ -1,80 +1,179 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:17 +0100
-Subject: [GIT PULL 00/16] clocksource: arm_arch_timer: GTDT-based MMIO timer
- support
-Message-ID: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+Date: Wed, 19 Apr 2017 17:44:18 +0100
+Subject: [PATCH 01/16] clocksource: arm_arch_timer: clean up printk usage
+In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1492620273-30037-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+From: Fu Wei <fu.wei@linaro.org>
 
-The series enables support for the MMIO architected timers (useful for
-system-level idle), which need to be probed via the GTDT when using ACPI. 
+Almost all string in the arm_arch_timer driver duplicate an common
+prefix (though a few do not). For consistency, it would be better to use
+pr_fmt(), and always use this prefix. At the same time, we may as well
+clean up some whitespace issues in arch_timer_banner and
+arch_timer_init.
 
-I realise this is a little late, but I would very much appreciate if you could
-pull these arch timer GTDT patches for v4.12. The series has been largely fine
-for a while now, and the major hold-ups were edge cases in error handling which
-have now been addressed.
+No functional change.
 
-The bulk of the series is a refactoring to cleanly separate the core driver, DT
-probe path, and ACPI probe path. The final patch of the series adds GTDT-based
-probing of the SBSA watchdog, using the new GTDT probing infrastructure. I've
-tested the patches on arm and arm64 platforms.
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+[Mark: reword commit message]
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++------------------
+ 1 file changed, 25 insertions(+), 24 deletions(-)
 
-The ACPI parts have all been appropriately acked, and it's preferred that these
-all go through the clocksource tree.
-
-The series is based on Marc's arch-timer-errata tag, which is alread in
-tip/timers/core.
-
-Thanks,
-Mark.
-
-The following changes since commit d003d029cea8a28139b4f9b88a36b8fac864f45b:
-
-  arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data (2017-04-07 11:22:10 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git tags/arch-timer-gtdt
-
-for you to fetch changes up to ca9ae5ec4ef0ed13833b03297ab319676965492c:
-
-  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver (2017-04-19 17:00:15 +0100)
-
-----------------------------------------------------------------
-arch timer GTDT patches
-
-- arch_timer cleanups and refactoring
-- new common GTDT parser
-- GTDT-based MMIO arch_timer support
-- GTDT-based SBSA watchdog support
-
-----------------------------------------------------------------
-Fu Wei (16):
-      clocksource: arm_arch_timer: clean up printk usage
-      clocksource: arm_arch_timer: rename type macros
-      clocksource: arm_arch_timer: rename the PPI enum
-      clocksource: arm_arch_timer: move enums and defines to header file
-      clocksource: arm_arch_timer: add a new enum for spi type
-      clocksource: arm_arch_timer: rework PPI selection
-      clocksource: arm_arch_timer: split dt-only rate handling
-      clocksource: arm_arch_timer: refactor arch_timer_needs_probing
-      clocksource: arm_arch_timer: move arch_timer_needs_of_probing into DT init call
-      clocksource: arm_arch_timer: add structs to describe MMIO timer
-      clocksource: arm_arch_timer: split MMIO timer probing.
-      acpi/arm64: Add GTDT table parse driver
-      clocksource: arm_arch_timer: simplify ACPI support code.
-      acpi/arm64: Add memory-mapped timer support in GTDT driver
-      clocksource: arm_arch_timer: add GTDT support for memory-mapped timer
-      acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
-
- arch/arm64/Kconfig                   |   1 +
- drivers/acpi/arm64/Kconfig           |   3 +
- drivers/acpi/arm64/Makefile          |   1 +
- drivers/acpi/arm64/gtdt.c            | 417 +++++++++++++++++++++++++
- drivers/clocksource/arm_arch_timer.c | 573 +++++++++++++++++++++++------------
- include/clocksource/arm_arch_timer.h |  34 +++
- include/linux/acpi.h                 |   7 +
- 7 files changed, 834 insertions(+), 202 deletions(-)
- create mode 100644 drivers/acpi/arm64/gtdt.c
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index bf9e9d7..467ee61 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -33,6 +33,9 @@
+ 
+ #include <clocksource/arm_arch_timer.h>
+ 
++#undef pr_fmt
++#define pr_fmt(fmt) "arch_timer: " fmt
++
+ #define CNTTIDR		0x08
+ #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
+ 
+@@ -846,22 +849,22 @@ static int arch_timer_starting_cpu(unsigned int cpu)
+ 
+ 	/* Check the timer frequency. */
+ 	if (arch_timer_rate == 0)
+-		pr_warn("Architected timer frequency not available\n");
++		pr_warn("frequency not available\n");
+ }
+ 
+ static void arch_timer_banner(unsigned type)
+ {
+-	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+-		     type & ARCH_CP15_TIMER ? "cp15" : "",
+-		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
+-		     type & ARCH_MEM_TIMER ? "mmio" : "",
+-		     (unsigned long)arch_timer_rate / 1000000,
+-		     (unsigned long)(arch_timer_rate / 10000) % 100,
+-		     type & ARCH_CP15_TIMER ?
+-		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
++	pr_info("%s%s%s timer(s) running@%lu.%02luMHz (%s%s%s).\n",
++		type & ARCH_CP15_TIMER ? "cp15" : "",
++		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
++		type & ARCH_MEM_TIMER ? "mmio" : "",
++		(unsigned long)arch_timer_rate / 1000000,
++		(unsigned long)(arch_timer_rate / 10000) % 100,
++		type & ARCH_CP15_TIMER ?
++			(arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
+ 			"",
+-		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+-		     type & ARCH_MEM_TIMER ?
++		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
++		type & ARCH_MEM_TIMER ?
+ 			arch_timer_mem_use_virtual ? "virt" : "phys" :
+ 			"");
+ }
+@@ -922,8 +925,7 @@ static void __init arch_counter_register(unsigned type)
+ 
+ static void arch_timer_stop(struct clock_event_device *clk)
+ {
+-	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
+-		 clk->irq, smp_processor_id());
++	pr_debug("disable IRQ%d cpu #%d\n", clk->irq, smp_processor_id());
+ 
+ 	disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
+ 	if (arch_timer_has_nonsecure_ppi())
+@@ -1016,8 +1018,7 @@ static int __init arch_timer_register(void)
+ 	}
+ 
+ 	if (err) {
+-		pr_err("arch_timer: can't register interrupt %d (%d)\n",
+-		       ppi, err);
++		pr_err("can't register interrupt %d (%d)\n", ppi, err);
+ 		goto out_free;
+ 	}
+ 
+@@ -1070,7 +1071,7 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
+ 
+ 	ret = request_irq(irq, func, IRQF_TIMER, "arch_mem_timer", &t->evt);
+ 	if (ret) {
+-		pr_err("arch_timer: Failed to request mem timer irq\n");
++		pr_err("Failed to request mem timer irq\n");
+ 		kfree(t);
+ 	}
+ 
+@@ -1148,7 +1149,7 @@ static int __init arch_timer_init(void)
+ 		}
+ 
+ 		if (!has_ppi) {
+-			pr_warn("arch_timer: No interrupt available, giving up\n");
++			pr_warn("No interrupt available, giving up\n");
+ 			return -EINVAL;
+ 		}
+ 	}
+@@ -1162,7 +1163,7 @@ static int __init arch_timer_init(void)
+ 		return ret;
+ 
+ 	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
+-	
++
+ 	return 0;
+ }
+ 
+@@ -1171,7 +1172,7 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	int i;
+ 
+ 	if (arch_timers_present & ARCH_CP15_TIMER) {
+-		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
++		pr_warn("multiple nodes in dt, skipping\n");
+ 		return 0;
+ 	}
+ 
+@@ -1213,7 +1214,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	arch_timers_present |= ARCH_MEM_TIMER;
+ 	cntctlbase = of_iomap(np, 0);
+ 	if (!cntctlbase) {
+-		pr_err("arch_timer: Can't find CNTCTLBase\n");
++		pr_err("Can't find CNTCTLBase\n");
+ 		return -ENXIO;
+ 	}
+ 
+@@ -1228,7 +1229,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 		u32 cntacr;
+ 
+ 		if (of_property_read_u32(frame, "frame-number", &n)) {
+-			pr_err("arch_timer: Missing frame-number\n");
++			pr_err("Missing frame-number\n");
+ 			of_node_put(frame);
+ 			goto out;
+ 		}
+@@ -1258,7 +1259,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
+ 							 "arch_mem_timer");
+ 	if (IS_ERR(base)) {
+-		pr_err("arch_timer: Can't map frame's registers\n");
++		pr_err("Can't map frame's registers\n");
+ 		goto out;
+ 	}
+ 
+@@ -1269,7 +1270,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 
+ 	ret = -EINVAL;
+ 	if (!irq) {
+-		pr_err("arch_timer: Frame missing %s irq",
++		pr_err("Frame missing %s irq.\n",
+ 		       arch_timer_mem_use_virtual ? "virt" : "phys");
+ 		goto out;
+ 	}
+@@ -1311,7 +1312,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 	struct acpi_table_gtdt *gtdt;
+ 
+ 	if (arch_timers_present & ARCH_CP15_TIMER) {
+-		pr_warn("arch_timer: already initialized, skipping\n");
++		pr_warn("already initialized, skipping\n");
+ 		return -EINVAL;
+ 	}
+ 
+-- 
+1.9.1
