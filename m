@@ -1,38 +1,239 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 19 Apr 2017 19:21:39 +0200
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170419131341.76bc7634@gandalf.local.home>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
-Message-ID: <20170419172139.hipylcdsarhvnsby@hirez.programming.kicks-ass.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 19 Apr 2017 11:25:31 -0600
+Subject: [PATCH v6 2/8] doc: Add documentation for Coresight CPU debug
+In-Reply-To: <1491485461-22800-3-git-send-email-leo.yan@linaro.org>
+References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
+ <1491485461-22800-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkwS9Zo4eZ7TVBUma4+D_BSDW6Dn5rytTyp5kgdfW+Um1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 01:13:41PM -0400, Steven Rostedt wrote:
-> On Thu, 21 Apr 2016 13:48:42 +0200
-> Petr Mladek <pmladek@suse.com> wrote:
-> 
-> > printk() takes some locks and could not be used a safe way in NMI context.
-> 
-> I just found a problem with this solution. It kills ftrace dumps from
-> NMI context :-(
-> 
-> [ 1295.168495]    <...>-67423  10dNh1 382171111us : do_raw_spin_lock <-_raw_spin_lock
-> [ 1295.168495]    <...>-67423  10dNh1 382171111us : sched_stat_runtime: comm=cc1 pid=67423 runtime=96858 [ns] vruntime=11924198270 [ns]
-> [ 1295.168496]    <...>-67423  10dNh1 382171111us : lock_acquire: ffffffff81c5c940 read rcu_read_lock
-> [ 1295.168497]
-> [ 1295.168498] Lost 4890096 message(s)!
-> [ 1296.805063] ---[ end Kernel panic - not syncing: Hard LOCKUP
-> [ 1296.811553] unchecked MSR access error: WRMSR to 0x83f (tried to write 0x00000000000000f6) at rIP: 0xffffffff81046fc7 (native_apic_msr_write+0x27/0x40)
-> [ 1296.811553] Call Trace:
-> [ 1296.811553]  <NMI>
-> 
-> I was hoping to see a cause of a hard lockup by enabling
-> ftrace_dump_on_oops. But as NMIs now have a very small buffer that
-> gets flushed, we need to find a new way to print out the full ftrace
-> buffer over serial.
-> 
-> Thoughts?
+On 6 April 2017 at 07:30, Leo Yan <leo.yan@linaro.org> wrote:
+> Update kernel-parameters.txt to add new parameter:
+> coresight_cpu_debug.enable is a knob to enable debugging at boot time.
+>
+> Add detailed documentation, which contains the implementation, Mike
+> Leach excellent summary for "clock and power domain". At the end some
+> examples on how to enable the debugging functionality are provided.
+>
+> Suggested-by: Mike Leach <mike.leach@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  Documentation/admin-guide/kernel-parameters.txt |   7 +
+>  Documentation/trace/coresight-cpu-debug.txt     | 173 ++++++++++++++++++++++++
+>  2 files changed, 180 insertions(+)
+>  create mode 100644 Documentation/trace/coresight-cpu-debug.txt
+>
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index facc20a..cf90146 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -650,6 +650,13 @@
+>                         /proc/<pid>/coredump_filter.
+>                         See also Documentation/filesystems/proc.txt.
+>
+> +       coresight_cpu_debug.enable
+> +                       [ARM,ARM64]
+> +                       Format: <bool>
+> +                       Enable/disable the CPU sampling based debugging.
+> +                       0: default value, disable debugging
+> +                       1: enable debugging at boot time
+> +
+>         cpuidle.off=1   [CPU_IDLE]
+>                         disable the cpuidle sub-system
+>
+> diff --git a/Documentation/trace/coresight-cpu-debug.txt b/Documentation/trace/coresight-cpu-debug.txt
+> new file mode 100644
+> index 0000000..e7ad05e
+> --- /dev/null
+> +++ b/Documentation/trace/coresight-cpu-debug.txt
+> @@ -0,0 +1,173 @@
+> +               Coresight CPU Debug Module
+> +               ==========================
+> +
+> +   Author:   Leo Yan <leo.yan@linaro.org>
+> +   Date:     April 5th, 2017
+> +
+> +Introduction
+> +------------
+> +
+> +Coresight CPU debug module is defined in ARMv8-a architecture reference manual
+> +(ARM DDI 0487A.k) Chapter 'Part H: External debug', the CPU can integrate
+> +debug module and it is mainly used for two modes: self-hosted debug and
+> +external debug. Usually the external debug mode is well known as the external
+> +debugger connects with SoC from JTAG port; on the other hand the program can
+> +explore debugging method which rely on self-hosted debug mode, this document
+> +is to focus on this part.
+> +
+> +The debug module provides sample-based profiling extension, which can be used
+> +to sample CPU program counter, secure state and exception level, etc; usually
+> +every CPU has one dedicated debug module to be connected. Based on self-hosted
+> +debug mechanism, Linux kernel can access these related registers from mmio
+> +region when the kernel panic happens. The callback notifier for kernel panic
+> +will dump related registers for every CPU; finally this is good for assistant
+> +analysis for panic.
+> +
+> +
+> +Implementation
+> +--------------
+> +
+> +- During driver registration, use EDDEVID and EDDEVID1 two device ID
+> +  registers to decide if sample-based profiling is implemented or not. On some
+> +  platforms this hardware feature is fully or partialy implemented; and if
+> +  this feature is not supported then registration will fail.
+> +
+> +- When write this doc, the debug driver mainly relies on three sampling
+> +  registers. The kernel panic callback notifier gathers info from EDPCSR
+> +  EDVIDSR and EDCIDSR; from EDPCSR we can get program counter, EDVIDSR has
+> +  information for secure state, exception level, bit width, etc; EDCIDSR is
+> +  context ID value which contains the sampled value of CONTEXTIDR_EL1.
+> +
+> +- The driver supports CPU running mode with either AArch64 or AArch32. The
+> +  registers naming convention is a bit different between them, AArch64 uses
+> +  'ED' for register prefix (ARM DDI 0487A.k, chapter H9.1) and AArch32 uses
+> +  'DBG' as prefix (ARM DDI 0487A.k, chapter G5.1). The driver is unified to
+> +  use AArch64 naming convention.
+> +
+> +- ARMv8-a (ARM DDI 0487A.k) and ARMv7-a (ARM DDI 0406C.b) have different
+> +  register bits definition. So the driver consolidates two difference:
+> +
+> +  If PCSROffset=0b0000. ARMv8-a doesn't apply offset on PCSR, but ARMv7-a
+> +  defines "PCSR samples are offset by a value that depends on the instruction
+> +  set state".
 
-early_printk ;-)
+I had to look in the documentation (ID092916) a little here.  On ARMv8
+if DEVID1.PCSROffset is 0 then the feature is not implemented - as
+such the first part of the sentence should be corrected.  The rest of
+the sentence about ARMv7 is correct.
+
+> For ARMv7-a, the driver checks furthermore if CPU runs with ARM
+> +  or thumb instruction set and calibrate PCSR value, the detailed description
+> +  for offset is in ARMv7-a ARM (ARM DDI 0406C.b) chapter C11.11.34 "DBGPCSR,
+> +  Program Counter Sampling Register".
+> +
+> +  If PCSROffset=0b0010, ARMv8-a defines "EDPCSR implemented, and samples have
+> +  no offset applied and do not sample the instruction set state in AArch32
+> +  state". So for the case when CPU runs with AArch32 state and PCSROffset=
+> +  0b0010, the driver considers PCSR doesn't really work.
+
+Please remove the word "really" - it either works or it doesn't.  So
+on ARMv8 if DEVID1.PCSROffset is 0x2 and the CPU operates in AArch32
+state, EDPCSR is not sampled.  When the CPU operates in AArch64 state
+EDPCSR is sampled and no offset are applied.
+
+> +
+> +
+> +Clock and power domain
+> +----------------------
+> +
+> +Before accessing debug registers, we should ensure the clock and power domain
+> +have been enabled properly. In ARMv8-a ARM (ARM DDI 0487A.k) chapter 'H9.1
+> +Debug registers', the debug registers are spread into two domains: the debug
+> +domain and the CPU domain.
+> +
+> +                                +---------------+
+> +                                |               |
+> +                                |               |
+> +                     +----------+--+            |
+> +          dbg_clk -->|          |**|            |<-- cpu_clk
+> +                     |    Debug |**|   CPU      |
+> +           dbg_pd -->|          |**|            |<-- cpu_pd
+> +                     +----------+--+            |
+> +                                |               |
+> +                                |               |
+> +                                +---------------+
+> +
+> +For debug domain, the user uses DT binding "clocks" and "power-domains" to
+> +specify the corresponding clock source and power supply for the debug logic.
+> +The driver calls the pm_runtime_{put|get} operations as needed to handle the
+> +debug power domain.
+> +
+> +For CPU domain, the different SoC designs have different power management
+> +schemes and finally this heavily impacts external debug module. So we can
+> +divide into below cases:
+> +
+> +- On systems with a sane power controller which can behave correctly with
+> +  respect to CPU power domain, the CPU power domain can be controlled by
+> +  register EDPRCR in driver. The driver firstly writes bit EDPRCR.COREPURQ
+> +  to power up the CPU, and then writes bit EDPRCR.CORENPDRQ for emulation
+> +  of CPU power down. As result, this can ensure the CPU power domain is
+> +  powered on properly during the period when access debug related registers;
+> +
+> +- Some designs will power down an entire cluster if all CPUs on the cluster
+> +  are powered down - including the parts of the debug registers that should
+> +  remain powered in the debug power domain. The bits in EDPRCR are not
+> +  respected in these cases, so these designs do not really support debug over
+> +  power down in the way that the CoreSight / Debug designers anticipated.
+> +  This means that even checking EDPRSR has the potential to cause a bus hang
+> +  if the target register is unpowered.
+> +
+> +  In this case, accessing to the debug registers while they are not powered
+> +  is a recipe for disaster; so we need preventing CPU low power states at boot
+> +  time or when user enable module at the run time. Please see chapter
+> +  "How to use the module" for detailed usage info for this.
+> +
+> +
+> +Device Tree Bindings
+> +--------------------
+> +
+> +See Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt for details.
+> +
+> +
+> +How to use the module
+> +---------------------
+> +
+> +If you want to enable debugging functionality at boot time, you can add
+> +"coresight_cpu_debug.enable=1" to the kernel command line parameter.
+> +
+> +The driver also can work as module, so can enable the debugging when insmod
+> +module:
+> +# insmod coresight_cpu_debug.ko debug=1
+> +
+> +When boot time or insmod module you have not enabled the debugging, the driver
+> +uses the debugfs file system to provide a knob to dynamically enable or disable
+> +debugging:
+> +
+> +To enable it, write a '1' into /sys/kernel/debug/coresight_cpu_debug/enable:
+> +# echo 1 > /sys/kernel/debug/coresight_cpu_debug/enable
+> +
+> +To disable it, write a '0' into /sys/kernel/debug/coresight_cpu_debug/enable:
+> +# echo 0 > /sys/kernel/debug/coresight_cpu_debug/enable
+> +
+> +As explained in chapter "Clock and power domain", if you are working on one
+> +platform which has idle states to power off debug logic and the power
+> +controller cannot work well for the request from EDPRCR, then you should
+> +firstly constraint CPU idle states before enable CPU debugging feature; so can
+> +ensure the accessing to debug logic.
+> +
+> +If you want to limit idle states at boot time, you can use "nohlt" or
+> +"cpuidle.off=1" in the kernel command line.
+> +
+> +At the runtime you can disable idle states with below methods:
+> +
+> +Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
+> +states (if latency = 0uS then disable all idle states):
+> +# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
+> +
+> +Disable specific CPU's specific idle state:
+> +# echo 1 > /sys/devices/system/cpu/cpu$cpu/cpuidle/state$state/disable
+> +
+> +
+> +Output format
+> +-------------
+> +
+> +Here is an example of the debugging output format:
+> +
+> +ARM external debug module:
+> +CPU[0]:
+> + EDPRSR:  0000000b (Power:On DLK:Unlock)
+> + EDPCSR:  [<ffff00000808eb54>] handle_IPI+0xe4/0x150
+> + EDCIDSR: 00000000
+> + EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+> +CPU[1]:
+> + EDPRSR:  0000000b (Power:On DLK:Unlock)
+> + EDPCSR:  [<ffff0000087a64c0>] debug_notifier_call+0x108/0x288
+> + EDCIDSR: 00000000
+> + EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+> --
+> 2.7.4
+>
