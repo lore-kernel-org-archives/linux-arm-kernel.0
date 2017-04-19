@@ -1,234 +1,770 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 19 Apr 2017 14:23:04 +0100
-Subject: [PATCH v6 6/8] coresight: add support for CPU debug module
-In-Reply-To: <1491485461-22800-7-git-send-email-leo.yan@linaro.org>
-References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
- <1491485461-22800-7-git-send-email-leo.yan@linaro.org>
-Message-ID: <5c5cb6f8-1dcb-8a9d-1605-c006656005eb@arm.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Wed, 19 Apr 2017 21:12:35 +0800
+Subject: [PATCH V5 1/4] arm64: dts: Add basic DT to support Spreadtrum's
+ SP9860G
+In-Reply-To: <1490599960-27330-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1490594208-26897-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1490599960-27330-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <CAAfSe-sk+Eq-KU_r63mn486oFOA5Jnf8d8cSDeXYkJULvsXpbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/17 14:30, Leo Yan wrote:
-> Coresight includes debug module and usually the module connects with CPU
-> debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
-> description for related info in "Part H: External Debug".
->
-> Chapter H7 "The Sample-based Profiling Extension" introduces several
-> sampling registers, e.g. we can check program counter value with
-> combined CPU exception level, secure state, etc. So this is helpful for
-> analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
-> loop with IRQ disabled. In this case the CPU cannot switch context and
-> handle any interrupt (including IPIs), as the result it cannot handle
-> SMP call for stack dump.
->
-> This patch is to enable coresight debug module, so firstly this driver
-> is to bind apb clock for debug module and this is to ensure the debug
-> module can be accessed from program or external debugger. And the driver
-> uses sample-based registers for debug purpose, e.g. when system triggers
-> panic, the driver will dump program counter and combined context
-> registers (EDCIDSR, EDVIDSR); by parsing context registers so can
-> quickly get to know CPU secure state, exception level, etc.
->
-> Some of the debug module registers are located in CPU power domain, so
-> this requires the CPU power domain stays on when access related debug
-> registers, but the power management for CPU power domain is quite
-> dependent on SoC integration for power management. For the platforms
-> which with sane power controller implementations, this driver follows
-> the method to set EDPRCR to try to pull the CPU out of low power state
-> and then set 'no power down request' bit so the CPU has no chance to
-> lose power.
->
-> If the SoC has not followed up this design well for power management
-> controller, the user should use the command line parameter or sysfs
-> to constrain all or partial idle states to ensure the CPU power
-> domain is enabled and access coresight CPU debug component safely.
+Hi Arnd, Olof
 
-Hi Leo,
+Could you please take this patch through arm-soc git if there are no
+further comments? (The three other patches in this series have been
+taken by Greg.)
 
-This version looks good to me. I have two minor comments below.
+Thanks,
+Chunyan
 
-
+On 27 March 2017 at 15:32, Chunyan Zhang <chunyan.zhang@spreadtrum.com> wrote:
+> From: Orson Zhai <orson.zhai@spreadtrum.com>
+>
+> SC9860G is a 8 cores of A53 SoC with 4G LTE support SoC from Spreadtrum.
+>
+> According to regular hierarchy of sprd dts, whale2.dtsi contains SoC
+> peripherals IP nodes, sc9860.dtsi contains stuff related to ARM core stuff
+> and sp9860g dts is for the board level.
+>
+> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  arch/arm64/boot/dts/sprd/Makefile         |   3 +-
+>  arch/arm64/boot/dts/sprd/sc9860.dtsi      | 569 ++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |  56 +++
+>  arch/arm64/boot/dts/sprd/whale2.dtsi      |  71 ++++
+>  4 files changed, 698 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+>  create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+>  create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
+> index b658c5e..f0535e6 100644
+> --- a/arch/arm64/boot/dts/sprd/Makefile
+> +++ b/arch/arm64/boot/dts/sprd/Makefile
+> @@ -1,4 +1,5 @@
+> -dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
+> +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb \
+> +                       sp9860g-1h10.dtb
+>
+>  always         := $(dtb-y)
+>  subdir-y       := $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> new file mode 100644
+> index 0000000..7b7d8ce
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> @@ -0,0 +1,569 @@
+> +/*
+> + * Spreadtrum SC9860 SoC
+> + *
+> + * Copyright (C) 2016, Spreadtrum Communications Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> + */
 > +
-> +static struct notifier_block debug_notifier = {
-> +	.notifier_call = debug_notifier_call,
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "whale2.dtsi"
+> +
+> +/ {
+> +       cpus {
+> +               #address-cells = <2>;
+> +               #size-cells = <0>;
+> +
+> +               cpu-map {
+> +                       cluster0 {
+> +                               core0 {
+> +                                       cpu = <&CPU0>;
+> +                               };
+> +                               core1 {
+> +                                       cpu = <&CPU1>;
+> +                               };
+> +                               core2 {
+> +                                       cpu = <&CPU2>;
+> +                               };
+> +                               core3 {
+> +                                       cpu = <&CPU3>;
+> +                               };
+> +                       };
+> +
+> +                       cluster1 {
+> +                               core0 {
+> +                                       cpu = <&CPU4>;
+> +                               };
+> +                               core1 {
+> +                                       cpu = <&CPU5>;
+> +                               };
+> +                               core2 {
+> +                                       cpu = <&CPU6>;
+> +                               };
+> +                               core3 {
+> +                                       cpu = <&CPU7>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               CPU0: cpu at 530000 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530000>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU1: cpu at 530001 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530001>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU2: cpu at 530002 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530002>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU3: cpu at 530003 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530003>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU4: cpu at 530100 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530100>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU5: cpu at 530101 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530101>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU6: cpu at 530102 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530102>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +
+> +               CPU7: cpu at 530103 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a53", "arm,armv8";
+> +                       reg = <0x0 0x530103>;
+> +                       enable-method = "psci";
+> +                       cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
+> +               };
+> +       };
+> +
+> +       idle-states{
+> +               entry-method = "arm,psci";
+> +
+> +               CORE_PD: core_pd {
+> +                       compatible = "arm,idle-state";
+> +                       entry-latency-us = <1000>;
+> +                       exit-latency-us = <700>;
+> +                       min-residency-us = <2500>;
+> +                       local-timer-stop;
+> +                       arm,psci-suspend-param = <0x00010002>;
+> +               };
+> +
+> +               CLUSTER_PD: cluster_pd {
+> +                       compatible = "arm,idle-state";
+> +                       entry-latency-us = <1000>;
+> +                       exit-latency-us = <1000>;
+> +                       min-residency-us = <3000>;
+> +                       local-timer-stop;
+> +                       arm,psci-suspend-param = <0x01010003>;
+> +               };
+> +       };
+> +
+> +       gic: interrupt-controller at 12001000 {
+> +               compatible = "arm,gic-400";
+> +               reg = <0 0x12001000 0 0x1000>,
+> +                     <0 0x12002000 0 0x2000>,
+> +                     <0 0x12004000 0 0x2000>,
+> +                     <0 0x12006000 0 0x2000>;
+> +               #interrupt-cells = <3>;
+> +               interrupt-controller;
+> +               interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8)
+> +                                       | IRQ_TYPE_LEVEL_HIGH)>;
+> +       };
+> +
+> +       psci {
+> +               compatible = "arm,psci-0.2";
+> +               method = "smc";
+> +       };
+> +
+> +       timer {
+> +               compatible = "arm,armv8-timer";
+> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8)
+> +                                        | IRQ_TYPE_LEVEL_LOW)>,
+> +                            <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8)
+> +                                        | IRQ_TYPE_LEVEL_LOW)>,
+> +                            <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8)
+> +                                        | IRQ_TYPE_LEVEL_LOW)>,
+> +                            <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8)
+> +                                        | IRQ_TYPE_LEVEL_LOW)>;
+> +       };
+> +
+> +       pmu {
+> +               compatible = "arm,cortex-a53-pmu", "arm,armv8-pmuv3";
+> +               interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-affinity = <&CPU0>,
+> +                                    <&CPU1>,
+> +                                    <&CPU2>,
+> +                                    <&CPU3>,
+> +                                    <&CPU4>,
+> +                                    <&CPU5>,
+> +                                    <&CPU6>,
+> +                                    <&CPU7>;
+> +       };
+> +
+> +       soc {
+> +               funnel at 10001000 { /* SoC Funnel */
+> +                       compatible = "arm,coresight-funnel", "arm,primecell";
+> +                       reg = <0 0x10001000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       reg = <0>;
+> +                                       soc_funnel_out_port: endpoint {
+> +                                               remote-endpoint = <&etb_in>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 1 {
+> +                                       reg = <0>;
+> +                                       soc_funnel_in_port0: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint =
+> +                                               <&main_funnel_out_port>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 2 {
+> +                                       reg = <4>;
+> +                                       soc_funnel_in_port1: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpioint =
+> +                                                       <&stm_out_port>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etb at 10003000 {
+> +                       compatible = "arm,coresight-tmc", "arm,primecell";
+> +                       reg = <0 0x10003000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +                       port {
+> +                               etb_in: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint =
+> +                                               <&soc_funnel_out_port>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               stm at 10006000 {
+> +                       compatible = "arm,coresight-stm", "arm,primecell";
+> +                       reg = <0 0x10006000 0 0x1000>,
+> +                             <0 0x01000000 0 0x180000>;
+> +                       reg-names = "stm-base", "stm-stimulus-base";
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +                       port {
+> +                               stm_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&soc_funnel_in_port1>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               funnel at 11001000 { /* Cluster0 Funnel */
+> +                       compatible = "arm,coresight-funnel", "arm,primecell";
+> +                       reg = <0 0x11001000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       reg = <0>;
+> +                                       cluster0_funnel_out_port: endpoint {
+> +                                               remote-endpoint =
+> +                                                       <&cluster0_etf_in>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 1 {
+> +                                       reg = <0>;
+> +                                       cluster0_funnel_in_port0: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm0_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 2 {
+> +                                       reg = <1>;
+> +                                       cluster0_funnel_in_port1: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm1_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 3 {
+> +                                       reg = <2>;
+> +                                       cluster0_funnel_in_port2: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm2_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 4 {
+> +                                       reg = <4>;
+> +                                       cluster0_funnel_in_port3: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm3_out>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               funnel at 11002000 { /* Cluster1 Funnel */
+> +                       compatible = "arm,coresight-funnel", "arm,primecell";
+> +                       reg = <0 0x11002000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       reg = <0>;
+> +                                       cluster1_funnel_out_port: endpoint {
+> +                                               remote-endpoint =
+> +                                                       <&cluster1_etf_in>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 1 {
+> +                                       reg = <0>;
+> +                                       cluster1_funnel_in_port0: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm4_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 2 {
+> +                                       reg = <1>;
+> +                                       cluster1_funnel_in_port1: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm5_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 3 {
+> +                                       reg = <2>;
+> +                                       cluster1_funnel_in_port2: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm6_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 4 {
+> +                                       reg = <3>;
+> +                                       cluster1_funnel_in_port3: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint = <&etm7_out>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etf at 11003000 { /*  ETF on Cluster0 */
+> +                       compatible = "arm,coresight-tmc", "arm,primecell";
+> +                       reg = <0 0x11003000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       reg = <0>;
+> +                                       cluster0_etf_out: endpoint {
+> +                                               remote-endpoint =
+> +                                               <&main_funnel_in_port0>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 1 {
+> +                                       reg = <0>;
+> +                                       cluster0_etf_in: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint =
+> +                                               <&cluster0_funnel_out_port>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etf at 11004000 { /* ETF on Cluster1 */
+> +                       compatible = "arm,coresight-tmc", "arm,primecell";
+> +                       reg = <0 0x11004000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       reg = <0>;
+> +                                       cluster1_etf_out: endpoint {
+> +                                               remote-endpoint =
+> +                                               <&main_funnel_in_port1>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 1 {
+> +                                       reg = <0>;
+> +                                       cluster1_etf_in: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint =
+> +                                               <&cluster1_funnel_out_port>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               funnel at 11005000 { /* Main Funnel */
+> +                       compatible = "arm,coresight-funnel", "arm,primecell";
+> +                       reg = <0 0x11005000 0 0x1000>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       reg = <0>;
+> +                                       main_funnel_out_port: endpoint {
+> +                                               remote-endpoint =
+> +                                                       <&soc_funnel_in_port0>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 1 {
+> +                                       reg = <0>;
+> +                                       main_funnel_in_port0: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint =
+> +                                                       <&cluster0_etf_out>;
+> +                                       };
+> +                               };
+> +
+> +                               port at 2 {
+> +                                       reg = <1>;
+> +                                       main_funnel_in_port1: endpoint {
+> +                                               slave-mode;
+> +                                               remote-endpoint =
+> +                                                       <&cluster1_etf_out>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11440000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11440000 0 0x1000>;
+> +                       cpu = <&CPU0>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm0_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster0_funnel_in_port0>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11540000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11540000 0 0x1000>;
+> +                       cpu = <&CPU1>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm1_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster0_funnel_in_port1>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11640000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11640000 0 0x1000>;
+> +                       cpu = <&CPU2>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm2_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster0_funnel_in_port2>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11740000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11740000 0 0x1000>;
+> +                       cpu = <&CPU3>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm3_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster0_funnel_in_port3>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11840000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11840000 0 0x1000>;
+> +                       cpu = <&CPU4>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm4_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster1_funnel_in_port0>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11940000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11940000 0 0x1000>;
+> +                       cpu = <&CPU5>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm5_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster1_funnel_in_port1>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11a40000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11a40000 0 0x1000>;
+> +                       cpu = <&CPU6>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm6_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster1_funnel_in_port2>;
+> +                               };
+> +                       };
+> +               };
+> +
+> +               etm at 11b40000 {
+> +                       compatible = "arm,coresight-etm4x", "arm,primecell";
+> +                       reg = <0 0x11b40000 0 0x1000>;
+> +                       cpu = <&CPU7>;
+> +                       clocks = <&ext_26m>;
+> +                       clock-names = "apb_pclk";
+> +
+> +                       port {
+> +                               etm7_out: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&cluster1_funnel_in_port3>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +};
+> diff --git a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+> new file mode 100644
+> index 0000000..ae0b28c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+> @@ -0,0 +1,56 @@
+> +/*
+> + * Spreadtrum SP9860g board
+> + *
+> + * Copyright (C) 2017, Spreadtrum Communications Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "sc9860.dtsi"
+> +
+> +/ {
+> +       model = "Spreadtrum SP9860G 3GFHD Board";
+> +
+> +       compatible = "sprd,sp9860g-1h10", "sprd,sc9860";
+> +
+> +       aliases {
+> +               serial0 = &uart0; /* for Bluetooth */
+> +               serial1 = &uart1; /* UART console */
+> +               serial2 = &uart2; /* Reserved */
+> +               serial3 = &uart3; /* for GPS */
+> +       };
+> +
+> +       memory{
+> +               device_type = "memory";
+> +               reg = <0x0 0x80000000 0 0x60000000>,
+> +                     <0x1 0x80000000 0 0x60000000>;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial1:115200n8";
+> +       };
+> +
+> +       reserved-memory {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+> +       };
 > +};
 > +
-> +static int debug_enable_func(void)
-> +{
-> +	struct debug_drvdata *drvdata;
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		drvdata = per_cpu(debug_drvdata, cpu);
-> +		if (!drvdata)
-> +			continue;
-> +
-> +		pm_runtime_get_sync(drvdata->dev);
-> +	}
-> +
-> +	return atomic_notifier_chain_register(&panic_notifier_list,
-> +					      &debug_notifier);
-> +}
-> +
-> +static int debug_disable_func(void)
-> +{
-> +	struct debug_drvdata *drvdata;
-> +	int cpu;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		drvdata = per_cpu(debug_drvdata, cpu);
-> +		if (!drvdata)
-> +			continue;
-> +
-> +		pm_runtime_put(drvdata->dev);
-> +	}
-> +
-> +	return atomic_notifier_chain_unregister(&panic_notifier_list,
-> +						&debug_notifier);
-> +}
-
-I believe you should, reverse the order of these operations in debug_disable_func()
-to prevent getting a panic notifier after we have released the power domain for the
-debug.
-i.e, :
-	atomic_notifier_chain_unregister(...);
-	
-	for_each_possible_cpu(cpu) {}
-
-
-
-> +
-> +static ssize_t debug_func_knob_write(struct file *f,
-> +		const char __user *buf, size_t count, loff_t *ppos)
-> +{
-> +	u8 val;
-> +	int ret;
-> +
-> +	ret = kstrtou8_from_user(buf, count, 2, &val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	mutex_lock(&debug_lock);
-> +
-> +	if (val == debug_enable)
-> +		goto out;
-> +
-> +	if (val)
-> +		ret = debug_enable_func();
-> +	else
-> +		ret = debug_disable_func();
-> +
-> +	if (ret) {
-> +		pr_err("%s: unable to %s debug function: %d\n",
-> +		       __func__, val ? "enable" : "disable", ret);
-> +		goto err;
-> +	}
-> +
-> +	debug_enable = val;
-> +out:
-> +	ret = count;
-> +err:
-> +	mutex_unlock(&debug_lock);
-> +	return ret;
-> +}
-> +
-> +static ssize_t debug_func_knob_read(struct file *f,
-> +		char __user *ubuf, size_t count, loff_t *ppos)
-> +{
-> +	ssize_t ret;
-> +	char buf[2];
-> +
-> +	mutex_lock(&debug_lock);
-> +
-> +	buf[0] = '0' + debug_enable;
-> +	buf[1] = '\n';
-> +	ret = simple_read_from_buffer(ubuf, count, ppos, buf, sizeof(buf));
-> +
-> +	mutex_unlock(&debug_lock);
-> +	return ret;
-> +}
-> +
-> +static const struct file_operations debug_func_knob_fops = {
-> +	.open	= simple_open,
-> +	.read	= debug_func_knob_read,
-> +	.write	= debug_func_knob_write,
+> +&uart0 {
+> +       status = "okay";
 > +};
 > +
-> +static int debug_func_init(void)
-> +{
-> +	struct dentry *file;
-> +	int ret;
+> +&uart1 {
+> +       status = "okay";
+> +};
 > +
-> +	/* Create debugfs node */
-> +	debug_debugfs_dir = debugfs_create_dir("coresight_cpu_debug", NULL);
-> +	if (!debug_debugfs_dir) {
-> +		pr_err("%s: unable to create debugfs directory\n", __func__);
-> +		return -ENOMEM;
-> +	}
+> +&uart2 {
+> +       status = "okay";
+> +};
 > +
-> +	file = debugfs_create_file("enable", S_IRUGO | S_IWUSR,
-> +			debug_debugfs_dir, NULL, &debug_func_knob_fops);
-> +	if (!file) {
-> +		pr_err("%s: unable to create enable knob file\n", __func__);
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
+> +&uart3 {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
+> new file mode 100644
+> index 0000000..7c217c5
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
+> @@ -0,0 +1,71 @@
+> +/*
+> + * Spreadtrum Whale2 platform peripherals
+> + *
+> + * Copyright (C) 2016, Spreadtrum Communications Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> + */
 > +
-> +	/* Use sysfs node to enable functionality */
-> +	if (!debug_enable)
-> +		return 0;
+> +/ {
+> +       interrupt-parent = <&gic>;
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
 > +
-> +	/* Register function to be called for panic */
-> +	ret = atomic_notifier_chain_register(&panic_notifier_list,
-> +					     &debug_notifier);
-> +	if (ret) {
-> +		pr_err("%s: unable to register notifier: %d\n",
-> +		       __func__, ret);
-> +		goto err;
-> +	}
+> +       soc: soc {
+> +               compatible = "simple-bus";
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
 > +
-
-Since we depend on the value of debug_enable above, below in debug_probe()
-and in debug_remove(), we should protect these paths using the debug_lock mutex,
-like we do above, to make sure we don't create a race.
-
-> +	return 0;
+> +               ap-apb {
+> +                       compatible = "simple-bus";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       ranges = <0 0x0 0x70000000 0x10000000>;
 > +
-> +err:
-> +	debugfs_remove_recursive(debug_debugfs_dir);
-> +	return ret;
-> +}
+> +                       uart0: serial at 0 {
+> +                               compatible = "sprd,sc9860-uart",
+> +                                            "sprd,sc9836-uart";
+> +                               reg = <0x0 0x100>;
+> +                               interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+> +                               clocks = <&ext_26m>;
+> +                               status = "disabled";
+> +                       };
 > +
-> +static void debug_func_exit(void)
-> +{
-> +	debugfs_remove_recursive(debug_debugfs_dir);
+> +                       uart1: serial at 100000 {
+> +                               compatible = "sprd,sc9860-uart",
+> +                                            "sprd,sc9836-uart";
+> +                               reg = <0x100000 0x100>;
+> +                               interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+> +                               clocks = <&ext_26m>;
+> +                               status = "disabled";
+> +                       };
 > +
-> +	/* Unregister panic notifier callback */
-> +	if (debug_enable)
-> +		atomic_notifier_chain_unregister(&panic_notifier_list,
-> +						 &debug_notifier);
-> +}
+> +                       uart2: serial at 200000 {
+> +                               compatible = "sprd,sc9860-uart",
+> +                                            "sprd,sc9836-uart";
+> +                               reg = <0x200000 0x100>;
+> +                               interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+> +                               clocks = <&ext_26m>;
+> +                               status = "disabled";
+> +                       };
 > +
-> +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
-> +{
-> +	void __iomem *base;
-> +	struct device *dev = &adev->dev;
-> +	struct debug_drvdata *drvdata;
-> +	struct resource *res = &adev->res;
-> +	struct device_node *np = adev->dev.of_node;
-> +	int ret;
+> +                       uart3: serial at 300000 {
+> +                               compatible = "sprd,sc9860-uart",
+> +                                            "sprd,sc9836-uart";
+> +                               reg = <0x300000 0x100>;
+> +                               interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+> +                               clocks = <&ext_26m>;
+> +                               status = "disabled";
+> +                       };
+> +               };
 > +
-> +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-> +	if (!drvdata)
-> +		return -ENOMEM;
+> +       };
 > +
-> +	drvdata->cpu = np ? of_coresight_get_cpu(np) : 0;
-> +	if (per_cpu(debug_drvdata, drvdata->cpu)) {
-> +		dev_err(dev, "CPU%d drvdata has been initialized\n",
-> +			drvdata->cpu);
-
-May be we could warn about a possible issue in the DT ?
-
-
-Cheers
-Suzuki
+> +       ext_26m: ext-26m {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <26000000>;
+> +               clock-output-names = "ext_26m";
+> +       };
+> +};
+> --
+> 2.7.4
+>
