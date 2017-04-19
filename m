@@ -1,58 +1,60 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 19 Apr 2017 19:38:53 -0400
-Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
-References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
- <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
- <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <baed1ecf-7a57-0229-42b0-d87599a225b5@redhat.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Thu, 20 Apr 2017 00:38:50 +0100
+Subject: [PATCH v4 04/18] dt-bindings: syscon: Add DT bindings
+ documentation for Allwinner syscon
+In-Reply-To: <20170412111400.2296-5-clabbe.montjoie@gmail.com>
+References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
+ <20170412111400.2296-5-clabbe.montjoie@gmail.com>
+Message-ID: <9382f9ae-895a-397b-3d8c-846cb0bc4486@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, JC,
-
-On 04/13/2017 08:19 PM, Bjorn Helgaas wrote:
-
-> I tentatively applied both patches to pci/host-thunder for v4.12.
-
-Thanks for that :)
-
-> However, I am concerned about the topology here:
-
-Various feedback has been provided on this one over the past $time. In
-addition, I have requested that this serve as an example of why we need
-a more complete PCIe integration guide for ARMv8. It's on the list of
-things for my intended opus magnum on the topic ;)
-
-> On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
->> On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
->> PCI topology is slightly unusual.  For a multi-node system, it looks
->> like:
->>
->>     00:00.0 [PCI] bridge to [bus 01-1e]
->>     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
->>     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
->>     03:00.0 PCIe Endpoint
+On 12/04/17 12:13, Corentin Labbe wrote:
+> This patch adds documentation for Device-Tree bindings for the
+> syscon present in allwinner devices.
 > 
-> A root port normally has a single PCIe link leading downstream.
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> new file mode 100644
+> index 0000000..c056c5b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> @@ -0,0 +1,19 @@
+> +* Allwinner sun8i system controller
+> +
+> +This file describes the bindings for the system controller present in
+> +Allwinner SoC H3, A83T and A64.
+> +The principal function of this syscon is to control EMAC PHY choice and
+> +config.
+> +
+> +Required properties for the system controller:
+> +- reg: address and length of the register for the device.
+> +- compatible: should be "syscon" and one of the following string:
+> +		"allwinner,sun8i-h3-system-controller"
+> +		"allwinner,sun8i-a64-system-controller"
 
-In integration terms, there's always a bus on the other side of the RC.
-It's just usually a processor local bus of some kind on a proprietary
-interconnect, but there's always something there. The issue is when you
-can see it as PCIe and it's not through a transparent glue bridge.
+While sun8i might make some sense technically, all 64-bit sunxi
+compatible strings use the sun50i prefix to follow the Allwinner naming.
+So this should read:
+		"allwinner,sun50i-a64-system-controller"
 
-I had originally hoped that the ECAM could be hacked up so that we would
-first walk the topology at the 02:00.0 as a root and not see what's
-above it BUT there are other device attachments up there for the on-SoC
-devices and I think we really intend to use those.
+Also I am wondering if we should add a compatible string for the H5
+(support for that SoC is in -next already):
+		"allwinner,sun50i-h5-system-controller"
 
-Bottom line in my opinion is document this case, use it as a learning
-example, and move forward. This has been useful in justifying why we
-need better integration documentation from the server community. And in
-particular from the OS vendors, of which I guess we can allude to their
-being more than Linux interested in ARM server these days ;)
+Cheers,
+Andre.
 
-Jon.
-
--- 
-Computer Architect | Sent from my Fedora powered Ryzen
+> +		"allwinner,sun8i-a83t-system-controller"
+> +
+> +Example:
+> +syscon: syscon at 01c00000 {
+> +	compatible = "allwinner,sun8i-h3-system-controller", "syscon";
+> +	reg = <0x01c00000 0x1000>;
+> +};
+> 
