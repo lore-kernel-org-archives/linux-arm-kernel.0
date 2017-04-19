@@ -1,50 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:20:41 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
- for v4.12
-In-Reply-To: <cover.1491578743.git.horms+renesas@verge.net.au>
-References: <cover.1491578743.git.horms+renesas@verge.net.au>
-Message-ID: <20170419132041.GF29219@localhost>
+Date: Wed, 19 Apr 2017 06:21:28 -0700
+Subject: [GIT PULL 4/5] arm64: dts: exynos: DTS for v4.12
+In-Reply-To: <20170408141004.386-5-krzk@kernel.org>
+References: <20170408141004.386-1-krzk@kernel.org>
+ <20170408141004.386-5-krzk@kernel.org>
+Message-ID: <20170419132128.GG29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 11:57:59AM -0400, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Sat, Apr 08, 2017 at 04:10:03PM +0200, Krzysztof Kozlowski wrote:
 > 
-> Please consider these second round of Renesas ARM64 based SoC DT updates
-> for v4.12.
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-arm64-dt-for-v4.12,
-> which you have already pulled.
-> 
-> 
-> The following changes since commit 3cbe33367d4fd480a92fbc131a96fa925be9e95d:
-> 
->   arm64: dts: r8a7796: salvator-x: Drop superfluous status update for frequency override (2017-03-13 10:21:16 +0100)
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.12
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12
 > 
-> for you to fetch changes up to 6922bd71adab0a7fe8ffbdc3e72a46431fa29656:
+> for you to fetch changes up to e3c07546747cdec07ff15c984bc6cebc9c9f788c:
 > 
->   arm64: dts: r8a7795: salvator-x: Drop _clk suffix from X12 clock node name (2017-04-05 14:17:19 -0400)
+>   arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
 > 
 > ----------------------------------------------------------------
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.12
-> 
-> Corrections:
-> * r8a7795: Correct SATA device size to 2MiB for r8a7795 SoC
-> 
-> Cleanup:
-> * Drop _clk suffix from X12 clock node name for r8a7795 SoC
-> 
-> Enhancements:
-> * Add reset control properties for r8a779[56]
-> 
+> Samsung DeviceTree ARM64 update for v4.12:
+> 1. Add IR, touchscreen and panel to TM2/TM2E boards.
+> 2. Add proper clock frequency properties to DSI nodes.
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
