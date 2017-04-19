@@ -1,53 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Apr 2017 12:10:58 +0200
-Subject: [PATCH v3 5/7] ARM: NOMMU: Introduce dma operations for noMMU
-In-Reply-To: <1489137839-549-6-git-send-email-vladimir.murzin@arm.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <1489137839-549-6-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAK8P3a37QAZNp9hvbM10EjMNnTsiiN-Z3u8o=883bev4Th-iOQ@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 19 Apr 2017 12:09:12 +0200
+Subject: [PATCH 2/2] KVM: arm/arm64: vgic-v3: Fix off-by-one LR access
+In-Reply-To: <20170410091944.19963-3-marc.zyngier@arm.com>
+References: <20170410091944.19963-1-marc.zyngier@arm.com>
+ <20170410091944.19963-3-marc.zyngier@arm.com>
+Message-ID: <20170419100912.GB4104@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 10:23 AM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> R/M classes of cpus can have memory covered by MPU which in turn might
-> configure RAM as Normal i.e. bufferable and cacheable. It breaks
-> dma_alloc_coherent() and friends, since data can stuck in caches now
-> or be buffered.
->
-> This patch factors out DMA support for NOMMU configuration into
-> separate entity which provides dedicated dma_ops. We have to handle
-> there several cases:
-> - configurations with MMU/MPU setup
-> - configurations without MMU/MPU setup
-> - special case for M-class, since caches and MPU there are optional
->
-> In general we rely on default DMA area for coherent allocations or/and
-> per-device memory reserves suitable for coherent DMA, so if such
-> regions are set coherent allocations go from there.
->
-> In case MPU/MPU was not setup we fallback to normal page allocator for
-> DMA memory allocation.
->
-> In case we run M-class cpus, for configuration without cache support
-> (like Cortex-M3/M4) dma operations are forced to be coherent and wired
-> with dma-noop (such decision is made based on cacheid global
-> variable); however, if caches are detected there and no DMA coherent
-> region is given (either default or per-device), dma is disallowed even
-> MPU is not set - it is because M-class implement system memory map
-> which defines part of address space as Normal memory.
->
-> Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Reported-by: Andras Szemzo <sza@esh.hu>
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> Tested-by: Andras Szemzo <sza@esh.hu>
-> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Mon, Apr 10, 2017 at 10:19:44AM +0100, Marc Zyngier wrote:
+> When iterating over the used LRs, be careful not to try to access
+> an unused LR, or even an unimplemented one if you're unlucky...
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/hyp/vgic-v3-sr.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 91922c1eddc8..bce6037cf01d 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -143,7 +143,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  		val = read_gicreg(ICH_VTR_EL2);
+>  		nr_pri_bits = vtr_to_nr_pri_bits(val);
+>  
+> -		for (i = 0; i <= used_lrs; i++) {
+> +		for (i = 0; i < used_lrs; i++) {
+>  			if (cpu_if->vgic_elrsr & (1 << i))
+>  				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
+>  			else
+> -- 
+> 2.11.0
+> 
 
-I thought I found a couple of problems with this, but after reading more
-carefully I was wrong about all of them and I think the code is doing
-exactly the right thing. I also like the way this is split out into a separate
-set of dma_map_ops to simplify the normal MMU case.
+Whoops, thanks for fixing my stupid mistake:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
