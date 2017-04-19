@@ -1,30 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:29:02 -0700
-Subject: [GIT PULL 4/4] DaVinci defconfig updates for v4.12 (part 2)
-In-Reply-To: <20170404092547.32480-4-nsekhar@ti.com>
-References: <20170404092547.32480-1-nsekhar@ti.com>
- <20170404092547.32480-4-nsekhar@ti.com>
-Message-ID: <20170419122902.GJ17004@localhost>
+Date: Wed, 19 Apr 2017 05:31:35 -0700
+Subject: [GIT PULL 1/2] SoCFPGA DTS updates for v4.12
+In-Reply-To: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
+References: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <20170419123135.GM17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 04, 2017 at 02:55:47PM +0530, Sekhar Nori wrote:
-> The following changes since commit 507c318d5ee7d05da6d94041dd42abe0cfdd62cf:
+On Wed, Apr 05, 2017 at 10:01:28AM -0500, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, and Olof:
 > 
->   ARM: davinci_all_defconfig: Enable TI ADS7950 (2017-03-07 15:48:21 +0530)
+> Please pull in these DTS updates for v4.12.
+> 
+> Thanks,
+> Dinh
+> 
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/defconfig-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.12
 > 
-> for you to fetch changes up to 2e5d77ef042a22fa1aa393a294999d28f7136d27:
+> for you to fetch changes up to 7fed0cbffe1db3383ae1900fffc8f4e14d2735c8:
 > 
->   ARM: davinci_all_defconfig: convert to use libata PATA (2017-03-30 16:16:17 +0530)
+>   ARM: dts: socfpga: Add Devkit A10-SR Reset Controller (2017-03-16 07:57:16 -0500)
 > 
 > ----------------------------------------------------------------
-> Shift to the newly introduced PalmChip
-> PATA driver for DaVinci.
+> SoCFPGA DTS updates for v4.12
+> - Clean-up:
+> 	- Add clock/memory nodes
+> 	- Add labels for CPU nodes
+> 	- Remove unused unit names and reg
+> 	- Remove unused skeleton.dtsi
+> - Add support for PMU
+> - Add QSPI for sodia board
+> - Add Reset controller for Arria10
 
 Merged, thanks!
+
 
 -Olof
