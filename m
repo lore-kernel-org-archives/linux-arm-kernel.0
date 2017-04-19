@@ -1,47 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Apr 2017 15:47:23 -0500
-Subject: [PATCH v3 3/4] bluetooth: hci_uart: add LL protocol serdev driver
- support
-In-Reply-To: <CAHCN7xLNcD1rmifEOyPhG2rpB_C81hsyzV9W2q6kCQkKa69sZg@mail.gmail.com>
-References: <20170413150353.7389-1-robh@kernel.org>
- <20170413150353.7389-4-robh@kernel.org>
- <CAHCN7xLNcD1rmifEOyPhG2rpB_C81hsyzV9W2q6kCQkKa69sZg@mail.gmail.com>
-Message-ID: <CAL_JsqKv=pYRTxE4H81DTiUqzgSU0tVDPKBQ+WPo=VJOBNTu9Q@mail.gmail.com>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Wed, 19 Apr 2017 16:48:39 -0400
+Subject: [PATCH v2 00/11] soc/fsl/qbman: Enable QBMan on ARM Platforms
+Message-ID: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 3:11 PM, Adam Ford <aford173@gmail.com> wrote:
-> On Thu, Apr 13, 2017 at 10:03 AM, Rob Herring <robh@kernel.org> wrote:
->> Turns out that the LL protocol and the TI-ST are the same thing AFAICT.
->> The TI-ST adds firmware loading, GPIO control, and shared access for
->> NFC, FM radio, etc. For now, we're only implementing what is needed for
->> BT. This mirrors other drivers like BCM and Intel, but uses the new
->> serdev bus.
->>
->> The firmware loading is greatly simplified by using existing
->> infrastructure to send commands. It may be a bit slower than the
->> original code using synchronous functions, but the real bottleneck is
->> likely doing firmware load at 115.2kbps.
->
-> I am using pdata-quirks to drive my wl1283 Bluetooth on a DM3730.  I
-> have the Bluetooth set to 3000000 baud in pdata quirks.  Looking at
-> the binding, I don't see an option to set the baudrate.  Is there (or
-> will there) be a way to set the baud rate of the Bluetooth?
+This patch series enables DPAA1 QBMan devices for ARM and
+ARM64 architectures. This allows the LS1043A and LS1046A to use
+QBMan functionality.
 
-If you read hci_ti_probe, you will see it is already there. The
-default is 3Mbps and the DT can override that with "max-speed". The
-intent is that 3Mbps is the max the device can do and max-speed is
-only for board or host limitations. Though I just checked the
-datasheet on the 1835 and it can go up to 4364kbps. No datasheets for
-wl1283, so I have no idea what the max is.
+Changes since v1:
+Reworked private memory allocations to use shared-dma-pool on ARM platforms
 
->> +static int hci_ti_probe(struct serdev_device *serdev)
->> +{
->> +       struct hci_uart *hu;
->> +       struct ll_device *lldev;
->> +       u32 max_speed = 3000000;
+Claudiu Manoil (2):
+  soc/fsl/qbman: Drop L1_CACHE_BYTES compile time check
+  soc/fsl/qbman: Add missing headers on ARM
 
-[...]
+Madalin Bucur (4):
+  soc/fsl/qbman: Drop set/clear_bits usage
+  soc/fsl/qbman: add QMAN_REV32
+  soc/fsl/qbman: different register offsets on ARM
+  fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
 
->> +       of_property_read_u32(serdev->dev.of_node, "max-speed", &max_speed);
->> +       hci_uart_set_speeds(hu, 115200, max_speed);
+Roy Pledge (4):
+  soc/fsl/qbman: Use shared-dma-pool for BMan private memory allocations
+  soc/fsl/qbman: Use shared-dma-pool for QMan private memory allocations
+  dt-bindings: soc/fsl: Update reserved memory binding for QBMan
+  soc/fsl/qbman: Rework ioremap() calls for ARM/PPC
+
+Valentin Rothberg (1):
+  soc/fsl/qbman: Fix ARM32 typo
+
+ Documentation/devicetree/bindings/soc/fsl/bman.txt |  11 +-
+ Documentation/devicetree/bindings/soc/fsl/qman.txt |  18 +--
+ drivers/soc/fsl/qbman/Kconfig                      |   2 +-
+ drivers/soc/fsl/qbman/bman.c                       |  24 +++-
+ drivers/soc/fsl/qbman/bman_ccsr.c                  |  35 +++++-
+ drivers/soc/fsl/qbman/bman_portal.c                |  16 ++-
+ drivers/soc/fsl/qbman/bman_priv.h                  |   3 +
+ drivers/soc/fsl/qbman/dpaa_sys.h                   |   8 +-
+ drivers/soc/fsl/qbman/qman.c                       |  46 ++++++-
+ drivers/soc/fsl/qbman/qman_ccsr.c                  | 138 ++++++++++++++++-----
+ drivers/soc/fsl/qbman/qman_portal.c                |  16 ++-
+ drivers/soc/fsl/qbman/qman_priv.h                  |   5 +-
+ drivers/soc/fsl/qbman/qman_test.h                  |   2 -
+ 13 files changed, 259 insertions(+), 65 deletions(-)
+
+--
+2.7.4
