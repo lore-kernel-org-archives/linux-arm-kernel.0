@@ -1,89 +1,78 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 19 Apr 2017 16:48:46 -0400
-Subject: [PATCH v2 07/11] soc/fsl/qbman: Rework ioremap() calls for ARM/PPC
-In-Reply-To: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
-References: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1492634930-10765-8-git-send-email-roy.pledge@nxp.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 19 Apr 2017 16:35:40 -0500
+Subject: [PATCH 1/3] dt-bindings: mt8173: Fix mdp device tree
+In-Reply-To: <1492068787-17838-2-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1492068787-17838-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1492068787-17838-2-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <20170419213540.4vigeed3mx24ie4e@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework ioremap() for PPC and ARM. The PPC devices require a
-non-coherent mapping while ARM will work with a non-cachable/write
-combine mapping.
+On Thu, Apr 13, 2017 at 03:33:05PM +0800, Minghsiu Tsai wrote:
+> If the mdp_* nodes are under an mdp sub-node, their corresponding
+> platform device does not automatically get its iommu assigned properly.
+> 
+> Fix this by moving the mdp component nodes up a level such that they are
+> siblings of mdp and all other SoC subsystems.  This also simplifies the
+> device tree.
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- drivers/soc/fsl/qbman/bman_portal.c | 16 +++++++++++++---
- drivers/soc/fsl/qbman/qman_portal.c | 16 +++++++++++++---
- 2 files changed, 26 insertions(+), 6 deletions(-)
+It may simplify the DT, but it also breaks compatibility with old DT. 
+Not sure if that's a problem on Mediatek platforms, but please be 
+explicit here that you are breaking compatibility and why that is okay.
 
-diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-index 8354d4d..a661f30 100644
---- a/drivers/soc/fsl/qbman/bman_portal.c
-+++ b/drivers/soc/fsl/qbman/bman_portal.c
-@@ -125,7 +125,18 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	}
- 	pcfg->irq = irq;
- 
--	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
-+#ifdef CONFIG_PPC
-+	/* PPC requires a cacheable/non-coherent mapping of the portal */
-+	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]),
-+			  (pgprot_val(PAGE_KERNEL) & ~_PAGE_COHERENT));
-+#else
-+	/*
-+	 * For ARM we can use write combine mapping.  A cacheable/non shareable
-+	 * mapping will perform better but equires additional platform
-+	 * support which is not currently available
-+	 */
-+	va = ioremap_wc(addr_phys[0]->start, resource_size(addr_phys[0]));
-+#endif
- 	if (!va) {
- 		dev_err(dev, "ioremap::CE failed\n");
- 		goto err_ioremap1;
-@@ -133,8 +144,7 @@ static int bman_portal_probe(struct platform_device *pdev)
- 
- 	pcfg->addr_virt[DPAA_PORTAL_CE] = va;
- 
--	va = ioremap_prot(addr_phys[1]->start, resource_size(addr_phys[1]),
--			  _PAGE_GUARDED | _PAGE_NO_CACHE);
-+	va = ioremap(addr_phys[1]->start, resource_size(addr_phys[1]));
- 	if (!va) {
- 		dev_err(dev, "ioremap::CI failed\n");
- 		goto err_ioremap2;
-diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-index adbaa30..e7a9eef 100644
---- a/drivers/soc/fsl/qbman/qman_portal.c
-+++ b/drivers/soc/fsl/qbman/qman_portal.c
-@@ -265,7 +265,18 @@ static int qman_portal_probe(struct platform_device *pdev)
- 	}
- 	pcfg->irq = irq;
- 
--	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
-+#ifdef CONFIG_PPC
-+	/* PPC requires a cacheable/non-coherent mapping of the portal */
-+	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]),
-+			  (pgprot_val(PAGE_KERNEL) & ~_PAGE_COHERENT));
-+#else
-+	/*
-+	 * For ARM we can use write combine mapping.  A cacheable/non shareable
-+	 * mapping will perform better but equires additional platform
-+	 * support which is not currently available
-+	 */
-+	va = ioremap_wc(addr_phys[0]->start, resource_size(addr_phys[0]));
-+#endif
- 	if (!va) {
- 		dev_err(dev, "ioremap::CE failed\n");
- 		goto err_ioremap1;
-@@ -273,8 +284,7 @@ static int qman_portal_probe(struct platform_device *pdev)
- 
- 	pcfg->addr_virt[DPAA_PORTAL_CE] = va;
- 
--	va = ioremap_prot(addr_phys[1]->start, resource_size(addr_phys[1]),
--			  _PAGE_GUARDED | _PAGE_NO_CACHE);
-+	va = ioremap(addr_phys[1]->start, resource_size(addr_phys[1]));
- 	if (!va) {
- 		dev_err(dev, "ioremap::CI failed\n");
- 		goto err_ioremap2;
--- 
-2.7.4
+> 
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+
+Should this have Daniel as the author?
+
+> 
+> ---
+>  Documentation/devicetree/bindings/media/mediatek-mdp.txt | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> index 4182063..0d03e3a 100644
+> --- a/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> @@ -2,7 +2,7 @@
+>  
+>  Media Data Path is used for scaling and color space conversion.
+>  
+> -Required properties (controller (parent) node):
+> +Required properties (controller node):
+>  - compatible: "mediatek,mt8173-mdp"
+>  - mediatek,vpu: the node of video processor unit, see
+>    Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
+> @@ -32,21 +32,16 @@ Required properties (DMA function blocks, child node):
+>    for details.
+>  
+>  Example:
+> -mdp {
+> -	compatible = "mediatek,mt8173-mdp";
+> -	#address-cells = <2>;
+> -	#size-cells = <2>;
+> -	ranges;
+> -	mediatek,vpu = <&vpu>;
+> -
+>  	mdp_rdma0: rdma at 14001000 {
+>  		compatible = "mediatek,mt8173-mdp-rdma";
+> +			     "mediatek,mt8173-mdp";
+>  		reg = <0 0x14001000 0 0x1000>;
+>  		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+>  			 <&mmsys CLK_MM_MUTEX_32K>;
+>  		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+>  		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+>  		mediatek,larb = <&larb0>;
+> +		mediatek,vpu = <&vpu>;
+>  	};
+>  
+>  	mdp_rdma1: rdma at 14002000 {
+> @@ -106,4 +101,3 @@ mdp {
+>  		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+>  		mediatek,larb = <&larb4>;
+>  	};
+> -};
+> -- 
+> 1.9.1
+> 
