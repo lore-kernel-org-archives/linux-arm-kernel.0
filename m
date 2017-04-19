@@ -1,125 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:24 +0100
-Subject: [PATCH 07/16] clocksource: arm_arch_timer: split dt-only rate handling
-In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1492620273-30037-8-git-send-email-mark.rutland@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 19 Apr 2017 19:21:39 +0200
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170419131341.76bc7634@gandalf.local.home>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+Message-ID: <20170419172139.hipylcdsarhvnsby@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Wed, Apr 19, 2017 at 01:13:41PM -0400, Steven Rostedt wrote:
+> On Thu, 21 Apr 2016 13:48:42 +0200
+> Petr Mladek <pmladek@suse.com> wrote:
+> 
+> > printk() takes some locks and could not be used a safe way in NMI context.
+> 
+> I just found a problem with this solution. It kills ftrace dumps from
+> NMI context :-(
+> 
+> [ 1295.168495]    <...>-67423  10dNh1 382171111us : do_raw_spin_lock <-_raw_spin_lock
+> [ 1295.168495]    <...>-67423  10dNh1 382171111us : sched_stat_runtime: comm=cc1 pid=67423 runtime=96858 [ns] vruntime=11924198270 [ns]
+> [ 1295.168496]    <...>-67423  10dNh1 382171111us : lock_acquire: ffffffff81c5c940 read rcu_read_lock
+> [ 1295.168497]
+> [ 1295.168498] Lost 4890096 message(s)!
+> [ 1296.805063] ---[ end Kernel panic - not syncing: Hard LOCKUP
+> [ 1296.811553] unchecked MSR access error: WRMSR to 0x83f (tried to write 0x00000000000000f6) at rIP: 0xffffffff81046fc7 (native_apic_msr_write+0x27/0x40)
+> [ 1296.811553] Call Trace:
+> [ 1296.811553]  <NMI>
+> 
+> I was hoping to see a cause of a hard lockup by enabling
+> ftrace_dump_on_oops. But as NMIs now have a very small buffer that
+> gets flushed, we need to find a new way to print out the full ftrace
+> buffer over serial.
+> 
+> Thoughts?
 
-For historical reasons, rate detection when probing via DT is somewhat
-convoluted. We tried to package this up in arch_timer_detect_rate(), but
-with the addition of ACPI worse, and gets in the way of stringent rate
-checking when ACPI is used.
-
-This patch makes arch_timer_detect_rate() specific to DT, ripping out
-ACPI logic. In preparation for rework of the MMIO timer probing, the
-reading of the relevant CNTFRQ register is factored out to callers. The
-function is then renamed to arch_timer_of_configure_rate(), which better
-represents its new place in the world.
-
-Comments are added in the DT and ACPI probe paths to explain this.
-
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-[Mark: reword commit message]
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- drivers/clocksource/arm_arch_timer.c | 41 ++++++++++++++++++++----------------
- 1 file changed, 23 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 94de018..02c5cb8 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -818,24 +818,19 @@ static int arch_timer_starting_cpu(unsigned int cpu)
- 	return 0;
- }
- 
--static void
--arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
-+/*
-+ * For historical reasons, when probing with DT we use whichever (non-zero)
-+ * rate was probed first, and don't verify that others match. If the first node
-+ * probed has a clock-frequency property, this overrides the HW register.
-+ */
-+static void arch_timer_of_configure_rate(u32 rate, struct device_node *np)
- {
- 	/* Who has more than one independent system counter? */
- 	if (arch_timer_rate)
- 		return;
- 
--	/*
--	 * Try to determine the frequency from the device tree or CNTFRQ,
--	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
--	 */
--	if (!acpi_disabled ||
--	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
--		if (cntbase)
--			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
--		else
--			arch_timer_rate = arch_timer_get_cntfrq();
--	}
-+	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
-+		arch_timer_rate = rate;
- 
- 	/* Check the timer frequency. */
- 	if (arch_timer_rate == 0)
-@@ -1166,6 +1161,7 @@ static int __init arch_timer_init(void)
- static int __init arch_timer_of_init(struct device_node *np)
- {
- 	int i;
-+	u32 rate;
- 
- 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
- 		pr_warn("multiple nodes in dt, skipping\n");
-@@ -1176,7 +1172,8 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
- 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
- 
--	arch_timer_detect_rate(NULL, np);
-+	rate = arch_timer_get_cntfrq;
-+	arch_timer_of_configure_rate(rate, np);
- 
- 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
- 
-@@ -1212,7 +1209,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 	struct device_node *frame, *best_frame = NULL;
- 	void __iomem *cntctlbase, *base;
- 	unsigned int irq, ret = -EINVAL;
--	u32 cnttidr;
-+	u32 cnttidr, rate;
- 
- 	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
- 	cntctlbase = of_iomap(np, 0);
-@@ -1278,7 +1275,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 		goto out;
- 	}
- 
--	arch_timer_detect_rate(base, np);
-+	rate = readl(base + CNTFRQ);
-+	arch_timer_of_configure_rate(rate, np);
- 	ret = arch_timer_mem_register(base, irq);
- 	if (ret)
- 		goto out;
-@@ -1339,8 +1337,15 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
- 		gtdt->non_secure_el2_flags);
- 
--	/* Get the frequency from CNTFRQ */
--	arch_timer_detect_rate(NULL, NULL);
-+	/*
-+	 * When probing via ACPI, we have no mechanism to override the sysreg
-+	 * CNTFRQ value. This *must* be correct.
-+	 */
-+	arch_timer_rate = arch_timer_get_cntfrq();
-+	if (!arch_timer_rate) {
-+		pr_err(FW_BUG "frequency not available.\n");
-+		return -EINVAL;
-+	}
- 
- 	arch_timer_uses_ppi = arch_timer_select_ppi();
- 	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
--- 
-1.9.1
+early_printk ;-)
