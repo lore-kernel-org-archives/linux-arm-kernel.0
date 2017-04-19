@@ -1,39 +1,22 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Apr 2017 12:09:12 +0200
-Subject: [PATCH 2/2] KVM: arm/arm64: vgic-v3: Fix off-by-one LR access
-In-Reply-To: <20170410091944.19963-3-marc.zyngier@arm.com>
-References: <20170410091944.19963-1-marc.zyngier@arm.com>
- <20170410091944.19963-3-marc.zyngier@arm.com>
-Message-ID: <20170419100912.GB4104@cbox>
+From: rebothenebo@outlook.com (Ross McCormack)
+Date: Wed, 19 Apr 2017 10:22:29 +0000
+Subject: atmel-hlcdc-display-controller atmel-hlcdc-dc: No connectors reported
+ connected with modes
+Message-ID: <VI1P18901MB001332E3589D86DD115C4CC0B9180@VI1P18901MB0013.EURP189.PROD.OUTLOOK.COM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 10:19:44AM +0100, Marc Zyngier wrote:
-> When iterating over the used LRs, be careful not to try to access
-> an unused LR, or even an unimplemented one if you're unlucky...
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 91922c1eddc8..bce6037cf01d 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -143,7 +143,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  		val = read_gicreg(ICH_VTR_EL2);
->  		nr_pri_bits = vtr_to_nr_pri_bits(val);
->  
-> -		for (i = 0; i <= used_lrs; i++) {
-> +		for (i = 0; i < used_lrs; i++) {
->  			if (cpu_if->vgic_elrsr & (1 << i))
->  				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
->  			else
-> -- 
-> 2.11.0
-> 
+I just tried to display the Linux Tux Logo at bootup of the SAM5D, but it won't show up. My display is 800x480, kernel version is 4.9.20. Appart from the display/drm stack the kernel works like a charm. I narrowed the problem down to this error:
 
-Whoops, thanks for fixing my stupid mistake:
+atmel-hlcdc-display-controller atmel-hlcdc-dc: failed to create HLCDC outputs: -517
+atmel-hlcdc-display-controller atmel-hlcdc-dc: failed to initialize mode setting
+atmel-hlcdc-display-controller atmel-hlcdc-dc: No connectors reported connected with modes
+[drm] Cannot find any crtc or sizes - going 1024x768
+Console: switching to colour frame buffer device 128x48
+atmel-hlcdc-display-controller atmel-hlcdc-dc: fb0:  frame buffer device
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Now I tried video=Unknown-1:800x480-16 as suggested on [1] but it still shows the error.
+
+What's the problem here? Is it a driver issue with the display?
+
+[1] http://www.at91.com/linux4sam/bin/view/Linux4SAM/UsingAtmelDRMDriver
