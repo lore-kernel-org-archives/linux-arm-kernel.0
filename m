@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:34:21 -0700
-Subject: [GIT PULL] Allwinner core changes for 4.12
-In-Reply-To: <20170406083311.be3gu26bk5y2glxd@lukather>
-References: <20170406083311.be3gu26bk5y2glxd@lukather>
-Message-ID: <20170419123421.GP17004@localhost>
+Date: Wed, 19 Apr 2017 05:37:09 -0700
+Subject: [GIT PULL] Allwinner DT changes for 4.12
+In-Reply-To: <20170406085810.lhizqmi65h2jats3@lukather>
+References: <20170406085810.lhizqmi65h2jats3@lukather>
+Message-ID: <20170419123709.GR17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 10:33:11AM +0200, Maxime Ripard wrote:
+On Thu, Apr 06, 2017 at 10:58:10AM +0200, Maxime Ripard wrote:
 > Hi Arnd, Olof,
 > 
-> Here are some patches for the next merge window.
+> Please pull the following DT changes for the next merge window.
 > 
 > Thanks!
 > Maxime
@@ -21,17 +21,24 @@ On Thu, Apr 06, 2017 at 10:33:11AM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-core-for-4.12
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.12
 > 
-> for you to fetch changes up to 87c586a6a0e166e0403533c2f67a3ae74d26fc14:
+> for you to fetch changes up to 367d2b0cb15dfbfa7243b200957c3c6b86276b54:
 > 
->   MAINTAINERS: Update the Allwinner sunXi entry (2017-04-04 17:50:59 +0200)
+>   ARM: sun8i: sina33: add highest OPP of CPUs (2017-04-05 14:11:36 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner core changes for 4.12
+> Allwinner DT changes for 4.12
 > 
-> A change to our MAINTAINERS entry to reflect the new git tree, and a select
-> in our KConfig option to enable the device frequency scaling.
+> As usual a number of changes, among which:
+>   - All the sun5i DTSI has been reworked based on the new documentation and
+>     the IPs that are actually found in all those SoCs. Part of that rework
+>     also brought the GR8 DTSI to include sun5i.dtsi
+>   - Mali devfreq and thermal throttling support on the A33
+>   - AC power supplies for the AXP209 and AXP22X PMIC
+>   - CAN support for the A20
+>   - CPUFreq-based thermal throttling for the A33
+>   - New board: NanoPi NEO Air
 
 Merged, thanks.
 
