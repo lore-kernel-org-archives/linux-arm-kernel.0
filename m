@@ -1,63 +1,92 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 19 Apr 2017 16:40:20 +0530
-Subject: [Query] Enabling parent device clock from resume_noirq
-In-Reply-To: <4c6e91e4-35fa-2fde-7915-fb922ec22567@ti.com>
-References: <62cd5ee0-3f0c-5e65-5f64-0c91a2a6f1e6@ti.com>
- <4c6e91e4-35fa-2fde-7915-fb922ec22567@ti.com>
-Message-ID: <23a79524-0445-e9cb-2e51-2dd2e37e4f5b@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Apr 2017 12:15:26 +0100
+Subject: [PATCH v2] KVM: arm/arm64: vgic-v3: De-optimize VMCR save/restore
+ when emulating a GICv2
+Message-ID: <20170419111526.21073-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When emulating a GICv2-on-GICv3, special care must be taken to only
+save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
+all Group-0 interrupts end-up being delivered as FIQ, which is
+probably not what the guest expects, as demonstrated here with
+an unhappy EFI:
 
-On Wednesday 19 April 2017 01:35 AM, Grygorii Strashko wrote:
-> + linux-pm
-> 
-> On 04/18/2017 01:07 AM, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> resume_noirq callbacks are used in PCIe core to restore PCI state (this
->> accesses PCI module). So the clocks of PCI module has to be enabled before
->> resume_noirq.
->>
->> The clocks for the PCI module in DRA7xx is provided by PIPE3 PHY device which
->> in turn gets it's clock from OCP2SCP device. During resume_noirq callbacks,
->> pm_runtime is disabled, so pm_runtime_get_sync is ineffective. However
->> pm_runtime can be enabled using pm_runtime_force_resume. Now the problem is
->> adding pm_runtime_force_resume() in resume_noirq callback of pci-dra7xx driver
->> will enable only the pm_runtime of PCI device but not PIPE3 PHY or OCP2SCP.
->> Adding pm_runtime_force_resume() in resume_noirq callback of PIPE3 PHY driver
->> or OCP2SCP driver will not help if the resume_noirq callbacks in PIP3PHY driver
->> and OCP2SCP driver are invoked after the resume_noirq of pci-dra7xx driver.
->>
->> How to enable the pm_runtime of parent devices in resume_noirq callback? Does
->> existing pm_runtime framework has support for that?
->>
-> 
-> Most probably you've hit the issue described in [1].
-> In general, if pci-dra7xx is consumer of  PIPE3 PHY device and 
-> PIPE3 PHY device is child of OCP2SCP then suspend/resume order should be
-> - pci-dra7xx
-> - PIPE3 PHY
-> - OCP2SCP
->  and resume
-> - OCP2SCP
-> - PIPE3 PHY
-> - pci-dra7xx
-> and in this case  pm_runtime_force_x() might work.
-> 
-> Hence, approach [1] was not accepted (personally I still like it) and
-> "Functional dependencies tracking support" was introduced instead by commit 9ed9895 [2]
-> you can try it.
-> 
-> But, as per code, I'm not sure that Functional dependencies properly tracked in 
-> pm_runtime_force_x() functions.
-> 
-> PS: you can try to reorder device's nodes in DT and place PCI node after "ocp2scp" :P
+	FIQ Exception at 0x000000013BD21CC4
 
-reordering helps ;-) I'll try the functional dependencies.
+This means that we cannot perform the load/put trick when dealing
+with VMCR_EL2 (because the host has SRE set), and we have to deal
+with it in the world-switch.
 
-Thanks for the hint :-)
+Fortunately, this is not the most common case (modern guests should
+be able to deal with GICv3 directly), and the performance is not worse
+than what it was before the VMCR optimization.
 
-Cheers
-Kishon
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+* From v1:
+  - Move vgic_sre testing from vgic_{load,put} to vgic_v3_{load,put}
+
+ virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
+ virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++--
+ 2 files changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 3d0b1ddb6929..91922c1eddc8 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 	 * Make sure stores to the GIC via the memory mapped interface
+ 	 * are now visible to the system register interface.
+ 	 */
+-	if (!cpu_if->vgic_sre)
++	if (!cpu_if->vgic_sre) {
+ 		dsb(st);
++		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
++	}
+ 
+ 	if (used_lrs) {
+ 		int i;
+@@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 	 * delivered as a FIQ to the guest, with potentially fatal
+ 	 * consequences. So we must make sure that ICC_SRE_EL1 has
+ 	 * been actually programmed with the value we want before
+-	 * starting to mess with the rest of the GIC.
++	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
++	 * particular.
+ 	 */
+ 	if (!cpu_if->vgic_sre) {
+ 		write_gicreg(0, ICC_SRE_EL1);
+ 		isb();
++		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+ 	}
+ 
+ 	val = read_gicreg(ICH_VTR_EL2);
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index bc7010db9f4d..df1503650300 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -373,12 +373,19 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 
+-	kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
++	/*
++	 * If dealing with a GICv2 emulation on GICv3, VMCR_EL2.VFIQen
++	 * is dependent on ICC_SRE_EL1.SRE, and we have to perform the
++	 * VMCR_EL2 save/restore in the world switch.
++	 */
++	if (likely(cpu_if->vgic_sre))
++		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
+ }
+ 
+ void vgic_v3_put(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 
+-	cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
++	if (likely(cpu_if->vgic_sre))
++		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
+ }
+-- 
+2.11.0
