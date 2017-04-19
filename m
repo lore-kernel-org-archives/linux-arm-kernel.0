@@ -1,118 +1,104 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 19 Apr 2017 14:46:19 +0000
-Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
- ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E205352FC@FRAEML521-MBX.china.huawei.com>
-References: <20170401.112603.1991545644693496714.davem@davemloft.net>
- <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>,
- <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
- <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E205352FC@FRAEML521-MBX.china.huawei.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E2053543C@FRAEML521-MBX.china.huawei.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 19 Apr 2017 16:45:16 +0200
+Subject: [PATCH v2] KVM: arm/arm64: vgic-v3: De-optimize VMCR
+ save/restore when emulating a GICv2
+In-Reply-To: <20170419111526.21073-1-marc.zyngier@arm.com>
+References: <20170419111526.21073-1-marc.zyngier@arm.com>
+Message-ID: <20170419144516.GD4104@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amir
- 
-> From: Amir Ancel [mailto:amira at mellanox.com]
-> Sent: 18 April 2017 21:18
-> To: David Laight; Gabriele Paoloni; davem at davemloft.net
-> Cc: Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy;
-> jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-
-> kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong;
-> Linuxarm
-> Subject: Re: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the
-> ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+On Wed, Apr 19, 2017 at 12:15:26PM +0100, Marc Zyngier wrote:
+> When emulating a GICv2-on-GICv3, special care must be taken to only
+> save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
+> all Group-0 interrupts end-up being delivered as FIQ, which is
+> probably not what the guest expects, as demonstrated here with
+> an unhappy EFI:
 > 
-> Hi,
-> mlx5 driver is planned to have RO support this year.
-> I believe drivers should be able to query whether the arch support it
+> 	FIQ Exception at 0x000000013BD21CC4
+> 
+> This means that we cannot perform the load/put trick when dealing
+> with VMCR_EL2 (because the host has SRE set), and we have to deal
+> with it in the world-switch.
+> 
+> Fortunately, this is not the most common case (modern guests should
+> be able to deal with GICv3 directly), and the performance is not worse
+> than what it was before the VMCR optimization.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I guess that here when you say query you mean having a config symbol
-that is set accordingly to the host architecture, right?
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
 
-As already said I have looked around a bit and other drivers do not seem
-to enable/disable RO for their EP on the basis of the host architecture.
-So why should mlx5 do it according to the host?
+I have applied both fixes.
 
-Also my understating is that some architectures (like ARM64 for example)
-can have different PCI host controller implementations depending on the
-vendor...therefore maybe it is not appropriate there to have a Kconfig
-symbol selected by the architecture...  
+Thanks,
+-Christoffer
 
-Thanks
-Gab
-
-> or not and enable it in the network adapter accordingly.
+> ---
+> * From v1:
+>   - Move vgic_sre testing from vgic_{load,put} to vgic_v3_{load,put}
 > 
-> -Amir
-> ________________________________________
-> From: netdev-owner at vger.kernel.org <netdev-owner@vger.kernel.org> on
-> behalf of David Laight <David.Laight@ACULAB.COM>
-> Sent: Tuesday, April 18, 2017 4:25:44 PM
-> To: 'Gabriele Paoloni'; davem at davemloft.net
-> Cc: Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy;
-> jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-
-> kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong;
-> Linuxarm
-> Subject: RE: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the
-> ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+>  virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
+>  virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++--
+>  2 files changed, 15 insertions(+), 4 deletions(-)
 > 
-> From: Gabriele Paoloni
-> > Sent: 13 April 2017 10:11
-> > > > Till now only the Intel ixgbe could support enable
-> > > > Relaxed ordering in the drivers for special architecture,
-> > > > but the ARCH_WANT_RELAX_ORDER is looks like a general name
-> > > > for all arch, so rename to a specific name for intel
-> > > > card looks more appropriate.
-> > > >
-> > > > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> > >
-> > > This is not a driver specific facility.
-> > >
-> > > Any driver can test this symbol and act accordingly.
-> > >
-> > > Just because IXGBE is the first and only user, doesn't mean
-> > > the facility is driver specific.
-> >
-> >
-> > Please correct me if I am wrong but my understanding is that the
-> standard
-> > way to enable/disable relaxed ordering is to set/clear bit 4 of the
-> Device
-> > Control Register (PCI_EXP_DEVCTL_RELAX_EN 0x0010 /* Enable relaxed
-> > ordering */).
-> > Now I have looked up for all drivers either enabling or disabling
-> relaxed
-> > ordering and none of them seems to need a symbol to decide whether to
-> > enable it or not.
-> > Also it seems to me enabling/disabling relaxed ordering is never
-> bound to the
-> > host architecture.
-> >
-> > So why this should be (or it is expected to be) a generic symbol?
-> > Wouldn't it be more correct to have this as a driver specific symbol
-> now and
-> > move it to a generic one later once we have other drivers requiring
-> it?
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index 3d0b1ddb6929..91922c1eddc8 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  	 * Make sure stores to the GIC via the memory mapped interface
+>  	 * are now visible to the system register interface.
+>  	 */
+> -	if (!cpu_if->vgic_sre)
+> +	if (!cpu_if->vgic_sre) {
+>  		dsb(st);
+> +		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+> +	}
+>  
+>  	if (used_lrs) {
+>  		int i;
+> @@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>  	 * delivered as a FIQ to the guest, with potentially fatal
+>  	 * consequences. So we must make sure that ICC_SRE_EL1 has
+>  	 * been actually programmed with the value we want before
+> -	 * starting to mess with the rest of the GIC.
+> +	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
+> +	 * particular.
+>  	 */
+>  	if (!cpu_if->vgic_sre) {
+>  		write_gicreg(0, ICC_SRE_EL1);
+>  		isb();
+> +		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+>  	}
+>  
+>  	val = read_gicreg(ICH_VTR_EL2);
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index bc7010db9f4d..df1503650300 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -373,12 +373,19 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>  
+> -	kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
+> +	/*
+> +	 * If dealing with a GICv2 emulation on GICv3, VMCR_EL2.VFIQen
+> +	 * is dependent on ICC_SRE_EL1.SRE, and we have to perform the
+> +	 * VMCR_EL2 save/restore in the world switch.
+> +	 */
+> +	if (likely(cpu_if->vgic_sre))
+> +		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
+>  }
+>  
+>  void vgic_v3_put(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>  
+> -	cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
+> +	if (likely(cpu_if->vgic_sre))
+> +		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
+>  }
+> -- 
+> 2.11.0
 > 
-> 'Relaxed ordering' is a bit in the TLP header.
-> A device (like the ixgbe hardware) can set it for some transactions and
-> still have the transactions 'ordered enough' for the driver to work.
-> (If all transactions have 'relaxed ordering' set then I suspect it is
-> almost impossible to write a working driver.)
-> The host side could (probably does) have a bit to enable 'relaxed
-> ordering',
-> it could also enforce stronger ordering than required by the PCIe spec
-> (eg keeping reads in order).
-> 
-> Clearly, on some sparc64 systems, ixgbe needs to use 'relaxed
-> ordering'.
-> To me this requires two separate bits be enabled:
-> 1) to the ixgbe driver to generate the 'relaxed' TLP.
-> 2) to the host to actually act on them.
-> If the ixgbe driver works when both are enabled why have options to
-> disable either (except for bug-finding)?
-> 
-> ??????? David
