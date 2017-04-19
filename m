@@ -1,43 +1,17 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 19 Apr 2017 23:54:25 +0200
-Subject: [PATCH V2] ARM: dts: BCM5301X: Specify MDIO bus in the DT
-In-Reply-To: <20170402210840.11429-1-zajec5@gmail.com>
-References: <20170402210840.11429-1-zajec5@gmail.com>
-Message-ID: <20170419215425.14821-1-zajec5@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 19 Apr 2017 16:57:08 -0500
+Subject: [PATCH 2/4] net: macb: Add tsu_clk to device tree
+In-Reply-To: <1492090686-14778-1-git-send-email-rafalo@cadence.com>
+References: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
+ <1492090686-14778-1-git-send-email-rafalo@cadence.com>
+Message-ID: <20170419215708.uw4zvzlw4ucpn3bc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Thu, Apr 13, 2017 at 02:38:06PM +0100, Rafal Ozieblo wrote:
+> Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
+> ---
+>  Documentation/devicetree/bindings/net/macb.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Northstar devices have MDIO bus that may contain various PHYs attached.
-A common example is USB 3.0 PHY (that doesn't have an MDIO driver yet).
-
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-V2: Disable MDIO bus by default.
-    Add mdio label to allow enabling it easily per board
----
- arch/arm/boot/dts/bcm5301x.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index acee36a61004..1f34bc6905f2 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -320,6 +320,14 @@
- 		};
- 	};
- 
-+	mdio: mdio at 18003000 {
-+		compatible = "brcm,iproc-mdio";
-+		reg = <0x18003000 0x8>;
-+		#size-cells = <1>;
-+		#address-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	i2c0: i2c at 18009000 {
- 		compatible = "brcm,iproc-i2c";
- 		reg = <0x18009000 0x50>;
--- 
-2.11.0
+Acked-by: Rob Herring <robh@kernel.org>
