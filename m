@@ -1,56 +1,115 @@
 From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Wed, 19 Apr 2017 09:06:16 +0100
-Subject: [PATCH v3 0/5] Add ARM Mali Midgard device tree bindings and gpu node
- for rk3288
-Message-ID: <cover.1492588180.git.guillaume.tucker@collabora.com>
+Date: Wed, 19 Apr 2017 09:06:17 +0100
+Subject: [PATCH v3 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <cover.1492588180.git.guillaume.tucker@collabora.com>
+References: <cover.1492588180.git.guillaume.tucker@collabora.com>
+Message-ID: <96021d989387d9aaff039efebd66aa3bfe667941.1492588180.git.guillaume.tucker@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Mali Midgard GPU kernel driver is only available
-out-of-tree and is not going to be merged in its current form.
-However, it would be useful to have its device tree bindings
-merged.  In particular, this would enable distributions to create
-working driver packages (dkms...) without having to patch the
-kernel.
+The ARM Mali Midgard GPU family is present in a number of SoCs
+from many different vendors such as Samsung Exynos and Rockchip.
 
-The bindings for the earlier Mali Utgard GPU family have already
-been merged, so this is essentially the same scenario but for
-newer GPUs (Mali-T604 ~ Mali-T880).
+Import the device tree bindings documentation from the r16p0
+release of the Mali Midgard GPU kernel driver:
 
-This series of patches first imports the bindings from the latest
-driver release with some clean-up then adds a gpu node for the
-rk3288 SoC.  This was successfully tested on Radxa Rock2 Square,
-Firefly, Veyron Minnie and Jerry boards board using Mali kernel
-driver r16p0 and r12p0 user-space binary.
+  https://developer.arm.com/-/media/Files/downloads/mali-drivers/kernel/mali-midgard-gpu/TX011-SW-99002-r16p0-00rel0.tgz
 
-Changes since v1:
-- enabled gpu on rk3288-veyron boards
+The "compatible" property strings have been redesigned to explicitly
+list all the Mali Midgard GPU types and include optional vendor ones.
 
-Changes since v2:
-- removed "clk-names" property and "clk_mali" name
-- converted values of "interrupt-names" property to
-  lower-case: "job", "mmu" and "gpu"
-- replaced dt compatible strings with list of all Midgard GPU variants and
-  optional vendors
-- cleaned up gpu node example
+The "clock-names" property has been dropped as only one clock is used
+by the Mali Midgard driver which now needs to call clk_get with NULL.
 
+The "interrupt-names" property values have been converted to
+lower-case: "job", "mmu" and "gpu".
 
-Enric Balletbo i Serra (1):
-  ARM: dts: rockchip: enable ARM Mali GPU on rk3288-veyron
+The following optional bindings have been omitted in this initial
+version as they are only used in very specific cases:
 
-Guillaume Tucker (4):
-  dt-bindings: gpu: add bindings for the ARM Mali Midgard GPU
-  ARM: dts: rockchip: add ARM Mali GPU node for rk3288
-  ARM: dts: rockchip: enable ARM Mali GPU on rk3288-rock2-som
-  ARM: dts: rockchip: enable ARM Mali GPU on rk3288-firefly
+  * snoop_enable_smc
+  * snoop_disable_smc
+  * jm_config
+  * power_model
+  * system-coherency
+  * ipa-model
 
+The example has been simplified accordingly.
+
+The copyright and GPL licence header has been removed as deemed not
+necessary.
+
+CC: John Reitan <john.reitan@arm.com>
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+---
  .../devicetree/bindings/gpu/arm,mali-midgard.txt   | 57 ++++++++++++++++++++++
- arch/arm/boot/dts/rk3288-firefly.dtsi              |  5 ++
- arch/arm/boot/dts/rk3288-rock2-som.dtsi            |  5 ++
- arch/arm/boot/dts/rk3288-veyron.dtsi               |  5 ++
- arch/arm/boot/dts/rk3288.dtsi                      | 22 +++++++++
- 5 files changed, 94 insertions(+)
+ 1 file changed, 57 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
 
---
+diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+new file mode 100644
+index 000000000000..917c4f8d178f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+@@ -0,0 +1,57 @@
++ARM Mali Midgard GPU
++====================
++
++Required properties:
++
++- compatible :
++  * Must be one of the following:
++    + "arm,mali-t60x"
++    + "arm,mali-t62x"
++    + "arm,mali-t720"
++    + "arm,mali-t760"
++    + "arm,mali-t820"
++    + "arm,mali-t830"
++    + "arm,mali-t860"
++    + "arm,mali-t880"
++  * And, optionally, one of the vendor specific compatible:
++    + "amlogic,meson-gxm-mali"
++
++- reg : Physical base address of the device and length of the register area.
++
++- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
++
++- interrupt-names : Contains the names of IRQ resources in the order they were
++  provided in the interrupts property. Must contain: "job", "mmu", "gpu".
++
++
++Optional properties:
++
++- clocks : Phandle to clock for the Mali Midgard device.
++
++- mali-supply : Phandle to regulator for the Mali device. Refer to
++  Documentation/devicetree/bindings/regulator/regulator.txt for details.
++
++- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
++  for details.
++
++
++Example for a Mali-T602:
++
++gpu at fc010000 {
++	compatible = "arm,mali-t60x", "arm,mali-midgard";
++	reg = <0xfc010000 0x4000>;
++	interrupts = <0 36 4>, <0 37 4>, <0 38 4>;
++	interrupt-names = "job", "mmu", "gpu";
++	clocks = <&pclk_mali>;
++	mali-supply = <&vdd_mali>;
++	operating-points = <
++		/* KHz   uV */
++		533000 1250000,
++		450000 1150000,
++		400000 1125000,
++		350000 1075000,
++		266000 1025000,
++		160000  925000,
++		100000  912500,
++	>;
++};
+-- 
 2.11.0
