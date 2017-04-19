@@ -1,75 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Apr 2017 17:13:11 +0200
-Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.12 (#2)
-In-Reply-To: <20170419140720.GP29219@localhost> (Olof Johansson's message of
- "Wed, 19 Apr 2017 07:07:20 -0700")
-References: <871ssww9zb.fsf@free-electrons.com>
- <20170419140720.GP29219@localhost>
-Message-ID: <87fuh4a0s8.fsf@free-electrons.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 19 Apr 2017 23:30:45 +0800
+Subject: [PATCH v6 6/8] coresight: add support for CPU debug module
+In-Reply-To: <CANLsYkyheVJkEjpcWAd5HHFCimfTPhgihioE7bYo1RAL=8Shdw@mail.gmail.com>
+References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
+ <1491485461-22800-7-git-send-email-leo.yan@linaro.org>
+ <20170418174050.GC22806@linaro.org>
+ <20170419001807.GB8524@leoy-linaro>
+ <CANLsYkyheVJkEjpcWAd5HHFCimfTPhgihioE7bYo1RAL=8Shdw@mail.gmail.com>
+Message-ID: <20170419153045.GB23319@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
- 
- On mer., avril 19 2017, Olof Johansson <olof@lixom.net> wrote:
+On Wed, Apr 19, 2017 at 08:52:12AM -0600, Mathieu Poirier wrote:
 
-> On Thu, Apr 13, 2017 at 06:25:28PM +0200, Gregory CLEMENT wrote:
->> Hi,
->> 
->> Here is the second pull request for defconfig64 for mvebu for v4.12.
->> There is a trivial merge conflict already solved by Stephen Rothwell
->> there:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/500998.html
->> 
->> Gregory
->> 
->> The following changes since commit 66e56302842e9971426bd7e504c4db4f88cbb037:
->> 
->>   arm64: defconfig: enable MVPP2 (2017-03-23 17:50:13 +0100)
->> 
->> are available in the git repository at:
->> 
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.12-2
->> 
->> for you to fetch changes up to 10ebb57ffcbf062ff224585fefa274e703fc363d:
->> 
->>   arm64: defconfig: enable the Safexcel crypto engine as a module (2017-04-12 15:35:16 +0200)
->> 
->> ----------------------------------------------------------------
->> mvebu defconfig64 for 4.12 (part 2)
->> 
->> Select two new drivers  for ARM64 mvebu SoCs:
->>  - Xenon SDHCI controller on Armada 37xx and Armada 7K/8K
->>  - Safexcel crypto engine on Armada 7K/8K
->> 
->> ----------------------------------------------------------------
->> Antoine Tenart (1):
->>       arm64: defconfig: enable the Safexcel crypto engine as a module
->> 
->> Gregory CLEMENT (1):
->>       arm64: configs: enable SDHCI driver for Xenon
->
-> Merged, thanks!
->
-> Please keep an eye on patch prefixes for consistency in the future.
+[...]
 
-OK I will do it.
+> >> > +static bool debug_enable;
+> >> > +module_param_named(enable, debug_enable, bool, 0600);
+> >> > +MODULE_PARM_DESC(enable, "Knob to enable debug functionality "
+> >> > +            "(default is 0, which means is disabled by default)");
+> >>
+> >> For this driver we have a debugFS interface so I question the validity of a
+> >> kernel module parameter.  Other than adding complexity to the code it offers no
+> >> real added value.  If a user is to insmod a module, it is just as easy to switch
+> >> on the functionality using debugFS in a second step.
+> >
+> > This module parameter can be used for kernel command line, so
+> > it's useful when user wants to dynamically turn on/off the
+> > functionality at boot up time.
+> >
+> > Does this make sense for you? Removing this parameter is okay for
+> > me, but this means users need to decide if use it by Kernel config
+> > with static building in. This is a bit contradictory with before's
+> > discussion.
+> 
+> My hope was to use the kernel command line and the debugFS interface,
+> avoiding the module parameter.  Look at what the baycom_par and
+> blacklist drivers are doing with the "__setup()" function and see if
+> we can void a module parameter.  If not then let it be, unless someone
+> else has a better idea.
+> 
+> [1]. drivers/net/hamradio/baycom_par.c
+> [2]. drivers/s390/cio/blacklist.c
+
+This driver supports module mode. So we can choose to use either module
+parameter or __setup(). But as described in the file
+Documentation/admin-guide/kernel-parameters.rst, the module parameter
+is more flexible to be used at boot time or insmod the module:
+
+"Parameters for modules which are built into the kernel need to be
+specified on the kernel command line.  modprobe looks through the 
+kernel command line (/proc/cmdline) and collects module parameters
+when it loads a module, so the kernel command line can be used for 
+loadable modules too."
+
+__setup() cannot support module mode, and when use __setup(), we need
+register one callback function for it. The callback function is
+friendly to parse complex parameters rather than module parameter.
+but it's not necessary for this case.
+
+So I'm bias to use module parameter :)
 
 Thanks,
-
-Gregory
-
->
->
-> -Olof
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Leo Yan
