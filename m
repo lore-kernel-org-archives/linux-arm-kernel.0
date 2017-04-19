@@ -1,50 +1,67 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 19 Apr 2017 11:45:33 +0100
-Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
-References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
- <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
- <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
- <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
- <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
-Message-ID: <CAFEAcA_B+EJJG6gb3iVzL5VRQkGhmDPbYWrUw7UF4VNV0m7XCQ@mail.gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 19 Apr 2017 07:56:43 -0300
+Subject: [PATCH] media: mtk-vcodec: remove informative log
+In-Reply-To: <1491390599.32502.1.camel@mtksdaap41>
+References: <1491389669-32737-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1491390599.32502.1.camel@mtksdaap41>
+Message-ID: <20170419075643.0a04af21@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 April 2017 at 11:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
->>
->> > That's affecting most architectures with a risk of ABI breakage. We
->> > could do it on arm64 only, though I'm not yet clear on the ABI
->> > implications (at a first look, there shouldn't be any).
->>
->> Is there a reason why it isn't just straightforwardly a bug
->> (which we could fix) to make READ_IMPLIES_EXEC propagate to
->> child processes?
->
-> While I agree that it looks like a bug, if there are user programs
-> relying on such bug we call it "ABI".
+Em Wed, 5 Apr 2017 19:09:59 +0800
+Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 
-Can there be any? Such a program would behave differently
-depending on how the program that spawned it happened to
-have been compiled, and for instance could break when
-the OS happened to have its init binary updated even if
-the kernel didn't change.
+> On Wed, 2017-04-05 at 18:54 +0800, Minghsiu Tsai wrote:
+> > Driver is stable. Remove DEBUG definition from driver.
+> > 
+> > There are debug message in /var/log/messages if DEBUG is defined,
+> > such as:
+> > [MTK_V4L2] level=0 fops_vcodec_open(),170: decoder capability 0
+> > [MTK_V4L2] level=0 fops_vcodec_open(),177: 16000000.vcodec decoder [0]
+> > [MTK_V4L2] level=0 fops_vcodec_release(),200: [0] decoder
+> > 
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>  
+> Acked-by:Tiffany Lin <Tiffany.lin@mediatek.com>
+> 
+> > ---
+> >  drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> > index 7d55975..1248083 100644
+> > --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> > +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> > @@ -31,7 +31,6 @@ struct mtk_vcodec_mem {
+> >  extern int mtk_v4l2_dbg_level;
+> >  extern bool mtk_vcodec_dbg;
+> >  
+> > -#define DEBUG	1
+> >  
+> >  #if defined(DEBUG)
+> >    
 
->> Behaviour shouldn't be variable across architectures either, I would
->> hope.
->
-> The behaviour has already been variable for a long time. Even on x86,
-> AFAICT x86_32 differs from x86_64 in this respect.
+After this patch, building the Kernel with W=1 now shows warnings:
 
-That also sounds like a bug to me.
+drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c: In function 'mtk_vcodec_dec_pw_on':
+drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c:114:51: warning: suggest braces around empty body in an 'if' statement [-Wempty-body]
+   mtk_v4l2_err("pm_runtime_get_sync fail %d", ret);
+                                                   ^
 
-> Anyway, the patch should be posted to linux-arch for a cross-arch
-> discussion.
+I wrote a patch fixing it, as this is really a trivial issue.
 
-Agreed -- there may be something I'm missing, since it looks
-like this behaviour of inheriting READ_IMPLIES_EXEC has always
-been there.
+Yet, after that, this one still remains:
 
-thanks
--- PMM
+
+drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c: In function 'mtk_vdec_pic_info_update':
+drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c:284:6: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  int ret;
+      ^~~
+
+
+Shouldn't be mtk_vdec_pic_info_update() returning an error code?
+
+
+Also, IMHO, at least errors should be shown at dmesg.
+
+Thanks,
+Mauro
