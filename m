@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:49:04 +0100
-Subject: [PATCH v4 15/21] PCI: armada8k: update PCI config space remap function
+Date: Wed, 19 Apr 2017 17:49:03 +0100
+Subject: [PATCH v4 14/21] PCI: designware: update PCI config space remap
+ function
 In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
 References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-16-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-15-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +15,48 @@ memory mappings for PCI configuration space are used.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
 ---
- drivers/pci/dwc/pcie-armada8k.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/dwc/pcie-designware-host.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
-index f110e3b..3ff3130 100644
---- a/drivers/pci/dwc/pcie-armada8k.c
-+++ b/drivers/pci/dwc/pcie-armada8k.c
-@@ -230,7 +230,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
+diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
+index 5ba3349..2b789af 100644
+--- a/drivers/pci/dwc/pcie-designware-host.c
++++ b/drivers/pci/dwc/pcie-designware-host.c
+@@ -338,8 +338,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	}
  
- 	/* Get the dw-pcie unit configuration/control registers base. */
- 	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
--	pci->dbi_base = devm_ioremap_resource(dev, base);
-+	pci->dbi_base = devm_pci_remap_cfg_resource(dev, base);
- 	if (IS_ERR(pci->dbi_base)) {
- 		dev_err(dev, "couldn't remap regs base %p\n", base);
- 		ret = PTR_ERR(pci->dbi_base);
+ 	if (!pci->dbi_base) {
+-		pci->dbi_base = devm_ioremap(dev, pp->cfg->start,
+-					resource_size(pp->cfg));
++		pci->dbi_base = devm_pci_remap_cfgspace(dev,
++						pp->cfg->start,
++						resource_size(pp->cfg));
+ 		if (!pci->dbi_base) {
+ 			dev_err(dev, "error with ioremap\n");
+ 			ret = -ENOMEM;
+@@ -350,8 +351,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	pp->mem_base = pp->mem->start;
+ 
+ 	if (!pp->va_cfg0_base) {
+-		pp->va_cfg0_base = devm_ioremap(dev, pp->cfg0_base,
+-						pp->cfg0_size);
++		pp->va_cfg0_base = devm_pci_remap_cfgspace(dev,
++					pp->cfg0_base, pp->cfg0_size);
+ 		if (!pp->va_cfg0_base) {
+ 			dev_err(dev, "error with ioremap in function\n");
+ 			ret = -ENOMEM;
+@@ -360,7 +361,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	}
+ 
+ 	if (!pp->va_cfg1_base) {
+-		pp->va_cfg1_base = devm_ioremap(dev, pp->cfg1_base,
++		pp->va_cfg1_base = devm_pci_remap_cfgspace(dev,
++						pp->cfg1_base,
+ 						pp->cfg1_size);
+ 		if (!pp->va_cfg1_base) {
+ 			dev_err(dev, "error with ioremap\n");
 -- 
 2.10.0
