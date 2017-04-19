@@ -1,30 +1,32 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Wed, 19 Apr 2017 11:20:42 +0300
-Subject: [PATCH 0/3] iio: adc: sama5d2_adc hw triggers and buffers
-Message-ID: <1492590045-17329-1-git-send-email-eugen.hristev@microchip.com>
+Date: Wed, 19 Apr 2017 11:20:45 +0300
+Subject: [PATCH 3/3] iio: tools: generic_buffer: increase trigger length
+In-Reply-To: <1492590045-17329-1-git-send-email-eugen.hristev@microchip.com>
+References: <1492590045-17329-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1492590045-17329-4-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the hardware triggers support and
-buffer management for sama5d2.
-The DT modifications ( [PATCH 1/3] ARM: dts: at91: sama5d2_xplained:
-enable ADTRG pin) are for demonstration purposes of the feature,
-setting the pinctrl for the ADC hw trigger pin,should go through at91
-maintainers.
-I also increased the buffer size for the trigger name in the generic_buffer
-application to cope with longer names and avoid stack smashing problem.
-This is in patch [PATCH 3/3] iio: tools: generic_buffer: increase trigger length
+Increased trigger length to 50 in order to cope with trigger names like
+fc030000.adc-dev0-external-rising
 
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+---
+ tools/iio/iio_utils.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Eugen Hristev (3):
-  ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
-  iio: adc: at91-sama5d2_adc: add hw trigger and buffer support
-  iio: tools: generic_buffer: increase trigger length
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts |  16 ++-
- drivers/iio/adc/at91-sama5d2_adc.c          | 208 +++++++++++++++++++++++++++-
- tools/iio/iio_utils.h                       |   2 +-
- 3 files changed, 220 insertions(+), 6 deletions(-)
-
+diff --git a/tools/iio/iio_utils.h b/tools/iio/iio_utils.h
+index 780f201..9d59771 100644
+--- a/tools/iio/iio_utils.h
++++ b/tools/iio/iio_utils.h
+@@ -13,7 +13,7 @@
+ #include <stdint.h>
+ 
+ /* Made up value to limit allocation sizes */
+-#define IIO_MAX_NAME_LENGTH 30
++#define IIO_MAX_NAME_LENGTH 50
+ 
+ #define FORMAT_SCAN_ELEMENTS_DIR "%s/scan_elements"
+ #define FORMAT_TYPE_FILE "%s_type"
 -- 
 2.7.4
