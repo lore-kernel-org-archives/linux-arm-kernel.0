@@ -1,92 +1,126 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Apr 2017 12:15:26 +0100
-Subject: [PATCH v2] KVM: arm/arm64: vgic-v3: De-optimize VMCR save/restore
- when emulating a GICv2
-Message-ID: <20170419111526.21073-1-marc.zyngier@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 19 Apr 2017 13:19:20 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <37cd6172-b04e-fcad-18fc-4fbb26cc611b@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+ <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+ <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
+ <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
+ <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
+ <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
+ <241b130e-1fb7-ecd4-034e-eb02065ada66@free.fr>
+ <37cd6172-b04e-fcad-18fc-4fbb26cc611b@arm.com>
+Message-ID: <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When emulating a GICv2-on-GICv3, special care must be taken to only
-save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
-all Group-0 interrupts end-up being delivered as FIQ, which is
-probably not what the guest expects, as demonstrated here with
-an unhappy EFI:
+On 12/04/2017 11:59, Marc Zyngier wrote:
 
-	FIQ Exception at 0x000000013BD21CC4
+> And that's *wrong*. I've repeatedly said that you only need to deal with
+> *your* irqchip. End of story. Nowhere else. Please leave the MSI irqchip
+> alone, it is very unlikely that you have to provide anything at all to it.
 
-This means that we cannot perform the load/put trick when dealing
-with VMCR_EL2 (because the host has SRE set), and we have to deal
-with it in the world-switch.
+Hello Marc,
 
-Fortunately, this is not the most common case (modern guests should
-be able to deal with GICv3 directly), and the performance is not worse
-than what it was before the VMCR optimization.
+I am hoping you can help me pinpoint what's missing in my code,
+to have it behave the way you describe.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-* From v1:
-  - Move vgic_sre testing from vgic_{load,put} to vgic_v3_{load,put}
+As you have stated, I have *two* struct irq_chip:
+one is mine (tango_chip), the other not_mine (msi_chip).
 
- virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
- virt/kvm/arm/vgic/vgic-v3.c   | 11 +++++++++--
- 2 files changed, 15 insertions(+), 4 deletions(-)
+static struct irq_chip tango_chip = {
+	.name			= "TANGO IRQ_CHIP",
+	.irq_compose_msi_msg	= tango_compose_msi_msg,
+	.irq_set_affinity	= tango_set_affinity,
+	.irq_ack		= tango_ack,
+	.irq_mask		= tango_mask,
+	.irq_unmask		= tango_unmask,
+};
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 3d0b1ddb6929..91922c1eddc8 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	 * Make sure stores to the GIC via the memory mapped interface
- 	 * are now visible to the system register interface.
- 	 */
--	if (!cpu_if->vgic_sre)
-+	if (!cpu_if->vgic_sre) {
- 		dsb(st);
-+		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
-+	}
- 
- 	if (used_lrs) {
- 		int i;
-@@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 	 * delivered as a FIQ to the guest, with potentially fatal
- 	 * consequences. So we must make sure that ICC_SRE_EL1 has
- 	 * been actually programmed with the value we want before
--	 * starting to mess with the rest of the GIC.
-+	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
-+	 * particular.
- 	 */
- 	if (!cpu_if->vgic_sre) {
- 		write_gicreg(0, ICC_SRE_EL1);
- 		isb();
-+		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
- 	}
- 
- 	val = read_gicreg(ICH_VTR_EL2);
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index bc7010db9f4d..df1503650300 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -373,12 +373,19 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 
--	kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
-+	/*
-+	 * If dealing with a GICv2 emulation on GICv3, VMCR_EL2.VFIQen
-+	 * is dependent on ICC_SRE_EL1.SRE, and we have to perform the
-+	 * VMCR_EL2 save/restore in the world switch.
-+	 */
-+	if (likely(cpu_if->vgic_sre))
-+		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
- }
- 
- void vgic_v3_put(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 
--	cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
-+	if (likely(cpu_if->vgic_sre))
-+		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
- }
--- 
-2.11.0
+static struct irq_chip msi_chip = {
+	.name = "NOT MY IRQ_CHIP",
+	.irq_ack = not_mine_ack,
+	.irq_mask = not_mine_mask,
+	.irq_unmask = not_mine_unmask,
+};
+
+
+A struct msi_domain_info links to the msi_chip.
+
+static struct msi_domain_info msi_dom_info = {
+	.flags	= MSI_FLAG_PCI_MSIX | MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS,
+	.chip	= &msi_chip,
+};
+
+irq_dom = irq_domain_create_linear(fwnode, MSI_COUNT, &irq_dom_ops, pcie);
+msi_dom = pci_msi_create_irq_domain(fwnode, &msi_dom_info, irq_dom);
+
+
+I believe irq_dom and tango_chip are tied together by:
+
+	irq_domain_set_info(dom, virq, pos, &tango_chip, pcie, handle_edge_irq, NULL, NULL);
+
+
+My biggest problem is that tango_unmask() is never called.
+
+
+Here is the log of function calls as they happen on my system:
+
+[    0.361586] TANGO irq_chip=c0d10a00 MSI irq_chip=c0d10aa8
+[    0.361595] IRQ_DOM=cf9db300 MSI_DOM=cf9b5080
+
+[    0.363214] find_free_msi: dom=cf9db300 virq=30 hwirq=0 chip=c0d10a00 cdata=cfb0a410
+[    0.363314] [<c0316e54>] (tango_irq_domain_alloc) from [<c0163468>] (msi_domain_alloc+0x68/0x128)
+
+[    0.363543] ENTER tango_compose_msi_msg
+[    0.363552] TANGO IRQ_CHIP: irq_data=cfaf4180 irq=30 hwirq=0 chip=c0d10a00 dom=cf9db300 pdata=  (null) cdata=cfb0a410
+[    0.363609] [<c0316ca4>] (tango_compose_msi_msg) from [<c015f654>] (irq_chip_compose_msi_msg+0x48/0x58)
+
+[    0.363928] ENTER not_mine_unmask
+[    0.363943] NOT MY IRQ_CHIP: irq_data=cf940110 irq=30 hwirq=0 chip=c0d10aa8 dom=cf9b5080 pdata=cfaf4180 cdata=  (null)
+[    0.364012] [<c0316c48>] (not_mine_unmask) from [<c015edc0>] (irq_enable+0x30/0x44)
+
+[    2.475111] find_free_msi: dom=cf9db300 virq=34 hwirq=1 chip=c0d10a00 cdata=cfb0a410
+[    2.516895] [<c0316e54>] (tango_irq_domain_alloc) from [<c0163468>] (msi_domain_alloc+0x68/0x128)
+
+[    2.686593] find_free_msi: dom=cf9db300 virq=35 hwirq=2 chip=c0d10a00 cdata=cfb0a410
+[    2.728334] [<c0316e54>] (tango_irq_domain_alloc) from [<c0163468>] (msi_domain_alloc+0x68/0x128)
+
+[    2.897946] find_free_msi: dom=cf9db300 virq=36 hwirq=3 chip=c0d10a00 cdata=cfb0a410
+[    2.939680] [<c0316e54>] (tango_irq_domain_alloc) from [<c0163468>] (msi_domain_alloc+0x68/0x128)
+
+[    3.109254] ENTER tango_compose_msi_msg
+[    3.114603] TANGO IRQ_CHIP: irq_data=cfb4b500 irq=34 hwirq=1 chip=c0d10a00 dom=cf9db300 pdata=  (null) cdata=cfb0a410
+[    3.160621] [<c0316ca4>] (tango_compose_msi_msg) from [<c015f654>] (irq_chip_compose_msi_msg+0x48/0x58)
+
+[    3.340161] ENTER tango_compose_msi_msg
+[    3.345507] TANGO IRQ_CHIP: irq_data=cfb4b440 irq=35 hwirq=2 chip=c0d10a00 dom=cf9db300 pdata=  (null) cdata=cfb0a410
+[    3.391522] [<c0316ca4>] (tango_compose_msi_msg) from [<c015f654>] (irq_chip_compose_msi_msg+0x48/0x58)
+
+[    3.571148] ENTER tango_compose_msi_msg
+[    3.576503] TANGO IRQ_CHIP: irq_data=cfb4b380 irq=36 hwirq=3 chip=c0d10a00 dom=cf9db300 pdata=  (null) cdata=cfb0a410
+[    3.631966] [<c015f654>] (irq_chip_compose_msi_msg) from [<c016362c>] (msi_domain_activate+0x18/0x40)
+
+[    3.802121] ENTER not_mine_unmask
+[    3.806937] NOT MY IRQ_CHIP: irq_data=cf95c210 irq=34 hwirq=524288 chip=c0d10aa8 dom=cf9b5080 pdata=cfb4b500 cdata=  (null)
+[    3.852943] [<c0316c48>] (not_mine_unmask) from [<c015edc0>] (irq_enable+0x30/0x44)
+
+[    3.998596] ENTER not_mine_unmask
+[    4.003410] NOT MY IRQ_CHIP: irq_data=cf95c010 irq=35 hwirq=524289 chip=c0d10aa8 dom=cf9b5080 pdata=cfb4b440 cdata=  (null)
+[    4.049415] [<c0316c48>] (not_mine_unmask) from [<c015edc0>] (irq_enable+0x30/0x44)
+
+[    4.195055] ENTER not_mine_unmask
+[    4.199870] NOT MY IRQ_CHIP: irq_data=cf97cf10 irq=36 hwirq=524290 chip=c0d10aa8 dom=cf9b5080 pdata=cfb4b380 cdata=  (null)
+[    4.245874] [<c0316c48>] (not_mine_unmask) from [<c015edc0>] (irq_enable+0x30/0x44)
+
+
+
+It's driving me nuts. Do you know what might be wrong?
+
+Regards.
