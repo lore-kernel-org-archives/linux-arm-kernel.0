@@ -1,26 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 07:08:38 -0700
-Subject: [PATCH v2 0/7] ARM: SPEAr600 updates
-In-Reply-To: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170419140838.GQ29219@localhost>
+Date: Wed, 19 Apr 2017 07:24:25 -0700
+Subject: [PATCH V5 1/4] arm64: dts: Add basic DT to support Spreadtrum's
+ SP9860G
+In-Reply-To: <1492603726250.cnoz1xemvxpkp3sd4toaurm2@android.mail.163.com>
+References: <1490594208-26897-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1490599960-27330-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <CAAfSe-s-Jbvin0GV6F6W8OM5zp3kSzHO0YLTM3Gt_Qxv_vA6ag@mail.gmail.com>
+ <1492603726250.cnoz1xemvxpkp3sd4toaurm2@android.mail.163.com>
+Message-ID: <20170419142425.GB12105@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 02:46:38PM +0200, Thomas Petazzoni wrote:
-> Arnd, Olof, Mike, Stephen,
-> 
-> Here are a set of patches touching the support of the SPEAr600
-> platform, for which the platform maintained Viresh Kumar has Acked the
-> patches, but would like the arm-soc and clk maintainers to pick up the
-> patches directly, see
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/501653.html.
-> 
-> Arnd, Olof, could you pick patches 1 to 6 directly in your arm-soc tree ?
-> 
-> Mike, Stephen, could you pick patch 7 directly in your clk tree ?
+Hi,
 
-Thanks, applied patches 1-6 to next/dt.
+On Wed, Apr 19, 2017 at 08:09:00PM +0800, Lyra Zhang wrote:
+> Hi Arnd, Olof, Could you please take this patch through arm-soc git if
+> there are no further comments? (The three other patches in this series
+> have been taken by Greg.) Thanks, Chunyan On
+
+First, something bad seems to have happened with this email, the formatting
+was all wrapped and it was hard to read. You might want to look into it so
+you can avoid more problems like it in the future.
+
+That being said, we can apply the patches but please re-send the series to
+arm at kernel.org with any acks received added, etc.
+
+
+Thanks!
 
 
 -Olof
