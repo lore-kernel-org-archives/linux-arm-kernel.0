@@ -1,175 +1,204 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Apr 2017 11:13:26 -0700
-Subject: [PATCH] ARM: dts: BCM5301X: Specify MDIO bus in the DT
-In-Reply-To: <ab696d24-3544-a554-82d1-18839b29caa0@milecki.pl>
-References: <20170402210840.11429-1-zajec5@gmail.com>
- <5a6ecda9-2cf6-2171-7210-6b3a1d4c6012@gmail.com>
- <c3a0455a-821f-d8a8-bf8a-7ad06ad0466e@milecki.pl>
- <94250925-7d5d-ac31-58ad-918406d904f1@gmail.com>
- <cd324440-ad88-0981-1577-822d39ee289d@gmail.com>
- <221a0208-8a64-6bd8-f6b2-39e845520a83@gmail.com>
- <ab696d24-3544-a554-82d1-18839b29caa0@milecki.pl>
-Message-ID: <84230a10-a10a-ee60-0238-24db94d2c53c@gmail.com>
+From: jgross@suse.com (Juergen Gross)
+Date: Wed, 19 Apr 2017 20:20:00 +0200
+Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
+ "Consolidate get_dma_ops..."
+In-Reply-To: <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
+References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
+ <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
+Message-ID: <a4e371e4-44ff-ee6d-22b6-3ff9d57ce421@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2017 11:10 AM, Rafa? Mi?ecki wrote:
-> On 04/19/2017 07:52 PM, Florian Fainelli wrote:
->> On 04/19/2017 10:35 AM, Rafa? Mi?ecki wrote:
->>> On 04/19/2017 06:43 PM, Florian Fainelli wrote:
->>>> On 04/02/2017 02:25 PM, Rafa? Mi?ecki wrote:
->>>>> On 04/02/2017 11:14 PM, Florian Fainelli wrote:
->>>>>> Le 04/02/17 ? 14:08, Rafa? Mi?ecki a ?crit :
->>>>>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>>>>>>
->>>>>>> Northstar devices have MDIO bus that may contain various PHYs
->>>>>>> attached.
->>>>>>> A common example is USB 3.0 PHY (that doesn't have an MDIO driver
->>>>>>> yet).
->>>>>>>
->>>>>>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->>>>>>> ---
->>>>>>>  arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
->>>>>>>  1 file changed, 7 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi
->>>>>>> b/arch/arm/boot/dts/bcm5301x.dtsi
->>>>>>> index acee36a61004..6a2afe7880ae 100644
->>>>>>> --- a/arch/arm/boot/dts/bcm5301x.dtsi
->>>>>>> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
->>>>>>> @@ -320,6 +320,13 @@
->>>>>>>          };
->>>>>>>      };
->>>>>>>
->>>>>>> +    mdio at 18003000 {
->>>>>>> +        compatible = "brcm,iproc-mdio";
->>>>>>> +        reg = <0x18003000 0x8>;
->>>>>>> +        #size-cells = <1>;
->>>>>>> +        #address-cells = <0>;
->>>>>>> +    };
->>>>>>
->>>>>> This looks fine, but usually the block should be enabled on a
->>>>>> per-board
->>>>>> basis, such that there should be a status = "disabled" property
->>>>>> here by
->>>>>> default.
->>>>>
->>>>> I think we have few blocks in bcm5301x.dtsi enabled by default. I
->>>>> guess
->>>>> it's
->>>>> for stuff that is always present on every SoC family board: rng, nand,
->>>>> spi to
->>>>> name few.
->>>>>
->>>>> It makes some sense, consider e.g. spi. Every Northstar board has SPI
->>>>> controller so it's enabled by default. Not every board has SPI
->>>>> flash, so
->>>>> it's
->>>>> disabled by default.
->>>>>
->>>>> It's there and it make sense to me. Is that OK or not?
->>>>
->>>> Even though there are devices that are always enabled on a given SoC,
->>>> because the board designs are always consistent does not necessarily
->>>> make them good candidates to be enabled at the .dtsi level. This is
->>>> particularly true when there are external connections to blocks (SPI,
->>>> NAND, USB, Ethernet, MDIO to name a few), having them disabled by
->>>> default is safer as a starting point to begin with.
+On 19/04/17 19:25, Stefano Stabellini wrote:
+> Hello Russell,
+> 
+> Can I have your acked-by on the following fix (original patch is
+> 1492117462-19886-1-git-send-email-sstabellini at kernel.org)?
+
+Stefano, through which tree should this go? ARM or Xen or other?
+
+
+Juergen
+
+> 
+> Thanks,
+> 
+> Stefano
+> 
+> 
+> On Tue, 18 Apr 2017, Catalin Marinas wrote:
+>> On Thu, Apr 13, 2017 at 02:04:21PM -0700, Stefano Stabellini wrote:
+>>> The following commit:
 >>>
->>> In case of Northstar there is USB 3.0 PHY connected *internally* to this
->>> MDIO.
->>> I don't think any board manufacturer is able to rip SoC out of the MDIO
->>> or the
->>> USB 3.0 PHY.
->>
->> OK, then can you still resubmit a proper patch that a) puts that
->> information in the commit message, and b) also adds a proper label to
->> the mdio node such that it can later on be referenced by label in
->> board-level DTS files? By that I mean:
->>
->> mdio: mdio at 18003000 {
->>
->> Thank you
->>
+>>>   commit 815dd18788fe0d41899f51b91d0560279cf16b0d
+>>>   Author: Bart Van Assche <bart.vanassche@sandisk.com>
+>>>   Date:   Fri Jan 20 13:04:04 2017 -0800
 >>>
+>>>       treewide: Consolidate get_dma_ops() implementations
 >>>
->>>>> I find MDIO situation quite simiar. It seems every Northstar board has
->>>>> MDIO bus
->>>>> just devices may differ and should not be enabled by default.
->>>>
->>>> In which case, the only difference, for you would be to do to, at the
->>>> board-level DTS:
->>>>
->>>> &mdio {
->>>>     status = "okay";
->>>>
->>>>     phy at 0 {
->>>>         reg = <0>;
->>>>         ...
->>>>     };
->>>> };
->>>>
->>>> versus:
->>>>
->>>> &mdio {
->>>>     phy at 0 {
->>>>         reg = <0>;
->>>>         ...
->>>>     };
->>>> };
->>>>
->>>> I think we can afford putting the mdio node's status property in each
->>>> board-level DTS and make it clear that way that it is enabled because
->>>> there are child nodes enabled?
+>>> rearranges get_dma_ops in a way that xen_dma_ops are not returned when
+>>> running on Xen anymore, dev->dma_ops is returned instead (see
+>>> arch/arm/include/asm/dma-mapping.h:get_arch_dma_ops and
+>>> include/linux/dma-mapping.h:get_dma_ops).
 >>>
->>> This will be a pretty big effort because every Northstar device I know
->>> has USB
->>> 3.0 PHY in the SoC.
+>>> Fix the problem by storing dev->dma_ops in dev_archdata, and setting
+>>> dev->dma_ops to xen_dma_ops. This way, xen_dma_ops is returned naturally
+>>> by get_dma_ops. The Xen code can retrieve the original dev->dma_ops from
+>>> dev_archdata when needed. It also allows us to remove __generic_dma_ops
+>>> from common headers.
+>>>
+>>> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
+>>> Tested-by: Julien Grall <julien.grall@arm.com>
+>>> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> CC: linux at armlinux.org.uk
+>>> CC: catalin.marinas at arm.com
+>>> CC: will.deacon at arm.com
+>>> CC: boris.ostrovsky at oracle.com
+>>> CC: jgross at suse.com
+>>> CC: Julien Grall <julien.grall@arm.com>
 >>
->> Adding a one liner is a "pretty big effort", for sure.
+>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>>
+>>> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+>>> index 220ba20..36ec9c8 100644
+>>> --- a/arch/arm/include/asm/device.h
+>>> +++ b/arch/arm/include/asm/device.h
+>>> @@ -16,6 +16,9 @@ struct dev_archdata {
+>>>  #ifdef CONFIG_ARM_DMA_USE_IOMMU
+>>>  	struct dma_iommu_mapping	*mapping;
+>>>  #endif
+>>> +#ifdef CONFIG_XEN
+>>> +	const struct dma_map_ops *dev_dma_ops;
+>>> +#endif
+>>>  	bool dma_coherent;
+>>>  };
+>>>  
+>>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+>>> index 7166569..680d3f3 100644
+>>> --- a/arch/arm/include/asm/dma-mapping.h
+>>> +++ b/arch/arm/include/asm/dma-mapping.h
+>>> @@ -16,19 +16,9 @@
+>>>  extern const struct dma_map_ops arm_dma_ops;
+>>>  extern const struct dma_map_ops arm_coherent_dma_ops;
+>>>  
+>>> -static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>>> -{
+>>> -	if (dev && dev->dma_ops)
+>>> -		return dev->dma_ops;
+>>> -	return &arm_dma_ops;
+>>> -}
+>>> -
+>>>  static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+>>>  {
+>>> -	if (xen_initial_domain())
+>>> -		return xen_dma_ops;
+>>> -	else
+>>> -		return __generic_dma_ops(NULL);
+>>> +	return &arm_dma_ops;
+>>>  }
+>>>  
+>>>  #define HAVE_ARCH_DMA_SUPPORTED 1
+>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>>> index 63eabb0..a614459 100644
+>>> --- a/arch/arm/mm/dma-mapping.c
+>>> +++ b/arch/arm/mm/dma-mapping.c
+>>> @@ -2396,6 +2396,13 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>>>  		dma_ops = arm_get_dma_map_ops(coherent);
+>>>  
+>>>  	set_dma_ops(dev, dma_ops);
+>>> +
+>>> +#ifdef CONFIG_XEN
+>>> +	if (xen_initial_domain()) {
+>>> +		dev->archdata.dev_dma_ops = dev->dma_ops;
+>>> +		dev->dma_ops = xen_dma_ops;
+>>> +	}
+>>> +#endif
+>>>  }
+>>>  
+>>>  void arch_teardown_dma_ops(struct device *dev)
+>>> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
+>>> index 73d5bab..5a5fa47 100644
+>>> --- a/arch/arm64/include/asm/device.h
+>>> +++ b/arch/arm64/include/asm/device.h
+>>> @@ -20,6 +20,9 @@ struct dev_archdata {
+>>>  #ifdef CONFIG_IOMMU_API
+>>>  	void *iommu;			/* private IOMMU data */
+>>>  #endif
+>>> +#ifdef CONFIG_XEN
+>>> +	const struct dma_map_ops *dev_dma_ops;
+>>> +#endif
+>>>  	bool dma_coherent;
+>>>  };
+>>>  
+>>> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+>>> index 505756c..5392dbe 100644
+>>> --- a/arch/arm64/include/asm/dma-mapping.h
+>>> +++ b/arch/arm64/include/asm/dma-mapping.h
+>>> @@ -27,11 +27,8 @@
+>>>  #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+>>>  extern const struct dma_map_ops dummy_dma_ops;
+>>>  
+>>> -static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>>> +static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+>>>  {
+>>> -	if (dev && dev->dma_ops)
+>>> -		return dev->dma_ops;
+>>> -
+>>>  	/*
+>>>  	 * We expect no ISA devices, and all other DMA masters are expected to
+>>>  	 * have someone call arch_setup_dma_ops at device creation time.
+>>> @@ -39,14 +36,6 @@ static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>>>  	return &dummy_dma_ops;
+>>>  }
+>>>  
+>>> -static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+>>> -{
+>>> -	if (xen_initial_domain())
+>>> -		return xen_dma_ops;
+>>> -	else
+>>> -		return __generic_dma_ops(NULL);
+>>> -}
+>>> -
+>>>  void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>>>  			const struct iommu_ops *iommu, bool coherent);
+>>>  #define arch_setup_dma_ops	arch_setup_dma_ops
+>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>>> index 81cdb2e..7f8b37e 100644
+>>> --- a/arch/arm64/mm/dma-mapping.c
+>>> +++ b/arch/arm64/mm/dma-mapping.c
+>>> @@ -977,4 +977,11 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>>>  
+>>>  	dev->archdata.dma_coherent = coherent;
+>>>  	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+>>> +
+>>> +#ifdef CONFIG_XEN
+>>> +	if (xen_initial_domain()) {
+>>> +		dev->archdata.dev_dma_ops = dev->dma_ops;
+>>> +		dev->dma_ops = xen_dma_ops;
+>>> +	}
+>>> +#endif
+>>>  }
+>>> diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
+>>> index 95ce6ac..b0a2bfc 100644
+>>> --- a/include/xen/arm/page-coherent.h
+>>> +++ b/include/xen/arm/page-coherent.h
+>>> @@ -2,8 +2,16 @@
+>>>  #define _ASM_ARM_XEN_PAGE_COHERENT_H
+>>>  
+>>>  #include <asm/page.h>
+>>> +#include <asm/dma-mapping.h>
+>>>  #include <linux/dma-mapping.h>
+>>>  
+>>> +static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>>> +{
+>>> +	if (dev && dev->archdata.dev_dma_ops)
+>>> +		return dev->archdata.dev_dma_ops;
+>>> +	return get_arch_dma_ops(NULL);
+>>> +}
+>>> +
+>>>  void __xen_dma_map_page(struct device *hwdev, struct page *page,
+>>>  	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+>>>  	     enum dma_data_direction dir, unsigned long attrs);
 > 
-> Sorry, we got a misunderstanding here.
-> 
-> I thought you meant adding something like this for every device:
-> 
-> &mdio {
->     status = "okay";
-> 
->     usb3_phy: usb-phy at 10 {
->         compatible = "brcm,ns-ax-usb3-phy";
->         reg = <0x10>;
->         usb3-dmp-syscon = <&usb3_dmp>;
->         #phy-cells = <0>;
->     };
-> };
-
-Ah no, I would have just done the following in the per-board DTS:
-
-&mdio {
-	status = "okay";
-};
-
-&usb3_phy {
-	status = "okay";
-};
-
-&xhci {
-	status = "okay";
-};
-
-Something like that.
-
-> 
-> usb3_dmp: syscon at 18105000 {
->     reg = <0x18105000 0x1000>;
-> };
-> 
-> So I clearly missed something important. Did you want to have USB 3.0 PHY
-> defined in the dtsi file?
-
-Yes, I think it does make sense to have it defined in the .dtsi file
-because it's internal to the SoC, however it should probably be marked
-disabled by default, unless a board enables its xHCI controller, does
-that make sense?
--- 
-Florian
