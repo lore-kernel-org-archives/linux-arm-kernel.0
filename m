@@ -1,80 +1,58 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:48:51 +0100
-Subject: [PATCH v4 02/21] linux/io.h: add PCI config space remap interface
+Date: Wed, 19 Apr 2017 17:48:54 +0100
+Subject: [PATCH v4 05/21] lib: fix Devres devm_ioremap_* offset parameter
+ kerneldoc description
 In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
 References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-3-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-6-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-Posting") mandate non-posted configuration transactions. As further
-highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-Considerations for the Enhanced Configuration Access Mechanism"),
-through ECAM and ECAM-derivative configuration mechanism, the memory
-mapped transactions from the host CPU into Configuration Requests on the
-PCI express fabric may create ordering problems for software because
-writes to memory address are typically posted transactions (unless the
-architecture can enforce through virtual address mapping non-posted
-write transactions behaviour) but writes to Configuration Space are not
-posted on the PCI express fabric.
+The offset parameter in Devres devm_ioremap_* functions kerneldoc
+entries is erroneously defined as BUS offset whereas it is actually
+a resource address.
 
-Current DT and ACPI host bridge controllers map PCI configuration space
-(ECAM and ECAM-derivative) into the virtual address space through
-ioremap() calls, that are non-cacheable device accesses on most
-architectures, but may provide "bufferable" or "posted" write semantics
-in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-to be buffered in the bus connecting the host CPU to the PCI fabric;
-this behaviour, as underlined in the PCIe specifications, may trigger
-transactions ordering rules and must be prevented.
-
-Introduce a new generic and explicit API to create a memory
-mapping for ECAM and ECAM-derivative config space area that
-defaults to ioremap_nocache() (which should provide a sane default
-behaviour) but still allowing architectures on which ioremap_nocache()
-results in posted write transactions to override the function
-call with an arch specific implementation that complies with
-the PCI specifications for configuration transactions.
+Since it is actually misleading, fix the Devres devm_ioremap_* offset
+parameter kerneldoc entry by replacing BUS offset with a more
+suitable description (ie Resource address).
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Tejun Heo <tj@kernel.org>
 ---
- include/linux/io.h | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ lib/devres.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/io.h b/include/linux/io.h
-index 82ef36e..3934aba 100644
---- a/include/linux/io.h
-+++ b/include/linux/io.h
-@@ -91,6 +91,25 @@ void devm_memunmap(struct device *dev, void *addr);
- void *__devm_memremap_pages(struct device *dev, struct resource *res);
- 
- /*
-+ * The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-+ * Posting") mandate non-posted configuration transactions. There is
-+ * no ioremap API in the kernel that can guarantee non-posted write
-+ * semantics across arches so provide a default implementation for
-+ * mapping PCI config space that defaults to ioremap_nocache(); arches
-+ * should override it if they have memory mapping implementations that
-+ * guarantee non-posted writes semantics to make the memory mapping
-+ * compliant with the PCI specification.
-+ */
-+#ifndef pci_remap_cfgspace
-+#define pci_remap_cfgspace pci_remap_cfgspace
-+static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
-+					       size_t size)
-+{
-+	return ioremap_nocache(offset, size);
-+}
-+#endif
-+
-+/*
-  * Some systems do not have legacy ISA devices.
-  * /dev/port is not a valid interface on these systems.
-  * So for those archs, <asm/io.h> should define the following symbol.
+diff --git a/lib/devres.c b/lib/devres.c
+index cb1464c..78eca71 100644
+--- a/lib/devres.c
++++ b/lib/devres.c
+@@ -17,7 +17,7 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
+ /**
+  * devm_ioremap - Managed ioremap()
+  * @dev: Generic device to remap IO address for
+- * @offset: BUS offset to map
++ * @offset: Resource address to map
+  * @size: Size of map
+  *
+  * Managed ioremap().  Map is automatically unmapped on driver detach.
+@@ -45,7 +45,7 @@ EXPORT_SYMBOL(devm_ioremap);
+ /**
+  * devm_ioremap_nocache - Managed ioremap_nocache()
+  * @dev: Generic device to remap IO address for
+- * @offset: BUS offset to map
++ * @offset: Resource address to map
+  * @size: Size of map
+  *
+  * Managed ioremap_nocache().  Map is automatically unmapped on driver
+@@ -74,7 +74,7 @@ EXPORT_SYMBOL(devm_ioremap_nocache);
+ /**
+  * devm_ioremap_wc - Managed ioremap_wc()
+  * @dev: Generic device to remap IO address for
+- * @offset: BUS offset to map
++ * @offset: Resource address to map
+  * @size: Size of map
+  *
+  * Managed ioremap_wc().  Map is automatically unmapped on driver detach.
 -- 
 2.10.0
