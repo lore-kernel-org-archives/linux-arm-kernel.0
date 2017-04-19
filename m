@@ -1,118 +1,49 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 19 Apr 2017 11:55:04 +0200
-Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
-In-Reply-To: <13d18e41-b430-37ea-afb8-d300326bfb12@i2se.com>
-References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
- <172093673.40121.1492427140661@email.1und1.de>
- <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
- <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
- <186569458.91967.1492547106553@email.1und1.de>
- <20170419085620.GE2823@localhost>
- <13d18e41-b430-37ea-afb8-d300326bfb12@i2se.com>
-Message-ID: <20170419095504.GF2823@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 19 Apr 2017 11:55:12 +0200
+Subject: [PATCH] ARM: dts: rockchip: reuse firefly dtsi
+In-Reply-To: <CAJrj+DPjNnk9n5k4DoxJ0Focm0DOz6362PYtVRZTEkaUFKYX0g@mail.gmail.com>
+References: <20170418121527.3155-1-eddie.cai.linux@gmail.com>
+ <746291609.ssvjv54Vin@phil>
+ <CAJrj+DPjNnk9n5k4DoxJ0Focm0DOz6362PYtVRZTEkaUFKYX0g@mail.gmail.com>
+Message-ID: <1534547.uoxyx99BdA@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 11:12:17AM +0200, Stefan Wahren wrote:
-> Am 19.04.2017 um 10:56 schrieb Johan Hovold:
-> > On Tue, Apr 18, 2017 at 10:25:06PM +0200, Stefan Wahren wrote:
-> >> Hi,
-> >>
-> >> [add Johan]
-> >>
-> >>> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. April 2017 um 10:07 geschrieben:
-> >>>
-> >>>
-> >>> Am 18.04.2017 um 00:37 schrieb Doug Anderson:
-> >>>> Hi,
-> >>>>
-> >>>> On Mon, Apr 17, 2017 at 4:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> >>>>> Hi,
-> >>>>>
-> >>>>>> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Oktober 2016 um 21:34 geschrieben:
-> >>>>>>
-> >>>>>>
-> >>>>>> I inspired by this issue [1] i build up a slightly modified
-> >>>>>> setup with a Raspberry Pi B (mainline kernel 4.9rc3), a powered
-> >>>>>> 7 port USB hub and 5 Prolific PL2303 USB to serial convertors. I
-> >>>>>> modified the usb_test for dwc2 [2], which only tries to open all
-> >>>>>> ttyUSB devices one after the other.
-> >>>>>>
-> >>>>>> Unfortunately the complete system stuck after opening the first
-> >>>>>> ttyUSB device ( heartbeat LED stop blinking, no reaction to
-> >>>>>> debug UART). The only way to reanimate the system is to
-> >>>>>> powerdown the USB hub with the USB to serial convertors.
-> >>>>>>
-> >>>>>> [1] - https://github.com/raspberrypi/linux/issues/1692
-> >> i took GPIO17 to measure _dwc2_hcd_irq and GPIO18 to measure
-> >> _dwc2_hcd_urb_enqueue (patch against 4.11rc1 below).
-> >>
-> >> So i made my observations for 3 test cases:
-> >>
-> >> 1) no serial converter connected (idle)
-> >> 2) 1 FTDI serial converter connected
-> >> 3) 1 PL2303 serial converter connected
-> >>
-> >> case   | ksoftirq cpu     | mean duration | max duration  | max duration | urb_enqueue  |
-> >>        |                  | hcd_irq       | hcd_irq       | urb_enqueue  | within 10 sec|
-> >> -------+------------------+---------------+---------------+--------------+--------------+
-> >> idle   | 0.0%             | 2 us          | 16.5 us       |     12 us    | 5            |
-> >> FTDI   | 25.0%            | 8.5 us        | 18.0 us       |  31000 us    | ~ 400        |
-> >> PL2303 | top doesn't work | 8.5 us        | 22.5 us       | 900000 us    | 4            |
-> >>
-> >> So it seems the serial USB driver has also an impact. In the analyzer
-> >> trace the FTDI triggers many smaller urb_enqueue calls in the opposite
-> >> to the PL2303 which only has few but huge calls.
-> > What do you mean by "huge calls" above?
-> 
-> The time it takes until _dwc2_hcd_urb_enqueue is finished.
+Hi Eddie,
 
-Yes, sorry, I realised that after I sent my reply.
-
-> > Are you just keeping the ports open (i.e. with no data being received or
-> > sent)?
-> 
-> Yes, only open and no data is received or sent (LEDs doesn't show any
-> activity).
-> 
-> > FTDI devices are notorious for their status messages being sent
-> > continuously while the port is open. You'll get a two-byte bulk-in
-> > message every 16ms by default (these were sent every millisecond up
-> > until recently due to a long-standing regression).
+Am Mittwoch, 19. April 2017, 08:42:09 CEST schrieb Eddie Cai:
+> 2017-04-19 6:20 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
+> > Hi Eddie,
 > >
-> > PL2303 devices have an interrupt-in endpoint which is used for status
-> > notifications so you would not see any completion callbacks on an
-> > otherwise idle port.
+> > Am Dienstag, 18. April 2017, 20:15:27 CEST schrieb Eddie Cai:
+> >> firefly reload is very similar with firefly board, so reuse firefly dtsi
+> >>
+> >> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+> >> ---
+> >>  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi | 310 ------------------
+> >>  arch/arm/boot/dts/rk3288-firefly-reload.dts       | 368 ++--------------------
 > >
-> >> Additional notes:
-> >> After closing the serial connection to the FTDI the system is usable
-> >> as before. In case of PL2303 i need to disconnect the converter in
-> >> order to get a usable system.
-> > Does your system lock up when you open the first pl2303 device?
-> 
-> Yes (directly to the onboard hub or an external hub make no difference).
-
-Ok, good. I suggest not using the external hub until you've tracked this
-down.
-
-> >> Why do they behave so differently?
-> > So the ftdi bulk-in status messages and the pl2303 interrupt-in endpoint
-> > could be two reasons, but I guess so could any change in timing etc.
+> > I would disagree and remember having a similar discussion when the reload-
+> > support was initially submitted. Please keep in mind that the firefly-
+> > reload is a som+baseboard combination, so somebody could (or maybe
+> > already has) create a completely different baseboard for the som that
+> > does not have any similarities with the original firefly.
+> > The previous firefly being a real single board.
 > >
-> > Is your ftdi-device a Full Speed device like the pl2303?
-> 
-> Sorry, i will need to verify.
+> > We also don't combine rock2 and firefly and other boards following the
+> > general rk3288 design guidelines :-) and the original firefly and reload are
+> > very different boards if you look at them.
+> OK, i think the real similar part is the core board and firefly. how
+> about reuse the
+> firefly code in the core board?
 
-Can you reproduce this on 4.11-rc7 without the external hub and post the
-corresponding soft lockup bug output?
+I'd really like to keep these separate.
+- firefly-rk3288 is one board
+- firefly-rk3288-reload is a completely different som+baseboard
 
-On open, the pl2303 driver first enqueues the interrupt-in URB before
-enqueueing two bulk-in URBs. From your original stack trace it looks
-like the lockup happens when queueing either of those. Perhaps you can
-enable debugging in the dwc2 driver or add some printks to determine how
-far you get.
+That they both have the "firefly" in the name is really more based on the
+company being named firefly :-) , but are not an indication that they
+are similar boards.
 
-Another thing to try is to comment out the interrupt-in URB submission
-in pl2303 and see whether that avoids triggering the lockup.
 
-Johan
+Heiko
