@@ -1,31 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:48:00 -0700
-Subject: [GIT PULL v2] ARM: at91: DT for 4.12
-In-Reply-To: <20170414080050.qb3n7ypomgciqa22@piout.net>
-References: <20170410163557.qocx3bvz5s5gcnkw@piout.net>
- <20170414080050.qb3n7ypomgciqa22@piout.net>
-Message-ID: <20170419134800.GB29219@localhost>
+Date: Wed, 19 Apr 2017 07:04:35 -0700
+Subject: [GIT PULL] DaVinci SoC updates for v4.12 (part 3)
+In-Reply-To: <90b39c89-450c-9ac2-2c69-ab2166986a8b@ti.com>
+References: <90b39c89-450c-9ac2-2c69-ab2166986a8b@ti.com>
+Message-ID: <20170419140435.GN29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 14, 2017 at 10:00:50AM +0200, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Wed, Apr 12, 2017 at 02:14:52PM +0530, Sekhar Nori wrote:
+> The following changes since commit 28d4d1d0e49b4ac4d12861a64f45101f36fbfab8:
 > 
-> As you didn't seem to have taken the previous version, I've folded a
-> late minute fix in Peter's patch. IF that is not OK, I'll sent the fix
-> later.
-> 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>   ARM: davinci: add pata_bk3710 libata driver support (2017-03-30 16:15:29 +0530)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.12-dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.12/soc-3
 > 
-> for you to fetch changes up to d3df1ec06353e51fc44563d2e7e18d42811af290:
+> for you to fetch changes up to 398dbc776a8f7dfdee7c38ad003e66abd31b3b0a:
 > 
->   ARM: dts: at91: sama5d3_xplained: not all ADC channels are available (2017-04-14 09:38:51 +0200)
+>   ARM: davinci: Add clock for CPPI 4.1 DMA engine (2017-04-11 19:50:53 +0530)
+> 
+> ----------------------------------------------------------------
+> Add clock for CPPI 4.1 DMA engine thats
+> part of USB OTG subsystem on DA830 and
+> DA850.
+> 
+> This builds on top of the pull request
+> sent earlier:
+> https://www.spinics.net/lists/arm-kernel/msg573985.html
+> 
+> ----------------------------------------------------------------
+> Alexandre Bailon (1):
+>       ARM: davinci: Add clock for CPPI 4.1 DMA engine
 
 Thanks, merged!
 
