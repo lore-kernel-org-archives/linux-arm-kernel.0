@@ -1,108 +1,105 @@
 From: architt@codeaurora.org (Archit Taneja)
-Date: Wed, 19 Apr 2017 10:19:50 +0530
-Subject: [PATCH v2 1/2] drm: dw-hdmi: add specific I2S and AHB functions
- for stream handling
-In-Reply-To: <20170414083113.4255-2-romain.perier@collabora.com>
+Date: Wed, 19 Apr 2017 10:21:44 +0530
+Subject: [PATCH v2 2/2] drm: dw-hdmi: gate audio clock from the I2S
+ enablement callbacks
+In-Reply-To: <20170414083113.4255-3-romain.perier@collabora.com>
 References: <20170414083113.4255-1-romain.perier@collabora.com>
- <20170414083113.4255-2-romain.perier@collabora.com>
-Message-ID: <07756d59-b2e6-cf6e-6948-9166de6befe5@codeaurora.org>
+ <20170414083113.4255-3-romain.perier@collabora.com>
+Message-ID: <c9258563-afcd-4088-a4f4-6a4e056f5d36@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 04/14/2017 02:01 PM, Romain Perier wrote:
-> Currently, CTS+N is forced to zero as a workaround of the IP block for
-> i.MX platforms. This is requested in the datasheet of the corresponding
-> IP for AHB mode only. However, we have seen that it introduces glitches
-> or delays when playing a sound on HDMI for I2S mode. This proves that we
-> cannot keep the current functions for handling audio stream as-is if
-> these contain workaround that are specific to a mode.
+> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
+> step E. and is kept enabled for later use. This clock should be enabled
+> and disabled along with the actual audio stream and not always on (that
+> is bad for PM). Futhermore, as described by the datasheet, the I2S
+
+s/Futhermore/Furthermore
+
+> variant need to gate/ungate the clock when the stream is
+
+s/need/needs
+
+> enabled/disabled.
 >
-> This commit introduces two callbacks, one for each variant.
-> dw_hdmi_setup defines the right function depending on the detected
-> variant. Then, the exported functions dw_hdmi_audio_enable and
-> dw_hdmi_audio_disable calls the corresponding callbacks
+> This commit adds a parameter to hdmi_audio_enable_clk() that controls
+> when the audio sample clock must be enabled or disabled. Then, it adds
+> the call to this function from dw_hdmi_i2s_audio_enable() and
+> dw_hdmi_i2s_audio_disable().
 >
 > Signed-off-by: Romain Perier <romain.perier@collabora.com>
 > ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 26 ++++++++++++++++++++++++--
->  1 file changed, 24 insertions(+), 2 deletions(-)
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 20 ++++++++++++++------
+>  1 file changed, 14 insertions(+), 6 deletions(-)
 >
 > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index 4b6f216..5b328c0 100644
+> index 5b328c0..a6da634 100644
 > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
 > +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -173,6 +173,8 @@ struct dw_hdmi {
->
->  	unsigned int reg_shift;
->  	struct regmap *regm;
-> +	void (*enable_audio)(struct dw_hdmi *hdmi);
-> +	void (*disable_audio)(struct dw_hdmi *hdmi);
->  };
->
->  #define HDMI_IH_PHY_STAT0_RX_SENSE \
-> @@ -542,13 +544,29 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+> @@ -544,6 +544,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
 >  }
 >  EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
 >
-> +void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
+> +static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
 > +{
-> +	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+> +	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
+> +		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
 > +}
 > +
-> +void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
-> +{
-> +	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
+>  void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
+>  {
+>  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+> @@ -557,6 +563,12 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
+>  void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
+>  {
+>  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+> +	hdmi_enable_audio_clk(hdmi, true);
 > +}
 > +
-> +void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
+> +void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
 > +{
-> +	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-> +}
-> +
+> +	hdmi_enable_audio_clk(hdmi, false);
+>  }
 
-I get some sparse warnings asking for the above 3 to be static.
+This should be static too.
+
+If you're okay with the suggestions, I can fix these myself and push. Let
+me know if that's okay.
 
 Thanks,
 Archit
 
+>
 >  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
+> @@ -1592,11 +1604,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>  			    HDMI_MC_FLOWCTRL);
+>  }
+>
+> -static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
+> -{
+> -	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+> -}
+> -
+>  /* Workaround to clear the overflow condition */
+>  static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
 >  {
->  	unsigned long flags;
+> @@ -1710,7 +1717,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
 >
->  	spin_lock_irqsave(&hdmi->audio_lock, flags);
->  	hdmi->audio_enable = true;
-> -	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-> +	if (hdmi->enable_audio)
-> +		hdmi->enable_audio(hdmi);
->  	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
->  }
->  EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
-> @@ -559,7 +577,8 @@ void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
+>  		/* HDMI Initialization Step E - Configure audio */
+>  		hdmi_clk_regenerator_update_pixel_clock(hdmi);
+> -		hdmi_enable_audio_clk(hdmi);
+> +		hdmi_enable_audio_clk(hdmi, true);
+>  	}
 >
->  	spin_lock_irqsave(&hdmi->audio_lock, flags);
->  	hdmi->audio_enable = false;
-> -	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
-> +	if (hdmi->disable_audio)
-> +		hdmi->disable_audio(hdmi);
->  	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
->  }
->  EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
-> @@ -2404,6 +2423,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		audio.irq = irq;
->  		audio.hdmi = hdmi;
->  		audio.eld = hdmi->connector.eld;
-> +		hdmi->enable_audio = dw_hdmi_ahb_audio_enable;
-> +		hdmi->disable_audio = dw_hdmi_ahb_audio_disable;
->
->  		pdevinfo.name = "dw-hdmi-ahb-audio";
->  		pdevinfo.data = &audio;
-> @@ -2416,6 +2437,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		audio.hdmi	= hdmi;
+>  	/* not for DVI mode */
+> @@ -2438,6 +2445,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
 >  		audio.write	= hdmi_writeb;
 >  		audio.read	= hdmi_readb;
-> +		hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
+>  		hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
+> +		hdmi->disable_audio = dw_hdmi_i2s_audio_disable;
 >
 >  		pdevinfo.name = "dw-hdmi-i2s-audio";
 >  		pdevinfo.data = &audio;
