@@ -1,83 +1,20 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 19 Apr 2017 21:12:11 +0200
-Subject: [PATCH 2/4] mmc: pxamci: Enhance error checking
+Date: Wed, 19 Apr 2017 21:14:05 +0200
+Subject: [PATCH 3/4] mmc: pxamci: Disable DATA_TRAN_DONE interrupt sooner
+In-Reply-To: <04139c1a-cee8-f64c-4b0e-2e3c472169a3@tul.cz> (Petr Cvek's
+ message of "Wed, 19 Apr 2017 01:17:33 +0200")
 References: <cover.1492492523.git.petr.cvek@tul.cz>
- <a8769ce8-2732-1f23-eaca-33591951ee78@tul.cz>
-Message-ID: <87o9vs6wl0.fsf@belgarion.home>
+ <04139c1a-cee8-f64c-4b0e-2e3c472169a3@tul.cz>
+Message-ID: <87k26g6whu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Petr Cvek <petr.cvek@tul.cz> writes:
 
-> The pxamci_dma_irq() and pxamci_data_done() should print errors if they
-> obtains invalid parameters. Make the pxamci_dma_irq() call with
-> the MMC_DATA_READ flag a fault as the DMA callback is used only for write.
->
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-> ---
->  drivers/mmc/host/pxamci.c | 33 ++++++++++++++++++++++++---------
->  1 file changed, 24 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-> index 80bc8065b50f..48c26d848e9f 100644
-> --- a/drivers/mmc/host/pxamci.c
-> +++ b/drivers/mmc/host/pxamci.c
-> @@ -354,13 +354,22 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
->  	struct mmc_data *data = host->data;
->  	struct dma_chan *chan;
->  
-> -	if (!data)
-> +	if (!data) {
-> +		pr_err("%s: Missing data structure\n",
-> +			mmc_hostname(host->mmc));
-I'd rather have :
-    dev_err(mmc_dev(mmc), ...)
-
->  		return 0;
-> +	}
->  
->  	if (data->flags & MMC_DATA_READ)
->  		chan = host->dma_chan_rx;
-> -	else
-> +	else if (data->flags & MMC_DATA_WRITE)
->  		chan = host->dma_chan_tx;
-> +	else {
-> +		pr_err("%s: Unknown data direction, flags=%08x\n",
-> +			mmc_hostname(host->mmc), data->flags);
-Ditto.
-
-> +	if (!host->data) {
-> +		pr_err("%s: Missing data structure\n",
-> +			mmc_hostname(host->mmc));
-Ditto.
-
->  		goto out_unlock;
-> +	}
->  
-> -	if (host->data->flags & MMC_DATA_READ)
-> -		chan = host->dma_chan_rx;
-> -	else
-> -		chan = host->dma_chan_tx;
-> +	if (!(host->data->flags & MMC_DATA_WRITE)) {
-> +		pr_err("%s: DMA callback is only for tx channel, flags=%x\n",
-> +			mmc_hostname(host->mmc), host->data->flags);
-Ditto.
-
-> +		goto out_unlock;
-> +	}
-> +
-> +	chan = host->dma_chan_tx;
->  
->  	status = dmaengine_tx_status(chan, host->dma_cookie, &state);
->  
->  	if (likely(status == DMA_COMPLETE)) {
->  		writel(BUF_PART_FULL, host->base + MMC_PRTBUF);
->  	} else {
-> -		pr_err("%s: DMA error on %s channel\n", mmc_hostname(host->mmc),
-> -			host->data->flags & MMC_DATA_READ ? "rx" : "tx");
-> +		pr_err("%s: Invalid DMA status %i\n", mmc_hostname(host->mmc),
-> +			status);
-Ditto.
+> Disable the DATA_TRAN_DONE interrupt as soon as possible in the handler.
+Yeah, but why, please explain.
+If that's only to "reduce" the race occurrence, then I'd rather have this patch
+dropped. Otherwise if there is a compelling reason let's see ...
 
 Cheers.
 
