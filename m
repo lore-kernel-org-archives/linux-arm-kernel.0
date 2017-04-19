@@ -1,177 +1,92 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 19 Apr 2017 16:46:06 +0800
-Subject: [PATCH v2] ARM: dts: at91: sama5d2: add m_can nodes
-Message-ID: <20170419084606.27543-1-wenyou.yang@atmel.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 19 Apr 2017 10:56:20 +0200
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <186569458.91967.1492547106553@email.1und1.de>
+References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+ <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+ <186569458.91967.1492547106553@email.1und1.de>
+Message-ID: <20170419085620.GE2823@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes to support the Controller Area Network(M_CAN) on SAMA5D2.
-The version of M_CAN IP core is 3.1.0 (CREL = 0x31040730).
+On Tue, Apr 18, 2017 at 10:25:06PM +0200, Stefan Wahren wrote:
+> Hi,
+> 
+> [add Johan]
+> 
+> > Stefan Wahren <stefan.wahren@i2se.com> hat am 18. April 2017 um 10:07 geschrieben:
+> > 
+> > 
+> > Am 18.04.2017 um 00:37 schrieb Doug Anderson:
+> > > Hi,
+> > >
+> > > On Mon, Apr 17, 2017 at 4:05 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > >> Hi,
+> > >>
+> > >>> Stefan Wahren <stefan.wahren@i2se.com> hat am 31. Oktober 2016 um 21:34 geschrieben:
+> > >>>
+> > >>>
+> > >>> I inspired by this issue [1] i build up a slightly modified
+> > >>> setup with a Raspberry Pi B (mainline kernel 4.9rc3), a powered
+> > >>> 7 port USB hub and 5 Prolific PL2303 USB to serial convertors. I
+> > >>> modified the usb_test for dwc2 [2], which only tries to open all
+> > >>> ttyUSB devices one after the other.
+> > >>>
+> > >>> Unfortunately the complete system stuck after opening the first
+> > >>> ttyUSB device ( heartbeat LED stop blinking, no reaction to
+> > >>> debug UART). The only way to reanimate the system is to
+> > >>> powerdown the USB hub with the USB to serial convertors.
+> > >>>
+> > >>> [1] - https://github.com/raspberrypi/linux/issues/1692
 
-As said in SAMA5D2 datasheet, the CAN clock is recommended to use
-frequencies of 20, 40 or 80 MHz. To achieve these frequencies,
-PMC GCLK3 must select the UPLLCK(480 MHz) as source clock and
-divide by 24, 12, or 6. So, the "assigned-clock-rates" property
-has three options: 20000000, 40000000, and 80000000.
-The "assigned-clock-parents" property should be referred to utmi
-fixedly.
+> i took GPIO17 to measure _dwc2_hcd_irq and GPIO18 to measure
+> _dwc2_hcd_urb_enqueue (patch against 4.11rc1 below).
+> 
+> So i made my observations for 3 test cases:
+> 
+> 1) no serial converter connected (idle)
+> 2) 1 FTDI serial converter connected
+> 3) 1 PL2303 serial converter connected
+> 
+> case   | ksoftirq cpu     | mean duration | max duration  | max duration | urb_enqueue  |
+>        |                  | hcd_irq       | hcd_irq       | urb_enqueue  | within 10 sec|
+> -------+------------------+---------------+---------------+--------------+--------------+
+> idle   | 0.0%             | 2 us          | 16.5 us       |     12 us    | 5            |
+> FTDI   | 25.0%            | 8.5 us        | 18.0 us       |  31000 us    | ~ 400        |
+> PL2303 | top doesn't work | 8.5 us        | 22.5 us       | 900000 us    | 4            |
+> 
+> So it seems the serial USB driver has also an impact. In the analyzer
+> trace the FTDI triggers many smaller urb_enqueue calls in the opposite
+> to the PL2303 which only has few but huge calls.
 
-The MSBs [bits 31:16] of the CAN Message RAM for CAN0 and CAN1 are
-default configured in 0x00200000. To avoid conflict with SRAM map
-for PM, change them to 0x00210000 in the AT91Bootstrap via setting
-the CAN Memories Address-based Register(SFR_CAN) of SFR.
+What do you mean by "huge calls" above?
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
-The patch is tested on SAMA5D2 Xplained and based on the patch set,
- 1. [PATCH v4 1/7] can: m_can: Disabled Interrupt Line 1
-    http://marc.info/?l=linux-can&m=149165343604033&w=2
+Are you just keeping the ports open (i.e. with no data being received or
+sent)?
 
-Changes in v2:
- - Configures 10 TX Event FIFO elements and 10 TX Buffers/FIFO slots,
-   because the TXE FIFO is needed to be configured.
- - Configure the offset of Message RAM for CAN1 followed from CAN0's.
+FTDI devices are notorious for their status messages being sent
+continuously while the port is open. You'll get a two-byte bulk-in
+message every 16ms by default (these were sent every millisecond up
+until recently due to a long-standing regression).
 
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 24 +++++++++++++
- arch/arm/boot/dts/sama5d2.dtsi              | 56 +++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
+PL2303 devices have an interrupt-in endpoint which is used for status
+notifications so you would not see any completion callbacks on an
+otherwise idle port.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 9f7f8a7d8ff9..2f19b08dc226 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -257,6 +257,12 @@
- 				status = "okay";
- 			};
- 
-+			can0: can at f8054000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can0_default>;
-+				status = "okay";
-+			};
-+
- 			uart3: serial at fc008000 {
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-@@ -321,6 +327,18 @@
- 					bias-disable;
- 				};
- 
-+				pinctrl_can0_default: can0_default {
-+					pinmux = <PIN_PC10__CANTX0>,
-+						 <PIN_PC11__CANRX0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_can1_default: can1_default {
-+					pinmux = <PIN_PC26__CANTX1>,
-+						 <PIN_PC27__CANRX1>;
-+					bias-disable;
-+				};
-+
- 				pinctrl_charger_chglev: charger_chglev {
- 					pinmux = <PIN_PA12__GPIO>;
- 					bias-disable;
-@@ -468,6 +486,12 @@
- 				};
- 
- 			};
-+
-+			can1: can at fc050000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can1_default>;
-+				status = "okay";
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 22332be72140..383ca9307edf 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -762,6 +762,18 @@
- 						atmel,clk-output-range = <0 83000000>;
- 					};
- 
-+					can0_clk: can0_clk {
-+						#clock-cells = <0>;
-+						reg = <56>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					can1_clk: can1_clk {
-+						#clock-cells = <0>;
-+						reg = <57>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
- 					classd_clk: classd_clk {
- 						#clock-cells = <0>;
- 						reg = <59>;
-@@ -890,6 +902,18 @@
- 						#clock-cells = <0>;
- 						reg = <55>;
- 					};
-+
-+					can0_gclk: can0_gclk {
-+						#clock-cells = <0>;
-+						reg = <56>;
-+						atmel,clk-output-range = <0 80000000>;
-+					};
-+
-+					can1_gclk: can1_gclk {
-+						#clock-cells = <0>;
-+						reg = <57>;
-+						atmel,clk-output-range = <0 80000000>;
-+					};
- 				};
- 			};
- 
-@@ -1144,6 +1168,22 @@
- 				clocks = <&clk32k>;
- 			};
- 
-+			can0: can at f8054000 {
-+				compatible = "bosch,m_can";
-+				reg = <0xf8054000 0x4000>, <0x210000 0x4000>;
-+				reg-names = "m_can", "message_ram";
-+				interrupts = <56 IRQ_TYPE_LEVEL_HIGH 7>,
-+					     <64 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-names = "int0", "int1";
-+				clocks = <&can0_clk>, <&can0_gclk>;
-+				clock-names = "hclk", "cclk";
-+				assigned-clocks = <&can0_gclk>;
-+				assigned-clock-parents = <&utmi>;
-+				assigned-clock-rates = <40000000>;
-+				bosch,mram-cfg = <0x0 0 0 32 0 0 10 10>;
-+				status = "disabled";
-+			};
-+
- 			spi1: spi at fc000000 {
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfc000000 0x100>;
-@@ -1305,6 +1345,22 @@
- 				status = "okay";
- 			};
- 
-+			can1: can at fc050000 {
-+				compatible = "bosch,m_can";
-+				reg = <0xfc050000 0x4000>, <0x210000 0x4000>;
-+				reg-names = "m_can", "message_ram";
-+				interrupts = <57 IRQ_TYPE_LEVEL_HIGH 7>,
-+					     <65 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-names = "int0", "int1";
-+				clocks = <&can1_clk>, <&can1_gclk>;
-+				clock-names = "hclk", "cclk";
-+				assigned-clocks = <&can1_gclk>;
-+				assigned-clock-parents = <&utmi>;
-+				assigned-clock-rates = <40000000>;
-+				bosch,mram-cfg = <0x1100 0 0 32 0 0 10 10>;
-+				status = "disabled";
-+			};
-+
- 			chipid at fc069000 {
- 				compatible = "atmel,sama5d2-chipid";
- 				reg = <0xfc069000 0x8>;
--- 
-2.11.0
+> Additional notes:
+> After closing the serial connection to the FTDI the system is usable
+> as before. In case of PL2303 i need to disconnect the converter in
+> order to get a usable system.
+
+Does your system lock up when you open the first pl2303 device?
+
+> Why do they behave so differently?
+
+So the ftdi bulk-in status messages and the pl2303 interrupt-in endpoint
+could be two reasons, but I guess so could any change in timing etc.
+
+Is your ftdi-device a Full Speed device like the pl2303?
+
+Johan
