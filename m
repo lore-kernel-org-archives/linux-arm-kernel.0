@@ -1,27 +1,120 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Wed, 19 Apr 2017 13:56:58 +0200
-Subject: [PATCH v3 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <21ea43fb-0d3d-88e2-12ee-4a114e9d8459@arm.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
- <33321273-E3E7-459B-A615-5ADA52445AA1@esh.hu>
- <186f0c06-39ce-cb88-35e5-6dd57aa81166@arm.com>
- <4e3ce329-6194-043b-0d69-cbec6b08e38e@arm.com>
- <21ea43fb-0d3d-88e2-12ee-4a114e9d8459@arm.com>
-Message-ID: <20170419115658.GD5077@suse.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Apr 2017 13:01:14 +0100
+Subject: [PATCH] Revert "arm64: Increase the max granular size"
+In-Reply-To: <CA+sq2Ccf9K=to7rFAmWqWe-oXqNOGhZ+UQKui+ea+rSkR2pcbg@mail.gmail.com>
+References: <10fef112-37f1-0a1b-b5af-435acd032f01@codeaurora.org>
+ <4525901c-45d4-6bd8-eec6-ae92977f16d1@codeaurora.org>
+ <20170406155825.GA7705@e104818-lin.cambridge.arm.com>
+ <CADAEsF_Hr=mPspvuPsQtKWiSDu6oCjfyy0rGwWrF9EJo-ZO1JA@mail.gmail.com>
+ <08fa98de-760b-15bc-5220-fa449b08c118@codeaurora.org>
+ <725F073F-025B-48B9-9935-24EFEBF2B7DC@caviumnetworks.com>
+ <93d2819a-95b1-6606-74d4-0bc0a64db29e@codeaurora.org>
+ <CA+sq2CeTZyTrc3kC-kJEyrT5Tt5Wr47F=OVaCHwMRZk96qo4HA@mail.gmail.com>
+ <20170418144839.GF27592@e104818-lin.cambridge.arm.com>
+ <CA+sq2Ccf9K=to7rFAmWqWe-oXqNOGhZ+UQKui+ea+rSkR2pcbg@mail.gmail.com>
+Message-ID: <20170419120114.GB3238@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 01:51:35PM +0100, Vladimir Murzin wrote:
-> FYI, nothing has changed since last "ping" - Andr?s and Alexandre are still
-> dependant on this series to safely enable DMA on their platforms. It is really
-> scary that these patches do not move forward even though they are supposed to
-> fix the real issue :(
+On Tue, Apr 18, 2017 at 10:35:02PM +0530, Sunil Kovvuri wrote:
+> On Tue, Apr 18, 2017 at 8:18 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Mon, Apr 17, 2017 at 04:08:52PM +0530, Sunil Kovvuri wrote:
+> >> >>     >> Do you have an explanation on the performance variation when
+> >> >>     >> L1_CACHE_BYTES is changed? We'd need to understand how the network stack
+> >> >>     >> is affected by L1_CACHE_BYTES, in which context it uses it (is it for
+> >> >>     >> non-coherent DMA?).
+> >> >>     >
+> >> >>     > network stack use SKB_DATA_ALIGN to align.
+> >> >>     > ---
+> >> >>     > #define SKB_DATA_ALIGN(X) (((X) + (SMP_CACHE_BYTES - 1)) & \
+> >> >>     > ~(SMP_CACHE_BYTES - 1))
+> >> >>     >
+> >> >>     > #define SMP_CACHE_BYTES L1_CACHE_BYTES
+> >> >>     > ---
+> >> >>     > I think this is the reason of performance regression.
+> >> >>     >
+> >> >>
+> >> >>     Yes this is the reason for performance regression. Due to increases L1 cache alignment the
+> >> >>     object is coming from next kmalloc slab and skb->truesize is changing from 2304 bytes to
+> >> >>     4352 bytes. This in turn increases sk_wmem_alloc which causes queuing of less send buffers.
+> >>
+> >> With what traffic did you check 'skb->truesize' ? Increase from
+> >> 2304 to 4352 bytes doesn't seem to be real. I checked with ICMP
+> >> pkts with maximum size possible with 1500byte MTU and I don't see
+> >> such a bump. If the bump is observed with Iperf sending TCP packets
+> >> then I suggest to check if TSO is playing a part over here.
+> >
+> > I haven't checked truesize but I added some printks to __alloc_skb() (on
+> > a Juno platform) and the size argument to this function is 1720 on many
+> > occasions. With sizeof(struct skb_shared_info) of 320, the actual data
+> > allocation is exactly 2048 when using 64 byte L1_CACHE_SIZE. With a
+> > 128 byte cache size, it goes slightly over 2K, hence the 4K slab
+> > allocation.
+> 
+> Understood but still in my opinion this '4K slab allocation' cannot be
+> considered as an issue with cache line size, there are many network
+> drivers out there which do receive buffer or page recycling to
+> minimize (sometimes almost to zero) the cost of buffer allocation.
 
-That's probably because you didn't include all relevant people in this
-post. I think patches the patches for dma-noop.c should go through 
-Andrew Morton.
+The slab allocation shouldn't make much difference (unless you are
+running on a memory constrained system) but I don't understand how
+skb->truesize (which is almost half unused) affects the sk_wmem_alloc
+and its interaction with other bits in the network stack (e.g.
+tcp_limit_output_bytes).
 
+However, I do think it's worth investigating further to fully understand
+the issue.
 
+> >The 1720 figure surprised me a bit as well since I was
+> > expecting something close to 1500.
+> >
+> > The thing that worries me is that skb->data may be used as a buffer to
+> > DMA into. If that's the case, skb_shared_info is wrongly aligned based
+> > on SMP_CACHE_BYTES only and can lead to corruption on a non-DMA-coherent
+> > platform. It should really be ARCH_DMA_MINALIGN.
+> 
+> I didn't get this, if you see __alloc_skb()
+> 
+> 229         size = SKB_DATA_ALIGN(size);
+> 230         size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+> 
+> both DMA buffer and skb_shared_info are aligned to a cacheline separately,
+> considering 128byte alignment guarantees 64byte alignment as well, how
+> will this lead to corruption ?
 
-	Joerg
+It's the other way around: you align only to 64 byte while running on a
+platform with 128 byte cache lines and non-coherent DMA.
+
+> And if platform is non-DMA-coherent then again it's the driver which
+> should take of coherency by using appropriate map/unmap APIs and
+> should avoid any cacheline sharing btw DMA buffer and skb_shared_info.
+
+The problem is that the streaming DMA API can only work correctly on
+cacheline-aligned buffers (because of the cache invalidation it performs
+for DMA ops; even with clean&invalidate, the operation isn't always safe
+if a cacheline is shared between DMA and CPU buffers). In the skb case,
+we could have the data potentially sharing the last addresses of a DMA
+buffer with struct skb_shared_info.
+
+We may be able to get away with SKB_DATA_ALIGN not using
+ARCH_DMA_MINALIGN *if* skb_shared_info is *not* written before or during
+an inbound DMA transfer (though such tricks are arch specific).
+
+> > IIUC, the Cavium platform has coherent DMA, so it shouldn't be an issue
+> > if we go back to 64 byte cache lines.
+> 
+> Yes, Cavium platform is DMA coherent and there is no issue with reverting back
+> to 64byte cachelines. But do we want to do this because some platform has a
+> performance issue and this is an easy way to solve it. IMHO there seems
+> to be many ways to solve performance degradation within the driver itself, and
+> if those doesn't work then probably it makes sense to revert this.
+
+My initial thought was to revert the change because it was causing a
+significant performance regression on certain SoC. But given that it
+took over a year for people to follow up, it doesn't seem too urgent, so
+we should rather try to understand the issue and potential side effects
+of moving back to a 64 byte cache line.
+
+-- 
+Catalin
