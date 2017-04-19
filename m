@@ -1,134 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Apr 2017 11:31:57 +0100
-Subject: [PATCH 1/2] KVM: arm/arm64: vgic-v3: De-optimize VMCR
- save/restore when emulating a GICv2
-In-Reply-To: <20170419100809.GA4104@cbox>
-References: <20170410091944.19963-1-marc.zyngier@arm.com>
- <20170410091944.19963-2-marc.zyngier@arm.com> <20170419100809.GA4104@cbox>
-Message-ID: <d28a52b7-7c7a-05f3-24c0-866b17faa8cf@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Apr 2017 11:33:14 +0100
+Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+ <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+ <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+ <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+Message-ID: <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/17 11:08, Christoffer Dall wrote:
-> On Mon, Apr 10, 2017 at 10:19:43AM +0100, Marc Zyngier wrote:
->> When emulating a GICv2-on-GICv3, special care must be taken to only
->> save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
->> all Group-0 interrupts end-up being delivered as FIQ, which is
->> probably not what the guest expects, as demonstrated here with
->> an unhappy EFI:
->>
->> 	FIQ Exception at 0x000000013BD21CC4
->>
->> This means that we cannot perform the load/put trick when dealing
->> with VMCR_EL2 (because the host has SRE set), and we have to deal
->> with it in the world-switch.
->>
->> Fortunately, this is not the most common case (modern guests should
->> be able to deal with GICv3 directly), and the performance is not worse
->> than what it was before the VMCR optimization.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
->>  virt/kvm/arm/vgic/vgic.c      | 26 ++++++++++++++++++++------
->>  2 files changed, 26 insertions(+), 8 deletions(-)
->>
->> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> index 3d0b1ddb6929..91922c1eddc8 100644
->> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
->> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
->> @@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->>  	 * Make sure stores to the GIC via the memory mapped interface
->>  	 * are now visible to the system register interface.
->>  	 */
->> -	if (!cpu_if->vgic_sre)
->> +	if (!cpu_if->vgic_sre) {
->>  		dsb(st);
->> +		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
->> +	}
->>  
->>  	if (used_lrs) {
->>  		int i;
->> @@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->>  	 * delivered as a FIQ to the guest, with potentially fatal
->>  	 * consequences. So we must make sure that ICC_SRE_EL1 has
->>  	 * been actually programmed with the value we want before
->> -	 * starting to mess with the rest of the GIC.
->> +	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
->> +	 * particular.
->>  	 */
->>  	if (!cpu_if->vgic_sre) {
->>  		write_gicreg(0, ICC_SRE_EL1);
->>  		isb();
->> +		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
->>  	}
->>  
->>  	val = read_gicreg(ICH_VTR_EL2);
->> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->> index 3d0979c30721..32205f2ba6ff 100644
->> --- a/virt/kvm/arm/vgic/vgic.c
->> +++ b/virt/kvm/arm/vgic/vgic.c
->> @@ -667,10 +667,20 @@ void kvm_vgic_load(struct kvm_vcpu *vcpu)
->>  	if (unlikely(!vgic_initialized(vcpu->kvm)))
->>  		return;
->>  
->> -	if (kvm_vgic_global_state.type == VGIC_V2)
->> +	if (kvm_vgic_global_state.type == VGIC_V2) {
->>  		vgic_v2_load(vcpu);
->> -	else
->> -		vgic_v3_load(vcpu);
->> +	} else {
->> +		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
->> +
->> +		/*
->> +		 * If dealing with a GICv2 emulation on GICv3,
->> +		 * VMCR_EL2.VFIQen is dependent on ICC_SRE_EL1.SRE,
->> +		 * and we have to perform the VMCR_EL2 save/restore in
->> +		 * the world switch.
->> +		 */
->> +		if (likely(cpu_if->vgic_sre))
->> +			vgic_v3_load(vcpu);
+On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
+> On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
+> >> From: Dong Bo <dongbo4@huawei.com>
+> >>
+> >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+> >> the flag is propagated to its child processes, even the elf
+> >> files are marked as not requiring executable stack. It may
+> >> cause superfluous operations on some arch, e.g.
+> >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+> >> also marked as PROT_EXEC.
 > 
-> I wonder if this conditional should really be inside vgic_v3_load
-> instead?
+> > That's affecting most architectures with a risk of ABI breakage. We
+> > could do it on arm64 only, though I'm not yet clear on the ABI
+> > implications (at a first look, there shouldn't be any).
+> 
+> Is there a reason why it isn't just straightforwardly a bug
+> (which we could fix) to make READ_IMPLIES_EXEC propagate to
+> child processes?
 
-That's a good point. It will keep the wart out of the main vgic code and
-make it an "implementation detail".
+While I agree that it looks like a bug, if there are user programs
+relying on such bug we call it "ABI". On arm64, I don't think there is
+anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
+the compat task handling without the corresponding change in arch/arm.
 
-> 
->> +	}
->>  }
->>  
->>  void kvm_vgic_put(struct kvm_vcpu *vcpu)
->> @@ -678,10 +688,14 @@ void kvm_vgic_put(struct kvm_vcpu *vcpu)
->>  	if (unlikely(!vgic_initialized(vcpu->kvm)))
->>  		return;
->>  
->> -	if (kvm_vgic_global_state.type == VGIC_V2)
->> +	if (kvm_vgic_global_state.type == VGIC_V2) {
->>  		vgic_v2_put(vcpu);
->> -	else
->> -		vgic_v3_put(vcpu);
->> +	} else {
->> +		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
->> +
->> +		if (likely(cpu_if->vgic_sre))
->> +			vgic_v3_put(vcpu);
-> 
-> And same here?
-> 
->> +	}
->>  }
->>  
->>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
->> -- 
->> 2.11.0
->>
-> 
-> Otherwise looks good.
+> AFAICT this should be per-process: just because
+> init happens not to have been (re)compiled to permit non-executable
+> stacks doesn't mean every process on the system needs to have
+> an executable stack.
 
-Thanks. I'll respin this patch shortly.
+I think this also affects the heap if brk(2) is used (via
+VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
+days).
 
-	M.
+> Behaviour shouldn't be variable across architectures either, I would
+> hope.
+
+The behaviour has already been variable for a long time. Even on x86,
+AFAICT x86_32 differs from x86_64 in this respect.
+
+Anyway, the patch should be posted to linux-arch for a cross-arch
+discussion.
+
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
