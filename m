@@ -1,44 +1,33 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 20 Apr 2017 00:06:03 +0200
-Subject: [PATCH V3] PM / OPP: Use - instead of @ for DT entries
-In-Reply-To: <20170419142215.GA12105@localhost>
-References: <734c5d5a66ef8a5505f368fc68a8ab9c02d710f9.1492492253.git.viresh.kumar@linaro.org>
- <20170419142215.GA12105@localhost>
-Message-ID: <3142028.bncGUUQ4qB@aspire.rjw.lan>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 20 Apr 2017 08:38:17 +1000
+Subject: linux-next: manual merge of the at91 tree with the arm-soc tree
+Message-ID: <20170420083817.5a44b69c@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 19, 2017 07:22:15 AM Olof Johansson wrote:
-> Hi Viresh,
-> 
-> On Tue, Apr 18, 2017 at 10:44:50AM +0530, Viresh Kumar wrote:
-> > Compiling the DT file with W=1, DTC warns like follows:
-> > 
-> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-> > unit name, but no reg property
-> > 
-> > Fix this by replacing '@' with '-' as the OPP nodes will never have a
-> > "reg" property.
-> > 
-> > Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
-> > Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com> (uniphier)
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> 
-> We've already turned down other patches that does this in a sweeping manner
-> like this, since they tend to be conflict prone with other DT changes.
-> 
-> Please split per platform and merge with each maintainer.
+Hi Nicolas,
 
-OK
+Today's linux-next merge of the at91 tree got a conflict in:
 
-So I'm assuming that you guys will take care of this going forward.
+  arch/arm/boot/dts/at91-tse850-3.dts
 
-Thanks,
-Rafael
+between commit:
+
+  e67cedc92812 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
+
+from the arm-soc tree and commit:
+
+  29dd89418007 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
+
+from the at91 tree.
+
+I fixed it up (I used the arm-soc tree version) and can carry the fix as
+necessary. This is now fixed as far as linux-next is concerned, but any
+non trivial conflicts should be mentioned to your upstream maintainer
+when your tree is submitted for merging.  You may also want to consider
+cooperating with the maintainer of the conflicting tree to minimise any
+particularly complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
