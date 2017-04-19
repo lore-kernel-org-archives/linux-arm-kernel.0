@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:33:35 -0700
-Subject: [GIT PULL] Allwinner arm64 config changes for 4.12
-In-Reply-To: <20170406081904.ctvamxa2u4mcavkf@lukather>
-References: <20170406081904.ctvamxa2u4mcavkf@lukather>
-Message-ID: <20170419123335.GO17004@localhost>
+Date: Wed, 19 Apr 2017 05:34:21 -0700
+Subject: [GIT PULL] Allwinner core changes for 4.12
+In-Reply-To: <20170406083311.be3gu26bk5y2glxd@lukather>
+References: <20170406083311.be3gu26bk5y2glxd@lukather>
+Message-ID: <20170419123421.GP17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 10:19:04AM +0200, Maxime Ripard wrote:
+On Thu, Apr 06, 2017 at 10:33:11AM +0200, Maxime Ripard wrote:
 > Hi Arnd, Olof,
 > 
-> Please pull the following changes for the next merge window.
+> Here are some patches for the next merge window.
 > 
 > Thanks!
 > Maxime
@@ -21,18 +21,19 @@ On Thu, Apr 06, 2017 at 10:19:04AM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-config64-for-4.12
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-core-for-4.12
 > 
-> for you to fetch changes up to 565fbac18efef447a6a97325664c77ddcbe82936:
+> for you to fetch changes up to 87c586a6a0e166e0403533c2f67a3ae74d26fc14:
 > 
->   arm64: defconfig: add Allwinner USB PHY (2017-03-24 16:43:02 +0100)
+>   MAINTAINERS: Update the Allwinner sunXi entry (2017-04-04 17:50:59 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner arm64 config changes for 4.12
+> Allwinner core changes for 4.12
 > 
-> Two patches to change our Kconfig option and add new options in the
-> defconfig.
+> A change to our MAINTAINERS entry to reflect the new git tree, and a select
+> in our KConfig option to enable the device frequency scaling.
 
-Merged, thanks!
+Merged, thanks.
+
 
 -Olof
