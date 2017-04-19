@@ -1,22 +1,16 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 19 Apr 2017 13:09:18 +0800
-Subject: [PATCH 3/4] ARM: sun8i: h3: orangepi-pc: Enable USB OTG
+Date: Wed, 19 Apr 2017 13:09:19 +0800
+Subject: [PATCH 4/4] ARM: sun8i: h3: bananapi-m2-plus: Enable USB OTG
 In-Reply-To: <20170419050919.6762-1-wens@csie.org>
 References: <20170419050919.6762-1-wens@csie.org>
-Message-ID: <20170419050919.6762-4-wens@csie.org>
+Message-ID: <20170419050919.6762-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi PC, PC Plus, and Plus 2E all have a USB OTG port
-that can be used in both powered host mode and peripheral mode.
-When in peripheral mode, the port does not power the board.
-There is no VBUS sensing on the port. All three boards have all
-related pins routed the same way.
-
-The device tree file for the Orange Pi Plus 2E is based on the
-Orange Pi PC Plus, which itself is based on the Orange Pi PC.
-Changes to the base Orange Pi PC device tree file affects all 3
-boards.
+The Bananapi M2 Plus has a USB OTG port that can be used in both
+powered host mode and peripheral mode. When in peripheral mode,
+the port does not power the board. There is no VBUS sensing on
+the port.
 
 This patch adds the regulator controlling VBUS on the OTG port,
 the GPIO for the ID detect pin, and enables the USB OTG and host
@@ -24,15 +18,15 @@ controllers.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 22 +++++++++++++++++++++-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 22 +++++++++++++++++++++-
  1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index f148111c326d..1a044b17d6c6 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -97,6 +97,10 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 52acbe111cad..17c7c088cdea 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -92,6 +92,10 @@
+ 	};
  };
  
 +&ehci0 {
@@ -42,7 +36,7 @@ index f148111c326d..1a044b17d6c6 100644
  &ehci1 {
  	status = "okay";
  };
-@@ -125,6 +129,10 @@
+@@ -145,6 +149,10 @@
  	status = "okay";
  };
  
@@ -53,20 +47,20 @@ index f148111c326d..1a044b17d6c6 100644
  &ohci1 {
  	status = "okay";
  };
-@@ -156,6 +164,11 @@
+@@ -170,6 +178,11 @@
  	};
  };
  
 +&reg_usb0_vbus {
-+	gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
++	gpio = <&pio 3 11 GPIO_ACTIVE_HIGH>; /* PD11 */
 +	status = "okay";
 +};
 +
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-@@ -180,7 +193,14 @@
- 	status = "disabled";
+@@ -182,7 +195,14 @@
+ 	status = "okay";
  };
  
 +&usb_otg {
@@ -75,10 +69,10 @@ index f148111c326d..1a044b17d6c6 100644
 +};
 +
  &usbphy {
--	/* USB VBUS is always on */
-+	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
+-	/* USB VBUS is on as long as VCC-IO is on */
++	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
 +	usb0_vbus-supply = <&reg_usb0_vbus>;
-+	/* VBUS on USB host ports are always on */
++	/* USB host VBUS is on as long as VCC-IO is on */
  	status = "okay";
  };
 -- 
