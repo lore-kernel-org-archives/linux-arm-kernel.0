@@ -1,16 +1,16 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Apr 2017 09:11:13 -0700
-Subject: [PATCH 1/2] clk: clk-imx7d: fix ahb clk definition
-In-Reply-To: <1491878269-9559-1-git-send-email-aisheng.dong@nxp.com>
+Date: Wed, 19 Apr 2017 09:11:16 -0700
+Subject: [PATCH 2/2] clk: imx7d: add the missing ipg_root_clk
+In-Reply-To: <1491878269-9559-2-git-send-email-aisheng.dong@nxp.com>
 References: <1491878269-9559-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170419161113.GY7065@codeaurora.org>
+ <1491878269-9559-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170419161116.GZ7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/11, Dong Aisheng wrote:
-> MX7D ahb clk actually has no LPCG gate, current LPCG offset 0x4200
-> used actually is for adc, not ahb. After fix, correct ocram_s_clk
-> parent accordingly as well.
+> Add the missing ipg_root_clk which actually is already used by many
+> orphan clks in current tree.
 > 
 > Cc: Shawn Guo <shawnguo@kernel.org>
 > Cc: Stefan Agner <stefan@agner.ch>
