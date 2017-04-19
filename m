@@ -1,23 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Apr 2017 11:56:44 +0200
-Subject: [PATCH v3 7/7] ARM: dma-mapping: Remove traces of NOMMU code
-In-Reply-To: <1489137839-549-8-git-send-email-vladimir.murzin@arm.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <1489137839-549-8-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CAK8P3a3ogS9RyxqOvxN1EQi2BWo-bpMVHasgY=eh48RMhmzVWw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Apr 2017 10:58:30 +0100
+Subject: LDM/STM alignment fixups on arm64
+In-Reply-To: <58F704D6.6000301@codeaurora.org>
+References: <58F704D6.6000301@codeaurora.org>
+Message-ID: <20170419095830.GK17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 10:23 AM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> DMA operations for NOMMU case have been just factored out into
-> separate compilation unit, so don't keep dead code.
->
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> Tested-by: Andras Szemzo <sza@esh.hu>
-> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Wed, Apr 19, 2017 at 12:03:58PM +0530, Srinivas Ramana wrote:
+> Hi,
+> 
+> While understanding how the alignment are handled on arm and arm64, we came
+> across the fixups for LDM/LDRD/STM on arm where as these fixups are not
+> present on arm64.
+> 
+> There may be some specific reason why these fixups are not ported to arm64.
+> Can you please help us understand this?
+> 
+> With this difference in how kernel handles 32-bit apps on arm and arm64,
+> there can be apps which are working without abort on arm, but fail on arm64
+> (SIGBUS). We have tried to get some history on web, but not successful.
+> 
+> If this is indeed missing on arm64, do you see any issue if its ported (does
+> it fail any guidance)?
 
-The patch is "obviously correct" after the previous changes,
+Do you have an application that fails because of this?  Your email makes
+it sound very theoretical.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
