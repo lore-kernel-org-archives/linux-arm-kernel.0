@@ -1,59 +1,131 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:48:52 +0100
-Subject: [PATCH v4 03/21] ARM64: implement pci_remap_cfgspace() interface
-In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-4-lorenzo.pieralisi@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Apr 2017 17:44:32 +0100
+Subject: [PATCH 15/16] clocksource: arm_arch_timer: add GTDT support for
+ memory-mapped timer
+In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1492620273-30037-16-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
-and Posting") defines rules for PCI configuration space transactions
-ordering and posting, that state that configuration writes
-are non-posted transactions.
+From: Fu Wei <fu.wei@linaro.org>
 
-This rule is reinforced by the ARM v8 architecture reference manual
-(issue A.k, Early Write Acknowledgment) that explicitly recommends
-that No Early Write Acknowledgment attribute should be used to map
-PCI configuration (write) transactions.
+The patch add memory-mapped timer register support by using the
+information provided by the new GTDT driver of ACPI.
 
-Current ioremap interface on ARM64 implements mapping functions
-where the Early Write Acknowledgment hint is enabled, so they
-cannot be used to map PCI configuration space in a PCI specs
-compliant way.
-
-Implement an ARM64 specific pci_remap_cfgspace() interface
-that allows to map PCI config region with nGnRnE attributes, providing
-a remap function that complies with PCI specifications and the ARMv8
-architecture reference manual recommendations.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+[Mark: verify CNTFRQ, only register the first frame]
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/include/asm/io.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 79 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 76 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 0c00c87..7a03250 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -173,6 +173,16 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define iounmap				__iounmap
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index e398228..2208fa4 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -1386,10 +1386,79 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
+ 		       arch_timer_mem_of_init);
  
- /*
-+ * PCI configuration space mapping function.
-+ *
-+ * PCI specifications disallows posted write configuration transactions.
-+ * Add an arch specific pci_remap_cfgspace definition that is implemented
-+ * through nGnRnE device memory attribute as recommended by the ARM v8
-+ * Architecture reference manual Issue A.k B2.8.2 "Device memory".
-+ */
-+#define pci_remap_cfgspace(addr, size) __ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRnE))
+ #ifdef CONFIG_ACPI_GTDT
+-/* Initialize per-processor generic timer */
++static int __init
++arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
++{
++	struct arch_timer_mem_frame *frame;
++	u32 rate;
++	int i;
 +
-+/*
-  * io{read,write}{16,32,64}be() macros
-  */
- #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
++	for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
++		frame = &timer_mem->frame[i];
++
++		if (!frame->valid)
++			continue;
++
++		rate = arch_timer_mem_frame_get_cntfrq(frame);
++		if (rate == arch_timer_rate)
++			continue;
++
++		pr_err(FW_BUG "CNTFRQ mismatch: frame @ %pa: (0x%08lx), CPU: (0x%08lx)\n",
++			&frame->cntbase,
++			(unsigned long)rate, (unsigned long)arch_timer_rate);
++
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int __init arch_timer_mem_acpi_init(int platform_timer_count)
++{
++	struct arch_timer_mem *timers, *timer;
++	struct arch_timer_mem_frame *frame;
++	int timer_count, i, ret = 0;
++
++	timers = kcalloc(platform_timer_count, sizeof(*timers),
++			    GFP_KERNEL);
++	if (!timers)
++		return -ENOMEM;
++
++	ret = acpi_arch_timer_mem_init(timers, &timer_count);
++	if (ret || !timer_count)
++		goto out;
++
++	for (i = 0; i < timer_count; i++) {
++		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
++		if (ret) {
++			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
++			goto out;
++		}
++	}
++
++	/*
++	 * While unlikely, it's theoretically possible that none of the frames
++	 * in a timer expose the combination of feature we want.
++	 */
++	for (i = i; i < timer_count; i++) {
++		timer = &timers[i];
++
++		frame = arch_timer_mem_find_best_frame(timer);
++		if (frame)
++			break;
++	}
++
++	if (frame)
++		ret = arch_timer_mem_frame_register(frame);
++out:
++	kfree(timers);
++	return ret;
++}
++
++/* Initialize per-processor generic timer and memory-mapped timer(if present) */
+ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ {
+-	int ret;
++	int ret, platform_timer_count;
+ 
+ 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
+ 		pr_warn("already initialized, skipping\n");
+@@ -1398,7 +1467,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 
+ 	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
+ 
+-	ret = acpi_gtdt_init(table, NULL);
++	ret = acpi_gtdt_init(table, &platform_timer_count);
+ 	if (ret) {
+ 		pr_err("Failed to init GTDT table.\n");
+ 		return ret;
+@@ -1441,6 +1510,10 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 	if (ret)
+ 		return ret;
+ 
++	if (platform_timer_count &&
++	    arch_timer_mem_acpi_init(platform_timer_count))
++		pr_err("Failed to initialize memory-mapped timer.\n");
++
+ 	return arch_timer_common_init();
+ }
+ CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
 -- 
-2.10.0
+1.9.1
