@@ -1,32 +1,52 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Wed, 19 Apr 2017 11:20:45 +0300
-Subject: [PATCH 3/3] iio: tools: generic_buffer: increase trigger length
+Date: Wed, 19 Apr 2017 11:20:43 +0300
+Subject: [PATCH 1/3] ARM: dts: at91: sama5d2_xplained: enable ADTRG pin
 In-Reply-To: <1492590045-17329-1-git-send-email-eugen.hristev@microchip.com>
 References: <1492590045-17329-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1492590045-17329-4-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1492590045-17329-2-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increased trigger length to 50 in order to cope with trigger names like
-fc030000.adc-dev0-external-rising
+Enable pinctrl for ADTRG pin (PD31) for ADC hardware trigger support.
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- tools/iio/iio_utils.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/tools/iio/iio_utils.h b/tools/iio/iio_utils.h
-index 780f201..9d59771 100644
---- a/tools/iio/iio_utils.h
-+++ b/tools/iio/iio_utils.h
-@@ -13,7 +13,7 @@
- #include <stdint.h>
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 0bef9e0..04754b1 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -303,7 +303,7 @@
+ 				vddana-supply = <&vdd_3v3_lp_reg>;
+ 				vref-supply = <&vdd_3v3_lp_reg>;
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&pinctrl_adc_default>;
++				pinctrl-0 = <&pinctrl_adc_default &pinctrl_adtrg_default>;
+ 				status = "okay";
+ 			};
  
- /* Made up value to limit allocation sizes */
--#define IIO_MAX_NAME_LENGTH 30
-+#define IIO_MAX_NAME_LENGTH 50
+@@ -322,6 +322,20 @@
+ 					bias-disable;
+ 				};
  
- #define FORMAT_SCAN_ELEMENTS_DIR "%s/scan_elements"
- #define FORMAT_TYPE_FILE "%s_type"
++				/*
++				 * The ADTRG pin can work on any edge type.
++				 * In here it's being pulled up, so need to
++				 * connect it to ground to get an edge e.g.
++				 * Trigger can be configured on falling, rise
++				 * or any edge, and the pull-up can be changed
++				 * to pull-down or left floating according to
++				 * needs.
++				 */
++				pinctrl_adtrg_default: adtrg_default {
++					pinmux = <PIN_PD31__ADTRG>;
++					bias-pull-up;
++				};
++
+ 				pinctrl_charger_chglev: charger_chglev {
+ 					pinmux = <PIN_PA12__GPIO>;
+ 					bias-disable;
 -- 
 2.7.4
