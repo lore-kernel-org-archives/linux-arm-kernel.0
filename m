@@ -1,31 +1,31 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Wed, 19 Apr 2017 13:18:11 -0700
-Subject: [PATCH] soc: brcmstb: enable drivers for ARM64 also
-Message-ID: <20170419201811.70246-1-code@mmayer.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 19 Apr 2017 22:22:03 +0200
+Subject: [PATCH 2/3] ARM: dts: imx6qdl-nitrogen6_som2: fix rv4162 compatible
+In-Reply-To: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
+References: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170419202204.7689-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Mayer <mmayer@broadcom.com>
+The rv4162 vendor is microcrystal, not ST.
 
-We enable the BRCMSTB SoC drivers not only for ARM, but also ARM64.
-
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/soc/bcm/Kconfig | 2 +-
+ arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
-index a39b0d5..b3834b9 100644
---- a/drivers/soc/bcm/Kconfig
-+++ b/drivers/soc/bcm/Kconfig
-@@ -11,7 +11,7 @@ config RASPBERRYPI_POWER
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+index 559da17297ef..aeaa5a6e4fcf 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+@@ -326,7 +326,7 @@
+ 	};
  
- config SOC_BRCMSTB
- 	bool "Broadcom STB SoC drivers"
--	depends on ARM
-+	depends on ARM || ARM64
- 	select SOC_BUS
- 	help
- 	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
+ 	rtc at 68 {
+-		compatible = "st,rv4162";
++		compatible = "microcrystal,rv4162";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_rv4162>;
+ 		reg = <0x68>;
 -- 
-2.7.4
+2.11.0
