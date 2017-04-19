@@ -1,13 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:10:36 -0700
-Subject: [GIT PULL 1/4] dt-bindings: Updates for v4.12-rc1
-In-Reply-To: <20170406231020.32048-1-thierry.reding@gmail.com>
+Date: Wed, 19 Apr 2017 06:12:01 -0700
+Subject: [GIT PULL 2/4] ARM: tegra: Maintainer changes for v4.12-rc1
+In-Reply-To: <20170406231020.32048-2-thierry.reding@gmail.com>
 References: <20170406231020.32048-1-thierry.reding@gmail.com>
-Message-ID: <20170419131036.GA29219@localhost>
+ <20170406231020.32048-2-thierry.reding@gmail.com>
+Message-ID: <20170419131201.GB29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 01:10:17AM +0200, Thierry Reding wrote:
+On Fri, Apr 07, 2017 at 01:10:18AM +0200, Thierry Reding wrote:
 > Hi ARM SoC maintainers,
 > 
 > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
@@ -16,26 +17,31 @@ On Fri, Apr 07, 2017 at 01:10:17AM +0200, Thierry Reding wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.12-dt-bindings
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.12-misc
 > 
-> for you to fetch changes up to bf594a896cdbae4a581eb80a2bdbda8df6997d75:
+> for you to fetch changes up to 89d39a63b2c25c8da1a038fdb208bfed041c889c:
 > 
->   dt-bindings: Add documentation for GP10B GPU (2017-04-04 16:08:18 +0200)
+>   MAINTAINERS: tegra: Remove self as maintainer (2017-03-08 14:54:14 +0100)
 > 
 > Thanks,
 > Thierry
 > 
 > ----------------------------------------------------------------
-> dt-bindings: Updates for v4.12-rc1
+> ARM: tegra: Maintainer changes for v4.12-rc1
 > 
-> This contains an update for the flow controller device tree binding as
-> well as the addition of the binding for the GP10B GPU found on the new
-> Tegra186 (Parker) SoC.
+> Stephen has been focussing on other areas of the open source community
+> within NVIDIA, but Jon has been helping out with the kernel development
+> for a while now. Replace Stephen's entry with one from Jon.
 
-Hm, usually we bundle bindings updates with the driver update that makes use of
-the new/amended binding.
+Welcome onboard as a maintainer, Jon!
 
-Anyway, merged this into next/dt. Thanks!
+> Secondly, Alex has unfortunately left the company and therefore won't
+> be serving as a Tegra maintainer any longer.
+
+Sad, but best of luck to Alex in new adventures.
+
+
+Merged branch into next/fixes-non-critical.
 
 
 -Olof
