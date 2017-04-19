@@ -1,99 +1,156 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:48:53 +0100
-Subject: [PATCH v4 04/21] ARM: implement pci_remap_cfgspace() interface
-In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-5-lorenzo.pieralisi@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Apr 2017 17:44:33 +0100
+Subject: [PATCH 16/16] acpi/arm64: Add SBSA Generic Watchdog support in GTDT
+ driver
+In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1492620273-30037-17-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
-and Posting") define rules for PCI configuration space transactions
-ordering and posting, that state that configuration writes have to
-be non-posted transactions.
+From: Fu Wei <fu.wei@linaro.org>
 
-Current ioremap interface on ARM provides mapping functions that
-provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
-memory type) aka posted writes, so PCI host controller drivers have
-no arch interface to remap PCI configuration space with memory
-attributes that comply with the PCI specifications for configuration
-space.
+This driver adds support for parsing SBSA Generic Watchdog timer
+in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
+and creating a platform device with that information.
 
-Implement an ARM specific pci_remap_cfgspace() interface that allows to
-map PCI config memory regions with MT_UNCACHED memory type (ie strongly
-ordered - non-posted writes), providing a remap function that complies
-with PCI specifications for config space transactions.
+This allows the operating system to obtain device data from the
+resource of platform device. The platform device named "sbsa-gwdt"
+can be used by the ARM SBSA Generic Watchdog driver.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm/include/asm/io.h | 10 ++++++++++
- arch/arm/mm/ioremap.c     |  7 +++++++
- arch/arm/mm/nommu.c       | 12 ++++++++++++
- 3 files changed, 29 insertions(+)
+ drivers/acpi/arm64/gtdt.c | 103 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 42871fb..74d1b09 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -187,6 +187,16 @@ static inline void pci_ioremap_set_mem_type(int mem_type) {}
- extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
+diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
+index b904667..597a737 100644
+--- a/drivers/acpi/arm64/gtdt.c
++++ b/drivers/acpi/arm64/gtdt.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
++#include <linux/platform_device.h>
  
- /*
-+ * PCI configuration space mapping function.
-+ *
-+ * PCI specifications does not allow configuration write
-+ * transactions to be posted. Add an arch specific
-+ * pci_remap_cfgspace definition that is implemented
-+ * through strongly ordered memory mappings.
-+ */
-+#define pci_remap_cfgspace pci_remap_cfgspace
-+void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size);
-+/*
-  * Now, pick up the machine-defined IO definitions
-  */
- #ifdef CONFIG_NEED_MACH_IO_H
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index ff0eed2..fc91205 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -481,6 +481,13 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
- 				  __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+ #include <clocksource/arm_arch_timer.h>
+ 
+@@ -60,6 +61,17 @@ static inline bool is_timer_block(void *platform_timer)
+ 	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
  }
- EXPORT_SYMBOL_GPL(pci_ioremap_io);
-+
-+void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size)
-+{
-+	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
-+				   __builtin_return_address(0));
-+}
-+EXPORT_SYMBOL_GPL(pci_remap_cfgspace);
- #endif
  
- /*
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 33a45bd..3b8e728 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -436,6 +436,18 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
- }
- EXPORT_SYMBOL(ioremap_wc);
- 
-+#ifdef CONFIG_PCI
-+
-+#include <asm/mach/map.h>
-+
-+void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size)
++static inline bool is_non_secure_watchdog(void *platform_timer)
 +{
-+	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
-+				   __builtin_return_address(0));
-+}
-+EXPORT_SYMBOL_GPL(pci_remap_cfgspace);
-+#endif
++	struct acpi_gtdt_header *gh = platform_timer;
++	struct acpi_gtdt_watchdog *wd = platform_timer;
 +
- void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
++	if (gh->type != ACPI_GTDT_TYPE_WATCHDOG)
++		return false;
++
++	return !(wd->timer_flags & ACPI_GTDT_WATCHDOG_SECURE);
++}
++
+ static int __init map_gt_gsi(u32 interrupt, u32 flags)
  {
- 	return (void *)phys_addr;
+ 	int trigger, polarity;
+@@ -312,3 +324,94 @@ int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
+ 
+ 	return 0;
+ }
++
++/*
++ * Initialize a SBSA generic Watchdog platform device info from GTDT
++ */
++static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
++					int index)
++{
++	struct platform_device *pdev;
++	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
++
++	/*
++	 * According to SBSA specification the size of refresh and control
++	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ??? 0xFFF).
++	 */
++	struct resource res[] = {
++		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
++		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
++		DEFINE_RES_IRQ(irq),
++	};
++	int nr_res = ARRAY_SIZE(res);
++
++	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
++		 wd->refresh_frame_address, wd->control_frame_address,
++		 wd->timer_interrupt, wd->timer_flags);
++
++	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
++		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
++		acpi_unregister_gsi(wd->timer_interrupt);
++		return -EINVAL;
++	}
++
++	if (irq <= 0) {
++		pr_warn("failed to map the Watchdog interrupt.\n");
++		nr_res--;
++	}
++
++	/*
++	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
++	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
++	 * The platform driver can get device info below by matching this name.
++	 */
++	pdev = platform_device_register_simple("sbsa-gwdt", index, res, nr_res);
++	if (IS_ERR(pdev)) {
++		acpi_unregister_gsi(wd->timer_interrupt);
++		return PTR_ERR(pdev);
++	}
++
++	return 0;
++}
++
++static int __init gtdt_sbsa_gwdt_init(void)
++{
++	void *platform_timer;
++	struct acpi_table_header *table;
++	int ret, timer_count, gwdt_count = 0;
++
++	if (acpi_disabled)
++		return 0;
++
++	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
++		return -EINVAL;
++
++	/*
++	 * Note: Even though the global variable acpi_gtdt_desc has been
++	 * initialized by acpi_gtdt_init() while initializing the arch timers,
++	 * when we call this function to get SBSA watchdogs info from GTDT, the
++	 * pointers stashed in it are stale (since they are early temporary
++	 * mappings carried out before acpi_permanent_mmap is set) and we need
++	 * to re-initialize them with permanent mapped pointer values to let the
++	 * GTDT parsing possible.
++	 */
++	ret = acpi_gtdt_init(table, &timer_count);
++	if (ret || !timer_count)
++		return ret;
++
++	for_each_platform_timer(platform_timer) {
++		if (is_non_secure_watchdog(platform_timer)) {
++			ret = gtdt_import_sbsa_gwdt(platform_timer, gwdt_count);
++			if (ret)
++				break;
++			gwdt_count++;
++		}
++	}
++
++	if (gwdt_count)
++		pr_info("found %d SBSA generic Watchdog(s).\n", gwdt_count);
++
++	return ret;
++}
++
++device_initcall(gtdt_sbsa_gwdt_init);
 -- 
-2.10.0
+1.9.1
