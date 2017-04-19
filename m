@@ -1,60 +1,67 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Thu, 20 Apr 2017 00:38:50 +0100
-Subject: [PATCH v4 04/18] dt-bindings: syscon: Add DT bindings
- documentation for Allwinner syscon
-In-Reply-To: <20170412111400.2296-5-clabbe.montjoie@gmail.com>
-References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
- <20170412111400.2296-5-clabbe.montjoie@gmail.com>
-Message-ID: <9382f9ae-895a-397b-3d8c-846cb0bc4486@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 19 Apr 2017 18:56:46 -0500
+Subject: [PATCH v3 03/21] ARM: dts: omap: Add generic compatible string
+ for I2C EEPROM
+In-Reply-To: <20170414010445.21727-4-javier@osg.samsung.com>
+References: <20170414010445.21727-1-javier@osg.samsung.com>
+ <20170414010445.21727-4-javier@osg.samsung.com>
+Message-ID: <20170419235646.j6cc3vm7eru6buv6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/17 12:13, Corentin Labbe wrote:
-> This patch adds documentation for Device-Tree bindings for the
-> syscon present in allwinner devices.
+On Thu, Apr 13, 2017 at 10:04:27PM -0300, Javier Martinez Canillas wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+> 
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > ---
->  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> new file mode 100644
-> index 0000000..c056c5b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> @@ -0,0 +1,19 @@
-> +* Allwinner sun8i system controller
-> +
-> +This file describes the bindings for the system controller present in
-> +Allwinner SoC H3, A83T and A64.
-> +The principal function of this syscon is to control EMAC PHY choice and
-> +config.
-> +
-> +Required properties for the system controller:
-> +- reg: address and length of the register for the device.
-> +- compatible: should be "syscon" and one of the following string:
-> +		"allwinner,sun8i-h3-system-controller"
-> +		"allwinner,sun8i-a64-system-controller"
-
-While sun8i might make some sense technically, all 64-bit sunxi
-compatible strings use the sun50i prefix to follow the Allwinner naming.
-So this should read:
-		"allwinner,sun50i-a64-system-controller"
-
-Also I am wondering if we should add a compatible string for the H5
-(support for that SoC is in -next already):
-		"allwinner,sun50i-h5-system-controller"
-
-Cheers,
-Andre.
-
-> +		"allwinner,sun8i-a83t-system-controller"
-> +
-> +Example:
-> +syscon: syscon at 01c00000 {
-> +	compatible = "allwinner,sun8i-h3-system-controller", "syscon";
-> +	reg = <0x01c00000 0x1000>;
-> +};
+> Changes in v3: None
+> Changes in v2: None
 > 
+>  arch/arm/boot/dts/am335x-baltos.dtsi            |  2 +-
+>  arch/arm/boot/dts/am335x-base0033.dts           |  2 +-
+>  arch/arm/boot/dts/am335x-bone-common.dtsi       | 10 +++++-----
+>  arch/arm/boot/dts/am335x-nano.dts               |  2 +-
+>  arch/arm/boot/dts/am335x-pepper.dts             |  2 +-
+>  arch/arm/boot/dts/am335x-shc.dts                |  2 +-
+>  arch/arm/boot/dts/am335x-sl50.dts               |  2 +-
+>  arch/arm/boot/dts/am437x-idk-evm.dts            |  2 +-
+>  arch/arm/boot/dts/am437x-sk-evm.dts             |  2 +-
+>  arch/arm/boot/dts/am43x-epos-evm.dts            |  2 +-
+>  arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  2 +-
+>  arch/arm/boot/dts/omap3-cm-t3x.dtsi             |  2 +-
+>  arch/arm/boot/dts/omap3-gta04.dtsi              |  2 +-
+>  arch/arm/boot/dts/omap3-sb-t35.dtsi             |  2 +-
+>  arch/arm/boot/dts/omap4-var-som-om44.dtsi       |  2 +-
+>  arch/arm/boot/dts/omap5-cm-t54.dts              |  2 +-
+>  arch/arm/boot/dts/omap5-sbc-t54.dts             |  2 +-
+>  17 files changed, 21 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
+> index d42b98f15e8b..6ca780d0623f 100644
+> --- a/arch/arm/boot/dts/am335x-baltos.dtsi
+> +++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+> @@ -255,7 +255,7 @@
+>  	};
+>  
+>  	at24 at 50 {
+> -		compatible = "at24,24c02";
+> +		compatible = "at24,24c02", "atmel,24c02";
+
+I think you can just drop the at24 compatibles. A new kernel doesn't 
+need it. An old kernel ignores the manufacturer. I checked that u-boot 
+only matches on "atmel,*", so okay there. Don't know about the *BSDs. I 
+couldn't find anything.
+
+Minimally, the deprecated compatible should come last.
+
+Rob
