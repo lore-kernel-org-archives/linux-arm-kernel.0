@@ -1,45 +1,45 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:49:06 +0100
-Subject: [PATCH v4 17/21] PCI: tegra: update PCI config space remap function
+Date: Wed, 19 Apr 2017 17:49:05 +0100
+Subject: [PATCH v4 16/21] PCI: xgene: update PCI config space remap function
 In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
 References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-18-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-17-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 PCI configuration space should be mapped with a memory region type that
 generates on the CPU host bus non-posted write transations. Update the
-driver to use correct memory mapping attributes to map config space
-regions to enforce configuration space non-posted writes behaviour.
+driver to use the devm_pci_remap_cfg* interface to make sure the correct
+memory mappings for PCI configuration space are used.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/host/pci-tegra.c | 4 ++--
+ drivers/pci/host/pci-xgene.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index ed8a93f..2618f87 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -380,7 +380,7 @@ static struct tegra_pcie_bus *tegra_pcie_bus_alloc(struct tegra_pcie *pcie,
- 						   unsigned int busnr)
- {
- 	struct device *dev = pcie->dev;
--	pgprot_t prot = pgprot_device(PAGE_KERNEL);
-+	pgprot_t prot = pgprot_noncached(PAGE_KERNEL);
- 	phys_addr_t cs = pcie->cs->start;
- 	struct tegra_pcie_bus *bus;
- 	unsigned int i;
-@@ -1962,7 +1962,7 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
- 		rp->pcie = pcie;
- 		rp->np = port;
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 1a61087..de19898 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -248,7 +248,7 @@ static int xgene_pcie_ecam_init(struct pci_config_window *cfg, u32 ipversion)
+ 		dev_err(dev, "can't get CSR resource\n");
+ 		return ret;
+ 	}
+-	port->csr_base = devm_ioremap_resource(dev, &csr);
++	port->csr_base = devm_pci_remap_cfg_resource(dev, &csr);
+ 	if (IS_ERR(port->csr_base))
+ 		return PTR_ERR(port->csr_base);
  
--		rp->base = devm_ioremap_resource(dev, &rp->regs);
-+		rp->base = devm_pci_remap_cfg_resource(dev, &rp->regs);
- 		if (IS_ERR(rp->base))
- 			return PTR_ERR(rp->base);
+@@ -359,7 +359,7 @@ static int xgene_pcie_map_reg(struct xgene_pcie_port *port,
+ 	struct resource *res;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "csr");
+-	port->csr_base = devm_ioremap_resource(dev, res);
++	port->csr_base = devm_pci_remap_cfg_resource(dev, res);
+ 	if (IS_ERR(port->csr_base))
+ 		return PTR_ERR(port->csr_base);
  
 -- 
 2.10.0
