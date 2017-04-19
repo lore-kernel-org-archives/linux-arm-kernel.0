@@ -1,33 +1,40 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 20 Apr 2017 08:38:17 +1000
-Subject: linux-next: manual merge of the at91 tree with the arm-soc tree
-Message-ID: <20170420083817.5a44b69c@canb.auug.org.au>
+From: code@mmayer.net (Markus Mayer)
+Date: Wed, 19 Apr 2017 15:50:40 -0700
+Subject: [PATCH v2] soc: brcmstb: enable drivers for ARM64 and BMIPS
+Message-ID: <20170419225040.71650-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+From: Markus Mayer <mmayer@broadcom.com>
 
-Today's linux-next merge of the at91 tree got a conflict in:
+We enable the BRCMSTB SoC drivers not only for ARM, but also ARM64 and
+BMIPS.
 
-  arch/arm/boot/dts/at91-tse850-3.dts
+Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+---
 
-between commit:
+I used (COMPILE_TEST & OF) as condition like Raspberry Pi, since we
+have of_* calls in our code, too.
 
-  e67cedc92812 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
+Changes since v1:
+  - Add BMIPS
+  - Add COMPILE_TEST
 
-from the arm-soc tree and commit:
+ drivers/soc/bcm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  29dd89418007 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
-
-from the at91 tree.
-
-I fixed it up (I used the arm-soc tree version) and can carry the fix as
-necessary. This is now fixed as far as linux-next is concerned, but any
-non trivial conflicts should be mentioned to your upstream maintainer
-when your tree is submitted for merging.  You may also want to consider
-cooperating with the maintainer of the conflicting tree to minimise any
-particularly complex conflicts.
-
+diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
+index a39b0d58ddd0..9463d6709909 100644
+--- a/drivers/soc/bcm/Kconfig
++++ b/drivers/soc/bcm/Kconfig
+@@ -11,7 +11,7 @@ config RASPBERRYPI_POWER
+ 
+ config SOC_BRCMSTB
+ 	bool "Broadcom STB SoC drivers"
+-	depends on ARM
++	depends on ARM || ARM64 || BMIPS_GENERIC || (COMPILE_TEST && OF)
+ 	select SOC_BUS
+ 	help
+ 	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
 -- 
-Cheers,
-Stephen Rothwell
+2.12.0
