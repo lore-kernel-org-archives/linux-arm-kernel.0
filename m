@@ -1,24 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Apr 2017 09:50:40 -0700
-Subject: [PATCH] clk: ns2: Correct SDIO bits
-In-Reply-To: <1490047934-3061-1-git-send-email-jon.mason@broadcom.com>
-References: <1490047934-3061-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20170419165040.GJ7065@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Apr 2017 17:49:10 +0100
+Subject: [PATCH v4 21/21] PCI: versatile: update PCI config space remap
+ function
+In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-22-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20, Jon Mason wrote:
-> From: Bharat Kumar Reddy Gooty <bharat.gooty@broadcom.com>
-> 
-> Corrected the bits for power and iso.
-> 
-> Signed-off-by: Bharat Kumar Reddy Gooty <bharat.gooty@broadcom.com>
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> Fixes: f7225a83 ("clk: ns2: add clock support for Broadcom Northstar 2 SoC")
-> ---
+PCI configuration space should be mapped with a memory region type that
+generates on the CPU host bus non-posted write transations. Update the
+driver to use the devm_ioremap_nopost* interface to make sure the correct
+memory mappings for PCI configuration space are used.
 
-Applied to clk-next
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Rob Herring <robh@kernel.org>
+---
+ drivers/pci/host/pci-versatile.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/pci/host/pci-versatile.c b/drivers/pci/host/pci-versatile.c
+index 5ebee7d..85e7736 100644
+--- a/drivers/pci/host/pci-versatile.c
++++ b/drivers/pci/host/pci-versatile.c
+@@ -138,7 +138,8 @@ static int versatile_pci_probe(struct platform_device *pdev)
+ 		return PTR_ERR(versatile_cfg_base[0]);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+-	versatile_cfg_base[1] = devm_ioremap_resource(&pdev->dev, res);
++	versatile_cfg_base[1] = devm_pci_remap_cfg_resource(&pdev->dev,
++							    res);
+ 	if (IS_ERR(versatile_cfg_base[1]))
+ 		return PTR_ERR(versatile_cfg_base[1]);
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.10.0
