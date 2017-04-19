@@ -1,31 +1,25 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 19 Apr 2017 09:23:44 -0700
-Subject: [PATCH v2 1/2] clk: imx7d: fix USDHC NAND clock
-In-Reply-To: <20170419161435.GA7065@codeaurora.org>
-References: <20170410210015.1620-1-stefan@agner.ch>
- <20170419161435.GA7065@codeaurora.org>
-Message-ID: <9f0b9e83bc2a46bacb323d3ff2cfcf64@agner.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Apr 2017 09:27:54 -0700
+Subject: [PATCH v2 7/7] clk: spear: fix ADC clock definition on SPEAr600
+In-Reply-To: <1492433205-13376-8-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1492433205-13376-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170419162754.GE7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-04-19 09:14, Stephen Boyd wrote:
-> On 04/10, Stefan Agner wrote:
->> The USDHC NAND root clock is not gated by any CCM clock gate. Remove
->> the bogus gate definition.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
+On 04/17, Thomas Petazzoni wrote:
+> There is no SPEAr600 device named "adc". Instead, the description of the
+> ADC was recently added to the Device Tree, and the device name is
+> "d820b000.adc", so we should associate the ADC gatable clock to this
+> device name.
 > 
-> Can this be applied? It's followed by a dtsi change and there is
-> zero information about if the two depend on each other. Please
-> add cover letters for these sorts of things in the future
-> indicating how you expect merging to work.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
 
-This can be merged. The two changes are independent.
+Applied to clk-next
 
-They look kind of dependent, but really aren't since
-IMX7D_NAND_USDHC_BUS_ROOT_CLK is still in the init_on list. Should have
-explicitly mentioned that, sorry about that.
-
---
-Stefan
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
