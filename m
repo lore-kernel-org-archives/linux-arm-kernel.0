@@ -1,38 +1,76 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 19 Apr 2017 09:14:18 +0200
-Subject: [PATCH v2 3/3] MAINTAINERS: add a maintainer for the Inside Secure
- crypto driver
-In-Reply-To: <20170419071418.18995-1-antoine.tenart@free-electrons.com>
-References: <20170419071418.18995-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170419071418.18995-4-antoine.tenart@free-electrons.com>
+Date: Wed, 19 Apr 2017 09:14:15 +0200
+Subject: [PATCH v2 0/3] arm64: marvell: add cryptographic engine support for
+ 7k/8k
+Message-ID: <20170419071418.18995-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new cryptographic engine driver was added in
-drivers/crypto/inside-secure. Add myself as a maintainer for this
-driver.
+Hi all,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+This series adds support for the Inside Secure SafeXcel EIP197
+cryptographic engine which can be found on Marvell Armada 7k and 8k
+boards. A new cryptographic engine driver is added, as well as the
+relevant device tree definition for the Armada 7040 DB and 8040 DB
+boards.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c265a5fe4848..7240b9bca638 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6487,6 +6487,12 @@ F:	Documentation/input/multi-touch-protocol.txt
- F:	drivers/input/input-mt.c
- K:	\b(ABS|SYN)_MT_
- 
-+INSIDE SECURE CRYPTO DRIVER
-+M:	Antoine Tenart <antoine.tenart@free-electrons.com>
-+F:	drivers/crypto/inside-secure/
-+S:	Maintained
-+L:	linux-crypto at vger.kernel.org
-+
- INTEL ASoC BDW/HSW DRIVERS
- M:	Jie Yang <yang.jie@linux.intel.com>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+This driver needs two firmwares to work correctly. These firmware are
+usually used for more advanced operations than the ones supported (as of
+now), but we still need them to pass the data to the internal
+cryptographic engine.
+
+This series was tested in various ways on both the Armada 7040 DB and
+the Armada 8040 DB: using the crypto framework self tests, using tcrypt
+and while performing various transfers with iperf on top of IPsec.
+
+This series is based on top of v4.11-rc1, and is available on a branch
+(which also contains the PPv2 support for 7k/8k, to ease the process of
+testing IPsec): https://github.com/atenart/linux  v4.11-rc1/7k8k-crypto
+I can rebase if needed. Patches adding device tree nodes and modifying
+the arm64 defconfig have been applied to the mvebu tree already.
+
+I'd like to thank Ofer Heifetz and Igal Liberman who helped me to do
+this driver by adding functionalities, optimizing functions and testing
+(a lot).
+
+Thanks,
+Antoine
+
+
+Since v1:
+  - Fixed two compilation issues reported by Kbuild.
+  - Removed all dma_to_phys() calls and used the dma addresses instead.
+  - Added a call to dma_set_mask_and_coherent() before calling any DMA
+    API helper.
+  - Removed some DMA free functions to avoid double-freeing.
+  - Do not rely on sg_nents_for_len() to get the number of sg anymore.
+  - Added a dedicated kmalloc'ed cache to use for dma_map_single().
+
+
+Antoine Tenart (3):
+  Documentation/bindings: Document the SafeXel cryptographic engine
+    driver
+  crypto: inside-secure: add SafeXcel EIP197 crypto engine driver
+  MAINTAINERS: add a maintainer for the Inside Secure crypto driver
+
+ .../bindings/crypto/inside-secure-safexcel.txt     |   27 +
+ MAINTAINERS                                        |    6 +
+ drivers/crypto/Kconfig                             |   17 +
+ drivers/crypto/Makefile                            |    1 +
+ drivers/crypto/inside-secure/Makefile              |    2 +
+ drivers/crypto/inside-secure/safexcel.c            |  940 +++++++++++++++++
+ drivers/crypto/inside-secure/safexcel.h            |  579 +++++++++++
+ drivers/crypto/inside-secure/safexcel_cipher.c     |  555 ++++++++++
+ drivers/crypto/inside-secure/safexcel_hash.c       | 1060 ++++++++++++++++++++
+ drivers/crypto/inside-secure/safexcel_ring.c       |  157 +++
+ 10 files changed, 3344 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+ create mode 100644 drivers/crypto/inside-secure/Makefile
+ create mode 100644 drivers/crypto/inside-secure/safexcel.c
+ create mode 100644 drivers/crypto/inside-secure/safexcel.h
+ create mode 100644 drivers/crypto/inside-secure/safexcel_cipher.c
+ create mode 100644 drivers/crypto/inside-secure/safexcel_hash.c
+ create mode 100644 drivers/crypto/inside-secure/safexcel_ring.c
+
 -- 
 2.11.0
