@@ -1,229 +1,125 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:31 +0100
-Subject: [PATCH 14/16] acpi/arm64: Add memory-mapped timer support in GTDT
- driver
+Date: Wed, 19 Apr 2017 17:44:24 +0100
+Subject: [PATCH 07/16] clocksource: arm_arch_timer: split dt-only rate handling
 In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
 References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1492620273-30037-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <1492620273-30037-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-On platforms booting with ACPI, architected memory-mapped timers'
-configuration data is provided by firmware through the ACPI GTDT
-static table.
+For historical reasons, rate detection when probing via DT is somewhat
+convoluted. We tried to package this up in arch_timer_detect_rate(), but
+with the addition of ACPI worse, and gets in the way of stringent rate
+checking when ACPI is used.
 
-The clocksource architected timer kernel driver requires a firmware
-interface to collect timer configuration and configure its driver.
-this infrastructure is present for device tree systems, but it is
-missing on systems booting with ACPI.
+This patch makes arch_timer_detect_rate() specific to DT, ripping out
+ACPI logic. In preparation for rework of the MMIO timer probing, the
+reading of the relevant CNTFRQ register is factored out to callers. The
+function is then renamed to arch_timer_of_configure_rate(), which better
+represents its new place in the world.
 
-Implement the kernel infrastructure required to parse the static
-ACPI GTDT table so that the architected timer clocksource driver can
-make use of it on systems booting with ACPI, therefore enabling
-the corresponding timers configuration.
+Comments are added in the DT and ACPI probe paths to explain this.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-[Mark: restructure error handling]
+[Mark: reword commit message]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/acpi/arm64/gtdt.c | 157 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi.h      |   1 +
- 2 files changed, 158 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 41 ++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index 3d95af8..b904667 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/acpi.h>
- #include <linux/init.h>
-+#include <linux/irqdomain.h>
- #include <linux/kernel.h>
- 
- #include <clocksource/arm_arch_timer.h>
-@@ -37,6 +38,28 @@ struct acpi_gtdt_descriptor {
- 
- static struct acpi_gtdt_descriptor acpi_gtdt_desc __initdata;
- 
-+static inline void *next_platform_timer(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	platform_timer += gh->length;
-+	if (platform_timer < acpi_gtdt_desc.gtdt_end)
-+		return platform_timer;
-+
-+	return NULL;
-+}
-+
-+#define for_each_platform_timer(_g)				\
-+	for (_g = acpi_gtdt_desc.platform_timer; _g;	\
-+	     _g = next_platform_timer(_g))
-+
-+static inline bool is_timer_block(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
-+}
-+
- static int __init map_gt_gsi(u32 interrupt, u32 flags)
- {
- 	int trigger, polarity;
-@@ -155,3 +178,137 @@ int __init acpi_gtdt_init(struct acpi_table_header *table,
- 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 94de018..02c5cb8 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -818,24 +818,19 @@ static int arch_timer_starting_cpu(unsigned int cpu)
  	return 0;
  }
-+
-+static int __init gtdt_parse_timer_block(struct acpi_gtdt_timer_block *block,
-+					 struct arch_timer_mem *timer_mem)
-+{
-+	int i;
-+	struct arch_timer_mem_frame *frame;
-+	struct acpi_gtdt_timer_entry *gtdt_frame;
-+
-+	if (!block->timer_count) {
-+		pr_err(FW_BUG "GT block present, but frame count is zero.");
-+		return -ENODEV;
-+	}
-+
-+	if (block->timer_count > ARCH_TIMER_MEM_MAX_FRAMES) {
-+		pr_err(FW_BUG "GT block lists %d frames, ACPI spec only allows 8\n",
-+		       block->timer_count);
-+		return -EINVAL;
-+	}
-+
-+	timer_mem->cntctlbase = (phys_addr_t)block->block_address;
-+	/*
-+	 * The CNTCTLBase frame is 4KB (register offsets 0x000 - 0xFFC).
-+	 * See ARM DDI 0487A.k_iss10775, page I1-5129, Table I1-3
-+	 * "CNTCTLBase memory map".
-+	 */
-+	timer_mem->size = SZ_4K;
-+
-+	gtdt_frame = (void *)block + block->timer_offset;
-+	if (gtdt_frame + block->timer_count != (void *)block + block->header.length)
-+		return -EINVAL;
-+
-+	/*
-+	 * Get the GT timer Frame data for every GT Block Timer
-+	 */
-+	for (i = 0; i < block->timer_count; i++, gtdt_frame++) {
-+		if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
-+			continue;
-+		if (gtdt_frame->frame_number >= ARCH_TIMER_MEM_MAX_FRAMES ||
-+		    !gtdt_frame->base_address || !gtdt_frame->timer_interrupt)
-+			goto error;
-+
-+		frame = &timer_mem->frame[gtdt_frame->frame_number];
-+
-+		/* duplicate frame */
-+		if (frame->valid)
-+			goto error;
-+
-+		frame->phys_irq = map_gt_gsi(gtdt_frame->timer_interrupt,
-+					     gtdt_frame->timer_flags);
-+		if (frame->phys_irq <= 0) {
-+			pr_warn("failed to map physical timer irq in frame %d.\n",
-+				gtdt_frame->frame_number);
-+			goto error;
-+		}
-+
-+		if (gtdt_frame->virtual_timer_interrupt) {
-+			frame->virt_irq =
-+				map_gt_gsi(gtdt_frame->virtual_timer_interrupt,
-+					   gtdt_frame->virtual_timer_flags);
-+			if (frame->virt_irq <= 0) {
-+				pr_warn("failed to map virtual timer irq in frame %d.\n",
-+					gtdt_frame->frame_number);
-+				goto error;
-+			}
-+		} else {
-+			pr_debug("virtual timer in frame %d not implemented.\n",
-+				 gtdt_frame->frame_number);
-+		}
-+
-+		frame->cntbase = gtdt_frame->base_address;
-+		/*
-+		 * The CNTBaseN frame is 4KB (register offsets 0x000 - 0xFFC).
-+		 * See ARM DDI 0487A.k_iss10775, page I1-5130, Table I1-4
-+		 * "CNTBaseN memory map".
-+		 */
-+		frame->size = SZ_4K;
-+		frame->valid = true;
-+	}
-+
-+	return 0;
-+
-+error:
-+	do {
-+		if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER ||
-+		    gtdt_frame->frame_number >= ARCH_TIMER_MEM_MAX_FRAMES)
-+			continue;
-+
-+		frame = &timer_mem->frame[gtdt_frame->frame_number];
-+
-+		if (frame->phys_irq > 0)
-+			acpi_unregister_gsi(gtdt_frame->timer_interrupt);
-+		frame->phys_irq = 0;
-+
-+		if (frame->virt_irq > 0)
-+			acpi_unregister_gsi(gtdt_frame->virtual_timer_interrupt);
-+		frame->virt_irq = 0;
-+	} while (i-- >= 0 && gtdt_frame--);
-+
-+	return -EINVAL;
-+}
-+
-+/**
-+ * acpi_arch_timer_mem_init() - Get the info of all GT blocks in GTDT table.
-+ * @timer_mem:	The pointer to the array of struct arch_timer_mem for returning
-+ *		the result of parsing. The element number of this array should
-+ *		be platform_timer_count(the total number of platform timers).
-+ * @timer_count: It points to a integer variable which is used for storing the
-+ *		number of GT blocks we have parsed.
-+ *
-+ * Return: 0 if success, -EINVAL/-ENODEV if error.
-+ */
-+int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
-+				    int *timer_count)
-+{
-+	int ret;
-+	void *platform_timer;
-+
-+	*timer_count = 0;
-+	for_each_platform_timer(platform_timer) {
-+		if (is_timer_block(platform_timer)) {
-+			ret = gtdt_parse_timer_block(platform_timer, timer_mem);
-+			if (ret)
-+				return ret;
-+			timer_mem++;
-+			(*timer_count)++;
-+		}
-+	}
-+
-+	if (*timer_count)
-+		pr_info("found %d memory-mapped timer block(s).\n",
-+			*timer_count);
-+
-+	return 0;
-+}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 4b5c146..3193724 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -599,6 +599,7 @@ enum acpi_reconfig_event  {
- int acpi_gtdt_init(struct acpi_table_header *table, int *platform_timer_count);
- int acpi_gtdt_map_ppi(int type);
- bool acpi_gtdt_c3stop(int type);
-+int acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem, int *timer_count);
- #endif
  
- #else	/* !CONFIG_ACPI */
+-static void
+-arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
++/*
++ * For historical reasons, when probing with DT we use whichever (non-zero)
++ * rate was probed first, and don't verify that others match. If the first node
++ * probed has a clock-frequency property, this overrides the HW register.
++ */
++static void arch_timer_of_configure_rate(u32 rate, struct device_node *np)
+ {
+ 	/* Who has more than one independent system counter? */
+ 	if (arch_timer_rate)
+ 		return;
+ 
+-	/*
+-	 * Try to determine the frequency from the device tree or CNTFRQ,
+-	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
+-	 */
+-	if (!acpi_disabled ||
+-	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+-		if (cntbase)
+-			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+-		else
+-			arch_timer_rate = arch_timer_get_cntfrq();
+-	}
++	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
++		arch_timer_rate = rate;
+ 
+ 	/* Check the timer frequency. */
+ 	if (arch_timer_rate == 0)
+@@ -1166,6 +1161,7 @@ static int __init arch_timer_init(void)
+ static int __init arch_timer_of_init(struct device_node *np)
+ {
+ 	int i;
++	u32 rate;
+ 
+ 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
+ 		pr_warn("multiple nodes in dt, skipping\n");
+@@ -1176,7 +1172,8 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
+ 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
+ 
+-	arch_timer_detect_rate(NULL, np);
++	rate = arch_timer_get_cntfrq;
++	arch_timer_of_configure_rate(rate, np);
+ 
+ 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+ 
+@@ -1212,7 +1209,7 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	struct device_node *frame, *best_frame = NULL;
+ 	void __iomem *cntctlbase, *base;
+ 	unsigned int irq, ret = -EINVAL;
+-	u32 cnttidr;
++	u32 cnttidr, rate;
+ 
+ 	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
+ 	cntctlbase = of_iomap(np, 0);
+@@ -1278,7 +1275,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 		goto out;
+ 	}
+ 
+-	arch_timer_detect_rate(base, np);
++	rate = readl(base + CNTFRQ);
++	arch_timer_of_configure_rate(rate, np);
+ 	ret = arch_timer_mem_register(base, irq);
+ 	if (ret)
+ 		goto out;
+@@ -1339,8 +1337,15 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+ 		gtdt->non_secure_el2_flags);
+ 
+-	/* Get the frequency from CNTFRQ */
+-	arch_timer_detect_rate(NULL, NULL);
++	/*
++	 * When probing via ACPI, we have no mechanism to override the sysreg
++	 * CNTFRQ value. This *must* be correct.
++	 */
++	arch_timer_rate = arch_timer_get_cntfrq();
++	if (!arch_timer_rate) {
++		pr_err(FW_BUG "frequency not available.\n");
++		return -EINVAL;
++	}
+ 
+ 	arch_timer_uses_ppi = arch_timer_select_ppi();
+ 	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
 -- 
 1.9.1
