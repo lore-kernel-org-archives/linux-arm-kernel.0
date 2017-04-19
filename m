@@ -1,36 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:23:37 -0700
-Subject: [GIT PULL 2/2] ZTE arm64 device tree changes for 4.12
-In-Reply-To: <1491837665-2579-2-git-send-email-shawnguo@kernel.org>
-References: <1491837665-2579-1-git-send-email-shawnguo@kernel.org>
- <1491837665-2579-2-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170419132337.GJ29219@localhost>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 19 Apr 2017 15:12:01 +0100
+Subject: [PATCH v3 5/7] ARM: NOMMU: Introduce dma operations for noMMU
+In-Reply-To: <CAK8P3a37QAZNp9hvbM10EjMNnTsiiN-Z3u8o=883bev4Th-iOQ@mail.gmail.com>
+References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+ <1489137839-549-6-git-send-email-vladimir.murzin@arm.com>
+ <CAK8P3a37QAZNp9hvbM10EjMNnTsiiN-Z3u8o=883bev4Th-iOQ@mail.gmail.com>
+Message-ID: <a669ed51-93a9-4e49-189c-98f2c1c6e312@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 11:21:05PM +0800, Shawn Guo wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+On 19/04/17 11:10, Arnd Bergmann wrote:
+> On Fri, Mar 10, 2017 at 10:23 AM, Vladimir Murzin
+> <vladimir.murzin@arm.com> wrote:
+>> R/M classes of cpus can have memory covered by MPU which in turn might
+>> configure RAM as Normal i.e. bufferable and cacheable. It breaks
+>> dma_alloc_coherent() and friends, since data can stuck in caches now
+>> or be buffered.
+>>
+>> This patch factors out DMA support for NOMMU configuration into
+>> separate entity which provides dedicated dma_ops. We have to handle
+>> there several cases:
+>> - configurations with MMU/MPU setup
+>> - configurations without MMU/MPU setup
+>> - special case for M-class, since caches and MPU there are optional
+>>
+>> In general we rely on default DMA area for coherent allocations or/and
+>> per-device memory reserves suitable for coherent DMA, so if such
+>> regions are set coherent allocations go from there.
+>>
+>> In case MPU/MPU was not setup we fallback to normal page allocator for
+>> DMA memory allocation.
+>>
+>> In case we run M-class cpus, for configuration without cache support
+>> (like Cortex-M3/M4) dma operations are forced to be coherent and wired
+>> with dma-noop (such decision is made based on cacheid global
+>> variable); however, if caches are detected there and no DMA coherent
+>> region is given (either default or per-device), dma is disallowed even
+>> MPU is not set - it is because M-class implement system memory map
+>> which defines part of address space as Normal memory.
+>>
+>> Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
+>> Reported-by: Andras Szemzo <sza@esh.hu>
+>> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>> Tested-by: Andras Szemzo <sza@esh.hu>
+>> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> I thought I found a couple of problems with this, but after reading more
+> carefully I was wrong about all of them and I think the code is doing
+> exactly the right thing. I also like the way this is split out into a separate
+> set of dma_map_ops to simplify the normal MMU case.
 > 
-> are available in the git repository at:
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt64-4.12
-> 
-> for you to fetch changes up to f006aaf7b11230e38a35f09d706e751fa77eb799:
-> 
->   arm64: dts: zte: add tvenc device for zx296718 (2017-03-24 16:25:19 +0800)
-> 
-> ----------------------------------------------------------------
-> ZTE arm64 device tree updates for 4.12:
->  - Add mmc devices for ZX296718 SoC and enable those available on
->    zx296718-evb board.
->  - Add VOU controller device, output devices HDMI and TVENC, and enable
->    display support for zx296718-evb board.
->  - Remove pll_vga clock from ZX296718 device tree, as it's not a fixed
->    rate clock.
 
-Merged, thanks.
+Much appreciated!
 
-
--Olof
+Vladimir
