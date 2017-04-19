@@ -1,53 +1,41 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 19 Apr 2017 15:20:56 +0100
-Subject: [PATCH v3 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <20170419115658.GD5077@suse.de>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
- <33321273-E3E7-459B-A615-5ADA52445AA1@esh.hu>
- <186f0c06-39ce-cb88-35e5-6dd57aa81166@arm.com>
- <4e3ce329-6194-043b-0d69-cbec6b08e38e@arm.com>
- <21ea43fb-0d3d-88e2-12ee-4a114e9d8459@arm.com>
- <20170419115658.GD5077@suse.de>
-Message-ID: <73e1eed0-9d21-6d36-d596-3ca40eb24075@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 19 Apr 2017 06:10:36 -0700
+Subject: [GIT PULL 1/4] dt-bindings: Updates for v4.12-rc1
+In-Reply-To: <20170406231020.32048-1-thierry.reding@gmail.com>
+References: <20170406231020.32048-1-thierry.reding@gmail.com>
+Message-ID: <20170419131036.GA29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/17 12:56, Joerg Roedel wrote:
-> On Tue, Apr 18, 2017 at 01:51:35PM +0100, Vladimir Murzin wrote:
->> FYI, nothing has changed since last "ping" - Andr?s and Alexandre are still
->> dependant on this series to safely enable DMA on their platforms. It is really
->> scary that these patches do not move forward even though they are supposed to
->> fix the real issue :(
+On Fri, Apr 07, 2017 at 01:10:17AM +0200, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> That's probably because you didn't include all relevant people in this
-> post. I think patches the patches for dma-noop.c should go through 
-> Andrew Morton.
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
-
-Thanks for suggestion, Joerg! Andrew is already in the loop.
-
-I'm wondering if there is better way/tool to get relevant people except
-get_maintainer.pl?
-
-./scripts/get_maintainer.pl -f lib/dma-noop.c
-Bart Van Assche <bart.vanassche@sandisk.com> (commit_signer:3/3=100%,authored:2/3=67%,added_lines:2/7=29%,removed_lines:2/6=33%)
-Vineet Gupta <vgupta@synopsys.com> (commit_signer:2/3=67%)
-Robin Murphy <robin.murphy@arm.com> (commit_signer:2/3=67%)
-Doug Ledford <dledford@redhat.com> (commit_signer:2/3=67%)
-Joerg Roedel <jroedel@suse.de> (commit_signer:2/3=67%)
-Krzysztof Kozlowski <krzk@kernel.org> (authored:1/3=33%,added_lines:5/7=71%,removed_lines:4/6=67%)
-linux-kernel at vger.kernel.org (open list)
-
-./scripts/get_maintainer.pl -f drivers/base/dma-coherent.c
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:DRIVER CORE, KOBJECTS, DEBUGFS AND SYSFS)
-linux-kernel at vger.kernel.org (open list)
-
-Cheers
-Vladimir
-
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
+> are available in the git repository at:
 > 
-> 	Joerg
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.12-dt-bindings
 > 
+> for you to fetch changes up to bf594a896cdbae4a581eb80a2bdbda8df6997d75:
 > 
+>   dt-bindings: Add documentation for GP10B GPU (2017-04-04 16:08:18 +0200)
+> 
+> Thanks,
+> Thierry
+> 
+> ----------------------------------------------------------------
+> dt-bindings: Updates for v4.12-rc1
+> 
+> This contains an update for the flow controller device tree binding as
+> well as the addition of the binding for the GP10B GPU found on the new
+> Tegra186 (Parker) SoC.
+
+Hm, usually we bundle bindings updates with the driver update that makes use of
+the new/amended binding.
+
+Anyway, merged this into next/dt. Thanks!
+
+
+-Olof
