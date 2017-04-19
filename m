@@ -1,86 +1,145 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 19 Apr 2017 23:37:31 +0530
-Subject: [PATCH 3/3] perf tool, arm64, thunderx2: Add implementation
- defined events for ThunderX2
-In-Reply-To: <20170406095533.GB29947@leverpostej>
-References: <1491291403-29893-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <1491291403-29893-4-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170404122828.GB8551@leverpostej>
- <CAFpQJXWTQ=gX63NHPoUST0oU9cP4xo+2fdr-p7ifhvJ6x-ih+A@mail.gmail.com>
- <20170405100548.GA10833@leverpostej>
- <CAFpQJXX9pt2R8TrLv0z=JT2VJxQROCn3cxPbaYiOEOFAT=Fg2Q@mail.gmail.com>
- <20170406095533.GB29947@leverpostej>
-Message-ID: <CAFpQJXUfR98gWbfmiBM69wKVLM7e=ujo8LZxmUFfxJ0iTrCKsQ@mail.gmail.com>
+From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 19 Apr 2017 20:10:02 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Specify MDIO bus in the DT
+In-Reply-To: <221a0208-8a64-6bd8-f6b2-39e845520a83@gmail.com>
+References: <20170402210840.11429-1-zajec5@gmail.com>
+ <5a6ecda9-2cf6-2171-7210-6b3a1d4c6012@gmail.com>
+ <c3a0455a-821f-d8a8-bf8a-7ad06ad0466e@milecki.pl>
+ <94250925-7d5d-ac31-58ad-918406d904f1@gmail.com>
+ <cd324440-ad88-0981-1577-822d39ee289d@gmail.com>
+ <221a0208-8a64-6bd8-f6b2-39e845520a83@gmail.com>
+Message-ID: <ab696d24-3544-a554-82d1-18839b29caa0@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-
-On Thu, Apr 6, 2017 at 3:25 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Apr 06, 2017 at 09:50:33AM +0530, Ganapatrao Kulkarni wrote:
->> On Wed, Apr 5, 2017 at 3:35 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Wed, Apr 05, 2017 at 02:42:39PM +0530, Ganapatrao Kulkarni wrote:
->> >> On Tue, Apr 4, 2017 at 5:58 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> > On Tue, Apr 04, 2017 at 01:06:43PM +0530, Ganapatrao Kulkarni wrote:
->
->> >> >> +     "CPU" :"armv8_pmuv3_0"
->> >> >
->> >> > Please let's not hard-code the name like this. Surely we can get rid of this?
->> >> >
->> >> > The kernel doesn't currently name PMUs as armv8_pmuv3_*, and as that can
->> >> > differ across DT/ACPI and in big.LITTLE, I don't think it makes sense to
->> >> > try to rely one particular string regardless.
->> >>
->> >> This string/name is fixed for a platform. having name here is essential to
->> >> know which devices among pmu (armv8_pmuv3_0, breakpoint, software)
->> >> devices, these jevents to be added.
->> >> also this json file is specific to a arch/soc/board, it is not a
->> >> generic file to be common.
->> >
->> > This file describe the events of a CPU PMU, and CPUs are not specific to
->> > a platform in general. There are many systems using Cortex-A57, for
->> > example.
->> >
->> > Across big.LITTLE SoCs with Cortex-A57, there's no guarantee as to
->> > whether the Cortex-A57 cores would be named armv8_pmuv3_0, or
->> > armv8_pmuv3_1, etc. This would depend on the boot CPU, probe order of
->> > secondaries, etc.
-
-some of the applications(perf etc) use sysfs files of perf PMU CORE devices.
-at present the names are created as per SOC/platform like
-armv8_pmuv3, armv8_cavium_thunder,  armv8_cortex_a57 etc.
-
-cpu_pmu->name                   = "armv8_cavium_thunder";
-
-can we please have common name similar to x86(cpu) and call them as
-cpu_0 and cpu_1?
-
+On 04/19/2017 07:52 PM, Florian Fainelli wrote:
+> On 04/19/2017 10:35 AM, Rafa? Mi?ecki wrote:
+>> On 04/19/2017 06:43 PM, Florian Fainelli wrote:
+>>> On 04/02/2017 02:25 PM, Rafa? Mi?ecki wrote:
+>>>> On 04/02/2017 11:14 PM, Florian Fainelli wrote:
+>>>>> Le 04/02/17 ? 14:08, Rafa? Mi?ecki a ?crit :
+>>>>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>>>>
+>>>>>> Northstar devices have MDIO bus that may contain various PHYs
+>>>>>> attached.
+>>>>>> A common example is USB 3.0 PHY (that doesn't have an MDIO driver
+>>>>>> yet).
+>>>>>>
+>>>>>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>>>> ---
+>>>>>>  arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
+>>>>>>  1 file changed, 7 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi
+>>>>>> b/arch/arm/boot/dts/bcm5301x.dtsi
+>>>>>> index acee36a61004..6a2afe7880ae 100644
+>>>>>> --- a/arch/arm/boot/dts/bcm5301x.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+>>>>>> @@ -320,6 +320,13 @@
+>>>>>>          };
+>>>>>>      };
+>>>>>>
+>>>>>> +    mdio at 18003000 {
+>>>>>> +        compatible = "brcm,iproc-mdio";
+>>>>>> +        reg = <0x18003000 0x8>;
+>>>>>> +        #size-cells = <1>;
+>>>>>> +        #address-cells = <0>;
+>>>>>> +    };
+>>>>>
+>>>>> This looks fine, but usually the block should be enabled on a per-board
+>>>>> basis, such that there should be a status = "disabled" property here by
+>>>>> default.
+>>>>
+>>>> I think we have few blocks in bcm5301x.dtsi enabled by default. I guess
+>>>> it's
+>>>> for stuff that is always present on every SoC family board: rng, nand,
+>>>> spi to
+>>>> name few.
+>>>>
+>>>> It makes some sense, consider e.g. spi. Every Northstar board has SPI
+>>>> controller so it's enabled by default. Not every board has SPI flash, so
+>>>> it's
+>>>> disabled by default.
+>>>>
+>>>> It's there and it make sense to me. Is that OK or not?
+>>>
+>>> Even though there are devices that are always enabled on a given SoC,
+>>> because the board designs are always consistent does not necessarily
+>>> make them good candidates to be enabled at the .dtsi level. This is
+>>> particularly true when there are external connections to blocks (SPI,
+>>> NAND, USB, Ethernet, MDIO to name a few), having them disabled by
+>>> default is safer as a starting point to begin with.
 >>
->> OK, we may not have complete name however, common part can be used to recognize
->> the PMU CORE devices from /sys/bus/event_source/devices
->> i.e we can have CPU id as "armv8_pmuv3".
+>> In case of Northstar there is USB 3.0 PHY connected *internally* to this
+>> MDIO.
+>> I don't think any board manufacturer is able to rip SoC out of the MDIO
+>> or the
+>> USB 3.0 PHY.
 >
-> For better or worse, that's not the case on DT systems.
+> OK, then can you still resubmit a proper patch that a) puts that
+> information in the commit message, and b) also adds a proper label to
+> the mdio node such that it can later on be referenced by label in
+> board-level DTS files? By that I mean:
 >
-> I'd much rather that we identified the CPU PMUs without requiring
-> particular names (e.g by looking for a "cpus" attribute).
+> mdio: mdio at 18003000 {
 >
->> same is extended to UNCORE as well.
+> Thank you
 >
-> Could you elaborate on that? I'm not sure I follow.
+>>
+>>
+>>>> I find MDIO situation quite simiar. It seems every Northstar board has
+>>>> MDIO bus
+>>>> just devices may differ and should not be enabled by default.
+>>>
+>>> In which case, the only difference, for you would be to do to, at the
+>>> board-level DTS:
+>>>
+>>> &mdio {
+>>>     status = "okay";
+>>>
+>>>     phy at 0 {
+>>>         reg = <0>;
+>>>         ...
+>>>     };
+>>> };
+>>>
+>>> versus:
+>>>
+>>> &mdio {
+>>>     phy at 0 {
+>>>         reg = <0>;
+>>>         ...
+>>>     };
+>>> };
+>>>
+>>> I think we can afford putting the mdio node's status property in each
+>>> board-level DTS and make it clear that way that it is enabled because
+>>> there are child nodes enabled?
+>>
+>> This will be a pretty big effort because every Northstar device I know
+>> has USB
+>> 3.0 PHY in the SoC.
 >
->> mapfile.csv file will have entry for both BIG and LITTLE processors event files.
->> the jevents creates table of pmu_events_map for all entries present in
->> mapfile.csv file
->> while lookup, which ever pmu matches the cpuid of pmu_events_map
->> then corresponding table created from json file is used to add the
->> jevents to that PMU.
->
-> Sorry, but I don't follow how that's related to the above.
->
-> Thanks,
-> Mark.
+> Adding a one liner is a "pretty big effort", for sure.
 
-thanks
-Ganapat
+Sorry, we got a misunderstanding here.
+
+I thought you meant adding something like this for every device:
+
+&mdio {
+	status = "okay";
+
+	usb3_phy: usb-phy at 10 {
+		compatible = "brcm,ns-ax-usb3-phy";
+		reg = <0x10>;
+		usb3-dmp-syscon = <&usb3_dmp>;
+		#phy-cells = <0>;
+	};
+};
+
+usb3_dmp: syscon at 18105000 {
+	reg = <0x18105000 0x1000>;
+};
+
+So I clearly missed something important. Did you want to have USB 3.0 PHY
+defined in the dtsi file?
