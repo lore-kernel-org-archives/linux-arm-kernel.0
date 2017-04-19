@@ -1,65 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Apr 2017 11:29:22 +0200
-Subject: [PATCH 1/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
- user-visible messages
-In-Reply-To: <1492085867.20068.4.camel@infradead.org>
-References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
- <20170328065130.16019-2-takahiro.akashi@linaro.org>
- <1491207492.6020.8.camel@infradead.org>
- <20170404054144.GG16309@linaro.org>
- <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
- <20170404073504.GI16309@linaro.org> <1491291844.6218.25.camel@infradead.org>
- <20170404092604.GB14898@arm.com> <1492085867.20068.4.camel@infradead.org>
-Message-ID: <CAMuHMdWHTZ6prRD+3FWBMV+d0huNuEA6DoGagS82DbucBSMjsA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Apr 2017 10:31:05 +0100
+Subject: Panic in arch_hw_breakpoint_init() on Cortex-A9 (SPEAr1340)
+In-Reply-To: <1492535481.28092.14.camel@v3.sk>
+References: <1492512268.28092.8.camel@v3.sk>
+ <20170418130326.GE17866@leverpostej>
+ <1492535481.28092.14.camel@v3.sk>
+Message-ID: <20170419093105.GD27829@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Tue, Apr 18, 2017 at 07:11:21PM +0200, Lubomir Rintel wrote:
+> On Tue, 2017-04-18 at 14:03 +0100, Mark Rutland wrote:
+> > On Tue, Apr 18, 2017 at 12:44:28PM +0200, Lubomir Rintel wrote:
+> > > I'm getting a crash that looks awfully lot like what ddc37832a1 [ARM:
+> > > 8634/1: hw_breakpoint: blacklist Scorpion CPUs] aims to fix.
+> > 
+> > Just to check, have you successfully booted a kernel on this board
+> > before? i.e. is this a new crash?
+> 
+> I've now checked, and it doesn't seem like it ever worked when
+> PERF_EVENTS (and in turn HAVE_HW_BREAKPOINT) is enabled. The crash look
+> the same up to 4.7; the previous versions also crash as soon as I
+> enable the options but for some reason I don't get an oops on the
+> console even with earlyprintk enabled (the machine reboots with panic=
+> argument, so there's just possibly just something wrong with the
+> console).
 
-On Thu, Apr 13, 2017 at 2:17 PM, David Woodhouse <dwmw2@infradead.org> wrote:
-> The IEC binary prefixes (Ki, Mi, Gi, etc.) were published over twenty
-> years ago. We should use them consistently, especially in user-visible
-> messages.
->
-> Sure, it doesn't often matter, just as *most* typos and spelling or
-> grammar mistakes don't often matter. But sometimes, such misuse really
-> do actually introduce ambiguity, and we should avoid that.
->
-> Conversely, there is absolutely no good reason *not* to be using the
-> binary prefixes. Some people once claimed to find them "ugly", or that
-> they would cause confusion. But those are purely down to unfamiliarity.
->
-> The perceived ugliness, and the alleged confusion, will pass with use.
->
-> The correctness, and the lack of ambiguity, will not.
->
-> ARM64 in particular, as a new platform, has no excuse for not using the
-> IEC prefixes which predate its existence by a decade and a half.
->
-> What's worse is that some people are pointing at the existing errors and
-> actually claiming that they want their *new* code to be deliberately
-> wrong in order to be "consistent" with what's there.
->
-> So let's fix the user-visible messages in all of arch/arm64 and nip
-> *that* particular stupidity in the bud...
->
-> Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
+Ok. So this isn't a recent regression.
 
-For correctness:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > My hardware doesn't use a Scorpion CPU though -- it uses a Cortex-A9
+> > > (cpuid=0x412fc091).
+> > > 
+> > > [????0.157000] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> > > [????0.157000] Modules linked in:
+> > > [????0.157000] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-0.rc3.git0.2.spear2.fc26.armv7hl #1
+> > > [????0.157000] Hardware name: ST SPEAr1340 SoC with Flattened Device Tree
+> > > [????0.157000] task: ef102b80 task.stack: ef0fa000
+> > > [????0.157000] PC is at arch_hw_breakpoint_init+0x130/0x2a0
+> > > [????0.157000] LR is at arch_hw_breakpoint_init+0x7c/0x2a0
+> > > [????0.157000] pc : [<c0e0538c>]????lr : [<c0e052d8>]????psr: 60000013
+> > 
+> > It would be helpful to know which specific access that is.
+> > 
+> > Can you figure that out with addr2line, e.g.
+> > 
+> > ?$ addr2line -ife vmlinux c0e0538c
+> 
+> Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc7 #21
+> Hardware name: ST SPEAr1340 SoC with Flattened Device Tree
+> task: ef058000 task.stack: ef04c000
+> PC is at arch_hw_breakpoint_init+0x9c/0x2a4
+> LR is at arch_hw_breakpoint_init+0x84/0x2a4
+> pc : [<c0905504>]????lr : [<c09054ec>]????psr: 60000013
+> 
+> $ addr2line -ife vmlinux c0905504
+> core_has_os_save_restore
+> /home/lkundrak/spear/linux/arch/arm/kernel/hw_breakpoint.c:920
 
-For the policy:
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+That's a read of DBGOSLSR, which shouldn't UNDEF.
 
-You're gonna need a new sweep for soon to be added occurrences, though.
+I suspect this is a result of Cortex-A9 erratum 764319, which causes
+DBGOSLSR to unexpectedly behave as UNDEF when the external DBGSWENABLE
+pin is wired to 0.
 
-Gr{oetje,eeting}s,
+The official workaround is to ensure that the DBGSWENABLE pin is wired
+to 1.
 
-                        Geert
+It might be possible to handle the trap and bail out, but it's not clear
+to me if we can safely assume that other functionality is available.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Mark.
