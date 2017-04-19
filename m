@@ -1,18 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:36:18 -0700
-Subject: [GIT PULL] Allwinner defconfig changes for 4.12
-In-Reply-To: <20170406083539.qhowtju6helnxm7v@lukather>
-References: <20170406083539.qhowtju6helnxm7v@lukather>
-Message-ID: <20170419123618.GQ17004@localhost>
+Date: Wed, 19 Apr 2017 05:47:15 -0700
+Subject: [GIT PULL] Allwinner H3 DT changes for 4.12
+In-Reply-To: <20170406093106.hcjthwt5vemw4xnw@lukather>
+References: <20170406093106.hcjthwt5vemw4xnw@lukather>
+Message-ID: <20170419124715.GU17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 10:35:39AM +0200, Maxime Ripard wrote:
+On Thu, Apr 06, 2017 at 11:31:06AM +0200, Maxime Ripard wrote:
 > Hi Arnd, Olof,
 > 
-> Here are some defconfig changes for the next merge window.
+> Here is a serie of patches a bit unusual for the next merge window.
 > 
-> Thanks!
+> Allwinner released a new SoC, the H5, that is basically an H3 with
+> arm64 CPU cores (A53 instead of A7).
+> 
+> In order to support it properly, we've created a common DTSI, and
+> built on top. Since that DTSI is spread across arm and arm64, it took
+> a bit of rework (all the patches in that PR until commit da89e1d5cbaf
+> ("ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5"))
+> that is shared with the next PR I'm about to send with the H5-only patches.
+> 
+> The patches on top of that commit are H3-specific commits and should
+> be merged through your arm DT branch.
+> 
+> Let me know if you have any questions,
 > Maxime
 > 
 > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
@@ -21,18 +33,23 @@ On Thu, Apr 06, 2017 at 10:35:39AM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-defconfig-for-4.12
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-h3-for-4.12
 > 
-> for you to fetch changes up to 7cae7ef89e360cd3dc139eaac2f480c25bc7bfa1:
+> for you to fetch changes up to 72897fa31fcf6222a11c6ebb0bcca25628bb1f7c:
 > 
->   ARM: multi_v7_defconfig: Switch AXP20x driver from module to built-in (2017-03-06 07:38:15 +0100)
+>   ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero board (2017-03-27 13:45:32 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner defconfig changes for 4.12
+> Allwinner H3 DT changes for 4.12
 > 
-> Some patches to enable new modules in the defconfig.
+> H3 patches for 4.12, which are mostly related to reworking the H3 DTSI to
+> be usable on the arm64 H5 DTSI, that shares almost everything with the H3
+> but the CPU cores.
+> 
+> We also have some new device addition (USB, mostly) that would conflict
+> otherwise.
 
-Merged, thanks!
+Merged into next/dt. Thanks.
 
 
 -Olof
