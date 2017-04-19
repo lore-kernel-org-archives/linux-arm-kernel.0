@@ -1,22 +1,134 @@
-From: rebothenebo@outlook.com (Ross McCormack)
-Date: Wed, 19 Apr 2017 10:22:29 +0000
-Subject: atmel-hlcdc-display-controller atmel-hlcdc-dc: No connectors reported
- connected with modes
-Message-ID: <VI1P18901MB001332E3589D86DD115C4CC0B9180@VI1P18901MB0013.EURP189.PROD.OUTLOOK.COM>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Apr 2017 11:31:57 +0100
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic-v3: De-optimize VMCR
+ save/restore when emulating a GICv2
+In-Reply-To: <20170419100809.GA4104@cbox>
+References: <20170410091944.19963-1-marc.zyngier@arm.com>
+ <20170410091944.19963-2-marc.zyngier@arm.com> <20170419100809.GA4104@cbox>
+Message-ID: <d28a52b7-7c7a-05f3-24c0-866b17faa8cf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I just tried to display the Linux Tux Logo at bootup of the SAM5D, but it won't show up. My display is 800x480, kernel version is 4.9.20. Appart from the display/drm stack the kernel works like a charm. I narrowed the problem down to this error:
+On 19/04/17 11:08, Christoffer Dall wrote:
+> On Mon, Apr 10, 2017 at 10:19:43AM +0100, Marc Zyngier wrote:
+>> When emulating a GICv2-on-GICv3, special care must be taken to only
+>> save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
+>> all Group-0 interrupts end-up being delivered as FIQ, which is
+>> probably not what the guest expects, as demonstrated here with
+>> an unhappy EFI:
+>>
+>> 	FIQ Exception at 0x000000013BD21CC4
+>>
+>> This means that we cannot perform the load/put trick when dealing
+>> with VMCR_EL2 (because the host has SRE set), and we have to deal
+>> with it in the world-switch.
+>>
+>> Fortunately, this is not the most common case (modern guests should
+>> be able to deal with GICv3 directly), and the performance is not worse
+>> than what it was before the VMCR optimization.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
+>>  virt/kvm/arm/vgic/vgic.c      | 26 ++++++++++++++++++++------
+>>  2 files changed, 26 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> index 3d0b1ddb6929..91922c1eddc8 100644
+>> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+>> @@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>>  	 * Make sure stores to the GIC via the memory mapped interface
+>>  	 * are now visible to the system register interface.
+>>  	 */
+>> -	if (!cpu_if->vgic_sre)
+>> +	if (!cpu_if->vgic_sre) {
+>>  		dsb(st);
+>> +		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+>> +	}
+>>  
+>>  	if (used_lrs) {
+>>  		int i;
+>> @@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>>  	 * delivered as a FIQ to the guest, with potentially fatal
+>>  	 * consequences. So we must make sure that ICC_SRE_EL1 has
+>>  	 * been actually programmed with the value we want before
+>> -	 * starting to mess with the rest of the GIC.
+>> +	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
+>> +	 * particular.
+>>  	 */
+>>  	if (!cpu_if->vgic_sre) {
+>>  		write_gicreg(0, ICC_SRE_EL1);
+>>  		isb();
+>> +		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+>>  	}
+>>  
+>>  	val = read_gicreg(ICH_VTR_EL2);
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index 3d0979c30721..32205f2ba6ff 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>> @@ -667,10 +667,20 @@ void kvm_vgic_load(struct kvm_vcpu *vcpu)
+>>  	if (unlikely(!vgic_initialized(vcpu->kvm)))
+>>  		return;
+>>  
+>> -	if (kvm_vgic_global_state.type == VGIC_V2)
+>> +	if (kvm_vgic_global_state.type == VGIC_V2) {
+>>  		vgic_v2_load(vcpu);
+>> -	else
+>> -		vgic_v3_load(vcpu);
+>> +	} else {
+>> +		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>> +
+>> +		/*
+>> +		 * If dealing with a GICv2 emulation on GICv3,
+>> +		 * VMCR_EL2.VFIQen is dependent on ICC_SRE_EL1.SRE,
+>> +		 * and we have to perform the VMCR_EL2 save/restore in
+>> +		 * the world switch.
+>> +		 */
+>> +		if (likely(cpu_if->vgic_sre))
+>> +			vgic_v3_load(vcpu);
+> 
+> I wonder if this conditional should really be inside vgic_v3_load
+> instead?
 
-atmel-hlcdc-display-controller atmel-hlcdc-dc: failed to create HLCDC outputs: -517
-atmel-hlcdc-display-controller atmel-hlcdc-dc: failed to initialize mode setting
-atmel-hlcdc-display-controller atmel-hlcdc-dc: No connectors reported connected with modes
-[drm] Cannot find any crtc or sizes - going 1024x768
-Console: switching to colour frame buffer device 128x48
-atmel-hlcdc-display-controller atmel-hlcdc-dc: fb0:  frame buffer device
+That's a good point. It will keep the wart out of the main vgic code and
+make it an "implementation detail".
 
-Now I tried video=Unknown-1:800x480-16 as suggested on [1] but it still shows the error.
+> 
+>> +	}
+>>  }
+>>  
+>>  void kvm_vgic_put(struct kvm_vcpu *vcpu)
+>> @@ -678,10 +688,14 @@ void kvm_vgic_put(struct kvm_vcpu *vcpu)
+>>  	if (unlikely(!vgic_initialized(vcpu->kvm)))
+>>  		return;
+>>  
+>> -	if (kvm_vgic_global_state.type == VGIC_V2)
+>> +	if (kvm_vgic_global_state.type == VGIC_V2) {
+>>  		vgic_v2_put(vcpu);
+>> -	else
+>> -		vgic_v3_put(vcpu);
+>> +	} else {
+>> +		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>> +
+>> +		if (likely(cpu_if->vgic_sre))
+>> +			vgic_v3_put(vcpu);
+> 
+> And same here?
+> 
+>> +	}
+>>  }
+>>  
+>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+>> -- 
+>> 2.11.0
+>>
+> 
+> Otherwise looks good.
 
-What's the problem here? Is it a driver issue with the display?
+Thanks. I'll respin this patch shortly.
 
-[1] http://www.at91.com/linux4sam/bin/view/Linux4SAM/UsingAtmelDRMDriver
+	M.
+-- 
+Jazz is not dead. It just smells funny...
