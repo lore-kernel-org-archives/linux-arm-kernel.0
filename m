@@ -1,41 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Apr 2017 16:54:10 +0200
-Subject: [PATCH 0/4] ARM: sunxi: device tree pinctrl clean up and H3 OTG
-In-Reply-To: <20170419050919.6762-1-wens@csie.org>
-References: <20170419050919.6762-1-wens@csie.org>
-Message-ID: <20170419145410.k2nkyfrz6ss7o2tt@lukather>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 19 Apr 2017 16:56:00 +0200
+Subject: [PATCH 4.4 18/45] irqchip/irq-imx-gpcv2: Fix spinlock initialization
+In-Reply-To: <20170419141634.793081968@linuxfoundation.org>
+References: <20170419141634.793081968@linuxfoundation.org>
+Message-ID: <20170419141635.503344519@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 01:09:15PM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
-> 
-> This series has 2 parts. The parts are largely unrelated, though the
-> second part should be applied after the first part, so we don't
-> accidentally mux pins that we shouldn't. Hence I'm sending them
-> together.
-> 
-> The first 2 patches clean up the sunxi device tree files, removing
-> pinmux settings for common GPIO pins. These include the enable pins
-> for the common regulators, and the mmc0 card detect pin from the
-> reference designs.
-> 
-> The second part, the latter 2 patches, enable USB OTG on the Orangepi
-> PC, PC Plus, Plus 2E, and the Bananapi M2+. The first 3 boards are
-> bunched together, due to how the PC Plus and Plus 2E device trees include
-> the device tree of the Opi PC.
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
-Applied, thanks!
-Maxime
+------------------
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/97e6c778/attachment.sig>
+From: Tyler Baker <tyler.baker@linaro.org>
+
+commit 75eb5e1e7b4edbc8e8f930de59004d21cb46961f upstream.
+
+The raw_spinlock in the IMX GPCV2 interupt chip is not initialized before
+usage. That results in a lockdep splat:
+
+  INFO: trying to register non-static key.
+  the code is fine but needs lockdep annotation.
+  turning off the locking correctness validator.
+
+Add the missing raw_spin_lock_init() to the setup code.
+
+Fixes: e324c4dc4a59 ("irqchip/imx-gpcv2: IMX GPCv2 driver for wakeup sources")
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: jason at lakedaemon.net
+Cc: marc.zyngier at arm.com
+Cc: shawnguo at kernel.org
+Cc: andrew.smirnov at gmail.com
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/20170413222731.5917-1-tyler.baker at linaro.org
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/irqchip/irq-imx-gpcv2.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/drivers/irqchip/irq-imx-gpcv2.c
++++ b/drivers/irqchip/irq-imx-gpcv2.c
+@@ -230,6 +230,8 @@ static int __init imx_gpcv2_irqchip_init
+ 		return -ENOMEM;
+ 	}
+ 
++	raw_spin_lock_init(&cd->rlock);
++
+ 	cd->gpc_base = of_iomap(node, 0);
+ 	if (!cd->gpc_base) {
+ 		pr_err("fsl-gpcv2: unable to map gpc registers\n");
