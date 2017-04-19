@@ -1,22 +1,50 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 19 Apr 2017 21:14:05 +0200
-Subject: [PATCH 3/4] mmc: pxamci: Disable DATA_TRAN_DONE interrupt sooner
-In-Reply-To: <04139c1a-cee8-f64c-4b0e-2e3c472169a3@tul.cz> (Petr Cvek's
- message of "Wed, 19 Apr 2017 01:17:33 +0200")
-References: <cover.1492492523.git.petr.cvek@tul.cz>
- <04139c1a-cee8-f64c-4b0e-2e3c472169a3@tul.cz>
-Message-ID: <87k26g6whu.fsf@belgarion.home>
+From: john@phrozen.org (John Crispin)
+Date: Wed, 19 Apr 2017 21:17:52 +0200
+Subject: [PATCH 0/2] clk: mediatek: add missing ethernet reset definition
+In-Reply-To: <20170419171835.GO7065@codeaurora.org>
+References: <1485175707-58528-1-git-send-email-john@phrozen.org>
+ <20170127001441.GS8801@codeaurora.org>
+ <6803ef87-fb22-075c-bee1-3c0adb8e297d@phrozen.org>
+ <20170419171835.GO7065@codeaurora.org>
+Message-ID: <0753780a-0a08-e0b2-0eb0-c3272d7bc487@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
 
-> Disable the DATA_TRAN_DONE interrupt as soon as possible in the handler.
-Yeah, but why, please explain.
-If that's only to "reduce" the race occurrence, then I'd rather have this patch
-dropped. Otherwise if there is a compelling reason let's see ...
 
-Cheers.
+On 19/04/17 19:18, Stephen Boyd wrote:
+> On 01/27, John Crispin wrote:
+>>
+>> On 27/01/2017 01:14, Stephen Boyd wrote:
+>>> On 01/23, John Crispin wrote:
+>>>> When the clk code for mt2701 was merged, we forgot to add the reset
+>>>> controller of the ethernet subsystem. This series adds the missing code
+>>>> and header files required to reference the bits from within a devicetree
+>>>> file.
+>>>>
+>>>> John Crispin (2):
+>>>>    clk: mediatek: add mt2701 ethernet reset
+>>>>    reset: mediatek: Add MT2701 ethsys reset controller include file
+>>>>
+>>>>   drivers/clk/mediatek/clk-mt2701-eth.c     |    2 ++
+>>>>   include/dt-bindings/reset/mt2701-resets.h |    7 +++++++
+>>> Any planned DT users in the next merge window? Should I put this
+>>> into a topic branch? Do you want a clk maintainer ack? At the
+>>> least we need someone like James to ack this first.
+>>>
+>> Hi Stephen,
+>>
+>> the addition of the dtsi snippets for the ethernet core is pending due
+>> to this patch. getting it into v4.11 would be geat so that i can sent
+>> dtsi changes during the next merge window.
+>>
+> Sorry, I never saw anything from anyone @mediatek so I never did
+> anything here. I suppose I'll just go and apply this to clk-next
+> now and then v4.13 can get the ethernet patches?
+>
+Hi Stephen,
 
--- 
-Robert
+sounds like a plan. i'll add the series to my local pending tree and 
+resend stuff during the next merge window if it was not merged by then.
+
+     John
