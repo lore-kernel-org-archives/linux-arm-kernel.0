@@ -1,57 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Apr 2017 11:33:14 +0100
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 19 Apr 2017 11:45:33 +0100
 Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
-In-Reply-To: <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+In-Reply-To: <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
 References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
  <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
  <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
  <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
-Message-ID: <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
+ <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
+Message-ID: <CAFEAcA_B+EJJG6gb3iVzL5VRQkGhmDPbYWrUw7UF4VNV0m7XCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
-> On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
-> >> From: Dong Bo <dongbo4@huawei.com>
-> >>
-> >> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
-> >> the flag is propagated to its child processes, even the elf
-> >> files are marked as not requiring executable stack. It may
-> >> cause superfluous operations on some arch, e.g.
-> >> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
-> >> also marked as PROT_EXEC.
-> 
-> > That's affecting most architectures with a risk of ABI breakage. We
-> > could do it on arm64 only, though I'm not yet clear on the ABI
-> > implications (at a first look, there shouldn't be any).
-> 
-> Is there a reason why it isn't just straightforwardly a bug
-> (which we could fix) to make READ_IMPLIES_EXEC propagate to
-> child processes?
+On 19 April 2017 at 11:33, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
+>>
+>> > That's affecting most architectures with a risk of ABI breakage. We
+>> > could do it on arm64 only, though I'm not yet clear on the ABI
+>> > implications (at a first look, there shouldn't be any).
+>>
+>> Is there a reason why it isn't just straightforwardly a bug
+>> (which we could fix) to make READ_IMPLIES_EXEC propagate to
+>> child processes?
+>
+> While I agree that it looks like a bug, if there are user programs
+> relying on such bug we call it "ABI".
 
-While I agree that it looks like a bug, if there are user programs
-relying on such bug we call it "ABI". On arm64, I don't think there is
-anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
-the compat task handling without the corresponding change in arch/arm.
+Can there be any? Such a program would behave differently
+depending on how the program that spawned it happened to
+have been compiled, and for instance could break when
+the OS happened to have its init binary updated even if
+the kernel didn't change.
 
-> AFAICT this should be per-process: just because
-> init happens not to have been (re)compiled to permit non-executable
-> stacks doesn't mean every process on the system needs to have
-> an executable stack.
+>> Behaviour shouldn't be variable across architectures either, I would
+>> hope.
+>
+> The behaviour has already been variable for a long time. Even on x86,
+> AFAICT x86_32 differs from x86_64 in this respect.
 
-I think this also affects the heap if brk(2) is used (via
-VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
-days).
+That also sounds like a bug to me.
 
-> Behaviour shouldn't be variable across architectures either, I would
-> hope.
+> Anyway, the patch should be posted to linux-arch for a cross-arch
+> discussion.
 
-The behaviour has already been variable for a long time. Even on x86,
-AFAICT x86_32 differs from x86_64 in this respect.
+Agreed -- there may be something I'm missing, since it looks
+like this behaviour of inheriting READ_IMPLIES_EXEC has always
+been there.
 
-Anyway, the patch should be posted to linux-arch for a cross-arch
-discussion.
-
--- 
-Catalin
+thanks
+-- PMM
