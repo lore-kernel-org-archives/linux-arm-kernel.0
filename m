@@ -1,81 +1,56 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Wed, 19 Apr 2017 18:20:10 +0530
-Subject: LDM/STM alignment fixups on arm64
-In-Reply-To: <20170419095830.GK17774@n2100.armlinux.org.uk>
-References: <58F704D6.6000301@codeaurora.org>
- <20170419095830.GK17774@n2100.armlinux.org.uk>
-Message-ID: <58F75D02.1030104@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 19 Apr 2017 21:54:09 +0900
+Subject: [PATCH v2 1/6] arm64: dts: Add symlinks for cros-ec-keyboard and
+ cros-ec-sbs
+In-Reply-To: <1529949.5djtX72aeJ@phil>
+References: <20170210010521.78872-1-briannorris@chromium.org>
+ <20170210010521.78872-2-briannorris@chromium.org>
+ <CAOesGMiim2WFfEAg-bJmWTwWn69=V_GuEg6AxsxPYMyzd3KFUw@mail.gmail.com>
+ <1529949.5djtX72aeJ@phil>
+Message-ID: <CAOesGMirj2j5P7_Ri4CSCux+O3hH_wxvrra7-p33AdXO4Ej5Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2017 03:28 PM, Russell King - ARM Linux wrote:
-> On Wed, Apr 19, 2017 at 12:03:58PM +0530, Srinivas Ramana wrote:
->> Hi,
->>
->> While understanding how the alignment are handled on arm and arm64, we came
->> across the fixups for LDM/LDRD/STM on arm where as these fixups are not
->> present on arm64.
->>
->> There may be some specific reason why these fixups are not ported to arm64.
->> Can you please help us understand this?
->>
->> With this difference in how kernel handles 32-bit apps on arm and arm64,
->> there can be apps which are working without abort on arm, but fail on arm64
->> (SIGBUS). We have tried to get some history on web, but not successful.
->>
->> If this is indeed missing on arm64, do you see any issue if its ported (does
->> it fail any guidance)?
+Hi,
+
+On Tue, Feb 28, 2017 at 3:20 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Olof,
 >
-> Do you have an application that fails because of this?  Your email makes
-> it sound very theoretical.
+> Am Dienstag, 21. Februar 2017, 15:47:31 CET schrieb Olof Johansson:
+>> On Thu, Feb 9, 2017 at 5:05 PM, Brian Norris <briannorris@chromium.org> wrote:
+>> > From: Douglas Anderson <dianders@chromium.org>
+>> >
+>> > We'd like to be able to use the cros-ec-keyboard.dtsi and
+>> > cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
+>> > in the arm/boot/dts directory.
+>> >
+>> > Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
+>> > vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
+>> > a symlink.  Note that in this case we put the files in a new
+>> > "include/common" directory since these snippets may need to be
+>> > referenced by dts files in many different subdirectories.
+>>
+>> I'd rather have something like this:
+>>
+>> https://marc.info/?m=147547436324674&w=2
+>>
+>> Instead of having everybody move things over. I.e. make it easy to
+>> refer to the arm version from arm64 instead of creating a "common"
+>> layer inbetween.
 >
+> just so it gets noticed, I've done and tested [0], which hopefully should
+> implement your suggestions above.
+>
+> If that looks ok, how do you want that picked up? Should I just include
+> them in my regular rockchip branches or do you to pick them into some
+> immutable branch, if other surprise-users turn up in time for 4.12?
 
-I don't have any application with me right now. But i just tried passing 
-an intentional misaligned address in a test program. When i say 
-intentional, please note this code is buggy and should be fixed.
+Sigh. I completely dropped the ball on this, and I didn't see it
+included in any of your pull requests for 4.12 since I never actually
+acked that approach.
 
-So, my question is when arm has such fixups to handle such cases and do 
-gracefully, is there any reason why those fixups are not ported to 
-arm64? Again, I do agree that apps has to fix these instances, but we do 
-have fixups in arch/arm.
-
-I do see that the compiler can detect (if its not intentionally induced) 
-such cases and avoiding to generate LDM/STM and generates multiple 
-LDR/STR. So, I just want to know if it is safe to assume that the 
-compiler would take care of all such misaligned addresses passed to LDM/STM?
-
------------------------->8---------------------------------------
-struct locat {
-         int a;
-         int b;
-         int c;
-         int d;
-};
-
-int test_func()
-{
-         struct locat *int_pool1;
-         struct locat int_pool2;
-         struct locat *int_pool3;
-         char *ptr;
-
-         int_pool1 = malloc(sizeof(struct locat) + 16);
-         ptr = (char *)int_pool1;
-         int_pool3 = (struct locat *)(ptr+1);
-
-         printf("pool1 addr: 0x%08x pool3 addr: 0x%08x \n", &int_pool1, 
-int_pool3);
-         int_pool2 = *int_pool3;
-}
-
-------------------------8<---------------------------------------
+I've applied the patches onto a dt/include-paths stable branch, but
+we're late for merging dependent code on top of it for 4.12.
 
 
-Thanks,
--- Srinivas R
-
-
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc.,
-is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
+-Olof
