@@ -1,25 +1,19 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 19 Apr 2017 09:30:30 +0200
-Subject: [PATCH/RFT 2/2] ARM: dts: gose: Enable UHS-I SDR-50 and SDR-104
-In-Reply-To: <1492494939-24568-3-git-send-email-horms+renesas@verge.net.au>
-References: <1492494939-24568-1-git-send-email-horms+renesas@verge.net.au>
- <1492494939-24568-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20170419073030.xgh5y232pag3wush@ninjato>
+From: eddie.cai.linux@gmail.com (Eddie Cai)
+Date: Wed, 19 Apr 2017 15:30:21 +0800
+Subject: [PATCH 0/2] correct id for clk_testout1
+Message-ID: <20170419073023.1921-1-eddie.cai.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 02:55:39PM +0900, Simon Horman wrote:
-> Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
-> And the sd-uhs-sdr104 property to SDHI0.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+the id for clk_testout1 is wrong, it's time to correct it. 
 
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Eddie Cai (2):
+  clk: rockchip: add SCLK_TESTCLKOUT1 id
+  clk: rockchip: fix the incorrect id for clk_testout1
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/3e32ce9f/attachment.sig>
+ drivers/clk/rockchip/clk-rk3399.c      | 2 +-
+ include/dt-bindings/clock/rk3399-cru.h | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+-- 
+2.10.2
