@@ -1,38 +1,99 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:48:58 +0100
-Subject: [PATCH v4 09/21] PCI: xilinx-nwl: update PCI config space remap
- function
+Date: Wed, 19 Apr 2017 17:48:53 +0100
+Subject: [PATCH v4 04/21] ARM: implement pci_remap_cfgspace() interface
 In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
 References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-10-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI configuration space should be mapped with a memory region type that
-generates on the CPU host bus non-posted write transations. Update the
-driver to use the devm_pci_remap_cfg* interface to make sure the correct
-memory mappings for PCI configuration space are used.
+The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+and Posting") define rules for PCI configuration space transactions
+ordering and posting, that state that configuration writes have to
+be non-posted transactions.
+
+Current ioremap interface on ARM provides mapping functions that
+provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
+memory type) aka posted writes, so PCI host controller drivers have
+no arch interface to remap PCI configuration space with memory
+attributes that comply with the PCI specifications for configuration
+space.
+
+Implement an ARM specific pci_remap_cfgspace() interface that allows to
+map PCI config memory regions with MT_UNCACHED memory type (ie strongly
+ordered - non-posted writes), providing a remap function that complies
+with PCI specifications for config space transactions.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@armlinux.org.uk>
 ---
- drivers/pci/host/pcie-xilinx-nwl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/io.h | 10 ++++++++++
+ arch/arm/mm/ioremap.c     |  7 +++++++
+ arch/arm/mm/nommu.c       | 12 ++++++++++++
+ 3 files changed, 29 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 4c3e0ab..4b16b26 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -761,7 +761,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
- 	pcie->phys_pcie_reg_base = res->start;
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 42871fb..74d1b09 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -187,6 +187,16 @@ static inline void pci_ioremap_set_mem_type(int mem_type) {}
+ extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
  
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfg");
--	pcie->ecam_base = devm_ioremap_resource(dev, res);
-+	pcie->ecam_base = devm_pci_remap_cfg_resource(dev, res);
- 	if (IS_ERR(pcie->ecam_base))
- 		return PTR_ERR(pcie->ecam_base);
- 	pcie->phys_ecam_base = res->start;
+ /*
++ * PCI configuration space mapping function.
++ *
++ * PCI specifications does not allow configuration write
++ * transactions to be posted. Add an arch specific
++ * pci_remap_cfgspace definition that is implemented
++ * through strongly ordered memory mappings.
++ */
++#define pci_remap_cfgspace pci_remap_cfgspace
++void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size);
++/*
+  * Now, pick up the machine-defined IO definitions
+  */
+ #ifdef CONFIG_NEED_MACH_IO_H
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index ff0eed2..fc91205 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -481,6 +481,13 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ 				  __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
+ }
+ EXPORT_SYMBOL_GPL(pci_ioremap_io);
++
++void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size)
++{
++	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
++				   __builtin_return_address(0));
++}
++EXPORT_SYMBOL_GPL(pci_remap_cfgspace);
+ #endif
+ 
+ /*
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 33a45bd..3b8e728 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -436,6 +436,18 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+ }
+ EXPORT_SYMBOL(ioremap_wc);
+ 
++#ifdef CONFIG_PCI
++
++#include <asm/mach/map.h>
++
++void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size)
++{
++	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
++				   __builtin_return_address(0));
++}
++EXPORT_SYMBOL_GPL(pci_remap_cfgspace);
++#endif
++
+ void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
+ {
+ 	return (void *)phys_addr;
 -- 
 2.10.0
