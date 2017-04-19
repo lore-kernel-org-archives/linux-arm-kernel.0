@@ -1,78 +1,98 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Apr 2017 16:35:40 -0500
-Subject: [PATCH 1/3] dt-bindings: mt8173: Fix mdp device tree
-In-Reply-To: <1492068787-17838-2-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1492068787-17838-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1492068787-17838-2-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <20170419213540.4vigeed3mx24ie4e@rob-hp-laptop>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 19 Apr 2017 23:39:44 +0200
+Subject: [GIT PULL 00/16] clocksource: arm_arch_timer: GTDT-based MMIO
+ timer support
+In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170419213944.GC2523@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 03:33:05PM +0800, Minghsiu Tsai wrote:
-> If the mdp_* nodes are under an mdp sub-node, their corresponding
-> platform device does not automatically get its iommu assigned properly.
+On Wed, Apr 19, 2017 at 05:44:17PM +0100, Mark Rutland wrote:
+> Hi Daniel,
 > 
-> Fix this by moving the mdp component nodes up a level such that they are
-> siblings of mdp and all other SoC subsystems.  This also simplifies the
-> device tree.
+> The series enables support for the MMIO architected timers (useful for
+> system-level idle), which need to be probed via the GTDT when using ACPI. 
+> 
+> I realise this is a little late, but I would very much appreciate if you could
+> pull these arch timer GTDT patches for v4.12. The series has been largely fine
+> for a while now, and the major hold-ups were edge cases in error handling which
+> have now been addressed.
+> 
+> The bulk of the series is a refactoring to cleanly separate the core driver, DT
+> probe path, and ACPI probe path. The final patch of the series adds GTDT-based
+> probing of the SBSA watchdog, using the new GTDT probing infrastructure. I've
+> tested the patches on arm and arm64 platforms.
+> 
+> The ACPI parts have all been appropriately acked, and it's preferred that these
+> all go through the clocksource tree.
+> 
+> The series is based on Marc's arch-timer-errata tag, which is alread in
+> tip/timers/core.
 
-It may simplify the DT, but it also breaks compatibility with old DT. 
-Not sure if that's a problem on Mediatek platforms, but please be 
-explicit here that you are breaking compatibility and why that is okay.
+Hi Thomas,
+
+the series is ok for me. Is it possible to pull these changes directly in 
+tip/timers/core?
+
+There is a single trivial conflict with a trace.
+
+  -- Daniel
 
 > 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> The following changes since commit d003d029cea8a28139b4f9b88a36b8fac864f45b:
+> 
+>   arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data (2017-04-07 11:22:10 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git tags/arch-timer-gtdt
+> 
+> for you to fetch changes up to ca9ae5ec4ef0ed13833b03297ab319676965492c:
+> 
+>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver (2017-04-19 17:00:15 +0100)
+> 
+> ----------------------------------------------------------------
+> arch timer GTDT patches
+> 
+> - arch_timer cleanups and refactoring
+> - new common GTDT parser
+> - GTDT-based MMIO arch_timer support
+> - GTDT-based SBSA watchdog support
+> 
+> ----------------------------------------------------------------
+> Fu Wei (16):
+>       clocksource: arm_arch_timer: clean up printk usage
+>       clocksource: arm_arch_timer: rename type macros
+>       clocksource: arm_arch_timer: rename the PPI enum
+>       clocksource: arm_arch_timer: move enums and defines to header file
+>       clocksource: arm_arch_timer: add a new enum for spi type
+>       clocksource: arm_arch_timer: rework PPI selection
+>       clocksource: arm_arch_timer: split dt-only rate handling
+>       clocksource: arm_arch_timer: refactor arch_timer_needs_probing
+>       clocksource: arm_arch_timer: move arch_timer_needs_of_probing into DT init call
+>       clocksource: arm_arch_timer: add structs to describe MMIO timer
+>       clocksource: arm_arch_timer: split MMIO timer probing.
+>       acpi/arm64: Add GTDT table parse driver
+>       clocksource: arm_arch_timer: simplify ACPI support code.
+>       acpi/arm64: Add memory-mapped timer support in GTDT driver
+>       clocksource: arm_arch_timer: add GTDT support for memory-mapped timer
+>       acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+> 
+>  arch/arm64/Kconfig                   |   1 +
+>  drivers/acpi/arm64/Kconfig           |   3 +
+>  drivers/acpi/arm64/Makefile          |   1 +
+>  drivers/acpi/arm64/gtdt.c            | 417 +++++++++++++++++++++++++
+>  drivers/clocksource/arm_arch_timer.c | 573 +++++++++++++++++++++++------------
+>  include/clocksource/arm_arch_timer.h |  34 +++
+>  include/linux/acpi.h                 |   7 +
+>  7 files changed, 834 insertions(+), 202 deletions(-)
+>  create mode 100644 drivers/acpi/arm64/gtdt.c
 
-Should this have Daniel as the author?
+-- 
 
-> 
-> ---
->  Documentation/devicetree/bindings/media/mediatek-mdp.txt | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> index 4182063..0d03e3a 100644
-> --- a/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> @@ -2,7 +2,7 @@
->  
->  Media Data Path is used for scaling and color space conversion.
->  
-> -Required properties (controller (parent) node):
-> +Required properties (controller node):
->  - compatible: "mediatek,mt8173-mdp"
->  - mediatek,vpu: the node of video processor unit, see
->    Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
-> @@ -32,21 +32,16 @@ Required properties (DMA function blocks, child node):
->    for details.
->  
->  Example:
-> -mdp {
-> -	compatible = "mediatek,mt8173-mdp";
-> -	#address-cells = <2>;
-> -	#size-cells = <2>;
-> -	ranges;
-> -	mediatek,vpu = <&vpu>;
-> -
->  	mdp_rdma0: rdma at 14001000 {
->  		compatible = "mediatek,mt8173-mdp-rdma";
-> +			     "mediatek,mt8173-mdp";
->  		reg = <0 0x14001000 0 0x1000>;
->  		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
->  			 <&mmsys CLK_MM_MUTEX_32K>;
->  		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
->  		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
->  		mediatek,larb = <&larb0>;
-> +		mediatek,vpu = <&vpu>;
->  	};
->  
->  	mdp_rdma1: rdma at 14002000 {
-> @@ -106,4 +101,3 @@ mdp {
->  		iommus = <&iommu M4U_PORT_MDP_WROT1>;
->  		mediatek,larb = <&larb4>;
->  	};
-> -};
-> -- 
-> 1.9.1
-> 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
