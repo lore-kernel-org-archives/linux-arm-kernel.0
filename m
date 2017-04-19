@@ -1,57 +1,118 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 19 Apr 2017 23:07:53 +0800
-Subject: [PATCH v6 6/8] coresight: add support for CPU debug module
-In-Reply-To: <f42088f6-aa53-06b1-b332-22198744ab7a@arm.com>
-References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
- <1491485461-22800-7-git-send-email-leo.yan@linaro.org>
- <5c5cb6f8-1dcb-8a9d-1605-c006656005eb@arm.com>
- <20170419142812.GA16160@leoy-linaro>
- <f42088f6-aa53-06b1-b332-22198744ab7a@arm.com>
-Message-ID: <20170419150753.GA23319@leoy-linaro>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 19 Apr 2017 14:46:19 +0000
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E205352FC@FRAEML521-MBX.china.huawei.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>,
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+ <DB5PR05MB138288172B04713EB0C1DB55D3190@DB5PR05MB1382.eurprd05.prod.outlook.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205352FC@FRAEML521-MBX.china.huawei.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E2053543C@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 03:32:39PM +0100, Suzuki K Poulose wrote:
+Hi Amir
+ 
+> From: Amir Ancel [mailto:amira at mellanox.com]
+> Sent: 18 April 2017 21:18
+> To: David Laight; Gabriele Paoloni; davem at davemloft.net
+> Cc: Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy;
+> jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-
+> kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong;
+> Linuxarm
+> Subject: Re: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the
+> ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+> 
+> Hi,
+> mlx5 driver is planned to have RO support this year.
+> I believe drivers should be able to query whether the arch support it
 
-[...]
+I guess that here when you say query you mean having a config symbol
+that is set accordingly to the host architecture, right?
 
-> >>>+static int debug_probe(struct amba_device *adev, const struct amba_id *id)
-> >>>+{
-> >>>+	void __iomem *base;
-> >>>+	struct device *dev = &adev->dev;
-> >>>+	struct debug_drvdata *drvdata;
-> >>>+	struct resource *res = &adev->res;
-> >>>+	struct device_node *np = adev->dev.of_node;
-> >>>+	int ret;
-> >>>+
-> >>>+	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-> >>>+	if (!drvdata)
-> >>>+		return -ENOMEM;
-> >>>+
-> >>>+	drvdata->cpu = np ? of_coresight_get_cpu(np) : 0;
-> >>>+	if (per_cpu(debug_drvdata, drvdata->cpu)) {
-> >>>+		dev_err(dev, "CPU%d drvdata has been initialized\n",
-> >>>+			drvdata->cpu);
-> >>
-> >>May be we could warn about a possible issue in the DT ?
+As already said I have looked around a bit and other drivers do not seem
+to enable/disable RO for their EP on the basis of the host architecture.
+So why should mlx5 do it according to the host?
+
+Also my understating is that some architectures (like ARM64 for example)
+can have different PCI host controller implementations depending on the
+vendor...therefore maybe it is not appropriate there to have a Kconfig
+symbol selected by the architecture...  
+
+Thanks
+Gab
+
+> or not and enable it in the network adapter accordingly.
+> 
+> -Amir
+> ________________________________________
+> From: netdev-owner at vger.kernel.org <netdev-owner@vger.kernel.org> on
+> behalf of David Laight <David.Laight@ACULAB.COM>
+> Sent: Tuesday, April 18, 2017 4:25:44 PM
+> To: 'Gabriele Paoloni'; davem at davemloft.net
+> Cc: Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy;
+> jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-
+> kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong;
+> Linuxarm
+> Subject: RE: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the
+> ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+> 
+> From: Gabriele Paoloni
+> > Sent: 13 April 2017 10:11
+> > > > Till now only the Intel ixgbe could support enable
+> > > > Relaxed ordering in the drivers for special architecture,
+> > > > but the ARCH_WANT_RELAX_ORDER is looks like a general name
+> > > > for all arch, so rename to a specific name for intel
+> > > > card looks more appropriate.
+> > > >
+> > > > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> > >
+> > > This is not a driver specific facility.
+> > >
+> > > Any driver can test this symbol and act accordingly.
+> > >
+> > > Just because IXGBE is the first and only user, doesn't mean
+> > > the facility is driver specific.
 > >
-> >So can I understand the suggestion is to add warning in function
-> >of_coresight_get_cpu() when cannot find CPU number, and here directly
-> >bail out?
+> >
+> > Please correct me if I am wrong but my understanding is that the
+> standard
+> > way to enable/disable relaxed ordering is to set/clear bit 4 of the
+> Device
+> > Control Register (PCI_EXP_DEVCTL_RELAX_EN 0x0010 /* Enable relaxed
+> > ordering */).
+> > Now I have looked up for all drivers either enabling or disabling
+> relaxed
+> > ordering and none of them seems to need a symbol to decide whether to
+> > enable it or not.
+> > Also it seems to me enabling/disabling relaxed ordering is never
+> bound to the
+> > host architecture.
+> >
+> > So why this should be (or it is expected to be) a generic symbol?
+> > Wouldn't it be more correct to have this as a driver specific symbol
+> now and
+> > move it to a generic one later once we have other drivers requiring
+> it?
 > 
-> No. One could have single CPU DT, where he doesn't need to provide the CPU number.
-> Hence, it doesn't make sense to WARN  in of_coresight_get_cpu().
+> 'Relaxed ordering' is a bit in the TLP header.
+> A device (like the ixgbe hardware) can set it for some transactions and
+> still have the transactions 'ordered enough' for the driver to work.
+> (If all transactions have 'relaxed ordering' set then I suspect it is
+> almost impossible to write a working driver.)
+> The host side could (probably does) have a bit to enable 'relaxed
+> ordering',
+> it could also enforce stronger ordering than required by the PCIe spec
+> (eg keeping reads in order).
 > 
-> But when we hit the case above, we find that the some node was registered for
-> the given CPU (be it 0 or any other), which is definitely an error in DT. Due to
+> Clearly, on some sparc64 systems, ixgbe needs to use 'relaxed
+> ordering'.
+> To me this requires two separate bits be enabled:
+> 1) to the ixgbe driver to generate the 'relaxed' TLP.
+> 2) to the host to actually act on them.
+> If the ixgbe driver works when both are enabled why have options to
+> disable either (except for bug-finding)?
 > 
-> 1) Hasn't specified the CPU number for more than one node
-> 
-> OR
-> 
-> 2) CPU number duplicated in the more than one nodes.
-
-Thanks for explaination. It's clear for me now.
-
-> Cheers
-> Suzuki
+> ??????? David
