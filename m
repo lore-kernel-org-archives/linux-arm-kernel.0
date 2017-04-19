@@ -1,32 +1,48 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Wed, 19 Apr 2017 12:03:58 +0530
-Subject: LDM/STM alignment fixups on arm64
-Message-ID: <58F704D6.6000301@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Apr 2017 08:52:06 +0200
+Subject: [PATCH 3/3] ARM: sun8i: a83t: Rename pinmux setting names
+In-Reply-To: <CAGb2v65is5iyzXYvJMF7QLWXBdMBpemEm2kmyTnytx7V30M7Og@mail.gmail.com>
+References: <20170418042205.27894-1-wens@csie.org>
+ <20170418042205.27894-4-wens@csie.org>
+ <20170418090447.dcxinewczubf26b7@lukather>
+ <CAGb2v65is5iyzXYvJMF7QLWXBdMBpemEm2kmyTnytx7V30M7Og@mail.gmail.com>
+Message-ID: <20170419065206.k5cb5gym35iabcbr@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 18, 2017 at 05:16:53PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Apr 18, 2017 at 5:04 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Tue, Apr 18, 2017 at 12:22:05PM +0800, Chen-Yu Tsai wrote:
+> >> The pinmux setting nodes all have an address element in their node
+> >> names, however the pinctrl node does not have #address-cells.
+> >>
+> >> Rename the existing pinmux setting nodes and labels in sun8i-a83t.dtsi,
+> >> dropping identifiers for functions that only have one possible setting,
+> >> and using the pingroup name if the function is identically available on
+> >> different pingroups.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > Applied, and I really like the new names.
+> >
+> > Would you make the same patch for everyone?
+> 
+> I can. No guarantees on the schedule though.
 
-While understanding how the alignment are handled on arm and arm64, we 
-came across the fixups for LDM/LDRD/STM on arm where as these fixups are 
-not present on arm64.
+Sure, I know this isn't really the most entertaining and fulfilling
+patch to make ;)
 
-There may be some specific reason why these fixups are not ported to 
-arm64. Can you please help us understand this?
-
-With this difference in how kernel handles 32-bit apps on arm and arm64, 
-there can be apps which are working without abort on arm, but fail on 
-arm64 (SIGBUS). We have tried to get some history on web, but not 
-successful.
-
-If this is indeed missing on arm64, do you see any issue if its ported 
-(does it fail any guidance)?
-
-Thanks,
--- Srinivas R
-
+Maxime
 
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc.,
-is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/274bb57d/attachment.sig>
