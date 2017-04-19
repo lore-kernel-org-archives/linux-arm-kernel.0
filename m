@@ -1,40 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 07:22:15 -0700
-Subject: [PATCH V3] PM / OPP: Use - instead of @ for DT entries
-In-Reply-To: <734c5d5a66ef8a5505f368fc68a8ab9c02d710f9.1492492253.git.viresh.kumar@linaro.org>
-References: <734c5d5a66ef8a5505f368fc68a8ab9c02d710f9.1492492253.git.viresh.kumar@linaro.org>
-Message-ID: <20170419142215.GA12105@localhost>
+Date: Wed, 19 Apr 2017 07:04:03 -0700
+Subject: [GIT PULL] ARM: at91: soc for 4.12
+In-Reply-To: <20170410165642.jt4bucl2zwk26orm@piout.net>
+References: <20170410165642.jt4bucl2zwk26orm@piout.net>
+Message-ID: <20170419140403.GM29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-On Tue, Apr 18, 2017 at 10:44:50AM +0530, Viresh Kumar wrote:
-> Compiling the DT file with W=1, DTC warns like follows:
+On Mon, Apr 10, 2017 at 06:56:42PM +0200, Alexandre Belloni wrote:
+> Hi Arnd, Olof,
 > 
-> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-> unit name, but no reg property
+> This is a huge cleanup of the PM code in order to prepare support for a
+> new suspend mode on sama5d2.
 > 
-> Fix this by replacing '@' with '-' as the OPP nodes will never have a
-> "reg" property.
+> Note that as discussed with Arnd, the first two patches are fixes that
+> are already upstream since v4.11-rc4. The rest of the pull request
+> depends on them.
 > 
-> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com> (uniphier)
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.12-soc
+> 
+> for you to fetch changes up to b32de9dd38fcf9063e993dcdd64cc64ad344d3ac:
+> 
+>   ARM: at91: move SoC detection to its own driver (2017-03-31 20:36:10 +0200)
+> 
+> ----------------------------------------------------------------
+> SoC for 4.12:
+> 
+>  - huge PM cleanup
+>  - Move SoC detection to its own driver
 
-We've already turned down other patches that does this in a sweeping manner
-like this, since they tend to be conflict prone with other DT changes.
+Thanks, merged!
 
-Please split per platform and merge with each maintainer.
-
-
-Thanks,
 
 -Olof
