@@ -1,61 +1,56 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:39:21 -0700
-Subject: [GIT PULL 1/5] i.MX driver changes for 4.12
-In-Reply-To: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
-References: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170419133921.GS29219@localhost>
+Date: Wed, 19 Apr 2017 06:45:22 -0700
+Subject: [GIT PULL 1/2] Rockchip dts32 updates for 4.12 part2
+In-Reply-To: <2927359.zDIxDMQbjs@phil>
+References: <2927359.zDIxDMQbjs@phil>
+Message-ID: <20170419134522.GY29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 10:37:52PM +0800, Shawn Guo wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+On Mon, Apr 10, 2017 at 11:56:03AM +0200, Heiko Stuebner wrote:
+> Hi Arnd, Kevin, Olof,
 > 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> some additional stuff, hopefully still in time for 4.12.
+> On the arm32 side devicetree the big thing is support for the phyCORE som
+> from Phytec and on the arm64 side (pull2) support for another new
+> 4-core soc, the rk3328 (4*A53) .
+> 
+> Please pull
+> 
+> Thanks
+> Heiko
+> 
+> PS: There should also defconfig patch be around in the arm at kernel.org
+> inbox named "multi_v7_defconfig: make Rockchip usb2-phy built-in"
+> Maybe you could look at that too :-)
+> 
+> 
+> The following changes since commit 94bbdd77247d8c16eed5f55dddcf1cbc38d06cc4:
+> 
+>   ARM: dts: rockchip: setup DMA-channels for mmc0 and emmc for rk3188 (2017-03-22 16:49:39 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.12
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts32-2
 > 
-> for you to fetch changes up to 44c43c98213fb123819c67c128a5d6c9a9a12280:
+> for you to fetch changes up to 81507732449076de35db3b5a439e4dfd548c6b5a:
 > 
->   soc: imx: gpc: add workaround for i.MX6QP to the GPC PD driver (2017-04-07 20:47:34 +0800)
-> 
-> ----------------------------------------------------------------
-> i.MX drivers updates for 4.12:
->  - A series from Lucas Stach which partly rewrites the imx gpc driver
->    to support multiple power domains, and moves the related code from
->    imx platform into drivers folder.
->  - A series from Dong Aisheng which fixes the issues with Lucas' code
->    changes and improves things.
->  - Add workaround for i.MX6QP hardware erratum ERR009619 that is PRE
->    clocks may be stalled during the power up sequencing of the PU power
->    domain.
->  - Add imx-gpcv2 driver to support power domains managed by GPCv2 IP
->    block found on i.MX7 series of SoCs.
+>   ARM: dts: rockchip: Add support for PCM-947 carrier board (2017-04-06 23:38:18 +0200)
 > 
 > ----------------------------------------------------------------
-> Andrey Smirnov (2):
->       dt-bindings: Add GPCv2 power gating driver
->       soc: imx: Add GPCv2 power gating driver
+> Support for the usb-sata controller on the rock2 and another new rk3288
+> board, the phyCORE som and its PCM-947 carrier board from Phytec.
 > 
-> Dong Aisheng (8):
->       soc: imx: gpc: fix gpc clk get error handling
->       soc: imx: gpc: fix the wrong using of regmap cache
->       soc: imx: gpc: fix domain_index sanity check issue
->       soc: imx: gpc: fix imx6sl gpc power domain regression
->       soc: imx: gpc: fix comment when power up domain
->       soc: imx: gpc: keep PGC_X_CTRL name align with reference manual
->       dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
->       soc: imx: gpc: remove unnecessary readable_reg callback
+> ----------------------------------------------------------------
+> Sjoerd Simons (1):
+>       ARM: dts: rockchip: Enable sata support on rock2 square
 > 
-> Lucas Stach (5):
->       dt-bindings: add multidomain support to i.MX GPC DT binding
->       soc: imx: move PGC handling to a new GPC driver
->       soc: imx: gpc: add defines for domain index
->       dt-bindings: imx-gpc: add i.MX6 QuadPlus compatible
->       soc: imx: gpc: add workaround for i.MX6QP to the GPC PD driver
+> Wadim Egorov (3):
+>       ARM: dts: rockchip: Add support for phyCORE-RK3288 SoM
+>       dt-bindings: Document Phytec phyCORE-RK3288 RDK
+>       ARM: dts: rockchip: Add support for PCM-947 carrier board
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
