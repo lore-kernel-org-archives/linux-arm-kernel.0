@@ -1,30 +1,25 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Wed, 19 Apr 2017 15:30:22 +0800
-Subject: [PATCH 1/2] clk: rockchip: add SCLK_TESTCLKOUT1 id
-In-Reply-To: <20170419073023.1921-1-eddie.cai.linux@gmail.com>
-References: <20170419073023.1921-1-eddie.cai.linux@gmail.com>
-Message-ID: <20170419073023.1921-2-eddie.cai.linux@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 19 Apr 2017 09:36:14 +0200
+Subject: [PATCH/RFT 1/2] ARM: dts: r8a7793: set maximum frequency for
+ SDHI clocks
+In-Reply-To: <1492494939-24568-2-git-send-email-horms+renesas@verge.net.au>
+References: <1492494939-24568-1-git-send-email-horms+renesas@verge.net.au>
+ <1492494939-24568-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20170419073614.GA2321@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we use SCLK_TESTCLKOUT1 for camera, so add this id.
+On Tue, Apr 18, 2017 at 02:55:38PM +0900, Simon Horman wrote:
+> Define the upper limit otherwise the driver cannot utilize max speeds.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
----
- include/dt-bindings/clock/rk3399-cru.h | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-diff --git a/include/dt-bindings/clock/rk3399-cru.h b/include/dt-bindings/clock/rk3399-cru.h
-index 220a60f..c505a98 100644
---- a/include/dt-bindings/clock/rk3399-cru.h
-+++ b/include/dt-bindings/clock/rk3399-cru.h
-@@ -132,6 +132,7 @@
- #define SCLK_RMII_SRC			166
- #define SCLK_PCIEPHY_REF100M		167
- #define SCLK_DDRC			168
-+#define SCLK_TESTCLKOUT1		169
- 
- #define DCLK_VOP0			180
- #define DCLK_VOP1			181
--- 
-2.10.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/fa482005/attachment.sig>
