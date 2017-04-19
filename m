@@ -1,27 +1,112 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:35:18 -0700
-Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.12
-In-Reply-To: <1491835076-1995-5-git-send-email-shawnguo@kernel.org>
-References: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
- <1491835076-1995-5-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170419133518.GO29219@localhost>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 19 Apr 2017 14:28:02 +0000
+Subject: [PATCH net-next 1/4] ixgbe: sparc: rename the
+ ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+References: <20170401.112603.1991545644693496714.davem@davemloft.net>
+ <42428725-89f1-1508-4e3d-723e087b3bbb@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E205199C0@FRAEML521-MBX.china.huawei.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFFD3C52@AcuExch.aculab.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E205352C3@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 10:37:56PM +0800, Shawn Guo wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.12
-> 
-> for you to fetch changes up to c5054a98bce49ab2956e0dbc3fdfd6345716b16b:
-> 
->   ARM: imx_v6_v7_defconfig: Select SMSC_PHY (2017-03-30 21:21:34 +0800)
+Hi David
 
-Merged, thanks!
+Many thanks for your reply
 
+> -----Original Message-----
+> From: David Laight [mailto:David.Laight at ACULAB.COM]
+> Sent: 18 April 2017 14:26
+> To: Gabriele Paoloni; davem at davemloft.net
+> Cc: Catalin Marinas; Will Deacon; Mark Rutland; Robin Murphy;
+> jeffrey.t.kirsher at intel.com; alexander.duyck at gmail.com; linux-arm-
+> kernel at lists.infradead.org; netdev at vger.kernel.org; Dingtianhong;
+> Linuxarm
+> Subject: RE: Re: [PATCH net-next 1/4] ixgbe: sparc: rename the
+> ARCH_WANT_RELAX_ORDER to IXGBE_ALLOW_RELAXED_ORDER
+> 
+> From: Gabriele Paoloni
+> > Sent: 13 April 2017 10:11
+> > > > Till now only the Intel ixgbe could support enable
+> > > > Relaxed ordering in the drivers for special architecture,
+> > > > but the ARCH_WANT_RELAX_ORDER is looks like a general name
+> > > > for all arch, so rename to a specific name for intel
+> > > > card looks more appropriate.
+> > > >
+> > > > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> > >
+> > > This is not a driver specific facility.
+> > >
+> > > Any driver can test this symbol and act accordingly.
+> > >
+> > > Just because IXGBE is the first and only user, doesn't mean
+> > > the facility is driver specific.
+> >
+> >
+> > Please correct me if I am wrong but my understanding is that the
+> standard
+> > way to enable/disable relaxed ordering is to set/clear bit 4 of the
+> Device
+> > Control Register (PCI_EXP_DEVCTL_RELAX_EN 0x0010 /* Enable relaxed
+> > ordering */).
+> > Now I have looked up for all drivers either enabling or disabling
+> relaxed
+> > ordering and none of them seems to need a symbol to decide whether to
+> > enable it or not.
+> > Also it seems to me enabling/disabling relaxed ordering is never
+> bound to the
+> > host architecture.
+> >
+> > So why this should be (or it is expected to be) a generic symbol?
+> > Wouldn't it be more correct to have this as a driver specific symbol
+> now and
+> > move it to a generic one later once we have other drivers requiring
+> it?
+> 
+> 'Relaxed ordering' is a bit in the TLP header.
+> A device (like the ixgbe hardware) can set it for some transactions and
+> still have the transactions 'ordered enough' for the driver to work.
+> (If all transactions have 'relaxed ordering' set then I suspect it is
+> almost impossible to write a working driver.)
+> The host side could (probably does) have a bit to enable 'relaxed
+> ordering',
+> it could also enforce stronger ordering than required by the PCIe spec
+> (eg keeping reads in order).
 
--Olof
+My understanding is that from the host side the host is always allowed
+(as long as it complies with the rules specified in sec.2.4.1 of the PCIe
+Specs) to set the RO attribute in the TLP and the target function should
+be abel to cope with it.
+
+On the device side the device is allowed to set the RO attribute in the
+TLP only if bit4 of the "Device Control Register" is set.
+
+> 
+> Clearly, on some sparc64 systems, ixgbe needs to use 'relaxed
+> ordering'.
+> To me this requires two separate bits be enabled:
+> 1) to the ixgbe driver to generate the 'relaxed' TLP.
+> 2) to the host to actually act on them.
+
+My understanding is that for performance reasons when possible we
+should enable relaxed ordering and I think this is up to the host
+(i.e. the host somehow should know when he is capable of handling
+RO TLPs and therefore it will try to enable it on the driver)
+
+> If the ixgbe driver works when both are enabled why have options to
+> disable either (except for bug-finding)?
+
+I think that by default the ixgbe driver disable RO since there are
+issues with "some chipsets" according to commit 3d5c520727ce "ixgbe:
+move disabling of relaxed ordering in start_hw()".
+What this means is a bit obscure to me and seems to be not related to
+the host architecture
+
+Also looking at where and why the other drivers set/clear the "Enable
+Relaxed Ordering" bit it seems that currently this is not tied to the
+host architecture nor to any global symbol; instead it seems purely
+dependent on the PCIe device chipset itself.
+
+> 
+> 	David
