@@ -1,19 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:37:09 -0700
-Subject: [GIT PULL] Allwinner DT changes for 4.12
-In-Reply-To: <20170406085810.lhizqmi65h2jats3@lukather>
-References: <20170406085810.lhizqmi65h2jats3@lukather>
-Message-ID: <20170419123709.GR17004@localhost>
+Date: Wed, 19 Apr 2017 05:24:04 -0700
+Subject: [GIT PULL] STM32 SOC changes for v4.12 #1
+In-Reply-To: <a7b21384-ec29-c39f-97a8-579ca8d16bc2@st.com>
+References: <a7b21384-ec29-c39f-97a8-579ca8d16bc2@st.com>
+Message-ID: <20170419122404.GE17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 10:58:10AM +0200, Maxime Ripard wrote:
-> Hi Arnd, Olof,
+On Mon, Apr 03, 2017 at 07:23:33PM +0200, Alexandre Torgue wrote:
+> Hi Olof, Arnd and Kevin,
 > 
-> Please pull the following DT changes for the next merge window.
-> 
-> Thanks!
-> Maxime
+> Please consider this first round of STM32 SOC updates for v4.12:
 > 
 > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
@@ -21,24 +18,12 @@ On Thu, Apr 06, 2017 at 10:58:10AM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.12
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/stm32-soc-for-v4.12-1
 > 
-> for you to fetch changes up to 367d2b0cb15dfbfa7243b200957c3c6b86276b54:
+> for you to fetch changes up to c6ed0f31ce3e1c5729d1c8f81a2a94ab881506a6:
 > 
->   ARM: sun8i: sina33: add highest OPP of CPUs (2017-04-05 14:11:36 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner DT changes for 4.12
-> 
-> As usual a number of changes, among which:
->   - All the sun5i DTSI has been reworked based on the new documentation and
->     the IPs that are actually found in all those SoCs. Part of that rework
->     also brought the GR8 DTSI to include sun5i.dtsi
->   - Mali devfreq and thermal throttling support on the A33
->   - AC power supplies for the AXP209 and AXP22X PMIC
->   - CAN support for the A20
->   - CPUFreq-based thermal throttling for the A33
->   - New board: NanoPi NEO Air
+>   ARM: stm32: Add a new SOC - STM32H743 (2017-03-24 11:37:24 +0100)
 
 Merged, thanks.
 
