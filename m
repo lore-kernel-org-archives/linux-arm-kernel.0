@@ -1,58 +1,54 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Apr 2017 17:48:54 +0100
-Subject: [PATCH v4 05/21] lib: fix Devres devm_ioremap_* offset parameter
- kerneldoc description
+Date: Wed, 19 Apr 2017 17:48:56 +0100
+Subject: [PATCH v4 07/21] PCI: ECAM: use pci_remap_cfgspace() to map config
+ region
 In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
 References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170419164913.19674-6-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-8-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The offset parameter in Devres devm_ioremap_* functions kerneldoc
-entries is erroneously defined as BUS offset whereas it is actually
-a resource address.
+Current ECAM kernel implementation uses ioremap() to map the ECAM
+configuration space memory region; this is not safe in that on some
+architectures the ioremap interface provides mappings that allow posted
+write transactions. This, as highlighted in the PCIe specifications
+(4.0 - Rev0.3, "Ordering Considerations for the Enhanced Configuration
+Address Mechanism"), can create ordering issues for software because
+posted writes transactions on the CPU host bus are non posted in the
+PCI express fabric.
 
-Since it is actually misleading, fix the Devres devm_ioremap_* offset
-parameter kerneldoc entry by replacing BUS offset with a more
-suitable description (ie Resource address).
+Update the ioremap() interface to use pci_remap_cfgspace() whose
+mapping attributes guarantee that non-posted writes transactions
+are issued for memory writes within the ECAM memory mapped address
+region.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Tejun Heo <tj@kernel.org>
+Cc: Jayachandran C <jnair@caviumnetworks.com>
 ---
- lib/devres.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/pci/ecam.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/lib/devres.c b/lib/devres.c
-index cb1464c..78eca71 100644
---- a/lib/devres.c
-+++ b/lib/devres.c
-@@ -17,7 +17,7 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
- /**
-  * devm_ioremap - Managed ioremap()
-  * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-+ * @offset: Resource address to map
-  * @size: Size of map
-  *
-  * Managed ioremap().  Map is automatically unmapped on driver detach.
-@@ -45,7 +45,7 @@ EXPORT_SYMBOL(devm_ioremap);
- /**
-  * devm_ioremap_nocache - Managed ioremap_nocache()
-  * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-+ * @offset: Resource address to map
-  * @size: Size of map
-  *
-  * Managed ioremap_nocache().  Map is automatically unmapped on driver
-@@ -74,7 +74,7 @@ EXPORT_SYMBOL(devm_ioremap_nocache);
- /**
-  * devm_ioremap_wc - Managed ioremap_wc()
-  * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-+ * @offset: Resource address to map
-  * @size: Size of map
-  *
-  * Managed ioremap_wc().  Map is automatically unmapped on driver detach.
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index 2fee61b..c228a2e 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -84,12 +84,14 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+ 		if (!cfg->winp)
+ 			goto err_exit_malloc;
+ 		for (i = 0; i < bus_range; i++) {
+-			cfg->winp[i] = ioremap(cfgres->start + i * bsz, bsz);
++			cfg->winp[i] =
++				pci_remap_cfgspace(cfgres->start + i * bsz,
++						   bsz);
+ 			if (!cfg->winp[i])
+ 				goto err_exit_iomap;
+ 		}
+ 	} else {
+-		cfg->win = ioremap(cfgres->start, bus_range * bsz);
++		cfg->win = pci_remap_cfgspace(cfgres->start, bus_range * bsz);
+ 		if (!cfg->win)
+ 			goto err_exit_iomap;
+ 	}
 -- 
 2.10.0
