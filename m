@@ -1,108 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Apr 2017 16:11:51 +0200
-Subject: [GIT PULL] Allwinner H5 DT changes for 4.12
-In-Reply-To: <20170419124552.GT17004@localhost>
-References: <20170406093748.7xybeycxnqj5frow@lukather>
- <20170419124552.GT17004@localhost>
-Message-ID: <20170419141151.abshl2iynsxqh76q@lukather>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 19 Apr 2017 15:20:56 +0100
+Subject: [PATCH v3 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <20170419115658.GD5077@suse.de>
+References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+ <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
+ <33321273-E3E7-459B-A615-5ADA52445AA1@esh.hu>
+ <186f0c06-39ce-cb88-35e5-6dd57aa81166@arm.com>
+ <4e3ce329-6194-043b-0d69-cbec6b08e38e@arm.com>
+ <21ea43fb-0d3d-88e2-12ee-4a114e9d8459@arm.com>
+ <20170419115658.GD5077@suse.de>
+Message-ID: <73e1eed0-9d21-6d36-d596-3ca40eb24075@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Wed, Apr 19, 2017 at 05:45:52AM -0700, Olof Johansson wrote:
-> On Thu, Apr 06, 2017 at 11:37:48AM +0200, Maxime Ripard wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Here is a serie of patches a bit unusual for the next merge window.
-> > 
-> > Allwinner released a new SoC, the H5, that is basically an H3 with
-> > arm64 CPU cores (A53 instead of A7).
-> > 
-> > In order to support it properly, we've created a common DTSI, and
-> > built on top. Since that DTSI is spread across arm and arm64, it took
-> > a bit of rework (all the patches in that PR until commit da89e1d5cbaf
-> > ("ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5"))
-> > that is shared with the PR I just sent with the H3-only patches.
-> > 
-> > The patches on top of that commit are H5-specific commits (new boards,
-> > new features) and should be merged through your arm64 DT branch.
-> > 
-> > Thanks,
-> > Maxime
-> > 
-> > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> > 
-> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-h5-for-4.12
-> > 
-> > for you to fetch changes up to d7bb5b966174fee6e4b0085124b75787a5d81b8a:
-> > 
-> >   ARM: sunxi: h3/h5: switch apb0-related clocks to r_ccu (2017-04-04 17:45:24 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner H5 DT changes for 4.12
-> > 
-> > H5 patches for 4.12, which are mostly related to reworking the H3 DTSI to
-> > be usable on the arm64 H5 DTSI, that shares almost everything with the H3
-> > but the CPU cores.
-> > 
-> > We then have patches to support the H5 boards on top.
-> > 
-> > ----------------------------------------------------------------
-> > Andre Przywara (3):
-> >       arm: sun8i: h3: split Allwinner H3 .dtsi
-> >       arm64: allwinner: h5: add Allwinner H5 .dtsi
-> >       arm64: allwinner: h5: add support for the Orange Pi PC 2 board
-> > 
-> > Icenowy Zheng (6):
-> >       arm: sun8i: h3: drop skeleton.dtsi inclusion in H3 DTSI
-> >       arm: sun8i: h3: drop pinctrl-a10.h inclusion for H3 DTSI
-> >       arm: sun8i: h3: correct the GIC compatible in H3 to gic-400
-> >       ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5
-> >       arm64: allwinner: h5: enable USB OTG on Orange Pi PC 2 board
-> >       ARM: sunxi: h3/h5: switch apb0-related clocks to r_ccu
-> > 
-> >  arch/arm/boot/dts/sun8i-h3.dtsi                    | 602 ++-------------------
-> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 601 ++++++++++++++++++++
-> >  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
-> >  .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 188 +++++++
-> >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       | 124 +++++
-> >  arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi     |   1 +
-> >  6 files changed, 955 insertions(+), 562 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-> >  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> >  create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+On 19/04/17 12:56, Joerg Roedel wrote:
+> On Tue, Apr 18, 2017 at 01:51:35PM +0100, Vladimir Murzin wrote:
+>> FYI, nothing has changed since last "ping" - Andr?s and Alexandre are still
+>> dependant on this series to safely enable DMA on their platforms. It is really
+>> scary that these patches do not move forward even though they are supposed to
+>> fix the real issue :(
 > 
-> So, I really don't like these symlinks. We had some discussions here:
+> That's probably because you didn't include all relevant people in this
+> post. I think patches the patches for dma-noop.c should go through 
+> Andrew Morton.
 > 
-> https://marc.info/?m=147547436324674&w=2
+
+Thanks for suggestion, Joerg! Andrew is already in the loop.
+
+I'm wondering if there is better way/tool to get relevant people except
+get_maintainer.pl?
+
+./scripts/get_maintainer.pl -f lib/dma-noop.c
+Bart Van Assche <bart.vanassche@sandisk.com> (commit_signer:3/3=100%,authored:2/3=67%,added_lines:2/7=29%,removed_lines:2/6=33%)
+Vineet Gupta <vgupta@synopsys.com> (commit_signer:2/3=67%)
+Robin Murphy <robin.murphy@arm.com> (commit_signer:2/3=67%)
+Doug Ledford <dledford@redhat.com> (commit_signer:2/3=67%)
+Joerg Roedel <jroedel@suse.de> (commit_signer:2/3=67%)
+Krzysztof Kozlowski <krzk@kernel.org> (authored:1/3=33%,added_lines:5/7=71%,removed_lines:4/6=67%)
+linux-kernel at vger.kernel.org (open list)
+
+./scripts/get_maintainer.pl -f drivers/base/dma-coherent.c
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:DRIVER CORE, KOBJECTS, DEBUGFS AND SYSFS)
+linux-kernel at vger.kernel.org (open list)
+
+Cheers
+Vladimir
+
 > 
-> Given my lack of attention on this, it's obviously way late in the release
-> cycle to ask you to respin so I'll merge this branch as-is right now.
 > 
-> What I'll do though, is that I'll apply that patch that sets up those
-> symlinks here, and may I ask that you revisit right after -rc1 with
-> a pull request that moves over to that model? I.e. the arm64 dts
-> would then include <arm/sunxi-h3-h5.dtsi> instead.
-
-I'll do it.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/3a31b68b/attachment.sig>
+> 	Joerg
+> 
+> 
