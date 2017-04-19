@@ -1,44 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:31:35 -0700
-Subject: [GIT PULL 1/2] SoCFPGA DTS updates for v4.12
-In-Reply-To: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
-References: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <20170419123135.GM17004@localhost>
+Date: Wed, 19 Apr 2017 05:30:48 -0700
+Subject: [GIT PULL] Reset controller changes for v4.12, part 2
+In-Reply-To: <1491387844.2381.77.camel@pengutronix.de>
+References: <1491387844.2381.77.camel@pengutronix.de>
+Message-ID: <20170419123048.GL17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 10:01:28AM -0500, Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
+On Wed, Apr 05, 2017 at 12:24:04PM +0200, Philipp Zabel wrote:
+> Dear arm-soc maintainers,
 > 
-> Please pull in these DTS updates for v4.12.
+> please consider merging this tag for v4.12, which just adds a few reset
+> lines for the NAND and eMMC controllers on Uniphier LD11/LD20 SoCs.
 > 
-> Thanks,
-> Dinh
+> regards
+> Philipp
 > 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> The following changes since commit 11282a49b735ad7f4cea187de2b8dc5489343e4b:
 > 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>   reset: sunxi: fix for 64-bit compilation (2017-03-15 12:19:12 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.12
+>   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.12-2
 > 
-> for you to fetch changes up to 7fed0cbffe1db3383ae1900fffc8f4e14d2735c8:
+> for you to fetch changes up to 23ade398c7c2809d031fe1d83ada11b3c08d73b4:
 > 
->   ARM: dts: socfpga: Add Devkit A10-SR Reset Controller (2017-03-16 07:57:16 -0500)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA DTS updates for v4.12
-> - Clean-up:
-> 	- Add clock/memory nodes
-> 	- Add labels for CPU nodes
-> 	- Remove unused unit names and reg
-> 	- Remove unused skeleton.dtsi
-> - Add support for PMU
-> - Add QSPI for sodia board
-> - Add Reset controller for Arria10
+>   reset: uniphier: add NAND and eMMC reset control (2017-03-28 18:45:35 +0200)
 
-Merged, thanks!
-
+Merged, thanks.
 
 -Olof
