@@ -1,49 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Apr 2017 19:37:09 +0200
-Subject: [PATCH] arm64: arch_timer: mark errata handlers as __maybe_unused
-Message-ID: <20170419173737.3846098-1-arnd@arndb.de>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Wed, 19 Apr 2017 23:14:06 +0530
+Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when kernel
+ is running in HYP
+Message-ID: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some rare randconfig builds, we end up with two functions being entirely
-unused:
+commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+is returning error for perf syscall with mixed attribute set for exclude_kernel
+and exclude_hv. This change is breaking some applications (observed with hhvm)
+when ran on VHE enabled platforms.
 
-drivers/clocksource/arm_arch_timer.c:342:12: error: 'erratum_set_next_event_tval_phys' defined but not used [-Werror=unused-function]
- static int erratum_set_next_event_tval_phys(unsigned long evt,
-drivers/clocksource/arm_arch_timer.c:335:12: error: 'erratum_set_next_event_tval_virt' defined but not used [-Werror=unused-function]
- static int erratum_set_next_event_tval_virt(unsigned long evt,
+Adding fix to consider only exclude_kernel attribute when kernel is
+running in HYP. Also adding sysfs file to notify the bhehaviour
+of attribute exclude_hv.
 
-We could add an #ifdef around them, but we would already have to check for
-several symbols there and there is a chance this would get more complicated
-over time, so marking them as __maybe_unused is the simplest way to avoid the
-harmless warnings.
-
-Fixes: 01d3e3ff2608 ("arm64: arch_timer: Rework the set_next_event workarounds")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 74183a7315ac..968ca3a9ee36 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -332,14 +332,14 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
- 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+Changelog:
+
+V2:
+ - Changes as per Will Deacon's suggestion.
+
+V1: Initial patch
+
+ arch/arm64/kernel/perf_event.c | 28 ++++++++++++++++++++++++----
+ include/linux/perf/arm_pmu.h   |  1 +
+ 2 files changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 57ae9d9..b35b94c 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -535,6 +535,25 @@
+ 	.attrs = armv8_pmuv3_format_attrs,
+ };
+ 
++static ssize_t armv8_pmuv3_exclude_hv_show(struct device *dev,
++				     struct device_attribute *attr, char *buf)
++{
++	return sprintf(buf, "%d\n", is_kernel_in_hyp_mode() ? 1 : 0);
++}
++
++static struct device_attribute armv8_pmuv3_exclude_hv_attr =
++		__ATTR(exclude_hv, 0444, armv8_pmuv3_exclude_hv_show, NULL);
++
++static struct attribute *armv8_pmuv3_attrs[] = {
++	&armv8_pmuv3_exclude_hv_attr.attr,
++	NULL,
++};
++
++static struct attribute_group armv8_pmuv3_attr_group = {
++	.name = "attr",
++	.attrs = armv8_pmuv3_attrs,
++};
++
+ /*
+  * Perf Events' indices
+  */
+@@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+ 
+ 	if (attr->exclude_idle)
+ 		return -EPERM;
+-	if (is_kernel_in_hyp_mode() &&
+-	    attr->exclude_kernel != attr->exclude_hv)
+-		return -EINVAL;
++	if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
++		config_base |= ARMV8_PMU_INCLUDE_EL2;
+ 	if (attr->exclude_user)
+ 		config_base |= ARMV8_PMU_EXCLUDE_EL0;
+ 	if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
+ 		config_base |= ARMV8_PMU_EXCLUDE_EL1;
+-	if (!attr->exclude_hv)
++	if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
+ 		config_base |= ARMV8_PMU_INCLUDE_EL2;
+ 
+ 	/*
+@@ -1008,6 +1026,8 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+ 		&armv8_pmuv3_events_attr_group;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+ 		&armv8_pmuv3_format_attr_group;
++	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_ATTR] =
++		&armv8_pmuv3_attr_group;
+ 	return armv8pmu_probe_pmu(cpu_pmu);
  }
  
--static int erratum_set_next_event_tval_virt(unsigned long evt,
-+static __maybe_unused int erratum_set_next_event_tval_virt(unsigned long evt,
- 					    struct clock_event_device *clk)
- {
- 	erratum_set_next_event_tval_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
- 	return 0;
- }
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 8462da2..a26ffc7 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -81,6 +81,7 @@ enum armpmu_attr_groups {
+ 	ARMPMU_ATTR_GROUP_COMMON,
+ 	ARMPMU_ATTR_GROUP_EVENTS,
+ 	ARMPMU_ATTR_GROUP_FORMATS,
++	ARMPMU_ATTR_GROUP_ATTR,
+ 	ARMPMU_NR_ATTR_GROUPS
+ };
  
--static int erratum_set_next_event_tval_phys(unsigned long evt,
-+static __maybe_unused int erratum_set_next_event_tval_phys(unsigned long evt,
- 					    struct clock_event_device *clk)
- {
- 	erratum_set_next_event_tval_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
 -- 
-2.9.0
+1.8.1.4
