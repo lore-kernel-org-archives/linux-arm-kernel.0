@@ -1,81 +1,81 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 19 Apr 2017 15:42:55 +0300
-Subject: [Linaro-mm-sig] [PATCHv4 12/12] staging/android: Update Ion TODO
- list
-In-Reply-To: <20170419083655.egqgf34dxdwpyomx@phenom.ffwll.local>
-References: <1492540034-5466-1-git-send-email-labbott@redhat.com>
- <1492540034-5466-13-git-send-email-labbott@redhat.com>
- <20170419083655.egqgf34dxdwpyomx@phenom.ffwll.local>
-Message-ID: <2224092.7NJfpfE285@avalon>
+From: sramana@codeaurora.org (Srinivas Ramana)
+Date: Wed, 19 Apr 2017 18:20:10 +0530
+Subject: LDM/STM alignment fixups on arm64
+In-Reply-To: <20170419095830.GK17774@n2100.armlinux.org.uk>
+References: <58F704D6.6000301@codeaurora.org>
+ <20170419095830.GK17774@n2100.armlinux.org.uk>
+Message-ID: <58F75D02.1030104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 04/19/2017 03:28 PM, Russell King - ARM Linux wrote:
+> On Wed, Apr 19, 2017 at 12:03:58PM +0530, Srinivas Ramana wrote:
+>> Hi,
+>>
+>> While understanding how the alignment are handled on arm and arm64, we came
+>> across the fixups for LDM/LDRD/STM on arm where as these fixups are not
+>> present on arm64.
+>>
+>> There may be some specific reason why these fixups are not ported to arm64.
+>> Can you please help us understand this?
+>>
+>> With this difference in how kernel handles 32-bit apps on arm and arm64,
+>> there can be apps which are working without abort on arm, but fail on arm64
+>> (SIGBUS). We have tried to get some history on web, but not successful.
+>>
+>> If this is indeed missing on arm64, do you see any issue if its ported (does
+>> it fail any guidance)?
+>
+> Do you have an application that fails because of this?  Your email makes
+> it sound very theoretical.
+>
 
-On Wednesday 19 Apr 2017 10:36:55 Daniel Vetter wrote:
-> On Tue, Apr 18, 2017 at 11:27:14AM -0700, Laura Abbott wrote:
-> > Most of the items have been taken care of by a clean up series. Remove
-> > the completed items and add a few new ones.
-> > 
-> > Signed-off-by: Laura Abbott <labbott@redhat.com>
-> > ---
-> > 
-> >  drivers/staging/android/TODO | 21 ++++-----------------
-> >  1 file changed, 4 insertions(+), 17 deletions(-)
-> > 
-> > diff --git a/drivers/staging/android/TODO b/drivers/staging/android/TODO
-> > index 8f3ac37..5f14247 100644
-> > --- a/drivers/staging/android/TODO
-> > +++ b/drivers/staging/android/TODO
-> > 
-> > @@ -7,23 +7,10 @@ TODO:
-> >  ion/
-> > 
-> > - - Remove ION_IOC_SYNC: Flushing for devices should be purely a kernel
-> > internal -   interface on top of dma-buf. flush_for_device needs to be
-> > added to dma-buf -   first.
-> > - - Remove ION_IOC_CUSTOM: Atm used for cache flushing for cpu access in
-> > some -   vendor trees. Should be replaced with an ioctl on the dma-buf to
-> > expose the -   begin/end_cpu_access hooks to userspace.
-> > - - Clarify the tricks ion plays with explicitly managing coherency behind
-> > the -   dma api's back (this is absolutely needed for high-perf gpu
-> > drivers): Add an -   explicit coherency management mode to
-> > flush_for_device to be used by drivers -   which want to manage caches
-> > themselves and which indicates whether cpu caches -   need flushing.
-> > - - With those removed there's probably no use for ION_IOC_IMPORT anymore
-> > either -   since ion would just be the central allocator for shared
-> > buffers. - - Add dt-binding to expose cma regions as ion heaps, with the
-> > rule that any -   such cma regions must already be used by some device
-> > for dma. I.e. ion only -   exposes existing cma regions and doesn't
-> > reserve unecessarily memory when -   booting a system which doesn't use
-> > ion.
-> > + - Add dt-bindings for remaining heaps (chunk and carveout heaps). This
-> > would +   involve putting appropriate bindings in a memory node for Ion
-> > to find. + - Split /dev/ion up into multiple nodes (e.g. /dev/ion/heap0)
-> > + - Better test framework (integration with VGEM was suggested)
-> 
-> Found another one: Integrate the ion kernel-doc into
-> Documenation/gpu/ion.rst and link it up within Documenation/gpu/index.rst.
+I don't have any application with me right now. But i just tried passing 
+an intentional misaligned address in a test program. When i say 
+intentional, please note this code is buggy and should be fixed.
 
-If ion is a generic-purpose allocator, should its documentation really reside 
-in Documentation/gpu/ ?
+So, my question is when arm has such fixups to handle such cases and do 
+gracefully, is there any reason why those fixups are not ported to 
+arm64? Again, I do agree that apps has to fix these instances, but we do 
+have fixups in arch/arm.
 
-> There's a lot of api and overview stuff already around, would be great to
-> make this more accessible.
-> 
-> But I wouldn't put this as a de-staging blocker, just an idea.
-> 
-> On the series: Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> 
-> No full review since a bunch of stuff I'm not too familiar with, but I
-> like where this is going.
-> -Daniel
-> 
-> >  Please send patches to Greg Kroah-Hartman <greg@kroah.com> and Cc:
-> >  Arve Hj?nnev?g <arve@android.com> and Riley Andrews
-> >  <riandrews@android.com>
+I do see that the compiler can detect (if its not intentionally induced) 
+such cases and avoiding to generate LDM/STM and generates multiple 
+LDR/STR. So, I just want to know if it is safe to assume that the 
+compiler would take care of all such misaligned addresses passed to LDM/STM?
+
+------------------------>8---------------------------------------
+struct locat {
+         int a;
+         int b;
+         int c;
+         int d;
+};
+
+int test_func()
+{
+         struct locat *int_pool1;
+         struct locat int_pool2;
+         struct locat *int_pool3;
+         char *ptr;
+
+         int_pool1 = malloc(sizeof(struct locat) + 16);
+         ptr = (char *)int_pool1;
+         int_pool3 = (struct locat *)(ptr+1);
+
+         printf("pool1 addr: 0x%08x pool3 addr: 0x%08x \n", &int_pool1, 
+int_pool3);
+         int_pool2 = *int_pool3;
+}
+
+------------------------8<---------------------------------------
+
+
+Thanks,
+-- Srinivas R
+
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
+Inc.,
+is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
