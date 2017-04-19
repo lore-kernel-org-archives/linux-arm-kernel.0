@@ -1,61 +1,54 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 19 Apr 2017 15:58:53 +0100
-Subject: [GIT PULL] ARM: hisi: soc updates for v4.12
-In-Reply-To: <20170419140302.GL29219@localhost>
-References: <58EBA936.3020404@hisilicon.com> <20170419140302.GL29219@localhost>
-Message-ID: <58F77B2D.5060506@hisilicon.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Apr 2017 16:07:25 +0100
+Subject: [PATCH v24 09/11] acpi/arm64: Add memory-mapped timer support in
+ GTDT driver
+In-Reply-To: <20170418172107.GA1401@red-moon>
+References: <20170414184014.8524-1-fu.wei@linaro.org>
+ <20170414184014.8524-10-fu.wei@linaro.org>
+ <20170418172107.GA1401@red-moon>
+Message-ID: <20170419150725.GH27829@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Apr 18, 2017 at 06:21:07PM +0100, Lorenzo Pieralisi wrote:
+> On Sat, Apr 15, 2017 at 02:40:12AM +0800, fu.wei at linaro.org wrote:
 
-On 2017/4/19 15:03, Olof Johansson wrote:
-> On Mon, Apr 10, 2017 at 04:48:06PM +0100, Wei Xu wrote:
->> Hi Arnd, Hi Olof, Hi Kevin,
->>
->> Please help to pull the following changes.
->> Thanks!
->>
->> Best Regards,
->> Wei
->>
->> ---
->>
->> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->>
->>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->>
->> are available in the git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.12
->>
->> for you to fetch changes up to f147140c7f0350d363c10aeb51b78b65b2425266:
->>
->>   ARM: hisi: fix error return code in hip04_smp_init() (2017-03-28 15:30:54 +0100)
->>
->> ----------------------------------------------------------------
->> ARM: mach-hisi: Hisilicon SoC updates for 4.12
->>
->> - Fix the error return code in hip04_smp_init
->>
->> ----------------------------------------------------------------
->> Wei Yongjun (1):
->>       ARM: hisi: fix error return code in hip04_smp_init()
->>
->>  arch/arm/mach-hisi/platmcpm.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
+> > +error:
+> > +	for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
+> > +		frame = &timer_mem->frame[i];
+> > +		if (frame->phys_irq > 0)
+> > +			acpi_unregister_irq(frame->phys_irq);
+> > +		if (frame->virt_irq > 0)
+> > +			acpi_unregister_irq(frame->virt_irq);
+> > +	}
 > 
-> Merged, thanks!
+> There are three error paths, none of them reset [i,gtdt_frame],
+> correct ?
 
-Thanks!
+Correct.
 
-BR,
-Wei
+> If yes, why can't it simply be written like this ?
+> 
+> for (; i >= 0; i--, gtdt_frame--) {
+> 	frame = &timer_mem->frame[gtdt_frame->frame_number];
+> 
+> 	/* not sure this check is actually needed */
+> 	if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
+> 		continue;
+> 
+> 	if (frame->phys_irq > 0)
+> 		acpi_unregister_gsi(gtdt_frame->timer_interrupt);
+> 	if (frame->virt_irq > 0)
+> 		acpi_unregister_gsi(gtdt_frame->virtual_timer_interrupt);
+> }
 
-> 
-> 
-> -Olof
-> 
-> .
-> 
+A reverse loop of this form will work.
+
+That requires some restructuring, and care to avoid going out of bounds
+instantaneously with the gtdt_frame--, so as to not invoke nasal demons.
+
+I've attacked this locally, and will send this out after testing. I'll
+drop the new ACPI API patch.
+
+Thanks,
+Mark.
