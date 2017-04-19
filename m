@@ -1,110 +1,85 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Wed, 19 Apr 2017 10:21:44 +0530
-Subject: [PATCH v2 2/2] drm: dw-hdmi: gate audio clock from the I2S
- enablement callbacks
-In-Reply-To: <20170414083113.4255-3-romain.perier@collabora.com>
-References: <20170414083113.4255-1-romain.perier@collabora.com>
- <20170414083113.4255-3-romain.perier@collabora.com>
-Message-ID: <c9258563-afcd-4088-a4f4-6a4e056f5d36@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 19 Apr 2017 13:09:18 +0800
+Subject: [PATCH 3/4] ARM: sun8i: h3: orangepi-pc: Enable USB OTG
+In-Reply-To: <20170419050919.6762-1-wens@csie.org>
+References: <20170419050919.6762-1-wens@csie.org>
+Message-ID: <20170419050919.6762-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Orange Pi PC, PC Plus, and Plus 2E all have a USB OTG port
+that can be used in both powered host mode and peripheral mode.
+When in peripheral mode, the port does not power the board.
+There is no VBUS sensing on the port. All three boards have all
+related pins routed the same way.
 
+The device tree file for the Orange Pi Plus 2E is based on the
+Orange Pi PC Plus, which itself is based on the Orange Pi PC.
+Changes to the base Orange Pi PC device tree file affects all 3
+boards.
 
-On 04/14/2017 02:01 PM, Romain Perier wrote:
-> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
-> step E. and is kept enabled for later use. This clock should be enabled
-> and disabled along with the actual audio stream and not always on (that
-> is bad for PM). Futhermore, as described by the datasheet, the I2S
+This patch adds the regulator controlling VBUS on the OTG port,
+the GPIO for the ID detect pin, and enables the USB OTG and host
+controllers.
 
-s/Futhermore/Furthermore
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-> variant need to gate/ungate the clock when the stream is
-
-s/need/needs
-
-> enabled/disabled.
->
-> This commit adds a parameter to hdmi_audio_enable_clk() that controls
-> when the audio sample clock must be enabled or disabled. Then, it adds
-> the call to this function from dw_hdmi_i2s_audio_enable() and
-> dw_hdmi_i2s_audio_disable().
->
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 20 ++++++++++++++------
->  1 file changed, 14 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index 5b328c0..a6da634 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -544,6 +544,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
->  }
->  EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
->
-> +static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
-> +{
-> +	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
-> +		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-> +}
-> +
->  void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
->  {
->  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-> @@ -557,6 +563,12 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
->  void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
->  {
->  	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-> +	hdmi_enable_audio_clk(hdmi, true);
-> +}
-> +
-> +void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
-> +{
-> +	hdmi_enable_audio_clk(hdmi, false);
->  }
-
-This should be static too.
-
-If you're okay with the suggestions, I can fix these myself and push. Let
-me know if that's okay.
-
-Thanks,
-Archit
-
->
->  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
-> @@ -1592,11 +1604,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
->  			    HDMI_MC_FLOWCTRL);
->  }
->
-> -static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
-> -{
-> -	hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-> -}
-> -
->  /* Workaround to clear the overflow condition */
->  static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
->  {
-> @@ -1710,7 +1717,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
->
->  		/* HDMI Initialization Step E - Configure audio */
->  		hdmi_clk_regenerator_update_pixel_clock(hdmi);
-> -		hdmi_enable_audio_clk(hdmi);
-> +		hdmi_enable_audio_clk(hdmi, true);
->  	}
->
->  	/* not for DVI mode */
-> @@ -2438,6 +2445,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		audio.write	= hdmi_writeb;
->  		audio.read	= hdmi_readb;
->  		hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
-> +		hdmi->disable_audio = dw_hdmi_i2s_audio_disable;
->
->  		pdevinfo.name = "dw-hdmi-i2s-audio";
->  		pdevinfo.data = &audio;
->
-
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index f148111c326d..1a044b17d6c6 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -97,6 +97,10 @@
+ 	status = "okay";
+ };
+ 
++&ehci0 {
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -125,6 +129,10 @@
+ 	status = "okay";
+ };
+ 
++&ohci0 {
++	status = "okay";
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
+@@ -156,6 +164,11 @@
+ 	};
+ };
+ 
++&reg_usb0_vbus {
++	gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+@@ -180,7 +193,14 @@
+ 	status = "disabled";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
+-	/* USB VBUS is always on */
++	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
++	/* VBUS on USB host ports are always on */
+ 	status = "okay";
+ };
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.11.0
