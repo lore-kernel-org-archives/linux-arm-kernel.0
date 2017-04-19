@@ -1,57 +1,92 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:22 +0100
-Subject: [PATCH 05/16] clocksource: arm_arch_timer: add a new enum for spi type
+Date: Wed, 19 Apr 2017 17:44:25 +0100
+Subject: [PATCH 08/16] clocksource: arm_arch_timer: refactor
+ arch_timer_needs_probing
 In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
 References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1492620273-30037-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1492620273-30037-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-This patch add a new enum "arch_timer_spi_nr" and use it in the driver.
-Just for code's readability, no functional change.
+When booting with DT, it's possible for timer nodes to be probed in any
+order. Some common initialisation needs to occur after all nodes have
+been probed, and arch_timer_common_init() has code to detect when this
+has happened.
+
+This logic is DT-specific, and it would be best to factor it out of the
+common code that will be shared with ACPI.
+
+This patch folds this into the existing arch_timer_needs_probing(),
+which is renamed to arch_timer_needs_of_probing(), and no longer takes
+any arguments. This is only called when using DT, and not when using
+ACPI, which will have a deterministic probe order.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+[Mark: reword commit message]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 4 ++--
- include/clocksource/arm_arch_timer.h | 6 ++++++
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 04218c1..15059c9 100644
+index 02c5cb8..e38f4d4 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1258,9 +1258,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 	}
- 
- 	if (arch_timer_mem_use_virtual)
--		irq = irq_of_parse_and_map(best_frame, 1);
-+		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_VIRT_SPI);
- 	else
--		irq = irq_of_parse_and_map(best_frame, 0);
-+		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_PHYS_SPI);
- 
- 	ret = -EINVAL;
- 	if (!irq) {
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index b898637..4a98c06 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -46,6 +46,12 @@ enum arch_timer_ppi_nr {
- 	ARCH_TIMER_MAX_TIMER_PPI
+@@ -1076,15 +1076,28 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
+ 	{},
  };
  
-+enum arch_timer_spi_nr {
-+	ARCH_TIMER_PHYS_SPI,
-+	ARCH_TIMER_VIRT_SPI,
-+	ARCH_TIMER_MAX_TIMER_SPI
-+};
+-static bool __init
+-arch_timer_needs_probing(int type, const struct of_device_id *matches)
++static bool __init arch_timer_needs_of_probing(void)
+ {
+ 	struct device_node *dn;
+ 	bool needs_probing = false;
++	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+ 
+-	dn = of_find_matching_node(NULL, matches);
+-	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
++	/* We have two timers, and both device-tree nodes are probed. */
++	if ((arch_timers_present & mask) == mask)
++		return false;
 +
- #define ARCH_TIMER_PHYS_ACCESS		0
- #define ARCH_TIMER_VIRT_ACCESS		1
- #define ARCH_TIMER_MEM_PHYS_ACCESS	2
++	/*
++	 * Only one type of timer is probed,
++	 * check if we have another type of timer node in device-tree.
++	 */
++	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
++		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
++	else
++		dn = of_find_matching_node(NULL, arch_timer_of_match);
++
++	if (dn && of_device_is_available(dn))
+ 		needs_probing = true;
++
+ 	of_node_put(dn);
+ 
+ 	return needs_probing;
+@@ -1092,17 +1105,8 @@ static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
+ 
+ static int __init arch_timer_common_init(void)
+ {
+-	unsigned mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+-
+-	/* Wait until both nodes are probed if we have two timers */
+-	if ((arch_timers_present & mask) != mask) {
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+-					     arch_timer_mem_of_match))
+-			return 0;
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+-					     arch_timer_of_match))
+-			return 0;
+-	}
++	if (acpi_disabled && arch_timer_needs_of_probing())
++		return 0;
+ 
+ 	arch_timer_banner(arch_timers_present);
+ 	arch_counter_register(arch_timers_present);
 -- 
 1.9.1
