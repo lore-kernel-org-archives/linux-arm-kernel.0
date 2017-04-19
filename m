@@ -1,32 +1,37 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Apr 2017 10:01:34 -0700
-Subject: [PATCH] soc: bcm: brcmstb: Correctly match 7435 SoC
-Message-ID: <20170419170136.4979-1-f.fainelli@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Apr 2017 17:49:09 +0100
+Subject: [PATCH v4 20/21] PCI: keystone-dw: update PCI config space remap
+ function
+In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-21-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the duplicate brcm,bcm7425-sun-top-ctrl compatible string and
-replace it with brcm,bcm7435-sun-top-ctrl which was intentend.
+PCI configuration space should be mapped with a memory region type that
+generates on the CPU host bus non-posted write transations. Update the
+driver to use the devm_pci_remap_cfg* interface to make sure the correct
+memory mappings for PCI configuration space are used.
 
-Fixes: bd0faf08dc7f ("soc: bcm: brcmstb: Match additional compatible strings")
-Reported-by: Andreas Oberritter <obi@saftware.de>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/soc/bcm/brcmstb/common.c | 2 +-
+ drivers/pci/dwc/pci-keystone-dw.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-index b6195fdf0d00..22e98a90468c 100644
---- a/drivers/soc/bcm/brcmstb/common.c
-+++ b/drivers/soc/bcm/brcmstb/common.c
-@@ -49,7 +49,7 @@ static const struct of_device_id sun_top_ctrl_match[] = {
- 	{ .compatible = "brcm,bcm7420-sun-top-ctrl", },
- 	{ .compatible = "brcm,bcm7425-sun-top-ctrl", },
- 	{ .compatible = "brcm,bcm7429-sun-top-ctrl", },
--	{ .compatible = "brcm,bcm7425-sun-top-ctrl", },
-+	{ .compatible = "brcm,bcm7435-sun-top-ctrl", },
- 	{ .compatible = "brcm,brcmstb-sun-top-ctrl", },
- 	{ }
- };
+diff --git a/drivers/pci/dwc/pci-keystone-dw.c b/drivers/pci/dwc/pci-keystone-dw.c
+index 6b396f6..8bc626e 100644
+--- a/drivers/pci/dwc/pci-keystone-dw.c
++++ b/drivers/pci/dwc/pci-keystone-dw.c
+@@ -543,7 +543,7 @@ int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
+ 
+ 	/* Index 0 is the config reg. space address */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	pci->dbi_base = devm_ioremap_resource(dev, res);
++	pci->dbi_base = devm_pci_remap_cfg_resource(dev, res);
+ 	if (IS_ERR(pci->dbi_base))
+ 		return PTR_ERR(pci->dbi_base);
+ 
 -- 
-2.9.3
+2.10.0
