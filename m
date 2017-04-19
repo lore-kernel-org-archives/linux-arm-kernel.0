@@ -1,28 +1,29 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Apr 2017 16:52:29 +0200
-Subject: [PATCH] arm64: dts: allwinner: pine64: Prepare optional UART
- nodes with pinctrl
-In-Reply-To: <20170418192538.24174-1-afaerber@suse.de>
-References: <20170418053458.phcbp4da3vatejpg@lukather>
- <20170418192538.24174-1-afaerber@suse.de>
-Message-ID: <20170419145229.esqvco3clilqk776@lukather>
+Date: Wed, 19 Apr 2017 16:54:10 +0200
+Subject: [PATCH 0/4] ARM: sunxi: device tree pinctrl clean up and H3 OTG
+In-Reply-To: <20170419050919.6762-1-wens@csie.org>
+References: <20170419050919.6762-1-wens@csie.org>
+Message-ID: <20170419145410.k2nkyfrz6ss7o2tt@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 09:25:38PM +0200, Andreas F?rber wrote:
-> Pine64 exposes all A64 UARTs, not just UART0.
+On Wed, Apr 19, 2017 at 01:09:15PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
 > 
-> Since the pins can be used as GPIO, don't enable the new UART nodes by
-> default, but prepare the pinctrl settings to aid in activating them via
-> overlays, i.e., overriding the status property of &uartX nodes.
+> This series has 2 parts. The parts are largely unrelated, though the
+> second part should be applied after the first part, so we don't
+> accidentally mux pins that we shouldn't. Hence I'm sending them
+> together.
 > 
-> For UART4 (Euler) the safer route of not including RTS/CTS pins is chosen,
-> whereas for UART1 (Bluetooth) they are included.
+> The first 2 patches clean up the sunxi device tree files, removing
+> pinmux settings for common GPIO pins. These include the enable pins
+> for the common regulators, and the mmc0 card detect pin from the
+> reference designs.
 > 
-> Add the corresponding pinctrl nodes where missing.
-> 
-> Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> The second part, the latter 2 patches, enable USB OTG on the Orangepi
+> PC, PC Plus, Plus 2E, and the Bananapi M2+. The first 3 boards are
+> bunched together, due to how the PC Plus and Plus 2E device trees include
+> the device tree of the Opi PC.
 
 Applied, thanks!
 Maxime
@@ -37,4 +38,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/9463c8d7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/97e6c778/attachment.sig>
