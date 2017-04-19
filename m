@@ -1,53 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 19 Apr 2017 16:56:00 +0200
-Subject: [PATCH 4.4 18/45] irqchip/irq-imx-gpcv2: Fix spinlock initialization
-In-Reply-To: <20170419141634.793081968@linuxfoundation.org>
-References: <20170419141634.793081968@linuxfoundation.org>
-Message-ID: <20170419141635.503344519@linuxfoundation.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 19 Apr 2017 15:59:20 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.12
+In-Reply-To: <20170419132420.GK29219@localhost>
+References: <58EBA861.2010809@hisilicon.com> <20170419132420.GK29219@localhost>
+Message-ID: <58F77B48.7000000@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.4-stable review patch.  If anyone has any objections, please let me know.
+Hi Olof,
 
-------------------
+On 2017/4/19 14:24, Olof Johansson wrote:
+> On Mon, Apr 10, 2017 at 04:44:33PM +0100, Wei Xu wrote:
+>> Hi Arnd, Hi Olof, Hi Kevin,
+>>
+>> Please help to pull the following changes.
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>>
+>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.12
+>>
+>> for you to fetch changes up to d4e1eaeee56894f45d0093f9d432be0c868f7c4c:
+>>
+>>   arm64: dts: hisi: add pinctrl dtsi file for HiKey960 development board (2017-04-10 23:34:26 +0800)
+>>
+>> ----------------------------------------------------------------
+>> ARM64: DT: Hisilicon SoC DT updates for 4.12
+>>
+>> - Reset the hi6220 mmc hosts to avoid hang
+>> - Add the binding for the hi3798cv200 SoC and the poplar board
+>> - Add basic dts files to support the hi3798cv200 poplar board
+>> - Enable the Mbigen, XGE, RoCE and SAS for the hip07 d05 board
+>> - Add driver strength MACRO for the hi3660 SoC
+>> - Add the pinctrl dtsi file for hikey960 board to configure the pins
+> 
+> Merged, thanks.
 
-From: Tyler Baker <tyler.baker@linaro.org>
+Thanks!
 
-commit 75eb5e1e7b4edbc8e8f930de59004d21cb46961f upstream.
+Best Regards,
+Wei
 
-The raw_spinlock in the IMX GPCV2 interupt chip is not initialized before
-usage. That results in a lockdep splat:
-
-  INFO: trying to register non-static key.
-  the code is fine but needs lockdep annotation.
-  turning off the locking correctness validator.
-
-Add the missing raw_spin_lock_init() to the setup code.
-
-Fixes: e324c4dc4a59 ("irqchip/imx-gpcv2: IMX GPCv2 driver for wakeup sources")
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: jason at lakedaemon.net
-Cc: marc.zyngier at arm.com
-Cc: shawnguo at kernel.org
-Cc: andrew.smirnov at gmail.com
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/20170413222731.5917-1-tyler.baker at linaro.org
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/irqchip/irq-imx-gpcv2.c |    2 ++
- 1 file changed, 2 insertions(+)
-
---- a/drivers/irqchip/irq-imx-gpcv2.c
-+++ b/drivers/irqchip/irq-imx-gpcv2.c
-@@ -230,6 +230,8 @@ static int __init imx_gpcv2_irqchip_init
- 		return -ENOMEM;
- 	}
- 
-+	raw_spin_lock_init(&cd->rlock);
-+
- 	cd->gpc_base = of_iomap(node, 0);
- 	if (!cd->gpc_base) {
- 		pr_err("fsl-gpcv2: unable to map gpc registers\n");
+> 
+> 
+> -Olof
+> 
+> .
+> 
