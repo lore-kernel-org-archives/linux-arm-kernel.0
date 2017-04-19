@@ -1,204 +1,136 @@
-From: jgross@suse.com (Juergen Gross)
-Date: Wed, 19 Apr 2017 20:20:00 +0200
-Subject: [PATCH 1/2] xen/arm, arm64: fix xen_dma_ops after 815dd18
- "Consolidate get_dma_ops..."
-In-Reply-To: <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
-References: <1492117462-19886-1-git-send-email-sstabellini@kernel.org>
- <20170418142126.GE27592@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.10.1704191023120.31486@sstabellini-ThinkPad-X260>
-Message-ID: <a4e371e4-44ff-ee6d-22b6-3ff9d57ce421@suse.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Apr 2017 20:24:01 +0200
+Subject: [PATCH] [RFC] gpu: host1x: shut up warning about DMA API misuse
+Message-ID: <20170419182413.866327-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/17 19:25, Stefano Stabellini wrote:
-> Hello Russell,
-> 
-> Can I have your acked-by on the following fix (original patch is
-> 1492117462-19886-1-git-send-email-sstabellini at kernel.org)?
+When dma_addr_t and phys_addr_t are not the same size, we get a warning
+from the dma_alloc_wc function:
 
-Stefano, through which tree should this go? ARM or Xen or other?
+drivers/gpu/host1x/cdma.c: In function 'host1x_pushbuffer_init':
+drivers/gpu/host1x/cdma.c:94:48: error: passing argument 3 of 'dma_alloc_wc' from incompatible pointer type [-Werror=incompatible-pointer-types]
+   pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+                                                ^
+In file included from drivers/gpu/host1x/cdma.c:22:0:
+include/linux/dma-mapping.h:761:37: note: expected 'dma_addr_t * {aka long long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned int *}'
+ static noinline_if_stackbloat void *dma_alloc_wc(struct device *dev, size_t size,
+                                     ^~~~~~~~~~~~
+drivers/gpu/host1x/cdma.c:113:48: error: passing argument 3 of 'dma_alloc_wc' from incompatible pointer type [-Werror=incompatible-pointer-types]
+   pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+                                                ^
+In file included from drivers/gpu/host1x/cdma.c:22:0:
+include/linux/dma-mapping.h:761:37: note: expected 'dma_addr_t * {aka long long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned int *}'
+ static noinline_if_stackbloat void *dma_alloc_wc(struct device *dev, size_t size,
+                                     ^~~~~~~~~~~~
 
+The problem here is that dma_alloc_wc() returns a pointer to a dma_addr_t
+that may already be translated by an IOMMU, but the driver passes this
+into iommu_map() as a physical address. This works by accident only when
+the IOMMU does not get registered with the DMA API and there is a 1:1
+mapping between physical addresses as seen by the CPU and the device.
 
-Juergen
+The fundamental problem here is the lack of a generic API to do what the
+driver wants: allocating CPU-visible memory for use by a device through
+user-defined IOMMU settings. Neither the dma-mapping API nor the IOMMU
+API can do this by itself, and combining the two is not well-defined.
 
-> 
-> Thanks,
-> 
-> Stefano
-> 
-> 
-> On Tue, 18 Apr 2017, Catalin Marinas wrote:
->> On Thu, Apr 13, 2017 at 02:04:21PM -0700, Stefano Stabellini wrote:
->>> The following commit:
->>>
->>>   commit 815dd18788fe0d41899f51b91d0560279cf16b0d
->>>   Author: Bart Van Assche <bart.vanassche@sandisk.com>
->>>   Date:   Fri Jan 20 13:04:04 2017 -0800
->>>
->>>       treewide: Consolidate get_dma_ops() implementations
->>>
->>> rearranges get_dma_ops in a way that xen_dma_ops are not returned when
->>> running on Xen anymore, dev->dma_ops is returned instead (see
->>> arch/arm/include/asm/dma-mapping.h:get_arch_dma_ops and
->>> include/linux/dma-mapping.h:get_dma_ops).
->>>
->>> Fix the problem by storing dev->dma_ops in dev_archdata, and setting
->>> dev->dma_ops to xen_dma_ops. This way, xen_dma_ops is returned naturally
->>> by get_dma_ops. The Xen code can retrieve the original dev->dma_ops from
->>> dev_archdata when needed. It also allows us to remove __generic_dma_ops
->>> from common headers.
->>>
->>> Signed-off-by: Stefano Stabellini <sstabellini@kernel.org>
->>> Tested-by: Julien Grall <julien.grall@arm.com>
->>> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
->>> CC: linux at armlinux.org.uk
->>> CC: catalin.marinas at arm.com
->>> CC: will.deacon at arm.com
->>> CC: boris.ostrovsky at oracle.com
->>> CC: jgross at suse.com
->>> CC: Julien Grall <julien.grall@arm.com>
->>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->>
->>> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
->>> index 220ba20..36ec9c8 100644
->>> --- a/arch/arm/include/asm/device.h
->>> +++ b/arch/arm/include/asm/device.h
->>> @@ -16,6 +16,9 @@ struct dev_archdata {
->>>  #ifdef CONFIG_ARM_DMA_USE_IOMMU
->>>  	struct dma_iommu_mapping	*mapping;
->>>  #endif
->>> +#ifdef CONFIG_XEN
->>> +	const struct dma_map_ops *dev_dma_ops;
->>> +#endif
->>>  	bool dma_coherent;
->>>  };
->>>  
->>> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
->>> index 7166569..680d3f3 100644
->>> --- a/arch/arm/include/asm/dma-mapping.h
->>> +++ b/arch/arm/include/asm/dma-mapping.h
->>> @@ -16,19 +16,9 @@
->>>  extern const struct dma_map_ops arm_dma_ops;
->>>  extern const struct dma_map_ops arm_coherent_dma_ops;
->>>  
->>> -static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
->>> -{
->>> -	if (dev && dev->dma_ops)
->>> -		return dev->dma_ops;
->>> -	return &arm_dma_ops;
->>> -}
->>> -
->>>  static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
->>>  {
->>> -	if (xen_initial_domain())
->>> -		return xen_dma_ops;
->>> -	else
->>> -		return __generic_dma_ops(NULL);
->>> +	return &arm_dma_ops;
->>>  }
->>>  
->>>  #define HAVE_ARCH_DMA_SUPPORTED 1
->>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->>> index 63eabb0..a614459 100644
->>> --- a/arch/arm/mm/dma-mapping.c
->>> +++ b/arch/arm/mm/dma-mapping.c
->>> @@ -2396,6 +2396,13 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>  		dma_ops = arm_get_dma_map_ops(coherent);
->>>  
->>>  	set_dma_ops(dev, dma_ops);
->>> +
->>> +#ifdef CONFIG_XEN
->>> +	if (xen_initial_domain()) {
->>> +		dev->archdata.dev_dma_ops = dev->dma_ops;
->>> +		dev->dma_ops = xen_dma_ops;
->>> +	}
->>> +#endif
->>>  }
->>>  
->>>  void arch_teardown_dma_ops(struct device *dev)
->>> diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
->>> index 73d5bab..5a5fa47 100644
->>> --- a/arch/arm64/include/asm/device.h
->>> +++ b/arch/arm64/include/asm/device.h
->>> @@ -20,6 +20,9 @@ struct dev_archdata {
->>>  #ifdef CONFIG_IOMMU_API
->>>  	void *iommu;			/* private IOMMU data */
->>>  #endif
->>> +#ifdef CONFIG_XEN
->>> +	const struct dma_map_ops *dev_dma_ops;
->>> +#endif
->>>  	bool dma_coherent;
->>>  };
->>>  
->>> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
->>> index 505756c..5392dbe 100644
->>> --- a/arch/arm64/include/asm/dma-mapping.h
->>> +++ b/arch/arm64/include/asm/dma-mapping.h
->>> @@ -27,11 +27,8 @@
->>>  #define DMA_ERROR_CODE	(~(dma_addr_t)0)
->>>  extern const struct dma_map_ops dummy_dma_ops;
->>>  
->>> -static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
->>> +static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
->>>  {
->>> -	if (dev && dev->dma_ops)
->>> -		return dev->dma_ops;
->>> -
->>>  	/*
->>>  	 * We expect no ISA devices, and all other DMA masters are expected to
->>>  	 * have someone call arch_setup_dma_ops at device creation time.
->>> @@ -39,14 +36,6 @@ static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
->>>  	return &dummy_dma_ops;
->>>  }
->>>  
->>> -static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
->>> -{
->>> -	if (xen_initial_domain())
->>> -		return xen_dma_ops;
->>> -	else
->>> -		return __generic_dma_ops(NULL);
->>> -}
->>> -
->>>  void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>  			const struct iommu_ops *iommu, bool coherent);
->>>  #define arch_setup_dma_ops	arch_setup_dma_ops
->>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>> index 81cdb2e..7f8b37e 100644
->>> --- a/arch/arm64/mm/dma-mapping.c
->>> +++ b/arch/arm64/mm/dma-mapping.c
->>> @@ -977,4 +977,11 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>>  
->>>  	dev->archdata.dma_coherent = coherent;
->>>  	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
->>> +
->>> +#ifdef CONFIG_XEN
->>> +	if (xen_initial_domain()) {
->>> +		dev->archdata.dev_dma_ops = dev->dma_ops;
->>> +		dev->dma_ops = xen_dma_ops;
->>> +	}
->>> +#endif
->>>  }
->>> diff --git a/include/xen/arm/page-coherent.h b/include/xen/arm/page-coherent.h
->>> index 95ce6ac..b0a2bfc 100644
->>> --- a/include/xen/arm/page-coherent.h
->>> +++ b/include/xen/arm/page-coherent.h
->>> @@ -2,8 +2,16 @@
->>>  #define _ASM_ARM_XEN_PAGE_COHERENT_H
->>>  
->>>  #include <asm/page.h>
->>> +#include <asm/dma-mapping.h>
->>>  #include <linux/dma-mapping.h>
->>>  
->>> +static inline const struct dma_map_ops *__generic_dma_ops(struct device *dev)
->>> +{
->>> +	if (dev && dev->archdata.dev_dma_ops)
->>> +		return dev->archdata.dev_dma_ops;
->>> +	return get_arch_dma_ops(NULL);
->>> +}
->>> +
->>>  void __xen_dma_map_page(struct device *hwdev, struct page *page,
->>>  	     dma_addr_t dev_addr, unsigned long offset, size_t size,
->>>  	     enum dma_data_direction dir, unsigned long attrs);
-> 
+This patch addresses the type mismatch by adding a third pointer into the
+push_buffer structure: in addition to the address as seen from the CPU
+and the address inside of the local IOMMU domain, the pb->alloc pointer
+is the token returned by dma_alloc_wc(), and this is what we later need
+to pass into dma_free_wc().
+
+The address we pass into iommu_map() however is the physical address
+computed from virt_to_phys(), assuming that the pointer we have here
+is part of the linear mapping (which is also questionable, e.g. when we
+have a non-coherent device on ARM32 this may be false). Also, when
+the DMA API uses the IOMMU to allocate the pointer for the default
+domain, we end up with two IOMMU mappings for the same physical address.
+
+Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/gpu/host1x/cdma.c | 26 ++++++++++----------------
+ drivers/gpu/host1x/cdma.h |  1 +
+ 2 files changed, 11 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/host1x/cdma.c b/drivers/gpu/host1x/cdma.c
+index 28541b280739..286edeca7ba1 100644
+--- a/drivers/gpu/host1x/cdma.c
++++ b/drivers/gpu/host1x/cdma.c
+@@ -59,7 +59,7 @@ static void host1x_pushbuffer_destroy(struct push_buffer *pb)
+ 		free_iova(&host1x->iova, iova_pfn(&host1x->iova, pb->dma));
+ 	}
+ 
+-	dma_free_wc(host1x->dev, pb->alloc_size, pb->mapped, pb->phys);
++	dma_free_wc(host1x->dev, pb->alloc_size, pb->mapped, pb->alloc);
+ 
+ 	pb->mapped = NULL;
+ 	pb->phys = 0;
+@@ -81,20 +81,21 @@ static int host1x_pushbuffer_init(struct push_buffer *pb)
+ 	pb->size = HOST1X_PUSHBUFFER_SLOTS * 8;
+ 
+ 	size = pb->size + 4;
++	if (host1x->domain)
++		size = iova_align(&host1x->iova, size);
+ 
+ 	/* initialize buffer pointers */
+ 	pb->fence = pb->size - 8;
+ 	pb->pos = 0;
+ 
+-	if (host1x->domain) {
+-		unsigned long shift;
++	pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->alloc, GFP_KERNEL);
++	if (!pb->mapped)
++		return -ENOMEM;
+ 
+-		size = iova_align(&host1x->iova, size);
++	pb->phys = virt_to_phys(pb->mapped);
+ 
+-		pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+-					  GFP_KERNEL);
+-		if (!pb->mapped)
+-			return -ENOMEM;
++	if (host1x->domain) {
++		unsigned long shift;
+ 
+ 		shift = iova_shift(&host1x->iova);
+ 		alloc = alloc_iova(&host1x->iova, size >> shift,
+@@ -109,13 +110,6 @@ static int host1x_pushbuffer_init(struct push_buffer *pb)
+ 				IOMMU_READ);
+ 		if (err)
+ 			goto iommu_free_iova;
+-	} else {
+-		pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+-					  GFP_KERNEL);
+-		if (!pb->mapped)
+-			return -ENOMEM;
+-
+-		pb->dma = pb->phys;
+ 	}
+ 
+ 	pb->alloc_size = size;
+@@ -127,7 +121,7 @@ static int host1x_pushbuffer_init(struct push_buffer *pb)
+ iommu_free_iova:
+ 	__free_iova(&host1x->iova, alloc);
+ iommu_free_mem:
+-	dma_free_wc(host1x->dev, pb->alloc_size, pb->mapped, pb->phys);
++	dma_free_wc(host1x->dev, pb->alloc_size, pb->mapped, pb->alloc);
+ 
+ 	return err;
+ }
+diff --git a/drivers/gpu/host1x/cdma.h b/drivers/gpu/host1x/cdma.h
+index ec170a78f4e1..8479192d4265 100644
+--- a/drivers/gpu/host1x/cdma.h
++++ b/drivers/gpu/host1x/cdma.h
+@@ -43,6 +43,7 @@ struct host1x_job;
+ 
+ struct push_buffer {
+ 	void *mapped;			/* mapped pushbuffer memory */
++	dma_addr_t alloc;		/* device address in root domain */
+ 	dma_addr_t dma;			/* device address of pushbuffer */
+ 	phys_addr_t phys;		/* physical address of pushbuffer */
+ 	u32 fence;			/* index we've written */
+-- 
+2.9.0
