@@ -1,131 +1,136 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:32 +0100
-Subject: [PATCH 15/16] clocksource: arm_arch_timer: add GTDT support for
- memory-mapped timer
+Date: Wed, 19 Apr 2017 17:44:26 +0100
+Subject: [PATCH 09/16] clocksource: arm_arch_timer: move
+ arch_timer_needs_of_probing into DT init call
 In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
 References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1492620273-30037-16-git-send-email-mark.rutland@arm.com>
+Message-ID: <1492620273-30037-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-The patch add memory-mapped timer register support by using the
-information provided by the new GTDT driver of ACPI.
+To cleanly split code paths specific to ACPI or DT at a higher level,
+this patch removes arch_timer_init(), folding the relevant
+parts of its logic into existing callers.
+
+This pathes the way for further rework, and saves a few lines.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-[Mark: verify CNTFRQ, only register the first frame]
+[Mark: reword commit message]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 79 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 76 insertions(+), 3 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 46 ++++++++++++++++--------------------
+ 1 file changed, 21 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index e398228..2208fa4 100644
+index e38f4d4..ac6fd00 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1386,10 +1386,79 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
- 		       arch_timer_mem_of_init);
+@@ -1105,9 +1105,6 @@ static bool __init arch_timer_needs_of_probing(void)
  
- #ifdef CONFIG_ACPI_GTDT
--/* Initialize per-processor generic timer */
-+static int __init
-+arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
-+{
-+	struct arch_timer_mem_frame *frame;
-+	u32 rate;
-+	int i;
-+
-+	for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
-+		frame = &timer_mem->frame[i];
-+
-+		if (!frame->valid)
-+			continue;
-+
-+		rate = arch_timer_mem_frame_get_cntfrq(frame);
-+		if (rate == arch_timer_rate)
-+			continue;
-+
-+		pr_err(FW_BUG "CNTFRQ mismatch: frame @ %pa: (0x%08lx), CPU: (0x%08lx)\n",
-+			&frame->cntbase,
-+			(unsigned long)rate, (unsigned long)arch_timer_rate);
-+
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init arch_timer_mem_acpi_init(int platform_timer_count)
-+{
-+	struct arch_timer_mem *timers, *timer;
-+	struct arch_timer_mem_frame *frame;
-+	int timer_count, i, ret = 0;
-+
-+	timers = kcalloc(platform_timer_count, sizeof(*timers),
-+			    GFP_KERNEL);
-+	if (!timers)
-+		return -ENOMEM;
-+
-+	ret = acpi_arch_timer_mem_init(timers, &timer_count);
-+	if (ret || !timer_count)
-+		goto out;
-+
-+	for (i = 0; i < timer_count; i++) {
-+		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
-+		if (ret) {
-+			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
-+			goto out;
-+		}
-+	}
-+
-+	/*
-+	 * While unlikely, it's theoretically possible that none of the frames
-+	 * in a timer expose the combination of feature we want.
-+	 */
-+	for (i = i; i < timer_count; i++) {
-+		timer = &timers[i];
-+
-+		frame = arch_timer_mem_find_best_frame(timer);
-+		if (frame)
-+			break;
-+	}
-+
-+	if (frame)
-+		ret = arch_timer_mem_frame_register(frame);
-+out:
-+	kfree(timers);
-+	return ret;
-+}
-+
-+/* Initialize per-processor generic timer and memory-mapped timer(if present) */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ static int __init arch_timer_common_init(void)
  {
+-	if (acpi_disabled && arch_timer_needs_of_probing())
+-		return 0;
+-
+ 	arch_timer_banner(arch_timers_present);
+ 	arch_counter_register(arch_timers_present);
+ 	return arch_timer_arch_init();
+@@ -1145,26 +1142,9 @@ static enum arch_timer_ppi_nr __init arch_timer_select_ppi(void)
+ 	return ARCH_TIMER_PHYS_SECURE_PPI;
+ }
+ 
+-static int __init arch_timer_init(void)
+-{
 -	int ret;
-+	int ret, platform_timer_count;
+-
+-	ret = arch_timer_register();
+-	if (ret)
+-		return ret;
+-
+-	ret = arch_timer_common_init();
+-	if (ret)
+-		return ret;
+-
+-	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
+-
+-	return 0;
+-}
+-
+ static int __init arch_timer_of_init(struct device_node *np)
+ {
+-	int i;
++	int i, ret;
+ 	u32 rate;
  
  	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
- 		pr_warn("already initialized, skipping\n");
-@@ -1398,7 +1467,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+@@ -1176,6 +1156,8 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
+ 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
  
- 	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
- 
--	ret = acpi_gtdt_init(table, NULL);
-+	ret = acpi_gtdt_init(table, &platform_timer_count);
- 	if (ret) {
- 		pr_err("Failed to init GTDT table.\n");
- 		return ret;
-@@ -1441,6 +1510,10 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	if (ret)
- 		return ret;
- 
-+	if (platform_timer_count &&
-+	    arch_timer_mem_acpi_init(platform_timer_count))
-+		pr_err("Failed to initialize memory-mapped timer.\n");
++	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
 +
- 	return arch_timer_common_init();
+ 	rate = arch_timer_get_cntfrq;
+ 	arch_timer_of_configure_rate(rate, np);
+ 
+@@ -1203,7 +1185,14 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	arch_counter_suspend_stop = of_property_read_bool(np,
+ 							 "arm,no-tick-in-suspend");
+ 
+-	return arch_timer_init();
++	ret = arch_timer_register();
++	if (ret)
++		return ret;
++
++	if (arch_timer_needs_of_probing())
++		return 0;
++
++	return arch_timer_common_init();
+ }
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
+ CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
+@@ -1285,7 +1274,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	if (ret)
+ 		goto out;
+ 
+-	return arch_timer_common_init();
++	if (!arch_timer_needs_of_probing())
++		ret = arch_timer_common_init();
+ out:
+ 	iounmap(cntctlbase);
+ 	of_node_put(best_frame);
+@@ -1314,6 +1304,7 @@ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
+ /* Initialize per-processor generic timer */
+ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ {
++	int ret;
+ 	struct acpi_table_gtdt *gtdt;
+ 
+ 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
+@@ -1341,6 +1332,8 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
+ 		gtdt->non_secure_el2_flags);
+ 
++	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
++
+ 	/*
+ 	 * When probing via ACPI, we have no mechanism to override the sysreg
+ 	 * CNTFRQ value. This *must* be correct.
+@@ -1363,8 +1356,11 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 	/* Check for globally applicable workarounds */
+ 	arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table);
+ 
+-	arch_timer_init();
+-	return 0;
++	ret = arch_timer_register();
++	if (ret)
++		return ret;
++
++	return arch_timer_common_init();
  }
  CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
+ #endif
 -- 
 1.9.1
