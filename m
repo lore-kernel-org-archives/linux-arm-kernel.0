@@ -1,32 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 07:24:25 -0700
-Subject: [PATCH V5 1/4] arm64: dts: Add basic DT to support Spreadtrum's
- SP9860G
-In-Reply-To: <1492603726250.cnoz1xemvxpkp3sd4toaurm2@android.mail.163.com>
-References: <1490594208-26897-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1490599960-27330-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <CAAfSe-s-Jbvin0GV6F6W8OM5zp3kSzHO0YLTM3Gt_Qxv_vA6ag@mail.gmail.com>
- <1492603726250.cnoz1xemvxpkp3sd4toaurm2@android.mail.163.com>
-Message-ID: <20170419142425.GB12105@localhost>
+Date: Wed, 19 Apr 2017 07:22:15 -0700
+Subject: [PATCH V3] PM / OPP: Use - instead of @ for DT entries
+In-Reply-To: <734c5d5a66ef8a5505f368fc68a8ab9c02d710f9.1492492253.git.viresh.kumar@linaro.org>
+References: <734c5d5a66ef8a5505f368fc68a8ab9c02d710f9.1492492253.git.viresh.kumar@linaro.org>
+Message-ID: <20170419142215.GA12105@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Viresh,
 
-On Wed, Apr 19, 2017 at 08:09:00PM +0800, Lyra Zhang wrote:
-> Hi Arnd, Olof, Could you please take this patch through arm-soc git if
-> there are no further comments? (The three other patches in this series
-> have been taken by Greg.) Thanks, Chunyan On
+On Tue, Apr 18, 2017 at 10:44:50AM +0530, Viresh Kumar wrote:
+> Compiling the DT file with W=1, DTC warns like follows:
+> 
+> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> unit name, but no reg property
+> 
+> Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> "reg" property.
+> 
+> Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com> (uniphier)
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-First, something bad seems to have happened with this email, the formatting
-was all wrapped and it was hard to read. You might want to look into it so
-you can avoid more problems like it in the future.
+We've already turned down other patches that does this in a sweeping manner
+like this, since they tend to be conflict prone with other DT changes.
 
-That being said, we can apply the patches but please re-send the series to
-arm at kernel.org with any acks received added, etc.
+Please split per platform and merge with each maintainer.
 
 
-Thanks!
-
+Thanks,
 
 -Olof
