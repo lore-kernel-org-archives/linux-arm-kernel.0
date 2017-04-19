@@ -1,126 +1,117 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 19 Apr 2017 12:08:09 +0200
-Subject: [PATCH 1/2] KVM: arm/arm64: vgic-v3: De-optimize VMCR
- save/restore when emulating a GICv2
-In-Reply-To: <20170410091944.19963-2-marc.zyngier@arm.com>
-References: <20170410091944.19963-1-marc.zyngier@arm.com>
- <20170410091944.19963-2-marc.zyngier@arm.com>
-Message-ID: <20170419100809.GA4104@cbox>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Wed, 19 Apr 2017 11:08:06 +0100
+Subject: [PATCH 1/2] arm64: dts: juno: fix few unit address format warnings
+In-Reply-To: <1492538279-16405-1-git-send-email-sudeep.holla@arm.com>
+References: <1492538279-16405-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20170419100806.GI10078@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 10:19:43AM +0100, Marc Zyngier wrote:
-> When emulating a GICv2-on-GICv3, special care must be taken to only
-> save/restore VMCR_EL2 when ICC_SRE_EL1.SRE is cleared. Otherwise,
-> all Group-0 interrupts end-up being delivered as FIQ, which is
-> probably not what the guest expects, as demonstrated here with
-> an unhappy EFI:
+On Tue, Apr 18, 2017 at 06:57:58PM +0100, Sudeep Holla wrote:
+> This patch fixes the following set of warnings on juno.
 > 
-> 	FIQ Exception at 0x000000013BD21CC4
+>  smb at 08000000 unit name should not have leading 0s
+>  sysctl at 020000 simple-bus unit address format error, expected "20000"
+>  apbregs at 010000 simple-bus unit address format error, expected "10000"
+>  mmci at 050000 simple-bus unit address format error, expected "50000"
+>  kmi at 060000 simple-bus unit address format error, expected "60000"
+>  kmi at 070000 simple-bus unit address format error, expected "70000"
+>  wdt at 0f0000 simple-bus unit address format error, expected "f0000"
 > 
-> This means that we cannot perform the load/put trick when dealing
-> with VMCR_EL2 (because the host has SRE set), and we have to deal
-> with it in the world-switch.
-> 
-> Fortunately, this is not the most common case (modern guests should
-> be able to deal with GICv3 directly), and the performance is not worse
-> than what it was before the VMCR optimization.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+
+Thanks!
+Liviu
+
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c |  8 ++++++--
->  virt/kvm/arm/vgic/vgic.c      | 26 ++++++++++++++++++++------
->  2 files changed, 26 insertions(+), 8 deletions(-)
+>  arch/arm64/boot/dts/arm/juno-base.dtsi        |  2 +-
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 ++++++------
+>  2 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 3d0b1ddb6929..91922c1eddc8 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -128,8 +128,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  	 * Make sure stores to the GIC via the memory mapped interface
->  	 * are now visible to the system register interface.
->  	 */
-> -	if (!cpu_if->vgic_sre)
-> +	if (!cpu_if->vgic_sre) {
->  		dsb(st);
-> +		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
-> +	}
->  
->  	if (used_lrs) {
->  		int i;
-> @@ -205,11 +207,13 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->  	 * delivered as a FIQ to the guest, with potentially fatal
->  	 * consequences. So we must make sure that ICC_SRE_EL1 has
->  	 * been actually programmed with the value we want before
-> -	 * starting to mess with the rest of the GIC.
-> +	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
-> +	 * particular.
->  	 */
->  	if (!cpu_if->vgic_sre) {
->  		write_gicreg(0, ICC_SRE_EL1);
->  		isb();
-> +		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
->  	}
->  
->  	val = read_gicreg(ICH_VTR_EL2);
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index 3d0979c30721..32205f2ba6ff 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -667,10 +667,20 @@ void kvm_vgic_load(struct kvm_vcpu *vcpu)
->  	if (unlikely(!vgic_initialized(vcpu->kvm)))
->  		return;
->  
-> -	if (kvm_vgic_global_state.type == VGIC_V2)
-> +	if (kvm_vgic_global_state.type == VGIC_V2) {
->  		vgic_v2_load(vcpu);
-> -	else
-> -		vgic_v3_load(vcpu);
-> +	} else {
-> +		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-> +
-> +		/*
-> +		 * If dealing with a GICv2 emulation on GICv3,
-> +		 * VMCR_EL2.VFIQen is dependent on ICC_SRE_EL1.SRE,
-> +		 * and we have to perform the VMCR_EL2 save/restore in
-> +		 * the world switch.
-> +		 */
-> +		if (likely(cpu_if->vgic_sre))
-> +			vgic_v3_load(vcpu);
-
-I wonder if this conditional should really be inside vgic_v3_load
-instead?
-
-> +	}
->  }
->  
->  void kvm_vgic_put(struct kvm_vcpu *vcpu)
-> @@ -678,10 +688,14 @@ void kvm_vgic_put(struct kvm_vcpu *vcpu)
->  	if (unlikely(!vgic_initialized(vcpu->kvm)))
->  		return;
->  
-> -	if (kvm_vgic_global_state.type == VGIC_V2)
-> +	if (kvm_vgic_global_state.type == VGIC_V2) {
->  		vgic_v2_put(vcpu);
-> -	else
-> -		vgic_v3_put(vcpu);
-> +	} else {
-> +		struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-> +
-> +		if (likely(cpu_if->vgic_sre))
-> +			vgic_v3_put(vcpu);
-
-And same here?
-
-> +	}
->  }
->  
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
-> -- 
-> 2.11.0
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index 8ffaff2043d0..bfe7d683a42e 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -699,7 +699,7 @@
+>  		      <0x00000008 0x80000000 0x1 0x80000000>;
+>  	};
+> 
+> -	smb at 08000000 {
+> +	smb at 8000000 {
+>  		compatible = "simple-bus";
+>  		#address-cells = <2>;
+>  		#size-cells = <1>;
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index 098601657f82..2ac43221ddb6 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -137,7 +137,7 @@
+>  				#size-cells = <1>;
+>  				ranges = <0 3 0 0x200000>;
+> 
+> -				v2m_sysctl: sysctl at 020000 {
+> +				v2m_sysctl: sysctl at 20000 {
+>  					compatible = "arm,sp810", "arm,primecell";
+>  					reg = <0x020000 0x1000>;
+>  					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&mb_clk24mhz>;
+> @@ -148,7 +148,7 @@
+>  					assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+>  				};
+> 
+> -				apbregs at 010000 {
+> +				apbregs at 10000 {
+>  					compatible = "syscon", "simple-mfd";
+>  					reg = <0x010000 0x1000>;
+> 
+> @@ -216,7 +216,7 @@
+>  					};
+>  				};
+> 
+> -				mmci at 050000 {
+> +				mmci at 50000 {
+>  					compatible = "arm,pl180", "arm,primecell";
+>  					reg = <0x050000 0x1000>;
+>  					interrupts = <5>;
+> @@ -228,7 +228,7 @@
+>  					clock-names = "mclk", "apb_pclk";
+>  				};
+> 
+> -				kmi at 060000 {
+> +				kmi at 60000 {
+>  					compatible = "arm,pl050", "arm,primecell";
+>  					reg = <0x060000 0x1000>;
+>  					interrupts = <8>;
+> @@ -236,7 +236,7 @@
+>  					clock-names = "KMIREFCLK", "apb_pclk";
+>  				};
+> 
+> -				kmi at 070000 {
+> +				kmi at 70000 {
+>  					compatible = "arm,pl050", "arm,primecell";
+>  					reg = <0x070000 0x1000>;
+>  					interrupts = <8>;
+> @@ -244,7 +244,7 @@
+>  					clock-names = "KMIREFCLK", "apb_pclk";
+>  				};
+> 
+> -				wdt at 0f0000 {
+> +				wdt at f0000 {
+>  					compatible = "arm,sp805", "arm,primecell";
+>  					reg = <0x0f0000 0x10000>;
+>  					interrupts = <7>;
+> --
+> 2.7.4
 > 
 
-Otherwise looks good.
-
-Thanks,
--Christoffer
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
