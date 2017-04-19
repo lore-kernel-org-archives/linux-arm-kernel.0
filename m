@@ -1,60 +1,45 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 19 Apr 2017 15:12:01 +0100
-Subject: [PATCH v3 5/7] ARM: NOMMU: Introduce dma operations for noMMU
-In-Reply-To: <CAK8P3a37QAZNp9hvbM10EjMNnTsiiN-Z3u8o=883bev4Th-iOQ@mail.gmail.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <1489137839-549-6-git-send-email-vladimir.murzin@arm.com>
- <CAK8P3a37QAZNp9hvbM10EjMNnTsiiN-Z3u8o=883bev4Th-iOQ@mail.gmail.com>
-Message-ID: <a669ed51-93a9-4e49-189c-98f2c1c6e312@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 19 Apr 2017 06:24:20 -0700
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.12
+In-Reply-To: <58EBA861.2010809@hisilicon.com>
+References: <58EBA861.2010809@hisilicon.com>
+Message-ID: <20170419132420.GK29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/17 11:10, Arnd Bergmann wrote:
-> On Fri, Mar 10, 2017 at 10:23 AM, Vladimir Murzin
-> <vladimir.murzin@arm.com> wrote:
->> R/M classes of cpus can have memory covered by MPU which in turn might
->> configure RAM as Normal i.e. bufferable and cacheable. It breaks
->> dma_alloc_coherent() and friends, since data can stuck in caches now
->> or be buffered.
->>
->> This patch factors out DMA support for NOMMU configuration into
->> separate entity which provides dedicated dma_ops. We have to handle
->> there several cases:
->> - configurations with MMU/MPU setup
->> - configurations without MMU/MPU setup
->> - special case for M-class, since caches and MPU there are optional
->>
->> In general we rely on default DMA area for coherent allocations or/and
->> per-device memory reserves suitable for coherent DMA, so if such
->> regions are set coherent allocations go from there.
->>
->> In case MPU/MPU was not setup we fallback to normal page allocator for
->> DMA memory allocation.
->>
->> In case we run M-class cpus, for configuration without cache support
->> (like Cortex-M3/M4) dma operations are forced to be coherent and wired
->> with dma-noop (such decision is made based on cacheid global
->> variable); however, if caches are detected there and no DMA coherent
->> region is given (either default or per-device), dma is disallowed even
->> MPU is not set - it is because M-class implement system memory map
->> which defines part of address space as Normal memory.
->>
->> Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
->> Reported-by: Andras Szemzo <sza@esh.hu>
->> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->> Tested-by: Andras Szemzo <sza@esh.hu>
->> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
->> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Mon, Apr 10, 2017 at 04:44:33PM +0100, Wei Xu wrote:
+> Hi Arnd, Hi Olof, Hi Kevin,
 > 
-> I thought I found a couple of problems with this, but after reading more
-> carefully I was wrong about all of them and I think the code is doing
-> exactly the right thing. I also like the way this is split out into a separate
-> set of dma_map_ops to simplify the normal MMU case.
+> Please help to pull the following changes.
+> Thanks!
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Best Regards,
+> Wei
 > 
+> ---
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.12
+> 
+> for you to fetch changes up to d4e1eaeee56894f45d0093f9d432be0c868f7c4c:
+> 
+>   arm64: dts: hisi: add pinctrl dtsi file for HiKey960 development board (2017-04-10 23:34:26 +0800)
+> 
+> ----------------------------------------------------------------
+> ARM64: DT: Hisilicon SoC DT updates for 4.12
+> 
+> - Reset the hi6220 mmc hosts to avoid hang
+> - Add the binding for the hi3798cv200 SoC and the poplar board
+> - Add basic dts files to support the hi3798cv200 poplar board
+> - Enable the Mbigen, XGE, RoCE and SAS for the hip07 d05 board
+> - Add driver strength MACRO for the hi3660 SoC
+> - Add the pinctrl dtsi file for hikey960 board to configure the pins
 
-Much appreciated!
+Merged, thanks.
 
-Vladimir
+
+-Olof
