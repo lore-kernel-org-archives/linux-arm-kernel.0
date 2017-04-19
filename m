@@ -1,43 +1,63 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Apr 2017 13:00:08 +0200
-Subject: [PATCH v4 3/6] mfd: exynos-lpass: Remove pad retention control
-In-Reply-To: <20170411120231.hivtn6c7to4z2gu6@dell>
-References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170323080348eucas1p29d1fb4eb06e4785d20341be7a374bfb3@eucas1p2.samsung.com>
- <1490256207-10061-4-git-send-email-m.szyprowski@samsung.com>
- <20170411120231.hivtn6c7to4z2gu6@dell>
-Message-ID: <4646acab-261e-32ea-df63-6f8333f64e2d@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 19 Apr 2017 16:40:20 +0530
+Subject: [Query] Enabling parent device clock from resume_noirq
+In-Reply-To: <4c6e91e4-35fa-2fde-7915-fb922ec22567@ti.com>
+References: <62cd5ee0-3f0c-5e65-5f64-0c91a2a6f1e6@ti.com>
+ <4c6e91e4-35fa-2fde-7915-fb922ec22567@ti.com>
+Message-ID: <23a79524-0445-e9cb-2e51-2dd2e37e4f5b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi,
 
-On 2017-04-11 14:02, Lee Jones wrote:
-> On Thu, 23 Mar 2017, Marek Szyprowski wrote:
->
->> Pad retention should be controlled from pin control driver, so remove it
->> from Exynos LPASS driver. After this change, no more access to PMU regmap
->> is needed, so remove also the code for handling PMU regmap.
+On Wednesday 19 April 2017 01:35 AM, Grygorii Strashko wrote:
+> + linux-pm
+> 
+> On 04/18/2017 01:07 AM, Kishon Vijay Abraham I wrote:
+>> Hi,
 >>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>   .../bindings/mfd/samsung,exynos5433-lpass.txt           |  2 --
->>   drivers/mfd/exynos-lpass.c                              | 17 -----------------
->>   include/linux/mfd/syscon/exynos5-pmu.h                  |  3 ---
->>   3 files changed, 22 deletions(-)
-> Applied, thanks.
+>> resume_noirq callbacks are used in PCIe core to restore PCI state (this
+>> accesses PCI module). So the clocks of PCI module has to be enabled before
+>> resume_noirq.
+>>
+>> The clocks for the PCI module in DRA7xx is provided by PIPE3 PHY device which
+>> in turn gets it's clock from OCP2SCP device. During resume_noirq callbacks,
+>> pm_runtime is disabled, so pm_runtime_get_sync is ineffective. However
+>> pm_runtime can be enabled using pm_runtime_force_resume. Now the problem is
+>> adding pm_runtime_force_resume() in resume_noirq callback of pci-dra7xx driver
+>> will enable only the pm_runtime of PCI device but not PIPE3 PHY or OCP2SCP.
+>> Adding pm_runtime_force_resume() in resume_noirq callback of PIPE3 PHY driver
+>> or OCP2SCP driver will not help if the resume_noirq callbacks in PIP3PHY driver
+>> and OCP2SCP driver are invoked after the resume_noirq of pci-dra7xx driver.
+>>
+>> How to enable the pm_runtime of parent devices in resume_noirq callback? Does
+>> existing pm_runtime framework has support for that?
+>>
+> 
+> Most probably you've hit the issue described in [1].
+> In general, if pci-dra7xx is consumer of  PIPE3 PHY device and 
+> PIPE3 PHY device is child of OCP2SCP then suspend/resume order should be
+> - pci-dra7xx
+> - PIPE3 PHY
+> - OCP2SCP
+>  and resume
+> - OCP2SCP
+> - PIPE3 PHY
+> - pci-dra7xx
+> and in this case  pm_runtime_force_x() might work.
+> 
+> Hence, approach [1] was not accepted (personally I still like it) and
+> "Functional dependencies tracking support" was introduced instead by commit 9ed9895 [2]
+> you can try it.
+> 
+> But, as per code, I'm not sure that Functional dependencies properly tracked in 
+> pm_runtime_force_x() functions.
+> 
+> PS: you can try to reorder device's nodes in DT and place PCI node after "ocp2scp" :P
 
-When can I expect this (and the remaining patches from this patchset) to 
-appear
-in your -next branch?
+reordering helps ;-) I'll try the functional dependencies.
 
- > ...
+Thanks for the hint :-)
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Cheers
+Kishon
