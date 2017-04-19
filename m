@@ -1,30 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:44:07 -0700
-Subject: [GIT PULL] ARM: mvebu: dt for v4.12 (#2)
-In-Reply-To: <87shlj50qx.fsf@free-electrons.com>
-References: <87shlj50qx.fsf@free-electrons.com>
-Message-ID: <20170419134407.GW29219@localhost>
+Date: Wed, 19 Apr 2017 06:36:26 -0700
+Subject: [GIT PULL] Qualcomm Driver Updates for v4.12
+In-Reply-To: <1491533316-13528-1-git-send-email-andy.gross@linaro.org>
+References: <1491533316-13528-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20170419133626.GQ29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 08, 2017 at 12:08:54AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Thu, Apr 06, 2017 at 09:48:36PM -0500, Andy Gross wrote:
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
-> Here is the second pull request for dt for mvebu for v4.12.
-> 
-> Gregory
-> 
-> The following changes since commit cd2f0d0d403b7eb779fba04ea9664faa3b625cde:
-> 
->   ARM: dts: mvebu: linksys: enable buffer manager support (2017-03-23 17:29:42 +0100)
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.12-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.12
 > 
-> for you to fetch changes up to 34240c26d1d7b4365d4d0a8d231b244eb396c8dc:
+> for you to fetch changes up to b182cc4d597a6e73ff04ee1b7fb4f1a28f56ae3d:
 > 
->   ARM: dts: armada-385-linksys: disk-activity trigger for all (2017-04-05 17:25:17 +0200)
+>   firmware: qcom_scm: add two scm calls for iommu secure page table (2017-03-28 16:03:21 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based Driver Updates for v4.12
+> 
+> * Add SCM APIs for restore_sec_cfg and iommu secure page table
 
 Merged, thanks!
 
