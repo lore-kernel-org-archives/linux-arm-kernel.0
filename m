@@ -1,25 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Apr 2017 09:27:54 -0700
-Subject: [PATCH v2 7/7] clk: spear: fix ADC clock definition on SPEAr600
-In-Reply-To: <1492433205-13376-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1492433205-13376-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1492433205-13376-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170419162754.GE7065@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 19 Apr 2017 09:36:11 -0700
+Subject: [GIT PULL] bcm2835-dt-next-2017-03-30
+In-Reply-To: <20170330191343.31647-1-eric@anholt.net>
+References: <20170330191343.31647-1-eric@anholt.net>
+Message-ID: <2604ca97-e128-6dde-3a31-e4ff602ead52@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17, Thomas Petazzoni wrote:
-> There is no SPEAr600 device named "adc". Instead, the description of the
-> ADC was recently added to the Device Tree, and the device name is
-> "d820b000.adc", so we should associate the ADC gatable clock to this
-> device name.
+On 03/30/2017 12:13 PM, Eric Anholt wrote:
+> Hi Florian,
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
+> Here's the pull request for those changes I'd misplaced from 4.11.
+> This may be my last PR of the cycle.  The only change I have left on
+> my radar for 4.12 is
+> http://lists.infradead.org/pipermail/linux-rpi-kernel/2017-March/006097.html
+> 
+> The following changes since commit 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
+> 
+>   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-30
+> 
+> for you to fetch changes up to 10b6c0c2e2bb8cd1be682f8d36ef597e3419cb88:
+> 
+>   ARM: dts: bcm2835: add index to the ethernet alias (2017-03-27 10:10:39 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings back bcm2835 DT fixups from Baruch Siach that
+> got misplaced after a PR for 4.11 got rejected.
+> 
+> ----------------------------------------------------------------
 
-Applied to clk-next
-
+Merged into devicetree/next, thanks Eric.
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Florian
