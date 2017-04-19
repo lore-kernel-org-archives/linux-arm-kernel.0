@@ -1,45 +1,55 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Apr 2017 14:21:23 -0700
-Subject: [PATCH] soc: brcmstb: enable drivers for ARM64 also
-In-Reply-To: <20170419201811.70246-1-code@mmayer.net>
-References: <20170419201811.70246-1-code@mmayer.net>
-Message-ID: <4bd9f3b3-4c2d-2da2-f728-8edb466f9bb9@gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Wed, 19 Apr 2017 14:22:11 -0700
+Subject: [PATCH] arm64: prefetch: Change assembly to be compatible with gcc
+ and clang
+Message-ID: <20170419212211.95803-1-mka@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2017 01:18 PM, Markus Mayer wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
-> 
-> We enable the BRCMSTB SoC drivers not only for ARM, but also ARM64.
+clang fails to build with the current code:
 
-This looks fine, can you also put add || BMIPS_GENERIC in there since
-the driver is also used for these platforms?
+arch/arm64/include/asm/processor.h:172:15: error: invalid operand in
+inline asm: 'prfm pldl1keep, ${0:a}'
 
-We may also want a || COMPILE_TEST just to improve build coverage.
+Apparently clang does not support the 'a' modifier. Change the
+constraint from 'p' ('An operand that is a valid memory address is
+allowed') to 'Q' ('A memory address which uses a single base register
+with no offset'), which works for both gcc and clang.
 
-Thanks!
+Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+---
+ arch/arm64/include/asm/processor.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> 
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> ---
->  drivers/soc/bcm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
-> index a39b0d5..b3834b9 100644
-> --- a/drivers/soc/bcm/Kconfig
-> +++ b/drivers/soc/bcm/Kconfig
-> @@ -11,7 +11,7 @@ config RASPBERRYPI_POWER
->  
->  config SOC_BRCMSTB
->  	bool "Broadcom STB SoC drivers"
-> -	depends on ARM
-> +	depends on ARM || ARM64
->  	select SOC_BUS
->  	help
->  	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
-> 
-
-
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index c97b8bd2acba..bfdc82e924a5 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -165,21 +165,21 @@ extern struct task_struct *cpu_switch_to(struct task_struct *prev,
+ #define ARCH_HAS_PREFETCH
+ static inline void prefetch(const void *ptr)
+ {
+-	asm volatile("prfm pldl1keep, %a0\n" : : "p" (ptr));
++	asm volatile("prfm pldl1keep, %0\n" : : "Q" (ptr));
+ }
+ 
+ #define ARCH_HAS_PREFETCHW
+ static inline void prefetchw(const void *ptr)
+ {
+-	asm volatile("prfm pstl1keep, %a0\n" : : "p" (ptr));
++	asm volatile("prfm pstl1keep, %0\n" : : "Q" (ptr));
+ }
+ 
+ #define ARCH_HAS_SPINLOCK_PREFETCH
+ static inline void spin_lock_prefetch(const void *ptr)
+ {
+ 	asm volatile(ARM64_LSE_ATOMIC_INSN(
+-		     "prfm pstl1strm, %a0",
+-		     "nop") : : "p" (ptr));
++		     "prfm pstl1strm, %0",
++		     "nop") : : "Q" (ptr));
+ }
+ 
+ #define HAVE_ARCH_PICK_MMAP_LAYOUT
 -- 
-Florian
+2.12.2.816.g2cccc81164-goog
