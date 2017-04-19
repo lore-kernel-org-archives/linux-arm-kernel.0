@@ -1,46 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:37:42 -0700
-Subject: [GIT PULL] ARM/clk move ICST library to drivers/clk
-In-Reply-To: <CACRpkdbPagc3fVyzryRYhcwnQ2WA-z7fSbW+VpR09iLqvVEhjQ@mail.gmail.com>
-References: <CACRpkdbPagc3fVyzryRYhcwnQ2WA-z7fSbW+VpR09iLqvVEhjQ@mail.gmail.com>
-Message-ID: <20170419133742.GR29219@localhost>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 19 Apr 2017 22:28:12 +0800
+Subject: [PATCH v6 6/8] coresight: add support for CPU debug module
+In-Reply-To: <5c5cb6f8-1dcb-8a9d-1605-c006656005eb@arm.com>
+References: <1491485461-22800-1-git-send-email-leo.yan@linaro.org>
+ <1491485461-22800-7-git-send-email-leo.yan@linaro.org>
+ <5c5cb6f8-1dcb-8a9d-1605-c006656005eb@arm.com>
+Message-ID: <20170419142812.GA16160@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 12:03:16PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> this moves the ICST library from arch/arm to drivers/clk
-> so it can be reused from there.
-> 
-> The patches are ACKed by Stephen Boyd.
-> 
-> Please pull it into some cleanup branch in ARM SoC.
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/arm-to-clk-icst
-> 
-> for you to fetch changes up to ba3fae06c7a4e80ab9d48a8a045b352da97cf23d:
-> 
->   ARM/clk: move the ICST library to drivers/clk (2017-04-07 11:58:12 +0200)
-> 
-> ----------------------------------------------------------------
-> This moves the ICST helper library from arch/arm to drivers/clk
+Hi Suzuki,
 
-We don't have a cleanup branch this release, so I merged this into
-next/drivers.
+On Wed, Apr 19, 2017 at 02:23:04PM +0100, Suzuki K Poulose wrote:
+> Hi Leo,
+> 
+> This version looks good to me. I have two minor comments below.
 
-Thanks!
+Thanks for reviewing. Will take the suggestions. Just check a bit for
+last comment.
 
+[...]
 
--Olof
+> >+static int debug_probe(struct amba_device *adev, const struct amba_id *id)
+> >+{
+> >+	void __iomem *base;
+> >+	struct device *dev = &adev->dev;
+> >+	struct debug_drvdata *drvdata;
+> >+	struct resource *res = &adev->res;
+> >+	struct device_node *np = adev->dev.of_node;
+> >+	int ret;
+> >+
+> >+	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+> >+	if (!drvdata)
+> >+		return -ENOMEM;
+> >+
+> >+	drvdata->cpu = np ? of_coresight_get_cpu(np) : 0;
+> >+	if (per_cpu(debug_drvdata, drvdata->cpu)) {
+> >+		dev_err(dev, "CPU%d drvdata has been initialized\n",
+> >+			drvdata->cpu);
+> 
+> May be we could warn about a possible issue in the DT ?
+
+So can I understand the suggestion is to add warning in function
+of_coresight_get_cpu() when cannot find CPU number, and here directly
+bail out?
+
+Thanks,
+Leo Yan
