@@ -1,42 +1,29 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 19 Apr 2017 15:29:52 -0500
-Subject: [GIT PULL] Qualcomm Device Tree Changes for v4.12
-In-Reply-To: <20170419134239.GU29219@localhost>
-References: <1491533330-13570-1-git-send-email-andy.gross@linaro.org>
- <20170419134239.GU29219@localhost>
-Message-ID: <20170419202952.GA9655@hector.attlocal.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 19 Apr 2017 22:30:12 +0200
+Subject: [PATCH] ARM: dts: am335x-phycore-som: fix rv4162 compatible
+Message-ID: <20170419203012.8158-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 06:42:39AM -0700, Olof Johansson wrote:
-> On Thu, Apr 06, 2017 at 09:48:50PM -0500, Andy Gross wrote:
-> > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> > 
-> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.12
-> > 
-> > for you to fetch changes up to 21677ecca20151e61c3290ef37c5cd7afec60a5a:
-> > 
-> >   Revert "ARM: dts: qcom: msm8974: Add USB gadget nodes" (2017-04-06 18:48:53 -0500)
-> > 
-> > ----------------------------------------------------------------
-> > Qualcomm Device Tree Changes for v4.12
-> > 
-> > * Add Coresight components for MSM8974
-> > * Fixup MSM8974 ADSP XO clk and add RPMCC node
-> > * Fix typo in APQ8060
-> > * Add SDCs on MSM8660
-> > * Revert MSM8974 USB gadget change due to issues
-> 
-> Merged, thanks. Should the USB gadget revert have been a fix for 4.11 instead?
+The rv4162 compatbile string is missing the vendor part, add it.
 
-I vacillated on that.  It broke one person using gadget for console, so I suppose it
-should be considered a fix for 4.11.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/am335x-phycore-som.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Regards,
-
-Andy
+diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+index 14533ff6d0ad..428a25e952b0 100644
+--- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
++++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+@@ -138,7 +138,7 @@
+ 	};
+ 
+ 	i2c_rtc: rtc at 68 {
+-		compatible = "rv4162";
++		compatible = "microcrystal,rv4162";
+ 		reg = <0x68>;
+ 		status = "disabled";
+ 	};
+-- 
+2.11.0
