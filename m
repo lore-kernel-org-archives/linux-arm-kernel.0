@@ -1,33 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:30:48 -0700
-Subject: [GIT PULL] Reset controller changes for v4.12, part 2
-In-Reply-To: <1491387844.2381.77.camel@pengutronix.de>
-References: <1491387844.2381.77.camel@pengutronix.de>
-Message-ID: <20170419123048.GL17004@localhost>
+Date: Wed, 19 Apr 2017 05:32:13 -0700
+Subject: [GIT PULL 2/2] SoCFPGA defconfig update for v4.12
+In-Reply-To: <1491404489-10411-2-git-send-email-dinguyen@kernel.org>
+References: <1491404489-10411-1-git-send-email-dinguyen@kernel.org>
+ <1491404489-10411-2-git-send-email-dinguyen@kernel.org>
+Message-ID: <20170419123213.GN17004@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 05, 2017 at 12:24:04PM +0200, Philipp Zabel wrote:
-> Dear arm-soc maintainers,
+On Wed, Apr 05, 2017 at 10:01:29AM -0500, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, and Olof:
 > 
-> please consider merging this tag for v4.12, which just adds a few reset
-> lines for the NAND and eMMC controllers on Uniphier LD11/LD20 SoCs.
+> Please pull in this defconfig update for v4.12.
 > 
-> regards
-> Philipp
+> Thanks,
+> Dinh
 > 
-> The following changes since commit 11282a49b735ad7f4cea187de2b8dc5489343e4b:
 > 
->   reset: sunxi: fix for 64-bit compilation (2017-03-15 12:19:12 +0100)
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.12-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_defconfig_updates_for_v4.12
 > 
-> for you to fetch changes up to 23ade398c7c2809d031fe1d83ada11b3c08d73b4:
+> for you to fetch changes up to b685b264636b4f3f3eaa0b62fee674a45f2b1679:
 > 
->   reset: uniphier: add NAND and eMMC reset control (2017-03-28 18:45:35 +0200)
+>   ARM: socfpga: updates for socfpga_defconfig (2017-03-16 08:05:46 -0500)
+> 
+> ----------------------------------------------------------------
+> SoCFPGA defconfig updates for v4.12
+> - enables TSE(Triple-Speed-Ethernet) support
 
-Merged, thanks.
+Merged, thanks!
+
 
 -Olof
