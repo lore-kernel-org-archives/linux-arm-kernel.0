@@ -1,67 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Apr 2017 08:53:43 +0200
-Subject: [PATCH 2/3] ARM: sun8i: a83t: Drop leading zeroes from device
- node addresses
-In-Reply-To: <CAGb2v664r+Wt9zrSK2GudMYRkp9N+QpdbEMdWEobx-HxS38Ovw@mail.gmail.com>
-References: <20170418042205.27894-1-wens@csie.org>
- <20170418042205.27894-3-wens@csie.org>
- <20170418090329.odixwybrkqvp2o7z@lukather>
- <CAGb2v664r+Wt9zrSK2GudMYRkp9N+QpdbEMdWEobx-HxS38Ovw@mail.gmail.com>
-Message-ID: <20170419065343.4lyfzf66z47tu3b4@lukather>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 19 Apr 2017 09:14:16 +0200
+Subject: [PATCH v2 1/3] Documentation/bindings: Document the SafeXel
+ cryptographic engine driver
+In-Reply-To: <20170419071418.18995-1-antoine.tenart@free-electrons.com>
+References: <20170419071418.18995-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170419071418.18995-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:22:02PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Apr 18, 2017 at 5:03 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Apr 18, 2017 at 12:22:04PM +0800, Chen-Yu Tsai wrote:
-> >> Kbuild now complains about leading zeroes in the address portion of
-> >> device node names.
-> >>
-> >> Get rid of them.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  arch/arm/boot/dts/sun8i-a83t.dtsi | 10 +++++-----
-> >>  1 file changed, 5 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> >> index 913aacafe8d5..82cb87f21b96 100644
-> >> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> >> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> >> @@ -162,7 +162,7 @@
-> >>               #size-cells = <1>;
-> >>               ranges;
-> >>
-> >> -             pio: pinctrl at 01c20800 {
-> >> +             pio: pinctrl at 1c20800 {
-> >
-> > As far as I know this breaks Uboot's auto-addition of stdout-path
-> 
-> You're right. It breaks as Uboot has the path to the uarts hard-coded.
-> That sucks. And from what I can tell, it's not easily solvable by just
-> switching to serial alias based references. CONS_INDEX won't line up
-> on the A23/A33 Q8 tablets.
-> 
-> Maybe we can just keep the uart device node the same for now, but fix
-> all the other ones. We can come back and fix the uart later once we
-> figure out how to fix Uboot.
+The Inside Secure Safexcel cryptographic engine is found on some Marvell
+SoCs (7k/8k). Document the bindings used by its driver.
 
-Thinking more about this, I don't really know why we have that in
-U-Boot actually. All our DTs for a very long time have had stdout-path
-properly set (and if it's improperly set, this should be fixed). I'd
-say we can simply remove that from U-Boot and be done with it.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ .../bindings/crypto/inside-secure-safexcel.txt     | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
 
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+new file mode 100644
+index 000000000000..ff56b9384fcc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/inside-secure-safexcel.txt
+@@ -0,0 +1,27 @@
++Inside Secure SafeXcel cryptographic engine
++
++Required properties:
++- compatible: Should be "inside-secure,safexcel-eip197".
++- reg: Base physical address of the engine and length of memory mapped region.
++- interrupts: Interrupt numbers for the rings and engine.
++- interrupt-names: Should be "ring0", "ring1", "ring2", "ring3", "eip", "mem".
++
++Optional properties:
++- clocks: Reference to the crypto engine clock.
++
++Example:
++
++	crypto: crypto at 800000 {
++		compatible = "inside-secure,safexcel-eip197";
++		reg = <0x800000 0x200000>;
++		interrupts = <GIC_SPI 34 (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "mem", "ring0", "ring1", "ring2", "ring3",
++				  "eip";
++		clocks = <&cpm_syscon0 1 26>;
++		status = "disabled";
++	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170419/38858818/attachment.sig>
+2.11.0
