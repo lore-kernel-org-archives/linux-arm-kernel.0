@@ -1,44 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:48:40 -0700
-Subject: [GIT PULL 1/2] omap devicetree changes for v4.12, part 2
-In-Reply-To: <58ebe106.066f630a.acb55.1f9aSMTPIN_ADDED_BROKEN@mx.google.com>
-References: <58ebe106.066f630a.acb55.1f9aSMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20170419134840.GC29219@localhost>
+Date: Wed, 19 Apr 2017 06:48:00 -0700
+Subject: [GIT PULL v2] ARM: at91: DT for 4.12
+In-Reply-To: <20170414080050.qb3n7ypomgciqa22@piout.net>
+References: <20170410163557.qocx3bvz5s5gcnkw@piout.net>
+ <20170414080050.qb3n7ypomgciqa22@piout.net>
+Message-ID: <20170419134800.GB29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 12:46:06PM -0700, Tony Lindgren wrote:
-> The following changes since commit da72e4936445e1081e1223fc58470644da8e8cdb:
+On Fri, Apr 14, 2017 at 10:00:50AM +0200, Alexandre Belloni wrote:
+> Arnd, Olof,
 > 
->   Merge branch 'omap-for-v4.12/dt-droid4-v2' into omap-for-v4.12/dt-v2 (2017-03-28 14:00:55 -0700)
+> As you didn't seem to have taken the previous version, I've folded a
+> late minute fix in Peter's patch. IF that is not OK, I'll sent the fix
+> later.
+> 
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.12/dt-pt2-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.12-dt
 > 
-> for you to fetch changes up to b4e1566e4c5e9fcaf9e17ad741b6094b4f3ddce5:
+> for you to fetch changes up to d3df1ec06353e51fc44563d2e7e18d42811af290:
 > 
->   Merge branch 'omap-for-v4.12/dt-droid4-v2' into omap-for-v4.12/dt-v2 (2017-04-09 16:35:51 -0700)
-> 
-> ----------------------------------------------------------------
-> Second set of devicetree changes for omaps for v4.12 merge window
-> to configure various devices:
-> 
-> - Enable DCAN on am57xx-idk
-> 
-> - Enable CPSW ethernet0 and 1 on am335x-icev2
-> 
-> - Non-critical fix for droid 4 PMIC interrupt triggering
-> 
-> - Stop disabling SRAM and GPMC on droid 4
-> 
-> - Configure CPCAP PMIC related devices on droid 4 for ADC, charger
->   and USB PHY. The charger and USB PHY drivers are still being
->   discussed, but the binding for them has been acked by Rob and
->   Sebastian so they should be safe to merge together with the ADC
->   driver in Linux next that they depend on
+>   ARM: dts: at91: sama5d3_xplained: not all ADC channels are available (2017-04-14 09:38:51 +0200)
 
-Merged, thanks.
+Thanks, merged!
 
 
 -Olof
