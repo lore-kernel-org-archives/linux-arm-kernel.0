@@ -1,10 +1,7 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 19 Apr 2017 10:37:37 +0200
-Subject: [PATCH v2] arm64: dts: r8a7795: salvator-x: Add current sense
- amplifiers
-In-Reply-To: <1492590950-10534-1-git-send-email-geert+renesas@glider.be>
-References: <1492590950-10534-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1492591057-10674-1-git-send-email-geert+renesas@glider.be>
+Date: Wed, 19 Apr 2017 10:35:50 +0200
+Subject: [PATCH] arm64: dts: r8a7795: salvator-x: Add current sense amplifiers
+Message-ID: <1492590950-10534-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
