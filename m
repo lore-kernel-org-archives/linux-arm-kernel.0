@@ -1,74 +1,48 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 19 Apr 2017 16:48:43 -0400
-Subject: [PATCH v2 04/11] soc/fsl/qbman: Drop set/clear_bits usage
+Date: Wed, 19 Apr 2017 16:48:47 -0400
+Subject: [PATCH v2 08/11] soc/fsl/qbman: add QMAN_REV32
 In-Reply-To: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
 References: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1492634930-10765-5-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1492634930-10765-9-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Madalin Bucur <madalin.bucur@nxp.com>
 
-Replace PPC specific set/clear_bits API with standard
-bit twiddling so driver is portalable outside PPC.
+Add revision 3.2 of the QBMan block.  This is the version
+for LS1043A and LS1046A SoCs.
 
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman.c | 2 +-
- drivers/soc/fsl/qbman/qman.c | 8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/soc/fsl/qbman/qman_ccsr.c | 2 ++
+ drivers/soc/fsl/qbman/qman_priv.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
-index a3d6d7c..3acded1 100644
---- a/drivers/soc/fsl/qbman/bman.c
-+++ b/drivers/soc/fsl/qbman/bman.c
-@@ -607,7 +607,7 @@ int bman_p_irqsource_add(struct bman_portal *p, u32 bits)
- 	unsigned long irqflags;
+diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
+index 39ad7c4..9327374 100644
+--- a/drivers/soc/fsl/qbman/qman_ccsr.c
++++ b/drivers/soc/fsl/qbman/qman_ccsr.c
+@@ -720,6 +720,8 @@ static int fsl_qman_probe(struct platform_device *pdev)
+ 		qman_ip_rev = QMAN_REV30;
+ 	else if (major == 3 && minor == 1)
+ 		qman_ip_rev = QMAN_REV31;
++	else if (major == 3 && minor == 2)
++		qman_ip_rev = QMAN_REV32;
+ 	else {
+ 		dev_err(dev, "Unknown QMan version\n");
+ 		return -ENODEV;
+diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
+index 1e998ea5..96f58c4 100644
+--- a/drivers/soc/fsl/qbman/qman_priv.h
++++ b/drivers/soc/fsl/qbman/qman_priv.h
+@@ -186,6 +186,7 @@ struct qm_portal_config {
+ #define QMAN_REV20 0x0200
+ #define QMAN_REV30 0x0300
+ #define QMAN_REV31 0x0301
++#define QMAN_REV32 0x0302
+ extern u16 qman_ip_rev; /* 0 if uninitialised, otherwise QMAN_REVx */
  
- 	local_irq_save(irqflags);
--	set_bits(bits & BM_PIRQ_VISIBLE, &p->irq_sources);
-+	p->irq_sources |= bits & BM_PIRQ_VISIBLE;
- 	bm_out(&p->p, BM_REG_IER, p->irq_sources);
- 	local_irq_restore(irqflags);
- 	return 0;
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index 3d891db..3f60289 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -909,12 +909,12 @@ static inline int qm_mc_result_timeout(struct qm_portal *portal,
- 
- static inline void fq_set(struct qman_fq *fq, u32 mask)
- {
--	set_bits(mask, &fq->flags);
-+	fq->flags |= mask;
- }
- 
- static inline void fq_clear(struct qman_fq *fq, u32 mask)
- {
--	clear_bits(mask, &fq->flags);
-+	fq->flags &= ~mask;
- }
- 
- static inline int fq_isset(struct qman_fq *fq, u32 mask)
-@@ -1561,7 +1561,7 @@ void qman_p_irqsource_add(struct qman_portal *p, u32 bits)
- 	unsigned long irqflags;
- 
- 	local_irq_save(irqflags);
--	set_bits(bits & QM_PIRQ_VISIBLE, &p->irq_sources);
-+	p->irq_sources |= bits & QM_PIRQ_VISIBLE;
- 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
- 	local_irq_restore(irqflags);
- }
-@@ -1584,7 +1584,7 @@ void qman_p_irqsource_remove(struct qman_portal *p, u32 bits)
- 	 */
- 	local_irq_save(irqflags);
- 	bits &= QM_PIRQ_VISIBLE;
--	clear_bits(bits, &p->irq_sources);
-+	p->irq_sources &= ~bits;
- 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
- 	ier = qm_in(&p->p, QM_REG_IER);
- 	/*
+ #define QM_FQID_RANGE_START 1 /* FQID 0 reserved for internal use */
 -- 
 2.7.4
