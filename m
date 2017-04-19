@@ -1,104 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:30 +0100
-Subject: [PATCH 13/16] clocksource: arm_arch_timer: simplify ACPI support code.
-In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1492620273-30037-14-git-send-email-mark.rutland@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 19 Apr 2017 17:48:50 +0100
+Subject: [PATCH v4 01/21] PCI: remove __weak tag from pci_remap_iospace()
+In-Reply-To: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170419164913.19674-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+pci_remap_iospace() is marked as a weak symbol even though
+no architecture is currently overriding it; given that its
+implementation internals have already code paths that are
+arch specific (ie PCI_IOBASE and ioremap_page_range() attributes)
+there is no need to leave the weak symbol in the kernel since the
+same functionality can be achieved by customizing per-arch the
+corresponding functionality.
 
-The patch update arm_arch_timer driver to use the function
-provided by the new GTDT driver of ACPI.
-By this way, arm_arch_timer.c can be simplified, and separate
-all the ACPI GTDT knowledge from this timer driver.
+Remove the __weak symbol from pci_remap_iospace().
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 40 +++++++++---------------------------
- 1 file changed, 10 insertions(+), 30 deletions(-)
+ drivers/pci/pci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d87c403..e398228 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1385,53 +1385,33 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
- CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_of_init);
- 
--#ifdef CONFIG_ACPI
--static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
--{
--	int trigger, polarity;
--
--	if (!interrupt)
--		return 0;
--
--	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
--			: ACPI_LEVEL_SENSITIVE;
--
--	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
--			: ACPI_ACTIVE_HIGH;
--
--	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
--}
--
-+#ifdef CONFIG_ACPI_GTDT
- /* Initialize per-processor generic timer */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 7904d02..bd98674 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3363,7 +3363,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
+  *	Only architectures that have memory mapped IO functions defined
+  *	(and the PCI_IOBASE value defined) should call this function.
+  */
+-int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
++int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
  {
- 	int ret;
--	struct acpi_table_gtdt *gtdt;
- 
- 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
- 		pr_warn("already initialized, skipping\n");
- 		return -EINVAL;
- 	}
- 
--	gtdt = container_of(table, struct acpi_table_gtdt, header);
--
- 	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
- 
--	arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] =
--		map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
--		gtdt->secure_el1_flags);
-+	ret = acpi_gtdt_init(table, NULL);
-+	if (ret) {
-+		pr_err("Failed to init GTDT table.\n");
-+		return ret;
-+	}
- 
- 	arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI] =
--		map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
--		gtdt->non_secure_el1_flags);
-+		acpi_gtdt_map_ppi(ARCH_TIMER_PHYS_NONSECURE_PPI);
- 
- 	arch_timer_ppi[ARCH_TIMER_VIRT_PPI] =
--		map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
--		gtdt->virtual_timer_flags);
-+		acpi_gtdt_map_ppi(ARCH_TIMER_VIRT_PPI);
- 
- 	arch_timer_ppi[ARCH_TIMER_HYP_PPI] =
--		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
--		gtdt->non_secure_el2_flags);
-+		acpi_gtdt_map_ppi(ARCH_TIMER_HYP_PPI);
- 
- 	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
- 
-@@ -1452,7 +1432,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	}
- 
- 	/* Always-on capability */
--	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
-+	arch_timer_c3stop = acpi_gtdt_c3stop(arch_timer_uses_ppi);
- 
- 	/* Check for globally applicable workarounds */
- 	arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table);
+ #if defined(PCI_IOBASE) && defined(CONFIG_MMU)
+ 	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
 -- 
-1.9.1
+2.10.0
