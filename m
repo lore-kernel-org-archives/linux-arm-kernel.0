@@ -1,33 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 05:37:43 -0700
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.12
-In-Reply-To: <20170406090606.uc5aucn5ixinkdiu@lukather>
-References: <20170406090606.uc5aucn5ixinkdiu@lukather>
-Message-ID: <20170419123743.GS17004@localhost>
+From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
+Date: Wed, 19 Apr 2017 15:45:47 +0200
+Subject: [PATCH] ARM: configs: Update Aspeed with VMSPLIT_2G
+Message-ID: <1492609547-9494-1-git-send-email-clg@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 06, 2017 at 11:06:06AM +0200, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following changes for the next merge window.
-> 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.12
-> 
-> for you to fetch changes up to ec4279053a6434f685246e022be95d2a62f8c608:
-> 
->   arm64: allwinner: a64: add R_PIO pinctrl node (2017-04-04 17:45:09 +0200)
+This is required for the SMC controller mapping windows on the AHB
+Bus.
 
-Merged, thanks!
+Signed-off-by: C?dric Le Goater <clg@kaod.org>
+---
+ arch/arm/configs/aspeed_g4_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-
--Olof
+diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_g4_defconfig
+index 8bd9e6a91d41..aa0e942cd64e 100644
+--- a/arch/arm/configs/aspeed_g4_defconfig
++++ b/arch/arm/configs/aspeed_g4_defconfig
+@@ -25,6 +25,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_ASPEED=y
+ CONFIG_MACH_ASPEED_G4=y
++CONFIG_VMSPLIT_2G=y
+ CONFIG_AEABI=y
+ CONFIG_UACCESS_WITH_MEMCPY=y
+ CONFIG_SECCOMP=y
+-- 
+2.7.4
