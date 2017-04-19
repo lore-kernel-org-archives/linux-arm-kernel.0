@@ -1,25 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Apr 2017 16:23:25 -0500
-Subject: [PATCH 1/2] dt-bindings: hwrng: Add Mediatek hardware random
- generator bindings
-In-Reply-To: <1492067108-14748-2-git-send-email-sean.wang@mediatek.com>
-References: <1492067108-14748-1-git-send-email-sean.wang@mediatek.com>
- <1492067108-14748-2-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170419212325.y3t2vohmsuhet2xu@rob-hp-laptop>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Wed, 19 Apr 2017 16:48:50 -0400
+Subject: [PATCH v2 11/11] fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
+In-Reply-To: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
+References: <1492634930-10765-1-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1492634930-10765-12-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 03:05:07PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Document the devicetree bindings for Mediatek random number
-> generator which could be found on MT7623 SoC or other similar
-> Mediatek SoCs.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/rng/mtk-rng.txt | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rng/mtk-rng.txt
+From: Madalin Bucur <madalin.bucur@nxp.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+[Stuart: changed to use ARCH_LAYERSCAPE]
+Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+---
+ drivers/soc/fsl/qbman/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
+index 757033c..fb4e6bf 100644
+--- a/drivers/soc/fsl/qbman/Kconfig
++++ b/drivers/soc/fsl/qbman/Kconfig
+@@ -1,6 +1,6 @@
+ menuconfig FSL_DPAA
+ 	bool "Freescale DPAA 1.x support"
+-	depends on FSL_SOC_BOOKE
++	depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
+ 	select GENERIC_ALLOCATOR
+ 	help
+ 	  The Freescale Data Path Acceleration Architecture (DPAA) is a set of
+-- 
+2.7.4
