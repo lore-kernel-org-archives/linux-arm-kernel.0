@@ -1,45 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 07:25:03 -0700
-Subject: [PATCH 2/2] arm64: Fix power-of-ten vs. power-of-two prefixes in
- comments etc.
-In-Reply-To: <20170418141312.GD27592@e104818-lin.cambridge.arm.com>
-References: <1491207492.6020.8.camel@infradead.org>
- <20170404054144.GG16309@linaro.org>
- <e275e8c8b8d81d97b6a28b860820a27c.squirrel@twosheds.infradead.org>
- <20170404073504.GI16309@linaro.org>
- <1491291844.6218.25.camel@infradead.org>
- <20170404092604.GB14898@arm.com>
- <1492085938.20068.6.camel@infradead.org>
- <20170416231223.GA31693@verge.net.au>
- <CAMuHMdXTgCEesv3imtnzs6Mcnkp22KW_rx0Jiv3_zce7bR3AVQ@mail.gmail.com>
- <20170418141312.GD27592@e104818-lin.cambridge.arm.com>
-Message-ID: <20170419142503.GC12105@localhost>
+Date: Wed, 19 Apr 2017 07:06:39 -0700
+Subject: [GIT PULL] ARM: aspeed: defconfig for 4.12
+In-Reply-To: <CACPK8XdwSk8y7ZTnU=H3DA+_O1UOcQNvv57y-GzZA2z8-AOWdA@mail.gmail.com>
+References: <CACPK8XdwSk8y7ZTnU=H3DA+_O1UOcQNvv57y-GzZA2z8-AOWdA@mail.gmail.com>
+Message-ID: <20170419140639.GO29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 03:13:12PM +0100, Catalin Marinas wrote:
-> On Mon, Apr 17, 2017 at 01:54:49PM +0200, Geert Uytterhoeven wrote:
-> > On Mon, Apr 17, 2017 at 1:12 AM, Simon Horman <horms@verge.net.au> wrote:
-> > > On Thu, Apr 13, 2017 at 01:18:58PM +0100, David Woodhouse wrote:
-> > >> Less important than in user-visible messages, but still good practice as
-> > >> there's still no excuse for ARM64 code to look like it was written before
-> > >> 1996.
-> > >>
-> > >> Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
-> > >
-> > > Hi David,
-> > >
-> > > I'd be happy to take the Renesas portions of this change if they were
-> > > broken out into a separate patch. The reason I would prefer a separate
-> > > patch is to avoid the possibility of conflicts, even trivial ones.
-> > 
-> > s/possibility/reality/, unless this series goes in before v4.12-rc1.
+On Wed, Apr 12, 2017 at 12:29:10PM +0930, Joel Stanley wrote:
+> Hello Arnd, Olof,
 > 
-> Maybe the arm-soc guys can take both patches on top of the other series
-> they pull, in which case, for both patches:
+> These are the Aspeed defconfig changes for 4.12.
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+> tags/aspeed-4.12-defconfig
+> 
+> for you to fetch changes up to 97bae47812dbbd220e354bc9f15c3b3c8b481a86:
+> 
+>   ARM: configs: aspeed: Add new drivers (2017-04-07 15:29:50 +0930)
+> 
+> ----------------------------------------------------------------
+> Aspeed defconfig updates for 4.12
+> 
+> Add newly unstreamed drivers to the defconfigs for the Aspeed SoCs.
 
-Sure, please resend to arm at kernel.org with collected acks.
+I highly recommend upstreaming drivers instead of unstreaming them. :-)
 
--Olo
+> The defconfigs are reworked to be useful for development and testing
+> of OpenBMC on these systems.
+
+Merged, thanks!
+
+
+-Olof
