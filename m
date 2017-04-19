@@ -1,72 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 22:31:39 +0900
-Subject: [PATCH v2 1/6] arm64: dts: Add symlinks for cros-ec-keyboard and
- cros-ec-sbs
-In-Reply-To: <2579212.374vCSe9xi@phil>
-References: <20170210010521.78872-1-briannorris@chromium.org>
- <1529949.5djtX72aeJ@phil>
- <CAOesGMirj2j5P7_Ri4CSCux+O3hH_wxvrra7-p33AdXO4Ej5Hg@mail.gmail.com>
- <2579212.374vCSe9xi@phil>
-Message-ID: <CAOesGMhmX4pXpKpxhZLGUXFpFEba1qJM7CdK8GzpKmdSab1img@mail.gmail.com>
+From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
+Date: Wed, 19 Apr 2017 15:43:15 +0200
+Subject: [PATCH] ARM: dts: aspeed-g4: fix AHB window size of the SMC
+ controllers
+Message-ID: <1492609395-9151-1-git-send-email-clg@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 10:25 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Mittwoch, 19. April 2017, 21:54:09 CEST schrieb Olof Johansson:
->> Hi,
->>
->> On Tue, Feb 28, 2017 at 3:20 AM, Heiko Stuebner <heiko@sntech.de> wrote:
->> > Hi Olof,
->> >
->> > Am Dienstag, 21. Februar 2017, 15:47:31 CET schrieb Olof Johansson:
->> >> On Thu, Feb 9, 2017 at 5:05 PM, Brian Norris <briannorris@chromium.org> wrote:
->> >> > From: Douglas Anderson <dianders@chromium.org>
->> >> >
->> >> > We'd like to be able to use the cros-ec-keyboard.dtsi and
->> >> > cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
->> >> > in the arm/boot/dts directory.
->> >> >
->> >> > Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
->> >> > vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
->> >> > a symlink.  Note that in this case we put the files in a new
->> >> > "include/common" directory since these snippets may need to be
->> >> > referenced by dts files in many different subdirectories.
->> >>
->> >> I'd rather have something like this:
->> >>
->> >> https://marc.info/?m=147547436324674&w=2
->> >>
->> >> Instead of having everybody move things over. I.e. make it easy to
->> >> refer to the arm version from arm64 instead of creating a "common"
->> >> layer inbetween.
->> >
->> > just so it gets noticed, I've done and tested [0], which hopefully should
->> > implement your suggestions above.
->> >
->> > If that looks ok, how do you want that picked up? Should I just include
->> > them in my regular rockchip branches or do you to pick them into some
->> > immutable branch, if other surprise-users turn up in time for 4.12?
->>
->> Sigh. I completely dropped the ball on this, and I didn't see it
->> included in any of your pull requests for 4.12 since I never actually
->> acked that approach.
->>
->> I've applied the patches onto a dt/include-paths stable branch, but
->> we're late for merging dependent code on top of it for 4.12.
->
-> Didn't you merge the patches into a branch already and the rk3399-gru
-> support on top of it?
->
-> Aka
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=shared/dt-symlinks
->
-> Which one of my previous pull requests was already based on.
+The window of the Aspeed AST2400 SMC Controllers to map chips on the
+AHB Bus has a 256MB size. The full window range is
 
-Yeah, ignore the above (the original branch is the one to use). I must
-be turning blind.
+    [ 0x20000000 - 0x2FFFFFFF ] for the FMC controller
+    [ 0x30000000 - 0x3FFFFFFF ] for the SPI controller
 
-Adding Maxime on Cc since I asked him to move over to the new include
-model post-rc1 for some of his stuff.
+This change requires CONFIG_VMSPLIT_2G to be set.
 
+Signed-off-by: C?dric Le Goater <clg@kaod.org>
+---
+ arch/arm/boot/dts/aspeed-g4.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
--Olof
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 4e3f055b365c..a7b6e04d5f1b 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -26,7 +26,7 @@
+ 
+ 		fmc: flash-controller at 1e620000 {
+ 			reg = < 0x1e620000 0x94
+-				0x20000000 0x02000000 >;
++				0x20000000 0x10000000 >;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2400-fmc";
+@@ -41,7 +41,7 @@
+ 
+ 		spi: flash-controller at 1e630000 {
+ 			reg = < 0x1e630000 0x18
+-				0x30000000 0x02000000 >;
++				0x30000000 0x10000000 >;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			compatible = "aspeed,ast2400-spi";
+-- 
+2.7.4
