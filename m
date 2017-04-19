@@ -1,53 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 19 Apr 2017 16:42:57 +0200
-Subject: [PATCH 4.9 41/69] irqchip/irq-imx-gpcv2: Fix spinlock initialization
-In-Reply-To: <20170419141616.919951169@linuxfoundation.org>
-References: <20170419141616.919951169@linuxfoundation.org>
-Message-ID: <20170419141618.632255623@linuxfoundation.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 19 Apr 2017 15:58:53 +0100
+Subject: [GIT PULL] ARM: hisi: soc updates for v4.12
+In-Reply-To: <20170419140302.GL29219@localhost>
+References: <58EBA936.3020404@hisilicon.com> <20170419140302.GL29219@localhost>
+Message-ID: <58F77B2D.5060506@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.9-stable review patch.  If anyone has any objections, please let me know.
+Hi Olof,
 
-------------------
+On 2017/4/19 15:03, Olof Johansson wrote:
+> On Mon, Apr 10, 2017 at 04:48:06PM +0100, Wei Xu wrote:
+>> Hi Arnd, Hi Olof, Hi Kevin,
+>>
+>> Please help to pull the following changes.
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>>
+>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>>
+>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.12
+>>
+>> for you to fetch changes up to f147140c7f0350d363c10aeb51b78b65b2425266:
+>>
+>>   ARM: hisi: fix error return code in hip04_smp_init() (2017-03-28 15:30:54 +0100)
+>>
+>> ----------------------------------------------------------------
+>> ARM: mach-hisi: Hisilicon SoC updates for 4.12
+>>
+>> - Fix the error return code in hip04_smp_init
+>>
+>> ----------------------------------------------------------------
+>> Wei Yongjun (1):
+>>       ARM: hisi: fix error return code in hip04_smp_init()
+>>
+>>  arch/arm/mach-hisi/platmcpm.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+> 
+> Merged, thanks!
 
-From: Tyler Baker <tyler.baker@linaro.org>
+Thanks!
 
-commit 75eb5e1e7b4edbc8e8f930de59004d21cb46961f upstream.
+BR,
+Wei
 
-The raw_spinlock in the IMX GPCV2 interupt chip is not initialized before
-usage. That results in a lockdep splat:
-
-  INFO: trying to register non-static key.
-  the code is fine but needs lockdep annotation.
-  turning off the locking correctness validator.
-
-Add the missing raw_spin_lock_init() to the setup code.
-
-Fixes: e324c4dc4a59 ("irqchip/imx-gpcv2: IMX GPCv2 driver for wakeup sources")
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: jason at lakedaemon.net
-Cc: marc.zyngier at arm.com
-Cc: shawnguo at kernel.org
-Cc: andrew.smirnov at gmail.com
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/20170413222731.5917-1-tyler.baker at linaro.org
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/irqchip/irq-imx-gpcv2.c |    2 ++
- 1 file changed, 2 insertions(+)
-
---- a/drivers/irqchip/irq-imx-gpcv2.c
-+++ b/drivers/irqchip/irq-imx-gpcv2.c
-@@ -230,6 +230,8 @@ static int __init imx_gpcv2_irqchip_init
- 		return -ENOMEM;
- 	}
- 
-+	raw_spin_lock_init(&cd->rlock);
-+
- 	cd->gpc_base = of_iomap(node, 0);
- 	if (!cd->gpc_base) {
- 		pr_err("fsl-gpcv2: unable to map gpc registers\n");
+> 
+> 
+> -Olof
+> 
+> .
+> 
