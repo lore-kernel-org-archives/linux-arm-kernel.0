@@ -1,29 +1,31 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Apr 2017 22:22:02 +0200
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-nitrogen6_max: fix rv4162 compatible
-Message-ID: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
+Date: Wed, 19 Apr 2017 22:22:04 +0200
+Subject: [PATCH 3/3] ARM: dts: imx7d-nitrogen7: fix rv4162 compatible
+In-Reply-To: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
+References: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170419202204.7689-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rv4162 vendor is microcrystal, not ST.
+The rv4162 compatbile string is missing the vendor part, add it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 2 +-
+ arch/arm/boot/dts/imx7d-nitrogen7.dts | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-index bad3c9f9eeac..b63134e3b51a 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-@@ -408,7 +408,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+index 5d98e2b5d54b..a44f992051ac 100644
+--- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
++++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+@@ -279,7 +279,7 @@
+ 	status = "okay";
  
- 	rtc: rtc at 68 {
--		compatible = "st,rv4162";
+ 	rtc at 68 {
+-		compatible = "rv4162";
 +		compatible = "microcrystal,rv4162";
  		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_rv4162>;
+ 		pinctrl-0 = <&pinctrl_i2c2_rv4162>;
  		reg = <0x68>;
 -- 
 2.11.0
