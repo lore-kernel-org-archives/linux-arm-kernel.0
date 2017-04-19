@@ -1,152 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Apr 2017 17:44:23 +0100
-Subject: [PATCH 06/16] clocksource: arm_arch_timer: rework PPI selection
-In-Reply-To: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1492620273-30037-7-git-send-email-mark.rutland@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Apr 2017 19:00:19 +0200
+Subject: [PATCH] [media] exynos_hdmi: improve MEDIA_CEC_NOTIFIER dependency
+Message-ID: <20170419170030.2869578-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+When the media subsystem is built as a loadable module, a built-in
+DRM driver cannot use the cec notifiers:
 
-Currently, the arch timer driver uses ARCH_TIMER_PHYS_SECURE_PPI to mean
-the driver will use the secure PPI *and* potentially also use the
-non-secure PPI. This is somewhat confusing.
+drivers/gpu/drm/exynos/exynos_hdmi.o: In function `hdmi_get_modes':
+exynos_hdmi.c:(.text.hdmi_get_modes+0x80): undefined reference to `cec_notifier_set_phys_addr_from_edid'
+drivers/gpu/drm/exynos/exynos_hdmi.o: In function `hdmi_remove':
+exynos_hdmi.c:(.text.hdmi_remove+0x24): undefined reference to `cec_notifier_set_phys_addr'
+exynos_hdmi.c:(.text.hdmi_remove+0x38): undefined reference to `cec_notifier_put'
 
-For arm64 it never makes sense to use the secure PPI, but we do anyway,
-inheriting this behaviour from 32-bit arm. For ACPI, we may not even
-have a valid secure PPI, so we need to be able to only request the
-non-secure PPI.
+This adds a Kconfig dependency to enforce the HDMI driver to also
+be a loadable module in this case.
 
-To that end, this patch reworks the timer driver so that we can request
-the non-secure PPI alone. The PPI selection is split out into a new
-function, arch_timer_select_ppi(), and verification of the selected PPI
-is shifted out to callers (as DT may select the PPI by other means and
-must handle this anyway).
-
-We now consistently use arch_timer_has_nonsecure_ppi() to determine
-whether we must manage a non-secure PPI *in addition* to a secure PPI.
-When we only have a non-secure PPI, this returns false.
-
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-[Mark: reword commit message]
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 278c811c5d05 ("[media] exynos_hdmi: add CEC notifier support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/clocksource/arm_arch_timer.c | 77 +++++++++++++++++++++---------------
- 1 file changed, 46 insertions(+), 31 deletions(-)
+ drivers/gpu/drm/exynos/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 15059c9..94de018 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -992,7 +992,7 @@ static int __init arch_timer_register(void)
- 	case ARCH_TIMER_PHYS_NONSECURE_PPI:
- 		err = request_percpu_irq(ppi, arch_timer_handler_phys,
- 					 "arch_timer", arch_timer_evt);
--		if (!err && arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]) {
-+		if (!err && arch_timer_has_nonsecure_ppi()) {
- 			ppi = arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI];
- 			err = request_percpu_irq(ppi, arch_timer_handler_phys,
- 						 "arch_timer", arch_timer_evt);
-@@ -1114,39 +1114,41 @@ static int __init arch_timer_common_init(void)
- 	return arch_timer_arch_init();
- }
- 
--static int __init arch_timer_init(void)
-+/**
-+ * arch_timer_select_ppi() - Select suitable PPI for the current system.
-+ *
-+ * If HYP mode is available, we know that the physical timer
-+ * has been configured to be accessible from PL1. Use it, so
-+ * that a guest can use the virtual timer instead.
-+ *
-+ * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
-+ * accesses to CNTP_*_EL1 registers are silently redirected to
-+ * their CNTHP_*_EL2 counterparts, and use a different PPI
-+ * number.
-+ *
-+ * If no interrupt provided for virtual timer, we'll have to
-+ * stick to the physical timer. It'd better be accessible...
-+ * For arm64 we never use the secure interrupt.
-+ *
-+ * Return: a suitable PPI type for the current system.
-+ */
-+static enum arch_timer_ppi_nr __init arch_timer_select_ppi(void)
- {
--	int ret;
--	/*
--	 * If HYP mode is available, we know that the physical timer
--	 * has been configured to be accessible from PL1. Use it, so
--	 * that a guest can use the virtual timer instead.
--	 *
--	 * If no interrupt provided for virtual timer, we'll have to
--	 * stick to the physical timer. It'd better be accessible...
--	 *
--	 * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
--	 * accesses to CNTP_*_EL1 registers are silently redirected to
--	 * their CNTHP_*_EL2 counterparts, and use a different PPI
--	 * number.
--	 */
--	if (is_hyp_mode_available() || !arch_timer_ppi[ARCH_TIMER_VIRT_PPI]) {
--		bool has_ppi;
-+	if (is_kernel_in_hyp_mode())
-+		return ARCH_TIMER_HYP_PPI;
- 
--		if (is_kernel_in_hyp_mode()) {
--			arch_timer_uses_ppi = ARCH_TIMER_HYP_PPI;
--			has_ppi = !!arch_timer_ppi[ARCH_TIMER_HYP_PPI];
--		} else {
--			arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
--			has_ppi = (!!arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] ||
--				   !!arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI]);
--		}
-+	if (!is_hyp_mode_available() && arch_timer_ppi[ARCH_TIMER_VIRT_PPI])
-+		return ARCH_TIMER_VIRT_PPI;
- 
--		if (!has_ppi) {
--			pr_warn("No interrupt available, giving up\n");
--			return -EINVAL;
--		}
--	}
-+	if (IS_ENABLED(CONFIG_ARM64))
-+		return ARCH_TIMER_PHYS_NONSECURE_PPI;
-+
-+	return ARCH_TIMER_PHYS_SECURE_PPI;
-+}
-+
-+static int __init arch_timer_init(void)
-+{
-+	int ret;
- 
- 	ret = arch_timer_register();
- 	if (ret)
-@@ -1188,6 +1190,13 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	if (IS_ENABLED(CONFIG_ARM) &&
- 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
- 		arch_timer_uses_ppi = ARCH_TIMER_PHYS_SECURE_PPI;
-+	else
-+		arch_timer_uses_ppi = arch_timer_select_ppi();
-+
-+	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
-+		pr_err("No interrupt available, giving up\n");
-+		return -EINVAL;
-+	}
- 
- 	/* On some systems, the counter stops ticking when in suspend. */
- 	arch_counter_suspend_stop = of_property_read_bool(np,
-@@ -1333,6 +1342,12 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Get the frequency from CNTFRQ */
- 	arch_timer_detect_rate(NULL, NULL);
- 
-+	arch_timer_uses_ppi = arch_timer_select_ppi();
-+	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
-+		pr_err("No interrupt available, giving up\n");
-+		return -EINVAL;
-+	}
-+
- 	/* Always-on capability */
- 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
- 
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index 1d185347c64c..65ba292f8e40 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -1,6 +1,7 @@
+ config DRM_EXYNOS
+ 	tristate "DRM Support for Samsung SoC EXYNOS Series"
+ 	depends on OF && DRM && (ARCH_S3C64XX || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
++	depends on (MEDIA_SUPPORT && MEDIA_CEC_NOTIFIER) || !MEDIA_CEC_NOTIFIER
+ 	select DRM_KMS_HELPER
+ 	select VIDEOMODE_HELPERS
+ 	help
 -- 
-1.9.1
+2.9.0
