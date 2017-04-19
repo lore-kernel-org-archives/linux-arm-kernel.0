@@ -1,17 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Apr 2017 16:57:08 -0500
-Subject: [PATCH 2/4] net: macb: Add tsu_clk to device tree
-In-Reply-To: <1492090686-14778-1-git-send-email-rafalo@cadence.com>
-References: <1492090439-11793-1-git-send-email-rafalo@cadence.com>
- <1492090686-14778-1-git-send-email-rafalo@cadence.com>
-Message-ID: <20170419215708.uw4zvzlw4ucpn3bc@rob-hp-laptop>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 20 Apr 2017 00:06:03 +0200
+Subject: [PATCH V3] PM / OPP: Use - instead of @ for DT entries
+In-Reply-To: <20170419142215.GA12105@localhost>
+References: <734c5d5a66ef8a5505f368fc68a8ab9c02d710f9.1492492253.git.viresh.kumar@linaro.org>
+ <20170419142215.GA12105@localhost>
+Message-ID: <3142028.bncGUUQ4qB@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 02:38:06PM +0100, Rafal Ozieblo wrote:
-> Signed-off-by: Rafal Ozieblo <rafalo@cadence.com>
-> ---
->  Documentation/devicetree/bindings/net/macb.txt | 1 +
->  1 file changed, 1 insertion(+)
+On Wednesday, April 19, 2017 07:22:15 AM Olof Johansson wrote:
+> Hi Viresh,
+> 
+> On Tue, Apr 18, 2017 at 10:44:50AM +0530, Viresh Kumar wrote:
+> > Compiling the DT file with W=1, DTC warns like follows:
+> > 
+> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> > unit name, but no reg property
+> > 
+> > Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> > "reg" property.
+> > 
+> > Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com> (sunxi)
+> > Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com> (uniphier)
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+> We've already turned down other patches that does this in a sweeping manner
+> like this, since they tend to be conflict prone with other DT changes.
+> 
+> Please split per platform and merge with each maintainer.
 
-Acked-by: Rob Herring <robh@kernel.org>
+OK
+
+So I'm assuming that you guys will take care of this going forward.
+
+Thanks,
+Rafael
