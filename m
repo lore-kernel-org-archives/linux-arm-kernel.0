@@ -1,41 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Apr 2017 06:22:00 -0700
-Subject: [GIT PULL 2/2] Rockchip dts64 updates for 4.12 part2
-In-Reply-To: <1589941.s7YUBqhHWQ@phil>
-References: <2927359.zDIxDMQbjs@phil>
- <1589941.s7YUBqhHWQ@phil>
-Message-ID: <20170419132200.GH29219@localhost>
+Date: Wed, 19 Apr 2017 06:22:57 -0700
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.12
+In-Reply-To: <1491835076-1995-4-git-send-email-shawnguo@kernel.org>
+References: <1491835076-1995-1-git-send-email-shawnguo@kernel.org>
+ <1491835076-1995-4-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170419132257.GI29219@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 11:56:37AM +0200, Heiko Stuebner wrote:
-> The following changes since commit 41b464ef10219e45513d1bcaddacd47ce0bd6136:
+On Mon, Apr 10, 2017 at 10:37:55PM +0800, Shawn Guo wrote:
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
->   arm64: dts: rockchip: fix PCIe domain number for rk3399 (2017-03-22 17:50:09 +0100)
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts64-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.12
 > 
-> for you to fetch changes up to 2f513bd9eac1a2642b40387d4f89c3987641e59b:
+> for you to fetch changes up to 6678254bb4a46dc47620f993a4b71480a3c56ee4:
 > 
->   arm64: dts: rockchip: fix the memory size of PX5 Evaluation board (2017-04-07 22:29:11 +0200)
-> 
-> ----------------------------------------------------------------
-> Basic support for new rk3328, a 4-core Cortex-A53 soc and a fix for the
-> default memory definition on the px5 eval board. While the bootloader
-> should already override it with the actual amount, it's better to not
-> carry around wrong values.
+>   dt-bindings: arm: Add entry for FSL LS1088A RDB, QDS boards (2017-04-04 20:57:27 +0800)
 > 
 > ----------------------------------------------------------------
-> Andy Yan (1):
->       arm64: dts: rockchip: fix the memory size of PX5 Evaluation board
-> 
-> Liang Chen (4):
->       dt-bindings: add binding for rk3328-grf
->       arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
->       dt-bindings: document rockchip rk3328-evb board
->       arm64: dts: rockchip: add RK3328 eavluation board devicetree
+> Freescale arm64 device tree updates for 4.12:
+>  - Add support of LS2088A SoC, which is a derivative of existing
+>    LS2080A SoC, and the major difference is on ARM cores.
+>  - Add support of LS1088A SoC which includes eight Cortex-A53 cores
+>    with 32 KB L1 D-cache and I-cache respectively.
+>  - Add crypto and thermal device support for LS1012A platform.
+>  - Add ECC register region for SATA device on LS1012A, LS1043A and
+>    LS1046A platforms.
 
 Merged, thanks!
 
