@@ -1,86 +1,62 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Thu, 20 Apr 2017 06:44:56 +0100
-Subject: [PATCH v3 2/5] ARM: dts: rockchip: add ARM Mali GPU node for
- rk3288
-In-Reply-To: <5403013.fQWx48MQOq@phil>
-References: <cover.1492588180.git.guillaume.tucker@collabora.com>
- <f6f127efb44fb1012f18c483fa522918f8f82d7c.1492588180.git.guillaume.tucker@collabora.com>
- <5403013.fQWx48MQOq@phil>
-Message-ID: <319a2a72-ca25-08d7-68dc-7eae74f1a622@collabora.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 20 Apr 2017 11:14:11 +0530
+Subject: [PATCH V4 0/7] PM / OPP: Use - instead of @ for DT entries
+Message-ID: <cover.1492666725.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Compiling the DT file with W=1, DTC warns like follows:
 
-On 19/04/17 09:59, Heiko Stuebner wrote:
-> Am Mittwoch, 19. April 2017, 09:06:18 CEST schrieb Guillaume Tucker:
->> Add Mali GPU device tree node for the rk3288 SoC, with devfreq
->> opp table.
->>
->> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
->> ---
->>  arch/arm/boot/dts/rk3288.dtsi | 22 ++++++++++++++++++++++
->>  1 file changed, 22 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
->> index df8a0dbe9d91..187eed528f83 100644
->> --- a/arch/arm/boot/dts/rk3288.dtsi
->> +++ b/arch/arm/boot/dts/rk3288.dtsi
->> @@ -43,6 +43,7 @@
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include <dt-bindings/pinctrl/rockchip.h>
->>  #include <dt-bindings/clock/rk3288-cru.h>
->> +#include <dt-bindings/power/rk3288-power.h>
->>  #include <dt-bindings/thermal/thermal.h>
->>  #include <dt-bindings/power/rk3288-power.h>
->>  #include <dt-bindings/soc/rockchip,boot-mode.h>
->> @@ -227,6 +228,27 @@
->>  		ports = <&vopl_out>, <&vopb_out>;
->>  	};
->>
->> +	gpu: mali at ffa30000 {
->
-> please sort nodes by address. ffa30000 should be placed below hdmi at ff980000
-> and above qos at ffaa0000 .
+Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+unit name, but no reg property
 
-Sure, will fix that in v4.
+Fix this by replacing '@' with '-' as the OPP nodes will never have a
+"reg" property.
 
->> +		compatible = "arm,mali-t760", "arm,mali-midgard";
->
-> As indicated before I don't trust that a generic binding will work for
-> everything, so I would feel safer if we had a "rockchip,rk3288-mali" in
-> front for future purposes, making it a
->
-> 		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
+This has been sent separately as a single patch earlier, and Olof
+suggested to split it per-platform and get it merged via platform
+specific trees. Please get these applied to your trees guys and the rest
+can go via arm-soc.
 
-OK, sorry I overlooked this part.  I'll add it in v4 with a
-vendor compatible string in the binding documentation.
+V3->V4:
+- split it per platform
 
->> +		reg = <0xffa30000 0x10000>;
->> +		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
->> +			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
->> +			     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
->> +		interrupt-names = "job", "mmu", "gpu";
->> +		clocks = <&cru ACLK_GPU>;
->> +		operating-points = <
->> +			/* KHz uV */
->> +			100000 950000
->> +			200000 950000
->> +			300000 1000000
->> +			400000 1100000
->> +			500000 1200000
->> +			600000 1250000
->> +		>;
->
-> Wasn't there a wish for opp-v2 in a previous version?
+V2->V3:
+- Rebased over 4.11-rc7 and fixed a merge conflict for sun8i.
 
-Well it wasn't entirely clear to me in Rob's email whether it was
-necessary to use opp-v2 now or rather if it would be a potential
-option whenever opp-v2 was needed.  If operating-points (v1) are
-being deprecated then I can change that in my next patch v4.
-Using operating-points-v2 with the Mali driver works as far as I
-can tell on rk3288 so that's not an issue.
+--
+Viresh
 
-Thanks,
-Guillaume
+Viresh Kumar (7):
+  PM / OPP: Use - instead of @ for DT entries
+  ARM: TI: Use - instead of @ for DT OPP entries
+  ARM: exynos: Use - instead of @ for DT OPP entries
+  ARM: pxa: Use - instead of @ for DT OPP entries
+  ARM: sun8i: Use - instead of @ for DT OPP entries
+  ARM: uniphier: Use - instead of @ for DT OPP entries
+  ARM: ZTE: Use - instead of @ for DT OPP entries
+
+ .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 20 +++----
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
+ Documentation/devicetree/bindings/opp/opp.txt      | 38 ++++++-------
+ arch/arm/boot/dts/am4372.dtsi                      | 10 ++--
+ arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
+ arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
+ arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
+ arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
+ arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
+ arch/arm/boot/dts/pxa25x.dtsi                      |  8 +--
+ arch/arm/boot/dts/pxa27x.dtsi                      | 14 ++---
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |  6 +-
+ arch/arm/boot/dts/uniphier-pro5.dtsi               | 32 +++++------
+ arch/arm/boot/dts/uniphier-pxs2.dtsi               | 16 +++---
+ arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi     | 48 ++++++++--------
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 50 ++++++++--------
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 14 ++---
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 32 +++++------
+ arch/arm64/boot/dts/zte/zx296718.dtsi              | 10 ++--
+ 20 files changed, 294 insertions(+), 294 deletions(-)
+
+-- 
+2.12.0.432.g71c3a4f4ba37
