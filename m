@@ -1,102 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Apr 2017 11:51:53 +0100
-Subject: [PATCH v4 02/21] linux/io.h: add PCI config space remap interface
-In-Reply-To: <20170419164913.19674-3-lorenzo.pieralisi@arm.com>
-References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
- <20170419164913.19674-3-lorenzo.pieralisi@arm.com>
-Message-ID: <20170420105153.GA9741@red-moon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 20 Apr 2017 16:25:04 +0530
+Subject: [PATCH V5 0/7] PM / OPP: Use - instead of @ for DT entries
+Message-ID: <cover.1492685450.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Michael]
+Compiling the DT file with W=1, DTC warns like follows:
 
-On Wed, Apr 19, 2017 at 05:48:51PM +0100, Lorenzo Pieralisi wrote:
-> The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-> Posting") mandate non-posted configuration transactions. As further
-> highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-> Considerations for the Enhanced Configuration Access Mechanism"),
-> through ECAM and ECAM-derivative configuration mechanism, the memory
-> mapped transactions from the host CPU into Configuration Requests on the
-> PCI express fabric may create ordering problems for software because
-> writes to memory address are typically posted transactions (unless the
-> architecture can enforce through virtual address mapping non-posted
-> write transactions behaviour) but writes to Configuration Space are not
-> posted on the PCI express fabric.
-> 
-> Current DT and ACPI host bridge controllers map PCI configuration space
-> (ECAM and ECAM-derivative) into the virtual address space through
-> ioremap() calls, that are non-cacheable device accesses on most
-> architectures, but may provide "bufferable" or "posted" write semantics
-> in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-> to be buffered in the bus connecting the host CPU to the PCI fabric;
-> this behaviour, as underlined in the PCIe specifications, may trigger
-> transactions ordering rules and must be prevented.
-> 
-> Introduce a new generic and explicit API to create a memory
-> mapping for ECAM and ECAM-derivative config space area that
-> defaults to ioremap_nocache() (which should provide a sane default
-> behaviour) but still allowing architectures on which ioremap_nocache()
-> results in posted write transactions to override the function
-> call with an arch specific implementation that complies with
-> the PCI specifications for configuration transactions.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  include/linux/io.h | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/include/linux/io.h b/include/linux/io.h
-> index 82ef36e..3934aba 100644
-> --- a/include/linux/io.h
-> +++ b/include/linux/io.h
-> @@ -91,6 +91,25 @@ void devm_memunmap(struct device *dev, void *addr);
->  void *__devm_memremap_pages(struct device *dev, struct resource *res);
->  
->  /*
-> + * The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-> + * Posting") mandate non-posted configuration transactions. There is
-> + * no ioremap API in the kernel that can guarantee non-posted write
-> + * semantics across arches so provide a default implementation for
-> + * mapping PCI config space that defaults to ioremap_nocache(); arches
-> + * should override it if they have memory mapping implementations that
-> + * guarantee non-posted writes semantics to make the memory mapping
-> + * compliant with the PCI specification.
-> + */
-> +#ifndef pci_remap_cfgspace
-> +#define pci_remap_cfgspace pci_remap_cfgspace
-> +static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
-> +					       size_t size)
-> +{
-> +	return ioremap_nocache(offset, size);
-> +}
-> +#endif
-> +
-> +/*
+Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+unit name, but no reg property
 
-As an heads-up, this patch strictly depends on:
+Fix this by replacing '@' with '-' as the OPP nodes will never have a
+"reg" property.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/arch/powerpc/include/asm/io.h?id=590c369e7ecc00be736be39ae0c62d1b5d563a51
+This is rebased over arm-soc/for-next:
+	commit 6f714927c553 ("ARM: SoC: Document merges")
 
-to go upstream first, otherwise we would break powerpc compilation
-(owing to powerpc including linux/io.h before ioremap_nocache() is
-defined in arch/powerpc/include/asm/io.h).
+Platform maintainers shall apply patches touching their code.
 
-If we want to decouple them I must drop the static inline and make
-it a #define, it is not ideal but we must be aware of this, I really
-want to prevent breakage if we go ahead with this set (and -next can
-hide the issue).
+V4->V5:
+- Rebased on arm-soc/for-next. Couldn't do that on linux-next/master as
+  it still had the V3 patch via the PM tree (which will be dropped
+  today).
+- Some more OPP entries got the update as they were present only in
+  next.
 
-Thanks,
-Lorenzo
+V3->V4:
+- split it per platform
 
->   * Some systems do not have legacy ISA devices.
->   * /dev/port is not a valid interface on these systems.
->   * So for those archs, <asm/io.h> should define the following symbol.
-> -- 
-> 2.10.0
-> 
+V2->V3:
+- Rebased over 4.11-rc7 and fixed a merge conflict for sun8i.
+
+--
+Viresh
+
+Viresh Kumar (7):
+  PM / OPP: Use - instead of @ for DT entries
+  ARM: TI: Use - instead of @ for DT OPP entries
+  ARM: exynos: Use - instead of @ for DT OPP entries
+  ARM: pxa: Use - instead of @ for DT OPP entries
+  ARM: sun8i: Use - instead of @ for DT OPP entries
+  ARM: uniphier: Use - instead of @ for DT OPP entries
+  ARM: ZTE: Use - instead of @ for DT OPP entries
+
+ .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 20 +++----
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
+ Documentation/devicetree/bindings/opp/opp.txt      | 38 ++++++-------
+ arch/arm/boot/dts/am335x-boneblack.dts             |  2 +-
+ arch/arm/boot/dts/am33xx.dtsi                      | 20 +++----
+ arch/arm/boot/dts/am4372.dtsi                      | 10 ++--
+ arch/arm/boot/dts/dra7.dtsi                        |  4 +-
+ arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
+ arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
+ arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
+ arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
+ arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
+ arch/arm/boot/dts/pxa25x.dtsi                      |  8 +--
+ arch/arm/boot/dts/pxa27x.dtsi                      | 14 ++---
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  4 +-
+ arch/arm/boot/dts/sun8i-a33.dtsi                   | 30 +++++-----
+ arch/arm/boot/dts/uniphier-pro5.dtsi               | 32 +++++------
+ arch/arm/boot/dts/uniphier-pxs2.dtsi               | 16 +++---
+ arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi     | 48 ++++++++--------
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 50 ++++++++--------
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 14 ++---
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 32 +++++------
+ arch/arm64/boot/dts/zte/zx296718.dtsi              | 10 ++--
+ 24 files changed, 321 insertions(+), 321 deletions(-)
+
+-- 
+2.12.0.432.g71c3a4f4ba37
