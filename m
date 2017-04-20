@@ -1,158 +1,111 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 20 Apr 2017 10:34:27 +1000
-Subject: linux-next: manual merge of the pm tree with the arm-soc tree
-Message-ID: <20170420103427.62fbf195@canb.auug.org.au>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 19 Apr 2017 17:36:56 -0700
+Subject: [v4.9-rt PATCH v2] ARM: mm: remove tasklist locking from
+ update_sections_early()
+In-Reply-To: <20170419201047.31578-1-grygorii.strashko@ti.com>
+References: <20170419201047.31578-1-grygorii.strashko@ti.com>
+Message-ID: <46862ce1-77d2-8e82-8820-64ec47957844@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On 04/19/2017 01:10 PM, Grygorii Strashko wrote:
+> The below backtrace can be observed on -rt kernel with CONFIG_DEBUG_RODATA
+> option enabled:
+> 
+>   BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:993
+>   in_atomic(): 1, irqs_disabled(): 128, pid: 14, name: migration/0
+>   1 lock held by migration/0/14:
+>    #0:  (tasklist_lock){+.+...}, at: [<c01183e8>] update_sections_early+0x24/0xdc
+>   irq event stamp: 38
+>   hardirqs last  enabled at (37): [<c08f6f7c>] _raw_spin_unlock_irq+0x24/0x68
+>   hardirqs last disabled at (38): [<c01fdfe8>] multi_cpu_stop+0xd8/0x138
+>   softirqs last  enabled at (0): [<c01303ec>] copy_process.part.5+0x238/0x1b64
+>   softirqs last disabled at (0): [<  (null)>]   (null)
+>   Preemption disabled at: [<c01fe244>] cpu_stopper_thread+0x80/0x10c
+>   CPU: 0 PID: 14 Comm: migration/0 Not tainted 4.9.21-rt16-02220-g49e319c #15
+>   Hardware name: Generic DRA74X (Flattened Device Tree)
+>   [<c0112014>] (unwind_backtrace) from [<c010d370>] (show_stack+0x10/0x14)
+>   [<c010d370>] (show_stack) from [<c049beb8>] (dump_stack+0xa8/0xd4)
+>   [<c049beb8>] (dump_stack) from [<c01631a0>] (___might_sleep+0x1bc/0x2ac)
+>   [<c01631a0>] (___might_sleep) from [<c08f7244>] (__rt_spin_lock+0x1c/0x30)
+>   [<c08f7244>] (__rt_spin_lock) from [<c08f77a4>] (rt_read_lock+0x54/0x68)
+>   [<c08f77a4>] (rt_read_lock) from [<c01183e8>] (update_sections_early+0x24/0xdc)
+>   [<c01183e8>] (update_sections_early) from [<c01184b0>] (__fix_kernmem_perms+0x10/0x1c)
+>   [<c01184b0>] (__fix_kernmem_perms) from [<c01fe010>] (multi_cpu_stop+0x100/0x138)
+>   [<c01fe010>] (multi_cpu_stop) from [<c01fe24c>] (cpu_stopper_thread+0x88/0x10c)
+>   [<c01fe24c>] (cpu_stopper_thread) from [<c015edc4>] (smpboot_thread_fn+0x174/0x31c)
+>   [<c015edc4>] (smpboot_thread_fn) from [<c015a988>] (kthread+0xf0/0x108)
+>   [<c015a988>] (kthread) from [<c0108818>] (ret_from_fork+0x14/0x3c)
+>   Freeing unused kernel memory: 1024K (c0d00000 - c0e00000)
+> 
+> The stop_machine() is called with cpus = NULL from fix_kernmem_perms() and
+> mark_rodata_ro() which means only one CPU will execute
+> update_sections_early() while all other CPUs will spin and wait. Hence,
+> it's safe to remove tasklist locking from update_sections_early(). As part
+> of this change also mark functions which are local to this module as
+> static
+Acked-by: Laura Abbott <labbott@redhat.com>
 
-Today's linux-next merge of the pm tree got a conflict in:
-
-  arch/arm/boot/dts/sun8i-a33.dtsi
-
-between commits:
-
-  66c373228dc4 ("ARM: sun8i: a33: Add the Mali OPPs")
-  e6bd37627e92 ("ARM: sun8i: a33: add all operating points")
-
-from the arm-soc tree and commit:
-
-  d87bd1942058 ("PM / OPP: Use - instead of @ for DT entries")
-
-from the pm tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
-I suspect that arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts may need
-some fixups as well.
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/boot/dts/sun8i-a33.dtsi
-index 013978259372,a2c555d6475c..000000000000
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@@ -50,73 -49,19 +50,73 @@@
-  		compatible = "operating-points-v2";
-  		opp-shared;
-  
-- 		opp at 120000000 {
-++		opp-120000000 {
- +			opp-hz = /bits/ 64 <120000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 240000000 {
-++		opp-240000000 {
- +			opp-hz = /bits/ 64 <240000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 312000000 {
-++		opp-312000000 {
- +			opp-hz = /bits/ 64 <312000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 408000000 {
-++		opp-408000000 {
- +			opp-hz = /bits/ 64 <408000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 480000000 {
-++		opp-480000000 {
- +			opp-hz = /bits/ 64 <480000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 504000000 {
-++		opp-504000000 {
- +			opp-hz = /bits/ 64 <504000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 600000000 {
-++		opp-600000000 {
- +			opp-hz = /bits/ 64 <600000000>;
- +			opp-microvolt = <1040000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 648000000 {
-+ 		opp-648000000 {
-  			opp-hz = /bits/ 64 <648000000>;
-  			opp-microvolt = <1040000>;
-  			clock-latency-ns = <244144>; /* 8 32k periods */
-  		};
-  
-- 		opp at 720000000 {
-++		opp-720000000 {
- +			opp-hz = /bits/ 64 <720000000>;
- +			opp-microvolt = <1100000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 816000000 {
-+ 		opp-816000000 {
-  			opp-hz = /bits/ 64 <816000000>;
-  			opp-microvolt = <1100000>;
-  			clock-latency-ns = <244144>; /* 8 32k periods */
-  		};
-  
-- 		opp at 912000000 {
-++		opp-912000000 {
- +			opp-hz = /bits/ 64 <912000000>;
- +			opp-microvolt = <1200000>;
- +			clock-latency-ns = <244144>; /* 8 32k periods */
- +		};
- +
-- 		opp at 1008000000 {
-+ 		opp-1008000000 {
-  			opp-hz = /bits/ 64 <1008000000>;
-  			opp-microvolt = <1200000>;
-  			clock-latency-ns = <244144>; /* 8 32k periods */
-@@@ -156,27 -100,6 +156,27 @@@
-  		status = "disabled";
-  	};
-  
- +	iio-hwmon {
- +		compatible = "iio-hwmon";
- +		io-channels = <&ths>;
- +	};
- +
- +	mali_opp_table: gpu-opp-table {
- +		compatible = "operating-points-v2";
- +
-- 		opp at 144000000 {
-++		opp-144000000 {
- +			opp-hz = /bits/ 64 <144000000>;
- +		};
- +
-- 		opp at 240000000 {
-++		opp-240000000 {
- +			opp-hz = /bits/ 64 <240000000>;
- +		};
- +
-- 		opp at 384000000 {
-++		opp-384000000 {
- +			opp-hz = /bits/ 64 <384000000>;
- +		};
- +	};
- +
-  	memory {
-  		reg = <0x40000000 0x80000000>;
-  	};
+> 
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+> As I've checked it also can be applied to LKML as is.
+> 
+> Changes in v2:
+>   - added comment to update_sections_early()
+> 
+> v1: https://patchwork.kernel.org/patch/9686289/
+> 
+>   arch/arm/mm/init.c | 13 ++++++++-----
+>   1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 370581a..838f6b35 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -689,34 +689,37 @@ void set_section_perms(struct section_perm *perms, int n, bool set,
+>   
+>   }
+>   
+> +/**
+> + * update_sections_early intended to be called only through stop_machine
+> + * framework and executed by only one CPU while all other CPUs will spin and
+> + * wait, so no locking is required in this function.
+> + */
+>   static void update_sections_early(struct section_perm perms[], int n)
+>   {
+>   	struct task_struct *t, *s;
+>   
+> -	read_lock(&tasklist_lock);
+>   	for_each_process(t) {
+>   		if (t->flags & PF_KTHREAD)
+>   			continue;
+>   		for_each_thread(t, s)
+>   			set_section_perms(perms, n, true, s->mm);
+>   	}
+> -	read_unlock(&tasklist_lock);
+>   	set_section_perms(perms, n, true, current->active_mm);
+>   	set_section_perms(perms, n, true, &init_mm);
+>   }
+>   
+> -int __fix_kernmem_perms(void *unused)
+> +static int __fix_kernmem_perms(void *unused)
+>   {
+>   	update_sections_early(nx_perms, ARRAY_SIZE(nx_perms));
+>   	return 0;
+>   }
+>   
+> -void fix_kernmem_perms(void)
+> +static void fix_kernmem_perms(void)
+>   {
+>   	stop_machine(__fix_kernmem_perms, NULL, NULL);
+>   }
+>   
+> -int __mark_rodata_ro(void *unused)
+> +static int __mark_rodata_ro(void *unused)
+>   {
+>   	update_sections_early(ro_perms, ARRAY_SIZE(ro_perms));
+>   	return 0;
+> 
