@@ -1,44 +1,50 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Apr 2017 21:51:33 +0300
-Subject: [PATCH v2 1/3] ARM: dts: r8a7743: add PFC support
-Message-ID: <20170420185543.775916688@cogentembedded.com>
+Date: Thu, 20 Apr 2017 21:51:34 +0300
+Subject: [PATCH v2 2/3] ARM: dts: sk-rzg1m: add SCIF0 pins
+Message-ID: <20170420185547.232302495@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7743 part of the PFC device node.
+Add the (previously omitted) SCIF0 pin data to the SK-RZG1M board's
+device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 Changes in version 2:
-- added Geert's tag.
+- fixed the SCIF0 data group inside the PFC node.
 
- arch/arm/boot/dts/r8a7743.dtsi |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
+Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7743.dtsi
+--- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
++++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
 @@ -1,7 +1,7 @@
  /*
-  * Device Tree Source for the r8a7743 SoC
+  * Device Tree Source for the SK-RZG1M board
   *
-- * Copyright (C) 2016 Cogent Embedded Inc.
-+ * Copyright (C) 2016-2017 Cogent Embedded Inc.
+- * Copyright (C) 2016 Cogent Embedded, Inc.
++ * Copyright (C) 2016-2017 Cogent Embedded, Inc.
   *
   * This file is licensed under the terms of the GNU General Public License
   * version 2. This program is licensed "as is" without any warranty of any
-@@ -123,6 +123,11 @@
- 			#power-domain-cells = <1>;
- 		};
+@@ -39,7 +39,17 @@
+ 	clock-frequency = <20000000>;
+ };
  
-+		pfc: pin-controller at e6060000 {
-+			compatible = "renesas,pfc-r8a7743";
-+			reg = <0 0xe6060000 0 0x250>;
-+		};
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data_d";
++		function = "scif0";
++	};
++};
 +
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a7743",
- 				     "renesas,rcar-dmac";
+ &scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
+ 
