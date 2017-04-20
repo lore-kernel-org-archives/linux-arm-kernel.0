@@ -1,32 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 19 Apr 2017 19:12:42 -0500
-Subject: [PATCH v3 00/21] eeprom: at24: Add OF device ID table
-In-Reply-To: <20170414010445.21727-1-javier@osg.samsung.com>
-References: <20170414010445.21727-1-javier@osg.samsung.com>
-Message-ID: <20170420001242.vl3sga2bd65jlaoi@rob-hp-laptop>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 19 Apr 2017 20:25:54 -0400
+Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <baed1ecf-7a57-0229-42b0-d87599a225b5@redhat.com>
+References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
+ <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
+ <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
+ <baed1ecf-7a57-0229-42b0-d87599a225b5@redhat.com>
+Message-ID: <832cb9b3-ceaf-6771-bfc9-7bae35494f6d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 13, 2017 at 10:04:24PM -0300, Javier Martinez Canillas wrote:
-> Hello Wolfram,
-> 
-> This series is a follow-up to patch [0] that added an OF device ID table
-> to the at24 EEPROM driver. As you suggested [1], this version instead of
-> adding entries for every used <vendor,device> tuple, only adds a single
-> entry for each chip type using the "atmel" vendor as a generic fallback.
-> 
-> The first patch adds the OF device ID table for the at24 driver and the
-> next patches adds a generic fallback compatible string to each DTS that
-> defines a compatible I2C EEPROM device node.
-> 
-> Patches can be applied independently since the DTS change without the
-> driver change is a no-op and the OF device table won't be used without
-> the DTS changes.
-> 
-> [0]: https://lkml.org/lkml/2017/3/14/589
+One additional footnote. I spent a bunch of time recently on my personal
+Xeon systems walking through the PCIe topology and aligning on how to
+advise the ARM server community proceed going forward. If you look at
+how Intel vs AMD handle their host bridges for example, you'll see two
+very different approaches to the case of cross-socket PCIe. But my
+operating assumption is that anything longer term which looks boring and
+x86 enough is probably fine from an ARM server point of view.
 
-I don't have this patch in my inbox, but the i2c core will still match 
-on compatibles with no vendor prefix? If not, those need to be added to 
-the match table too.
+On 04/19/2017 07:38 PM, Jon Masters wrote:
+> Hi Bjorn, JC,
+> 
+> On 04/13/2017 08:19 PM, Bjorn Helgaas wrote:
+> 
+>> I tentatively applied both patches to pci/host-thunder for v4.12.
+> 
+> Thanks for that :)
+> 
+>> However, I am concerned about the topology here:
+> 
+> Various feedback has been provided on this one over the past $time. In
+> addition, I have requested that this serve as an example of why we need
+> a more complete PCIe integration guide for ARMv8. It's on the list of
+> things for my intended opus magnum on the topic ;)
+> 
+>> On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
+>>> On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
+>>> PCI topology is slightly unusual.  For a multi-node system, it looks
+>>> like:
+>>>
+>>>     00:00.0 [PCI] bridge to [bus 01-1e]
+>>>     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
+>>>     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
+>>>     03:00.0 PCIe Endpoint
+>>
+>> A root port normally has a single PCIe link leading downstream.
+> 
+> In integration terms, there's always a bus on the other side of the RC.
+> It's just usually a processor local bus of some kind on a proprietary
+> interconnect, but there's always something there. The issue is when you
+> can see it as PCIe and it's not through a transparent glue bridge.
+> 
+> I had originally hoped that the ECAM could be hacked up so that we would
+> first walk the topology at the 02:00.0 as a root and not see what's
+> above it BUT there are other device attachments up there for the on-SoC
+> devices and I think we really intend to use those.
+> 
+> Bottom line in my opinion is document this case, use it as a learning
+> example, and move forward. This has been useful in justifying why we
+> need better integration documentation from the server community. And in
+> particular from the OS vendors, of which I guess we can allude to their
+> being more than Linux interested in ARM server these days ;)
+> 
+> Jon.
+> 
 
-Rob
+-- 
+Computer Architect | Sent from my Fedora powered Ryzen
