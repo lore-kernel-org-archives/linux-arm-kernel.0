@@ -1,28 +1,29 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 20 Apr 2017 09:05:54 -0500
-Subject: [PATCH v4 03/11] dt-bindings: add bindings for DE2 on V3s SoC
-In-Reply-To: <20170416120849.54542-4-icenowy@aosc.io>
+Date: Thu, 20 Apr 2017 08:58:31 -0500
+Subject: [PATCH v4 01/11] dt-bindings: add binding for the Allwinner DE2
+ CCU
+In-Reply-To: <20170416120849.54542-2-icenowy@aosc.io>
 References: <20170416120849.54542-1-icenowy@aosc.io>
- <20170416120849.54542-4-icenowy@aosc.io>
-Message-ID: <20170420140554.f5squ3uqah3dfvlv@rob-hp-laptop>
+ <20170416120849.54542-2-icenowy@aosc.io>
+Message-ID: <20170420135831.owkaymplu4tbzdzs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 16, 2017 at 08:08:41PM +0800, Icenowy Zheng wrote:
-> Allwinner V3s SoC have a display engine which have a different pipeline
-> with older SoCs.
+On Sun, Apr 16, 2017 at 08:08:39PM +0800, Icenowy Zheng wrote:
+> Allwinner "Display Engine 2.0" contains some clock controls in it.
 > 
-> Add document for it (new compatibles and the new "mixer" part).
+> In order to add them as clock drivers, we need a device tree binding.
+> Add the binding here.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
 > Changes in v4:
-> - Removed the refactor at TCON chapter.
-> 
+> - Dropped the leading 0 in clock at 1000000 .
 > Changes in v3:
-> - Remove the description of having a BE directly as allwinner,pipeline.
+> - Fill the address space length of DE2 CCU to 0x100000, just reach the start of mixer0.
 > 
->  .../bindings/display/sunxi/sun4i-drm.txt           | 29 ++++++++++++++++++++--
->  1 file changed, 27 insertions(+), 2 deletions(-)
+>  .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
