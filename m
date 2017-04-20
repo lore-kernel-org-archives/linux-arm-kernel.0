@@ -1,23 +1,23 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Thu, 20 Apr 2017 11:09:17 +0200
-Subject: [PATCH 3/3] ARM: dts: imx7d-nitrogen7: fix rv4162 compatible
-In-Reply-To: <20170419202204.7689-3-alexandre.belloni@free-electrons.com>
-References: <20170419202204.7689-1-alexandre.belloni@free-electrons.com>
- <20170419202204.7689-3-alexandre.belloni@free-electrons.com>
-Message-ID: <20170420090917.pdcq2xgslway7yem@t450s.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 20 Apr 2017 18:10:19 +0900
+Subject: [PATCH v2] arm64: dts: r8a7795: salvator-x: Add current sense
+ amplifiers
+In-Reply-To: <1492591057-10674-1-git-send-email-geert+renesas@glider.be>
+References: <1492590950-10534-1-git-send-email-geert+renesas@glider.be>
+ <1492591057-10674-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170420091018.GK3760@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On Wed, Apr 19, 2017 at 10:22:04PM +0200, Alexandre Belloni wrote:
-> The rv4162 compatbile string is missing the vendor part, add it.
+On Wed, Apr 19, 2017 at 10:37:37AM +0200, Geert Uytterhoeven wrote:
+> Add device nodes for two Maxim max961x current sense amplifiers
+> sensing the VDD_0.8V and DVFS_0.8V lines.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Based on a patch for r8a7796-salvator-x.dts by Jacopo Mondi.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Bindings and driver are now in staging-next.
 
-Acked-by: Gary Bisson <gary.bisson@boundarydevices.com>
-
-Thanks for fixing it.
-
-Regards,
-Gary
+Forgive my ignorance, what is the flow of changes from staging-next
+to a release?
