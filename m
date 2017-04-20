@@ -1,181 +1,48 @@
-From: priyanka.jain@nxp.com (Priyanka Jain)
-Date: Thu, 20 Apr 2017 10:07:47 +0530
-Subject: [PATCH] arm64: dts: freescale: ls2081ardb: Add DTS support for NXP
- LS2081ARDB
-Message-ID: <1492663067-2364-1-git-send-email-priyanka.jain@nxp.com>
+From: strongbox8@zoho.com (Perr Zhang)
+Date: Thu, 20 Apr 2017 12:55:56 +0800
+Subject: [PATCH] arm: alignment: update comments on /proc/cpu/alignment
+Message-ID: <1492664156-6136-1-git-send-email-strongbox8@zoho.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for NXP LS2081ARDB board which has
-LS2081A SoC.
+The path name in the comment is out of date, update it.
 
-LS2081A SoC is 40-pin derivative of LS2088A SoC
-So, from functional perspective both are same.
-Hence,ls2088a SoC dtsi files are included from ls2081ARDB dts
-
-Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+Signed-off-by: Perr Zhang <strongbox8@zoho.com>
 ---
- arch/arm64/boot/dts/freescale/Makefile            |    1 +
- arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts |  139 +++++++++++++++++++++
- 2 files changed, 140 insertions(+), 0 deletions(-)
- create mode 100755 arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
+ arch/arm/mm/alignment.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 72c4b52..58b80de 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2081a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-new file mode 100444
-index 0000000..7ae408e
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2081a-rdb.dts
-@@ -0,0 +1,139 @@
-+/*
-+ * Device Tree file for NXP LS2081A RDB Board.
-+ *
-+ * Copyright (C) 2017, NXP Semiconductors
-+ *
-+ * Priyanka Jain <priyanka.jain@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "fsl-ls2088a.dtsi"
-+
-+/ {
-+	model = "NXP Layerscape 2081A RDB Board";
-+	compatible = "fsl,ls2081a-rdb", "fsl,ls2081a";
-+
-+	aliases {
-+		serial0 = &serial0;
-+		serial1 = &serial1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial1:115200n8";
-+	};
-+};
-+
-+&esdhc {
-+	status = "okay";
-+};
-+
-+&ifc {
-+	status = "disabled";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pca9547 at 75 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x75>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x01>;
-+			rtc at 51 {
-+				compatible = "nxp,pcf2129";
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			adt7481 at 4c {
-+				compatible = "adi,adt7461";
-+				reg = <0x4c>;
-+			};
-+		};
-+	};
-+};
-+
-+&dspi {
-+	status = "okay";
-+	dflash0: n25q512a {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <3000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+
-+&qspi {
-+	status = "okay";
-+	flash0: n25q512a at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+	flash1: n25q512a at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 2c96190..db9c2cf 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -33,8 +33,12 @@
+ 
+ /*
+  * 32-bit misaligned trap handler (c) 1998 San Mehat (CCC) -July 1998
+- * /proc/sys/debug/alignment, modified and integrated into
+- * Linux 2.1 by Russell King
++ * /proc/cpu/alignment, modified and integrated into Linux 2.1 by Russell King
++ * Note:
++ *     The path name may be different for very old versions of Linux,
++ *     i.e, /proc/sys/debug/alignment for Linux 2.1.
++ *     This was relocated because it was in conflict with sysctl(/proc/sys/)
++ *     and it doesn't contain sysctl information.
+  *
+  * Speed optimisations and better fault handling by Russell King.
+  *
+@@ -985,10 +989,8 @@ static int __init noalign_setup(char *__unused)
+ __setup("noalign", noalign_setup);
+ 
+ /*
+- * This needs to be done after sysctl_init, otherwise sys/ will be
+- * overwritten.  Actually, this shouldn't be in sys/ at all since
+- * it isn't a sysctl, and it doesn't contain sysctl information.
+- * We now locate it in /proc/cpu/alignment instead.
++ * Refer to Documentation/arm/mem_alignment for
++ * usage of /proc/cpu/alignment.
+  */
+ static int __init alignment_init(void)
+ {
 -- 
-1.7.4.1
+1.9.3
