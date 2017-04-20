@@ -1,83 +1,108 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 20 Apr 2017 14:24 +0300
-Subject: [PATCH/RFC v2 1/2] arm64: dts: r8a7795: Add support for R-Car H3
- ES2.0
-In-Reply-To: <CAMuHMdWmvhZjxKfEdGJ3d_w0d2s2kK+8iW1tsEM584qZc+dVEQ@mail.gmail.com>
-References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
- <1714563.qChlbIjNcO@avalon>
- <CAMuHMdWmvhZjxKfEdGJ3d_w0d2s2kK+8iW1tsEM584qZc+dVEQ@mail.gmail.com>
-Message-ID: <3119026.3cPho1BBNv@avalon>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 20 Apr 2017 13:23:06 +0200
+Subject: [PATCH] ARM: hyp-stub: Fix Thumb-2 compilation
+In-Reply-To: <20170420101620.1368-1-marc.zyngier@arm.com>
+References: <20170420101620.1368-1-marc.zyngier@arm.com>
+Message-ID: <20170420112306.GE4104@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Thursday 20 Apr 2017 12:55:28 Geert Uytterhoeven wrote:
-> On Thu, Apr 20, 2017 at 12:42 PM, Laurent Pinchart wrote:
-> > On Thursday 20 Apr 2017 11:36:59 Geert Uytterhoeven wrote:
-> >> On Mon, Mar 27, 2017 at 10:48 AM, Laurent Pinchart wrote:
-> >>> On Friday 24 Mar 2017 14:37:44 Geert Uytterhoeven wrote:
-> >>>> Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
-> >>>>   - The following devices no longer exist on ES2.0, and are thus
-> >>>>     removed:
-> >>>>     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
-> >>>>   
-> >>>>   - The DU <-> VSPD topology is different on ES2.0, hence remove the
-> >>>>     "vsps" property from the DU node until the driver can handle this.
-> >>> 
-> >>> I think I'll need a different compatible string between ES1.x and ES2
-> >>> for the DU. It could make sense to move the whole DU node to *-es1.dtsi.
-> >>> We can decide about that later when I'll have a DU driver prototype
-> >>> ready.
-> >> 
-> >> Why would you need a different compatible string?
-> >> Can't you use soc_device_match() to handle ES1.x SoCs?
-> >> 
-> >> The different DU <-> VSPD topology is handled through the vsps property
-> >> in
-> >> DTS. Are the ports different, too? That can be handled in DTS.
-> > 
-> > My point (not expressed clearly) was that, as I'll need a different vsps
-> > property, I can as well go for a different compatible string.
+On Thu, Apr 20, 2017 at 11:16:20AM +0100, Marc Zyngier wrote:
+> The assembler defaults to emiting the short form of ADR, leading
+> to an out-of-range immediate. Using the wide version solves this
+> issue.
 > 
-> Do you need a different vsps property?
-> AFAIK, the current array links each DU channel to a VSPD.
-> When a VSPD is shared between multiple channels, you can still link these
-> channels to the same VSPD.
+> Fixes: bc845e4fbbbb ("ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall in the init code")
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kernel/hyp-stub.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Or is my understanding incorrect?
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index d8523cc47a54..ec7e7377d423 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -125,7 +125,7 @@ ENTRY(__hyp_stub_install_secondary)
+>   * (see safe_svcmode_maskall).
+>   */
+>  	@ Now install the hypervisor stub:
+> -	adr	r7, __hyp_stub_vectors
+> +	W(adr)	r7, __hyp_stub_vectors
+>  	mcr	p15, 4, r7, c12, c0, 0	@ set hypervisor vector base (HVBAR)
+>  
+>  	@ Disable all traps, so we don't get any nasty surprise
+> -- 
+> 2.11.0
+> 
 
-Do you mean listing the same VSP multiple times in the vsps array ? Yes, from 
-a bindings point of view I think that would work too. That is, until we get a 
-ES2.1 that will have a completely different hardware topology :-)
+This fixes the compile, but I get this when booting it on TC2:
 
-> >> The main reason why I kept the DU node in r8a7795.dtsi is that the board
-> >> DTS refers to it.  Sharing board DTS means there needs to be at least a
-> >> placeholder node for the DU in r8a7795.dtsi, unless you want to keep on
-> >> shuffling board overrides around.
-> > 
-> > As the ports are identical it makes sense to share the same board DTS, I
-> > agree with you. We could override the compatible string in
-> > r8a7795-es1.dtsi and leave it blank in r8a7795.dtsi for now, as there's
-> > no driver support for ES2.0. That's a bit of a workaround as it shouldn't
-> > matter to DT whether driver support is available or not. On the other
-> > hand, leaving the vsps property out is a workaround too.
-> > 
-> > The current driver will fail probing if the number of VSPs is different
-> > than the number of CRTCs, so I believe you can keep the vsps property in
-> > r8a7795.dtsi with 3 VSPS without causing any problem. However, there's no
-> > DT bindings for the H3 ES2.0 DU yet, so we would end up merging DT
-> > without bindings, which is not good. I think that regardless of how we
-> > proceed, keeping the DU node in the ES2.0 .dtsi will be a violation of
-> > that policy.
->
-> What does the current driver do if the number of VSPs is the same as the
-> number of CRTCs, but some VSPs are listed more than once?
-> I guess it will break in a subtle way, instead of refusing to probe?
+kvm [1]: 8-bit VMID
+kvm [1]: IDMAP page: 80201000
+kvm [1]: HYP VA range: 80000000:ffffffff
+kvm [1]: Hyp mode initialized successfully
+kvm [1]: vgic-v2 at 2c004000
+kvm [1]: vgic interrupt IRQ16
+kvm [1]: virtual timer IRQ19
+Kernel panic - not syncing:
+HYP panic: UNDEF PC:802010ac CPSR:800001da
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.11.0-rc3+ #140
+Hardware name: ARM-Versatile Express
+[<8021c5f1>] (unwind_backtrace) from [<802199eb>] (show_stack+0xb/0xc)
+[<802199eb>] (show_stack) from [<803ccc15>] (dump_stack+0x71/0x80)
+[<803ccc15>] (dump_stack) from [<80289467>] (panic+0xbb/0x1d4)
+[<80289467>] (panic) from [<8020b1f5>]
+(_kvm_arch_hardware_disable+0x11/0x20)
+[<8020b1f5>] (_kvm_arch_hardware_disable) from [<8026c497>]
+(flush_smp_call_function_queue+0x77/0x134)
+[<8026c497>] (flush_smp_call_function_queue) from [<8021b8f9>]
+(handle_IPI+0xd9/0x150)
+[<8021b8f9>] (handle_IPI) from [<80201425>] (gic_handle_irq+0x65/0x6c)
+[<80201425>] (gic_handle_irq) from [<8021a213>] (__irq_svc+0x53/0x7c)
+Exception stack(0x80a01f18 to 0x80a01f60)
+1f00:                                                       00000001
+00000000
+1f20: 80a01f70 802231c1 00000000 80a00000 00000000 80a03c80 80a03c34
+808445d8
+1f40: 80a01f70 80a03c88 805b31d1 80a01f68 80217ce1 80217ce2 40000033
+ffffffff
+[<8021a213>] (__irq_svc) from [<80217ce2>] (arch_cpu_idle+0x22/0x24)
+[<80217ce2>] (arch_cpu_idle) from [<8024ca89>] (do_idle+0xf9/0x158)
+[<8024ca89>] (do_idle) from [<8024ccaf>] (cpu_startup_entry+0x13/0x14)
+[<8024ccaf>] (cpu_startup_entry) from [<80800a4d>]
+(start_kernel+0x309/0x314)
+[<80800a4d>] (start_kernel) from [<80008095>] (0x80008095)
+CPU1: stopping
+CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.11.0-rc3+ #140
+Hardware name: ARM-Versatile Express
+[<8021c5f1>] (unwind_backtrace) from [<802199eb>] (show_stack+0xb/0xc)
+[<802199eb>] (show_stack) from [<803ccc15>] (dump_stack+0x71/0x80)
+[<803ccc15>] (dump_stack) from [<8021b95d>] (handle_IPI+0x13d/0x150)
+[<8021b95d>] (handle_IPI) from [<80201425>] (gic_handle_irq+0x65/0x6c)
+[<80201425>] (gic_handle_irq) from [<8021a213>] (__irq_svc+0x53/0x7c)
+Exception stack(0xeec47e20 to 0xeec47e68)
+7e20: 00000000 ef1a96dc 80000000 80000000 80a03de4 80a03cf8 ef1b5a84
+ef1b5a80
+7e40: 00000001 00000008 80a03de4 80845a00 00000000 eec47e70 8026c9ed
+8026ca02
+7e60: a0000033 ffffffff
+[<8021a213>] (__irq_svc) from [<8026ca02>]
+(smp_call_function_many+0x1aa/0x1f0)
+[<8026ca02>] (smp_call_function_many) from [<8026ca89>]
+(on_each_cpu+0x1d/0x30)
+[<8026ca89>] (on_each_cpu) from [<8020c369>] (kvm_arch_init+0x339/0x3fc)
+[<8020c369>] (kvm_arch_init) from [<80207149>] (kvm_init+0x11/0x214)
+[<80207149>] (kvm_init) from [<8020177d>] (do_one_initcall+0x2d/0x104)
+[<8020177d>] (do_one_initcall) from [<80800bed>]
+(kernel_init_freeable+0x195/0x208)
+[<80800bed>] (kernel_init_freeable) from [<805b2383>]
+(kernel_init+0x7/0xd4)
+[<805b2383>] (kernel_init) from [<80217361>] (ret_from_fork+0x11/0x30)
+SMP: failed to stop secondary CPUs
+---[ end Kernel panic - not syncing:
+HYP panic: UNDEF PC:802010ac CPSR:800001da
 
-Correct, it will be messy.
 
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+-Christoffer
