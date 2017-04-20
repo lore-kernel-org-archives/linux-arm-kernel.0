@@ -1,48 +1,122 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Apr 2017 11:36:59 +0200
-Subject: [PATCH/RFC v2 1/2] arm64: dts: r8a7795: Add support for R-Car H3
- ES2.0
-In-Reply-To: <1612430.SNEha5n02K@avalon>
-References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
- <1490362665-4422-2-git-send-email-geert+renesas@glider.be>
- <1612430.SNEha5n02K@avalon>
-Message-ID: <CAMuHMdXOzyo+kzaGAXp+jZTtUejYyXCQzezo+SmvNVQuEC9=_Q@mail.gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Thu, 20 Apr 2017 15:09:36 +0530
+Subject: [PATCH v2 2/2] drm: dw-hdmi: gate audio clock from the I2S
+ enablement callbacks
+In-Reply-To: <c9258563-afcd-4088-a4f4-6a4e056f5d36@codeaurora.org>
+References: <20170414083113.4255-1-romain.perier@collabora.com>
+ <20170414083113.4255-3-romain.perier@collabora.com>
+ <c9258563-afcd-4088-a4f4-6a4e056f5d36@codeaurora.org>
+Message-ID: <ad52c44d-331a-2813-6f38-7782888ab3b9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
 
-On Mon, Mar 27, 2017 at 10:48 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Friday 24 Mar 2017 14:37:44 Geert Uytterhoeven wrote:
->> Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
->>   - The following devices no longer exist on ES2.0, and are thus removed:
->>     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
->>   - The DU <-> VSPD topology is different on ES2.0, hence remove the
->>     "vsps" property from the DU node until the driver can handle this.
+
+On 04/19/2017 10:21 AM, Archit Taneja wrote:
 >
-> I think I'll need a different compatible string between ES1.x and ES2 for the
-> DU. It could make sense to move the whole DU node to *-es1.dtsi. We can decide
-> about that later when I'll have a DU driver prototype ready.
+>
+> On 04/14/2017 02:01 PM, Romain Perier wrote:
+>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
+>> step E. and is kept enabled for later use. This clock should be enabled
+>> and disabled along with the actual audio stream and not always on (that
+>> is bad for PM). Futhermore, as described by the datasheet, the I2S
+>
+> s/Futhermore/Furthermore
+>
+>> variant need to gate/ungate the clock when the stream is
+>
+> s/need/needs
+>
+>> enabled/disabled.
+>>
+>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
+>> when the audio sample clock must be enabled or disabled. Then, it adds
+>> the call to this function from dw_hdmi_i2s_audio_enable() and
+>> dw_hdmi_i2s_audio_disable().
+>>
+>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+>> ---
+>>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 20 ++++++++++++++------
+>>  1 file changed, 14 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> index 5b328c0..a6da634 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> @@ -544,6 +544,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+>>  }
+>>  EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+>>
+>> +static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
+>> +{
+>> +    hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
+>> +          HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+>> +}
+>> +
+>>  void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
+>>  {
+>>      hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+>> @@ -557,6 +563,12 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
+>>  void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
+>>  {
+>>      hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+>> +    hdmi_enable_audio_clk(hdmi, true);
+>> +}
+>> +
+>> +void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
+>> +{
+>> +    hdmi_enable_audio_clk(hdmi, false);
+>>  }
+>
+> This should be static too.
+>
+> If you're okay with the suggestions, I can fix these myself and push. Let
+> me know if that's okay.
 
-Why would you need a different compatible string?
-Can't you use soc_device_match() to handle ES1.x SoCs?
+Took the liberty of going ahead with the fixes. Queued both patches to
+drm-misc-next.
 
-The different DU <-> VSPD topology is handled through the vsps property in DTS.
-Are the ports different, too? That can be handled in DTS.
+Thanks,
+Archit
 
-The main reason why I kept the DU node in r8a7795.dtsi is that the board DTS
-refers to it.  Sharing board DTS means there needs to be at least a
-placeholder node for the DU in r8a7795.dtsi, unless you want to keep on
-shuffling board overrides around.
+>
+> Thanks,
+> Archit
+>
+>>
+>>  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
+>> @@ -1592,11 +1604,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>>                  HDMI_MC_FLOWCTRL);
+>>  }
+>>
+>> -static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
+>> -{
+>> -    hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+>> -}
+>> -
+>>  /* Workaround to clear the overflow condition */
+>>  static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
+>>  {
+>> @@ -1710,7 +1717,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
+>>
+>>          /* HDMI Initialization Step E - Configure audio */
+>>          hdmi_clk_regenerator_update_pixel_clock(hdmi);
+>> -        hdmi_enable_audio_clk(hdmi);
+>> +        hdmi_enable_audio_clk(hdmi, true);
+>>      }
+>>
+>>      /* not for DVI mode */
+>> @@ -2438,6 +2445,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>          audio.write    = hdmi_writeb;
+>>          audio.read    = hdmi_readb;
+>>          hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
+>> +        hdmi->disable_audio = dw_hdmi_i2s_audio_disable;
+>>
+>>          pdevinfo.name = "dw-hdmi-i2s-audio";
+>>          pdevinfo.data = &audio;
+>>
+>
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
