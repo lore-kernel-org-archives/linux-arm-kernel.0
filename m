@@ -1,28 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 20 Apr 2017 09:18:30 -0500
-Subject: [PATCH v3 03/12] dt-bindings: make AXP20X compatible strings one
- per line
-In-Reply-To: <20170417115747.7300-4-icenowy@aosc.io>
-References: <20170417115747.7300-1-icenowy@aosc.io>
- <20170417115747.7300-4-icenowy@aosc.io>
-Message-ID: <20170420141830.63tusju7typolwxa@rob-hp-laptop>
+Date: Thu, 20 Apr 2017 09:05:54 -0500
+Subject: [PATCH v4 03/11] dt-bindings: add bindings for DE2 on V3s SoC
+In-Reply-To: <20170416120849.54542-4-icenowy@aosc.io>
+References: <20170416120849.54542-1-icenowy@aosc.io>
+ <20170416120849.54542-4-icenowy@aosc.io>
+Message-ID: <20170420140554.f5squ3uqah3dfvlv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 07:57:38PM +0800, Icenowy Zheng wrote:
-> In the binding documentation of AXP20X mfd, the compatible strings used
-> to be listed for three per line, which leads to some mess when trying to
-> add AXP803 compatible string (as we have already AXP806 and AXP809
-> compatibles, which is after AXP803 in ascending order).
+On Sun, Apr 16, 2017 at 08:08:41PM +0800, Icenowy Zheng wrote:
+> Allwinner V3s SoC have a display engine which have a different pipeline
+> with older SoCs.
 > 
-> Make the compatible strings one per line, so that inserting a new
-> compatible string will be directly a new line.
+> Add document for it (new compatibles and the new "mixer" part).
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
-> New patch in v3.
+> Changes in v4:
+> - Removed the refactor at TCON chapter.
 > 
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+> Changes in v3:
+> - Remove the description of having a BE directly as allwinner,pipeline.
+> 
+>  .../bindings/display/sunxi/sun4i-drm.txt           | 29 ++++++++++++++++++++--
+>  1 file changed, 27 insertions(+), 2 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
