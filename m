@@ -1,70 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Apr 2017 20:10:22 +0100
-Subject: [PATCHv3 08/14] drivers/perf: arm_pmu: split cpu-local irq
- request/free
-In-Reply-To: <CAMuHMdVs+JQ3-Lj=TyN5Zi9fAhJROuc7upgFKmCwXVaA8eb1WQ@mail.gmail.com>
-References: <1491899997-32210-1-git-send-email-mark.rutland@arm.com>
- <1491899997-32210-9-git-send-email-mark.rutland@arm.com>
- <CAMuHMdVV4qMyYTYN92TE4fsrxo66WK-Gd001YbJZok2txOH4ig@mail.gmail.com>
- <20170418183316.GM17866@leverpostej>
- <CAMuHMdVs+JQ3-Lj=TyN5Zi9fAhJROuc7upgFKmCwXVaA8eb1WQ@mail.gmail.com>
-Message-ID: <20170420191022.GB9795@leverpostej>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 20 Apr 2017 21:05:30 +0200
+Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
+In-Reply-To: <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
+References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
+ <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
+ <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
+ <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
+Message-ID: <20170420190530.GA6873@worktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 08:57:04PM +0200, Geert Uytterhoeven wrote:
-> On Tue, Apr 18, 2017 at 8:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+On Thu, Apr 20, 2017 at 09:23:18PM +0300, Yury Norov wrote:
+> Is there some test to reproduce the locking failure for the case.
 
-> > I'm somewhat surprised that this patch would have that
-> > effect -- I would imagine that the rework this is based on is more
-> > likely to. e.g. commit:
-> >
-> >   c09adab01e4aeecf ("drivers/perf: arm_pmu: split irq request from enable")
-> 
-> Bummer. You're right. It's actually due to that commit.
+Possibly sysvsem stress before commit:
 
-Ok; I understand what's happening, then.
+  27d7be1801a4 ("ipc/sem.c: avoid using spin_unlock_wait()")
 
-FWIW, the warnings are benign, albeit annoying.
+Although a similar scheme is also used in nf_conntrack, see commit:
 
-I'll have a go at cleaning this up.
+  b316ff783d17 ("locking/spinlock, netfilter: Fix nf_conntrack_lock() barriers")
 
-> I searched in my gmail for a patch with the specific title, and blindly
-> replied to the first match, not noticing that was not the right patch.
-> Sorry for that.
+> I
+> ask because I run loctorture for many hours on my qemu (emulating
+> cortex-a57), and I see no failures in the test reports. And Jan did it
+> on ThunderX, and Adam on QDF2400 without any problems. So even if I
+> rework those functions, how could I check them for correctness?
 
-No worries.
+Running them doesn't prove them correct. Memory ordering bugs have been
+in the kernel for many years without 'ever' triggering. This is stuff
+you have to think about.
 
-> On R-Car Gen3, there's no change in PMU related messages.
-> Actual PMU messages are:
-> 
->     hw perfevents: enabled with armv8_cortex_a57 PMU driver, 7
-> counters available
->     hw perfevents: /soc/pmu_a53: failed to probe PMU!
->     hw perfevents: /soc/pmu_a53: failed to register PMU devices!
-> 
-> The last two are due to the CA53 cores being described in DT, but not
-> enabled in the firmware.
+> Anyway, regarding the queued_spin_unlock_wait(), is my understanding
+> correct that you assume adding smp_mb() before entering the for(;;)
+> cycle, and using ldaxr/strxr instead of atomic_read()?
 
-Ok. 
-
-> On SH-Mobile AG5 (sh73a0/kzm9g), it recently (not due to the bad commit)
-> started printing:
-> 
->    +hw perfevents: no interrupt-affinity property for /pmu, guessing.
->     hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7 counters available
-> 
-> which looks related.
-
-That's stating that the DTB doesn't provide a interrupt-affinity
-property for the PMU nodem so the affinity is guessed based on the
-logical CPU ordering, which is dodgy.
-
-I can see that's missing in arch/arm/boot/dts/sh73a0.dtsi.
-
-That should be easy to fix up, as per
-arch/arm64/boot/dts/renesas/r8a7795.dtsi, assuming you're aware of which
-IRQ corresponds to which CPU.
-
-Thanks,
-Mark.
+You'll have to ask Will, I always forget the arm64 details.
