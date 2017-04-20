@@ -1,35 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Apr 2017 10:15:20 +0200
-Subject: [PATCH] ASoC: mediatek: add I2C dependency for CS42XX8
-Message-ID: <20170420081541.658178-1-arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Apr 2017 10:17:49 +0200
+Subject: [GIT PULL] Allwinner clock changes for 4.12, take 2
+Message-ID: <20170420081749.bok3wwusmk2no5vw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should not select drivers that depend on I2C when that is disabled,
-as it results in a build error:
+Hi Mike, Stephen,
 
-warning: (SND_SOC_MT2701_WM8960) selects SND_SOC_WM8960 which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && I2C)
-sound/soc/codecs/wm8960.c:1469:1: error: data definition has no type or storage class [-Werror]
-sound/soc/codecs/wm8960.c:1469:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+Here are the few last minor fixes that didn't go through for 4.11,
+plus two fixes for previous drivers changes found in the earlier pull
+request for 4.12.
 
-Fixes: 8625c1dbd876 ("ASoC: mediatek: Add mt2701-wm8960 machine driver")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/mediatek/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks!
+Maxime
 
-diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
-index c6f39040f71f..5c68797f36c4 100644
---- a/sound/soc/mediatek/Kconfig
-+++ b/sound/soc/mediatek/Kconfig
-@@ -24,7 +24,7 @@ config SND_SOC_MT2701_CS42448
- 
- config SND_SOC_MT2701_WM8960
- 	tristate "ASoc Audio driver for MT2701 with WM8960 codec"
--	depends on SND_SOC_MT2701
-+	depends on SND_SOC_MT2701 && I2C
- 	select SND_SOC_WM8960
- 	help
- 	  This adds ASoC driver for Mediatek MT2701 boards
+The following changes since commit cb545960dea2749771c88b0cb26e5adfd12a0315:
+
+  clk: sunxi-ng: Display index when clock registration fails (2017-04-06 09:10:30 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.12-2
+
+for you to fetch changes up to 7149c1becddf49022fe0aad2fa395377cd8f753e:
+
+  clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code (2017-04-13 14:09:30 +0200)
+
+----------------------------------------------------------------
+Allwinner clock changes, take 2
+
+A few minor bug and comment fixes, plus some fixes for the PRCM CCU driver
+merged in the prior pull request
+
+----------------------------------------------------------------
+Chen-Yu Tsai (3):
+      clk: sunxi-ng: use 1 as fallback for minimum multiplier
+      clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
+      clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
+
+Icenowy Zheng (2):
+      clk: sunxi-ng: fix PRCM CCU ir clk parent
+      clk: sunxi-ng: fix PRCM CCU CLK_NUMBER value
+
+ drivers/clk/sunxi-ng/ccu-sun8i-r.c   | 2 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-r.h   | 2 +-
+ drivers/clk/sunxi-ng/ccu-sun9i-a80.c | 3 +--
+ drivers/clk/sunxi-ng/ccu_nk.c        | 8 ++++----
+ drivers/clk/sunxi-ng/ccu_nkm.c       | 8 ++++----
+ drivers/clk/sunxi-ng/ccu_nkmp.c      | 8 ++++----
+ drivers/clk/sunxi-ng/ccu_nm.c        | 4 ++--
+ 7 files changed, 17 insertions(+), 18 deletions(-)
+
 -- 
-2.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/78e44516/attachment.sig>
