@@ -1,111 +1,52 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Thu, 20 Apr 2017 19:17:14 +0100
-Subject: [PATCH 4/4] arm64: documentation: document tagged pointer stack
- constraints
-In-Reply-To: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
-References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1492712234-4950-5-git-send-email-kristina.martsenko@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 20 Apr 2017 21:23:18 +0300
+Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
+In-Reply-To: <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
+References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
+ <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
+ <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
+Message-ID: <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some kernel features don't currently work if a task puts a non-zero
-address tag in its stack pointer, frame pointer, or frame record entries
-(FP, LR).
+On Thu, Apr 13, 2017 at 08:12:12PM +0200, Peter Zijlstra wrote:
+> On Tue, Apr 11, 2017 at 01:35:04AM +0400, Yury Norov wrote:
+> 
+> > +++ b/arch/arm64/include/asm/qspinlock.h
+> > @@ -0,0 +1,20 @@
+> > +#ifndef _ASM_ARM64_QSPINLOCK_H
+> > +#define _ASM_ARM64_QSPINLOCK_H
+> > +
+> > +#include <asm-generic/qspinlock_types.h>
+> > +
+> > +#define	queued_spin_unlock queued_spin_unlock
+> > +/**
+> > + * queued_spin_unlock - release a queued spinlock
+> > + * @lock : Pointer to queued spinlock structure
+> > + *
+> > + * A smp_store_release() on the least-significant byte.
+> > + */
+> > +static inline void queued_spin_unlock(struct qspinlock *lock)
+> > +{
+> > +	smp_store_release((u8 *)lock, 0);
+> > +}
+> 
+> I'm afraid this isn't enough for arm64. I suspect you want your own
+> variant of queued_spin_unlock_wait() and queued_spin_is_locked() as
+> well.
+> 
+> Much memory ordering fun to be had there.
 
-For example, with a tagged stack pointer, the kernel can't deliver
-signals to the process, and the task is killed instead. As another
-example, with a tagged frame pointer or frame records, perf fails to
-generate call graphs or resolve symbols.
+Hi Peter,
 
-For now, just document these limitations, instead of finding and fixing
-everything that doesn't work, as it's not known if anyone needs to use
-tags in these places anyway.
+Is there some test to reproduce the locking failure for the case. I
+ask because I run loctorture for many hours on my qemu (emulating
+cortex-a57), and I see no failures in the test reports. And Jan did it
+on ThunderX, and Adam on QDF2400 without any problems. So even if I
+rework those functions, how could I check them for correctness?
 
-In addition, as requested by Dave Martin, generalize the limitations
-into a general kernel address tag policy, and refactor
-tagged-pointers.txt to include it.
+Anyway, regarding the queued_spin_unlock_wait(), is my understanding
+correct that you assume adding smp_mb() before entering the for(;;)
+cycle, and using ldaxr/strxr instead of atomic_read()?
 
-Cc: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
----
- Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
- 1 file changed, 47 insertions(+), 15 deletions(-)
-
-diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
-index d9995f1f51b3..a25a99e82bb1 100644
---- a/Documentation/arm64/tagged-pointers.txt
-+++ b/Documentation/arm64/tagged-pointers.txt
-@@ -11,24 +11,56 @@ in AArch64 Linux.
- The kernel configures the translation tables so that translations made
- via TTBR0 (i.e. userspace mappings) have the top byte (bits 63:56) of
- the virtual address ignored by the translation hardware. This frees up
--this byte for application use, with the following caveats:
-+this byte for application use.
- 
--	(1) The kernel requires that all user addresses passed to EL1
--	    are tagged with tag 0x00. This means that any syscall
--	    parameters containing user virtual addresses *must* have
--	    their top byte cleared before trapping to the kernel.
- 
--	(2) Non-zero tags are not preserved when delivering signals.
--	    This means that signal handlers in applications making use
--	    of tags cannot rely on the tag information for user virtual
--	    addresses being maintained for fields inside siginfo_t.
--	    One exception to this rule is for signals raised in response
--	    to watchpoint debug exceptions, where the tag information
--	    will be preserved.
-+Passing tagged addresses to the kernel
-+--------------------------------------
- 
--	(3) Special care should be taken when using tagged pointers,
--	    since it is likely that C compilers will not hazard two
--	    virtual addresses differing only in the upper byte.
-+All interpretation of userspace memory addresses by the kernel assumes
-+an address tag of 0x00.
-+
-+This includes, but is not limited to, addresses found in:
-+
-+ - pointer arguments to system calls, including pointers in structures
-+   passed to system calls,
-+
-+ - the stack pointer (sp), e.g. when interpreting it to deliver a
-+   signal,
-+
-+ - the frame pointer (x29) and frame records, e.g. when interpreting
-+   them to generate a backtrace or call graph.
-+
-+Using non-zero address tags in any of these locations may result in an
-+error code being returned, a (fatal) signal being raised, or other modes
-+of failure.
-+
-+For these reasons, passing non-zero address tags to the kernel via
-+system calls is forbidden, and using a non-zero address tag for sp is
-+strongly discouraged.
-+
-+Programs maintaining a frame pointer and frame records that use non-zero
-+address tags may suffer impaired or inaccurate debug and profiling
-+visibility.
-+
-+
-+Preserving tags
-+---------------
-+
-+Non-zero tags are not preserved when delivering signals. This means that
-+signal handlers in applications making use of tags cannot rely on the
-+tag information for user virtual addresses being maintained for fields
-+inside siginfo_t. One exception to this rule is for signals raised in
-+response to watchpoint debug exceptions, where the tag information will
-+be preserved.
- 
- The architecture prevents the use of a tagged PC, so the upper byte will
- be set to a sign-extension of bit 55 on exception return.
-+
-+
-+Other considerations
-+--------------------
-+
-+Special care should be taken when using tagged pointers, since it is
-+likely that C compilers will not hazard two virtual addresses differing
-+only in the upper byte.
--- 
-2.1.4
+Yury
