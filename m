@@ -1,10 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 20 Apr 2017 12:05:44 -0700
-Subject: [PATCH 1/2] arm64: perf: Wire-up Cortex A53 L2 cache events and DTLB
+Date: Thu, 20 Apr 2017 12:05:45 -0700
+Subject: [PATCH 1/2] arm64: pmu: Wire-up Cortex A53 L2 cache events and DTLB
  refills
 In-Reply-To: <20170420190546.7453-1-f.fainelli@gmail.com>
 References: <20170420190546.7453-1-f.fainelli@gmail.com>
-Message-ID: <20170420190546.7453-2-f.fainelli@gmail.com>
+Message-ID: <20170420190546.7453-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
