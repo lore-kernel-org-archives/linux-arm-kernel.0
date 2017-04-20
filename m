@@ -1,33 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Apr 2017 11:16:20 +0100
-Subject: [PATCH] ARM: hyp-stub: Fix Thumb-2 compilation
-Message-ID: <20170420101620.1368-1-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Apr 2017 11:33:40 +0100
+Subject: [PATCH v4 03/21] ARM64: implement pci_remap_cfgspace() interface
+In-Reply-To: <20170419164913.19674-4-lorenzo.pieralisi@arm.com>
+References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
+ <20170419164913.19674-4-lorenzo.pieralisi@arm.com>
+Message-ID: <20170420103340.GA755@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The assembler defaults to emiting the short form of ADR, leading
-to an out-of-range immediate. Using the wide version solves this
-issue.
+On Wed, Apr 19, 2017 at 05:48:52PM +0100, Lorenzo Pieralisi wrote:
+> The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+> and Posting") defines rules for PCI configuration space transactions
+> ordering and posting, that state that configuration writes
+> are non-posted transactions.
+> 
+> This rule is reinforced by the ARM v8 architecture reference manual
+> (issue A.k, Early Write Acknowledgment) that explicitly recommends
+> that No Early Write Acknowledgment attribute should be used to map
+> PCI configuration (write) transactions.
+> 
+> Current ioremap interface on ARM64 implements mapping functions
+> where the Early Write Acknowledgment hint is enabled, so they
+> cannot be used to map PCI configuration space in a PCI specs
+> compliant way.
+> 
+> Implement an ARM64 specific pci_remap_cfgspace() interface
+> that allows to map PCI config region with nGnRnE attributes, providing
+> a remap function that complies with PCI specifications and the ARMv8
+> architecture reference manual recommendations.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
 
-Fixes: bc845e4fbbbb ("ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall in the init code")
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/hyp-stub.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index d8523cc47a54..ec7e7377d423 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -125,7 +125,7 @@ ENTRY(__hyp_stub_install_secondary)
-  * (see safe_svcmode_maskall).
-  */
- 	@ Now install the hypervisor stub:
--	adr	r7, __hyp_stub_vectors
-+	W(adr)	r7, __hyp_stub_vectors
- 	mcr	p15, 4, r7, c12, c0, 0	@ set hypervisor vector base (HVBAR)
- 
- 	@ Disable all traps, so we don't get any nasty surprise
--- 
-2.11.0
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
