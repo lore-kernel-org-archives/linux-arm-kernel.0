@@ -1,73 +1,73 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 20 Apr 2017 18:07:20 +0200
-Subject: [PATCH v4 3/8] ARM: dts: stm32: Enable DCMI support on STM32F429 MCU
+Date: Thu, 20 Apr 2017 18:07:18 +0200
+Subject: [PATCH v4 1/8] dt-bindings: Document STM32 DCMI bindings
 In-Reply-To: <1492704445-22186-1-git-send-email-hugues.fruchet@st.com>
 References: <1492704445-22186-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1492704445-22186-4-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1492704445-22186-2-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DCMI camera interface on STM32F429 MCU.
+This adds documentation of device tree bindings for the STM32 DCMI
+(Digital Camera Memory Interface).
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ .../devicetree/bindings/media/st,stm32-dcmi.txt    | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index ee0da97..e1ff978 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -736,6 +736,29 @@
- 					slew-rate = <3>;
- 				};
- 			};
+diff --git a/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+new file mode 100644
+index 0000000..f8baf65
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
+@@ -0,0 +1,46 @@
++STMicroelectronics STM32 Digital Camera Memory Interface (DCMI)
 +
-+			dcmi_pins: dcmi_pins at 0 {
-+				pins {
-+					pinmux = <STM32F429_PA4_FUNC_DCMI_HSYNC>,
-+						 <STM32F429_PB7_FUNC_DCMI_VSYNC>,
-+						 <STM32F429_PA6_FUNC_DCMI_PIXCLK>,
-+						 <STM32F429_PC6_FUNC_DCMI_D0>,
-+						 <STM32F429_PC7_FUNC_DCMI_D1>,
-+						 <STM32F429_PC8_FUNC_DCMI_D2>,
-+						 <STM32F429_PC9_FUNC_DCMI_D3>,
-+						 <STM32F429_PC11_FUNC_DCMI_D4>,
-+						 <STM32F429_PD3_FUNC_DCMI_D5>,
-+						 <STM32F429_PB8_FUNC_DCMI_D6>,
-+						 <STM32F429_PE6_FUNC_DCMI_D7>,
-+						 <STM32F429_PC10_FUNC_DCMI_D8>,
-+						 <STM32F429_PC12_FUNC_DCMI_D9>,
-+						 <STM32F429_PD6_FUNC_DCMI_D10>,
-+						 <STM32F429_PD2_FUNC_DCMI_D11>;
-+					bias-disable;
-+					drive-push-pull;
-+					slew-rate = <3>;
-+				};
++Required properties:
++- compatible: "st,stm32-dcmi"
++- reg: physical base address and length of the registers set for the device
++- interrupts: should contain IRQ line for the DCMI
++- resets: reference to a reset controller,
++          see Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
++- clocks: list of clock specifiers, corresponding to entries in
++          the clock-names property
++- clock-names: must contain "mclk", which is the DCMI peripherial clock
++- pinctrl: the pincontrol settings to configure muxing properly
++           for pins that connect to DCMI device.
++           See Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt.
++- dmas: phandle to DMA controller node,
++        see Documentation/devicetree/bindings/dma/stm32-dma.txt
++- dma-names: must contain "tx", which is the transmit channel from DCMI to DMA
++
++DCMI supports a single port node with parallel bus. It should contain one
++'port' child node with child 'endpoint' node. Please refer to the bindings
++defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
++
++Example:
++
++	dcmi: dcmi at 50050000 {
++		compatible = "st,stm32-dcmi";
++		reg = <0x50050000 0x400>;
++		interrupts = <78>;
++		resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
++		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
++		clock-names = "mclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&dcmi_pins>;
++		dmas = <&dma2 1 1 0x414 0x3>;
++		dma-names = "tx";
++		port {
++			dcmi_0: endpoint {
++				remote-endpoint = <...>;
++				bus-width = <8>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				pclk-sample = <1>;
 +			};
- 		};
- 
- 		rcc: rcc at 40023810 {
-@@ -805,6 +828,20 @@
- 			status = "disabled";
- 		};
- 
-+		dcmi: dcmi at 50050000 {
-+			compatible = "st,stm32-dcmi";
-+			reg = <0x50050000 0x400>;
-+			interrupts = <78>;
-+			resets = <&rcc STM32F4_AHB2_RESET(DCMI)>;
-+			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(DCMI)>;
-+			clock-names = "mclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&dcmi_pins>;
-+			dmas = <&dma2 1 1 0x414 0x3>;
-+			dma-names = "tx";
-+			status = "disabled";
 +		};
++	};
 +
- 		rng: rng at 50060800 {
- 			compatible = "st,stm32-rng";
- 			reg = <0x50060800 0x400>;
 -- 
 1.9.1
