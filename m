@@ -1,27 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 20 Apr 2017 09:21:35 -0500
-Subject: [PATCH 1/3] Documentation: dt-bindings: iio: adc: add Meson8 and
- Meson8b support
-In-Reply-To: <20170417182820.26670-2-martin.blumenstingl@googlemail.com>
-References: <20170417182820.26670-1-martin.blumenstingl@googlemail.com>
- <20170417182820.26670-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20170420142135.4abputt7z4pkvvdx@rob-hp-laptop>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 20 Apr 2017 16:24:39 +0200
+Subject: [PATCH v4 0/2] Tango PCIe controller support
+Message-ID: <d054300a-5891-0a25-8726-2be6b1beff6c@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 08:28:18PM +0200, Martin Blumenstingl wrote:
-> The Amlogic Meson SAR ADC driver can be used on Meson8 and Meson8b
-> (probably on earlier SoC generations as well, but I don't have any
-> hardware available for testing that).
-> Add a separate compatible for Meson8 and Meson8b because it does not
-> need any of the BL30 magic (unlike the GX SoCs).
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt | 2 ++
->  1 file changed, 2 insertions(+)
+Hello,
 
-I'd prefer "Documentation: " prefix is dropped as that's implied with 
-"dt-bindings". Otherwise,
+This patch was split in two, to ease review of two orthogonal
+parts (MSI controller and host bridge). NB: the patch is
+just split in two where host bridge support starts.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Changes from v3 to v4
+
+In the MSI part:
+- Support 256 MSIs instead of only 32
+- Define tango_{ack,mask,unmask} callbacks for the HW irq_chip
+- Use a spinlock instead of a mutex
+- Rename msi_mask register to msi_enable
+
+In the host bridge part:
+- Move several quirk-handling snippets out of the config space read function
+- Check whether the PCIe link is up at probe-time
+
+Other files
+- Let the framework compute the bus-range from the config space width
+- Be slightly more verbose in the Kconfig help
+
+
+What has *not* changed, waiting from feedback from Bjorn:
+
+- Pray that config and mem space accesses NEVER occur concurrently.
+- Using of_device_is_compatible() vs of_device_get_match_data()
+
+
+Marc Gonzalez (2):
+  PCI: Add tango MSI controller support
+  PCI: Add tango PCIe host bridge support
+
+ Documentation/devicetree/bindings/pci/tango-pcie.txt |  32 ++++
+ drivers/pci/host/Kconfig                             |   8 +
+ drivers/pci/host/Makefile                            |   1 +
+ drivers/pci/host/pcie-tango.c                        | 393 +++++++++++++++++++++++++++++++++++++++
+ include/linux/pci_ids.h                              |   2 +
+ 5 files changed, 436 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/tango-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-tango.c
+
+-- 
+2.11.0
