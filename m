@@ -1,51 +1,29 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 20 Apr 2017 10:20:31 +0200
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
- <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
- <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
- <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
- <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
- <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
- <241b130e-1fb7-ecd4-034e-eb02065ada66@free.fr>
- <37cd6172-b04e-fcad-18fc-4fbb26cc611b@arm.com>
- <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
-Message-ID: <2003d851-e17e-1a43-3889-ec6e79e635e3@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Apr 2017 10:22:16 +0200
+Subject: [PATCH] lib/mpi: fix build with clang
+In-Reply-To: <20170420034022.24109-1-stefan@agner.ch>
+References: <20170420034022.24109-1-stefan@agner.ch>
+Message-ID: <CAK8P3a0cW-u-hzYX+qijMcEs=Ztar=WaDnsd4JcPvqiTR69TbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/2017 13:19, Mason wrote:
+On Thu, Apr 20, 2017 at 5:40 AM, Stefan Agner <stefan@agner.ch> wrote:
+> Use just @ to denote comments which works with gcc and clang.
+> Otherwise clang reports an escape sequence error:
+>   error: invalid % escape in inline assembly string
+>
+> Use %0-%3 as operand references, this avoids:
+>   error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
+>
+> Also remove superfluous casts on output operands to avoid warnings
+> such as:
+>   warning: invalid use of a cast in an inline asm context requiring an l-value
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> I checked the output of gcc with -S switch before and after this change,
+> gcc generated the same assembly.
 
-> My biggest problem is that tango_unmask() is never called.
+I've done a lot of build testing on a tree that contains a very similar patch.
 
-FTR, the missing incantation was:
-Explicitly calling tango_{mask/unmask/ack} from the corresponding msi_{mask/unmask/ack}
-
-Marc, I have one nagging doubt, wrt splitting MSI line selection
-and MSI enable.
-
-tango_irq_domain_alloc : finds an available MSI 'j' to allocate
-tango_irq_domain_free : release MSI 'j'
-tango_unmask : enable MSI 'j'
-tango_mask : disable MSI 'j'
-
-Is the following scenario guaranteed to never happen?
-
-tango_irq_domain_alloc // alloc 0
-tango_irq_domain_free  // free 0
-tango_irq_domain_alloc // alloc 0
-tango_unmask // enable 0
-tango_unmask // enable 0 = NOP
-tango_mask   // disable 0
-
-In this theoretical scenario, we would be left with a non-functional
-MSI 0.
-
-Regards.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
