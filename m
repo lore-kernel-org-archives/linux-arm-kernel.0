@@ -1,48 +1,37 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 20 Apr 2017 16:50:03 +0200
-Subject: [PATCH v4 3/8] arm: fix return value of parse_cpu_capacity
-In-Reply-To: <20170420144316.15632-4-juri.lelli@arm.com>
-References: <20170420144316.15632-1-juri.lelli@arm.com>
- <20170420144316.15632-4-juri.lelli@arm.com>
-Message-ID: <CAKfTPtCnK6TW3+pdYLeDcUWEtQi5j+id70Lhtv4umg1eNyZV1w@mail.gmail.com>
+From: Nicolas.Ferre@microchip.com (Nicolas.Ferre at microchip.com)
+Date: Thu, 20 Apr 2017 14:50:57 +0000
+Subject: linux-next: manual merge of the at91 tree with the arm-soc tree
+In-Reply-To: <20170420083817.5a44b69c@canb.auug.org.au>
+References: <20170420083817.5a44b69c@canb.auug.org.au>
+Message-ID: <56448E9475A7CD4F97A754616F76B45780C65F@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2017 at 16:43, Juri Lelli <juri.lelli@arm.com> wrote:
-> parse_cpu_capacity() has to return 0 on failure, but it currently returns
-> 1 instead if raw_capacity kcalloc failed.
+> Hi Nicolas,
 >
-> Fix it (by directly returning 0).
+> Today's linux-next merge of the at91 tree got a conflict in:
+> 
+>  arch/arm/boot/dts/at91-tse850-3.dts
+> between commit:
 >
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Reported-by: Morten Rasmussen <morten.rasmussen@arm.com>
-> Fixes: 06073ee26775 ('ARM: 8621/3: parse cpu capacity-dmips-mhz from DT')
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
+> e67cedc92812 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
 >
-> Changes from v3:
+> from the arm-soc tree and commit:
 >
->  - directly return 0 on failure (as pointed out by Vincent)
-> ---
->  arch/arm/kernel/topology.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  29dd89418007 ("ARM: dts: at91: add envelope detector mux to the Axentia TSE-850")
 >
-> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-> index f8a3ab82e77f..1b8ec3054642 100644
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -166,7 +166,7 @@ static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
->                         if (!raw_capacity) {
->                                 pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
->                                 cap_parsing_failed = true;
-> -                               return !ret;
-> +                               return 0;
+> from the at91 tree.
+>
+> I fixed it up (I used the arm-soc tree version) and can carry the fix as
+> necessary. This is now fixed as far as linux-next is concerned, but any
+> non trivial conflicts should be mentioned to your upstream maintainer
+> when your tree is submitted for merging.  You may also want to consider
+> cooperating with the maintainer of the conflicting tree to minimise any
+> particularly complex conflicts.
 
-Acked-by: Vincent Guittot <vincent.guittot@linaor.org>
->                         }
->                 }
->                 capacity_scale = max(cpu_capacity, capacity_scale);
-> --
-> 2.10.0
->
+Stephen,
+
+Yes, the use of arm-soc version was the way to go. I now have updated my at91-next tree to match Alexandre's pull-request and hope it is not in conflict anymore.
+
+Thanks for your fix.
+Best regards,
