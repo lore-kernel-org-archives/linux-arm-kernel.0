@@ -1,129 +1,155 @@
-From: drivshin@awxrd.com (David Rivshin)
-Date: Thu, 20 Apr 2017 09:53:41 -0400
-Subject: [PATCH 2/2] gpio: omap: compute debounce-time from actual
- debounce-clock rate
-In-Reply-To: <5d0fab0d-bc9d-5148-063c-8bfe9e26f9a5@ti.com>
-References: <20170317005704.11971-1-drivshin@awxrd.com>
- <20170317005704.11971-3-drivshin@awxrd.com>
- <adc98bfd-ebce-49f0-5991-3c6a1e99ec25@ti.com>
- <20170317191419.021bdd84.drivshin@awxrd.com>
- <5d0fab0d-bc9d-5148-063c-8bfe9e26f9a5@ti.com>
-Message-ID: <20170420095341.6c919e40.drivshin@awxrd.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 20 Apr 2017 09:02:53 -0500
+Subject: [PATCH v4 02/11] clk: sunxi-ng: add support for DE2 CCU
+In-Reply-To: <20170416120849.54542-3-icenowy@aosc.io>
+References: <20170416120849.54542-1-icenowy@aosc.io>
+ <20170416120849.54542-3-icenowy@aosc.io>
+Message-ID: <20170420140252.vd6aeeweshx2tdou@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Mar 2017 19:06:47 -0500
-Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-
-> CC: Tero
- 
-Gentle ping. Any thoughts on this? Is there anything I should 
-investigate, or other information you'd like me to provide?
-
-> On 03/17/2017 06:14 PM, David Rivshin wrote:
-> > On Fri, 17 Mar 2017 14:43:02 -0500
-> > Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> >  
-> >> On 03/16/2017 07:57 PM, David Rivshin wrote:  
-> >>> From: David Rivshin <DRivshin@allworx.com>
-> >>>
-> >>> omap2_set_gpio_debounce() assumes the debounce clock runs at 32768Hz,
-> >>> leading to 31us granularity. In reality the debounce clock (which
-> >>> is provided by other modules) could be at different rate, leading to
-> >>> an incorrect computation of the number of debounce clock cycles for
-> >>> GPIO_DEBOUNCINGTIME[DEBOUNCETIME].
-> >>>
-> >>> Also, even with a standard 32768Hz input clock, the actual granularity
-> >>> is ~30.5us. This leads to the actual debounce time being ~1.5% too
-> >>> short.
-> >>>
-> >>> Fix both issues by simply querying the dbck rate, rather than
-> >>> hardcoding.  
-> >>
-> >> Pls, hold on with this - I'm trying to check it, as it doesn't follow TRMs.  
-> >
-> > Yes, the TRMs are somewhat cryptic about the details, perhaps I can give
-> > some more background on how I came to this. I think the chapters for the
-> > GPIO block are written with a strong assumption that the input debounce
-> > clock is 32768Hz, and further round 1/32768Hz to the nearest whole
-> > microsecond (~30.5us->31us).
-> >
-> > However, at least on AM335x the debounce clock (i.e. the CLK_32KHZ) can
-> > be made to run at other rates via the Control Module.
-> >
-> > Here is an example from clk_summary:
-> >  clk_24mhz                    1            1    24000000          0 0
-> >     clkdiv32k_ck              1            1       65536          0 0
-> >        clkdiv32k_ick          2            6       65536          0 0
-> >           timer7_fck          1            1       65536          0 0
-> >           wdt1_fck            0            1       65536          0 0
-> >           gpio3_dbclk         0            2       65536          0 0
-> >           gpio2_dbclk         0            2       65536          0 0
-> >           gpio1_dbclk         0            2       65536          0 0
-> >
-> > This is accomplished by setting clk32kdivratio_ctl[clkdivopp50_en] to 1
-> > even while in OPP100, and adjusting the devicetree to match. Timer7 is
-> > known to truly have a 65536Hz fck by configuring it as a 50% duty cycle
-> > PWM and measuring with an oscilloscope.
-> >
-> > Here are some relevant sections from the AM335x TRM (spruh73o):
-> >   25.2.2 GPIO Clock and Reset Management
-> >     Debounce Functional clock (GPIO[123]) comes from CLK_32KHZ.
-> >   8.1.6.8 Peripheral PLL Description
-> >     CLK_32KHZ is CLK_24 divided by either 732.4219 or 366.2109.
-> >     In OPP100 this results in either 32768Hz or 65536Hz.
-> >     In OPP50 this results in either 16384Hz or 32768Hz.
-> >   9.3.1.8 clk32kdivratio_ctrl Register
-> >     Names of the register and field differ from 8.1.6.8, but it's
-> >      clear they are the same.
-> >
-> > I'm not sure if other devices can be similarly cajoled into running
-> > their equivalent 32KHZ clocks at a different rate, but it certainly
-> > works for AM335x. Checking OMAP4430 TRM as an example makes it look
-> > like OMAP44xx has a fixed 32768Hz clock with no adjustment possible
-> > (backed up by omap44xx-clocks.dtsi having it just be a fixed-clock).
-> >
-> >  
-> >>>
-> >>> Fixes: e85ec6c3047b ("gpio: omap: fix omap2_set_gpio_debounce")
-> >>> Cc: <stable@vger.kernel.org> # 4.3+
-> >>> Signed-off-by: David Rivshin <drivshin@allworx.com>
-> >>> ---
-> >>>
-> >>> This logical bug existed before e85ec6c3047b, but if backporting
-> >>> further it's probably best to just cherry-pick/backport e85ec6c3047b
-> >>> first.
-> >>>
-> >>>  drivers/gpio/gpio-omap.c | 8 +++++---
-> >>>  1 file changed, 5 insertions(+), 3 deletions(-)
-> >>>
-> >>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> >>> index 33ec02d..865a831 100644
-> >>> --- a/drivers/gpio/gpio-omap.c
-> >>> +++ b/drivers/gpio/gpio-omap.c
-> >>> @@ -205,8 +205,8 @@ static inline void omap_gpio_dbck_disable(struct gpio_bank *bank)
-> >>>   * @offset: the gpio number on this @bank
-> >>>   * @debounce: debounce time to use
-> >>>   *
-> >>> - * OMAP's debounce time is in 31us steps
-> >>> - *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) x 31
-> >>> + * OMAP's debounce time is in 1/DBCK steps
-> >>> + *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) / DBCK
-> >>>   * so we need to convert and round up to the closest unit.
-> >>>   *
-> >>>   * Return: 0 on success, negative error otherwise.
-> >>> @@ -223,7 +223,9 @@ static int omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
-> >>>  		return -ENOTSUPP;
-> >>>
-> >>>  	if (enable) {
-> >>> -		debounce = DIV_ROUND_UP(debounce, 31) - 1;
-> >>> +		u64 tmp = (u64)debounce * clk_get_rate(bank->dbck);
-> >>> +
-> >>> +		debounce = DIV_ROUND_UP_ULL(tmp, 1000000) - 1;
-> >>>  		if ((debounce & OMAP4_GPIO_DEBOUNCINGTIME_MASK) != debounce)
-> >>>  			return -EINVAL;
-> >>>  	}
-> >>>  
-> >>  
-> >  
+On Sun, Apr 16, 2017 at 08:08:40PM +0800, Icenowy Zheng wrote:
+> The "Display Engine 2.0" in Allwinner newer SoCs contains a clock
+> management unit for its subunits, like the DE CCU in A80.
 > 
+> Add a sunxi-ng style driver for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Changes in v4:
+> - Fixed the inconsistence between mixer_div clocks' number and real clock.
+> Changes in v2:
+> - Rename sunxi-de2-ccu to sun8i-de2-ccu.
+> 
+>  drivers/clk/sunxi-ng/Kconfig          |   5 +
+>  drivers/clk/sunxi-ng/Makefile         |   1 +
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.c  | 218 ++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.h  |  28 +++++
+>  include/dt-bindings/clock/sun8i-de2.h |  54 +++++++++
+>  include/dt-bindings/reset/sun8i-de2.h |  50 ++++++++
+
+These 2 includes belong with the binding patch.
+
+>  6 files changed, 356 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+>  create mode 100644 include/dt-bindings/clock/sun8i-de2.h
+>  create mode 100644 include/dt-bindings/reset/sun8i-de2.h
+
+
+> diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+> new file mode 100644
+> index 000000000000..982c6d18c75b
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/sun8i-de2.h
+> @@ -0,0 +1,54 @@
+> +/*
+> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+
+You can use SPDX tag here:
+
+SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+> +
+> +#ifndef _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
+> +#define _DT_BINDINGS_CLOCK_SUN8I_DE2_H_
+> +
+> +#define CLK_BUS_MIXER0		0
+> +#define CLK_BUS_MIXER1		1
+> +#define CLK_BUS_WB		2
+> +
+> +#define CLK_MIXER0		6
+> +#define CLK_MIXER1		7
+> +#define CLK_WB			8
+> +
+> +#endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+> diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+> new file mode 100644
+> index 000000000000..52af2dc55376
+> --- /dev/null
+> +++ b/include/dt-bindings/reset/sun8i-de2.h
+> @@ -0,0 +1,50 @@
+> +/*
+> + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+
+And here.
+
+Rob
