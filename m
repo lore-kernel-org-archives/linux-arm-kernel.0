@@ -1,50 +1,23 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Apr 2017 17:51:12 +0900
-Subject: [PATCH 1/3] ARM: dts: r8a7743: add PFC support
-In-Reply-To: <20170414211505.733692280@cogentembedded.com>
-References: <20170414211505.733692280@cogentembedded.com>
-Message-ID: <20170420085112.GF3760@verge.net.au>
+Date: Thu, 20 Apr 2017 17:52:24 +0900
+Subject: [PATCH 0/3] Add R8A7743/SK-RZG1M PFC support
+In-Reply-To: <20170414210941.143838720@cogentembedded.com>
+References: <20170414210941.143838720@cogentembedded.com>
+Message-ID: <20170420085223.GG3760@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 15, 2017 at 12:09:42AM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A7743 part of the PFC device node.
+On Sat, Apr 15, 2017 at 12:09:41AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20170410-v4.11-rc6' tag.  We're adding the R8A7743 PFC node and
+> then describe the pins for SCIF0 and Ether devices described eralier. These
+> patches depend on the R8A7743 PFC suport in order to work properly.
 > 
-> ---
->  arch/arm/boot/dts/r8a7743.dtsi |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-> @@ -1,7 +1,7 @@
->  /*
->   * Device Tree Source for the r8a7743 SoC
->   *
-> - * Copyright (C) 2016 Cogent Embedded Inc.
-> + * Copyright (C) 2016-2017 Cogent Embedded Inc.
->   *
->   * This file is licensed under the terms of the GNU General Public License
->   * version 2. This program is licensed "as is" without any warranty of any
-> @@ -123,6 +123,11 @@
->  			#power-domain-cells = <1>;
->  		};
->  
-> +		pfc: pin-controller at e6060000 {
-> +			compatible = "renesas,pfc-r8a7743";
-> +			reg = <0 0xe6060000 0 0x250>;
-> +		};
-> +
+> [1/3] ARM: dts: r8a7743: add PFC support
+> [2/3] ARM: dts: sk-rzg1m: add SCIF0 pins
+> [3/3] ARM: dts: sk-rzg1m: add Ether pins
 
-I am curious to know why pin-controller was chosen rather than pfc which
-is dominant in the DT for Renesas SoCs. And as a follow-up question, do
-you think it would be worth creating patches to make this uniform
-across the DT for Renesas SoCs.
-
->  		dmac0: dma-controller at e6700000 {
->  			compatible = "renesas,dmac-r8a7743",
->  				     "renesas,rcar-dmac";
-> 
+These look good to me. Please repost me or ping me once the prerequisites
+have been accepted. Likewise for the similar patchset for the R8A7745/SK-RZG1E.
