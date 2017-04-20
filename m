@@ -1,64 +1,66 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Thu, 20 Apr 2017 19:17:10 +0100
-Subject: [PATCH 0/4] arm64: improve tagged pointer handling
-Message-ID: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+Date: Thu, 20 Apr 2017 19:17:11 +0100
+Subject: [PATCH 1/4] arm64: traps: fix userspace cache maintenance emulation
+ on a tagged pointer
+In-Reply-To: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1492712234-4950-2-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When we emulate userspace cache maintenance in the kernel, we can
+currently send the task a SIGSEGV even though the maintenance was done
+on a valid address. This happens if the address has a non-zero address
+tag, and happens to not be mapped in.
 
-Here are some patches to fix a few issues related to tagged pointer
-handling.
+When we get the address from a user register, we don't currently remove
+the address tag before performing cache maintenance on it. If the
+maintenance faults, we end up in either __do_page_fault, where find_vma
+can't find the VMA if the address has a tag, or in do_translation_fault,
+where the tagged address will appear to be above TASK_SIZE. In both
+cases, the address is not mapped in, and the task is sent a SIGSEGV.
 
-Tagged pointers from userspace can end up in the kernel in a number of
-ways. I most likely have not found all of them, but they include at
-least the following:
+This patch removes the tag from the address before using it. With this
+patch, the fault is handled correctly, the address gets mapped in, and
+the cache maintenance succeeds.
 
- - Passing tagged pointers in system call arguments. This would be a
-   userspace bug, as documented in tagged-pointers.txt.
+As a second bug, if cache maintenance (correctly) fails on an invalid
+tagged address, the address gets passed into arm64_notify_segfault,
+where find_vma fails to find the VMA due to the tag, and the wrong
+si_code may be sent as part of the siginfo_t of the segfault. With this
+patch, the correct si_code is sent.
 
- - Through FAR_EL1 when we take a data abort or watchpoint exception.
-   Watchpoint handling is currently broken if we get a tagged pointer,
-   patch #2 in this series fixes it. We already do the right thing for
-   data aborts but patch #3 tries to improve on it a little.
+Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+---
 
- - Reading a tagged pointer from a GPR when trapping and emulating
-   instructions, e.g. cache maintenance or uprobes. Patch #1 fixes the
-   cache maintenance case.
+Note that patch #3 would also fix the first bug (incorrect segfault),
+but not the second (wrong si_code), hence this patch.
 
- - The user stack pointer, frame pointer (x29), frame records, and link
-   register (x30) can contain tagged pointers. Patch #4 documents that
-   some kernel features do not currently work with tagged pointers in
-   the first three of these.
+ arch/arm64/kernel/traps.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- - A tagged pointer can end up in the PC on an illegal exception return
-   (see D4.1.4 ARMARM A.k_iss10775), and from there in ELR on exception
-   entry. As I understand it, this can only be caused by a bad eret at
-   EL1 or a bad debug state exit by an external debugger, so only by a
-   bug in Linux/firmware or the external debugger. So I don't think we
-   need to handle this.
-
-Note that the above applies to Linux only. I have spoken to Marc Zyngier
-about KVM, and so far he hasn't found any problems there.
-
-Thanks,
-Kristina
-
-
-Kristina Martsenko (4):
-  arm64: traps: fix userspace cache maintenance emulation on a tagged
-    pointer
-  arm64: hw_breakpoint: fix watchpoint matching for tagged pointers
-  arm64: entry: improve data abort handling of tagged pointers
-  arm64: documentation: document tagged pointer stack constraints
-
- Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
- arch/arm64/include/asm/asm-uaccess.h    |  9 +++++
- arch/arm64/include/asm/uaccess.h        |  6 ++--
- arch/arm64/kernel/entry.S               |  4 ++-
- arch/arm64/kernel/hw_breakpoint.c       |  3 ++
- arch/arm64/kernel/traps.c               |  4 +--
- 6 files changed, 67 insertions(+), 21 deletions(-)
-
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e52be6aa44ee..45c8eca951bc 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -443,7 +443,7 @@ int cpu_enable_cache_maint_trap(void *__unused)
+ }
+ 
+ #define __user_cache_maint(insn, address, res)			\
+-	if (untagged_addr(address) >= user_addr_max()) {	\
++	if (address >= user_addr_max()) {			\
+ 		res = -EFAULT;					\
+ 	} else {						\
+ 		uaccess_ttbr0_enable();				\
+@@ -469,7 +469,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ 	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+ 	int ret = 0;
+ 
+-	address = pt_regs_read_reg(regs, rt);
++	address = untagged_addr(pt_regs_read_reg(regs, rt));
+ 
+ 	switch (crm) {
+ 	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
 -- 
 2.1.4
