@@ -1,96 +1,37 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 20 Apr 2017 14:56:50 +0530
-Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
- kernel is running in HYP
-In-Reply-To: <20170420084928.GC31436@leverpostej>
-References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
- <20170420084928.GC31436@leverpostej>
-Message-ID: <CAFpQJXVSsg8CX28vEo2LzmOi3pknHiH233spMD6ip4LZO4vw=Q@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 20 Apr 2017 14:59:42 +0530
+Subject: [PATCH V4 5/7] ARM: sun8i: Use - instead of @ for DT OPP entries
+In-Reply-To: <20170420080202.olu2mhel6xtmnnjt@lukather>
+References: <cover.1492666725.git.viresh.kumar@linaro.org>
+ <d13e447e9cc080d81c4f2db3bd5433506d3ef739.1492666725.git.viresh.kumar@linaro.org>
+ <20170420080202.olu2mhel6xtmnnjt@lukather>
+Message-ID: <20170420092942.GG5436@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 2:19 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Apr 19, 2017 at 11:14:06PM +0530, Ganapatrao Kulkarni wrote:
->> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
->> is returning error for perf syscall with mixed attribute set for exclude_kernel
->> and exclude_hv. This change is breaking some applications (observed with hhvm)
->> when ran on VHE enabled platforms.
->>
->> Adding fix to consider only exclude_kernel attribute when kernel is
->> running in HYP. Also adding sysfs file to notify the bhehaviour
->> of attribute exclude_hv.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>
->> Changelog:
->>
->> V2:
->>  - Changes as per Will Deacon's suggestion.
->>
->> V1: Initial patch
->>
->>  arch/arm64/kernel/perf_event.c | 28 ++++++++++++++++++++++++----
->>  include/linux/perf/arm_pmu.h   |  1 +
->>  2 files changed, 25 insertions(+), 4 deletions(-)
->>
->> @@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
->>
->>       if (attr->exclude_idle)
->>               return -EPERM;
->> -     if (is_kernel_in_hyp_mode() &&
->> -         attr->exclude_kernel != attr->exclude_hv)
->> -             return -EINVAL;
->> +     if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
->> +             config_base |= ARMV8_PMU_INCLUDE_EL2;
->>       if (attr->exclude_user)
->>               config_base |= ARMV8_PMU_EXCLUDE_EL0;
->>       if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
->>               config_base |= ARMV8_PMU_EXCLUDE_EL1;
->> -     if (!attr->exclude_hv)
->> +     if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
->>               config_base |= ARMV8_PMU_INCLUDE_EL2;
->
-> This isn't quite what Will suggested.
->
-> The idea was that userspace would read sysfs, then use that to determine
-> the correct exclusion parameters [1,2]. This logic was not expected to
-> change; it correctly validates whether we can provide what the user
-> requests.
+On 20-04-17, 10:02, Maxime Ripard wrote:
+> Hi,
+> 
+> On Thu, Apr 20, 2017 at 11:14:16AM +0530, Viresh Kumar wrote:
+> > Compiling the DT file with W=1, DTC warns like follows:
+> > 
+> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> > unit name, but no reg property
+> > 
+> > Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> > "reg" property.
+> > 
+> > Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> 
+> This patch doesn't apply, please make sure to base them on linux-next
 
-OK, if you are ok with sysfs part, i can send next version with that
-change only?.
+I can do that tomorrow once linux-next includes the new PM tree as the
+old PM tree had my patch from V3.
 
->
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499224.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499493.html
->
->>
->>       /*
->> @@ -1008,6 +1026,8 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
->>               &armv8_pmuv3_events_attr_group;
->>       cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
->>               &armv8_pmuv3_format_attr_group;
->> +     cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_ATTR] =
->> +             &armv8_pmuv3_attr_group;
->>       return armv8pmu_probe_pmu(cpu_pmu);
->>  }
->>
->> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
->> index 8462da2..a26ffc7 100644
->> --- a/include/linux/perf/arm_pmu.h
->> +++ b/include/linux/perf/arm_pmu.h
->> @@ -81,6 +81,7 @@ enum armpmu_attr_groups {
->>       ARMPMU_ATTR_GROUP_COMMON,
->>       ARMPMU_ATTR_GROUP_EVENTS,
->>       ARMPMU_ATTR_GROUP_FORMATS,
->> +     ARMPMU_ATTR_GROUP_ATTR,
->>       ARMPMU_NR_ATTR_GROUPS
->>  };
->>
->> --
->> 1.8.1.4
->>
+-- 
+viresh
