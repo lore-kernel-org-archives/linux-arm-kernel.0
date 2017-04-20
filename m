@@ -1,38 +1,42 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 20 Apr 2017 15:43:10 +0100
-Subject: [PATCH v4 2/8] Documentation/ABI: add information about cpu_capacity
+Date: Thu, 20 Apr 2017 15:43:09 +0100
+Subject: [PATCH v4 1/8] Documentation: arm: fix wrong reference number in DT
+ definition
 In-Reply-To: <20170420144316.15632-1-juri.lelli@arm.com>
 References: <20170420144316.15632-1-juri.lelli@arm.com>
-Message-ID: <20170420144316.15632-3-juri.lelli@arm.com>
+Message-ID: <20170420144316.15632-2-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-/sys/devices/system/cpu/cpu#/cpu_capacity describe information about
-CPUs heterogeneity (ref. to Documentation/devicetree/bindings/arm/
-cpu-capacity.txt).
+Reference to cpu capacity binding has a wrong number. Fix it.
 
-Add such description.
-
+Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- Documentation/ABI/testing/sysfs-devices-system-cpu | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/ABI/testing/sysfs-devices-system-cpu b/Documentation/ABI/testing/sysfs-devices-system-cpu
-index 2a4a423d08e0..f3d5817c4ef0 100644
---- a/Documentation/ABI/testing/sysfs-devices-system-cpu
-+++ b/Documentation/ABI/testing/sysfs-devices-system-cpu
-@@ -366,3 +366,10 @@ Contact:	Linux ARM Kernel Mailing list <linux-arm-kernel@lists.infradead.org>
- Description:	AArch64 CPU registers
- 		'identification' directory exposes the CPU ID registers for
- 		 identifying model and revision of the CPU.
-+
-+What:		/sys/devices/system/cpu/cpu#/cpu_capacity
-+Date:		December 2016
-+Contact:	Linux kernel mailing list <linux-kernel@vger.kernel.org>
-+Description:	information about CPUs heterogeneity.
-+
-+		cpu_capacity: capacity of cpu#.
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 698ad1f097fa..83ec3fa0a05e 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -248,7 +248,7 @@ nodes to be present and contain the properties described below.
+ 		Usage: Optional
+ 		Value type: <u32>
+ 		Definition:
+-			# u32 value representing CPU capacity [3] in
++			# u32 value representing CPU capacity [4] in
+ 			  DMIPS/MHz, relative to highest capacity-dmips-mhz
+ 			  in the system.
+ 
+@@ -475,5 +475,5 @@ cpus {
+ [2] arm/msm/qcom,kpss-acc.txt
+ [3] ARM Linux kernel documentation - idle states bindings
+     Documentation/devicetree/bindings/arm/idle-states.txt
+-[3] ARM Linux kernel documentation - cpu capacity bindings
++[4] ARM Linux kernel documentation - cpu capacity bindings
+     Documentation/devicetree/bindings/arm/cpu-capacity.txt
 -- 
 2.10.0
