@@ -1,167 +1,104 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Apr 2017 09:36:29 +0200
-Subject: [PATCH 09/11] drm/sun4i: Support two display pipelines
-In-Reply-To: <CAGb2v64etokrb2at8Z9mpRfLhQO_2BcypZBF_rG7sVSRKiW1KQ@mail.gmail.com>
-References: <20170309100534.14023-1-wens@csie.org>
- <20170309100534.14023-10-wens@csie.org>
- <20170309103636.j5jtjhwjztzchr6u@lukather>
- <CAGb2v66gFtEiESQHC9sU-XmNOoR3gCJAyQ+ZWozQmuvtWaaJMQ@mail.gmail.com>
- <20170309144009.kgixcnrjg4cot6ut@lukather>
- <CAGb2v64fmMj-YX+A-Gm_T7U=dr9J6ekwX4thqD7zegoqGMdSFQ@mail.gmail.com>
- <20170418095741.dfay2drvyiwpmlyl@lukather>
- <CAGb2v64etokrb2at8Z9mpRfLhQO_2BcypZBF_rG7sVSRKiW1KQ@mail.gmail.com>
-Message-ID: <20170420073629.ngcckusehl4iuapa@lukather>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 20 Apr 2017 09:46:46 +0200
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <CAD=FV=UShTqx3JjijEZSayA4HtFzztye6rotsJubtoiYxxMC=g@mail.gmail.com>
+References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+ <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+ <186569458.91967.1492547106553@email.1und1.de>
+ <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+ <212870399.174480.1492633502649@email.1und1.de>
+ <CAD=FV=UShTqx3JjijEZSayA4HtFzztye6rotsJubtoiYxxMC=g@mail.gmail.com>
+Message-ID: <e141d7fb-7ec8-805e-d2f2-f1892b76d00e@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am 19.04.2017 um 23:47 schrieb Doug Anderson:
+> Hi,
+>
+> On Wed, Apr 19, 2017 at 1:25 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Hi,
+>>
+>>> Doug Anderson <dianders@chromium.org> hat am 18. April 2017 um 22:41 geschrieben:
+>>>
+>>>
+>>> It's hard to know for sure that all of this time is really in
+>>> urb_enqueue().  Possible we could have task switched out and been
+>>> blocked elsewhere.  Using ftrace to get more fine-grained timings
+>>> would be useful.  ktime_get(), ktime_sub(), and ktime_to_us() are your
+>>> friends here if you want to use trace_printk.
+>> i'm a newbie to ftrace, so i hope this would be helpful.
+>>
+>> # connect PL2303 to the onboard hub
+>> # echo 0 > options/sleep-time
+>> # echo 0 > function_profile_enabled
+>> # echo 1 > function_profile_enabled
+>> # ./usb_test
+>> # Waiting for at least 20 seconds and then disconnect PL2303
+>> # echo 0 > function_profile_enabled
+>> # cat trace_stat/function0
+>>
+>>   Function                               Hit    Time            Avg             s^2
+>>   --------                               ---    ----            ---             ---
+>>   bcm2835_handle_irq                  361347    219567633 us     607.636 us      1485199 us
+>>   __handle_domain_irq                1082482    212639551 us     196.437 us      3642030 us
+>>   generic_handle_irq                 1082482    100592051 us     92.927 us       50511334 us
+>>   irq_exit                           1082482    98197771 us     90.715 us       29649040 us
+>>   handle_level_irq                   1082482    95812379 us     88.511 us       51910093 us
+>>   do_sys_open                           1806    87612983 us     48512.17 us     2198507 us
+>>   SyS_open                              1601    87372331 us     54573.59 us     1898996 us
+>>   do_filp_open                          1862    87368058 us     46921.62 us     1634982 us
+>>   path_openat                           1862    87314553 us     46892.88 us     3357817 us
+>>   __do_softirq                          3035    86266050 us     28423.73 us     6449768 us
+>>   vfs_open                              1515    85877012 us     56684.49 us     101673.5 us
+>>   do_dentry_open                        1515    85861429 us     56674.21 us     812420.7 us
+>>   usb_submit_urb                         136    85760172 us     630589.5 us     59532024 us
+>>   usb_hcd_submit_urb                     134    85756518 us     639974.0 us     726298102 us
+>>   _dwc2_hcd_urb_enqueue                  134    85738333 us     639838.3 us     874104371 us
+> The 134 calls to this are taking a ton of time.  It would be nice to
+> know where all the time actually was in here.  Are you on a
+> single-core device, or multi-core?
 
-Hi,
+Raspberry Pi B is a single core device which runs with 700 MHz cpu freq.
 
-On Tue, Apr 18, 2017 at 06:10:26PM +0800, Chen-Yu Tsai wrote:
-> >> >> >> @@ -540,14 +539,22 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
-> >> >> >>       /* This can fail if the DT does not have any downstream encoders. */
-> >> >> >>       tcon->id = sun4i_tcon_of_get_id(dev->of_node);
-> >> >> >>       if (tcon->id < 0) {
-> >> >> >> -             /*
-> >> >> >> -              * TODO We currently support only 1 TCON, so we can
-> >> >> >> -              * safely set this to 0. This should be revisited
-> >> >> >> -              * when we add support for multiple pipelines.
-> >> >> >> -              */
-> >> >> >> -             tcon->id = 0;
-> >> >> >> +             int i;
-> >> >> >> +
-> >> >> >> +             /* find the first empty tcon in sun4i_drv */
-> >> >> >> +             for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++)
-> >> >> >> +                     if (!drv->tcon[i])
-> >> >> >> +                             tcon->id = i;
-> >> >> >> +
-> >> >> >> +             /* bail out if that failed */
-> >> >> >> +             if (tcon->id < 0)
-> >> >> >> +                     return tcon->id;
-> >> >> >>       }
-> >> >> >>
-> >> >> >> +     /* We only support SUN4I_DRM_MAX_PIPELINES number of tcons */
-> >> >> >> +     if (tcon->id >= SUN4I_DRM_MAX_PIPELINES)
-> >> >> >> +             return -EINVAL;
-> >> >> >> +
-> >> >> >>       tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
-> >> >> >>       if (IS_ERR(tcon->lcd_rst)) {
-> >> >> >>               dev_err(dev, "Couldn't get our reset line\n");
-> >> >> >> @@ -588,7 +595,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
-> >> >> >>               goto err_free_dotclock;
-> >> >> >>       }
-> >> >> >>
-> >> >> >> -     tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
-> >> >> >> +     tcon->crtc = sun4i_crtc_init(drm, drv->backend[tcon->id], tcon);
-> >> >> >
-> >> >> > I'm not a big fan of those IDs. The heuristic seems to be a bit
-> >> >> > fragile since we really never enforced any order in our bindings.
-> >> >>
-> >> >> Yes. I seem to have forgotten that bit which I had intended to add.
-> >> >> The endpoint IDs would ideally match the actual mux values used.
-> >> >
-> >> > That works for me, but the binding documentation would need to be
-> >> > amended.
-> >> >
-> >> >> On the TCON side that's not doable, so we might have to just require
-> >> >> them being in an increasing order.
-> >> >
-> >> > What are you planning to use those IDs on for the TCON?
-> >>
-> >> This reply sat in my draft box for way too long.
-> >>
-> >> As mentioned, the IDs on the TCON side are for the IDing the TV encoders.
-> >> I think having the IDs for the same type of encoder be increasing, such
-> >> that the endpoint for TV encoder 1 has a higher ID than the one for TV
-> >> encoder 0 should be enough. There aren't any other instances where we
-> >> have 2 or more of the same type. Or we could just add some kind of index
-> >> property to the TV encoder node. This is for the A20 by the way.
-> >
-> > Sorry if I'm missing a bit of context here, but I still don't get
-> > *why* you would need to ID them. So far, your explanation seems to
-> > have been "so that we can ID them", which is pretty circular to me :)
-> 
-> The mux controls for the TCON output path to the TV/HDMI/MIPI encoders,
-> and the TV encoder outputs, reside in the address space of the first TCON
-> and TV encoder, respectively. That's why we need to ID them, to access
-> the mux controls in the right block to setup the display pipeline.
+> Oh, probably this so slow because we're just getting interrupted
+> constantly.  You can see that during your trace 80686112 us was in
+> handle_irq_event().  Presumably all of that time could have been
+> counted towards whatever code you were in when the interrupt went off.
+> Of that 80 seconds, 60 seconds or so was usb_hcd_irq, and of that 57
+> seconds was in _dwc2_hcd_irq().
 
-Cant' we just do that based on the endpoint ID? Especially if the only
-thing we really need to tell is which TCON, we basically just have to
-loop around until we find a TCON, and use that one (and the same
-applies for the TV encoder).
+Since the FTDI (full speed device) and the PL2303 (also full speed
+device) behaves differently, i will try to compare those ftraces.
 
-This needs to be documented properly, but I don't see anything wrong
-with that
+>
+> Presumably the big part of your problem is that dwc2_handle_hcd_intr()
+> is just too slow.  From glancing at the numbers below, it seems likely
+> that nothing in particular is slow, it's just running a lot of code
+> and (in total) all of that is slow.  ...but someone with more time on
+> their hands would need to really debug.
+>
+> One thing that would be interesting would be to see if you can
+> increase the bug clock for talking to the dwc2 controller.  
 
-> >> >> > You seem to use it for two things:
-> >> >> >  - to match a TCON to its backend in our code
-> >> >> >  - to not step on each others' toes when registering the backends/tcons
-> >> >> >
-> >> >> > I think the second could be easily addressed using a linked list, and
-> >> >> > the first one by storing the of_node. Then we just need to follow the
-> >> >> > OF graph to our input of_node, and then iterate through our registered
-> >> >> > backend list to find the one with the same of_node.
-> >> >>
-> >> >> Yes that would work for the above purposes.
-> >> >>
-> >> >> For getting the first TCON to access the mux registers, it kind of falls
-> >> >> short. We also need something like this for the TV encoders on A10/A20.
-> >> >> They too have a mux, which seems to be in the first TV encoder. This
-> >> >> controls how the 8 DACs are mapped to the 4 external pins.
-> >> >
-> >> > How are those pins muxed between the two? Can't we just create a
-> >> > connector that would be usable for both encoders?
-> >>
-> >> They are freely muxable. However if you want VGA output, you need 3 pins
-> >> for RGB from the same TV encoder, plus H/V sync from it's upstream TCON.
-> >
-> > (you don't really need hsync and vsync on VGA, those are optional signals)
-> 
-> Really? I think you are confusing VGA with the broader "component RGB video".
-> AFAIK most monitors need separate sync signals.
-> 
-> See https://en.wikipedia.org/wiki/Component_video#RGB_analog_component_video
+Unfortunately the bcm2835 datasheet [1] doesn't provide many information
+about the USB IP core and the Synopsys documents aren't public
+available. The Raspberry Pi Foundation decided to use a different driver
+which uses FIQ in the downstream tree [2], but this won't be an option here.
 
-Hmm, Wikipedia seem to contradict itself :)
-https://en.wikipedia.org/wiki/VGA_connector
+Maybe i could start with comparing the register settings between dwc2
+and dwc_otg.
 
-In the video signal box... but yeah, it seems like it's needed in VGA.
+[1] -
+https://www.raspberrypi.org/app/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
+[2] -
+https://github.com/raspberrypi/linux/commit/65165df02f2ba9feccebf45d8c732dffb34b6109
 
-> >> And you have one pin left that you can use for composite, which would
-> >> likely be fed from the other TCON, as you need interlaced YUV data,
-> >> which is like the opposite of VGA.
-> >
-> > I'm not sure how these muxers should be implemented in DRM. One
-> > trivial way would be to have a small pinctrl driver in the TCON driver
-> > to deal with that, and switch states in both TV encoders at runtime
-> > (if needed, statically otherwise).
-> >
-> > Or maybe we can do something simpler, I don't know.
-> 
-> Pinctrl or pinctrl like seems to be a good solution. The lines are routed
-> on the board so it doesn't make sense to have something runtime configurable.
-> We just need to know which pins are in the same group, and what kind of
-> signals they each expect.
-
-I discussed this with Boris yesterday, and he also pointed out that
-there is another solution that might work. The global DRM device also
-has an atomic_check method we could use to check that we aren't using
-an impossible combination (2 VGA outputs for example), and assign the
-pins properly between the two blocks that need them.
-
-This would be easier to implement than a pinctrl driver.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/267ccdb3/attachment-0001.sig>
+> Possibly
+> some of those memory mapped IOs talking to dwc2 could be making
+> everything slow?
+>
+> Other than that, maybe you can find some way to optimize the code in
+> dwc2 so it runs faster, at least in the cases you care about...
+>
