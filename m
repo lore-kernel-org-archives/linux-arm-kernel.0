@@ -1,30 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Apr 2017 09:26:28 +0100
-Subject: [GIT PULL 00/16] clocksource: arm_arch_timer: GTDT-based MMIO
- timer support
-In-Reply-To: <20170419213944.GC2523@mai>
-References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
- <20170419213944.GC2523@mai>
-Message-ID: <20170420082627.GA31436@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Apr 2017 10:25:01 +0200
+Subject: [PATCH] [RFC] gpu: host1x: shut up warning about DMA API misuse
+In-Reply-To: <8df7c5a9-c71c-4ee9-9bc2-9c861cf9796c@kapsi.fi>
+References: <20170419182413.866327-1-arnd@arndb.de>
+ <8df7c5a9-c71c-4ee9-9bc2-9c861cf9796c@kapsi.fi>
+Message-ID: <CAK8P3a3JJrA_4Zur47ngWmR7VeKBopJLNZCaqOPzzmnFoV3=Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 11:39:44PM +0200, Daniel Lezcano wrote:
-> On Wed, Apr 19, 2017 at 05:44:17PM +0100, Mark Rutland wrote:
-> > Hi Daniel,
+On Thu, Apr 20, 2017 at 9:02 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
+> On 19.04.2017 21:24, Arnd Bergmann wrote:
+>>
+>> When dma_addr_t and phys_addr_t are not the same size, we get a warning
+>> from the dma_alloc_wc function:
+>>
+>> drivers/gpu/host1x/cdma.c: In function 'host1x_pushbuffer_init':
+>> drivers/gpu/host1x/cdma.c:94:48: error: passing argument 3 of
+>> 'dma_alloc_wc' from incompatible pointer type
+>> [-Werror=incompatible-pointer-types]
+>>    pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+>>                                                 ^
+>> In file included from drivers/gpu/host1x/cdma.c:22:0:
+>> include/linux/dma-mapping.h:761:37: note: expected 'dma_addr_t * {aka long
+>> long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned
+>> int *}'
+>>  static noinline_if_stackbloat void *dma_alloc_wc(struct device *dev,
+>> size_t size,
+>>                                      ^~~~~~~~~~~~
+>> drivers/gpu/host1x/cdma.c:113:48: error: passing argument 3 of
+>> 'dma_alloc_wc' from incompatible pointer type
+>> [-Werror=incompatible-pointer-types]
+>>    pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+>>                                                 ^
+>> In file included from drivers/gpu/host1x/cdma.c:22:0:
+>> include/linux/dma-mapping.h:761:37: note: expected 'dma_addr_t * {aka long
+>> long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned
+>> int *}'
+>>  static noinline_if_stackbloat void *dma_alloc_wc(struct device *dev,
+>> size_t size,
+>>                                      ^~~~~~~~~~~~
+>>
+>> The problem here is that dma_alloc_wc() returns a pointer to a dma_addr_t
+>> that may already be translated by an IOMMU, but the driver passes this
+>> into iommu_map() as a physical address. This works by accident only when
+>> the IOMMU does not get registered with the DMA API and there is a 1:1
+>> mapping between physical addresses as seen by the CPU and the device.
+>>
+>> The fundamental problem here is the lack of a generic API to do what the
+>> driver wants: allocating CPU-visible memory for use by a device through
+>> user-defined IOMMU settings. Neither the dma-mapping API nor the IOMMU
+>> API can do this by itself, and combining the two is not well-defined.
+>>
+>> This patch addresses the type mismatch by adding a third pointer into the
+>> push_buffer structure: in addition to the address as seen from the CPU
+>> and the address inside of the local IOMMU domain, the pb->alloc pointer
+>> is the token returned by dma_alloc_wc(), and this is what we later need
+>> to pass into dma_free_wc().
+>>
+>> The address we pass into iommu_map() however is the physical address
+>> computed from virt_to_phys(), assuming that the pointer we have here
+>> is part of the linear mapping (which is also questionable, e.g. when we
+>> have a non-coherent device on ARM32 this may be false). Also, when
+>> the DMA API uses the IOMMU to allocate the pointer for the default
+>> domain, we end up with two IOMMU mappings for the same physical address.
+>>
+>
+> I think we have a "policy" on Tegra that the DMA API will never allocate
+> using the IOMMU (Thierry can elaborate on this), which is why I wrote the
+> code with that assumption. Essentially, we have made the DMA API into the
+> API that allocates CPU-visible memory.
 
-> > I realise this is a little late, but I would very much appreciate if you could
-> > pull these arch timer GTDT patches for v4.12. The series has been largely fine
-> > for a while now, and the major hold-ups were edge cases in error handling which
-> > have now been addressed.
+I don't think this can be a per-platform policy.
 
-> Hi Thomas,
-> 
-> the series is ok for me. Is it possible to pull these changes directly in 
-> tip/timers/core?
+> Considering that, I'm wondering if we can just have a temporary local
+> dma_addr_t and then cast that to phys_addr_t, combined with a good comment?
 
-The tip-bot tells me it was.
+That was my first approach, and it does address the warning, but
+I did not send it because it still felt too wrong.
 
-Many thanks for picking these up, it's much appreciated.
-
-Mark.
+     Arnd
