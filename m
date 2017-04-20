@@ -1,42 +1,45 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 20 Apr 2017 15:43:09 +0100
-Subject: [PATCH v4 1/8] Documentation: arm: fix wrong reference number in DT
- definition
+Date: Thu, 20 Apr 2017 15:43:12 +0100
+Subject: [PATCH v4 4/8] arm: remove wrong CONFIG_PROC_SYSCTL ifdef
 In-Reply-To: <20170420144316.15632-1-juri.lelli@arm.com>
 References: <20170420144316.15632-1-juri.lelli@arm.com>
-Message-ID: <20170420144316.15632-2-juri.lelli@arm.com>
+Message-ID: <20170420144316.15632-5-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference to cpu capacity binding has a wrong number. Fix it.
+The sysfs cpu_capacity entry for each CPU has nothing to do with
+PROC_FS, nor it's in /proc/sys path.
 
-Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Remove such ifdef.
+
+Cc: Russell King <linux@arm.linux.org.uk>
+Reported-and-suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+Fixes: 7e5930aaef5d ('ARM: 8622/3: add sysfs cpu_capacity attribute')
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/topology.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 698ad1f097fa..83ec3fa0a05e 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -248,7 +248,7 @@ nodes to be present and contain the properties described below.
- 		Usage: Optional
- 		Value type: <u32>
- 		Definition:
--			# u32 value representing CPU capacity [3] in
-+			# u32 value representing CPU capacity [4] in
- 			  DMIPS/MHz, relative to highest capacity-dmips-mhz
- 			  in the system.
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 1b8ec3054642..40dd35aa46d0 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -57,7 +57,6 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+ 	per_cpu(cpu_scale, cpu) = capacity;
+ }
  
-@@ -475,5 +475,5 @@ cpus {
- [2] arm/msm/qcom,kpss-acc.txt
- [3] ARM Linux kernel documentation - idle states bindings
-     Documentation/devicetree/bindings/arm/idle-states.txt
--[3] ARM Linux kernel documentation - cpu capacity bindings
-+[4] ARM Linux kernel documentation - cpu capacity bindings
-     Documentation/devicetree/bindings/arm/cpu-capacity.txt
+-#ifdef CONFIG_PROC_SYSCTL
+ static ssize_t cpu_capacity_show(struct device *dev,
+ 				 struct device_attribute *attr,
+ 				 char *buf)
+@@ -114,7 +113,6 @@ static int register_cpu_capacity_sysctl(void)
+ 	return 0;
+ }
+ subsys_initcall(register_cpu_capacity_sysctl);
+-#endif
+ 
+ #ifdef CONFIG_OF
+ struct cpu_efficiency {
 -- 
 2.10.0
