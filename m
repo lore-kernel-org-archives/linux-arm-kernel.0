@@ -1,41 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Apr 2017 16:02:21 +0100
-Subject: [PATCH] ARM: KVM: Fix idmap stub entry when running Thumb-2 code
-Message-ID: <20170420150221.15796-1-marc.zyngier@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 20 Apr 2017 09:14:13 -0600
+Subject: [patch V2 08/24] hwtracing/coresight-etm3x: Use
+ cpuhp_setup_state_nocalls_cpuslocked()
+In-Reply-To: <20170418170553.026838125@linutronix.de>
+References: <20170418170442.665445272@linutronix.de>
+ <20170418170553.026838125@linutronix.de>
+Message-ID: <CANLsYkzC_g6g=q7qgWj8CU_=e1s22b_C-DSwSvJ7BZiUScQCtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When entering the hyp stub implemented in the idmap, we try to
-be mindful of the fact that we could be running a Thumb-2 kernel
-by adding 1 to the address we compute. Unfortunately, the assembler
-also knows about this trick, and has already generated an address
-that has bit 0 set in the litteral pool.
+On 18 April 2017 at 11:04, Thomas Gleixner <tglx@linutronix.de> wrote:
+> From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+>
+> etm_probe() holds get_online_cpus() while invoking
+> cpuhp_setup_state_nocalls().
+>
+> cpuhp_setup_state_nocalls() invokes get_online_cpus() as well. This is
+> correct, but prevents the conversion of the hotplug locking to a percpu
+> rwsem.
+>
+> Use cpuhp_setup_state_nocalls_cpuslocked() to avoid the nested call.
+>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm3x.c |   12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+> @@ -803,12 +803,12 @@ static int etm_probe(struct amba_device
+>                 dev_err(dev, "ETM arch init failed\n");
+>
+>         if (!etm_count++) {
+> -               cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
+> -                                         "arm/coresight:starting",
+> -                                         etm_starting_cpu, etm_dying_cpu);
+> -               ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
+> -                                               "arm/coresight:online",
+> -                                               etm_online_cpu, NULL);
+> +               cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ARM_CORESIGHT_STARTING,
+> +                                                    "arm/coresight:starting",
+> +                                                    etm_starting_cpu, etm_dying_cpu);
+> +               ret = cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_ONLINE_DYN,
+> +                                                          "arm/coresight:online",
+> +                                                          etm_online_cpu, NULL);
+>                 if (ret < 0)
+>                         goto err_arch_supported;
+>                 hp_online = ret;
+>
 
-Our superfluous correction ends up confusing the CPU entierely,
-as we now branch to the stub in ARM mode instead of Thumb, and on
-a possibly unaligned address for good measure. From that point,
-nothing really good happens.
-
-The obvious fix in to remove this stupid target PC correction.
-
-Fixes: 6bebcecb6c5b ("ARM: KVM: Allow the main HYP code to use the init hyp stub implementation")
-Reported-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/hyp/hyp-entry.S | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index a35baa81fd23..95a2faefc070 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -144,7 +144,6 @@ hyp_hvc:
- 	ldr	r1, [r1]
- 	ldr	ip, =__kvm_handle_stub_hvc
- 	sub	ip, ip, r1
--THUMB(	add	ip, ip, #1)
- 	pop	{r1}
- 
- 	bx	ip
--- 
-2.11.0
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
