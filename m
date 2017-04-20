@@ -1,122 +1,61 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Thu, 20 Apr 2017 15:09:36 +0530
-Subject: [PATCH v2 2/2] drm: dw-hdmi: gate audio clock from the I2S
- enablement callbacks
-In-Reply-To: <c9258563-afcd-4088-a4f4-6a4e056f5d36@codeaurora.org>
-References: <20170414083113.4255-1-romain.perier@collabora.com>
- <20170414083113.4255-3-romain.perier@collabora.com>
- <c9258563-afcd-4088-a4f4-6a4e056f5d36@codeaurora.org>
-Message-ID: <ad52c44d-331a-2813-6f38-7782888ab3b9@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Apr 2017 10:43:11 +0100
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <2003d851-e17e-1a43-3889-ec6e79e635e3@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+ <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+ <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
+ <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
+ <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
+ <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
+ <241b130e-1fb7-ecd4-034e-eb02065ada66@free.fr>
+ <37cd6172-b04e-fcad-18fc-4fbb26cc611b@arm.com>
+ <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
+ <2003d851-e17e-1a43-3889-ec6e79e635e3@free.fr>
+Message-ID: <b61614bd-10e4-25eb-95bc-fd8939d4449f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 20/04/17 09:20, Mason wrote:
+> On 19/04/2017 13:19, Mason wrote:
+> 
+>> My biggest problem is that tango_unmask() is never called.
+> 
+> FTR, the missing incantation was:
+> Explicitly calling tango_{mask/unmask/ack} from the corresponding msi_{mask/unmask/ack}
 
+Using irq_chip_mask_parent and co, you mean?
 
-On 04/19/2017 10:21 AM, Archit Taneja wrote:
->
->
-> On 04/14/2017 02:01 PM, Romain Perier wrote:
->> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
->> step E. and is kept enabled for later use. This clock should be enabled
->> and disabled along with the actual audio stream and not always on (that
->> is bad for PM). Futhermore, as described by the datasheet, the I2S
->
-> s/Futhermore/Furthermore
->
->> variant need to gate/ungate the clock when the stream is
->
-> s/need/needs
->
->> enabled/disabled.
->>
->> This commit adds a parameter to hdmi_audio_enable_clk() that controls
->> when the audio sample clock must be enabled or disabled. Then, it adds
->> the call to this function from dw_hdmi_i2s_audio_enable() and
->> dw_hdmi_i2s_audio_disable().
->>
->> Signed-off-by: Romain Perier <romain.perier@collabora.com>
->> ---
->>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 20 ++++++++++++++------
->>  1 file changed, 14 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> index 5b328c0..a6da634 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> @@ -544,6 +544,12 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
->>  }
->>  EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
->>
->> +static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
->> +{
->> +    hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
->> +          HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
->> +}
->> +
->>  void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
->>  {
->>      hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
->> @@ -557,6 +563,12 @@ void dw_hdmi_ahb_audio_disable(struct dw_hdmi *hdmi)
->>  void dw_hdmi_i2s_audio_enable(struct dw_hdmi *hdmi)
->>  {
->>      hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
->> +    hdmi_enable_audio_clk(hdmi, true);
->> +}
->> +
->> +void dw_hdmi_i2s_audio_disable(struct dw_hdmi *hdmi)
->> +{
->> +    hdmi_enable_audio_clk(hdmi, false);
->>  }
->
-> This should be static too.
->
-> If you're okay with the suggestions, I can fix these myself and push. Let
-> me know if that's okay.
+> Marc, I have one nagging doubt, wrt splitting MSI line selection
+> and MSI enable.
+> 
+> tango_irq_domain_alloc : finds an available MSI 'j' to allocate
+> tango_irq_domain_free : release MSI 'j'
+> tango_unmask : enable MSI 'j'
+> tango_mask : disable MSI 'j'
+> 
+> Is the following scenario guaranteed to never happen?
+> 
+> tango_irq_domain_alloc // alloc 0
+> tango_irq_domain_free  // free 0
+> tango_irq_domain_alloc // alloc 0
+> tango_unmask // enable 0
+> tango_unmask // enable 0 = NOP
+> tango_mask   // disable 0
+> 
+> In this theoretical scenario, we would be left with a non-functional
+> MSI 0.
 
-Took the liberty of going ahead with the fixes. Queued both patches to
-drm-misc-next.
+I'm not sure I get the example above, and what the various alloc/free
+calls have to do with anything. If you have unbalanced
+enable/disable_irq, you loose. Don't do that.
 
-Thanks,
-Archit
-
->
-> Thanks,
-> Archit
->
->>
->>  void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
->> @@ -1592,11 +1604,6 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
->>                  HDMI_MC_FLOWCTRL);
->>  }
->>
->> -static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi)
->> -{
->> -    hdmi_modb(hdmi, 0, HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
->> -}
->> -
->>  /* Workaround to clear the overflow condition */
->>  static void dw_hdmi_clear_overflow(struct dw_hdmi *hdmi)
->>  {
->> @@ -1710,7 +1717,7 @@ static int dw_hdmi_setup(struct dw_hdmi *hdmi, struct drm_display_mode *mode)
->>
->>          /* HDMI Initialization Step E - Configure audio */
->>          hdmi_clk_regenerator_update_pixel_clock(hdmi);
->> -        hdmi_enable_audio_clk(hdmi);
->> +        hdmi_enable_audio_clk(hdmi, true);
->>      }
->>
->>      /* not for DVI mode */
->> @@ -2438,6 +2445,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
->>          audio.write    = hdmi_writeb;
->>          audio.read    = hdmi_readb;
->>          hdmi->enable_audio = dw_hdmi_i2s_audio_enable;
->> +        hdmi->disable_audio = dw_hdmi_i2s_audio_disable;
->>
->>          pdevinfo.name = "dw-hdmi-i2s-audio";
->>          pdevinfo.data = &audio;
->>
->
-
+	M.
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jazz is not dead. It just smells funny...
