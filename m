@@ -1,67 +1,96 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Thu, 20 Apr 2017 19:59:17 +0000
-Subject: [linux-sunxi] Re: [PATCH v2 1/6] clk: sunxi-ng: Add sun4i/sun7i
- CCU driver
-In-Reply-To: <20170407133805.aiythp3hdvuyhcrc@lukather>
-References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
- <ac8c4dab4f160ec605d52120517774bf1de87c2e.1490545262.git-series.plaes@plaes.org>
- <20170327075438.cw3d6s7zyeemenwr@lukather>
- <20170404200919.GA22159@plaes.org>
- <20170407133805.aiythp3hdvuyhcrc@lukather>
-Message-ID: <20170420195917.GA16113@plaes.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 20 Apr 2017 22:01:39 +0200
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <20170412150558.57c865e5@free-electrons.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+ <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+ <20170321155054.2f4cb921@free-electrons.com>
+ <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
+ <20170402233028.60acf612@free-electrons.com>
+ <0468e2fb-5a7d-97ec-c51c-2436a13dda69@st.com>
+ <20170412150558.57c865e5@free-electrons.com>
+Message-ID: <20170420220139.6dcc6224@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 07, 2017 at 03:38:05PM +0200, Maxime Ripard wrote:
-> Hi Priit,
+Viresh, Shiraz,
+
+As the SPEAr600 platform maintainers, have you tested Ethernet in
+recent times, especially with a MII PHY ? I'm still struggling to get
+it working. Quick summary:
+
+ - The same kernel works fine on another SPEAr600 platform that has a
+   GMII PHY
+
+ - The SPEAr600 platform with a MII PHY has Ethernet working fine under
+   U-Boot (TFTP works), so the HW is known to be working.
+
+ - I've compared the values of the MAC registers between U-Boot and
+   Linux, and traced all the PHY registers read/write over the MDIO
+   bus, and compared the traces between U-Boot and Linux. Found a few
+   differences, but solving them didn't change the problem.
+
+I'm suspecting the problem is not directly in the MAC/PHY
+configuration. Would you have some hints like clock configuration, or
+other system-level configuration that could affect this? Especially the
+TXCLK from the PHY is not coming in through the same pin when in GMII
+and MII mode it seems. Does this needs some special configuration?
+
+Any hint/idea would definitely be welcome.
+
+Thanks a lot!
+
+Thomas
+
+On Wed, 12 Apr 2017 15:05:58 +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> On Tue, Apr 04, 2017 at 08:09:19PM +0000, Priit Laes wrote:
-> > > > +/* Not documented on A10 */
-> > > > +static SUNXI_CCU_GATE(pll_periph_sata_clk, "pll-periph-sata", "pll-periph",
-> > > > +		      0x028, BIT(14), 0);
-> > > 
-> > > The rate doesn't come from pll-periph directly, does it?
-> > 
-> > So it uses hosc (24MHz parent clock) instead of pll-periph?
+> Thanks again for your answer, sorry for the delay, I was away from the
+> spear600 board for a while.
 > 
-> I never looked too much at this, but it looks more like the input is
-> pll-periph-sata itself.
+> On Mon, 3 Apr 2017 08:16:50 +0200, Giuseppe CAVALLARO wrote:
+> 
+> > I tested the SMSC on other platform (+ stmmac), not on SPEAr.  
+> 
+> OK. But I believe there might be a SPEAr specific issue here, which
+> might explain why you don't reproduce the problem.
+> 
+> > ok for reset, keep the radar on clock. Hmm, can you attach a piece of 
+> > log file to see the failure?  
+> 
+> During the boot, nothing bad:
+> 
+> libphy: Fixed MDIO Bus: probed
+> stmmaceth e0800000.ethernet: no reset control found
+> stmmac - user ID: 0x10, Synopsys ID: 0x32
+>  Ring mode enabled
+>  DMA HW capability register supported Normal descriptors
+> libphy: stmmac: probed
+> eth0: PHY ID 0007c0c4 at 31 IRQ POLL (stmmac-0:1f) active
+> 
+> Then, when upping the interface:
+> 
+> # ifconfig eth0 up
+> eth0: device MAC address 00:30:d3:21:22:60
+> stmmaceth e0800000.ethernet: Failed to reset the dma
+> stmmac_hw_setup: DMA engine initialization failed
+> stmmac_open: Hw setup failed
+> SIOCSIFFLAGS: Device or resource busy
+> 
+> As I said earlier, the "Failed to reset the dma" is because
+> dwmac_dma_reset() returns -EBUSY because the DMA reset bit never
+> clears. Again, we see the same behavior in U-Boot (DMA reset bit never
+> clears), but Ethernet does work in U-Boot.
+> 
+> Best regards,
+> 
+> Thomas
 
-OK, I think I have now fixed most of the issues thanks to Maxime and Chen-Yu
-and I'm almost ready to send out V3.
 
->From my side there is only single issue remaining - how to create "sata-ext"
-clock?
 
-[snip]
-static struct ccu_div pll_periph_sata_clk = {
-	.enable		= BIT(14),
-	.div		= _SUNXI_CCU_DIV(0, 2),
-	.common		= {
-		.prediv		= 6,
-		.reg		= 0x028,
-		.features	= CCU_FEATURE_ALL_PREDIV,
-		.hw.init	= CLK_HW_INIT("pll-periph-sata",
-					      "pll-periph-base",
-					      &ccu_nk_ops, 0),
-	},
-};
-
-static const char* const sata_parents[] = {"pll-periph-sata", "sata-ext"};
-static SUNXI_CCU_MUX_WITH_GATE(sata_clk, "sata", sata_parents,
-			       0x0c8, 24, 1, BIT(31), 0);
-[/snip]
-
-Should I create a fixed-clock node in the dtsi:
-
-sata-ext: clk at 0 {
-	#clock-cells = <0>;
-	compatible = "fixed-clock";
-	clock-frequency = <200000000>;
-	clock-output-names = "sata-ext";
-};
-
-And would it also need pio definition?
-
-P?ikest,
-Priit :)
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
