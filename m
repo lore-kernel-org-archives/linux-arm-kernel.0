@@ -1,93 +1,60 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 20 Apr 2017 08:43:40 +0200
-Subject: [PATCH v3 2/5] ARM: dts: rockchip: add ARM Mali GPU node for
- rk3288
-In-Reply-To: <319a2a72-ca25-08d7-68dc-7eae74f1a622@collabora.com>
-References: <cover.1492588180.git.guillaume.tucker@collabora.com>
- <5403013.fQWx48MQOq@phil>
- <319a2a72-ca25-08d7-68dc-7eae74f1a622@collabora.com>
-Message-ID: <20465416.u9Y0ETYs62@phil>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 20 Apr 2017 08:50:53 +0200
+Subject: [PATCH v4 04/18] dt-bindings: syscon: Add DT bindings
+ documentation for Allwinner syscon
+In-Reply-To: <9382f9ae-895a-397b-3d8c-846cb0bc4486@arm.com>
+References: <20170412111400.2296-1-clabbe.montjoie@gmail.com>
+ <20170412111400.2296-5-clabbe.montjoie@gmail.com>
+ <9382f9ae-895a-397b-3d8c-846cb0bc4486@arm.com>
+Message-ID: <20170420065053.GA28021@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guillaume,
-
-Am Donnerstag, 20. April 2017, 06:44:56 CEST schrieb Guillaume Tucker:
-> On 19/04/17 09:59, Heiko Stuebner wrote:
-> > Am Mittwoch, 19. April 2017, 09:06:18 CEST schrieb Guillaume Tucker:
-> >> Add Mali GPU device tree node for the rk3288 SoC, with devfreq
-> >> opp table.
-> >>
-> >> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> >> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
-> >> ---
-> >>  arch/arm/boot/dts/rk3288.dtsi | 22 ++++++++++++++++++++++
-> >>  1 file changed, 22 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> >> index df8a0dbe9d91..187eed528f83 100644
-> >> --- a/arch/arm/boot/dts/rk3288.dtsi
-> >> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> >> @@ -43,6 +43,7 @@
-> >>  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >>  #include <dt-bindings/pinctrl/rockchip.h>
-> >>  #include <dt-bindings/clock/rk3288-cru.h>
-> >> +#include <dt-bindings/power/rk3288-power.h>
-> >>  #include <dt-bindings/thermal/thermal.h>
-> >>  #include <dt-bindings/power/rk3288-power.h>
-> >>  #include <dt-bindings/soc/rockchip,boot-mode.h>
-> >> @@ -227,6 +228,27 @@
-> >>  		ports = <&vopl_out>, <&vopb_out>;
-> >>  	};
-> >>
-> >> +	gpu: mali at ffa30000 {
-> >
-> > please sort nodes by address. ffa30000 should be placed below hdmi at ff980000
-> > and above qos at ffaa0000 .
+On Thu, Apr 20, 2017 at 12:38:50AM +0100, Andr? Przywara wrote:
+> On 12/04/17 12:13, Corentin Labbe wrote:
+> > This patch adds documentation for Device-Tree bindings for the
+> > syscon present in allwinner devices.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> > new file mode 100644
+> > index 0000000..c056c5b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> > @@ -0,0 +1,19 @@
+> > +* Allwinner sun8i system controller
+> > +
+> > +This file describes the bindings for the system controller present in
+> > +Allwinner SoC H3, A83T and A64.
+> > +The principal function of this syscon is to control EMAC PHY choice and
+> > +config.
+> > +
+> > +Required properties for the system controller:
+> > +- reg: address and length of the register for the device.
+> > +- compatible: should be "syscon" and one of the following string:
+> > +		"allwinner,sun8i-h3-system-controller"
+> > +		"allwinner,sun8i-a64-system-controller"
 > 
-> Sure, will fix that in v4.
+> While sun8i might make some sense technically, all 64-bit sunxi
+> compatible strings use the sun50i prefix to follow the Allwinner naming.
+> So this should read:
+> 		"allwinner,sun50i-a64-system-controller"
 > 
-> >> +		compatible = "arm,mali-t760", "arm,mali-midgard";
-> >
-> > As indicated before I don't trust that a generic binding will work for
-> > everything, so I would feel safer if we had a "rockchip,rk3288-mali" in
-> > front for future purposes, making it a
-> >
-> > 		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
+> Also I am wondering if we should add a compatible string for the H5
+> (support for that SoC is in -next already):
+> 		"allwinner,sun50i-h5-system-controller"
 > 
-> OK, sorry I overlooked this part.  I'll add it in v4 with a
-> vendor compatible string in the binding documentation.
-
-great, thanks :-)
-
+> Cheers,
+> Andre.
 > 
-> >> +		reg = <0xffa30000 0x10000>;
-> >> +		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-> >> +			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
-> >> +			     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> >> +		interrupt-names = "job", "mmu", "gpu";
-> >> +		clocks = <&cru ACLK_GPU>;
-> >> +		operating-points = <
-> >> +			/* KHz uV */
-> >> +			100000 950000
-> >> +			200000 950000
-> >> +			300000 1000000
-> >> +			400000 1100000
-> >> +			500000 1200000
-> >> +			600000 1250000
-> >> +		>;
-> >
-> > Wasn't there a wish for opp-v2 in a previous version?
-> 
-> Well it wasn't entirely clear to me in Rob's email whether it was
-> necessary to use opp-v2 now or rather if it would be a potential
-> option whenever opp-v2 was needed.  If operating-points (v1) are
-> being deprecated then I can change that in my next patch v4.
-> Using operating-points-v2 with the Mali driver works as far as I
-> can tell on rk3288 so that's not an issue.
 
-I don't care to much either way, just remembered it being mentioned
-in the previous version. So lets see what Rob says.
+I agree with sun50i-a64-system-controller, the sun8i-a64 is a copy/paste error.
+I will add sun50i-h5-system-controller since all xxx-system-controller are just hypothetic compatible.
 
-
-Heiko
+Thanks
+Regards
