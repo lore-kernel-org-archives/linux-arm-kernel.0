@@ -1,38 +1,31 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 20 Apr 2017 21:05:30 +0200
-Subject: [PATCH 3/3] arm64/locking: qspinlocks and qrwlocks support
-In-Reply-To: <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
-References: <1491860104-4103-1-git-send-email-ynorov@caviumnetworks.com>
- <1491860104-4103-4-git-send-email-ynorov@caviumnetworks.com>
- <20170413181212.y3ezah76qoztxhnn@hirez.programming.kicks-ass.net>
- <20170420182318.4ddtfiobxz6hgbo4@yury-N73SV>
-Message-ID: <20170420190530.GA6873@worktop>
+From: Haiying.Wang@nxp.com (Haiying Wang)
+Date: Thu, 20 Apr 2017 15:34:15 -0400
+Subject: [PATCH 0/3] bus: fsl-mc: dpio: udpate QMan CENA region
+Message-ID: <1492716858-24509-1-git-send-email-Haiying.Wang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 09:23:18PM +0300, Yury Norov wrote:
-> Is there some test to reproduce the locking failure for the case.
+This patchset allows the NXP's DPAA2 QMan Software portal
+CENA region to be cacheable as designed for the performance
+goal. Besides, the write allocate stash feature of the QMan
+requires the non-shareable attribute for this cache-enabled
+memory.
+So this patchset extends the arm64 ioremap with cache-enable
+and non-shareable first, then enables the CENA portal memory
+access in the QBMan driver, at last changes the ioremap call
+in dpio driver where the software portal CENA memory is
+mapped to be the correct one.
 
-Possibly sysvsem stress before commit:
+Haiying Wang (3):
+  arm64: extend ioremap for cacheable non-shareable memory
+  bus: fsl-mc: dpio: enable qbman CENA portal memory access
+  bus: fsl-mc: dpio: change CENA regs to be cacheable
 
-  27d7be1801a4 ("ipc/sem.c: avoid using spin_unlock_wait()")
+ arch/arm64/include/asm/io.h                    |  1 +
+ arch/arm64/include/asm/pgtable-prot.h          |  1 +
+ drivers/staging/fsl-mc/bus/dpio/dpio-driver.c  |  6 +++---
+ drivers/staging/fsl-mc/bus/dpio/qbman-portal.c | 23 +++++++++++++++++------
+ 4 files changed, 22 insertions(+), 9 deletions(-)
 
-Although a similar scheme is also used in nf_conntrack, see commit:
-
-  b316ff783d17 ("locking/spinlock, netfilter: Fix nf_conntrack_lock() barriers")
-
-> I
-> ask because I run loctorture for many hours on my qemu (emulating
-> cortex-a57), and I see no failures in the test reports. And Jan did it
-> on ThunderX, and Adam on QDF2400 without any problems. So even if I
-> rework those functions, how could I check them for correctness?
-
-Running them doesn't prove them correct. Memory ordering bugs have been
-in the kernel for many years without 'ever' triggering. This is stuff
-you have to think about.
-
-> Anyway, regarding the queued_spin_unlock_wait(), is my understanding
-> correct that you assume adding smp_mb() before entering the for(;;)
-> cycle, and using ldaxr/strxr instead of atomic_read()?
-
-You'll have to ask Will, I always forget the arm64 details.
+-- 
+2.7.4
