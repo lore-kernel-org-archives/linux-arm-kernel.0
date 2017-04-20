@@ -1,47 +1,66 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 20 Apr 2017 16:35:32 +0800
-Subject: [GIT PULL 00/16] clocksource: arm_arch_timer: GTDT-based MMIO
- timer support
-In-Reply-To: <20170420082627.GA31436@leverpostej>
-References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
- <20170419213944.GC2523@mai> <20170420082627.GA31436@leverpostej>
-Message-ID: <CADyBb7vV++qxYtNFmsoNQXhi6TkPvNa5tFTkdpmvjEZBqSnH-Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Apr 2017 10:37:07 +0200
+Subject: [PATCH v4 06/11] drm/sun4i: add support for Allwinner DE2 mixers
+In-Reply-To: <88F5FAC9-1873-4C76-9AB9-FF361C07664E@aosc.io>
+References: <20170416120849.54542-1-icenowy@aosc.io>
+ <20170416120849.54542-7-icenowy@aosc.io>
+ <20170418090047.7i2k6dtoqxfdqwwy@lukather>
+ <88F5FAC9-1873-4C76-9AB9-FF361C07664E@aosc.io>
+Message-ID: <20170420083707.wdtrdlxpvocpzc7g@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel, Lorenzo, Mark,
+On Tue, Apr 18, 2017 at 06:47:56PM +0800, Icenowy Zheng wrote:
+> >> +	/* Get the physical address of the buffer in memory */
+> >> +	gem = drm_fb_cma_get_gem_obj(fb, 0);
+> >> +
+> >> +	DRM_DEBUG_DRIVER("Using GEM @ %pad\n", &gem->paddr);
+> >> +
+> >> +	/* Compute the start of the displayed memory */
+> >> +	bpp = fb->format->cpp[0];
+> >> +	paddr = gem->paddr + fb->offsets[0];
+> >> +	paddr += (state->src_x >> 16) * bpp;
+> >> +	paddr += (state->src_y >> 16) * fb->pitches[0];
+> >> +
+> >> +	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+> >> +
+> >> +	paddr_u32 = (uint32_t) paddr;
+> >
+> >How does that work on 64-bits systems ?
+> 
+> The hardware is not designed to work on 64-bit systems.
+> 
+> Even 64-bit A64/H5 has also 3GiB memory limit.
 
+That's a fragile assumption.
 
-On 20 April 2017 at 16:26, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Apr 19, 2017 at 11:39:44PM +0200, Daniel Lezcano wrote:
->> On Wed, Apr 19, 2017 at 05:44:17PM +0100, Mark Rutland wrote:
->> > Hi Daniel,
->
->> > I realise this is a little late, but I would very much appreciate if you could
->> > pull these arch timer GTDT patches for v4.12. The series has been largely fine
->> > for a while now, and the major hold-ups were edge cases in error handling which
->> > have now been addressed.
->
->> Hi Thomas,
->>
->> the series is ok for me. Is it possible to pull these changes directly in
->> tip/timers/core?
->
-> The tip-bot tells me it was.
->
-> Many thanks for picking these up, it's much appreciated.
+> The address cell in mixer hardware is also only 32-bit.
+> 
+> So we should just keep the force conversion here. If we then really
+> met 4GiB-capable AW SoC without changing DE2, I think we should have
+> other way to limit CMA pool inside 4GiB.
 
-Great thanks to all of you, I very appreciate all the help and
-suggestion from you :-)
+The register name looks like this is only the lower 32 bits that you
+can set here, and that there is another register for the upper 32 bits
+of that address somewhere.
 
->
-> Mark.
+In that case, please use the lower_32_bits and upper_32_bits helper,
+and don't cast it that way.
 
+If it isn't the case, you should set the DMA mask (through
+dma_set_mask) so that we only allocate memory that can be accessed by
+this device.
 
+Maxime
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/77277f32/attachment.sig>
