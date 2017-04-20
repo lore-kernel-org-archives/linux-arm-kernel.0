@@ -1,29 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Apr 2017 10:22:16 +0200
-Subject: [PATCH] lib/mpi: fix build with clang
-In-Reply-To: <20170420034022.24109-1-stefan@agner.ch>
-References: <20170420034022.24109-1-stefan@agner.ch>
-Message-ID: <CAK8P3a0cW-u-hzYX+qijMcEs=Ztar=WaDnsd4JcPvqiTR69TbA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Apr 2017 09:26:28 +0100
+Subject: [GIT PULL 00/16] clocksource: arm_arch_timer: GTDT-based MMIO
+ timer support
+In-Reply-To: <20170419213944.GC2523@mai>
+References: <1492620273-30037-1-git-send-email-mark.rutland@arm.com>
+ <20170419213944.GC2523@mai>
+Message-ID: <20170420082627.GA31436@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 5:40 AM, Stefan Agner <stefan@agner.ch> wrote:
-> Use just @ to denote comments which works with gcc and clang.
-> Otherwise clang reports an escape sequence error:
->   error: invalid % escape in inline assembly string
->
-> Use %0-%3 as operand references, this avoids:
->   error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
->
-> Also remove superfluous casts on output operands to avoid warnings
-> such as:
->   warning: invalid use of a cast in an inline asm context requiring an l-value
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> I checked the output of gcc with -S switch before and after this change,
-> gcc generated the same assembly.
+On Wed, Apr 19, 2017 at 11:39:44PM +0200, Daniel Lezcano wrote:
+> On Wed, Apr 19, 2017 at 05:44:17PM +0100, Mark Rutland wrote:
+> > Hi Daniel,
 
-I've done a lot of build testing on a tree that contains a very similar patch.
+> > I realise this is a little late, but I would very much appreciate if you could
+> > pull these arch timer GTDT patches for v4.12. The series has been largely fine
+> > for a while now, and the major hold-ups were edge cases in error handling which
+> > have now been addressed.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Hi Thomas,
+> 
+> the series is ok for me. Is it possible to pull these changes directly in 
+> tip/timers/core?
+
+The tip-bot tells me it was.
+
+Many thanks for picking these up, it's much appreciated.
+
+Mark.
