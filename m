@@ -1,27 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Apr 2017 16:08:57 +0200
-Subject: [PATCH 1/3] ARM: dts: r8a7745: add PFC support
-In-Reply-To: <20170415202036.987901107@cogentembedded.com>
-References: <20170415202036.987901107@cogentembedded.com>
-Message-ID: <CAMuHMdUPda7Mjo_P8p1V5a20XOAYM6GFf8Jqf0KLUuO7zAODeA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 20 Apr 2017 09:12:29 -0500
+Subject: [PATCH 22/29] dt-bindings: Clarify compatible property for
+ rockchip timers
+In-Reply-To: <1492374441-23336-22-git-send-email-daniel.lezcano@linaro.org>
+References: <20170416202542.GV2078@mai>
+ <1492374441-23336-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492374441-23336-22-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170420141229.a3qran4agt24iczc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 15, 2017 at 10:18 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A7745 part of the PFC device node.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Sun, Apr 16, 2017 at 10:27:12PM +0200, Daniel Lezcano wrote:
+> From: Alexander Kochetkov <al.kochet@gmail.com>
+> 
+> Make all properties description in form '"rockchip,<chip>-timer",
+> "rockchip,rk3288-timer"' for all chips found in linux kernel.
+> 
+> Suggested-by: Heiko St?bner <heiko@sntech.de>
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  .../devicetree/bindings/timer/rockchip,rk-timer.txt          | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+> index a41b184..16a5f45 100644
+> --- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+> @@ -1,9 +1,15 @@
+>  Rockchip rk timer
+>  
+>  Required properties:
+> -- compatible: shall be one of:
+> -  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
+> -  "rockchip,rk3399-timer" - for rk3399
+> +- compatible: should be:
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+should be one of:
 
-Gr{oetje,eeting}s,
+> +  "rockchip,rk3036-timer", "rockchip,rk3288-timer": for Rockchip RK3036
+> +  "rockchip,rk3066-timer", "rockchip,rk3288-timer": for Rockchip RK3066
+> +  "rockchip,rk3188-timer", "rockchip,rk3288-timer": for Rockchip RK3188
+> +  "rockchip,rk3228-timer", "rockchip,rk3288-timer": for Rockchip RK3228
+> +  "rockchip,rk3229-timer", "rockchip,rk3288-timer": for Rockchip RK3229
+> +  "rockchip,rk3288-timer": for Rockchip RK3288
+> +  "rockchip,rk3368-timer", "rockchip,rk3288-timer": for Rockchip RK3368
+> +  "rockchip,rk3399-timer": for Rockchip RK3399
 
-                        Geert
+I find the "for Rockchip RKxxxx" a bit redundant, but it's fine with or 
+without. Otherwise,
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Acked-by: Rob Herring <robh@kernel.org>
