@@ -1,138 +1,64 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 20 Apr 2017 19:09:29 +0100
-Subject: [PATCH] arm64: xen: Implement EFI reset_system callback
-In-Reply-To: <b9238471-6957-8720-9c98-37a5a32776d2@suse.com>
-References: <20170405181417.15985-1-julien.grall@arm.com>
- <e5b548be-2ec3-9b4f-a456-929d5fb881ab@oracle.com>
- <b8c9c6cd-906a-2360-ca9f-d34a45258567@suse.com>
- <3f6f5853-cd08-8afc-f71a-b0c1545c7564@arm.com>
- <20170406142710.GE4372@olila.local.net-space.pl>
- <ed7f64f4-17db-e2a5-f362-b382666cbc36@suse.com>
- <20170406152040.GH4372@olila.local.net-space.pl>
- <e449f220-8db7-d58c-bdbf-47ccd6dd014b@arm.com>
- <20170406160653.GJ4372@olila.local.net-space.pl>
- <c23a6d11-cde8-7690-9676-537b5f17b967@suse.com>
- <20170406164309.GM4372@olila.local.net-space.pl>
- <b6cd0d59-9569-2958-9cc7-c971139881f4@suse.com>
- <alpine.DEB.2.10.1704181135580.31486@sstabellini-ThinkPad-X260>
- <fcc5ac4b-ed82-b5dd-a848-9ac9a3572853@suse.com>
- <alpine.DEB.2.10.1704181145420.31486@sstabellini-ThinkPad-X260>
- <b9238471-6957-8720-9c98-37a5a32776d2@suse.com>
-Message-ID: <66b377bd-999f-9010-8257-95f663f4ebd2@arm.com>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Thu, 20 Apr 2017 19:17:10 +0100
+Subject: [PATCH 0/4] arm64: improve tagged pointer handling
+Message-ID: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 18/04/17 19:51, Juergen Gross wrote:
-> On 18/04/17 20:46, Stefano Stabellini wrote:
->> On Tue, 18 Apr 2017, Juergen Gross wrote:
->>> On 18/04/17 20:37, Stefano Stabellini wrote:
->>>> On Thu, 6 Apr 2017, Juergen Gross wrote:
->>>>> On 06/04/17 18:43, Daniel Kiper wrote:
->>>>>> On Thu, Apr 06, 2017 at 06:22:44PM +0200, Juergen Gross wrote:
->>>>>>> On 06/04/17 18:06, Daniel Kiper wrote:
->>>>>>>> Hi Julien,
->>>>>>>>
->>>>>>>> On Thu, Apr 06, 2017 at 04:39:13PM +0100, Julien Grall wrote:
->>>>>>>>> Hi Daniel,
->>>>>>>>>
->>>>>>>>> On 06/04/17 16:20, Daniel Kiper wrote:
->>>>>>>>>> On Thu, Apr 06, 2017 at 04:38:24PM +0200, Juergen Gross wrote:
->>>>>>>>>>> On 06/04/17 16:27, Daniel Kiper wrote:
->>>>>>>>>>>> On Thu, Apr 06, 2017 at 09:32:32AM +0100, Julien Grall wrote:
->>>>>>>>>>>>> Hi Juergen,
->>>>>>>>>>>>>
->>>>>>>>>>>>> On 06/04/17 07:23, Juergen Gross wrote:
->>>>>>>>>>>>>> On 05/04/17 21:49, Boris Ostrovsky wrote:
->>>>>>>>>>>>>>> On 04/05/2017 02:14 PM, Julien Grall wrote:
->>>>>>>>>>>>>>>> The x86 code has theoritically a similar issue, altought EFI does not
->>>>>>>>>>>>>>>> seem to be the preferred method. I have left it unimplemented on x86 and
->>>>>>>>>>>>>>>> CCed Linux Xen x86 maintainers to know their view here.
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> (+Daniel)
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> This could be a problem for x86 as well, at least theoretically.
->>>>>>>>>>>>>>> xen_machine_power_off() may call pm_power_off(), which is efi.reset_system.
->>>>>>>>>>>>>>>
->>>>>>>>>>>>>>> So I think we should have a similar routine there.
->>>>>>>>>>>>>>
->>>>>>>>>>>>>> +1
->>>>>>>>>>>>>>
->>>>>>>>>>>>>> I don't see any problem with such a routine added, in contrast to
->>>>>>>>>>>>>> potential "reboots" instead of power off without it.
->>>>>>>>>>>>>>
->>>>>>>>>>>>>> So I think this dummy xen_efi_reset_system() should be added to
->>>>>>>>>>>>>> drivers/xen/efi.c instead.
->>>>>>>>>>>>>
->>>>>>>>>>>>> I will resend the patch during day with xen_efi_reset_system moved
->>>>>>>>>>>>> to common code and implement the x86 counterpart (thought, I will
->>>>>>>>>>>>> not be able to test it).
->>>>>>>>>>>>
->>>>>>>>>>>> I think that this is ARM specific issue. On x86 machine_restart() calls
->>>>>>>>>>>> xen_restart(). Hence, everything works. So, I think that it should be
->>>>>>>>>>>> fixed only for ARM. Anyway, please CC me when you send a patch.
->>>>>>>>>>>
->>>>>>>>>>> What about xen_machine_power_off() (as stated in Boris' mail)?
->>>>>>>>>>
->>>>>>>>>> Guys what do you think about that:
->>>>>>>>>>
->>>>>>>>>> --- a/drivers/firmware/efi/reboot.c
->>>>>>>>>> +++ b/drivers/firmware/efi/reboot.c
->>>>>>>>>> @@ -55,7 +55,7 @@ static void efi_power_off(void)
->>>>>>>>>>
->>>>>>>>>> static int __init efi_shutdown_init(void)
->>>>>>>>>> {
->>>>>>>>>> -       if (!efi_enabled(EFI_RUNTIME_SERVICES))
->>>>>>>>>> +       if (!efi_enabled(EFI_RUNTIME_SERVICES) || efi_enabled(EFI_PARAVIRT))
->>>>>>>>>>                return -ENODEV;
->>>>>>>>>>
->>>>>>>>>>        if (efi_poweroff_required())
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Julien, for ARM64 please take a look at arch/arm64/kernel/efi.c:efi_poweroff_required(void).
->>>>>>>>>>
->>>>>>>>>> I hope that tweaks for both files should solve our problem.
->>>>>>>>>
->>>>>>>>> This sounds good for power off (I haven't tried to power off DOM0
->>>>>>>>> yet). But this will not solve the restart problem (see
->>>>>>>>> machine_restart in arch/arm64/kernel/process.c) which call directly
->>>>>>>>> efi_reboot.
->>>>>>>>
->>>>>>>> Hmmm... It seems to me that efi.reset_system override with empty function
->>>>>>>> in arch/arm/xen/efi.c is the best solution. So, I see three patches here.
->>>>>>>> One for drivers/firmware/efi/reboot.c, one for arch/arm/xen/efi.c and one
->>>>>>>> for arch/arm64/kernel/efi.c. Does it make sense?
->>>>>>>
->>>>>>> I still think the empty function should be in drivers/xen/efi.c and we
->>>>>>> should use it in arch/x86/xen/efi.c, too.
->>>>>>
->>>>>> If you wish we can go that way too. Though I thing that we should fix
->>>>>> drivers/firmware/efi/reboot.c:efi_shutdown_init() too. Just in case.
->>>>>
->>>>> Sure, go ahead. I won't object.
->>>>
->>>> For the Xen on ARM side, the original patch that started this thread
->>>> (20170405181417.15985-1-julien.grall at arm.com) is good to go, right?
->>>>
->>>
->>> As I said: the dummy xen_efi_reset_system() should be in
->>> drivers/xen/efi.c
->>
->> OK. Who is working on it?
->
-> Didn't Julien say he would do it?
+Here are some patches to fix a few issues related to tagged pointer
+handling.
 
-Yes. I looked at bit closer to the problem mention with power off. 
-xen_efi_reset_system cannot be a NOP because there may not be fallback 
-alternatives (see machine_power_off in arch/arm64/kernel/process.c)
+Tagged pointers from userspace can end up in the kernel in a number of
+ways. I most likely have not found all of them, but they include at
+least the following:
 
-So I think we would have to translate EFI_RESET* to Xen SHUTDOWN_* and 
-then call HYPERVISOR_sched_op directly.
+ - Passing tagged pointers in system call arguments. This would be a
+   userspace bug, as documented in tagged-pointers.txt.
 
-I will send a new version soon.
+ - Through FAR_EL1 when we take a data abort or watchpoint exception.
+   Watchpoint handling is currently broken if we get a tagged pointer,
+   patch #2 in this series fixes it. We already do the right thing for
+   data aborts but patch #3 tries to improve on it a little.
 
-Cheers,
+ - Reading a tagged pointer from a GPR when trapping and emulating
+   instructions, e.g. cache maintenance or uprobes. Patch #1 fixes the
+   cache maintenance case.
+
+ - The user stack pointer, frame pointer (x29), frame records, and link
+   register (x30) can contain tagged pointers. Patch #4 documents that
+   some kernel features do not currently work with tagged pointers in
+   the first three of these.
+
+ - A tagged pointer can end up in the PC on an illegal exception return
+   (see D4.1.4 ARMARM A.k_iss10775), and from there in ELR on exception
+   entry. As I understand it, this can only be caused by a bad eret at
+   EL1 or a bad debug state exit by an external debugger, so only by a
+   bug in Linux/firmware or the external debugger. So I don't think we
+   need to handle this.
+
+Note that the above applies to Linux only. I have spoken to Marc Zyngier
+about KVM, and so far he hasn't found any problems there.
+
+Thanks,
+Kristina
+
+
+Kristina Martsenko (4):
+  arm64: traps: fix userspace cache maintenance emulation on a tagged
+    pointer
+  arm64: hw_breakpoint: fix watchpoint matching for tagged pointers
+  arm64: entry: improve data abort handling of tagged pointers
+  arm64: documentation: document tagged pointer stack constraints
+
+ Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
+ arch/arm64/include/asm/asm-uaccess.h    |  9 +++++
+ arch/arm64/include/asm/uaccess.h        |  6 ++--
+ arch/arm64/kernel/entry.S               |  4 ++-
+ arch/arm64/kernel/hw_breakpoint.c       |  3 ++
+ arch/arm64/kernel/traps.c               |  4 +--
+ 6 files changed, 67 insertions(+), 21 deletions(-)
 
 -- 
-Julien Grall
+2.1.4
