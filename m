@@ -1,14 +1,14 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 20 Apr 2017 17:30:29 +0100
-Subject: [GIT PULL] ARM: dts: vexpress: fix for v4.12
-Message-ID: <3457b9e7-f720-b142-fa82-2855b2c2e2b1@arm.com>
+Date: Thu, 20 Apr 2017 17:30:51 +0100
+Subject: [GIT PULL] arm64: dts: juno: fixes for v4.12
+Message-ID: <42ac5309-62aa-1c5e-3cbb-cb40d68e8b9b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi ARM SoC team,
 
-Sorry for the late pull request, but this just contain fix to remove DT
-build warnings that are showing up in linux-next
+Sorry for the late pull request, but this contains only fixes
+that were found when I tested linux-next.
 
 Please pull!
 
@@ -22,27 +22,33 @@ The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-tags/vexpress-dt-4.12
+tags/juno-fixes-4.12
 
-for you to fetch changes up to e6a7efad7921f12ea8112f16681e47fb30c7d975:
+for you to fetch changes up to f9936c4abf63106e0bcc3d82098dd1cfc3dc5290:
 
-  ARM: dts: vexpress: fix few unit address format warnings (2017-04-19
-12:08:37 +0100)
-
-----------------------------------------------------------------
-ARMv7 VExpress DT fix for v4.12
-
-A single fix to remove device tree warnings introduced with recently
-added checks in DTC
+  arm64: dts: juno: add information about L1 and L2 caches (2017-04-19
+12:16:51 +0100)
 
 ----------------------------------------------------------------
-Sudeep Holla (1):
-      ARM: dts: vexpress: fix few unit address format warnings
+ARMv8 Juno DT fixes for v4.12
 
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi     | 24 +++++++---------
- arch/arm/boot/dts/vexpress-v2m.dtsi         | 24 +++++++---------
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |  2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  | 18 +++++++-------
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |  2 +-
- arch/arm/boot/dts/vexpress-v2p-ca9.dts      |  2 +-
- 6 files changed, 36 insertions(+), 36 deletions(-)
+1. Couple of fixes to remove device tree warnings introduced with
+   recently added checks in DTC
+
+2. Add information about L1 and L2 caches to Juno device trees as
+   CCSIDR-based cacheinfo probing is now removed
+
+----------------------------------------------------------------
+Rob Herring (1):
+      arm64: dts: juno: fix PCI bus dtc warnings
+
+Sudeep Holla (2):
+      arm64: dts: juno: fix few unit address format warnings
+      arm64: dts: juno: add information about L1 and L2 caches
+
+ arch/arm64/boot/dts/arm/juno-base.dtsi        |  4 +--
+ arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 12 +++---
+ arch/arm64/boot/dts/arm/juno-r1.dts           | 42 +++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r2.dts           | 42 +++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts              | 42 +++++++++++++++++
+ 5 files changed, 134 insertions(+), 8 deletions(-)
