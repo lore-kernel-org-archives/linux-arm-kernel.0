@@ -1,85 +1,226 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Thu, 20 Apr 2017 16:50:30 +0530
-Subject: LDM/STM alignment fixups on arm64
-In-Reply-To: <20170419155801.GC3238@e104818-lin.cambridge.arm.com>
-References: <58F704D6.6000301@codeaurora.org>
- <20170419095830.GK17774@n2100.armlinux.org.uk>
- <58F75D02.1030104@codeaurora.org>
- <20170419155801.GC3238@e104818-lin.cambridge.arm.com>
-Message-ID: <58F8997E.8040907@codeaurora.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 20 Apr 2017 13:14:51 +0200
+Subject: [PATCH V15 02/11] ras: acpi/apei: cper: add support for generic
+ data v3 structure
+In-Reply-To: <1492556723-9189-3-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-3-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170420111451.6mo4o2oulwal3j33@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2017 09:28 PM, Catalin Marinas wrote:
-> On Wed, Apr 19, 2017 at 06:20:10PM +0530, Srinivas Ramana wrote:
->> On 04/19/2017 03:28 PM, Russell King - ARM Linux wrote:
->>> On Wed, Apr 19, 2017 at 12:03:58PM +0530, Srinivas Ramana wrote:
->>>> While understanding how the alignment are handled on arm and arm64, we came
->>>> across the fixups for LDM/LDRD/STM on arm where as these fixups are not
->>>> present on arm64.
->>>>
->>>> There may be some specific reason why these fixups are not ported to arm64.
->>>> Can you please help us understand this?
->>>>
->>>> With this difference in how kernel handles 32-bit apps on arm and arm64,
->>>> there can be apps which are working without abort on arm, but fail on arm64
->>>> (SIGBUS). We have tried to get some history on web, but not successful.
->>>>
->>>> If this is indeed missing on arm64, do you see any issue if its ported (does
->>>> it fail any guidance)?
->>>
->>> Do you have an application that fails because of this?  Your email makes
->>> it sound very theoretical.
->>
->> I don't have any application with me right now. But i just tried passing an
->> intentional misaligned address in a test program. When i say intentional,
->> please note this code is buggy and should be fixed.
->>
->> So, my question is when arm has such fixups to handle such cases and do
->> gracefully, is there any reason why those fixups are not ported to arm64?
->
-> As Russell said, until we find some application in the wild I wouldn't
-> rush to provide such emulation. Such code is either broken or relying on
-> undefined C behaviour so they should rather be fixed. As with the
-> deprecated/obsolete ARMv7 instructions (SWP, CP15 barriers), we
-> initially decided not to implement the emulation in the arm64 kernel,
-> though we eventually accepted it. But in those cases the instructions
-> were once real and used correctly. The unaligned LDM/STM or LDRD/STRD
-> have never been supported by the ARM architecture. They were added to
-> cope with some unaligned accesses in the Linux kernel network stack (in
-> hindsight, they should have not been provided to user but maybe there
-> were good reasons, I don't know the full history here).
->
-Sure. Thanks. I think i got some context and guidance now.
+On Tue, Apr 18, 2017 at 05:05:14PM -0600, Tyler Baicar wrote:
+> The ACPI 6.1 spec adds a new version of the generic data structure.
 
->> Again, I do agree that apps has to fix these instances, but we do have
->> fixups in arch/arm.
->
-> I also think the default on arch/arm should be SIGBUS for these
-> instructions on ARMv7 but this was discussed before on the list.
->
->> I do see that the compiler can detect (if its not intentionally induced)
->> such cases and avoiding to generate LDM/STM and generates multiple LDR/STR.
->> So, I just want to know if it is safe to assume that the compiler would take
->> care of all such misaligned addresses passed to LDM/STM?
->
-> The compiler won't detect if you break its alignment assumptions (i.e.
-> in your example pointers to struct locat are 64-bit aligned as per the
-> EABI/PCS). If you want the compiler to assume unaligned struct pointers,
-> you'd have to mark the structure with the packed attribute (with the
-> additional padding if necessary, not in your example though).
->
-You are right. with __packed__ attribute compiler detects the 
-unalignment (added a char to the test structure in my program), I could 
-see that compiler generates multiple LDRs instead of LDM.
+which data structure? HEST?
 
-Thanks for the details.
+> Add support to handle the new structure as well as properly verify
+> and iterate through the generic data entries.
+> 
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks,
--- Srinivas R
+This is clearly a new version of the patch so Reviewed-by tags don't
+apply anymore. Ditto for the next one. Remember to remove such tags in
+the future when the patches are changed non-trivially in a following
+iteration.
 
+> ---
+>  drivers/acpi/apei/ghes.c    |  6 +++---
+>  drivers/firmware/efi/cper.c | 37 ++++++++++++++++++++++---------------
+>  include/acpi/ghes.h         | 22 ++++++++++++++++++++++
+>  3 files changed, 47 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 6d87ab7..dfb7dd2 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -429,7 +429,7 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
+>  	int flags = -1;
+>  	int sec_sev = ghes_severity(gdata->error_severity);
+>  	struct cper_sec_mem_err *mem_err;
+> -	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
+> +	mem_err = acpi_hest_get_payload(gdata);
+
+        struct cper_sec_mem_err *mem_err = acpi_hest_get_payload(gdata);
+
+while you're at it.
+
+>  	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
+>  		return;
+> @@ -466,7 +466,7 @@ static void ghes_do_proc(struct ghes *ghes,
+>  		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>  				 CPER_SEC_PLATFORM_MEM)) {
+>  			struct cper_sec_mem_err *mem_err;
+> -			mem_err = (struct cper_sec_mem_err *)(gdata+1);
+> +			mem_err = acpi_hest_get_payload(gdata);
+
+Ditto
+
++ add a \n here.
+
+>  			ghes_edac_report_mem_error(ghes, sev, mem_err);
+>  
+>  			arch_apei_report_mem_error(sev, mem_err);
+> @@ -476,7 +476,7 @@ static void ghes_do_proc(struct ghes *ghes,
+>  		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>  				      CPER_SEC_PCIE)) {
+>  			struct cper_sec_pcie *pcie_err;
+> -			pcie_err = (struct cper_sec_pcie *)(gdata+1);
+> +			pcie_err = acpi_hest_get_payload(gdata);
+
+Ditto.
+
+>  			if (sev == GHES_SEV_RECOVERABLE &&
+>  			    sec_sev == GHES_SEV_RECOVERABLE &&
+>  			    pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
+> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+> index d425374..8328a6f 100644
+> --- a/drivers/firmware/efi/cper.c
+> +++ b/drivers/firmware/efi/cper.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/acpi.h>
+>  #include <linux/pci.h>
+>  #include <linux/aer.h>
+> +#include <acpi/ghes.h>
+>  
+>  #define INDENT_SP	" "
+>  
+> @@ -386,8 +387,9 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
+>  	pfx, pcie->bridge.secondary_status, pcie->bridge.control);
+>  }
+>  
+> -static void cper_estatus_print_section(
+> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
+> +static void
+> +cper_estatus_print_section(const char *pfx, struct acpi_hest_generic_data *gdata,
+> +			   int sec_no)
+>  {
+>  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
+>  	__u16 severity;
+> @@ -403,14 +405,18 @@ static void cper_estatus_print_section(
+>  
+>  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+>  	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
+> -		struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
+> +		struct cper_sec_proc_generic *proc_err;
+> +
+> +		proc_err = acpi_hest_get_payload(gdata);
+
+Ditto.
+
+>  		printk("%s""section_type: general processor error\n", newpfx);
+>  		if (gdata->error_data_length >= sizeof(*proc_err))
+>  			cper_print_proc_generic(newpfx, proc_err);
+>  		else
+>  			goto err_section_too_small;
+>  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
+> -		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
+> +		struct cper_sec_mem_err *mem_err;
+> +
+> +		mem_err = acpi_hest_get_payload(gdata);
+
+Ditto.
+
+>  		printk("%s""section_type: memory error\n", newpfx);
+>  		if (gdata->error_data_length >=
+>  		    sizeof(struct cper_sec_mem_err_old))
+> @@ -419,7 +425,9 @@ static void cper_estatus_print_section(
+>  		else
+>  			goto err_section_too_small;
+>  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
+> -		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
+> +		struct cper_sec_pcie *pcie;
+> +
+> +		pcie = acpi_hest_get_payload(gdata);
+
+Ditto.
+
+>  		printk("%s""section_type: PCIe error\n", newpfx);
+>  		if (gdata->error_data_length >= sizeof(*pcie))
+>  			cper_print_pcie(newpfx, pcie, gdata);
+> @@ -438,7 +446,7 @@ void cper_estatus_print(const char *pfx,
+>  			const struct acpi_hest_generic_status *estatus)
+>  {
+>  	struct acpi_hest_generic_data *gdata;
+> -	unsigned int data_len, gedata_len;
+> +	unsigned int data_len;
+>  	int sec_no = 0;
+>  	char newpfx[64];
+>  	__u16 severity;
+> @@ -452,11 +460,10 @@ void cper_estatus_print(const char *pfx,
+>  	data_len = estatus->data_length;
+>  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+>  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+> -	while (data_len >= sizeof(*gdata)) {
+> -		gedata_len = gdata->error_data_length;
+
+<-- \n here while you're@it.
+
+We have to start making this code more readable. It looks write-only
+right now.
+
+> +	while (data_len >= acpi_hest_get_size(gdata)) {
+>  		cper_estatus_print_section(newpfx, gdata, sec_no);
+> -		data_len -= gedata_len + sizeof(*gdata);
+> -		gdata = (void *)(gdata + 1) + gedata_len;
+> +		data_len -= acpi_hest_get_record_size(gdata);
+> +		gdata = acpi_hest_get_next(gdata);
+>  		sec_no++;
+>  	}
+>  }
+> @@ -486,12 +493,12 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
+>  		return rc;
+>  	data_len = estatus->data_length;
+>  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+> -	while (data_len >= sizeof(*gdata)) {
+> -		gedata_len = gdata->error_data_length;
+> -		if (gedata_len > data_len - sizeof(*gdata))
+
+Ditto.
+
+> +	while (data_len >= acpi_hest_get_size(gdata)) {
+> +		gedata_len = acpi_hest_get_error_length(gdata);
+> +		if (gedata_len > data_len - acpi_hest_get_size(gdata))
+>  			return -EINVAL;
+
+<-- \n here too
+
+> -		data_len -= gedata_len + sizeof(*gdata);
+> -		gdata = (void *)(gdata + 1) + gedata_len;
+> +		data_len -= acpi_hest_get_record_size(gdata);
+> +		gdata = acpi_hest_get_next(gdata);
+>  	}
+>  	if (data_len)
+>  		return -EINVAL;
+> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+> index 68f088a..b89361a 100644
+> --- a/include/acpi/ghes.h
+> +++ b/include/acpi/ghes.h
+> @@ -12,6 +12,20 @@
+>  #define GHES_TO_CLEAR		0x0001
+>  #define GHES_EXITING		0x0002
+>  
+> +#define acpi_hest_get_error_length(gdata)	\
+> +	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
+> +#define acpi_hest_get_size(gdata)		\
+> +	((acpi_hest_get_version(gdata) >= 3) ?	\
+> +	sizeof(struct acpi_hest_generic_data_v300) :	\
+> +	sizeof(struct acpi_hest_generic_data))
+> +#define acpi_hest_get_record_size(gdata)	\
+> +	(acpi_hest_get_size(gdata) +		\
+> +	acpi_hest_get_error_length(gdata))
+> +#define acpi_hest_get_next(gdata)		\
+> +	((void *)(gdata) + acpi_hest_get_record_size(gdata))
+> +#define acpi_hest_get_version(gdata)			\
+> +	(gdata->revision >> 8)
+
+Make all those inline functions.
 
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc.,
-is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
