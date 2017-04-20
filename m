@@ -1,226 +1,83 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 20 Apr 2017 13:14:51 +0200
-Subject: [PATCH V15 02/11] ras: acpi/apei: cper: add support for generic
- data v3 structure
-In-Reply-To: <1492556723-9189-3-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170420111451.6mo4o2oulwal3j33@pd.tnic>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 20 Apr 2017 14:24 +0300
+Subject: [PATCH/RFC v2 1/2] arm64: dts: r8a7795: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <CAMuHMdWmvhZjxKfEdGJ3d_w0d2s2kK+8iW1tsEM584qZc+dVEQ@mail.gmail.com>
+References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
+ <1714563.qChlbIjNcO@avalon>
+ <CAMuHMdWmvhZjxKfEdGJ3d_w0d2s2kK+8iW1tsEM584qZc+dVEQ@mail.gmail.com>
+Message-ID: <3119026.3cPho1BBNv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:05:14PM -0600, Tyler Baicar wrote:
-> The ACPI 6.1 spec adds a new version of the generic data structure.
+Hi Geert,
 
-which data structure? HEST?
-
-> Add support to handle the new structure as well as properly verify
-> and iterate through the generic data entries.
+On Thursday 20 Apr 2017 12:55:28 Geert Uytterhoeven wrote:
+> On Thu, Apr 20, 2017 at 12:42 PM, Laurent Pinchart wrote:
+> > On Thursday 20 Apr 2017 11:36:59 Geert Uytterhoeven wrote:
+> >> On Mon, Mar 27, 2017 at 10:48 AM, Laurent Pinchart wrote:
+> >>> On Friday 24 Mar 2017 14:37:44 Geert Uytterhoeven wrote:
+> >>>> Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
+> >>>>   - The following devices no longer exist on ES2.0, and are thus
+> >>>>     removed:
+> >>>>     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
+> >>>>   
+> >>>>   - The DU <-> VSPD topology is different on ES2.0, hence remove the
+> >>>>     "vsps" property from the DU node until the driver can handle this.
+> >>> 
+> >>> I think I'll need a different compatible string between ES1.x and ES2
+> >>> for the DU. It could make sense to move the whole DU node to *-es1.dtsi.
+> >>> We can decide about that later when I'll have a DU driver prototype
+> >>> ready.
+> >> 
+> >> Why would you need a different compatible string?
+> >> Can't you use soc_device_match() to handle ES1.x SoCs?
+> >> 
+> >> The different DU <-> VSPD topology is handled through the vsps property
+> >> in
+> >> DTS. Are the ports different, too? That can be handled in DTS.
+> > 
+> > My point (not expressed clearly) was that, as I'll need a different vsps
+> > property, I can as well go for a different compatible string.
 > 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-This is clearly a new version of the patch so Reviewed-by tags don't
-apply anymore. Ditto for the next one. Remember to remove such tags in
-the future when the patches are changed non-trivially in a following
-iteration.
-
-> ---
->  drivers/acpi/apei/ghes.c    |  6 +++---
->  drivers/firmware/efi/cper.c | 37 ++++++++++++++++++++++---------------
->  include/acpi/ghes.h         | 22 ++++++++++++++++++++++
->  3 files changed, 47 insertions(+), 18 deletions(-)
+> Do you need a different vsps property?
+> AFAIK, the current array links each DU channel to a VSPD.
+> When a VSPD is shared between multiple channels, you can still link these
+> channels to the same VSPD.
 > 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 6d87ab7..dfb7dd2 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -429,7 +429,7 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
->  	int flags = -1;
->  	int sec_sev = ghes_severity(gdata->error_severity);
->  	struct cper_sec_mem_err *mem_err;
-> -	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
-> +	mem_err = acpi_hest_get_payload(gdata);
+> Or is my understanding incorrect?
 
-        struct cper_sec_mem_err *mem_err = acpi_hest_get_payload(gdata);
+Do you mean listing the same VSP multiple times in the vsps array ? Yes, from 
+a bindings point of view I think that would work too. That is, until we get a 
+ES2.1 that will have a completely different hardware topology :-)
 
-while you're at it.
+> >> The main reason why I kept the DU node in r8a7795.dtsi is that the board
+> >> DTS refers to it.  Sharing board DTS means there needs to be at least a
+> >> placeholder node for the DU in r8a7795.dtsi, unless you want to keep on
+> >> shuffling board overrides around.
+> > 
+> > As the ports are identical it makes sense to share the same board DTS, I
+> > agree with you. We could override the compatible string in
+> > r8a7795-es1.dtsi and leave it blank in r8a7795.dtsi for now, as there's
+> > no driver support for ES2.0. That's a bit of a workaround as it shouldn't
+> > matter to DT whether driver support is available or not. On the other
+> > hand, leaving the vsps property out is a workaround too.
+> > 
+> > The current driver will fail probing if the number of VSPs is different
+> > than the number of CRTCs, so I believe you can keep the vsps property in
+> > r8a7795.dtsi with 3 VSPS without causing any problem. However, there's no
+> > DT bindings for the H3 ES2.0 DU yet, so we would end up merging DT
+> > without bindings, which is not good. I think that regardless of how we
+> > proceed, keeping the DU node in the ES2.0 .dtsi will be a violation of
+> > that policy.
+>
+> What does the current driver do if the number of VSPs is the same as the
+> number of CRTCs, but some VSPs are listed more than once?
+> I guess it will break in a subtle way, instead of refusing to probe?
 
->  	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
->  		return;
-> @@ -466,7 +466,7 @@ static void ghes_do_proc(struct ghes *ghes,
->  		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
->  				 CPER_SEC_PLATFORM_MEM)) {
->  			struct cper_sec_mem_err *mem_err;
-> -			mem_err = (struct cper_sec_mem_err *)(gdata+1);
-> +			mem_err = acpi_hest_get_payload(gdata);
-
-Ditto
-
-+ add a \n here.
-
->  			ghes_edac_report_mem_error(ghes, sev, mem_err);
->  
->  			arch_apei_report_mem_error(sev, mem_err);
-> @@ -476,7 +476,7 @@ static void ghes_do_proc(struct ghes *ghes,
->  		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
->  				      CPER_SEC_PCIE)) {
->  			struct cper_sec_pcie *pcie_err;
-> -			pcie_err = (struct cper_sec_pcie *)(gdata+1);
-> +			pcie_err = acpi_hest_get_payload(gdata);
-
-Ditto.
-
->  			if (sev == GHES_SEV_RECOVERABLE &&
->  			    sec_sev == GHES_SEV_RECOVERABLE &&
->  			    pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index d425374..8328a6f 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -32,6 +32,7 @@
->  #include <linux/acpi.h>
->  #include <linux/pci.h>
->  #include <linux/aer.h>
-> +#include <acpi/ghes.h>
->  
->  #define INDENT_SP	" "
->  
-> @@ -386,8 +387,9 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
->  	pfx, pcie->bridge.secondary_status, pcie->bridge.control);
->  }
->  
-> -static void cper_estatus_print_section(
-> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
-> +static void
-> +cper_estatus_print_section(const char *pfx, struct acpi_hest_generic_data *gdata,
-> +			   int sec_no)
->  {
->  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->  	__u16 severity;
-> @@ -403,14 +405,18 @@ static void cper_estatus_print_section(
->  
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->  	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
-> -		struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
-> +		struct cper_sec_proc_generic *proc_err;
-> +
-> +		proc_err = acpi_hest_get_payload(gdata);
-
-Ditto.
-
->  		printk("%s""section_type: general processor error\n", newpfx);
->  		if (gdata->error_data_length >= sizeof(*proc_err))
->  			cper_print_proc_generic(newpfx, proc_err);
->  		else
->  			goto err_section_too_small;
->  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
-> -		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
-> +		struct cper_sec_mem_err *mem_err;
-> +
-> +		mem_err = acpi_hest_get_payload(gdata);
-
-Ditto.
-
->  		printk("%s""section_type: memory error\n", newpfx);
->  		if (gdata->error_data_length >=
->  		    sizeof(struct cper_sec_mem_err_old))
-> @@ -419,7 +425,9 @@ static void cper_estatus_print_section(
->  		else
->  			goto err_section_too_small;
->  	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
-> -		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
-> +		struct cper_sec_pcie *pcie;
-> +
-> +		pcie = acpi_hest_get_payload(gdata);
-
-Ditto.
-
->  		printk("%s""section_type: PCIe error\n", newpfx);
->  		if (gdata->error_data_length >= sizeof(*pcie))
->  			cper_print_pcie(newpfx, pcie, gdata);
-> @@ -438,7 +446,7 @@ void cper_estatus_print(const char *pfx,
->  			const struct acpi_hest_generic_status *estatus)
->  {
->  	struct acpi_hest_generic_data *gdata;
-> -	unsigned int data_len, gedata_len;
-> +	unsigned int data_len;
->  	int sec_no = 0;
->  	char newpfx[64];
->  	__u16 severity;
-> @@ -452,11 +460,10 @@ void cper_estatus_print(const char *pfx,
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-
-<-- \n here while you're@it.
-
-We have to start making this code more readable. It looks write-only
-right now.
-
-> +	while (data_len >= acpi_hest_get_size(gdata)) {
->  		cper_estatus_print_section(newpfx, gdata, sec_no);
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		data_len -= acpi_hest_get_record_size(gdata);
-> +		gdata = acpi_hest_get_next(gdata);
->  		sec_no++;
->  	}
->  }
-> @@ -486,12 +493,12 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
->  		return rc;
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-> -		if (gedata_len > data_len - sizeof(*gdata))
-
-Ditto.
-
-> +	while (data_len >= acpi_hest_get_size(gdata)) {
-> +		gedata_len = acpi_hest_get_error_length(gdata);
-> +		if (gedata_len > data_len - acpi_hest_get_size(gdata))
->  			return -EINVAL;
-
-<-- \n here too
-
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		data_len -= acpi_hest_get_record_size(gdata);
-> +		gdata = acpi_hest_get_next(gdata);
->  	}
->  	if (data_len)
->  		return -EINVAL;
-> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-> index 68f088a..b89361a 100644
-> --- a/include/acpi/ghes.h
-> +++ b/include/acpi/ghes.h
-> @@ -12,6 +12,20 @@
->  #define GHES_TO_CLEAR		0x0001
->  #define GHES_EXITING		0x0002
->  
-> +#define acpi_hest_get_error_length(gdata)	\
-> +	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
-> +#define acpi_hest_get_size(gdata)		\
-> +	((acpi_hest_get_version(gdata) >= 3) ?	\
-> +	sizeof(struct acpi_hest_generic_data_v300) :	\
-> +	sizeof(struct acpi_hest_generic_data))
-> +#define acpi_hest_get_record_size(gdata)	\
-> +	(acpi_hest_get_size(gdata) +		\
-> +	acpi_hest_get_error_length(gdata))
-> +#define acpi_hest_get_next(gdata)		\
-> +	((void *)(gdata) + acpi_hest_get_record_size(gdata))
-> +#define acpi_hest_get_version(gdata)			\
-> +	(gdata->revision >> 8)
-
-Make all those inline functions.
+Correct, it will be messy.
 
 -- 
-Regards/Gruss,
-    Boris.
+Regards,
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Laurent Pinchart
