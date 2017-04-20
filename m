@@ -1,32 +1,67 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 20 Apr 2017 21:58:40 +0200
-Subject: [Bug] VCHIQ functional test broken
-In-Reply-To: <87pog7x7c5.fsf@eliezer.anholt.net>
-References: <331235003.222371.1491934205807@email.1und1.de>
- <685482264.60263.1492105308873@email.1und1.de>
- <20170413222915.GF17774@n2100.armlinux.org.uk>
- <20170414074104.GA8704@laptop> <87pog7x7c5.fsf@eliezer.anholt.net>
-Message-ID: <20170420195822.GA22677@laptop>
+From: plaes@plaes.org (Priit Laes)
+Date: Thu, 20 Apr 2017 19:59:17 +0000
+Subject: [linux-sunxi] Re: [PATCH v2 1/6] clk: sunxi-ng: Add sun4i/sun7i
+ CCU driver
+In-Reply-To: <20170407133805.aiythp3hdvuyhcrc@lukather>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <ac8c4dab4f160ec605d52120517774bf1de87c2e.1490545262.git-series.plaes@plaes.org>
+ <20170327075438.cw3d6s7zyeemenwr@lukather>
+ <20170404200919.GA22159@plaes.org>
+ <20170407133805.aiythp3hdvuyhcrc@lukather>
+Message-ID: <20170420195917.GA16113@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
-> I'm confused by what you're saying here.  The driver has already been
-> converted to not use dmac_map_area (commit
-> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
-> matching the radeon driver you give as a model as far as I can see.
-> That commit is in v4.11-rc6 from Stefan's regression report.
+On Fri, Apr 07, 2017 at 03:38:05PM +0200, Maxime Ripard wrote:
+> Hi Priit,
+> 
+> On Tue, Apr 04, 2017 at 08:09:19PM +0000, Priit Laes wrote:
+> > > > +/* Not documented on A10 */
+> > > > +static SUNXI_CCU_GATE(pll_periph_sata_clk, "pll-periph-sata", "pll-periph",
+> > > > +		      0x028, BIT(14), 0);
+> > > 
+> > > The rate doesn't come from pll-periph directly, does it?
+> > 
+> > So it uses hosc (24MHz parent clock) instead of pll-periph?
+> 
+> I never looked too much at this, but it looks more like the input is
+> pll-periph-sata itself.
 
-Right.  Sorry.  I must have had an old tag checked out when I looked at
-the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
-current master looks fine, except for one thing:
+OK, I think I have now fixed most of the issues thanks to Maxime and Chen-Yu
+and I'm almost ready to send out V3.
 
-The flush in flush_dcache_page() (from get_user_pages()) was done with a
-v6_flush_kern_dcache_page() which always did a clean+invalidate while
-the DMA API only does what is required by the direction, which is only a
-invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
-the entire page, even if userspace sent in an offset into the page,
-unrelated data in userspace may be thrown away.
+>From my side there is only single issue remaining - how to create "sata-ext"
+clock?
 
-Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
-test pass?
+[snip]
+static struct ccu_div pll_periph_sata_clk = {
+	.enable		= BIT(14),
+	.div		= _SUNXI_CCU_DIV(0, 2),
+	.common		= {
+		.prediv		= 6,
+		.reg		= 0x028,
+		.features	= CCU_FEATURE_ALL_PREDIV,
+		.hw.init	= CLK_HW_INIT("pll-periph-sata",
+					      "pll-periph-base",
+					      &ccu_nk_ops, 0),
+	},
+};
+
+static const char* const sata_parents[] = {"pll-periph-sata", "sata-ext"};
+static SUNXI_CCU_MUX_WITH_GATE(sata_clk, "sata", sata_parents,
+			       0x0c8, 24, 1, BIT(31), 0);
+[/snip]
+
+Should I create a fixed-clock node in the dtsi:
+
+sata-ext: clk at 0 {
+	#clock-cells = <0>;
+	compatible = "fixed-clock";
+	clock-frequency = <200000000>;
+	clock-output-names = "sata-ext";
+};
+
+And would it also need pio definition?
+
+P?ikest,
+Priit :)
