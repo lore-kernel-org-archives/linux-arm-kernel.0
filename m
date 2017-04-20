@@ -1,75 +1,111 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Thu, 20 Apr 2017 19:17:13 +0100
-Subject: [PATCH 3/4] arm64: entry: improve data abort handling of tagged
- pointers
+Date: Thu, 20 Apr 2017 19:17:14 +0100
+Subject: [PATCH 4/4] arm64: documentation: document tagged pointer stack
+ constraints
 In-Reply-To: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
 References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1492712234-4950-4-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1492712234-4950-5-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When handling a data abort from EL0, we currently zero the top byte of
-the faulting address, as we assume the address is a TTBR0 address, which
-may contain a non-zero address tag. However, the address may be a TTBR1
-address, in which case we should not zero the top byte. This patch fixes
-that. The effect is that the full TTBR1 address is passed to the task's
-signal handler (or printed out in the kernel log).
+Some kernel features don't currently work if a task puts a non-zero
+address tag in its stack pointer, frame pointer, or frame record entries
+(FP, LR).
 
-When handling a data abort from EL1, we leave the faulting address
-intact, as we assume it's either a TTBR1 address or a TTBR0 address with
-tag 0x00. This is true as far as I'm aware, we don't seem to access a
-tagged TTBR0 address anywhere in the kernel. Regardless, it's easy to
-forget about address tags, and code added in the future may not always
-remember to remove tags from addresses before accessing them. So add tag
-handling to the EL1 data abort handler as well. This also makes it
-consistent with the EL0 data abort handler.
+For example, with a tagged stack pointer, the kernel can't deliver
+signals to the process, and the task is killed instead. As another
+example, with a tagged frame pointer or frame records, perf fails to
+generate call graphs or resolve symbols.
 
-Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
+For now, just document these limitations, instead of finding and fixing
+everything that doesn't work, as it's not known if anyone needs to use
+tags in these places anyway.
+
+In addition, as requested by Dave Martin, generalize the limitations
+into a general kernel address tag policy, and refactor
+tagged-pointers.txt to include it.
+
+Cc: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/asm-uaccess.h | 9 +++++++++
- arch/arm64/kernel/entry.S            | 4 +++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+ Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
+ 1 file changed, 47 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-index df411f3e083c..790ce8e64f8d 100644
---- a/arch/arm64/include/asm/asm-uaccess.h
-+++ b/arch/arm64/include/asm/asm-uaccess.h
-@@ -62,4 +62,13 @@ alternative_if ARM64_ALT_PAN_NOT_UAO
- alternative_else_nop_endif
- 	.endm
+diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+index d9995f1f51b3..a25a99e82bb1 100644
+--- a/Documentation/arm64/tagged-pointers.txt
++++ b/Documentation/arm64/tagged-pointers.txt
+@@ -11,24 +11,56 @@ in AArch64 Linux.
+ The kernel configures the translation tables so that translations made
+ via TTBR0 (i.e. userspace mappings) have the top byte (bits 63:56) of
+ the virtual address ignored by the translation hardware. This frees up
+-this byte for application use, with the following caveats:
++this byte for application use.
  
-+/*
-+ * Remove the address tag from a virtual address, if present.
-+ */
-+	.macro	clear_address_tag, addr, tmp
-+	bic	\tmp, \addr, #(0xff << 56)
-+	tst	\addr, #(1 << 55)
-+	csel	\addr, \tmp, \addr, eq
-+	.endm
+-	(1) The kernel requires that all user addresses passed to EL1
+-	    are tagged with tag 0x00. This means that any syscall
+-	    parameters containing user virtual addresses *must* have
+-	    their top byte cleared before trapping to the kernel.
+ 
+-	(2) Non-zero tags are not preserved when delivering signals.
+-	    This means that signal handlers in applications making use
+-	    of tags cannot rely on the tag information for user virtual
+-	    addresses being maintained for fields inside siginfo_t.
+-	    One exception to this rule is for signals raised in response
+-	    to watchpoint debug exceptions, where the tag information
+-	    will be preserved.
++Passing tagged addresses to the kernel
++--------------------------------------
+ 
+-	(3) Special care should be taken when using tagged pointers,
+-	    since it is likely that C compilers will not hazard two
+-	    virtual addresses differing only in the upper byte.
++All interpretation of userspace memory addresses by the kernel assumes
++an address tag of 0x00.
 +
- #endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 43512d4d7df2..2f7ec392ef50 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -434,6 +434,7 @@ el1_da:
- 	tbnz	x23, #7, 1f			// PSR_I_BIT
- 	enable_irq
- 1:
-+	clear_address_tag x0, x3
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_mem_abort
++This includes, but is not limited to, addresses found in:
++
++ - pointer arguments to system calls, including pointers in structures
++   passed to system calls,
++
++ - the stack pointer (sp), e.g. when interpreting it to deliver a
++   signal,
++
++ - the frame pointer (x29) and frame records, e.g. when interpreting
++   them to generate a backtrace or call graph.
++
++Using non-zero address tags in any of these locations may result in an
++error code being returned, a (fatal) signal being raised, or other modes
++of failure.
++
++For these reasons, passing non-zero address tags to the kernel via
++system calls is forbidden, and using a non-zero address tag for sp is
++strongly discouraged.
++
++Programs maintaining a frame pointer and frame records that use non-zero
++address tags may suffer impaired or inaccurate debug and profiling
++visibility.
++
++
++Preserving tags
++---------------
++
++Non-zero tags are not preserved when delivering signals. This means that
++signal handlers in applications making use of tags cannot rely on the
++tag information for user virtual addresses being maintained for fields
++inside siginfo_t. One exception to this rule is for signals raised in
++response to watchpoint debug exceptions, where the tag information will
++be preserved.
  
-@@ -594,7 +595,8 @@ el0_da:
- 	// enable interrupts before calling the main handler
- 	enable_dbg_and_irq
- 	ct_user_exit
--	bic	x0, x26, #(0xff << 56)
-+	mov	x0, x26
-+	clear_address_tag x0, x3
- 	mov	x1, x25
- 	mov	x2, sp
- 	bl	do_mem_abort
+ The architecture prevents the use of a tagged PC, so the upper byte will
+ be set to a sign-extension of bit 55 on exception return.
++
++
++Other considerations
++--------------------
++
++Special care should be taken when using tagged pointers, since it is
++likely that C compilers will not hazard two virtual addresses differing
++only in the upper byte.
 -- 
 2.1.4
