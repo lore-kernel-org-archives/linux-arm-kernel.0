@@ -1,51 +1,82 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 20 Apr 2017 10:58:20 -0500
-Subject: [PATCH v6 1/6] dt-bindings: power: supply: add AXP20X/AXP22X
- battery DT binding
-In-Reply-To: <20170418073421.31351-2-quentin.schulz@free-electrons.com>
-References: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
- <20170418073421.31351-2-quentin.schulz@free-electrons.com>
-Message-ID: <20170420155820.tzvvwqnl2ze63jel@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 20 Apr 2017 09:58:44 -0600
+Subject: [PATCH] coresight: tmc: minor fix for output log
+In-Reply-To: <1491578520-5957-1-git-send-email-leo.yan@linaro.org>
+References: <1491578520-5957-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <CANLsYkw5P3YX+6k8oEN0FouzBQ=Mox4gy4QLCT9qganYEd5qoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 09:34:16AM +0200, Quentin Schulz wrote:
-> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
-> 
-> This patch adds the DT binding documentation for the battery power
-> supply which gets various data from the PMIC, such as the battery status
-> (charging, discharging, full, dead), current max limit, current current,
-> battery capacity (in percentage), voltage max and min limits, current
-> voltage and battery capacity (in Ah).
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 7 April 2017 at 09:22, Leo Yan <leo.yan@linaro.org> wrote:
+> In current code the output logs are not well symmetric for sink and link
+> enabling and disabling. This patch is to fix that so can output paired
+> logs.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
-> v6:
->   - removed mention to monitored-battery, will be sent when the battery
->   framework has been merged,
-> 
-> v5:
->   - removed DT property example from monitored-battery,
-> 
-> v4:
->  - added monitored-battery optional property,
->  - added example with battery,
-> 
-> v3:
->  - removed constant charge current property, now should use the WIP
->  battery framework,
-> 
-> v2:
->  - changed DT node name from ac_power_supply to ac-power-supply,
->  - removed io-channels and io-channel-names from DT (the IIO mapping is
->  done in the IIO ADC driver now),
->  - added x-powers,constant-charge-current property to set the maximal
->  default constant current charge of the battery,
-> 
->  .../bindings/power/supply/axp20x_battery.txt         | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c | 25 +++++++++++++++++--------
+>  1 file changed, 17 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 1549436..3a1c181 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -166,9 +166,6 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
+>         if (!used)
+>                 kfree(buf);
+>
+> -       if (!ret)
+> -               dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
+> -
+>         return ret;
+>  }
+>
+> @@ -204,15 +201,27 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev)
+>
+>  static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+>  {
+> +       int ret;
+> +       struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+>         switch (mode) {
+>         case CS_MODE_SYSFS:
+> -               return tmc_enable_etf_sink_sysfs(csdev);
+> +               ret = tmc_enable_etf_sink_sysfs(csdev);
+> +               break;
+>         case CS_MODE_PERF:
+> -               return tmc_enable_etf_sink_perf(csdev);
+> +               ret = tmc_enable_etf_sink_perf(csdev);
+> +               break;
+> +       /* We shouldn't be here */
+> +       default:
+> +               ret = -EINVAL;
+> +               break;
+>         }
+>
+> -       /* We shouldn't be here */
+> -       return -EINVAL;
+> +       if (ret)
+> +               return ret;
+> +
+> +       dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
+> +       return 0;
+>  }
+>
+>  static void tmc_disable_etf_sink(struct coresight_device *csdev)
+> @@ -273,7 +282,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
+>         drvdata->mode = CS_MODE_DISABLED;
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>
+> -       dev_info(drvdata->dev, "TMC disabled\n");
+> +       dev_info(drvdata->dev, "TMC-ETF disabled\n");
+>  }
+>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied - thanks.
+Mathieu
+
+>  static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
+> --
+> 2.7.4
+>
