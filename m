@@ -1,61 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Apr 2017 10:43:11 +0100
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <2003d851-e17e-1a43-3889-ec6e79e635e3@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
- <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
- <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
- <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
- <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
- <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
- <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
- <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
- <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
- <241b130e-1fb7-ecd4-034e-eb02065ada66@free.fr>
- <37cd6172-b04e-fcad-18fc-4fbb26cc611b@arm.com>
- <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
- <2003d851-e17e-1a43-3889-ec6e79e635e3@free.fr>
-Message-ID: <b61614bd-10e4-25eb-95bc-fd8939d4449f@arm.com>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Thu, 20 Apr 2017 12:44:42 +0300
+Subject: [PATCH] [RFC] gpu: host1x: shut up warning about DMA API misuse
+In-Reply-To: <CAK8P3a3JJrA_4Zur47ngWmR7VeKBopJLNZCaqOPzzmnFoV3=Ew@mail.gmail.com>
+References: <20170419182413.866327-1-arnd@arndb.de>
+ <8df7c5a9-c71c-4ee9-9bc2-9c861cf9796c@kapsi.fi>
+ <CAK8P3a3JJrA_4Zur47ngWmR7VeKBopJLNZCaqOPzzmnFoV3=Ew@mail.gmail.com>
+Message-ID: <46945c47-2e4e-270d-b551-b207c538e5cb@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/04/17 09:20, Mason wrote:
-> On 19/04/2017 13:19, Mason wrote:
-> 
->> My biggest problem is that tango_unmask() is never called.
-> 
-> FTR, the missing incantation was:
-> Explicitly calling tango_{mask/unmask/ack} from the corresponding msi_{mask/unmask/ack}
+On 20.04.2017 11:25, Arnd Bergmann wrote:
+> On Thu, Apr 20, 2017 at 9:02 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
+>> On 19.04.2017 21:24, Arnd Bergmann wrote:
+>>>
+>>> When dma_addr_t and phys_addr_t are not the same size, we get a warning
+>>> from the dma_alloc_wc function:
+>>>
+>>> drivers/gpu/host1x/cdma.c: In function 'host1x_pushbuffer_init':
+>>> drivers/gpu/host1x/cdma.c:94:48: error: passing argument 3 of
+>>> 'dma_alloc_wc' from incompatible pointer type
+>>> [-Werror=incompatible-pointer-types]
+>>>    pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+>>>                                                 ^
+>>> In file included from drivers/gpu/host1x/cdma.c:22:0:
+>>> include/linux/dma-mapping.h:761:37: note: expected 'dma_addr_t * {aka long
+>>> long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned
+>>> int *}'
+>>>  static noinline_if_stackbloat void *dma_alloc_wc(struct device *dev,
+>>> size_t size,
+>>>                                      ^~~~~~~~~~~~
+>>> drivers/gpu/host1x/cdma.c:113:48: error: passing argument 3 of
+>>> 'dma_alloc_wc' from incompatible pointer type
+>>> [-Werror=incompatible-pointer-types]
+>>>    pb->mapped = dma_alloc_wc(host1x->dev, size, &pb->phys,
+>>>                                                 ^
+>>> In file included from drivers/gpu/host1x/cdma.c:22:0:
+>>> include/linux/dma-mapping.h:761:37: note: expected 'dma_addr_t * {aka long
+>>> long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned
+>>> int *}'
+>>>  static noinline_if_stackbloat void *dma_alloc_wc(struct device *dev,
+>>> size_t size,
+>>>                                      ^~~~~~~~~~~~
+>>>
+>>> The problem here is that dma_alloc_wc() returns a pointer to a dma_addr_t
+>>> that may already be translated by an IOMMU, but the driver passes this
+>>> into iommu_map() as a physical address. This works by accident only when
+>>> the IOMMU does not get registered with the DMA API and there is a 1:1
+>>> mapping between physical addresses as seen by the CPU and the device.
+>>>
+>>> The fundamental problem here is the lack of a generic API to do what the
+>>> driver wants: allocating CPU-visible memory for use by a device through
+>>> user-defined IOMMU settings. Neither the dma-mapping API nor the IOMMU
+>>> API can do this by itself, and combining the two is not well-defined.
+>>>
+>>> This patch addresses the type mismatch by adding a third pointer into the
+>>> push_buffer structure: in addition to the address as seen from the CPU
+>>> and the address inside of the local IOMMU domain, the pb->alloc pointer
+>>> is the token returned by dma_alloc_wc(), and this is what we later need
+>>> to pass into dma_free_wc().
+>>>
+>>> The address we pass into iommu_map() however is the physical address
+>>> computed from virt_to_phys(), assuming that the pointer we have here
+>>> is part of the linear mapping (which is also questionable, e.g. when we
+>>> have a non-coherent device on ARM32 this may be false). Also, when
+>>> the DMA API uses the IOMMU to allocate the pointer for the default
+>>> domain, we end up with two IOMMU mappings for the same physical address.
+>>>
+>>
+>> I think we have a "policy" on Tegra that the DMA API will never allocate
+>> using the IOMMU (Thierry can elaborate on this), which is why I wrote the
+>> code with that assumption. Essentially, we have made the DMA API into the
+>> API that allocates CPU-visible memory.
+>
+> I don't think this can be a per-platform policy.
 
-Using irq_chip_mask_parent and co, you mean?
+Yeah, now that we are using the ARM SMMU on T186 onwards it's more 
+difficult than when we were using the Tegra SMMU, so we'll probably have 
+to change that.
 
-> Marc, I have one nagging doubt, wrt splitting MSI line selection
-> and MSI enable.
-> 
-> tango_irq_domain_alloc : finds an available MSI 'j' to allocate
-> tango_irq_domain_free : release MSI 'j'
-> tango_unmask : enable MSI 'j'
-> tango_mask : disable MSI 'j'
-> 
-> Is the following scenario guaranteed to never happen?
-> 
-> tango_irq_domain_alloc // alloc 0
-> tango_irq_domain_free  // free 0
-> tango_irq_domain_alloc // alloc 0
-> tango_unmask // enable 0
-> tango_unmask // enable 0 = NOP
-> tango_mask   // disable 0
-> 
-> In this theoretical scenario, we would be left with a non-functional
-> MSI 0.
+The goal of the current code is to allocate memory from the CMA, so one 
+option would be to change it to use dma_alloc_from_contiguous. That way 
+we wouldn't get the double IOMMU mapping, which would be nice.
 
-I'm not sure I get the example above, and what the various alloc/free
-calls have to do with anything. If you have unbalanced
-enable/disable_irq, you loose. Don't do that.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+>> Considering that, I'm wondering if we can just have a temporary local
+>> dma_addr_t and then cast that to phys_addr_t, combined with a good comment?
+>
+> That was my first approach, and it does address the warning, but
+> I did not send it because it still felt too wrong.
+>
+>      Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
