@@ -1,156 +1,45 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Thu, 20 Apr 2017 14:57:52 -0600
-Subject: [PATCH V8 5/6] ACPI: Support the probing on the devices which
- apply indirect-IO
-In-Reply-To: <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
-References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
- <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <CALdTtnuO=592n+PoR_kkdTyeFYRd90VyPf0JLwnEo7DtXwzoPA@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 20 Apr 2017 14:20:40 -0700
+Subject: [Bug] VCHIQ functional test broken
+In-Reply-To: <20170420195822.GA22677@laptop>
+References: <331235003.222371.1491934205807@email.1und1.de>
+ <685482264.60263.1492105308873@email.1und1.de>
+ <20170413222915.GF17774@n2100.armlinux.org.uk> <20170414074104.GA8704@laptop>
+ <87pog7x7c5.fsf@eliezer.anholt.net> <20170420195822.GA22677@laptop>
+Message-ID: <87bmrq22tz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 30, 2017 at 9:26 AM, zhichang.yuan
-<yuanzhichang@hisilicon.com> wrote:
-> On some platforms(such as Hip06/Hip07), the legacy ISA/LPC devices access I/O
-> with some special host-local I/O ports known on x86. To access the I/O
-> peripherals, an indirect-IO mechanism is introduced to mapped the host-local
-> I/O to system logical/fake PIO similar the PCI MMIO on architectures where no
-> separate I/O space exists. Just as PCI MMIO, the host I/O range should be
-> registered before probing the downstream devices and set up the I/O mapping.
-> But current ACPI bus probing doesn't support these indirect-IO hosts/devices.
->
-> This patch introdueces a new ACPI handler for this device category. Through the
-> handler attach callback, the indirect-IO hosts I/O registration is done and
-> all peripherals' I/O resources are translated into logic/fake PIO before
-> starting the enumeration.
->
-> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> ---
->  drivers/acpi/Makefile          |   1 +
->  drivers/acpi/acpi_indirectio.c | 344 +++++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/internal.h        |   5 +
->  drivers/acpi/scan.c            |   1 +
->  4 files changed, 351 insertions(+)
->  create mode 100644 drivers/acpi/acpi_indirectio.c
->
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index a391bbc..10e5f2b 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -57,6 +57,7 @@ acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
->  acpi-y                         += acpi_lpat.o
->  acpi-$(CONFIG_ACPI_GENERIC_GSI) += irq.o
->  acpi-$(CONFIG_ACPI_WATCHDOG)   += acpi_watchdog.o
-> +acpi-$(CONFIG_INDIRECT_PIO)    += acpi_indirectio.o
->
->  # These are (potentially) separate modules
->
-> diff --git a/drivers/acpi/acpi_indirectio.c b/drivers/acpi/acpi_indirectio.c
-> new file mode 100644
-> index 0000000..c8c80b5
-> --- /dev/null
-> +++ b/drivers/acpi/acpi_indirectio.c
-> @@ -0,0 +1,344 @@
-> +/*
-> + * ACPI support for indirect-IO bus.
-> + *
-> + * Copyright (C) 2017 Hisilicon Limited, All Rights Reserved.
-> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/logic_pio.h>
-> +
-> +#include "internal.h"
-> +
-> +ACPI_MODULE_NAME("indirect IO");
-> +
-> +#define INDIRECT_IO_INFO(desc) ((unsigned long)&desc)
-> +
-> +struct lpc_private_data {
-> +       resource_size_t io_size;
-> +       resource_size_t io_start;
-> +};
-> +
-> +struct indirectio_device_desc {
-> +       void *pdata; /* device relevant info data */
-> +       int (*pre_setup)(struct acpi_device *adev, void *pdata);
-> +};
-> +
-> +static struct lpc_private_data lpc_data = {
-> +       .io_size = LPC_BUS_IO_SIZE,
-> +       .io_start = LPC_MIN_BUS_RANGE,
-> +};
-> +
-> +static inline bool acpi_logicio_supported_resource(struct acpi_resource *res)
-> +{
-> +       switch (res->type) {
-> +       case ACPI_RESOURCE_TYPE_ADDRESS32:
-> +       case ACPI_RESOURCE_TYPE_ADDRESS64:
-> +               return true;
-> +       }
-> +       return false;
-> +}
-> +
-> +static acpi_status acpi_count_logiciores(struct acpi_resource *res,
-> +                                          void *data)
-> +{
-> +       int *res_cnt = data;
-> +
-> +       if (acpi_logicio_supported_resource(res) &&
-> +               !acpi_dev_filter_resource_type(res, IORESOURCE_IO))
-> +               (*res_cnt)++;
-> +
-> +       return AE_OK;
-> +}
-> +
-> +static acpi_status acpi_read_one_logiciores(struct acpi_resource *res,
-> +               void *data)
-> +{
-> +       struct acpi_resource **resource = data;
-> +
-> +       if (acpi_logicio_supported_resource(res) &&
-> +               !acpi_dev_filter_resource_type(res, IORESOURCE_IO)) {
-> +               memcpy((*resource), res, sizeof(struct acpi_resource));
-> +               (*resource)->length = sizeof(struct acpi_resource);
-> +               (*resource)->type = res->type;
-> +               (*resource)++;
-> +       }
-> +
-> +       return AE_OK;
-> +}
-> +
-> +static acpi_status
-> +acpi_build_logiciores_template(struct acpi_device *adev,
-> +                       struct acpi_buffer *buffer)
-> +{
-> +       acpi_handle handle = adev->handle;
-> +       struct acpi_resource *resource;
-> +       acpi_status status;
-> +       int res_cnt = 0;
-> +
-> +       status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-> +                                    acpi_count_logiciores, &res_cnt);
-> +       if (ACPI_FAILURE(status) || !res_cnt) {
-> +               dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
-> +               return -EINVAL;
-> +       }
-> +
-> +       buffer->length = sizeof(struct acpi_resource) * (res_cnt + 1) + 1;
-> +       buffer->pointer = kzalloc(buffer->length - 1, GFP_KERNEL);
+Rabin Vincent <rabin@rab.in> writes:
 
-(Seth Forshee noticed this issue, just passing it on)
+> On Thu, Apr 20, 2017 at 11:27:38AM -0700, Eric Anholt wrote:
+>> I'm confused by what you're saying here.  The driver has already been
+>> converted to not use dmac_map_area (commit
+>> cf9caf1929882b66922aee698e99e6c8f357bee5), and uses dma_map_sg instead,
+>> matching the radeon driver you give as a model as far as I can see.
+>> That commit is in v4.11-rc6 from Stefan's regression report.
+>
+> Right.  Sorry.  I must have had an old tag checked out when I looked at
+> the driver earlier.  The DMA API usage in the driver in v4.11-rc6 and
+> current master looks fine, except for one thing:
+>
+> The flush in flush_dcache_page() (from get_user_pages()) was done with a
+> v6_flush_kern_dcache_page() which always did a clean+invalidate while
+> the DMA API only does what is required by the direction, which is only a
+> invalidate for DMA_FROM_DEVICE.  Since the driver calls dma_from_sg() on
+> the entire page, even if userspace sent in an offset into the page,
+> unrelated data in userspace may be thrown away.
+>
+> Does changing the dma API calls to always use DMA_BIDIRECTIONAL make the
+> test pass?
 
-Should this just allocate the full buffer->length? That would keep the
-length attribute accurate (possibly avoiding an off-by-1 error later).
-It's not clear what the trailing byte is needed for, but other drivers
-allocate it as well (drivers/acpi/pci_link.c and
-drivers/platform/x86/sony-laptop.c).
-
- -dann
+Oh, that's a neat explanation for what might be wrong, and there seem to
+be tests trying to poke at that within the functional test code.
+Hopefully Stefan can try that out.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/c55cf587/attachment-0001.sig>
