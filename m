@@ -1,92 +1,99 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 19 Apr 2017 20:40:22 -0700
-Subject: [PATCH] lib/mpi: fix build with clang
-Message-ID: <20170420034022.24109-1-stefan@agner.ch>
+From: dongbo4@huawei.com (dongbo (E))
+Date: Thu, 20 Apr 2017 11:50:38 +0800
+Subject: [PATCH] fs: Preventing READ_IMPLIES_EXEC Propagation
+In-Reply-To: <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
+References: <1492088223-98232-1-git-send-email-zhangshaokun@hisilicon.com>
+ <2414e3b3-03f6-bd6c-5aa4-ad58c66b5aa5@huawei.com>
+ <20170418170118.GH27592@e104818-lin.cambridge.arm.com>
+ <CAFEAcA_wH1dDbcjEEBaLX0q8pfWsfYUGGL-zOC4MuxySqa=uvA@mail.gmail.com>
+ <20170419103313.GA3238@e104818-lin.cambridge.arm.com>
+Message-ID: <edd83c82-7800-b1ca-2069-3b40cefa93d3@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use just @ to denote comments which works with gcc and clang.
-Otherwise clang reports an escape sequence error:
-  error: invalid % escape in inline assembly string
+On 2017/4/19 18:33, Catalin Marinas wrote:
+> On Tue, Apr 18, 2017 at 09:01:52PM +0100, Peter Maydell wrote:
+>> On 18 April 2017 at 18:01, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>> On Thu, Apr 13, 2017 at 08:33:52PM +0800, dongbo (E) wrote:
+>>>> From: Dong Bo <dongbo4@huawei.com>
+>>>>
+>>>> In load_elf_binary(), once the READ_IMPLIES_EXEC flag is set,
+>>>> the flag is propagated to its child processes, even the elf
+>>>> files are marked as not requiring executable stack. It may
+>>>> cause superfluous operations on some arch, e.g.
+>>>> __sync_icache_dcache on aarch64 due to a PROT_READ mmap is
+>>>> also marked as PROT_EXEC.
+>>>>
+>>>> Signed-off-by: Dong Bo <dongbo4@huawei.com>
+>>>> ---
+>>>>  fs/binfmt_elf.c       | 2 ++
+>>>>  fs/binfmt_elf_fdpic.c | 2 ++
+>>>>  2 files changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+>>>> index 5075fd5..c52e670 100644
+>>>> --- a/fs/binfmt_elf.c
+>>>> +++ b/fs/binfmt_elf.c
+>>>> @@ -863,6 +863,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
+>>>>  	SET_PERSONALITY2(loc->elf_ex, &arch_state);
+>>>>  	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
+>>>>  		current->personality |= READ_IMPLIES_EXEC;
+>>>> +	else
+>>>> +		current->personality &= ~READ_IMPLIES_EXEC;
+>>>>   	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
+>>>> 		current->flags |= PF_RANDOMIZE;
+>>>> diff --git a/fs/binfmt_elf_fdpic.c b/fs/binfmt_elf_fdpic.c
+>>>> index cf93a4f..c4bc4d0 100644
+>>>> --- a/fs/binfmt_elf_fdpic.c
+>>>> +++ b/fs/binfmt_elf_fdpic.c
+>>>> @@ -354,6 +354,8 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm)
+>>>>  		set_personality(PER_LINUX);
+>>>>  	if (elf_read_implies_exec(&exec_params.hdr, executable_stack))
+>>>>  		current->personality |= READ_IMPLIES_EXEC;
+>>>> +	else
+>>>> +		current->personality &= ~READ_IMPLIES_EXEC;
+>>>>   	setup_new_exec(bprm);
+>>
+>>> That's affecting most architectures with a risk of ABI breakage. We
+>>> could do it on arm64 only, though I'm not yet clear on the ABI
+>>> implications (at a first look, there shouldn't be any).
+>>
+>> Is there a reason why it isn't just straightforwardly a bug
+>> (which we could fix) to make READ_IMPLIES_EXEC propagate to
+>> child processes?
+> 
+> While I agree that it looks like a bug, if there are user programs
+> relying on such bug we call it "ABI". On arm64, I don't think there is
+> anything relying on inheriting READ_IMPLIES_EXEC but I wouldn't change
+> the compat task handling without the corresponding change in arch/arm.
+> 
 
-Use %0-%3 as operand references, this avoids:
-  error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
+With READ_IMPLIES_EXEC propagation, several hundreds times of
+__sync_icache_dcache operations shows up than not READ_IMPLIES_EXEC
+propagation, which degenerating the system performance. Changing arm64
+only would settle our problem down, thanks for figuring out previously.
 
-Also remove superfluous casts on output operands to avoid warnings
-such as:
-  warning: invalid use of a cast in an inline asm context requiring an l-value
+Seems that arch/arm had discussed the propagation of READ_IMPLIES_EXEC:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/086490.html
+But the READ_IMPLIES_EXEC is still not cleared in elf_set_personality().
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-I checked the output of gcc with -S switch before and after this change,
-gcc generated the same assembly.
+>> AFAICT this should be per-process: just because
+>> init happens not to have been (re)compiled to permit non-executable
+>> stacks doesn't mean every process on the system needs to have
+>> an executable stack.
+> 
+> I think this also affects the heap if brk(2) is used (via
+> VM_DATA_DEFAULT_FLAGS though I guess malloc mostly uses mmap these
+> days).
+> 
+>> Behaviour shouldn't be variable across architectures either, I would
+>> hope.
+> 
+> The behaviour has already been variable for a long time. Even on x86,
+> AFAICT x86_32 differs from x86_64 in this respect.
+> 
+> Anyway, the patch should be posted to linux-arch for a cross-arch
+> discussion.
+> 
 
---
-Stefan
-
- lib/mpi/longlong.h | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
-
-diff --git a/lib/mpi/longlong.h b/lib/mpi/longlong.h
-index 93336502af08..57fd45ab7af1 100644
---- a/lib/mpi/longlong.h
-+++ b/lib/mpi/longlong.h
-@@ -176,8 +176,8 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- #define add_ssaaaa(sh, sl, ah, al, bh, bl) \
- 	__asm__ ("adds %1, %4, %5\n" \
- 		"adc  %0, %2, %3" \
--	: "=r" ((USItype)(sh)), \
--		"=&r" ((USItype)(sl)) \
-+	: "=r" (sh), \
-+		"=&r" (sl) \
- 	: "%r" ((USItype)(ah)), \
- 		"rI" ((USItype)(bh)), \
- 		"%r" ((USItype)(al)), \
-@@ -185,15 +185,15 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- #define sub_ddmmss(sh, sl, ah, al, bh, bl) \
- 	__asm__ ("subs %1, %4, %5\n" \
- 		"sbc  %0, %2, %3" \
--	: "=r" ((USItype)(sh)), \
--		"=&r" ((USItype)(sl)) \
-+	: "=r" (sh), \
-+		"=&r" (sl) \
- 	: "r" ((USItype)(ah)), \
- 		"rI" ((USItype)(bh)), \
- 		"r" ((USItype)(al)), \
- 		"rI" ((USItype)(bl)))
- #if defined __ARM_ARCH_2__ || defined __ARM_ARCH_3__
- #define umul_ppmm(xh, xl, a, b) \
--	__asm__ ("%@ Inlined umul_ppmm\n" \
-+	__asm__ ("@ Inlined umul_ppmm\n" \
- 		"mov	%|r0, %2, lsr #16		@ AAAA\n" \
- 		"mov	%|r2, %3, lsr #16		@ BBBB\n" \
- 		"bic	%|r1, %2, %|r0, lsl #16		@ aaaa\n" \
-@@ -206,19 +206,19 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- 		"addcs	%|r2, %|r2, #65536\n" \
- 		"adds	%1, %|r1, %|r0, lsl #16\n" \
- 		"adc	%0, %|r2, %|r0, lsr #16" \
--	: "=&r" ((USItype)(xh)), \
--		"=r" ((USItype)(xl)) \
-+	: "=&r" (xh), \
-+		"=r" (xl) \
- 	: "r" ((USItype)(a)), \
- 		"r" ((USItype)(b)) \
- 	: "r0", "r1", "r2")
- #else
- #define umul_ppmm(xh, xl, a, b) \
--	__asm__ ("%@ Inlined umul_ppmm\n" \
--		"umull %r1, %r0, %r2, %r3" \
--	: "=&r" ((USItype)(xh)), \
--			"=&r" ((USItype)(xl)) \
-+	__asm__ ("@ Inlined umul_ppmm\n" \
-+		"umull %1, %0, %2, %3" \
-+	: "=&r" (xh), \
-+		"=&r" (xl) \
- 	: "r" ((USItype)(a)), \
--			"r" ((USItype)(b)) \
-+		"r" ((USItype)(b)) \
- 	: "r0", "r1")
- #endif
- #define UMUL_TIME 20
--- 
-2.12.2
+OK, this mail Cc to linux-arch. Thanks.
