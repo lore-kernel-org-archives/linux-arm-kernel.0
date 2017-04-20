@@ -1,72 +1,69 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Thu, 20 Apr 2017 06:58:46 +0100
-Subject: [PATCH v3 1/5] dt-bindings: gpu: add bindings for the ARM Mali
- Midgard GPU
-In-Reply-To: <5481965.3RkcDb038R@phil>
-References: <cover.1492588180.git.guillaume.tucker@collabora.com>
- <96021d989387d9aaff039efebd66aa3bfe667941.1492588180.git.guillaume.tucker@collabora.com>
- <5481965.3RkcDb038R@phil>
-Message-ID: <4fd957ab-8365-eb4f-b003-467d3747a949@collabora.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Apr 2017 07:58:02 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 02/12] arm64: allwinner: a64: add
+ NMI controller on A64
+In-Reply-To: <FB3B3C68-EB16-4352-B0B9-64857B1A6C03@aosc.io>
+References: <20170417115747.7300-1-icenowy@aosc.io>
+ <20170417115747.7300-3-icenowy@aosc.io>
+ <20170418070016.qsng3qtk76bqxyc5@lukather>
+ <FB3B3C68-EB16-4352-B0B9-64857B1A6C03@aosc.io>
+Message-ID: <20170420055802.btibui5pspan4qal@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, Apr 18, 2017 at 06:56:43PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2017?4?18? GMT+08:00 ??3:00:16, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
+> >On Mon, Apr 17, 2017 at 07:57:37PM +0800, Icenowy Zheng wrote:
+> >> Allwinner A64 SoC features a NMI controller, which is usually
+> >connected
+> >> to the AXP PMIC.
+> >> 
+> >> Add support for it.
+> >> 
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >> Changes in v2:
+> >> - Added Chen-Yu's ACK.
+> >> 
+> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
+> >>  1 file changed, 8 insertions(+)
+> >> 
+> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> index 05ec9fc5e81f..53c18ca372ea 100644
+> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> >> @@ -403,6 +403,14 @@
+> >>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+> >>  		};
+> >>  
+> >> +		nmi_intc: interrupt-controller at 01f00c0c {
+> >> +			compatible = "allwinner,sun6i-a31-sc-nmi";
+> >> +			interrupt-controller;
+> >> +			#interrupt-cells = <2>;
+> >> +			reg = <0x01f00c0c 0x38>;
+> >
+> >The base address is not correct, and there's uncertainty on whether
+> >this is this particular controller or not. Did you even test this?
+> 
+> Tested by axp20x-pek.
 
-On 19/04/17 10:02, Heiko Stuebner wrote:
-> Am Mittwoch, 19. April 2017, 09:06:17 CEST schrieb Guillaume Tucker:
->> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->> new file mode 100644
->> index 000000000000..917c4f8d178f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
->> @@ -0,0 +1,57 @@
->> +ARM Mali Midgard GPU
->> +====================
->> +
->> +Required properties:
->> +
->> +- compatible :
->> +  * Must be one of the following:
->> +    + "arm,mali-t60x"
->> +    + "arm,mali-t62x"
->> +    + "arm,mali-t720"
->> +    + "arm,mali-t760"
->> +    + "arm,mali-t820"
->> +    + "arm,mali-t830"
->> +    + "arm,mali-t860"
->> +    + "arm,mali-t880"
->> +  * And, optionally, one of the vendor specific compatible:
->> +    + "amlogic,meson-gxm-mali"
->
-> Please add a "rockchip,rk3288-mali" as well :-) , as I don't trust that the
-> generic compatible will be enough for all time and having that already
-> defined makes fixing the per soc things later a lot easier.
+Still, the base address is wrong, which is yet another hint that this
+is not the same interrupt controller, and just works by accident.
 
-Sure, will do in patch v4.
+Maxime
 
->> +
->> +- reg : Physical base address of the device and length of the register area.
->> +
->> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
->> +
->> +- interrupt-names : Contains the names of IRQ resources in the order they were
->> +  provided in the interrupts property. Must contain: "job", "mmu", "gpu".
->> +
->> +
->> +Optional properties:
->> +
->> +- clocks : Phandle to clock for the Mali Midgard device.
->> +
->> +- mali-supply : Phandle to regulator for the Mali device. Refer to
->> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
->> +
->> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
->> +  for details.
-
-So I can simply change that to operating-points-v2.  Both
-versions can be used in practice but it sounds like
-operating-points can just be ignored in this binding's
-documentation.  Could you please confirm?
-
-Thanks,
-Guillaume
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/e5ed6016/attachment.sig>
