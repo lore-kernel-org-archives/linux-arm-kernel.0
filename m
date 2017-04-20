@@ -1,69 +1,158 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 19 Apr 2017 20:25:54 -0400
-Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <baed1ecf-7a57-0229-42b0-d87599a225b5@redhat.com>
-References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
- <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
- <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
- <baed1ecf-7a57-0229-42b0-d87599a225b5@redhat.com>
-Message-ID: <832cb9b3-ceaf-6771-bfc9-7bae35494f6d@redhat.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 20 Apr 2017 10:34:27 +1000
+Subject: linux-next: manual merge of the pm tree with the arm-soc tree
+Message-ID: <20170420103427.62fbf195@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One additional footnote. I spent a bunch of time recently on my personal
-Xeon systems walking through the PCIe topology and aligning on how to
-advise the ARM server community proceed going forward. If you look at
-how Intel vs AMD handle their host bridges for example, you'll see two
-very different approaches to the case of cross-socket PCIe. But my
-operating assumption is that anything longer term which looks boring and
-x86 enough is probably fine from an ARM server point of view.
+Hi Rafael,
 
-On 04/19/2017 07:38 PM, Jon Masters wrote:
-> Hi Bjorn, JC,
-> 
-> On 04/13/2017 08:19 PM, Bjorn Helgaas wrote:
-> 
->> I tentatively applied both patches to pci/host-thunder for v4.12.
-> 
-> Thanks for that :)
-> 
->> However, I am concerned about the topology here:
-> 
-> Various feedback has been provided on this one over the past $time. In
-> addition, I have requested that this serve as an example of why we need
-> a more complete PCIe integration guide for ARMv8. It's on the list of
-> things for my intended opus magnum on the topic ;)
-> 
->> On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
->>> On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
->>> PCI topology is slightly unusual.  For a multi-node system, it looks
->>> like:
->>>
->>>     00:00.0 [PCI] bridge to [bus 01-1e]
->>>     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
->>>     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
->>>     03:00.0 PCIe Endpoint
->>
->> A root port normally has a single PCIe link leading downstream.
-> 
-> In integration terms, there's always a bus on the other side of the RC.
-> It's just usually a processor local bus of some kind on a proprietary
-> interconnect, but there's always something there. The issue is when you
-> can see it as PCIe and it's not through a transparent glue bridge.
-> 
-> I had originally hoped that the ECAM could be hacked up so that we would
-> first walk the topology at the 02:00.0 as a root and not see what's
-> above it BUT there are other device attachments up there for the on-SoC
-> devices and I think we really intend to use those.
-> 
-> Bottom line in my opinion is document this case, use it as a learning
-> example, and move forward. This has been useful in justifying why we
-> need better integration documentation from the server community. And in
-> particular from the OS vendors, of which I guess we can allude to their
-> being more than Linux interested in ARM server these days ;)
-> 
-> Jon.
-> 
+Today's linux-next merge of the pm tree got a conflict in:
 
+  arch/arm/boot/dts/sun8i-a33.dtsi
+
+between commits:
+
+  66c373228dc4 ("ARM: sun8i: a33: Add the Mali OPPs")
+  e6bd37627e92 ("ARM: sun8i: a33: add all operating points")
+
+from the arm-soc tree and commit:
+
+  d87bd1942058 ("PM / OPP: Use - instead of @ for DT entries")
+
+from the pm tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+I suspect that arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts may need
+some fixups as well.
 -- 
-Computer Architect | Sent from my Fedora powered Ryzen
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/boot/dts/sun8i-a33.dtsi
+index 013978259372,a2c555d6475c..000000000000
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@@ -50,73 -49,19 +50,73 @@@
+  		compatible = "operating-points-v2";
+  		opp-shared;
+  
+- 		opp at 120000000 {
+++		opp-120000000 {
+ +			opp-hz = /bits/ 64 <120000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 240000000 {
+++		opp-240000000 {
+ +			opp-hz = /bits/ 64 <240000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 312000000 {
+++		opp-312000000 {
+ +			opp-hz = /bits/ 64 <312000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 408000000 {
+++		opp-408000000 {
+ +			opp-hz = /bits/ 64 <408000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 480000000 {
+++		opp-480000000 {
+ +			opp-hz = /bits/ 64 <480000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 504000000 {
+++		opp-504000000 {
+ +			opp-hz = /bits/ 64 <504000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 600000000 {
+++		opp-600000000 {
+ +			opp-hz = /bits/ 64 <600000000>;
+ +			opp-microvolt = <1040000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 648000000 {
++ 		opp-648000000 {
+  			opp-hz = /bits/ 64 <648000000>;
+  			opp-microvolt = <1040000>;
+  			clock-latency-ns = <244144>; /* 8 32k periods */
+  		};
+  
+- 		opp at 720000000 {
+++		opp-720000000 {
+ +			opp-hz = /bits/ 64 <720000000>;
+ +			opp-microvolt = <1100000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 816000000 {
++ 		opp-816000000 {
+  			opp-hz = /bits/ 64 <816000000>;
+  			opp-microvolt = <1100000>;
+  			clock-latency-ns = <244144>; /* 8 32k periods */
+  		};
+  
+- 		opp at 912000000 {
+++		opp-912000000 {
+ +			opp-hz = /bits/ 64 <912000000>;
+ +			opp-microvolt = <1200000>;
+ +			clock-latency-ns = <244144>; /* 8 32k periods */
+ +		};
+ +
+- 		opp at 1008000000 {
++ 		opp-1008000000 {
+  			opp-hz = /bits/ 64 <1008000000>;
+  			opp-microvolt = <1200000>;
+  			clock-latency-ns = <244144>; /* 8 32k periods */
+@@@ -156,27 -100,6 +156,27 @@@
+  		status = "disabled";
+  	};
+  
+ +	iio-hwmon {
+ +		compatible = "iio-hwmon";
+ +		io-channels = <&ths>;
+ +	};
+ +
+ +	mali_opp_table: gpu-opp-table {
+ +		compatible = "operating-points-v2";
+ +
+- 		opp at 144000000 {
+++		opp-144000000 {
+ +			opp-hz = /bits/ 64 <144000000>;
+ +		};
+ +
+- 		opp at 240000000 {
+++		opp-240000000 {
+ +			opp-hz = /bits/ 64 <240000000>;
+ +		};
+ +
+- 		opp at 384000000 {
+++		opp-384000000 {
+ +			opp-hz = /bits/ 64 <384000000>;
+ +		};
+ +	};
+ +
+  	memory {
+  		reg = <0x40000000 0x80000000>;
+  	};
