@@ -1,69 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Apr 2017 07:58:02 +0200
-Subject: [linux-sunxi] Re: [PATCH v3 02/12] arm64: allwinner: a64: add
- NMI controller on A64
-In-Reply-To: <FB3B3C68-EB16-4352-B0B9-64857B1A6C03@aosc.io>
-References: <20170417115747.7300-1-icenowy@aosc.io>
- <20170417115747.7300-3-icenowy@aosc.io>
- <20170418070016.qsng3qtk76bqxyc5@lukather>
- <FB3B3C68-EB16-4352-B0B9-64857B1A6C03@aosc.io>
-Message-ID: <20170420055802.btibui5pspan4qal@lukather>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 20 Apr 2017 08:43:40 +0200
+Subject: [PATCH v3 2/5] ARM: dts: rockchip: add ARM Mali GPU node for
+ rk3288
+In-Reply-To: <319a2a72-ca25-08d7-68dc-7eae74f1a622@collabora.com>
+References: <cover.1492588180.git.guillaume.tucker@collabora.com>
+ <5403013.fQWx48MQOq@phil>
+ <319a2a72-ca25-08d7-68dc-7eae74f1a622@collabora.com>
+Message-ID: <20465416.u9Y0ETYs62@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 06:56:43PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> ? 2017?4?18? GMT+08:00 ??3:00:16, Maxime Ripard <maxime.ripard@free-electrons.com> ??:
-> >On Mon, Apr 17, 2017 at 07:57:37PM +0800, Icenowy Zheng wrote:
-> >> Allwinner A64 SoC features a NMI controller, which is usually
-> >connected
-> >> to the AXP PMIC.
-> >> 
-> >> Add support for it.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> Acked-by: Chen-Yu Tsai <wens@csie.org>
+Hi Guillaume,
+
+Am Donnerstag, 20. April 2017, 06:44:56 CEST schrieb Guillaume Tucker:
+> On 19/04/17 09:59, Heiko Stuebner wrote:
+> > Am Mittwoch, 19. April 2017, 09:06:18 CEST schrieb Guillaume Tucker:
+> >> Add Mali GPU device tree node for the rk3288 SoC, with devfreq
+> >> opp table.
+> >>
+> >> Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> >> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
 > >> ---
-> >> Changes in v2:
-> >> - Added Chen-Yu's ACK.
-> >> 
-> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
-> >>  1 file changed, 8 insertions(+)
-> >> 
-> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> index 05ec9fc5e81f..53c18ca372ea 100644
-> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> @@ -403,6 +403,14 @@
-> >>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-> >>  		};
-> >>  
-> >> +		nmi_intc: interrupt-controller at 01f00c0c {
-> >> +			compatible = "allwinner,sun6i-a31-sc-nmi";
-> >> +			interrupt-controller;
-> >> +			#interrupt-cells = <2>;
-> >> +			reg = <0x01f00c0c 0x38>;
+> >>  arch/arm/boot/dts/rk3288.dtsi | 22 ++++++++++++++++++++++
+> >>  1 file changed, 22 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> >> index df8a0dbe9d91..187eed528f83 100644
+> >> --- a/arch/arm/boot/dts/rk3288.dtsi
+> >> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> >> @@ -43,6 +43,7 @@
+> >>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> >>  #include <dt-bindings/pinctrl/rockchip.h>
+> >>  #include <dt-bindings/clock/rk3288-cru.h>
+> >> +#include <dt-bindings/power/rk3288-power.h>
+> >>  #include <dt-bindings/thermal/thermal.h>
+> >>  #include <dt-bindings/power/rk3288-power.h>
+> >>  #include <dt-bindings/soc/rockchip,boot-mode.h>
+> >> @@ -227,6 +228,27 @@
+> >>  		ports = <&vopl_out>, <&vopb_out>;
+> >>  	};
+> >>
+> >> +	gpu: mali at ffa30000 {
 > >
-> >The base address is not correct, and there's uncertainty on whether
-> >this is this particular controller or not. Did you even test this?
+> > please sort nodes by address. ffa30000 should be placed below hdmi at ff980000
+> > and above qos at ffaa0000 .
 > 
-> Tested by axp20x-pek.
+> Sure, will fix that in v4.
+> 
+> >> +		compatible = "arm,mali-t760", "arm,mali-midgard";
+> >
+> > As indicated before I don't trust that a generic binding will work for
+> > everything, so I would feel safer if we had a "rockchip,rk3288-mali" in
+> > front for future purposes, making it a
+> >
+> > 		compatible = "rockchip,rk3288-mali", "arm,mali-t760", "arm,mali-midgard";
+> 
+> OK, sorry I overlooked this part.  I'll add it in v4 with a
+> vendor compatible string in the binding documentation.
 
-Still, the base address is wrong, which is yet another hint that this
-is not the same interrupt controller, and just works by accident.
+great, thanks :-)
 
-Maxime
+> 
+> >> +		reg = <0xffa30000 0x10000>;
+> >> +		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+> >> +			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+> >> +			     <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> >> +		interrupt-names = "job", "mmu", "gpu";
+> >> +		clocks = <&cru ACLK_GPU>;
+> >> +		operating-points = <
+> >> +			/* KHz uV */
+> >> +			100000 950000
+> >> +			200000 950000
+> >> +			300000 1000000
+> >> +			400000 1100000
+> >> +			500000 1200000
+> >> +			600000 1250000
+> >> +		>;
+> >
+> > Wasn't there a wish for opp-v2 in a previous version?
+> 
+> Well it wasn't entirely clear to me in Rob's email whether it was
+> necessary to use opp-v2 now or rather if it would be a potential
+> option whenever opp-v2 was needed.  If operating-points (v1) are
+> being deprecated then I can change that in my next patch v4.
+> Using operating-points-v2 with the Mali driver works as far as I
+> can tell on rk3288 so that's not an issue.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/e5ed6016/attachment.sig>
+I don't care to much either way, just remembered it being mentioned
+in the previous version. So lets see what Rob says.
+
+
+Heiko
