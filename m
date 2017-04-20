@@ -1,48 +1,22 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Apr 2017 18:45:54 +0300
-Subject: [PATCH 2/3] ARM: dts: sk-rzg1m: add SCIF0 pins
-In-Reply-To: <CAMuHMdWCan+XRgbjdMXNqWuUoY_ZeWR1hiicgYg3s5gKQRchpQ@mail.gmail.com>
-References: <20170414211509.818645915@cogentembedded.com>
- <CAMuHMdWCan+XRgbjdMXNqWuUoY_ZeWR1hiicgYg3s5gKQRchpQ@mail.gmail.com>
-Message-ID: <45efbee2-eb71-a702-5c96-5312cbb4eaac@cogentembedded.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 20 Apr 2017 10:57:17 -0500
+Subject: [PATCH 1/2] clk: hi6220: add acpu clock
+In-Reply-To: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20170420155717.mohnrg6lxpwkoytb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2017 05:19 PM, Geert Uytterhoeven wrote:
+On Tue, Apr 18, 2017 at 09:17:21AM +0800, Zhangfei Gao wrote:
+> Add acpu clock, including sft clock controlling hi6220 coresight module
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+> ---
+>  .../devicetree/bindings/clock/hi6220-clock.txt     |  1 +
 
->> Add the (previously omitted) SCIF0 pin data to the SK-RZG1M board's
->> device tree.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->>  arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   12 +++++++++++-
->>  1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
->> +++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-[...]
->> @@ -39,7 +39,17 @@
->>         clock-frequency = <20000000>;
->>  };
->>
->> +&pfc {
->> +       scif0_pins: scif0 {
->> +               groups = "scif0_data";
->
-> I don't have schematics for this board, but you told me it's very similar to
-> Porter. Hence I'd expect "scif0_data_d" instead.
+Acked-by: Rob Herring <robh@kernel.org>
 
-    And you are absolutely right! Sorry about my overlook...
-
-> In my experience, when changing pinctrl to map the lines of a device to a new
-> set of pins, but not mapping another device to the old set of pins, it may
-> output the signals on both the old and the new set of pins.
->
-> Does serial console input work with "scif0_data"?
-
-    Sure. :-)
-
-MBR, Sergei
+>  drivers/clk/hisilicon/clk-hi6220.c                 | 23 ++++++++++++++++++++++
+>  include/dt-bindings/clock/hi6220-clock.h           |  4 ++++
+>  3 files changed, 28 insertions(+)
