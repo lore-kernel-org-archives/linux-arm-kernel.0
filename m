@@ -1,66 +1,70 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Thu, 20 Apr 2017 19:17:11 +0100
-Subject: [PATCH 1/4] arm64: traps: fix userspace cache maintenance emulation
- on a tagged pointer
+Date: Thu, 20 Apr 2017 19:17:12 +0100
+Subject: [PATCH 2/4] arm64: hw_breakpoint: fix watchpoint matching for tagged
+ pointers
 In-Reply-To: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
 References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1492712234-4950-2-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1492712234-4950-3-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we emulate userspace cache maintenance in the kernel, we can
-currently send the task a SIGSEGV even though the maintenance was done
-on a valid address. This happens if the address has a non-zero address
-tag, and happens to not be mapped in.
+When we take a watchpoint exception, the address that triggered the
+watchpoint is found in FAR_EL1. We compare it to the address of each
+configured watchpoint to see which one was hit.
 
-When we get the address from a user register, we don't currently remove
-the address tag before performing cache maintenance on it. If the
-maintenance faults, we end up in either __do_page_fault, where find_vma
-can't find the VMA if the address has a tag, or in do_translation_fault,
-where the tagged address will appear to be above TASK_SIZE. In both
-cases, the address is not mapped in, and the task is sent a SIGSEGV.
+The configured watchpoint addresses are untagged, while the address in
+FAR_EL1 will have an address tag if the data access was done using a
+tagged address. The tag needs to be removed to compare the address to
+the watchpoints.
 
-This patch removes the tag from the address before using it. With this
-patch, the fault is handled correctly, the address gets mapped in, and
-the cache maintenance succeeds.
+Currently we don't remove it, and as a result can report the wrong
+watchpoint as being hit (specifically, always either the highest TTBR0
+watchpoint or lowest TTBR1 watchpoint). This patch removes the tag.
 
-As a second bug, if cache maintenance (correctly) fails on an invalid
-tagged address, the address gets passed into arm64_notify_segfault,
-where find_vma fails to find the VMA due to the tag, and the wrong
-si_code may be sent as part of the siginfo_t of the segfault. With this
-patch, the correct si_code is sent.
-
-Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
+Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
+ arch/arm64/include/asm/uaccess.h  | 6 +++---
+ arch/arm64/kernel/hw_breakpoint.c | 3 +++
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-Note that patch #3 would also fix the first bug (incorrect segfault),
-but not the second (wrong si_code), hence this patch.
-
- arch/arm64/kernel/traps.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index e52be6aa44ee..45c8eca951bc 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -443,7 +443,7 @@ int cpu_enable_cache_maint_trap(void *__unused)
- }
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 5308d696311b..0221029e27ff 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -106,9 +106,9 @@ static inline void set_fs(mm_segment_t fs)
+ })
  
- #define __user_cache_maint(insn, address, res)			\
--	if (untagged_addr(address) >= user_addr_max()) {	\
-+	if (address >= user_addr_max()) {			\
- 		res = -EFAULT;					\
- 	} else {						\
- 		uaccess_ttbr0_enable();				\
-@@ -469,7 +469,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
- 	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
- 	int ret = 0;
+ /*
+- * When dealing with data aborts or instruction traps we may end up with
+- * a tagged userland pointer. Clear the tag to get a sane pointer to pass
+- * on to access_ok(), for instance.
++ * When dealing with data aborts, watchpoints, or instruction traps we may end
++ * up with a tagged userland pointer. Clear the tag to get a sane pointer to
++ * pass on to access_ok(), for instance.
+  */
+ #define untagged_addr(addr)		sign_extend64(addr, 55)
  
--	address = pt_regs_read_reg(regs, rt);
-+	address = untagged_addr(pt_regs_read_reg(regs, rt));
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 0296e7924240..749f81779420 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -36,6 +36,7 @@
+ #include <asm/traps.h>
+ #include <asm/cputype.h>
+ #include <asm/system_misc.h>
++#include <asm/uaccess.h>
  
- 	switch (crm) {
- 	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
+ /* Breakpoint currently in use for each BRP. */
+ static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
+@@ -721,6 +722,8 @@ static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
+ 	u64 wp_low, wp_high;
+ 	u32 lens, lene;
+ 
++	addr = untagged_addr(addr);
++
+ 	lens = __ffs(ctrl->len);
+ 	lene = __fls(ctrl->len);
+ 
 -- 
 2.1.4
