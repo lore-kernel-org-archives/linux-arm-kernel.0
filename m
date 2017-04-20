@@ -1,64 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Apr 2017 10:17:49 +0200
-Subject: [GIT PULL] Allwinner clock changes for 4.12, take 2
-Message-ID: <20170420081749.bok3wwusmk2no5vw@lukather>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 20 Apr 2017 10:20:31 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+ <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
+ <30f662a6-5dab-515b-e35a-a312f3c7b509@free.fr>
+ <5f81730d-fbe3-1f4c-de34-09bbfb893ee1@arm.com>
+ <2b5eef4c-32f2-54f1-ca2f-f9426e68fb2c@free.fr>
+ <67014006-a380-9e3b-c9af-a421052cb8e0@arm.com>
+ <b59b81ea-bc1b-bff5-4a78-8a69538b0de3@free.fr>
+ <bc5bf8ad-69ef-4f14-f450-e162ddb5af7c@arm.com>
+ <241b130e-1fb7-ecd4-034e-eb02065ada66@free.fr>
+ <37cd6172-b04e-fcad-18fc-4fbb26cc611b@arm.com>
+ <87d48d57-5f9f-1b35-99da-ab39de2d3d48@free.fr>
+Message-ID: <2003d851-e17e-1a43-3889-ec6e79e635e3@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On 19/04/2017 13:19, Mason wrote:
 
-Here are the few last minor fixes that didn't go through for 4.11,
-plus two fixes for previous drivers changes found in the earlier pull
-request for 4.12.
+> My biggest problem is that tango_unmask() is never called.
 
-Thanks!
-Maxime
+FTR, the missing incantation was:
+Explicitly calling tango_{mask/unmask/ack} from the corresponding msi_{mask/unmask/ack}
 
-The following changes since commit cb545960dea2749771c88b0cb26e5adfd12a0315:
+Marc, I have one nagging doubt, wrt splitting MSI line selection
+and MSI enable.
 
-  clk: sunxi-ng: Display index when clock registration fails (2017-04-06 09:10:30 +0200)
+tango_irq_domain_alloc : finds an available MSI 'j' to allocate
+tango_irq_domain_free : release MSI 'j'
+tango_unmask : enable MSI 'j'
+tango_mask : disable MSI 'j'
 
-are available in the git repository at:
+Is the following scenario guaranteed to never happen?
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.12-2
+tango_irq_domain_alloc // alloc 0
+tango_irq_domain_free  // free 0
+tango_irq_domain_alloc // alloc 0
+tango_unmask // enable 0
+tango_unmask // enable 0 = NOP
+tango_mask   // disable 0
 
-for you to fetch changes up to 7149c1becddf49022fe0aad2fa395377cd8f753e:
+In this theoretical scenario, we would be left with a non-functional
+MSI 0.
 
-  clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code (2017-04-13 14:09:30 +0200)
-
-----------------------------------------------------------------
-Allwinner clock changes, take 2
-
-A few minor bug and comment fixes, plus some fixes for the PRCM CCU driver
-merged in the prior pull request
-
-----------------------------------------------------------------
-Chen-Yu Tsai (3):
-      clk: sunxi-ng: use 1 as fallback for minimum multiplier
-      clk: sunxi-ng: Fix round_rate/set_rate multiplier minimum mismatch
-      clk: sunxi-ng: a80: Fix audio PLL comment not matching actual code
-
-Icenowy Zheng (2):
-      clk: sunxi-ng: fix PRCM CCU ir clk parent
-      clk: sunxi-ng: fix PRCM CCU CLK_NUMBER value
-
- drivers/clk/sunxi-ng/ccu-sun8i-r.c   | 2 +-
- drivers/clk/sunxi-ng/ccu-sun8i-r.h   | 2 +-
- drivers/clk/sunxi-ng/ccu-sun9i-a80.c | 3 +--
- drivers/clk/sunxi-ng/ccu_nk.c        | 8 ++++----
- drivers/clk/sunxi-ng/ccu_nkm.c       | 8 ++++----
- drivers/clk/sunxi-ng/ccu_nkmp.c      | 8 ++++----
- drivers/clk/sunxi-ng/ccu_nm.c        | 4 ++--
- 7 files changed, 17 insertions(+), 18 deletions(-)
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/78e44516/attachment.sig>
+Regards.
