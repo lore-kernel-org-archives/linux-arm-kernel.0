@@ -1,303 +1,72 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Apr 2017 11:14:17 +0530
-Subject: [PATCH V4 6/7] ARM: uniphier: Use - instead of @ for DT OPP entries
-In-Reply-To: <cover.1492666725.git.viresh.kumar@linaro.org>
-References: <cover.1492666725.git.viresh.kumar@linaro.org>
-Message-ID: <7e6663fcf7b7c8707e78216326fe622ceb64f196.1492666725.git.viresh.kumar@linaro.org>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Thu, 20 Apr 2017 06:58:46 +0100
+Subject: [PATCH v3 1/5] dt-bindings: gpu: add bindings for the ARM Mali
+ Midgard GPU
+In-Reply-To: <5481965.3RkcDb038R@phil>
+References: <cover.1492588180.git.guillaume.tucker@collabora.com>
+ <96021d989387d9aaff039efebd66aa3bfe667941.1492588180.git.guillaume.tucker@collabora.com>
+ <5481965.3RkcDb038R@phil>
+Message-ID: <4fd957ab-8365-eb4f-b003-467d3747a949@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling the DT file with W=1, DTC warns like follows:
+Hi Heiko,
 
-Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-unit name, but no reg property
+On 19/04/17 10:02, Heiko Stuebner wrote:
+> Am Mittwoch, 19. April 2017, 09:06:17 CEST schrieb Guillaume Tucker:
+>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> new file mode 100644
+>> index 000000000000..917c4f8d178f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt
+>> @@ -0,0 +1,57 @@
+>> +ARM Mali Midgard GPU
+>> +====================
+>> +
+>> +Required properties:
+>> +
+>> +- compatible :
+>> +  * Must be one of the following:
+>> +    + "arm,mali-t60x"
+>> +    + "arm,mali-t62x"
+>> +    + "arm,mali-t720"
+>> +    + "arm,mali-t760"
+>> +    + "arm,mali-t820"
+>> +    + "arm,mali-t830"
+>> +    + "arm,mali-t860"
+>> +    + "arm,mali-t880"
+>> +  * And, optionally, one of the vendor specific compatible:
+>> +    + "amlogic,meson-gxm-mali"
+>
+> Please add a "rockchip,rk3288-mali" as well :-) , as I don't trust that the
+> generic compatible will be enough for all time and having that already
+> defined makes fixing the per soc things later a lot easier.
 
-Fix this by replacing '@' with '-' as the OPP nodes will never have a
-"reg" property.
+Sure, will do in patch v4.
 
-Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- arch/arm/boot/dts/uniphier-pro5.dtsi             | 32 ++++++++++++------------
- arch/arm/boot/dts/uniphier-pxs2.dtsi             | 16 ++++++------
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 14 +++++------
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 32 ++++++++++++------------
- 4 files changed, 47 insertions(+), 47 deletions(-)
+>> +
+>> +- reg : Physical base address of the device and length of the register area.
+>> +
+>> +- interrupts : Contains the three IRQ lines required by Mali Midgard devices.
+>> +
+>> +- interrupt-names : Contains the names of IRQ resources in the order they were
+>> +  provided in the interrupts property. Must contain: "job", "mmu", "gpu".
+>> +
+>> +
+>> +Optional properties:
+>> +
+>> +- clocks : Phandle to clock for the Mali Midgard device.
+>> +
+>> +- mali-supply : Phandle to regulator for the Mali device. Refer to
+>> +  Documentation/devicetree/bindings/regulator/regulator.txt for details.
+>> +
+>> +- operating-points : Refer to Documentation/devicetree/bindings/power/opp.txt
+>> +  for details.
 
-diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
-index dbc5e5333163..22ef2842be3a 100644
---- a/arch/arm/boot/dts/uniphier-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
-@@ -77,67 +77,67 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
--		opp at 100000000 {
-+		opp-100000000 {
- 			opp-hz = /bits/ 64 <100000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 116667000 {
-+		opp-116667000 {
- 			opp-hz = /bits/ 64 <116667000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 150000000 {
-+		opp-150000000 {
- 			opp-hz = /bits/ 64 <150000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 175000000 {
-+		opp-175000000 {
- 			opp-hz = /bits/ 64 <175000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 200000000 {
-+		opp-200000000 {
- 			opp-hz = /bits/ 64 <200000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 233334000 {
-+		opp-233334000 {
- 			opp-hz = /bits/ 64 <233334000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 300000000 {
-+		opp-300000000 {
- 			opp-hz = /bits/ 64 <300000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 350000000 {
-+		opp-350000000 {
- 			opp-hz = /bits/ 64 <350000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 400000000 {
-+		opp-400000000 {
- 			opp-hz = /bits/ 64 <400000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 466667000 {
-+		opp-466667000 {
- 			opp-hz = /bits/ 64 <466667000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 600000000 {
-+		opp-600000000 {
- 			opp-hz = /bits/ 64 <600000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 700000000 {
-+		opp-700000000 {
- 			opp-hz = /bits/ 64 <700000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 800000000 {
-+		opp-800000000 {
- 			opp-hz = /bits/ 64 <800000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 933334000 {
-+		opp-933334000 {
- 			opp-hz = /bits/ 64 <933334000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1200000000 {
-+		opp-1200000000 {
- 			opp-hz = /bits/ 64 <1200000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1400000000 {
-+		opp-1400000000 {
- 			opp-hz = /bits/ 64 <1400000000>;
- 			clock-latency-ns = <300>;
- 		};
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index e9e031d63c1a..acaaa2187843 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -97,35 +97,35 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
--		opp at 100000000 {
-+		opp-100000000 {
- 			opp-hz = /bits/ 64 <100000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 150000000 {
-+		opp-150000000 {
- 			opp-hz = /bits/ 64 <150000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 200000000 {
-+		opp-200000000 {
- 			opp-hz = /bits/ 64 <200000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 300000000 {
-+		opp-300000000 {
- 			opp-hz = /bits/ 64 <300000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 400000000 {
-+		opp-400000000 {
- 			opp-hz = /bits/ 64 <400000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 600000000 {
-+		opp-600000000 {
- 			opp-hz = /bits/ 64 <600000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 800000000 {
-+		opp-800000000 {
- 			opp-hz = /bits/ 64 <800000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1200000000 {
-+		opp-1200000000 {
- 			opp-hz = /bits/ 64 <1200000000>;
- 			clock-latency-ns = <300>;
- 		};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index da881f5b6ed4..0f2bee028ab0 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -89,31 +89,31 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
--		opp at 245000000 {
-+		opp-245000000 {
- 			opp-hz = /bits/ 64 <245000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 250000000 {
-+		opp-250000000 {
- 			opp-hz = /bits/ 64 <250000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 490000000 {
-+		opp-490000000 {
- 			opp-hz = /bits/ 64 <490000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 500000000 {
-+		opp-500000000 {
- 			opp-hz = /bits/ 64 <500000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 653334000 {
-+		opp-653334000 {
- 			opp-hz = /bits/ 64 <653334000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 666667000 {
-+		opp-666667000 {
- 			opp-hz = /bits/ 64 <666667000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 980000000 {
-+		opp-980000000 {
- 			opp-hz = /bits/ 64 <980000000>;
- 			clock-latency-ns = <300>;
- 		};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index a6b3a70dae83..19f782408d54 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -116,35 +116,35 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
--		opp at 250000000 {
-+		opp-250000000 {
- 			opp-hz = /bits/ 64 <250000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 275000000 {
-+		opp-275000000 {
- 			opp-hz = /bits/ 64 <275000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 500000000 {
-+		opp-500000000 {
- 			opp-hz = /bits/ 64 <500000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 550000000 {
-+		opp-550000000 {
- 			opp-hz = /bits/ 64 <550000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 666667000 {
-+		opp-666667000 {
- 			opp-hz = /bits/ 64 <666667000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 733334000 {
-+		opp-733334000 {
- 			opp-hz = /bits/ 64 <733334000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1000000000 {
-+		opp-1000000000 {
- 			opp-hz = /bits/ 64 <1000000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1100000000 {
-+		opp-1100000000 {
- 			opp-hz = /bits/ 64 <1100000000>;
- 			clock-latency-ns = <300>;
- 		};
-@@ -154,35 +154,35 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
--		opp at 250000000 {
-+		opp-250000000 {
- 			opp-hz = /bits/ 64 <250000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 275000000 {
-+		opp-275000000 {
- 			opp-hz = /bits/ 64 <275000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 500000000 {
-+		opp-500000000 {
- 			opp-hz = /bits/ 64 <500000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 550000000 {
-+		opp-550000000 {
- 			opp-hz = /bits/ 64 <550000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 666667000 {
-+		opp-666667000 {
- 			opp-hz = /bits/ 64 <666667000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 733334000 {
-+		opp-733334000 {
- 			opp-hz = /bits/ 64 <733334000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1000000000 {
-+		opp-1000000000 {
- 			opp-hz = /bits/ 64 <1000000000>;
- 			clock-latency-ns = <300>;
- 		};
--		opp at 1100000000 {
-+		opp-1100000000 {
- 			opp-hz = /bits/ 64 <1100000000>;
- 			clock-latency-ns = <300>;
- 		};
--- 
-2.12.0.432.g71c3a4f4ba37
+So I can simply change that to operating-points-v2.  Both
+versions can be used in practice but it sounds like
+operating-points can just be ignored in this binding's
+documentation.  Could you please confirm?
+
+Thanks,
+Guillaume
