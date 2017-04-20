@@ -1,46 +1,80 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 20 Apr 2017 12:52:18 -0700
-Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
-In-Reply-To: <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
-References: <20161216105634.235457-1-arnd@arndb.de>
- <3302470.IDcDrWa0u6@wuerfel>
- <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
- <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
-Message-ID: <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 20 Apr 2017 12:57:35 -0700
+Subject: usb: dwc2: NMI watchdog: BUG: soft lockup - CPU#0 stuck for 146s
+In-Reply-To: <CAD=FV=XKkKr5ZeU098Co4JDRfa-Sv6dvZ-kt-c8Ui9_SfHjRkQ@mail.gmail.com>
+References: <1795308650.27171.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+ <172093673.40121.1492427140661@email.1und1.de>
+ <CAD=FV=WJBTUcMPw8OgQT_jhz0H8AsH=YqWMR7LtudUKrF5-XOA@mail.gmail.com>
+ <79b9b35b-0600-771f-4cd2-9e03c5ba3a25@i2se.com>
+ <186569458.91967.1492547106553@email.1und1.de>
+ <CAD=FV=VHkJFrsJDmMytbUw=WjKQaGZ-8Ewfy5bPCA82AWS4O2Q@mail.gmail.com>
+ <212870399.174480.1492633502649@email.1und1.de>
+ <87mvbaykn1.fsf@eliezer.anholt.net>
+ <CAD=FV=XKkKr5ZeU098Co4JDRfa-Sv6dvZ-kt-c8Ui9_SfHjRkQ@mail.gmail.com>
+Message-ID: <87a87a97io.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 3:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sun, Apr 16, 2017 at 9:52 PM, Kees Cook <keescook@chromium.org> wrote:
->>>> The original gcc-4.3 release was in early 2008. If we decide to still
->>>> support that, we probably want the first 10 quirks in this series,
->>>> while gcc-4.6 (released in 2011) requires none of them.
->>
->> I'd be in support of raising the minimum to gcc 4.6. (I'd actually
->> prefer 4.7, just to avoid some 4.6 packaging issues, and for better
->> gcc plugin support.)
->>
->> I'm curious what gcc 4.6 binaries are common in the wild besides
->> old-stable Debian (unsupported in maybe a year from now?) and 12.04
->> Ubuntu (going fully unsupported in 2 weeks). It looks like 4.6 was
->> used only in Fedora 15 and 16 (both EOL).
+Doug Anderson <dianders@chromium.org> writes:
+
+> Hi,
 >
-> I think we are better off defining two versions: One that we know
-> a lot of people care about, and we actively try to make that work
-> well in all configurations (e.g. 4.6, 4.7 or 4.8), fixing all warnings
-> we run into, and an older version that we try not to break
-> intentionally (e.g. 3.4, 4.1 or 4.3) but that we only fix when
-> someone actually runs into a problem they can't work around
-> by upgrading to a more modern compiler.
+> On Thu, Apr 20, 2017 at 11:54 AM, Eric Anholt <eric@anholt.net> wrote:
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>>
+>>> Hi,
+>>>
+>>>> Doug Anderson <dianders@chromium.org> hat am 18. April 2017 um 22:41 geschrieben:
+>>>>
+>>>>
+>>>> It's hard to know for sure that all of this time is really in
+>>>> urb_enqueue().  Possible we could have task switched out and been
+>>>> blocked elsewhere.  Using ftrace to get more fine-grained timings
+>>>> would be useful.  ktime_get(), ktime_sub(), and ktime_to_us() are your
+>>>> friends here if you want to use trace_printk.
+>>>
+>>> i'm a newbie to ftrace, so i hope this would be helpful.
+>>>
+>>> # connect PL2303 to the onboard hub
+>>> # echo 0 > options/sleep-time
+>>> # echo 0 > function_profile_enabled
+>>> # echo 1 > function_profile_enabled
+>>> # ./usb_test
+>>> # Waiting for at least 20 seconds and then disconnect PL2303
+>>> # echo 0 > function_profile_enabled
+>>> # cat trace_stat/function0
+>>>
+>>>   Function                               Hit    Time            Avg             s^2
+>>>   --------                               ---    ----            ---             ---
+>>>   bcm2835_handle_irq                  361347    219567633 us     607.636 us      1485199 us
+>>>   __handle_domain_irq                1082482    212639551 us     196.437 us      3642030 us
+>>>   generic_handle_irq                 1082482    100592051 us     92.927 us       50511334 us
+>>>   irq_exit                           1082482    98197771 us     90.715 us       29649040 us
+>>>   handle_level_irq                   1082482    95812379 us     88.511 us       51910093 us
+>>
+>> If I'm reading this output right, we're spending half of our interrupt
+>> processing time in irq_exit(), so even if dwc2's interrupt was free (the
+>> generic_handle_irq() chain), we'd be eating about half the CPU getting
+>> back out of the interrupt handler, right?
+>>
+>> I don't really know anything about DWC2 or USB, but is there any way we
+>> could mitigate the interrupt frequency with this hardware?  If nothing
+>> else, could we loop reading gintsts until it reads back 0?
+>
+> Take ftrace with a little bit of a grain of salt, especially on older
+> / slower ARMs (without the arch timer).  Whenever ftrace takes a log
+> it grabs a timestamp.  This can be an expensive (ish) operation.  Even
+> on newer CPUs it's still not free if you call it as much as ftrace,
+> but on older CPUs it's extra expensive.
 
-For "working well everywhere" I feel like 4.8 is the better of those
-three (I'd prefer 4.9). I think we should avoid 4.6 -- it seems not
-widely used.
-
-For an old compiler... yikes. 3.4 sounds insane to me. :)
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+If per-function timestamp cost was the problem, shouldn't I expect to
+see a bunch of irq_exit()'s children each taking a bit of time?  We have
+a long callchain with the functions each taking a bit of time in the
+dwc2 interrupt handler, but irq_exit() seems to be a monolithic cost.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/7d2ce091/attachment.sig>
