@@ -1,267 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Apr 2017 16:25:06 +0530
-Subject: [PATCH V5 2/7] ARM: TI: Use - instead of @ for DT OPP entries
-In-Reply-To: <cover.1492685450.git.viresh.kumar@linaro.org>
-References: <cover.1492685450.git.viresh.kumar@linaro.org>
-Message-ID: <5f0656140309d53a45058c048ca059c4ba294756.1492685450.git.viresh.kumar@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Apr 2017 12:55:28 +0200
+Subject: [PATCH/RFC v2 1/2] arm64: dts: r8a7795: Add support for R-Car H3
+ ES2.0
+In-Reply-To: <1714563.qChlbIjNcO@avalon>
+References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
+ <1612430.SNEha5n02K@avalon>
+ <CAMuHMdXOzyo+kzaGAXp+jZTtUejYyXCQzezo+SmvNVQuEC9=_Q@mail.gmail.com>
+ <1714563.qChlbIjNcO@avalon>
+Message-ID: <CAMuHMdWmvhZjxKfEdGJ3d_w0d2s2kK+8iW1tsEM584qZc+dVEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling the DT file with W=1, DTC warns like follows:
+Hi Laurent,
 
-Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-unit name, but no reg property
+On Thu, Apr 20, 2017 at 12:42 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Thursday 20 Apr 2017 11:36:59 Geert Uytterhoeven wrote:
+>> On Mon, Mar 27, 2017 at 10:48 AM, Laurent Pinchart wrote:
+>> > On Friday 24 Mar 2017 14:37:44 Geert Uytterhoeven wrote:
+>> >> Update r8a7795.dtsi so it corresponds to R-Car H3 ES2.0 or later:
+>> >>   - The following devices no longer exist on ES2.0, and are thus removed:
+>> >>     fcpf2, fcpvd3, fcpvi2, fdp1-2, usb3-if1, vspd3, vspi2.
+>> >>
+>> >>   - The DU <-> VSPD topology is different on ES2.0, hence remove the
+>> >>     "vsps" property from the DU node until the driver can handle this.
+>> >
+>> > I think I'll need a different compatible string between ES1.x and ES2 for
+>> > the DU. It could make sense to move the whole DU node to *-es1.dtsi. We
+>> > can decide about that later when I'll have a DU driver prototype ready.
+>>
+>> Why would you need a different compatible string?
+>> Can't you use soc_device_match() to handle ES1.x SoCs?
+>>
+>> The different DU <-> VSPD topology is handled through the vsps property in
+>> DTS. Are the ports different, too? That can be handled in DTS.
+>
+> My point (not expressed clearly) was that, as I'll need a different vsps
+> property, I can as well go for a different compatible string.
 
-Fix this by replacing '@' with '-' as the OPP nodes will never have a
-"reg" property.
+Do you need a different vsps property?
+AFAIK, the current array links each DU channel to a VSPD.
+When a VSPD is shared between multiple channels, you can still link these
+channels to the same VSPD.
 
-Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- .../devicetree/bindings/cpufreq/ti-cpufreq.txt       | 20 ++++++++++----------
- arch/arm/boot/dts/am335x-boneblack.dts               |  2 +-
- arch/arm/boot/dts/am33xx.dtsi                        | 20 ++++++++++----------
- arch/arm/boot/dts/am4372.dtsi                        | 10 +++++-----
- arch/arm/boot/dts/dra7.dtsi                          |  4 ++--
- 5 files changed, 28 insertions(+), 28 deletions(-)
+Or is my understanding incorrect?
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-index ba0e15ad5bd9..0c38e4b8fc51 100644
---- a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-+++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-@@ -63,64 +63,64 @@ cpu0_opp_table: opp-table {
- 	 * because they can not be enabled simultaneously on a
- 	 * single SoC.
- 	 */
--	opp50 at 300000000 {
-+	opp50-300000000 {
- 		opp-hz = /bits/ 64 <300000000>;
- 		opp-microvolt = <950000 931000 969000>;
- 		opp-supported-hw = <0x06 0x0010>;
- 		opp-suspend;
- 	};
- 
--	opp100 at 275000000 {
-+	opp100-275000000 {
- 		opp-hz = /bits/ 64 <275000000>;
- 		opp-microvolt = <1100000 1078000 1122000>;
- 		opp-supported-hw = <0x01 0x00FF>;
- 		opp-suspend;
- 	};
- 
--	opp100 at 300000000 {
-+	opp100-300000000 {
- 		opp-hz = /bits/ 64 <300000000>;
- 		opp-microvolt = <1100000 1078000 1122000>;
- 		opp-supported-hw = <0x06 0x0020>;
- 		opp-suspend;
- 	};
- 
--	opp100 at 500000000 {
-+	opp100-500000000 {
- 		opp-hz = /bits/ 64 <500000000>;
- 		opp-microvolt = <1100000 1078000 1122000>;
- 		opp-supported-hw = <0x01 0xFFFF>;
- 	};
- 
--	opp100 at 600000000 {
-+	opp100-600000000 {
- 		opp-hz = /bits/ 64 <600000000>;
- 		opp-microvolt = <1100000 1078000 1122000>;
- 		opp-supported-hw = <0x06 0x0040>;
- 	};
- 
--	opp120 at 600000000 {
-+	opp120-600000000 {
- 		opp-hz = /bits/ 64 <600000000>;
- 		opp-microvolt = <1200000 1176000 1224000>;
- 		opp-supported-hw = <0x01 0xFFFF>;
- 	};
- 
--	opp120 at 720000000 {
-+	opp120-720000000 {
- 		opp-hz = /bits/ 64 <720000000>;
- 		opp-microvolt = <1200000 1176000 1224000>;
- 		opp-supported-hw = <0x06 0x0080>;
- 	};
- 
--	oppturbo at 720000000 {
-+	oppturbo-720000000 {
- 		opp-hz = /bits/ 64 <720000000>;
- 		opp-microvolt = <1260000 1234800 1285200>;
- 		opp-supported-hw = <0x01 0xFFFF>;
- 	};
- 
--	oppturbo at 800000000 {
-+	oppturbo-800000000 {
- 		opp-hz = /bits/ 64 <800000000>;
- 		opp-microvolt = <1260000 1234800 1285200>;
- 		opp-supported-hw = <0x06 0x0100>;
- 	};
- 
--	oppnitro at 1000000000 {
-+	oppnitro-1000000000 {
- 		opp-hz = /bits/ 64 <1000000000>;
- 		opp-microvolt = <1325000 1298500 1351500>;
- 		opp-supported-hw = <0x04 0x0200>;
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 935ed17d22e4..d154d3133c16 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -22,7 +22,7 @@
- 	 * BeagleBone Blacks have PG 2.0 silicon which is guaranteed
- 	 * to support 1GHz OPP so enable it for PG 2.0 on this board.
- 	 */
--	oppnitro at 1000000000 {
-+	oppnitro-1000000000 {
- 		opp-supported-hw = <0x06 0x0100>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 9e242943dcec..bdacb3dd689c 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -64,64 +64,64 @@
- 		 * because the can not be enabled simultaneously on a
- 		 * single SoC.
- 		 */
--		opp50 at 300000000 {
-+		opp50-300000000 {
- 			opp-hz = /bits/ 64 <300000000>;
- 			opp-microvolt = <950000 931000 969000>;
- 			opp-supported-hw = <0x06 0x0010>;
- 			opp-suspend;
- 		};
- 
--		opp100 at 275000000 {
-+		opp100-275000000 {
- 			opp-hz = /bits/ 64 <275000000>;
- 			opp-microvolt = <1100000 1078000 1122000>;
- 			opp-supported-hw = <0x01 0x00FF>;
- 			opp-suspend;
- 		};
- 
--		opp100 at 300000000 {
-+		opp100-300000000 {
- 			opp-hz = /bits/ 64 <300000000>;
- 			opp-microvolt = <1100000 1078000 1122000>;
- 			opp-supported-hw = <0x06 0x0020>;
- 			opp-suspend;
- 		};
- 
--		opp100 at 500000000 {
-+		opp100-500000000 {
- 			opp-hz = /bits/ 64 <500000000>;
- 			opp-microvolt = <1100000 1078000 1122000>;
- 			opp-supported-hw = <0x01 0xFFFF>;
- 		};
- 
--		opp100 at 600000000 {
-+		opp100-600000000 {
- 			opp-hz = /bits/ 64 <600000000>;
- 			opp-microvolt = <1100000 1078000 1122000>;
- 			opp-supported-hw = <0x06 0x0040>;
- 		};
- 
--		opp120 at 600000000 {
-+		opp120-600000000 {
- 			opp-hz = /bits/ 64 <600000000>;
- 			opp-microvolt = <1200000 1176000 1224000>;
- 			opp-supported-hw = <0x01 0xFFFF>;
- 		};
- 
--		opp120 at 720000000 {
-+		opp120-720000000 {
- 			opp-hz = /bits/ 64 <720000000>;
- 			opp-microvolt = <1200000 1176000 1224000>;
- 			opp-supported-hw = <0x06 0x0080>;
- 		};
- 
--		oppturbo at 720000000 {
-+		oppturbo-720000000 {
- 			opp-hz = /bits/ 64 <720000000>;
- 			opp-microvolt = <1260000 1234800 1285200>;
- 			opp-supported-hw = <0x01 0xFFFF>;
- 		};
- 
--		oppturbo at 800000000 {
-+		oppturbo-800000000 {
- 			opp-hz = /bits/ 64 <800000000>;
- 			opp-microvolt = <1260000 1234800 1285200>;
- 			opp-supported-hw = <0x06 0x0100>;
- 		};
- 
--		oppnitro at 1000000000 {
-+		oppnitro-1000000000 {
- 			opp-hz = /bits/ 64 <1000000000>;
- 			opp-microvolt = <1325000 1298500 1351500>;
- 			opp-supported-hw = <0x04 0x0200>;
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 176e09e9a45e..e5b061469bf8 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -59,32 +59,32 @@
- 		compatible = "operating-points-v2-ti-cpu";
- 		syscon = <&scm_conf>;
- 
--		opp50 at 300000000 {
-+		opp50-300000000 {
- 			opp-hz = /bits/ 64 <300000000>;
- 			opp-microvolt = <950000 931000 969000>;
- 			opp-supported-hw = <0xFF 0x01>;
- 			opp-suspend;
- 		};
- 
--		opp100 at 600000000 {
-+		opp100-600000000 {
- 			opp-hz = /bits/ 64 <600000000>;
- 			opp-microvolt = <1100000 1078000 1122000>;
- 			opp-supported-hw = <0xFF 0x04>;
- 		};
- 
--		opp120 at 720000000 {
-+		opp120-720000000 {
- 			opp-hz = /bits/ 64 <720000000>;
- 			opp-microvolt = <1200000 1176000 1224000>;
- 			opp-supported-hw = <0xFF 0x08>;
- 		};
- 
--		oppturbo at 800000000 {
-+		oppturbo-800000000 {
- 			opp-hz = /bits/ 64 <800000000>;
- 			opp-microvolt = <1260000 1234800 1285200>;
- 			opp-supported-hw = <0xFF 0x10>;
- 		};
- 
--		oppnitro at 1000000000 {
-+		oppnitro-1000000000 {
- 			opp-hz = /bits/ 64 <1000000000>;
- 			opp-microvolt = <1325000 1298500 1351500>;
- 			opp-supported-hw = <0xFF 0x20>;
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 57892f264cea..25908dd338ee 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -99,14 +99,14 @@
- 		compatible = "operating-points-v2-ti-cpu";
- 		syscon = <&scm_wkup>;
- 
--		opp_nom at 1000000000 {
-+		opp_nom-1000000000 {
- 			opp-hz = /bits/ 64 <1000000000>;
- 			opp-microvolt = <1060000 850000 1150000>;
- 			opp-supported-hw = <0xFF 0x01>;
- 			opp-suspend;
- 		};
- 
--		opp_od at 1176000000 {
-+		opp_od-1176000000 {
- 			opp-hz = /bits/ 64 <1176000000>;
- 			opp-microvolt = <1160000 885000 1160000>;
- 			opp-supported-hw = <0xFF 0x02>;
--- 
-2.12.0.432.g71c3a4f4ba37
+>> The main reason why I kept the DU node in r8a7795.dtsi is that the board DTS
+>> refers to it.  Sharing board DTS means there needs to be at least a
+>> placeholder node for the DU in r8a7795.dtsi, unless you want to keep on
+>> shuffling board overrides around.
+>
+> As the ports are identical it makes sense to share the same board DTS, I agree
+> with you. We could override the compatible string in r8a7795-es1.dtsi and
+> leave it blank in r8a7795.dtsi for now, as there's no driver support for
+> ES2.0. That's a bit of a workaround as it shouldn't matter to DT whether
+> driver support is available or not. On the other hand, leaving the vsps
+> property out is a workaround too.
+>
+> The current driver will fail probing if the number of VSPs is different than
+> the number of CRTCs, so I believe you can keep the vsps property in
+> r8a7795.dtsi with 3 VSPS without causing any problem. However, there's no DT
+> bindings for the H3 ES2.0 DU yet, so we would end up merging DT without
+> bindings, which is not good. I think that regardless of how we proceed,
+> keeping the DU node in the ES2.0 .dtsi will be a violation of that policy.
+
+What does the current driver do if the number of VSPs is the same as the
+number of CRTCs, but some VSPs are listed more than once?
+I guess it will break in a subtle way, instead of refusing to probe?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
