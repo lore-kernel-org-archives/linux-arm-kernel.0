@@ -1,87 +1,90 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Apr 2017 09:42:07 +0100
-Subject: [PATCH] arm64: prefetch: Change assembly to be compatible with
- gcc and clang
-In-Reply-To: <20170419212211.95803-1-mka@chromium.org>
-References: <20170419212211.95803-1-mka@chromium.org>
-Message-ID: <20170420084206.GB31436@leverpostej>
+Date: Thu, 20 Apr 2017 09:49:29 +0100
+Subject: [PATCH v2] arm64: perf: Use only exclude_kernel attribute when
+ kernel is running in HYP
+In-Reply-To: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+References: <1492623846-29335-1-git-send-email-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170420084928.GC31436@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 02:22:11PM -0700, Matthias Kaehlcke wrote:
-> clang fails to build with the current code:
+On Wed, Apr 19, 2017 at 11:14:06PM +0530, Ganapatrao Kulkarni wrote:
+> commit d98ecda (arm64: perf: Count EL2 events if the kernel is running in HYP)
+> is returning error for perf syscall with mixed attribute set for exclude_kernel
+> and exclude_hv. This change is breaking some applications (observed with hhvm)
+> when ran on VHE enabled platforms.
 > 
-> arch/arm64/include/asm/processor.h:172:15: error: invalid operand in
-> inline asm: 'prfm pldl1keep, ${0:a}'
+> Adding fix to consider only exclude_kernel attribute when kernel is
+> running in HYP. Also adding sysfs file to notify the bhehaviour
+> of attribute exclude_hv.
 > 
-> Apparently clang does not support the 'a' modifier. Change the
-> constraint from 'p' ('An operand that is a valid memory address is
-> allowed') to 'Q' ('A memory address which uses a single base register
-> with no offset'), which works for both gcc and clang.
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+> 
+> Changelog:
+> 
+> V2:
+>  - Changes as per Will Deacon's suggestion.
+> 
+> V1: Initial patch
+> 
+>  arch/arm64/kernel/perf_event.c | 28 ++++++++++++++++++++++++----
+>  include/linux/perf/arm_pmu.h   |  1 +
+>  2 files changed, 25 insertions(+), 4 deletions(-)
+> 
+> @@ -871,14 +890,13 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>  
+>  	if (attr->exclude_idle)
+>  		return -EPERM;
+> -	if (is_kernel_in_hyp_mode() &&
+> -	    attr->exclude_kernel != attr->exclude_hv)
+> -		return -EINVAL;
+> +	if (is_kernel_in_hyp_mode() && !attr->exclude_kernel)
+> +		config_base |= ARMV8_PMU_INCLUDE_EL2;
+>  	if (attr->exclude_user)
+>  		config_base |= ARMV8_PMU_EXCLUDE_EL0;
+>  	if (!is_kernel_in_hyp_mode() && attr->exclude_kernel)
+>  		config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> -	if (!attr->exclude_hv)
+> +	if (!is_kernel_in_hyp_mode() && !attr->exclude_hv)
+>  		config_base |= ARMV8_PMU_INCLUDE_EL2;
 
-It looks like the current %a0 template and p constraint were inherited
-from arch/arm, as they've been there from day one on arm64.
+This isn't quite what Will suggested.
 
-Looking at the arch/arm history, the "a" operand modifier and "p"
-constraint were introduced in commit:
-
-  16f719de62809e22 ("[ARM] 5196/1: fix inline asm constraints for preload")
-
-... so as to avoid GCC assuming prefetch of a pointer implied it was not
-NULL. Until that point, we'd used no operand modifier and "o"
-constraint.
-
-It's not clear to me whether "o", "p", and "Q" constraints differ in
-this regard on AArch64, or if the issue regarding NULL is still
-relevant. The GCC docs say the "p" constraint is used for "a valid
-memory address", which does sound like it shouldn't be NULL.
-
-Otherwise, this does look consistent with what we do elsewhere.
+The idea was that userspace would read sysfs, then use that to determine
+the correct exclusion parameters [1,2]. This logic was not expected to
+change; it correctly validates whether we can provide what the user
+requests.
 
 Thanks,
 Mark.
 
-> 
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  arch/arm64/include/asm/processor.h | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index c97b8bd2acba..bfdc82e924a5 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -165,21 +165,21 @@ extern struct task_struct *cpu_switch_to(struct task_struct *prev,
->  #define ARCH_HAS_PREFETCH
->  static inline void prefetch(const void *ptr)
->  {
-> -	asm volatile("prfm pldl1keep, %a0\n" : : "p" (ptr));
-> +	asm volatile("prfm pldl1keep, %0\n" : : "Q" (ptr));
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499224.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/499493.html
+
+>  
+>  	/*
+> @@ -1008,6 +1026,8 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+>  		&armv8_pmuv3_events_attr_group;
+>  	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
+>  		&armv8_pmuv3_format_attr_group;
+> +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_ATTR] =
+> +		&armv8_pmuv3_attr_group;
+>  	return armv8pmu_probe_pmu(cpu_pmu);
 >  }
 >  
->  #define ARCH_HAS_PREFETCHW
->  static inline void prefetchw(const void *ptr)
->  {
-> -	asm volatile("prfm pstl1keep, %a0\n" : : "p" (ptr));
-> +	asm volatile("prfm pstl1keep, %0\n" : : "Q" (ptr));
->  }
+> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+> index 8462da2..a26ffc7 100644
+> --- a/include/linux/perf/arm_pmu.h
+> +++ b/include/linux/perf/arm_pmu.h
+> @@ -81,6 +81,7 @@ enum armpmu_attr_groups {
+>  	ARMPMU_ATTR_GROUP_COMMON,
+>  	ARMPMU_ATTR_GROUP_EVENTS,
+>  	ARMPMU_ATTR_GROUP_FORMATS,
+> +	ARMPMU_ATTR_GROUP_ATTR,
+>  	ARMPMU_NR_ATTR_GROUPS
+>  };
 >  
->  #define ARCH_HAS_SPINLOCK_PREFETCH
->  static inline void spin_lock_prefetch(const void *ptr)
->  {
->  	asm volatile(ARM64_LSE_ATOMIC_INSN(
-> -		     "prfm pstl1strm, %a0",
-> -		     "nop") : : "p" (ptr));
-> +		     "prfm pstl1strm, %0",
-> +		     "nop") : : "Q" (ptr));
->  }
->  
->  #define HAVE_ARCH_PICK_MMAP_LAYOUT
 > -- 
-> 2.12.2.816.g2cccc81164-goog
+> 1.8.1.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
