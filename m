@@ -1,48 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Apr 2017 16:39:57 +0200
-Subject: [PATCH v4 05/11] drm/sun4i: abstract a engine type
-In-Reply-To: <5F52665D-8A24-40D3-B84B-E8991B3BE457@aosc.io>
-References: <20170416120849.54542-1-icenowy@aosc.io>
- <20170416120849.54542-6-icenowy@aosc.io>
- <20170418085548.4cisone2yfcuizcp@lukather>
- <5F52665D-8A24-40D3-B84B-E8991B3BE457@aosc.io>
-Message-ID: <20170420143957.t4vppaeydlaeocgh@lukather>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Thu, 20 Apr 2017 15:43:08 +0100
+Subject: [PATCH v4 0/8] Fix issues and factorize arm/arm64 capacity
+ information code
+Message-ID: <20170420144316.15632-1-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 07:05:12PM +0800, Icenowy Zheng wrote:
-> >> @@ -56,7 +55,7 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc
-> >*crtc,
-> >>  
-> >>  	DRM_DEBUG_DRIVER("Committing plane changes\n");
-> >>  
-> >> -	sun4i_backend_commit(scrtc->backend);
-> >> +	scrtc->engine_ops->commit(scrtc->engine);
-> >
-> >You rely on the backend having setup things properly, which is pretty
-> >fragile. Ideally, you should have a function to check that engine_ops
-> >and commit is !NULL, and call it, and the consumers would use that
-> >function...
-> 
-> If it's really NULL how should the function return?
+Hi,
 
-It depends on the return code. ENOSYS if it returns an int, and simply
-does nothing if it's a void. I don't think any of the current
-functions return an error code at the moment though, so I'd just keep
-the current behaviour and just call the function if it's set.
+arm and arm64 topology.c share a lot of code related to parsing of capacity
+information. This is v4 of a solution [1] (based on Will's, Catalin's and
+Mark's off-line suggestions) to move such common code in a single place:
+drivers/base/arch_topology.c (by creating such file and conditionally compiling
+it for arm and arm64 only).
 
-You cannot fail in atomic_flush anyway.
+First 4 patches are actually fixes for the current code.
 
-Maxime
+Patch 5 is the actual refactoring.
+
+Patch 6 removes one of the extern symbols by changing a bit the now common
+code.
+
+Patch 7 removes the remaining externs (as required by Russell during v1 review)
+by creating a new header file include/linux/arch_topology.h and including that
+from arm, arm64 and drivers.
+
+Last patch addresses Dietmar's comments to v1 and adds a 'atd_' prefix to
+interfaces exported by drivers code and used by arch (and potentially others in
+the future).
+
+Changes from v3:
+
+ - rebase on top of 4.11-rc7
+ - addressed Vincent's comment on patch 3/8
+ - removed v3 6/9 as discussed with Russell
+ - added Russell and Catalin's Acked-by
+
+The set is based on top of linux/master (4.11-rc7 f61143c45077) and it is also
+available from:
+
+ git://linux-arm.org/linux-jl.git upstream/default_caps_factorize-v4
+
+Best,
+
+- Juri
+
+[1] v1 - https://marc.info/?l=linux-kernel&m=148483680119355&w=2
+    v2 - https://marc.info/?l=linux-kernel&m=148663344018205&w=2
+    v3 - http://marc.info/?l=linux-kernel&m=149062080701399&w=2
+
+Juri Lelli (8):
+  Documentation: arm: fix wrong reference number in DT definition
+  Documentation/ABI: add information about cpu_capacity
+  arm: fix return value of parse_cpu_capacity
+  arm: remove wrong CONFIG_PROC_SYSCTL ifdef
+  arm, arm64: factorize common cpu capacity default code
+  arm,arm64,drivers: reduce scope of cap_parsing_failed
+  arm,arm64,drivers: move externs in a new header file
+  arm,arm64,drivers: add a prefix to drivers arch_topology interfaces
+
+ Documentation/ABI/testing/sysfs-devices-system-cpu |   7 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   4 +-
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/kernel/topology.c                         | 221 +------------------
+ arch/arm64/Kconfig                                 |   1 +
+ arch/arm64/kernel/topology.c                       | 226 +------------------
+ drivers/base/Kconfig                               |   8 +
+ drivers/base/Makefile                              |   1 +
+ drivers/base/arch_topology.c                       | 243 +++++++++++++++++++++
+ include/linux/arch_topology.h                      |  17 ++
+ 10 files changed, 290 insertions(+), 439 deletions(-)
+ create mode 100644 drivers/base/arch_topology.c
+ create mode 100644 include/linux/arch_topology.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170420/92199a8f/attachment.sig>
+2.10.0
