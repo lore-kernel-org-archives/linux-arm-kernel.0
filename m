@@ -1,81 +1,36 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 20 Apr 2017 18:07:23 +0200
-Subject: [PATCH v4 6/8] ARM: dts: stm32: Enable OV2640 camera support of
- STM32F429-EVAL board
+Date: Thu, 20 Apr 2017 18:07:25 +0200
+Subject: [PATCH v4 8/8] ARM: configs: stm32: DCMI + OV2640 camera support
 In-Reply-To: <1492704445-22186-1-git-send-email-hugues.fruchet@st.com>
 References: <1492704445-22186-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1492704445-22186-7-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1492704445-22186-9-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable OV2640 camera support of STM32F429-EVAL board.
+Enable DCMI camera interface and OV2640 camera sensor drivers.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- arch/arm/boot/dts/stm32429i-eval.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/configs/stm32_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 2bb8a0f..95c33b1 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -48,6 +48,7 @@
- /dts-v1/;
- #include "stm32f429.dtsi"
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "STMicroelectronics STM32429i-EVAL board";
-@@ -66,6 +67,14 @@
- 		serial0 = &usart1;
- 	};
- 
-+	clocks {
-+		clk_ext_camera: clk-ext-camera {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
- 	soc {
- 		dma-ranges = <0xc0000000 0x0 0x10000000>;
- 	};
-@@ -146,6 +155,11 @@
- 
- 	port {
- 		dcmi_0: endpoint {
-+			remote-endpoint = <&ov2640_0>;
-+			bus-width = <8>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
- 		};
- 	};
- };
-@@ -155,6 +169,22 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- 
-+	ov2640: camera at 30 {
-+		compatible = "ovti,ov2640";
-+		reg = <0x30>;
-+		resetb-gpios = <&stmpegpio 2 GPIO_ACTIVE_HIGH>;
-+		pwdn-gpios = <&stmpegpio 0 GPIO_ACTIVE_LOW>;
-+		clocks = <&clk_ext_camera>;
-+		clock-names = "xvclk";
-+		status = "okay";
-+
-+		port {
-+			ov2640_0: endpoint {
-+				remote-endpoint = <&dcmi_0>;
-+			};
-+		};
-+	};
-+
- 	stmpe1600: stmpe1600 at 42 {
- 		compatible = "st,stmpe1600";
- 		reg = <0x42>;
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 84adc88..3f2e4ce 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -53,6 +53,13 @@ CONFIG_GPIO_STMPE=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ # CONFIG_USB_SUPPORT is not set
++CONFIG_VIDEO_V4L2=y
++CONFIG_MEDIA_SUBDRV_AUTOSELECT=n
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_VIDEO_STM32_DCMI=y
++CONFIG_VIDEO_OV2640=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
 -- 
 1.9.1
