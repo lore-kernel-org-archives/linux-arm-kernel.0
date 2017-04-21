@@ -1,45 +1,46 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Apr 2017 18:40:50 +0200
-Subject: [GIT PULL 2/2] arm64 dts: exynos: Last round for v4.12
-In-Reply-To: <20170421164050.7404-1-krzk@kernel.org>
-References: <20170421164050.7404-1-krzk@kernel.org>
-Message-ID: <20170421164050.7404-2-krzk@kernel.org>
+Date: Fri, 21 Apr 2017 18:40:49 +0200
+Subject: [GIT PULL 1/2] ARM: dts: exynos: Last round for v4.12
+Message-ID: <20170421164050.7404-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
+I know it is late so just one fix for v4.12.
 On top of previous pull request.
 
 Best regards,
 Krzysztof
 
 
-The following changes since commit e3c07546747cdec07ff15c984bc6cebc9c9f788c:
+The following changes since commit a1146328ec47141007a6ec076e1cbfc80f31887f:
 
-  arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
+  Merge tag 'samsung-dt-hdmi-cec-4.12' into next/dt (2017-03-31 00:27:18 +0300)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.12-2
 
-for you to fetch changes up to 5dccc9873c4af60f4478b3ef54267353f25cc301:
+for you to fetch changes up to 6a611d149a9a1eff7c89e81bab018e4121cce17e:
 
-  arm64: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:10:05 +0200)
-
-----------------------------------------------------------------
-Second update of  Samsung DeviceTree ARM64 for v4.12:
- - Fix DTC warnings in Exynos ARM64 Device Tree sources.
- - Add panel node to TM2E board.
+  ARM: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:06:03 +0200)
 
 ----------------------------------------------------------------
-Hoegeun Kwon (1):
-      arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
+Fix DTC warnings in Exynos ARMv7 Device Tree sources.
 
+----------------------------------------------------------------
 Viresh Kumar (1):
-      arm64: dts: exynos: Use - instead of @ for DT OPP entries
+      ARM: dts: exynos: Use - instead of @ for DT OPP entries
 
- arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 48 ++++++++++++-------------
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 11 ++++++
- arch/arm64/boot/dts/exynos/exynos5433.dtsi     | 50 +++++++++++++-------------
- 3 files changed, 60 insertions(+), 49 deletions(-)
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
+ arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
+ arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
+ arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
+ arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
+ arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
+ .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 43 +++++++++++++-
+ arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 17 ++++++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 18 ++++++
+ 10 files changed, 221 insertions(+), 147 deletions(-)
