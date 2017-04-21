@@ -1,53 +1,111 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 16:38:53 +0800
-Subject: [PATCH v2 5/9] drm/sun4i: backend: Save pointer to device tree node
+Date: Fri, 21 Apr 2017 16:38:54 +0800
+Subject: [PATCH v2 6/9] drm/sun4i: tcon: Find matching display backend by
+ device node matching
 In-Reply-To: <20170421083857.29636-1-wens@csie.org>
 References: <20170421083857.29636-1-wens@csie.org>
-Message-ID: <20170421083857.29636-6-wens@csie.org>
+Message-ID: <20170421083857.29636-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save a pointer to the backend's underlying device tree node in its
-data structure. This will be used later for downstream tcons to find
-and match their respective upstream backends.
+With Allwinner's Display Engine 1.0, each TCON's input is tied to a
+specific display backend, and the 2 comprise what is known as a crtc
+in DRM KMS land: The layer, framebuffer, and compositing functions are
+provided by the backend, while the TCON provides the display timing
+signals and vblank interrupts. This 1 to 1 relationship is represented
+in the device tree. On some systems there is an intermediate DRC
+component.
+
+Pointers to both matching components must be provided when initializing
+the crtc. As the backend is always registered before the associated
+tcon, we can recursively search upwards through the of_graph to find
+the matching backend.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 1 +
- drivers/gpu/drm/sun4i/sun4i_backend.h | 2 ++
- 2 files changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 55 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 51 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 0b4222312e49..e9eca057ff35 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -352,6 +352,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 		return -ENOMEM;
- 	dev_set_drvdata(dev, backend);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 52f37ef9a050..4409e7b6c74d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -472,6 +472,53 @@ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node)
+ 	return of_drm_find_bridge(remote) ?: ERR_PTR(-EPROBE_DEFER);
+ }
  
-+	backend->node = dev->of_node;
- 	backend->id = sun4i_backend_of_get_id(dev->of_node);
- 	if (backend->id < 0)
- 		return backend->id;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 45b7fc110590..6327a2985fe6 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -15,6 +15,7 @@
++/*
++ * On SoCs with the old display pipeline design (Display Engine 1.0),
++ * the TCON is always tied to just one backend. Hence we can traverse
++ * the of_graph upwards to find the backend our tcon is connected to,
++ * and take its ID as our own.
++ *
++ * We can either identify backends from their compatible strings, which
++ * means maintaining a large list of them. Or, since the backend is
++ * registered and binded before the TCON, we can just go through the
++ * list of registered backends and compare the device node.
++ */
++static struct sun4i_backend *sun4i_tcon_find_backend(struct sun4i_drv *drv,
++						     struct device_node *node)
++{
++	struct device_node *port, *ep, *remote;
++	struct sun4i_backend *backend;
++
++	port = of_graph_get_port_by_id(node, 0);
++	if (!port)
++		return ERR_PTR(-EINVAL);
++
++	for_each_available_child_of_node(port, ep) {
++		remote = of_graph_get_remote_port_parent(ep);
++		if (!remote)
++			continue;
++
++		/* does this node match any registered backends? */
++		list_for_each_entry(backend, &drv->backend_list, list) {
++			if (remote == backend->node) {
++				of_node_put(remote);
++				of_node_put(port);
++				return backend;
++			}
++		}
++
++		/* keep looking through upstream ports */
++		backend = sun4i_tcon_find_backend(drv, remote);
++		if (!IS_ERR(backend)) {
++			of_node_put(remote);
++			of_node_put(port);
++			return backend;
++		}
++	}
++
++	return ERR_PTR(-EINVAL);
++}
++
+ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 			   void *data)
+ {
+@@ -481,9 +528,11 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	struct sun4i_tcon *tcon;
+ 	int ret;
  
- #include <linux/clk.h>
- #include <linux/list.h>
-+#include <linux/of.h>
- #include <linux/regmap.h>
- #include <linux/reset.h>
+-	/* Wait for a backend to be registered */
+-	if (list_empty(&drv->backend_list))
++	backend = sun4i_tcon_find_backend(drv, dev->of_node);
++	if (IS_ERR(backend)) {
++		dev_err(dev, "Couldn't find matching backend\n");
+ 		return -EPROBE_DEFER;
++	}
  
-@@ -140,6 +141,7 @@
- #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+ 	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+ 	if (!tcon)
+@@ -533,8 +582,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		goto err_free_dotclock;
+ 	}
  
- struct sun4i_backend {
-+	struct device_node	*node;
- 	struct regmap		*regs;
- 
- 	struct reset_control	*reset;
+-	backend = list_first_entry(&drv->backend_list,
+-				   struct sun4i_backend, list);
+ 	tcon->crtc = sun4i_crtc_init(drm, backend, tcon);
+ 	if (IS_ERR(tcon->crtc)) {
+ 		dev_err(dev, "Couldn't create our CRTC\n");
 -- 
 2.11.0
