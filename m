@@ -1,93 +1,43 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 21 Apr 2017 10:39:20 +0200
-Subject: [PATCH v2 1/5] dt-bindings: input: Add Atmel PTC subsystem bindings
-In-Reply-To: <20170421083924.15096-1-ludovic.desroches@microchip.com>
-References: <20170421083924.15096-1-ludovic.desroches@microchip.com>
-Message-ID: <20170421083924.15096-2-ludovic.desroches@microchip.com>
+Date: Fri, 21 Apr 2017 10:39:19 +0200
+Subject: [PATCH v2 0/5] Introduce the Atmel PTC subsystem
+Message-ID: <20170421083924.15096-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description of the Atmel PTC subsystem bindings.
+Hi,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/input/atmel,ptc.txt        | 67 ++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+The Atmel Peripheral touch controller subsystem offers built-in hardware for
+capacitive touch measurement on sensors that function as buttons, sliders and
+wheels. It is available on SAMA5D2.
+
+A firmware and a configuration file describing the topology and the parameters
+of the sensor are loaded when probing the driver.
+
+Changes:
+- v2:
+  - reorder patches to get the bindings documentation in first
+  - remove the header from the uapi since it may change in the future. Declare
+  only the few structures needed in the driver.
+  - add this driver to the sama5_defconfig
+
+Ludovic Desroches (5):
+  dt-bindings: input: Add Atmel PTC subsystem bindings
+  input: misc: introduce Atmel PTC driver
+  MAINTAINERS: add Atmel PTC entries
+  ARM: dts: at91: sama5d2: add PTC subsystem device
+  ARM: at91/defconfig: add PTC driver to sama5_defconfig
+
+ .../devicetree/bindings/input/atmel,ptc.txt        |  67 ++
+ MAINTAINERS                                        |   7 +
+ arch/arm/boot/dts/sama5d2.dtsi                     |  16 +
+ arch/arm/configs/sama5_defconfig                   |   2 +
+ drivers/input/misc/Kconfig                         |  12 +
+ drivers/input/misc/Makefile                        |   1 +
+ drivers/input/misc/atmel_ptc.c                     | 723 +++++++++++++++++++++
+ 7 files changed, 828 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/input/atmel,ptc.txt
+ create mode 100644 drivers/input/misc/atmel_ptc.c
 
-diff --git a/Documentation/devicetree/bindings/input/atmel,ptc.txt b/Documentation/devicetree/bindings/input/atmel,ptc.txt
-new file mode 100644
-index 0000000..a183fd5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/atmel,ptc.txt
-@@ -0,0 +1,67 @@
-+Atmel PTC Subsystem
-+
-+The Atmel Peripheral Touch Controller subsystem offers built-in hardware
-+for capacitive touch measurement on sensors that function as buttons, sliders
-+and wheels.
-+
-+1) PTC Subsystem node
-+
-+Required properties:
-+- compatible: 		Must be "atmel,sama5d2-ptc"
-+- reg: 			Address, length of the shared memory and ppp registers location
-+			and length.
-+- clocks: 		Phandlers to the clocks.
-+- clock-names: 		Must be "ptc_clk", "ptc_int_osc", "slow_clk".
-+- #address-cells:	Must be one. The cell is the button or scroller id.
-+- #size-cells: 		Must be zero.
-+
-+Example:
-+	ptc at fc060000 {
-+		compatible = "atmel,sama5d2-ptc";
-+		reg = <0x00800000 0x10000
-+		       0xfc060000 0xcf>;
-+		interrupts = <58 IRQ_TYPE_LEVEL_HIGH 7>;
-+		clocks = <&ptc_clk>, <&main>, <&clk32k>;
-+		clock-names = "ptc_clk", "ptc_int_osc", "slow_clk";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		[ child node definitions... ]
-+	};
-+
-+2) Scroller / buttons subnodes
-+
-+Subnodes describe the kind of sensors the customer want to use. They have to be
-+named according to their function: button, slider or wheel.
-+
-+2.1) Scroller subnodes
-+
-+Required properties:
-+- reg:	Id of the scroller, each id must be different.
-+
-+Example:
-+	slider at 0 {
-+		reg = <0>;
-+	};
-+
-+	wheel at 1 {
-+		reg = <1>;
-+	};
-+
-+2.2) Button subnodes
-+
-+Required properties:
-+- reg:			Id of node used for the button, each id must be
-+			different.
-+- linux,keycode: 	Key code of the button.
-+
-+Example:
-+		button at 8 {
-+			reg = <8>;
-+			linux,keycode = <2>;
-+		};
-+
-+		button at 9 {
-+			reg = <9>;
-+			linux,keycode = <3>;
-+		};
 -- 
 2.9.0
