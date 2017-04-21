@@ -1,136 +1,141 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Apr 2017 22:40:58 +0200
-Subject: [PATCH 5/5 v3] ARM: dts: Add the FOTG210 USB host to Gemini
+Date: Fri, 21 Apr 2017 22:40:57 +0200
+Subject: [PATCH 4/5 v3] usb: host: fotg2: add Gemini-specific handling
 In-Reply-To: <20170421204058.6206-1-linus.walleij@linaro.org>
 References: <20170421204058.6206-1-linus.walleij@linaro.org>
-Message-ID: <20170421204058.6206-5-linus.walleij@linaro.org>
+Message-ID: <20170421204058.6206-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the FOTG210 USB host controller to the Gemini
-device trees. In the main SoC DTSI it is flagged as disabled
-and then it is selectively enabled on the devices that utilize
-it (these per-platform enablements are done on the out-of-tree
-OpenWrt patch set). It is not enabled on the Itian SquareOne
-NAS/router since this instead has a VIA host controller
-soldered on the PCI port, and can gate off these USB host
-controllers.
+The Cortina Systems Gemini has bolted on a PHY inside the
+silicon that can be handled by six bits in a MISC register in
+the system controller.
+
+If we are running on Gemini, look up a syscon regmap through
+a phandle and enable VBUS and optionally the Mini-B connector.
+
+If the device is flagged as "wakeup-source" using the standard
+DT bindings, we also enable this in the global controller for
+respective port.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-USB maintainers: I will merge this through the ARM SoC tree,
-the patch is only included in the series for context.
----
- arch/arm/boot/dts/gemini-nas4220b.dts |  8 ++++++++
- arch/arm/boot/dts/gemini-rut1xx.dts   |  8 ++++++++
- arch/arm/boot/dts/gemini-wbd111.dts   |  8 ++++++++
- arch/arm/boot/dts/gemini-wbd222.dts   |  8 ++++++++
- arch/arm/boot/dts/gemini.dtsi         | 22 ++++++++++++++++++++++
- 5 files changed, 54 insertions(+)
+ drivers/usb/host/Kconfig       |  1 +
+ drivers/usb/host/fotg210-hcd.c | 76 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
 
-diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
-index 7668ba52158e..55059a72aef2 100644
---- a/arch/arm/boot/dts/gemini-nas4220b.dts
-+++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-@@ -98,5 +98,13 @@
- 				read-only;
- 			};
- 		};
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 407d947b34ea..9750783e5481 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -375,6 +375,7 @@ config USB_ISP1362_HCD
+ config USB_FOTG210_HCD
+ 	tristate "FOTG210 HCD support"
+ 	depends on USB && HAS_DMA && HAS_IOMEM
++	select MFD_SYSCON
+ 	---help---
+ 	  Faraday FOTG210 is an OTG controller which can be configured as
+ 	  an USB2.0 host. It is designed to meet USB2.0 EHCI specification
+diff --git a/drivers/usb/host/fotg210-hcd.c b/drivers/usb/host/fotg210-hcd.c
+index 906e42458791..146f1eb96b60 100644
+--- a/drivers/usb/host/fotg210-hcd.c
++++ b/drivers/usb/host/fotg210-hcd.c
+@@ -46,6 +46,10 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/bitops.h>
++/* For Cortina Gemini */
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
+ 
+ #include <asm/byteorder.h>
+ #include <asm/irq.h>
+@@ -5583,6 +5587,72 @@ static void fotg210_init(struct fotg210_hcd *fotg210)
+ 	iowrite32(value, &fotg210->regs->otgcsr);
+ }
+ 
++/*
++ * Gemini-specific initialization function, only executed on the
++ * Gemini SoC using the global misc control register.
++ */
++#define GEMINI_GLOBAL_MISC_CTRL		0x30
++#define GEMINI_MISC_USB0_WAKEUP		BIT(14)
++#define GEMINI_MISC_USB1_WAKEUP		BIT(15)
++#define GEMINI_MISC_USB0_VBUS_ON	BIT(22)
++#define GEMINI_MISC_USB1_VBUS_ON	BIT(23)
++#define GEMINI_MISC_USB0_MINI_B		BIT(29)
++#define GEMINI_MISC_USB1_MINI_B		BIT(30)
 +
-+		usb at 68000000 {
-+			status = "okay";
-+		};
++static int fotg210_gemini_init(struct device *dev, struct usb_hcd *hcd)
++{
++	struct device_node *np = dev->of_node;
++	struct regmap *map;
++	bool mini_b;
++	bool wakeup;
++	u32 mask, val;
++	int ret;
 +
-+		usb at 69000000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/gemini-rut1xx.dts b/arch/arm/boot/dts/gemini-rut1xx.dts
-index 7b920bfbda32..1c253da9f28c 100644
---- a/arch/arm/boot/dts/gemini-rut1xx.dts
-+++ b/arch/arm/boot/dts/gemini-rut1xx.dts
-@@ -61,5 +61,13 @@
- 			reg = <0x30000000 0x00800000>;
- 			/* TODO: add flash partitions here */
- 		};
++	map = syscon_regmap_lookup_by_phandle(np, "syscon");
++	if (IS_ERR(map)) {
++		dev_err(dev, "no syscon\n");
++		return PTR_ERR(map);
++	}
++	mini_b = of_property_read_bool(np, "cortina,gemini-mini-b");
++	wakeup = of_property_read_bool(np, "wakeup-source");
 +
-+		usb at 68000000 {
-+			status = "okay";
-+		};
++	/*
++	 * Figure out if this is USB0 or USB1 by simply checking the
++	 * physical base address.
++	 */
++	mask = 0;
++	if (hcd->rsrc_start == 0x69000000) {
++		val = GEMINI_MISC_USB1_VBUS_ON;
++		if (mini_b)
++			val |= GEMINI_MISC_USB1_MINI_B;
++		else
++			mask |= GEMINI_MISC_USB1_MINI_B;
++		if (wakeup)
++			val |= GEMINI_MISC_USB1_WAKEUP;
++		else
++			mask |= GEMINI_MISC_USB1_WAKEUP;
++	} else {
++		val = GEMINI_MISC_USB0_VBUS_ON;
++		if (mini_b)
++			val |= GEMINI_MISC_USB0_MINI_B;
++		else
++			mask |= GEMINI_MISC_USB0_MINI_B;
++		if (wakeup)
++			val |= GEMINI_MISC_USB0_WAKEUP;
++		else
++			mask |= GEMINI_MISC_USB0_WAKEUP;
++	}
 +
-+		usb at 69000000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
-index 63b756e3bf5a..c6a5abca0935 100644
---- a/arch/arm/boot/dts/gemini-wbd111.dts
-+++ b/arch/arm/boot/dts/gemini-wbd111.dts
-@@ -98,5 +98,13 @@
- 				read-only;
- 			};
- 		};
++	ret = regmap_update_bits(map, GEMINI_GLOBAL_MISC_CTRL, mask, val);
++	if (ret) {
++		dev_err(dev, "failed to initialize Gemini PHY\n");
++		return ret;
++	}
 +
-+		usb at 68000000 {
-+			status = "okay";
-+		};
++	dev_info(dev, "initialized Gemini PHY\n");
++	return 0;
++}
 +
-+		usb at 69000000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
-index 9747f5a47807..415380262140 100644
---- a/arch/arm/boot/dts/gemini-wbd222.dts
-+++ b/arch/arm/boot/dts/gemini-wbd222.dts
-@@ -98,5 +98,13 @@
- 				read-only;
- 			};
- 		};
+ /**
+  * fotg210_hcd_probe - initialize faraday FOTG210 HCDs
+  *
+@@ -5662,6 +5732,12 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
+ 
+ 	fotg210_init(fotg210);
+ 
++	if (of_device_is_compatible(dev->of_node, "cortina,gemini-usb")) {
++		retval = fotg210_gemini_init(dev, hcd);
++		if (retval)
++			goto failed_dis_clk;
++	}
 +
-+		usb at 68000000 {
-+			status = "okay";
-+		};
-+
-+		usb at 69000000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
-index 6fe678a68e31..2f8d0381d5eb 100644
---- a/arch/arm/boot/dts/gemini.dtsi
-+++ b/arch/arm/boot/dts/gemini.dtsi
-@@ -183,5 +183,27 @@
- 				#interrupt-cells = <1>;
- 			};
- 		};
-+
-+		usb at 68000000 {
-+			compatible = "cortina,gemini-usb", "faraday,fotg210";
-+			reg = <0x68000000 0x1000>;
-+			interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&rcon 8>;
-+			clocks = <&gcc GEMINI_CLK_GATE_USB0>;
-+			clock-names = "PCLK";
-+			syscon = <&syscon>;
-+			status = "disabled";
-+		};
-+
-+		usb at 69000000 {
-+			compatible = "cortina,gemini-usb", "faraday,fotg210";
-+			reg = <0x69000000 0x1000>;
-+			interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&rcon 9>;
-+			clocks = <&gcc GEMINI_CLK_GATE_USB1>;
-+			clock-names = "PCLK";
-+			syscon = <&syscon>;
-+			status = "disabled";
-+		};
- 	};
- };
+ 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (retval) {
+ 		dev_err(dev, "failed to add hcd with err %d\n", retval);
 -- 
 2.9.3
