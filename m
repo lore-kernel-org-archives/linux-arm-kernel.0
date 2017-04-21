@@ -1,73 +1,98 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 09:46:58 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 1/6] clk: sunxi-ng: Add sun4i/sun7i
- CCU driver
-In-Reply-To: <20170420195917.GA16113@plaes.org>
-References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
- <ac8c4dab4f160ec605d52120517774bf1de87c2e.1490545262.git-series.plaes@plaes.org>
- <20170327075438.cw3d6s7zyeemenwr@lukather> <20170404200919.GA22159@plaes.org>
- <20170407133805.aiythp3hdvuyhcrc@lukather> <20170420195917.GA16113@plaes.org>
-Message-ID: <CAGb2v66iNddKty4ObeGuVRDOp1NV-9A6=cg7omGMiDLJe7T_=g@mail.gmail.com>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Fri, 21 Apr 2017 10:57:25 +0900
+Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20170420131154.GL3452@pathway.suse.cz>
+References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
+ <1461239325-22779-2-git-send-email-pmladek@suse.com>
+ <20170419131341.76bc7634@gandalf.local.home>
+ <20170420033112.GB542@jagdpanzerIV.localdomain>
+ <20170420131154.GL3452@pathway.suse.cz>
+Message-ID: <20170421015724.GA586@jagdpanzerIV.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 3:59 AM, Priit Laes <plaes@plaes.org> wrote:
-> On Fri, Apr 07, 2017 at 03:38:05PM +0200, Maxime Ripard wrote:
->> Hi Priit,
->>
->> On Tue, Apr 04, 2017 at 08:09:19PM +0000, Priit Laes wrote:
->> > > > +/* Not documented on A10 */
->> > > > +static SUNXI_CCU_GATE(pll_periph_sata_clk, "pll-periph-sata", "pll-periph",
->> > > > +                     0x028, BIT(14), 0);
->> > >
->> > > The rate doesn't come from pll-periph directly, does it?
->> >
->> > So it uses hosc (24MHz parent clock) instead of pll-periph?
->>
->> I never looked too much at this, but it looks more like the input is
->> pll-periph-sata itself.
->
-> OK, I think I have now fixed most of the issues thanks to Maxime and Chen-Yu
-> and I'm almost ready to send out V3.
->
-> From my side there is only single issue remaining - how to create "sata-ext"
-> clock?
->
-> [snip]
-> static struct ccu_div pll_periph_sata_clk = {
->         .enable         = BIT(14),
->         .div            = _SUNXI_CCU_DIV(0, 2),
->         .common         = {
->                 .prediv         = 6,
->                 .reg            = 0x028,
->                 .features       = CCU_FEATURE_ALL_PREDIV,
->                 .hw.init        = CLK_HW_INIT("pll-periph-sata",
->                                               "pll-periph-base",
->                                               &ccu_nk_ops, 0),
->         },
-> };
->
-> static const char* const sata_parents[] = {"pll-periph-sata", "sata-ext"};
-> static SUNXI_CCU_MUX_WITH_GATE(sata_clk, "sata", sata_parents,
->                                0x0c8, 24, 1, BIT(31), 0);
-> [/snip]
->
-> Should I create a fixed-clock node in the dtsi:
->
-> sata-ext: clk at 0 {
->         #clock-cells = <0>;
->         compatible = "fixed-clock";
->         clock-frequency = <200000000>;
->         clock-output-names = "sata-ext";
-> };
+Hello,
 
-You can just leave it missing. You probably shouldn't register it
-if it's not populated. The clk core can cope with missing parents,
-as long as they aren't all missing.
+On (04/20/17 15:11), Petr Mladek wrote:
+[..]
+> Good analyze. I would summarize it that we need to be careful of:
+> 
+>   + logbug_lock
+>   + PRINTK_SAFE_CONTEXT
+>   + locks used by console drivers
+> 
+> The first two things are easy to check. Except that a check for logbuf_lock
+> might produce false negatives. The last check is very hard.
+> 
+> > so at the moment what I can think of is something like
+> > 
+> >   -- check this_cpu_read(printk_context) in NMI prink
+> > 
+> > 	-- if we are NOT in printk_safe on this CPU, then do printk_deferred()
+> > 	   and bypass `nmi_print_seq' buffer
+> 
+> I would add also a check for logbuf_lock.
+> > 	-- if we are in printk_safe
+> > 	  -- well... bad luck... have a bigger buffer.
+> 
+> Yup, we do the best effort while still trying to stay on the safe
+> side.
+> 
+> I have cooked up a patch based on this. It uses printk_deferred()
+> in NMI when it is safe. Note that console_flush_on_panic() will
+> try to get them on the console when a kdump is not generated.
+> I believe that it will help Steven.
 
->
-> And would it also need pio definition?
 
-Nope. It has dedicated pins.
+OK. I need to look more at the patch. It does more than I'd expected/imagined.
 
-ChenYu
+
+[..]
+>  void printk_nmi_enter(void)
+>  {
+> -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
+> +	/*
+> +	 * The size of the extra per-CPU buffer is limited. Use it
+> +	 * only when really needed.
+> +	 */
+> +	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK ||
+> +	    raw_spin_is_locked(&logbuf_lock)) {
+> +		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
+> +	} else {
+> +		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
+> +	}
+>  }
+
+well... the logbuf_lock can temporarily be locked from another CPU. I'd say
+that spin_is_locked() has better chances for false positive than
+this_cpu_read(printk_context). because this_cpu_read(printk_context) depends
+only on this CPU state, while spin_is_locked() depends on all CPUs. and the
+idea with this_cpu_read(printk_context) was that we check if the logbuf_lock
+was locked from this particular CPU.
+
+I agree that this_cpu_read(printk_context) covers slightly more than
+logbuf_lock scope, so we may get positive this_cpu_read(printk_context)
+with unlocked logbuf_lock, but I don't tend to think that it's a big
+problem.
+
+
+wouldn't something as simple as below do the trick?
+// absolutely and completely untested //
+
+
+diff --git a/kernel/printk/printk_safe.c b/kernel/printk/printk_safe.c
+index 033e50a7d706..c7477654c5b1 100644
+--- a/kernel/printk/printk_safe.c
++++ b/kernel/printk/printk_safe.c
+@@ -303,7 +303,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
+ {
+        struct printk_safe_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
+ 
+-       return printk_safe_log_store(s, fmt, args);
++       if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK)
++               return printk_safe_log_store(s, fmt, args);
++
++       return vprintk_emit(0, LOGLEVEL_SCHED, NULL, 0, fmt, args);
+ }
+
+	-ss
