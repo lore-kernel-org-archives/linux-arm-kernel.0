@@ -1,71 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 21 Apr 2017 18:28:33 +0100
-Subject: Applied "ASoC: mediatek: add I2C dependency for CS42XX8" to the asoc
- tree
-In-Reply-To: <20170420081541.658178-1-arnd@arndb.de>
-Message-ID: <E1d1cMD-0001wP-SQ@debutante>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 21 Apr 2017 19:30:41 +0200
+Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
+ pass2.x host controller
+In-Reply-To: <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
+References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
+ <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1e1aef81-3d0e-02a3-8005-47d9c1d9d5f3@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 21.04.2017 18:56, Bjorn Helgaas wrote:
+> On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
+>> Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
+>> However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
+>> in their BARs which results in driver probe failure during resource request.
+>> Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
+>> quirk entry to obtain BAR addresses correction using EA header emulation.
+>>
+>> Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> CC: stable at vger.kernel.org	# v4.10+
+>
+> Sorry Tomasz, I must have mistakenly marked this "accepted" in
+> patchwork, so it fell off my to-do list.  It's too late to get this in
+> v4.11, but I can still apply it for v4.12.
+>
+> I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
+> patch to tidy up whitespace, which makes this patch look like just:
+>
+>         /* SoC pass2.x */
+>         THUNDER_PEM_QUIRK(1, 0),
+>         THUNDER_PEM_QUIRK(1, 1),
+> +       THUNDER_ECAM_QUIRK(1, 10),
+>
+> Please double-check it to make sure this is what you need.
 
-   ASoC: mediatek: add I2C dependency for CS42XX8
+This is exactly what we need. Thank you Bjorn.
 
-has been applied to the asoc tree at
+Tomasz
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 362c59436c143edbcdd4cc2ee0e9856eb6a93bc4 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 20 Apr 2017 10:15:20 +0200
-Subject: [PATCH] ASoC: mediatek: add I2C dependency for CS42XX8
-
-We should not select drivers that depend on I2C when that is disabled,
-as it results in a build error:
-
-warning: (SND_SOC_MT2701_WM8960) selects SND_SOC_WM8960 which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && I2C)
-sound/soc/codecs/wm8960.c:1469:1: error: data definition has no type or storage class [-Werror]
-sound/soc/codecs/wm8960.c:1469:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
-
-Fixes: 8625c1dbd876 ("ASoC: mediatek: Add mt2701-wm8960 machine driver")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/mediatek/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
-index c6f39040f71f..5c68797f36c4 100644
---- a/sound/soc/mediatek/Kconfig
-+++ b/sound/soc/mediatek/Kconfig
-@@ -24,7 +24,7 @@ config SND_SOC_MT2701_CS42448
- 
- config SND_SOC_MT2701_WM8960
- 	tristate "ASoc Audio driver for MT2701 with WM8960 codec"
--	depends on SND_SOC_MT2701
-+	depends on SND_SOC_MT2701 && I2C
- 	select SND_SOC_WM8960
- 	help
- 	  This adds ASoC driver for Mediatek MT2701 boards
--- 
-2.11.0
+>
+>> ---
+>>  drivers/acpi/pci_mcfg.c | 7 ++++---
+>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+>> index a6a4cea..a0a391e 100644
+>> --- a/drivers/acpi/pci_mcfg.c
+>> +++ b/drivers/acpi/pci_mcfg.c
+>> @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
+>>  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
+>>  	{ "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,	    \
+>>  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
+>> +#define THUNDER_ECAM_QUIRK(rev, seg)					\
+>> +	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
+>> +	&pci_thunder_ecam_ops }
+>>  	/* SoC pass2.x */
+>>  	THUNDER_PEM_QUIRK(1, 0),
+>>  	THUNDER_PEM_QUIRK(1, 1),
+>> +	THUNDER_ECAM_QUIRK(1, 10),
+>>
+>> -#define THUNDER_ECAM_QUIRK(rev, seg)					\
+>> -	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
+>> -	&pci_thunder_ecam_ops }
+>>  	/* SoC pass1.x */
+>>  	THUNDER_PEM_QUIRK(2, 0),	/* off-chip devices */
+>>  	THUNDER_PEM_QUIRK(2, 1),	/* off-chip devices */
+>> --
+>> 2.7.4
+>>
