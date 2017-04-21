@@ -1,77 +1,121 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 21 Apr 2017 12:57:05 -0500
-Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <20170421170414.GA2429@localhost>
-References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
- <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
- <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
- <20170414210646.GA5346@localhost>
- <CAErSpo731xSzrnKF+G+8SA_UUHy7ROA1V9oFkpwKi85GQf9VAg@mail.gmail.com>
- <20170417174712.GA7575@localhost>
- <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
- <20170421170414.GA2429@localhost>
-Message-ID: <20170421175705.GB17916@bhelgaas-glaptop.roam.corp.google.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Fri, 21 Apr 2017 18:59:45 +0100
+Subject: [PATCH 4/4] arm64: documentation: document tagged pointer stack
+ constraints
+In-Reply-To: <1492712234-4950-5-git-send-email-kristina.martsenko@arm.com>
+References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+ <1492712234-4950-5-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <20170421175945.GS14784@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 05:05:41PM +0000, Jayachandran C wrote:
-> On Fri, Apr 21, 2017 at 10:48:15AM -0500, Bjorn Helgaas wrote:
-> > On Mon, Apr 17, 2017 at 12:47 PM, Jayachandran C
-> > <jnair@caviumnetworks.com> wrote:
-> > > On Fri, Apr 14, 2017 at 09:00:06PM -0500, Bjorn Helgaas wrote:
+On Thu, Apr 20, 2017 at 07:17:14PM +0100, Kristina Martsenko wrote:
+> Some kernel features don't currently work if a task puts a non-zero
+> address tag in its stack pointer, frame pointer, or frame record entries
+> (FP, LR).
+>
+> For example, with a tagged stack pointer, the kernel can't deliver
+> signals to the process, and the task is killed instead. As another
+> example, with a tagged frame pointer or frame records, perf fails to
+> generate call graphs or resolve symbols.
+>
+> For now, just document these limitations, instead of finding and fixing
+> everything that doesn't work, as it's not known if anyone needs to use
+> tags in these places anyway.
+>
+> In addition, as requested by Dave Martin, generalize the limitations
+> into a general kernel address tag policy, and refactor
+> tagged-pointers.txt to include it.
+>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 
-> > >> Could you collect "lspci -vv" output from this system?  I'd like to
-> > >> archive that as background for this IOMMU issue and the ASPM tweaks I
-> > >> suspect we'll have to do.  I *wish* we had more information about that
-> > >> VIA thing, because I suspect we could get rid of it if we had more
-> > >> details.
-> > >
-> > > The full logs are slightly large, so I have kept them at:
-> > > https://github.com/jchandra-cavm/thunderx2/blob/master/logs/
-> > > The lspci -vv output is lspci-vv.txt and lspci -tvn output is lspci-tvn.txt
-> > >
-> > > The output is from 2 socket system, the cards are not on the first slot
-> > > like the example above, so the bus and device numbers are different.
-> > 
-> > Can somebody with this system collect the "lspci -xxxx" output as well?
-> > 
-> > I'm making some lspci changes to handle the PCI-to-PCIe bridge
-> > correctly, and I can use the "lspci -xxxx" output to create an lspci
-> > test case.
-> 
-> [Sorry was AFK for a few days]
-> 
-> I have updated the above directory with the log. Also tested your next branch
-> and it works fine on ThunderX2.
+Looks OK to me.  It's not feasible to describe all possible scenarios
+here, but this makes the kernel's intentions clearer.
 
-Thanks!
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-With regard to my lspci changes, they add "Slot-" here:
-
-   01:0a.0 PCI bridge: Broadcom Corporation Device 9039
-   ...
-  -   Capabilities: [40] Express (v2) PCI/PCI-X to PCI-Express Bridge, MSI 00
-  +   Capabilities: [40] Express (v2) PCI/PCI-X to PCI-Express Bridge (Slot-), MSI 00
-
-for all your PCI-to-PCIe bridges.  I assume the "Slot-" is correct, i.e.,
-the link is not connected to a slot, right?  This comes from the "Slot
-Implemented" bit in the PCIe Capabilities Register.
-
-I did notice that all the Root Port devices claim to *not* be connected to
-slots, which doesn't seem right.  For example,
-
-  12:00.0 PCI bridge: Broadcom Corporation Device 9084
-      Bus: primary=12, secondary=13, subordinate=14, sec-latency=0
-      Capabilities: [ac] Express (v2) Root Port (Slot-), MSI 00
-
-  13:00.0 Ethernet controller: Intel Corporation 82599EB 10-Gigabit SFI/SFP+ Network Connection
-
-It seems strange because the 12:00.0 Root Port looks like it probably
-*does* lead to a slot where the NIC is plugged in.  Or is that NIC really
-soldered down?
-
-But I assume there are *some* PCIe slots, so at some of those Root Ports
-should advertise "Slot+" (which by itself does not imply hotplug support,
-if that's the concern).
-
-Bjorn
+> ---
+>  Documentation/arm64/tagged-pointers.txt | 62 +++++++++++++++++++++++++--------
+>  1 file changed, 47 insertions(+), 15 deletions(-)
+>
+> diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+> index d9995f1f51b3..a25a99e82bb1 100644
+> --- a/Documentation/arm64/tagged-pointers.txt
+> +++ b/Documentation/arm64/tagged-pointers.txt
+> @@ -11,24 +11,56 @@ in AArch64 Linux.
+>  The kernel configures the translation tables so that translations made
+>  via TTBR0 (i.e. userspace mappings) have the top byte (bits 63:56) of
+>  the virtual address ignored by the translation hardware. This frees up
+> -this byte for application use, with the following caveats:
+> +this byte for application use.
+>
+> -     (1) The kernel requires that all user addresses passed to EL1
+> -         are tagged with tag 0x00. This means that any syscall
+> -         parameters containing user virtual addresses *must* have
+> -         their top byte cleared before trapping to the kernel.
+>
+> -     (2) Non-zero tags are not preserved when delivering signals.
+> -         This means that signal handlers in applications making use
+> -         of tags cannot rely on the tag information for user virtual
+> -         addresses being maintained for fields inside siginfo_t.
+> -         One exception to this rule is for signals raised in response
+> -         to watchpoint debug exceptions, where the tag information
+> -         will be preserved.
+> +Passing tagged addresses to the kernel
+> +--------------------------------------
+>
+> -     (3) Special care should be taken when using tagged pointers,
+> -         since it is likely that C compilers will not hazard two
+> -         virtual addresses differing only in the upper byte.
+> +All interpretation of userspace memory addresses by the kernel assumes
+> +an address tag of 0x00.
+> +
+> +This includes, but is not limited to, addresses found in:
+> +
+> + - pointer arguments to system calls, including pointers in structures
+> +   passed to system calls,
+> +
+> + - the stack pointer (sp), e.g. when interpreting it to deliver a
+> +   signal,
+> +
+> + - the frame pointer (x29) and frame records, e.g. when interpreting
+> +   them to generate a backtrace or call graph.
+> +
+> +Using non-zero address tags in any of these locations may result in an
+> +error code being returned, a (fatal) signal being raised, or other modes
+> +of failure.
+> +
+> +For these reasons, passing non-zero address tags to the kernel via
+> +system calls is forbidden, and using a non-zero address tag for sp is
+> +strongly discouraged.
+> +
+> +Programs maintaining a frame pointer and frame records that use non-zero
+> +address tags may suffer impaired or inaccurate debug and profiling
+> +visibility.
+> +
+> +
+> +Preserving tags
+> +---------------
+> +
+> +Non-zero tags are not preserved when delivering signals. This means that
+> +signal handlers in applications making use of tags cannot rely on the
+> +tag information for user virtual addresses being maintained for fields
+> +inside siginfo_t. One exception to this rule is for signals raised in
+> +response to watchpoint debug exceptions, where the tag information will
+> +be preserved.
+>
+>  The architecture prevents the use of a tagged PC, so the upper byte will
+>  be set to a sign-extension of bit 55 on exception return.
+> +
+> +
+> +Other considerations
+> +--------------------
+> +
+> +Special care should be taken when using tagged pointers, since it is
+> +likely that C compilers will not hazard two virtual addresses differing
+> +only in the upper byte.
+> --
+> 2.1.4
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
