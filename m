@@ -1,46 +1,64 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Apr 2017 18:40:49 +0200
-Subject: [GIT PULL 1/2] ARM: dts: exynos: Last round for v4.12
-Message-ID: <20170421164050.7404-1-krzk@kernel.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 21 Apr 2017 11:56:14 -0500
+Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
+ pass2.x host controller
+In-Reply-To: <1490789773-21506-1-git-send-email-tn@semihalf.com>
+References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
+Message-ID: <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
+> Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
+> However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
+> in their BARs which results in driver probe failure during resource request.
+> Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
+> quirk entry to obtain BAR addresses correction using EA header emulation.
+> 
+> Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> CC: stable at vger.kernel.org	# v4.10+
 
-I know it is late so just one fix for v4.12.
-On top of previous pull request.
+Sorry Tomasz, I must have mistakenly marked this "accepted" in
+patchwork, so it fell off my to-do list.  It's too late to get this in
+v4.11, but I can still apply it for v4.12.
 
-Best regards,
-Krzysztof
+I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
+patch to tidy up whitespace, which makes this patch look like just:
 
+        /* SoC pass2.x */
+        THUNDER_PEM_QUIRK(1, 0),
+        THUNDER_PEM_QUIRK(1, 1),
++       THUNDER_ECAM_QUIRK(1, 10),
 
-The following changes since commit a1146328ec47141007a6ec076e1cbfc80f31887f:
+Please double-check it to make sure this is what you need.
 
-  Merge tag 'samsung-dt-hdmi-cec-4.12' into next/dt (2017-03-31 00:27:18 +0300)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.12-2
-
-for you to fetch changes up to 6a611d149a9a1eff7c89e81bab018e4121cce17e:
-
-  ARM: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:06:03 +0200)
-
-----------------------------------------------------------------
-Fix DTC warnings in Exynos ARMv7 Device Tree sources.
-
-----------------------------------------------------------------
-Viresh Kumar (1):
-      ARM: dts: exynos: Use - instead of @ for DT OPP entries
-
- .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
- arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
- arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
- arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
- arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
- arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
- arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 43 +++++++++++++-
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      | 17 ++++++
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 18 ++++++
- 10 files changed, 221 insertions(+), 147 deletions(-)
+> ---
+>  drivers/acpi/pci_mcfg.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index a6a4cea..a0a391e 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
+>  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
+>  	{ "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,	    \
+>  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
+> +#define THUNDER_ECAM_QUIRK(rev, seg)					\
+> +	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
+> +	&pci_thunder_ecam_ops }
+>  	/* SoC pass2.x */
+>  	THUNDER_PEM_QUIRK(1, 0),
+>  	THUNDER_PEM_QUIRK(1, 1),
+> +	THUNDER_ECAM_QUIRK(1, 10),
+>  
+> -#define THUNDER_ECAM_QUIRK(rev, seg)					\
+> -	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
+> -	&pci_thunder_ecam_ops }
+>  	/* SoC pass1.x */
+>  	THUNDER_PEM_QUIRK(2, 0),	/* off-chip devices */
+>  	THUNDER_PEM_QUIRK(2, 1),	/* off-chip devices */
+> -- 
+> 2.7.4
+> 
