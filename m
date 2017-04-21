@@ -1,31 +1,48 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 21 Apr 2017 10:39:24 +0200
-Subject: [PATCH v2 5/5] ARM: at91/defconfig: add PTC driver to sama5_defconfig
-In-Reply-To: <20170421083924.15096-1-ludovic.desroches@microchip.com>
-References: <20170421083924.15096-1-ludovic.desroches@microchip.com>
-Message-ID: <20170421083924.15096-6-ludovic.desroches@microchip.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 21 Apr 2017 16:38:57 +0800
+Subject: [PATCH v2 9/9] ARM: dts: sun6i: Enable tcon0 by default
+In-Reply-To: <20170421083857.29636-1-wens@csie.org>
+References: <20170421083857.29636-1-wens@csie.org>
+Message-ID: <20170421083857.29636-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Peripheral Touch Controller driver to sama5_defconfig.
+tcon0 contains a muxing register used to mux tcon output to downstream
+hdmi or mipi dsi encoders. tcon0 must be available for the mux to be
+configured.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Whether the display subsystem is enabled or not is now solely controlled
+by the display-engine node.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/configs/sama5_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 1 -
+ arch/arm/boot/dts/sun6i-a31.dtsi            | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 777c9e9..7480665 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -116,6 +116,8 @@ CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_ATMEL_PTC=m
- # CONFIG_SERIO is not set
- CONFIG_LEGACY_PTY_COUNT=4
- CONFIG_SERIAL_ATMEL=y
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index b4c87a23e3f8..55607208468b 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -319,7 +319,6 @@
+ &tcon0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&lcd0_rgb888_pins>;
+-	status = "okay";
+ };
+ 
+ &tcon0_out {
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index dfcf64515d7f..d0cede5aaeb5 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -264,7 +264,6 @@
+ 				      "tcon-ch0",
+ 				      "tcon-ch1";
+ 			clock-output-names = "tcon0-pixel-clock";
+-			status = "disabled";
+ 
+ 			ports {
+ 				#address-cells = <1>;
 -- 
-2.9.0
+2.11.0
