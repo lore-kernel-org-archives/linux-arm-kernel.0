@@ -1,45 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 21 Apr 2017 10:43:20 +0200
-Subject: [PATCH v2] dmaengine: sun4i: fix invalid argument
-In-Reply-To: <20170421082417.7cqtevwuhjvfgjcx@lukather>
-References: <20170421084033.5c987e13@canb.auug.org.au>
- <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
- <584a2c53-100b-945b-d665-cef3fa856526@free.fr>
- <20170421082417.7cqtevwuhjvfgjcx@lukather>
-Message-ID: <3e98596a-0322-e4f1-7cc2-9b0eaceb4465@free.fr>
+From: peng.fan@nxp.com (Peng Fan)
+Date: Fri, 21 Apr 2017 17:03:36 +0800
+Subject: [PATCH] iommu: arm-smmu: correct sid to mask
+Message-ID: <1492765416-30835-1-git-send-email-peng.fan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>From code "SMR mask 0x%x out of range for SMMU",
+so, we need to use mask, not sid.
 
-The "pchans_used" field is an unsigned long array.
-
-for_each_clear_bit_from() expects an unsigned long pointer,
-not an array address.
-
-$ make C=2 drivers/dma/sun4i-dma.o
-  CHECK   drivers/dma/sun4i-dma.c
-drivers/dma/sun4i-dma.c:241:9: warning: incorrect type in argument 1 (different base types)
-drivers/dma/sun4i-dma.c:241:9:    expected unsigned long const *p
-drivers/dma/sun4i-dma.c:241:9:    got unsigned long ( *<noident> )[1]
-
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+Signed-off-by: Peng Fan <peng.fan@nxp.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/dma/sun4i-dma.c | 2 +-
+ drivers/iommu/arm-smmu.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
-index 57aa227bfadb..f4ed3f17607c 100644
---- a/drivers/dma/sun4i-dma.c
-+++ b/drivers/dma/sun4i-dma.c
-@@ -238,7 +238,7 @@ static struct sun4i_dma_pchan *find_and_use_pchan(struct sun4i_dma_dev *priv,
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index b493c99..5a06de2 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1467,7 +1467,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 		}
+ 		if (mask & ~smmu->smr_mask_mask) {
+ 			dev_err(dev, "SMR mask 0x%x out of range for SMMU (0x%x)\n",
+-				sid, smmu->smr_mask_mask);
++				mask, smmu->smr_mask_mask);
+ 			goto out_free;
+ 		}
  	}
- 
- 	spin_lock_irqsave(&priv->lock, flags);
--	for_each_clear_bit_from(i, &priv->pchans_used, max) {
-+	for_each_clear_bit_from(i, priv->pchans_used, max) {
- 		pchan = &pchans[i];
- 		pchan->vchan = vchan;
- 		set_bit(i, priv->pchans_used);
 -- 
-3.14159
+2.6.6
