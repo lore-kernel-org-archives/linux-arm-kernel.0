@@ -1,42 +1,71 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Fri, 21 Apr 2017 21:52:54 +0200
-Subject: [RFC-b PATCH] kbuild: redefine __FILE__ as relative path from
- $(srctree) if possible
-In-Reply-To: <1492803404-17837-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1492803404-17837-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <0f175fe5-6036-b06a-db90-6fd05ece7102@suse.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 21 Apr 2017 22:40:55 +0200
+Subject: [PATCH 2/5 v3] usb: host: fotg2: add device tree probing
+In-Reply-To: <20170421204058.6206-1-linus.walleij@linaro.org>
+References: <20170421204058.6206-1-linus.walleij@linaro.org>
+Message-ID: <20170421204058.6206-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 21.4.2017 v 21:36 Masahiro Yamada napsal(a):
-> Since Kbuild runs in the objtree, __FILE__ can be a very long path
-> depending of $(srctree).
-> 
-> Commit 9da0763bdd82 ("kbuild: Use relative path when building in a
-> subdir of the source tree") made the situation better for cases
-> where objtree is a child of srctree.  ($(srctree) is "..")
-> 
-> For other cases of out-of-tree build, filenames in WARN_ON() etc.
-> are still an absolute path.  It also means the kernel image depends
-> on where it was built.
-> 
-> Here, the idea is to redefine __FILE__ as the relative path from
-> $(srctree), but doing so causes a compiler warning:
->   warning: "__FILE__" redefined [-Wbuiltin-macro-redefined]
-> 
-> We can suppress it with -Wno-builtin-macro-redefined.  However,
-> this option is not recognized by old compilers.  So, __FILE__
-> is re-defined only when the option is supported.
+From: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 
-I actually like the KBUILD_FILE approach more, even if it means patching
-various users.
+Add device tree probing to the fotg2 driver.
 
+Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Change compatible to "faraday,fotg210" simply.
+---
+ drivers/usb/host/fotg210-hcd.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-> Please note __FILE__ is always an absolute path for external
-> modules.  We can strip KBUILD_EXTMOD from the path if we want,
-> but I am not doing that.  It would make it difficult to figure out
-> the module in question in case of WARN_ON().
-
-Agreed. OOT modules are potential source of trouble, so let them stand out.
-
-Michal
+diff --git a/drivers/usb/host/fotg210-hcd.c b/drivers/usb/host/fotg210-hcd.c
+index 1c5b34b74860..c226041101d1 100644
+--- a/drivers/usb/host/fotg210-hcd.c
++++ b/drivers/usb/host/fotg210-hcd.c
+@@ -23,6 +23,7 @@
+  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/device.h>
+ #include <linux/dmapool.h>
+ #include <linux/kernel.h>
+@@ -5600,6 +5601,15 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
+ 	if (usb_disabled())
+ 		return -ENODEV;
+ 
++	/* Right now device-tree probed devices don't get dma_mask set.
++	 * Since shared usb code relies on it, set it here for now.
++	 * Once we have dma capability bindings this can go away.
++	 */
++
++	retval = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
++	if (retval)
++		goto fail_create_hcd;
++
+ 	pdev->dev.power.power_state = PMSG_ON;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+@@ -5676,9 +5686,18 @@ static int fotg210_hcd_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id fotg210_of_match[] = {
++	{ .compatible = "faraday,fotg210" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, fotg210_of_match);
++#endif
++
+ static struct platform_driver fotg210_hcd_driver = {
+ 	.driver = {
+ 		.name   = "fotg210-hcd",
++		.of_match_table = of_match_ptr(fotg210_of_match),
+ 	},
+ 	.probe  = fotg210_hcd_probe,
+ 	.remove = fotg210_hcd_remove,
+-- 
+2.9.3
