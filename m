@@ -1,48 +1,33 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 16:38:49 +0800
-Subject: [PATCH v2 1/9] dt-bindings: display: sun4i: Add component endpoint ID
- numbering scheme
+Date: Fri, 21 Apr 2017 16:38:51 +0800
+Subject: [PATCH v2 3/9] drm/sun4i: backend: Drop trailing 0 from backend in
+ error message
 In-Reply-To: <20170421083857.29636-1-wens@csie.org>
 References: <20170421083857.29636-1-wens@csie.org>
-Message-ID: <20170421083857.29636-2-wens@csie.org>
+Message-ID: <20170421083857.29636-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner display pipeline contains many hardware components, some
-of which can consume data from one of multiple upstream components.
-The numbering scheme of these components must be encoded into the device
-tree so the driver can figure out which component out of two or more of
-the same type it is supposed to use or program.
-
-This patch adds the constraint that local endpoint IDs must be the index
-or number of the remote endpoint's hardware block, for all components
-in the display pipeline up to the TCONs.
+Now that we support multiple instances of backends, the trailing 0
+implying only one backend no longer makes sense.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 57a8d0610062..7acdbf14ae1c 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -4,6 +4,16 @@ Allwinner A10 Display Pipeline
- The Allwinner A10 Display pipeline is composed of several components
- that are going to be documented below:
- 
-+For the input port of all components up to the TCON in the display
-+pipeline, if there are multiple components, the local endpoint IDs
-+must correspond to the index of the upstream block. For example, if
-+the remote endpoint is Frontend 1, then the local endpoint ID must
-+be 1.
-+
-+Conversely, for the output ports of the same group, the remote endpoint
-+ID must be the index of the local hardware block. If the local backend
-+is backend 1, then the remote endpoint ID must be 1.
-+
- TV Encoder
- ----------
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 95a77c6a9161..e17e20036aa3 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -320,7 +320,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 	backend->regs = devm_regmap_init_mmio(dev, regs,
+ 					      &sun4i_backend_regmap_config);
+ 	if (IS_ERR(backend->regs)) {
+-		dev_err(dev, "Couldn't create the backend0 regmap\n");
++		dev_err(dev, "Couldn't create the backend regmap\n");
+ 		return PTR_ERR(backend->regs);
+ 	}
  
 -- 
 2.11.0
