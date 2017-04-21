@@ -1,54 +1,35 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Fri, 21 Apr 2017 15:50:35 +0800
-Subject: [PATCH] [media] mtk-vcodec: avoid warnings because of empty macros
-In-Reply-To: <5bc3ebc3c6f57c2b30126f113bc35ec95c6f5b5d.1492599391.git.mchehab@s-opensource.com>
-References: <5bc3ebc3c6f57c2b30126f113bc35ec95c6f5b5d.1492599391.git.mchehab@s-opensource.com>
-Message-ID: <1492761035.12924.0.camel@mtksdaap41>
+From: sreekanth.reddy@broadcom.com (Sreekanth Reddy)
+Date: Fri, 21 Apr 2017 13:26:29 +0530
+Subject: [PATCH V2] scsi: mpt3sas: remove redundant wmb
+In-Reply-To: <yq1y3uvq0c1.fsf@oracle.com>
+References: <1491591978-17880-1-git-send-email-okaya@codeaurora.org>
+ <yq1y3uvq0c1.fsf@oracle.com>
+Message-ID: <CAK=zhgpmcmq-CnWuU9=WRJpAaEduw63LSPLE9yZzF_sUHkM4AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-04-19 at 07:56 -0300, Mauro Carvalho Chehab wrote:
-> Remove those gcc warnings:
-> 
-> 	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c: In function 'mtk_vcodec_dec_pw_on':
-> 	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c:114:51: warning: suggest braces around empty body in an 'if' statement [-Wempty-body]
-> 	   mtk_v4l2_err("pm_runtime_get_sync fail %d", ret);
-> 	                                                   ^
-> 
-> By adding braces.
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-> index 12480837ff2e..237e144c194f 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
-> @@ -66,15 +66,15 @@ extern bool mtk_vcodec_dbg;
->  
->  #else
->  
-> -#define mtk_v4l2_debug(level, fmt, args...)
-> -#define mtk_v4l2_err(fmt, args...)
-> -#define mtk_v4l2_debug_enter()
-> -#define mtk_v4l2_debug_leave()
-> +#define mtk_v4l2_debug(level, fmt, args...) {}
-> +#define mtk_v4l2_err(fmt, args...) {}
-> +#define mtk_v4l2_debug_enter() {}
-> +#define mtk_v4l2_debug_leave() {}
->  
-> -#define mtk_vcodec_debug(h, fmt, args...)
-> -#define mtk_vcodec_err(h, fmt, args...)
-> -#define mtk_vcodec_debug_enter(h)
-> -#define mtk_vcodec_debug_leave(h)
-> +#define mtk_vcodec_debug(h, fmt, args...) {}
-> +#define mtk_vcodec_err(h, fmt, args...) {}
-> +#define mtk_vcodec_debug_enter(h) {}
-> +#define mtk_vcodec_debug_leave(h) {}
->  
->  #endif
->  
+On Thu, Apr 20, 2017 at 7:58 AM, Martin K. Petersen
+<martin.petersen@oracle.com> wrote:
+> Sinan Kaya <okaya@codeaurora.org> writes:
+>
+>> Due to relaxed ordering requirements on multiple architectures,
+>> drivers are required to use wmb/rmb/mb combinations when they need to
+>> guarantee observability between the memory and the HW.
+>>
+>> The mpt3sas driver is already using wmb() for this purpose.  However,
+>> it issues a writel following wmb(). writel() function on arm/arm64
+>> arhictectures have an embedded wmb() call inside.
 
-Acked-by: Tiffany Lin <Tiffany.lin@mediatek.com>
+[Sreekanth] Whether same thing applicable for SPARC & POWER
+architectures. If yes then we are fine with this patch changes.
+
+>>
+>> This results in unnecessary performance loss and code duplication.
+>>
+>> writel already guarantees ordering for both cpu and bus. we don't need
+>> additional wmb()
+>
+> Broadcom folks, please review!
+>
+> --
+> Martin K. Petersen      Oracle Linux Engineering
