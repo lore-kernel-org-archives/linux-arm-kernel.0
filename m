@@ -1,113 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Apr 2017 10:11:57 +0100
-Subject: [PATCH 1/3] arm64: extend ioremap for cacheable non-shareable
- memory
-In-Reply-To: <1492716858-24509-2-git-send-email-Haiying.Wang@nxp.com>
-References: <1492716858-24509-1-git-send-email-Haiying.Wang@nxp.com>
- <1492716858-24509-2-git-send-email-Haiying.Wang@nxp.com>
-Message-ID: <20170421091156.GA6406@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Apr 2017 11:19:52 +0200
+Subject: [PATCH v5 1/4] gpio: mvebu: Add limited PWM support
+In-Reply-To: <20170412151932.GE7023@lunn.ch>
+References: <20170409180931.4884-1-ralph.sennhauser@gmail.com>
+ <20170409180931.4884-2-ralph.sennhauser@gmail.com>
+ <20170412163128.5c985a26@free-electrons.com>
+ <20170412151932.GE7023@lunn.ch>
+Message-ID: <20170421111952.54978e80@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-I notice you missed Catalin and Will from Cc. In future, please ensure
-that you Cc them when altering arm64 arch code.
+On Wed, 12 Apr 2017 17:19:32 +0200, Andrew Lunn wrote:
 
-On Thu, Apr 20, 2017 at 03:34:16PM -0400, Haiying Wang wrote:
-> NXP arm64 based SoC needs to allocate cacheable and
-> non-shareable memory for the software portals of
-> Queue manager, so we extend the arm64 ioremap support
-> for this memory attribute.
-
-NAK to this patch.
-
-It is not possible to safely use Non-Shareable attributes in Linux page
-tables, given that these page tables are shared by all PEs (i.e. CPUs).
-
-My understanding is that if several PEs map a region as Non-Shareable,
-the usual background behaviour of the PEs (e.g. speculation,
-prefetching, natural eviction) mean that uniprocessor semantics are not
-guaranteed (i.e. a read following a write may see stale data).
-
-For example, in a system like:
-
-    +------+  +------+
-    | PE-a |  | PE-b |
-    +------+  +------+
-    | L1-a |  | L1-b |
-    +------+  +------+
-       ||        ||
-    +----------------+
-    |  Shared cache  |
-    +----------------+
-            ||
-    +----------------+
-    |     Memory     |
-    +----------------+
-
-... you could have a sequence like:
-
-1) PE-a allocates a line into L1-a for address X in preparation for a
-   store.
-
-2) PE-b allocates a line into L1-b for the same address X as a result of
-   speculation.
-
-3) PE-a makes a store to the line in L1-a. Since address X is mapped as
-   Non-shareable, no snoops are performed to keep other copies of the
-   line in sync.
-
-4) As a result of explicit maintenance or as a natural eviction, L1-a
-   evicts its line into shared cache. The shared cache subsequently
-   evicts this to memory.
-
-5) L1-b evicts its line to shared cache as a natural eviction.
-
-6) L1-a fetches the line from shared cache in response to a load by
-   PE-a, returning stale data (i.e. the store is lost).
-
-No amount of cache maintenance can avoid this. In general, Non-Shareable
-mappings are a bad idea.
-
-Thanks,
-Mark.
-
-> Signed-off-by: Haiying Wang <Haiying.Wang@nxp.com>
-> ---
->  arch/arm64/include/asm/io.h           | 1 +
->  arch/arm64/include/asm/pgtable-prot.h | 1 +
->  2 files changed, 2 insertions(+)
+> Yep. It was a compromise. By adding a new binding for the GPIO driver,
+> this might be possible. But it did not seem worth such a major change.
 > 
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 0c00c87..b6f03e7 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -170,6 +170,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
->  #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->  #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
->  #define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
-> +#define ioremap_cache_ns(addr, size)	__ioremap((addr), (size), __pgprot(PROT_NORMAL_NS))
->  #define iounmap				__iounmap
->  
->  /*
-> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-> index 2142c77..7fc7910 100644
-> --- a/arch/arm64/include/asm/pgtable-prot.h
-> +++ b/arch/arm64/include/asm/pgtable-prot.h
-> @@ -42,6 +42,7 @@
->  #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_NC))
->  #define PROT_NORMAL_WT		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL_WT))
->  #define PROT_NORMAL		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
-> +#define PROT_NORMAL_NS		(PTE_TYPE_PAGE | PTE_AF | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_NORMAL))
->  
->  #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
->  #define PROT_SECT_NORMAL	(PROT_SECT_DEFAULT | PMD_SECT_PXN | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The prime use of this feature is for controlling a fan. So far, i've
+> not seen any hardware with more than one fan, i.e. needs more than one
+> PWM. Nor have i seen any hardware with the GPIO for the fan being on
+> the third bank. A hardware manufacture could add multiple fans, but i
+> doubt it, they make noise and fail. And if a manufacture does place a
+> fan on the third bank, it can still be controlled as a plain GPIO fan,
+> as we have been doing for the last few years.
+
+Right.
+
+> So i personally think it is an O.K. compromise.
+
+I clearly don't want to block this, but I believe this is a very good
+illustration of why stable DT bindings simply don't work. We are
+realizing here that having each GPIO bank represented as a separate DT
+node doesn't work, because this blinking functionality is not per GPIO
+bank, but global to all GPIO banks.
+
+I am totally fine with compromise, and having things simple first, and
+extend them later if needed. But this stable DT binding rule makes this
+quite impossible: what is a compromise today might put you in big
+troubles tomorrow.
+
+Anyway, it's fine for me, I don't think it's worth the effort making a
+much more complicated solution/change.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
