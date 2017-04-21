@@ -1,111 +1,202 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 16:38:52 +0800
-Subject: [PATCH v2 4/9] drm/sun4i: backend: Fetch backend ID from device tree
+Date: Fri, 21 Apr 2017 16:38:50 +0800
+Subject: [PATCH v2 2/9] drm/sun4i: Use lists to track registered display
+ backends and TCONs
 In-Reply-To: <20170421083857.29636-1-wens@csie.org>
 References: <20170421083857.29636-1-wens@csie.org>
-Message-ID: <20170421083857.29636-5-wens@csie.org>
+Message-ID: <20170421083857.29636-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Allwinner SoCs have 2 display pipelines, as in 2 of each
-components, including the frontend, backend, TCON, and any other
-extras.
+To support multiple display pipelines, we need to keep track of the
+multiple display backends and TCONs registered with the driver.
 
-As the backend and TCON are always paired together and form the CRTC,
-we need to know which backend or TCON we are currently probing, so we
-can pair them when initializing the CRTC.
-
-This patch figures out the backend's ID from the device tree and stores
-it in the backend's data structure. It does this by looking at the "reg"
-property of any remote endpoints connected to the backend's input port.
+Switch to lists to track registered components. Components are only
+appended to their respective lists if the bind process was successful.
+The TCON bind function now defers if a backend was not registered.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 44 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.h |  2 ++
- 2 files changed, 46 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c |  6 +++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  4 ++++
+ drivers/gpu/drm/sun4i/sun4i_drv.c     |  2 ++
+ drivers/gpu/drm/sun4i/sun4i_drv.h     |  4 +++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c    | 14 ++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_tcon.h    |  4 ++++
+ 6 files changed, 30 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index e17e20036aa3..0b4222312e49 100644
+index d660741ba475..95a77c6a9161 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -20,6 +20,7 @@
+@@ -19,6 +19,7 @@
+ #include <drm/drm_plane_helper.h>
  
  #include <linux/component.h>
- #include <linux/list.h>
-+#include <linux/of_graph.h>
++#include <linux/list.h>
  #include <linux/reset.h>
  
  #include "sun4i_backend.h"
-@@ -289,6 +290,45 @@ static int sun4i_backend_free_sat(struct device *dev) {
- 	return 0;
- }
- 
-+/*
-+ * The display backend can take video output from the display frontend, or
-+ * the display enhancement unit on the A80, as input for one it its layers.
-+ * This relationship within the display pipeline is encoded in the device
-+ * tree with of_graph, and we use it here to figure out which backend, if
-+ * there are 2 or more, we are currently probing. The number would be in
-+ * the "reg" property of the upstream output port endpoint.
-+ */
-+static int sun4i_backend_of_get_id(struct device_node *node)
-+{
-+	struct device_node *port, *ep;
-+	int ret = -EINVAL;
-+
-+	/* input is port 0 */
-+	port = of_graph_get_port_by_id(node, 0);
-+	if (!port)
-+		return -EINVAL;
-+
-+	/* try finding an upstream endpoint */
-+	for_each_available_child_of_node(port, ep) {
-+		struct device_node *remote;
-+		u32 reg;
-+
-+		remote = of_parse_phandle(ep, "remote-endpoint", 0);
-+		if (!remote)
-+			continue;
-+
-+		ret = of_property_read_u32(remote, "reg", &reg);
-+		if (ret)
-+			continue;
-+
-+		ret = reg;
-+	}
-+
-+	of_node_put(port);
-+
-+	return ret;
-+}
-+
- static struct regmap_config sun4i_backend_regmap_config = {
- 	.reg_bits	= 32,
- 	.val_bits	= 32,
-@@ -312,6 +352,10 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+@@ -310,7 +311,6 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 	if (!backend)
  		return -ENOMEM;
  	dev_set_drvdata(dev, backend);
+-	drv->backend = backend;
  
-+	backend->id = sun4i_backend_of_get_id(dev->of_node);
-+	if (backend->id < 0)
-+		return backend->id;
-+
  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
  	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
+@@ -369,6 +369,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 		}
+ 	}
+ 
++	list_add_tail(&backend->list, &drv->backend_list);
++
+ 	/* Reset the registers */
+ 	for (i = 0x800; i < 0x1000; i += 4)
+ 		regmap_write(backend->regs, i, 0);
+@@ -400,6 +402,8 @@ static void sun4i_backend_unbind(struct device *dev, struct device *master,
+ {
+ 	struct sun4i_backend *backend = dev_get_drvdata(dev);
+ 
++	list_del(&backend->list);
++
+ 	if (of_device_is_compatible(dev->of_node,
+ 				    "allwinner,sun8i-a33-display-backend"))
+ 		sun4i_backend_free_sat(dev);
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 9c8287309c65..45b7fc110590 100644
+index 83e63cc702b4..9c8287309c65 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -151,6 +151,8 @@ struct sun4i_backend {
+@@ -14,6 +14,7 @@
+ #define _SUN4I_BACKEND_H_
+ 
+ #include <linux/clk.h>
++#include <linux/list.h>
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+ 
+@@ -149,6 +150,9 @@ struct sun4i_backend {
+ 
  	struct clk		*sat_clk;
  	struct reset_control	*sat_reset;
- 
-+	int			id;
 +
- 	/* Backend list management */
- 	struct list_head	list;
++	/* Backend list management */
++	struct list_head	list;
  };
+ 
+ void sun4i_backend_apply_color_correction(struct sun4i_backend *backend);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 767bbadcc85d..89c51fd6e9af 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -101,6 +101,8 @@ static int sun4i_drv_bind(struct device *dev)
+ 		goto free_drm;
+ 	}
+ 	drm->dev_private = drv;
++	INIT_LIST_HEAD(&drv->backend_list);
++	INIT_LIST_HEAD(&drv->tcon_list);
+ 
+ 	ret = of_reserved_mem_device_init(dev);
+ 	if (ret && ret != -ENODEV) {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+index 5df50126ff52..835bdb5cc0c2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.h
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+@@ -14,10 +14,12 @@
+ #define _SUN4I_DRV_H_
+ 
+ #include <linux/clk.h>
++#include <linux/list.h>
+ #include <linux/regmap.h>
+ 
+ struct sun4i_drv {
+-	struct sun4i_backend	*backend;
++	struct list_head	backend_list;
++	struct list_head	tcon_list;
+ 	struct sun4i_tcon	*tcon;
+ 
+ 	struct drm_fbdev_cma	*fbdev;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 3ced0b1cef6e..52f37ef9a050 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -26,6 +26,7 @@
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+ 
++#include "sun4i_backend.h"
+ #include "sun4i_crtc.h"
+ #include "sun4i_dotclock.h"
+ #include "sun4i_drv.h"
+@@ -476,14 +477,18 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ {
+ 	struct drm_device *drm = data;
+ 	struct sun4i_drv *drv = drm->dev_private;
++	struct sun4i_backend *backend;
+ 	struct sun4i_tcon *tcon;
+ 	int ret;
+ 
++	/* Wait for a backend to be registered */
++	if (list_empty(&drv->backend_list))
++		return -EPROBE_DEFER;
++
+ 	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+ 	if (!tcon)
+ 		return -ENOMEM;
+ 	dev_set_drvdata(dev, tcon);
+-	drv->tcon = tcon;
+ 	tcon->drm = drm;
+ 	tcon->dev = dev;
+ 	tcon->quirks = of_device_get_match_data(dev);
+@@ -528,7 +533,9 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		goto err_free_dotclock;
+ 	}
+ 
+-	tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
++	backend = list_first_entry(&drv->backend_list,
++				   struct sun4i_backend, list);
++	tcon->crtc = sun4i_crtc_init(drm, backend, tcon);
+ 	if (IS_ERR(tcon->crtc)) {
+ 		dev_err(dev, "Couldn't create our CRTC\n");
+ 		ret = PTR_ERR(tcon->crtc);
+@@ -539,6 +546,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	if (ret < 0)
+ 		goto err_free_clocks;
+ 
++	list_add_tail(&tcon->list, &drv->tcon_list);
++
+ 	return 0;
+ 
+ err_free_dotclock:
+@@ -555,6 +564,7 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
+ {
+ 	struct sun4i_tcon *tcon = dev_get_drvdata(dev);
+ 
++	list_del(&tcon->list);
+ 	sun4i_dclk_free(tcon);
+ 	sun4i_tcon_free_clocks(tcon);
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f636343a935d..1bda4d183eec 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -17,6 +17,7 @@
+ #include <drm/drm_crtc.h>
+ 
+ #include <linux/kernel.h>
++#include <linux/list.h>
+ #include <linux/reset.h>
+ 
+ #define SUN4I_TCON_GCTL_REG			0x0
+@@ -172,6 +173,9 @@ struct sun4i_tcon {
+ 
+ 	/* Associated crtc */
+ 	struct sun4i_crtc		*crtc;
++
++	/* TCON list management */
++	struct list_head		list;
+ };
+ 
+ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
 -- 
 2.11.0
