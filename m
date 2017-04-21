@@ -1,67 +1,50 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 21 Apr 2017 23:31:25 +0200
-Subject: linux-next: manual merge of the pm tree with the arm-soc tree
-In-Reply-To: <e2f9efab-291f-1436-2176-0fff3f2aae3f@oracle.com>
-References: <20170421105405.6a690b35@canb.auug.org.au>
- <CAK8P3a0cVMt3y_oYH70V-ekPvUMeeBApSvybpRftSupzYy1FWQ@mail.gmail.com>
- <e2f9efab-291f-1436-2176-0fff3f2aae3f@oracle.com>
-Message-ID: <1721375.qoxY63CZOC@aspire.rjw.lan>
+Date: Fri, 21 Apr 2017 23:33:01 +0200
+Subject: Touchscreen failure with CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND
+In-Reply-To: <CAOMZO5C776E3AqnhPPJSTF=atuOHi5Mok7F7yocBhRsJ6Ror2A@mail.gmail.com>
+References: <CAOMZO5BZ8Z8dfwsfuiunNQ_q39_k4QJg7jLPQfaxn+YBsmz2jw@mail.gmail.com>
+ <1998934.0RuxqCUAOW@aspire.rjw.lan>
+ <CAOMZO5C776E3AqnhPPJSTF=atuOHi5Mok7F7yocBhRsJ6Ror2A@mail.gmail.com>
+Message-ID: <1593358.0FdoGjUNcl@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 21, 2017 02:02:35 PM santosh.shilimkar at oracle.com wrote:
-> 
-> On 4/21/17 2:31 AM, Arnd Bergmann wrote:
-> > On Fri, Apr 21, 2017 at 8:39 AM, santosh.shilimkar at oracle.com
-> > <santosh.shilimkar@oracle.com> wrote:
-> >> On 4/20/17 10:53 PM, Arnd Bergmann wrote:
-> >>>
-> >>> On Fri, Apr 21, 2017 at 2:54 AM, Stephen Rothwell <sfr@canb.auug.org.au>
-> >>> wrote:
-> >>>>
-> >>>> Hi all,
-> >>>>
-> >>>> Today's linux-next merge of the pm tree got a conflict in:
-> >>>>
-> >>>>   include/dt-bindings/genpd/k2g.h
-> >>>>
-> >>>> between commit:
-> >>>>
-> >>>>   7cc119f29b19 ("dt-bindings: Add TI SCI PM Domains")
-> >>>>
-> >>>> from the arm-soc tree and commit:
-> >>>>
-> >>>>   45da8edd1741 ("dt-bindings: Add TI SCI PM Domains")
-> >>>>
-> >>>> from the pm tree.
-> >>>>
-> >>>> I fixed it up (I just used the pm tree version) and can carry the fix as
-> >>>> necessary. This is now fixed as far as linux-next is concerned, but any
-> >>>> non trivial conflicts should be mentioned to your upstream maintainer
-> >>>> when your tree is submitted for merging.  You may also want to consider
-> >>>> cooperating with the maintainer of the conflicting tree to minimise any
-> >>>> particularly complex conflicts.
-> >>>
-> >>>
-> >>> Dave, Santosh,
-> >>>
-> >>> any idea what happened here? It seems that we picked up the wrong
-> >>> version of the tree, do we need to drop this from arm-soc?
-> >>>
-> >> Nope. Its because this series was in my 'next' branch for a week or
-> >> so and now it made it via arm-soc tree next as well.
+On Friday, April 21, 2017 06:37:31 PM Fabio Estevam wrote:
+> On Fri, Apr 21, 2017 at 6:28 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Friday, April 21, 2017 01:11:52 PM Fabio Estevam wrote:
+> >> Hi,
 > >>
-> >> I just cleaned up my next head so it linux-next next tag should have
-> >> only arm-soc copy.
+> >> Running 4.11-rc7 on a imx6q-sabresd board I notice that egalax
+> >> touchscreen stops generating evtest events after a random period of
+> >> time.
+> >>
+> >> This problem can be avoided if I unselect CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND:
+> >>
+> >> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> >> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> >> @@ -54,7 +54,6 @@ CONFIG_CMA=y
+> >>  CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
+> >>  CONFIG_KEXEC=y
+> >>  CONFIG_CPU_FREQ=y
+> >> -CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+> >>  CONFIG_ARM_IMX6Q_CPUFREQ=y
+> >>  CONFIG_CPU_IDLE=y
+> >>  CONFIG_VFP=y
+> >>
+> >> With this change evtest always capture all touchscreen events. No
+> >> single failure is seen.
+> >>
+> >> I could see the same behavior with all mainline kernels I tested (4.9 and 4.10).
+> >>
+> >> Any ideas as to how fix this bug when CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y?
 > >
-> > I still see two conflicting trees in linux-next as of today, neither of
-> > them is your keystone tree:
-> >
-> In the list it was agreed that the patchset goes via arm-soc tree.
+> > And which governor is the default otherwise?
+> 
+> When CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y is removed then the
+> 'performance' governor is the default.
 
-OK, I missed that when I looked at it again a couple of days ago, sorry.
-
-I'll drop it from the pm-domains branch.
+There you go.  Apparently, using frequencies below the max causes problems to
+happen in the SoC.
 
 Thanks,
 Rafael
