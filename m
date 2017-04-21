@@ -1,94 +1,151 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 21 Apr 2017 19:24:53 +0100
-Subject: [PATCH 3/4] arm64: entry: improve data abort handling of tagged
- pointers
-In-Reply-To: <1492712234-4950-4-git-send-email-kristina.martsenko@arm.com>
-References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
- <1492712234-4950-4-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <20170421182450.GR3750@e103592.cambridge.arm.com>
+From: xhnjupt@gmail.com (Han Xu)
+Date: Fri, 21 Apr 2017 13:29:16 -0500
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+ <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+ <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+ <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
+ <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
+Message-ID: <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 07:17:13PM +0100, Kristina Martsenko wrote:
-> When handling a data abort from EL0, we currently zero the top byte of
-> the faulting address, as we assume the address is a TTBR0 address, which
-> may contain a non-zero address tag. However, the address may be a TTBR1
-> address, in which case we should not zero the top byte. This patch fixes
-> that. The effect is that the full TTBR1 address is passed to the task's
-> signal handler (or printed out in the kernel log).
-> 
-> When handling a data abort from EL1, we leave the faulting address
-> intact, as we assume it's either a TTBR1 address or a TTBR0 address with
-> tag 0x00. This is true as far as I'm aware, we don't seem to access a
-> tagged TTBR0 address anywhere in the kernel. Regardless, it's easy to
-> forget about address tags, and code added in the future may not always
-> remember to remove tags from addresses before accessing them. So add tag
-> handling to the EL1 data abort handler as well. This also makes it
-> consistent with the EL0 data abort handler.
+On Fri, Apr 21, 2017 at 12:38 PM, Stefan Agner <stefan@agner.ch> wrote:
+> On 2017-04-21 10:22, Marek Vasut wrote:
+>> On 04/21/2017 06:19 PM, Stefan Agner wrote:
+>>> On 2017-04-21 06:08, Marek Vasut wrote:
+>>>> On 04/21/2017 05:15 AM, Stefan Agner wrote:
+>>>>> On 2017-04-20 19:03, Marek Vasut wrote:
+>>>>>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
+>>>>>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
+>>>>>>> clock architecture requiring only two clocks to be referenced.
+>>>>>>> The IP is slightly different compared to i.MX 6SoloX, but currently
+>>>>>>> none of this differences are in use so there is no detection needed
+>>>>>>> and the driver can reuse IS_MX6SX.
+>>>>>>>
+>>>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>>>>> ---
+>>>>>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
+>>>>>>>  1 file changed, 15 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>>>>> index c8bbf5da2ab8..4a45d37ddc80 100644
+>>>>>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>>>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>>>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
+>>>>>>>          .clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+>>>>>>>  };
+>>>>>>>
+>>>>>>> +static const char * const gpmi_clks_for_mx7d[] = {
+>>>>>>> +        "gpmi_io", "gpmi_bch_apb",
+>>>>>>> +};
+>>>>>>> +
+>>>>>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
+>>>>>>> +        .type = IS_MX6SX,
+>>>>>>
+>>>>>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
+>>>>>>
+>>>>>
+>>>>> Yeah I was thinking we can do it once we have an actual reason to
+>>>>> distinguish.
+>>>>
+>>>> So what are the differences anyway ?
+>>>>
+>>>
+>>> I did not check the details, but Han's patchset (link in cover letter)
+>>> mentions:
+>>> "add the HW bitflip detection and correction for i.MX6QP and i.MX7D."...
+>>
+>> Oh, interesting.
+>>
+>>>>> But then, adding the type would only require 2-3 lines of change if I
+>>>>> add it to the GPMI_IS_MX6 macro...
+>>>>
+>>>> Then at least add a comment because using type = IMX6SX right under
+>>>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
+>>>
+>>> FWIW, I mentioned it in the commit message.
+>>>
+>>> I think rather then adding a comment it is cleaner to just add IS_IMX7D
+>>> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
+>>> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
+>>> rather small change. Does that sound acceptable?
+>>
+>> Sure, that's even better, thanks.
+>>
+>> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
+>> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
+>> maybe mx7d is the right thing to do here ...
+>>
+>
+> There is a Solo version yes, and it has GPMI NAND too. However, almost
+> all i.MX 7 IPs have been named imx7d by NXP for some reason (including
+> compatible strings, see grep -r -e imx7 Documentation/), so I thought I
+> stay consistent here...
 
-Possibly it doesn't matter whether the tag bits are cleared for an EL0
-fault on a TTBR1 address, since userspace can't have a valid pointer in
-this range to (mis)match the fault address against ... or did I miss
-something?
+Hi Guys,
 
-Factoring out the tag handling makes the intent of the code clearer
-though, either way.
+Yes, there should be a i.MX7 Solo version with one core fused out. IMO, can
+we use QUIRK to distinguish them rather than SoC name. I know I also sent
+some patch set with SoC Name but I prefer to use QUIRK now.
 
-Cheers
----Dave
+>
+> --
+> Stefan
+>
+>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>> @@ -132,7 +132,7 @@ static const char * const gpmi_clks_for_mx7d[] = {
+>>>  };
+>>>
+>>>  static const struct gpmi_devdata gpmi_devdata_imx7d = {
+>>> -       .type = IS_MX6SX,
+>>> +       .type = IS_MX7D,
+>>>         .bch_max_ecc_strength = 62,
+>>>         .max_chain_delay = 12,
+>>>         .clks = gpmi_clks_for_mx7d,
+>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>>> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>>> index 2e584e18d980..f2cc13abc896 100644
+>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+>>> @@ -123,7 +123,8 @@ enum gpmi_type {
+>>>         IS_MX23,
+>>>         IS_MX28,
+>>>         IS_MX6Q,
+>>> -       IS_MX6SX
+>>> +       IS_MX6SX,
+>>> +       IS_MX7D,
+>>>  };
+>>>
+>>>  struct gpmi_devdata {
+>>> @@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
+>>>  #define GPMI_IS_MX28(x)                ((x)->devdata->type == IS_MX28)
+>>>  #define GPMI_IS_MX6Q(x)                ((x)->devdata->type == IS_MX6Q)
+>>>  #define GPMI_IS_MX6SX(x)       ((x)->devdata->type == IS_MX6SX)
+>>> +#define GPMI_IS_MX7D(x)                ((x)->devdata->type == IS_MX7D)
+>>>
+>>> -#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
+>>> +#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) ||
+>>> \
+>>> +                                GPMI_IS_MX7D(x))
+>>>  #endif
+>>>
+>>> --
+>>> Stefan
+>>>
+>
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
 
-> Fixes: d50240a5f6ce ("arm64: mm: permit use of tagged pointers at EL0")
-> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> ---
->  arch/arm64/include/asm/asm-uaccess.h | 9 +++++++++
->  arch/arm64/kernel/entry.S            | 4 +++-
->  2 files changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-> index df411f3e083c..790ce8e64f8d 100644
-> --- a/arch/arm64/include/asm/asm-uaccess.h
-> +++ b/arch/arm64/include/asm/asm-uaccess.h
-> @@ -62,4 +62,13 @@ alternative_if ARM64_ALT_PAN_NOT_UAO
->  alternative_else_nop_endif
->  	.endm
->  
-> +/*
-> + * Remove the address tag from a virtual address, if present.
-> + */
-> +	.macro	clear_address_tag, addr, tmp
-> +	bic	\tmp, \addr, #(0xff << 56)
-> +	tst	\addr, #(1 << 55)
-> +	csel	\addr, \tmp, \addr, eq
-> +	.endm
-> +
->  #endif
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 43512d4d7df2..2f7ec392ef50 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -434,6 +434,7 @@ el1_da:
->  	tbnz	x23, #7, 1f			// PSR_I_BIT
->  	enable_irq
->  1:
-> +	clear_address_tag x0, x3
->  	mov	x2, sp				// struct pt_regs
->  	bl	do_mem_abort
->  
-> @@ -594,7 +595,8 @@ el0_da:
->  	// enable interrupts before calling the main handler
->  	enable_dbg_and_irq
->  	ct_user_exit
-> -	bic	x0, x26, #(0xff << 56)
-> +	mov	x0, x26
-> +	clear_address_tag x0, x3
->  	mov	x1, x25
->  	mov	x2, sp
->  	bl	do_mem_abort
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Sincerely,
+
+Han XU
