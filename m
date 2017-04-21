@@ -1,41 +1,29 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 21 Apr 2017 10:06:10 +0200
-Subject: [PATCH] dmaengine: sun4i: fix invalid argument
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Apr 2017 18:12:30 +1000
+Subject: linux-next: build failure after merge of the arm tree
 In-Reply-To: <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
 References: <20170421084033.5c987e13@canb.auug.org.au>
  <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
-Message-ID: <584a2c53-100b-945b-d665-cef3fa856526@free.fr>
+Message-ID: <20170421181230.05dcf937@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "pchans_used" field is an unsigned long array.
+Hi Mason,
 
-for_each_clear_bit_from() expects an unsigned long pointer,
-not an array address.
+On Fri, 21 Apr 2017 09:58:58 +0200 Mason <slash.tmp@free.fr> wrote:
+>
+> Anyway, the fix is trivial.
+> 
+> The "pchans_used" field is an unsigned long array.
+> for_each_clear_bit_from() expects an unsigned long pointer,
+> not an array address.
+> 
+> I'll send a patch to the drivers/dma maintainers.
 
-$ make C=2 drivers/dma/sun4i-dma.o
-  CHECK   drivers/dma/sun4i-dma.c
-drivers/dma/sun4i-dma.c:241:9: warning: incorrect type in argument 1 (different base types)
-drivers/dma/sun4i-dma.c:241:9:    expected unsigned long const *p
-drivers/dma/sun4i-dma.c:241:9:    got unsigned long ( *<noident> )[1]
+The fix really needs to go into the arm tree (as well?) since that is
+the tree that has the patch that causes the build to break (even if the
+actual bug was preexisting).
 
-Signed-off-by: Mason <slash.tmp@free.fr>
----
- drivers/dma/sun4i-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
-index 57aa227bfadb..f4ed3f17607c 100644
---- a/drivers/dma/sun4i-dma.c
-+++ b/drivers/dma/sun4i-dma.c
-@@ -238,7 +238,7 @@ static struct sun4i_dma_pchan *find_and_use_pchan(struct sun4i_dma_dev *priv,
- 	}
- 
- 	spin_lock_irqsave(&priv->lock, flags);
--	for_each_clear_bit_from(i, &priv->pchans_used, max) {
-+	for_each_clear_bit_from(i, priv->pchans_used, max) {
- 		pchan = &pchans[i];
- 		pchan->vchan = vchan;
- 		set_bit(i, priv->pchans_used);
 -- 
-3.14159
+Cheers,
+Stephen Rothwell
