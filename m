@@ -1,39 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 22 Apr 2017 00:12:39 +0200
-Subject: [PATCH v3 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
- cpus
-In-Reply-To: <7eb9a87f-9b61-1367-311c-bc37430291e5@arm.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <1489137839-549-7-git-send-email-vladimir.murzin@arm.com>
- <CAK8P3a1UH1qfCi5FC0aKxJvG=CNKOGSKbiU6Nz=0GA6Jit5Cpg@mail.gmail.com>
- <7eb9a87f-9b61-1367-311c-bc37430291e5@arm.com>
-Message-ID: <CAK8P3a0zu5q4wY-BDk4B8UAs83bSoo=gvDruW0tVZhCZjq7M7Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Apr 2017 15:21:59 -0700
+Subject: [PATCH] ARM: omap2+: make omap4_get_cpu1_ns_pa_addr declaration
+ usable
+In-Reply-To: <20170421215556.2244576-1-arnd@arndb.de>
+References: <20170421215556.2244576-1-arnd@arndb.de>
+Message-ID: <20170421222159.GA3780@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 19, 2017 at 4:10 PM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> On 19/04/17 11:02, Arnd Bergmann wrote:
+* Arnd Bergmann <arnd@arndb.de> [170421 14:59]:
+> When CONFIG_PM is disabled, we get a build error:
+> 
+> arch/arm/mach-omap2/omap-smp.c: In function 'omap4_smp_maybe_reset_cpu1':
+> arch/arm/mach-omap2/omap-smp.c:309:20: error: implicit declaration of function 'omap4_get_cpu1_ns_pa_addr'; did you mean 'omap4_get_scu_base'? [-Werror=implicit-function-declaration]
+> 
+> We need to fix this in multiple files, to ensure the declaration is visible,
+> to actually build the function without CONFIG_PM, and to only call it
+> when OMAP4 and/or OMAP5 are enabled.
+> 
+> Fixes: 351b7c490700 ("ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot")
 
->> Can you either modify the description to explain why we now need this on
->> all ARMv7M, or add a '|| CPU_V7M' for the 'bool' line to make it optional?
->>
->> Would it be better to leave the default as disabled on CPU_V7M and
->> require users to enable it manually? That way we don't regress the
->> performance of readl/writel on platforms that don't need this.
->>
->
-> It is architectural vs implementation differences. Even though existing
-> implementations rarely need this sticking with architecture (it permits memory
-> re-ordering to happen in many cases) makes code more robust and save some
-> debugging time when more sophisticated implementations go wild (see, for
-> instance, 8e02676ffa69 "ARM: 8610/1: V7M: Add dsb before jumping in handler
-> mode"). We can consider making it user selectable if performance regressions
-> are reported.
+Oops, sorry about that. Looks like I never hit that with my
+randconfig builds earlier probably as we have at least CPU_IDLE and
+ARCH_OMAP2PLUS_TYPICAL select PM. Thanks for fixing it:
 
-I would expect the performance difference to be noticeable, even though
-MMIO tends to be a rather slow operation, having tons of barriers in drivers
-that don't do DMA but transfer data through a series of writel() can be
-significant.
-
-      Arnd
+Acked-by: Tony Lindgren <tony@atomide.com>
