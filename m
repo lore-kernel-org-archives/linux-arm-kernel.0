@@ -1,74 +1,109 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Apr 2017 22:40:54 +0200
-Subject: [PATCH 1/5 v3] usb: host: add DT bindings for faraday fotg2
-Message-ID: <20170421204058.6206-1-linus.walleij@linaro.org>
+Date: Fri, 21 Apr 2017 22:40:56 +0200
+Subject: [PATCH 3/5 v3] usb: host: fotg2: add silicon clock handling
+In-Reply-To: <20170421204058.6206-1-linus.walleij@linaro.org>
+References: <20170421204058.6206-1-linus.walleij@linaro.org>
+Message-ID: <20170421204058.6206-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+When used in a system with software-controller silicon clocks,
+the FOTG210 needs to grab, prepare and enable the clock.
+This is needed on for example the Cortina Gemini, where the
+platform will by default gate off the clock unless the
+peripheral (in this case the USB driver) grabs and enables
+the clock.
 
-This adds device tree bindings for the Faraday FOTG2
-dual-mode host controller.
-
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v1->v3:
-- Change compatible to "faraday,fotg210" as the name of the
-  hardware block.
-- Add an elaborate SoC-specific compatible string for the
-  Cortina Systems Gemini so that SoC-specific features can
-  be enabled.
-- Add cortina,gemini-mini-b to indicate a Gemini PHY with
-  a Mini-B adapter connected.
-- Indicated that the Gemini version can handle "wakeup-source".
-- Add optional IP block clock.
----
- .../devicetree/bindings/usb/faraday,fotg210.txt    | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/faraday,fotg210.txt
+ drivers/usb/host/fotg210-hcd.c | 26 ++++++++++++++++++++++----
+ drivers/usb/host/fotg210.h     |  3 +++
+ 2 files changed, 25 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/faraday,fotg210.txt b/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
-new file mode 100644
-index 000000000000..cf06808303e2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/faraday,fotg210.txt
-@@ -0,0 +1,35 @@
-+Faraday FOTG Host controller
+diff --git a/drivers/usb/host/fotg210-hcd.c b/drivers/usb/host/fotg210-hcd.c
+index c226041101d1..906e42458791 100644
+--- a/drivers/usb/host/fotg210-hcd.c
++++ b/drivers/usb/host/fotg210-hcd.c
+@@ -45,6 +45,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
+ 
+ #include <asm/byteorder.h>
+ #include <asm/irq.h>
+@@ -5635,7 +5636,7 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
+ 	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(hcd->regs)) {
+ 		retval = PTR_ERR(hcd->regs);
+-		goto failed;
++		goto failed_put_hcd;
+ 	}
+ 
+ 	hcd->rsrc_start = res->start;
+@@ -5645,22 +5646,35 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
+ 
+ 	fotg210->caps = hcd->regs;
+ 
++	/* It's OK not to supply this clock */
++	fotg210->pclk = clk_get(dev, "PCLK");
++	if (!IS_ERR(fotg210->pclk)) {
++		retval = clk_prepare_enable(fotg210->pclk);
++		if (retval) {
++			dev_err(dev, "failed to enable PCLK\n");
++			goto failed_dis_clk;
++		}
++	}
 +
-+This OTG-capable USB host controller is found in Cortina Systems
-+Gemini and other SoC products.
+ 	retval = fotg210_setup(hcd);
+ 	if (retval)
+-		goto failed;
++		goto failed_dis_clk;
+ 
+ 	fotg210_init(fotg210);
+ 
+ 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (retval) {
+ 		dev_err(dev, "failed to add hcd with err %d\n", retval);
+-		goto failed;
++		goto failed_dis_clk;
+ 	}
+ 	device_wakeup_enable(hcd->self.controller);
+ 
+ 	return retval;
+ 
+-failed:
++failed_dis_clk:
++	if (!IS_ERR(fotg210->pclk))
++		clk_disable_unprepare(fotg210->pclk);
++failed_put_hcd:
+ 	usb_put_hcd(hcd);
+ fail_create_hcd:
+ 	dev_err(dev, "init %s fail, %d\n", dev_name(dev), retval);
+@@ -5676,6 +5690,10 @@ static int fotg210_hcd_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
++	struct fotg210_hcd *fotg210 = hcd_to_fotg210(hcd);
 +
-+Required properties:
-+- compatible: should be one of:
-+  "faraday,fotg210"
-+  "cortina,gemini-usb", "faraday,fotg210"
-+- reg: should contain one register range i.e. start and length
-+- interrupts: description of the interrupt line
++	if (!IS_ERR(fotg210->pclk))
++		clk_disable_unprepare(fotg210->pclk);
+ 
+ 	if (!hcd)
+ 		return 0;
+diff --git a/drivers/usb/host/fotg210.h b/drivers/usb/host/fotg210.h
+index b5cfa7aeb277..c429efeb2b7e 100644
+--- a/drivers/usb/host/fotg210.h
++++ b/drivers/usb/host/fotg210.h
+@@ -181,6 +181,9 @@ struct fotg210_hcd {			/* one per controller */
+ #	define COUNT(x)
+ #endif
+ 
++	/* silicon clock */
++	struct clk		*pclk;
 +
-+Optional properties:
-+- clocks: should contain the IP block clock
-+- clock-names: should be "PCLK" for the IP block clock
-+
-+Required properties for "cortina,gemini-usb" compatible:
-+- syscon: a phandle to the system controller to access PHY registers
-+
-+Optional properties for "cortina,gemini-usb" compatible:
-+- cortina,gemini-mini-b: boolean property that indicates that a Mini-B
-+  OTH connector is in use
-+- wakeup-source: see power/wakeup-source.txt
-+
-+Example for Gemini:
-+
-+usb at 68000000 {
-+	compatible = "cortina,gemini-usb", "faraday,fotg210";
-+	reg = <0x68000000 0x1000>;
-+	interrupts = <10 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&cc 12>;
-+	clock-names = "PCLK";
-+	syscon = <&syscon>;
-+	wakeup-source;
-+};
+ 	/* debug files */
+ 	struct dentry		*debug_dir;
+ };
 -- 
 2.9.3
