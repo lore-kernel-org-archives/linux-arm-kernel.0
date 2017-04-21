@@ -1,39 +1,75 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Apr 2017 14:55:18 +0200
-Subject: [PATCH 2/5] arm64: renesas: r8a7796: Add external PCIe bus clock
-In-Reply-To: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
-References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1492779321-23939-3-git-send-email-geert+renesas@glider.be>
+Date: Fri, 21 Apr 2017 14:55:16 +0200
+Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board support
+Message-ID: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the external PCIe bus clock as a zero Hz fixed-frequency clock.
-Boards that provide this clock should override it.
+	Hi all,
 
-Based on r8a7795.dtsi.
+The Renesas Salvator-X and ULCB development board can be equipped with
+either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
+use separate DTBs, but currently there's no sharing of board-specific
+devices in DTS.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+This series reduces duplication by extracting common board support into
+their own .dtsi files.  As the level of support varies across boards and
+SoCs, this requires the addition of a few external clocks and
+placeholder devices on R-Car M3-W, so the common board support DTS can
+refer to them.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 101cd41d693a7ab5..8e2aab8b6b103cc9 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -157,6 +157,13 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
+  - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
+    M3-W, which are present in r8a7795.dtsi, and used in
+    r8a7795-salvator-x.dts,
+  - RFC patch 3 adds placeholders for devices that are not yet supported
+    and/or tested on R-Car M3-W, but used on R-Car H3,
+  - RFC patch 4 extracts common Salvator-X board support,
+  - RFC patch 5 extracts common ULCB board support.
+
+For R-Car H3 based boards, there are no functional changes.
+For R-Car M3-W based boards, some new devices are now described in DT.
+
+Dependencies:
+  - renesas-devel-20170420-v4.11-rc7,
+  - Patches 1 and 2 can be applied as-is,
+  - Patches 4 and 5 depend on "[PATCH 0/8] arm64: dts: renesas: Break
+    out R-Car H3 and M3-W SiP"
+    (http://www.spinics.net/lists/devicetree/msg173820.html).
+
+DTB changes have been inspected using scripts/dtc/dtx_diff.
+This has been tested on Salvator-X (both H3 and M3-W).
+This has not been tested on H3ULCB and M3ULCB due to lack of hardware.
+
+Thanks for your comments!
+
+Geert Uytterhoeven (5):
+  arm64: renesas: r8a7796: Add external audio clocks
+  arm64: renesas: r8a7796: Add external PCIe bus clock
+  [RFC] arm64: dts: r8a7796: Add placeholders for various devices
+  [RFC] arm64: dts: renesas: Extract common Salvator-X board support
+  [RFC] arm64: dts: renesas: Extract common ULCB board support
+
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 341 +-------------
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 522 +--------------------
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 201 +-------
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 259 +---------
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 112 +++++
+ .../{r8a7795-salvator-x.dts => salvator-x.dtsi}    | 372 +++++++--------
+ .../dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi}  | 243 +++++-----
+ 7 files changed, 421 insertions(+), 1629 deletions(-)
+ copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => salvator-x.dtsi} (95%)
+ copy arch/arm64/boot/dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi} (96%)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
