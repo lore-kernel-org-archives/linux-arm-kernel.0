@@ -1,41 +1,47 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 21 Apr 2017 10:10:38 +0800
-Subject: [PATCH] ASoC: mediatek: add I2C dependency for CS42XX8
-In-Reply-To: <20170420081541.658178-1-arnd@arndb.de>
-References: <20170420081541.658178-1-arnd@arndb.de>
-Message-ID: <1492740638.23218.0.camel@mtkswgap22>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 21 Apr 2017 11:46:58 +0930
+Subject: [GIT PULL] ARM: aspeed: defconfig for 4.12
+In-Reply-To: <20170419140639.GO29219@localhost>
+References: <CACPK8XdwSk8y7ZTnU=H3DA+_O1UOcQNvv57y-GzZA2z8-AOWdA@mail.gmail.com>
+ <20170419140639.GO29219@localhost>
+Message-ID: <CACPK8XcBTDGC+7ALMTLEgfv+_dFR8Y6X2d0v=fdyFKhkS9hbVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-04-20 at 10:15 +0200, Arnd Bergmann wrote:
-> We should not select drivers that depend on I2C when that is disabled,
-> as it results in a build error:
-> 
-> warning: (SND_SOC_MT2701_WM8960) selects SND_SOC_WM8960 which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && I2C)
-> sound/soc/codecs/wm8960.c:1469:1: error: data definition has no type or storage class [-Werror]
-> sound/soc/codecs/wm8960.c:1469:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
-> 
-> Fixes: 8625c1dbd876 ("ASoC: mediatek: Add mt2701-wm8960 machine driver")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  sound/soc/mediatek/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
-> index c6f39040f71f..5c68797f36c4 100644
-> --- a/sound/soc/mediatek/Kconfig
-> +++ b/sound/soc/mediatek/Kconfig
-> @@ -24,7 +24,7 @@ config SND_SOC_MT2701_CS42448
->  
->  config SND_SOC_MT2701_WM8960
->  	tristate "ASoc Audio driver for MT2701 with WM8960 codec"
-> -	depends on SND_SOC_MT2701
-> +	depends on SND_SOC_MT2701 && I2C
->  	select SND_SOC_WM8960
->  	help
->  	  This adds ASoC driver for Mediatek MT2701 boards
+On Wed, Apr 19, 2017 at 11:36 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Apr 12, 2017 at 12:29:10PM +0930, Joel Stanley wrote:
+>> Hello Arnd, Olof,
+>>
+>> These are the Aspeed defconfig changes for 4.12.
+>>
+>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>>
+>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+>> tags/aspeed-4.12-defconfig
+>>
+>> for you to fetch changes up to 97bae47812dbbd220e354bc9f15c3b3c8b481a86:
+>>
+>>   ARM: configs: aspeed: Add new drivers (2017-04-07 15:29:50 +0930)
+>>
+>> ----------------------------------------------------------------
+>> Aspeed defconfig updates for 4.12
+>>
+>> Add newly unstreamed drivers to the defconfigs for the Aspeed SoCs.
+>
+> I highly recommend upstreaming drivers instead of unstreaming them. :-)
 
+Good call. Don't cross the streams.
 
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+>
+>> The defconfigs are reworked to be useful for development and testing
+>> of OpenBMC on these systems.
+>
+> Merged, thanks!
 
-Thanks
+Cheers!
+
+Joel
