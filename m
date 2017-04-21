@@ -1,28 +1,56 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Fri, 21 Apr 2017 13:34:54 +0200
-Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
- pass2.x host controller
-In-Reply-To: <1490789773-21506-1-git-send-email-tn@semihalf.com>
-References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
-Message-ID: <20170421113454.GR16981@rric.localdomain>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 21 Apr 2017 13:36:45 +0200
+Subject: [PATCH v2 2/3] crypto: inside-secure: add SafeXcel EIP197 crypto
+ engine driver
+In-Reply-To: <20170421092935.fszux3qg5hbwwobj@kwain>
+References: <20170419071418.18995-1-antoine.tenart@free-electrons.com>
+ <20170419071418.18995-3-antoine.tenart@free-electrons.com>
+ <20170421073056.GA2041@Red> <20170421092935.fszux3qg5hbwwobj@kwain>
+Message-ID: <20170421113645.GA18422@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.03.17 14:16:13, Tomasz Nowicki wrote:
-> Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
-> However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
-> in their BARs which results in driver probe failure during resource request.
-> Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
-> quirk entry to obtain BAR addresses correction using EA header emulation.
+> > > +	memset(ipad + keylen, 0, blocksize - keylen);
+> > > +	memcpy(opad, ipad, blocksize);
+> > > +
+> > > +	for (i = 0; i < blocksize; i++) {
+> > > +		ipad[i] ^= 0x36;
+> > > +		opad[i] ^= 0x5c;
+> > 
+> > What are these constant ?
 > 
-> Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> CC: stable at vger.kernel.org	# v4.10+
+> They are defined in the HMAC RFC, as ipad and opad values. See
+> https://www.ietf.org/rfc/rfc2104.txt.
+> 
 
-Acked-by: Robert Richter <rrichter@cavium.com>
+Since many driver use them, I think defining them in include/ should be done (HMAC_IPAD/HMAC_OPAD)
+I will send a patch for it.
 
-Bjorn, please apply.
+> > [...]
+> > > +struct safexcel_alg_template safexcel_alg_sha256 = {
+> > > +	.type = SAFEXCEL_ALG_TYPE_AHASH,
+> > > +	.alg.ahash = {
+> > > +		.init = safexcel_sha256_init,
+> > > +		.update = safexcel_ahash_update,
+> > > +		.final = safexcel_ahash_final,
+> > > +		.finup = safexcel_ahash_finup,
+> > > +		.digest = safexcel_sha256_digest,
+> > > +		.export = safexcel_ahash_export,
+> > > +		.import = safexcel_ahash_import,
+> > > +		.halg = {
+> > > +			.digestsize = SHA256_DIGEST_SIZE,
+> > > +			.statesize = sizeof(struct safexcel_ahash_export_state),
+> > > +			.base = {
+> > > +				.cra_name = "sha256",
+> > > +				.cra_driver_name = "safexcel-sha256",
+> > > +				.cra_priority = 300,
+> > > +				.cra_flags = CRYPTO_ALG_ASYNC |
+> > > +					     CRYPTO_ALG_KERN_DRIVER_ONLY,
+> > 
+> > Why do use CRYPTO_ALG_KERN_DRIVER_ONLY ?
+> 
+> See http://lxr.free-electrons.com/source/include/linux/crypto.h#L97.
+> 
 
-Thanks,
-
--Robert
+Sorry, I had understood that flag as "do not let userspace use me".
+Anyway, this flag is totally ignored by the cryptoAPI.
