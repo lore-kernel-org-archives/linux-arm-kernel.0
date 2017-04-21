@@ -1,71 +1,49 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Thu, 20 Apr 2017 23:03:42 -0600
-Subject: linux-next: build failure after merge of the drm-misc tree
-In-Reply-To: <20170421121014.3ee14a83@canb.auug.org.au>
-References: <20170421121014.3ee14a83@canb.auug.org.au>
-Message-ID: <3805ce0d-bb1a-03b5-3f8f-93043306fa82@deltatee.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 21 Apr 2017 10:57:05 +0530
+Subject: [PATCH V5 3/7] ARM: exynos: Use - instead of @ for DT OPP entries
+In-Reply-To: <20170420160930.halyszjunt4q2634@kozik-lap>
+References: <cover.1492685450.git.viresh.kumar@linaro.org>
+ <8fd1dcd1bfa2011411dceab82bcd1587fe913cd1.1492685450.git.viresh.kumar@linaro.org>
+ <20170420160930.halyszjunt4q2634@kozik-lap>
+Message-ID: <20170421052705.GA26900@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Stephen. Looks good to me.
+On 20-04-17, 18:09, Krzysztof Kozlowski wrote:
+> On Thu, Apr 20, 2017 at 04:25:07PM +0530, Viresh Kumar wrote:
+> > Compiling the DT file with W=1, DTC warns like follows:
+> > 
+> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+> > unit name, but no reg property
+> > 
+> > Fix this by replacing '@' with '-' as the OPP nodes will never have a
+> > "reg" property.
+> > 
+> > Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
+> >  arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
+> >  arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
+> >  arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
+> >  arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
+> >  arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
+> >  arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
+> >  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi     | 48 ++++++++--------
+> >  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 50 ++++++++--------
+> >  9 files changed, 194 insertions(+), 194 deletions(-)
+> 
+> 
+> Thanks, split ARM64 from ARM and applied (for v4.12). arm-soc keeps DTS
+> separated between ARM architectures. Technically this should require a
+> resend but we had way too many resends for this simple patch.
 
-Logan
+Bah! Will make sure to send separate patches from now on. Thanks.
 
-On 20/04/17 08:10 PM, Stephen Rothwell wrote:
-> Hi all,
-> 
-> After merging the drm-misc tree, today's linux-next build (x86_64
-> allmodconfig) failed like this:
-> 
-> drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
->   .kmap_atomic = tee_shm_op_kmap_atomic,
->   ^
-> drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .kmap_atomic = tee_shm_op_kmap_atomic,
->                  ^
-> drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
-> drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
->   .kmap = tee_shm_op_kmap,
->   ^
-> drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
->   .kmap = tee_shm_op_kmap,
->           ^
-> drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
-> 
-> Caused by commit
-> 
->   f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
-> 
-> interacting with commit
-> 
->   967c9cca2cc5 ("tee: generic TEE subsystem")
-> 
-> from the arm-soc tree.
-> 
-> I applied the following merge fix patch for today:
-> 
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Fri, 21 Apr 2017 12:06:32 +1000
-> Subject: [PATCH] tee: merge fix for dma-ops field name changes
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> ---
->  drivers/tee/tee_shm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-> index 0be1e3e93bee..4e14c9c9cb1c 100644
-> --- a/drivers/tee/tee_shm.c
-> +++ b/drivers/tee/tee_shm.c
-> @@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
->  	.map_dma_buf = tee_shm_op_map_dma_buf,
->  	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
->  	.release = tee_shm_op_release,
-> -	.kmap_atomic = tee_shm_op_kmap_atomic,
-> -	.kmap = tee_shm_op_kmap,
-> +	.map_atomic = tee_shm_op_kmap_atomic,
-> +	.map = tee_shm_op_kmap,
->  	.mmap = tee_shm_op_mmap,
->  };
->  
-> 
+-- 
+viresh
