@@ -1,73 +1,39 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Fri, 21 Apr 2017 18:02:54 -0400
-Subject: [PATCH v4 14/21] PCI: designware: update PCI config space remap
- function
-In-Reply-To: <20170419164913.19674-15-lorenzo.pieralisi@arm.com>
-References: <20170419164913.19674-1-lorenzo.pieralisi@arm.com>
- <20170419164913.19674-15-lorenzo.pieralisi@arm.com>
-Message-ID: <000001d2baeb$07e84870$17b8d950$@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 22 Apr 2017 00:12:39 +0200
+Subject: [PATCH v3 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
+ cpus
+In-Reply-To: <7eb9a87f-9b61-1367-311c-bc37430291e5@arm.com>
+References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+ <1489137839-549-7-git-send-email-vladimir.murzin@arm.com>
+ <CAK8P3a1UH1qfCi5FC0aKxJvG=CNKOGSKbiU6Nz=0GA6Jit5Cpg@mail.gmail.com>
+ <7eb9a87f-9b61-1367-311c-bc37430291e5@arm.com>
+Message-ID: <CAK8P3a0zu5q4wY-BDk4B8UAs83bSoo=gvDruW0tVZhCZjq7M7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 19, 2017 12:49 PM, Lorenzo Pieralisi wrote:
-> 
-> PCI configuration space should be mapped with a memory region type that
-> generates on the CPU host bus non-posted write transations. Update the
-> driver to use the devm_pci_remap_cfg* interface to make sure the correct
-> memory mappings for PCI configuration space are used.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Jingoo Han <jingoohan1@gmail.com>
+On Wed, Apr 19, 2017 at 4:10 PM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> On 19/04/17 11:02, Arnd Bergmann wrote:
 
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
+>> Can you either modify the description to explain why we now need this on
+>> all ARMv7M, or add a '|| CPU_V7M' for the 'bool' line to make it optional?
+>>
+>> Would it be better to leave the default as disabled on CPU_V7M and
+>> require users to enable it manually? That way we don't regress the
+>> performance of readl/writel on platforms that don't need this.
+>>
+>
+> It is architectural vs implementation differences. Even though existing
+> implementations rarely need this sticking with architecture (it permits memory
+> re-ordering to happen in many cases) makes code more robust and save some
+> debugging time when more sophisticated implementations go wild (see, for
+> instance, 8e02676ffa69 "ARM: 8610/1: V7M: Add dsb before jumping in handler
+> mode"). We can consider making it user selectable if performance regressions
+> are reported.
 
-Best regards,
-Jingoo Han
+I would expect the performance difference to be noticeable, even though
+MMIO tends to be a rather slow operation, having tons of barriers in drivers
+that don't do DMA but transfer data through a series of writel() can be
+significant.
 
-
-> Cc: Joao Pinto <Joao.Pinto@synopsys.com>
-> ---
->  drivers/pci/dwc/pcie-designware-host.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-designware-host.c
-> b/drivers/pci/dwc/pcie-designware-host.c
-> index 5ba3349..2b789af 100644
-> --- a/drivers/pci/dwc/pcie-designware-host.c
-> +++ b/drivers/pci/dwc/pcie-designware-host.c
-> @@ -338,8 +338,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	}
-> 
->  	if (!pci->dbi_base) {
-> -		pci->dbi_base = devm_ioremap(dev, pp->cfg->start,
-> -					resource_size(pp->cfg));
-> +		pci->dbi_base = devm_pci_remap_cfgspace(dev,
-> +						pp->cfg->start,
-> +						resource_size(pp->cfg));
->  		if (!pci->dbi_base) {
->  			dev_err(dev, "error with ioremap\n");
->  			ret = -ENOMEM;
-> @@ -350,8 +351,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	pp->mem_base = pp->mem->start;
-> 
->  	if (!pp->va_cfg0_base) {
-> -		pp->va_cfg0_base = devm_ioremap(dev, pp->cfg0_base,
-> -						pp->cfg0_size);
-> +		pp->va_cfg0_base = devm_pci_remap_cfgspace(dev,
-> +					pp->cfg0_base, pp->cfg0_size);
->  		if (!pp->va_cfg0_base) {
->  			dev_err(dev, "error with ioremap in function\n");
->  			ret = -ENOMEM;
-> @@ -360,7 +361,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	}
-> 
->  	if (!pp->va_cfg1_base) {
-> -		pp->va_cfg1_base = devm_ioremap(dev, pp->cfg1_base,
-> +		pp->va_cfg1_base = devm_pci_remap_cfgspace(dev,
-> +						pp->cfg1_base,
->  						pp->cfg1_size);
->  		if (!pp->va_cfg1_base) {
->  			dev_err(dev, "error with ioremap\n");
-> --
-> 2.10.0
+      Arnd
