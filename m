@@ -1,49 +1,34 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 21 Apr 2017 10:57:05 +0530
-Subject: [PATCH V5 3/7] ARM: exynos: Use - instead of @ for DT OPP entries
-In-Reply-To: <20170420160930.halyszjunt4q2634@kozik-lap>
+Date: Fri, 21 Apr 2017 11:00:41 +0530
+Subject: [PATCH V5 4/7] ARM: pxa: Use - instead of @ for DT OPP entries
+In-Reply-To: <87a87a7s66.fsf@belgarion.home>
 References: <cover.1492685450.git.viresh.kumar@linaro.org>
- <8fd1dcd1bfa2011411dceab82bcd1587fe913cd1.1492685450.git.viresh.kumar@linaro.org>
- <20170420160930.halyszjunt4q2634@kozik-lap>
-Message-ID: <20170421052705.GA26900@vireshk-i7>
+ <cover.1492685450.git.viresh.kumar@linaro.org>
+ <741bc9af28d6968e6a9409f94681066db5d1228b.1492685450.git.viresh.kumar@linaro.org>
+ <87a87a7s66.fsf@belgarion.home>
+Message-ID: <20170421053041.GB26900@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-04-17, 18:09, Krzysztof Kozlowski wrote:
-> On Thu, Apr 20, 2017 at 04:25:07PM +0530, Viresh Kumar wrote:
+On 20-04-17, 22:14, Robert Jarzmik wrote:
+> Viresh Kumar <viresh.kumar@linaro.org> writes:
+> 
 > > Compiling the DT file with W=1, DTC warns like follows:
-> > 
+> >
 > > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
 > > unit name, but no reg property
-> > 
+> >
 > > Fix this by replacing '@' with '-' as the OPP nodes will never have a
 > > "reg" property.
-> > 
+> >
 > > Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
 > > Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > > Suggested-by: Mark Rutland <mark.rutland@arm.com>
 > > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 > > Acked-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  .../devicetree/bindings/devfreq/exynos-bus.txt     | 46 +++++++--------
-> >  arch/arm/boot/dts/exynos3250.dtsi                  | 46 +++++++--------
-> >  arch/arm/boot/dts/exynos4210.dtsi                  | 32 +++++------
-> >  arch/arm/boot/dts/exynos4412-prime.dtsi            |  4 +-
-> >  arch/arm/boot/dts/exynos4412.dtsi                  | 66 +++++++++++-----------
-> >  arch/arm/boot/dts/exynos5420.dtsi                  | 40 ++++++-------
-> >  arch/arm/boot/dts/exynos5800.dtsi                  | 56 +++++++++---------
-> >  arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi     | 48 ++++++++--------
-> >  arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 50 ++++++++--------
-> >  9 files changed, 194 insertions(+), 194 deletions(-)
-> 
-> 
-> Thanks, split ARM64 from ARM and applied (for v4.12). arm-soc keeps DTS
-> separated between ARM architectures. Technically this should require a
-> resend but we had way too many resends for this simple patch.
+> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Bah! Will make sure to send separate patches from now on. Thanks.
+Thanks. But I need you to pick it up for your pull request for arm-soc.
 
 -- 
 viresh
