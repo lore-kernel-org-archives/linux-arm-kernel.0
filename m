@@ -1,151 +1,85 @@
-From: xhnjupt@gmail.com (Han Xu)
-Date: Fri, 21 Apr 2017 13:29:16 -0500
-Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
-In-Reply-To: <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
-References: <20170421010755.18025-1-stefan@agner.ch>
- <20170421010755.18025-3-stefan@agner.ch>
- <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
- <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
- <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
- <494a7bc044457240a302d92b3a50b8e5@agner.ch>
- <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
- <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
-Message-ID: <CA+EcR20FCPSec+ihTMA=SGwogd7p5tsnECCp3CR-Nv6fUciK4g@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 22 Apr 2017 04:03:26 +0900
+Subject: [RFC PATCH 1/2] kbuild: add KBUILD_FILE to point relative file path
+ from $(srctree)
+In-Reply-To: <1492801407-26823-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1492801407-26823-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1492801407-26823-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 12:38 PM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2017-04-21 10:22, Marek Vasut wrote:
->> On 04/21/2017 06:19 PM, Stefan Agner wrote:
->>> On 2017-04-21 06:08, Marek Vasut wrote:
->>>> On 04/21/2017 05:15 AM, Stefan Agner wrote:
->>>>> On 2017-04-20 19:03, Marek Vasut wrote:
->>>>>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
->>>>>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
->>>>>>> clock architecture requiring only two clocks to be referenced.
->>>>>>> The IP is slightly different compared to i.MX 6SoloX, but currently
->>>>>>> none of this differences are in use so there is no detection needed
->>>>>>> and the driver can reuse IS_MX6SX.
->>>>>>>
->>>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>>>>>> ---
->>>>>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
->>>>>>>  1 file changed, 15 insertions(+)
->>>>>>>
->>>>>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>>>>> index c8bbf5da2ab8..4a45d37ddc80 100644
->>>>>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>>>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>>>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
->>>>>>>          .clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
->>>>>>>  };
->>>>>>>
->>>>>>> +static const char * const gpmi_clks_for_mx7d[] = {
->>>>>>> +        "gpmi_io", "gpmi_bch_apb",
->>>>>>> +};
->>>>>>> +
->>>>>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
->>>>>>> +        .type = IS_MX6SX,
->>>>>>
->>>>>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
->>>>>>
->>>>>
->>>>> Yeah I was thinking we can do it once we have an actual reason to
->>>>> distinguish.
->>>>
->>>> So what are the differences anyway ?
->>>>
->>>
->>> I did not check the details, but Han's patchset (link in cover letter)
->>> mentions:
->>> "add the HW bitflip detection and correction for i.MX6QP and i.MX7D."...
->>
->> Oh, interesting.
->>
->>>>> But then, adding the type would only require 2-3 lines of change if I
->>>>> add it to the GPMI_IS_MX6 macro...
->>>>
->>>> Then at least add a comment because using type = IMX6SX right under
->>>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
->>>
->>> FWIW, I mentioned it in the commit message.
->>>
->>> I think rather then adding a comment it is cleaner to just add IS_IMX7D
->>> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
->>> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
->>> rather small change. Does that sound acceptable?
->>
->> Sure, that's even better, thanks.
->>
->> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
->> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
->> maybe mx7d is the right thing to do here ...
->>
->
-> There is a Solo version yes, and it has GPMI NAND too. However, almost
-> all i.MX 7 IPs have been named imx7d by NXP for some reason (including
-> compatible strings, see grep -r -e imx7 Documentation/), so I thought I
-> stay consistent here...
+Since Kbuild runs in the objtree, __FILE__ can be a very long path
+depending of $(srctree).
 
-Hi Guys,
+Commit 9da0763bdd82 ("kbuild: Use relative path when building in a
+subdir of the source tree") made the situation better for cases
+where objtree is a child of srctree.  ($(srctree) is "..")
 
-Yes, there should be a i.MX7 Solo version with one core fused out. IMO, can
-we use QUIRK to distinguish them rather than SoC name. I know I also sent
-some patch set with SoC Name but I prefer to use QUIRK now.
+For other cases of out-of-tree build, filenames in WARN_ON() etc.
+are still an absolute path.  It also means the kernel image depends
+on where it was built.
 
->
-> --
-> Stefan
->
->>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>> @@ -132,7 +132,7 @@ static const char * const gpmi_clks_for_mx7d[] = {
->>>  };
->>>
->>>  static const struct gpmi_devdata gpmi_devdata_imx7d = {
->>> -       .type = IS_MX6SX,
->>> +       .type = IS_MX7D,
->>>         .bch_max_ecc_strength = 62,
->>>         .max_chain_delay = 12,
->>>         .clks = gpmi_clks_for_mx7d,
->>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->>> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->>> index 2e584e18d980..f2cc13abc896 100644
->>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->>> @@ -123,7 +123,8 @@ enum gpmi_type {
->>>         IS_MX23,
->>>         IS_MX28,
->>>         IS_MX6Q,
->>> -       IS_MX6SX
->>> +       IS_MX6SX,
->>> +       IS_MX7D,
->>>  };
->>>
->>>  struct gpmi_devdata {
->>> @@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
->>>  #define GPMI_IS_MX28(x)                ((x)->devdata->type == IS_MX28)
->>>  #define GPMI_IS_MX6Q(x)                ((x)->devdata->type == IS_MX6Q)
->>>  #define GPMI_IS_MX6SX(x)       ((x)->devdata->type == IS_MX6SX)
->>> +#define GPMI_IS_MX7D(x)                ((x)->devdata->type == IS_MX7D)
->>>
->>> -#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
->>> +#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) ||
->>> \
->>> +                                GPMI_IS_MX7D(x))
->>>  #endif
->>>
->>> --
->>> Stefan
->>>
->
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+Here, the idea is to define a new macro, KBUILD_FILE, to point the
+relative file path from $(srctree).
 
+If we replace __FILE__ with KBUILD_FILE, we can rip off the path
+to the build directory.
 
+I am adding stringify helper because '"..."' wrapping is the same
+pattern for KBUILD_BASENAME, KBUILD_MODNAME, and KBUILD_FILE.
 
+Please note KBUILD_FILE is still an absolute path for external
+modules.  We can strip KBUILD_EXTMOD from the path if we want,
+but I am not doing that.  It would make it difficult to figure out
+the module in question in case of WARN_ON().
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+ scripts/Kbuild.include | 4 ++++
+ scripts/Makefile.lib   | 5 +++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+index 61f87a9..7fc3841 100644
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -31,6 +31,10 @@ baseprereq = $(basename $(notdir $<))
+ escsq = $(subst $(squote),'\$(squote)',$1)
+ 
+ ###
++# Quote a string to pass it to C files. foo => '"foo"'
++stringify = $(squote)$(quote)$1$(quote)$(squote)
++
++###
+ # Easy method for doing a status message
+        kecho := :
+  quiet_kecho := echo
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 9e70196..f8dce56 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -96,10 +96,11 @@ obj-dirs	:= $(addprefix $(obj)/,$(obj-dirs))
+ # Note: Files that end up in two or more modules are compiled without the
+ #       KBUILD_MODNAME definition. The reason is that any made-up name would
+ #       differ in different configs.
+-name-fix = $(squote)$(quote)$(subst $(comma),_,$(subst -,_,$1))$(quote)$(squote)
++name-fix = $(call stringify,$(subst $(comma),_,$(subst -,_,$1)))
+ basename_flags = -DKBUILD_BASENAME=$(call name-fix,$(basetarget))
+ modname_flags  = $(if $(filter 1,$(words $(modname))),\
+                  -DKBUILD_MODNAME=$(call name-fix,$(modname)))
++filepath_flags = -DKBUILD_FILE=$(call stringify,$(src)/$(notdir $<))
+ 
+ orig_c_flags   = $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS) $(KBUILD_SUBDIR_CCFLAGS) \
+                  $(ccflags-y) $(CFLAGS_$(basetarget).o)
+@@ -163,7 +164,7 @@ endif
+ 
+ c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
+ 		 $(__c_flags) $(modkern_cflags)                           \
+-		 $(basename_flags) $(modname_flags)
++		 $(basename_flags) $(modname_flags) $(filepath_flags)
+ 
+ a_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(LINUXINCLUDE)     \
+ 		 $(__a_flags) $(modkern_aflags)
 -- 
-Sincerely,
-
-Han XU
+2.7.4
