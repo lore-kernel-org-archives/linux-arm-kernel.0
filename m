@@ -1,43 +1,25 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 21 Apr 2017 09:47:50 -0400
-Subject: [PATCH V2] scsi: mpt3sas: remove redundant wmb
-In-Reply-To: <CAK=zhgpmcmq-CnWuU9=WRJpAaEduw63LSPLE9yZzF_sUHkM4AA@mail.gmail.com>
-References: <1491591978-17880-1-git-send-email-okaya@codeaurora.org>
- <yq1y3uvq0c1.fsf@oracle.com>
- <CAK=zhgpmcmq-CnWuU9=WRJpAaEduw63LSPLE9yZzF_sUHkM4AA@mail.gmail.com>
-Message-ID: <63726ec2-56dc-4fe2-f7ea-e177832d6114@codeaurora.org>
+Date: Fri, 21 Apr 2017 09:50:23 -0400
+Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
+ <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
+ <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
+ <20170414214452.GA21870@bhelgaas-glaptop.roam.corp.google.com>
+ <66168dde-7719-6f74-3f06-8e4724dd2918@codeaurora.org>
+ <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
+ <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
+Message-ID: <16c80ef9-8928-b7c9-dc6e-f1c96efb6da3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/21/2017 3:56 AM, Sreekanth Reddy wrote:
-> [Sreekanth] Whether same thing applicable for SPARC & POWER
-> architectures. If yes then we are fine with this patch changes.
+On 4/21/2017 3:46 AM, Patel, Mayurkumar wrote:
+> If we want to follow above approach then shall we consider having something similar as following?
 
-This behavior is common for all architectures according to this document.
+Do you see this problem if you boot with pcie_aspm.policy=powersave option?
 
-Who would be the best person to comment on SPARC and POWER architectures
-in specific? James and I exchanged some comments on the first version. 
-
-James? can you comment on POWER behavior.
-
-https://www.kernel.org/doc/Documentation/memory-barriers.txt
-
-Inside of the Linux kernel, I/O should be done through the appropriate accessor
-routines - such as inb() or writel() - which know how to make such accesses
-appropriately sequential.  
-
-"Whilst this, for the most part, renders the explicit
-use of memory barriers unnecessary", 
-
-there are a couple of situations where they might be needed:
-
- (1) On some systems, I/O stores are not strongly ordered across all CPUs, and
-     so for _all_ general drivers locks should be used and mmiowb() must be
-     issued prior to unlocking the critical section.
-
- (2) If the accessor functions are used to refer to an I/O memory window with
-     relaxed memory access properties, then _mandatory_ memory barriers are
-     required to enforce ordering.
 
 -- 
 Sinan Kaya
