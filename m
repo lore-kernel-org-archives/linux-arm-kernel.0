@@ -1,94 +1,71 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 21 Apr 2017 11:52:36 +0800
-Subject: [PATCH 3/3] arm64: dts: ls1012a: add eSDHC nodes
-In-Reply-To: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
-References: <1492746756-12024-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1492746756-12024-4-git-send-email-yangbo.lu@nxp.com>
+From: logang@deltatee.com (Logan Gunthorpe)
+Date: Thu, 20 Apr 2017 23:03:42 -0600
+Subject: linux-next: build failure after merge of the drm-misc tree
+In-Reply-To: <20170421121014.3ee14a83@canb.auug.org.au>
+References: <20170421121014.3ee14a83@canb.auug.org.au>
+Message-ID: <3805ce0d-bb1a-03b5-3f8f-93043306fa82@deltatee.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two eSDHC controllers in LS1012A. This patch is to add
-eSDHC nodes for ls1012a dts. Also enable eSDHC for RDB/QDS boards.
+Thanks Stephen. Looks good to me.
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts |  8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts | 13 ++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi    | 25 +++++++++++++++++++++++
- 3 files changed, 46 insertions(+)
+Logan
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-index e2a93d5..a21a587 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-@@ -130,3 +130,11 @@
- &sata {
- 	status = "okay";
- };
-+
-+&esdhc0 {
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-index ed77f6b..57669b0 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-@@ -61,3 +61,16 @@
- &sata {
- 	status = "okay";
- };
-+
-+&esdhc0 {
-+	sd-uhs-sdr104;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr12;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	mmc-hs200-1_8v;
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index b497ac1..e3a1943 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -302,6 +302,31 @@
- 			};
- 		};
- 
-+		esdhc0: esdhc at 1560000 {
-+			compatible = "fsl,ls1012a-esdhc", "fsl,esdhc";
-+			reg = <0x0 0x1560000 0x0 0x10000>;
-+			interrupts = <0 62 0x4>;
-+			clocks = <&clockgen 4 0>;
-+			voltage-ranges = <1800 1800 3300 3300>;
-+			sdhci,auto-cmd12;
-+			big-endian;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		esdhc1: esdhc at 1580000 {
-+			compatible = "fsl,ls1012a-esdhc", "fsl,esdhc";
-+			reg = <0x0 0x1580000 0x0 0x10000>;
-+			interrupts = <0 65 0x4>;
-+			clocks = <&clockgen 4 0>;
-+			voltage-ranges = <1800 1800 3300 3300>;
-+			sdhci,auto-cmd12;
-+			big-endian;
-+			broken-cd;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at 2180000 {
- 			compatible = "fsl,vf610-i2c";
- 			#address-cells = <1>;
--- 
-2.1.0.27.g96db324
+On 20/04/17 08:10 PM, Stephen Rothwell wrote:
+> Hi all,
+> 
+> After merging the drm-misc tree, today's linux-next build (x86_64
+> allmodconfig) failed like this:
+> 
+> drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
+>   .kmap_atomic = tee_shm_op_kmap_atomic,
+>   ^
+> drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   .kmap_atomic = tee_shm_op_kmap_atomic,
+>                  ^
+> drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
+> drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
+>   .kmap = tee_shm_op_kmap,
+>   ^
+> drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>   .kmap = tee_shm_op_kmap,
+>           ^
+> drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
+> 
+> Caused by commit
+> 
+>   f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
+> 
+> interacting with commit
+> 
+>   967c9cca2cc5 ("tee: generic TEE subsystem")
+> 
+> from the arm-soc tree.
+> 
+> I applied the following merge fix patch for today:
+> 
+> From: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date: Fri, 21 Apr 2017 12:06:32 +1000
+> Subject: [PATCH] tee: merge fix for dma-ops field name changes
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> ---
+>  drivers/tee/tee_shm.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
+> index 0be1e3e93bee..4e14c9c9cb1c 100644
+> --- a/drivers/tee/tee_shm.c
+> +++ b/drivers/tee/tee_shm.c
+> @@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
+>  	.map_dma_buf = tee_shm_op_map_dma_buf,
+>  	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
+>  	.release = tee_shm_op_release,
+> -	.kmap_atomic = tee_shm_op_kmap_atomic,
+> -	.kmap = tee_shm_op_kmap,
+> +	.map_atomic = tee_shm_op_kmap_atomic,
+> +	.map = tee_shm_op_kmap,
+>  	.mmap = tee_shm_op_mmap,
+>  };
+>  
+> 
