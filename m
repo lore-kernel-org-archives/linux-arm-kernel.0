@@ -1,71 +1,44 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 21 Apr 2017 16:18:57 +0800
-Subject: [PATCH v4 06/11] drm/sun4i: add support for Allwinner DE2 mixers
-In-Reply-To: <20170420083707.wdtrdlxpvocpzc7g@lukather>
-References: <20170416120849.54542-1-icenowy@aosc.io>
- <20170416120849.54542-7-icenowy@aosc.io>
- <20170418090047.7i2k6dtoqxfdqwwy@lukather>
- <88F5FAC9-1873-4C76-9AB9-FF361C07664E@aosc.io>
- <20170420083707.wdtrdlxpvocpzc7g@lukather>
-Message-ID: <2C85F818-5612-4A53-A558-B633315B8D37@aosc.io>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Apr 2017 10:24:17 +0200
+Subject: [PATCH] dmaengine: sun4i: fix invalid argument
+In-Reply-To: <584a2c53-100b-945b-d665-cef3fa856526@free.fr>
+References: <20170421084033.5c987e13@canb.auug.org.au>
+ <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
+ <584a2c53-100b-945b-d665-cef3fa856526@free.fr>
+Message-ID: <20170421082417.7cqtevwuhjvfgjcx@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-? 2017?4?20? GMT+08:00 ??4:37:07, Maxime Ripard 
-<maxime.ripard@free-electrons.com> ??:
-> On Tue, Apr 18, 2017 at 06:47:56PM +0800, Icenowy Zheng wrote:
->> >> +	/* Get the physical address of the buffer in memory */
->> >> +	gem = drm_fb_cma_get_gem_obj(fb, 0);
->> >> +
->> >> +	DRM_DEBUG_DRIVER("Using GEM @ %pad\n", &gem->paddr);
->> >> +
->> >> +	/* Compute the start of the displayed memory */
->> >> +	bpp = fb->format->cpp[0];
->> >> +	paddr = gem->paddr + fb->offsets[0];
->> >> +	paddr += (state->src_x >> 16) * bpp;
->> >> +	paddr += (state->src_y >> 16) * fb->pitches[0];
->> >> +
->> >> +	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
->> >> +
->> >> +	paddr_u32 = (uint32_t) paddr;
->> >
->> >How does that work on 64-bits systems ?
->> 
->> The hardware is not designed to work on 64-bit systems.
->> 
->> Even 64-bit A64/H5 has also 3GiB memory limit.
+On Fri, Apr 21, 2017 at 10:06:10AM +0200, Mason wrote:
+> The "pchans_used" field is an unsigned long array.
 > 
-> That's a fragile assumption.
-
-Yes, it's only the basical reason.
-
+> for_each_clear_bit_from() expects an unsigned long pointer,
+> not an array address.
 > 
->> The address cell in mixer hardware is also only 32-bit.
->> 
->> So we should just keep the force conversion here. If we then really
->> met 4GiB-capable AW SoC without changing DE2, I think we should have
->> other way to limit CMA pool inside 4GiB.
-> 
-> The register name looks like this is only the lower 32 bits that you
-> can set here, and that there is another register for the upper 32 bits
-> of that address somewhere.
+> $ make C=2 drivers/dma/sun4i-dma.o
+>   CHECK   drivers/dma/sun4i-dma.c
+> drivers/dma/sun4i-dma.c:241:9: warning: incorrect type in argument 1 (different base types)
+> drivers/dma/sun4i-dma.c:241:9:    expected unsigned long const *p
+> drivers/dma/sun4i-dma.c:241:9:    got unsigned long ( *<noident> )[1]
 
-Maybe... but no one can verify this as their's no currently any user
-which has 4GiB+ DRAM.
+The patch looks good...
 
-I think we should keep this until Allwinner really made a 4GiB-capable
-hardware.
+> Signed-off-by: Mason <slash.tmp@free.fr>
 
-> 
-> In that case, please use the lower_32_bits and upper_32_bits helper,
-> and don't cast it that way.
-> 
-> If it isn't the case, you should set the DMA mask (through
-> dma_set_mask) so that we only allocate memory that can be accessed by
-> this device.
+However this doesn't.
 
-How to do it?
+See https://www.kernel.org/doc/html/latest/process/submitting-patches.html#developer-s-certificate-of-origin-1-1
 
-> 
-> Maxime
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170421/d7979951/attachment.sig>
