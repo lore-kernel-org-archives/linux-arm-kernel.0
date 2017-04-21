@@ -1,131 +1,71 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 21 Apr 2017 10:38:28 -0700
-Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
-In-Reply-To: <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
-References: <20170421010755.18025-1-stefan@agner.ch>
- <20170421010755.18025-3-stefan@agner.ch>
- <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
- <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
- <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
- <494a7bc044457240a302d92b3a50b8e5@agner.ch>
- <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
-Message-ID: <a9cdc47795433e7b152dcdd123f9bd63@agner.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 21 Apr 2017 19:39:43 +0200
+Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
+ mmaping code
+In-Reply-To: <20170421173233.GE5312@e104818-lin.cambridge.arm.com>
+References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
+ <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
+ <20170421173233.GE5312@e104818-lin.cambridge.arm.com>
+Message-ID: <CAMuHMdXRkZGTd71emwVBpm4bWcuE--YR2avaMDZX=KG50zZ2Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-04-21 10:22, Marek Vasut wrote:
-> On 04/21/2017 06:19 PM, Stefan Agner wrote:
->> On 2017-04-21 06:08, Marek Vasut wrote:
->>> On 04/21/2017 05:15 AM, Stefan Agner wrote:
->>>> On 2017-04-20 19:03, Marek Vasut wrote:
->>>>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
->>>>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
->>>>>> clock architecture requiring only two clocks to be referenced.
->>>>>> The IP is slightly different compared to i.MX 6SoloX, but currently
->>>>>> none of this differences are in use so there is no detection needed
->>>>>> and the driver can reuse IS_MX6SX.
->>>>>>
->>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>>>>> ---
->>>>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
->>>>>>  1 file changed, 15 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>>>> index c8bbf5da2ab8..4a45d37ddc80 100644
->>>>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
->>>>>>  	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
->>>>>>  };
->>>>>>
->>>>>> +static const char * const gpmi_clks_for_mx7d[] = {
->>>>>> +	"gpmi_io", "gpmi_bch_apb",
->>>>>> +};
->>>>>> +
->>>>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
->>>>>> +	.type = IS_MX6SX,
->>>>>
->>>>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
->>>>>
->>>>
->>>> Yeah I was thinking we can do it once we have an actual reason to
->>>> distinguish.
->>>
->>> So what are the differences anyway ?
->>>
->>
->> I did not check the details, but Han's patchset (link in cover letter)
->> mentions:
->> "add the HW bitflip detection and correction for i.MX6QP and i.MX7D."...
-> 
-> Oh, interesting.
-> 
->>>> But then, adding the type would only require 2-3 lines of change if I
->>>> add it to the GPMI_IS_MX6 macro...
->>>
->>> Then at least add a comment because using type = IMX6SX right under
->>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
->>
->> FWIW, I mentioned it in the commit message.
->>
->> I think rather then adding a comment it is cleaner to just add IS_IMX7D
->> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
->> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
->> rather small change. Does that sound acceptable?
-> 
-> Sure, that's even better, thanks.
-> 
-> btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
-> with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
-> maybe mx7d is the right thing to do here ...
-> 
+Hi Catalin,
 
-There is a Solo version yes, and it has GPMI NAND too. However, almost
-all i.MX 7 IPs have been named imx7d by NXP for some reason (including
-compatible strings, see grep -r -e imx7 Documentation/), so I thought I
-stay consistent here...
+On Fri, Apr 21, 2017 at 7:32 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
+>> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+>> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable should not
+>> use it and take advantage of contiguous nature of the allocation.
+>
+> As I replied to your original patch, I think
+> dma_common_contiguous_remap() should be fixed not to leave a dangling
+> area->pages pointer.
+>
+>>  arch/arm64/mm/dma-mapping.c | 17 ++++++++++++++++-
+>>  1 file changed, 16 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index f7b5401..41c7c36 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -703,6 +703,10 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>>       if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+>>               return ret;
+>>
+>> +     if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
+>> +             return vm_iomap_memory(vma,
+>> +                             page_to_phys(vmalloc_to_page(cpu_addr)), size);
+>
+> I replied to Geert's patch on whether we actually need to call
+> dma_common_contiguous_remap() in __iommu_alloc_attrs() if the device is
+> coherent. We don't do this for the swiotlb allocation. If we are going
+> to change this, cpu_addr may or may not be in the vmalloc range and
+> vmalloc_to_page() would fail (I guess we could add an is_vmalloc_addr()
+> check).
+>
+> Alternatively, just open-code dma_common_contiguous_remap() in
+> __iommu_alloc_attrs() to keep a valid area->pages around (I think Geert
+> already suggested this). AFAICT, arch/arm does this already in its own
+> __iommu_alloc_buffer().
+>
+> Yet another option would be for iommu_dma_alloc() to understand
+> DMA_ATTR_FORCE_CONTIGUOUS and remove the arm64-specific handling.
+
+That was actually the approach I took in my v1.
+V2 changed that to provide standalone iommu_dma_{alloc,free}_contiguous()
+functions.
+V3 changed that to call everything directly from the arm64 code.
+...
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 --
-Stefan
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
->> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->> @@ -132,7 +132,7 @@ static const char * const gpmi_clks_for_mx7d[] = {
->>  };
->>
->>  static const struct gpmi_devdata gpmi_devdata_imx7d = {
->> -       .type = IS_MX6SX,
->> +       .type = IS_MX7D,
->>         .bch_max_ecc_strength = 62,
->>         .max_chain_delay = 12,
->>         .clks = gpmi_clks_for_mx7d,
->> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->> index 2e584e18d980..f2cc13abc896 100644
->> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
->> @@ -123,7 +123,8 @@ enum gpmi_type {
->>         IS_MX23,
->>         IS_MX28,
->>         IS_MX6Q,
->> -       IS_MX6SX
->> +       IS_MX6SX,
->> +       IS_MX7D,
->>  };
->>
->>  struct gpmi_devdata {
->> @@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
->>  #define GPMI_IS_MX28(x)                ((x)->devdata->type == IS_MX28)
->>  #define GPMI_IS_MX6Q(x)                ((x)->devdata->type == IS_MX6Q)
->>  #define GPMI_IS_MX6SX(x)       ((x)->devdata->type == IS_MX6SX)
->> +#define GPMI_IS_MX7D(x)                ((x)->devdata->type == IS_MX7D)
->>
->> -#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
->> +#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) ||
->> \
->> +                                GPMI_IS_MX7D(x))
->>  #endif
->>
->> --
->> Stefan
->>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
