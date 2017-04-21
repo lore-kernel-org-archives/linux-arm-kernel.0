@@ -1,56 +1,76 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 21 Apr 2017 09:58:58 +0200
-Subject: linux-next: build failure after merge of the arm tree
-In-Reply-To: <20170421084033.5c987e13@canb.auug.org.au>
-References: <20170421084033.5c987e13@canb.auug.org.au>
-Message-ID: <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Fri, 21 Apr 2017 16:04:14 +0800
+Subject: [PATCH] media: mtk-vcodec: remove informative log
+In-Reply-To: <20170419075643.0a04af21@vento.lan>
+References: <1491389669-32737-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1491390599.32502.1.camel@mtksdaap41> <20170419075643.0a04af21@vento.lan>
+Message-ID: <1492761854.12924.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/2017 00:40, Stephen Rothwell wrote:
-
-> After merging the arm tree, today's linux-next build (arm
-> multi_v7_defconfig) failed like this:
+On Wed, 2017-04-19 at 07:56 -0300, Mauro Carvalho Chehab wrote:
+> Em Wed, 5 Apr 2017 19:09:59 +0800
+> Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 > 
-> In file included from include/linux/bitops.h:36:0,
->                  from include/linux/bitmap.h:7,
->                  from drivers/dma/sun4i-dma.c:11:
-> drivers/dma/sun4i-dma.c: In function 'find_and_use_pchan':
-> include/linux/bitops.h:56:34: error:
-> passing argument 1 of '_find_next_zero_bit_le' from incompatible pointer type [-Werror=incompatible-pointer-types]
->   for ((bit) = find_next_zero_bit((addr), (size), (bit)); \
->                                   ^
-> arch/arm/include/asm/bitops.h:200:61: note: in definition of macro 'find_next_zero_bit'
->  #define find_next_zero_bit(p,sz,off) _find_next_zero_bit_le(p,sz,off)
->                                                              ^
-> drivers/dma/sun4i-dma.c:241:2: note: in expansion of macro 'for_each_clear_bit_from'
->   for_each_clear_bit_from(i, &priv->pchans_used, max) {
->   ^
-> arch/arm/include/asm/bitops.h:163:12: note:
-> expected 'const long unsigned int *' but argument is of type 'long unsigned int (*)[1]'
->  extern int _find_next_zero_bit_le(const unsigned long *p, int size, int offset);
->             ^
-> [...]
+> > On Wed, 2017-04-05 at 18:54 +0800, Minghsiu Tsai wrote:
+> > > Driver is stable. Remove DEBUG definition from driver.
+> > > 
+> > > There are debug message in /var/log/messages if DEBUG is defined,
+> > > such as:
+> > > [MTK_V4L2] level=0 fops_vcodec_open(),170: decoder capability 0
+> > > [MTK_V4L2] level=0 fops_vcodec_open(),177: 16000000.vcodec decoder [0]
+> > > [MTK_V4L2] level=0 fops_vcodec_release(),200: [0] decoder
+> > > 
+> > > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>  
+> > Acked-by:Tiffany Lin <Tiffany.lin@mediatek.com>
+> > 
+> > > ---
+> > >  drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 1 -
+> > >  1 file changed, 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> > > index 7d55975..1248083 100644
+> > > --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> > > +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> > > @@ -31,7 +31,6 @@ struct mtk_vcodec_mem {
+> > >  extern int mtk_v4l2_dbg_level;
+> > >  extern bool mtk_vcodec_dbg;
+> > >  
+> > > -#define DEBUG	1
+> > >  
+> > >  #if defined(DEBUG)
+> > >    
 > 
-> Caused (or exposed) by commit
+> After this patch, building the Kernel with W=1 now shows warnings:
 > 
->   c4f8ff16b46b ("ARM: 8669/1: bitops: Align prototypes to generic API")
+> drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c: In function 'mtk_vcodec_dec_pw_on':
+> drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c:114:51: warning: suggest braces around empty body in an 'if' statement [-Wempty-body]
+>    mtk_v4l2_err("pm_runtime_get_sync fail %d", ret);
+>                                                    ^
 > 
-> I have used the arm tree from next-20170420 for today.
+> I wrote a patch fixing it, as this is really a trivial issue.
+> 
+> Yet, after that, this one still remains:
+> 
+> 
+> drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c: In function 'mtk_vdec_pic_info_update':
+> drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c:284:6: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+>   int ret;
+>       ^~~
+> 
 
-Weird that I didn't catch this when I ran make allyesconfig.
-https://www.spinics.net/lists/arm-kernel/msg573736.html
 
-Anyway, the fix is trivial.
+> 
+> Shouldn't be mtk_vdec_pic_info_update() returning an error code?
+> 
+> 
+> Also, IMHO, at least errors should be shown at dmesg.
+> 
+Got it. We will upstream patch to fix warning and add dmesg when error.
 
-The "pchans_used" field is an unsigned long array.
-for_each_clear_bit_from() expects an unsigned long pointer,
-not an array address.
 
-I'll send a patch to the drivers/dma maintainers.
+best regards,
+Tiffany
 
-$ make C=2 drivers/dma/sun4i-dma.o
-  CHECK   drivers/dma/sun4i-dma.c
-  CC      drivers/dma/sun4i-dma.o
-
-Regards.
+> Thanks,
+> Mauro
