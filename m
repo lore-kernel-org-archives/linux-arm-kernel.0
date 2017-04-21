@@ -1,111 +1,223 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 16:38:54 +0800
-Subject: [PATCH v2 6/9] drm/sun4i: tcon: Find matching display backend by
- device node matching
+Date: Fri, 21 Apr 2017 16:38:56 +0800
+Subject: [PATCH v2 8/9] ARM: dts: sun6i: Add second display pipeline device
+ nodes
 In-Reply-To: <20170421083857.29636-1-wens@csie.org>
 References: <20170421083857.29636-1-wens@csie.org>
-Message-ID: <20170421083857.29636-7-wens@csie.org>
+Message-ID: <20170421083857.29636-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With Allwinner's Display Engine 1.0, each TCON's input is tied to a
-specific display backend, and the 2 comprise what is known as a crtc
-in DRM KMS land: The layer, framebuffer, and compositing functions are
-provided by the backend, while the TCON provides the display timing
-signals and vblank interrupts. This 1 to 1 relationship is represented
-in the device tree. On some systems there is an intermediate DRC
-component.
+The Allwinner A31/A31s SoCs have 2 display pipelines, as in 2 display
+frontends, backends, and tcons each. The relationship between the
+backends and tcons are 1:1, but the frontends can feed either backend.
 
-Pointers to both matching components must be provided when initializing
-the crtc. As the backend is always registered before the associated
-tcon, we can recursively search upwards through the of_graph to find
-the matching backend.
+Add device nodes and of graph nodes describing this relationship.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 55 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 51 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 168 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 167 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 52f37ef9a050..4409e7b6c74d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -472,6 +472,53 @@ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node)
- 	return of_drm_find_bridge(remote) ?: ERR_PTR(-EPROBE_DEFER);
- }
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 9c999d3788f6..dfcf64515d7f 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -232,7 +232,7 @@
  
-+/*
-+ * On SoCs with the old display pipeline design (Display Engine 1.0),
-+ * the TCON is always tied to just one backend. Hence we can traverse
-+ * the of_graph upwards to find the backend our tcon is connected to,
-+ * and take its ID as our own.
-+ *
-+ * We can either identify backends from their compatible strings, which
-+ * means maintaining a large list of them. Or, since the backend is
-+ * registered and binded before the TCON, we can just go through the
-+ * list of registered backends and compare the device node.
-+ */
-+static struct sun4i_backend *sun4i_tcon_find_backend(struct sun4i_drv *drv,
-+						     struct device_node *node)
-+{
-+	struct device_node *port, *ep, *remote;
-+	struct sun4i_backend *backend;
-+
-+	port = of_graph_get_port_by_id(node, 0);
-+	if (!port)
-+		return ERR_PTR(-EINVAL);
-+
-+	for_each_available_child_of_node(port, ep) {
-+		remote = of_graph_get_remote_port_parent(ep);
-+		if (!remote)
-+			continue;
-+
-+		/* does this node match any registered backends? */
-+		list_for_each_entry(backend, &drv->backend_list, list) {
-+			if (remote == backend->node) {
-+				of_node_put(remote);
-+				of_node_put(port);
-+				return backend;
-+			}
-+		}
-+
-+		/* keep looking through upstream ports */
-+		backend = sun4i_tcon_find_backend(drv, remote);
-+		if (!IS_ERR(backend)) {
-+			of_node_put(remote);
-+			of_node_put(port);
-+			return backend;
-+		}
-+	}
-+
-+	return ERR_PTR(-EINVAL);
-+}
-+
- static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 			   void *data)
- {
-@@ -481,9 +528,11 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	struct sun4i_tcon *tcon;
- 	int ret;
+ 	de: display-engine {
+ 		compatible = "allwinner,sun6i-a31-display-engine";
+-		allwinner,pipelines = <&fe0>;
++		allwinner,pipelines = <&fe0>, <&fe1>;
+ 		status = "disabled";
+ 	};
  
--	/* Wait for a backend to be registered */
--	if (list_empty(&drv->backend_list))
-+	backend = sun4i_tcon_find_backend(drv, dev->of_node);
-+	if (IS_ERR(backend)) {
-+		dev_err(dev, "Couldn't find matching backend\n");
- 		return -EPROBE_DEFER;
-+	}
+@@ -289,6 +289,43 @@
+ 			};
+ 		};
  
- 	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
- 	if (!tcon)
-@@ -533,8 +582,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_dotclock;
- 	}
++		tcon1: lcd-controller at 01c0d000 {
++			compatible = "allwinner,sun6i-a31-tcon";
++			reg = <0x01c0d000 0x1000>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&ccu RST_AHB1_LCD1>;
++			reset-names = "lcd";
++			clocks = <&ccu CLK_AHB1_LCD1>,
++				 <&ccu CLK_LCD1_CH0>,
++				 <&ccu CLK_LCD1_CH1>;
++			clock-names = "ahb",
++				      "tcon-ch0",
++				      "tcon-ch1";
++			clock-output-names = "tcon1-pixel-clock";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon1_in_drc1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc1_out_tcon1>;
++					};
++				};
++
++				tcon1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -896,6 +933,130 @@
+ 						reg = <0>;
+ 						remote-endpoint = <&be0_in_fe0>;
+ 					};
++
++					fe0_out_be1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&be1_in_fe0>;
++					};
++				};
++			};
++		};
++
++		fe1: display-frontend at 01e20000 {
++			compatible = "allwinner,sun6i-a31-display-frontend";
++			reg = <0x01e20000 0x20000>;
++			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_FE1>, <&ccu CLK_FE1>,
++				 <&ccu CLK_DRAM_FE1>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_FE1>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				fe1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					fe1_out_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_in_fe1>;
++					};
++
++					fe1_out_be1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&be1_in_fe1>;
++					};
++				};
++			};
++		};
++
++		be1: display-backend at 01e40000 {
++			compatible = "allwinner,sun6i-a31-display-backend";
++			reg = <0x01e40000 0x10000>;
++			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_BE1>, <&ccu CLK_BE1>,
++				 <&ccu CLK_DRAM_BE1>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_BE1>;
++
++			assigned-clocks = <&ccu CLK_BE1>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				be1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					be1_in_fe0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&fe0_out_be1>;
++					};
++
++					be1_in_fe1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&fe1_out_be1>;
++					};
++				};
++
++				be1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					be1_out_drc1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc1_in_be1>;
++					};
++				};
++			};
++		};
++
++		drc1: drc at 01e50000 {
++			compatible = "allwinner,sun6i-a31-drc";
++			reg = <0x01e50000 0x10000>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_DRC1>, <&ccu CLK_IEP_DRC1>,
++				 <&ccu CLK_DRAM_DRC1>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_DRC1>;
++
++			assigned-clocks = <&ccu CLK_IEP_DRC1>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				drc1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					drc1_in_be1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be1_out_drc1>;
++					};
++				};
++
++				drc1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					drc1_out_tcon1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon1_in_drc1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -926,6 +1087,11 @@
+ 						reg = <0>;
+ 						remote-endpoint = <&fe0_out_be0>;
+ 					};
++
++					be0_in_fe1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&fe1_out_be0>;
++					};
+ 				};
  
--	backend = list_first_entry(&drv->backend_list,
--				   struct sun4i_backend, list);
- 	tcon->crtc = sun4i_crtc_init(drm, backend, tcon);
- 	if (IS_ERR(tcon->crtc)) {
- 		dev_err(dev, "Couldn't create our CRTC\n");
+ 				be0_out: port at 1 {
 -- 
 2.11.0
