@@ -1,67 +1,758 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 11:30:06 +0800
-Subject: [PATCH 3/3] ARM: sun8i: a83t: Rename pinmux setting names
-In-Reply-To: <20170418042205.27894-4-wens@csie.org>
-References: <20170418042205.27894-1-wens@csie.org>
- <20170418042205.27894-4-wens@csie.org>
-Message-ID: <CAGb2v64s1vSVasHT_ABs9rKu-mWKi+uXZ74fvqkHDzp2kSkk=A@mail.gmail.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Fri, 21 Apr 2017 11:47:20 +0800
+Subject: [PATCH V5 1/4] arm64: dts: Add basic DT to support Spreadtrum's
+ SP9860G
+In-Reply-To: <20170419142425.GB12105@localhost>
+References: <20170419142425.GB12105@localhost>
+Message-ID: <1492746440-11071-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 12:22 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> The pinmux setting nodes all have an address element in their node
-> names, however the pinctrl node does not have #address-cells.
->
-> Rename the existing pinmux setting nodes and labels in sun8i-a83t.dtsi,
-> dropping identifiers for functions that only have one possible setting,
-> and using the pingroup name if the function is identically available on
-> different pingroups.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts |  2 +-
->  arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts       |  2 +-
->  arch/arm/boot/dts/sun8i-a83t.dtsi                      | 10 +++++-----
->  3 files changed, 7 insertions(+), 7 deletions(-)
->
-[...]
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index 82cb87f21b96..87b99338716b 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -174,7 +174,7 @@
->                         #interrupt-cells = <3>;
->                         #gpio-cells = <3>;
->
-> -                       mmc0_pins_a: mmc0 at 0 {
-> +                       mmc0_pins: mmc0_pins {
->                                 pins = "PF0", "PF1", "PF2",
->                                        "PF3", "PF4", "PF5";
->                                 function = "mmc0";
-> @@ -182,13 +182,13 @@
->                                 bias-pull-up;
->                         };
->
-> -                       uart0_pins_a: uart0 at 0 {
-> -                               pins = "PF2", "PF4";
-> +                       uart0_pb_pins: uart0_pb_pins {
+From: Orson Zhai <orson.zhai@spreadtrum.com>
 
-Duh... Forgot to use hyphens instead of underscores in the node names.
-I'll send a patch for you to squash in.
+SC9860G is a 8 cores of A53 SoC with 4G LTE support SoC from Spreadtrum.
 
-ChenYu
+According to regular hierarchy of sprd dts, whale2.dtsi contains SoC
+peripherals IP nodes, sc9860.dtsi contains stuff related to ARM core stuff
+and sp9860g dts is for the board level.
 
-> +                               pins = "PB9", "PB10";
->                                 function = "uart0";
->                         };
->
-> -                       uart0_pins_b: uart0 at 1 {
-> -                               pins = "PB9", "PB10";
-> +                       uart0_pf_pins: uart0_pf_pins {
-> +                               pins = "PF2", "PF4";
->                                 function = "uart0";
->                         };
->                 };
-> --
-> 2.11.0
->
+Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ arch/arm64/boot/dts/sprd/Makefile         |   3 +-
+ arch/arm64/boot/dts/sprd/sc9860.dtsi      | 569 ++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |  56 +++
+ arch/arm64/boot/dts/sprd/whale2.dtsi      |  71 ++++
+ 4 files changed, 698 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+ create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
+
+diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
+index b658c5e..f0535e6 100644
+--- a/arch/arm64/boot/dts/sprd/Makefile
++++ b/arch/arm64/boot/dts/sprd/Makefile
+@@ -1,4 +1,5 @@
+-dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
++dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb \
++			sp9860g-1h10.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+new file mode 100644
+index 0000000..7b7d8ce
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+@@ -0,0 +1,569 @@
++/*
++ * Spreadtrum SC9860 SoC
++ *
++ * Copyright (C) 2016, Spreadtrum Communications Inc.
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include "whale2.dtsi"
++
++/ {
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&CPU0>;
++				};
++				core1 {
++					cpu = <&CPU1>;
++				};
++				core2 {
++					cpu = <&CPU2>;
++				};
++				core3 {
++					cpu = <&CPU3>;
++				};
++			};
++
++			cluster1 {
++				core0 {
++					cpu = <&CPU4>;
++				};
++				core1 {
++					cpu = <&CPU5>;
++				};
++				core2 {
++					cpu = <&CPU6>;
++				};
++				core3 {
++					cpu = <&CPU7>;
++				};
++			};
++		};
++
++		CPU0: cpu at 530000 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530000>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU1: cpu at 530001 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530001>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU2: cpu at 530002 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530002>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU3: cpu at 530003 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530003>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU4: cpu at 530100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530100>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU5: cpu at 530101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530101>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU6: cpu at 530102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530102>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++
++		CPU7: cpu at 530103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x530103>;
++			enable-method = "psci";
++			cpu-idle-states = <&CORE_PD &CLUSTER_PD>;
++		};
++	};
++
++	idle-states{
++		entry-method = "arm,psci";
++
++		CORE_PD: core_pd {
++			compatible = "arm,idle-state";
++			entry-latency-us = <1000>;
++			exit-latency-us = <700>;
++			min-residency-us = <2500>;
++			local-timer-stop;
++			arm,psci-suspend-param = <0x00010002>;
++		};
++
++		CLUSTER_PD: cluster_pd {
++			compatible = "arm,idle-state";
++			entry-latency-us = <1000>;
++			exit-latency-us = <1000>;
++			min-residency-us = <3000>;
++			local-timer-stop;
++			arm,psci-suspend-param = <0x01010003>;
++		};
++	};
++
++	gic: interrupt-controller at 12001000 {
++		compatible = "arm,gic-400";
++		reg = <0 0x12001000 0 0x1000>,
++		      <0 0x12002000 0 0x2000>,
++		      <0 0x12004000 0 0x2000>,
++		      <0 0x12006000 0 0x2000>;
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8)
++					| IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8)
++					 | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8)
++					 | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8)
++					 | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8)
++					 | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a53-pmu", "arm,armv8-pmuv3";
++		interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&CPU0>,
++				     <&CPU1>,
++				     <&CPU2>,
++				     <&CPU3>,
++				     <&CPU4>,
++				     <&CPU5>,
++				     <&CPU6>,
++				     <&CPU7>;
++	};
++
++	soc {
++		funnel at 10001000 { /* SoC Funnel */
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0 0x10001000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					soc_funnel_out_port: endpoint {
++						remote-endpoint = <&etb_in>;
++					};
++				};
++
++				port at 1 {
++					reg = <0>;
++					soc_funnel_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint =
++						<&main_funnel_out_port>;
++					};
++				};
++
++				port at 2 {
++					reg = <4>;
++					soc_funnel_in_port1: endpoint {
++						slave-mode;
++						remote-endpioint =
++							<&stm_out_port>;
++					};
++				};
++			};
++		};
++
++		etb at 10003000 {
++			compatible = "arm,coresight-tmc", "arm,primecell";
++			reg = <0 0x10003000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++			port {
++				etb_in: endpoint {
++					slave-mode;
++					remote-endpoint =
++						<&soc_funnel_out_port>;
++				};
++			};
++		};
++
++		stm at 10006000 {
++			compatible = "arm,coresight-stm", "arm,primecell";
++			reg = <0 0x10006000 0 0x1000>,
++			      <0 0x01000000 0 0x180000>;
++			reg-names = "stm-base", "stm-stimulus-base";
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++			port {
++				stm_out_port: endpoint {
++					remote-endpoint =
++						<&soc_funnel_in_port1>;
++				};
++			};
++		};
++
++		funnel at 11001000 { /* Cluster0 Funnel */
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0 0x11001000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					cluster0_funnel_out_port: endpoint {
++						remote-endpoint =
++							<&cluster0_etf_in>;
++					};
++				};
++
++				port at 1 {
++					reg = <0>;
++					cluster0_funnel_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm0_out>;
++					};
++				};
++
++				port at 2 {
++					reg = <1>;
++					cluster0_funnel_in_port1: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm1_out>;
++					};
++				};
++
++				port at 3 {
++					reg = <2>;
++					cluster0_funnel_in_port2: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm2_out>;
++					};
++				};
++
++				port at 4 {
++					reg = <4>;
++					cluster0_funnel_in_port3: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm3_out>;
++					};
++				};
++			};
++		};
++
++		funnel at 11002000 { /* Cluster1 Funnel */
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0 0x11002000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					cluster1_funnel_out_port: endpoint {
++						remote-endpoint =
++							<&cluster1_etf_in>;
++					};
++				};
++
++				port at 1 {
++					reg = <0>;
++					cluster1_funnel_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm4_out>;
++					};
++				};
++
++				port at 2 {
++					reg = <1>;
++					cluster1_funnel_in_port1: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm5_out>;
++					};
++				};
++
++				port at 3 {
++					reg = <2>;
++					cluster1_funnel_in_port2: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm6_out>;
++					};
++				};
++
++				port at 4 {
++					reg = <3>;
++					cluster1_funnel_in_port3: endpoint {
++						slave-mode;
++						remote-endpoint = <&etm7_out>;
++					};
++				};
++			};
++		};
++
++		etf at 11003000 { /*  ETF on Cluster0 */
++			compatible = "arm,coresight-tmc", "arm,primecell";
++			reg = <0 0x11003000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					cluster0_etf_out: endpoint {
++						remote-endpoint =
++						<&main_funnel_in_port0>;
++					};
++				};
++
++				port at 1 {
++					reg = <0>;
++					cluster0_etf_in: endpoint {
++						slave-mode;
++						remote-endpoint =
++						<&cluster0_funnel_out_port>;
++					};
++				};
++			};
++		};
++
++		etf at 11004000 { /* ETF on Cluster1 */
++			compatible = "arm,coresight-tmc", "arm,primecell";
++			reg = <0 0x11004000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					cluster1_etf_out: endpoint {
++						remote-endpoint =
++						<&main_funnel_in_port1>;
++					};
++				};
++
++				port at 1 {
++					reg = <0>;
++					cluster1_etf_in: endpoint {
++						slave-mode;
++						remote-endpoint =
++						<&cluster1_funnel_out_port>;
++					};
++				};
++			};
++		};
++
++		funnel at 11005000 { /* Main Funnel */
++			compatible = "arm,coresight-funnel", "arm,primecell";
++			reg = <0 0x11005000 0 0x1000>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					main_funnel_out_port: endpoint {
++						remote-endpoint =
++							<&soc_funnel_in_port0>;
++					};
++				};
++
++				port at 1 {
++					reg = <0>;
++					main_funnel_in_port0: endpoint {
++						slave-mode;
++						remote-endpoint =
++							<&cluster0_etf_out>;
++					};
++				};
++
++				port at 2 {
++					reg = <1>;
++					main_funnel_in_port1: endpoint {
++						slave-mode;
++						remote-endpoint =
++							<&cluster1_etf_out>;
++					};
++				};
++			};
++		};
++
++		etm at 11440000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11440000 0 0x1000>;
++			cpu = <&CPU0>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm0_out: endpoint {
++					remote-endpoint =
++						<&cluster0_funnel_in_port0>;
++				};
++			};
++		};
++
++		etm at 11540000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11540000 0 0x1000>;
++			cpu = <&CPU1>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm1_out: endpoint {
++					remote-endpoint =
++						<&cluster0_funnel_in_port1>;
++				};
++			};
++		};
++
++		etm at 11640000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11640000 0 0x1000>;
++			cpu = <&CPU2>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm2_out: endpoint {
++					remote-endpoint =
++						<&cluster0_funnel_in_port2>;
++				};
++			};
++		};
++
++		etm at 11740000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11740000 0 0x1000>;
++			cpu = <&CPU3>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm3_out: endpoint {
++					remote-endpoint =
++						<&cluster0_funnel_in_port3>;
++				};
++			};
++		};
++
++		etm at 11840000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11840000 0 0x1000>;
++			cpu = <&CPU4>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm4_out: endpoint {
++					remote-endpoint =
++						<&cluster1_funnel_in_port0>;
++				};
++			};
++		};
++
++		etm at 11940000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11940000 0 0x1000>;
++			cpu = <&CPU5>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm5_out: endpoint {
++					remote-endpoint =
++						<&cluster1_funnel_in_port1>;
++				};
++			};
++		};
++
++		etm at 11a40000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11a40000 0 0x1000>;
++			cpu = <&CPU6>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm6_out: endpoint {
++					remote-endpoint =
++						<&cluster1_funnel_in_port2>;
++				};
++			};
++		};
++
++		etm at 11b40000 {
++			compatible = "arm,coresight-etm4x", "arm,primecell";
++			reg = <0 0x11b40000 0 0x1000>;
++			cpu = <&CPU7>;
++			clocks = <&ext_26m>;
++			clock-names = "apb_pclk";
++
++			port {
++				etm7_out: endpoint {
++					remote-endpoint =
++						<&cluster1_funnel_in_port3>;
++				};
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+new file mode 100644
+index 0000000..ae0b28c
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+@@ -0,0 +1,56 @@
++/*
++ * Spreadtrum SP9860g board
++ *
++ * Copyright (C) 2017, Spreadtrum Communications Inc.
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++/dts-v1/;
++
++#include "sc9860.dtsi"
++
++/ {
++	model = "Spreadtrum SP9860G 3GFHD Board";
++
++	compatible = "sprd,sp9860g-1h10", "sprd,sc9860";
++
++	aliases {
++		serial0 = &uart0; /* for Bluetooth */
++		serial1 = &uart1; /* UART console */
++		serial2 = &uart2; /* Reserved */
++		serial3 = &uart3; /* for GPS */
++	};
++
++	memory{
++		device_type = "memory";
++		reg = <0x0 0x80000000 0 0x60000000>,
++		      <0x1 0x80000000 0 0x60000000>;
++	};
++
++	chosen {
++		stdout-path = "serial1:115200n8";
++	};
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
+new file mode 100644
+index 0000000..7c217c5
+--- /dev/null
++++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
+@@ -0,0 +1,71 @@
++/*
++ * Spreadtrum Whale2 platform peripherals
++ *
++ * Copyright (C) 2016, Spreadtrum Communications Inc.
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++/ {
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	soc: soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		ap-apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x0 0x70000000 0x10000000>;
++
++			uart0: serial at 0 {
++				compatible = "sprd,sc9860-uart",
++					     "sprd,sc9836-uart";
++				reg = <0x0 0x100>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&ext_26m>;
++				status = "disabled";
++			};
++
++			uart1: serial at 100000 {
++				compatible = "sprd,sc9860-uart",
++					     "sprd,sc9836-uart";
++				reg = <0x100000 0x100>;
++				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&ext_26m>;
++				status = "disabled";
++			};
++
++			uart2: serial at 200000 {
++				compatible = "sprd,sc9860-uart",
++					     "sprd,sc9836-uart";
++				reg = <0x200000 0x100>;
++				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&ext_26m>;
++				status = "disabled";
++			};
++
++			uart3: serial at 300000 {
++				compatible = "sprd,sc9860-uart",
++					     "sprd,sc9836-uart";
++				reg = <0x300000 0x100>;
++				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&ext_26m>;
++				status = "disabled";
++			};
++		};
++
++	};
++
++	ext_26m: ext-26m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
++		clock-output-names = "ext_26m";
++	};
++};
+-- 
+2.7.4
