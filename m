@@ -1,27 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Apr 2017 15:21:59 -0700
-Subject: [PATCH] ARM: omap2+: make omap4_get_cpu1_ns_pa_addr declaration
- usable
-In-Reply-To: <20170421215556.2244576-1-arnd@arndb.de>
-References: <20170421215556.2244576-1-arnd@arndb.de>
-Message-ID: <20170421222159.GA3780@atomide.com>
+From: rudici.cazeao@litepoint.com (Rudici Cazeao)
+Date: Fri, 21 Apr 2017 23:04:19 +0000
+Subject: ARM lockup during Kexec operation
+Message-ID: <f094f2a481994c31bff01ef7579f1d3c@LPHQEX2013.litepoint.internal>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [170421 14:59]:
-> When CONFIG_PM is disabled, we get a build error:
-> 
-> arch/arm/mach-omap2/omap-smp.c: In function 'omap4_smp_maybe_reset_cpu1':
-> arch/arm/mach-omap2/omap-smp.c:309:20: error: implicit declaration of function 'omap4_get_cpu1_ns_pa_addr'; did you mean 'omap4_get_scu_base'? [-Werror=implicit-function-declaration]
-> 
-> We need to fix this in multiple files, to ensure the declaration is visible,
-> to actually build the function without CONFIG_PM, and to only call it
-> when OMAP4 and/or OMAP5 are enabled.
-> 
-> Fixes: 351b7c490700 ("ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot")
+Using kexec on a dual-core arm processor (arm7), the non-boot CPU (CPU1) appears to be locking up during kexec.
 
-Oops, sorry about that. Looks like I never hit that with my
-randconfig builds earlier probably as we have at least CPU_IDLE and
-ARCH_OMAP2PLUS_TYPICAL select PM. Thanks for fixing it:
+The SoC is mach-transcede
+The kernel version is 3.0.51-rt75
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+The issue is localized to  linux-3.0.51/arch\arm/mach-transcede/hotplug.c.
+
+
+                cpu_enter_lowpower();
+            platform_do_lowpower(cpu, &spurious);
+                cpu_leave_lowpower().                                      / *  bring this CPU back into the world of cache  coherency, and then restore interrupts  */
+
+
+static inline void platform_do_lowpower(unsigned int cpu, int *spurious) {
+                for (;;) {                                                                    / * there is no power-control hardware on this platform, so all we can do is put the core into WFI; this is safe as the calling code will have already disabled interrupts */
+                        wfe();
+                                if (pen_release == cpu) {
+                                                break;                                          / * OK, proper wakeup, we're done */
+                                }
+
+                                (*spurious)++;                                         / * Getting here, means that we have come out of WFI without having been woken up - Just note it happening - when we're woken, we can report its occurrence.
+                }
+}
+
+
+
+When the issue occurs the non-boot CPU (ie CPU 1) is entering the platform_do_lowpower sequence where it should wait until pren_release is set to 1 by  CPU1 
+
+
+Please note that  This failure is random. It usually happens somewhere between 300 and 5000 kexec loops.
