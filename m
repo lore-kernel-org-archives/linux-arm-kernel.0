@@ -1,172 +1,99 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Fri, 21 Apr 2017 18:46:48 +0800
-Subject: [PATCH v3 7/8] arm64: exception: handle asynchronous SError
- interrupt
-In-Reply-To: <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
-References: <1490869877-118713-1-git-send-email-xiexiuqi@huawei.com>
- <1490869877-118713-8-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1cf65f76-65ee-d98c-cf3e-a5e8ff63550d@huawei.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 21 Apr 2017 11:59:30 +0100
+Subject: [PATCH 1/4] arm64: traps: fix userspace cache maintenance
+ emulation on a tagged pointer
+In-Reply-To: <1492712234-4950-2-git-send-email-kristina.martsenko@arm.com>
+References: <1492712234-4950-1-git-send-email-kristina.martsenko@arm.com>
+ <1492712234-4950-2-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <f5ef088a-7d95-a43a-843e-064f8e13d2a7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi XiuQi,
+Hi Kristina,
 
-On 2017/3/30 18:31, Xie XiuQi wrote:
-> Error Synchronization Barrier (ESB; part of the ARMv8.2 Extensions)
-> is used to synchronize Unrecoverable errors. That is, containable errors
-> architecturally consumed by the PE and not silently propagated.
+On 20/04/17 19:17, Kristina Martsenko wrote:
+> When we emulate userspace cache maintenance in the kernel, we can
+> currently send the task a SIGSEGV even though the maintenance was done
+> on a valid address. This happens if the address has a non-zero address
+> tag, and happens to not be mapped in.
 > 
-> With ESB it is generally possible to isolate an unrecoverable error
-> between two ESB instructions. So, it's possible to recovery from
-> unrecoverable errors reported by asynchronous SError interrupt.
+> When we get the address from a user register, we don't currently remove
+> the address tag before performing cache maintenance on it. If the
+> maintenance faults, we end up in either __do_page_fault, where find_vma
+> can't find the VMA if the address has a tag, or in do_translation_fault,
+> where the tagged address will appear to be above TASK_SIZE. In both
+> cases, the address is not mapped in, and the task is sent a SIGSEGV.
+
+Right, well spotted!
+So thanks for the patch, which I think is correct. But ...
+
+> This patch removes the tag from the address before using it. With this
+> patch, the fault is handled correctly, the address gets mapped in, and
+> the cache maintenance succeeds.
+
+Looking more closely at this code, I see that we actually don't use the
+address parameter in the force_signal_inject() function. Instead we
+always put the PC address into the siginfo structure, which is wrong in
+case this SEGV is triggered by an invalid address of a cache maintenance
+operation.
+
+I made a simple patch to fix this (using the address argument and
+explicitly passing the PC in when we fault on an invalid instruction).
+
+But now we would pass the untagged address back into userland. I am not
+sure this is a real problem, since we don't promise anything in case of
+tagged pointers, if I got this correctly.
+
+But also our untagged_addr() macro seems to not cover all cases
+correctly, for instance passing in 0x00ffffffffff5678 (which is an
+invalid, but untagged address) would extend to some probably valid
+kernel pointer. And although this would fail our user space address
+check, we would return a wrong address (with all the upper bits being 1)
+in siginfo.
+
+Do we care about this?
+What would be the best fix for the untagged_addr macro? Is that macro
+actually the proper place to fix this issue?
+
+Cheers,
+Andre.
+
+> As a second bug, if cache maintenance (correctly) fails on an invalid
+> tagged address, the address gets passed into arm64_notify_segfault,
+> where find_vma fails to find the VMA due to the tag, and the wrong
+> si_code may be sent as part of the siginfo_t of the segfault. With this
+> patch, the correct si_code is sent.
 > 
-> If ARMv8.2 RAS Extension is not support, ESB is treated as a NOP.
-> 
-> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
-> Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
+> Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
+> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 > ---
->  arch/arm64/Kconfig           | 16 ++++++++++
->  arch/arm64/include/asm/esr.h | 14 +++++++++
->  arch/arm64/kernel/entry.S    | 70 ++++++++++++++++++++++++++++++++++++++++++--
->  arch/arm64/kernel/traps.c    | 54 ++++++++++++++++++++++++++++++++--
->  4 files changed, 150 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 859a90e..7402175 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -911,6 +911,22 @@ endmenu
+> Note that patch #3 would also fix the first bug (incorrect segfault),
+> but not the second (wrong si_code), hence this patch.
+> 
+>  arch/arm64/kernel/traps.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index e52be6aa44ee..45c8eca951bc 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -443,7 +443,7 @@ int cpu_enable_cache_maint_trap(void *__unused)
+>  }
 >  
->  menu "ARMv8.2 architectural features"
+>  #define __user_cache_maint(insn, address, res)			\
+> -	if (untagged_addr(address) >= user_addr_max()) {	\
+> +	if (address >= user_addr_max()) {			\
+>  		res = -EFAULT;					\
+>  	} else {						\
+>  		uaccess_ttbr0_enable();				\
+> @@ -469,7 +469,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+>  	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+>  	int ret = 0;
 >  
-> +config ARM64_ESB
-> +	bool "Enable support for Error Synchronization Barrier (ESB)"
-> +	default n
-> +	help
-> +	  Error Synchronization Barrier (ESB; part of the ARMv8.2 Extensions)
-> +	  is used to synchronize Unrecoverable errors. That is, containable errors
-> +	  architecturally consumed by the PE and not silently propagated.
-> +
-> +	  Without ESB it is not generally possible to isolate an Unrecoverable
-> +	  error because it is not known which instruction generated the error.
-> +
-> +	  Selecting this option allows inject esb instruction before the exception
-> +	  change. If ARMv8.2 RAS Extension is not support, ESB is treated as a NOP.
-> +
-> +	  Note that ESB instruction can introduce slight overhead, so say N if unsure.
-> +
->  config ARM64_UAO
->  	bool "Enable support for User Access Override (UAO)"
->  	default y
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index f20c64a..22f9c90 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -106,6 +106,20 @@
->  #define ESR_ELx_AR 		(UL(1) << 14)
->  #define ESR_ELx_CM 		(UL(1) << 8)
+> -	address = pt_regs_read_reg(regs, rt);
+> +	address = untagged_addr(pt_regs_read_reg(regs, rt));
 >  
-> +#define ESR_Elx_DFSC_SEI	(0x11)
-> +
-> +#define ESR_ELx_AET_SHIFT	(10)
-> +#define ESR_ELx_AET_MAX		(7)
-> +#define ESR_ELx_AET_MASK	(UL(7) << ESR_ELx_AET_SHIFT)
-> +#define ESR_ELx_AET(esr)	(((esr) & ESR_ELx_AET_MASK) >> ESR_ELx_AET_SHIFT)
-> +
-> +#define ESR_ELx_AET_UC		(0)
-> +#define ESR_ELx_AET_UEU		(1)
-> +#define ESR_ELx_AET_UEO		(2)
-> +#define ESR_ELx_AET_UER		(3)
-> +#define ESR_ELx_AET_CE		(6)
-> +
-> +
->  /* ISS field definitions for exceptions taken in to Hyp */
->  #define ESR_ELx_CV		(UL(1) << 24)
->  #define ESR_ELx_COND_SHIFT	(20)
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 43512d4..d8a7306 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -69,7 +69,14 @@
->  #define BAD_FIQ		2
->  #define BAD_ERROR	3
->  
-> +	.arch_extension ras
-> +
->  	.macro	kernel_entry, el, regsize = 64
-because we also want to take SEI exception in kernel space, we may need to unmask SEI in kernel_entry.
-> +#ifdef CONFIG_ARM64_ESB
-> +	.if	\el == 0
-> +	esb
-> +	.endif
-> +#endif
->  	sub	sp, sp, #S_FRAME_SIZE
->  	.if	\regsize == 32
->  	mov	w0, w0				// zero upper 32 bits of x0
-> @@ -208,6 +215,7 @@ alternative_else_nop_endif
->  #endif
->  
->  	.if	\el == 0
-> +	msr	daifset, #0xF			// Set flags
->  	ldr	x23, [sp, #S_SP]		// load return stack pointer
->  	msr	sp_el0, x23
->  #ifdef CONFIG_ARM64_ERRATUM_845719
-> @@ -226,6 +234,15 @@ alternative_else_nop_endif
->  
->  	msr	elr_el1, x21			// set up the return data
->  	msr	spsr_el1, x22
-> +
-> +#ifdef CONFIG_ARM64_ESB
-> +	.if \el == 0
-> +	esb					// Error Synchronization Barrier
-> +	mrs	x21, disr_el1			// Check for deferred error
-> +	tbnz	x21, #31, el1_sei
-> +	.endif
-> +#endif
-> +
->  	ldp	x0, x1, [sp, #16 * 0]
->  	ldp	x2, x3, [sp, #16 * 1]
->  	ldp	x4, x5, [sp, #16 * 2]
-> @@ -318,7 +335,7 @@ ENTRY(vectors)
->  	ventry	el1_sync_invalid		// Synchronous EL1t
->  	ventry	el1_irq_invalid			// IRQ EL1t
->  	ventry	el1_fiq_invalid			// FIQ EL1t
-> -	ventry	el1_error_invalid		// Error EL1t
-> +	ventry	el1_error			// Error EL1t
->  
->  	ventry	el1_sync			// Synchronous EL1h
->  	ventry	el1_irq				// IRQ EL1h
-> @@ -328,7 +345,7 @@ ENTRY(vectors)
->  	ventry	el0_sync			// Synchronous 64-bit EL0
->  	ventry	el0_irq				// IRQ 64-bit EL0
->  	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
-> -	ventry	el0_error_invalid		// Error 64-bit EL0
-> +	ventry	el0_error			// Error 64-bit EL0
-
-for the situation 'Current EL with SPx', we also need to change the sError vector to el1_error.
->  
->  #ifdef CONFIG_COMPAT
->  	ventry	el0_sync_compat			// Synchronous 32-bit EL0
-> @@ -508,12 +525,31 @@ el1_preempt:
->  	ret	x24
->  #endif
->  
-> +	.align	6
-> +el1_error:
-> +	kernel_entry 1
-> +el1_sei:
-> +	/*
-> +	 * asynchronous SError interrupt from kernel
-> +	 */
-> +	mov	x0, sp
-> +	mrs	x1, esr_el1
-> +	mov	x2, #1				// exception level of SEI generated
-> +	b	do_sei
-> +ENDPROC(el1_error)
-> +
-> +
-
-
-Thanks,
-
-Wang Xiongfeng
+>  	switch (crm) {
+>  	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
+> 
