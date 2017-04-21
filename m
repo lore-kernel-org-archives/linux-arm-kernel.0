@@ -1,108 +1,39 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 21 Apr 2017 14:21:50 +0200
-Subject: [PATCH V15 03/11] cper: add timestamp print to CPER status
- printing
-In-Reply-To: <1492556723-9189-4-git-send-email-tbaicar@codeaurora.org>
-References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
- <1492556723-9189-4-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170421122150.76cce2cfrt767glv@pd.tnic>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 21 Apr 2017 14:55:18 +0200
+Subject: [PATCH 2/5] arm64: renesas: r8a7796: Add external PCIe bus clock
+In-Reply-To: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
+References: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1492779321-23939-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 05:05:15PM -0600, Tyler Baicar wrote:
-> The ACPI 6.1 spec added a timestamp to the HEST generic data
+Add the external PCIe bus clock as a zero Hz fixed-frequency clock.
+Boards that provide this clock should override it.
 
-HEST?
+Based on r8a7795.dtsi.
 
-I see the timestamp in
-
-Table 18-343 Generic Error Data Entry
-
-where those things are "One or more Generic Error Data Entry structures
-may be recorded in the Generic Error Data Entries field of the Generic
-Error Status Block structure."
-
-And those are part of the "18.3.2.7 Generic Hardware Error Source",
-i.e., GHES. So why do you say "HEST" above?
-
-> structure. Print the timestamp out when printing out the error
-> status information.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Remove those Reviewed-by:s
-
-> ---
->  drivers/firmware/efi/cper.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index 8328a6f..46585f9 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -32,6 +32,8 @@
->  #include <linux/acpi.h>
->  #include <linux/pci.h>
->  #include <linux/aer.h>
-> +#include <linux/printk.h>
-> +#include <linux/bcd.h>
->  #include <acpi/ghes.h>
->  
->  #define INDENT_SP	" "
-> @@ -387,6 +389,29 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
->  	pfx, pcie->bridge.secondary_status, pcie->bridge.control);
->  }
->  
-> +static void cper_estatus_timestamp(const char *pfx,
-
-cper_print_tstamp()
-
-> +				   struct acpi_hest_generic_data_v300 *gdata)
-> +{
-> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
-> +
-> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-> +		timestamp = (__u8 *)&(gdata->time_stamp);
-> +		sec       = bcd2bin(timestamp[0]);
-> +		min       = bcd2bin(timestamp[1]);
-> +		hour      = bcd2bin(timestamp[2]);
-> +		day       = bcd2bin(timestamp[4]);
-> +		mon       = bcd2bin(timestamp[5]);
-> +		year      = bcd2bin(timestamp[6]);
-> +		century   = bcd2bin(timestamp[7]);
-> +
-> +		if (*(timestamp + 3) & 0x1)
-> +			printk("%stimestamp is precise\n", pfx);
-> +
-> +		printk("%stime: %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
-> +			century, year, mon, day, hour, min, sec);
-
-Yeah, about the precise tstamp, you can do something like this:
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index 46585f92b741..a649884e2264 100644
---- a/drivers/firmware/efi/cper.c
-+++ b/drivers/firmware/efi/cper.c
-@@ -404,10 +404,8 @@ static void cper_estatus_timestamp(const char *pfx,
- 		year      = bcd2bin(timestamp[6]);
- 		century   = bcd2bin(timestamp[7]);
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 101cd41d693a7ab5..8e2aab8b6b103cc9 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -157,6 +157,13 @@
+ 		clock-frequency = <0>;
+ 	};
  
--		if (*(timestamp + 3) & 0x1)
--			printk("%stimestamp is precise\n", pfx);
--
--		printk("%stime: %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
-+		printk("%s%ststamp: %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
-+			(timestamp[3] & 0x1 ? "precise " : ""), 
- 			century, year, mon, day, hour, min, sec);
- 	}
- }
-
++	/* External PCIe clock - can be overridden by the board */
++	pcie_bus_clk: pcie_bus {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+2.7.4
