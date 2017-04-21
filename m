@@ -1,49 +1,53 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 16:38:55 +0800
-Subject: [PATCH v2 7/9] drm/sun4i: tcon: Copy ID from associated backend
+Date: Fri, 21 Apr 2017 16:38:53 +0800
+Subject: [PATCH v2 5/9] drm/sun4i: backend: Save pointer to device tree node
 In-Reply-To: <20170421083857.29636-1-wens@csie.org>
 References: <20170421083857.29636-1-wens@csie.org>
-Message-ID: <20170421083857.29636-8-wens@csie.org>
+Message-ID: <20170421083857.29636-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tcons and backends have a one-to-one relationship. Their IDs,
-or indexes in the documentation, are also the same.
-
-Copy the ID from the associated backend and save it in the tcon
-structure. This will later be used when we add support for the
-output data path muxes.
+Save a pointer to the backend's underlying device tree node in its
+data structure. This will be used later for downstream tcons to find
+and match their respective upstream backends.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 1 +
- drivers/gpu/drm/sun4i/sun4i_tcon.h | 2 ++
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 1 +
+ drivers/gpu/drm/sun4i/sun4i_backend.h | 2 ++
  2 files changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 4409e7b6c74d..8301389c411d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -540,6 +540,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	dev_set_drvdata(dev, tcon);
- 	tcon->drm = drm;
- 	tcon->dev = dev;
-+	tcon->id = backend->id;
- 	tcon->quirks = of_device_get_match_data(dev);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 0b4222312e49..e9eca057ff35 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -352,6 +352,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 		return -ENOMEM;
+ 	dev_set_drvdata(dev, backend);
  
- 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 1bda4d183eec..d37e1e2ed60e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -174,6 +174,8 @@ struct sun4i_tcon {
- 	/* Associated crtc */
- 	struct sun4i_crtc		*crtc;
++	backend->node = dev->of_node;
+ 	backend->id = sun4i_backend_of_get_id(dev->of_node);
+ 	if (backend->id < 0)
+ 		return backend->id;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+index 45b7fc110590..6327a2985fe6 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+@@ -15,6 +15,7 @@
  
-+	int				id;
-+
- 	/* TCON list management */
- 	struct list_head		list;
- };
+ #include <linux/clk.h>
+ #include <linux/list.h>
++#include <linux/of.h>
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+ 
+@@ -140,6 +141,7 @@
+ #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+ 
+ struct sun4i_backend {
++	struct device_node	*node;
+ 	struct regmap		*regs;
+ 
+ 	struct reset_control	*reset;
 -- 
 2.11.0
