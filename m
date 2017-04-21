@@ -1,99 +1,40 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 21 Apr 2017 10:48:15 -0500
-Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <20170417174712.GA7575@localhost>
-References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
- <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
- <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
- <20170414210646.GA5346@localhost>
- <CAErSpo731xSzrnKF+G+8SA_UUHy7ROA1V9oFkpwKi85GQf9VAg@mail.gmail.com>
- <20170417174712.GA7575@localhost>
-Message-ID: <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 21 Apr 2017 18:02:32 +0200
+Subject: [PATCH V5 4/7] ARM: pxa: Use - instead of @ for DT OPP entries
+In-Reply-To: <20170421053041.GB26900@vireshk-i7> (Viresh Kumar's message of
+ "Fri, 21 Apr 2017 11:00:41 +0530")
+References: <cover.1492685450.git.viresh.kumar@linaro.org>
+ <cover.1492685450.git.viresh.kumar@linaro.org>
+ <741bc9af28d6968e6a9409f94681066db5d1228b.1492685450.git.viresh.kumar@linaro.org>
+ <87a87a7s66.fsf@belgarion.home> <20170421053041.GB26900@vireshk-i7>
+Message-ID: <874lxhkauf.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 17, 2017 at 12:47 PM, Jayachandran C
-<jnair@caviumnetworks.com> wrote:
-> On Fri, Apr 14, 2017 at 09:00:06PM -0500, Bjorn Helgaas wrote:
->> On Fri, Apr 14, 2017 at 4:06 PM, Jayachandran C
->> <jnair@caviumnetworks.com> wrote:
->> > On Thu, Apr 13, 2017 at 07:19:11PM -0500, Bjorn Helgaas wrote:
->> >> I tentatively applied both patches to pci/host-thunder for v4.12.
->> >>
->> >> However, I am concerned about the topology here:
->> >>
->> >> On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
->> >> > On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
->> >> > PCI topology is slightly unusual.  For a multi-node system, it looks
->> >> > like:
->> >> >
->> >> >     00:00.0 [PCI] bridge to [bus 01-1e]
->> >> >     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
->> >> >     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
->> >> >     03:00.0 PCIe Endpoint
->> >>
->> >> A root port normally has a single PCIe link leading downstream.
->> >> According to this, 02:00.0 is a root port that has the usual
->> >> downstream link leading to 03:00.0, but it also has an upstream link
->> >> to 01:0a.0.
->> >
->> > The PCI topology is a bit broken due to the way that the PCIe IP block
->> > was integrated into SoC PCI bridges and devices. The current mechanism
->> > of adding a PCI-PCIe bridge to glue these together is not ideal.
->>
->> Yeah, that's definitely broken.
->>
->> >> Maybe this example is omitting details that are not relevant to DMA
->> >> aliases?  The PCIe capability only contains one set of link-related
->> >> registers, so I don't know how we could manage a single device that
->> >> has two links.
->> >
->> > The root port is standard and has just one link to the EP (or whatever
->> > is on the external PCIe slot). The fallout of the current hw design is
->> > that the PCI-PCIe bridge has a link that does not follow standard and
->> > does not have a counterpart (as you noted).
->> >
->> >> A device with two links would break things like ASPM.  In
->> >> set_pcie_port_type(), for example, we have this comment:
->> >>
->> >>    * A Root Port or a PCI-to-PCIe bridge is always the upstream end
->> >>    * of a Link.  No PCIe component has two Links.  Two Links are
->> >>    * connected by a Switch that has a Port on each Link and internal
->> >>    * logic to connect the two Ports.
->> >>
->> >> The topology above breaks these assumptions, which will make
->> >> pdev->has_secondary_link incorrect, which means ASPM won't work
->> >> correctly.
->> >
->> > Given the current hardware, the pcieport driver seems to work reasonably
->> > for the root port at 02:00.0, with AER support. I will take a look at the
->> > ASPM part.
->>
->> I don't think pcieport itself cares much about links.  ASPM does, but
->> it looks like set_pcie_port_type() actually is smart enough to know
->> that PCI-to-PCIe bridges and Root Ports always have links on their
->> secondary sides.  So has_secondary_link probably does get set
->> correctly.
->>
->> But I think you'll hit the VIA "strange chipset" thing in
->> pcie_aspm_init_link_state(), which will probably prevent us from doing
->> ASPM on the link from 02:00.0 to 03:00.0.
->>
->> Could you collect "lspci -vv" output from this system?  I'd like to
->> archive that as background for this IOMMU issue and the ASPM tweaks I
->> suspect we'll have to do.  I *wish* we had more information about that
->> VIA thing, because I suspect we could get rid of it if we had more
->> details.
->
-> The full logs are slightly large, so I have kept them at:
-> https://github.com/jchandra-cavm/thunderx2/blob/master/logs/
-> The lspci -vv output is lspci-vv.txt and lspci -tvn output is lspci-tvn.txt
->
-> The output is from 2 socket system, the cards are not on the first slot
-> like the example above, so the bus and device numbers are different.
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-Can somebody with this system collect the "lspci -xxxx" output as well?
+> On 20-04-17, 22:14, Robert Jarzmik wrote:
+>> Viresh Kumar <viresh.kumar@linaro.org> writes:
+>> 
+>> > Compiling the DT file with W=1, DTC warns like follows:
+>> >
+>> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+>> > unit name, but no reg property
+>> >
+>> > Fix this by replacing '@' with '-' as the OPP nodes will never have a
+>> > "reg" property.
+>> >
+>> > Reported-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> > Reported-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
+>> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> > Acked-by: Rob Herring <robh@kernel.org>
+>> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> Thanks. But I need you to pick it up for your pull request for arm-soc.
+Sure, let me take it through my tree, no problem.
 
-I'm making some lspci changes to handle the PCI-to-PCIe bridge
-correctly, and I can use the "lspci -xxxx" output to create an lspci
-test case.
+Cheers.
+
+-- 
+Robert
