@@ -1,39 +1,34 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 22 Apr 2017 00:24:16 +0100
-Subject: ARM lockup during Kexec operation
-In-Reply-To: <f094f2a481994c31bff01ef7579f1d3c@LPHQEX2013.litepoint.internal>
-References: <f094f2a481994c31bff01ef7579f1d3c@LPHQEX2013.litepoint.internal>
-Message-ID: <20170421232416.GN17774@n2100.armlinux.org.uk>
+Date: Sat, 22 Apr 2017 00:43:16 +0100
+Subject: linux-next: build failure after merge of the arm tree
+In-Reply-To: <20170421181230.05dcf937@canb.auug.org.au>
+References: <20170421084033.5c987e13@canb.auug.org.au>
+ <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
+ <20170421181230.05dcf937@canb.auug.org.au>
+Message-ID: <20170421234315.GO17774@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 11:04:19PM +0000, Rudici Cazeao wrote:
-> The issue is localized to  linux-3.0.51/arch\arm/mach-transcede/hotplug.c.
+On Fri, Apr 21, 2017 at 06:12:30PM +1000, Stephen Rothwell wrote:
+> Hi Mason,
 > 
->                 cpu_enter_lowpower();
->             platform_do_lowpower(cpu, &spurious);
->                 cpu_leave_lowpower().                                      / *  bring this CPU back into the world of cache  coherency, and then restore interrupts  */
+> On Fri, 21 Apr 2017 09:58:58 +0200 Mason <slash.tmp@free.fr> wrote:
+> >
+> > Anyway, the fix is trivial.
+> > 
+> > The "pchans_used" field is an unsigned long array.
+> > for_each_clear_bit_from() expects an unsigned long pointer,
+> > not an array address.
+> > 
+> > I'll send a patch to the drivers/dma maintainers.
 > 
-> 
-> static inline void platform_do_lowpower(unsigned int cpu, int *spurious) {
->                 for (;;) {                                                                    / * there is no power-control hardware on this platform, so all we can do is put the core into WFI; this is safe as the calling code will have already disabled interrupts */
->                         wfe();
->                                 if (pen_release == cpu) {
->                                                 break;                                          / * OK, proper wakeup, we're done */
->                                 }
-> 
->                                 (*spurious)++;                                         / * Getting here, means that we have come out of WFI without having been woken up - Just note it happening - when we're woken, we can report its occurrence.
->                 }
-> }
+> The fix really needs to go into the arm tree (as well?) since that is
+> the tree that has the patch that causes the build to break (even if the
+> actual bug was preexisting).
 
-Sorry, but with the above, the platform can't support suspend/resume or
-kexec reliably.  It needs a proper implementation - iow, one which
-actually takes the CPU offline such that it resumes as it does the very
-first time we boot.
-
-This also doesn't seem to be mainline kernel related - and searching
-google for "arm/mach-transcede" brings up no relevant results,
-certainly not on the first page.
+Or I drop the offending patch (done) and we get the DMA subsystem fixed
+first.  Given how long it's been this way, I doubt there's any hurry to
+get this change in for the next merge window.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
