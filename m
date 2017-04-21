@@ -1,38 +1,39 @@
-From: colin.king@canonical.com (Colin King)
-Date: Fri, 21 Apr 2017 08:02:30 +0100
-Subject: [PATCH] PCI: imx6: fix spelling mistake: "contol" -> "control"
-Message-ID: <20170421070230.16582-1-colin.king@canonical.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 21 Apr 2017 09:04:48 +0200
+Subject: [PATCH 2/8] [RFC] arm64: dts: renesas: Add R-Car H3 SiP (4 x 1
+ GiB) support
+In-Reply-To: <20170421054201.GR28868@bigcity.dyn.berto.se>
+References: <1492593351-13835-1-git-send-email-geert+renesas@glider.be>
+ <1492593351-13835-3-git-send-email-geert+renesas@glider.be>
+ <20170421054201.GR28868@bigcity.dyn.berto.se>
+Message-ID: <CAMuHMdUbhONx9=mf=EG_soLEAkrb-jsZD_pAkkovc5wMDdv8hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hi Niklas,
 
-trivial fix to spelling mistake in dev_err message
+On Fri, Apr 21, 2017 at 7:42 AM, Niklas S?derlund
+<niklas.soderlund@ragnatech.se> wrote:
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/renesas/r8j7795-4x1g.dtsi
+>> @@ -0,0 +1,36 @@
+>> +/*
+>> + * Device Tree Source for the r8j7795 SiP with 4 channels of 1 GiB RAM
+>> + *
+>> + * Copyright (C) 2015 Renesas Electronics Corp.
+>
+> 2017 right? If so same comment for patches 3 and 4.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/pci/dwc/pci-imx6.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+As I just moved statements from an existing file, I retained the original
+copyright information.
 
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index 102edcf1e261..129717ae5022 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -726,13 +726,13 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 		imx6_pcie->pciephy_reset = devm_reset_control_get(dev,
- 								  "pciephy");
- 		if (IS_ERR(imx6_pcie->pciephy_reset)) {
--			dev_err(dev, "Failed to get PCIEPHY reset contol\n");
-+			dev_err(dev, "Failed to get PCIEPHY reset control\n");
- 			return PTR_ERR(imx6_pcie->pciephy_reset);
- 		}
- 
- 		imx6_pcie->apps_reset = devm_reset_control_get(dev, "apps");
- 		if (IS_ERR(imx6_pcie->apps_reset)) {
--			dev_err(dev, "Failed to get PCIE APPS reset contol\n");
-+			dev_err(dev, "Failed to get PCIE APPS reset control\n");
- 			return PTR_ERR(imx6_pcie->apps_reset);
- 		}
- 		break;
--- 
-2.11.0
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
