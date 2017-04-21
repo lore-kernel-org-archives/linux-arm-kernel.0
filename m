@@ -1,37 +1,48 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 21 Apr 2017 10:30:11 +0200
-Subject: linux-next: build failure after merge of the arm tree
-In-Reply-To: <20170421181230.05dcf937@canb.auug.org.au>
-References: <20170421084033.5c987e13@canb.auug.org.au>
- <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
- <20170421181230.05dcf937@canb.auug.org.au>
-Message-ID: <216e8509-e7e8-5a5c-918c-a1a6e0e5285d@free.fr>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 21 Apr 2017 16:38:49 +0800
+Subject: [PATCH v2 1/9] dt-bindings: display: sun4i: Add component endpoint ID
+ numbering scheme
+In-Reply-To: <20170421083857.29636-1-wens@csie.org>
+References: <20170421083857.29636-1-wens@csie.org>
+Message-ID: <20170421083857.29636-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/04/2017 10:12, Stephen Rothwell wrote:
+The Allwinner display pipeline contains many hardware components, some
+of which can consume data from one of multiple upstream components.
+The numbering scheme of these components must be encoded into the device
+tree so the driver can figure out which component out of two or more of
+the same type it is supposed to use or program.
 
-> Mason wrote:
->
->> Anyway, the fix is trivial.
->>
->> The "pchans_used" field is an unsigned long array.
->> for_each_clear_bit_from() expects an unsigned long pointer,
->> not an array address.
->>
->> I'll send a patch to the drivers/dma maintainers.
-> 
-> The fix really needs to go into the arm tree (as well?) since that is
-> the tree that has the patch that causes the build to break (even if the
-> actual bug was preexisting).
+This patch adds the constraint that local endpoint IDs must be the index
+or number of the remote endpoint's hardware block, for all components
+in the display pipeline up to the TCONs.
 
-Hello Stephen,
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Since it's a trivial patch, and since Vinod is on vacation
-until Monday, I suppose Russell could push the patch through
-his own tree? (Maybe after an ACK from a sunxi maintainer.)
-
-I am currently building an allyesconfig next-20170420 kernel.
-Considering the speed of this system, this will take a while.
-
-Regards.
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 57a8d0610062..7acdbf14ae1c 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -4,6 +4,16 @@ Allwinner A10 Display Pipeline
+ The Allwinner A10 Display pipeline is composed of several components
+ that are going to be documented below:
+ 
++For the input port of all components up to the TCON in the display
++pipeline, if there are multiple components, the local endpoint IDs
++must correspond to the index of the upstream block. For example, if
++the remote endpoint is Frontend 1, then the local endpoint ID must
++be 1.
++
++Conversely, for the output ports of the same group, the remote endpoint
++ID must be the index of the local hardware block. If the local backend
++is backend 1, then the remote endpoint ID must be 1.
++
+ TV Encoder
+ ----------
+ 
+-- 
+2.11.0
