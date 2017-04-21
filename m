@@ -1,141 +1,116 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Apr 2017 22:40:57 +0200
-Subject: [PATCH 4/5 v3] usb: host: fotg2: add Gemini-specific handling
-In-Reply-To: <20170421204058.6206-1-linus.walleij@linaro.org>
-References: <20170421204058.6206-1-linus.walleij@linaro.org>
-Message-ID: <20170421204058.6206-4-linus.walleij@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Apr 2017 22:55:39 +0200
+Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
+In-Reply-To: <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
+References: <20161216105634.235457-1-arnd@arndb.de>
+ <3302470.IDcDrWa0u6@wuerfel>
+ <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
+ <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
+ <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
+Message-ID: <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortina Systems Gemini has bolted on a PHY inside the
-silicon that can be handled by six bits in a MISC register in
-the system controller.
+On Thu, Apr 20, 2017 at 9:52 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Thu, Apr 20, 2017 at 3:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Sun, Apr 16, 2017 at 9:52 PM, Kees Cook <keescook@chromium.org> wrote:
+>>>>> The original gcc-4.3 release was in early 2008. If we decide to still
+>>>>> support that, we probably want the first 10 quirks in this series,
+>>>>> while gcc-4.6 (released in 2011) requires none of them.
+>>>
+>>> I'd be in support of raising the minimum to gcc 4.6. (I'd actually
+>>> prefer 4.7, just to avoid some 4.6 packaging issues, and for better
+>>> gcc plugin support.)
+>>>
+>>> I'm curious what gcc 4.6 binaries are common in the wild besides
+>>> old-stable Debian (unsupported in maybe a year from now?) and 12.04
+>>> Ubuntu (going fully unsupported in 2 weeks). It looks like 4.6 was
+>>> used only in Fedora 15 and 16 (both EOL).
+>>
+>> I think we are better off defining two versions: One that we know
+>> a lot of people care about, and we actively try to make that work
+>> well in all configurations (e.g. 4.6, 4.7 or 4.8), fixing all warnings
+>> we run into, and an older version that we try not to break
+>> intentionally (e.g. 3.4, 4.1 or 4.3) but that we only fix when
+>> someone actually runs into a problem they can't work around
+>> by upgrading to a more modern compiler.
+>
+> For "working well everywhere" I feel like 4.8 is the better of those
+> three (I'd prefer 4.9). I think we should avoid 4.6 -- it seems not
+> widely used.
 
-If we are running on Gemini, look up a syscon regmap through
-a phandle and enable VBUS and optionally the Mini-B connector.
+I suspect that 4.9 might be the one that actually works best
+across architectures, and it contained some very significant
+changes. In my testing gcc-5 tends to behave very similarly
+to 4.9, and gcc-6 introduced a larger number of new warnings,
+so that would clearly be too new for a recommended version.
 
-If the device is flagged as "wakeup-source" using the standard
-DT bindings, we also enable this in the global controller for
-respective port.
+The suggestion of 4.9 or higher is appealing as a recommendation
+because it matches what I would personally tell people:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/usb/host/Kconfig       |  1 +
- drivers/usb/host/fotg210-hcd.c | 76 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
+- If you have gcc-4.9 or newer and you don't rely on any newer
+  features, there is no need to upgrade
+- Wth gcc-4.8, the -Wmaybe-uninitialized warnings are now turned
+  off because they were too noisy, so upgrading is probably a good
+  idea even though the compiler is otherwise ok and in widespread
+  use
+- gcc-4.6 and 4.7 are basically usable for building kernels, but the
+  warning output is often counterproductive, and the generated
+  object code may be noticeably worse.
+- anything before gcc-4.6 is missing too many features to be
+  useful on ARM, but may still be fine on other architectures.
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 407d947b34ea..9750783e5481 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -375,6 +375,7 @@ config USB_ISP1362_HCD
- config USB_FOTG210_HCD
- 	tristate "FOTG210 HCD support"
- 	depends on USB && HAS_DMA && HAS_IOMEM
-+	select MFD_SYSCON
- 	---help---
- 	  Faraday FOTG210 is an OTG controller which can be configured as
- 	  an USB2.0 host. It is designed to meet USB2.0 EHCI specification
-diff --git a/drivers/usb/host/fotg210-hcd.c b/drivers/usb/host/fotg210-hcd.c
-index 906e42458791..146f1eb96b60 100644
---- a/drivers/usb/host/fotg210-hcd.c
-+++ b/drivers/usb/host/fotg210-hcd.c
-@@ -46,6 +46,10 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/clk.h>
-+#include <linux/bitops.h>
-+/* For Cortina Gemini */
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
- 
- #include <asm/byteorder.h>
- #include <asm/irq.h>
-@@ -5583,6 +5587,72 @@ static void fotg210_init(struct fotg210_hcd *fotg210)
- 	iowrite32(value, &fotg210->regs->otgcsr);
- }
- 
-+/*
-+ * Gemini-specific initialization function, only executed on the
-+ * Gemini SoC using the global misc control register.
-+ */
-+#define GEMINI_GLOBAL_MISC_CTRL		0x30
-+#define GEMINI_MISC_USB0_WAKEUP		BIT(14)
-+#define GEMINI_MISC_USB1_WAKEUP		BIT(15)
-+#define GEMINI_MISC_USB0_VBUS_ON	BIT(22)
-+#define GEMINI_MISC_USB1_VBUS_ON	BIT(23)
-+#define GEMINI_MISC_USB0_MINI_B		BIT(29)
-+#define GEMINI_MISC_USB1_MINI_B		BIT(30)
-+
-+static int fotg210_gemini_init(struct device *dev, struct usb_hcd *hcd)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct regmap *map;
-+	bool mini_b;
-+	bool wakeup;
-+	u32 mask, val;
-+	int ret;
-+
-+	map = syscon_regmap_lookup_by_phandle(np, "syscon");
-+	if (IS_ERR(map)) {
-+		dev_err(dev, "no syscon\n");
-+		return PTR_ERR(map);
-+	}
-+	mini_b = of_property_read_bool(np, "cortina,gemini-mini-b");
-+	wakeup = of_property_read_bool(np, "wakeup-source");
-+
-+	/*
-+	 * Figure out if this is USB0 or USB1 by simply checking the
-+	 * physical base address.
-+	 */
-+	mask = 0;
-+	if (hcd->rsrc_start == 0x69000000) {
-+		val = GEMINI_MISC_USB1_VBUS_ON;
-+		if (mini_b)
-+			val |= GEMINI_MISC_USB1_MINI_B;
-+		else
-+			mask |= GEMINI_MISC_USB1_MINI_B;
-+		if (wakeup)
-+			val |= GEMINI_MISC_USB1_WAKEUP;
-+		else
-+			mask |= GEMINI_MISC_USB1_WAKEUP;
-+	} else {
-+		val = GEMINI_MISC_USB0_VBUS_ON;
-+		if (mini_b)
-+			val |= GEMINI_MISC_USB0_MINI_B;
-+		else
-+			mask |= GEMINI_MISC_USB0_MINI_B;
-+		if (wakeup)
-+			val |= GEMINI_MISC_USB0_WAKEUP;
-+		else
-+			mask |= GEMINI_MISC_USB0_WAKEUP;
-+	}
-+
-+	ret = regmap_update_bits(map, GEMINI_GLOBAL_MISC_CTRL, mask, val);
-+	if (ret) {
-+		dev_err(dev, "failed to initialize Gemini PHY\n");
-+		return ret;
-+	}
-+
-+	dev_info(dev, "initialized Gemini PHY\n");
-+	return 0;
-+}
-+
- /**
-  * fotg210_hcd_probe - initialize faraday FOTG210 HCDs
-  *
-@@ -5662,6 +5732,12 @@ static int fotg210_hcd_probe(struct platform_device *pdev)
- 
- 	fotg210_init(fotg210);
- 
-+	if (of_device_is_compatible(dev->of_node, "cortina,gemini-usb")) {
-+		retval = fotg210_gemini_init(dev, hcd);
-+		if (retval)
-+			goto failed_dis_clk;
-+	}
-+
- 	retval = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (retval) {
- 		dev_err(dev, "failed to add hcd with err %d\n", retval);
--- 
-2.9.3
+On the other hand, there is a noticeable difference in compile
+speed, as a 5% slowdown compared to the previous release
+apparently is not considered a regression. These are the times
+I see for building ARM 'vexpress_defconfig':
+
+gcc-4.4: real 0m47.269s user 11m48.576s
+gcc-4.5: real 0m44.878s user 10m58.900s
+gcc-4.6: real 0m44.621s user 11m34.716s
+gcc-4.7: real 0m47.476s user 12m42.924s
+gcc-4.8: real 0m48.494s user 13m19.736s
+gcc-4.9: real 0m50.140s user 13m44.876s
+gcc-5.x: real 0m51.302s user 14m05.564s
+gcc-6.x: real 0m54.615s user 15m06.304s
+gcc-7.x: real 0m56.008s user 15m44.720s
+
+That is a factor of 1.5x in CPU cycles between slowest and
+fastest, so there is clearly a benefit to keeping the old versions
+around, but there is also no clear cut-off other thannoticing
+that gcc-4.4 is slower than 4.5 in this particular
+configuration.
+
+> For an old compiler... yikes. 3.4 sounds insane to me. :)
+
+That was my initial thought as well. On ARM, it clearly is
+insane, as even gcc-4.0 is unable to build any of the modern
+defconfigs (lacking -mabi=aapcs, ICE when building vsprintf.c)
+and even the patch I did to get gcc-4.1 to build is probably
+too ugly to get merged, so to build any unpatched kernel after
+linux-3.6 you need at least gcc-4.2, or even gcc-4.4 for the
+''defconfig' (gcc-4.3 if you disable vdso).
+
+Then again, on x86, old cmpilers were claimed to be much better
+supported. I just tried it out and found that no x86 defconfig kernel
+since linux-3.2 could be built with gcc-3.4, probably not on any
+other architecture either (it cannot have forward declarations
+for inline functions and we have one in kernel/sched_fair.c).
+
+I think that would be a really good argument for requiring
+something newer ;-)
+
+The linux-4.2 x86 defconfig could still be built with gcc-4.0, but
+later kernels have several minor problems with that, and
+require at least gcc-4.3.
+
+If we are ok with this status quo, we could simply declare gcc-4.3
+the absolute minimum version for the kernel, make gcc-4.9
+the recommeded minimum version, and remove all workarounds
+for gcc-4.2 or older.
+
+If anyone has a good reason for gcc-4.0 through gcc-4.2, then
+we would need a small number of patches to get them back
+working with x86 defconfig.
+
+       Arnd
