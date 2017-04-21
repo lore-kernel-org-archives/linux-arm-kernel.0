@@ -1,108 +1,112 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Fri, 21 Apr 2017 17:05:41 +0000
-Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
-References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
- <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
- <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
- <20170414210646.GA5346@localhost>
- <CAErSpo731xSzrnKF+G+8SA_UUHy7ROA1V9oFkpwKi85GQf9VAg@mail.gmail.com>
- <20170417174712.GA7575@localhost>
- <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
-Message-ID: <20170421170414.GA2429@localhost>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 21 Apr 2017 18:14:02 +0100
+Subject: [PATCH V8 5/6] ACPI: Support the probing on the devices which
+ apply indirect-IO
+In-Reply-To: <a73c87d3-59fc-843b-a4e1-d9f5201bffd9@gmail.com>
+References: <1490887619-61732-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1490887619-61732-6-git-send-email-yuanzhichang@hisilicon.com>
+ <CALdTtnuO=592n+PoR_kkdTyeFYRd90VyPf0JLwnEo7DtXwzoPA@mail.gmail.com>
+ <a73c87d3-59fc-843b-a4e1-d9f5201bffd9@gmail.com>
+Message-ID: <20170421171352.GA27801@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 10:48:15AM -0500, Bjorn Helgaas wrote:
-> On Mon, Apr 17, 2017 at 12:47 PM, Jayachandran C
-> <jnair@caviumnetworks.com> wrote:
-> > On Fri, Apr 14, 2017 at 09:00:06PM -0500, Bjorn Helgaas wrote:
-> >> On Fri, Apr 14, 2017 at 4:06 PM, Jayachandran C
-> >> <jnair@caviumnetworks.com> wrote:
-> >> > On Thu, Apr 13, 2017 at 07:19:11PM -0500, Bjorn Helgaas wrote:
-> >> >> I tentatively applied both patches to pci/host-thunder for v4.12.
-> >> >>
-> >> >> However, I am concerned about the topology here:
-> >> >>
-> >> >> On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
-> >> >> > On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
-> >> >> > PCI topology is slightly unusual.  For a multi-node system, it looks
-> >> >> > like:
-> >> >> >
-> >> >> >     00:00.0 [PCI] bridge to [bus 01-1e]
-> >> >> >     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
-> >> >> >     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
-> >> >> >     03:00.0 PCIe Endpoint
-> >> >>
-> >> >> A root port normally has a single PCIe link leading downstream.
-> >> >> According to this, 02:00.0 is a root port that has the usual
-> >> >> downstream link leading to 03:00.0, but it also has an upstream link
-> >> >> to 01:0a.0.
-> >> >
-> >> > The PCI topology is a bit broken due to the way that the PCIe IP block
-> >> > was integrated into SoC PCI bridges and devices. The current mechanism
-> >> > of adding a PCI-PCIe bridge to glue these together is not ideal.
-> >>
-> >> Yeah, that's definitely broken.
-> >>
-> >> >> Maybe this example is omitting details that are not relevant to DMA
-> >> >> aliases?  The PCIe capability only contains one set of link-related
-> >> >> registers, so I don't know how we could manage a single device that
-> >> >> has two links.
-> >> >
-> >> > The root port is standard and has just one link to the EP (or whatever
-> >> > is on the external PCIe slot). The fallout of the current hw design is
-> >> > that the PCI-PCIe bridge has a link that does not follow standard and
-> >> > does not have a counterpart (as you noted).
-> >> >
-> >> >> A device with two links would break things like ASPM.  In
-> >> >> set_pcie_port_type(), for example, we have this comment:
-> >> >>
-> >> >>    * A Root Port or a PCI-to-PCIe bridge is always the upstream end
-> >> >>    * of a Link.  No PCIe component has two Links.  Two Links are
-> >> >>    * connected by a Switch that has a Port on each Link and internal
-> >> >>    * logic to connect the two Ports.
-> >> >>
-> >> >> The topology above breaks these assumptions, which will make
-> >> >> pdev->has_secondary_link incorrect, which means ASPM won't work
-> >> >> correctly.
-> >> >
-> >> > Given the current hardware, the pcieport driver seems to work reasonably
-> >> > for the root port at 02:00.0, with AER support. I will take a look at the
-> >> > ASPM part.
-> >>
-> >> I don't think pcieport itself cares much about links.  ASPM does, but
-> >> it looks like set_pcie_port_type() actually is smart enough to know
-> >> that PCI-to-PCIe bridges and Root Ports always have links on their
-> >> secondary sides.  So has_secondary_link probably does get set
-> >> correctly.
-> >>
-> >> But I think you'll hit the VIA "strange chipset" thing in
-> >> pcie_aspm_init_link_state(), which will probably prevent us from doing
-> >> ASPM on the link from 02:00.0 to 03:00.0.
-> >>
-> >> Could you collect "lspci -vv" output from this system?  I'd like to
-> >> archive that as background for this IOMMU issue and the ASPM tweaks I
-> >> suspect we'll have to do.  I *wish* we had more information about that
-> >> VIA thing, because I suspect we could get rid of it if we had more
-> >> details.
-> >
-> > The full logs are slightly large, so I have kept them at:
-> > https://github.com/jchandra-cavm/thunderx2/blob/master/logs/
-> > The lspci -vv output is lspci-vv.txt and lspci -tvn output is lspci-tvn.txt
-> >
-> > The output is from 2 socket system, the cards are not on the first slot
-> > like the example above, so the bus and device numbers are different.
+On Fri, Apr 21, 2017 at 10:22:52AM +0800, zhichang.yuan wrote:
+> Hi, Dann,
 > 
-> Can somebody with this system collect the "lspci -xxxx" output as well?
 > 
-> I'm making some lspci changes to handle the PCI-to-PCIe bridge
-> correctly, and I can use the "lspci -xxxx" output to create an lspci
-> test case.
+> 
+> On 04/21/2017 04:57 AM, dann frazier wrote:
+> > On Thu, Mar 30, 2017 at 9:26 AM, zhichang.yuan
+> > <yuanzhichang@hisilicon.com> wrote:
+> >> On some platforms(such as Hip06/Hip07), the legacy ISA/LPC devices access I/O
+> >> with some special host-local I/O ports known on x86. To access the I/O
+> >> peripherals, an indirect-IO mechanism is introduced to mapped the host-local
+> >> I/O to system logical/fake PIO similar the PCI MMIO on architectures where no
+> >> separate I/O space exists. Just as PCI MMIO, the host I/O range should be
+> >> registered before probing the downstream devices and set up the I/O mapping.
+> >> But current ACPI bus probing doesn't support these indirect-IO hosts/devices.
+> >>
+> >> This patch introdueces a new ACPI handler for this device category. Through the
+> >> handler attach callback, the indirect-IO hosts I/O registration is done and
+> >> all peripherals' I/O resources are translated into logic/fake PIO before
+> >> starting the enumeration.
+> >>
+> >> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+> >> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> >> ---
+> >>  drivers/acpi/Makefile          |   1 +
+> >>  drivers/acpi/acpi_indirectio.c | 344 +++++++++++++++++++++++++++++++++++++++++
+> >>  drivers/acpi/internal.h        |   5 +
+> >>  drivers/acpi/scan.c            |   1 +
+> >>  4 files changed, 351 insertions(+)
+> >>  create mode 100644 drivers/acpi/acpi_indirectio.c
+> >>
+> >> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> >> index a391bbc..10e5f2b 100644
+> >> --- a/drivers/acpi/Makefile
+> >> +++ b/drivers/acpi/Makefile
+> >> @@ -57,6 +57,7 @@ acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
+> >>  acpi-y                         += acpi_lpat.o
+> >>  acpi-$(CONFIG_ACPI_GENERIC_GSI) += irq.o
+> >>  acpi-$(CONFIG_ACPI_WATCHDOG)   += acpi_watchdog.o
+> >> +acpi-$(CONFIG_INDIRECT_PIO)    += acpi_indirectio.o
+> >>
+> >>  # These are (potentially) separate modules
+> >>
+> >> diff --git a/drivers/acpi/acpi_indirectio.c b/drivers/acpi/acpi_indirectio.c
+> >> new file mode 100644
+> >> index 0000000..c8c80b5
+> >> --- /dev/null
+> >> +++ b/drivers/acpi/acpi_indirectio.c
+> >> @@ -0,0 +1,344 @@
+> 
+> [snip]
+> 
+> >> +acpi_build_logiciores_template(struct acpi_device *adev,
+> >> +                       struct acpi_buffer *buffer)
+> >> +{
+> >> +       acpi_handle handle = adev->handle;
+> >> +       struct acpi_resource *resource;
+> >> +       acpi_status status;
+> >> +       int res_cnt = 0;
+> >> +
+> >> +       status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> >> +                                    acpi_count_logiciores, &res_cnt);
+> >> +       if (ACPI_FAILURE(status) || !res_cnt) {
+> >> +               dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
+> >> +               return -EINVAL;
+> >> +       }
+> >> +
+> >> +       buffer->length = sizeof(struct acpi_resource) * (res_cnt + 1) + 1;
+> >> +       buffer->pointer = kzalloc(buffer->length - 1, GFP_KERNEL);
+> > 
+> > (Seth Forshee noticed this issue, just passing it on)
+> > 
+> > Should this just allocate the full buffer->length? That would keep the
+> > length attribute accurate (possibly avoiding an off-by-1 error later).
+> > It's not clear what the trailing byte is needed for, but other drivers
+> > allocate it as well (drivers/acpi/pci_link.c and
+> > drivers/platform/x86/sony-laptop.c).
+> 
+> Thanks for your suggestion!
+> 
+> I also curious why this one appended byte is needed as it seems the later
+> acpi_set_current_resources() doesn't use this byte.
+> And I tested without setting the buffer->length as the length of resource list
+> directly, it seems ok.
+> 
+> But anyway, it looks more reasonable to allocate the memory with the
+> buffer->length rather than buffer->length - 1;
+> 
+> I was made the V9 patch-set, and I can add your suggestion there. But I also
+> awaiting for ARM64 ACPI maintainer's comment about this patch before really
+> sending V9. I wonder whether there is better way to make our indirect-IO devices
+> can be assigned the logic PIO before the enumeration...
+> 
+> Lorenzo, Hanjun, what do you think about this patch?
 
-[Sorry was AFK for a few days]
+I will get to it shortly, sorry for the delay.
 
-I have updated the above directory with the log. Also tested your next branch
-and it works fine on ThunderX2.
-
-JC.
+Thanks,
+Lorenzo
