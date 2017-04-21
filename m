@@ -1,134 +1,119 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Apr 2017 09:43:17 +0200
-Subject: [PATCH v6 0/6] add support for AXP20X and AXP22X battery power
- supply driver
-In-Reply-To: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
-References: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170421074317.rqk253sblxjaayzz@lukather>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Fri, 21 Apr 2017 07:46:27 +0000
+Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
+In-Reply-To: <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
+References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
+ <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
+ <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
+ <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
+ <20170414214452.GA21870@bhelgaas-glaptop.roam.corp.google.com>
+ <66168dde-7719-6f74-3f06-8e4724dd2918@codeaurora.org>
+ <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
+ <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 18, 2017 at 09:34:15AM +0200, Quentin Schulz wrote:
-> This is a series for AXP20X and AXP22X battery power supply without the
-> support for changing constant charge current from the DT. The patches for
-> supporting the constant charge current from DT are ready and will be sent
-> once the battery framework required to make this work has been merged.
-> 
-> v6:
->   - removed mention to fixed battery in DT-binding documentation,
-> 
-> Quote from v4 cover letter:
-> 
-> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose
-> information and data of the various power supplies they support such as
-> ACIN, battery and VBUS. For example, they expose the current battery
-> voltage, charge or discharge, as well as ACIN and VBUS current voltages
-> and currents, internal PMIC temperature and ADC on 2 different GPIOs
-> when in the right mode (for the AXP209 only).
-> 
-> The ACIN power supply driver is added by this patch. The AXP20X and
-> AXP22X can both read the status and the "usability" of the power supply
-> but only the AXP209 will be able to tell the current current and voltage
-> of the power supply by reading ADC channels. It is simply not supported
-> by the AXP22X PMICs.
-> 
-> The battery power supply driver is also added by this patch. The AXP20X
-> and AXP22X share most of their behaviour but have slight variations. The
-> allowed target voltages for battery charging are not the same, the
-> AXP22X PMIC are able to tell if the battery percentage computed by the
-> PMIC is trustworthy and they have different formulas for computing max
-> current for battery power supply. The driver is able to give the current
-> voltage and current of the battery (be it charging or discharging), the
-> maximal and minimal voltage and maximal current allowed for the battery,
-> whether the battery is present and usable and its capacity. It will get
-> the battery current current and voltage by reading the ADC channels. The
-> PMIC allows maximal voltages (4.36V for AXP20X and 4.22V and 4.24V for
-> AXP22X) that should not be used with Lithium-based batteries and since
-> this PMIC is supposed to be used with Lithium-based batteries, they have
-> been disabled. The values returned by the ADC driver are multipled by
-> 1000 to scale from the mV returned by the ADC to the uV expected by the
-> power supply framework.
-> 
-> This series of patch adds DT bindings for ACIN power supply, ADC and
-> battery power supply drivers for AXP20X and AXP22X PMICs and their
-> documentation. It also enables the supported power supplies for the
-> Nextthing Co. CHIP and Sinlinx SinA33 boards.
-> 
-> The different drivers are also added to the MFD cells of the AXP20X and
-> AXP22X cells and the writeable and volatile regs updated to work with
-> the newly added drivers.
-> 
-> This series of patch is based on a previous upstreaming attempt done by
-> Bruno Pr?mont few months ago. It differs in three points: the ADC
-> driver does not tell the battery temperature (TS_IN) as I do not have a
-> board to test it with, it does not tell the instantaneous battery power
-> as it returns crazy values for me and finally no support for OCV curves
-> for the battery.
-> 
-> You can test these patches from this repo and branch:
-> https://github.com/QSchulz/linux/tree/axp2xx_adc_batt_ac_v4
-> 
-> v4:
->  - added the ability to set maximum constant charge current from sysfs,
->  - added a warning when setting a higher than current maximum constant charge
->  current,
->  - set default to minimum possible value for current and maximum constant charge
->  current when no battery DT is present or invalid battery DT,
->  - fixed a forgotten custom formula to compute maximum constant charge current
->  for AXP22X,
->  - automatically lower the current constant charge current when it is higher
->  than the maximum constant charge current about to be set,
-> 
-> v3:
->  - Removed DT property for constant charge current in favor of the WIP
->  battery framework as requested by Sebastian Reichel,
->  - Using a simple if condition instead of a switch in the ADC driver,
->  - Fixed error handling in ADC driver's probe,
->  - Fixed missing call to iio_map_array_unregister in the ADC driver's
->  remove,
->  - Removed ADC driver's DT node and documentation,
->  - Merged IIO channel mapping patches into the original ADC driver
->  patch,
->  - Removed `adding V-OFF to writeable reg' patch as it's already in
->  writeable reg range,
-> 
-> v2:
->  - Some registers' name have been changed to better reflect their
->  purpose,
->  - Make VBUS power supply driver use IIO channels when AXP ADC driver is
->  enabled, but fall back on previous behavior when disabled. This is made
->  to avoid the ADC driver overwritting registers for VBUS power supply
->  ADC when removed,
->  - Removed useless adding of data registers to volatile registers,
->  - Reordered IIO channels, now grouped by same part of the PMIC (e.g.
->  voltage and current of the battery have the same index in different
->  IIO types),
->  - Added structures for specific data instead of matching on IDs,
->  - Switched from DT IIO channels mapping to iio_map structures IIO
->  channels mapping,
-> 
-> Quentin
-> 
-> Quentin Schulz (6):
->   dt-bindings: power: supply: add AXP20X/AXP22X battery DT binding
->   power: supply: add battery driver for AXP20X and AXP22X PMICs
->   ARM: dtsi: axp209: add battery power supply subnode
->   ARM: dtsi: axp22x: add battery power supply subnode
->   ARM: dts: sun8i: sina33: enable battery power supply subnode
->   ARM: sun5i: chip: enable battery power supply subnode
+Hi Bjorn/Kaya,
 
-Applied the last 4 patches.
 
-Maxime
+>
+>On 4/17/2017 12:38 PM, Bjorn Helgaas wrote:
+>>> Like you said, what do we do by default is the question. Should we opt
+>>> for safe like we are doing, or try to save some power.
+>> I think safety is paramount.  Every user should be able to boot safely
+>> without any kernel parameters.  We don't want users to have a problem
+>> booting and then have to search for a workaround like booting with
+>> "pcie_aspm=off".  Most users will never do that.
+>>
+>
+>OK, no problem with leaving the behavior as it is.
+>
+>My initial approach was #2. We knew this way that user had full control
+>over the ASPM policy by changing the BIOS option. Then, Mayurkumar
+>complained that ASPM is not enabled following a hotplug insertion to an
+>empty slot. That's when I switched to #3 as it sounded like a good thing
+>to have for us.
+>
+>> Here's a long-term strawman proposal, see what you think:
+>>
+>>   - Deprecate CONFIG_PCIEASPM_DEFAULT, CONFIG_PCIEASPM_POWERSAVE, etc.
+>>   - Default aspm_policy is POLICY_DEFAULT always.
+>>   - POLICY_DEFAULT means Linux doesn't touch anything: if BIOS enabled
+>> ASPM, we leave it that way; we leave ASPM disabled on hot-added
+>> devices.
+>
+I am also ok with leaving the same behavior as now.
+But still following is something open I feel besides, Which may be there in your comments redundantly.
+The current problem is, pcie_aspm_exit_link_state() disables the ASPM configuration even
+if POLICY_DEFAULT was set.
+I am seeing already following problem(or may be influence) with it. The Endpoint I have does not have
+does not have "Presence detect change" mechanism. Hot plug is working with Link status events.
+When link is in L1 or L1SS and if EP is powered off, no Link status change event are triggered (It might be
+the expected behavior in L1 or L1SS).  When next time EP is powered on there are link down and
+link up events coming one after other. BIOS enables ASPM on Root port and Endpoint, but while
+processing link status down, pcie_aspm_exit_link_state() clears the ASPM already which were enabled by BIOS. 
+If we want to follow above approach then shall we consider having something similar as following?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170421/90365e17/attachment.sig>
+diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+index 1dfa10c..bf5be6d 100644
+--- a/drivers/pci/pcie/aspm.c
++++ b/drivers/pci/pcie/aspm.c
+@@ -940,7 +940,8 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
+        parent_link = link->parent;
+
+        /* All functions are removed, so just disable ASPM for the link */
+-       pcie_config_aspm_link(link, 0);
++       if (aspm_policy != POLICY_DEFAULT)
++               pcie_config_aspm_link(link, 0);
+        list_del(&link->sibling);
+        list_del(&link->link);
+        /* Clock PM is for endpoint device */
+ 
+
+>I can easily see people complaining the other way around. There
+>could be some boot FW that doesn't know what ASPM is and this particular
+>system could rely on the compile time option for enabling power options.
+>Maybe, a command line option will be required for them to keep the existing
+>behavior.
+>
+>>   - Deprecate kernel boot parameters (possibly keep pcie_aspm=off for
+>> debugging use).
+>>   - Use /sys/module/pcie_aspm/parameters/policy for run-time
+>> system-wide  control, including for future hot-added devices.
+>>   - Remove CONFIG_PCIEASPM_DEBUG and enable that code always, so we
+>> have fine-grained run-time control.
+>>
+>
+>Runtime control sounds like a better plan. We need hooks into the system
+>power management policy.
+>
+>>> Maybe, we are missing a HPP option from the PCI spec.
+>> That's an interesting idea.  _HPX does have provision for manipulating
+>> Link Control bits (see ACPI r5.0, sec 6.2.8.3), but I don't think very
+>> many systems implement it.  And there's currently no connection
+>> between program_hpp_type2() and aspm.c, so I'm a little worried that
+>> we might have issues if a system did implement an _HPX that sets any
+>> of the ASPM bits.
+>
+>I looked at the spec some more. These are there to restore the register
+>settings following hotplug insertion. I agree it won't play nice with ASPM
+>as the control bits need to be enabled in coordination with the upstream
+>device.
+>
+>I think the right approach is to let the userspace feed the required
+>policy to the kernel like you suggested. Then, it needs to be per port
+>via link_state to have the most flexibility.
+>
+>
+>--
+>Sinan Kaya
+>Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
