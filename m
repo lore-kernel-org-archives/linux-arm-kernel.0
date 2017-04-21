@@ -1,69 +1,41 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 21 Apr 2017 12:10:14 +1000
-Subject: linux-next: build failure after merge of the drm-misc tree
-Message-ID: <20170421121014.3ee14a83@canb.auug.org.au>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 21 Apr 2017 10:10:38 +0800
+Subject: [PATCH] ASoC: mediatek: add I2C dependency for CS42XX8
+In-Reply-To: <20170420081541.658178-1-arnd@arndb.de>
+References: <20170420081541.658178-1-arnd@arndb.de>
+Message-ID: <1492740638.23218.0.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, 2017-04-20 at 10:15 +0200, Arnd Bergmann wrote:
+> We should not select drivers that depend on I2C when that is disabled,
+> as it results in a build error:
+> 
+> warning: (SND_SOC_MT2701_WM8960) selects SND_SOC_WM8960 which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && I2C)
+> sound/soc/codecs/wm8960.c:1469:1: error: data definition has no type or storage class [-Werror]
+> sound/soc/codecs/wm8960.c:1469:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+> 
+> Fixes: 8625c1dbd876 ("ASoC: mediatek: Add mt2701-wm8960 machine driver")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  sound/soc/mediatek/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
+> index c6f39040f71f..5c68797f36c4 100644
+> --- a/sound/soc/mediatek/Kconfig
+> +++ b/sound/soc/mediatek/Kconfig
+> @@ -24,7 +24,7 @@ config SND_SOC_MT2701_CS42448
+>  
+>  config SND_SOC_MT2701_WM8960
+>  	tristate "ASoc Audio driver for MT2701 with WM8960 codec"
+> -	depends on SND_SOC_MT2701
+> +	depends on SND_SOC_MT2701 && I2C
+>  	select SND_SOC_WM8960
+>  	help
+>  	  This adds ASoC driver for Mediatek MT2701 boards
 
-After merging the drm-misc tree, today's linux-next build (x86_64
-allmodconfig) failed like this:
 
-drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
-  .kmap_atomic = tee_shm_op_kmap_atomic,
-  ^
-drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-  .kmap_atomic = tee_shm_op_kmap_atomic,
-                 ^
-drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
-drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
-  .kmap = tee_shm_op_kmap,
-  ^
-drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-  .kmap = tee_shm_op_kmap,
-          ^
-drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
+Acked-by: Ryder Lee <ryder.lee@mediatek.com>
 
-Caused by commit
-
-  f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
-
-interacting with commit
-
-  967c9cca2cc5 ("tee: generic TEE subsystem")
-
-from the arm-soc tree.
-
-I applied the following merge fix patch for today:
-
-From: Stephen Rothwell <sfr@canb.auug.org.au>
-Date: Fri, 21 Apr 2017 12:06:32 +1000
-Subject: [PATCH] tee: merge fix for dma-ops field name changes
-
-Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
----
- drivers/tee/tee_shm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-index 0be1e3e93bee..4e14c9c9cb1c 100644
---- a/drivers/tee/tee_shm.c
-+++ b/drivers/tee/tee_shm.c
-@@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
- 	.map_dma_buf = tee_shm_op_map_dma_buf,
- 	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
- 	.release = tee_shm_op_release,
--	.kmap_atomic = tee_shm_op_kmap_atomic,
--	.kmap = tee_shm_op_kmap,
-+	.map_atomic = tee_shm_op_kmap_atomic,
-+	.map = tee_shm_op_kmap,
- 	.mmap = tee_shm_op_mmap,
- };
- 
--- 
-2.11.0
-
--- 
-Cheers,
-Stephen Rothwell
+Thanks
