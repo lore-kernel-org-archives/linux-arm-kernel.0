@@ -1,71 +1,77 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 21 Apr 2017 19:30:41 +0200
-Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
- pass2.x host controller
-In-Reply-To: <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
-References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
- <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1e1aef81-3d0e-02a3-8005-47d9c1d9d5f3@semihalf.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Apr 2017 18:32:33 +0100
+Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
+ mmaping code
+In-Reply-To: <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
+References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
+ <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <20170421173233.GE5312@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.04.2017 18:56, Bjorn Helgaas wrote:
-> On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
->> Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
->> However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
->> in their BARs which results in driver probe failure during resource request.
->> Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
->> quirk entry to obtain BAR addresses correction using EA header emulation.
->>
->> Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> CC: stable at vger.kernel.org	# v4.10+
->
-> Sorry Tomasz, I must have mistakenly marked this "accepted" in
-> patchwork, so it fell off my to-do list.  It's too late to get this in
-> v4.11, but I can still apply it for v4.12.
->
-> I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
-> patch to tidy up whitespace, which makes this patch look like just:
->
->         /* SoC pass2.x */
->         THUNDER_PEM_QUIRK(1, 0),
->         THUNDER_PEM_QUIRK(1, 1),
-> +       THUNDER_ECAM_QUIRK(1, 10),
->
-> Please double-check it to make sure this is what you need.
+On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
+> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
+> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable should not
+> use it and take advantage of contiguous nature of the allocation.
 
-This is exactly what we need. Thank you Bjorn.
+As I replied to your original patch, I think
+dma_common_contiguous_remap() should be fixed not to leave a dangling
+area->pages pointer.
 
-Tomasz
+>  arch/arm64/mm/dma-mapping.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index f7b5401..41c7c36 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -703,6 +703,10 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+>  	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+>  		return ret;
+>  
+> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
+> +		return vm_iomap_memory(vma,
+> +				page_to_phys(vmalloc_to_page(cpu_addr)), size);
 
->
->> ---
->>  drivers/acpi/pci_mcfg.c | 7 ++++---
->>  1 file changed, 4 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> index a6a4cea..a0a391e 100644
->> --- a/drivers/acpi/pci_mcfg.c
->> +++ b/drivers/acpi/pci_mcfg.c
->> @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
->>  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
->>  	{ "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,	    \
->>  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
->> +#define THUNDER_ECAM_QUIRK(rev, seg)					\
->> +	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
->> +	&pci_thunder_ecam_ops }
->>  	/* SoC pass2.x */
->>  	THUNDER_PEM_QUIRK(1, 0),
->>  	THUNDER_PEM_QUIRK(1, 1),
->> +	THUNDER_ECAM_QUIRK(1, 10),
->>
->> -#define THUNDER_ECAM_QUIRK(rev, seg)					\
->> -	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
->> -	&pci_thunder_ecam_ops }
->>  	/* SoC pass1.x */
->>  	THUNDER_PEM_QUIRK(2, 0),	/* off-chip devices */
->>  	THUNDER_PEM_QUIRK(2, 1),	/* off-chip devices */
->> --
->> 2.7.4
->>
+I replied to Geert's patch on whether we actually need to call
+dma_common_contiguous_remap() in __iommu_alloc_attrs() if the device is
+coherent. We don't do this for the swiotlb allocation. If we are going
+to change this, cpu_addr may or may not be in the vmalloc range and
+vmalloc_to_page() would fail (I guess we could add an is_vmalloc_addr()
+check).
+
+Alternatively, just open-code dma_common_contiguous_remap() in
+__iommu_alloc_attrs() to keep a valid area->pages around (I think Geert
+already suggested this). AFAICT, arch/arm does this already in its own
+__iommu_alloc_buffer().
+
+Yet another option would be for iommu_dma_alloc() to understand
+DMA_ATTR_FORCE_CONTIGUOUS and remove the arm64-specific handling.
+
+> @@ -715,8 +719,19 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  			       size_t size, unsigned long attrs)
+>  {
+>  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> -	struct vm_struct *area = find_vm_area(cpu_addr);
+> +	struct vm_struct *area;
+> +
+> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+> +		int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+> +
+> +		if (!ret)
+> +			sg_set_page(sgt->sgl, vmalloc_to_page(cpu_addr),
+> +				    PAGE_ALIGN(size), 0);
+>  
+> +		return ret;
+> +	}
+> +
+> +	area = find_vm_area(cpu_addr);
+
+As Russell already stated, this function needs a "fix" regardless of the
+DMA_ATTR_FORCE_CONTIGUOUS as we may not have page structures
+(*_from_coherent allocations). But I agree with you that
+dma_get_sgtable() issues should be addressed separately (and I'm happy
+to disable such API on arm64 until sorted).
+
+-- 
+Catalin
