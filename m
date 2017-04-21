@@ -1,77 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Apr 2017 18:32:33 +0100
-Subject: [PATCH v2] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS
- mmaping code
-In-Reply-To: <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
-References: <CGME20170331110300eucas1p1535f003de554a9f6e1db56eb47630885@eucas1p1.samsung.com>
- <1490958171-2303-1-git-send-email-a.hajda@samsung.com>
-Message-ID: <20170421173233.GE5312@e104818-lin.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 21 Apr 2017 19:26:03 +0200
+Subject: [PATCH V15 03/11] cper: add timestamp print to CPER status
+ printing
+In-Reply-To: <35cc4ae0-e8fa-fd3a-5d7f-243ed2e82ea0@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-4-git-send-email-tbaicar@codeaurora.org>
+ <20170421122150.76cce2cfrt767glv@pd.tnic>
+ <35cc4ae0-e8fa-fd3a-5d7f-243ed2e82ea0@codeaurora.org>
+Message-ID: <20170421172603.4574wonnm5tgvbcn@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 31, 2017 at 01:02:51PM +0200, Andrzej Hajda wrote:
-> In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
-> is invalid. __iommu_mmap_attrs and __iommu_get_sgtable should not
-> use it and take advantage of contiguous nature of the allocation.
+On Fri, Apr 21, 2017 at 10:04:35AM -0600, Baicar, Tyler wrote:
+> This is basically what I already had in v14...you asked to move it into a
+> different if-statement? https://lkml.org/lkml/2017/4/12/397
 
-As I replied to your original patch, I think
-dma_common_contiguous_remap() should be fixed not to leave a dangling
-area->pages pointer.
+Well, clearly I've been smoking some nasty potent sh*t. :-\
 
->  arch/arm64/mm/dma-mapping.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index f7b5401..41c7c36 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -703,6 +703,10 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
->  	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
->  		return ret;
->  
-> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS)
-> +		return vm_iomap_memory(vma,
-> +				page_to_phys(vmalloc_to_page(cpu_addr)), size);
+/me goes and looks at the spec:
 
-I replied to Geert's patch on whether we actually need to call
-dma_common_contiguous_remap() in __iommu_alloc_attrs() if the device is
-coherent. We don't do this for the swiotlb allocation. If we are going
-to change this, cpu_addr may or may not be in the vmalloc range and
-vmalloc_to_page() would fail (I guess we could add an is_vmalloc_addr()
-check).
+"Bit 0 ? Timestamp is precise if this bit is set and correlates to the
+time of the error event."
 
-Alternatively, just open-code dma_common_contiguous_remap() in
-__iommu_alloc_attrs() to keep a valid area->pages around (I think Geert
-already suggested this). AFAICT, arch/arm does this already in its own
-__iommu_alloc_buffer().
+So why are we even printing the timestamp when !precise?
 
-Yet another option would be for iommu_dma_alloc() to understand
-DMA_ATTR_FORCE_CONTIGUOUS and remove the arm64-specific handling.
+IOW, I think we should do:
 
-> @@ -715,8 +719,19 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
->  			       size_t size, unsigned long attrs)
->  {
->  	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> -	struct vm_struct *area = find_vm_area(cpu_addr);
-> +	struct vm_struct *area;
-> +
-> +	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
-> +
-> +		if (!ret)
-> +			sg_set_page(sgt->sgl, vmalloc_to_page(cpu_addr),
-> +				    PAGE_ALIGN(size), 0);
->  
-> +		return ret;
-> +	}
-> +
-> +	area = find_vm_area(cpu_addr);
+	if (!(timestamp[3] & 0x1))
+		printk("%stimestamp imprecise\n", pfx);
+	else {
+		sec = ..
+		min = ...
 
-As Russell already stated, this function needs a "fix" regardless of the
-DMA_ATTR_FORCE_CONTIGUOUS as we may not have page structures
-(*_from_coherent allocations). But I agree with you that
-dma_get_sgtable() issues should be addressed separately (and I'm happy
-to disable such API on arm64 until sorted).
+		...
+	}
+
+and print the actual values only when the timestamp is precise.
+Otherwise it has *some* values which could just as well be completely
+random. And it's not like we're reporting the error tomorrow - it is
+mostly a couple of seconds from logging to the fw pushing it out...
 
 -- 
-Catalin
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
