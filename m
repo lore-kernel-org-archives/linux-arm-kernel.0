@@ -1,55 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 11:51:04 +0800
-Subject: [PATCH v6 1/6] dt-bindings: power: supply: add AXP20X/AXP22X
- battery DT binding
-In-Reply-To: <20170420155820.tzvvwqnl2ze63jel@rob-hp-laptop>
-References: <20170418073421.31351-1-quentin.schulz@free-electrons.com>
- <20170418073421.31351-2-quentin.schulz@free-electrons.com>
- <20170420155820.tzvvwqnl2ze63jel@rob-hp-laptop>
-Message-ID: <CAGb2v64mWWv-_Svi1WB3u0RB8hpGh369iFBYa-SjudW0E_y2qQ@mail.gmail.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Fri, 21 Apr 2017 12:06:10 +0800
+Subject: [PATCH 1/3] dt-bindings: mt8173: Fix mdp device tree
+In-Reply-To: <20170419213540.4vigeed3mx24ie4e@rob-hp-laptop>
+References: <1492068787-17838-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1492068787-17838-2-git-send-email-minghsiu.tsai@mediatek.com>
+ <20170419213540.4vigeed3mx24ie4e@rob-hp-laptop>
+Message-ID: <1492747570.25908.36.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 20, 2017 at 11:58 PM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Apr 18, 2017 at 09:34:16AM +0200, Quentin Schulz wrote:
->> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
->>
->> This patch adds the DT binding documentation for the battery power
->> supply which gets various data from the PMIC, such as the battery status
->> (charging, discharging, full, dead), current max limit, current current,
->> battery capacity (in percentage), voltage max and min limits, current
->> voltage and battery capacity (in Ah).
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->> v6:
->>   - removed mention to monitored-battery, will be sent when the battery
->>   framework has been merged,
->>
->> v5:
->>   - removed DT property example from monitored-battery,
->>
->> v4:
->>  - added monitored-battery optional property,
->>  - added example with battery,
->>
->> v3:
->>  - removed constant charge current property, now should use the WIP
->>  battery framework,
->>
->> v2:
->>  - changed DT node name from ac_power_supply to ac-power-supply,
->>  - removed io-channels and io-channel-names from DT (the IIO mapping is
->>  done in the IIO ADC driver now),
->>  - added x-powers,constant-charge-current property to set the maximal
->>  default constant current charge of the battery,
->>
->>  .../bindings/power/supply/axp20x_battery.txt         | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
->
-> Acked-by: Rob Herring <robh@kernel.org>
+On Wed, 2017-04-19 at 16:35 -0500, Rob Herring wrote:
+> On Thu, Apr 13, 2017 at 03:33:05PM +0800, Minghsiu Tsai wrote:
+> > If the mdp_* nodes are under an mdp sub-node, their corresponding
+> > platform device does not automatically get its iommu assigned properly.
+> > 
+> > Fix this by moving the mdp component nodes up a level such that they are
+> > siblings of mdp and all other SoC subsystems.  This also simplifies the
+> > device tree.
+> 
+> It may simplify the DT, but it also breaks compatibility with old DT. 
+> Not sure if that's a problem on Mediatek platforms, but please be 
+> explicit here that you are breaking compatibility and why that is okay.
+> 
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+I will add the following description for more information.
+"
+Although it fixes iommu assignment issue, it also break compatibility
+with old device tree, so driver patch[1] is needed to iterate over
+sibling mdp device nodes, not child ones, to keep driver work properly.
+In mtk_mdp_probe()
+Old: for_each_child_of_node(dev->of_node, node)
+New: for_each_child_of_node(dev->of_node->parent, node)
+
+[1]https://patchwork.kernel.org/patch/9678833/
+"
+
+> > 
+> > Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> 
+> Should this have Daniel as the author?
+
+This patch is provided by Daniel, so I keep he is the author.
+I just split his patch into two parts. One is dts only, and the other is
+for driver. I also provide another patch to modify dts bindings
+according to this patch.
+
+
+> 
+> > 
+> > ---
+> >  Documentation/devicetree/bindings/media/mediatek-mdp.txt | 12 +++---------
+> >  1 file changed, 3 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > index 4182063..0d03e3a 100644
+> > --- a/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > @@ -2,7 +2,7 @@
+> >  
+> >  Media Data Path is used for scaling and color space conversion.
+> >  
+> > -Required properties (controller (parent) node):
+> > +Required properties (controller node):
+> >  - compatible: "mediatek,mt8173-mdp"
+> >  - mediatek,vpu: the node of video processor unit, see
+> >    Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
+> > @@ -32,21 +32,16 @@ Required properties (DMA function blocks, child node):
+> >    for details.
+> >  
+> >  Example:
+> > -mdp {
+> > -	compatible = "mediatek,mt8173-mdp";
+> > -	#address-cells = <2>;
+> > -	#size-cells = <2>;
+> > -	ranges;
+> > -	mediatek,vpu = <&vpu>;
+> > -
+> >  	mdp_rdma0: rdma at 14001000 {
+> >  		compatible = "mediatek,mt8173-mdp-rdma";
+> > +			     "mediatek,mt8173-mdp";
+> >  		reg = <0 0x14001000 0 0x1000>;
+> >  		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+> >  			 <&mmsys CLK_MM_MUTEX_32K>;
+> >  		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> >  		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+> >  		mediatek,larb = <&larb0>;
+> > +		mediatek,vpu = <&vpu>;
+> >  	};
+> >  
+> >  	mdp_rdma1: rdma at 14002000 {
+> > @@ -106,4 +101,3 @@ mdp {
+> >  		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+> >  		mediatek,larb = <&larb4>;
+> >  	};
+> > -};
+> > -- 
+> > 1.9.1
+> > 
