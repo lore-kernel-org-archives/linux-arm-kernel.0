@@ -1,118 +1,108 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Fri, 21 Apr 2017 14:06:27 +0200
-Subject: [PATCH v5 1/4] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20170421015724.GA586@jagdpanzerIV.localdomain>
-References: <1461239325-22779-1-git-send-email-pmladek@suse.com>
- <1461239325-22779-2-git-send-email-pmladek@suse.com>
- <20170419131341.76bc7634@gandalf.local.home>
- <20170420033112.GB542@jagdpanzerIV.localdomain>
- <20170420131154.GL3452@pathway.suse.cz>
- <20170421015724.GA586@jagdpanzerIV.localdomain>
-Message-ID: <20170421120627.GO3452@pathway.suse.cz>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 21 Apr 2017 14:21:50 +0200
+Subject: [PATCH V15 03/11] cper: add timestamp print to CPER status
+ printing
+In-Reply-To: <1492556723-9189-4-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-4-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170421122150.76cce2cfrt767glv@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2017-04-21 10:57:25, Sergey Senozhatsky wrote:
-> On (04/20/17 15:11), Petr Mladek wrote:
-> [..]
-> >  void printk_nmi_enter(void)
-> >  {
-> > -	this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-> > +	/*
-> > +	 * The size of the extra per-CPU buffer is limited. Use it
-> > +	 * only when really needed.
-> > +	 */
-> > +	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK ||
-> > +	    raw_spin_is_locked(&logbuf_lock)) {
-> > +		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-> > +	} else {
-> > +		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
-> > +	}
-> >  }
+On Tue, Apr 18, 2017 at 05:05:15PM -0600, Tyler Baicar wrote:
+> The ACPI 6.1 spec added a timestamp to the HEST generic data
+
+HEST?
+
+I see the timestamp in
+
+Table 18-343 Generic Error Data Entry
+
+where those things are "One or more Generic Error Data Entry structures
+may be recorded in the Generic Error Data Entries field of the Generic
+Error Status Block structure."
+
+And those are part of the "18.3.2.7 Generic Hardware Error Source",
+i.e., GHES. So why do you say "HEST" above?
+
+> structure. Print the timestamp out when printing out the error
+> status information.
 > 
-> well... the logbuf_lock can temporarily be locked from another CPU. I'd say
-> that spin_is_locked() has better chances for false positive than
-> this_cpu_read(printk_context). because this_cpu_read(printk_context) depends
-> only on this CPU state, while spin_is_locked() depends on all CPUs. and the
-> idea with this_cpu_read(printk_context) was that we check if the logbuf_lock
-> was locked from this particular CPU.
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I finally see the point. I confess that I did not think much about
-this way yesterday because it looked too tricky (indirect) and possibly
-error prone.
+Remove those Reviewed-by:s
 
-> I agree that this_cpu_read(printk_context) covers slightly more than
-> logbuf_lock scope, so we may get positive this_cpu_read(printk_context)
-> with unlocked logbuf_lock, but I don't tend to think that it's a big
-> problem.
-
-PRINTK_SAFE_CONTEXT is set also in call_console_drivers().
-It might take rather long and logbuf_lock is availe. So, it is
-noticeable source of false positives.
-
-Hmm, my version actually checks both the lock and the context.
-It is very deffensive to be always on the safe side.
-
-We could get the best restults with both checks and by using "&&":
-
-void printk_nmi_enter(void)
-{
-	/*
-	 * The size of the extra per-CPU buffer is limited. Use it
-	 * only when the lock for the main log buffer is not
-	 * available.
-	 *
-	 * logbuf_lock might be taken on another CPU. But it must be
-	 * in PRINTK_SAFE context. Reduce false positives by a check
-	 * of the context.
-	 */
-	if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK ||
-	    raw_spin_is_locked(&logbuf_lock)) {
-		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-	} else {
-		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
-	}
-}
-
-
-But after all, I would prefer to keep it simple, strightforward,
-and check only the logbuf_lock:
-
-	if (raw_spin_is_locked(&logbuf_lock))
-		this_cpu_or(printk_context, PRINTK_NMI_CONTEXT_MASK);
-	else
-		this_cpu_or(printk_context, PRINTK_NMI_DEFERRED_CONTEXT_MASK);
-
-
-> wouldn't something as simple as below do the trick?
-> // absolutely and completely untested //
+> ---
+>  drivers/firmware/efi/cper.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
 > 
-> 
-> diff --git a/kernel/printk/printk_safe.c b/kernel/printk/printk_safe.c
-> index 033e50a7d706..c7477654c5b1 100644
-> --- a/kernel/printk/printk_safe.c
-> +++ b/kernel/printk/printk_safe.c
-> @@ -303,7 +303,10 @@ static int vprintk_nmi(const char *fmt, va_list args)
->  {
->         struct printk_safe_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
+> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+> index 8328a6f..46585f9 100644
+> --- a/drivers/firmware/efi/cper.c
+> +++ b/drivers/firmware/efi/cper.c
+> @@ -32,6 +32,8 @@
+>  #include <linux/acpi.h>
+>  #include <linux/pci.h>
+>  #include <linux/aer.h>
+> +#include <linux/printk.h>
+> +#include <linux/bcd.h>
+>  #include <acpi/ghes.h>
 >  
-> -       return printk_safe_log_store(s, fmt, args);
-> +       if (this_cpu_read(printk_context) & PRINTK_SAFE_CONTEXT_MASK)
-> +               return printk_safe_log_store(s, fmt, args);
-> +
-> +       return vprintk_emit(0, LOGLEVEL_SCHED, NULL, 0, fmt, args);
+>  #define INDENT_SP	" "
+> @@ -387,6 +389,29 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
+>  	pfx, pcie->bridge.secondary_status, pcie->bridge.control);
 >  }
+>  
+> +static void cper_estatus_timestamp(const char *pfx,
 
-It looks simple but some things are missing. It will be used also
-outside panic/oops, so it should queue the irq_work to flush the console.
-Also the serialization of nmi_cpu_backtrace() backtrace calls is
-needed.
+cper_print_tstamp()
 
-All in all, we could get rid only of the extra
-PRINTK_NMI_DEFERRED_CONTEXT_MASK with this approach. Other than
-that it looks more tricky to me.
+> +				   struct acpi_hest_generic_data_v300 *gdata)
+> +{
+> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
+> +
+> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
+> +		timestamp = (__u8 *)&(gdata->time_stamp);
+> +		sec       = bcd2bin(timestamp[0]);
+> +		min       = bcd2bin(timestamp[1]);
+> +		hour      = bcd2bin(timestamp[2]);
+> +		day       = bcd2bin(timestamp[4]);
+> +		mon       = bcd2bin(timestamp[5]);
+> +		year      = bcd2bin(timestamp[6]);
+> +		century   = bcd2bin(timestamp[7]);
+> +
+> +		if (*(timestamp + 3) & 0x1)
+> +			printk("%stimestamp is precise\n", pfx);
+> +
+> +		printk("%stime: %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
+> +			century, year, mon, day, hour, min, sec);
 
-Sigh, I hate problems without the single best solution.
+Yeah, about the precise tstamp, you can do something like this:
 
-Best Regards,
-Petr
+---
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index 46585f92b741..a649884e2264 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -404,10 +404,8 @@ static void cper_estatus_timestamp(const char *pfx,
+ 		year      = bcd2bin(timestamp[6]);
+ 		century   = bcd2bin(timestamp[7]);
+ 
+-		if (*(timestamp + 3) & 0x1)
+-			printk("%stimestamp is precise\n", pfx);
+-
+-		printk("%stime: %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
++		printk("%s%ststamp: %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
++			(timestamp[3] & 0x1 ? "precise " : ""), 
+ 			century, year, mon, day, hour, min, sec);
+ 	}
+ }
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
