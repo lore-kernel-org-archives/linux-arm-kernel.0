@@ -1,223 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Apr 2017 16:38:56 +0800
-Subject: [PATCH v2 8/9] ARM: dts: sun6i: Add second display pipeline device
- nodes
-In-Reply-To: <20170421083857.29636-1-wens@csie.org>
-References: <20170421083857.29636-1-wens@csie.org>
-Message-ID: <20170421083857.29636-9-wens@csie.org>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 21 Apr 2017 10:43:20 +0200
+Subject: [PATCH v2] dmaengine: sun4i: fix invalid argument
+In-Reply-To: <20170421082417.7cqtevwuhjvfgjcx@lukather>
+References: <20170421084033.5c987e13@canb.auug.org.au>
+ <9858a4ed-bdd9-bd6c-d8a4-e9e6bd539904@free.fr>
+ <584a2c53-100b-945b-d665-cef3fa856526@free.fr>
+ <20170421082417.7cqtevwuhjvfgjcx@lukather>
+Message-ID: <3e98596a-0322-e4f1-7cc2-9b0eaceb4465@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A31/A31s SoCs have 2 display pipelines, as in 2 display
-frontends, backends, and tcons each. The relationship between the
-backends and tcons are 1:1, but the frontends can feed either backend.
+From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 
-Add device nodes and of graph nodes describing this relationship.
+The "pchans_used" field is an unsigned long array.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+for_each_clear_bit_from() expects an unsigned long pointer,
+not an array address.
+
+$ make C=2 drivers/dma/sun4i-dma.o
+  CHECK   drivers/dma/sun4i-dma.c
+drivers/dma/sun4i-dma.c:241:9: warning: incorrect type in argument 1 (different base types)
+drivers/dma/sun4i-dma.c:241:9:    expected unsigned long const *p
+drivers/dma/sun4i-dma.c:241:9:    got unsigned long ( *<noident> )[1]
+
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 168 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 167 insertions(+), 1 deletion(-)
+ drivers/dma/sun4i-dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 9c999d3788f6..dfcf64515d7f 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -232,7 +232,7 @@
+diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
+index 57aa227bfadb..f4ed3f17607c 100644
+--- a/drivers/dma/sun4i-dma.c
++++ b/drivers/dma/sun4i-dma.c
+@@ -238,7 +238,7 @@ static struct sun4i_dma_pchan *find_and_use_pchan(struct sun4i_dma_dev *priv,
+ 	}
  
- 	de: display-engine {
- 		compatible = "allwinner,sun6i-a31-display-engine";
--		allwinner,pipelines = <&fe0>;
-+		allwinner,pipelines = <&fe0>, <&fe1>;
- 		status = "disabled";
- 	};
- 
-@@ -289,6 +289,43 @@
- 			};
- 		};
- 
-+		tcon1: lcd-controller at 01c0d000 {
-+			compatible = "allwinner,sun6i-a31-tcon";
-+			reg = <0x01c0d000 0x1000>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&ccu RST_AHB1_LCD1>;
-+			reset-names = "lcd";
-+			clocks = <&ccu CLK_AHB1_LCD1>,
-+				 <&ccu CLK_LCD1_CH0>,
-+				 <&ccu CLK_LCD1_CH1>;
-+			clock-names = "ahb",
-+				      "tcon-ch0",
-+				      "tcon-ch1";
-+			clock-output-names = "tcon1-pixel-clock";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon1_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon1_in_drc1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&drc1_out_tcon1>;
-+					};
-+				};
-+
-+				tcon1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 01c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
-@@ -896,6 +933,130 @@
- 						reg = <0>;
- 						remote-endpoint = <&be0_in_fe0>;
- 					};
-+
-+					fe0_out_be1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&be1_in_fe0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		fe1: display-frontend at 01e20000 {
-+			compatible = "allwinner,sun6i-a31-display-frontend";
-+			reg = <0x01e20000 0x20000>;
-+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_AHB1_FE1>, <&ccu CLK_FE1>,
-+				 <&ccu CLK_DRAM_FE1>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_AHB1_FE1>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				fe1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					fe1_out_be0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_in_fe1>;
-+					};
-+
-+					fe1_out_be1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&be1_in_fe1>;
-+					};
-+				};
-+			};
-+		};
-+
-+		be1: display-backend at 01e40000 {
-+			compatible = "allwinner,sun6i-a31-display-backend";
-+			reg = <0x01e40000 0x10000>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_AHB1_BE1>, <&ccu CLK_BE1>,
-+				 <&ccu CLK_DRAM_BE1>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_AHB1_BE1>;
-+
-+			assigned-clocks = <&ccu CLK_BE1>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				be1_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					be1_in_fe0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&fe0_out_be1>;
-+					};
-+
-+					be1_in_fe1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&fe1_out_be1>;
-+					};
-+				};
-+
-+				be1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					be1_out_drc1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&drc1_in_be1>;
-+					};
-+				};
-+			};
-+		};
-+
-+		drc1: drc at 01e50000 {
-+			compatible = "allwinner,sun6i-a31-drc";
-+			reg = <0x01e50000 0x10000>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_AHB1_DRC1>, <&ccu CLK_IEP_DRC1>,
-+				 <&ccu CLK_DRAM_DRC1>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_AHB1_DRC1>;
-+
-+			assigned-clocks = <&ccu CLK_IEP_DRC1>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				drc1_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					drc1_in_be1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&be1_out_drc1>;
-+					};
-+				};
-+
-+				drc1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					drc1_out_tcon1: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon1_in_drc1>;
-+					};
- 				};
- 			};
- 		};
-@@ -926,6 +1087,11 @@
- 						reg = <0>;
- 						remote-endpoint = <&fe0_out_be0>;
- 					};
-+
-+					be0_in_fe1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&fe1_out_be0>;
-+					};
- 				};
- 
- 				be0_out: port at 1 {
+ 	spin_lock_irqsave(&priv->lock, flags);
+-	for_each_clear_bit_from(i, &priv->pchans_used, max) {
++	for_each_clear_bit_from(i, priv->pchans_used, max) {
+ 		pchan = &pchans[i];
+ 		pchan->vchan = vchan;
+ 		set_bit(i, priv->pchans_used);
 -- 
-2.11.0
+3.14159
