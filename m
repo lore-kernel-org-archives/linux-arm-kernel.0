@@ -1,75 +1,58 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Apr 2017 14:55:16 +0200
-Subject: [PATCH/RFC 0/5] arm64: dts: renesas: Break out common board support
-Message-ID: <1492779321-23939-1-git-send-email-geert+renesas@glider.be>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 21 Apr 2017 15:08:16 +0200
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+Message-ID: <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi all,
+On 04/21/2017 05:15 AM, Stefan Agner wrote:
+> On 2017-04-20 19:03, Marek Vasut wrote:
+>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
+>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
+>>> clock architecture requiring only two clocks to be referenced.
+>>> The IP is slightly different compared to i.MX 6SoloX, but currently
+>>> none of this differences are in use so there is no detection needed
+>>> and the driver can reuse IS_MX6SX.
+>>>
+>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>> ---
+>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
+>>>  1 file changed, 15 insertions(+)
+>>>
+>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>> index c8bbf5da2ab8..4a45d37ddc80 100644
+>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
+>>>  	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+>>>  };
+>>>
+>>> +static const char * const gpmi_clks_for_mx7d[] = {
+>>> +	"gpmi_io", "gpmi_bch_apb",
+>>> +};
+>>> +
+>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
+>>> +	.type = IS_MX6SX,
+>>
+>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
+>>
+> 
+> Yeah I was thinking we can do it once we have an actual reason to
+> distinguish.
 
-The Renesas Salvator-X and ULCB development board can be equipped with
-either an R-Car H3 or M3-W SiP, which are pin-compatible.  All boards
-use separate DTBs, but currently there's no sharing of board-specific
-devices in DTS.
+So what are the differences anyway ?
 
-This series reduces duplication by extracting common board support into
-their own .dtsi files.  As the level of support varies across boards and
-SoCs, this requires the addition of a few external clocks and
-placeholder devices on R-Car M3-W, so the common board support DTS can
-refer to them.
+> But then, adding the type would only require 2-3 lines of change if I
+> add it to the GPMI_IS_MX6 macro...
 
-  - Patches 1 and 2 add the external audio and PCIe bus clocks on R-Car
-    M3-W, which are present in r8a7795.dtsi, and used in
-    r8a7795-salvator-x.dts,
-  - RFC patch 3 adds placeholders for devices that are not yet supported
-    and/or tested on R-Car M3-W, but used on R-Car H3,
-  - RFC patch 4 extracts common Salvator-X board support,
-  - RFC patch 5 extracts common ULCB board support.
-
-For R-Car H3 based boards, there are no functional changes.
-For R-Car M3-W based boards, some new devices are now described in DT.
-
-Dependencies:
-  - renesas-devel-20170420-v4.11-rc7,
-  - Patches 1 and 2 can be applied as-is,
-  - Patches 4 and 5 depend on "[PATCH 0/8] arm64: dts: renesas: Break
-    out R-Car H3 and M3-W SiP"
-    (http://www.spinics.net/lists/devicetree/msg173820.html).
-
-DTB changes have been inspected using scripts/dtc/dtx_diff.
-This has been tested on Salvator-X (both H3 and M3-W).
-This has not been tested on H3ULCB and M3ULCB due to lack of hardware.
-
-Thanks for your comments!
-
-Geert Uytterhoeven (5):
-  arm64: renesas: r8a7796: Add external audio clocks
-  arm64: renesas: r8a7796: Add external PCIe bus clock
-  [RFC] arm64: dts: r8a7796: Add placeholders for various devices
-  [RFC] arm64: dts: renesas: Extract common Salvator-X board support
-  [RFC] arm64: dts: renesas: Extract common ULCB board support
-
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     | 341 +-------------
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 522 +--------------------
- arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     | 201 +-------
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 259 +---------
- arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 112 +++++
- .../{r8a7795-salvator-x.dts => salvator-x.dtsi}    | 372 +++++++--------
- .../dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi}  | 243 +++++-----
- 7 files changed, 421 insertions(+), 1629 deletions(-)
- copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => salvator-x.dtsi} (95%)
- copy arch/arm64/boot/dts/renesas/{r8a7795-h3ulcb.dts => ulcb.dtsi} (96%)
+Then at least add a comment because using type = IMX6SX right under
+gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
 
 -- 
-2.7.4
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Best regards,
+Marek Vasut
