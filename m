@@ -1,95 +1,125 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Apr 2017 18:17:03 +0100
-Subject: [PATCH] arm64: acpi: Support PCI devices numa_node property in
- ACPI mode
-In-Reply-To: <CAPEA6daR9+BmyW6G9XOsO18782a-tjJrJKyxcYNHeHonuXRggw@mail.gmail.com>
-References: <20170406114711.17261-1-s.temerkhanov@gmail.com>
- <20170407171812.GA12012@red-moon>
- <CAPEA6daR9+BmyW6G9XOsO18782a-tjJrJKyxcYNHeHonuXRggw@mail.gmail.com>
-Message-ID: <20170421171703.GB27801@red-moon>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 21 Apr 2017 19:22:05 +0200
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+ <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+ <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+Message-ID: <57336d7e-7b48-8855-9e87-3eb370facd05@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Fri, Apr 07, 2017 at 11:31:12AM -0700, Sergei Temerkhanov wrote:
-> On Fri, Apr 7, 2017 at 10:18 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > Hi Sergey,
-> >
-> > On Thu, Apr 06, 2017 at 11:47:11AM +0000, Sergey Temerkhanov wrote:
-> >> This commit modifies ARM64-specific ACPI PCI support functions to
-> >> properly set the numa_node property on host bridges and thus on PCI
-> >> devices. Such support requires _PXM objects to be set in DSDT/SSDT
-> >> tables describing PCI root bridges
-> >>
-> >> Signed-off-by: Sergey Temerkhanov <s.temerkhanov@gmail.com>
-> >> ---
-> >>  arch/arm64/kernel/pci.c | 13 ++++++++++++-
-> >>  1 file changed, 12 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> >> index 4f0e3ebfea4b..c45c7a26f984 100644
-> >> --- a/arch/arm64/kernel/pci.c
-> >> +++ b/arch/arm64/kernel/pci.c
-> >> @@ -81,7 +81,16 @@ int raw_pci_write(unsigned int domain, unsigned int bus,
-> >>
-> >>  int pcibus_to_node(struct pci_bus *bus)
-> >>  {
-> >> -     return dev_to_node(&bus->dev);
-> >> +     struct pci_config_window *cfg = bus->sysdata;
-> >
-> > Well, this implicit cast is a guess (ie it might be a DT sysdata
-> > and there you can't have a clue on what it really is).
+On 04/21/2017 06:19 PM, Stefan Agner wrote:
+> On 2017-04-21 06:08, Marek Vasut wrote:
+>> On 04/21/2017 05:15 AM, Stefan Agner wrote:
+>>> On 2017-04-20 19:03, Marek Vasut wrote:
+>>>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
+>>>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
+>>>>> clock architecture requiring only two clocks to be referenced.
+>>>>> The IP is slightly different compared to i.MX 6SoloX, but currently
+>>>>> none of this differences are in use so there is no detection needed
+>>>>> and the driver can reuse IS_MX6SX.
+>>>>>
+>>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>>> ---
+>>>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
+>>>>>  1 file changed, 15 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>>> index c8bbf5da2ab8..4a45d37ddc80 100644
+>>>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
+>>>>>  	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+>>>>>  };
+>>>>>
+>>>>> +static const char * const gpmi_clks_for_mx7d[] = {
+>>>>> +	"gpmi_io", "gpmi_bch_apb",
+>>>>> +};
+>>>>> +
+>>>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
+>>>>> +	.type = IS_MX6SX,
+>>>>
+>>>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
+>>>>
+>>>
+>>> Yeah I was thinking we can do it once we have an actual reason to
+>>> distinguish.
+>>
+>> So what are the differences anyway ?
+>>
 > 
-> Yes, but it's only accessed when acpi_disabled != 0. I just tried to
-> save few lines and brackets :-)
+> I did not check the details, but Han's patchset (link in cover letter)
+> mentions:
+> "add the HW bitflip detection and correction for i.MX6QP and i.MX7D."...
 
-I have put together a patch, I will drop it on linux-pci next week
-so that we can all have a look and test it.
+Oh, interesting.
 
-Thanks !
-Lorenzo
-
-> Regards,
-> Sergey
+>>> But then, adding the type would only require 2-3 lines of change if I
+>>> add it to the GPMI_IS_MX6 macro...
+>>
+>> Then at least add a comment because using type = IMX6SX right under
+>> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
 > 
-> >
-> >> +     struct acpi_device *adev = NULL;
-> >> +     struct device *dev;
-> >> +
-> >> +     if (!acpi_disabled)
-> >> +             adev = to_acpi_device(cfg->parent);
-> >> +
-> >> +     dev = adev ? &adev->dev : &bus->dev;
-> >> +
-> >> +     return dev_to_node(dev);
-> >>  }
-> >>  EXPORT_SYMBOL(pcibus_to_node);
-> >>
-> >> @@ -186,6 +195,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> >>       struct pci_bus *bus, *child;
-> >>       struct acpi_pci_root_ops *root_ops;
-> >>
-> >> +     set_dev_node(&root->device->dev, node);
-> >
-> > Ok I suspect this is one of those catch-22 issues with host bridge
-> > creation/scan code (like domain nr), let me have a look I will send
-> > you a patch next week when I figure out the call ordering required
-> > to make this work, I want to make sure we can make this work with
-> > DT and ACPI alike.
-> >
-> > Thanks !
-> > Lorenzo
-> >
-> >> +
-> >>       ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
-> >>       if (!ri)
-> >>               return NULL;
-> >> --
-> >> 2.12.1
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> FWIW, I mentioned it in the commit message.
+> 
+> I think rather then adding a comment it is cleaner to just add IS_IMX7D
+> and add it to the GPMI_IS_MX6 macro. That does not need a comment since
+> it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
+> rather small change. Does that sound acceptable?
+
+Sure, that's even better, thanks.
+
+btw isn't there some single-core mx7 (mx7s ?) , maybe we should just go
+with mx7 (without the d suffix). I dunno if it has GPMI NAND though, so
+maybe mx7d is the right thing to do here ...
+
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+> @@ -132,7 +132,7 @@ static const char * const gpmi_clks_for_mx7d[] = {
+>  };
+> 
+>  static const struct gpmi_devdata gpmi_devdata_imx7d = {
+> -       .type = IS_MX6SX,
+> +       .type = IS_MX7D,
+>         .bch_max_ecc_strength = 62,
+>         .max_chain_delay = 12,
+>         .clks = gpmi_clks_for_mx7d,
+> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> index 2e584e18d980..f2cc13abc896 100644
+> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+> @@ -123,7 +123,8 @@ enum gpmi_type {
+>         IS_MX23,
+>         IS_MX28,
+>         IS_MX6Q,
+> -       IS_MX6SX
+> +       IS_MX6SX,
+> +       IS_MX7D,
+>  };
+> 
+>  struct gpmi_devdata {
+> @@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
+>  #define GPMI_IS_MX28(x)                ((x)->devdata->type == IS_MX28)
+>  #define GPMI_IS_MX6Q(x)                ((x)->devdata->type == IS_MX6Q)
+>  #define GPMI_IS_MX6SX(x)       ((x)->devdata->type == IS_MX6SX)
+> +#define GPMI_IS_MX7D(x)                ((x)->devdata->type == IS_MX7D)
+> 
+> -#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
+> +#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) ||
+> \
+> +                                GPMI_IS_MX7D(x))
+>  #endif
+> 
+> --
+> Stefan
+> 
+
+
+-- 
+Best regards,
+Marek Vasut
