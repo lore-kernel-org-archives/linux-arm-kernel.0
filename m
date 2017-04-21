@@ -1,132 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Apr 2017 17:12:35 +0100
-Subject: [PATCH] arm64/dma-mapping: fix DMA_ATTR_FORCE_CONTIGUOUS mmaping
- code
-In-Reply-To: <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
-References: <CGME20170329100540eucas1p22d428e33aa678cbef0a24dd249820451@eucas1p2.samsung.com>
- <1490781926-6209-1-git-send-email-a.hajda@samsung.com>
- <15b1be13-625f-db74-d213-ad1df86f7eb5@arm.com>
-Message-ID: <20170421161234.GD5312@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Apr 2017 18:17:54 +0200
+Subject: stable/linux-3.18.y build: 204 builds: 5 failed, 199 passed, 35
+ errors, 212 warnings (v3.18.49)
+In-Reply-To: <20170421145901.3wcft3ou7wwywuiu@sirena.org.uk>
+References: <58f8ea00.84621c0a.da7d6.1c19@mx.google.com>
+ <CAK8P3a3QsSMtc7AWjVjtM+tW8ARt1Ygw53=CSjgbG6Pvpq0QvQ@mail.gmail.com>
+ <20170421145901.3wcft3ou7wwywuiu@sirena.org.uk>
+Message-ID: <CAK8P3a0j_cnd9j2UuFD5eRVN8q-=dPh2-LBaibb8qdpDQbHpJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 01:55:32PM +0100, Robin Murphy wrote:
-> On 29/03/17 11:05, Andrzej Hajda wrote:
-> > In case of DMA_ATTR_FORCE_CONTIGUOUS allocations vm_area->pages
-> > is invalid. __iommu_mmap_attrs and __iommu_get_sgtable cannot use
-> > it. In first case temporary pages array is passed to iommu_dma_mmap,
-> > in 2nd case single entry sg table is created directly instead
-> > of calling helper.
-> > 
-> > Fixes: 44176bb ("arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU")
-> > Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> > ---
-> > Hi,
-> > 
-> > I am not familiar with this framework so please don't be too cruel ;)
-> > Alternative solution I see is to always create vm_area->pages,
-> > I do not know which approach is preferred.
-> > 
-> > Regards
-> > Andrzej
-> > ---
-> >  arch/arm64/mm/dma-mapping.c | 40 ++++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 38 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> > index f7b5401..bba2bc8 100644
-> > --- a/arch/arm64/mm/dma-mapping.c
-> > +++ b/arch/arm64/mm/dma-mapping.c
-> > @@ -704,7 +704,30 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
-> >  		return ret;
-> >  
-> >  	area = find_vm_area(cpu_addr);
-> > -	if (WARN_ON(!area || !area->pages))
-> > +	if (WARN_ON(!area))
-> 
-> From the look of things, it doesn't seem strictly necessary to change
-> this, but whether that's a good thing is another matter. I'm not sure
-> that dma_common_contiguous_remap() should really be leaving a dangling
-> pointer in area->pages as it apparently does... :/
+On Fri, Apr 21, 2017 at 4:59 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Apr 21, 2017 at 04:27:14PM +0200, Arnd Bergmann wrote:
+>> On Thu, Apr 20, 2017 at 7:04 PM, kernelci.org bot <bot@kernelci.org> wrote:
+>> > stable/linux-3.18.y build: 204 builds: 5 failed, 199 passed, 35 errors, 212 warnings (v3.18.49)
+>
+>> > 2 arch/mips/mm/fault.c:321:1: error: the frame size of 1104 bytes is larger
+>> > than 1024 bytes [-Werror=frame-larger-than=]
+>
+>> This is a result of a newer compiler version, combined with the -Werror
+>> flag that is applied to arch/mips/, and two of the mips defconfigs overriding
+>> CONFIG_FRAME_WARN to 1024 on a 64-bit architecture (probably by
+>> accident).
+>
+> I'm wondering how good an idea it is to leave -Werror on in stable
+> kernels given that they're very likely to get used with newer compilers
+> at some point.  But then I've never been a fan of -Werror in the first
+> place.
 
-On this specific point, I don't think area->pages should be set either
-(cc'ing Laura). As in the vmalloc vs vmap case, area->pages when pages
-need to be freed (via vfree), which is not the case here. The
-dma_common_pages_remap() would need to set area->pages when called
-directly from the iommu DMA ops. Proposal below, not tested with the
-iommu ops. I assume the patch would cause __iommu_mmap_attrs() to return
--ENXIO if DMA_ATTR_FORCE_CONTIGUOUS is set.
+I agree it's problematic as you never know what future compilers will warn
+about. At the moment, alpha, mips, sh and sparc turn on -Werror
+unconditionally for architecture specific code and there are only five
+device drivers do this as well. The powerpc architecture and the i915
+driver have a Kconfig option to control whether the warnings are enabled,
+and they are turned off in allmodconfig.
 
-------------8<---------------------------------
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index efd71cf4fdea..ab7071041141 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -277,8 +277,8 @@ EXPORT_SYMBOL(dma_common_mmap);
-  * remaps an array of PAGE_SIZE pages into another vm_area
-  * Cannot be used in non-sleeping contexts
-  */
--void *dma_common_pages_remap(struct page **pages, size_t size,
--			unsigned long vm_flags, pgprot_t prot,
-+static struct vm_struct *__dma_common_pages_remap(struct page **pages,
-+			size_t size, unsigned long vm_flags, pgprot_t prot,
- 			const void *caller)
- {
- 	struct vm_struct *area;
-@@ -287,13 +287,26 @@ void *dma_common_pages_remap(struct page **pages, size_t size,
- 	if (!area)
- 		return NULL;
- 
--	area->pages = pages;
--
- 	if (map_vm_area(area, prot, pages)) {
- 		vunmap(area->addr);
- 		return NULL;
- 	}
- 
-+	return area;
-+}
-+
-+void *dma_common_pages_remap(struct page **pages, size_t size,
-+			unsigned long vm_flags, pgprot_t prot,
-+			const void *caller)
-+{
-+	struct vm_struct *area;
-+
-+	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-+	if (!area)
-+		return NULL;
-+
-+	area->pages = pages;
-+
- 	return area->addr;
- }
- 
-@@ -308,7 +321,7 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
- {
- 	int i;
- 	struct page **pages;
--	void *ptr;
-+	struct vm_struct *area;
- 	unsigned long pfn;
- 
- 	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
-@@ -318,11 +331,13 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
- 	for (i = 0, pfn = page_to_pfn(page); i < (size >> PAGE_SHIFT); i++)
- 		pages[i] = pfn_to_page(pfn + i);
- 
--	ptr = dma_common_pages_remap(pages, size, vm_flags, prot, caller);
-+	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
- 
- 	kfree(pages);
- 
--	return ptr;
-+	if (!area)
-+		return NULL;
-+	return area->addr;
- }
- 
- /*
+I think this is just an artifact from the old days when we always had tons of
+warnings in a given build, but we should try to replace it with something
+better instead of just removing it (which would be easy enough to do).
 
--- 
-Catalin
+I personally build with 'make CC="gcc -Werror" and fix all the warnings I
+run into. I have some plans to improve it by hooking into the
+scripts/Makefile.extrawarn infrastructure. Today, we can use "make W=1"
+or "make W=12" to turn on extra levels of warnings, and I'd like to
+add "make E=0" or "make E=012" as a way to turn on errors for
+the default (0) or higher (1, 2, 3) levels, but this takes a little more
+preparation.
+
+    Arnd
