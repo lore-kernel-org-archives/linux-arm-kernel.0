@@ -1,50 +1,109 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Apr 2017 18:17:54 +0200
-Subject: stable/linux-3.18.y build: 204 builds: 5 failed, 199 passed, 35
- errors, 212 warnings (v3.18.49)
-In-Reply-To: <20170421145901.3wcft3ou7wwywuiu@sirena.org.uk>
-References: <58f8ea00.84621c0a.da7d6.1c19@mx.google.com>
- <CAK8P3a3QsSMtc7AWjVjtM+tW8ARt1Ygw53=CSjgbG6Pvpq0QvQ@mail.gmail.com>
- <20170421145901.3wcft3ou7wwywuiu@sirena.org.uk>
-Message-ID: <CAK8P3a0j_cnd9j2UuFD5eRVN8q-=dPh2-LBaibb8qdpDQbHpJA@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 21 Apr 2017 09:19:56 -0700
+Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+References: <20170421010755.18025-1-stefan@agner.ch>
+ <20170421010755.18025-3-stefan@agner.ch>
+ <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
+ <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
+ <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
+Message-ID: <494a7bc044457240a302d92b3a50b8e5@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 21, 2017 at 4:59 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Apr 21, 2017 at 04:27:14PM +0200, Arnd Bergmann wrote:
->> On Thu, Apr 20, 2017 at 7:04 PM, kernelci.org bot <bot@kernelci.org> wrote:
->> > stable/linux-3.18.y build: 204 builds: 5 failed, 199 passed, 35 errors, 212 warnings (v3.18.49)
->
->> > 2 arch/mips/mm/fault.c:321:1: error: the frame size of 1104 bytes is larger
->> > than 1024 bytes [-Werror=frame-larger-than=]
->
->> This is a result of a newer compiler version, combined with the -Werror
->> flag that is applied to arch/mips/, and two of the mips defconfigs overriding
->> CONFIG_FRAME_WARN to 1024 on a 64-bit architecture (probably by
->> accident).
->
-> I'm wondering how good an idea it is to leave -Werror on in stable
-> kernels given that they're very likely to get used with newer compilers
-> at some point.  But then I've never been a fan of -Werror in the first
-> place.
+On 2017-04-21 06:08, Marek Vasut wrote:
+> On 04/21/2017 05:15 AM, Stefan Agner wrote:
+>> On 2017-04-20 19:03, Marek Vasut wrote:
+>>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
+>>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
+>>>> clock architecture requiring only two clocks to be referenced.
+>>>> The IP is slightly different compared to i.MX 6SoloX, but currently
+>>>> none of this differences are in use so there is no detection needed
+>>>> and the driver can reuse IS_MX6SX.
+>>>>
+>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>> ---
+>>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
+>>>>  1 file changed, 15 insertions(+)
+>>>>
+>>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>> index c8bbf5da2ab8..4a45d37ddc80 100644
+>>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+>>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
+>>>>  	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+>>>>  };
+>>>>
+>>>> +static const char * const gpmi_clks_for_mx7d[] = {
+>>>> +	"gpmi_io", "gpmi_bch_apb",
+>>>> +};
+>>>> +
+>>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
+>>>> +	.type = IS_MX6SX,
+>>>
+>>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
+>>>
+>>
+>> Yeah I was thinking we can do it once we have an actual reason to
+>> distinguish.
+> 
+> So what are the differences anyway ?
+> 
 
-I agree it's problematic as you never know what future compilers will warn
-about. At the moment, alpha, mips, sh and sparc turn on -Werror
-unconditionally for architecture specific code and there are only five
-device drivers do this as well. The powerpc architecture and the i915
-driver have a Kconfig option to control whether the warnings are enabled,
-and they are turned off in allmodconfig.
+I did not check the details, but Han's patchset (link in cover letter)
+mentions:
+"add the HW bitflip detection and correction for i.MX6QP and i.MX7D."...
 
-I think this is just an artifact from the old days when we always had tons of
-warnings in a given build, but we should try to replace it with something
-better instead of just removing it (which would be easy enough to do).
+>> But then, adding the type would only require 2-3 lines of change if I
+>> add it to the GPMI_IS_MX6 macro...
+> 
+> Then at least add a comment because using type = IMX6SX right under
+> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
 
-I personally build with 'make CC="gcc -Werror" and fix all the warnings I
-run into. I have some plans to improve it by hooking into the
-scripts/Makefile.extrawarn infrastructure. Today, we can use "make W=1"
-or "make W=12" to turn on extra levels of warnings, and I'd like to
-add "make E=0" or "make E=012" as a way to turn on errors for
-the default (0) or higher (1, 2, 3) levels, but this takes a little more
-preparation.
+FWIW, I mentioned it in the commit message.
 
-    Arnd
+I think rather then adding a comment it is cleaner to just add IS_IMX7D
+and add it to the GPMI_IS_MX6 macro. That does not need a comment since
+it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
+rather small change. Does that sound acceptable?
+
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -132,7 +132,7 @@ static const char * const gpmi_clks_for_mx7d[] = {
+ };
+
+ static const struct gpmi_devdata gpmi_devdata_imx7d = {
+-       .type = IS_MX6SX,
++       .type = IS_MX7D,
+        .bch_max_ecc_strength = 62,
+        .max_chain_delay = 12,
+        .clks = gpmi_clks_for_mx7d,
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 2e584e18d980..f2cc13abc896 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -123,7 +123,8 @@ enum gpmi_type {
+        IS_MX23,
+        IS_MX28,
+        IS_MX6Q,
+-       IS_MX6SX
++       IS_MX6SX,
++       IS_MX7D,
+ };
+
+ struct gpmi_devdata {
+@@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
+ #define GPMI_IS_MX28(x)                ((x)->devdata->type == IS_MX28)
+ #define GPMI_IS_MX6Q(x)                ((x)->devdata->type == IS_MX6Q)
+ #define GPMI_IS_MX6SX(x)       ((x)->devdata->type == IS_MX6SX)
++#define GPMI_IS_MX7D(x)                ((x)->devdata->type == IS_MX7D)
+
+-#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
++#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) ||
+\
++                                GPMI_IS_MX7D(x))
+ #endif
+
+--
+Stefan
