@@ -1,119 +1,54 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Fri, 21 Apr 2017 07:46:27 +0000
-Subject: [PATCH V8 4/5] PCI/ASPM: save power on values during bridge init
-In-Reply-To: <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
-References: <1491627351-1111-1-git-send-email-okaya@codeaurora.org>
- <1491627351-1111-5-git-send-email-okaya@codeaurora.org>
- <CACK8Z6GXfMWxakNQnvMToig9z9McnJKeYFc2BAAFy7ys8=PUWg@mail.gmail.com>
- <d3857812-7e03-4b62-f7cb-ac0d139b6123@codeaurora.org>
- <20170414214452.GA21870@bhelgaas-glaptop.roam.corp.google.com>
- <66168dde-7719-6f74-3f06-8e4724dd2918@codeaurora.org>
- <CAErSpo7p_2dTDTC7J4HdQUw_5GH8081dUZ=XVqd=sRLrA_FJnA@mail.gmail.com>
- <c0c2f48f-d725-058e-a1ad-92ab4b6e7fb3@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846676C7EF@IRSMSX101.ger.corp.intel.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Fri, 21 Apr 2017 15:50:35 +0800
+Subject: [PATCH] [media] mtk-vcodec: avoid warnings because of empty macros
+In-Reply-To: <5bc3ebc3c6f57c2b30126f113bc35ec95c6f5b5d.1492599391.git.mchehab@s-opensource.com>
+References: <5bc3ebc3c6f57c2b30126f113bc35ec95c6f5b5d.1492599391.git.mchehab@s-opensource.com>
+Message-ID: <1492761035.12924.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn/Kaya,
+On Wed, 2017-04-19 at 07:56 -0300, Mauro Carvalho Chehab wrote:
+> Remove those gcc warnings:
+> 
+> 	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c: In function 'mtk_vcodec_dec_pw_on':
+> 	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c:114:51: warning: suggest braces around empty body in an 'if' statement [-Wempty-body]
+> 	   mtk_v4l2_err("pm_runtime_get_sync fail %d", ret);
+> 	                                                   ^
+> 
+> By adding braces.
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> ---
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> index 12480837ff2e..237e144c194f 100644
+> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.h
+> @@ -66,15 +66,15 @@ extern bool mtk_vcodec_dbg;
+>  
+>  #else
+>  
+> -#define mtk_v4l2_debug(level, fmt, args...)
+> -#define mtk_v4l2_err(fmt, args...)
+> -#define mtk_v4l2_debug_enter()
+> -#define mtk_v4l2_debug_leave()
+> +#define mtk_v4l2_debug(level, fmt, args...) {}
+> +#define mtk_v4l2_err(fmt, args...) {}
+> +#define mtk_v4l2_debug_enter() {}
+> +#define mtk_v4l2_debug_leave() {}
+>  
+> -#define mtk_vcodec_debug(h, fmt, args...)
+> -#define mtk_vcodec_err(h, fmt, args...)
+> -#define mtk_vcodec_debug_enter(h)
+> -#define mtk_vcodec_debug_leave(h)
+> +#define mtk_vcodec_debug(h, fmt, args...) {}
+> +#define mtk_vcodec_err(h, fmt, args...) {}
+> +#define mtk_vcodec_debug_enter(h) {}
+> +#define mtk_vcodec_debug_leave(h) {}
+>  
+>  #endif
+>  
 
-
->
->On 4/17/2017 12:38 PM, Bjorn Helgaas wrote:
->>> Like you said, what do we do by default is the question. Should we opt
->>> for safe like we are doing, or try to save some power.
->> I think safety is paramount.  Every user should be able to boot safely
->> without any kernel parameters.  We don't want users to have a problem
->> booting and then have to search for a workaround like booting with
->> "pcie_aspm=off".  Most users will never do that.
->>
->
->OK, no problem with leaving the behavior as it is.
->
->My initial approach was #2. We knew this way that user had full control
->over the ASPM policy by changing the BIOS option. Then, Mayurkumar
->complained that ASPM is not enabled following a hotplug insertion to an
->empty slot. That's when I switched to #3 as it sounded like a good thing
->to have for us.
->
->> Here's a long-term strawman proposal, see what you think:
->>
->>   - Deprecate CONFIG_PCIEASPM_DEFAULT, CONFIG_PCIEASPM_POWERSAVE, etc.
->>   - Default aspm_policy is POLICY_DEFAULT always.
->>   - POLICY_DEFAULT means Linux doesn't touch anything: if BIOS enabled
->> ASPM, we leave it that way; we leave ASPM disabled on hot-added
->> devices.
->
-I am also ok with leaving the same behavior as now.
-But still following is something open I feel besides, Which may be there in your comments redundantly.
-The current problem is, pcie_aspm_exit_link_state() disables the ASPM configuration even
-if POLICY_DEFAULT was set.
-I am seeing already following problem(or may be influence) with it. The Endpoint I have does not have
-does not have "Presence detect change" mechanism. Hot plug is working with Link status events.
-When link is in L1 or L1SS and if EP is powered off, no Link status change event are triggered (It might be
-the expected behavior in L1 or L1SS).  When next time EP is powered on there are link down and
-link up events coming one after other. BIOS enables ASPM on Root port and Endpoint, but while
-processing link status down, pcie_aspm_exit_link_state() clears the ASPM already which were enabled by BIOS. 
-If we want to follow above approach then shall we consider having something similar as following?
-
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index 1dfa10c..bf5be6d 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -940,7 +940,8 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
-        parent_link = link->parent;
-
-        /* All functions are removed, so just disable ASPM for the link */
--       pcie_config_aspm_link(link, 0);
-+       if (aspm_policy != POLICY_DEFAULT)
-+               pcie_config_aspm_link(link, 0);
-        list_del(&link->sibling);
-        list_del(&link->link);
-        /* Clock PM is for endpoint device */
- 
-
->I can easily see people complaining the other way around. There
->could be some boot FW that doesn't know what ASPM is and this particular
->system could rely on the compile time option for enabling power options.
->Maybe, a command line option will be required for them to keep the existing
->behavior.
->
->>   - Deprecate kernel boot parameters (possibly keep pcie_aspm=off for
->> debugging use).
->>   - Use /sys/module/pcie_aspm/parameters/policy for run-time
->> system-wide  control, including for future hot-added devices.
->>   - Remove CONFIG_PCIEASPM_DEBUG and enable that code always, so we
->> have fine-grained run-time control.
->>
->
->Runtime control sounds like a better plan. We need hooks into the system
->power management policy.
->
->>> Maybe, we are missing a HPP option from the PCI spec.
->> That's an interesting idea.  _HPX does have provision for manipulating
->> Link Control bits (see ACPI r5.0, sec 6.2.8.3), but I don't think very
->> many systems implement it.  And there's currently no connection
->> between program_hpp_type2() and aspm.c, so I'm a little worried that
->> we might have issues if a system did implement an _HPX that sets any
->> of the ASPM bits.
->
->I looked at the spec some more. These are there to restore the register
->settings following hotplug insertion. I agree it won't play nice with ASPM
->as the control bits need to be enabled in coordination with the upstream
->device.
->
->I think the right approach is to let the userspace feed the required
->policy to the kernel like you suggested. Then, it needs to be per port
->via link_state to have the most flexibility.
->
->
->--
->Sinan Kaya
->Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+Acked-by: Tiffany Lin <Tiffany.lin@mediatek.com>
