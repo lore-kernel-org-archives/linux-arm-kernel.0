@@ -1,44 +1,101 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 21 Apr 2017 14:54:22 -0700
-Subject: linux-next: manual merge of the pm tree with the arm-soc tree
-In-Reply-To: <CAK8P3a1mPgM4XmS398DPsSbyCyD=12xQfUrF_HRqyd52_21o7Q@mail.gmail.com>
-References: <20170421105405.6a690b35@canb.auug.org.au>
- <CAK8P3a3kHO1NZFJXvDwWO625aEmXoo2540FRKe+YYzoYE9NCSg@mail.gmail.com>
- <4b58d5ab-c924-97af-728f-b9f524e62a53@oracle.com>
- <CAK8P3a0cVMt3y_oYH70V-ekPvUMeeBApSvybpRftSupzYy1FWQ@mail.gmail.com>
- <e2f9efab-291f-1436-2176-0fff3f2aae3f@oracle.com>
- <CAK8P3a1mPgM4XmS398DPsSbyCyD=12xQfUrF_HRqyd52_21o7Q@mail.gmail.com>
-Message-ID: <c3dfaceb-41ba-b13d-f47e-a279c3e2f6b9@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Apr 2017 23:55:28 +0200
+Subject: [PATCH] ARM: omap2+: make omap4_get_cpu1_ns_pa_addr declaration usable
+Message-ID: <20170421215556.2244576-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Dave,
+When CONFIG_PM is disabled, we get a build error:
 
-On 4/21/2017 2:44 PM, Arnd Bergmann wrote:
-> On Fri, Apr 21, 2017 at 11:02 PM, santosh.shilimkar at oracle.com
-> <santosh.shilimkar@oracle.com> wrote:
->> On 4/21/17 2:31 AM, Arnd Bergmann wrote:
+arch/arm/mach-omap2/omap-smp.c: In function 'omap4_smp_maybe_reset_cpu1':
+arch/arm/mach-omap2/omap-smp.c:309:20: error: implicit declaration of function 'omap4_get_cpu1_ns_pa_addr'; did you mean 'omap4_get_scu_base'? [-Werror=implicit-function-declaration]
 
-[...]
+We need to fix this in multiple files, to ensure the declaration is visible,
+to actually build the function without CONFIG_PM, and to only call it
+when OMAP4 and/or OMAP5 are enabled.
 
->>> arm-soc/next/drivers:
->>> ae3874cc931b ARM: keystone: Drop PM domain support for k2g
->>> 52835d59fc6c soc: ti: Add ti_sci_pm_domains driver
->>> 7cc119f29b19 dt-bindings: Add TI SCI PM Domains
->>> 213ec7fed302 PM / Domains: Do not check if simple providers have phandle
->>> cells
->>> a5ea7a0fcbd7 PM / Domains: Add generic data pointer to genpd data struct
->>>
->> Above are the correct git object for which I sent pull request for.
->
-> Ok, good, thanks for checking! They are however the commits that
-> contain the silly https://urldefense.proofpoint.com URLs. Can you
-> send a follow-up patch to fix these and use the regular https://urldefense.proofpoint.com/v2/url?u=http-3A__www.ti.org&d=DwIBaQ&c=RoP1YumCXCgaWHvlZYR8PQcxBKCX5YTpkKY057SbK10&r=XBn1JQGPwR8CsE7xpP3wPlG6DQU7qw8ym65xieNZ4hY&m=vFHOEb7p2FxbH00YRQq4WnRiu2BKHADn0gl6e6DoNFQ&s=7mfiIp2Ywy9_ppWKjEGlrswiKRndv8_I7zGVF9uyT0w&e=
-> URL that is in linux-next?
->
-Dave,
-Any reason you changed these URLs in last version ?
-Can you please fixup these URLs to along with DT defines.
+Fixes: 351b7c490700 ("ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during boot")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-omap2/common.h              |  3 ++-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 10 +++++-----
+ arch/arm/mach-omap2/omap-smp.c            | 11 +++++++----
+ 3 files changed, 14 insertions(+), 10 deletions(-)
 
-Regards,
-Santosh
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 3089d3bfa19b..8cc6338fcb12 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -266,11 +266,12 @@ extern int omap4_cpu_kill(unsigned int cpu);
+ extern const struct smp_operations omap4_smp_ops;
+ #endif
+ 
++extern u32 omap4_get_cpu1_ns_pa_addr(void);
++
+ #if defined(CONFIG_SMP) && defined(CONFIG_PM)
+ extern int omap4_mpuss_init(void);
+ extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+ extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
+-extern u32 omap4_get_cpu1_ns_pa_addr(void);
+ #else
+ static inline int omap4_enter_lowpower(unsigned int cpu,
+ 					unsigned int power_state)
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 03ec6d307c82..4cfc4f9b2c69 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -213,11 +213,6 @@ static void __init save_l2x0_context(void)
+ {}
+ #endif
+ 
+-u32 omap4_get_cpu1_ns_pa_addr(void)
+-{
+-	return old_cpu1_ns_pa_addr;
+-}
+-
+ /**
+  * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
+  * The purpose of this function is to manage low power programming
+@@ -457,6 +452,11 @@ int __init omap4_mpuss_init(void)
+ 
+ #endif
+ 
++u32 omap4_get_cpu1_ns_pa_addr(void)
++{
++	return old_cpu1_ns_pa_addr;
++}
++
+ /*
+  * For kexec, we must set CPU1_WAKEUP_NS_PA_ADDR to point to
+  * current kernel's secondary_startup() early before
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 3faf454ba487..33e4953c61a8 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -306,7 +306,6 @@ static void __init omap4_smp_maybe_reset_cpu1(struct omap_smp_config *c)
+ 
+ 	cpu1_startup_pa = readl_relaxed(cfg.wakeupgen_base +
+ 					OMAP_AUX_CORE_BOOT_1);
+-	cpu1_ns_pa_addr = omap4_get_cpu1_ns_pa_addr();
+ 
+ 	/* Did the configured secondary_startup() get overwritten? */
+ 	if (!omap4_smp_cpu1_startup_valid(cpu1_startup_pa))
+@@ -316,9 +315,13 @@ static void __init omap4_smp_maybe_reset_cpu1(struct omap_smp_config *c)
+ 	 * If omap4 or 5 has NS_PA_ADDR configured, CPU1 may be in a
+ 	 * deeper idle state in WFI and will wake to an invalid address.
+ 	 */
+-	if ((soc_is_omap44xx() || soc_is_omap54xx()) &&
+-	    !omap4_smp_cpu1_startup_valid(cpu1_ns_pa_addr))
+-		needs_reset = true;
++	if ((soc_is_omap44xx() || soc_is_omap54xx())) {
++		cpu1_ns_pa_addr = omap4_get_cpu1_ns_pa_addr();
++		if (!omap4_smp_cpu1_startup_valid(cpu1_ns_pa_addr))
++			needs_reset = true;
++	} else {
++		cpu1_ns_pa_addr = 0;
++	}
+ 
+ 	if (!needs_reset || !c->cpu1_rstctrl_va)
+ 		return;
+-- 
+2.9.0
