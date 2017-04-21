@@ -1,109 +1,45 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 21 Apr 2017 09:19:56 -0700
-Subject: [PATCH 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
-In-Reply-To: <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
-References: <20170421010755.18025-1-stefan@agner.ch>
- <20170421010755.18025-3-stefan@agner.ch>
- <af3fe671-c5fb-d3cf-c891-e6b7c973baa1@gmail.com>
- <5cf26d2b020392c875464c7504a9fb5b@agner.ch>
- <8377dadc-043f-5932-cb13-3367db38a6dd@gmail.com>
-Message-ID: <494a7bc044457240a302d92b3a50b8e5@agner.ch>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 21 Apr 2017 18:40:50 +0200
+Subject: [GIT PULL 2/2] arm64 dts: exynos: Last round for v4.12
+In-Reply-To: <20170421164050.7404-1-krzk@kernel.org>
+References: <20170421164050.7404-1-krzk@kernel.org>
+Message-ID: <20170421164050.7404-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-04-21 06:08, Marek Vasut wrote:
-> On 04/21/2017 05:15 AM, Stefan Agner wrote:
->> On 2017-04-20 19:03, Marek Vasut wrote:
->>> On 04/21/2017 03:07 AM, Stefan Agner wrote:
->>>> Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
->>>> clock architecture requiring only two clocks to be referenced.
->>>> The IP is slightly different compared to i.MX 6SoloX, but currently
->>>> none of this differences are in use so there is no detection needed
->>>> and the driver can reuse IS_MX6SX.
->>>>
->>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
->>>> ---
->>>>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
->>>>  1 file changed, 15 insertions(+)
->>>>
->>>> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>> index c8bbf5da2ab8..4a45d37ddc80 100644
->>>> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
->>>> @@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
->>>>  	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
->>>>  };
->>>>
->>>> +static const char * const gpmi_clks_for_mx7d[] = {
->>>> +	"gpmi_io", "gpmi_bch_apb",
->>>> +};
->>>> +
->>>> +static const struct gpmi_devdata gpmi_devdata_imx7d = {
->>>> +	.type = IS_MX6SX,
->>>
->>> Would it make sense to use IS_MX7 here already to prevent future surprises ?
->>>
->>
->> Yeah I was thinking we can do it once we have an actual reason to
->> distinguish.
-> 
-> So what are the differences anyway ?
-> 
+Hi,
 
-I did not check the details, but Han's patchset (link in cover letter)
-mentions:
-"add the HW bitflip detection and correction for i.MX6QP and i.MX7D."...
+On top of previous pull request.
 
->> But then, adding the type would only require 2-3 lines of change if I
->> add it to the GPMI_IS_MX6 macro...
-> 
-> Then at least add a comment because using type = IMX6SX right under
-> gpmi_data_mx7d can trigger some head-scratching. And put my R-B on V2.
+Best regards,
+Krzysztof
 
-FWIW, I mentioned it in the commit message.
 
-I think rather then adding a comment it is cleaner to just add IS_IMX7D
-and add it to the GPMI_IS_MX6 macro. That does not need a comment since
-it implicitly says we have a i.MX 7 but treat it like i.MX 6 and it is a
-rather small change. Does that sound acceptable?
+The following changes since commit e3c07546747cdec07ff15c984bc6cebc9c9f788c:
 
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -132,7 +132,7 @@ static const char * const gpmi_clks_for_mx7d[] = {
- };
+  arm64: dts: exynos: Add the burst and esc clock frequency properties to DSI node (2017-03-08 08:55:39 +0200)
 
- static const struct gpmi_devdata gpmi_devdata_imx7d = {
--       .type = IS_MX6SX,
-+       .type = IS_MX7D,
-        .bch_max_ecc_strength = 62,
-        .max_chain_delay = 12,
-        .clks = gpmi_clks_for_mx7d,
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-index 2e584e18d980..f2cc13abc896 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-@@ -123,7 +123,8 @@ enum gpmi_type {
-        IS_MX23,
-        IS_MX28,
-        IS_MX6Q,
--       IS_MX6SX
-+       IS_MX6SX,
-+       IS_MX7D,
- };
+are available in the git repository at:
 
- struct gpmi_devdata {
-@@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
- #define GPMI_IS_MX28(x)                ((x)->devdata->type == IS_MX28)
- #define GPMI_IS_MX6Q(x)                ((x)->devdata->type == IS_MX6Q)
- #define GPMI_IS_MX6SX(x)       ((x)->devdata->type == IS_MX6SX)
-+#define GPMI_IS_MX7D(x)                ((x)->devdata->type == IS_MX7D)
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.12-2
 
--#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
-+#define GPMI_IS_MX6(x)         (GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) ||
-\
-+                                GPMI_IS_MX7D(x))
- #endif
+for you to fetch changes up to 5dccc9873c4af60f4478b3ef54267353f25cc301:
 
---
-Stefan
+  arm64: dts: exynos: Use - instead of @ for DT OPP entries (2017-04-20 18:10:05 +0200)
+
+----------------------------------------------------------------
+Second update of  Samsung DeviceTree ARM64 for v4.12:
+ - Fix DTC warnings in Exynos ARM64 Device Tree sources.
+ - Add panel node to TM2E board.
+
+----------------------------------------------------------------
+Hoegeun Kwon (1):
+      arm64: dts: exynos: Add support for s6e3hf2 panel device on TM2e board
+
+Viresh Kumar (1):
+      arm64: dts: exynos: Use - instead of @ for DT OPP entries
+
+ arch/arm64/boot/dts/exynos/exynos5433-bus.dtsi | 48 ++++++++++++-------------
+ arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts | 11 ++++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi     | 50 +++++++++++++-------------
+ 3 files changed, 60 insertions(+), 49 deletions(-)
