@@ -1,37 +1,69 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 21 Apr 2017 04:02:03 +0200
-Subject: [PATCH 1/5] mtd: nand: gpmi: unify clock handling
-In-Reply-To: <20170421010755.18025-2-stefan@agner.ch>
-References: <20170421010755.18025-1-stefan@agner.ch>
- <20170421010755.18025-2-stefan@agner.ch>
-Message-ID: <66b18c07-54f1-a532-5fce-e1759c5d3488@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 21 Apr 2017 12:10:14 +1000
+Subject: linux-next: build failure after merge of the drm-misc tree
+Message-ID: <20170421121014.3ee14a83@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/21/2017 03:07 AM, Stefan Agner wrote:
-> Add device specific list of clocks required, and handle all clocks
-> in a single for loop. This avoids further code duplication when
-> adding i.MX 7 support.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Hi all,
 
-[...]
+After merging the drm-misc tree, today's linux-next build (x86_64
+allmodconfig) failed like this:
 
-> diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> index 4e49a1f5fa27..2e584e18d980 100644
-> --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> @@ -130,6 +130,8 @@ struct gpmi_devdata {
->  	enum gpmi_type type;
->  	int bch_max_ecc_strength;
->  	int max_chain_delay; /* See the async EDO mode */
-> +	const char * const *clks;
-> +	int clks_count;
+drivers/tee/tee_shm.c:87:2: error: unknown field 'kmap_atomic' specified in initializer
+  .kmap_atomic = tee_shm_op_kmap_atomic,
+  ^
+drivers/tee/tee_shm.c:87:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .kmap_atomic = tee_shm_op_kmap_atomic,
+                 ^
+drivers/tee/tee_shm.c:87:17: note: (near initialization for 'tee_shm_dma_buf_ops.begin_cpu_access')
+drivers/tee/tee_shm.c:88:2: error: unknown field 'kmap' specified in initializer
+  .kmap = tee_shm_op_kmap,
+  ^
+drivers/tee/tee_shm.c:88:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  .kmap = tee_shm_op_kmap,
+          ^
+drivers/tee/tee_shm.c:88:10: note: (near initialization for 'tee_shm_dma_buf_ops.end_cpu_access')
 
-const int ? :)
+Caused by commit
 
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+  f9b67f0014cb ("dma-buf: Rename dma-ops to prevent conflict with kunmap_atomic macro")
+
+interacting with commit
+
+  967c9cca2cc5 ("tee: generic TEE subsystem")
+
+from the arm-soc tree.
+
+I applied the following merge fix patch for today:
+
+From: Stephen Rothwell <sfr@canb.auug.org.au>
+Date: Fri, 21 Apr 2017 12:06:32 +1000
+Subject: [PATCH] tee: merge fix for dma-ops field name changes
+
+Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+---
+ drivers/tee/tee_shm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
+index 0be1e3e93bee..4e14c9c9cb1c 100644
+--- a/drivers/tee/tee_shm.c
++++ b/drivers/tee/tee_shm.c
+@@ -84,8 +84,8 @@ static struct dma_buf_ops tee_shm_dma_buf_ops = {
+ 	.map_dma_buf = tee_shm_op_map_dma_buf,
+ 	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
+ 	.release = tee_shm_op_release,
+-	.kmap_atomic = tee_shm_op_kmap_atomic,
+-	.kmap = tee_shm_op_kmap,
++	.map_atomic = tee_shm_op_kmap_atomic,
++	.map = tee_shm_op_kmap,
+ 	.mmap = tee_shm_op_mmap,
+ };
+ 
+-- 
+2.11.0
 
 -- 
-Best regards,
-Marek Vasut
+Cheers,
+Stephen Rothwell
