@@ -1,64 +1,108 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 21 Apr 2017 11:56:14 -0500
-Subject: [PATCH 1/1] PCI: Add MCFG quirk for 2nd node of Cavium ThunderX
- pass2.x host controller
-In-Reply-To: <1490789773-21506-1-git-send-email-tn@semihalf.com>
-References: <1490789773-21506-1-git-send-email-tn@semihalf.com>
-Message-ID: <20170421165614.GA17916@bhelgaas-glaptop.roam.corp.google.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Fri, 21 Apr 2017 17:05:41 +0000
+Subject: [PATCH v5 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
+In-Reply-To: <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
+References: <1492115445-4069-1-git-send-email-jnair@caviumnetworks.com>
+ <1492115445-4069-3-git-send-email-jnair@caviumnetworks.com>
+ <20170414001911.GA13163@bhelgaas-glaptop.roam.corp.google.com>
+ <20170414210646.GA5346@localhost>
+ <CAErSpo731xSzrnKF+G+8SA_UUHy7ROA1V9oFkpwKi85GQf9VAg@mail.gmail.com>
+ <20170417174712.GA7575@localhost>
+ <CAErSpo6+do8GXon3EzZAUpqc2TFsA0BDwWBULqZCd1ayCJhD6w@mail.gmail.com>
+Message-ID: <20170421170414.GA2429@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 29, 2017 at 02:16:13PM +0200, Tomasz Nowicki wrote:
-> Currently SoCs pass2.x do not emulate EA headers for ACPI boot method at all.
-> However, for pass2.x some devices (like EDAC) advertise incorrect base addresses
-> in their BARs which results in driver probe failure during resource request.
-> Since all problematic blocks are on 2nd NUMA node under domain 10 add necessary
-> quirk entry to obtain BAR addresses correction using EA header emulation.
+On Fri, Apr 21, 2017 at 10:48:15AM -0500, Bjorn Helgaas wrote:
+> On Mon, Apr 17, 2017 at 12:47 PM, Jayachandran C
+> <jnair@caviumnetworks.com> wrote:
+> > On Fri, Apr 14, 2017 at 09:00:06PM -0500, Bjorn Helgaas wrote:
+> >> On Fri, Apr 14, 2017 at 4:06 PM, Jayachandran C
+> >> <jnair@caviumnetworks.com> wrote:
+> >> > On Thu, Apr 13, 2017 at 07:19:11PM -0500, Bjorn Helgaas wrote:
+> >> >> I tentatively applied both patches to pci/host-thunder for v4.12.
+> >> >>
+> >> >> However, I am concerned about the topology here:
+> >> >>
+> >> >> On Thu, Apr 13, 2017 at 08:30:45PM +0000, Jayachandran C wrote:
+> >> >> > On Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the
+> >> >> > PCI topology is slightly unusual.  For a multi-node system, it looks
+> >> >> > like:
+> >> >> >
+> >> >> >     00:00.0 [PCI] bridge to [bus 01-1e]
+> >> >> >     01:0a.0 [PCI-PCIe bridge, type 8] bridge to [bus 02-04]
+> >> >> >     02:00.0 [PCIe root port, type 4] bridge to [bus 03-04] (XLATE_ROOT)
+> >> >> >     03:00.0 PCIe Endpoint
+> >> >>
+> >> >> A root port normally has a single PCIe link leading downstream.
+> >> >> According to this, 02:00.0 is a root port that has the usual
+> >> >> downstream link leading to 03:00.0, but it also has an upstream link
+> >> >> to 01:0a.0.
+> >> >
+> >> > The PCI topology is a bit broken due to the way that the PCIe IP block
+> >> > was integrated into SoC PCI bridges and devices. The current mechanism
+> >> > of adding a PCI-PCIe bridge to glue these together is not ideal.
+> >>
+> >> Yeah, that's definitely broken.
+> >>
+> >> >> Maybe this example is omitting details that are not relevant to DMA
+> >> >> aliases?  The PCIe capability only contains one set of link-related
+> >> >> registers, so I don't know how we could manage a single device that
+> >> >> has two links.
+> >> >
+> >> > The root port is standard and has just one link to the EP (or whatever
+> >> > is on the external PCIe slot). The fallout of the current hw design is
+> >> > that the PCI-PCIe bridge has a link that does not follow standard and
+> >> > does not have a counterpart (as you noted).
+> >> >
+> >> >> A device with two links would break things like ASPM.  In
+> >> >> set_pcie_port_type(), for example, we have this comment:
+> >> >>
+> >> >>    * A Root Port or a PCI-to-PCIe bridge is always the upstream end
+> >> >>    * of a Link.  No PCIe component has two Links.  Two Links are
+> >> >>    * connected by a Switch that has a Port on each Link and internal
+> >> >>    * logic to connect the two Ports.
+> >> >>
+> >> >> The topology above breaks these assumptions, which will make
+> >> >> pdev->has_secondary_link incorrect, which means ASPM won't work
+> >> >> correctly.
+> >> >
+> >> > Given the current hardware, the pcieport driver seems to work reasonably
+> >> > for the root port at 02:00.0, with AER support. I will take a look at the
+> >> > ASPM part.
+> >>
+> >> I don't think pcieport itself cares much about links.  ASPM does, but
+> >> it looks like set_pcie_port_type() actually is smart enough to know
+> >> that PCI-to-PCIe bridges and Root Ports always have links on their
+> >> secondary sides.  So has_secondary_link probably does get set
+> >> correctly.
+> >>
+> >> But I think you'll hit the VIA "strange chipset" thing in
+> >> pcie_aspm_init_link_state(), which will probably prevent us from doing
+> >> ASPM on the link from 02:00.0 to 03:00.0.
+> >>
+> >> Could you collect "lspci -vv" output from this system?  I'd like to
+> >> archive that as background for this IOMMU issue and the ASPM tweaks I
+> >> suspect we'll have to do.  I *wish* we had more information about that
+> >> VIA thing, because I suspect we could get rid of it if we had more
+> >> details.
+> >
+> > The full logs are slightly large, so I have kept them at:
+> > https://github.com/jchandra-cavm/thunderx2/blob/master/logs/
+> > The lspci -vv output is lspci-vv.txt and lspci -tvn output is lspci-tvn.txt
+> >
+> > The output is from 2 socket system, the cards are not on the first slot
+> > like the example above, so the bus and device numbers are different.
 > 
-> Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> CC: stable at vger.kernel.org	# v4.10+
-
-Sorry Tomasz, I must have mistakenly marked this "accepted" in
-patchwork, so it fell off my to-do list.  It's too late to get this in
-v4.11, but I can still apply it for v4.12.
-
-I put it on my pci/host-thunder branch with Robert's ack.  I added a preceding
-patch to tidy up whitespace, which makes this patch look like just:
-
-        /* SoC pass2.x */
-        THUNDER_PEM_QUIRK(1, 0),
-        THUNDER_PEM_QUIRK(1, 1),
-+       THUNDER_ECAM_QUIRK(1, 10),
-
-Please double-check it to make sure this is what you need.
-
-> ---
->  drivers/acpi/pci_mcfg.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+> Can somebody with this system collect the "lspci -xxxx" output as well?
 > 
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> index a6a4cea..a0a391e 100644
-> --- a/drivers/acpi/pci_mcfg.c
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -90,13 +90,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
->  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x894057000000UL, node) },  \
->  	{ "CAVIUM", "THUNDERX", rev, 9 + (10 * (node)), MCFG_BUS_ANY,	    \
->  	  &thunder_pem_ecam_ops, THUNDER_PEM_RES(0x89808f000000UL, node) }
-> +#define THUNDER_ECAM_QUIRK(rev, seg)					\
-> +	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
-> +	&pci_thunder_ecam_ops }
->  	/* SoC pass2.x */
->  	THUNDER_PEM_QUIRK(1, 0),
->  	THUNDER_PEM_QUIRK(1, 1),
-> +	THUNDER_ECAM_QUIRK(1, 10),
->  
-> -#define THUNDER_ECAM_QUIRK(rev, seg)					\
-> -	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
-> -	&pci_thunder_ecam_ops }
->  	/* SoC pass1.x */
->  	THUNDER_PEM_QUIRK(2, 0),	/* off-chip devices */
->  	THUNDER_PEM_QUIRK(2, 1),	/* off-chip devices */
-> -- 
-> 2.7.4
-> 
+> I'm making some lspci changes to handle the PCI-to-PCIe bridge
+> correctly, and I can use the "lspci -xxxx" output to create an lspci
+> test case.
+
+[Sorry was AFK for a few days]
+
+I have updated the above directory with the log. Also tested your next branch
+and it works fine on ThunderX2.
+
+JC.
