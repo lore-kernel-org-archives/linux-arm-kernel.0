@@ -1,38 +1,53 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 22 Apr 2017 10:52:08 +0800
-Subject: [PATCH 5/5 v3] ARM: dts: Add the FOTG210 USB host to Gemini
-In-Reply-To: <20170421204058.6206-5-linus.walleij@linaro.org>
-Message-ID: <201704221033.gRgELoti%fengguang.wu@intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 21 Apr 2017 19:55:47 -0700
+Subject: [RFC PATCH 2/3] clk: add managed version of clk_bulk_get
+In-Reply-To: <1491969809-20154-3-git-send-email-aisheng.dong@nxp.com>
+References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
+ <1491969809-20154-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170422025547.GT7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 04/12, Dong Aisheng wrote:
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 1d05b66..3fc6010 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -278,11 +278,25 @@ struct clk *clk_get(struct device *dev, const char *id);
+>   *
+>   * clk_bulk_get should not be called from within interrupt context.
+>   */
+> -
 
-[auto build test ERROR on next-20170421]
-[cannot apply to robh/for-next usb/usb-testing balbi-usb/next v4.9-rc8 v4.9-rc7 v4.9-rc6 v4.11-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Should be in previous patch?
 
-url:    https://github.com/0day-ci/linux/commits/Linus-Walleij/usb-host-add-DT-bindings-for-faraday-fotg2/20170422-072414
-config: arm-sama5_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+>  int __must_check clk_bulk_get(struct device *dev, int num_clks,
+>  			      struct clk_bulk_data *clks);
+>  
+>  /**
+> + * devm_clk_bulk_get - managed get multiple clk consumers
+> + * @dev: device for clock "consumer"
+> + * @num_clks: the number of clk_bulk_data
+> + * @clks: the clk_bulk_data table of consumer
+> + *
+> + * Return 0 on success, an errno on failure.
+> + *
+> + * This helper function allows drivers to get several regulator
 
-All errors (new ones prefixed by >>):
+s/regulator/clk/
 
->> Error: arch/arm/boot/dts/gemini.dtsi:161.19-20 syntax error
-   FATAL ERROR: Unable to parse input tree
+> + * consumers in one operation with management, the clks will
+> + * automatically be freed when the device is unbound.
+> + */
+> +int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 24300 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170422/a2a86dda/attachment-0001.gz>
+Thanks for the __must_check. We need to add more __must_check to
+clk APIs.
+
+> +				   struct clk_bulk_data *clks);
+> +
+> +/**
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
