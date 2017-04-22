@@ -1,33 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 22 Apr 2017 16:09:45 +0200
-Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
- the pmic mfd
-In-Reply-To: <20170422020233.GA7065@codeaurora.org>
-References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
- <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
- <20170422020233.GA7065@codeaurora.org>
-Message-ID: <370c36f9-e6fc-416c-776b-edc1e42d7ddc@linaro.org>
+From: net147@gmail.com (Jonathan Liu)
+Date: Sun, 23 Apr 2017 00:46:24 +1000
+Subject: [linux-sunxi] [PATCH v2 1/6] clk: sunxi-ng: Add sun4i/sun7i CCU
+ driver
+In-Reply-To: <ac8c4dab4f160ec605d52120517774bf1de87c2e.1490545262.git-series.plaes@plaes.org>
+References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
+ <ac8c4dab4f160ec605d52120517774bf1de87c2e.1490545262.git-series.plaes@plaes.org>
+Message-ID: <CANwerB3CySDKDF0Q5g4h5yaKBEF2S_rmp8ikR2HgGyf+RXzgAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/2017 04:02, Stephen Boyd wrote:
-> On 04/17, Daniel Lezcano wrote:
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
->>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
->>  2 files changed, 7 insertions(+)
->>
-> 
-> I take it this goes through arm-soc? Not sure why I'm on To:
-> line.
+Hi Priit,
 
-Probably it should go through Lee's tree.
+On 27 March 2017 at 04:20, Priit Laes <plaes@plaes.org> wrote:
+> +static struct ccu_nkmp pll_ve_clk = {
+> +       .enable         = BIT(31),
+> +       .n              = _SUNXI_CCU_MULT_OFFSET(8, 5, 0),
+> +       .k              = _SUNXI_CCU_MULT(4, 2),
+> +       .m              = _SUNXI_CCU_DIV(0, 2),
+> +       .p              = _SUNXI_CCU_DIV(16, 2),
+> +       .common         = {
+> +               .reg            = 0x018,
+> +               .hw.init        = CLK_HW_INIT("pll-ve",
+> +                                             "hosc",
+> +                                             &ccu_nkmp_ops,
+> +                                             0),
+> +       },
+> +};
 
+pll-ve is a NKMP clock in A10 but a NK clock in A20.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> +static const char *const hdmi_parents[] = { "pll-video0", "pll-video0-2x",
+> +                                           "pll-vide01", "pll-video1-2x" };
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+"pll-vide01" should be "pll-video1".
+
+Regards,
+Jonathan
