@@ -1,195 +1,125 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Sat, 22 Apr 2017 02:28:44 +0200
-Subject: [PATCH v3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-In-Reply-To: <28bece63-9917-5f00-ccdf-fe663def500f@arm.com>
-References: <1491228763-23450-1-git-send-email-suzuki.poulose@arm.com>
- <20170404101316.GF11752@cbox> <28bece63-9917-5f00-ccdf-fe663def500f@arm.com>
-Message-ID: <febea966-3767-21ff-3c40-1a76d1399138@suse.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 21 Apr 2017 18:23:34 -0700
+Subject: [PATCH v2 1/5] mtd: nand: gpmi: unify clock handling
+In-Reply-To: <20170422012338.4635-1-stefan@agner.ch>
+References: <20170422012338.4635-1-stefan@agner.ch>
+Message-ID: <20170422012338.4635-2-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add device specific list of clocks required, and handle all clocks
+in a single for loop. This avoids further code duplication when
+adding i.MX 7 support.
 
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 41 +++++++++++++++-------------------
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  2 ++
+ 2 files changed, 20 insertions(+), 23 deletions(-)
 
-On 04.04.17 12:35, Suzuki K Poulose wrote:
-> Hi Christoffer,
->
-> On 04/04/17 11:13, Christoffer Dall wrote:
->> Hi Suzuki,
->>
->> On Mon, Apr 03, 2017 at 03:12:43PM +0100, Suzuki K Poulose wrote:
->>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
->>> unmap_stage2_range() on the entire memory range for the guest. This
->>> could
->>> cause problems with other callers (e.g, munmap on a memslot) trying to
->>> unmap a range. And since we have to unmap the entire Guest memory range
->>> holding a spinlock, make sure we yield the lock if necessary, after we
->>> unmap each PUD range.
->>>
->>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
->>> Cc: stable at vger.kernel.org # v3.10+
->>> Cc: Paolo Bonzini <pbonzin@redhat.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> [ Avoid vCPU starvation and lockup detector warnings ]
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>
->>
->> This unfortunately fails to build on 32-bit ARM, and I also think we
->> intended to check against S2_PGDIR_SIZE, not S2_PUD_SIZE.
->
-> Sorry about that, I didn't test the patch with arm32. I am fine the
-> patch below. And I agree that the name change does make things more
-> readable. See below for a hunk that I posted to the kbuild report.
->
->>
->> How about adding this to your patch (which includes a rename of
->> S2_PGD_SIZE which is horribly confusing as it indicates the size of the
->> first level stage-2 table itself, where S2_PGDIR_SIZE indicates the size
->> of address space mapped by a single entry in the same table):
->>
->> diff --git a/arch/arm/include/asm/stage2_pgtable.h
->> b/arch/arm/include/asm/stage2_pgtable.h
->> index 460d616..c997f2d 100644
->> --- a/arch/arm/include/asm/stage2_pgtable.h
->> +++ b/arch/arm/include/asm/stage2_pgtable.h
->> @@ -35,10 +35,13 @@
->>
->>  #define stage2_pud_huge(pud)            pud_huge(pud)
->>
->> +#define S2_PGDIR_SIZE                PGDIR_SIZE
->> +#define S2_PGDIR_MASK                PGDIR_MASK
->> +
->>  /* Open coded p*d_addr_end that can deal with 64bit addresses */
->>  static inline phys_addr_t stage2_pgd_addr_end(phys_addr_t addr,
->> phys_addr_t end)
->>  {
->> -    phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
->> +    phys_addr_t boundary = (addr + S2_PGDIR_SIZE) & S2_PGDIR_MASK;
->>
->>      return (boundary - 1 < end - 1) ? boundary : end;
->>  }
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index db94f3a..6e79a4c 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -41,7 +41,7 @@ static unsigned long hyp_idmap_start;
->>  static unsigned long hyp_idmap_end;
->>  static phys_addr_t hyp_idmap_vector;
->>
->> -#define S2_PGD_SIZE    (PTRS_PER_S2_PGD * sizeof(pgd_t))
->> +#define S2_PGD_TABLE_SIZE    (PTRS_PER_S2_PGD * sizeof(pgd_t))
->>  #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
->>
->>  #define KVM_S2PTE_FLAG_IS_IOMAP        (1UL << 0)
->> @@ -299,7 +299,7 @@ static void unmap_stage2_range(struct kvm *kvm,
->> phys_addr_t start, u64 size)
->>           * If the range is too large, release the kvm->mmu_lock
->>           * to prevent starvation and lockup detector warnings.
->>           */
->> -        if (size > S2_PUD_SIZE)
->> +        if (size > S2_PGDIR_SIZE)
->>              cond_resched_lock(&kvm->mmu_lock);
->>          next = stage2_pgd_addr_end(addr, end);
->>          if (!stage2_pgd_none(*pgd))
->> @@ -747,7 +747,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
->>      }
->>
->>      /* Allocate the HW PGD, making sure that each page gets its own
->> refcount */
->> -    pgd = alloc_pages_exact(S2_PGD_SIZE, GFP_KERNEL | __GFP_ZERO);
->> +    pgd = alloc_pages_exact(S2_PGD_TABLE_SIZE, GFP_KERNEL | __GFP_ZERO);
->>      if (!pgd)
->>          return -ENOMEM;
->>
->> @@ -843,7 +843,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
->>      spin_unlock(&kvm->mmu_lock);
->>
->>      /* Free the HW pgd, one page at a time */
->> -    free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
->> +    free_pages_exact(kvm->arch.pgd, S2_PGD_TABLE_SIZE);
->>      kvm->arch.pgd = NULL;
->>  }
->>
->
-> Btw, I have a different hunk to solve the problem, posted to the kbuild
-> report. I will post it here for the sake of capturing the discussion in
-> one place. The following hunk on top of the patch, changes the lock
-> release after we process one PGDIR entry. As for the first time
-> we enter the loop we haven't done much with the lock held, hence it may
-> make
-> sense to do it after the first round and we have more work to do.
->
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index db94f3a..582a972 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -295,15 +295,15 @@ static void unmap_stage2_range(struct kvm *kvm,
-> phys_addr_t start, u64 size)
->         assert_spin_locked(&kvm->mmu_lock);
->         pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->         do {
-> +               next = stage2_pgd_addr_end(addr, end);
-> +               if (!stage2_pgd_none(*pgd))
-
-Just as heads up, I had this version applied to my tree by accident 
-(commit 8b3405e345b5a098101b0c31b264c812bba045d9 from Christoffer's 
-queue) and ran into a NULL pointer dereference:
-
-[223090.242280] Unable to handle kernel NULL pointer dereference at 
-virtual address 00000040
-[223090.262330] PC is at unmap_stage2_range+0x8c/0x428
-[223090.262332] LR is at kvm_unmap_hva_handler+0x2c/0x3c
-[223090.262531] Call trace:
-[223090.262533] [<ffff0000080adb78>] unmap_stage2_range+0x8c/0x428
-[223090.262535] [<ffff0000080adf40>] kvm_unmap_hva_handler+0x2c/0x3c
-[223090.262537] [<ffff0000080ace2c>] handle_hva_to_gpa+0xb0/0x104
-[223090.262539] [<ffff0000080af988>] kvm_unmap_hva+0x5c/0xbc
-[223090.262543] [<ffff0000080a2478>] 
-kvm_mmu_notifier_invalidate_page+0x50/0x8c
-[223090.262547] [<ffff0000082274f8>] 
-__mmu_notifier_invalidate_page+0x5c/0x84
-[223090.262551] [<ffff00000820b700>] try_to_unmap_one+0x1d0/0x4a0
-[223090.262553] [<ffff00000820c5c8>] rmap_walk+0x1cc/0x2e0
-[223090.262555] [<ffff00000820c90c>] try_to_unmap+0x74/0xa4
-[223090.262557] [<ffff000008230ce4>] migrate_pages+0x31c/0x5ac
-[223090.262561] [<ffff0000081f869c>] compact_zone+0x3fc/0x7ac
-[223090.262563] [<ffff0000081f8ae0>] compact_zone_order+0x94/0xb0
-[223090.262564] [<ffff0000081f91c0>] try_to_compact_pages+0x108/0x290
-[223090.262569] [<ffff0000081d5108>] __alloc_pages_direct_compact+0x70/0x1ac
-[223090.262571] [<ffff0000081d64a0>] __alloc_pages_nodemask+0x434/0x9f4
-[223090.262572] [<ffff0000082256f0>] alloc_pages_vma+0x230/0x254
-[223090.262574] [<ffff000008235e5c>] do_huge_pmd_anonymous_page+0x114/0x538
-[223090.262576] [<ffff000008201bec>] handle_mm_fault+0xd40/0x17a4
-[223090.262577] [<ffff0000081fb324>] __get_user_pages+0x12c/0x36c
-[223090.262578] [<ffff0000081fb804>] get_user_pages_unlocked+0xa4/0x1b8
-[223090.262579] [<ffff0000080a3ce8>] __gfn_to_pfn_memslot+0x280/0x31c
-[223090.262580] [<ffff0000080a3dd0>] gfn_to_pfn_prot+0x4c/0x5c
-[223090.262582] [<ffff0000080af3f8>] kvm_handle_guest_abort+0x240/0x774
-[223090.262584] [<ffff0000080b2bac>] handle_exit+0x11c/0x1ac
-[223090.262586] [<ffff0000080ab99c>] kvm_arch_vcpu_ioctl_run+0x31c/0x648
-[223090.262587] [<ffff0000080a1d78>] kvm_vcpu_ioctl+0x378/0x768
-[223090.262590] [<ffff00000825df5c>] do_vfs_ioctl+0x324/0x5a4
-[223090.262591] [<ffff00000825e26c>] SyS_ioctl+0x90/0xa4
-[223090.262595] [<ffff000008085d84>] el0_svc_naked+0x38/0x3c
-
-0xffff0000080adb78 is in unmap_stage2_range (../arch/arm/kvm/mmu.c:260).
-255		pud_t *pud, *start_pud;
-256
-257		start_pud = pud = stage2_pud_offset(pgd, addr);
-258		do {
-259			next = stage2_pud_addr_end(addr, end);
-260			if (!stage2_pud_none(*pud)) {
-261				if (stage2_pud_huge(*pud)) {
-262					pud_t old_pud = *pud;
-263
-264					stage2_pud_clear(pud);
-
-
-So please beware that for some reason pud may become invalid after 
-rescheduling.
-
-
-Alex
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index d52139635b67..c8bbf5da2ab8 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -82,6 +82,10 @@ static int gpmi_ooblayout_free(struct mtd_info *mtd, int section,
+ 	return 0;
+ }
+ 
++static const char * const gpmi_clks_for_mx2x[] = {
++	"gpmi_io",
++};
++
+ static const struct mtd_ooblayout_ops gpmi_ooblayout_ops = {
+ 	.ecc = gpmi_ooblayout_ecc,
+ 	.free = gpmi_ooblayout_free,
+@@ -91,24 +95,36 @@ static const struct gpmi_devdata gpmi_devdata_imx23 = {
+ 	.type = IS_MX23,
+ 	.bch_max_ecc_strength = 20,
+ 	.max_chain_delay = 16,
++	.clks = gpmi_clks_for_mx2x,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx2x),
+ };
+ 
+ static const struct gpmi_devdata gpmi_devdata_imx28 = {
+ 	.type = IS_MX28,
+ 	.bch_max_ecc_strength = 20,
+ 	.max_chain_delay = 16,
++	.clks = gpmi_clks_for_mx2x,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx2x),
++};
++
++static const char * const gpmi_clks_for_mx6[] = {
++	"gpmi_io", "gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
+ };
+ 
+ static const struct gpmi_devdata gpmi_devdata_imx6q = {
+ 	.type = IS_MX6Q,
+ 	.bch_max_ecc_strength = 40,
+ 	.max_chain_delay = 12,
++	.clks = gpmi_clks_for_mx6,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+ };
+ 
+ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
+ 	.type = IS_MX6SX,
+ 	.bch_max_ecc_strength = 62,
+ 	.max_chain_delay = 12,
++	.clks = gpmi_clks_for_mx6,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+ };
+ 
+ static irqreturn_t bch_irq(int irq, void *cookie)
+@@ -599,35 +615,14 @@ static int acquire_dma_channels(struct gpmi_nand_data *this)
+ 	return -EINVAL;
+ }
+ 
+-static char *extra_clks_for_mx6q[GPMI_CLK_MAX] = {
+-	"gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
+-};
+-
+ static int gpmi_get_clks(struct gpmi_nand_data *this)
+ {
+ 	struct resources *r = &this->resources;
+-	char **extra_clks = NULL;
+ 	struct clk *clk;
+ 	int err, i;
+ 
+-	/* The main clock is stored in the first. */
+-	r->clock[0] = devm_clk_get(this->dev, "gpmi_io");
+-	if (IS_ERR(r->clock[0])) {
+-		err = PTR_ERR(r->clock[0]);
+-		goto err_clock;
+-	}
+-
+-	/* Get extra clocks */
+-	if (GPMI_IS_MX6(this))
+-		extra_clks = extra_clks_for_mx6q;
+-	if (!extra_clks)
+-		return 0;
+-
+-	for (i = 1; i < GPMI_CLK_MAX; i++) {
+-		if (extra_clks[i - 1] == NULL)
+-			break;
+-
+-		clk = devm_clk_get(this->dev, extra_clks[i - 1]);
++	for (i = 0; i < this->devdata->clks_count; i++) {
++		clk = devm_clk_get(this->dev, this->devdata->clks[i]);
+ 		if (IS_ERR(clk)) {
+ 			err = PTR_ERR(clk);
+ 			goto err_clock;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 4e49a1f5fa27..8879c4eff25e 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -130,6 +130,8 @@ struct gpmi_devdata {
+ 	enum gpmi_type type;
+ 	int bch_max_ecc_strength;
+ 	int max_chain_delay; /* See the async EDO mode */
++	const char * const *clks;
++	const int clks_count;
+ };
+ 
+ struct gpmi_nand_data {
+-- 
+2.12.2
