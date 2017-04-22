@@ -1,37 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Apr 2017 19:58:37 -0700
-Subject: [RFC PATCH 2/3] clk: add managed version of clk_bulk_get
-In-Reply-To: <20170413143727.GE24254@b29396-OptiPlex-7040>
+Date: Fri, 21 Apr 2017 20:04:19 -0700
+Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
+In-Reply-To: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
 References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
- <1491969809-20154-3-git-send-email-aisheng.dong@nxp.com>
- <20170413143727.GE24254@b29396-OptiPlex-7040>
-Message-ID: <20170422025837.GU7065@codeaurora.org>
+Message-ID: <20170422030419.GV7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13, Dong Aisheng wrote:
-> On Wed, Apr 12, 2017 at 12:03:28PM +0800, Dong Aisheng wrote:
+On 04/12, Dong Aisheng wrote:
 > 
->    drivers/built-in.o: In function `devm_clk_bulk_get':
-> >> (.text+0x1930e): undefined reference to `clk_bulk_get'
->    drivers/built-in.o: In function `devm_clk_bulk_release':
-> >> clk-devres.c:(.text+0x19370): undefined reference to `clk_bulk_put'
+> Together with the err path handling for each clocks, it does make
+> things a bit ugly.
 > 
-> clk_bulk_get is defined in clkdev.c which depends on CONFIG_CLKDEV_LOOKUP.
-> However, some platforms like m68k may not select CLKDEV_LOOKUP but
-> select HAVE_CLK. Thus compiling devm_clk_bulk_get may cause a undefined
-> reference to 'clk_bulk_get'.
+> Since we already have regulator_bulk_get accessories, i thought we
+> probably could introduce clk_bulk_get as well to handle such case to
+> ease the driver owners' life. 
 > 
-> Since clk_bulk_get is built upon the platform specific clk_get api,
-> clk_bulk_get can also be used by that platform accordingly.
+> Besides IMX cpufreq driver, there is also some similar cases
+> in kernel which could befinit from this api as well.
+> e.g.
+> drivers/cpufreq/tegra124-cpufreq.c
+> drivers/cpufreq/s3c2412-cpufreq.c
+> sound/soc/samsung/smdk_spdif.c
+> arch/arm/mach-omap1/serial.c
+> ...
 > 
-> Then we probably could move clk_bulk_get into clk-devres.c as well which
-> is controlled by common CONFIG_HAVE_CLK to benifit all platforms.
+> And actually, if we handle clocks more than 3, then it might be
+> worthy to try, which there is quite many manay in kernel and
+> that probably could save a lot codes.
+> 
+> This is a RFC patch intending to bring up the idea to discuss.
+> 
 
-clk-devres is for devm* things. I'd just make another file for
-now, clk-bulk.c or something like that. When everyone moves to
-common clk, we can fold it into clk.c, or not because clk.c is
-rather large right now.
+Idea seems fine to me. Please also add Russell King, as we need
+an ack from him on the clk.h API changes.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
