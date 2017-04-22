@@ -1,105 +1,198 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Apr 2017 20:16:47 -0700
-Subject: [RFC PATCH 1/3] clk: add clk_bulk_get accessories
-In-Reply-To: <1491969809-20154-2-git-send-email-aisheng.dong@nxp.com>
-References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
- <1491969809-20154-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170422031647.GW7065@codeaurora.org>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Sat, 22 Apr 2017 13:38:07 +0530
+Subject: [RFC PATH] of/pci/dma: fix DMA configruation for PCI masters
+Message-ID: <1492848487-11768-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12, Dong Aisheng wrote:
->  
->  #ifdef CONFIG_HAVE_CLK
-> @@ -230,6 +257,32 @@ static inline void clk_unprepare(struct clk *clk)
->  struct clk *clk_get(struct device *dev, const char *id);
->  
->  /**
-> + * clk_bulk_get - lookup and obtain a number of references to clock producer.
-> + * @dev: device for clock "consumer"
-> + * @num_clks: the number of clk_bulk_data
-> + * @clks: the clk_bulk_data table of consumer
-> + *
-> + * This helper function allows drivers to get several clk consumers in one
-> + * operation. If any of the clk cannot be acquired then any clks
-> + * that were obtained will be freed before returning to the caller.
-> + *
-> + * Returns 0 if all clocks specified in clk_bulk_data table are obtained
-> + * successfully, or valid IS_ERR() condition containing errno.
-> + * The implementation uses @dev and @clk_bulk_data.id to determine the
-> + * clock consumer, and thereby the clock producer.
-> + * (IOW, @id may be identical strings, but clk_get may return different
-> + * clock producers depending on @dev.) The clock returned is stored in
+current device frmework and of framework integration assumes dma-ranges
+in a way where memory-mapped devices define their dma-ranges.
+dma-ranges: (child-bus-address, parent-bus-address, length).
 
-This comment is inaccurate. Only one dev is possible with this
-API.
+but iproc based SOCs and other SOCs(suc as rcar) have PCI world dma-ranges.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
 
-> + * each @clk_bulk_data.clk field.
-> + *
-> + * Drivers must assume that the clock source is not enabled.
-> + *
-> + * clk_bulk_get should not be called from within interrupt context.
-> + */
-> +
+of_dma_configure is specifically witten to take care of memory mapped devices.
+but no implementation exists for pci to take care of pcie based memory ranges.
+in fact pci world doesnt seem to define standard dma-ranges
 
-Drop space.
+this patch served following purposes
 
-> +int __must_check clk_bulk_get(struct device *dev, int num_clks,
-> +			      struct clk_bulk_data *clks);
-> +
-> +/**
->   * devm_clk_get - lookup and obtain a managed reference to a clock producer.
->   * @dev: device for clock "consumer"
->   * @id: clock consumer ID
-> @@ -279,6 +332,20 @@ struct clk *devm_get_clk_from_child(struct device *dev,
->  int clk_enable(struct clk *clk);
->  
->  /**
-> + * clk_bulk_enable - inform the system when the bulk of clock source should
-> + *		     be running.
-> + * @num_clks: the number of clk_bulk_data
-> + * @clks: the clk_bulk_data table of consumer
-> + *
-> + * If the clock can not be enabled/disabled all, this should return success.
-> + *
-> + * May be called from atomic contexts.
-> + *
-> + * Returns success (0) or negative errno.
-> + */
-> +int __must_check clk_bulk_enable(int num_clks, struct clk_bulk_data *clks);
-> +
-> +/**
->   * clk_disable - inform the system when the clock source is no longer required.
->   * @clk: clock source
->   *
-> @@ -295,6 +362,24 @@ int clk_enable(struct clk *clk);
->  void clk_disable(struct clk *clk);
->  
->  /**
-> + * clk_bulk_disable - inform the system when the bulk of clock source is no
-> + *		      longer required.
-> + * @num_clks: the number of clk_bulk_data
-> + * @clks: the clk_bulk_data table of consumer
-> + *
-> + * Inform the system that a bulk of clock source is no longer required by
-> + * a driver and may be shut down.
-> + *
-> + * May be called from atomic contexts.
-> + *
-> + * Implementation detail: if the bulk of clock source is shared between
+1) exposes intrface to the pci host driver for thir inbound memory ranges
 
-I'm not sure "bulk of clock source" is the correct terminology.
-Perhaps "set of clks"?
+2) provide an interface to callers such as of_dma_get_ranges.
+so then the returned size get best possible (largest) dma_mask.
+for e.g.
+dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
+we should get dev->coherent_dma_mask=0x7fffffffff.
 
-> + * multiple drivers, clk_bulk_enable() calls must be balanced by the
-> + * same number of clk_bulk_disable() calls for the clock source to be
-> + * disabled.
-> + */
-> +void clk_bulk_disable(int num_clks, struct clk_bulk_data *clks);
+3) this patch handles multiple inbound windows and dma-ranges.
+it is left to the caller, how it wants to use them.
+the new function returns the resources in a standard and unform way
 
-We can mark clk_bulk_data structure as const here? Probably
-applies in other places as well in this patch.
+4) this way the callers of of_dma_get_ranges does not need to change.
+and
 
+5) leaves scope of adding PCI flag handling for inbound memory
+by the new function.
+
+Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 02b2903..ec21191 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -6,6 +6,7 @@
+ #include <linux/ioport.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
++#include <linux/of_pci.h>
+ #include <linux/pci.h>
+ #include <linux/pci_regs.h>
+ #include <linux/sizes.h>
+@@ -829,10 +830,30 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
+ 	int len, naddr, nsize, pna;
+ 	int ret = 0;
+ 	u64 dmaaddr;
++	struct resource_entry *window;
++	LIST_HEAD(res);
+ 
+ 	if (!node)
+ 		return -EINVAL;
+ 
++	if (strcmp(np->name, "pci")) {
++		*size = 0;
++		ret = of_pci_get_dma_ranges(np, &res);
++		if (!ret) {
++			resource_list_for_each_entry(window, &res) {
++			struct resource *res_dma = window->res;
++
++			if (*size < resource_size(res_dma)) {
++				*dma_addr = res_dma->start - window->offset;
++				*paddr = res_dma->start;
++				*size = resource_size(res_dma);
++				}
++			}
++		}
++		pci_free_resource_list(&res);
++		goto out;
++	}
++
+ 	while (1) {
+ 		naddr = of_n_addr_cells(node);
+ 		nsize = of_n_size_cells(node);
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 0ee42c3..2aa9401 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -283,6 +283,83 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
++
++/**
++ * of_pci_get_dma_ranges - Parse PCI host bridge inbound resources from DT
++ * @np: device node of the host bridge having the dma-ranges property
++ * @resources: list where the range of resources will be added after DT parsing
++ *
++ * It is the caller's job to free the @resources list.
++ *
++ * This function will parse the "dma-ranges" property of a
++ * PCI host bridge device node and setup the resource mapping based
++ * on its content.
++ *
++ * It returns zero if the range parsing has been successful or a standard error
++ * value if it failed.
++ */
++
++int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources)
++{
++	struct device_node *node = of_node_get(np);
++	int rlen;
++	int ret = 0;
++	const int na = 3, ns = 2;
++	struct resource *res;
++	struct of_pci_range_parser parser;
++	struct of_pci_range range;
++
++	if (!node)
++		return -EINVAL;
++
++	parser.node = node;
++	parser.pna = of_n_addr_cells(node);
++	parser.np = parser.pna + na + ns;
++
++	parser.range = of_get_property(node, "dma-ranges", &rlen);
++
++	if (!parser.range) {
++		pr_debug("pcie device has no dma-ranges defined for node(%s)\n",
++			  np->full_name);
++		ret = -ENODEV;
++		goto out;
++	}
++
++	parser.end = parser.range + rlen / sizeof(__be32);
++
++	for_each_of_pci_range(&parser, &range) {
++		/*
++		 * If we failed translation or got a zero-sized region
++		 * then skip this range
++		 */
++		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
++			continue;
++
++		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
++		if (!res) {
++			ret = -ENOMEM;
++			goto parse_failed;
++		}
++
++		ret = of_pci_range_to_resource(&range, np, res);
++		if (ret) {
++			kfree(res);
++			continue;
++		}
++
++		pci_add_resource_offset(resources, res,
++					res->start - range.pci_addr);
++	}
++
++	return ret;
++
++parse_failed:
++	pci_free_resource_list(resources);
++out:
++	of_node_put(node);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(of_pci_get_dma_ranges);
+ #endif /* CONFIG_OF_ADDRESS */
+ 
+ #ifdef CONFIG_PCI_MSI
+diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
+index 0e0974e..617b90d 100644
+--- a/include/linux/of_pci.h
++++ b/include/linux/of_pci.h
+@@ -76,6 +76,7 @@ static inline void of_pci_check_probe_only(void) { }
+ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 			unsigned char busno, unsigned char bus_max,
+ 			struct list_head *resources, resource_size_t *io_base);
++int of_pci_get_dma_ranges(struct device_node *np, struct list_head *resources);
+ #else
+ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 			unsigned char busno, unsigned char bus_max,
+@@ -83,6 +84,12 @@ static inline int of_pci_get_host_bridge_resources(struct device_node *dev,
+ {
+ 	return -EINVAL;
+ }
++
++static inline int of_pci_get_dma_ranges(struct device_node *np,
++					struct list_head *resources)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
