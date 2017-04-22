@@ -1,40 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 21 Apr 2017 20:04:19 -0700
-Subject: [RFC PATCH 0/3] clk: introduce clk_bulk_get accessories
-In-Reply-To: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
-References: <1491969809-20154-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170422030419.GV7065@codeaurora.org>
+From: macro@linux-mips.org (Maciej W. Rozycki)
+Date: Sat, 22 Apr 2017 04:10:08 +0100 (BST)
+Subject: [RFC] minimum gcc version for kernel: raise to gcc-4.3 or 4.6?
+In-Reply-To: <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
+References: <20161216105634.235457-1-arnd@arndb.de>
+ <3302470.IDcDrWa0u6@wuerfel>
+ <CAGXu5jLPRYi+HK=07Zndc8szEKD4mZCqaHJFnHmmoYr7tA1xPw@mail.gmail.com>
+ <CAK8P3a2C2WhWjzF=HrzU15Ncg0juR+nstZukBEpqCrVNW5pnDA@mail.gmail.com>
+ <CAGXu5jLTR+dY_Ayyix5Tg0Yn9LBFAt=j56MQVdJVGue-R-CizA@mail.gmail.com>
+ <CAK8P3a114EVbnhbObfq-4pZp8XCT4fWzMXD+WkRi7iPXs1vFMA@mail.gmail.com>
+ <CAGXu5jJpofLF0qAf0-2iNTesZt-X704Q7L=DpQYdtHY5n2HD0w@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1704220400380.32200@eddie.linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12, Dong Aisheng wrote:
-> 
-> Together with the err path handling for each clocks, it does make
-> things a bit ugly.
-> 
-> Since we already have regulator_bulk_get accessories, i thought we
-> probably could introduce clk_bulk_get as well to handle such case to
-> ease the driver owners' life. 
-> 
-> Besides IMX cpufreq driver, there is also some similar cases
-> in kernel which could befinit from this api as well.
-> e.g.
-> drivers/cpufreq/tegra124-cpufreq.c
-> drivers/cpufreq/s3c2412-cpufreq.c
-> sound/soc/samsung/smdk_spdif.c
-> arch/arm/mach-omap1/serial.c
-> ...
-> 
-> And actually, if we handle clocks more than 3, then it might be
-> worthy to try, which there is quite many manay in kernel and
-> that probably could save a lot codes.
-> 
-> This is a RFC patch intending to bring up the idea to discuss.
-> 
+On Fri, 21 Apr 2017, Kees Cook wrote:
 
-Idea seems fine to me. Please also add Russell King, as we need
-an ack from him on the clk.h API changes.
+> > The linux-4.2 x86 defconfig could still be built with gcc-4.0, but
+> > later kernels have several minor problems with that, and
+> > require at least gcc-4.3.
+> >
+> > If we are ok with this status quo, we could simply declare gcc-4.3
+> > the absolute minimum version for the kernel, make gcc-4.9
+> > the recommeded minimum version, and remove all workarounds
+> > for gcc-4.2 or older.
+> 
+> I think starting with this would be a good first step. I'm not sure
+> the best way to add "recommended minimum" to
+> Documentation/process/changes.rst hmmm
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+ FWIW for some reasons (mainly the ability to avoid NPTL) I have stuck to 
+GCC 4.1.2 with some MIPS configurations and I've had no issues with that 
+compiler up to Linux 4.6.0, which is the last kernel version I have tried 
+with that compiler so far.  I could check if anything has regressed since 
+then I suppose.
+
+  Maciej
