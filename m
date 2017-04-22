@@ -1,38 +1,80 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 21 Apr 2017 18:23:33 -0700
-Subject: [PATCH v2 0/5] mtd: nand: gpmi: add i.MX 7 support
-Message-ID: <20170422012338.4635-1-stefan@agner.ch>
+Date: Fri, 21 Apr 2017 18:23:35 -0700
+Subject: [PATCH v2 2/5] mtd: nand: gpmi: add i.MX 7 SoC support
+In-Reply-To: <20170422012338.4635-1-stefan@agner.ch>
+References: <20170422012338.4635-1-stefan@agner.ch>
+Message-ID: <20170422012338.4635-3-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for i.MX 7 SoC for the GPMI NAND controller.
-There have been similar patchsets already:
-https://lkml.org/lkml/2016/2/23/912
+Add support for i.MX 7 SoC. The i.MX 7 has a slightly different
+clock architecture requiring only two clocks to be referenced.
+The IP is slightly different compared to i.MX 6, but currently none
+of this differences are in use, therefore reuse GPMI_IS_MX6.
 
-However, this patchset does not make use of any of the new features.
-The current feature set seems to work fine, I successfully run the MTD
-tests on a Colibri iMX7.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 15 +++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  7 +++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
 
---
-Stefan
-
-Changes since v1:
-- Make clks_count const
-- Introduce IS_IMX7D for i.MX 7 SoC's and make it part of GPMI_IS_MX6
-
-Stefan Agner (5):
-  mtd: nand: gpmi: unify clock handling
-  mtd: nand: gpmi: add i.MX 7 SoC support
-  mtd: gpmi: document current clock requirements
-  ARM: dts: imx7: add GPMI NAND
-  ARM: dts: imx7-colibri: add NAND support
-
- .../devicetree/bindings/mtd/gpmi-nand.txt          | 14 +++++-
- arch/arm/boot/dts/imx7-colibri.dtsi                |  9 ++++
- arch/arm/boot/dts/imx7s.dtsi                       | 31 ++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c             | 56 +++++++++++++---------
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h             |  9 +++-
- 5 files changed, 93 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index c8bbf5da2ab8..9b777be633a9 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -127,6 +127,18 @@ static const struct gpmi_devdata gpmi_devdata_imx6sx = {
+ 	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
+ };
+ 
++static const char * const gpmi_clks_for_mx7d[] = {
++	"gpmi_io", "gpmi_bch_apb",
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx7d = {
++	.type = IS_MX7D,
++	.bch_max_ecc_strength = 62,
++	.max_chain_delay = 12,
++	.clks = gpmi_clks_for_mx7d,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx7d),
++};
++
+ static irqreturn_t bch_irq(int irq, void *cookie)
+ {
+ 	struct gpmi_nand_data *this = cookie;
+@@ -2071,6 +2083,9 @@ static const struct of_device_id gpmi_nand_id_table[] = {
+ 	}, {
+ 		.compatible = "fsl,imx6sx-gpmi-nand",
+ 		.data = &gpmi_devdata_imx6sx,
++	}, {
++		.compatible = "fsl,imx7d-gpmi-nand",
++		.data = &gpmi_devdata_imx7d,
+ 	}, {}
+ };
+ MODULE_DEVICE_TABLE(of, gpmi_nand_id_table);
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+index 8879c4eff25e..e88a45a62ab6 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+@@ -123,7 +123,8 @@ enum gpmi_type {
+ 	IS_MX23,
+ 	IS_MX28,
+ 	IS_MX6Q,
+-	IS_MX6SX
++	IS_MX6SX,
++	IS_MX7D,
+ };
+ 
+ struct gpmi_devdata {
+@@ -307,6 +308,8 @@ void gpmi_copy_bits(u8 *dst, size_t dst_bit_off,
+ #define GPMI_IS_MX28(x)		((x)->devdata->type == IS_MX28)
+ #define GPMI_IS_MX6Q(x)		((x)->devdata->type == IS_MX6Q)
+ #define GPMI_IS_MX6SX(x)	((x)->devdata->type == IS_MX6SX)
++#define GPMI_IS_MX7D(x)		((x)->devdata->type == IS_MX7D)
+ 
+-#define GPMI_IS_MX6(x)		(GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x))
++#define GPMI_IS_MX6(x)		(GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) || \
++				 GPMI_IS_MX7D(x))
+ #endif
 -- 
 2.12.2
