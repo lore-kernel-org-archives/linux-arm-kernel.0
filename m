@@ -1,39 +1,25 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 21 Apr 2017 18:23:38 -0700
-Subject: [PATCH v2 5/5] ARM: dts: imx7-colibri: add NAND support
-In-Reply-To: <20170422012338.4635-1-stefan@agner.ch>
-References: <20170422012338.4635-1-stefan@agner.ch>
-Message-ID: <20170422012338.4635-6-stefan@agner.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 21 Apr 2017 19:02:33 -0700
+Subject: [PATCH V3 2/2] ARM64: dts: hi6220-hikey: Add clock binding for
+ the pmic mfd
+In-Reply-To: <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
+References: <1492449567-31399-1-git-send-email-daniel.lezcano@linaro.org>
+ <1492449567-31399-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20170422020233.GA7065@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Colibri iMX7 modules come with 512MB on-module SLC NAND flash
-populated. Make use of it by enabling the GPMI controller.
+On 04/17, Daniel Lezcano wrote:
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/hisilicon,hi655x.txt | 6 ++++++
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts             | 1 +
+>  2 files changed, 7 insertions(+)
+> 
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/imx7-colibri.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+I take it this goes through arm-soc? Not sure why I'm on To:
+line.
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 2d87489f9105..ad4ce19d455b 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -106,6 +106,15 @@
- 	fsl,magic-packet;
- };
- 
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	fsl,use-minimum-ecc;
-+	nand-on-flash-bbt;
-+	nand-ecc-mode = "hw";
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
 -- 
-2.12.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
