@@ -1,269 +1,74 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:29 +0200
-Subject: [PULL 19/79] KVM: arm/arm64: vgic: Get rid of live_lrs
+Date: Sun, 23 Apr 2017 19:09:08 +0200
+Subject: [PULL 58/79] ARM: KVM: Convert __cpu_reset_hyp_mode to using
+ __hyp_reset_vectors
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-20-cdall@linaro.org>
+Message-ID: <20170423170929.27334-59-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-There is no need to calculate and maintain live_lrs when we always
-populate the lowest numbered LRs first on every entry and clear all LRs
-on every exit.
+We are now able to use the hyp stub to reset HYP mode. Time to
+kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Tested-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- include/kvm/arm_vgic.h        |  2 --
- virt/kvm/arm/hyp/vgic-v2-sr.c | 39 ++++++++++-----------------------------
- virt/kvm/arm/hyp/vgic-v3-sr.c | 42 ++++++++++++------------------------------
- 3 files changed, 22 insertions(+), 61 deletions(-)
+ arch/arm/include/asm/kvm_asm.h  | 2 --
+ arch/arm/include/asm/kvm_host.h | 2 +-
+ arch/arm/kvm/init.S             | 2 --
+ 3 files changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index f7a2e31..ea940db 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -264,8 +264,6 @@ struct vgic_cpu {
- 	 */
- 	struct list_head ap_list_head;
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index dd16044..eae11b3 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
--	u64 live_lrs;
+ extern void __init_stage2_translation(void);
+ 
+-extern void __kvm_hyp_reset(unsigned long);
 -
- 	/*
- 	 * Members below are used with GICv3 emulation only and represent
- 	 * parts of the redistributor.
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index d3d3b9b..34b37ce 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -26,27 +26,23 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 					    void __iomem *base)
+ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+ extern u64 __vgic_v3_read_vmcr(void);
+ extern void __vgic_v3_write_vmcr(u32 vmcr);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 31ee468..adea307 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
+ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+ 					phys_addr_t phys_idmap_start)
  {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 	u32 eisr0, eisr1;
- 	int i;
- 	bool expect_mi;
- 
- 	expect_mi = !!(cpu_if->vgic_hcr & GICH_HCR_UIE);
- 
--	for (i = 0; i < nr_lr; i++) {
--		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
--				continue;
--
-+	for (i = 0; i < used_lrs && !expect_mi; i++)
- 		expect_mi |= (!(cpu_if->vgic_lr[i] & GICH_LR_HW) &&
- 			      (cpu_if->vgic_lr[i] & GICH_LR_EOI));
--	}
- 
- 	if (expect_mi) {
- 		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
- 
- 		if (cpu_if->vgic_misr & GICH_MISR_EOI) {
- 			eisr0  = readl_relaxed(base + GICH_EISR0);
--			if (unlikely(nr_lr > 32))
-+			if (unlikely(used_lrs > 32))
- 				eisr1  = readl_relaxed(base + GICH_EISR1);
- 			else
- 				eisr1 = 0;
-@@ -87,13 +83,10 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
- {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
- 	int i;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 
--	for (i = 0; i < nr_lr; i++) {
--		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
--			continue;
--
-+	for (i = 0; i < used_lrs; i++) {
- 		if (cpu_if->vgic_elrsr & (1UL << i))
- 			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
- 		else
-@@ -110,11 +103,12 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 
- 	if (!base)
- 		return;
- 
--	if (vcpu->arch.vgic_cpu.live_lrs) {
-+	if (used_lrs) {
- 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
- 
- 		save_maint_int_state(vcpu, base);
-@@ -122,8 +116,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 		save_lrs(vcpu, base);
- 
- 		writel_relaxed(0, base + GICH_HCR);
--
--		vcpu->arch.vgic_cpu.live_lrs = 0;
- 	} else {
- 		cpu_if->vgic_eisr = 0;
- 		cpu_if->vgic_elrsr = ~0UL;
-@@ -139,31 +131,20 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
- 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
- 	int i;
--	u64 live_lrs = 0;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 
- 	if (!base)
- 		return;
- 
--
--	for (i = 0; i < nr_lr; i++)
--		if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
--			live_lrs |= 1UL << i;
--
--	if (live_lrs) {
-+	if (used_lrs) {
- 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
- 		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
--		for (i = 0; i < nr_lr; i++) {
--			if (!(live_lrs & (1UL << i)))
--				continue;
--
-+		for (i = 0; i < used_lrs; i++) {
- 			writel_relaxed(cpu_if->vgic_lr[i],
- 				       base + GICH_LR0 + (i * 4));
- 		}
- 	}
--
--	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
+-	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
++	__hyp_reset_vectors();
  }
  
- #ifdef CONFIG_ARM64
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index e51ee7e..b3c36b6 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -118,18 +118,16 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
- 	}
- }
+ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index d6b2f49..fb33609 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
  
--static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu, int nr_lr)
-+static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 	int i;
- 	bool expect_mi;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+ 1:	cmp	r0, #HVC_RESET_VECTORS
+ 	bne	1f
+-ENTRY(__kvm_hyp_reset)
+ 	/* We're now in idmap, disable MMU */
+ 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
+ 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
+ exit:
+ 	eret
+ ENDPROC(__kvm_handle_stub_hvc)
+-ENDPROC(__kvm_hyp_reset)
  
- 	expect_mi = !!(cpu_if->vgic_hcr & ICH_HCR_UIE);
+ 	.ltorg
  
--	for (i = 0; i < nr_lr; i++) {
--		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
--				continue;
--
-+	for (i = 0; i < used_lrs; i++) {
- 		expect_mi |= (!(cpu_if->vgic_lr[i] & ICH_LR_HW) &&
- 			      (cpu_if->vgic_lr[i] & ICH_LR_EOI));
- 	}
-@@ -150,6 +148,7 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu, int nr_lr)
- void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 	u64 val;
- 
- 	/*
-@@ -159,23 +158,19 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	if (!cpu_if->vgic_sre)
- 		dsb(st);
- 
--	if (vcpu->arch.vgic_cpu.live_lrs) {
-+	if (used_lrs) {
- 		int i;
--		u32 max_lr_idx, nr_pri_bits;
-+		u32 nr_pri_bits;
- 
- 		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
- 
- 		write_gicreg(0, ICH_HCR_EL2);
- 		val = read_gicreg(ICH_VTR_EL2);
--		max_lr_idx = vtr_to_max_lr_idx(val);
- 		nr_pri_bits = vtr_to_nr_pri_bits(val);
- 
--		save_maint_int_state(vcpu, max_lr_idx + 1);
--
--		for (i = 0; i <= max_lr_idx; i++) {
--			if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
--				continue;
-+		save_maint_int_state(vcpu);
- 
-+		for (i = 0; i <= used_lrs; i++) {
- 			if (cpu_if->vgic_elrsr & (1 << i))
- 				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
- 			else
-@@ -203,8 +198,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		default:
- 			cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
- 		}
--
--		vcpu->arch.vgic_cpu.live_lrs = 0;
- 	} else {
- 		cpu_if->vgic_misr  = 0;
- 		cpu_if->vgic_eisr  = 0;
-@@ -232,9 +225,9 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 	u64 val;
--	u32 max_lr_idx, nr_pri_bits;
--	u16 live_lrs = 0;
-+	u32 nr_pri_bits;
- 	int i;
- 
- 	/*
-@@ -251,15 +244,9 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 	}
- 
- 	val = read_gicreg(ICH_VTR_EL2);
--	max_lr_idx = vtr_to_max_lr_idx(val);
- 	nr_pri_bits = vtr_to_nr_pri_bits(val);
- 
--	for (i = 0; i <= max_lr_idx; i++) {
--		if (cpu_if->vgic_lr[i] & ICH_LR_STATE)
--			live_lrs |= (1 << i);
--	}
--
--	if (live_lrs) {
-+	if (used_lrs) {
- 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 
- 		switch (nr_pri_bits) {
-@@ -282,12 +269,8 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 			write_gicreg(cpu_if->vgic_ap1r[0], ICH_AP1R0_EL2);
- 		}
- 
--		for (i = 0; i <= max_lr_idx; i++) {
--			if (!(live_lrs & (1 << i)))
--				continue;
--
-+		for (i = 0; i < used_lrs; i++)
- 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
--		}
- 	}
- 
- 	/*
-@@ -299,7 +282,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		isb();
- 		dsb(sy);
- 	}
--	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
- 
- 	/*
- 	 * Prevent the guest from touching the GIC system registers if
 -- 
 2.9.0
