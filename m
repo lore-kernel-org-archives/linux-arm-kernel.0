@@ -1,77 +1,80 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:25 +0200
-Subject: [PULL 75/79] KVM: arm/arm64: fix races in kvm_psci_vcpu_on
+Date: Sun, 23 Apr 2017 19:08:57 +0200
+Subject: [PULL 47/79] ARM: hyp-stub: improve ABI
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-76-cdall@linaro.org>
+Message-ID: <20170423170929.27334-48-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jones <drjones@redhat.com>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Fix potential races in kvm_psci_vcpu_on() by taking the kvm->lock
-mutex.  In general, it's a bad idea to allow more than one PSCI_CPU_ON
-to process the same target VCPU at the same time.  One such problem
-that may arise is that one PSCI_CPU_ON could be resetting the target
-vcpu, which fills the entire sys_regs array with a temporary value
-including the MPIDR register, while another looks up the VCPU based
-on the MPIDR value, resulting in no target VCPU found.  Resolves both
-races found with the kvm-unit-tests/arm/psci unit test.
+Improve the hyp-stub ABI to allow it to do more than just get/set the
+vectors.  We follow the example in ARM64, where r0 is used as an opcode
+with the other registers as an argument.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Reported-by: Levente Kurusa <lkurusa@redhat.com>
-Suggested-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Andrew Jones <drjones@redhat.com>
-Cc: stable at vger.kernel.org
+Tested-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/kvm/psci.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/kernel/hyp-stub.S | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index c2b1315..a08d7a9 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -208,9 +208,10 @@ int kvm_psci_version(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 15d073a..f3e9ba5 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -22,6 +22,9 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
  
- static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- {
--	int ret = 1;
-+	struct kvm *kvm = vcpu->kvm;
- 	unsigned long psci_fn = vcpu_get_reg(vcpu, 0) & ~((u32) 0);
- 	unsigned long val;
-+	int ret = 1;
++#define HVC_GET_VECTORS 0
++#define HVC_SET_VECTORS 1
++
+ #ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+@@ -202,9 +205,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ ENDPROC(__hyp_stub_install_secondary)
  
- 	switch (psci_fn) {
- 	case PSCI_0_2_FN_PSCI_VERSION:
-@@ -230,7 +231,9 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
- 		break;
- 	case PSCI_0_2_FN_CPU_ON:
- 	case PSCI_0_2_FN64_CPU_ON:
-+		mutex_lock(&kvm->lock);
- 		val = kvm_psci_vcpu_on(vcpu);
-+		mutex_unlock(&kvm->lock);
- 		break;
- 	case PSCI_0_2_FN_AFFINITY_INFO:
- 	case PSCI_0_2_FN64_AFFINITY_INFO:
-@@ -279,6 +282,7 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+ __hyp_stub_do_trap:
+-	cmp	r0, #-1
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
++	teq	r0, #HVC_GET_VECTORS
++	bne	1f
++	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
++	b	__hyp_stub_exit
++
++1:	teq	r0, #HVC_SET_VECTORS
++	bne	1f
++	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
++	b	__hyp_stub_exit
++
++1:	mov	r0, #-1
++
++__hyp_stub_exit:
+ 	__ERET
+ ENDPROC(__hyp_stub_do_trap)
  
- static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- {
-+	struct kvm *kvm = vcpu->kvm;
- 	unsigned long psci_fn = vcpu_get_reg(vcpu, 0) & ~((u32) 0);
- 	unsigned long val;
- 
-@@ -288,7 +292,9 @@ static int kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
- 		val = PSCI_RET_SUCCESS;
- 		break;
- 	case KVM_PSCI_FN_CPU_ON:
-+		mutex_lock(&kvm->lock);
- 		val = kvm_psci_vcpu_on(vcpu);
-+		mutex_unlock(&kvm->lock);
- 		break;
- 	default:
- 		val = PSCI_RET_NOT_SUPPORTED;
+@@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+  * initialisation entry point.
+  */
+ ENTRY(__hyp_get_vectors)
+-	mov	r0, #-1
++	mov	r0, #HVC_GET_VECTORS
++	__HVC(0)
++	ret	lr
+ ENDPROC(__hyp_get_vectors)
+-	@ fall through
++
+ ENTRY(__hyp_set_vectors)
++	mov	r1, r0
++	mov	r0, #HVC_SET_VECTORS
+ 	__HVC(0)
+ 	ret	lr
+ ENDPROC(__hyp_set_vectors)
 -- 
 2.9.0
