@@ -1,103 +1,153 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:55 +0200
-Subject: [PULL 45/79] arm64: KVM: Convert __cpu_reset_hyp_mode to using
- __hyp_reset_vectors
+Date: Sun, 23 Apr 2017 19:08:58 +0200
+Subject: [PULL 48/79] ARM: soft-reboot into same mode that we entered the
+ kernel
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-46-cdall@linaro.org>
+Message-ID: <20170423170929.27334-49-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-We are now able to use the hyp stub to reset HYP mode. Time to
-kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
+When we soft-reboot (eg, kexec) from one kernel into the next, we need
+to ensure that we enter the new kernel in the same processor mode as
+when we were entered, so that (eg) the new kernel can install its own
+hypervisor - the old kernel's hypervisor will have been overwritten.
 
+In order to do this, we need to pass a flag to cpu_reset() so it knows
+what to do, and we need to modify the kernel's own hypervisor stub to
+allow it to handle a soft-reboot.
+
+As we are always guaranteed to install our own hypervisor if we're
+entered in HYP32 mode, and KVM will have moved itself out of the way
+on kexec/normal reboot, we can assume that our hypervisor is in place
+when we want to kexec, so changing our hypervisor API should not be a
+problem.
+
+Tested-by: Keerthy <j-keerthy@ti.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: James Morse <james.morse@arm.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_asm.h  |  1 -
- arch/arm64/include/asm/kvm_host.h |  3 +--
- arch/arm64/kvm/hyp-init.S         |  2 --
- arch/arm64/kvm/hyp/hyp-entry.S    | 15 ---------------
- 4 files changed, 1 insertion(+), 20 deletions(-)
+ arch/arm/include/asm/proc-fns.h |  4 ++--
+ arch/arm/kernel/hyp-stub.S      | 13 +++++++++++++
+ arch/arm/kernel/reboot.c        |  7 +++++--
+ arch/arm/mm/proc-v7.S           | 12 ++++++++----
+ 4 files changed, 28 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index b7e4ef5..26a64d0 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -47,7 +47,6 @@ struct kvm_vcpu;
- 
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
--extern char __kvm_hyp_reset[];
- 
- extern char __kvm_hyp_vector[];
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e7705e7..0355dd1 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -362,11 +362,10 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
- }
- 
--void __kvm_hyp_teardown(void);
- static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
- 					phys_addr_t phys_idmap_start)
- {
--	kvm_call_hyp(__kvm_hyp_teardown, phys_idmap_start);
-+	__hyp_reset_vectors();
- }
- 
- static inline void kvm_arch_hardware_unsetup(void) {}
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index fded932..b7a8f12 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -134,7 +134,6 @@ ENTRY(__kvm_handle_stub_hvc)
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index 8877ad5..f2e1af4 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -43,7 +43,7 @@ extern struct processor {
  	/*
- 	 * Reset kvm back to the hyp stub.
+ 	 * Special stuff for a reset
  	 */
--ENTRY(__kvm_hyp_reset)
- 	/* We're now in idmap, disable MMU */
- 	mrs	x0, sctlr_el2
- 	ldr	x1, =SCTLR_ELx_FLAGS
-@@ -152,7 +151,6 @@ ENTRY(__kvm_hyp_reset)
+-	void (*reset)(unsigned long addr) __attribute__((noreturn));
++	void (*reset)(unsigned long addr, bool hvc) __attribute__((noreturn));
+ 	/*
+ 	 * Idle the processor
+ 	 */
+@@ -88,7 +88,7 @@ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+ #else
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
+ #endif
+-extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_reset(unsigned long addr, bool hvc) __attribute__((noreturn));
  
- exit:
- 	eret
--ENDPROC(__kvm_hyp_reset)
- ENDPROC(__kvm_handle_stub_hvc)
+ /* These three are private to arch/arm/kernel/suspend.c */
+ extern void cpu_do_suspend(void *);
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index f3e9ba5..8291523 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -24,6 +24,7 @@
  
- 	.ltorg
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 4f34c59..5170ce1 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -53,21 +53,6 @@ ENTRY(__vhe_hyp_call)
- 	ret
- ENDPROC(__vhe_hyp_call)
+ #define HVC_GET_VECTORS 0
+ #define HVC_SET_VECTORS 1
++#define HVC_SOFT_RESTART 2
  
--/*
-- * Compute the idmap address of __kvm_hyp_reset based on the idmap
-- * start passed as a parameter, and jump there.
-- *
-- * x0: HYP phys_idmap_start
-- */
--ENTRY(__kvm_hyp_teardown)
--	mov	x4, x0
--	adr_l	x3, __kvm_hyp_reset
--
--	/* insert __kvm_hyp_reset()s offset into phys_idmap_start */
--	bfi	x4, x3, #0, #PAGE_SHIFT
--	br	x4
--ENDPROC(__kvm_hyp_teardown)
--	
- el1_sync:				// Guest trapped into EL2
- 	stp	x0, x1, [sp, #-16]!
+ #ifndef ZIMAGE
+ /*
+@@ -215,6 +216,10 @@ __hyp_stub_do_trap:
+ 	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
+ 	b	__hyp_stub_exit
  
++1:	teq	r0, #HVC_SOFT_RESTART
++	bne	1f
++	bx	r3
++
+ 1:	mov	r0, #-1
+ 
+ __hyp_stub_exit:
+@@ -256,6 +261,14 @@ ENTRY(__hyp_set_vectors)
+ 	ret	lr
+ ENDPROC(__hyp_set_vectors)
+ 
++ENTRY(__hyp_soft_restart)
++	mov	r3, r0
++	mov	r0, #HVC_SOFT_RESTART
++	__HVC(0)
++	mov	r0, r3
++	ret	lr
++ENDPROC(__hyp_soft_restart)
++
+ #ifndef ZIMAGE
+ .align 2
+ .L__boot_cpu_mode_offset:
+diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+index 3fa867a..3b2aa9a 100644
+--- a/arch/arm/kernel/reboot.c
++++ b/arch/arm/kernel/reboot.c
+@@ -12,10 +12,11 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
++#include <asm/virt.h>
+ 
+ #include "reboot.h"
+ 
+-typedef void (*phys_reset_t)(unsigned long);
++typedef void (*phys_reset_t)(unsigned long, bool);
+ 
+ /*
+  * Function pointers to optional machine specific functions
+@@ -51,7 +52,9 @@ static void __soft_restart(void *addr)
+ 
+ 	/* Switch to the identity mapping. */
+ 	phys_reset = (phys_reset_t)virt_to_idmap(cpu_reset);
+-	phys_reset((unsigned long)addr);
++
++	/* original stub should be restored by kvm */
++	phys_reset((unsigned long)addr, is_hyp_mode_available());
+ 
+ 	/* Should never get here. */
+ 	BUG();
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index d00d52c..1846ca4 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -53,11 +53,15 @@ ENDPROC(cpu_v7_proc_fin)
+ 	.align	5
+ 	.pushsection	.idmap.text, "ax"
+ ENTRY(cpu_v7_reset)
+-	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+-	bic	r1, r1, #0x1			@ ...............m
+- THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
+-	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
++	mrc	p15, 0, r2, c1, c0, 0		@ ctrl register
++	bic	r2, r2, #0x1			@ ...............m
++ THUMB(	bic	r2, r2, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
++	mcr	p15, 0, r2, c1, c0, 0		@ disable MMU
+ 	isb
++#ifdef CONFIG_ARM_VIRT_EXT
++	teq	r1, #0
++	bne	__hyp_soft_restart
++#endif
+ 	bx	r0
+ ENDPROC(cpu_v7_reset)
+ 	.popsection
 -- 
 2.9.0
