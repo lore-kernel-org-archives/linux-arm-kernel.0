@@ -1,45 +1,53 @@
-From: yinghai@kernel.org (Yinghai Lu)
-Date: Sat, 22 Apr 2017 18:45:47 -0700
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu9dS4OhLbBw59yKYQmoJ8SpFexzk9yH=XfXnzn8NJ4mcg@mail.gmail.com>
-References: <CAKv+Gu-qRg8-YRCairppKrEfeLcW+OwVF8qZHp7vxXJA_AwPOw@mail.gmail.com>
- <20170330100524.GA22801@red-moon>
- <CAKv+Gu-ff98HrPK3f+E8soGJUXaaMxPLs2AuJ+rvXd0HWX-jXw@mail.gmail.com>
- <CAKv+Gu8YjySTDMgsrtGqEPMOtVhHc8gvTHZ4C5Ga8OTYdC9R3A@mail.gmail.com>
- <ae87ae28-f50d-095f-576e-f3fd7f96dea2@codeaurora.org>
- <CAKv+Gu8x0rQUnTUorknW-mW9LFgrxFYsXyy4LU_w9JbA-m_sjA@mail.gmail.com>
- <CAKv+Gu9Su0F9CSRe=sxomuDDH7c2szO6Z8dpqOQ=t_1Vn3JD3g@mail.gmail.com>
- <20170410165328.GA5248@red-moon>
- <CAKv+Gu-AN-OwnAJG5dt0Qg4GU8HxZBowTSA0H3LhNA3nHfrsQg@mail.gmail.com>
- <CAKv+Gu9dS4OhLbBw59yKYQmoJ8SpFexzk9yH=XfXnzn8NJ4mcg@mail.gmail.com>
-Message-ID: <20170423014546.GA2704@dhcp-whq-twvpn-1-vpnpool-10-159-153-149.vpn.oracle.com>
+From: bianpan2016@163.com (Pan Bian)
+Date: Sun, 23 Apr 2017 15:00:23 +0800
+Subject: [PATCH 1/1] mt7601u: check return value of alloc_skb
+Message-ID: <1492930823-17249-1-git-send-email-bianpan2016@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 10, 2017 at 06:29:27PM +0100, Ard Biesheuvel wrote:
->  /*
-> @@ -208,8 +208,8 @@ struct pci_bus *pci_acpi_scan_root(struct
-> acpi_pci_root *root)
->         if (!bus)
->                 return NULL;
-> 
-> -       pci_bus_size_bridges(bus);
-> -       pci_bus_assign_resources(bus);
-> +       pci_assign_unassigned_root_bus_resources(bus);
-> +       pci_bus_claim_resources(bus);
-> 
->         list_for_each_entry(child, &bus->children, node)
->                 pcie_bus_configure_settings(child);
->
+Function alloc_skb() will return a NULL pointer if there is no enough
+memory. However, in function mt7601u_mcu_msg_alloc(), its return value
+is not validated before it is used. This patch fixes it.
 
-looks like those two lines are reversed. you should use:
-                pcibios_resource_survey_bus(bus);
-                pci_assign_unassigned_root_bus_resources(bus);
+Signed-off-by: Pan Bian <bianpan2016@163.com>
+---
+ drivers/net/wireless/mediatek/mt7601u/mcu.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-please check x86 pcibios_resource_survey_bus() definition in
-	arch/x86/pci/i386.c
-
-but pci_bus_claim_resources() should work too.
-
-Yinghai
+diff --git a/drivers/net/wireless/mediatek/mt7601u/mcu.c b/drivers/net/wireless/mediatek/mt7601u/mcu.c
+index dbdfb3f..a9f5f39 100644
+--- a/drivers/net/wireless/mediatek/mt7601u/mcu.c
++++ b/drivers/net/wireless/mediatek/mt7601u/mcu.c
+@@ -66,8 +66,10 @@ static inline void trace_mt_mcu_msg_send_cs(struct mt7601u_dev *dev,
+ 	WARN_ON(len % 4); /* if length is not divisible by 4 we need to pad */
+ 
+ 	skb = alloc_skb(len + MT_DMA_HDR_LEN + 4, GFP_KERNEL);
+-	skb_reserve(skb, MT_DMA_HDR_LEN);
+-	memcpy(skb_put(skb, len), data, len);
++	if (skb) {
++		skb_reserve(skb, MT_DMA_HDR_LEN);
++		memcpy(skb_put(skb, len), data, len);
++	}
+ 
+ 	return skb;
+ }
+@@ -170,6 +172,8 @@ static int mt7601u_mcu_function_select(struct mt7601u_dev *dev,
+ 	};
+ 
+ 	skb = mt7601u_mcu_msg_alloc(dev, &msg, sizeof(msg));
++	if (!skb)
++		return -ENOMEM;
+ 	return mt7601u_mcu_msg_send(dev, skb, CMD_FUN_SET_OP, func == 5);
+ }
+ 
+@@ -205,6 +209,8 @@ int mt7601u_mcu_tssi_read_kick(struct mt7601u_dev *dev, int use_hvga)
+ 	};
+ 
+ 	skb = mt7601u_mcu_msg_alloc(dev, &msg, sizeof(msg));
++	if (!skb)
++		return -ENOMEM;
+ 	return mt7601u_mcu_msg_send(dev, skb, CMD_CALIBRATION_OP, true);
+ }
+ 
+-- 
+1.9.1
