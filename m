@@ -1,129 +1,53 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:08:32 +0200
-Subject: [PULL 22/79] KVM: arm/arm64: vgic: Get rid of unnecessary
- save_maint_int_state
+Date: Sun, 23 Apr 2017 19:08:38 +0200
+Subject: [PULL 28/79] arm64: KVM: PMU: Inject UNDEF exception on illegal
+ register access
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-23-cdall@linaro.org>
+Message-ID: <20170423170929.27334-29-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Now when we don't look at the MISR and EISR values anymore, we can get
-rid of the logic to save them in the GIC save/restore code.
+Both pmu_*_el0_disabled() and pmu_counter_idx_valid() perform checks
+on the validity of an access, but only return a boolean indicating
+if the access is valid or not.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Let's allow these functions to also inject an UNDEF exception if
+the access was illegal.
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v2-sr.c | 40 ----------------------------------------
- virt/kvm/arm/hyp/vgic-v3-sr.c | 29 -----------------------------
- 2 files changed, 69 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index 34b37ce..a4c3bb0 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -22,45 +22,6 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 036efc97..750c129 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -465,6 +465,9 @@ static bool check_pmu_access_disabled(struct kvm_vcpu *vcpu, u64 flags)
+ 	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
+ 	bool enabled = (reg & flags) || vcpu_mode_priv(vcpu);
  
--static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
--					    void __iomem *base)
--{
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
--	u32 eisr0, eisr1;
--	int i;
--	bool expect_mi;
--
--	expect_mi = !!(cpu_if->vgic_hcr & GICH_HCR_UIE);
--
--	for (i = 0; i < used_lrs && !expect_mi; i++)
--		expect_mi |= (!(cpu_if->vgic_lr[i] & GICH_LR_HW) &&
--			      (cpu_if->vgic_lr[i] & GICH_LR_EOI));
--
--	if (expect_mi) {
--		cpu_if->vgic_misr = readl_relaxed(base + GICH_MISR);
--
--		if (cpu_if->vgic_misr & GICH_MISR_EOI) {
--			eisr0  = readl_relaxed(base + GICH_EISR0);
--			if (unlikely(used_lrs > 32))
--				eisr1  = readl_relaxed(base + GICH_EISR1);
--			else
--				eisr1 = 0;
--		} else {
--			eisr0 = eisr1 = 0;
--		}
--	} else {
--		cpu_if->vgic_misr = 0;
--		eisr0 = eisr1 = 0;
--	}
--
--#ifdef CONFIG_CPU_BIG_ENDIAN
--	cpu_if->vgic_eisr = ((u64)eisr0 << 32) | eisr1;
--#else
--	cpu_if->vgic_eisr = ((u64)eisr1 << 32) | eisr0;
--#endif
--}
--
- static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-@@ -111,7 +72,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	if (used_lrs) {
- 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
- 
--		save_maint_int_state(vcpu, base);
- 		save_elrsr(vcpu, base);
- 		save_lrs(vcpu, base);
- 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index b3c36b6..41bbbb0 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -118,33 +118,6 @@ static void __hyp_text __gic_v3_set_lr(u64 val, int lr)
- 	}
++	if (!enabled)
++		kvm_inject_undefined(vcpu);
++
+ 	return !enabled;
  }
  
--static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu)
--{
--	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
--	int i;
--	bool expect_mi;
--	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
--
--	expect_mi = !!(cpu_if->vgic_hcr & ICH_HCR_UIE);
--
--	for (i = 0; i < used_lrs; i++) {
--		expect_mi |= (!(cpu_if->vgic_lr[i] & ICH_LR_HW) &&
--			      (cpu_if->vgic_lr[i] & ICH_LR_EOI));
--	}
--
--	if (expect_mi) {
--		cpu_if->vgic_misr  = read_gicreg(ICH_MISR_EL2);
--
--		if (cpu_if->vgic_misr & ICH_MISR_EOI)
--			cpu_if->vgic_eisr = read_gicreg(ICH_EISR_EL2);
--		else
--			cpu_if->vgic_eisr = 0;
--	} else {
--		cpu_if->vgic_misr = 0;
--		cpu_if->vgic_eisr = 0;
--	}
--}
--
- void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -168,8 +141,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 		val = read_gicreg(ICH_VTR_EL2);
- 		nr_pri_bits = vtr_to_nr_pri_bits(val);
+@@ -564,8 +567,10 @@ static bool pmu_counter_idx_valid(struct kvm_vcpu *vcpu, u64 idx)
  
--		save_maint_int_state(vcpu);
--
- 		for (i = 0; i <= used_lrs; i++) {
- 			if (cpu_if->vgic_elrsr & (1 << i))
- 				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
+ 	pmcr = vcpu_sys_reg(vcpu, PMCR_EL0);
+ 	val = (pmcr >> ARMV8_PMU_PMCR_N_SHIFT) & ARMV8_PMU_PMCR_N_MASK;
+-	if (idx >= val && idx != ARMV8_PMU_CYCLE_IDX)
++	if (idx >= val && idx != ARMV8_PMU_CYCLE_IDX) {
++		kvm_inject_undefined(vcpu);
+ 		return false;
++	}
+ 
+ 	return true;
+ }
 -- 
 2.9.0
