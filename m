@@ -1,61 +1,89 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 23 Apr 2017 19:09:14 +0200
-Subject: [PULL 64/79] ARM: decompressor: Remove __hyp_get_vectors usage
+Date: Sun, 23 Apr 2017 19:09:20 +0200
+Subject: [PULL 70/79] KVM: arm/arm64: Cleanup the arch timer code's irqchip
+ checking
 In-Reply-To: <20170423170929.27334-1-cdall@linaro.org>
 References: <20170423170929.27334-1-cdall@linaro.org>
-Message-ID: <20170423170929.27334-65-cdall@linaro.org>
+Message-ID: <20170423170929.27334-71-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-When the compressed image needs to be relocated to avoid being
-overwritten by the decompression process, we need to relocate
-the hyp vectors as well so that we can find them once the
-decompression has taken effect.
+Currently we check if we have an in-kernel irqchip and if the vgic was
+properly implemented several places in the arch timer code.  But, we
+already predicate our enablement of the arm timers on having a valid
+and initialized gic, so we can simply check if the timers are enabled or
+not.
 
-For that, we perform the following calculation:
-	u32 v = __hyp_get_vectors();
-	v += offset;
-	__hyp_set_vectors(v);
+This also gets rid of the ugly "error that's not an error but used to
+signal that the timer shouldn't poke the gic" construct we have.
 
-But we're guaranteed that the initial value of v as returned by
-__hyp_get_vectors is always __hyp_stub_vectors, because we have
-just set it by calling __hyp_stub_install.
-
-So let's remove the use of __hyp_get_vectors, and directly use
-__hyp_stub_vectors instead.
-
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Alexander Graf <agraf@suse.de>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/boot/compressed/head.S | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ virt/kvm/arm/arch_timer.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 9150f97..7c711ba 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -422,7 +422,17 @@ dtb_check_done:
- 		cmp	r0, #HYP_MODE
- 		bne	1f
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 35d7100..363f0d2 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -189,8 +189,6 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ {
+ 	int ret;
  
--		bl	__hyp_get_vectors
-+		/*
-+		 * Compute the address of the hyp vectors after relocation.
-+		 * This requires some arithmetic since we cannot directly
-+		 * reference __hyp_stub_vectors in a PC-relative way.
-+		 * Call __hyp_set_vectors with the new address so that we
-+		 * can HVC again after the copy.
-+		 */
-+0:		adr	r0, 0b
-+		movw	r1, #:lower16:__hyp_stub_vectors - 0b
-+		movt	r1, #:upper16:__hyp_stub_vectors - 0b
-+		add	r0, r0, r1
- 		sub	r0, r0, r5
- 		add	r0, r0, r10
- 		bl	__hyp_set_vectors
+-	BUG_ON(!vgic_initialized(vcpu->kvm));
+-
+ 	timer_ctx->active_cleared_last = false;
+ 	timer_ctx->irq.level = new_level;
+ 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+@@ -205,7 +203,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+  * Check if there was a change in the timer state (should we raise or lower
+  * the line level to the GIC).
+  */
+-static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
++static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+@@ -217,16 +215,14 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	 * because the guest would never see the interrupt.  Instead wait
+ 	 * until we call this function from kvm_timer_flush_hwstate.
+ 	 */
+-	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+-		return -ENODEV;
++	if (!timer->enabled)
++		return;
+ 
+ 	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
+ 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+ 
+ 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+ 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+-
+-	return 0;
+ }
+ 
+ /* Schedule the background timer for the emulated timer. */
+@@ -295,13 +291,16 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+  */
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ {
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	bool phys_active;
+ 	int ret;
+ 
+-	if (kvm_timer_update_state(vcpu))
++	if (unlikely(!timer->enabled))
+ 		return;
+ 
++	kvm_timer_update_state(vcpu);
++
+ 	/* Set the background timer for the physical timer emulation. */
+ 	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
+ 
 -- 
 2.9.0
